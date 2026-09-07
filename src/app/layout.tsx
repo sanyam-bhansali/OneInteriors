@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     template: '%s · One Interiors',
   },
   description:
-    'Find a verified interior studio in Pune, matched to your home, your budget and how you like to work. Your money stays in escrow until each stage is approved.',
+    'Find a verified interior studio in Pune, matched to your home, your budget and how you like to work. We set the milestone plan and verify every stage against photographs from your site.',
   // See src/lib/site.ts — an unset NEXT_PUBLIC_* arrives as '' on Vercel, and
   // `?? fallback` does not catch that. Do not inline this back.
   metadataBase: siteUrl(),

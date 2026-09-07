@@ -144,7 +144,7 @@ function scoreWorkingStyle(brief: Brief, studio: Studio): number | null {
 
 function scoreDeliveryReliability(studio: Studio): number | null {
   // The cold-start factor. Null until the studio has run projects through OUR
-  // escrow — exactly the data that makes Tier 3 uncopiable, and exactly the
+  // monitored milestone plan — exactly the data that makes Tier 3 uncopiable,
   // data we will not have on day one. Say so rather than invent it.
   if (studio.completedProjects < MIN_PROJECTS_FOR_RELIABILITY) return null;
   if (studio.avgVarianceDays === null) return null;
@@ -268,7 +268,7 @@ function buildReasoning(brief: Brief, studio: Studio, breakdown: FactorScores): 
     );
   } else {
     lines.push(
-      `${name} has not completed a project through our escrow yet, so we have no delivery record for them.`,
+      `${name} has not completed a project with us yet, so we have no delivery record for them.`,
     );
   }
 

@@ -282,7 +282,7 @@ export const STUDIOS: Studio[] = [
     legalName: 'Openplan Studio',
     tradeName: 'Openplan Studio',
     about:
-      'New practice founded by two architects. No completed projects through our escrow yet — their score reflects only what we could verify.',
+      'New practice founded by two architects. No completed projects with us yet — their score reflects only what we could verify.',
     city: 'pune',
     localities: ['baner', 'balewadi', 'wakad', 'hinjewadi', 'ravet'],
     status: 'ACTIVE',

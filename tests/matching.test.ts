@@ -68,7 +68,18 @@ describe('cold start — the honesty rule', () => {
   it('says so in the reasoning when there is no delivery record', () => {
     const permissive: Brief = { ...baseBrief, locality: 'kothrud', styleDislikes: [] };
     const result = scoreMatch(permissive, noRecord)!;
-    expect(result.reasoning.join(' ')).toMatch(/not completed a project through our escrow/i);
+    expect(result.reasoning.join(' ')).toMatch(/no delivery record for them/i);
+  });
+
+  // v1 does not hold client funds. Until escrow ships, nothing the matching
+  // engine says to a customer may imply that it does. See docs/FUTURE-SCOPE.md.
+  it('never claims we hold money', () => {
+    const permissive: Brief = { ...baseBrief, locality: 'kothrud', styleDislikes: [] };
+    for (const studio of STUDIOS) {
+      const result = scoreMatch(permissive, studio);
+      if (!result) continue;
+      expect(result.reasoning.join(' ')).not.toMatch(/escrow/i);
+    }
   });
 });
 

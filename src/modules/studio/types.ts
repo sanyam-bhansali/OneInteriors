@@ -101,7 +101,7 @@ export const TIER_DESCRIPTIONS: Record<VerificationTier, string> = {
   UNVERIFIED: 'Not yet checked.',
   LISTED: 'Identity and address confirmed by our team.',
   VERIFIED: 'Identity, GST filing history, references and two site inspections confirmed.',
-  PROVEN: 'Everything in Verified, plus a delivery record built on projects completed through our escrow.',
+  PROVEN: 'Everything in Verified, plus a delivery record built on projects we monitored stage by stage.',
 };
 
 export const CHECK_LABELS: Record<CheckType, string> = {
@@ -139,7 +139,7 @@ export function hasDeliveryRecord(studio: Studio): boolean {
  */
 export function describeDelivery(studio: Studio): string {
   if (!hasDeliveryRecord(studio)) {
-    return 'No delivery record yet — this studio has not completed a project through our escrow.';
+    return 'No delivery record yet — this studio has not completed a project with us.';
   }
   const d = Math.round(studio.avgVarianceDays as number);
   if (d <= 0) {

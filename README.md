@@ -6,6 +6,8 @@ to be wrapped with Capacitor for Play Store and App Store from the same codebase
 - **How we work:** [`CONTRIBUTING.md`](./CONTRIBUTING.md) — branching, versioning, bug policy
 - **Architecture:** [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
 - **Dependencies:** [`docs/DEPENDENCIES.md`](./docs/DEPENDENCIES.md) — why anything is pinned or overridden
+- **Future scope:** [`docs/FUTURE-SCOPE.md`](./docs/FUTURE-SCOPE.md) — what's deferred, why, and the trigger to build it
+- **Quotation builder:** [`docs/QUOTATION-BUILDER.md`](./docs/QUOTATION-BUILDER.md) — planned Sprint 5–6
 
 ---
 
@@ -88,15 +90,21 @@ undo, and the studios shown are still fixtures.
 
 | Route | State |
 |---|---|
-| `/` | Landing. Escrow-first promise, proof strip computed from real fixture rows. |
+| `/` | Landing. Verification + monitored-milestone promise, proof strip computed from real fixture rows. |
 | `/quiz` | The 9-question brief with live profile panel. Session-scoped, no signup. |
 | `/match` | Reveal (comprehension before the ask) + ranked studios with reasoning. |
 | `/studios` | The full roster. |
 | `/studios/[slug]` | Profile: track record, 12-check verification list with sources and dates, tagged portfolio. |
 | `/verification` | How verification works and what it does not prove. |
 
-**Not built yet** — escrow, contracts, milestones, quotation builder, studio
-dashboard, ops console, auth. See the sprint plan in the build plan document.
+**Not built yet** — auth, ops console, project tracker, quotation builder,
+studio dashboard. See `docs/FUTURE-SCOPE.md`.
+
+> **v1 does not hold client funds.** We author the milestone plan, verify each
+> stage against site photographs, and publish the variance — the customer pays
+> the studio directly. Escrow is a later phase. No copy anywhere in this product
+> may imply otherwise until it ships; that constraint is recorded in
+> `FUTURE-SCOPE.md` and in `MilestoneTrack.tsx`.
 
 ---
 

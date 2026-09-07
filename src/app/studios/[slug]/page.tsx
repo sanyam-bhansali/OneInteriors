@@ -84,7 +84,7 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
             </p>
             <div className="grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-4">
               <Stat
-                label="Completed through our escrow"
+                label="Completed with us"
                 value={studio.completedProjects > 0 ? String(studio.completedProjects) : null}
                 empty="None yet"
               />
@@ -120,7 +120,7 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
             <p className="m-0 mt-5 max-w-[64ch] border-t border-[var(--color-rule)] pt-4 text-[14px] leading-relaxed text-[var(--color-ink-2)]">
               {describeDelivery(studio)}{' '}
               {studio.completedProjects === 0
-                ? 'These figures only exist once a studio has run projects through our escrow, which is how we measure them — so a new studio shows nothing here rather than an estimate.'
+                ? 'These figures only exist once a studio has completed a project on a milestone plan we monitored — so a new studio shows nothing here rather than an estimate.'
                 : 'Every figure here is computed from milestone approvals, not self-reported.'}
             </p>
           </Container>

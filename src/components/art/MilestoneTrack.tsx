@@ -1,11 +1,15 @@
 /**
- * The escrow mechanic, drawn.
+ * The milestone plan, drawn.
  *
- * This is the single most important idea on the site and it was previously
- * three paragraphs of prose. A diagram earns its place here because the thing
- * being explained is a *sequence with a gate in it* — money sits, evidence
- * arrives, the customer opens the gate, money moves. Prose makes that abstract;
+ * A diagram earns its place because the thing being explained is a *sequence
+ * with a gate in it* — a stage is built, evidence arrives, we check it against
+ * the quote, the customer releases the next payment. Prose makes that abstract;
  * a track makes it obvious.
+ *
+ * NOTE ON WORDING — v1 does NOT hold funds. The customer pays the studio
+ * directly against this schedule; we author it, verify each stage, and publish
+ * the variance. Escrow is a later phase (see docs/FUTURE-SCOPE.md). Nothing in
+ * this component may imply we are holding money until that ships.
  *
  * Values are a real split of a ₹8,50,000 contract using DEFAULT_MILESTONES,
  * computed through splitAcross so the parts genuinely sum to the whole.
@@ -50,10 +54,10 @@ export function MilestoneTrack({ className = '' }: { className?: string }) {
                   <p className="m-0 text-[14.5px] leading-snug text-[var(--color-ink)]">{m.title}</p>
                   <p className="m-0 font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-[0.1em] text-[var(--color-ink-3)]">
                     {state === 'approved'
-                      ? 'Approved · released'
+                      ? 'Verified · you released payment'
                       : state === 'awaiting'
-                        ? 'Photos uploaded · your approval'
-                        : 'Held in escrow'}
+                        ? 'Photos in · checking against the quote'
+                        : 'Not due yet'}
                   </p>
                 </div>
                 <span
@@ -87,7 +91,7 @@ function Marker({ state }: { state: 'approved' | 'awaiting' | 'pending' }) {
     return (
       <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[var(--color-ontrack)] text-[11px] leading-none text-[var(--color-paper)]">
         <span aria-hidden="true">✓</span>
-        <span className="sr-only">Approved and released</span>
+        <span className="sr-only">Verified and paid</span>
       </span>
     );
   }
@@ -95,13 +99,13 @@ function Marker({ state }: { state: 'approved' | 'awaiting' | 'pending' }) {
     return (
       <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border-2 border-[var(--color-brass)] bg-[var(--color-brass-soft)] text-[11px] leading-none text-[var(--color-brass)]">
         <span aria-hidden="true">◍</span>
-        <span className="sr-only">Awaiting your approval</span>
+        <span className="sr-only">Evidence in, being checked</span>
       </span>
     );
   }
   return (
     <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border-2 border-dashed border-[var(--color-rule)] bg-transparent">
-      <span className="sr-only">Held in escrow</span>
+      <span className="sr-only">Not due yet</span>
     </span>
   );
 }

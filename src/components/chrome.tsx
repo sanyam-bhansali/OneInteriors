@@ -54,7 +54,7 @@ export function SiteFooter() {
               One Interiors
             </p>
             <p className="m-0 text-[14px] leading-relaxed text-[var(--color-ink-2)]">
-              Verified interior studios in Pune, matched to your home and paid through escrow.
+              Verified interior studios in Pune, matched to your home and held to a milestone plan.
             </p>
           </div>
 

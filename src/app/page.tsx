@@ -52,14 +52,14 @@ export default function LandingPage() {
                 </div>
                 {/* Measure is capped so the headline breaks where it means to,
                     rather than wherever the viewport happens to run out. */}
-                <h1 className="rise rise-2 display mb-6 max-w-[13ch]">
-                  Your money stays put until the work is{' '}
-                  <span className="text-[var(--color-petrol)]">right</span>.
+                <h1 className="rise rise-2 display mb-6 max-w-[14ch]">
+                  Verified studios, on a plan we{' '}
+                  <span className="text-[var(--color-petrol)]">hold them to</span>.
                 </h1>
                 <p className="rise rise-3 lede mb-8">
-                  Answer nine questions about your home. We match you to verified interior studios in
-                  Pune, show you exactly why each one fits, and hold every rupee in escrow until you
-                  approve each stage of the work.
+                  Answer nine questions about your home. We match you to interior studios in Pune
+                  we&rsquo;ve actually checked, show you exactly why each one fits, then set the
+                  milestone plan and verify every stage against photographs from your site.
                 </p>
                 <div className="rise rise-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-5">
                   <Button href="/quiz" size="lg">
@@ -84,7 +84,7 @@ export default function LandingPage() {
           <Container size="wide">
             <dl className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4">
               <ProofStat value={String(verified)} label="Studios verified" />
-              <ProofStat value={String(completed)} label="Projects completed through escrow" />
+              <ProofStat value={String(completed)} label="Projects completed with us" />
               <ProofStat
                 value={avgVariance === null ? '—' : `${avgVariance > 0 ? '+' : ''}${avgVariance}d`}
                 label="Average variance to committed date"
@@ -128,23 +128,31 @@ export default function LandingPage() {
           <Container size="wide">
             <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-16">
               <div>
-                <Eyebrow>Why we hold the money</Eyebrow>
+                <Eyebrow>How we stay involved</Eyebrow>
                 <h2 className="h2 mb-5">
                   The usual complaint about interiors in India is not the design.
                 </h2>
                 <p className="m-0 mb-4 text-[var(--color-ink-2)]">
                   It is a project three months late. Plywood quoted, MDF delivered. An advance that
                   does not come back. Almost none of it is a matchmaking problem — it all happens
-                  after the contract is signed.
+                  after the contract is signed. Which is why we don&rsquo;t hand you a phone number
+                  and disappear.
                 </p>
                 <p className="m-0 mb-4 text-[var(--color-ink-2)]">
-                  So we sit on the payment rail rather than beside it. Your project is split into
-                  milestones. The studio uploads site photographs and material invoices when a stage
-                  is done. You approve, and only then does that money move.
+                  Before work starts we set the milestone plan with you and the studio, with a date
+                  and a value against each stage. You pay the studio directly. At every stage they
+                  upload site photographs and material invoices, and we check the work matches what
+                  was quoted before you release the next payment.
                 </p>
-                <p className="m-0 text-[var(--color-ink-2)]">
-                  It is also how we can measure what actually happened — which is where every
-                  delivery figure on this site comes from.
+                <p className="m-0 mb-5 text-[var(--color-ink-2)]">
+                  If a stage slips, it is on the record — and every delivery figure on this site is
+                  built from exactly that.
+                </p>
+                <p className="m-0 rounded-[10px] border border-[var(--color-brass)] bg-[var(--color-brass-soft)] px-4 py-3 text-[14.5px] leading-relaxed text-[var(--color-ink-2)]">
+                  <strong className="text-[var(--color-ink)]">Coming next:</strong> we&rsquo;re
+                  building escrow, so payments will sit with a licensed partner and release only on
+                  your approval. Today we verify and hold the schedule — we do not hold your money,
+                  and we won&rsquo;t say otherwise until we do.
                 </p>
               </div>
 
@@ -239,8 +247,8 @@ export default function LandingPage() {
               />
               <Step
                 n="04"
-                title="Pay into escrow"
-                body="Milestones, not a lump-sum advance. Money releases when you approve the stage against photographs from the site."
+                title="Pay against milestones"
+                body="A schedule with a date and a value per stage, not a lump-sum advance. You release each payment once we've checked the work against the quote."
               />
             </ol>
           </Container>
