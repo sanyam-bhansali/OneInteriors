@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Instrument_Serif, Public_Sans, IBM_Plex_Mono } from 'next/font/google';
+import { siteUrl } from '@/lib/site';
 import './globals.css';
 
 const display = Instrument_Serif({
@@ -29,7 +30,9 @@ export const metadata: Metadata = {
   },
   description:
     'Find a verified interior studio in Pune, matched to your home, your budget and how you like to work. Your money stays in escrow until each stage is approved.',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'),
+  // See src/lib/site.ts — an unset NEXT_PUBLIC_* arrives as '' on Vercel, and
+  // `?? fallback` does not catch that. Do not inline this back.
+  metadataBase: siteUrl(),
   openGraph: {
     type: 'website',
     locale: 'en_IN',

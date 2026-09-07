@@ -73,7 +73,7 @@ Semver, on the whole application: `MAJOR.MINOR.PATCH`.
 Version bumps are generated, never hand-edited. Tag on `main`:
 
 ```bash
-pnpm release          # reads commits, bumps, writes CHANGELOG.md, tags
+npm version <major|minor|patch>   # bumps package.json and tags
 git push --follow-tags
 ```
 
@@ -173,14 +173,43 @@ A PR is not done until all of these are true.
 - [ ] Keyboard reachable, visible focus, labelled inputs
 - [ ] Renders correctly in light and dark
 - [ ] No secrets, no PII in logs, no raw IPs — hash them
-- [ ] Money in paise as `BigInt`. **No floats in a money path, ever.**
+- [ ] Environment variables read with `||` / a truthiness check, **never `??`** — see below
+- [ ] Money as **integer paise** via `src/lib/money.ts`. **No floats in a money path, ever.** Use `applyBps` for rates and `splitAcross` for milestones — never a bare `*` or `/`
 - [ ] Currency renders in the Indian system: `₹8,50,000` not `₹850,000`
 - [ ] Strings go through the i18n layer — Marathi and Hindi are phase 3 and retrofitting is miserable
 - [ ] Anything a customer sees that makes a claim about a studio is backed by a real row, not a placeholder
 
 ---
 
-## 8. Module boundaries
+## 8. Environment variables — the `??` trap
+
+This one already cost us a broken production deploy, so it is a rule rather
+than a preference.
+
+```ts
+// WRONG — fails on Vercel, works locally
+new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000')
+
+// RIGHT
+import { siteUrl } from '@/lib/site';
+```
+
+`NEXT_PUBLIC_*` variables are inlined at **build** time. A variable that is
+merely *declared* but empty — which is what Vercel provides for unset public
+vars — arrives as `''`, not `undefined`. `??` only catches `null` and
+`undefined`, so the fallback never fires, and `new URL('')` throws
+`ERR_INVALID_URL` during page-data collection.
+
+It passes locally because there the variable is genuinely undefined. That
+asymmetry is exactly what makes it dangerous: local green, deploy red.
+
+**Read env vars with a truthiness check, and never let a bad value throw at
+module scope.** `src/lib/site.ts` is the pattern to copy — resolve, trim,
+degrade to a safe default, and cover it with tests.
+
+---
+
+## 9. Module boundaries
 
 `src/modules/*` is the domain layer. Each module owns its logic and exposes a
 public surface through its `index.ts`.
@@ -211,7 +240,7 @@ modules/
 
 ---
 
-## 9. Environments
+## 10. Environments
 
 | Env | Branch | Data | Payments |
 |---|---|---|---|
