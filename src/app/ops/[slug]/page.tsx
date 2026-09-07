@@ -5,9 +5,12 @@ import { Container, TierBadge, Pill, Divider } from '@/components/ui';
 import { studioRepository } from '@/modules/studio/repository';
 import { assessTier, hasExpired, REAUDIT_MONTHS } from '@/modules/verification/tiers';
 import { validateGstin } from '@/modules/verification/gstin';
-import { CHECK_LABELS, TIER_CHECKS, type CheckResult, type VerificationCheck } from '@/modules/studio/types';
+import { CHECK_LABELS, TIER_CHECKS, type Studio } from '@/modules/studio/types';
 import { formatINRCompact } from '@/lib/money';
 import { OpsHeader, TierProgress } from '../ui';
+import { CheckRow } from './CheckRow';
+import { StatusControl } from './StatusControl';
+import { studioAuditTrail } from '@/modules/verification/record';
 
 export const metadata: Metadata = {
   title: 'Studio verification',
@@ -31,6 +34,7 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
   const assessment = assessTier(studio);
   const gstin = studio.gstin ? validateGstin(studio.gstin) : null;
   const now = new Date();
+  const trail = await studioAuditTrail(studio.id, 20);
 
   return (
     <>
@@ -112,13 +116,13 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
                 <CheckList
                   title="Tier 1 — Identity"
                   types={TIER_CHECKS.LISTED}
-                  studioChecks={studio.checks}
+                  studio={studio}
                   now={now}
                 />
                 <CheckList
                   title={`Tier 2 — Trading history · re-audit every ${REAUDIT_MONTHS} months`}
                   types={TIER_CHECKS.VERIFIED}
-                  studioChecks={studio.checks}
+                  studio={studio}
                   now={now}
                 />
               </section>
@@ -170,6 +174,37 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
                   Tier is computed from these, never set by hand. To change how a studio is treated,
                   change its status — not its tier.
                 </p>
+
+                <Divider className="my-4" />
+                <StatusControl studioId={studio.id} slug={studio.slug} status={studio.status} />
+              </div>
+
+              {/* Who changed what, when. The appeal the /verification page
+                  promises is unanswerable without this. */}
+              <div className="mt-4 rounded-[10px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-5">
+                <p className="label m-0 mb-3">Recent activity</p>
+                {trail.length === 0 ? (
+                  <p className="m-0 text-[13.5px] italic text-[var(--color-ink-3)]">
+                    Nothing recorded yet.
+                  </p>
+                ) : (
+                  <ol className="m-0 flex list-none flex-col gap-2.5 p-0">
+                    {trail.map((e) => (
+                      <li key={e.id} className="text-[12.5px] leading-snug">
+                        <span className="font-[family-name:var(--font-mono)] text-[var(--color-ink)]">
+                          {e.action}
+                        </span>
+                        <br />
+                        <span className="text-[var(--color-ink-3)]">
+                          {e.actorName} ·{' '}
+                          {new Date(e.createdAt).toLocaleString('en-IN', {
+                            day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                          })}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
               </div>
             </aside>
           </div>
@@ -182,66 +217,39 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
 function CheckList({
   title,
   types,
-  studioChecks,
+  studio,
   now,
 }: {
   title: string;
   types: readonly (keyof typeof CHECK_LABELS)[];
-  studioChecks: VerificationCheck[];
+  studio: Studio;
   now: Date;
 }) {
-  const map = new Map(studioChecks.map((c) => [c.type, c]));
+  const map = new Map(studio.checks.map((c) => [c.type, c]));
   return (
     <div className="mb-6">
       <p className="m-0 mb-2 text-[13px] font-bold text-[var(--color-ink-2)]">{title}</p>
       <ul className="m-0 list-none rounded-[10px] border border-[var(--color-rule)] p-0">
         {types.map((t, i) => {
           const check = map.get(t);
-          const expired = check ? hasExpired(check, now) : false;
-          const result: CheckResult = expired ? 'EXPIRED' : (check?.result ?? 'PENDING');
           return (
-            <li
+            <CheckRow
               key={t}
-              className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2.5 ${
-                i > 0 ? 'border-t border-[var(--color-rule-soft)]' : ''
-              }`}
-            >
-              <span className="flex items-center gap-2.5 text-[14px] text-[var(--color-ink)]">
-                <ResultDot result={result} />
-                {CHECK_LABELS[t]}
-              </span>
-              <span className="font-[family-name:var(--font-mono)] text-[11.5px] text-[var(--color-ink-3)]">
-                {check?.source ?? '—'}
-                {check?.checkedAt
-                  ? ` · ${new Date(check.checkedAt).toLocaleDateString('en-IN', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    })}`
-                  : ''}
-              </span>
-            </li>
+              studioId={studio.id}
+              slug={studio.slug}
+              type={t}
+              label={CHECK_LABELS[t]}
+              result={check?.result ?? 'PENDING'}
+              source={check?.source ?? null}
+              notes={check?.detail ?? null}
+              checkedAt={check?.checkedAt ?? null}
+              expired={check ? hasExpired(check, now) : false}
+              isLast={i === types.length - 1}
+            />
           );
         })}
       </ul>
     </div>
-  );
-}
-
-function ResultDot({ result }: { result: CheckResult }) {
-  const map: Record<CheckResult, { cls: string; glyph: string }> = {
-    PASS: { cls: 'text-[var(--color-ontrack)]', glyph: '●' },
-    PENDING: { cls: 'text-[var(--color-brass)]', glyph: '◍' },
-    FAIL: { cls: 'text-[var(--color-atrisk)]', glyph: '✕' },
-    EXPIRED: { cls: 'text-[var(--color-atrisk)]', glyph: '◍' },
-    NOT_APPLICABLE: { cls: 'text-[var(--color-ink-3)]', glyph: '–' },
-  };
-  const { cls, glyph } = map[result];
-  return (
-    <span className={`text-[12px] leading-none ${cls}`} title={result}>
-      <span aria-hidden="true">{glyph}</span>
-      <span className="sr-only">{result}</span>
-    </span>
   );
 }
 
