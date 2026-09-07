@@ -34,9 +34,12 @@ enum UserRole {
 
 model User {
   id            String    @id @default(cuid())
-  phone         String    @unique // E.164, +91XXXXXXXXXX — primary identity, WhatsApp OTP
+  /// E.164. Primary identity for customers (WhatsApp OTP). Optional because ops
+  /// and studio staff sign in by email before a phone is ever collected.
+  phone         String?   @unique
   phoneVerified DateTime?
   email         String?   @unique
+  emailVerified DateTime?
   name          String?
   role          UserRole  @default(CUSTOMER)
   locale        String    @default("en-IN")
@@ -60,27 +63,47 @@ model Session {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token     String   @unique
+  /// SHA-256 of the session token. The cookie holds the plaintext; the database
+  /// never does, so a dump cannot be replayed as a login.
+  tokenHash String   @unique
   userAgent String?
   ipHash    String? // hashed, never raw — DPDP minimisation
   expiresAt DateTime
+  lastUsedAt DateTime @default(now())
+  revokedAt DateTime?
   createdAt DateTime @default(now())
 
   @@index([userId])
+  @@index([expiresAt])
   @@map("sessions")
 }
 
-model OtpChallenge {
-  id         String    @id @default(cuid())
-  phone      String
-  codeHash   String
-  attempts   Int       @default(0)
+enum AuthChannel {
+  EMAIL
+  WHATSAPP
+}
+
+/// One model for both sign-in routes. Email magic links carry ops and studio
+/// staff today; WhatsApp OTP carries customers when Meta approval lands. The
+/// verification flow is identical either way, so it should not be two code
+/// paths that drift.
+model LoginChallenge {
+  id         String      @id @default(cuid())
+  /// Email address or E.164 phone, normalised.
+  identifier String
+  channel    AuthChannel
+  /// SHA-256 of the token. The plaintext exists only in the email/SMS — a
+  /// database leak must not hand someone a working sign-in link.
+  tokenHash  String      @unique
+  attempts   Int         @default(0)
   consumedAt DateTime?
   expiresAt  DateTime
-  createdAt  DateTime  @default(now())
+  ipHash     String?
+  createdAt  DateTime    @default(now())
 
-  @@index([phone, createdAt])
-  @@map("otp_challenges")
+  @@index([identifier, createdAt])
+  @@index([expiresAt])
+  @@map("login_challenges")
 }
 
 // DPDP Act 2023 — consent is per-purpose, versioned, and withdrawable.

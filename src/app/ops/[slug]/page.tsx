@@ -14,10 +14,14 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export async function generateStaticParams() {
-  const slugs = await studioRepository.allSlugs();
-  return slugs.map((slug) => ({ slug }));
-}
+/**
+ * Never prerendered. The auth check in ops/layout.tsx already forces this
+ * dynamic (it reads cookies), but stating it removes the ambiguity: an
+ * authenticated page listing legal names and GSTINs should never have build-time
+ * HTML sitting in the deployment artifact, and `generateStaticParams` here
+ * would enumerate every studio slug for no benefit.
+ */
+export const dynamic = 'force-dynamic';
 
 export default async function OpsStudio({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

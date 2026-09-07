@@ -1,37 +1,30 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 /**
- * Stopgap gate on /ops.
+ * Cheap pre-filter for /ops.
  *
- * The ops console has no authentication yet — that is OI-3 (WhatsApp OTP) plus
- * a role check. Until then this blocks the route anywhere that isn't local
- * development, so an internal verification queue cannot be reached from a
- * public deploy by anyone who guesses the URL.
+ * The real gate is `src/app/ops/layout.tsx`, which reads the session and the
+ * user's current role from Postgres. This only checks that a session cookie
+ * exists at all — middleware runs on the edge runtime and cannot reach the
+ * database, so anything it decided about *identity* would have to trust an
+ * unverified claim.
  *
- * This is a lock on the door, not a security model. Delete it in the same PR
- * that adds real auth — and do not relax it before then, because "just for the
- * demo" is how an unauthenticated admin surface reaches production.
+ * So: no cookie, no point rendering. A cookie present means the layout does the
+ * actual work. Do not add authorisation logic here.
  */
-export function middleware(_request: NextRequest) {
-  // An EXPLICIT allowed value, not truthiness.
-  //
-  // On Vercel NODE_ENV is always 'production', so this one variable is the
-  // whole gate. `Boolean(process.env.OPS_PREVIEW)` would open it for the
-  // strings "false", "0" and "off" — and setting it to "false" is exactly what
-  // someone would do to turn it off. Only the literal "1" opens it.
-  const allowOps =
-    process.env.NODE_ENV === 'development' || process.env.OPS_PREVIEW?.trim() === '1';
+export function middleware(request: NextRequest) {
+  const hasSessionCookie = Boolean(request.cookies.get('oi_session')?.value);
 
-  if (!allowOps) {
-    return new NextResponse('Not found', { status: 404 });
+  if (!hasSessionCookie) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/sign-in';
+    url.search = '';
+    return NextResponse.redirect(url);
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  // '/ops' is listed separately from '/ops/:path*'. The quantifier probably
-  // covers the bare path, but "probably" is not good enough for the gate on an
-  // unauthenticated admin index that lists legal names and GSTINs.
   matcher: ['/ops', '/ops/:path*'],
 };
