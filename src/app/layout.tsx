@@ -49,10 +49,9 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover', // safe-area insets for the wrapped app
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f5f6f3' },
-    { media: '(prefers-color-scheme: dark)', color: '#111415' },
-  ],
+  // Single value: the product is light-only by design (see globals.css).
+  themeColor: '#fdf9f2',
+  colorScheme: 'light',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

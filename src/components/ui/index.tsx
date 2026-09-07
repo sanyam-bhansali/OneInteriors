@@ -58,7 +58,7 @@ export function Button({
   const sizes = size === 'lg' ? 'px-7 py-3.5 text-[15px]' : 'px-5 py-2.5 text-sm';
   const variants = {
     primary:
-      'bg-[var(--color-petrol)] text-[var(--color-paper)] hover:bg-[var(--color-petrol-deep)] dark:text-[#17130f] dark:hover:opacity-90',
+      'bg-[var(--color-petrol)] text-[var(--color-paper)] hover:bg-[var(--color-petrol-deep)]',
     secondary:
       'border border-[var(--color-rule)] bg-[var(--color-paper-2)] text-[var(--color-ink)] hover:border-[var(--color-ink-3)]',
     ghost: 'bg-transparent text-[var(--color-petrol)] hover:underline underline-offset-4 px-0',

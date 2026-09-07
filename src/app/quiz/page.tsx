@@ -42,6 +42,7 @@ import { loadBrief, saveBrief } from '@/modules/brief/store';
 import { STUDIOS } from '@/data/studios';
 import { rankStudios } from '@/modules/matching/score';
 import { StyleScene, MaterialSwatches } from '@/components/art/StyleScene';
+import { Wordmark } from '@/components/brand';
 import {
   IconStudio,
   IconApartment2,
@@ -159,13 +160,11 @@ export default function QuizPage() {
       <header className="sticky top-0 z-10 border-b border-[var(--color-rule)] bg-[var(--color-paper)]">
         <Container size="wide">
           <div className="flex items-center justify-between gap-4 py-3.5">
-            <Link href="/" className="no-underline">
-              <span className="font-[family-name:var(--font-display)] text-[19px] text-[var(--color-ink)]">
-                One Interiors
-              </span>
+            <Link href="/" className="no-underline" aria-label="One Interiors, home">
+              <Wordmark showCity={false} />
             </Link>
-            <span className="tabular font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-ink-3)]">
-              {step} / {TOTAL_STEPS}
+            <span className="tabular label m-0">
+              Question {step} of {TOTAL_STEPS}
             </span>
           </div>
         </Container>
@@ -185,12 +184,22 @@ export default function QuizPage() {
 
       <main className="flex-1 py-10 sm:py-14">
         <Container size="wide">
-          {/* Split: the question holds the left, the options cluster on the right. */}
-          <div key={step} className="rise grid grid-cols-1 gap-9 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-16">
-            <QuestionStep step={step} brief={brief} update={update} />
+          {/* Three tracks on a wide screen: the question and its running
+              confirmation on the left, the options on the right. The panel is
+              the thing that makes the quiz feel like it is listening, so it
+              sits with the question rather than being tucked away. */}
+          <div className="grid grid-cols-1 gap-9 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-14">
+            <div key={`q-${step}`} className="rise flex flex-col gap-8">
+              <QuestionStep step={step} brief={brief} update={update} slot="ask" />
+              <LiveProfile brief={brief} matchCount={matchCount} className="hidden lg:block" />
+            </div>
+
+            <div key={`o-${step}`} className="rise rise-1 min-w-0">
+              <QuestionStep step={step} brief={brief} update={update} slot="options" />
+            </div>
           </div>
 
-          <div className="mt-12 flex flex-wrap items-center gap-3 border-t border-[var(--color-rule)] pt-6">
+          <div className="mt-10 flex flex-wrap items-center gap-3 border-t border-[var(--color-rule)] pt-6">
             <Button variant="secondary" onClick={back}>
               Back
             </Button>
@@ -198,17 +207,14 @@ export default function QuizPage() {
               {step === TOTAL_STEPS ? 'See my matches' : 'Continue'}
             </Button>
             {!canAdvance ? (
-              <span className="text-[13.5px] text-[var(--color-ink-3)]">Pick an answer to continue</span>
+              <span className="text-[13.5px] text-[var(--color-ink-3)]">
+                Pick an answer to continue
+              </span>
             ) : null}
-            <span className="ml-auto hidden items-baseline gap-2 sm:flex">
-              <span className="tabular font-[family-name:var(--font-display)] text-[24px] leading-none text-[var(--color-petrol)]">
-                {matchCount}
-              </span>
-              <span className="text-[13px] text-[var(--color-ink-3)]">
-                studio{matchCount === 1 ? '' : 's'} still match
-              </span>
-            </span>
           </div>
+
+          {/* On narrow screens the panel follows the options instead. */}
+          <LiveProfile brief={brief} matchCount={matchCount} className="mt-8 lg:hidden" />
         </Container>
       </main>
     </div>
@@ -217,23 +223,45 @@ export default function QuizPage() {
 
 // ── Steps ──────────────────────────────────────────────────────
 
+/**
+ * Each step yields two pieces: the question (left column) and the controls
+ * (right column). Keeping them defined together means the copy and the inputs
+ * it refers to can never drift apart, while still rendering into separate
+ * tracks of the layout.
+ */
+type StepParts = { ask: React.ReactNode; options: React.ReactNode };
+
 function QuestionStep({
   step,
   brief,
   update,
+  slot,
 }: {
   step: number;
   brief: Brief;
   update: (patch: Partial<Brief>) => void;
+  slot: 'ask' | 'options';
 }) {
+  const parts = stepContent(step, brief, update);
+  if (!parts) return null;
+  return <>{slot === 'ask' ? parts.ask : parts.options}</>;
+}
+
+function stepContent(
+  step: number,
+  brief: Brief,
+  update: (patch: Partial<Brief>) => void,
+): StepParts | null {
   switch (step) {
     case 1:
-      return (
-        <>
+      return {
+        ask: (
           <Ask
             title="First — what kind of home are we working with?"
-            hint="And which part of Pune it's in, so we only show you studios who actually work there."
+            hint="And where in Pune it is, so we only show you studios who actually work there."
           />
+        ),
+        options: (
           <div className="flex flex-col gap-8">
             <TileRow>
               {(Object.keys(PROPERTY_LABELS) as PropertyType[]).map((k) => (
@@ -279,16 +307,18 @@ function QuestionStep({
               </div>
             </div>
           </div>
-        </>
-      );
+        ),
+      };
 
     case 2:
-      return (
-        <>
+      return {
+        ask: (
           <Ask
             title="How much of it are we doing?"
             hint="You can widen this later with your studio — nothing here is fixed."
           />
+        ),
+        options: (
           <TileRow>
             {(Object.keys(SCOPE_LABELS) as ScopeType[]).map((k) => (
               <CircleTile
@@ -300,19 +330,21 @@ function QuestionStep({
               />
             ))}
           </TileRow>
-        </>
-      );
+        ),
+      };
 
     case 3:
-      return <BudgetStep brief={brief} update={update} />;
+      return budgetStep(brief, update);
 
     case 4:
-      return (
-        <>
+      return {
+        ask: (
           <Ask
             title="Which of these feel like your home?"
             hint="Pick three, on instinct. Don't overthink it — we'll tell you what you chose afterwards."
           />
+        ),
+        options: (
           <div>
             <StylePicker
               selected={brief.styleLikes}
@@ -321,7 +353,7 @@ function QuestionStep({
               onChange={(styleLikes) => update({ styleLikes })}
             />
             {brief.styleLikes.length === 3 ? (
-              <p className="mt-5 rounded-[3px] bg-[var(--color-terracotta-soft)] px-4 py-3 text-[15px] leading-relaxed text-[var(--color-ink-2)]">
+              <p className="mt-5 rounded-[10px] bg-[var(--color-terracotta-soft)] px-4 py-3 text-[15px] leading-relaxed text-[var(--color-ink-2)]">
                 So you lean{' '}
                 <strong className="font-bold text-[var(--color-ink)]">
                   {brief.styleLikes.map((t) => STYLE_LABELS[t]).join(', ')}
@@ -330,16 +362,18 @@ function QuestionStep({
               </p>
             ) : null}
           </div>
-        </>
-      );
+        ),
+      };
 
     case 5:
-      return (
-        <>
+      return {
+        ask: (
           <Ask
             title="And which two would you never want?"
             hint="Higher signal than what you like. Almost nobody asks this, and it rules studios out completely."
           />
+        ),
+        options: (
           <StylePicker
             selected={brief.styleDislikes}
             max={2}
@@ -347,22 +381,24 @@ function QuestionStep({
             tone="exclude"
             onChange={(styleDislikes) => update({ styleDislikes })}
           />
-        </>
-      );
+        ),
+      };
 
     case 6:
-      return <HouseholdStep brief={brief} update={update} />;
+      return householdStep(brief, update);
 
     case 7:
-      return <PriorityStep brief={brief} update={update} />;
+      return priorityStep(brief, update);
 
     case 8:
-      return (
-        <>
+      return {
+        ask: (
           <Ask
             title="How involved do you want to be?"
             hint="The most common reason a project goes wrong is a mismatch here — not a mismatch in taste."
           />
+        ),
+        options: (
           <TileRow>
             {(Object.keys(INVOLVEMENT_LABELS) as Involvement[]).map((k) => (
               <CircleTile
@@ -374,16 +410,18 @@ function QuestionStep({
               />
             ))}
           </TileRow>
-        </>
-      );
+        ),
+      };
 
     case 9:
-      return (
-        <>
+      return {
+        ask: (
           <Ask
             title="Last one — when do you want to move in?"
             hint="An honest date helps far more than an optimistic one."
           />
+        ),
+        options: (
           <div>
             <input
               type="date"
@@ -391,21 +429,21 @@ function QuestionStep({
               onChange={(e) => update({ moveInBy: e.target.value || null })}
               className="tabular rounded-full border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-5 py-3 text-[15px] text-[var(--color-ink)]"
             />
-            <p className="mt-5 max-w-[50ch] text-[14.5px] leading-relaxed text-[var(--color-ink-3)]">
+            <p className="mt-5 max-w-[48ch] text-[14.5px] leading-relaxed text-[var(--color-ink-3)]">
               A full-home project in Pune usually runs 70 to 130 days from sign-off. If your date is
               tighter than that, we&rsquo;ll say so — rather than quietly match you to someone who
               will miss it.
             </p>
           </div>
-        </>
-      );
+        ),
+      };
 
     default:
       return null;
   }
 }
 
-function BudgetStep({ brief, update }: { brief: Brief; update: (p: Partial<Brief>) => void }) {
+function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
   const lakhs = brief.budgetMaxPaise ? Math.round(brief.budgetMaxPaise / 100 / 100_000) : 8;
 
   function setLakhs(v: number) {
@@ -415,14 +453,16 @@ function BudgetStep({ brief, update }: { brief: Brief; update: (p: Partial<Brief
     });
   }
 
-  return (
-    <>
+  return {
+    ask: (
       <Ask
         title="What are you planning to spend?"
         hint="A range is fine, and it isn't a commitment. It just stops us showing you studios who don't work at your level."
       />
+    ),
+    options: (
       <div className="max-w-lg">
-        <div className="tabular mb-4 font-[family-name:var(--font-display)] text-[clamp(34px,6vw,50px)] leading-none text-[var(--color-ink)]">
+        <div className="tabular mb-4 font-[family-name:var(--font-display)] text-[clamp(34px,6vw,50px)] leading-none tracking-[-0.02em] text-[var(--color-ink)]">
           {formatINRCompact(lakhsToPaise(lakhs * 0.8))} – {formatINRCompact(lakhsToPaise(lakhs))}
         </div>
         <input
@@ -435,19 +475,19 @@ function BudgetStep({ brief, update }: { brief: Brief; update: (p: Partial<Brief
           className="w-full accent-[var(--color-petrol)]"
           aria-label="Budget in lakhs"
         />
-        <div className="tabular mt-1 flex justify-between font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-[0.1em] text-[var(--color-ink-3)]">
+        <div className="label mt-1 flex justify-between">
           <span>₹2 L</span>
           <span>₹40 L</span>
         </div>
 
         {/* Anchoring + expectation setting. Killing an unqualified lead here is
             far cheaper for everyone than killing it at the quotation. */}
-        <p className="mt-6 rounded-[3px] bg-[var(--color-paper-2)] px-4 py-3.5 text-[15px] leading-relaxed text-[var(--color-ink-2)]">
+        <p className="mt-6 rounded-[10px] bg-[var(--color-paper-2)] px-4 py-3.5 text-[15px] leading-relaxed text-[var(--color-ink-2)]">
           {budgetGuidance(lakhs)}
         </p>
       </div>
-    </>
-  );
+    ),
+  };
 }
 
 function budgetGuidance(lakhs: number): string {
@@ -462,7 +502,7 @@ function budgetGuidance(lakhs: number): string {
   return 'Bespoke territory. Custom furniture, imported hardware and a longer design phase. Expect five to six months.';
 }
 
-function HouseholdStep({ brief, update }: { brief: Brief; update: (p: Partial<Brief>) => void }) {
+function householdStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
   const h = brief.household ?? {
     adults: 2,
     children: 0,
@@ -472,16 +512,34 @@ function HouseholdStep({ brief, update }: { brief: Brief; update: (p: Partial<Br
   };
   const set = (patch: Partial<typeof h>) => update({ household: { ...h, ...patch } });
 
-  return (
-    <>
+  return {
+    ask: (
       <Ask
         title="Who's going to live there?"
-        hint="This drives the practical side of the match — storage, durability, how the space gets used."
+        hint="This drives the practical side of the match — storage, durability, how the space actually gets used."
       />
+    ),
+    options: (
       <div className="flex max-w-lg flex-col gap-4">
-        <Counter label="Adults" Icon={IconAdults} value={h.adults} onChange={(adults) => set({ adults })} min={1} />
-        <Counter label="Children" Icon={IconChildren} value={h.children} onChange={(children) => set({ children })} />
-        <Counter label="Parents / elderly" Icon={IconElderly} value={h.elderly} onChange={(elderly) => set({ elderly })} />
+        <Counter
+          label="Adults"
+          Icon={IconAdults}
+          value={h.adults}
+          onChange={(adults) => set({ adults })}
+          min={1}
+        />
+        <Counter
+          label="Children"
+          Icon={IconChildren}
+          value={h.children}
+          onChange={(children) => set({ children })}
+        />
+        <Counter
+          label="Parents / elderly"
+          Icon={IconElderly}
+          value={h.elderly}
+          onChange={(elderly) => set({ elderly })}
+        />
 
         <div className="mt-1 flex flex-wrap gap-2">
           <Chip selected={h.pets} onClick={() => set({ pets: !h.pets })} Icon={IconPets}>
@@ -496,22 +554,24 @@ function HouseholdStep({ brief, update }: { brief: Brief; update: (p: Partial<Br
           </Chip>
         </div>
       </div>
-    </>
-  );
+    ),
+  };
 }
 
-function PriorityStep({ brief, update }: { brief: Brief; update: (p: Partial<Brief>) => void }) {
+function priorityStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
   const ranked = brief.priorityRanking;
   const remaining = (Object.keys(PRIORITY_LABELS) as PriorityFactor[]).filter(
     (k) => !ranked.includes(k),
   );
 
-  return (
-    <>
+  return {
+    ask: (
       <Ask
         title="If you had to give one of these up, which goes first?"
         hint="Tap them in order, most important first. This single answer does more matching work than any other."
       />
+    ),
+    options: (
       <div className="flex max-w-lg flex-col gap-2.5">
         {ranked.map((k, i) => {
           const Icon = PRIORITY_ICONS[k];
@@ -527,9 +587,7 @@ function PriorityStep({ brief, update }: { brief: Brief; update: (p: Partial<Bri
               </span>
               <Icon className="h-6 w-6 shrink-0 text-[var(--color-petrol)]" />
               <span className="flex-1">{PRIORITY_LABELS[k]}</span>
-              <span className="font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-[0.1em] text-[var(--color-ink-3)]">
-                Remove
-              </span>
+              <span className="label m-0">Remove</span>
             </button>
           );
         })}
@@ -549,7 +607,89 @@ function PriorityStep({ brief, update }: { brief: Brief; update: (p: Partial<Bri
           );
         })}
       </div>
-    </>
+    ),
+  };
+}
+
+/**
+ * The running confirmation. This is what makes the quiz feel like it is
+ * listening rather than collecting — the user watches their own brief assemble
+ * itself, and the studio count move, as they answer. It is the strongest
+ * anti-dropout device in the flow, which is why it sits beside the question
+ * rather than below the fold.
+ */
+function LiveProfile({
+  brief,
+  matchCount,
+  className = '',
+}: {
+  brief: Brief;
+  matchCount: number;
+  className?: string;
+}) {
+  const rows: Array<[string, string]> = [];
+
+  if (brief.propertyType) {
+    const loc = PUNE_LOCALITIES.find((l) => l.slug === brief.locality)?.label;
+    rows.push(['Home', `${PROPERTY_LABELS[brief.propertyType]}${loc ? ` · ${loc}` : ''}`]);
+  }
+  if (brief.scope) rows.push(['Scope', SCOPE_LABELS[brief.scope]]);
+  if (brief.budgetMinPaise && brief.budgetMaxPaise) {
+    rows.push([
+      'Budget',
+      `${formatINRCompact(brief.budgetMinPaise)} – ${formatINRCompact(brief.budgetMaxPaise)}`,
+    ]);
+  }
+  if (brief.styleLikes.length) {
+    rows.push(['Leaning', brief.styleLikes.map((t) => STYLE_LABELS[t]).join(', ')]);
+  }
+  if (brief.styleDislikes.length) {
+    rows.push(['Ruled out', brief.styleDislikes.map((t) => STYLE_LABELS[t]).join(', ')]);
+  }
+  if (brief.household) {
+    const h = brief.household;
+    const parts = [`${h.adults} adult${h.adults === 1 ? '' : 's'}`];
+    if (h.children) parts.push(`${h.children} child${h.children === 1 ? '' : 'ren'}`);
+    if (h.elderly) parts.push(`${h.elderly} elderly`);
+    if (h.pets) parts.push('pets');
+    if (h.worksFromHome) parts.push('WFH');
+    rows.push(['Household', parts.join(', ')]);
+  }
+  if (brief.priorityRanking.length) {
+    rows.push(['Priority', PRIORITY_LABELS[brief.priorityRanking[0]]]);
+  }
+  if (brief.involvement) rows.push(['Working style', INVOLVEMENT_LABELS[brief.involvement]]);
+
+  return (
+    <aside
+      className={`rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-5 ${className}`}
+    >
+      <p className="label m-0 mb-4">Your brief so far</p>
+
+      {rows.length === 0 ? (
+        <p className="m-0 text-[14px] italic text-[var(--color-ink-3)]">
+          This fills in as you answer.
+        </p>
+      ) : (
+        <dl className="m-0 flex flex-col gap-3.5">
+          {rows.map(([k, v]) => (
+            <div key={k} className="flex flex-col gap-0.5">
+              <dt className="label m-0">{k}</dt>
+              <dd className="m-0 text-[14.5px] leading-snug text-[var(--color-ink)]">{v}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      <div className="mt-5 flex items-baseline gap-2 border-t border-[var(--color-rule)] pt-4">
+        <span className="tabular font-[family-name:var(--font-display)] text-[30px] leading-none text-[var(--color-petrol)]">
+          {matchCount}
+        </span>
+        <span className="text-[13.5px] text-[var(--color-ink-2)]">
+          studio{matchCount === 1 ? '' : 's'} still match
+        </span>
+      </div>
+    </aside>
   );
 }
 
@@ -557,15 +697,9 @@ function PriorityStep({ brief, update }: { brief: Brief; update: (p: Partial<Bri
 
 function Ask({ title, hint }: { title: string; hint?: string }) {
   return (
-    <div className="lg:pt-6">
-      <h1 className="m-0 mb-4 font-[family-name:var(--font-display)] text-[clamp(30px,5.2vw,48px)] font-normal leading-[1.06] tracking-[-0.01em]">
-        {title}
-      </h1>
-      {hint ? (
-        <p className="m-0 max-w-[44ch] text-[16px] leading-relaxed text-[var(--color-ink-2)]">
-          {hint}
-        </p>
-      ) : null}
+    <div className="lg:pt-4">
+      <h1 className="h1 mb-4 max-w-[16ch]">{title}</h1>
+      {hint ? <p className="m-0 max-w-[42ch] text-[16px] leading-relaxed text-[var(--color-ink-2)]">{hint}</p> : null}
     </div>
   );
 }

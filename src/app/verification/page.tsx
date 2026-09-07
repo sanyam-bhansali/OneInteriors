@@ -20,7 +20,7 @@ export default function VerificationPage() {
             <p className="m-0 mb-3 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-ink-3)]">
               How we verify
             </p>
-            <h1 className="m-0 mb-5 font-[family-name:var(--font-display)] text-[clamp(30px,6vw,50px)] font-normal leading-[1.05]">
+            <h1 className="display mb-5 max-w-[17ch]">
               There is no such thing as a licensed interior designer in India.
             </h1>
             <p className="m-0 text-[17px] leading-relaxed text-[var(--color-ink-2)]">
@@ -33,7 +33,7 @@ export default function VerificationPage() {
 
         <section className="border-b border-[var(--color-rule)] py-10">
           <Container size="narrow">
-            <h2 className="m-0 mb-4 font-[family-name:var(--font-display)] text-[28px] font-normal">
+            <h2 className="h2 mb-4">
               So we verify what can actually be verified.
             </h2>
             <p className="m-0 mb-4 text-[var(--color-ink-2)]">
@@ -72,7 +72,7 @@ export default function VerificationPage() {
             />
 
             <div className="mt-10 border-l-2 border-[var(--color-brass)] pl-5">
-              <h3 className="m-0 mb-2 text-[16px] font-bold">What we do when it goes wrong</h3>
+              <h3 className="h3 mb-2">What we do when it goes wrong</h3>
               <p className="m-0 mb-3 text-[15px] leading-relaxed text-[var(--color-ink-2)]">
                 A studio is suspended while a serious dispute is investigated, and removed
                 permanently for material misrepresentation, a pattern of upheld disputes, or
@@ -118,7 +118,7 @@ function Tier({
         <span className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.13em] text-[var(--color-ink-3)]">
           {n}
         </span>
-        <h3 className="m-0 font-[family-name:var(--font-display)] text-[26px] font-normal leading-none">
+        <h3 className="h2">
           {name}
         </h3>
       </div>

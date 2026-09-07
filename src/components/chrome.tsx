@@ -1,31 +1,40 @@
 import Link from 'next/link';
 import { Container } from '@/components/ui';
+import { Wordmark, Mark } from '@/components/brand';
+
+const NAV = [
+  { href: '/studios', label: 'Studios' },
+  { href: '/verification', label: 'How we verify' },
+];
 
 export function SiteHeader() {
   return (
-    <header className="border-b border-[var(--color-rule)]">
-      <Container>
+    <header className="border-b border-[var(--color-rule)] bg-[var(--color-paper)]">
+      <Container size="wide">
         <div className="flex items-center justify-between gap-4 py-4">
-          <Link href="/" className="no-underline">
-            <span className="font-[family-name:var(--font-display)] text-[21px] leading-none text-[var(--color-ink)]">
-              One Interiors
-            </span>
-            <span className="ml-2 font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-[0.14em] text-[var(--color-ink-3)]">
-              Pune
-            </span>
+          <Link href="/" className="no-underline" aria-label="One Interiors, home">
+            <Wordmark />
           </Link>
-          <nav className="flex items-center gap-5">
+
+          {/* Sentence case, not all-caps: the nav should read as words, not as
+              a control panel. All-caps mono is reserved for labels on data. */}
+          <nav className="flex items-center gap-6">
+            {NAV.map((item, i) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`text-[14.5px] text-[var(--color-ink-2)] no-underline transition-colors hover:text-[var(--color-petrol)] ${
+                  i === 1 ? 'hidden sm:inline' : ''
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
             <Link
-              href="/studios"
-              className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-ink-2)] no-underline hover:text-[var(--color-petrol)]"
+              href="/quiz"
+              className="rounded-full bg-[var(--color-petrol)] px-4 py-2 text-[14px] font-medium text-[var(--color-paper)] no-underline transition-colors hover:bg-[var(--color-petrol-deep)]"
             >
-              Studios
-            </Link>
-            <Link
-              href="/verification"
-              className="hidden font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-ink-2)] no-underline hover:text-[var(--color-petrol)] sm:inline"
-            >
-              How we verify
+              Start
             </Link>
           </nav>
         </div>
@@ -36,35 +45,44 @@ export function SiteHeader() {
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-[var(--color-ink)] py-10">
-      <Container>
-        <div className="flex flex-col gap-6 sm:flex-row sm:justify-between">
-          <div className="max-w-[46ch]">
-            <p className="m-0 mb-2 font-[family-name:var(--font-display)] text-[19px] leading-none">
+    <footer className="border-t border-[var(--color-ink)] bg-[var(--color-paper-2)] py-12">
+      <Container size="wide">
+        <div className="flex flex-col gap-9 sm:flex-row sm:justify-between sm:gap-12">
+          <div className="max-w-[42ch]">
+            <Mark className="mb-3 h-7 w-7 text-[var(--color-petrol)]" />
+            <p className="m-0 mb-2 font-[family-name:var(--font-display)] text-[20px] leading-none">
               One Interiors
             </p>
-            <p className="m-0 text-[13px] leading-relaxed text-[var(--color-ink-3)]">
+            <p className="m-0 text-[14px] leading-relaxed text-[var(--color-ink-2)]">
               Verified interior studios in Pune, matched to your home and paid through escrow.
             </p>
           </div>
-          <nav className="flex flex-col gap-2 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em]">
-            <Link href="/studios" className="text-[var(--color-ink-2)] no-underline hover:text-[var(--color-petrol)]">
-              Studios
-            </Link>
-            <Link href="/verification" className="text-[var(--color-ink-2)] no-underline hover:text-[var(--color-petrol)]">
-              How we verify
-            </Link>
-            <Link href="/quiz" className="text-[var(--color-ink-2)] no-underline hover:text-[var(--color-petrol)]">
-              Start
+
+          <nav className="flex flex-col gap-2.5">
+            <p className="label m-0 mb-1">Pages</p>
+            {NAV.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="text-[14px] text-[var(--color-ink-2)] no-underline hover:text-[var(--color-petrol)]"
+              >
+                {item.label}
+              </Link>
+            ))}
+            <Link
+              href="/quiz"
+              className="text-[14px] text-[var(--color-ink-2)] no-underline hover:text-[var(--color-petrol)]"
+            >
+              Start the brief
             </Link>
           </nav>
         </div>
 
         {/* Pre-launch honesty notice. Remove when real studios are onboarded. */}
-        <p className="mt-8 max-w-[70ch] border-t border-[var(--color-rule-soft)] pt-5 font-[family-name:var(--font-mono)] text-[11px] leading-relaxed text-[var(--color-ink-3)]">
+        <p className="m-0 mt-10 max-w-[74ch] border-t border-[var(--color-rule)] pt-6 text-[13px] leading-relaxed text-[var(--color-ink-3)]">
           Pre-launch build. The studios shown are placeholder records used to develop and review the
-          product — they are not real businesses and the registration numbers are not real. No data
-          entered here is stored or sent anywhere.
+          product — they are not real businesses and the registration numbers are not real. Nothing
+          you enter here is stored or sent anywhere.
         </p>
       </Container>
     </footer>

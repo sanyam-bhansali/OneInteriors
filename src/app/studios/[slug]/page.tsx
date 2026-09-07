@@ -59,7 +59,7 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
           <Container>
             <div className="flex flex-wrap items-start justify-between gap-5">
               <div className="min-w-0 flex-1">
-                <h1 className="m-0 mb-2 font-[family-name:var(--font-display)] text-[clamp(30px,5vw,44px)] font-normal leading-[1.05]">
+                <h1 className="h1 mb-2">
                   {studio.tradeName}
                 </h1>
                 <p className="m-0 mb-4 max-w-[58ch] text-[16px] leading-relaxed text-[var(--color-ink-2)]">
@@ -132,7 +132,7 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
             <p className="m-0 mb-2 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-ink-3)]">
               What we verified
             </p>
-            <h2 className="m-0 mb-2 font-[family-name:var(--font-display)] text-[28px] font-normal">
+            <h2 className="h2 mb-2">
               Twelve checks, each with a source and a date.
             </h2>
             <p className="m-0 mb-7 max-w-[62ch] text-[15px] leading-relaxed text-[var(--color-ink-2)]">
@@ -168,7 +168,7 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
             <p className="m-0 mb-2 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-ink-3)]">
               Work
             </p>
-            <h2 className="m-0 mb-7 font-[family-name:var(--font-display)] text-[28px] font-normal">
+            <h2 className="h2 mb-7">
               {studio.portfolio.length} projects, with budgets and timelines attached.
             </h2>
 

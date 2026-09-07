@@ -32,7 +32,7 @@ export default function StudiosPage() {
             <p className="m-0 mb-3 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-ink-3)]">
               The roster · Pune
             </p>
-            <h1 className="m-0 mb-4 max-w-[20ch] font-[family-name:var(--font-display)] text-[clamp(32px,6vw,52px)] font-normal leading-[1.05]">
+            <h1 className="display mb-5 max-w-[15ch]">
               {STUDIOS.length} studios. That is the whole list.
             </h1>
             <p className="m-0 max-w-[58ch] text-[17px] leading-relaxed text-[var(--color-ink-2)]">
@@ -55,7 +55,7 @@ export default function StudiosPage() {
                   />
                   <div className="flex flex-1 flex-col gap-3 border-t border-[var(--color-rule)] p-5">
                     <div>
-                      <h2 className="m-0 mb-2 text-[17px] font-bold leading-snug">
+                      <h2 className="h3 mb-2">
                         <Link
                           href={`/studios/${s.slug}`}
                           className="text-[var(--color-ink)] no-underline hover:text-[var(--color-petrol)]"
@@ -90,7 +90,7 @@ export default function StudiosPage() {
             </ul>
 
             <div className="mt-10 border-t border-[var(--color-rule)] pt-8">
-              <h2 className="m-0 mb-3 font-[family-name:var(--font-display)] text-[26px] font-normal">
+              <h2 className="h2 mb-3">
                 Not sure which one?
               </h2>
               <p className="m-0 mb-6 max-w-[52ch] text-[var(--color-ink-2)]">

@@ -45,43 +45,42 @@ export default function LandingPage() {
           <div className="grid-ground grid-ground-fade absolute inset-0" aria-hidden="true" />
 
           <Container size="wide" className="relative">
-            <div className="grid grid-cols-1 items-center gap-10 py-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,46%)] lg:gap-16 lg:py-20">
+            <div className="grid grid-cols-1 items-center gap-10 py-12 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-14 lg:py-16">
               <div>
                 <div className="rise rise-1">
                   <Eyebrow>Pune · Invite-only studios</Eyebrow>
                 </div>
-                <h1 className="rise rise-2 m-0 mb-5 font-[family-name:var(--font-display)] text-[clamp(40px,8vw,74px)] font-normal leading-[0.98] tracking-[-0.018em]">
-                  Your money stays put
-                  <br />
-                  <span className="text-[var(--color-petrol)]">until the work is right.</span>
+                {/* Measure is capped so the headline breaks where it means to,
+                    rather than wherever the viewport happens to run out. */}
+                <h1 className="rise rise-2 display mb-6 max-w-[13ch]">
+                  Your money stays put until the work is{' '}
+                  <span className="text-[var(--color-petrol)]">right</span>.
                 </h1>
-                <p className="rise rise-3 m-0 mb-8 max-w-[50ch] text-[18px] leading-relaxed text-[var(--color-ink-2)]">
+                <p className="rise rise-3 lede mb-8">
                   Answer nine questions about your home. We match you to verified interior studios in
                   Pune, show you exactly why each one fits, and hold every rupee in escrow until you
                   approve each stage of the work.
                 </p>
-                <div className="rise rise-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="rise rise-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-5">
                   <Button href="/quiz" size="lg">
                     Start — takes 3 minutes
                   </Button>
-                  <span className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-ink-3)]">
-                    Free · No signup until the end
+                  <span className="text-[14px] text-[var(--color-ink-3)]">
+                    Free · no signup until the end
                   </span>
                 </div>
               </div>
 
               <div className="rise rise-3 relative">
                 <FloorPlan className="w-full" />
-                <p className="mt-2 text-center font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-[0.12em] text-[var(--color-ink-3)]">
-                  3 BHK · 1,180 sq ft · typical Pune plan
-                </p>
+                <p className="label mt-3 text-center">3 BHK · 1,180 sq ft · typical Pune plan</p>
               </div>
             </div>
           </Container>
         </section>
 
         {/* ── Proof strip ── */}
-        <section className="border-b border-[var(--color-rule)] bg-[var(--color-petrol-deep)] py-9 text-[var(--color-paper)] dark:bg-[var(--color-paper-2)] dark:text-[var(--color-ink)]">
+        <section className="border-b border-[var(--color-rule)] bg-[var(--color-petrol-deep)] py-10 text-[var(--color-paper)]">
           <Container size="wide">
             <dl className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4">
               <ProofStat value={String(verified)} label="Studios verified" />
@@ -100,10 +99,10 @@ export default function LandingPage() {
           <Container size="wide">
             <div className="mb-8 max-w-[56ch]">
               <Eyebrow>Step one</Eyebrow>
-              <h2 className="m-0 mb-3 font-[family-name:var(--font-display)] text-[clamp(28px,4.5vw,40px)] font-normal leading-[1.08]">
+              <h2 className="h2 mb-3">
                 You don&rsquo;t need the vocabulary. You just need to point.
               </h2>
-              <p className="m-0 text-[16px] leading-relaxed text-[var(--color-ink-2)]">
+              <p className="m-0 text-[16px] leading-relaxed text-[var(--color-ink-2)] prose-measure">
                 Most people know a room they like when they see it and have no words for why. So the
                 quiz shows you rooms, not style names — and tells you what you picked afterwards,
                 down to the materials.
@@ -115,9 +114,7 @@ export default function LandingPage() {
                 <li key={tag} className="border border-[var(--color-rule)] bg-[var(--color-paper-2)]">
                   <StyleScene tag={tag} className="block aspect-[4/3] w-full" />
                   <div className="border-t border-[var(--color-rule)] p-2.5">
-                    <p className="m-0 mb-1.5 text-[12.5px] font-bold leading-tight">
-                      {STYLE_LABELS[tag]}
-                    </p>
+                    <p className="h3 mb-1.5 text-[13px]">{STYLE_LABELS[tag]}</p>
                     <MaterialSwatches tag={tag} className="flex-col gap-y-0.5" />
                   </div>
                 </li>
@@ -132,7 +129,7 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-16">
               <div>
                 <Eyebrow>Why we hold the money</Eyebrow>
-                <h2 className="m-0 mb-5 font-[family-name:var(--font-display)] text-[clamp(26px,4.2vw,38px)] font-normal leading-[1.08]">
+                <h2 className="h2 mb-5">
                   The usual complaint about interiors in India is not the design.
                 </h2>
                 <p className="m-0 mb-4 text-[var(--color-ink-2)]">
@@ -172,7 +169,7 @@ export default function LandingPage() {
             <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
               <div className="max-w-[46ch]">
                 <Eyebrow>The roster</Eyebrow>
-                <h2 className="m-0 font-[family-name:var(--font-display)] text-[clamp(26px,4.2vw,38px)] font-normal leading-[1.08]">
+                <h2 className="h2">
                   {STUDIOS.length} studios in Pune. That is the whole list.
                 </h2>
               </div>
@@ -220,7 +217,7 @@ export default function LandingPage() {
         <section className="border-b border-[var(--color-rule)] py-14 sm:py-16">
           <Container size="wide">
             <Eyebrow>How it works</Eyebrow>
-            <h2 className="m-0 mb-9 font-[family-name:var(--font-display)] text-[clamp(26px,4.2vw,38px)] font-normal leading-[1.08]">
+            <h2 className="h2 mb-9">
               Four steps, and you can stop at any of them.
             </h2>
 
@@ -253,10 +250,10 @@ export default function LandingPage() {
         <section className="relative overflow-hidden py-16">
           <div className="grid-ground grid-ground-fade absolute inset-0" aria-hidden="true" />
           <Container size="wide" className="relative">
-            <h2 className="m-0 mb-4 max-w-[18ch] font-[family-name:var(--font-display)] text-[clamp(30px,5.5vw,52px)] font-normal leading-[1.02]">
+            <h2 className="display mb-5 max-w-[14ch]">
               Ready when you are.
             </h2>
-            <p className="m-0 mb-8 max-w-[50ch] text-[17px] text-[var(--color-ink-2)]">
+            <p className="lede mb-8">
               Three minutes, no signup, and every answer stays changeable afterwards.
             </p>
             <Button href="/quiz" size="lg">
@@ -290,7 +287,7 @@ function Step({ n, title, body }: { n: string; title: string; body: string }) {
       <span className="tabular font-[family-name:var(--font-mono)] text-[11px] tracking-[0.1em] text-[var(--color-petrol)]">
         {n}
       </span>
-      <h3 className="m-0 mb-2 mt-2 text-[16px] font-bold leading-snug">{title}</h3>
+      <h3 className="h3 mb-2 mt-2">{title}</h3>
       <p className="m-0 text-[14.5px] leading-relaxed text-[var(--color-ink-2)]">{body}</p>
     </li>
   );

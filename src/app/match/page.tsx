@@ -68,7 +68,7 @@ export default function MatchPage() {
         <SiteHeader />
         <main className="py-16">
           <Container size="narrow">
-            <h1 className="m-0 mb-3 font-[family-name:var(--font-display)] text-[32px] font-normal">
+            <h1 className="h1 mb-3">
               We don&rsquo;t have your brief yet
             </h1>
             <p className="mb-6 text-[var(--color-ink-2)]">
@@ -98,7 +98,7 @@ export default function MatchPage() {
                 <p className="m-0 mb-4 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-ink-3)]">
                   Your style
                 </p>
-                <h1 className="m-0 mb-6 font-[family-name:var(--font-display)] text-[clamp(30px,5.6vw,54px)] font-normal leading-[1.04] tracking-[-0.01em]">
+                <h1 className="display mb-6 max-w-[15ch]">
                   Going by what you picked, your home leans{' '}
                   <span className="text-[var(--color-terracotta)] underline decoration-[var(--color-terracotta)]/40 decoration-2 underline-offset-[6px]">
                     {primary ? STYLE_LABELS[primary] : 'Contemporary'}
@@ -281,7 +281,7 @@ function StudioCard({ match }: { match: MatchResult }) {
 function EmptyState() {
   return (
     <div className="max-w-[54ch] border-l-2 border-[var(--color-brass)] pl-5">
-      <h2 className="m-0 mb-3 font-[family-name:var(--font-display)] text-[26px] font-normal">
+      <h2 className="h2 mb-3">
         No studio in our Pune roster fits this brief.
       </h2>
       <p className="mb-4 text-[var(--color-ink-2)]">
