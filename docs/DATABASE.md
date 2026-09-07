@@ -9,23 +9,37 @@ switches it to Postgres; removing them switches it back. Nothing else changes.
 
 ## 1. Get the two connection strings
 
-Supabase dashboard → **Project Settings → Database → Connection string**.
+**Dashboard → Connect (top bar) → the `ORM` tab.**
+
+That tab exists specifically for Prisma and emits both variables already
+formatted, with the right hostnames and ports for this project. Copy from there
+rather than assembling them by hand — the pooler region is baked into the
+hostname and varies by project, and Supabase changes these defaults from time
+to time.
+
+Ignore the other tabs: `Framework` and `Server` are for `supabase-js`, which we
+do not use.
 
 You need **both**, and the distinction is not optional:
 
 | Variable | Which string | Port | Used by |
 |---|---|---|---|
-| `DATABASE_URL` | **Transaction pooler** (Supavisor) | `6543` | PrismaClient at runtime |
-| `DIRECT_URL` | **Direct connection** | `5432` | Prisma CLI for migrations |
+| `DATABASE_URL` | Transaction pooler | `6543` | PrismaClient at runtime |
+| `DIRECT_URL` | Session pooler / direct | `5432` | Prisma CLI for migrations |
 
-```bash
-# .env.local  — never commit this file
-DATABASE_URL="postgresql://postgres.tkxuvtctaknmymtuvcuo:YOUR_PASSWORD@aws-0-<region>.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
-DIRECT_URL="postgresql://postgres:YOUR_PASSWORD@db.tkxuvtctaknmymtuvcuo.supabase.co:5432/postgres"
-```
+Both contain a `[YOUR-PASSWORD]` placeholder. That is the **database
+password** — a different credential from the publishable and secret API keys.
+If you do not have it: **Settings → Database → Database password → Reset**.
+Resetting is safe while nothing is using it yet.
 
-Copy the exact hostnames from the dashboard rather than typing them — the
-pooler region is in the string and varies by project.
+Append `&connection_limit=1` to `DATABASE_URL`. Each serverless function
+instance should hold one connection rather than open a pool of its own.
+
+> If `DIRECT_URL` cannot connect, check whether you were given the
+> `db.<ref>.supabase.co:5432` form — direct connections are IPv6-only unless
+> the IPv4 add-on is enabled, so on most networks the **session pooler** on
+> 5432 is the one that works. The ORM tab already accounts for this, which is
+> the reason to copy from it.
 
 **Why both.** Serverless functions open a connection per invocation, so runtime
 traffic must go through the pooler or the direct connection limit is exhausted
