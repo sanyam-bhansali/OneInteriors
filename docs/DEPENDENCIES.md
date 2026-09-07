@@ -11,7 +11,8 @@ Update this whenever you change one of them — a pin with no recorded reason ge
 ```json
 "overrides": {
   "postcss": "^8.5.28",
-  "sharp": "^0.35.4"
+  "sharp": "^0.35.4",
+  "deepmerge-ts": "^8.0.0"
 }
 ```
 
@@ -30,6 +31,19 @@ with it.
 The alternative npm offers is upgrading to Next 16, which is a semver-major
 change we do not need yet. Revisit at the next planned Next upgrade; if Next 16
 ships with a patched postcss, drop this override.
+
+### `deepmerge-ts` → `^8.0.0`
+
+Prisma 6.19 depends on a version carrying **GHSA-ggr8-5vv4-36mx** (stack
+exhaustion on recursive object graphs) via `@prisma/config`.
+
+`npm audit fix` wants to resolve this by **downgrading Prisma to 6.12**, which
+is a semver-major move backwards and gives up seven minor versions of fixes.
+The override to the patched `deepmerge-ts@8` fixes the advisory while keeping
+Prisma current.
+
+Re-check at each Prisma upgrade; drop the override once Prisma ships with an
+unaffected version.
 
 ### `sharp` → `^0.35.4`
 
@@ -74,31 +88,15 @@ alongside the Next 16 upgrade. Both changes want to happen in the same PR.
 
 ---
 
-## Deliberately not installed
+## Installed in Sprint 3
 
 ### `prisma` / `@prisma/client`
 
-`prisma/schema.prisma` is written and reviewed, but nothing imports it yet — the
-app runs entirely on fixtures in `src/data/studios.ts` until Sprint 3.
+Added when Supabase was provisioned. `postinstall` runs `prisma generate` so
+the client types exist after a clean clone — the build typechecks against them.
 
-Installing the CLI early bought us three high-severity advisories
-(`deepmerge-ts` stack exhaustion via `@prisma/config`) in exchange for nothing,
-plus a slow `postinstall` that downloads query engines on every CI run.
-
-**Add it back in Sprint 3**, when Postgres is provisioned:
-
-```bash
-npm install prisma --save-dev
-npm install @prisma/client
-```
-
-and restore the scripts:
-
-```json
-"db:generate": "prisma generate",
-"db:migrate":  "prisma migrate dev",
-"db:studio":   "prisma studio"
-```
+It brought back the `deepmerge-ts` advisory, handled by the override above
+rather than by the downgrade npm suggests.
 
 ---
 

@@ -6,6 +6,7 @@ to be wrapped with Capacitor for Play Store and App Store from the same codebase
 - **How we work:** [`CONTRIBUTING.md`](./CONTRIBUTING.md) — branching, versioning, bug policy
 - **Architecture:** [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
 - **Dependencies:** [`docs/DEPENDENCIES.md`](./docs/DEPENDENCIES.md) — why anything is pinned or overridden
+- **Database:** [`docs/DATABASE.md`](./docs/DATABASE.md) — Supabase + Prisma setup
 - **Future scope:** [`docs/FUTURE-SCOPE.md`](./docs/FUTURE-SCOPE.md) — what's deferred, why, and the trigger to build it
 - **Quotation builder:** [`docs/QUOTATION-BUILDER.md`](./docs/QUOTATION-BUILDER.md) — planned Sprint 5–6
 

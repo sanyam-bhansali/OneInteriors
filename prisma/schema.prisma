@@ -8,7 +8,17 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+
+  // Supabase needs BOTH, and the distinction is not optional:
+  //   DATABASE_URL — Supavisor transaction pooler, port 6543, ?pgbouncer=true.
+  //                  Used by PrismaClient at runtime. Serverless functions open
+  //                  a connection per invocation, and the direct port will run
+  //                  out of connections under any real traffic.
+  //   DIRECT_URL   — direct connection, port 5432. Used by the Prisma CLI for
+  //                  migrations. Migrations through the pooler hang or fail,
+  //                  which is the single most common Prisma+Supabase problem.
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -223,6 +233,11 @@ model Studio {
   udyamNumber String?
   panLast4    String?
 
+  // Self-declared context. Shown, but never used to compute a tier — anything
+  // that affects the badge has to be something we checked.
+  yearsActive Int?
+  teamSize    Int?
+
   // Commercial
   minProjectPaise BigInt?
   maxProjectPaise BigInt?
@@ -235,6 +250,10 @@ model Studio {
   avgVarianceDays     Float?
   upheldDisputes      Int   @default(0)
   specComplianceRate  Float?
+  /// Mean past-client rating for communication, 1–5. Null until ~3 ratings.
+  communicationRating Float?
+  /// 0 = hands-off, 1 = highly collaborative. Drives the working-style match.
+  autonomyProfile     Float?
   performanceComputedAt DateTime?
 
   createdAt DateTime @default(now())

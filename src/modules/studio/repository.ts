@@ -18,6 +18,8 @@
 import type { Studio, VerificationTier } from './types';
 import { STUDIOS } from '@/data/studios';
 import { assessTier } from '@/modules/verification/tiers';
+import { hasDatabase } from '@/lib/env';
+import { PrismaStudioRepository } from './prisma-repository';
 
 export interface StudioQuery {
   /** Pune only for now, but the field exists so city two is not a refactor. */
@@ -86,13 +88,20 @@ export class FixtureStudioRepository implements StudioRepository {
 /**
  * The single instance the app uses.
  *
- * When Postgres lands this becomes:
+ * Graceful degradation, deliberately: with no DATABASE_URL the app still runs
+ * on fixtures. That means a new developer can clone and `npm run dev` with no
+ * setup, CI needs no database, and a missing environment variable degrades to
+ * "shows sample studios" rather than a crashed deploy.
  *
- *   export const studioRepository: StudioRepository =
- *     process.env.DATABASE_URL
- *       ? new PrismaStudioRepository()
- *       : new FixtureStudioRepository();
- *
- * — note the truthiness check, not `??`. See docs/CONTRIBUTING.md §8.
+ * Truthiness, not nullishness — an unset variable arrives as '' on Vercel.
+ * See CONTRIBUTING.md §8 and the deploy that mistake broke.
  */
-export const studioRepository: StudioRepository = new FixtureStudioRepository();
+function selectRepository(): StudioRepository {
+  if (!hasDatabase()) return new FixtureStudioRepository();
+  return new PrismaStudioRepository();
+}
+
+export const studioRepository: StudioRepository = selectRepository();
+
+/** True when the app is serving invented studios rather than real rows. */
+export const usingFixtures = !hasDatabase();
