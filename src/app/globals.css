@@ -1,0 +1,226 @@
+@import 'tailwindcss';
+
+/* ─────────────────────────────────────────────────────────────
+   Design tokens — the single source of truth.
+   Anything in src/components reads these, never a literal hex.
+
+   Direction: the category default is warm beige + serif + big photography
+   (Livspace, HomeLane, DesignCafe all sit there), which reads as LIFESTYLE.
+   Our emotional job is SAFETY, so the register is taken from institutions
+   people already trust with money. The warmth comes from the customer's own
+   home photography, not from the chrome.
+   ───────────────────────────────────────────────────────────── */
+
+@theme {
+  /* Neutrals — warm cream. The discovery surfaces (landing, quiz, reveal) are
+     where someone is imagining their home, and warmth belongs there.
+     The money surfaces stay institutional; see --color-petrol-deep below. */
+  --color-paper: #fcf8f1;
+  --color-paper-2: #f7efe2;
+  --color-paper-3: #f0e3d0;
+  --color-ink: #2a2622;
+  --color-ink-2: #574e45;
+  --color-ink-3: #8b7f72;
+  --color-rule: #e4d8c6;
+  --color-rule-soft: #efe6d8;
+
+  /* Primary — trust surfaces, escrow, headers. Deepened slightly to hold its
+     own against a warm ground rather than going muddy on it. */
+  --color-petrol-deep: #10383c;
+  --color-petrol: #1a6068;
+  --color-petrol-soft: #dbebe9;
+
+  /* Terracotta — secondary warm accent. Onboarding and reveal only.
+     Never on an escrow or verification surface. */
+  --color-terracotta: #bc6440;
+  --color-terracotta-soft: #f7e2d6;
+
+  /* Brass — verification tier ONLY. Never a call to action. */
+  --color-brass: #9a6d15;
+  --color-brass-bright: #c9922a;
+  --color-brass-soft: #f4e8ce;
+
+  /* Semantic state. Separate from the accent, and always paired with a shape
+     as well as a colour — ~8% of male users cannot separate red from green. */
+  --color-ontrack: #4d6b52;
+  --color-ontrack-soft: #e3ecdf;
+  --color-atrisk: #9c3a22;
+  --color-atrisk-soft: #f7e0d7;
+
+  /* Type */
+  /* next/font sets the *-loaded variables on <html>; these carry the fallbacks. */
+  --font-display: var(--font-display-loaded), Georgia, 'Times New Roman', serif;
+  --font-sans: var(--font-sans-loaded), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: var(--font-mono-loaded), ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --radius-card: 3px;
+}
+
+/* Dark theme. Every token above is redefined — never define a colour only
+   inside this block, or it will be missing in light mode. */
+/* Dark theme — warm dark, not cool. A cream page inverted to blue-grey reads as
+   a different product; the browns keep it the same room with the lights off. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: #17130f;
+    --color-paper-2: #201a15;
+    --color-paper-3: #2b231c;
+    --color-ink: #f2ebdf;
+    --color-ink-2: #c3b7a7;
+    --color-ink-3: #8f8477;
+    --color-rule: #372e25;
+    --color-rule-soft: #271f19;
+
+    --color-petrol-deep: #0d2c2f;
+    --color-petrol: #74c2c2;
+    --color-petrol-soft: #16302f;
+
+    --color-terracotta: #e08a63;
+    --color-terracotta-soft: #332016;
+
+    --color-brass: #d9aa54;
+    --color-brass-bright: #e6bd6d;
+    --color-brass-soft: #302614;
+
+    --color-ontrack: #9bb79f;
+    --color-ontrack-soft: #1d2620;
+    --color-atrisk: #e4886c;
+    --color-atrisk-soft: #351d15;
+  }
+}
+
+/* ── Base ── */
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+  /* Prevent the pull-to-refresh bounce showing a mismatched ground in the
+     Capacitor build. */
+  overscroll-behavior-y: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Digits must line up wherever they stack — quotes, milestone tables,
+   comparison rows. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-petrol);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Utility: horizontal scroll container for wide content. The page body must
+   never scroll sideways. */
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Screen-reader-only text — state that colour alone must never carry. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ── Texture ──
+   A drafting grid, used sparingly on section grounds. It reads as graph paper
+   rather than decoration, which is the register the whole product is in. */
+.grid-ground {
+  background-image:
+    linear-gradient(var(--color-rule-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-rule-soft) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-position: -1px -1px;
+}
+
+/* Fades the grid out at the edges so it never fights the type. */
+.grid-ground-fade {
+  -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 40%, #000 35%, transparent 100%);
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 40%, #000 35%, transparent 100%);
+}
+
+/* ── Motion ──
+   Everything animates FROM a visible resting state. Nothing is parked at
+   opacity 0 waiting on a scroll observer — the first still frame of the page is
+   what a shared link and a skimming reader both get. */
+@keyframes rise {
+  from {
+    opacity: 0.55;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.rise-1 { animation-delay: 0.04s; }
+.rise-2 { animation-delay: 0.10s; }
+.rise-3 { animation-delay: 0.16s; }
+.rise-4 { animation-delay: 0.22s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none;
+  }
+}
+
+/* Card hover — a lift, not a glow. */
+.lift {
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.lift:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-ink-3);
+  box-shadow: 0 6px 20px -12px rgb(21 26 27 / 0.4);
+}
+
+/* Rule with a weight change — used to separate a section without a full border. */
+.rule-accent {
+  background: linear-gradient(90deg, var(--color-petrol) 0 56px, var(--color-rule) 56px 100%);
+  height: 2px;
+}

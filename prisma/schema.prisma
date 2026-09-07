@@ -1,0 +1,754 @@
+// One Interiors — data model
+// Postgres + Prisma. Money is stored in PAISE (integer) everywhere. Never floats.
+// Every model that participates in the trust record is append-only or audited.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// IDENTITY
+// ─────────────────────────────────────────────────────────────
+
+enum UserRole {
+  CUSTOMER
+  STUDIO
+  OPS
+  ADMIN
+}
+
+model User {
+  id            String    @id @default(cuid())
+  phone         String    @unique // E.164, +91XXXXXXXXXX — primary identity, WhatsApp OTP
+  phoneVerified DateTime?
+  email         String?   @unique
+  name          String?
+  role          UserRole  @default(CUSTOMER)
+  locale        String    @default("en-IN")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime? // soft delete — DPDP erasure sets this + scrubs PII
+
+  brief         Brief?
+  studioMember  StudioMember?
+  sessions      Session[]
+  consents      Consent[]
+  auditEntries  AuditLog[]      @relation("AuditActor")
+  notifications Notification[]
+
+  @@index([role])
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  userAgent String?
+  ipHash    String? // hashed, never raw — DPDP minimisation
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model OtpChallenge {
+  id         String    @id @default(cuid())
+  phone      String
+  codeHash   String
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+
+  @@index([phone, createdAt])
+  @@map("otp_challenges")
+}
+
+// DPDP Act 2023 — consent is per-purpose, versioned, and withdrawable.
+// The 20,000 imported records need a row here before any campaign touches them.
+enum ConsentPurpose {
+  MARKETING_EMAIL
+  MARKETING_WHATSAPP
+  MARKETING_SMS
+  DATA_PROCESSING
+  IMPORTED_LEAD // pre-existing record; source must be recorded
+}
+
+model Consent {
+  id          String         @id @default(cuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose     ConsentPurpose
+  granted     Boolean
+  source      String // "quiz_step_9" | "hauspire_import_2026_09" | "ops_manual"
+  policyVersion String
+  grantedAt   DateTime       @default(now())
+  withdrawnAt DateTime?
+
+  @@index([userId, purpose])
+  @@map("consents")
+}
+
+// ─────────────────────────────────────────────────────────────
+// BRIEF — the 9-question quiz output
+// ─────────────────────────────────────────────────────────────
+
+enum PropertyType {
+  BHK_1
+  BHK_2
+  BHK_3
+  BHK_4_PLUS
+  VILLA
+  OTHER
+}
+
+enum ScopeType {
+  FULL_HOME
+  KITCHEN_WARDROBE
+  SINGLE_ROOM
+  RENOVATION
+}
+
+enum Involvement {
+  DECIDE_FOR_ME
+  COLLABORATE
+  APPROVE_EVERYTHING
+}
+
+enum PriorityFactor {
+  BUDGET
+  SPEED
+  DESIGN_AMBITION
+  MATERIAL_QUALITY
+}
+
+model Brief {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Q1
+  propertyType PropertyType?
+  carpetAreaSqft Int?
+  locality     String? // Pune locality slug: "kharadi", "baner", "wakad"
+  possessionOn DateTime?
+
+  // Q2
+  scope ScopeType?
+
+  // Q3 — paise
+  budgetMinPaise BigInt?
+  budgetMaxPaise BigInt?
+
+  // Q4 / Q5 — style image picks resolve to tag slugs
+  styleLikes    String[] @default([])
+  styleDislikes String[] @default([]) // HARD FILTER, not a weight
+
+  // Q6
+  adults    Int?
+  children  Int?
+  elderly   Int?
+  pets      Boolean @default(false)
+  worksFromHome Boolean @default(false)
+
+  // Q7 — ranked, index 0 = most important
+  priorityRanking PriorityFactor[] @default([])
+
+  // Q8
+  involvement Involvement?
+
+  // Q9
+  moveInBy DateTime?
+
+  completedAt DateTime? // null = abandoned mid-quiz; drives drop-off analytics
+  lastStep    Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  matches       Match[]
+  shortlists    Shortlist[]
+  quotations    Quotation[]
+  projects      Project[]
+  consultations Consultation[]
+
+  @@index([locality, completedAt])
+  @@map("briefs")
+}
+
+// ─────────────────────────────────────────────────────────────
+// STUDIO
+// ─────────────────────────────────────────────────────────────
+
+enum VerificationTier {
+  UNVERIFIED
+  LISTED // Tier 1 — identity
+  VERIFIED // Tier 2 — trading history
+  PROVEN // Tier 3 — performance through our escrow. The moat.
+}
+
+enum StudioStatus {
+  ONBOARDING
+  ACTIVE
+  PAUSED // voluntarily not taking leads
+  SUSPENDED // ops action, appealable
+  REMOVED
+}
+
+model Studio {
+  id   String @id @default(cuid())
+  slug String @unique
+
+  legalName  String
+  tradeName  String
+  about      String?  @db.Text
+  city       String   @default("pune")
+  localities String[] @default([]) // areas they serve
+
+  status StudioStatus     @default(ONBOARDING)
+  tier   VerificationTier @default(UNVERIFIED)
+
+  // Registry identifiers — verified, not self-declared
+  gstin       String? @unique
+  cin         String? @unique
+  udyamNumber String?
+  panLast4    String?
+
+  // Commercial
+  minProjectPaise BigInt?
+  maxProjectPaise BigInt?
+  designFeePaise  BigInt?
+
+  // Derived performance — recomputed by a job, never written by hand.
+  // Null until enough completed projects exist. Do NOT default these to
+  // flattering values; the UI must render "not enough data".
+  completedProjects   Int   @default(0)
+  avgVarianceDays     Float?
+  upheldDisputes      Int   @default(0)
+  specComplianceRate  Float?
+  performanceComputedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members       StudioMember[]
+  verifications VerificationCheck[]
+  portfolio     PortfolioProject[]
+  rateCard      RateCardItem[]
+  matches       Match[]
+  quotations    Quotation[]
+  projects      Project[]
+  subscription  Subscription?
+  allocations   AllocationPeriod[]
+
+  @@index([city, status, tier])
+  @@map("studios")
+}
+
+model StudioMember {
+  id       String  @id @default(cuid())
+  studioId String
+  studio   Studio  @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  userId   String  @unique
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isOwner  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([studioId])
+  @@map("studio_members")
+}
+
+// Every verification item is a row with a source and a date, because the
+// profile publishes "GST filings current as of 12 Aug 2026", not a badge.
+enum CheckType {
+  PAN_NAME_MATCH
+  AADHAAR_KYC
+  ADDRESS_VISIT
+  CONTACT_REACHABLE
+  CODE_OF_CONDUCT
+  GSTIN_ACTIVE
+  GST_FILING_HISTORY
+  MCA_STATUS
+  UDYAM
+  CLIENT_REFERENCE
+  SITE_INSPECTION
+  LITIGATION_SEARCH
+}
+
+enum CheckResult {
+  PENDING
+  PASS
+  FAIL
+  NOT_APPLICABLE
+  EXPIRED
+}
+
+model VerificationCheck {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  type       CheckType
+  result     CheckResult @default(PENDING)
+  source     String? // "gst_portal" | "idfy" | "ops:manual" | "mca"
+  evidenceUrl String? // private object storage key, never public
+  notes      String?     @db.Text
+
+  checkedById String?
+  checkedAt   DateTime?
+  expiresAt   DateTime? // Tier 2 re-audit every 6 months
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studioId, type])
+  @@index([studioId, result])
+  @@map("verification_checks")
+}
+
+model PortfolioProject {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  title     String
+  locality  String?
+  propertyType PropertyType?
+  scope     ScopeType?
+  styleTags String[]      @default([]) // must use the same vocabulary as Brief.styleLikes
+  valuePaise BigInt?
+  durationDays Int?
+  completedOn  DateTime?
+
+  images       String[] @default([])
+  isRender     Boolean  @default(false) // a render labelled as a render is fine; passing one off is not
+  clientConsented Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([studioId])
+  @@map("portfolio_projects")
+}
+
+model RateCardItem {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  category  String // "modular_kitchen" | "wardrobe" | "false_ceiling" | "painting" | "electrical"
+  label     String
+  unit      String // "sqft" | "rft" | "unit" | "lumpsum"
+  ratePaise BigInt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([studioId, category])
+  @@map("rate_card_items")
+}
+
+// ─────────────────────────────────────────────────────────────
+// MATCHING
+// ─────────────────────────────────────────────────────────────
+
+model Match {
+  id       String @id @default(cuid())
+  briefId  String
+  brief    Brief  @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  score          Float // 0..100, over MEASURED factors only
+  factorsScored  Int // e.g. 4 — UI must say "matched on 4 of 6 factors"
+  factorsTotal   Int   @default(6)
+  breakdown      Json // { styleOverlap: 88, budgetFit: 71, ... } incl. nulls
+  reasoning      String @db.Text // the customer-facing explanation
+  engineVersion  String // "match@1.0.0" — never reinterpret an old score
+
+  createdAt DateTime @default(now())
+
+  @@unique([briefId, studioId])
+  @@index([briefId, score])
+  @@map("matches")
+}
+
+model Shortlist {
+  id       String @id @default(cuid())
+  briefId  String
+  brief    Brief  @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  studioId String
+  position Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@unique([briefId, studioId])
+  @@map("shortlists")
+}
+
+// ─────────────────────────────────────────────────────────────
+// QUOTATION
+// ─────────────────────────────────────────────────────────────
+
+enum QuotationKind {
+  INDICATIVE // generated from brief + rate card. Must render its assumptions.
+  FIRM // studio-issued, binding within variance band
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+model Quotation {
+  id       String @id @default(cuid())
+  briefId  String
+  brief    Brief  @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  kind   QuotationKind
+  status QuotationStatus @default(DRAFT)
+
+  subtotalPaise BigInt
+  gstPaise      BigInt
+  totalPaise    BigInt
+  variancePct   Float? @default(15) // published band on indicative quotes
+
+  assumptions String? @db.Text
+  validUntil  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lineItems QuotationLineItem[]
+  project   Project?
+
+  @@index([briefId, studioId])
+  @@map("quotations")
+}
+
+model QuotationLineItem {
+  id          String    @id @default(cuid())
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  category    String
+  description String
+  unit        String
+  quantity    Float
+  ratePaise   BigInt
+  amountPaise BigInt
+  position    Int    @default(0)
+
+  @@index([quotationId])
+  @@map("quotation_line_items")
+}
+
+// ─────────────────────────────────────────────────────────────
+// PROJECT + ESCROW — the actual product
+// ─────────────────────────────────────────────────────────────
+
+enum ProjectStatus {
+  CONTRACTED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+model Project {
+  id       String @id @default(cuid())
+  briefId  String
+  brief    Brief  @relation(fields: [briefId], references: [id], onDelete: Restrict)
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Restrict)
+  quotationId String? @unique
+  quotation   Quotation? @relation(fields: [quotationId], references: [id])
+
+  reference String        @unique // human-readable: "OI-PN-2026-0042"
+  status    ProjectStatus @default(CONTRACTED)
+
+  contractValuePaise BigInt
+  // Commission model applies during the pilot; subscription studios have 0 here.
+  commissionBps      Int    @default(400) // 4.00%
+  commissionPaise    BigInt @default(0)
+  escrowFeeBps       Int    @default(175) // 1.75% customer-side
+
+  committedStartOn DateTime
+  committedEndOn   DateTime // the date variance is measured against
+  actualEndOn      DateTime?
+
+  contractUrl   String?
+  contractSignedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  milestones Milestone[]
+  escrow     EscrowTransaction[]
+  disputes   Dispute[]
+
+  @@index([studioId, status])
+  @@index([status, committedEndOn])
+  @@map("projects")
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  SUBMITTED // studio uploaded evidence, awaiting customer
+  APPROVED // triggers escrow release
+  REJECTED
+}
+
+model Milestone {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  position Int
+  title    String
+  description String? @db.Text
+
+  amountPaise BigInt
+  status      MilestoneStatus @default(PENDING)
+
+  dueOn       DateTime
+  submittedAt DateTime?
+  approvedAt  DateTime?
+  rejectedAt  DateTime?
+  rejectionReason String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  evidence MilestoneEvidence[]
+
+  @@unique([projectId, position])
+  @@index([projectId, status])
+  @@map("milestones")
+}
+
+model MilestoneEvidence {
+  id          String    @id @default(cuid())
+  milestoneId String
+  milestone   Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  kind      String // "photo" | "invoice" | "material_spec"
+  storageKey String
+  caption   String?
+  capturedAt DateTime?
+  uploadedById String
+
+  createdAt DateTime @default(now())
+
+  @@index([milestoneId])
+  @@map("milestone_evidence")
+}
+
+enum EscrowDirection {
+  DEPOSIT // customer -> escrow
+  RELEASE // escrow -> studio
+  REFUND // escrow -> customer
+  FEE // escrow -> platform
+}
+
+enum EscrowStatus {
+  INITIATED
+  PENDING
+  SETTLED
+  FAILED
+  REVERSED
+}
+
+// Append-only ledger. Corrections are new rows, never updates.
+model EscrowTransaction {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  milestoneId String?
+
+  direction EscrowDirection
+  status    EscrowStatus    @default(INITIATED)
+  amountPaise BigInt
+
+  providerRef String? @unique // escrow partner's transaction id
+  providerPayload Json?
+  failureReason String?
+
+  initiatedAt DateTime  @default(now())
+  settledAt   DateTime?
+
+  @@index([projectId, direction])
+  @@index([status])
+  @@map("escrow_transactions")
+}
+
+enum DisputeStatus {
+  OPEN
+  INVESTIGATING
+  UPHELD // against the studio — counts on their record
+  DISMISSED
+  WITHDRAWN
+}
+
+model Dispute {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  raisedByUserId String
+  category  String // "delay" | "material_substitution" | "workmanship" | "billing"
+  summary   String  @db.Text
+  status    DisputeStatus @default(OPEN)
+
+  resolution String? @db.Text
+  resolvedAt DateTime?
+  resolvedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([status])
+  @@map("disputes")
+}
+
+// ─────────────────────────────────────────────────────────────
+// BILLING + ALLOCATION
+// ─────────────────────────────────────────────────────────────
+
+enum SubscriptionTier {
+  LISTED // ₹0, no guarantee
+  VERIFIED // ₹40k/mo, 2 guaranteed
+  SIGNATURE // ₹1L/mo, 5 guaranteed
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+}
+
+model Subscription {
+  id       String @id @default(cuid())
+  studioId String @unique
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  tier   SubscriptionTier   @default(LISTED)
+  status SubscriptionStatus @default(TRIAL)
+
+  monthlyPaise      BigInt @default(0)
+  guaranteedProjects Int   @default(0)
+
+  startedOn   DateTime  @default(now())
+  cancelledOn DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("subscriptions")
+}
+
+// One row per studio per billing month. This is how the guarantee is tracked
+// and how credit rollover is computed — never recalculated ad hoc.
+model AllocationPeriod {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  periodStart DateTime
+  periodEnd   DateTime
+
+  guaranteed Int
+  // "delivered" means SIGNED CONTRACTS, not leads. Contractual definition.
+  delivered  Int @default(0)
+  shortfall  Int @default(0)
+
+  creditCarriedInPaise  BigInt @default(0)
+  creditCarriedOutPaise BigInt @default(0)
+  invoicedPaise         BigInt @default(0)
+
+  closedAt DateTime?
+
+  @@unique([studioId, periodStart])
+  @@index([periodStart])
+  @@map("allocation_periods")
+}
+
+// ─────────────────────────────────────────────────────────────
+// SUPPORT
+// ─────────────────────────────────────────────────────────────
+
+model Consultation {
+  id      String @id @default(cuid())
+  briefId String
+  brief   Brief  @relation(fields: [briefId], references: [id], onDelete: Cascade)
+
+  scheduledFor DateTime
+  expertUserId String?
+  status       String   @default("scheduled") // scheduled | completed | no_show | cancelled
+
+  // The expert's read is the training signal for the matching engine.
+  outcomeNotes      String? @db.Text
+  recommendedStudioId String?
+  matchWasCorrect   Boolean?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([briefId])
+  @@map("consultations")
+}
+
+model Notification {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  channel String // "push" | "whatsapp" | "email"
+  template String
+  payload Json
+  readAt  DateTime?
+  sentAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id      String  @id @default(cuid())
+  actorId String?
+  actor   User?   @relation("AuditActor", fields: [actorId], references: [id])
+
+  action     String // "verification.pass" | "escrow.release" | "studio.suspend"
+  entityType String
+  entityId   String
+  before     Json?
+  after      Json?
+  ipHash     String?
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
+}
