@@ -4,7 +4,7 @@ import { Container, TierBadge, Stat, Divider, Button, Pill } from '@/components/
 import { StyleScene } from '@/components/art/StyleScene';
 import { PlanFragment } from '@/components/art/PlanFragment';
 import { SiteHeader, SiteFooter } from '@/components/chrome';
-import { STUDIOS, getStudioBySlug } from '@/data/studios';
+import { studioRepository } from '@/modules/studio/repository';
 import { formatINRCompact } from '@/lib/money';
 import {
   CHECK_LABELS,
@@ -16,8 +16,9 @@ import {
 } from '@/modules/studio/types';
 import { PROPERTY_LABELS, SCOPE_LABELS, STYLE_LABELS } from '@/modules/brief/types';
 
-export function generateStaticParams() {
-  return STUDIOS.map((s) => ({ slug: s.slug }));
+export async function generateStaticParams() {
+  const slugs = await studioRepository.allSlugs();
+  return slugs.map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({
@@ -26,7 +27,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const studio = getStudioBySlug(slug);
+  const studio = await studioRepository.bySlug(slug);
   if (!studio) return {};
   return {
     title: studio.tradeName,
@@ -36,7 +37,7 @@ export async function generateMetadata({
 
 export default async function StudioProfile({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const studio = getStudioBySlug(slug);
+  const studio = await studioRepository.bySlug(slug);
   if (!studio) notFound();
 
   const formatDate = (iso: string | null) =>

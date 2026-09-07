@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { Container, TierBadge, Pill, Button } from '@/components/ui';
 import { PlanFragment } from '@/components/art/PlanFragment';
 import { SiteHeader, SiteFooter } from '@/components/chrome';
-import { STUDIOS } from '@/data/studios';
+import { studioRepository } from '@/modules/studio/repository';
 import { formatINRCompact } from '@/lib/money';
 import { describeDelivery } from '@/modules/studio/types';
 import { PUNE_LOCALITIES } from '@/modules/brief/types';
@@ -13,7 +13,8 @@ export const metadata: Metadata = {
   description: 'Every interior studio we have verified in Pune, with their delivery record.',
 };
 
-export default function StudiosPage() {
+export default async function StudiosPage() {
+  const STUDIOS = await studioRepository.list({ activeOnly: true });
   // Proven first, then by delivery record. No studio can buy this position.
   const ordered = [...STUDIOS].sort((a, b) => {
     const tierRank = { PROVEN: 0, VERIFIED: 1, LISTED: 2, UNVERIFIED: 3 };

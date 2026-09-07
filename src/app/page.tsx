@@ -5,7 +5,7 @@ import { FloorPlan } from '@/components/art/FloorPlan';
 import { MilestoneTrack } from '@/components/art/MilestoneTrack';
 import { StyleScene, MaterialSwatches } from '@/components/art/StyleScene';
 import { PlanFragment } from '@/components/art/PlanFragment';
-import { STUDIOS } from '@/data/studios';
+import { studioRepository } from '@/modules/studio/repository';
 import { formatINRCompact } from '@/lib/money';
 import { describeDelivery } from '@/modules/studio/types';
 import type { StyleTag } from '@/modules/brief/types';
@@ -20,7 +20,8 @@ const SHOWCASE_STYLES: StyleTag[] = [
   'coastal-light',
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const STUDIOS = await studioRepository.list();
   const verified = STUDIOS.filter((s) => s.tier === 'PROVEN' || s.tier === 'VERIFIED').length;
   const withRecord = STUDIOS.filter((s) => s.avgVarianceDays !== null);
   const avgVariance =
