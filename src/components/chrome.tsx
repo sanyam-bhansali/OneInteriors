@@ -76,6 +76,14 @@ export function SiteFooter() {
             >
               Start the brief
             </Link>
+            {/* Designers look for this in the footer, not the nav — and the
+                header is customer space. */}
+            <Link
+              href="/apply"
+              className="mt-1.5 text-[14px] text-[var(--color-ink-3)] no-underline hover:text-[var(--color-petrol)]"
+            >
+              For studios — apply to join
+            </Link>
           </nav>
         </div>
 

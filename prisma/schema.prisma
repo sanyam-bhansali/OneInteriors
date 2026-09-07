@@ -219,6 +219,72 @@ model Brief {
 }
 
 // ─────────────────────────────────────────────────────────────
+// APPLICATION — how a studio gets in
+// ─────────────────────────────────────────────────────────────
+
+enum ApplicationStatus {
+  SUBMITTED
+  REVIEWING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+/// Studios apply; we approve. Nobody self-serves onto the roster.
+///
+/// Kept SEPARATE from Studio on purpose: an application is a claim, a Studio is
+/// something we have checked. Merging them would mean an unreviewed applicant
+/// briefly existing as a studio row, and the whole product rests on that never
+/// being possible.
+///
+/// Everything here is SELF-DECLARED and must be treated as such until an ops
+/// check says otherwise — nothing on this model may reach a customer-facing
+/// page.
+model StudioApplication {
+  id     String            @id @default(cuid())
+  status ApplicationStatus @default(SUBMITTED)
+
+  // Who
+  tradeName   String
+  legalName   String?
+  contactName String
+  email       String
+  phone       String
+  website     String?
+  instagram   String?
+
+  // What they say about themselves
+  city            String   @default("pune")
+  localities      String[] @default([])
+  gstin           String?
+  yearsActive     Int?
+  teamSize        Int?
+  minProjectPaise BigInt?
+  maxProjectPaise BigInt?
+  about           String?  @db.Text
+
+  /// Where they heard about us — the cheapest acquisition signal we get.
+  howHeard String?
+
+  // Review
+  reviewedById   String?
+  reviewedAt     DateTime?
+  decisionReason String?   @db.Text
+  /// Set when approved — the Studio this became.
+  studioId       String?   @unique
+
+  /// Anti-spam: hashed, never raw.
+  ipHash String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([email])
+  @@map("studio_applications")
+}
+
+// ─────────────────────────────────────────────────────────────
 // STUDIO
 // ─────────────────────────────────────────────────────────────
 
@@ -260,6 +326,12 @@ model Studio {
   // that affects the badge has to be something we checked.
   yearsActive Int?
   teamSize    Int?
+  website     String?
+  instagram   String?
+
+  /// Which onboarding steps the studio has finished. Drives their checklist and
+  /// tells ops whether the ball is in our court or theirs.
+  onboardingSteps Json?
 
   // Commercial
   minProjectPaise BigInt?

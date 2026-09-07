@@ -23,6 +23,18 @@ export function OpsHeader() {
           </Link>
           <div className="flex items-center gap-5">
             <Link
+              href="/ops"
+              className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-paper)] no-underline opacity-70 hover:opacity-100"
+            >
+              Verification
+            </Link>
+            <Link
+              href="/ops/applications"
+              className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-paper)] no-underline opacity-70 hover:opacity-100"
+            >
+              Applications
+            </Link>
+            <Link
               href="/"
               className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-paper)] no-underline opacity-70 hover:opacity-100"
             >
@@ -31,14 +43,6 @@ export function OpsHeader() {
           </div>
         </div>
       </Container>
-
-      {/* Until OI-3 lands there is no auth on this route at all. Say so, loudly,
-          rather than letting it feel finished. */}
-      <div className="bg-[var(--color-atrisk)] py-1.5 text-center">
-        <p className="m-0 font-[family-name:var(--font-mono)] text-[10.5px] uppercase tracking-[0.12em] text-white">
-          No authentication yet — development only
-        </p>
-      </div>
     </header>
   );
 }
