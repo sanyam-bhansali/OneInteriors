@@ -35,6 +35,15 @@ Resetting is safe while nothing is using it yet.
 Append `&connection_limit=1` to `DATABASE_URL`. Each serverless function
 instance should hold one connection rather than open a pool of its own.
 
+**URL-encode the password if it contains punctuation.** A connection string is
+a URL, so `@ : / ? # [ ] % &` inside the password break the parse and produce a
+misleading error — usually "invalid port number" or a host that looks wrong.
+`@` → `%40`, `#` → `%23`, `/` → `%2F`. If you are resetting it anyway, an
+alphanumeric password sidesteps this entirely.
+
+For this project the strings are the Mumbai (`ap-south-1`) pooler, which is the
+right region — the database, the studios and the customers are all in India.
+
 > If `DIRECT_URL` cannot connect, check whether you were given the
 > `db.<ref>.supabase.co:5432` form — direct connections are IPv6-only unless
 > the IPv4 add-on is enabled, so on most networks the **session pooler** on
