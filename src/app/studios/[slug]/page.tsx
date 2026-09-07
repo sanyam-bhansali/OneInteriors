@@ -134,7 +134,7 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
               What we verified
             </p>
             <h2 className="h2 mb-2">
-              Twelve checks, each with a source and a date.
+              {TIER_CHECKS.LISTED.length + TIER_CHECKS.VERIFIED.length} checks, each with a source and a date.
             </h2>
             <p className="m-0 mb-7 max-w-[62ch] text-[15px] leading-relaxed text-[var(--color-ink-2)]">
               {TIER_DESCRIPTIONS[studio.tier]} Interior design is an unregulated profession in India

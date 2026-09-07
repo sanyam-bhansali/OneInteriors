@@ -10,6 +10,10 @@ import { formatINRCompact } from '@/lib/money';
 import { describeDelivery } from '@/modules/studio/types';
 import type { StyleTag } from '@/modules/brief/types';
 import { STYLE_LABELS } from '@/modules/brief/types';
+import { TIER_CHECKS } from '@/modules/studio/types';
+
+/** Derived, so adding a check cannot make the landing page lie. */
+const TOTAL_CHECKS = TIER_CHECKS.LISTED.length + TIER_CHECKS.VERIFIED.length;
 
 const SHOWCASE_STYLES: StyleTag[] = [
   'warm-modern',
@@ -21,7 +25,7 @@ const SHOWCASE_STYLES: StyleTag[] = [
 ];
 
 export default async function LandingPage() {
-  const STUDIOS = await studioRepository.list();
+  const STUDIOS = await studioRepository.list({ activeOnly: true });
   const verified = STUDIOS.filter((s) => s.tier === 'PROVEN' || s.tier === 'VERIFIED').length;
   const withRecord = STUDIOS.filter((s) => s.avgVarianceDays !== null);
   const avgVariance =
@@ -90,7 +94,7 @@ export default async function LandingPage() {
                 value={avgVariance === null ? '—' : `${avgVariance > 0 ? '+' : ''}${avgVariance}d`}
                 label="Average variance to committed date"
               />
-              <ProofStat value="12" label="Checks on every studio" />
+              <ProofStat value={String(TOTAL_CHECKS)} label="Checks on every studio" />
             </dl>
           </Container>
         </section>
@@ -277,15 +281,17 @@ export default async function LandingPage() {
   );
 }
 
+// dt before dd in the DOM — assistive tech follows source order, not the
+// visual order, so flex-col-reverse does the flipping rather than `order`.
 function ProofStat({ value, label }: { value: string; label: string }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <dd className="tabular order-1 m-0 font-[family-name:var(--font-display)] text-[clamp(34px,5vw,46px)] leading-none">
-        {value}
-      </dd>
-      <dt className="order-2 font-[family-name:var(--font-mono)] text-[10px] uppercase leading-snug tracking-[0.11em] opacity-70">
+    <div className="flex flex-col-reverse gap-1.5">
+      <dt className="font-[family-name:var(--font-mono)] text-[10px] uppercase leading-snug tracking-[0.11em] opacity-70">
         {label}
       </dt>
+      <dd className="tabular m-0 font-[family-name:var(--font-display)] text-[clamp(34px,5vw,46px)] leading-none">
+        {value}
+      </dd>
     </div>
   );
 }

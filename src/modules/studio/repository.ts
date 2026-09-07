@@ -103,5 +103,3 @@ function selectRepository(): StudioRepository {
 
 export const studioRepository: StudioRepository = selectRepository();
 
-/** True when the app is serving invented studios rather than real rows. */
-export const usingFixtures = !hasDatabase();

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Container } from '@/components/ui';
 import { Wordmark, Mark } from '@/components/brand';
+import { rosterIsReal } from '@/lib/env';
 
 const NAV = [
   { href: '/studios', label: 'Studios' },
@@ -78,12 +79,18 @@ export function SiteFooter() {
           </nav>
         </div>
 
-        {/* Pre-launch honesty notice. Remove when real studios are onboarded. */}
-        <p className="m-0 mt-10 max-w-[74ch] border-t border-[var(--color-rule)] pt-6 text-[13px] leading-relaxed text-[var(--color-ink-3)]">
-          Pre-launch build. The studios shown are placeholder records used to develop and review the
-          product — they are not real businesses and the registration numbers are not real. Nothing
-          you enter here is stored or sent anywhere.
-        </p>
+        {/* Pre-launch honesty notice.
+            Keyed to whether the ROSTER is real, not to whether a database
+            exists — the database is currently seeded with the invented
+            studios, so `hasDatabase()` would have hidden this while every
+            studio on the page was still fabricated. Defaults to showing:
+            forgetting the flag over-discloses, which is the safe direction. */}
+        {!rosterIsReal() ? (
+          <p className="m-0 mt-10 max-w-[74ch] border-t border-[var(--color-rule)] pt-6 text-[13px] leading-relaxed text-[var(--color-ink-3)]">
+            Pre-launch build. The studios shown are placeholder records used to develop and review
+            the product — they are not real businesses and the registration numbers are not real.
+          </p>
+        ) : null}
       </Container>
     </footer>
   );

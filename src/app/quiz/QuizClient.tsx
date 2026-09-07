@@ -20,7 +20,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Container, Button } from '@/components/ui';
-import { formatINRCompact, lakhsToPaise } from '@/lib/money';
+import { formatINRCompact, lakhsToPaise, applyBps } from '@/lib/money';
 import {
   EMPTY_BRIEF,
   INVOLVEMENT_LABELS,
@@ -171,6 +171,7 @@ export function QuizClient({ studios }: { studios: Studio[] }) {
         <div
           className="h-[3px] w-full bg-[var(--color-paper-3)]"
           role="progressbar"
+          aria-label="Quiz progress"
           aria-valuenow={step}
           aria-valuemin={1}
           aria-valuemax={TOTAL_STEPS}
@@ -443,15 +444,29 @@ function stepContent(
   }
 }
 
+const DEFAULT_BUDGET_LAKHS = 8;
+/** The lower bound is 80% of the slider value. Basis points, not a float rate. */
+const BUDGET_FLOOR_BPS = 8000;
+
 function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
-  const lakhs = brief.budgetMaxPaise ? Math.round(brief.budgetMaxPaise / 100 / 100_000) : 8;
+  const committed = brief.budgetMaxPaise !== null;
+  const lakhs = committed
+    ? Math.round(brief.budgetMaxPaise! / 100 / 100_000)
+    : DEFAULT_BUDGET_LAKHS;
 
   function setLakhs(v: number) {
-    update({
-      budgetMinPaise: lakhsToPaise(Math.max(1, v * 0.8)),
-      budgetMaxPaise: lakhsToPaise(v),
-    });
+    const max = lakhsToPaise(v);
+    update({ budgetMaxPaise: max, budgetMinPaise: applyBps(max, BUDGET_FLOOR_BPS) });
   }
+
+  // Commit the default the first time this step renders. Without this the
+  // slider shows ₹8L, the user agrees with it, and Continue stays disabled
+  // because budgetMaxPaise is still null — with no way to fire a change event
+  // except moving the slider away and back. A blocked core flow.
+  if (!committed) setLakhs(DEFAULT_BUDGET_LAKHS);
+
+  const shownMin = brief.budgetMinPaise ?? applyBps(lakhsToPaise(lakhs), BUDGET_FLOOR_BPS);
+  const shownMax = brief.budgetMaxPaise ?? lakhsToPaise(lakhs);
 
   return {
     ask: (
@@ -463,7 +478,7 @@ function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPart
     options: (
       <div className="max-w-lg">
         <div className="tabular mb-4 font-[family-name:var(--font-display)] text-[clamp(34px,6vw,50px)] leading-none tracking-[-0.02em] text-[var(--color-ink)]">
-          {formatINRCompact(lakhsToPaise(lakhs * 0.8))} – {formatINRCompact(lakhsToPaise(lakhs))}
+          {formatINRCompact(shownMin)} – {formatINRCompact(shownMax)}
         </div>
         <input
           type="range"

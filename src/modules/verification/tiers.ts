@@ -64,11 +64,15 @@ function isSatisfied(check: VerificationCheck | undefined, now: Date): boolean {
 
 export function hasExpired(check: VerificationCheck, now: Date = new Date()): boolean {
   if (check.result === 'EXPIRED') return true;
-  if (!check.checkedAt) return false;
 
   // Only Tier 2 (trading history) checks lapse. Identity does not go stale in
   // the same way — a PAN does not stop being someone's PAN.
   if (!TIER_CHECKS.VERIFIED.includes(check.type)) return false;
+
+  // A trading check with no date cannot be current: the profile publishes
+  // "source · date", and a badge with no date behind it is exactly what the
+  // /verification page says we do not do. Treat it as needing a re-audit.
+  if (!check.checkedAt) return true;
 
   const checked = new Date(check.checkedAt);
   const due = new Date(checked);

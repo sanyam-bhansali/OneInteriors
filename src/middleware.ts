@@ -13,9 +13,14 @@ import { NextResponse, type NextRequest } from 'next/server';
  * demo" is how an unauthenticated admin surface reaches production.
  */
 export function middleware(_request: NextRequest) {
-  // Truthiness, not nullishness — an unset env var can arrive as ''.
-  // See CONTRIBUTING.md §8.
-  const allowOps = process.env.NODE_ENV === 'development' || Boolean(process.env.OPS_PREVIEW);
+  // An EXPLICIT allowed value, not truthiness.
+  //
+  // On Vercel NODE_ENV is always 'production', so this one variable is the
+  // whole gate. `Boolean(process.env.OPS_PREVIEW)` would open it for the
+  // strings "false", "0" and "off" — and setting it to "false" is exactly what
+  // someone would do to turn it off. Only the literal "1" opens it.
+  const allowOps =
+    process.env.NODE_ENV === 'development' || process.env.OPS_PREVIEW?.trim() === '1';
 
   if (!allowOps) {
     return new NextResponse('Not found', { status: 404 });
@@ -25,5 +30,8 @@ export function middleware(_request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/ops/:path*'],
+  // '/ops' is listed separately from '/ops/:path*'. The quantifier probably
+  // covers the bare path, but "probably" is not good enough for the gate on an
+  // unauthenticated admin index that lists legal names and GSTINs.
+  matcher: ['/ops', '/ops/:path*'],
 };

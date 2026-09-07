@@ -13,9 +13,15 @@
  *
  * Values are a real split of a ₹8,50,000 contract using DEFAULT_MILESTONES,
  * computed through splitAcross so the parts genuinely sum to the whole.
+ *
+ * Shown with formatINR, NOT formatINRCompact. The compact form rounds to two
+ * decimals, so the five parts displayed as ₹1.27L + ₹1.7L + ₹2.55L + ₹1.7L +
+ * ₹1.27L add up to ₹8,49,000 against a stated ₹8,50,000. A visitor checking
+ * the arithmetic on the page that sells checkable figures would find it short
+ * by ₹1,000.
  */
 
-import { DEFAULT_MILESTONES, splitAcross, lakhsToPaise, formatINRCompact, formatINR } from '@/lib/money';
+import { DEFAULT_MILESTONES, splitAcross, lakhsToPaise, formatINR } from '@/lib/money';
 
 const CONTRACT = lakhsToPaise(8.5);
 
@@ -65,7 +71,7 @@ export function MilestoneTrack({ className = '' }: { className?: string }) {
                     state === 'approved' ? 'text-[var(--color-ontrack)]' : 'text-[var(--color-ink-2)]'
                   }`}
                 >
-                  {formatINRCompact(amounts[i])}
+                  {formatINR(amounts[i])}
                 </span>
               </div>
             </li>

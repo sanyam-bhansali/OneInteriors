@@ -139,7 +139,11 @@ export function hasDeliveryRecord(studio: Studio): boolean {
  */
 export function describeDelivery(studio: Studio): string {
   if (!hasDeliveryRecord(studio)) {
-    return 'No delivery record yet — this studio has not completed a project with us.';
+    if (studio.completedProjects === 0) {
+      return 'No delivery record yet — this studio has not completed a project with us.';
+    }
+    const n = studio.completedProjects;
+    return `${n} project${n === 1 ? '' : 's'} completed with us — not yet enough to state a reliable average.`;
   }
   const d = Math.round(studio.avgVarianceDays as number);
   if (d <= 0) {

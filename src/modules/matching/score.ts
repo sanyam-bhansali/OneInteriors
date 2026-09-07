@@ -54,6 +54,22 @@ export interface MatchResult {
 
 const FACTOR_COUNT = Object.keys(WEIGHTS).length;
 
+/** Above this share of a studio's work in a rejected style, it is not shown. */
+export const MAX_DISLIKED_SHARE = 0.4;
+
+/**
+ * Share of a studio's tagged work sitting in a style the customer ruled out.
+ * null when there is nothing to measure. Used both to exclude and to phrase the
+ * reasoning honestly — the same number, so the two can never disagree.
+ */
+function dislikedShare(brief: Brief, studio: Studio): number | null {
+  if (brief.styleDislikes.length === 0) return null;
+  const tags = studio.portfolio.flatMap((p) => p.styleTags);
+  if (tags.length === 0) return null;
+  const disliked = new Set<string>(brief.styleDislikes);
+  return tags.filter((t) => disliked.has(t)).length / tags.length;
+}
+
 // ── Hard filters ───────────────────────────────────────────────
 // These run before scoring. A studio failing one is not ranked low — it is not
 // shown at all. A bad match displayed at 41% still costs trust.
@@ -63,14 +79,8 @@ export function passesHardFilters(brief: Brief, studio: Studio): boolean {
   if (studio.tier === 'UNVERIFIED') return false;
 
   // Q5 anti-style is an exclusion, not a weight.
-  if (brief.styleDislikes.length > 0) {
-    const disliked = new Set<string>(brief.styleDislikes);
-    const tags = studio.portfolio.flatMap((p) => p.styleTags);
-    if (tags.length > 0) {
-      const share = tags.filter((t) => disliked.has(t)).length / tags.length;
-      if (share > 0.4) return false;
-    }
-  }
+  const share = dislikedShare(brief, studio);
+  if (share !== null && share > MAX_DISLIKED_SHARE) return false;
 
   // Budget: exclude only on a hard miss, so we don't over-filter thin supply.
   if (brief.budgetMaxPaise !== null && studio.minProjectPaise !== null) {
@@ -255,8 +265,20 @@ function buildReasoning(brief: Brief, studio: Studio, breakdown: FactorScores): 
     );
   }
 
+  // Say the true thing, not the flattering one. The hard filter only excludes a
+  // studio when MORE than 40% of its work sits in a rejected style — so
+  // "none of their portfolio goes there" was false for anything up to 40%.
   if (brief.styleDislikes.length > 0) {
-    lines.push(`You ruled out ${formatStyles(brief.styleDislikes)}. None of their portfolio goes there.`);
+    const share = dislikedShare(brief, studio);
+    if (share === 0) {
+      lines.push(
+        `You ruled out ${formatStyles(brief.styleDislikes)}. None of their portfolio goes there.`,
+      );
+    } else if (share !== null) {
+      lines.push(
+        `You ruled out ${formatStyles(brief.styleDislikes)}. About ${Math.round(share * 100)}% of their work leans that way.`,
+      );
+    }
   }
 
   if (breakdown.deliveryReliability !== null && studio.avgVarianceDays !== null) {
@@ -266,9 +288,16 @@ function buildReasoning(brief: Brief, studio: Studio, breakdown: FactorScores): 
         ? `Their last ${studio.completedProjects} projects finished on or ahead of the committed date.`
         : `Their last ${studio.completedProjects} projects averaged ${d} day${d === 1 ? '' : 's'} past the committed date.`,
     );
-  } else {
+  } else if (studio.completedProjects === 0) {
     lines.push(
       `${name} has not completed a project with us yet, so we have no delivery record for them.`,
+    );
+  } else {
+    // 1 or 2 completed projects: they HAVE delivered, just not enough to state
+    // a reliable average. Saying "has not completed a project" here was false.
+    const n = studio.completedProjects;
+    lines.push(
+      `${name} has completed ${n} project${n === 1 ? '' : 's'} with us — not yet enough to state a reliable delivery average.`,
     );
   }
 
@@ -278,8 +307,17 @@ function buildReasoning(brief: Brief, studio: Studio, breakdown: FactorScores): 
     );
   }
 
-  if (breakdown.scopeExperience !== null && breakdown.scopeExperience >= 60 && brief.locality) {
-    lines.push(`They have completed comparable homes in ${titleCase(brief.locality)}.`);
+  // Derived from locality, not from scope. scoreScopeExperience never looks at
+  // p.locality, so gating this on that score claimed local experience a studio
+  // might not have — and the locality hard filter is skipped entirely when a
+  // studio has declared no service areas.
+  if (brief.locality) {
+    const local = studio.portfolio.filter((p) => p.locality === brief.locality).length;
+    if (local > 0) {
+      lines.push(
+        `They have completed ${local} ${local === 1 ? 'home' : 'homes'} in ${titleCase(brief.locality)}.`,
+      );
+    }
   }
 
   if (studio.upheldDisputes > 0) {

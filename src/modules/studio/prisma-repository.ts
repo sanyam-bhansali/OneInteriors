@@ -30,6 +30,7 @@ import type {
 } from './types';
 import type { StudioQuery, StudioRepository } from './repository';
 import type { PropertyType, ScopeType, StyleTag } from '@/modules/brief/types';
+import { STYLE_TAGS } from '@/modules/brief/types';
 
 const INCLUDE = {
   verifications: true,
@@ -57,9 +58,18 @@ function toPortfolio(row: StudioRow['portfolio'][number]): PortfolioProject {
     id: row.id,
     title: row.title,
     locality: row.locality,
-    propertyType: row.propertyType as PropertyType | null,
+    // The schema has PropertyType.OTHER, the domain union does not. Map the
+    // unknown to null rather than casting an invalid value into the type.
+    propertyType: row.propertyType === 'OTHER' ? null : (row.propertyType as PropertyType | null),
     scope: row.scope as ScopeType | null,
-    styleTags: row.styleTags as StyleTag[],
+    // Filtered, not cast. `styleTags` is a String[] column with no constraint
+    // against the vocabulary, so a stray tag would reach STYLE_LABELS[t] and
+    // render the literal "undefined" to a customer — while silently scoring
+    // zero style overlap, which ARCHITECTURE.md names as the failure nobody
+    // notices. Drop what we do not recognise.
+    styleTags: row.styleTags.filter((t): t is StyleTag =>
+      (STYLE_TAGS as readonly string[]).includes(t),
+    ),
     valuePaise: row.valuePaise === null ? null : fromDb(row.valuePaise),
     durationDays: row.durationDays,
     completedOn: toIso(row.completedOn),

@@ -50,3 +50,21 @@ export function hasSupabase(): boolean {
 export function isProduction(): boolean {
   return process.env.NODE_ENV === 'production';
 }
+
+/**
+ * Is the studio roster real businesses, or still placeholders?
+ *
+ * This is NOT the same question as "is there a database". The database is
+ * currently seeded with the eight invented studios, so keying the pre-launch
+ * disclosure off `hasDatabase()` made the notice disappear the moment Postgres
+ * was wired up — while every studio on the site was still fabricated, with a
+ * deliberately invalid GSTIN.
+ *
+ * So it is an explicit flag, and the default is the safe direction: unless
+ * someone has affirmatively said the roster is real, we show the notice.
+ * Forgetting to set it over-discloses. Forgetting the other way would have us
+ * presenting invented businesses as verified ones.
+ */
+export function rosterIsReal(): boolean {
+  return process.env.NEXT_PUBLIC_ROSTER_IS_REAL?.trim() === '1';
+}
