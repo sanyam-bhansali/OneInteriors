@@ -7,6 +7,7 @@ import { validateGstin } from '@/modules/verification/gstin';
 import { formatINRCompact, fromDb } from '@/lib/money';
 import { PUNE_LOCALITIES } from '@/modules/brief/types';
 import { DecisionForm } from './DecisionForm';
+import { SitePanel } from './SitePanel';
 
 export const metadata: Metadata = {
   title: 'Applications',
@@ -120,6 +121,8 @@ export default async function ApplicationsPage() {
                         ) : null}
                       </p>
                     ) : null}
+
+                    {a.website ? <SitePanel website={a.website} /> : null}
 
                     <DecisionForm id={a.id} tradeName={a.tradeName} />
                   </li>
