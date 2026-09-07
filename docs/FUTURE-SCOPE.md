@@ -116,9 +116,18 @@ gambling.
 
 ## 6. Quotation builder — Sprint 5–6
 
-See [`QUOTATION-BUILDER.md`](./QUOTATION-BUILDER.md) for the full plan. Blocked
-on real Hauspire quotations and studio rate cards — building a line-item model
-from imagination guarantees rework.
+See [`QUOTATION-BUILDER.md`](./QUOTATION-BUILDER.md) for the full plan, revised
+after reviewing the existing Hauspire quotation app. Large parts port directly:
+the product catalogue structure, the four price types, the auto-build engine,
+and the domain constants.
+
+**Carry one rule out of that document into everything else:** Hauspire's rates
+are used for *structure*, never as any studio's default prices. Seeding a
+platform catalogue with the cofounder's factory pricing is setting market prices
+in favour of a business we own, and pricing is where a studio's margin lives —
+it would do more damage there than the supply conflict in §3. Studios load their
+own rates. Aggregate benchmarks are anonymised and only once no single studio is
+identifiable.
 
 ---
 

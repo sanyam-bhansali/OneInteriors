@@ -1,182 +1,241 @@
 # Quotation builder — plan
 
-**Status:** planned, Sprint 5–6. Blocked on real Hauspire quotations and studio
-rate cards.
+**Status:** planned, Sprint 5–6.
+
+**Revised after reviewing the Hauspire quotation app** (`Quotation automation/Quotation hosted`).
+That app is a working, calibrated, single-tenant version of most of this, on the
+same stack. Large parts port directly; the parts that don't are the parts that
+matter most, and they're listed here honestly.
 
 ---
 
 ## Why this is the highest-value thing we build for studios
 
-An independent Pune studio quotes today in Excel, or in Word, or by hand. A
-₹8–10 lakh quotation is 60–120 line items across eight or nine work categories,
-it gets revised four or five times during negotiation, and every revision is a
-fresh copy of the file. Version confusion at signing is routine, and "that's not
-what you quoted" is one of the most common disputes in the category.
+A ₹8–10 lakh quote is 60–120 line items, revised four or five times during
+negotiation, usually in Excel. Version confusion at signing is routine and
+"that's not what you quoted" is one of the most common disputes in the category.
 
-This is their most painful recurring task. Solving it properly is what makes the
-platform load-bearing in a studio's week rather than a lead source they can
-abandon — which is the difference between the subscription being renewable and
-not. Houzz reached the same conclusion and became a SaaS company on the back of it.
-
-**It also produces the data the rest of the product needs:**
-
-- Line-item structure → the indicative quote engine for customers
-- Material specification → what we verify against at each milestone
-- Category totals → the milestone schedule, generated rather than typed
-- Real rate data → budget-fit scoring based on delivered prices, not claimed ranges
+It also generates what the rest of the product needs: line items feed the
+indicative quote, material spec becomes what we verify at each milestone,
+category totals become the milestone schedule, and real rate data makes
+budget-fit scoring reflect delivered prices instead of claimed ranges.
 
 ---
 
-## What it is not
+## What we inherit from the Hauspire app
 
-**Not a price comparison engine.** We are not putting studios in a race to the
-bottom; the entire proposition is that the cheapest quote is usually the one that
-substitutes materials later.
+| Asset | Value |
+|---|---|
+| **ProductMaster** — 52 products with rates, work codes, descriptions, room tags, first-quote defaults | Months of work. Real catalogue structure, real copy for every line's "details" text. |
+| **Four price types** — Area, Unit, SqFt, RFT | The actual dimensional model Indian interior quoting uses. My original spec underspecified this badly. |
+| **Auto-build engine** (`buildQuote.ts`, `template.json`) | BHK → rooms → auto-generated first quote. This *is* the indicative quote, already calibrated. |
+| **Domain constants** | Kitchen run = `(W + D) − 900mm`. Standard heights: base 750, wall/loft 600, wardrobe 2100, TV 2100, console 900, mandir 1800. `92903.04 mm²/sqft`. |
+| **Payment staging** | Booking advance + 5/10/40/40/5. Informs — but does not become — our milestone plan (see below). |
+| **Plan OCR + 3D render** (`ocrPlan.ts`, `/api/extract-plan`) | Upload a floor plan, extract rooms and dimensions. Could pre-fill the brief. Later. |
+| **`PROJECT_LEARNINGS.md`** | Genuinely good hard-won rules — AI parsing, graceful degradation, Supabase RLS. Read it before building. |
+| **Rate provenance** | Archive medians across 25,581 line items from 940 quotations, with the fee/discount formula reverse-engineered and verified to the rupee against 4 real quotes. |
 
-**Not automated pricing.** The studio owns their numbers. We provide structure,
-reuse and arithmetic — never a suggested rate. The moment we set prices we become
-a contractor with a marketplace attached, and we inherit liability for the number.
+**Same stack** — Next.js App Router, TypeScript, Tailwind, Vercel. Supabase is
+Postgres, so it coexists with Prisma; we can host on Supabase and keep Prisma as
+the client.
 
 ---
 
-## Two documents, one model
+## Where my original spec was wrong
 
-| | **Indicative quote** | **Firm quote** |
+Recorded so the corrections stick.
+
+**1. I invented a 14-category taxonomy. The real structure is product-level.**
+Hauspire prices *products* (Base Cabinets, Tall Pantry Unit, Mandir), each
+tagged to rooms. My `civil / flooring / false_ceiling / …` list was a plausible
+guess and it is not how anyone actually quotes. **Use the product model.**
+
+**2. I missed the Area price type.** I had "sqft / rft / unit / lumpsum". The
+one that carries most of the value is **Area**: width × height in *millimetres*,
+converted to square feet, times a ₹/sqft rate. That's how cabinetry and
+wardrobes are priced, and it's what makes a dimension edit auto-reprice.
+
+**3. MO / NM is a commercial axis, not a scope axis.** Modular (MO-01) vs
+non-modular (NM-01) exists so the modular discount can apply to one and not the
+other. It is *not* a comparison taxonomy. **We need both:** MO/NM per line for
+pricing, and a coarse scope category for cross-studio comparison. That
+synthesis is the one genuinely new thing we add.
+
+---
+
+## What must change before it can serve the platform
+
+### 1. Single-tenant → multi-tenant. Non-negotiable.
+
+`product_master` is one global table. On our platform **every studio has their
+own rate card**. Every product, rate and template row needs a `studioId`.
+
+The commercial constants are Hauspire's too — `FEE_RATE = 0.07`,
+`MODULAR_DISCOUNT = 0.15`, `BOOKING_ADVANCE = 25000` are hardcoded module
+constants. Those are one studio's commercial model. They become per-studio
+configuration.
+
+### 2. The governance landmine — read this twice
+
+**Hauspire's rates must never become the platform's default rates.**
+
+If every studio quotes off a catalogue seeded with the cofounder's factory
+pricing, we have effectively set market prices in favour of a business we own —
+and it will be read exactly that way the moment one studio notices. That is the
+conflict `FUTURE-SCOPE.md` §3 exists to prevent, and it would do far more damage
+here than in supply, because pricing is where a studio's margin lives.
+
+**What is legitimate**, and genuinely valuable:
+
+- **Structure, shared.** The product list, the room tags, the price types, the
+  description copy — this is a *format*, not a price. Ship it as an empty
+  catalogue every studio fills with their own numbers.
+- **Benchmark, anonymised.** "Your base-cabinet rate is 18% above the Pune
+  median across 12 studios." Aggregate, never attributed, never prescriptive.
+  Only once enough studios are loaded that no single one is identifiable.
+
+**What is not:** any studio's rate card pre-populated with Hauspire's numbers,
+and any nudge toward Hauspire pricing anywhere in the flow.
+
+Say this in the studio agreement: *rate cards are private, we never set your
+prices, and aggregate benchmarks are anonymised.*
+
+### 3. Quotes must be immutable and versioned
+
+The `quotes` table stores `lines jsonb` and edits in place. For an in-house tool
+that's fine. For us it is not: **"that's not what you quoted" has to be
+answerable with a diff, not a memory.** Every revision becomes a new immutable
+row; the customer sees every version sent to them.
+
+### 4. Money moves to integer paise
+
+Hauspire's app works in rupees with `Math.round`. Ours is integer paise through
+`src/lib/money.ts` — `applyBps` for rates, `splitAcross` for milestones. Convert
+at the import boundary and never again. (Their `inr()` uses
+`toLocaleString('en-IN')`, which does give correct lakh/crore grouping — our
+`formatINR` is equivalent.)
+
+### 5. Payment stages ≠ our milestone plan
+
+Theirs is **factory-weighted**: booking → design draft 5% → design closure 10%
+→ procurement 40% → dispatch 40% → handover 5%. That is right for a
+manufacturer, where the cost lands at production.
+
+Ours is **site-progress-weighted**: design sign-off 15 → civil 20 → modular
+install 30 → services 20 → finishing 15. That is right for a platform verifying
+work on site, because we release against *photographs of completed work*, not
+against a factory event we cannot see.
+
+Keep ours. Theirs is useful evidence that Indian clients accept staged payment —
+which is the assumption the whole model rests on.
+
+### 6. Auth swaps
+
+`designer_id` is a Clerk user id. Ours is a WhatsApp-verified phone.
+
+---
+
+## ⚠️ A finding you should act on independently of this
+
+**`CALCULATIONS.md` is stale, and 21 of 52 products disagree with the live
+`productMaster.json`.** Not rounding — structural:
+
+| Product | Doc | Live |
 |---|---|---|
-| Who makes it | Generated by us from the brief | Written by the studio |
-| When | Immediately after matching, before contact | After a site visit |
-| Basis | Studio's rate card × brief quantities | Measured quantities, real selections |
-| Accuracy | Banded, ±15% stated | Binding within a stated variance |
-| Purpose | Lets the customer compare like with like | The thing they sign |
+| Base Cabinets | ₹2,035/sqft | ₹2,580/sqft |
+| Platform Creation | ₹18,500 | ₹50,000 |
+| Appliance Unit | ₹22,000 | ₹16,000 |
+| Crockery Unit | ₹36,500 **Unit** | ₹2,580/sqft **Area** — *the price type changed* |
+| Workstation | ₹12,000 | ₹2,000 |
 
-**The indicative quote is the dangerous one.** An indicative number that lands
-30% under the firm quote destroys more trust than showing no number at all — it
-is precisely the bait-and-switch pattern the brand exists to oppose. So:
-
-- The variance band is displayed as prominently as the total, never in a footnote
-- Assumptions are listed on the quote itself ("assumes 8ft ceiling, laminate finish, no structural work")
-- We track indicative-to-firm drift per studio; **persistent under-quoting is a verification issue**, not a pricing quirk
+Anyone pricing from that document is wrong on roughly 40% of the catalogue. The
+document says rates are "archive medians ~15–20% below current standard", which
+suggests the JSON was deliberately updated to current rates and the doc was
+never caught up. Worth fixing in the Hauspire repo regardless of this project —
+and it's the argument for generating rate documentation from the data rather
+than maintaining it by hand.
 
 ---
 
 ## Data model
 
-Already in `prisma/schema.prisma`: `Quotation`, `QuotationLineItem`,
-`RateCardItem`. Additions needed:
+Extend `prisma/schema.prisma`:
 
 ```
-QuotationVersion    every revision is a new immutable row; nothing is edited
-                    in place. "That's not what you quoted" must be answerable
-                    with a diff, not a memory.
+Product           studioId, name, workCode (MO|NM), priceType (AREA|UNIT|SQFT|RFT),
+                  ratePaise, unitPaise, details, rooms[], scopeCategory,
+                  fqDefaults (jsonb: w, h, qty, area, len, perBath, perBed,
+                  useRun, balcony, bhk), sortOrder
+                  → per-studio catalogue. Ports directly from ProductMaster
+                    plus studioId and scopeCategory.
 
-MaterialSpec        brand, grade, finish, thickness per line item. This is what
-                    the milestone check verifies against — without it,
-                    "plywood quoted, MDF delivered" is unprovable.
+RateCardVersion   studioId, effectiveFrom, note
+                  → rates change. A quote must price against the version
+                    current when it was issued, never today's.
 
-WorkCategory        the canonical taxonomy (below). Studios map their own
-                    language onto it so quotes are comparable across studios.
+Quotation         briefId, studioId, kind (INDICATIVE|FIRM), version,
+                  supersedesId, status, totals, assumptions, variancePct
+                  → immutable. A revision is a new row.
+
+QuotationLine     quotationId, productId?, room, description, workCode,
+                  priceType, widthMm, heightMm, qty, sqft, rft, ratePaise,
+                  amountPaise, materialSpec (jsonb)
+
+StudioPricing     studioId, feeBps, modularDiscountBps, bookingAdvancePaise
+                  → Hauspire's 7% / 15% / ₹25,000, per studio
 ```
 
-**Money rules apply without exception.** Integer paise, `applyBps` for GST,
-`splitAcross` when a total becomes milestones. No float ever touches a quotation.
-A rounding error here is an S1 — it is the number someone signs.
-
----
-
-## Category taxonomy
-
-The comparison tray is meaningless without this. Two quotes at ₹8.4L and ₹9.1L
-tell you nothing until you can see that one excludes false ceiling and the other
-includes appliances.
-
-```
-civil               demolition, brickwork, plaster, waterproofing
-flooring            tile, stone, laminate, skirting
-false_ceiling       gypsum, POP, cove lighting provision
-modular_kitchen     carcass, shutters, hardware, counter, backsplash
-wardrobes           carcass, shutters, internals, mirrors
-loose_furniture     beds, sofas, dining, study
-carpentry           TV units, crockery, pooja, bespoke joinery
-electrical          points, wiring, DB, automation
-plumbing            CP fittings, sanitaryware, concealed work
-painting            putty, primer, coats, texture
-lighting            fixtures, profiles, drivers
-furnishing          curtains, upholstery, rugs
-appliances          chimney, hob, oven, sink
-design_fee          design, drawings, site supervision
-```
-
-Every line item belongs to exactly one category. Studios keep their own
-descriptions; the category is what makes quotes comparable.
-
----
-
-## Studio-side flow
-
-1. **Rate card** — set up once, reused forever. Category, description, unit
-   (sqft / rft / unit / lumpsum), rate. This is the setup cost that buys every
-   later quote in minutes.
-2. **New quote from a brief** — customer's rooms, areas and scope pre-populate
-   the skeleton. They are quoting *against a real brief*, not a blank page.
-3. **Line items** — add from rate card or free-type. Live category subtotals.
-4. **Material spec per line** — brand, grade, finish. Feeds milestone verification.
-5. **Review** — subtotal, GST at 18%, total, validity, assumptions, exclusions.
-6. **Send** — customer sees it in their project view. A new version is a new
-   immutable row.
-
-**Bulk import matters more than it sounds.** The first thing a studio with a
-mature Excel rate card will ask is whether they have to retype it. CSV import
-against the category taxonomy, in sprint one of this feature.
-
----
-
-## Customer-side flow
-
-- Quote renders grouped by category with subtotals, not as a 90-row wall
-- **Compare view normalises scope** — the useful row is "what does this one include that the other doesn't"
-- Every revision visible, with a diff against the previous version
-- Accepting a quote generates the milestone plan from category totals — no retyping, no drift between what was quoted and what gets verified
+`scopeCategory` is the new field and the one that earns its place: a coarse
+bucket (`modular_kitchen`, `wardrobes`, `carpentry`, `false_ceiling`,
+`painting`, `electrical`, `plumbing`, `flooring`, `furnishing`, `appliances`,
+`civil`, `design_fee`) mapped onto each product. Studios keep their own product
+names; the category is what makes two quotes comparable in the compare tray, and
+what generates the milestone schedule. **Without it, "₹8.4L vs ₹9.1L" tells the
+customer nothing.**
 
 ---
 
 ## Build sequence
 
-| | Scope | Est |
-|---|---|---|
-| **A** | Category taxonomy, `RateCardItem` CRUD, CSV import | 3d |
-| **B** | Quote builder: line items, live totals, GST, versioning | 4d |
-| **C** | Material spec per line item | 2d |
-| **D** | Customer quote view, grouped, with version history | 2d |
-| **E** | Indicative generator from brief × rate card, with bands | 3d |
-| **F** | Scope-normalised comparison across up to 3 quotes | 3d |
-| **G** | Accepted quote → milestone plan | 2d |
+| | Scope | Est | Notes |
+|---|---|---|---|
+| **A** | Port ProductMaster shape → `Product` with `studioId` + `scopeCategory`; CSV import | 2d | Structure ported, **rates empty** |
+| **B** | Rate card CRUD + versioning | 2d | |
+| **C** | Port the four price types and `lineAmount` into `money.ts` (paise) | 2d | Direct port + unit conversion, with tests |
+| **D** | Quote builder: lines, live totals, per-studio fee/discount, GST, immutable versions | 4d | |
+| **E** | Material spec per line | 2d | Feeds milestone verification |
+| **F** | Customer quote view, grouped by scope category, version history | 2d | |
+| **G** | Port the auto-build engine → indicative quote from brief × rate card | 3d | Biggest single inherited win |
+| **H** | Scope-normalised comparison across 3 quotes | 3d | |
+| **I** | Accepted quote → milestone plan via `splitAcross` | 1d | |
 
-Roughly 19 days. **A–D are the studio-retention core** and should ship together;
-E–G depend on having several real rate cards loaded, so they follow naturally a
-sprint later.
+**~21 days.** Materially cheaper than building from nothing because C and G —
+the hard, calibrated parts — are ports rather than inventions.
+
+**Later:** plan OCR pre-filling the brief; anonymised rate benchmarking once
+enough studios are loaded.
 
 ---
 
-## What we need from you before starting
+## Still needed from you
 
-1. **Two or three real Hauspire quotations**, with line items intact. Model the
-   format that actually exists rather than inventing one.
-2. **Two studio rate cards** from the pilot cohort — the categories and units
-   Pune studios genuinely price in. Our taxonomy above is a hypothesis until it
-   has been checked against real ones.
-3. **A real GST treatment.** 18% is the headline for interior services, but
-   composite supply versus works contract changes the treatment, and getting it
-   wrong on a signed document is a problem. One conversation with your CA.
+1. **Two pilot-studio rate cards** — to confirm the product model holds outside
+   Hauspire. It's one company's catalogue until a second one fits it.
+2. **GST treatment**, from your CA. 18% is the headline, but composite supply vs
+   works contract changes it, and it is wrong on a signed document otherwise.
+   Note the Hauspire app has **no GST handling at all** — TPV is pre-tax. Ours
+   cannot be.
+3. **Confirmation on the rates question** — that studios load their own, and
+   Hauspire's catalogue is used for structure only.
 
 ---
 
 ## Open questions
 
-- **Do studios want their rates visible to us at all?** The rate card is
-  commercially sensitive. Likely answer: private by default, aggregate-only for
-  budget-fit scoring, and say so plainly in the studio agreement.
-- **Who owns a quotation if a studio leaves the platform?** Should be the studio.
-  Write it down before it is contested.
-- **How much revision history does the customer see?** Full transparency is
-  on-brand, but it also exposes a studio's negotiation. Probably: customer sees
-  every version sent *to them*, not internal drafts.
+- **Are rate cards visible to us?** They're commercially sensitive. Proposed:
+  private by default, aggregate-only for budget-fit scoring, stated plainly in
+  the studio agreement.
+- **Who owns a quotation if a studio leaves?** Should be the studio. Write it
+  down before it's contested.
+- **How much history does the customer see?** Every version sent *to them* —
+  not internal drafts.
