@@ -46,9 +46,19 @@ Two install-time warnings are expected and explained in
 The repo is initialised on `main` with the first commit already made. Two steps
 are yours because they need your credentials:
 
+The remote is already configured as
+[`sanyam-bhansali/OneInteriors`](https://github.com/sanyam-bhansali/OneInteriors),
+so the first push is one command:
+
 ```bash
-# 1. Create an empty repo on GitHub (no README, no .gitignore), then:
-git remote add origin https://github.com/<you>/one-interiors.git
+git push -u origin main
+```
+
+If GitHub rejects it because the repo was created with a README or .gitignore,
+pull those in first rather than force-pushing over them:
+
+```bash
+git pull --rebase origin main
 git push -u origin main
 ```
 
