@@ -83,10 +83,31 @@ in India.
 
 | Key | Public? | What protects it |
 |---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Nothing — it's just an address |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (`sb_publishable_…`) | **Yes, by design** | **Row Level Security, and nothing else** |
-| Database password (in the Prisma URLs) | **No** | Keep it in `.env.local` and Vercel only |
-| `service_role` key | **No** | Bypasses RLS entirely. Server-only, never `NEXT_PUBLIC_*`. We do not need it. |
+| `SUPABASE_URL` | Yes | Nothing — it's just an address |
+| `SUPABASE_PUBLISHABLE_KEY` (`sb_publishable_…`) | **Yes, by design** | **Row Level Security, and nothing else** |
+| `SUPABASE_JWKS_URL` | Yes | Public endpoint; it exists to publish signing keys |
+| Database password (inside the Prisma URLs) | **No** | `.env.local` and Vercel only |
+| `SUPABASE_SECRET_KEY` (`sb_secret_…`) | **No — this is the dangerous one** | Nothing. It **bypasses RLS entirely.** |
+
+### The secret key
+
+`sb_secret_…` (and the legacy `service_role` key) is not a stronger version of
+the publishable key — it is a different category. It bypasses Row Level
+Security completely: full read and write on every table, all storage, admin
+operations. Anyone holding it has your database.
+
+Rules:
+
+- **Server-only.** Never prefix it with `NEXT_PUBLIC_` — that inlines it into
+  the browser bundle and publishes it to every visitor.
+- **Never commit it, and never send it through chat, Slack or email.** Anything
+  transmitted that way should be considered exposed.
+- **If exposed, rotate immediately**: Supabase → Project Settings → API Keys →
+  roll the secret key. Rotation costs a redeploy. A leaked RLS-bypass key costs
+  the database.
+- **We do not currently need it.** Prisma authenticates with the database
+  password. Leave `SUPABASE_SECRET_KEY` blank until something genuinely
+  requires admin access, and prefer a scoped approach when it does.
 
 The publishable key is meant to ship in the browser bundle — that is not a
 leak. But it is worth being precise about what makes it safe: **the key is not
