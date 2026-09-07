@@ -24,6 +24,29 @@ export function hasDirectDatabase(): boolean {
   return present(process.env.DIRECT_URL);
 }
 
+/**
+ * Supabase project, for Storage.
+ *
+ * The publishable key is PUBLIC by design — it is inlined into the browser
+ * bundle, and that is fine. What makes it safe is Row Level Security: the key
+ * only reaches what a policy allows. With RLS off it is full read/write on
+ * every table, so treat "is RLS on?" as the actual security boundary and this
+ * key as a project identifier.
+ *
+ * Nothing consumes this yet. It arrives with OI-5c, when milestone photos and
+ * verification evidence need somewhere private to live.
+ */
+export function supabaseConfig(): { url: string; publishableKey: string } | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
+  if (!url || !publishableKey) return null;
+  return { url, publishableKey };
+}
+
+export function hasSupabase(): boolean {
+  return supabaseConfig() !== null;
+}
+
 export function isProduction(): boolean {
   return process.env.NODE_ENV === 'production';
 }

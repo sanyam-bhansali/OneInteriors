@@ -79,12 +79,44 @@ in India.
 
 ## Notes
 
+## Keys, and which of them matter
+
+| Key | Public? | What protects it |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Nothing — it's just an address |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (`sb_publishable_…`) | **Yes, by design** | **Row Level Security, and nothing else** |
+| Database password (in the Prisma URLs) | **No** | Keep it in `.env.local` and Vercel only |
+| `service_role` key | **No** | Bypasses RLS entirely. Server-only, never `NEXT_PUBLIC_*`. We do not need it. |
+
+The publishable key is meant to ship in the browser bundle — that is not a
+leak. But it is worth being precise about what makes it safe: **the key is not
+the security boundary, RLS is.** With RLS off, that public key is full read and
+write on every table in the project, for anyone who opens devtools.
+
+Nothing in the app uses it yet. It arrives with OI-5c, when milestone photos
+and verification evidence need somewhere private to live.
+
+**Before anything talks to Supabase with that key**, decide the policies. Two
+rules for us specifically:
+
+- Verification evidence and milestone photos go in **private** buckets, reached
+  through signed URLs. A studio's site photographs and a client's home are not
+  public objects.
+- Studio rate cards are commercially sensitive (see `QUOTATION-BUILDER.md`).
+  Whatever policy governs them must not let one studio read another's.
+
+---
+
+## Notes
+
 **Row Level Security.** Supabase enables RLS on new tables and, with it on and
-no policy, reads and writes silently return nothing rather than erroring — a
-genuinely confusing failure. Prisma connects as the `postgres` role and
-bypasses RLS, so this does not bite us today. It will the moment anything talks
-to Supabase with the anon key. Decide deliberately then; do not disable RLS to
-make a bug go away.
+no policy, reads and writes **silently return nothing rather than erroring** —
+a genuinely confusing failure that looks like a bug in your code.
+
+Prisma connects as the `postgres` role and bypasses RLS, so this does not bite
+us today. It will the moment anything uses the publishable key. Decide the
+policy deliberately then — do not disable RLS to make a bug go away, because
+that is precisely the setting the public key depends on.
 
 **Tier is recomputed on read.** `PrismaStudioRepository` recomputes each
 studio's tier from its checks rather than trusting the column, so a stale or
