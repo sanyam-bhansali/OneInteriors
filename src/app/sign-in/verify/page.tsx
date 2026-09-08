@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { Container, Button } from '@/components/ui';
 import { Wordmark } from '@/components/brand';
 import { consumeMagicLink } from '@/modules/auth/magic-link';
+import { claimBrief } from '@/modules/brief/repository';
+import { claimConsent } from '@/modules/consent/record';
+import { record } from '@/modules/analytics/record';
 import { prisma } from '@/lib/prisma';
 
 export const metadata: Metadata = {
@@ -53,8 +56,21 @@ export default async function VerifyPage({
   });
 
   if (result.ok) {
+    // Attach anything this browser did before signing in. Both are best-effort
+    // and neither may block the sign-in — a failed claim costs a brief, a
+    // failed sign-in costs the customer.
+    const { claimed, anonKey } = await claimBrief(result.userId);
+    await claimConsent(result.userId, anonKey);
+    if (claimed) await record('brief.claimed');
+    await record('signin.completed');
+
     const user = await prisma.user.findUnique({ where: { id: result.userId } });
-    redirect(user?.role === 'OPS' || user?.role === 'ADMIN' ? '/ops' : '/');
+
+    if (user?.role === 'OPS' || user?.role === 'ADMIN') redirect('/ops');
+    if (user?.role === 'STUDIO') redirect('/studio');
+    // A customer who signed in mid-funnel wants their matches, not the
+    // landing page they have already read.
+    redirect(claimed ? '/match' : '/');
   }
 
   const message = MESSAGES[result.reason] ?? MESSAGES.invalid;

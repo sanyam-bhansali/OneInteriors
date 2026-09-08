@@ -117,17 +117,31 @@ enum ConsentPurpose {
 }
 
 model Consent {
-  id          String         @id @default(cuid())
-  userId      String
-  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  purpose     ConsentPurpose
-  granted     Boolean
-  source      String // "quiz_step_9" | "hauspire_import_2026_09" | "ops_manual"
+  id String @id @default(cuid())
+
+  /// Null until they sign in. Consent is asked at the end of the quiz, which
+  /// is before we know who they are — and asking for a phone number in order
+  /// to record a consent decision would itself be collecting data we had no
+  /// consent for.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The same browser token the anonymous brief uses. Claimed together.
+  anonKey String?
+
+  purpose ConsentPurpose
+  granted Boolean
+  source  String // "quiz_consent_step" | "hauspire_import_2026_09" | "ops_manual"
+
+  /// The version of the notice they were shown. Consent does not carry across
+  /// a material change to what we said, and that is only knowable if the
+  /// version was recorded at the time.
   policyVersion String
-  grantedAt   DateTime       @default(now())
+
+  grantedAt   DateTime  @default(now())
   withdrawnAt DateTime?
 
   @@index([userId, purpose])
+  @@index([anonKey])
   @@map("consents")
 }
 
@@ -165,9 +179,19 @@ enum PriorityFactor {
 }
 
 model Brief {
-  id     String @id @default(cuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id String @id @default(cuid())
+
+  /// Null until the person signs in. A brief starts anonymous because asking
+  /// for a phone number before showing any value is what kills quiz
+  /// completion — the whole flow is built to give the reveal first and ask
+  /// second.
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Random token held in an httpOnly cookie, so an anonymous brief survives a
+  /// reload and can be claimed on sign-in. Cleared when claimed, so a brief is
+  /// never reachable by both a stale cookie and an account.
+  anonKey String? @unique
 
   // Q1
   propertyType PropertyType?
@@ -214,7 +238,13 @@ model Brief {
   projects      Project[]
   consultations Consultation[]
 
+  /// Set when an anonymous brief is attached to an account. Kept for the
+  /// funnel: the gap between completedAt and this is how long people take to
+  /// decide we are worth a phone number.
+  claimedAt DateTime?
+
   @@index([locality, completedAt])
+  @@index([anonKey])
   @@map("briefs")
 }
 
@@ -909,4 +939,41 @@ model ProfileDraft {
   approvedById String?
 
   @@map("profile_drafts")
+}
+
+/// A funnel event.
+///
+/// Deliberately thin, and deliberately ours rather than a third-party script:
+/// under the DPDP Act the cheapest position is not to ship visitor data to
+/// anyone else at all, and the questions we actually need answered — which
+/// quiz question loses people, what did a qualified lead cost — are answerable
+/// from our own rows.
+///
+/// **No personal data goes in `props`.** Not a name, phone, email or free
+/// text. It carries counts, slugs and enum values only, and everything here is
+/// readable by anyone with ops access.
+model AnalyticsEvent {
+  id   String @id @default(cuid())
+  name String // "quiz.step.view" | "quiz.complete" | "match.view" | "enquiry.sent"
+
+  /// The anonymous brief cookie token, when there is one. Lets a funnel be
+  /// followed across a session without knowing who the person is.
+  anonKey String?
+  /// Set only once they have signed in.
+  userId  String?
+  briefId String?
+
+  /// Small structured payload. Numbers, slugs and enums only — never free text.
+  props Json?
+
+  /// Where they came from. Recorded once per session, on the first event.
+  source   String?
+  campaign String?
+
+  createdAt DateTime @default(now())
+
+  @@index([name, createdAt])
+  @@index([anonKey])
+  @@index([briefId])
+  @@map("analytics_events")
 }

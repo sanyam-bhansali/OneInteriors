@@ -39,6 +39,11 @@ import {
   type StyleTag,
 } from '@/modules/brief/types';
 import { loadBrief, saveBrief } from '@/modules/brief/store';
+import {
+  saveBriefAction,
+  loadBriefAction,
+  trackAction,
+} from './actions';
 import { rankStudios } from '@/modules/matching/score';
 import type { Studio } from '@/modules/studio/types';
 import { StyleScene, MaterialSwatches } from '@/components/art/StyleScene';
@@ -102,11 +107,37 @@ export function QuizClient({ studios }: { studios: Studio[] }) {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    const stored = loadBrief();
-    setBrief(stored);
-    setStep(Math.min(Math.max(stored.lastStep || 1, 1), TOTAL_STEPS));
+    // sessionStorage first so the quiz paints immediately, then reconcile with
+    // the server. A stored brief always wins over an empty local one; a local
+    // brief wins when the server has never heard of this browser.
+    const local = loadBrief();
+    setBrief(local);
+    setStep(Math.min(Math.max(local.lastStep || 1, 1), TOTAL_STEPS));
     setHydrated(true);
+
+    let cancelled = false;
+    void loadBriefAction().then((remote) => {
+      if (cancelled || !remote) return;
+      // Only adopt the server copy if it is further along. Otherwise someone
+      // who reloads mid-question gets thrown backwards to their last sync.
+      if ((remote.lastStep ?? 0) >= (local.lastStep ?? 0)) {
+        setBrief(remote);
+        saveBrief(remote);
+        setStep(Math.min(Math.max(remote.lastStep || 1, 1), TOTAL_STEPS));
+      }
+    });
+
+    void trackAction('quiz.start');
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  // One view event per step, including the first.
+  useEffect(() => {
+    if (!hydrated) return;
+    void trackAction('quiz.step.view', { step });
+  }, [step, hydrated]);
 
   function update(patch: Partial<Brief>) {
     setBrief((prev) => {
@@ -116,16 +147,31 @@ export function QuizClient({ studios }: { studios: Studio[] }) {
     });
   }
 
+  /**
+   * Persist to the server without blocking the UI. The local copy is already
+   * written by the time this fires, so a rejected promise costs the sync and
+   * nothing else.
+   */
+  function sync(next: Brief) {
+    void saveBriefAction(next).catch(() => {});
+  }
+
   function next() {
+    void trackAction('quiz.step.complete', { step });
+
     if (step >= TOTAL_STEPS) {
       const done = { ...brief, completedAt: new Date().toISOString(), lastStep: TOTAL_STEPS };
       saveBrief(done);
+      sync(done);
+      void trackAction('quiz.complete');
       router.push('/match');
       return;
     }
     const n = step + 1;
     setStep(n);
-    saveBrief({ ...brief, lastStep: n });
+    const advanced = { ...brief, lastStep: n };
+    saveBrief(advanced);
+    sync(advanced);
   }
 
   function back() {
