@@ -1,183 +1,314 @@
 # What I need from you
 
+Last updated 8 September 2026.
+
 Everything currently blocking or slowing the build, in the order it will bite.
-Each item says **why** it matters and **what it unblocks**, so you can judge
-what's worth your afternoon.
+Each item says **why** it matters and **what it unblocks**, so you can judge what
+is worth your afternoon.
 
-Nothing here is a nice-to-have. Where something can be worked around, I've said
-so.
-
----
-
-## 1. Blocking now — nothing progresses past these
-
-### 1.1 Resend account → `RESEND_API_KEY`, `EMAIL_FROM`
-**5 minutes. Free tier is 3,000 emails/month.**
-
-Sign-in is a magic link. Without an email provider the link only prints to your
-local dev console, which means **`/ops` is unusable from the deployed site** —
-you could not onboard a studio from anywhere but your own laptop.
-
-1. Sign up at resend.com
-2. Add and verify a sending domain (a DNS record or two). A subdomain like
-   `mail.yourdomain.in` is fine and keeps your main domain's reputation separate.
-3. Create an API key → `RESEND_API_KEY`
-4. Set `EMAIL_FROM` to something like `One Interiors <hello@yourdomain.in>`
-
-**Unblocks:** ops sign-in in production, and later every milestone notification.
-
-> Needs the brand name and domain settled first — see 1.2.
+Nothing here is a nice-to-have. Where something can be worked around, I have
+said so. Where you have already done it, it has moved to §6 so you can see the
+list shrinking.
 
 ---
 
-### 1.2 The brand name and domain
-**A decision, not a task. Currently the largest blocker by knock-on effect.**
+## 0. Do these today — 40 minutes, and they are all small
 
-"One Interiors" is a category label, not a brand. It competes on search with
-every interiors business in India, and I'd be surprised if the `.in` were free.
+These are the ones where a small task is holding up something much larger.
 
-It blocks more than it looks: the email sending domain, the Vercel production
-domain, `NEXT_PUBLIC_SITE_URL`, the app store listings, and whether we can drop
-`robots: noindex` and start accumulating SEO on locality cost pages — which is a
-primary organic channel and takes months to compound. Every week on `noindex` is
-a week not compounding.
+### 0.1 Build and push
 
-**Before committing:** check the `.in` domain, the Instagram handle, and run an
-MCA name-availability search.
+```
+cd C:\Sanyam\OneInteriors
+npm run build
+git push origin main
+```
+
+Twelve commits are sitting unpushed. **Run the build first** — I cannot run it
+from my side, and an unverified build is exactly what broke the last Vercel
+deploy (`TypeError: Invalid URL` from an empty env var). Typecheck, lint and 119
+tests already pass; the build is the one gap.
+
+If the build fails, paste me the whole log rather than the last line.
 
 ---
 
-### 1.3 The six to eight pilot studios
-**The critical path to the entire business.**
+### 0.2 Rotate the Supabase secret key
 
-The ops console can now onboard a studio end to end — but there are none to
-onboard. Everything downstream waits on this: real projects, delivery variance,
-Tier 3 "Proven", which is the only part of the product a competitor cannot buy
-from a KYC vendor.
+**Two minutes. Do it even though nothing uses it.**
 
-For each studio I need:
+`sb_secret_IJ7AQgl…` came through this chat. That key **bypasses Row Level
+Security entirely** — it is the one credential that would undo the lockdown we
+put on all 25 tables. Nothing in the codebase needs it and `SUPABASE_SECRET_KEY`
+is deliberately blank, so rotating costs you nothing.
 
-| Field | Notes |
+Supabase dashboard → Project Settings → API Keys → roll the secret key. Do not
+paste the new one anywhere, including to me.
+
+---
+
+### 0.3 Set the production env vars in Vercel
+
+**Five minutes. Without these, approving a studio silently fails in production.**
+
+These exist only in your local `.env.local`. Vercel has never seen them:
+
+| Variable | Value |
 |---|---|
-| Legal name and trade name | As on the GST certificate |
-| GSTIN | Validated offline on entry; an invalid checksum is rejected |
-| Localities served | From the twelve Pune areas in the quiz |
-| Project value range | Their realistic floor and ceiling |
-| Years active, team size | Self-declared; shown but never used for a tier |
-| A one-paragraph description | I'll write these from a call if easier |
-| 3–6 past projects | Title, locality, BHK, scope, value, duration, completion date |
+| `RESEND_API_KEY` | The `re_…` key |
+| `EMAIL_FROM` | Currently `One Interiors <onboarding@resend.dev>` |
+| `SESSION_SECRET` | Generate a **new** one for production, do not reuse local |
+| `DATABASE_URL` | Transaction pooler, port 6543, `?pgbouncer=true&connection_limit=1` |
+| `DIRECT_URL` | Session pooler, port 5432 |
+| `NEXT_PUBLIC_SUPABASE_URL` | Same as local |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Same as local |
+| `NEXT_PUBLIC_SITE_URL` | Your Vercel production URL, **no trailing slash** |
 
-**Concentrate the pilot across six to eight studios, not twenty** — several
-studios reaching three completed projects each is what produces a delivery
-record. Twenty studios with one project each produces nothing.
+`NEXT_PUBLIC_SITE_URL` is the one that bit us before. Vercel passes an unset
+`NEXT_PUBLIC_*` as an empty string, not as undefined — `src/lib/site.ts` now
+handles that, but set it properly anyway or every magic link will point at
+localhost.
+
+Leave `SUPABASE_SECRET_KEY` blank. Leave `NEXT_PUBLIC_ROSTER_IS_REAL` unset
+until real studios are actually live — it controls the "these are placeholder
+studios" disclaimer, and forgetting it over-discloses, which is the safe
+direction.
 
 ---
 
-## 2. Needed within the next two sprints
+## 1. Blocking the next piece of work
 
-### 2.1 WhatsApp Business API
-**Meta business verification has a lead time of weeks. Start it now.**
+### 1.1 Which LLM provider — Anthropic, OpenAI, or Google
 
-Customers sign in by phone, not email — it's the channel the rest of the
-relationship happens on in India anyway. The code path already exists and shares
-one implementation with email, so this is a provider swap rather than new work.
+**A decision plus an API key. This is the only thing blocking the AI portfolio
+agent.**
 
-Needs: a Meta Business account, business verification, a phone number, then
-`WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`,
-`WHATSAPP_WEBHOOK_VERIFY_TOKEN`.
+You asked for an agent that reads a studio's projects and drafts a polished
+portfolio — aligning their photographs with written copy. I cannot start it
+without knowing what it is calling.
 
-**Unblocks:** customer accounts, briefs surviving a device change, milestone
-notifications.
+My recommendation is **Anthropic**, for one specific reason rather than general
+preference: this agent writes copy that goes on a page a customer makes a
+₹8-lakh decision from, and the failure mode that matters is *invention* — an
+agent writing "delivered in 40 days" because it reads well, when nobody measured
+it. That risk is handled by how I prompt and constrain it, but longer-context
+models handle "use only these facts, and say nothing where a fact is missing"
+more reliably, and I would rather over-provision on that.
 
-### 2.2 DPDP position on the 20,000 records — **in writing**
+Either way I will build it so the studio approves every word before it
+publishes. The agent drafts; it never publishes.
+
+**Send:** the provider, and the API key. Costs are small — drafting one
+portfolio is a few rupees.
+
+---
+
+### 1.2 The real contact person at Hauspire and Urbanline
+
+**A name and a direct email each.**
+
+Both are seeded in `/ops/applications` and waiting for you to approve them. But
+I only had their published addresses:
+
+| Studio | What I have | What I need |
+|---|---|---|
+| Hauspire | `info@hauspire.com` | The person who will actually build the profile |
+| Urbanline Interiors | `connect@urbanlineinteriors.com` | Same |
+
+Approving emails a sign-in link to that address. A shared `info@` inbox means
+the link either goes unnoticed or gets clicked by whoever opens the mail — and
+that person then owns the studio account.
+
+Also worth knowing before you approve: **Urbanline's domain is
+`urbanlineinteriors.com`, plural.** The `urbanlineinterior.com` you sent me does
+not resolve. Worth checking whether they own the singular and let it lapse,
+because someone else can take it.
+
+---
+
+### 1.3 Verify a sending domain in Resend
+
+**15 minutes, mostly waiting on DNS.**
+
+The Resend account is live and sending, but it is unverified — which means it
+**can only send to `sanyambhansali1@gmail.com`.** Any other recipient gets a 403.
+
+So today, approving Hauspire would create the studio, create their user, and
+then fail to deliver the sign-in link. The approval itself survives (the email
+send is deliberately outside the database transaction), but nobody gets in.
+
+This needs a domain. If the name is not settled, use any domain you already
+control — even a Hauspire subdomain — and change it later. It is one env var.
+
+**Unblocks:** actually onboarding the first two studios.
+
+---
+
+## 2. The name — your call, but here is the clock
+
+You said to decide the name later and focus on development, and I agree that
+was the right call two weeks ago. It is worth knowing what it is costing now
+that the product is real.
+
+The site is `robots: noindex` until it has a permanent home. Locality cost pages
+("interior designers in Baner", "2 BHK interior cost in Pune") are a primary
+organic channel for this category and they take **months** to rank. Both
+Hauspire and Urbanline already run exactly these pages — I saw them on both
+sites while building the scraper. Every week on `noindex` is a week not
+compounding, and that cost is invisible because nothing looks broken.
+
+It also gates: the email sending domain, the Vercel production domain, and the
+app store listings.
+
+**Before committing to any name:** check the `.in` domain, the Instagram handle,
+and run an MCA name-availability search. "One Interiors" is a category label —
+it will fight every interiors business in India for search, and I would be
+surprised if the `.in` is free.
+
+Nothing in the codebase hardcodes the name. Changing it is a copy pass, not a
+rebuild.
+
+---
+
+## 3. Needed within the next two sprints
+
+### 3.1 DPDP position on the 20,000 Hauspire records — **in writing**
+
 **A lawyer's two hours. Blocks your entire demand plan.**
 
-Those records were collected by Hauspire for its own purpose. Marketing a
+Those records were collected by Hauspire for Hauspire's purpose. Marketing a
 different entity to them is a live consent question under the DPDP Act 2023.
 
 I can build the consent model without this — but you cannot legally send the
 first campaign, and that campaign is what fills the pilot studios' pipeline. If
-consent doesn't transfer, the acquisition timeline moves out by a quarter and
-the budget changes shape. Better to know now.
+consent does not transfer, the acquisition timeline moves out by a quarter and
+the budget changes shape. Better to know now than after the first complaint.
 
-### 2.3 Agency baseline numbers
-**You have these; nobody else does.**
+### 3.2 Agency baseline numbers
 
-From the performance marketing business, per designer, over 6–12 months:
-cost per lead, lead→meeting, meeting→signed. Anonymised is fine.
+**You have these; nobody else in this market does.**
 
-This is the anchor for the whole pricing ladder — it's how you tell a studio
+From the performance marketing business, per designer, over 6–12 months: cost
+per lead, lead→meeting, meeting→signed. Anonymised is fine.
+
+This is the anchor for the whole pricing ladder. It is how you tell a studio
 "₹1L/month for five projects is half what you already pay per booked project."
-Without it that conversation is an assertion.
+Without it, that sentence is an assertion rather than a calculation.
 
-### 2.4 Apple Developer + Google Play accounts
-**Apple enrolment can take 2+ weeks. It becomes the blocker if left.**
+### 3.3 WhatsApp Business API
+
+**Meta business verification takes weeks. Start it now, use it later.**
+
+Customers will sign in by phone, not email — it is the channel the rest of the
+relationship happens on in India anyway. The auth code path already exists and
+shares one implementation with email, so this is a provider swap rather than new
+work.
+
+Needs a Meta Business account, business verification, and a number. Then
+`WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`,
+`WHATSAPP_WEBHOOK_VERIFY_TOKEN`.
+
+### 3.4 Apple Developer + Google Play accounts
+
+**Apple enrolment can take 2+ weeks. It becomes the blocker if left to the end.**
 
 Apple ₹8,900/year, Google $25 one-time. The apps are a Capacitor wrap of the
-same codebase, so there's no second app to build — but the account can't be
+same codebase, so there is no second app to build — but the account cannot be
 rushed at the end.
 
 ---
 
-## 3. Needed for the quotation builder (Sprint 5–6)
+## 4. For the quotation builder
 
-This is the highest-value thing for studio retention, and it is **fully blocked**
-on real data. I will not invent a line-item model — that guarantees rework.
+### 4.1 GST treatment, from your CA
 
-### 3.1 Two or three real Hauspire quotations
-With line items intact. I've read the app's ProductMaster, but I need to see how
-a quote is actually *presented* to a client.
+**The one genuinely blocking item here.**
 
-### 3.2 Two pilot-studio rate cards
-The categories and units Pune studios genuinely price in. Hauspire's catalogue
-is one company's structure until a second one fits it.
+18% is the headline, but composite supply versus works contract changes it, and
+it is wrong on a signed document otherwise. **The Hauspire app has no GST
+handling at all** — its TPV is pre-tax. Ours cannot be, because ours produces a
+document a customer pays against.
 
-### 3.3 GST treatment, from your CA
-18% is the headline, but composite supply vs works contract changes it, and it's
-wrong on a signed document otherwise. **The Hauspire app has no GST handling at
-all** — its TPV is pre-tax. Ours can't be.
+### 4.2 One pilot-studio rate card that is not Hauspire's
+
+I now have 980 Hauspire quotation files, which is more than enough to derive
+structure. But Hauspire's catalogue is *one company's* structure until a second
+one fits into it. Urbanline's would do.
+
+This also matters for the rule in §5.1: I need to know the shape of the model
+without anchoring its numbers to your cofounder's factory.
 
 ---
 
-## 4. Decisions only you can make
+## 5. Decisions only you can make
 
-### 4.1 Confirm the Hauspire rate rule
+### 5.1 Confirm the Hauspire rate rule
+
 That studios load **their own** rates, and Hauspire's catalogue is used for
-structure only. Seeding the platform with your cofounder's factory pricing would
-be setting market prices in favour of a business you own — and pricing is where
-a studio's margin lives. I've written this into `FUTURE-SCOPE.md` §6 as settled;
-tell me if it isn't.
+*structure* only, never as default prices.
 
-### 4.2 Escrow — is it feasible at all?
-Two weeks with a lawyer. If holding client funds turns out to be impractical at
-this stage, the repositioning in §03 of the build plan collapses and we're back
-to a commission model with known failure modes. Everything currently says "we do
-not hold your money" and that stays true until this is answered.
+Seeding the platform with your cofounder's factory pricing would be setting
+market prices in favour of a business you own — and pricing is where a studio's
+margin lives. It is also the single fact that, if it came out later, would cost
+you the roster. I have written this into `FUTURE-SCOPE.md` §6 as settled. Tell
+me if it is not.
 
-### 4.3 The dispute and removal policy
-Needs writing before launch, not after the first dispute. What triggers
-suspension, what triggers permanent removal, who decides, what the appeal is.
-The ops console already **requires** a written reason for any status change and
-records who made it — that machinery exists, but the policy it enforces doesn't.
+### 5.2 Escrow — is it feasible at all?
+
+Two weeks with a lawyer, and worth starting inside the three-month window rather
+than at the end of it. If holding client funds turns out to be impractical for
+an entity at this stage, the repositioning collapses and we are back to a
+commission model with known failure modes.
+
+Everything on the site currently says "we do not hold your money", and that
+stays true until this is answered. Measurement is separate from money movement,
+so the delivery record keeps accruing either way — that was the point of
+deferring it.
+
+### 5.3 The dispute and removal policy
+
+Needs writing **before** launch, not after the first dispute. What triggers
+suspension, what triggers permanent removal, who decides, and what the appeal
+is.
+
+The ops console already *requires* a written reason for any status change and
+records who made it — that machinery exists. The policy it enforces does not.
 
 ---
 
-## 5. Things I do NOT need
+## 6. Done — no longer needed from you
 
-So you don't spend time on them:
+So you can see the list shrinking:
 
-- **The Supabase secret key.** Nothing uses it and it bypasses RLS. Leave it
-  blank, and rotate the one that went through chat.
+- ~~Supabase project and connection strings~~ — live, 25 tables, RLS enforced
+- ~~Resend API key~~ — set, sending confirmed (domain verification still open, §1.3)
+- ~~Admin email~~ — `kairossmma@gmail.com` and `sanyambhansali1@gmail.com` are both OPS
+- ~~Hauspire quotation samples~~ — 980 `.xlsm` files, more than enough
+- ~~The first two studios~~ — Hauspire and Urbanline seeded and waiting for approval
+
+---
+
+## 7. Things I do **not** need
+
+So you do not spend time on them:
+
+- **The Supabase secret key.** Nothing uses it, it bypasses RLS, leave it blank.
 - **Design assets, logos, fonts.** The mark, palette and type scale are built.
-- **Copy.** I'll draft it; you correct it.
-- **A KYC vendor yet.** GSTIN validation runs offline. Only the *live* portal
-  lookup needs one, and reference calls and site visits are human work anyway.
+- **Copy.** I draft it, you correct it.
+- **A KYC vendor.** GSTIN validation runs offline with a real checksum. Only a
+  *live portal lookup* needs a vendor, and reference calls and site visits are
+  human work regardless.
 - **Hosting decisions.** Vercel and Supabase are both provisioned.
+- **Studio data typed out by hand.** The apply form and the website scraper
+  collect it. That was the point of building them.
 
 ---
 
-## If you only do three things this week
+## If you only do four things this week
 
-1. **Name and domain.** Unblocks email, SEO, the app stores, and the launch date.
-2. **Resend account.** Five minutes, and `/ops` becomes usable from the deployed site.
-3. **First two pilot studios.** Two is enough to prove the onboarding flow against real data — the other six can follow.
+1. **Build and push** (§0.1) — five minutes, and the last two sprints go live.
+2. **Rotate the Supabase key and set the Vercel env vars** (§0.2, §0.3) — ten minutes, and one of them is a security fix.
+3. **Verify a sending domain in Resend** (§1.3) — without it you cannot onboard a single studio, and this is not obvious until it fails.
+4. **Pick the LLM provider** (§1.1) — one decision, and it unblocks the largest remaining piece of work.
+
+The name (§2) is the fifth, and it is the one with a compounding cost.
