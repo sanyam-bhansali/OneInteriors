@@ -56,8 +56,18 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en-IN">
-      <body className={`${display.variable} ${sans.variable} ${mono.variable}`}>{children}</body>
+    // The font variables MUST be on <html>, not <body>.
+    //
+    // `--font-display` is declared inside @theme, which Tailwind emits on
+    // :root. Its value references `--font-display-loaded`. A custom property's
+    // value is resolved where it is DECLARED, so with the next/font classes on
+    // <body> the inner var() is undefined at :root, the whole declaration
+    // becomes invalid at computed-value time, and every element using
+    // var(--font-display) silently inherits the body sans instead.
+    //
+    // The symptom is that the serif simply never appears and nothing errors.
+    <html lang="en-IN" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
+      <body>{children}</body>
     </html>
   );
 }

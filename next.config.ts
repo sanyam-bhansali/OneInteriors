@@ -19,10 +19,20 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: false,
   },
 
-  // Studio portfolio images will come from our own object storage. Add the
-  // bucket host here when S3 is provisioned.
   images: {
-    remotePatterns: [],
+    remotePatterns: [
+      // Stock photography, pre-launch only. Unsplash's licence permits
+      // commercial use without attribution and their guidelines expect hot
+      // linking to this CDN, which is also how the studios we are onboarding
+      // serve their own site images.
+      //
+      // These MUST be replaced with photographs of real work before launch.
+      // A page promising verified local studios, illustrated with somebody
+      // else's living room, is a small lie that undermines a large claim.
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+      // Studio portfolio images, once the bucket is provisioned.
+      { protocol: 'https', hostname: 'tkxuvtctaknmymtuvcuo.supabase.co' },
+    ],
   },
 
   async headers() {
