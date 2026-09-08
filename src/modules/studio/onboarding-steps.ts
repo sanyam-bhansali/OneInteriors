@@ -8,7 +8,7 @@
  * profile cannot disagree.
  */
 
-export const ONBOARDING_STEPS = ['profile', 'registration', 'portfolio', 'review'] as const;
+export const ONBOARDING_STEPS = ['profile', 'registration', 'portfolio', 'rates', 'review'] as const;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
@@ -16,6 +16,7 @@ export const STEP_LABELS: Record<OnboardingStep, string> = {
   profile: 'Your studio',
   registration: 'Registration',
   portfolio: 'Your work',
+  rates: 'Your rates',
   review: 'Send for review',
 };
 
@@ -23,6 +24,7 @@ export const STEP_BLURBS: Record<OnboardingStep, string> = {
   profile: 'How you describe yourselves, where you work, and what you take on.',
   registration: 'The numbers we check against the public registries.',
   portfolio: 'Three completed projects. This is what customers actually read.',
+  rates: 'What you charge. Private, and never shown to anyone but you.',
   review: 'We take it from here.',
 };
 
@@ -43,6 +45,8 @@ export interface OnboardingSnapshot {
   teamSize: number | null;
   gstin: string | null;
   portfolioCount: number;
+  /// Core rate categories still without a rate. Empty = quotable.
+  missingRates: string[];
   submittedForReview: boolean;
 }
 
@@ -94,14 +98,28 @@ export function assessSteps(studio: OnboardingSnapshot): StepStatus[] {
     missing: portfolioMissing,
   };
 
-  const earlierDone = profile.done && registration.done && portfolio.done;
+  // Without a complete rate card the studio produces no quote, and a studio
+  // nobody can get a quote from cannot be shown to a customer — the quote is
+  // the only route from a match to a conversation.
+  const ratesMissing: string[] = [];
+  if (studio.missingRates.length > 0) {
+    const n = studio.missingRates.length;
+    ratesMissing.push(`${n} rate${n === 1 ? '' : 's'} still to enter`);
+  }
+  const rates: StepStatus = {
+    step: 'rates',
+    done: ratesMissing.length === 0,
+    missing: ratesMissing,
+  };
+
+  const earlierDone = profile.done && registration.done && portfolio.done && rates.done;
   const review: StepStatus = {
     step: 'review',
     done: studio.submittedForReview,
     missing: earlierDone ? [] : ['the steps above'],
   };
 
-  return [profile, registration, portfolio, review];
+  return [profile, registration, portfolio, rates, review];
 }
 
 export function onboardingProgress(studio: OnboardingSnapshot) {

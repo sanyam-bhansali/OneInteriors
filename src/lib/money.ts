@@ -44,6 +44,15 @@ export function paiseToLakhs(paise: Paise): number {
   return paise / PAISE_PER_RUPEE / 100_000;
 }
 
+/**
+ * Back to rupees, for putting a stored amount into a form field a person
+ * types in. Display goes through `formatINR`; this is only for round-tripping
+ * an input's value, which is why it returns a plain number.
+ */
+export function paiseToRupees(paise: Paise): number {
+  return paise / PAISE_PER_RUPEE;
+}
+
 /** Prisma stores BigInt. Convert only at that boundary. */
 export function fromDb(value: bigint): Paise {
   const n = Number(value);

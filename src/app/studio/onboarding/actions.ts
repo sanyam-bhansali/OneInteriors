@@ -1,6 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { RATE_CATEGORIES, CATEGORY } from '@/modules/quotation/categories';
+import { saveRateCard, type RateInput } from '@/modules/quotation/rate-card';
 import {
   saveProfile,
   saveGstin,
@@ -92,6 +94,34 @@ export async function submitForReviewAction(
 ): Promise<StepState> {
   const result = await submitForReview();
   if (!result.ok) return { status: 'error', errors: result.errors };
+  refresh();
+  return { status: 'saved' };
+}
+
+export async function saveRatesAction(
+  _prev: StepState,
+  formData: FormData,
+): Promise<StepState> {
+  const inputs: RateInput[] = [];
+
+  for (const category of RATE_CATEGORIES) {
+    const raw = String(formData.get(category) ?? '').trim();
+    // An empty field is a deliberate "I do not do this work" for the optional
+    // categories, and clearing a rate for the core ones. Either way it is a
+    // value of zero, which the store turns into a deletion.
+    const value = raw === '' ? 0 : Number(raw);
+    if (!Number.isFinite(value) || value < 0) {
+      return {
+        status: 'error',
+        errors: { [category]: `${CATEGORY[category].label} must be a number.` },
+      };
+    }
+    inputs.push({ category, value });
+  }
+
+  const result = await saveRateCard(inputs);
+  if (!result.ok) return { status: 'error', errors: result.errors };
+
   refresh();
   return { status: 'saved' };
 }

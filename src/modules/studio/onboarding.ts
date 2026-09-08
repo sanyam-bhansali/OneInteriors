@@ -25,6 +25,7 @@ import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import { requireRole, type AuthUser } from '@/modules/auth/session';
 import { validateGstin } from '@/modules/verification/gstin';
+import { missingCoreRates } from '@/modules/quotation/categories';
 import { lakhsToPaise } from '@/lib/money';
 import { onboardingProgress, MIN_ABOUT_LENGTH } from './onboarding-steps';
 import {
@@ -64,6 +65,7 @@ export interface StudioContext {
     maxProjectPaise: bigint | null;
     status: string;
     portfolioCount: number;
+    missingRates: string[];
     submittedForReview: boolean;
   };
 }
@@ -85,6 +87,13 @@ export async function currentStudio(): Promise<StudioContext | null> {
   const s = member.studio;
   const steps = readSteps(s.onboardingSteps);
 
+  const rateItems = await prisma.rateCardItem.findMany({
+    where: { studioId: s.id },
+    select: { category: true, ratePaise: true },
+  });
+  const rates: Partial<Record<string, number>> = {};
+  for (const item of rateItems) rates[item.category] = Number(item.ratePaise);
+
   return {
     user,
     studio: {
@@ -103,6 +112,7 @@ export async function currentStudio(): Promise<StudioContext | null> {
       maxProjectPaise: s.maxProjectPaise,
       status: s.status,
       portfolioCount: s._count.portfolio,
+      missingRates: missingCoreRates(rates as never),
       submittedForReview: steps.submittedForReview === true,
     },
   };

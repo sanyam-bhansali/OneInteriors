@@ -17,6 +17,10 @@ import { ProfileForm } from '../ProfileForm';
 import { RegistrationForm } from '../RegistrationForm';
 import { PortfolioForm } from '../PortfolioForm';
 import { ReviewPanel } from '../ReviewPanel';
+import { RateCardForm } from '../RateCardForm';
+import { myRateCard } from '@/modules/quotation/rate-card';
+import { CATEGORY, RATE_CATEGORIES } from '@/modules/quotation/categories';
+import { paiseToRupees } from '@/lib/money';
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -95,6 +99,10 @@ export default async function OnboardingStepPage({
           />
         ) : null}
 
+        {step === 'rates' ? (
+          <RateCardForm values={await rateCardValues()} />
+        ) : null}
+
         {step === 'review' ? (
           <ReviewPanel
             ready={steps.filter((s) => s.step !== 'review').every((s) => s.done)}
@@ -130,4 +138,26 @@ export default async function OnboardingStepPage({
       </Container>
     </main>
   );
+}
+
+/**
+ * Rates for the editor, in the units a studio typed them in: rupees for money,
+ * whole percent for the design fee. Basis points are a storage detail and must
+ * never surface in a form field.
+ */
+async function rateCardValues(): Promise<Record<string, number | null>> {
+  const card = await myRateCard();
+  const values: Record<string, number | null> = {};
+
+  for (const category of RATE_CATEGORIES) {
+    const stored = card[category];
+    if (stored === undefined || stored === null) {
+      values[category] = null;
+      continue;
+    }
+    values[category] =
+      CATEGORY[category].unit === 'percent' ? stored / 100 : paiseToRupees(stored);
+  }
+
+  return values;
 }

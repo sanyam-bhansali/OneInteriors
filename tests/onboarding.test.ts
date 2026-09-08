@@ -18,6 +18,7 @@ const COMPLETE: OnboardingSnapshot = {
   teamSize: 8,
   gstin: '27AAPFU0939F1ZV',
   portfolioCount: MIN_PORTFOLIO_PROJECTS,
+  missingRates: [],
   submittedForReview: false,
 };
 
@@ -70,6 +71,31 @@ describe('assessSteps — registration', () => {
   });
 });
 
+describe('assessSteps — rates', () => {
+  it('is done when every core rate is entered', () => {
+    expect(step(COMPLETE, 'rates').done).toBe(true);
+  });
+
+  // A studio with no rate card produces no quote, and the quote is the only
+  // route from a match to a conversation — so an incomplete card is not a
+  // cosmetic gap, it makes the studio unshowable.
+  it('is not done while core rates are missing', () => {
+    const s = snapshot({ missingRates: ['painting', 'electrical'] });
+    expect(step(s, 'rates').done).toBe(false);
+    expect(step(s, 'rates').missing[0]).toBe('2 rates still to enter');
+  });
+
+  it('gets the singular right at one missing', () => {
+    expect(step(snapshot({ missingRates: ['painting'] }), 'rates').missing[0]).toBe(
+      '1 rate still to enter',
+    );
+  });
+
+  it('blocks review until rates are in', () => {
+    expect(readyForReview(snapshot({ missingRates: ['painting'] }))).toBe(false);
+  });
+});
+
 describe('assessSteps — portfolio', () => {
   it(`needs ${MIN_PORTFOLIO_PROJECTS} projects`, () => {
     expect(step(snapshot({ portfolioCount: MIN_PORTFOLIO_PROJECTS - 1 }), 'portfolio').done).toBe(false);
@@ -115,7 +141,7 @@ describe('onboardingProgress', () => {
   it('counts done steps out of the full list', () => {
     const p = onboardingProgress(snapshot({ portfolioCount: 0, gstin: null }));
     expect(p.total).toBe(ONBOARDING_STEPS.length);
-    expect(p.done).toBe(1); // profile only
+    expect(p.done).toBe(2); // profile and rates
   });
 
   /**
