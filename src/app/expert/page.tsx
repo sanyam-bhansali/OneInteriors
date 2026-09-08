@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { Container, Eyebrow } from '@/components/ui';
 import { SiteHeader, SiteFooter } from '@/components/chrome';
+import { JourneyNav } from '@/components/JourneyNav';
 import { prisma } from '@/lib/prisma';
 import { loadBrief, readAnonKey } from '@/modules/brief/repository';
 import { getCurrentUser } from '@/modules/auth/session';
@@ -36,6 +37,7 @@ export default async function ExpertPage() {
   return (
     <>
       <SiteHeader />
+      <JourneyNav />
 
       <main className="py-10 sm:py-14">
         <Container size="narrow">

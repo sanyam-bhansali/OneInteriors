@@ -75,6 +75,13 @@ export interface Brief {
   // Q2 — scope
   scope: ScopeType | null;
 
+  /**
+   * Essential / Premium / Luxury. Chosen after the nine questions rather than
+   * inside them: the bands are shown with real costs for this customer's own
+   * home, which is only possible once we know the size.
+   */
+  tier: BudgetTier | null;
+
   // Q3 — budget, integer paise
   budgetMinPaise: Paise | null;
   budgetMaxPaise: Paise | null;
@@ -106,6 +113,7 @@ export const EMPTY_BRIEF: Brief = {
   locality: null,
   possessionOn: null,
   scope: null,
+  tier: null,
   budgetMinPaise: null,
   budgetMaxPaise: null,
   styleLikes: [],
@@ -117,6 +125,8 @@ export const EMPTY_BRIEF: Brief = {
   lastStep: 0,
   completedAt: null,
 };
+
+export type BudgetTier = 'ESSENTIAL' | 'PREMIUM' | 'LUXURY';
 
 export const TOTAL_STEPS = 9;
 

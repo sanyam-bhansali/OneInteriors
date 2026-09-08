@@ -11,6 +11,7 @@ import { rankStudios } from '@/modules/matching/score';
 import { quoteBrief, storeQuotes } from '@/modules/quotation/generate';
 import { TIER } from '@/modules/quotation/tiers';
 import { record } from '@/modules/analytics/record';
+import { JourneyNav } from '@/components/JourneyNav';
 
 export const metadata: Metadata = {
   title: 'Your quotes',
@@ -32,7 +33,32 @@ export default async function QuotesPage() {
   const user = await getCurrentUser();
   if (!user) redirect('/sign-in?next=/quotes&reason=quotes');
 
-  if (!found || !brief.completedAt) redirect('/quiz');
+  // Deliberately NOT a redirect to /quiz. Someone who just answered nine
+  // questions and gets silently returned to question one assumes the product
+  // ate their answers — which is exactly what it looks like. Say what is
+  // missing instead.
+  const briefIncomplete = !found || !brief.completedAt;
+
+  if (briefIncomplete) {
+    return (
+      <>
+        <SiteHeader />
+        <JourneyNav reached={1} />
+        <main className="py-16">
+          <Container size="narrow">
+            <h1 className="h1 mb-4">We do not have your brief yet.</h1>
+            <p className="m-0 mb-8 max-w-[54ch] text-[17px] leading-relaxed text-[var(--color-ink-2)]">
+              Either it was not finished, or it was answered in a different browser and has not
+              caught up with this sign-in yet. Nine questions, three minutes, and your quotes
+              follow immediately.
+            </p>
+            <Button href="/quiz" size="lg">Answer the questions</Button>
+          </Container>
+        </main>
+        <SiteFooter />
+      </>
+    );
+  }
 
   const studios = await studioRepository.list();
   const ranked = rankStudios(brief, studios).slice(0, DEFAULT_QUOTES);
@@ -46,6 +72,7 @@ export default async function QuotesPage() {
     return (
       <>
         <SiteHeader />
+        <JourneyNav reached={2} />
         <main className="py-16">
           <Container size="narrow">
             <h1 className="h1 mb-4">
@@ -83,6 +110,7 @@ export default async function QuotesPage() {
   return (
     <>
       <SiteHeader />
+      <JourneyNav />
 
       <main className="py-10 sm:py-14">
         <Container size="wide">

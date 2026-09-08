@@ -24,6 +24,7 @@ export interface BriefRow {
   locality: string | null;
   possessionOn: Date | null;
   scope: string | null;
+  tier: string | null;
   budgetMinPaise: bigint | null;
   budgetMaxPaise: bigint | null;
   styleLikes: string[];
@@ -71,6 +72,7 @@ export function rowToBrief(row: BriefRow): Brief {
     locality: row.locality,
     possessionOn: isoDate(row.possessionOn),
     scope: (row.scope as ScopeType) ?? null,
+    tier: (row.tier as Brief['tier']) ?? null,
     budgetMinPaise: row.budgetMinPaise === null ? null : Number(row.budgetMinPaise),
     budgetMaxPaise: row.budgetMaxPaise === null ? null : Number(row.budgetMaxPaise),
     styleLikes: row.styleLikes as StyleTag[],
@@ -92,6 +94,7 @@ export function briefToRow(brief: Brief) {
     locality: brief.locality,
     possessionOn: toDate(brief.possessionOn),
     scope: brief.scope,
+    tier: brief.tier,
     budgetMinPaise: brief.budgetMinPaise === null ? null : BigInt(brief.budgetMinPaise),
     budgetMaxPaise: brief.budgetMaxPaise === null ? null : BigInt(brief.budgetMaxPaise),
     styleLikes: brief.styleLikes,

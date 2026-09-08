@@ -20,6 +20,7 @@ export const EVENTS = [
   'quiz.abandon',
   'quiz.complete',
   'reveal.view',
+  'tier.select',
   'match.view',
   'quote.view',
   'compare.view',

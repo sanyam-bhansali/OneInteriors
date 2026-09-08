@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { Container, Button, Eyebrow } from '@/components/ui';
 import { SiteHeader, SiteFooter } from '@/components/chrome';
+import { JourneyNav } from '@/components/JourneyNav';
 import { formatINR, formatINRCompact } from '@/lib/money';
 import { loadBrief } from '@/modules/brief/repository';
 import { getCurrentUser } from '@/modules/auth/session';
@@ -43,6 +44,7 @@ export default async function ComparePage() {
   return (
     <>
       <SiteHeader />
+      <JourneyNav />
 
       <main className="py-10 sm:py-14">
         <Container size="wide">

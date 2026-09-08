@@ -75,20 +75,20 @@ export default function Home() {
                   className="m-0 mb-6 font-[family-name:var(--font-display)] text-[clamp(2.5rem,5.2vw,4rem)] font-normal leading-[1.02] tracking-[-0.02em] text-[var(--color-ink)]"
                   style={{ textWrap: 'balance' }}
                 >
-                  Eight studios.
+                  Know what your home costs
                   <br />
-                  <span className="italic text-[var(--color-petrol)]">All of them checked.</span>
+                  <span className="italic text-[var(--color-petrol)]">before anyone visits.</span>
                 </h1>
 
                 <p className="m-0 mb-8 max-w-[36rem] text-[17px] leading-[1.65] text-[var(--color-ink-2)] sm:text-[18px]">
-                  Answer nine questions about your home. See real quotes built from each
-                  studio&rsquo;s own rates, compare them line by line, then talk it through with
-                  someone who has read all of them before you decide.
+                  Answer nine questions and get real quotes from real Pune studios, side by side,
+                  in one afternoon. No site visits, no salespeople, no giving your number to six
+                  companies to find out a price.
                 </p>
 
                 <div className="mb-9 flex flex-wrap items-center gap-4">
                   <Button href="/quiz" size="lg">
-                    Start your brief
+                    Get my quotes
                   </Button>
                   <span className="text-[14.5px] text-[var(--color-ink-3)]">
                     Three minutes · no sign-up to see your matches
@@ -98,9 +98,9 @@ export default function Home() {
                 {/* The trust strip. Facts with numbers in them, immediately
                     under the button, because this is the moment of hesitation. */}
                 <ul className="m-0 flex list-none flex-wrap gap-x-8 gap-y-3 border-t border-[var(--color-rule)] p-0 pt-6">
-                  <TrustFact figure={`${TOTAL_CHECKS}`} label="checks before listing" />
-                  <TrustFact figure="2" label="sites visited in person" />
-                  <TrustFact figure="0%" label="markup on any quote" />
+                  <TrustFact figure="3 min" label="to your first number" />
+                  <TrustFact figure="0" label="calls before you see prices" />
+                  <TrustFact figure="0%" label="added to any quote" />
                 </ul>
               </div>
             </div>
@@ -129,12 +129,10 @@ export default function Home() {
                 className="m-0 mb-5 font-[family-name:var(--font-display)] text-[clamp(2rem,4vw,3rem)] font-normal leading-[1.06] tracking-[-0.018em] text-[var(--color-ink)]"
                 style={{ textWrap: 'balance' }}
               >
-                Six steps, and you will always know which one you are on.
+                You will never wonder what happens next.
               </h2>
-              <p className="m-0 max-w-[62ch] text-[17px] leading-[1.65] text-[var(--color-ink-2)]">
-                Most interior enquiries vanish into a call centre and come back as a salesperson.
-                Every step below happens here, in order, and you can read all six before you give
-                us anything.
+              <p className="m-0 max-w-[62ch] text-[17px] leading-[1.65] text-[var(--color-ink-2)]">                Every other enquiry you send today disappears into a call centre and comes back as a
+                salesperson. Here you can read all six steps before you start one of them.
               </p>
             </div>
 
@@ -174,12 +172,11 @@ export default function Home() {
               <h2
                 className="m-0 mb-5 font-[family-name:var(--font-display)] text-[clamp(2rem,4vw,3rem)] font-normal leading-[1.06] tracking-[-0.018em] text-[var(--color-ink)]"
                 style={{ textWrap: 'balance' }}
-              >
-                Here are the numbers, before you give us anything.
+              >                What your flat actually costs, in plain numbers.
               </h2>
-              <p className="m-0 max-w-[62ch] text-[17px] leading-[1.65] text-[var(--color-ink-2)]">
-                Three bands, set by materials rather than status. A studio cannot buy its way into
-                one — which band they work in comes from their own rate card.
+              <p className="m-0 max-w-[62ch] text-[17px] leading-[1.65] text-[var(--color-ink-2)]">                Most people have no idea whether their budget is realistic until someone has been to
+                their home and quoted them. Here is the honest range for a typical 2 BHK at three
+                levels of finish, so you know where you stand today.
               </p>
             </div>
 
@@ -273,31 +270,29 @@ export default function Home() {
                 <h2
                   className="m-0 mb-6 font-[family-name:var(--font-display)] text-[clamp(2rem,4vw,3rem)] font-normal leading-[1.06] tracking-[-0.018em] text-[var(--color-ink)]"
                   style={{ textWrap: 'balance' }}
-                >
-                  Three things that cost us something.
+                >                  Why you can believe the number.
                 </h2>
-                <p className="m-0 mb-9 max-w-[58ch] text-[16.5px] leading-[1.65] text-[var(--color-ink-2)]">
-                  Anyone can promise quality. These are the promises that are expensive to keep,
-                  which is the only reason they are worth reading.
+                <p className="m-0 mb-9 max-w-[58ch] text-[16.5px] leading-[1.65] text-[var(--color-ink-2)]">                  A quote is only worth what the company behind it is worth. Here is what we do before
+                  a studio is allowed to send you one.
                 </p>
 
                 <div className="flex flex-col gap-8">
                   <PromiseRow
                     n="01"
-                    title={`${TOTAL_CHECKS} checks before a studio is listed`}
-                    body="Identity, GST filing history, references we telephone ourselves, and two completed sites we visit. No studio can pay to skip a single one."
+                    title="Somebody has actually been to their sites"
+                    body={`We run ${TOTAL_CHECKS} checks before a studio appears — GST filings, references we telephone ourselves, and two finished homes we walk through. No studio can pay to skip one.`}
                     href="/verification"
                     linkLabel="What we check"
                   />
                   <PromiseRow
                     n="02"
-                    title="We publish the bad numbers too"
-                    body="Days past a studio's own committed date, and any dispute upheld against them. It cuts both ways — which is exactly why the good numbers mean something."
+                    title="You can see how late they usually run"
+                    body="Every studio's profile carries the days they typically run past their own committed date, and any dispute upheld against them. Nobody else will show you that."
                   />
                   <PromiseRow
                     n="03"
-                    title="We do not hold your money"
-                    body="You pay the studio directly against a milestone plan we set and check. There is no escrow yet, and we would rather say so than imply a protection you do not have."
+                    title="Your money never passes through us"
+                    body="You pay the studio directly, against a milestone plan we set and check. We are not holding your deposit, and we would rather say so than imply a protection you do not have."
                   />
                 </div>
               </div>
@@ -316,18 +311,16 @@ export default function Home() {
                 <h2
                   className="m-0 mb-6 font-[family-name:var(--font-display)] text-[clamp(2rem,4vw,3rem)] font-normal leading-[1.06] tracking-[-0.018em] text-[var(--color-ink)]"
                   style={{ textWrap: 'balance' }}
-                >
-                  Nobody chooses a studio from a webpage.
+                >                  Then talk to someone who has no stake in your answer.
                 </h2>
-                <p className="m-0 mb-5 max-w-[58ch] text-[16.5px] leading-[1.65] text-[var(--color-ink-2)]">
-                  So the last step is a person. Once you have your quotes, pick the studios you
-                  want to discuss and we will call you. Whoever you speak to has already read your
-                  brief, your floor plan and every quote in front of you.
+                <p className="m-0 mb-5 max-w-[58ch] text-[16.5px] leading-[1.65] text-[var(--color-ink-2)]">                  Once you have your quotes, pick the studios you want to discuss and we will call you.
+                  Whoever you speak to has already read your brief, your floor plan and every quote
+                  in front of you — you will not be explaining your flat again.
                 </p>
                 <p className="m-0 max-w-[58ch] text-[16.5px] leading-[1.65] text-[var(--color-ink-2)]">
-                  Then we arrange the meeting or the site visit ourselves. It is the only way to
-                  reach a studio through us, and it is why people do not end up sitting opposite
-                  someone who was never going to suit them.
+                  Then we set up the meeting with whichever one you choose. Free, and there is
+                  nothing to buy on the call — which is why we can tell you when none of them is
+                  right for you.
                 </p>
               </div>
 
@@ -351,15 +344,13 @@ export default function Home() {
               <h2
                 className="m-0 mb-5 font-[family-name:var(--font-display)] text-[clamp(1.9rem,3.6vw,2.75rem)] font-normal leading-[1.08] tracking-[-0.018em] text-[var(--color-ink)]"
                 style={{ textWrap: 'balance' }}
-              >
-                Start with the nine questions.
+              >                Find out what your home costs.
               </h2>
-              <p className="mx-auto m-0 mb-8 max-w-[46ch] text-[17px] leading-[1.65] text-[var(--color-ink-2)]">
-                You will see your matches and your quotes before we ask for anything. If none of it
-                is useful, you have lost three minutes.
+              <p className="mx-auto m-0 mb-8 max-w-[46ch] text-[17px] leading-[1.65] text-[var(--color-ink-2)]">                Nine questions, three minutes, and you will have real numbers from real studios. If
+                none of it is useful, you have lost an afternoon coffee&rsquo;s worth of time.
               </p>
               <Button href="/quiz" size="lg">
-                Start your brief
+                Get my quotes
               </Button>
               <p className="m-0 mt-6 text-[14px] text-[var(--color-ink-3)]">
                 Already started?{' '}

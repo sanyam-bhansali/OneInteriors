@@ -164,7 +164,7 @@ export function QuizClient({ studios }: { studios: Studio[] }) {
       saveBrief(done);
       sync(done);
       void trackAction('quiz.complete');
-      router.push('/match');
+      router.push('/tier');
       return;
     }
     const n = step + 1;
@@ -202,7 +202,7 @@ export function QuizClient({ studios }: { studios: Studio[] }) {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--color-paper)]">
+    <div className="flex h-dvh flex-col overflow-hidden bg-[var(--color-paper)]">
       <header className="sticky top-0 z-10 border-b border-[var(--color-rule)] bg-[var(--color-paper)]">
         <Container size="wide">
           <div className="flex items-center justify-between gap-4 py-3.5">
@@ -229,41 +229,53 @@ export function QuizClient({ studios }: { studios: Studio[] }) {
         </div>
       </header>
 
-      <main className="flex-1 py-10 sm:py-14">
+      {/* A fixed three-part frame: header, a scrolling question area, and a
+          footer that never leaves the viewport.
+
+          The first build put Continue after the options AND after the running
+          profile panel, so answering a question meant scrolling down to find
+          the button — on every one of the nine. A quiz where the primary
+          action is below the fold reads as broken, however good the question
+          above it is. */}
+      <main className="min-h-0 flex-1 overflow-y-auto">
         <Container size="wide">
-          {/* Three tracks on a wide screen: the question and its running
-              confirmation on the left, the options on the right. The panel is
-              the thing that makes the quiz feel like it is listening, so it
-              sits with the question rather than being tucked away. */}
-          <div className="grid grid-cols-1 gap-9 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-14">
-            <div key={`q-${step}`} className="rise flex flex-col gap-8">
+          <div className="grid grid-cols-1 gap-9 py-8 sm:py-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-14">
+            <div key={`q-${step}`} className="rise flex flex-col gap-7">
               <QuestionStep step={step} brief={brief} update={update} slot="ask" />
               <LiveProfile brief={brief} matchCount={matchCount} className="hidden lg:block" />
             </div>
 
             <div key={`o-${step}`} className="rise rise-1 min-w-0">
               <QuestionStep step={step} brief={brief} update={update} slot="options" />
+              {/* On narrow screens the panel follows the options, inside the
+                  scrolling area, so it never sits between the answer and the
+                  button. */}
+              <LiveProfile brief={brief} matchCount={matchCount} className="mt-8 lg:hidden" />
             </div>
           </div>
+        </Container>
+      </main>
 
-          <div className="mt-10 flex flex-wrap items-center gap-3 border-t border-[var(--color-rule)] pt-6">
+      <footer className="sticky bottom-0 z-10 border-t border-[var(--color-rule)] bg-[var(--color-paper)]/95 backdrop-blur">
+        <Container size="wide">
+          <div className="flex items-center justify-between gap-4 py-4">
             <Button variant="secondary" onClick={back}>
               Back
             </Button>
-            <Button onClick={next} disabled={!canAdvance}>
-              {step === TOTAL_STEPS ? 'See my matches' : 'Continue'}
-            </Button>
-            {!canAdvance ? (
-              <span className="text-[13.5px] text-[var(--color-ink-3)]">
-                Pick an answer to continue
-              </span>
-            ) : null}
-          </div>
 
-          {/* On narrow screens the panel follows the options instead. */}
-          <LiveProfile brief={brief} matchCount={matchCount} className="mt-8 lg:hidden" />
+            <div className="flex items-center gap-4">
+              {!canAdvance ? (
+                <span className="hidden text-[13.5px] text-[var(--color-ink-3)] sm:inline">
+                  Pick an answer to continue
+                </span>
+              ) : null}
+              <Button onClick={next} disabled={!canAdvance} size="lg">
+                {step === TOTAL_STEPS ? 'See what it costs' : 'Continue'}
+              </Button>
+            </div>
+          </div>
         </Container>
-      </main>
+      </footer>
     </div>
   );
 }
