@@ -35,6 +35,12 @@ export function OpsHeader() {
               Funnel
             </Link>
             <Link
+              href="/ops/consultations"
+              className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-paper)] no-underline opacity-70 hover:opacity-100"
+            >
+              Calls
+            </Link>
+            <Link
               href="/ops/applications"
               className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-paper)] no-underline opacity-70 hover:opacity-100"
             >

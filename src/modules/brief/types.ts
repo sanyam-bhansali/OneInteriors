@@ -144,6 +144,25 @@ export const PROPERTY_LABELS: Record<PropertyType, string> = {
   VILLA: 'Villa / Row house',
 };
 
+/**
+ * Label lookups that tolerate a value the UI does not know about.
+ *
+ * The Prisma enums are wider than these TS unions — `PropertyType` carries an
+ * `OTHER` the quiz never writes, and a future migration can add more. Indexing
+ * the Record directly with a database value therefore renders `undefined` into
+ * the page, silently, on exactly the rows that are unusual enough to matter.
+ * Everything that displays a stored enum goes through these.
+ */
+export function propertyLabel(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return PROPERTY_LABELS[value as PropertyType] ?? 'Other';
+}
+
+export function scopeLabel(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return SCOPE_LABELS[value as ScopeType] ?? 'Other';
+}
+
 export const SCOPE_LABELS: Record<ScopeType, string> = {
   FULL_HOME: 'Full home',
   KITCHEN_WARDROBE: 'Kitchen & wardrobes',

@@ -158,6 +158,12 @@ enum PropertyType {
   OTHER
 }
 
+enum BudgetTier {
+  ESSENTIAL
+  PREMIUM
+  LUXURY
+}
+
 enum ScopeType {
   FULL_HOME
   KITCHEN_WARDROBE
@@ -201,6 +207,17 @@ model Brief {
 
   // Q2
   scope ScopeType?
+
+  /// Essential / Premium / Luxury. The band the customer chose — a statement
+  /// about materials and finish, never a ranking of studios and never
+  /// influenced by what a studio pays us.
+  tier BudgetTier?
+
+  /// Object path in the private floor-plan bucket. Never a public URL: the
+  /// file is somebody's home layout, and it is served only through a short
+  /// signed URL to a person who owns the brief.
+  floorPlanPath String?
+  floorPlanName String?
 
   // Q3 — paise
   budgetMinPaise BigInt?
@@ -854,9 +871,24 @@ model Consultation {
   briefId String
   brief   Brief  @relation(fields: [briefId], references: [id], onDelete: Cascade)
 
-  scheduledFor DateTime
+  /// How to reach them. Collected at the request, because this is the first
+  /// point in the flow where we genuinely need to call somebody back.
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
+
+  /// The studios they want to talk about. Studio ids, in the order they
+  /// picked them — the expert reads these before the call.
+  studioIds String[] @default([])
+  /// What they want to get out of it, in their own words.
+  askedAbout String? @db.Text
+  /// Free text: "weekday evenings", "Saturday morning". A slot picker would
+  /// hardcode a scheduling model before we know the shape of these calls.
+  preferredTimes String?
+
+  scheduledFor DateTime?
   expertUserId String?
-  status       String   @default("scheduled") // scheduled | completed | no_show | cancelled
+  status       String   @default("requested") // requested | scheduled | completed | no_show | cancelled
 
   // The expert's read is the training signal for the matching engine.
   outcomeNotes      String? @db.Text

@@ -21,6 +21,8 @@ export const EVENTS = [
   'quiz.complete',
   'reveal.view',
   'match.view',
+  'quote.view',
+  'compare.view',
   'studio.view',
   'enquiry.sent',
   'signin.requested',
