@@ -47,6 +47,22 @@ export function hasSupabase(): boolean {
   return supabaseConfig() !== null;
 }
 
+/**
+ * Is the portfolio drafting agent configured?
+ *
+ * Everything that uses this must degrade to "the studio writes it themselves",
+ * never to a blank profile or a crash. The agent is a convenience that saves a
+ * studio owner an evening of writing; it is not load-bearing, and the product
+ * has to work with the key absent — which is also how it works in every test.
+ */
+export function hasAnthropic(): boolean {
+  return present(process.env.ANTHROPIC_API_KEY);
+}
+
+export function anthropicModel(): string {
+  return process.env.ANTHROPIC_MODEL?.trim() || 'claude-sonnet-5';
+}
+
 export function isProduction(): boolean {
   return process.env.NODE_ENV === 'production';
 }

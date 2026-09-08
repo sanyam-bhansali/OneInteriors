@@ -96,6 +96,23 @@ export default async function StudioHome() {
           ))}
         </ol>
 
+        {studio.portfolioCount > 0 ? (
+          <Link
+            href="/studio/profile"
+            className="mb-10 flex items-start gap-4 rounded-[12px] border border-dashed border-[var(--color-rule)] bg-[var(--color-paper-2)] p-5 no-underline hover:border-[var(--color-ink-3)]"
+          >
+            <span className="min-w-0">
+              <span className="mb-1 block font-[family-name:var(--font-display)] text-[20px] leading-none text-[var(--color-ink)]">
+                Hate writing about yourself?
+              </span>
+              <span className="block text-[14.5px] leading-relaxed text-[var(--color-ink-2)]">
+                We can draft your profile copy from the projects you have entered. You edit it and
+                approve it — nothing is published until you have.
+              </span>
+            </span>
+          </Link>
+        ) : null}
+
         {/* The studio must never be able to mistake "I finished the form" for
             "I am live". Said plainly, on the page they spend the most time on. */}
         <div className="rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper-3)] p-6">

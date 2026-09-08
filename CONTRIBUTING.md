@@ -237,6 +237,23 @@ modules/
    lets the same logic serve web and the Capacitor build without a second codebase.
 4. If two modules keep needing each other, they are one module. Merge them rather
    than building a circular import you will fight for a year.
+5. **Pure logic does not live in a `server-only` file.** A module that starts
+   with `import 'server-only'` cannot be imported by Vitest at all — the test
+   fails on the import line, before a single assertion runs. So any function
+   that is worth testing and does not touch the database or the session goes in
+   a sibling file with no `server-only`, and the server module re-exports it.
+
+   This has bitten three times now: `normalisePhone` (→ `phone.ts`),
+   `assessSteps` (→ `onboarding-steps.ts`) and `parseDraft` (→
+   `portfolio-draft.ts`). The pattern to follow:
+
+   ```
+   studio/onboarding.ts        'server-only' — Prisma, auth, writes
+   studio/onboarding-steps.ts  pure — the rules, exhaustively tested
+   ```
+
+   Splitting it afterwards is cheap. Noticing you cannot test the interesting
+   half is the expensive part, so decide when you write it.
 
 ---
 

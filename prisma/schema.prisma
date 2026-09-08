@@ -329,6 +329,14 @@ model Studio {
   website     String?
   instagram   String?
 
+  /// One line under the studio name on their profile. Written by them, or
+  /// drafted by the agent and then approved by them — never published unread.
+  headline String?
+  /// Who this studio is genuinely not right for. Published deliberately: a
+  /// studio that suits everyone suits no one, and this is what makes the rest
+  /// of the profile believable.
+  notFor   String? @db.Text
+
   /// Which onboarding steps the studio has finished. Drives their checklist and
   /// tells ops whether the ball is in our court or theirs.
   onboardingSteps Json?
@@ -362,6 +370,7 @@ model Studio {
   quotations    Quotation[]
   projects      Project[]
   subscription  Subscription?
+  profileDraft  ProfileDraft?
   allocations   AllocationPeriod[]
 
   @@index([city, status, tier])
@@ -865,4 +874,39 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([actorId, createdAt])
   @@map("audit_logs")
+}
+
+/// A drafted profile, waiting for the studio to read it.
+///
+/// Kept separate from `Studio` on purpose: a draft is a proposal, and it must
+/// be impossible for one to be mistaken for published copy. Nothing here
+/// appears anywhere public until the studio has read it and approved it, at
+/// which point the text is copied onto the Studio row and `approvedAt` is set.
+///
+/// `issues` records what the honesty check found at generation time. A draft
+/// with issues is still stored — knowing that a draft invented a number is
+/// more useful than discarding it silently, and it is how we find out the
+/// prompt has drifted.
+model ProfileDraft {
+  id       String @id @default(cuid())
+  studioId String @unique
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  headline     String
+  introduction String @db.Text
+  notFor       String @db.Text
+  /// [{ title, story }] — one per portfolio project, in the same order.
+  stories      Json
+
+  /// Which model wrote it, so a bad batch can be traced to a change.
+  model       String
+  /// Findings from verifyDraft() at generation time. Empty array = clean.
+  issues      Json
+  generatedAt DateTime @default(now())
+
+  /// Set only when a human at the studio has read it and said yes.
+  approvedAt   DateTime?
+  approvedById String?
+
+  @@map("profile_drafts")
 }
