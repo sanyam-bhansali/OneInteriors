@@ -26,7 +26,7 @@ import 'server-only';
 
 import { unstable_cache, revalidateTag } from 'next/cache';
 import { studioRepository } from './repository';
-import type { Studio, StudioQuery } from './types';
+import type { Studio } from './types';
 
 const TAG = 'roster';
 const TTL_SECONDS = 60;
@@ -50,9 +50,4 @@ export const cachedRoster = unstable_cache(
  */
 export async function revalidateRoster(): Promise<void> {
   revalidateTag(TAG);
-}
-
-/** Uncached, for ops and for queries that are not the plain public roster. */
-export function listStudios(query: StudioQuery): Promise<Studio[]> {
-  return studioRepository.list(query);
 }
