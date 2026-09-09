@@ -13,6 +13,9 @@ export const metadata: Metadata = {
   description: 'Every interior studio we have verified in Pune, with their delivery record.',
 };
 
+/** Per request: the roster must not be frozen into a build. See /match. */
+export const dynamic = 'force-dynamic';
+
 export default async function StudiosPage() {
   const STUDIOS = await studioRepository.list({ activeOnly: true });
   // Proven first, then by delivery record. No studio can buy this position.

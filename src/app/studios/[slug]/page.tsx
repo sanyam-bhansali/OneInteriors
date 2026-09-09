@@ -26,6 +26,13 @@ import { PROPERTY_LABELS, SCOPE_LABELS, STYLE_LABELS } from '@/modules/brief/typ
  */
 export const dynamicParams = true;
 
+/**
+ * And rendered per request, so an approved studio's profile is live the moment
+ * ops flips them to ACTIVE — and so a database problem during `next build`
+ * cannot fail the deploy.
+ */
+export const dynamic = 'force-dynamic';
+
 export async function generateStaticParams() {
   const slugs = await studioRepository.allSlugs();
   return slugs.map((slug) => ({ slug }));
