@@ -21,6 +21,7 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
+import { safeNext } from '@/lib/site';
 import { AuthChannel } from '@prisma/client';
 import { createSession, hashIp, hashToken, newToken } from './session';
 import { sendMagicLink } from './email';
@@ -54,7 +55,7 @@ export type RequestResult =
  */
 export async function requestMagicLink(
   rawEmail: string,
-  meta: { ip?: string | null; baseUrl: string },
+  meta: { ip?: string | null; baseUrl: string; next?: string | null },
 ): Promise<RequestResult> {
   const email = normaliseEmail(rawEmail);
   if (!isValidEmail(email)) return { ok: false, reason: 'invalid_email' };
@@ -78,13 +79,28 @@ export async function requestMagicLink(
     },
   });
 
-  const link = `${meta.baseUrl}/sign-in/verify?token=${encodeURIComponent(token)}`;
+  const next = safeNext(meta.next);
+  const link =
+    `${meta.baseUrl}/sign-in/verify?token=${encodeURIComponent(token)}` +
+    (next ? `&next=${encodeURIComponent(next)}` : '');
 
-  // Only send to addresses we actually know. An unknown address still gets a
-  // successful-looking response above, it just receives no email — so the
-  // endpoint cannot be used to enumerate accounts.
+  /**
+   * Customers get an account on first sign-in; staff and studios do not.
+   *
+   * The original rule — send only to addresses that already have a user —
+   * meant a customer could never sign in at all, because nothing creates
+   * customer users. The sign-in gate in front of the quotes page was therefore
+   * a dead end for every real customer, which is precisely what it did.
+   *
+   * OPS and STUDIO accounts stay invite-only: ops accounts are created by
+   * hand, studio accounts by approving an application. Neither can be
+   * self-served by typing an address here, because the account created below
+   * is always a CUSTOMER.
+   */
   const user = await prisma.user.findUnique({ where: { email } });
-  if (user && !user.deletedAt) {
+  const deliverable = user ? !user.deletedAt : true;
+
+  if (deliverable) {
     const sent = await sendMagicLink(email, link);
     // In development with no email provider configured, hand the link back so
     // sign-in works offline. Never in production.
@@ -128,7 +144,16 @@ export async function consumeMagicLink(
       data: { consumedAt: new Date(), attempts: { increment: 1 } },
     });
 
-    const user = await tx.user.findUnique({ where: { email: challenge.identifier } });
+    const existing = await tx.user.findUnique({ where: { email: challenge.identifier } });
+
+    // First sign-in creates a CUSTOMER. Always CUSTOMER — an OPS or STUDIO
+    // account is never self-served, so the worst a stranger with a working
+    // inbox can do here is become a customer, which is the point.
+    const user =
+      existing ??
+      (await tx.user.create({
+        data: { email: challenge.identifier, role: 'CUSTOMER', emailVerified: new Date() },
+      }));
     if (!user || user.deletedAt) return { ok: false as const, reason: 'no_account' as const };
 
     if (!user.emailVerified) {

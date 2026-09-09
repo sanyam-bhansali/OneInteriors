@@ -28,7 +28,7 @@ export default async function ComparePage() {
   const { brief, found } = await loadBrief();
   if (!found || !brief.completedAt) redirect('/quiz');
 
-  const studios = await studioRepository.list();
+  const studios = await studioRepository.list({ activeOnly: true });
   const ranked = rankStudios(brief, studios).slice(0, MAX_COMPARE);
   const result = await quoteBrief(brief, ranked.map((r) => r.studioId));
 

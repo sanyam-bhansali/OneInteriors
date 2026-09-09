@@ -60,7 +60,11 @@ export default async function QuotesPage() {
     );
   }
 
-  const studios = await studioRepository.list();
+  // activeOnly, always. A studio still in ONBOARDING has not been verified,
+  // and quoting a customer on behalf of one would put a number in front of
+  // them from a business we have not checked — which is the entire thing this
+  // product exists not to do.
+  const studios = await studioRepository.list({ activeOnly: true });
   const ranked = rankStudios(brief, studios).slice(0, DEFAULT_QUOTES);
 
   const result = await quoteBrief(

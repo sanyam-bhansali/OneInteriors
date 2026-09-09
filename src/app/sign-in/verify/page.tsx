@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Container, Button } from '@/components/ui';
 import { Wordmark } from '@/components/brand';
 import { consumeMagicLink } from '@/modules/auth/magic-link';
+import { safeNext } from '@/lib/site';
 import { claimBrief } from '@/modules/brief/repository';
 import { claimConsent } from '@/modules/consent/record';
 import { record } from '@/modules/analytics/record';
@@ -45,9 +46,9 @@ const MESSAGES: Record<string, { title: string; body: string }> = {
 export default async function VerifyPage({
   searchParams,
 }: {
-  searchParams: Promise<{ token?: string }>;
+  searchParams: Promise<{ token?: string; next?: string }>;
 }) {
-  const { token } = await searchParams;
+  const { token, next } = await searchParams;
   const h = await headers();
 
   const result = await consumeMagicLink(token ?? '', {
@@ -66,8 +67,15 @@ export default async function VerifyPage({
 
     const user = await prisma.user.findUnique({ where: { id: result.userId } });
 
-    if (user?.role === 'OPS' || user?.role === 'ADMIN') redirect('/ops');
-    if (user?.role === 'STUDIO') redirect('/studio');
+    // Where they were headed wins, for customers. Someone who clicked "get my
+    // quotes", signed in, and landed on the marketing homepage has been sent
+    // back to the start of a journey they were four steps into — which is what
+    // this page did before, because it never read `next` at all.
+    const destination = safeNext(next ?? null);
+
+    if (user?.role === 'OPS' || user?.role === 'ADMIN') redirect(destination ?? '/ops');
+    if (user?.role === 'STUDIO') redirect(destination ?? '/studio');
+    if (destination) redirect(destination);
     // A customer who signed in mid-funnel wants their matches, not the
     // landing page they have already read.
     redirect(claimed ? '/match' : '/');

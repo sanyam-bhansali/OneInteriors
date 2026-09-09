@@ -29,7 +29,7 @@ export default async function ExpertPage() {
   const id = await briefId();
   if (!id) redirect('/quiz');
 
-  const studios = await studioRepository.list();
+  const studios = await studioRepository.list({ activeOnly: true });
   const ranked = rankStudios(brief, studios).slice(0, MAX_STUDIOS);
   const result = await quoteBrief(brief, ranked.map((r) => r.studioId));
   if (!result.ok) redirect('/quotes');

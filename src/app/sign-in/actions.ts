@@ -23,6 +23,9 @@ export async function requestSignInLink(
   const result = await requestMagicLink(email, {
     ip: h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
     baseUrl: resolveSiteUrl(),
+    // Carried into the emailed link so the customer lands back where they
+    // were, not on the homepage. Validated inside requestMagicLink.
+    next: String(formData.get('next') ?? '') || null,
   });
 
   if (!result.ok) {

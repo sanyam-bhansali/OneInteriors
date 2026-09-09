@@ -12,6 +12,8 @@
  * Idempotent: re-running updates the existing row rather than making a second.
  */
 
+// Must be first: it populates DATABASE_URL before PrismaClient reads it.
+import './load-env';
 import { PrismaClient } from '@prisma/client';
 import { lakhsToPaise } from '../src/lib/money';
 

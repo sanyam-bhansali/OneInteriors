@@ -6,7 +6,7 @@ import { requestSignInLink, type SignInState } from './actions';
 
 const INITIAL: SignInState = { status: 'idle' };
 
-export function SignInForm() {
+export function SignInForm({ next }: { next?: string | null }) {
   const [state, action, pending] = useActionState(requestSignInLink, INITIAL);
 
   if (state.status === 'sent') {
@@ -36,6 +36,9 @@ export function SignInForm() {
 
   return (
     <form action={action} className="flex flex-col gap-4">
+      {/* Rides along into the emailed link so the customer returns to the step
+          they were on rather than the homepage. */}
+      {next ? <input type="hidden" name="next" value={next} /> : null}
       <div>
         <label
           htmlFor="email"

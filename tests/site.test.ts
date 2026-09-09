@@ -1,5 +1,55 @@
 import { describe, it, expect } from 'vitest';
-import { resolveSiteUrl, siteUrl } from '@/lib/site';
+import { resolveSiteUrl, siteUrl, safeNext } from '@/lib/site';
+
+/**
+ * An open-redirect guard, so the negative cases matter far more than the
+ * positive one. This value ends up inside an emailed sign-in link: the mail
+ * really is from us and the link really does sign the person in, so anything
+ * it wrongly accepts is somewhere an attacker can land a trusting,
+ * freshly-authenticated user.
+ */
+describe('safeNext', () => {
+  it('allows a same-site absolute path', () => {
+    expect(safeNext('/quotes')).toBe('/quotes');
+    expect(safeNext('/studio/onboarding/rates')).toBe('/studio/onboarding/rates');
+    expect(safeNext('/compare?from=email')).toBe('/compare?from=email');
+  });
+
+  it('rejects an absolute URL to another origin', () => {
+    expect(safeNext('https://evil.example/login')).toBeNull();
+    expect(safeNext('http://evil.example')).toBeNull();
+  });
+
+  // Both of these are protocol-relative in a browser: they leave the site
+  // while sailing past a naive startsWith('/') check.
+  it('rejects protocol-relative paths', () => {
+    expect(safeNext('//evil.example/login')).toBeNull();
+    expect(safeNext('/\\evil.example')).toBeNull();
+  });
+
+  it('rejects a scheme smuggled into the middle', () => {
+    expect(safeNext('/redirect?to=https://evil.example')).toBeNull();
+  });
+
+  it('rejects control characters, which can split a header or a log line', () => {
+    expect(safeNext(['/quotes', 'Location: https://evil.example'].join('\n'))).toBeNull();
+    expect(safeNext(['/a', 'b'].join('\t'))).toBeNull();
+    expect(safeNext(['/a', 'b'].join('\r'))).toBeNull();
+    expect(safeNext('/a' + String.fromCharCode(0) + 'b')).toBeNull();
+  });
+
+  it('rejects anything that is not a path', () => {
+    expect(safeNext('quotes')).toBeNull();
+    expect(safeNext('javascript:alert(1)')).toBeNull();
+    expect(safeNext('')).toBeNull();
+    expect(safeNext(null)).toBeNull();
+    expect(safeNext(undefined)).toBeNull();
+  });
+
+  it('trims surrounding whitespace rather than rejecting on it', () => {
+    expect(safeNext('  /quotes  ')).toBe('/quotes');
+  });
+});
 
 describe('resolveSiteUrl', () => {
   // The regression that broke the first Vercel deploy. Next inlines
