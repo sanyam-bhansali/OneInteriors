@@ -16,6 +16,16 @@ import {
 } from '@/modules/studio/types';
 import { PROPERTY_LABELS, SCOPE_LABELS, STYLE_LABELS } from '@/modules/brief/types';
 
+/**
+ * Explicit, because the default is easy to lose to a later refactor and this
+ * page depends on it: a slug that was not pre-rendered still renders on
+ * demand. That is what lets `allSlugs()` fall back to an empty list when the
+ * database is unreachable at build time without the site losing every studio
+ * profile — and what gives a newly approved studio a page before the next
+ * deploy.
+ */
+export const dynamicParams = true;
+
 export async function generateStaticParams() {
   const slugs = await studioRepository.allSlugs();
   return slugs.map((slug) => ({ slug }));

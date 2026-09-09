@@ -147,8 +147,34 @@ export class PrismaStudioRepository implements StudioRepository {
     return row ? toStudio(row) : null;
   }
 
+  /**
+   * Slugs to pre-render.
+   *
+   * This runs inside `generateStaticParams()`, which Next calls at BUILD time.
+   * That makes a deploy depend on the database being reachable *and* the
+   * credentials being valid at the moment of the build — and when they are
+   * not, the build fails outright rather than the site degrading. A rotated
+   * password took a production deploy down exactly this way.
+   *
+   * So a failure here returns an empty list instead of throwing. `/studios/
+   * [slug]` keeps `dynamicParams` on, so nothing is pre-rendered and every
+   * profile is served on demand: slower for the first visitor to each page,
+   * and the site is up.
+   *
+   * There is a second reason this is the right shape. Pre-rendering bakes the
+   * roster into the build, so a studio approved on Tuesday has no page until
+   * the next deploy. Falling back to on-demand rendering fixes that too.
+   */
   async allSlugs(): Promise<string[]> {
-    const rows = await prisma.studio.findMany({ select: { slug: true } });
-    return rows.map((r) => r.slug);
+    try {
+      const rows = await prisma.studio.findMany({ select: { slug: true } });
+      return rows.map((r) => r.slug);
+    } catch (error) {
+      console.error(
+        '[studios] Could not read slugs for pre-rendering; falling back to on-demand.',
+        error,
+      );
+      return [];
+    }
   }
 }
