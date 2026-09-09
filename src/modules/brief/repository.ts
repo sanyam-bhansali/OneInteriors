@@ -148,8 +148,26 @@ export async function saveBrief(brief: Brief): Promise<SaveResult> {
  *  1. **Never overwrite an existing brief.** Someone who already has a brief
  *     and arrives with a stale cookie from a shared laptop must not have their
  *     answers replaced by a stranger's.
- *  2. **Always clear the cookie afterwards**, claimed or not, so the token
+ *  2. **Clear the cookie once the row it points at is gone**, so the token
  *     cannot later reach a brief that now belongs to an account.
+ *
+ * ## Why the cookie is NOT cleared unconditionally
+ *
+ * It used to be, and that was the bug behind the funnel loop: finish the quiz,
+ * sign in at the quote step, and land on "we do not have your brief yet".
+ *
+ * The brief is written to Postgres best-effort — `saveBrief` swallows failures
+ * on purpose, because a database blip must not break the quiz. So a browser can
+ * legitimately hold a cookie whose row was never written. Deleting the cookie
+ * in that state was permanent damage: the client still had the brief in
+ * sessionStorage and would happily re-sync it, but `ensureAnonKey` would mint a
+ * NEW key, so the re-synced row and the account could never meet. Every
+ * server-rendered step after sign-in then said the brief did not exist, and
+ * every one of those screens offers exactly one way out: back to the quiz.
+ *
+ * A cookie pointing at no row is harmless — there is nothing for a stale token
+ * on a shared machine to reach. So it is kept, and cleared only once we have
+ * actually consumed or deleted the row behind it.
  */
 export async function claimBrief(
   userId: string,
@@ -160,21 +178,21 @@ export async function claimBrief(
   const anonKey = jar.get(COOKIE)?.value ?? null;
   if (!anonKey) return { claimed: false, anonKey: null };
 
-  // Whatever happens below, this token stops being usable.
-  jar.delete(COOKIE);
-
   try {
     const [anonymous, existing] = await Promise.all([
       prisma.brief.findUnique({ where: { anonKey } }),
       prisma.brief.findUnique({ where: { userId } }),
     ]);
 
+    // Nothing behind the token. Keep it: the client may still re-sync this
+    // browser's brief, and it must land on the same key when it does.
     if (!anonymous) return { claimed: false, anonKey };
 
     if (existing) {
       // They already have one. Theirs wins; the anonymous row is dropped
       // rather than left orphaned holding someone's budget indefinitely.
       await prisma.brief.delete({ where: { id: anonymous.id } });
+      jar.delete(COOKIE);
       return { claimed: false, anonKey };
     }
 
@@ -182,6 +200,8 @@ export async function claimBrief(
       where: { id: anonymous.id },
       data: { userId, anonKey: null, claimedAt: new Date() },
     });
+    // The row now belongs to an account, so the token must stop working.
+    jar.delete(COOKIE);
     return { claimed: true, anonKey };
   } catch {
     return { claimed: false, anonKey };

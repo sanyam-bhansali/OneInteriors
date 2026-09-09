@@ -119,16 +119,37 @@ describe('tiersForBudget', () => {
     expect(offered.find((o) => o.tier === 'LUXURY')?.withinBudget).toBe(false);
   });
 
-  it('drops a band the customer has visibly outgrown', () => {
-    // ₹40 lakh on a 1150 sqft flat is well past anything Essential covers.
-    const offered = tiersForBudget(lakhsToPaise(40), 1150);
-    expect(offered.map((o) => o.tier)).not.toContain('ESSENTIAL');
-    expect(offered.map((o) => o.tier)).toContain('LUXURY');
+  /**
+   * The regression. An earlier version dropped bands the customer had
+   * "outgrown", which on a small flat with a healthy budget left exactly ONE
+   * card on screen — and one option is not a choice. The whole point of the
+   * step is comparing what more money buys.
+   */
+  it('always offers all three, whatever the budget', () => {
+    for (const budget of [1, 5, 10, 40, 200]) {
+      for (const area of [350, 850, 1650]) {
+        const offered = tiersForBudget(lakhsToPaise(budget), area);
+        expect(offered.map((o) => o.tier)).toEqual([...TIERS]);
+      }
+    }
   });
 
-  it('never returns an empty list', () => {
-    for (const budget of [1, 5, 10, 50, 200]) {
-      expect(tiersForBudget(lakhsToPaise(budget), 1150).length).toBeGreaterThan(0);
-    }
+  it('marks a band the budget clears entirely as within reach', () => {
+    // ₹40 lakh on 1150 sqft clears Essential's ceiling completely.
+    const offered = tiersForBudget(lakhsToPaise(40), 1150);
+    expect(offered.find((o) => o.tier === 'ESSENTIAL')?.fit).toBe('under');
+    expect(offered.find((o) => o.tier === 'ESSENTIAL')?.withinBudget).toBe(true);
+  });
+
+  it('marks a band the budget cannot reach as a stretch', () => {
+    const offered = tiersForBudget(lakhsToPaise(9), 1150);
+    expect(offered.find((o) => o.tier === 'LUXURY')?.fit).toBe('stretch');
+    expect(offered.find((o) => o.tier === 'LUXURY')?.withinBudget).toBe(false);
+  });
+
+  it('marks the band the budget actually lands in', () => {
+    // ₹14 lakh on 1150 sqft sits inside Premium's range.
+    const offered = tiersForBudget(lakhsToPaise(14), 1150);
+    expect(offered.find((o) => o.tier === 'PREMIUM')?.fit).toBe('within');
   });
 });

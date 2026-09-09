@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Container, Eyebrow } from '@/components/ui';
 import { SiteHeader, SiteFooter } from '@/components/chrome';
 import { JourneyNav } from '@/components/JourneyNav';
+import { BriefRescue } from '@/components/BriefRescue';
 import { prisma } from '@/lib/prisma';
 import { loadBrief, readAnonKey } from '@/modules/brief/repository';
 import { getCurrentUser } from '@/modules/auth/session';
@@ -23,11 +24,22 @@ export default async function ExpertPage() {
   const user = await getCurrentUser();
   if (!user) redirect('/sign-in?next=/expert&reason=expert');
 
+  // Both of these mean the same thing — the server has no brief for this
+  // person — and neither is grounds for restarting them. The browser may still
+  // hold it; let the client try to hand it over. See BriefRescue.
   const { brief, found } = await loadBrief();
-  if (!found || !brief.completedAt) redirect('/quiz');
+  const id = found && brief.completedAt ? await briefId() : null;
 
-  const id = await briefId();
-  if (!id) redirect('/quiz');
+  if (!id) {
+    return (
+      <>
+        <SiteHeader />
+        <JourneyNav reached={1} />
+        <BriefRescue destination="the expert call" />
+        <SiteFooter />
+      </>
+    );
+  }
 
   const studios = await studioRepository.list({ activeOnly: true });
   const ranked = rankStudios(brief, studios).slice(0, MAX_STUDIOS);

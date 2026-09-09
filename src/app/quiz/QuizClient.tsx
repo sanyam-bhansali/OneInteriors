@@ -105,6 +105,8 @@ export function QuizClient({ studios }: { studios: Studio[] }) {
   const [brief, setBrief] = useState<Brief>(EMPTY_BRIEF);
   const [step, setStep] = useState(1);
   const [hydrated, setHydrated] = useState(false);
+  /** True between the last answer and the tier page. Keeps the button honest. */
+  const [finishing, setFinishing] = useState(false);
 
   useEffect(() => {
     // sessionStorage first so the quiz paints immediately, then reconcile with
@@ -162,9 +164,26 @@ export function QuizClient({ studios }: { studios: Studio[] }) {
     if (step >= TOTAL_STEPS) {
       const done = { ...brief, completedAt: new Date().toISOString(), lastStep: TOTAL_STEPS };
       saveBrief(done);
-      sync(done);
       void trackAction('quiz.complete');
-      router.push('/tier');
+
+      /**
+       * The one sync that is waited on.
+       *
+       * Every other write is fire-and-forget so Continue never feels slow. This
+       * one is different: it carries `completedAt`, and every server-rendered
+       * step after this point refuses to work without it. Racing the navigation
+       * against it means the customer can reach the quote step before the row
+       * says their brief is finished.
+       *
+       * Waited on, but never blocking: a second, then we move regardless.
+       * BriefRescue picks up whatever did not land, so the worst case is a
+       * short "picking up your brief" rather than a stall here.
+       */
+      setFinishing(true);
+      void Promise.race([
+        saveBriefAction(done).catch(() => {}),
+        new Promise((resolve) => setTimeout(resolve, 1000)),
+      ]).then(() => router.push('/tier'));
       return;
     }
     const n = step + 1;
@@ -269,8 +288,12 @@ export function QuizClient({ studios }: { studios: Studio[] }) {
                   Pick an answer to continue
                 </span>
               ) : null}
-              <Button onClick={next} disabled={!canAdvance} size="lg">
-                {step === TOTAL_STEPS ? 'See what it costs' : 'Continue'}
+              <Button onClick={next} disabled={!canAdvance || finishing} size="lg">
+                {finishing
+                  ? 'Saving your brief…'
+                  : step === TOTAL_STEPS
+                    ? 'See what it costs'
+                    : 'Continue'}
               </Button>
             </div>
           </div>

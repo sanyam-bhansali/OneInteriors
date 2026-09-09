@@ -195,6 +195,22 @@ export function MatchClient({ studios }: { studios: Studio[] }) {
                     <StudioCard key={m.studioId} match={m} studio={studios.find((s) => s.id === m.studioId)!} />
                   ))}
                 </ul>
+
+                {/* The way forward.
+                    This page used to end here, with nothing but individual
+                    studio profiles to click into — which is the one thing the
+                    product does not want, because contacting a studio directly
+                    skips the expert and the comparison. The next step is
+                    quotes, and it has to be on the page. */}
+                <div className="mt-12 flex flex-wrap items-center gap-5 border-t border-[var(--color-rule)] pt-8">
+                  <Button href="/quotes" size="lg">
+                    Get {matches.length > 1 ? 'their quotes' : 'the quote'}
+                  </Button>
+                  <span className="max-w-[46ch] text-[14.5px] leading-relaxed text-[var(--color-ink-3)]">
+                    Each studio prices your home from its own rate card. We ask you to sign in
+                    first, so the numbers are yours to come back to.
+                  </span>
+                </div>
               </>
             )}
           </Container>

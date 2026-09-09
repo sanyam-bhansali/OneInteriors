@@ -152,29 +152,53 @@ export function studioTierFrom(quoteTotalPaise: Paise, carpetAreaSqft: number): 
 }
 
 /**
- * Which tiers to offer, given what the customer said they would spend.
+ * The bands to offer, given what the customer said they would spend.
  *
- * A budget is a fact about the customer, so a band above it is shown but
- * marked as a stretch rather than hidden — people routinely move up when they
- * see what the difference buys, and silently removing the option would be
- * deciding for them. A band far below is dropped, because offering someone
- * with ₹20 lakh an Essential quote wastes everybody's time.
+ * **Always all three.** An earlier version dropped bands the customer had
+ * "outgrown" — the reasoning being that someone with ₹20 lakh does not need an
+ * Essential quote. In practice it could leave a single card on the screen,
+ * which is not a choice at all: the whole point of this step is comparing what
+ * more money buys, and one option compares with nothing.
+ *
+ * It was also wrong on its own terms. A budget is what someone *expects* to
+ * spend, not a floor they refuse to go below, and plenty of people are pleased
+ * to discover the level below does what they wanted. Hiding it decides for
+ * them.
+ *
+ * So every band is shown and each is labelled with how it sits against the
+ * budget. `stretch` is the one that needs saying out loud; `under` is
+ * information, not a warning.
  */
+export type BudgetFit = 'within' | 'stretch' | 'under';
+
+export interface TierOffer {
+  tier: Tier;
+  /** Kept for callers that only care whether it is affordable. */
+  withinBudget: boolean;
+  fit: BudgetFit;
+}
+
 export function tiersForBudget(
   budgetMaxPaise: Paise | null,
   carpetAreaSqft: number,
-): { tier: Tier; withinBudget: boolean }[] {
+): TierOffer[] {
   return TIERS.map((tier) => {
-    if (budgetMaxPaise === null) return { tier, withinBudget: true };
-    const { lowPaise } = tierRangeFor(tier, carpetAreaSqft);
-    return { tier, withinBudget: budgetMaxPaise >= lowPaise };
-  }).filter((entry, index, all) => {
-    // Drop a band only when the customer's budget clears the *next* band's
-    // floor comfortably — i.e. they have visibly outgrown this one.
-    if (budgetMaxPaise === null) return true;
-    const next = all[index + 1];
-    if (!next) return true;
-    const nextRange = tierRangeFor(next.tier, carpetAreaSqft);
-    return budgetMaxPaise < nextRange.highPaise;
+    if (budgetMaxPaise === null) {
+      return { tier, withinBudget: true, fit: 'within' as const };
+    }
+
+    const { lowPaise, highPaise } = tierRangeFor(tier, carpetAreaSqft);
+
+    // Their budget does not reach this band's floor.
+    if (budgetMaxPaise < lowPaise) {
+      return { tier, withinBudget: false, fit: 'stretch' as const };
+    }
+
+    // Their budget clears the whole band — they can afford everything in it.
+    if (budgetMaxPaise > highPaise) {
+      return { tier, withinBudget: true, fit: 'under' as const };
+    }
+
+    return { tier, withinBudget: true, fit: 'within' as const };
   });
 }

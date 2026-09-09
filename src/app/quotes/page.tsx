@@ -12,6 +12,7 @@ import { quoteBrief, storeQuotes } from '@/modules/quotation/generate';
 import { TIER } from '@/modules/quotation/tiers';
 import { record } from '@/modules/analytics/record';
 import { JourneyNav } from '@/components/JourneyNav';
+import { BriefRescue, RescueSettled } from '@/components/BriefRescue';
 
 export const metadata: Metadata = {
   title: 'Your quotes',
@@ -33,28 +34,17 @@ export default async function QuotesPage() {
   const user = await getCurrentUser();
   if (!user) redirect('/sign-in?next=/quotes&reason=quotes');
 
-  // Deliberately NOT a redirect to /quiz. Someone who just answered nine
-  // questions and gets silently returned to question one assumes the product
-  // ate their answers — which is exactly what it looks like. Say what is
-  // missing instead.
-  const briefIncomplete = !found || !brief.completedAt;
-
-  if (briefIncomplete) {
+  // Deliberately NOT a redirect to /quiz, and deliberately not a dead end
+  // either. The server can be missing a brief the browser still holds — the
+  // quiz syncs fire-and-forget on purpose — so hand over to the client, which
+  // can look in sessionStorage, push it up and reload this page. See
+  // BriefRescue for the full reasoning.
+  if (!found || !brief.completedAt) {
     return (
       <>
         <SiteHeader />
         <JourneyNav reached={1} />
-        <main className="py-16">
-          <Container size="narrow">
-            <h1 className="h1 mb-4">We do not have your brief yet.</h1>
-            <p className="m-0 mb-8 max-w-[54ch] text-[17px] leading-relaxed text-[var(--color-ink-2)]">
-              Either it was not finished, or it was answered in a different browser and has not
-              caught up with this sign-in yet. Nine questions, three minutes, and your quotes
-              follow immediately.
-            </p>
-            <Button href="/quiz" size="lg">Answer the questions</Button>
-          </Container>
-        </main>
+        <BriefRescue destination="your quotes" />
         <SiteFooter />
       </>
     );
@@ -115,6 +105,7 @@ export default async function QuotesPage() {
     <>
       <SiteHeader />
       <JourneyNav />
+      <RescueSettled />
 
       <main className="py-10 sm:py-14">
         <Container size="wide">

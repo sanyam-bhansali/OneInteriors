@@ -84,7 +84,7 @@ export function TierClient({ initial }: { initial: Brief }) {
           </div>
 
           <div className="mb-10 grid grid-cols-1 gap-5 md:grid-cols-3">
-            {offered.map(({ tier, withinBudget }) => {
+            {offered.map(({ tier, fit }) => {
               const definition = TIER[tier];
               const low = Math.round(definition.perSqftFrom * area * 100);
               const high = Math.round(definition.perSqftTo * area * 100);
@@ -106,13 +106,18 @@ export function TierClient({ initial }: { initial: Brief }) {
                     <span className="font-[family-name:var(--font-display)] text-[24px] leading-none text-[var(--color-ink)]">
                       {definition.label}
                     </span>
-                    {/* A band above their stated budget is shown and labelled,
-                        never hidden — people move up when they see what the
-                        difference buys, and removing the option silently is
-                        deciding for them. */}
-                    {!withinBudget ? (
+                    {/* Every band is shown and labelled against their budget,
+                        never hidden. People move up when they see what the
+                        difference buys, and they are often pleased to find the
+                        level below does what they wanted — removing either
+                        option decides for them. */}
+                    {fit === 'stretch' ? (
                       <span className="rounded-full bg-[var(--color-paper-3)] px-2.5 py-0.5 font-[family-name:var(--font-mono)] text-[9.5px] uppercase tracking-[0.11em] text-[var(--color-ink-3)]">
                         Above your budget
+                      </span>
+                    ) : fit === 'under' ? (
+                      <span className="rounded-full bg-[var(--color-ontrack-soft)] px-2.5 py-0.5 font-[family-name:var(--font-mono)] text-[9.5px] uppercase tracking-[0.11em] text-[var(--color-ontrack)]">
+                        Within reach
                       </span>
                     ) : null}
                   </div>

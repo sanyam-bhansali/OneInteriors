@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Container } from '@/components/ui';
 import { Wordmark, Mark } from '@/components/brand';
 import { rosterIsReal } from '@/lib/env';
+import { StartLink } from '@/components/StartCta';
 
 const NAV = [
   { href: '/studios', label: 'Studios' },
@@ -31,12 +32,8 @@ export function SiteHeader() {
                 {item.label}
               </Link>
             ))}
-            <Link
-              href="/quiz"
-              className="rounded-full bg-[var(--color-petrol)] px-4 py-2 text-[14px] font-medium text-[var(--color-paper)] no-underline transition-colors hover:bg-[var(--color-petrol-deep)]"
-            >
-              Start
-            </Link>
+            {/* Resumes rather than restarts — see StartCta. */}
+            <StartLink />
           </nav>
         </div>
       </Container>

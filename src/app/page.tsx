@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Container, Button } from '@/components/ui';
+import { Container } from '@/components/ui';
 import { SiteHeader, SiteFooter } from '@/components/chrome';
 import { JOURNEY } from '@/modules/brief/journey';
 import { TIER, TIERS, tierRangeFor } from '@/modules/quotation/tiers';
@@ -8,6 +8,7 @@ import { formatINRCompact } from '@/lib/money';
 import { PHOTOS } from '@/lib/imagery';
 import { TIER_CHECKS } from '@/modules/studio/types';
 import { rosterIsReal } from '@/lib/env';
+import { StartCta } from '@/components/StartCta';
 
 const TOTAL_CHECKS = TIER_CHECKS.LISTED.length + TIER_CHECKS.VERIFIED.length;
 const SAMPLE_SQFT = 850;
@@ -87,12 +88,10 @@ export default function Home() {
                 </p>
 
                 <div className="mb-9 flex flex-wrap items-center gap-4">
-                  <Button href="/quiz" size="lg">
-                    Get my quotes
-                  </Button>
-                  <span className="text-[14.5px] text-[var(--color-ink-3)]">
-                    Three minutes · no sign-up to see your matches
-                  </span>
+                  {/* Resumes if this browser already has a brief. A returning
+                      visitor clicking "Get my quotes" and landing on question
+                      one reads as the product having forgotten them. */}
+                  <StartCta fallbackNote="Three minutes · no sign-up to see your matches" />
                 </div>
 
                 {/* The trust strip. Facts with numbers in them, immediately
@@ -349,9 +348,9 @@ export default function Home() {
               <p className="mx-auto m-0 mb-8 max-w-[46ch] text-[17px] leading-[1.65] text-[var(--color-ink-2)]">                Nine questions, three minutes, and you will have real numbers from real studios. If
                 none of it is useful, you have lost an afternoon coffee&rsquo;s worth of time.
               </p>
-              <Button href="/quiz" size="lg">
-                Get my quotes
-              </Button>
+              <div className="flex flex-wrap items-center justify-center gap-4">
+                <StartCta />
+              </div>
               <p className="m-0 mt-6 text-[14px] text-[var(--color-ink-3)]">
                 Already started?{' '}
                 <Link href="/sign-in" className="text-[var(--color-petrol)]">

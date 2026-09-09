@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Container, Button, Eyebrow } from '@/components/ui';
 import { SiteHeader, SiteFooter } from '@/components/chrome';
 import { JourneyNav } from '@/components/JourneyNav';
+import { BriefRescue } from '@/components/BriefRescue';
 import { formatINR, formatINRCompact } from '@/lib/money';
 import { loadBrief } from '@/modules/brief/repository';
 import { getCurrentUser } from '@/modules/auth/session';
@@ -26,7 +27,20 @@ export default async function ComparePage() {
   if (!user) redirect('/sign-in?next=/compare&reason=quotes');
 
   const { brief, found } = await loadBrief();
-  if (!found || !brief.completedAt) redirect('/quiz');
+
+  // Not a redirect to /quiz. The browser may still hold a brief the server has
+  // not got — see BriefRescue. Sending someone back to question one because a
+  // background write did not land is how a finished funnel reads as broken.
+  if (!found || !brief.completedAt) {
+    return (
+      <>
+        <SiteHeader />
+        <JourneyNav reached={1} />
+        <BriefRescue destination="the comparison" />
+        <SiteFooter />
+      </>
+    );
+  }
 
   const studios = await studioRepository.list({ activeOnly: true });
   const ranked = rankStudios(brief, studios).slice(0, MAX_COMPARE);
