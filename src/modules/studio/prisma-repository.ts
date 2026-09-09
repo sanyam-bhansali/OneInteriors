@@ -116,17 +116,37 @@ const TIER_ORDER: Record<VerificationTier, number> = {
 };
 
 export class PrismaStudioRepository implements StudioRepository {
+  /**
+   * The roster.
+   *
+   * A database failure here returns an EMPTY list rather than throwing.
+   * `/quiz`, `/match` and `/studios` all read the roster on every request, so
+   * an unreachable database would otherwise 500 a customer in the middle of
+   * the funnel — the single worst place to fail, because they cannot tell a
+   * broken deployment from a broken product and simply leave.
+   *
+   * Empty, not fixtures. Falling back to the invented studios would put eight
+   * fake businesses in front of a real customer as though we had verified
+   * them, which is the one thing this product exists not to do. An empty
+   * roster is visibly wrong to us and merely disappointing to them.
+   */
   async list(query: StudioQuery = {}): Promise<Studio[]> {
     const where: Prisma.StudioWhereInput = {};
     if (query.city) where.city = query.city;
     if (query.activeOnly) where.status = 'ACTIVE';
     if (query.locality) where.localities = { has: query.locality };
 
-    const rows = await prisma.studio.findMany({
-      where,
-      include: INCLUDE,
-      orderBy: { tradeName: 'asc' },
-    });
+    let rows;
+    try {
+      rows = await prisma.studio.findMany({
+        where,
+        include: INCLUDE,
+        orderBy: { tradeName: 'asc' },
+      });
+    } catch (error) {
+      console.error('[studios] Roster unavailable; serving an empty list.', error);
+      return [];
+    }
 
     const studios = rows.map(toStudio);
 

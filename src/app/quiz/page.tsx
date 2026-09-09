@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { studioRepository } from '@/modules/studio/repository';
+import { cachedRoster } from '@/modules/studio/roster-cache';
 import { QuizClient } from './QuizClient';
 
 export const metadata: Metadata = {
@@ -16,6 +16,6 @@ export const dynamic = 'force-dynamic';
  * directly, and Postgres is a swap behind this line rather than a rewrite.
  */
 export default async function QuizPage() {
-  const studios = await studioRepository.list({ activeOnly: true });
+  const studios = await cachedRoster();
   return <QuizClient studios={studios} />;
 }

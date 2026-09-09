@@ -23,6 +23,7 @@ import { validateGstin } from '@/modules/verification/gstin';
 import { isValidEmail, normaliseEmail, requestMagicLink } from '@/modules/auth/magic-link';
 import { lakhsToPaise } from '@/lib/money';
 import { normalisePhone } from './phone';
+import { revalidateRoster } from './roster-cache';
 import { resolveSiteUrl } from '@/lib/site';
 
 export type ApplyResult =
@@ -184,11 +185,34 @@ export async function approveApplication(id: string, note: string): Promise<Deci
         },
       });
 
-      // The contact becomes a STUDIO user and gets a sign-in link.
+      /**
+       * The contact becomes a STUDIO user and gets a sign-in link.
+       *
+       * The role must be set on the UPDATE branch too, not only on create.
+       * Anyone can now self-serve a CUSTOMER account just by signing in with
+       * an address, so a studio's contact may already exist as a customer by
+       * the time we approve them — someone at the studio poking around the
+       * site is enough. Without this, approval would leave them a CUSTOMER,
+       * `/studio` would reject them, and they would be bounced to the homepage
+       * with no explanation and no way to tell us what went wrong.
+       *
+       * Existing OPS and ADMIN accounts are never demoted: approving an
+       * application is not a privilege change, and a form must not be able to
+       * strip a staff account of its access.
+       */
+      const existing = await tx.user.findUnique({
+        where: { email: app.email },
+        select: { role: true },
+      });
+      const keepsElevatedRole = existing?.role === 'OPS' || existing?.role === 'ADMIN';
+
       const user = await tx.user.upsert({
         where: { email: app.email },
         create: { email: app.email, name: app.contactName, role: 'STUDIO' },
-        update: { name: app.contactName },
+        update: {
+          name: app.contactName,
+          ...(keepsElevatedRole ? {} : { role: 'STUDIO' as const }),
+        },
       });
 
       await tx.studioMember.upsert({
@@ -221,6 +245,10 @@ export async function approveApplication(id: string, note: string): Promise<Deci
 
       return { slug, email: app.email };
     });
+
+    // The roster is cached for a minute; approving someone should not wait for
+    // that to expire.
+    await revalidateRoster();
 
     // Outside the transaction — a mail failure must not roll back the approval.
     await requestMagicLink(result.email, { baseUrl: resolveSiteUrl() });

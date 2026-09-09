@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { studioRepository } from '@/modules/studio/repository';
+import { cachedRoster } from '@/modules/studio/roster-cache';
 import { MatchClient } from './MatchClient';
 
 export const metadata: Metadata = {
@@ -23,6 +23,6 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function MatchPage() {
-  const studios = await studioRepository.list({ activeOnly: true });
+  const studios = await cachedRoster();
   return <MatchClient studios={studios} />;
 }
