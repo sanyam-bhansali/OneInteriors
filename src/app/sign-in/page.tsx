@@ -5,6 +5,7 @@ import { Wordmark } from '@/components/brand';
 import { getCurrentUser } from '@/modules/auth/session';
 import { safeNext } from '@/lib/site';
 import { SignInForm } from './SignInForm';
+import { OtpForm } from './OtpForm';
 
 export const metadata: Metadata = {
   title: 'Sign in',
@@ -41,35 +42,40 @@ export default async function SignInPage({
           </div>
 
           <h1 className="h1 mb-3">
-            {fromQuotes ? 'Where should we send your quotes?' : 'Sign in'}
+            {fromQuotes ? 'Last step before your quotes.' : 'Sign in'}
           </h1>
           <p className="m-0 mb-8 text-[16px] leading-relaxed text-[var(--color-ink-2)]">
             {fromQuotes ? (
               <>
-                Your answers are saved. We&rsquo;ll email you a link so your quotes stay yours —
-                you can come back to them from any device, and every version is kept.
+                Your answers are saved. Your name and number, a code on WhatsApp, and the quotes
+                are on the next screen — so they stay yours and you can come back to them.
               </>
             ) : (
-              <>We&rsquo;ll email you a link. No password to remember or lose.</>
+              <>Your number and a code on WhatsApp. No password to remember or lose.</>
             )}
           </p>
 
-          <SignInForm next={destination} />
+          {/* Customers sign in by phone. The emailed link is still here, below
+              the fold, because ops and studio accounts use it — but it is not
+              what a customer should be reading first. */}
+          <OtpForm next={destination} />
 
-          {fromQuotes ? (
-            <p className="m-0 mt-10 border-t border-[var(--color-rule)] pt-5 text-[13.5px] leading-relaxed text-[var(--color-ink-3)]">
-              No password, and nothing is shared with any studio until you ask us to introduce
-              you.
-            </p>
-          ) : (
-            <p className="m-0 mt-10 border-t border-[var(--color-rule)] pt-5 text-[13.5px] leading-relaxed text-[var(--color-ink-3)]">
-              Looking for an interior designer? You can see your matches without an account —{' '}
-              <a href="/quiz" className="text-[var(--color-petrol)]">
-                start with the nine questions
-              </a>
-              .
-            </p>
-          )}
+          <p className="m-0 mt-10 border-t border-[var(--color-rule)] pt-5 text-[13.5px] leading-relaxed text-[var(--color-ink-3)]">
+            Nothing is shared with any studio until you ask us to introduce you, and we do not
+            send your quotes anywhere — they live on this site.
+          </p>
+
+          {/* Staff route. Deliberately understated and last: a customer who
+              opens it has taken a wrong turn, and a studio owner looking for
+              it knows what they are looking for. */}
+          <details className="group mt-6">
+            <summary className="cursor-pointer list-none text-[13.5px] text-[var(--color-ink-3)] underline underline-offset-4">
+              Studio or team member? Sign in by email instead
+            </summary>
+            <div className="mt-5">
+              <SignInForm next={destination} />
+            </div>
+          </details>
         </div>
       </Container>
     </main>

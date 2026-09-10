@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Instrument_Serif, Public_Sans, IBM_Plex_Mono } from 'next/font/google';
 import { siteUrl } from '@/lib/site';
+import { RosterGateBanner } from '@/components/RosterGateBanner';
 import './globals.css';
 
 const display = Instrument_Serif({
@@ -67,7 +68,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     //
     // The symptom is that the serif simply never appears and nothing errors.
     <html lang="en-IN" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
-      <body>{children}</body>
+      <body>
+        {/* The verification-gate warning lives HERE, not in SiteHeader.
+            It was in SiteHeader, and it silently vanished on /match — the one
+            page it exists for. SiteHeader is rendered from inside MatchClient,
+            which is a client component, so everything it touches gets compiled
+            into the browser bundle. `showUnverifiedStudios()` reads
+            DEV_SHOW_UNVERIFIED_STUDIOS, which is deliberately not
+            NEXT_PUBLIC_, so in the browser it read `undefined` and the banner
+            rendered nothing.
+
+            The root layout is a server component and always will be, so the
+            warning appears exactly once on every page regardless of how the
+            page below it renders. A safety banner that only shows on the safe
+            pages is worse than no banner: it teaches you to trust its
+            absence. */}
+        <RosterGateBanner />
+        {children}
+      </body>
     </html>
   );
 }

@@ -33,7 +33,17 @@ export function TierClient({ initial }: { initial: Brief }) {
   });
   const [picked, setPicked] = useState<Tier | null>(brief.tier ?? null);
 
-  const area = brief.carpetAreaSqft ?? 850;
+  /**
+   * The carpet area, and whether it is theirs or ours.
+   *
+   * The fallback is fine — we cannot price a home without a size. Presenting
+   * the fallback as *their* number was not: the page said "here is what your
+   * 850 sqft would cost" to someone who never told us a figure. On a product
+   * whose whole argument is that we label what we assumed, saying an
+   * assumption back as fact is the one mistake that costs the most.
+   */
+  const areaAssumed = !brief.carpetAreaSqft || brief.carpetAreaSqft <= 0;
+  const area = areaAssumed ? 850 : (brief.carpetAreaSqft as number);
   const offered = tiersForBudget(brief.budgetMaxPaise, area);
 
   function choose(tier: Tier) {
@@ -74,13 +84,29 @@ export function TierClient({ initial }: { initial: Brief }) {
               className="m-0 mb-4 font-[family-name:var(--font-display)] text-[clamp(1.9rem,4vw,2.9rem)] font-normal leading-[1.06] tracking-[-0.02em] text-[var(--color-ink)]"
               style={{ textWrap: 'balance' }}
             >
-              Here is what your {area} sqft would cost, at three levels of finish.
+              {areaAssumed
+                ? 'Here is what a home like yours would cost, at three levels of finish.'
+                : `Here is what your ${area} sqft would cost, at three levels of finish.`}
             </h1>
             <p className="m-0 max-w-[58ch] text-[17px] leading-[1.65] text-[var(--color-ink-2)]">
               These are real ranges for a home your size, not brackets we invented to make one
               look reasonable. Pick the one you actually want to spend in — you can change it
               later, and it does not commit you to anything.
             </p>
+
+            {/* Said where the numbers are, not in a footnote. An assumed area
+                moves every figure on this page, so the customer should be able
+                to fix it from here in one tap. */}
+            {areaAssumed ? (
+              <p className="m-0 mt-4 max-w-[58ch] rounded-[10px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 py-3 text-[14px] leading-[1.55] text-[var(--color-ink-2)]">
+                You did not give us a carpet area, so these use{' '}
+                <strong className="font-semibold">850 sqft</strong>, typical for a 2 BHK in Pune.{' '}
+                <Link href="/quiz" className="text-[var(--color-petrol)]">
+                  Tell us the real figure
+                </Link>{' '}
+                and every number here tightens.
+              </p>
+            ) : null}
           </div>
 
           <div className="mb-10 grid grid-cols-1 gap-5 md:grid-cols-3">

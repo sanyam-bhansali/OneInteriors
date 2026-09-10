@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Container } from '@/components/ui';
 import { Wordmark, Mark } from '@/components/brand';
-import { rosterIsReal, showUnverifiedStudios } from '@/lib/env';
+import { rosterIsReal } from '@/lib/env';
 import { StartLink } from '@/components/StartCta';
 
 const NAV = [
@@ -9,26 +9,15 @@ const NAV = [
   { href: '/verification', label: 'How we verify' },
 ];
 
+/**
+ * The site header.
+ *
+ * The verification-gate warning used to be here and is not any more: this
+ * component is imported by client components (MatchClient, for one), so
+ * anything it reads from a non-`NEXT_PUBLIC_` variable is `undefined` in the
+ * browser. It lives in the root layout now. See RosterGateBanner.
+ */
 export function SiteHeader() {
-  return (
-    <>
-      {/* Impossible to miss on purpose. The verification gate being off is a
-          development state, and the cost of forgetting it is showing unchecked
-          studios as though we had checked them. A quiet flag would get
-          forgotten; this one is in the way. */}
-      {showUnverifiedStudios() ? (
-        <div className="bg-[var(--color-terracotta)] py-1.5 text-center">
-          <p className="m-0 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-paper)]">
-            Dev · verification gate off · unverified studios are visible
-          </p>
-        </div>
-      ) : null}
-      <SiteHeaderBar />
-    </>
-  );
-}
-
-function SiteHeaderBar() {
   return (
     <header className="border-b border-[var(--color-rule)] bg-[var(--color-paper)]">
       <Container size="wide">

@@ -16,7 +16,7 @@
  *     for more than the customer has earned reason to give.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Container, Button } from '@/components/ui';
@@ -158,6 +158,25 @@ export function QuizClient({ studios }: { studios: Studio[] }) {
     void trackAction('quiz.step.view', { step });
   }, [step, hydrated]);
 
+  /**
+   * Put every new question back at the top of its own screen.
+   *
+   * The question area is a scrolling container inside a fixed frame, and its
+   * scroll offset survives a step change. Answer a tall question, scroll down
+   * to reach the last option, hit Continue — and the next question opens at
+   * whatever offset the previous one was left at. On a tall step that means
+   * landing on a grid of unlabelled options with the heading and the
+   * instructions both above the fold, which is exactly what it looks like when
+   * a page is broken.
+   *
+   * `scrollTop = 0` rather than `scrollIntoView`: this must be instant and
+   * invisible. A smooth scroll here reads as the page moving on its own.
+   */
+  const scroller = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    scroller.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, [step]);
+
   function update(patch: Partial<Brief>) {
     setBrief((prev) => {
       const next = { ...prev, ...patch, lastStep: step };
@@ -286,7 +305,7 @@ export function QuizClient({ studios }: { studios: Studio[] }) {
           the button — on every one of the nine. A quiz where the primary
           action is below the fold reads as broken, however good the question
           above it is. */}
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <main ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
         <Container size="wide">
           <div className="grid grid-cols-1 gap-9 py-8 sm:py-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-14">
             <div key={`q-${step}`} className="rise flex flex-col gap-7">
@@ -395,7 +414,14 @@ function stepContent(
           />
         ),
         options: (
-          <div className="flex flex-col gap-8">
+          /* Tighter than the other steps on purpose.
+             This is the only question carrying three fields, and Continue does
+             not unlock until locality is answered — so if locality sits below
+             the fold, the very first screen of the funnel looks like a dead
+             button. It was doing exactly that on anything shorter than a
+             full-height laptop window. The gaps here are the difference
+             between all three fields fitting and not. */
+          <div className="flex flex-col gap-5 sm:gap-6">
             <TileRow>
               {(Object.keys(PROPERTY_LABELS) as PropertyType[]).map((k) => (
                 <CircleTile
@@ -474,7 +500,10 @@ function stepContent(
         ask: (
           <Ask
             title="Which of these feel like your home?"
-            hint="Pick three, on instinct. Don't overthink it — we'll tell you what you chose afterwards."
+            // "Pick three" while Continue unlocked at one was a small lie that
+            // taught people the instructions here are approximate. Two or
+            // three is what the step actually accepts, so that is what it says.
+            hint="Pick two or three, on instinct. Don't overthink it — we'll tell you what you chose afterwards."
           />
         ),
         options: (
@@ -713,9 +742,20 @@ function priorityStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPa
 
   return {
     ask: (
+      {/* The heading and the hint used to point in OPPOSITE directions.
+          "If you had to give one of these up, which goes first?" asks for the
+          LEAST important thing. "Tap them in order, most important first" asks
+          for the most. A reader who trusted the heading ranked the list
+          backwards — and `priorityRanking[0]` is treated everywhere as the
+          thing that matters most, so that answer silently inverted the single
+          largest input to the matching engine. Nobody would ever have seen it
+          go wrong: the customer gets confidently ranked studios that suit the
+          opposite of what they said.
+
+          Both lines now ask the same question, in the same direction. */}
       <Ask
-        title="If you had to give one of these up, which goes first?"
-        hint="Tap them in order, most important first. This single answer does more matching work than any other."
+        title="What matters most to you here?"
+        hint="Tap them in order, starting with the most important. This single answer does more matching work than any other."
       />
     ),
     options: (
@@ -727,6 +767,12 @@ function priorityStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPa
               key={k}
               type="button"
               onClick={() => update({ priorityRanking: ranked.filter((r) => r !== k) })}
+              // Without this the accessibility tree shows four unlabelled
+              // buttons: the visible text sits in nested spans alongside a
+              // rank number and the word "Remove", which do not compose into a
+              // usable name. A screen reader user was being asked to rank four
+              // things called "button".
+              aria-label={`${PRIORITY_LABELS[k]} — ranked ${i + 1}. Tap to remove from the ranking.`}
               className="flex items-center gap-3 rounded-full border-2 border-[var(--color-petrol)] bg-[var(--color-petrol-soft)] px-4 py-3 text-left text-[15px] text-[var(--color-ink)]"
             >
               <span className="tabular flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-petrol)] font-[family-name:var(--font-mono)] text-[11px] text-[var(--color-paper)]">
@@ -745,6 +791,7 @@ function priorityStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPa
               key={k}
               type="button"
               onClick={() => update({ priorityRanking: [...ranked, k] })}
+              aria-label={`${PRIORITY_LABELS[k]} — tap to rank it ${ranked.length + 1}.`}
               className="flex items-center gap-3 rounded-full border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 py-3 text-left text-[15px] text-[var(--color-ink-2)] transition-colors hover:border-[var(--color-petrol)]"
             >
               <span className="h-6 w-6 shrink-0" />
@@ -875,7 +922,13 @@ function CircleTile({
       type="button"
       onClick={onClick}
       aria-pressed={selected}
-      className={`relative flex h-[122px] w-[122px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-full px-3 text-center transition-all sm:h-[136px] sm:w-[136px] ${
+      /* Fixed at 122px. The tile used to grow to 136 at the `sm` breakpoint,
+         which is where it started costing more than it gained: five tiles at
+         136 plus gaps need ~744px, so on any window between roughly 640 and
+         1024 the fifth tile wrapped onto a second row and pushed the locality
+         chips — the field that actually unlocks Continue — below the fold.
+         Twelve pixels of tile is not worth a hidden required field. */
+      className={`relative flex h-[122px] w-[122px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-full px-3 text-center transition-all ${
         selected
           ? 'bg-[var(--color-petrol-soft)] ring-2 ring-[var(--color-petrol)]'
           : 'bg-[var(--color-paper-2)] hover:bg-[var(--color-paper-3)]'
@@ -1068,11 +1121,27 @@ function isStepAnswered(brief: Brief, step: number): boolean {
     case 3:
       return brief.budgetMaxPaise !== null;
     case 4:
-      return brief.styleLikes.length > 0;
+      // Two, not one. The question asks for three and the reveal on /match
+      // reads "leaning X, with a bit of Y" — a single pick makes that sentence
+      // impossible and gives the matcher nothing to weigh against.
+      return brief.styleLikes.length >= 2;
     case 5:
       return true; // optional, but high-signal when given
     case 6:
-      return brief.household !== null;
+      /**
+       * Answered by default, because the screen already shows a real answer.
+       *
+       * The step renders two adults, no children, no elderly — the modal Pune
+       * household — and used to leave Continue disabled behind "Pick an answer
+       * to continue" until you nudged a stepper. So the product displayed an
+       * answer and then denied it had one, and the only way forward was to
+       * change something you agreed with and change it back.
+       *
+       * Nothing is hidden by accepting it: the defaults are on screen, they
+       * are what we would have assumed anyway, and anyone whose household
+       * differs can see at a glance that it needs changing.
+       */
+      return true;
     case 7:
       return brief.priorityRanking.length === 4;
     case 8:
