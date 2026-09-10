@@ -37,6 +37,7 @@ import 'server-only';
 import { randomBytes } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
 import { AuthChannel } from '@prisma/client';
+import { showOtpOnScreen } from '@/lib/env';
 import { createSession, hashIp, hashToken } from './session';
 import { normalisePhone } from '@/modules/studio/phone';
 import { sendOtp } from './whatsapp';
@@ -142,11 +143,28 @@ export async function requestOtp(
    */
   const sent = await sendOtp(phone, code);
 
-  // Development with no WhatsApp credentials: hand the code back so sign-in
-  // works offline. Never in production — the guard is on NODE_ENV rather than
-  // on whether delivery failed, because a delivery failure in production must
-  // not turn into "here is the code in the response body".
+  // Local development with no WhatsApp credentials: hand the code back so
+  // sign-in works offline.
   if (!sent.delivered && process.env.NODE_ENV !== 'production') {
+    return { ok: true, devCode: code };
+  }
+
+  /**
+   * The pre-launch escape hatch, for deployed builds.
+   *
+   * On Vercel `NODE_ENV` is always 'production', so the check above never
+   * fires there — which meant that until Meta approved the template, nobody
+   * could get past the sign-in gate on the deployed site and everything behind
+   * it was untestable.
+   *
+   * `showOtpOnScreen()` is off unless explicitly set, and refuses to work at
+   * all once the roster is declared real. Read its comment before touching
+   * this: with it on, the OTP proves nothing whatsoever.
+   *
+   * Returned regardless of whether delivery succeeded, deliberately — the
+   * whole point is not depending on delivery.
+   */
+  if (showOtpOnScreen()) {
     return { ok: true, devCode: code };
   }
 

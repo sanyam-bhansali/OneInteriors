@@ -201,10 +201,21 @@ export function OtpForm({ next }: { next: string | null }) {
         </p>
       </div>
 
+      {/* Loud on purpose.
+          A code on screen means the OTP is verifying nothing — anyone can type
+          any number and read the code. That is an acceptable trade on a
+          pre-launch build waiting for Meta template approval, and a disaster
+          if it ever ships. It should look wrong every single time it appears,
+          so nobody stops noticing it. */}
       {devCode ? (
-        <p className="m-0 rounded-[10px] border border-dashed border-[var(--color-rule)] px-4 py-3 font-[family-name:var(--font-mono)] text-[13px] text-[var(--color-ink-2)]">
-          Dev — no WhatsApp provider configured. Your code is {devCode}.
-        </p>
+        <div className="rounded-[10px] border-2 border-[var(--color-terracotta)] bg-[var(--color-paper-2)] px-4 py-3">
+          <p className="m-0 mb-1 font-[family-name:var(--font-mono)] text-[10.5px] uppercase tracking-[0.12em] text-[var(--color-terracotta)]">
+            Dev bypass · this code was not verified against your phone
+          </p>
+          <p className="m-0 font-[family-name:var(--font-mono)] text-[22px] tracking-[0.2em] text-[var(--color-ink)]">
+            {devCode}
+          </p>
+        </div>
       ) : null}
 
       {error ? (

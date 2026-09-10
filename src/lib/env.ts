@@ -122,3 +122,42 @@ export function showUnverifiedStudios(): boolean {
   if (rosterIsReal()) return false;
   return process.env.DEV_SHOW_UNVERIFIED_STUDIOS?.trim() === '1';
 }
+
+/**
+ * Development only: print the sign-in code on the screen instead of requiring
+ * the WhatsApp message to arrive.
+ *
+ * ## Be clear about what this costs
+ *
+ * With this on, **the OTP verifies nothing.** Anyone can type any Indian mobile
+ * number, read the code off the page, and become the signed-in owner of that
+ * number's account. The entire point of an OTP — proving the person holds the
+ * phone — is gone. It is not a weakened check; it is no check.
+ *
+ * ## Why it exists anyway
+ *
+ * A WhatsApp authentication template needs Meta approval, which takes days, and
+ * until it clears nobody can get past the sign-in gate on a deployed build —
+ * which means `/quotes`, `/compare`, the expert request and the share link
+ * cannot be tested at all. Blocking a week of work on a template review is
+ * worse than a deliberate, loudly-labelled hole in a pre-launch site that is
+ * `noindex` and whose studios are admitted placeholders.
+ *
+ * ## Why it cannot survive launch
+ *
+ * Two conditions, and the second is the one that matters:
+ *
+ *  1. `DEV_SHOW_OTP_ON_SCREEN=1` is set, and
+ *  2. `rosterIsReal()` is FALSE.
+ *
+ * Declaring the roster real disables it everywhere, immediately, with no second
+ * edit — the same guard the studio gate uses. The day this site has a real
+ * studio on it is the day this stops working, and that is not a coincidence:
+ * both flags are answering "is anything on this deployment real yet?"
+ *
+ * Delete this before the first real customer. It is scaffolding.
+ */
+export function showOtpOnScreen(): boolean {
+  if (rosterIsReal()) return false;
+  return process.env.DEV_SHOW_OTP_ON_SCREEN?.trim() === '1';
+}

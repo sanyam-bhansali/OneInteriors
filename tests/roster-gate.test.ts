@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { showUnverifiedStudios, rosterIsReal } from '@/lib/env';
+import { showUnverifiedStudios, showOtpOnScreen, rosterIsReal } from '@/lib/env';
 
 /**
  * The verification gate's development bypass.
@@ -14,6 +14,7 @@ import { showUnverifiedStudios, rosterIsReal } from '@/lib/env';
 
 const ORIGINAL = {
   dev: process.env.DEV_SHOW_UNVERIFIED_STUDIOS,
+  otp: process.env.DEV_SHOW_OTP_ON_SCREEN,
   real: process.env.NEXT_PUBLIC_ROSTER_IS_REAL,
 };
 
@@ -25,8 +26,18 @@ function setEnv(dev: string | undefined, real: string | undefined): void {
   else process.env.NEXT_PUBLIC_ROSTER_IS_REAL = real;
 }
 
+function setOtpEnv(otp: string | undefined, real: string | undefined): void {
+  if (otp === undefined) delete process.env.DEV_SHOW_OTP_ON_SCREEN;
+  else process.env.DEV_SHOW_OTP_ON_SCREEN = otp;
+
+  if (real === undefined) delete process.env.NEXT_PUBLIC_ROSTER_IS_REAL;
+  else process.env.NEXT_PUBLIC_ROSTER_IS_REAL = real;
+}
+
 afterEach(() => {
   setEnv(ORIGINAL.dev, ORIGINAL.real);
+  if (ORIGINAL.otp === undefined) delete process.env.DEV_SHOW_OTP_ON_SCREEN;
+  else process.env.DEV_SHOW_OTP_ON_SCREEN = ORIGINAL.otp;
 });
 
 describe('showUnverifiedStudios', () => {
@@ -68,5 +79,56 @@ describe('showUnverifiedStudios', () => {
   it('tolerates surrounding whitespace, which pasted env values often carry', () => {
     setEnv(' 1 ', undefined);
     expect(showUnverifiedStudios()).toBe(true);
+  });
+});
+
+/**
+ * The OTP bypass, which is the more dangerous of the two flags.
+ *
+ * With it on, a sign-in code is printed on the page and the OTP verifies
+ * nothing at all — anyone can claim any phone number. It exists only so the
+ * funnel behind the sign-in gate can be tested while a WhatsApp template waits
+ * on Meta approval, and it must be impossible for it to survive contact with a
+ * real roster.
+ */
+describe('showOtpOnScreen', () => {
+  it('is off whenever the roster is real, however loudly the flag is set', () => {
+    setOtpEnv('1', '1');
+    expect(rosterIsReal()).toBe(true);
+    expect(showOtpOnScreen()).toBe(false);
+  });
+
+  it('is on for a placeholder roster when explicitly asked', () => {
+    setOtpEnv('1', undefined);
+    expect(showOtpOnScreen()).toBe(true);
+  });
+
+  it('is off by default — the safe direction', () => {
+    setOtpEnv(undefined, undefined);
+    expect(showOtpOnScreen()).toBe(false);
+  });
+
+  it('treats an empty value as off, not as set', () => {
+    setOtpEnv('', undefined);
+    expect(showOtpOnScreen()).toBe(false);
+  });
+
+  it('accepts only "1"', () => {
+    for (const value of ['true', 'yes', 'on', '0', 'TRUE']) {
+      setOtpEnv(value, undefined);
+      expect(showOtpOnScreen()).toBe(false);
+    }
+  });
+
+  /**
+   * The two flags are independent. Turning the studio gate off must not
+   * quietly turn the auth bypass on — they are different amounts of danger and
+   * should be decided separately.
+   */
+  it('is not switched on by the studio gate', () => {
+    delete process.env.DEV_SHOW_OTP_ON_SCREEN;
+    setEnv('1', undefined);
+    expect(showUnverifiedStudios()).toBe(true);
+    expect(showOtpOnScreen()).toBe(false);
   });
 });
