@@ -500,9 +500,9 @@ function stepContent(
         ask: (
           <Ask
             title="Which of these feel like your home?"
-            // "Pick three" while Continue unlocked at one was a small lie that
-            // taught people the instructions here are approximate. Two or
-            // three is what the step actually accepts, so that is what it says.
+            /* "Pick three" while Continue unlocked at one was a small lie that
+               taught people the instructions here are approximate. Two or three
+               is what the step actually accepts, so that is what it says. */
             hint="Pick two or three, on instinct. Don't overthink it — we'll tell you what you chose afterwards."
           />
         ),
@@ -742,17 +742,17 @@ function priorityStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPa
 
   return {
     ask: (
-      {/* The heading and the hint used to point in OPPOSITE directions.
-          "If you had to give one of these up, which goes first?" asks for the
-          LEAST important thing. "Tap them in order, most important first" asks
-          for the most. A reader who trusted the heading ranked the list
-          backwards — and `priorityRanking[0]` is treated everywhere as the
-          thing that matters most, so that answer silently inverted the single
-          largest input to the matching engine. Nobody would ever have seen it
-          go wrong: the customer gets confidently ranked studios that suit the
-          opposite of what they said.
+      /* The heading and the hint used to point in OPPOSITE directions.
+         "If you had to give one of these up, which goes first?" asks for the
+         LEAST important thing. "Tap them in order, most important first" asks
+         for the most. A reader who trusted the heading ranked the list
+         backwards — and `priorityRanking[0]` is treated everywhere as the
+         thing that matters most, so that answer silently inverted the single
+         largest input to the matching engine. Nobody would ever have seen it
+         go wrong: the customer gets confidently ranked studios that suit the
+         opposite of what they said.
 
-          Both lines now ask the same question, in the same direction. */}
+         Both lines now ask the same question, in the same direction. */
       <Ask
         title="What matters most to you here?"
         hint="Tap them in order, starting with the most important. This single answer does more matching work than any other."
@@ -767,11 +767,11 @@ function priorityStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPa
               key={k}
               type="button"
               onClick={() => update({ priorityRanking: ranked.filter((r) => r !== k) })}
-              // Without this the accessibility tree shows four unlabelled
-              // buttons: the visible text sits in nested spans alongside a
-              // rank number and the word "Remove", which do not compose into a
-              // usable name. A screen reader user was being asked to rank four
-              // things called "button".
+              /* Without this the accessibility tree shows four unlabelled
+                 buttons: the visible text sits in nested spans alongside a rank
+                 number and the word "Remove", which do not compose into a
+                 usable name. A screen reader user was being asked to rank four
+                 things called "button". */
               aria-label={`${PRIORITY_LABELS[k]} — ranked ${i + 1}. Tap to remove from the ranking.`}
               className="flex items-center gap-3 rounded-full border-2 border-[var(--color-petrol)] bg-[var(--color-petrol-soft)] px-4 py-3 text-left text-[15px] text-[var(--color-ink)]"
             >
