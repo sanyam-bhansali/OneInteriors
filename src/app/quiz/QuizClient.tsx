@@ -20,7 +20,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Container, Button } from '@/components/ui';
-import { formatINRCompact, lakhsToPaise, applyBps } from '@/lib/money';
+import { formatINRCompact } from '@/lib/money';
+import { TIER, TIERS, tierRangeFor } from '@/modules/quotation/tiers';
 import {
   EMPTY_BRIEF,
   INVOLVEMENT_LABELS,
@@ -219,7 +220,13 @@ export function QuizClient({ studios }: { studios: Studio[] }) {
       void Promise.race([
         saveBriefAction(done).catch(() => {}),
         new Promise((resolve) => setTimeout(resolve, 1000)),
-      ]).then(() => router.push('/tier'));
+      ]).then(() =>
+        // Straight to the matches. The band was chosen on question 3, with real
+        // numbers for their own home, so the separate /tier screen it used to
+        // land on was asking the same question a second time. That page still
+        // exists for anyone who wants to change their level later.
+        router.push('/match'),
+      );
       return;
     }
     const n = step + 1;
@@ -362,7 +369,7 @@ export function QuizClient({ studios }: { studios: Studio[] }) {
                 {finishing
                   ? 'Saving your brief…'
                   : step === TOTAL_STEPS
-                    ? 'See what it costs'
+                    ? 'See who fits'
                     : 'Continue'}
               </Button>
             </div>
@@ -605,77 +612,105 @@ function stepContent(
   }
 }
 
-const DEFAULT_BUDGET_LAKHS = 8;
-/** The lower bound is 80% of the slider value. Basis points, not a float rate. */
-const BUDGET_FLOOR_BPS = 8000;
+/**
+ * The area assumed when the customer skipped the carpet-area field.
+ *
+ * Typical for a 2 BHK in Pune. It is stated as an assumption wherever it is
+ * used rather than presented as their figure — a number we made up, shown back
+ * as theirs, is exactly the move this product exists not to make.
+ */
+const TYPICAL_SQFT = 850;
 
+/**
+ * Budget and finish level, as one question.
+ *
+ * ## Why these used to be two steps, and why that was wrong
+ *
+ * The quiz asked for a budget on a slider, and then a separate `/tier` screen
+ * asked the customer to choose Essential, Premium or Luxury. Those are the same
+ * question asked twice: a band IS a budget, and a budget already implies a
+ * band. Answering it once, with real numbers attached, is strictly more
+ * informative and one screen shorter.
+ *
+ * ## Why bands rather than a slider
+ *
+ * A slider asks "what number is in your head", which most people genuinely do
+ * not know before anyone has quoted them — it is the whole reason they are
+ * here. Three bands priced for *their* carpet area asks a question they can
+ * actually answer: given what each level of finish costs for a home this size,
+ * which one do you want to be in?
+ *
+ * The `notFor` line on each card is doing real work. Naming what a band cannot
+ * deliver kills an unqualified expectation here, which is far cheaper for
+ * everyone than killing it at the quotation.
+ */
 function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
-  const committed = brief.budgetMaxPaise !== null;
-  const lakhs = committed
-    ? Math.round(brief.budgetMaxPaise! / 100 / 100_000)
-    : DEFAULT_BUDGET_LAKHS;
-
-  function setLakhs(v: number) {
-    const max = lakhsToPaise(v);
-    update({ budgetMaxPaise: max, budgetMinPaise: applyBps(max, BUDGET_FLOOR_BPS) });
-  }
-
-  // Commit the default the first time this step renders. Without this the
-  // slider shows ₹8L, the user agrees with it, and Continue stays disabled
-  // because budgetMaxPaise is still null — with no way to fire a change event
-  // except moving the slider away and back. A blocked core flow.
-  if (!committed) setLakhs(DEFAULT_BUDGET_LAKHS);
-
-  const shownMin = brief.budgetMinPaise ?? applyBps(lakhsToPaise(lakhs), BUDGET_FLOOR_BPS);
-  const shownMax = brief.budgetMaxPaise ?? lakhsToPaise(lakhs);
+  const areaAssumed = !brief.carpetAreaSqft || brief.carpetAreaSqft <= 0;
+  const area = areaAssumed ? TYPICAL_SQFT : (brief.carpetAreaSqft as number);
 
   return {
     ask: (
       <Ask
         title="What are you planning to spend?"
-        hint="A range is fine, and it isn't a commitment. It just stops us showing you studios who don't work at your level."
+        hint="Priced for a home your size, at three levels of finish. It isn't a commitment — it stops us showing you studios who don't work at your level."
       />
     ),
     options: (
-      <div className="max-w-lg">
-        <div className="tabular mb-4 font-[family-name:var(--font-display)] text-[clamp(34px,6vw,50px)] leading-none tracking-[-0.02em] text-[var(--color-ink)]">
-          {formatINRCompact(shownMin)} – {formatINRCompact(shownMax)}
-        </div>
-        <input
-          type="range"
-          min={2}
-          max={40}
-          step={1}
-          value={lakhs}
-          onChange={(e) => setLakhs(Number(e.target.value))}
-          className="w-full accent-[var(--color-petrol)]"
-          aria-label="Budget in lakhs"
-        />
-        <div className="label mt-1 flex justify-between">
-          <span>₹2 L</span>
-          <span>₹40 L</span>
-        </div>
+      <div className="flex flex-col gap-3">
+        {TIERS.map((tier) => {
+          const definition = TIER[tier];
+          const { lowPaise, highPaise } = tierRangeFor(tier, area);
+          const selected = brief.tier === tier;
 
-        {/* Anchoring + expectation setting. Killing an unqualified lead here is
-            far cheaper for everyone than killing it at the quotation. */}
-        <p className="mt-6 rounded-[10px] bg-[var(--color-paper-2)] px-4 py-3.5 text-[15px] leading-relaxed text-[var(--color-ink-2)]">
-          {budgetGuidance(lakhs)}
+          return (
+            <button
+              key={tier}
+              type="button"
+              onClick={() =>
+                update({
+                  tier,
+                  // The band is the budget. Both are set from one tap so
+                  // nothing downstream has to guess which one the customer
+                  // really meant.
+                  budgetMinPaise: lowPaise,
+                  budgetMaxPaise: highPaise,
+                })
+              }
+              aria-pressed={selected}
+              className={`rounded-[14px] border-2 p-5 text-left transition-colors ${
+                selected
+                  ? 'border-[var(--color-petrol)] bg-[var(--color-petrol-soft)]'
+                  : 'border-[var(--color-rule)] bg-[var(--color-paper-2)] hover:border-[var(--color-ink-3)]'
+              }`}
+            >
+              <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <span className="font-[family-name:var(--font-display)] text-[21px] leading-none text-[var(--color-ink)]">
+                  {definition.label}
+                </span>
+                <span className="tabular font-[family-name:var(--font-display)] text-[19px] leading-none text-[var(--color-petrol)]">
+                  {formatINRCompact(lowPaise)} – {formatINRCompact(highPaise)}
+                </span>
+              </div>
+              <p className="m-0 text-[14.5px] leading-[1.5] text-[var(--color-ink-2)]">
+                {definition.promise}
+              </p>
+              {selected ? (
+                <p className="m-0 mt-2.5 border-t border-[var(--color-rule)] pt-2.5 text-[13px] leading-[1.5] text-[var(--color-ink-3)]">
+                  {definition.notFor}
+                </p>
+              ) : null}
+            </button>
+          );
+        })}
+
+        <p className="m-0 mt-1 text-[13px] leading-[1.55] text-[var(--color-ink-3)]">
+          {areaAssumed
+            ? `Excluding GST, for a typical ${TYPICAL_SQFT} sqft home — tell us your carpet area on the first question and these tighten.`
+            : `Excluding GST, for your ${area} sqft. Your real quotes come from each studio's own rates.`}
         </p>
       </div>
     ),
   };
-}
-
-function budgetGuidance(lakhs: number): string {
-  if (lakhs < 5)
-    return 'At this level you are looking at essentials — modular kitchen, wardrobes, painting, basic electrical. Full civil work and false ceilings will not fit.';
-  if (lakhs < 10)
-    return 'This covers a standard 2BHK end to end: kitchen, wardrobes, false ceiling in the living areas, painting, electrical and basic furnishing.';
-  if (lakhs < 18)
-    return 'A complete 3BHK with better material grades, more built-in storage and lighting design. This is the most common band in Pune.';
-  if (lakhs < 28)
-    return 'Premium finishes throughout — veneer and laminate upgrades, bespoke joinery, full lighting and furnishing.';
-  return 'Bespoke territory. Custom furniture, imported hardware and a longer design phase. Expect five to six months.';
 }
 
 function householdStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {

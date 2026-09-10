@@ -7,8 +7,10 @@ import { PlanFragment } from '@/components/art/PlanFragment';
 import { SiteHeader, SiteFooter } from '@/components/chrome';
 import { studioRepository } from '@/modules/studio/repository';
 import { formatINRCompact } from '@/lib/money';
+import { StudioQuotation } from './StudioQuotation';
 import {
   CHECK_LABELS,
+  CHECK_MEANINGS,
   TIER_CHECKS,
   TIER_DESCRIPTIONS,
   describeDelivery,
@@ -149,6 +151,13 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
           </Container>
         </section>
 
+        {/* This studio's own number for this customer's own home.
+            Placed here rather than only on /quotes because a quote belongs
+            beside the studio it came from: the whole argument is that the same
+            brief costs different amounts at different studios, and that only
+            lands when the number sits next to their work and their checks. */}
+        <StudioQuotation studio={studio} />
+
         {/* What we verified — a checklist with sources and dates, never a badge */}
         <section className="border-b border-[var(--color-rule)] py-10">
           <Container>
@@ -273,7 +282,16 @@ function CheckGroup({
               <p className="m-0 text-[14px] leading-snug text-[var(--color-ink)]">
                 {CHECK_LABELS[c.type]}
               </p>
-              <p className="m-0 font-[family-name:var(--font-mono)] text-[11px] leading-snug text-[var(--color-ink-3)]">
+              {/* What it means, in their language, and only when it passed.
+                  "We walked through finished homes they built" is a claim, and
+                  printing it beside a PENDING or FAILED check would be a
+                  straightforward lie. */}
+              {c.result === 'PASS' ? (
+                <p className="m-0 mt-0.5 max-w-[46ch] text-[13px] leading-snug text-[var(--color-ink-2)]">
+                  {CHECK_MEANINGS[c.type]}
+                </p>
+              ) : null}
+              <p className="m-0 mt-0.5 font-[family-name:var(--font-mono)] text-[11px] leading-snug text-[var(--color-ink-3)]">
                 {c.result === 'PENDING'
                   ? (c.detail ?? 'In progress')
                   : c.result === 'NOT_APPLICABLE'

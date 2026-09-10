@@ -119,6 +119,34 @@ export const CHECK_LABELS: Record<CheckType, string> = {
   LITIGATION_SEARCH: 'Litigation and consumer forum search',
 };
 
+/**
+ * What each check actually means, in the customer's language.
+ *
+ * `CHECK_LABELS` names the check for us; this says what was done for them.
+ * "GST_FILING_HISTORY" and even "12 months of GST filings" tell a homeowner
+ * nothing — "they have filed returns for twelve straight months, so the
+ * business is trading, not dormant" tells them why they should care.
+ *
+ * Every line here is a claim we have to be able to stand behind for every
+ * studio showing it. If a check stops being performed, the sentence comes out
+ * of this file on the same day.
+ */
+export const CHECK_MEANINGS: Record<CheckType, string> = {
+  PAN_NAME_MATCH: 'The PAN on file belongs to the person who signed for the studio.',
+  AADHAAR_KYC: 'We confirmed who owns this business, from government ID.',
+  ADDRESS_VISIT: 'Somebody from our team stood at the address they gave us.',
+  CONTACT_REACHABLE: 'The phone number and email reach a person who answers.',
+  CODE_OF_CONDUCT: 'They have signed our code of conduct, which covers how disputes are handled.',
+  GSTIN_ACTIVE: 'Their GST registration is live, checked against the public register.',
+  GST_FILING_HISTORY:
+    'Twelve straight months of GST returns — the business is trading, not dormant.',
+  MCA_STATUS: 'Company filings are up to date at the Ministry of Corporate Affairs.',
+  UDYAM: 'Registered as an MSME, which is where their scale is declared.',
+  CLIENT_REFERENCE: 'We telephoned past clients ourselves. We did not take a list of testimonials.',
+  SITE_INSPECTION: 'We walked through finished homes they built, in person.',
+  LITIGATION_SEARCH: 'We searched the courts and consumer forums for cases against them.',
+};
+
 /** Which checks belong to which tier — drives the profile checklist grouping. */
 export const TIER_CHECKS: Record<Exclude<VerificationTier, 'UNVERIFIED'>, CheckType[]> = {
   LISTED: ['PAN_NAME_MATCH', 'AADHAAR_KYC', 'ADDRESS_VISIT', 'CONTACT_REACHABLE', 'CODE_OF_CONDUCT'],

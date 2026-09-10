@@ -328,6 +328,83 @@ function buildReasoning(brief: Brief, studio: Studio, breakdown: FactorScores): 
   return lines;
 }
 
+/**
+ * The one-sentence version, for the hero card.
+ *
+ * ## Why this exists alongside `reasoning`
+ *
+ * `reasoning` is a list of complete sentences — right for a detail panel, wrong
+ * for the top of the page, where a customer is deciding in about two seconds
+ * whether the ranking is worth trusting. A score with no sentence next to it is
+ * a number they cannot check, and an unverifiable number reads as marketing.
+ *
+ * So this composes short clauses into one line: *"because you leaned toward
+ * Warm Minimalist and most of their work sits there; their delivered projects
+ * land in your range; they work in Baner."*
+ *
+ * ## The rules it inherits
+ *
+ * Every clause must quote something the customer actually told us, and no
+ * clause may describe a factor that scored `null`. A studio with nothing
+ * measurable gets no sentence rather than a vague one — `null` is a real
+ * return value here and the caller must handle it.
+ *
+ * Capped at three clauses. A fourth is read as boilerplate, and the honest
+ * detail lives in `reasoning` directly below it on the page.
+ */
+export function matchSummary(
+  brief: Brief,
+  studio: Studio,
+  result: MatchResult,
+): string | null {
+  const clauses: string[] = [];
+  const b = result.breakdown;
+
+  if (b.styleOverlap !== null && b.styleOverlap >= 55 && brief.styleLikes.length > 0) {
+    clauses.push(
+      `you leaned toward ${formatStyles(brief.styleLikes)} and most of their work sits there`,
+    );
+  }
+
+  // Phrased from delivered values where we used them, because "fits your
+  // budget" from a studio's own claimed range is a claim, not a measurement.
+  if (b.budgetFit !== null && b.budgetFit >= 50) {
+    const delivered = studio.portfolio.filter((p) => p.valuePaise !== null).length;
+    clauses.push(
+      delivered >= 3
+        ? 'the projects they have actually delivered land in your range'
+        : 'their stated project range covers your budget',
+    );
+  }
+
+  if (b.workingStyle !== null && b.workingStyle >= 60 && brief.involvement) {
+    clauses.push(
+      brief.involvement === 'DECIDE_FOR_ME'
+        ? 'they are used to running a project without needing you at every step'
+        : brief.involvement === 'APPROVE_EVERYTHING'
+          ? 'they work with clients who want to sign off on every detail'
+          : 'they work the way you said you want to — decisions made together',
+    );
+  }
+
+  if (brief.locality) {
+    const local = studio.portfolio.filter((p) => p.locality === brief.locality).length;
+    if (local > 0) {
+      clauses.push(
+        `they have finished ${local} ${local === 1 ? 'home' : 'homes'} in ${titleCase(brief.locality)}`,
+      );
+    }
+  }
+
+  if (b.deliveryReliability !== null && b.deliveryReliability >= 70) {
+    clauses.push('their delivery record holds up');
+  }
+
+  if (clauses.length === 0) return null;
+
+  return `${result.score}% match — because ${clauses.slice(0, 3).join('; ')}.`;
+}
+
 // ── Helpers ────────────────────────────────────────────────────
 
 function clamp(n: number): number {

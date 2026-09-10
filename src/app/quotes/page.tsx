@@ -11,6 +11,8 @@ import { rankStudios } from '@/modules/matching/score';
 import { quoteBrief, storeQuotes } from '@/modules/quotation/generate';
 import { TIER } from '@/modules/quotation/tiers';
 import { narrowing } from '@/modules/quotation/narrowing';
+import { splitByWorkCode } from '@/modules/quotation/price';
+import { QuoteTotals } from '@/app/studios/[slug]/StudioQuotation';
 import { record } from '@/modules/analytics/record';
 import { JourneyNav } from '@/components/JourneyNav';
 import { BriefRescue, RescueSettled } from '@/components/BriefRescue';
@@ -189,7 +191,7 @@ export default async function QuotesPage() {
                   );
                 })()}
 
-                <table className="mb-5 w-full border-collapse text-[14px]">
+                <table className="mb-4 w-full border-collapse text-[14px]">
                   <tbody>
                     {entry.quote.lines.map((line) => (
                       <tr key={line.category} className="border-b border-[var(--color-rule-soft)]">
@@ -202,15 +204,26 @@ export default async function QuotesPage() {
                         </td>
                       </tr>
                     ))}
-                    <tr>
-                      <td className="py-2 pr-3 text-[var(--color-ink-3)]">GST at 18%</td>
-                      <td />
-                      <td className="py-2 text-right tabular-nums text-[var(--color-ink-3)]">
-                        {formatINR(entry.quote.gstPaise)}
-                      </td>
-                    </tr>
                   </tbody>
                 </table>
+
+                {/* The modular split, because it is what explains the gap
+                    between two studios. Site work prices cluster; carpentry is
+                    where a rate card is really a rate card. */}
+                {(() => {
+                  const split = splitByWorkCode(entry.quote);
+                  return (
+                    <div className="mb-5">
+                      <QuoteTotals
+                        modularPaise={split.modularPaise}
+                        nonModularPaise={split.nonModularPaise}
+                        designFeePaise={entry.quote.designFeePaise}
+                        gstPaise={entry.quote.gstPaise}
+                        totalPaise={entry.quote.totalPaise}
+                      />
+                    </div>
+                  );
+                })()}
 
                 <details className="mt-auto">
                   <summary className="cursor-pointer font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-petrol)]">

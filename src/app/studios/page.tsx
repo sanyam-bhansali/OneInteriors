@@ -1,12 +1,9 @@
-import Link from 'next/link';
 import type { Metadata } from 'next';
-import { Container, TierBadge, Pill, Button } from '@/components/ui';
-import { PlanFragment } from '@/components/art/PlanFragment';
+import { Container, Button } from '@/components/ui';
 import { SiteHeader, SiteFooter } from '@/components/chrome';
 import { cachedRoster } from '@/modules/studio/roster-cache';
-import { formatINRCompact } from '@/lib/money';
 import { describeDelivery } from '@/modules/studio/types';
-import { PUNE_LOCALITIES } from '@/modules/brief/types';
+import { RosterList } from './RosterList';
 
 export const metadata: Metadata = {
   title: 'Studios',
@@ -49,49 +46,23 @@ export default async function StudiosPage() {
 
         <section className="py-10">
           <Container>
-            <ul className="m-0 grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-2 lg:grid-cols-3">
-              {ordered.map((s) => (
-                <li key={s.id} className="lift flex flex-col border border-[var(--color-rule)] bg-[var(--color-paper-2)]">
-                  <PlanFragment
-                    seed={s.id}
-                    styles={s.portfolio.flatMap((p) => p.styleTags)}
-                    className="block h-28 w-full"
-                  />
-                  <div className="flex flex-1 flex-col gap-3 border-t border-[var(--color-rule)] p-5">
-                    <div>
-                      <h2 className="h3 mb-2">
-                        <Link
-                          href={`/studios/${s.slug}`}
-                          className="text-[var(--color-ink)] no-underline hover:text-[var(--color-petrol)]"
-                        >
-                          {s.tradeName}
-                        </Link>
-                      </h2>
-                      <TierBadge tier={s.tier} />
-                    </div>
-
-                    <p className="m-0 text-[14px] leading-snug text-[var(--color-ink-2)]">
-                      {describeDelivery(s)}
-                    </p>
-
-                    <div className="mt-auto flex flex-wrap gap-1.5 border-t border-[var(--color-rule-soft)] pt-3">
-                      {s.minProjectPaise && s.maxProjectPaise ? (
-                        <Pill>
-                          {formatINRCompact(s.minProjectPaise)}–{formatINRCompact(s.maxProjectPaise)}
-                        </Pill>
-                      ) : null}
-                      <Pill>{s.localities.length} areas</Pill>
-                    </div>
-
-                    <p className="m-0 text-[12px] leading-snug text-[var(--color-ink-3)]">
-                      {s.localities
-                        .map((l) => PUNE_LOCALITIES.find((p) => p.slug === l)?.label ?? l)
-                        .join(' · ')}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            {/* Narrowed in the browser — the roster is small and already on the
+                page. `describeDelivery` runs here, on the server, so the client
+                bundle carries the sentence rather than the whole studio record
+                it was derived from. */}
+            <RosterList
+              studios={ordered.map((s) => ({
+                id: s.id,
+                slug: s.slug,
+                tradeName: s.tradeName,
+                tier: s.tier,
+                delivery: describeDelivery(s),
+                localities: s.localities,
+                styleTags: Array.from(new Set(s.portfolio.flatMap((p) => p.styleTags))),
+                minProjectPaise: s.minProjectPaise,
+                maxProjectPaise: s.maxProjectPaise,
+              }))}
+            />
 
             <div className="mt-10 border-t border-[var(--color-rule)] pt-8">
               <h2 className="h2 mb-3">

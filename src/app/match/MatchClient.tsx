@@ -26,7 +26,8 @@ import {
   type Brief,
 } from '@/modules/brief/types';
 import { loadBrief } from '@/modules/brief/store';
-import { rankStudios, type MatchResult } from '@/modules/matching/score';
+import { rankStudios, matchSummary, type MatchResult } from '@/modules/matching/score';
+import { ShortlistBar, ShortlistButton } from '@/components/Shortlist';
 import type { Studio } from '@/modules/studio/types';
 import { PlanFragment } from '@/components/art/PlanFragment';
 import { StyleScene, MaterialSwatches } from '@/components/art/StyleScene';
@@ -185,16 +186,41 @@ export function MatchClient({ studios }: { studios: Studio[] }) {
               <EmptyState />
             ) : (
               <>
-                <p className="m-0 mb-6 max-w-[60ch] text-[15px] text-[var(--color-ink-2)]">
+                <p className="m-0 mb-8 max-w-[60ch] text-[15px] text-[var(--color-ink-2)]">
                   Ranked by fit, not by what anyone paid us — no studio can buy placement here.
                   Scores are calculated only from factors we could actually measure, and each card
                   says how many that was.
                 </p>
-                <ul className="m-0 grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-2">
-                  {matches.map((m) => (
-                    <StudioCard key={m.studioId} match={m} studio={studios.find((s) => s.id === m.studioId)!} />
-                  ))}
-                </ul>
+
+                {/* Hero match, then alternates.
+                    Nine equal cards is a choice-architecture problem: equivalent
+                    options push a reader onto the axis that is easiest to
+                    compare, which is price — the exact axis this whole product
+                    argues against. If the ranking is good enough to sort by, it
+                    is good enough to lead with one. */}
+                <HeroMatch
+                  match={matches[0]}
+                  studio={studios.find((s) => s.id === matches[0].studioId)!}
+                  brief={brief}
+                />
+
+                {matches.length > 1 ? (
+                  <>
+                    <div className="mb-5 mt-12 flex items-baseline justify-between gap-4 border-t border-[var(--color-rule)] pt-8">
+                      <p className="m-0 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.13em] text-[var(--color-ink-3)]">
+                        Others we would also put in front of you
+                      </p>
+                      <p className="m-0 font-[family-name:var(--font-mono)] text-[11px] tabular-nums text-[var(--color-ink-3)]">
+                        {matches.length - 1} more
+                      </p>
+                    </div>
+                    <ul className="m-0 grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-2">
+                      {matches.slice(1).map((m) => (
+                        <StudioCard key={m.studioId} match={m} studio={studios.find((s) => s.id === m.studioId)!} />
+                      ))}
+                    </ul>
+                  </>
+                ) : null}
 
                 {/* The way forward.
                     This page used to end here, with nothing but individual
@@ -215,10 +241,105 @@ export function MatchClient({ studios }: { studios: Studio[] }) {
             )}
           </Container>
         </section>
+
+        {/* Appears once two studios are picked, and follows the customer down
+            the page. Comparing one thing with nothing is not a comparison, so
+            it stays hidden until there is something to do. */}
+        <ShortlistBar />
       </main>
 
       <SiteFooter />
     </>
+  );
+}
+
+/**
+ * The top match, given the room the ranking says it deserves.
+ *
+ * The sentence is the point. A score with no explanation beside it is a number
+ * the customer cannot check, and an unverifiable number reads as marketing —
+ * which is precisely what every competitor's "98% match" already is. So the
+ * prose leads and the ring is secondary.
+ *
+ * `matchSummary` returns null when nothing could be measured well enough to say
+ * out loud. That is not an error case to paper over: the fallback is the honest
+ * `reasoning` list, never an invented sentence.
+ */
+function HeroMatch({
+  match,
+  studio,
+  brief,
+}: {
+  match: MatchResult;
+  studio: Studio;
+  brief: Brief;
+}) {
+  const summary = matchSummary(brief, studio, match);
+  const partial = match.factorsScored < match.factorsTotal;
+
+  return (
+    <article className="rise overflow-hidden rounded-[16px] border-2 border-[var(--color-petrol)] bg-[var(--color-paper-2)]">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,38%)]">
+        <div className="p-7 sm:p-9">
+          <p className="m-0 mb-4 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.15em] text-[var(--color-petrol)]">
+            Your closest fit
+          </p>
+
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <h2 className="m-0 font-[family-name:var(--font-display)] text-[clamp(1.75rem,3.4vw,2.4rem)] font-normal leading-none text-[var(--color-ink)]">
+              <Link
+                href={`/studios/${studio.slug}`}
+                className="text-[var(--color-ink)] no-underline hover:text-[var(--color-petrol)]"
+              >
+                {studio.tradeName}
+              </Link>
+            </h2>
+            <TierBadge tier={studio.tier} />
+          </div>
+
+          {summary ? (
+            <p className="m-0 mb-6 max-w-[60ch] text-[17px] leading-[1.6] text-[var(--color-ink-2)]">
+              {summary}
+            </p>
+          ) : null}
+
+          <ul className="m-0 mb-7 flex list-none flex-col gap-2 p-0">
+            {match.reasoning.slice(0, 3).map((line, i) => (
+              <li
+                key={i}
+                className="grid max-w-[62ch] grid-cols-[14px_minmax(0,1fr)] gap-2.5 text-[14.5px] leading-[1.55] text-[var(--color-ink-3)]"
+              >
+                <span aria-hidden="true" className="text-[var(--color-brass)]">
+                  ·
+                </span>
+                {line}
+              </li>
+            ))}
+          </ul>
+
+          <div className="flex flex-wrap items-center gap-4">
+            <Button href={`/studios/${studio.slug}`} size="lg">
+              See their work and their quote
+            </Button>
+            <ShortlistButton slug={studio.slug} name={studio.tradeName} />
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center justify-center gap-3 border-t border-[var(--color-rule)] bg-[var(--color-paper-3)] p-7 lg:border-l lg:border-t-0">
+          <ScoreRing score={match.score} />
+          {/* The unflattering number, kept next to the flattering one. */}
+          <p className="m-0 text-center font-[family-name:var(--font-mono)] text-[10.5px] uppercase leading-relaxed tracking-[0.1em] text-[var(--color-ink-3)]">
+            {match.factorsScored} of {match.factorsTotal} factors measured
+            {partial ? (
+              <>
+                <br />
+                the rest need a delivery record
+              </>
+            ) : null}
+          </p>
+        </div>
+      </div>
+    </article>
   );
 }
 

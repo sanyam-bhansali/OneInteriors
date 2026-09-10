@@ -55,6 +55,47 @@ export type PriceResult =
   | { ok: true; quote: PricedQuote }
   | { ok: false; reason: 'incomplete_rate_card'; missing: RateCategory[] };
 
+export interface WorkCodeSplit {
+  /** Factory-made carpentry. Where two studios' rate cards actually differ. */
+  modularPaise: Paise;
+  /** Site work — ceiling, paint, electrical, and the rest. */
+  nonModularPaise: Paise;
+}
+
+/**
+ * Split a quote into modular and non-modular subtotals.
+ *
+ * ## Why this is worth a function
+ *
+ * "₹8.4L versus ₹9.1L" tells a customer nothing about *why*. Almost all of the
+ * gap between two studios lives in modular carpentry — kitchen, wardrobes, the
+ * rest of the joinery — because that is where a rate card is really a rate
+ * card; site work like painting and electrical is close to a commodity and
+ * prices cluster. Showing the two subtotals separately turns an unexplained
+ * difference into a legible one.
+ *
+ * It also matters for reading a discount. In this trade "15% off" nearly always
+ * means 15% off modular, not off the paint and not off the fee, so a customer
+ * who cannot see the modular subtotal cannot check what a discount is actually
+ * worth.
+ *
+ * The design fee is deliberately in neither subtotal — it is a fee on the work
+ * rather than work, it has its own line, and folding it into either side would
+ * make a modular discount computable against it.
+ */
+export function splitByWorkCode(quote: PricedQuote): WorkCodeSplit {
+  let modularPaise = 0;
+  let nonModularPaise = 0;
+
+  for (const line of quote.lines) {
+    if (line.category === 'design_fee') continue;
+    if (CATEGORY[line.category].modular) modularPaise += line.amountPaise;
+    else nonModularPaise += line.amountPaise;
+  }
+
+  return { modularPaise, nonModularPaise };
+}
+
 /**
  * GST on interior work.
  *

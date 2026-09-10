@@ -24,17 +24,20 @@ export interface JourneyStep {
 }
 
 export const JOURNEY: JourneyStep[] = [
+  /**
+   * Five steps, not six.
+   *
+   * There used to be a separate OneTier step between the brief and the
+   * matches, asking the customer to choose Essential, Premium or Luxury after
+   * they had already given a budget. That is the same question twice — a band
+   * IS a budget — so it now happens inside the brief, on the budget question,
+   * with real ranges for their own carpet area attached to each band.
+   */
   {
     name: `${PREFIX}Brief`,
     title: 'Nine questions about your home',
-    body: 'Your flat, your budget, the styles you like — and the ones you cannot live with. Upload a floor plan if you have one; it makes everything after this sharper. Nothing is shared with anyone yet.',
+    body: 'Your flat, the styles you like, and the ones you cannot live with — plus what each level of finish costs for a home your size, so you can pick the one you actually want to spend in. Nothing is shared with anyone yet.',
     duration: 'Three minutes',
-  },
-  {
-    name: `${PREFIX}Tier`,
-    title: 'Choose what you are actually buying',
-    body: 'Essential, Premium or Luxury — set by materials and finish, not by status. We show you what each band costs for a home your size before you spend any more time.',
-    duration: 'One minute',
   },
   {
     name: `${PREFIX}Match`,

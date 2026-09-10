@@ -23,9 +23,22 @@ export const dynamic = 'force-dynamic';
 
 const MAX_COMPARE = 4;
 
-export default async function ComparePage() {
+export default async function ComparePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ studios?: string }>;
+}) {
+  const { studios: requested } = await searchParams;
+
   const user = await getCurrentUser();
-  if (!user) redirect('/sign-in?next=/compare&reason=quotes');
+  if (!user) {
+    // Carry the selection through sign-in, or the customer comes back to a
+    // comparison of four studios they did not choose.
+    const next = requested
+      ? `/compare?studios=${encodeURIComponent(requested)}`
+      : '/compare';
+    redirect(`/sign-in?next=${encodeURIComponent(next)}&reason=quotes`);
+  }
 
   const { brief, found } = await loadBrief();
 
@@ -44,8 +57,38 @@ export default async function ComparePage() {
   }
 
   const studios = await studioRepository.list({ activeOnly: true });
-  const ranked = rankStudios(brief, studios).slice(0, MAX_COMPARE);
-  const result = await quoteBrief(brief, ranked.map((r) => r.studioId));
+  const ranked = rankStudios(brief, studios);
+
+  /**
+   * Whom to compare: their shortlist if they made one, otherwise our top four.
+   *
+   * The customer's choice wins. Automatically comparing the top four is a
+   * comparison we picked for them, and it throws away the most useful signal
+   * this product can collect before it has completed projects — which studios a
+   * person shortlisted, and which they dropped.
+   *
+   * Slugs are matched against the ranked set rather than looked up directly, so
+   * a hand-edited URL cannot pull in a studio that failed the hard filters or
+   * is not ACTIVE. An unknown slug is silently dropped rather than erroring:
+   * the studio may simply have been suspended since they picked it.
+   */
+  const chosen = (requested ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const selected = chosen.length
+    ? ranked.filter((r) => {
+        const studio = studios.find((s) => s.id === r.studioId);
+        return studio ? chosen.includes(studio.slug) : false;
+      })
+    : ranked;
+
+  const shortlisted = chosen.length > 0 && selected.length > 0;
+  const result = await quoteBrief(
+    brief,
+    (selected.length ? selected : ranked).slice(0, MAX_COMPARE).map((r) => r.studioId),
+  );
 
   if (!result.ok) redirect('/quotes');
 
@@ -64,9 +107,14 @@ export default async function ComparePage() {
       <main className="py-10 sm:py-14">
         <Container size="wide">
           <Eyebrow>OneCompare</Eyebrow>
-          <h1 className="display mb-8 max-w-[22ch] text-[clamp(2rem,4.5vw,3.2rem)] leading-[1.02]">
+          <h1 className="display mb-4 max-w-[22ch] text-[clamp(2rem,4.5vw,3.2rem)] leading-[1.02]">
             Side by side, line by line.
           </h1>
+          <p className="m-0 mb-8 max-w-[62ch] text-[15px] leading-relaxed text-[var(--color-ink-3)]">
+            {shortlisted
+              ? `The ${result.quotes.length} studios you picked, priced against the same brief.`
+              : `Your closest ${result.quotes.length} matches, priced against the same brief. Add studios to your comparison from their profiles to choose these yourself.`}
+          </p>
 
           {/* ── Our read ─────────────────────────────────── */}
           <div className="mb-10 rounded-[16px] border-l-[3px] border-[var(--color-brass)] bg-[var(--color-paper-2)] p-7">
