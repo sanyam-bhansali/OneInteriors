@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { Container, TierBadge, Stat, Divider, Button, Pill } from '@/components/ui';
+import { Container, TierBadge, Stat, Divider, Pill } from '@/components/ui';
+import { StartCta } from '@/components/StartCta';
 import { StyleScene } from '@/components/art/StyleScene';
 import { PlanFragment } from '@/components/art/PlanFragment';
 import { SiteHeader, SiteFooter } from '@/components/chrome';
@@ -89,7 +90,11 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
                   {studio.teamSize ? <Pill>Team of {studio.teamSize}</Pill> : null}
                 </div>
               </div>
-              <Button href="/quiz">Get an indicative quote</Button>
+              {/* Resume-aware. Someone reaching this profile from their own
+                  matches is mid-funnel; a hard link to /quiz would restart
+                  them. There is deliberately no way to contact the studio from
+                  here — every introduction runs through the expert. */}
+              <StartCta size="md" />
             </div>
           </Container>
         </section>

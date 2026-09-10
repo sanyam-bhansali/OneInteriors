@@ -29,6 +29,12 @@ export const EVENTS = [
   'signin.requested',
   'signin.completed',
   'brief.claimed',
+  // The second decision-maker. `share.created` is the customer asking for a
+  // link; `share.view` is somebody opening one. The ratio between them is the
+  // only read we get on whether the person who answered the questions is
+  // actually the person who decides.
+  'share.created',
+  'share.view',
 ] as const;
 
 export type EventName = (typeof EVENTS)[number];

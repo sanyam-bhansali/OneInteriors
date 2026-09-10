@@ -1,72 +1,126 @@
-import { redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { Container, Button, Eyebrow } from '@/components/ui';
-import { SiteHeader, SiteFooter } from '@/components/chrome';
-import { JourneyNav } from '@/components/JourneyNav';
-import { BriefRescue } from '@/components/BriefRescue';
-import { ShareButton } from './ShareButton';
+import { SiteFooter } from '@/components/chrome';
+import { Wordmark } from '@/components/brand';
+import Link from 'next/link';
 import { formatINR, formatINRCompact } from '@/lib/money';
-import { loadBrief } from '@/modules/brief/repository';
-import { getCurrentUser } from '@/modules/auth/session';
-import { studioRepository } from '@/modules/studio/repository';
+import { briefByShareToken } from '@/modules/brief/share';
+import { cachedRoster } from '@/modules/studio/roster-cache';
 import { rankStudios } from '@/modules/matching/score';
 import { quoteBrief } from '@/modules/quotation/generate';
 import { compareQuotes } from '@/modules/quotation/price';
 import { record } from '@/modules/analytics/record';
+import { PROPERTY_LABELS, SCOPE_LABELS, STYLE_LABELS } from '@/modules/brief/types';
+
+/**
+ * The read-only comparison, for the person who was not on the call.
+ *
+ * ## What is deliberately absent
+ *
+ * Everything that would let a reader act, and everything that identifies the
+ * sender. There is no expert request, no sign-in prompt on the quotes, no
+ * "change an answer", and no studio contact route — the same rule that holds
+ * on every other page holds harder here, because the holder of this URL is
+ * someone we have never met.
+ *
+ * There is exactly one call to action, at the bottom, and it starts a brief of
+ * their own. If a spouse reads this and wants to engage, they engage as
+ * themselves.
+ *
+ * ## Why it re-prices rather than reading stored quotes
+ *
+ * The numbers a spouse sees must be the numbers the customer sees. Storing a
+ * snapshot would drift the moment a studio changed a rate, and the two of them
+ * comparing different figures over dinner is worse than either figure being
+ * slightly stale.
+ */
 
 export const metadata: Metadata = {
-  title: 'Compare quotes',
-  robots: { index: false, follow: false },
+  title: 'A comparison shared with you',
+  // Never indexed. The URL is a bearer token; a search engine that crawls one
+  // has published somebody's budget.
+  robots: { index: false, follow: false, nocache: true },
 };
 
 export const dynamic = 'force-dynamic';
 
 const MAX_COMPARE = 4;
 
-export default async function ComparePage() {
-  const user = await getCurrentUser();
-  if (!user) redirect('/sign-in?next=/compare&reason=quotes');
+export default async function SharedPage({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}) {
+  const { token } = await params;
 
-  const { brief, found } = await loadBrief();
+  const shared = await briefByShareToken(token);
+  // A missing token, a revoked one and a malformed one are all 404. Telling a
+  // stranger that a link "has been revoked" confirms it was once real.
+  if (!shared) notFound();
 
-  // Not a redirect to /quiz. The browser may still hold a brief the server has
-  // not got — see BriefRescue. Sending someone back to question one because a
-  // background write did not land is how a finished funnel reads as broken.
-  if (!found || !brief.completedAt) {
-    return (
-      <>
-        <SiteHeader />
-        <JourneyNav reached={1} />
-        <BriefRescue destination="the comparison" />
-        <SiteFooter />
-      </>
-    );
-  }
+  const { brief } = shared;
 
-  const studios = await studioRepository.list({ activeOnly: true });
+  const studios = await cachedRoster();
   const ranked = rankStudios(brief, studios).slice(0, MAX_COMPARE);
-  const result = await quoteBrief(brief, ranked.map((r) => r.studioId));
+  const result = await quoteBrief(
+    brief,
+    ranked.map((r) => r.studioId),
+  );
 
-  if (!result.ok) redirect('/quotes');
+  if (!result.ok) notFound();
 
-  await record('compare.view', { studios: result.quotes.length });
+  await record('share.view', { studios: result.quotes.length });
 
   const comparison = compareQuotes(
     result.quotes.map((q) => ({ studioId: q.studioId, quote: q.quote })),
   );
   const { summary } = result;
 
+  const home = brief.propertyType ? PROPERTY_LABELS[brief.propertyType] : 'A home';
+  const scope = brief.scope ? SCOPE_LABELS[brief.scope] : null;
+
   return (
     <>
-      <SiteHeader />
-      <JourneyNav />
+      {/* Not SiteHeader. That header carries a "Start"/"Continue" button wired
+          to this browser's own brief, which for a recipient is either empty or,
+          worse, their own unrelated one. A shared document gets a masthead, not
+          the app chrome. */}
+      <header className="border-b border-[var(--color-rule)] bg-[var(--color-paper)]">
+        <Container size="wide">
+          <div className="flex items-center justify-between gap-4 py-4">
+            <Link href="/" className="no-underline" aria-label="One Interiors, home">
+              <Wordmark />
+            </Link>
+            <span className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.12em] text-[var(--color-ink-3)]">
+              Shared with you · read only
+            </span>
+          </div>
+        </Container>
+      </header>
 
       <main className="py-10 sm:py-14">
         <Container size="wide">
           <Eyebrow>OneCompare</Eyebrow>
-          <h1 className="display mb-8 max-w-[22ch] text-[clamp(2rem,4.5vw,3.2rem)] leading-[1.02]">
-            Side by side, line by line.
+          <h1 className="display mb-4 max-w-[24ch] text-[clamp(2rem,4.5vw,3.2rem)] leading-[1.02]">
+            Someone has shared their interior quotes with you.
           </h1>
+
+          <p className="m-0 mb-3 max-w-[62ch] text-[17px] leading-[1.65] text-[var(--color-ink-2)]">
+            {home}
+            {brief.carpetAreaSqft ? `, ${brief.carpetAreaSqft} sqft` : ''}
+            {scope ? ` · ${scope}` : ''}
+            {brief.styleLikes.length
+              ? ` · leaning ${brief.styleLikes.map((t) => STYLE_LABELS[t]).join(' and ')}`
+              : ''}
+            . Below is what {result.quotes.length} verified Pune studios would charge, priced from
+            each studio&rsquo;s own rates.
+          </p>
+
+          <p className="m-0 mb-10 max-w-[62ch] text-[14.5px] leading-[1.6] text-[var(--color-ink-3)]">
+            Nobody has visited the flat, so every figure is a range rather than a price. We do not
+            add anything to these numbers, and no studio can pay to appear here or to appear first.
+          </p>
 
           {/* ── Our read ─────────────────────────────────── */}
           <div className="mb-10 rounded-[16px] border-l-[3px] border-[var(--color-brass)] bg-[var(--color-paper-2)] p-7">
@@ -100,8 +154,6 @@ export default async function ComparePage() {
               ))}
             </ul>
 
-            {/* Said here, on the screen where the temptation to pick on price
-                is highest. */}
             <p className="m-0 mt-6 max-w-[70ch] border-t border-[var(--color-rule)] pt-4 text-[13.5px] leading-relaxed text-[var(--color-ink-3)]">
               This read is generated from the numbers on this page, not written by anyone who has
               met these studios. It is arithmetic, deliberately — the expert call is where
@@ -179,23 +231,16 @@ export default async function ComparePage() {
             </table>
           </div>
 
+          {/* The only action on the page, and it starts something of their own
+              rather than acting on somebody else's brief. */}
           <div className="flex flex-wrap items-center gap-5 border-t border-[var(--color-rule)] pt-8">
-            <Button href="/expert" size="lg">
-              Talk it through with our expert
+            <Button href="/quiz" size="lg">
+              Get quotes for your own home
             </Button>
-            <span className="max-w-[44ch] text-[14.5px] leading-relaxed text-[var(--color-ink-3)]">
-              Pick the studios you want to discuss. We read everything beforehand, and we arrange
-              the meeting afterwards.
+            <span className="max-w-[46ch] text-[14.5px] leading-relaxed text-[var(--color-ink-3)]">
+              Nine questions, three minutes. Whoever sent you this will not be told that you
+              opened it.
             </span>
-          </div>
-
-          {/* Deliberately BELOW the expert CTA and visually quieter.
-              Sharing is the more common next action, but the expert call is
-              the one that moves a customer forward, and putting a secondary
-              action first is how a page ends up with two equal buttons and no
-              obvious next step. */}
-          <div className="mt-8 border-t border-[var(--color-rule)] pt-8">
-            <ShareButton />
           </div>
         </Container>
       </main>

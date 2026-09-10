@@ -260,6 +260,26 @@ model Brief {
   /// decide we are worth a phone number.
   claimedAt DateTime?
 
+  /// Bearer token for the read-only shared comparison.
+  ///
+  /// Nobody spends nine lakh rupees alone. The decision is made with a spouse,
+  /// often with parents, and until now the second person could only hear about
+  /// the quotes second-hand from someone reciting them from memory. This is the
+  /// link that puts them in front of the same page.
+  ///
+  /// It is a BEARER token: anyone holding the URL can read it. That is the
+  /// point — the recipient has no account and we are not making them create
+  /// one — but it is also why the shared page shows the brief and the quotes
+  /// and nothing else. No email, no phone, no name, and no way to act: a
+  /// reader cannot request an introduction, change an answer, or see who else
+  /// it was sent to.
+  ///
+  /// Null until the customer deliberately asks for a link. Revocable by
+  /// clearing it, which is why it is nullable rather than generated up front
+  /// for every brief.
+  shareToken String?   @unique
+  sharedAt   DateTime?
+
   @@index([locality, completedAt])
   @@index([anonKey])
   @@map("briefs")

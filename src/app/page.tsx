@@ -72,19 +72,28 @@ export default function Home() {
                   Pune · Interior design
                 </p>
 
+                {/* The fear, then the relief — in that order.
+                    "Know what your home costs before anyone visits" promised
+                    CONVENIENCE. Convenience is not what anyone is anxious about
+                    at eight lakh rupees; being left half-finished by someone
+                    who stops answering is. Naming a fear the reader already
+                    carries costs nothing and buys recognition.
+                    The line to hold: name a fear they HAVE. Never manufacture
+                    one. Scare-selling would make us the thing we are
+                    positioning against, and it would work for about a quarter. */}
                 <h1
                   className="m-0 mb-6 font-[family-name:var(--font-display)] text-[clamp(2.5rem,5.2vw,4rem)] font-normal leading-[1.02] tracking-[-0.02em] text-[var(--color-ink)]"
                   style={{ textWrap: 'balance' }}
                 >
-                  Know what your home costs
+                  Nine lakh rupees is a lot
                   <br />
-                  <span className="italic text-[var(--color-petrol)]">before anyone visits.</span>
+                  <span className="italic text-[var(--color-petrol)]">to hand to a stranger.</span>
                 </h1>
 
                 <p className="m-0 mb-8 max-w-[36rem] text-[17px] leading-[1.65] text-[var(--color-ink-2)] sm:text-[18px]">
-                  Answer nine questions and get real quotes from real Pune studios, side by side,
-                  in one afternoon. No site visits, no salespeople, no giving your number to six
-                  companies to find out a price.
+                  So we check the studio before you meet them, show you what your flat costs before
+                  anyone visits it, and put someone on a call with you who has no stake in which
+                  one you pick. Nine questions, three minutes, and you will have real numbers.
                 </p>
 
                 <div className="mb-9 flex flex-wrap items-center gap-4">
@@ -96,10 +105,16 @@ export default function Home() {
 
                 {/* The trust strip. Facts with numbers in them, immediately
                     under the button, because this is the moment of hesitation. */}
+                {/* The trust strip.
+                    Reordered so the strongest fact is first. "0% added to any
+                    quote" answers the question every visitor is silently asking
+                    about a free service — what is the catch — and it is the one
+                    a competitor cannot copy without changing how they earn.
+                    Burying it third, in three words, was wasting it. */}
                 <ul className="m-0 flex list-none flex-wrap gap-x-8 gap-y-3 border-t border-[var(--color-rule)] p-0 pt-6">
-                  <TrustFact figure="3 min" label="to your first number" />
+                  <TrustFact figure="0%" label="added to any quote, ever" />
                   <TrustFact figure="0" label="calls before you see prices" />
-                  <TrustFact figure="0%" label="added to any quote" />
+                  <TrustFact figure={String(TOTAL_CHECKS)} label="checks before a studio appears" />
                 </ul>
               </div>
             </div>
@@ -299,6 +314,60 @@ export default function Home() {
           </Container>
         </section>
 
+        {/* ── How we make money ─────────────────────────
+            The unspoken objection to anything free in India is "so how are
+            they making money off me" — and left unanswered the reader fills it
+            in with the worst available explanation, which is that we sell the
+            phone number. That guess is exactly the thing they came here to
+            escape, so leaving the question open costs more than any wording
+            here could.
+
+            Stated in the present tense and true today: studios pay a share of
+            projects that actually start. It becomes a flat subscription later,
+            and this copy changes when that changes. A claim about how we earn
+            is worth nothing if it is aspirational. */}
+        <section className="border-b border-[var(--color-rule)] bg-[var(--color-paper-2)] py-16 sm:py-24">
+          <Container size="wide">
+            <div className="mb-11 max-w-[44rem]">
+              <p className="m-0 mb-4 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-ink-3)]">
+                The catch
+              </p>
+              <h2
+                className="m-0 mb-5 font-[family-name:var(--font-display)] text-[clamp(2rem,4vw,3rem)] font-normal leading-[1.06] tracking-[-0.018em] text-[var(--color-ink)]"
+                style={{ textWrap: 'balance' }}
+              >
+                How we make money, since you are not paying us.
+              </h2>
+              <p className="m-0 max-w-[62ch] text-[17px] leading-[1.65] text-[var(--color-ink-2)]">
+                Every free service is being paid for by someone. You should know who, before you
+                answer nine questions about your home.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-px overflow-hidden rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-rule)] md:grid-cols-3">
+              <MoneyFact
+                figure="The studio pays"
+                title="And only once a project actually starts"
+                body="A share of the project value, from the studio's side, on work that goes ahead. Nothing is added to your quote to cover it — the number you see is the number they would have charged you if you had walked into their office."
+              />
+              <MoneyFact
+                figure="Never for position"
+                title="No studio can buy its way up your list"
+                body="Order comes from how well a studio fits your brief, and nothing else. Which band a studio sits in is worked out from their own rate card, so it cannot be bought or claimed. The code that ranks studios cannot see what anyone pays."
+              />
+              <MoneyFact
+                figure="Never your details"
+                title="Your number is not the product"
+                body="We do not sell or pass on your contact details, and no studio receives them until you tell an expert which introduction you want. That is also why there is no 'contact this studio' button anywhere on this site."
+              />
+            </div>
+
+            <p className="m-0 mt-7 max-w-[64ch] text-[14px] leading-[1.6] text-[var(--color-ink-3)]">
+              If we ever change this, it will say so here before it changes anywhere else.
+            </p>
+          </Container>
+        </section>
+
         {/* ── Expert ────────────────────────────────────── */}
         <section className="border-b border-[var(--color-rule)] py-16 sm:py-24">
           <Container size="wide">
@@ -386,6 +455,28 @@ function TrustFact({ figure, label }: { figure: string; label: string }) {
       </span>
       <span className="mt-1 block text-[13px] leading-snug text-[var(--color-ink-3)]">{label}</span>
     </li>
+  );
+}
+
+function MoneyFact({
+  figure,
+  title,
+  body,
+}: {
+  figure: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="flex flex-col gap-3 bg-[var(--color-paper)] p-7">
+      <p className="m-0 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.13em] text-[var(--color-petrol)]">
+        {figure}
+      </p>
+      <h3 className="m-0 font-[family-name:var(--font-display)] text-[21px] font-normal leading-[1.22] text-[var(--color-ink)]">
+        {title}
+      </h3>
+      <p className="m-0 text-[14.5px] leading-[1.6] text-[var(--color-ink-2)]">{body}</p>
+    </div>
   );
 }
 

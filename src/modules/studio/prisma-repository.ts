@@ -18,6 +18,7 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { fromDb } from '@/lib/money';
+import { showUnverifiedStudios } from '@/lib/env';
 import { assessTier } from '@/modules/verification/tiers';
 import type {
   CheckResult,
@@ -133,8 +134,23 @@ export class PrismaStudioRepository implements StudioRepository {
   async list(query: StudioQuery = {}): Promise<Studio[]> {
     const where: Prisma.StudioWhereInput = {};
     if (query.city) where.city = query.city;
-    if (query.activeOnly) where.status = 'ACTIVE';
     if (query.locality) where.localities = { has: query.locality };
+
+    /**
+     * The verification gate, and its one development bypass.
+     *
+     * Applied HERE rather than at each call site on purpose: this is the single
+     * place every customer-facing page reaches the roster through, so the gate
+     * cannot be forgotten by a new page, and the bypass cannot be turned on in
+     * one place and not another.
+     *
+     * `showUnverifiedStudios()` refuses to return true once the roster is
+     * declared real — see its comment. So this drops the filter only while
+     * every studio on the site is an admitted placeholder.
+     */
+    if (query.activeOnly && !showUnverifiedStudios()) {
+      where.status = 'ACTIVE';
+    }
 
     let rows;
     try {

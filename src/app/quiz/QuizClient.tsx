@@ -100,6 +100,23 @@ const PRIORITY_ICONS: Record<PriorityFactor, React.ComponentType<{ className?: s
   MATERIAL_QUALITY: IconMaterial,
 };
 
+/**
+ * How much longer this takes, in words.
+ *
+ * Rounded up and deliberately never optimistic — "under a minute" that turns
+ * out to be ninety seconds costs more trust than it saved, and this is a
+ * product whose entire proposition is that our numbers are honest. The last
+ * question says "nearly done" rather than a duration, because at that point a
+ * number invites arithmetic and the answer is obviously "almost none".
+ */
+function minutesLeft(step: number): string {
+  const remaining = TOTAL_STEPS - step + 1;
+  if (remaining <= 1) return 'nearly done';
+  const seconds = remaining * 20;
+  if (seconds <= 60) return 'under a minute left';
+  return `about ${Math.ceil(seconds / 60)} minutes left`;
+}
+
 export function QuizClient({ studios }: { studios: Studio[] }) {
   const router = useRouter();
   const [brief, setBrief] = useState<Brief>(EMPTY_BRIEF);
@@ -228,8 +245,15 @@ export function QuizClient({ studios }: { studios: Studio[] }) {
             <Link href="/" className="no-underline" aria-label="One Interiors, home">
               <Wordmark showCity={false} />
             </Link>
+            {/* Time left, not a count.
+                "Question 3 of 9" answers a question nobody asked. What someone
+                deciding whether to keep going actually wants to know is how
+                much longer this is — and an honest estimate is far more
+                motivating than an index. Calibrated at roughly twenty seconds
+                a question, which is what the nine-in-three-minutes promise on
+                the landing page implies, so the two cannot contradict. */}
             <span className="tabular label m-0">
-              Question {step} of {TOTAL_STEPS}
+              {step} of {TOTAL_STEPS} · {minutesLeft(step)}
             </span>
           </div>
         </Container>
@@ -241,9 +265,15 @@ export function QuizClient({ studios }: { studios: Studio[] }) {
           aria-valuemin={1}
           aria-valuemax={TOTAL_STEPS}
         >
+          {/* The bar never starts empty.
+                A zero-width bar on question one reads as "you have done
+                nothing", which is both discouraging and untrue — they have
+                already decided to start, which is the hardest step. The floor
+                is a visual minimum only: the number of questions left is stated
+                in words right above it, so nothing here overstates progress. */}
           <div
             className="h-full bg-[var(--color-petrol)] transition-all duration-500 ease-out"
-            style={{ width: `${(step / TOTAL_STEPS) * 100}%` }}
+            style={{ width: `${Math.max(7, (step / TOTAL_STEPS) * 100)}%` }}
           />
         </div>
       </header>
@@ -266,10 +296,31 @@ export function QuizClient({ studios }: { studios: Studio[] }) {
 
             <div key={`o-${step}`} className="rise rise-1 min-w-0">
               <QuestionStep step={step} brief={brief} update={update} slot="options" />
-              {/* On narrow screens the panel follows the options, inside the
-                  scrolling area, so it never sits between the answer and the
-                  button. */}
-              <LiveProfile brief={brief} matchCount={matchCount} className="mt-8 lg:hidden" />
+
+              {/* On a phone the panel is COLLAPSED by default.
+                  It is reassurance, not information the customer needs to
+                  answer the question in front of them — and expanded it pushed
+                  the options down far enough that the question and its answers
+                  no longer shared a screen. Available in one tap for anyone who
+                  wants to check what we have understood so far; out of the way
+                  for everyone else. On a laptop it stays open in the left
+                  column, where it costs no vertical space at all. */}
+              <details className="group mt-7 rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] lg:hidden">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+                  <span className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.12em] text-[var(--color-ink-3)]">
+                    What we have so far
+                  </span>
+                  <span className="font-[family-name:var(--font-mono)] text-[11px] text-[var(--color-petrol)] group-open:hidden">
+                    Show
+                  </span>
+                  <span className="hidden font-[family-name:var(--font-mono)] text-[11px] text-[var(--color-petrol)] group-open:inline">
+                    Hide
+                  </span>
+                </summary>
+                <div className="border-t border-[var(--color-rule)] p-4">
+                  <LiveProfile brief={brief} matchCount={matchCount} />
+                </div>
+              </details>
             </div>
           </div>
         </Container>

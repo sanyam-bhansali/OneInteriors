@@ -10,6 +10,7 @@ import { studioRepository } from '@/modules/studio/repository';
 import { rankStudios } from '@/modules/matching/score';
 import { quoteBrief, storeQuotes } from '@/modules/quotation/generate';
 import { TIER } from '@/modules/quotation/tiers';
+import { narrowing } from '@/modules/quotation/narrowing';
 import { record } from '@/modules/analytics/record';
 import { JourneyNav } from '@/components/JourneyNav';
 import { BriefRescue, RescueSettled } from '@/components/BriefRescue';
@@ -145,9 +146,48 @@ export default async function QuotesPage() {
                 <p className="m-0 mb-1 font-[family-name:var(--font-mono)] text-[10.5px] uppercase tracking-[0.12em] text-[var(--color-ink-3)]">
                   Likely range, including GST
                 </p>
-                <p className="m-0 mb-6 font-[family-name:var(--font-display)] text-[32px] leading-none text-[var(--color-ink)]">
+                <p className="m-0 mb-2 font-[family-name:var(--font-display)] text-[32px] leading-none text-[var(--color-ink)]">
                   {formatINRCompact(entry.quote.lowPaise)} – {formatINRCompact(entry.quote.highPaise)}
                 </p>
+
+                {/* How wide, and what would narrow it.
+                    A range with no explanation reads as evasion, and people
+                    are ambiguity-averse enough to prefer a competitor's
+                    confident wrong number over our honest band. Naming the
+                    spread and the single most useful next step turns the
+                    uncertainty into something they can act on. */}
+                {(() => {
+                  const n = narrowing({
+                    variancePct: entry.quote.variancePct,
+                    propertyTypeKnown: brief.propertyType !== null,
+                    areaKnown: Boolean(brief.carpetAreaSqft && brief.carpetAreaSqft > 0),
+                    scopeKnown: brief.scope !== null,
+                    // Not collected yet. Stated as absent rather than assumed
+                    // present, so the line is true today.
+                    floorPlanUploaded: false,
+                  });
+                  return (
+                    <p className="m-0 mb-6 text-[13px] leading-[1.55] text-[var(--color-ink-3)]">
+                      <span
+                        className={`font-[family-name:var(--font-mono)] ${
+                          n.tooWide ? 'text-[var(--color-terracotta)]' : ''
+                        }`}
+                      >
+                        {n.spread}
+                      </span>
+                      {n.action ? (
+                        <>
+                          {' · '}
+                          <Link href="/quiz" className="text-[var(--color-petrol)]">
+                            {n.action}
+                          </Link>
+                        </>
+                      ) : (
+                        ' · Only a site visit narrows this further.'
+                      )}
+                    </p>
+                  );
+                })()}
 
                 <table className="mb-5 w-full border-collapse text-[14px]">
                   <tbody>
