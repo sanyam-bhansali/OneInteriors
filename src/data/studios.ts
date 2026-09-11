@@ -89,7 +89,21 @@ const TIER1_CHECKS = (date: string) =>
     ['LITIGATION_SEARCH', 'PASS', 'eCourts + NCDRC', date, 'No matters found'],
   ]);
 
-export const STUDIOS: Studio[] = [
+/**
+ * The fixtures, without the allocation fields.
+ *
+ * Allocation is operational state — paused, capacity — and a fixture has none
+ * of it by definition: nobody has ever taken one of these out of rotation
+ * because none of them is real. Rather than repeat three null defaults across
+ * eight literals, they are applied once below, which also means a future
+ * allocation field is a one-line change here rather than eight.
+ */
+type RawStudio = Omit<
+  Studio,
+  'capacityPerMonth' | 'pausedAt' | 'pausedReason' | 'pauseCause'
+>;
+
+const RAW_STUDIOS: RawStudio[] = [
   {
     id: 'st-akara',
     slug: 'akara-design-studio',
@@ -337,6 +351,14 @@ export const STUDIOS: Studio[] = [
     ]),
   },
 ];
+
+export const STUDIOS: Studio[] = RAW_STUDIOS.map((s) => ({
+  ...s,
+  capacityPerMonth: null,
+  pausedAt: null,
+  pausedReason: null,
+  pauseCause: null,
+}));
 
 export function getStudioBySlug(slug: string): Studio | undefined {
   return STUDIOS.find((s) => s.slug === slug);

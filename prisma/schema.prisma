@@ -413,6 +413,31 @@ model Studio {
   maxProjectPaise BigInt?
   designFeePaise  BigInt?
 
+  // ── Allocation ──
+  //
+  // What a subscription actually buys is VOLUME — how many briefs a studio is
+  // shown for. It never buys POSITION: order within a customer's matches comes
+  // from the matching engine and nothing else, which is why none of these
+  // fields is readable by `score.ts` except `pausedAt`, and why there is no
+  // "boost" or "priority" column here for anyone to reach for later.
+
+  /// How many projects a month this studio says it can actually take on.
+  /// Self-declared and used for allocation planning, never for ranking.
+  capacityPerMonth Int?
+
+  /// Set while a studio is out of rotation — at capacity, on holiday, unpaid,
+  /// or under investigation. A paused studio fails the matching hard filters
+  /// outright rather than ranking low: showing a customer a studio that cannot
+  /// take the work wastes the one introduction we get.
+  pausedAt     DateTime?
+  /// Why. Required when pausing, and shown to the studio, because a studio that
+  /// discovers it is invisible without being told is a studio that leaves.
+  pausedReason String?
+  /// What kind of pause. Distinguishes the ones that should lift by themselves —
+  /// a capacity pause ends with the month, a payment pause ends when they pay —
+  /// from a deliberate one that only a human should undo.
+  pauseCause   PauseCause?
+
   // Derived performance — recomputed by a job, never written by hand.
   // Null until enough completed projects exist. Do NOT default these to
   // flattering values; the UI must render "not enough data".
@@ -441,6 +466,8 @@ model Studio {
   allocations   AllocationPeriod[]
 
   @@index([city, status, tier])
+  /// Every customer-facing query filters paused studios out.
+  @@index([pausedAt])
   @@map("studios")
 }
 
@@ -823,10 +850,30 @@ model Dispute {
 // BILLING + ALLOCATION
 // ─────────────────────────────────────────────────────────────
 
+/// Why a studio is out of rotation.
+///
+/// The three differ in who lifts them, which is the whole reason to record it:
+/// AT_CAPACITY lifts itself when the month turns, PAYMENT_DUE lifts when the
+/// invoice clears, and MANUAL only lifts when a person decides. Collapsing them
+/// into one flag means either auto-resuming a studio somebody suspended, or
+/// leaving a studio invisible for a month after they paid.
+enum PauseCause {
+  MANUAL
+  AT_CAPACITY
+  PAYMENT_DUE
+}
+
+/// Named for the customer-facing bands, because a studio that sits in the
+/// Premium band and pays for a tier called "Verified" has two vocabularies to
+/// hold in their head and will mix them up on a call with us.
+///
+/// Fees live in `src/modules/studio/subscription.ts`, not here — a price is a
+/// commercial decision that changes, and a database enum is the wrong place to
+/// find out what something costs.
 enum SubscriptionTier {
-  LISTED // ₹0, no guarantee
-  VERIFIED // ₹40k/mo, 2 guaranteed
-  SIGNATURE // ₹1L/mo, 5 guaranteed
+  ESSENTIAL // ₹25k/mo
+  PREMIUM // ₹50k/mo
+  LUXURY // ₹1L/mo
 }
 
 enum SubscriptionStatus {
@@ -841,7 +888,7 @@ model Subscription {
   studioId String @unique
   studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
 
-  tier   SubscriptionTier   @default(LISTED)
+  tier   SubscriptionTier   @default(ESSENTIAL)
   status SubscriptionStatus @default(TRIAL)
 
   monthlyPaise      BigInt @default(0)

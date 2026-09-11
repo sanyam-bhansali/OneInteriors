@@ -101,6 +101,10 @@ function toStudio(row: StudioRow): Studio {
     specComplianceRate: row.specComplianceRate,
     communicationRating: row.communicationRating,
     autonomyProfile: row.autonomyProfile,
+    capacityPerMonth: row.capacityPerMonth ?? null,
+    pausedAt: row.pausedAt ? row.pausedAt.toISOString() : null,
+    pausedReason: row.pausedReason ?? null,
+    pauseCause: row.pauseCause ?? null,
     checks: row.verifications.map(toCheck),
     portfolio: row.portfolio.map(toPortfolio),
   };

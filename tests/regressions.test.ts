@@ -43,6 +43,7 @@ function studio(over: Partial<Studio> = {}): Studio {
     minProjectPaise: lakhsToPaise(5), maxProjectPaise: lakhsToPaise(20),
     completedProjects: 5, avgVarianceDays: 5, upheldDisputes: 0,
     specComplianceRate: 0.95, communicationRating: 4.5, autonomyProfile: 0.5,
+    capacityPerMonth: null, pausedAt: null, pausedReason: null, pauseCause: null,
     checks: [...TIER_CHECKS.LISTED, ...TIER_CHECKS.VERIFIED].map((t) => check(t)),
     portfolio: [project()],
     ...over,

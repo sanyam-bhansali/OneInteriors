@@ -86,6 +86,22 @@ export interface Studio {
   /** 0 = hands-off, 1 = highly collaborative. From past-client feedback. */
   autonomyProfile: number | null;
 
+  // ── Allocation ──
+  // How often a studio is shown, never where it appears. See the schema
+  // comment: there is deliberately no priority or boost field here.
+
+  /** Projects a month this studio says it can take. Self-declared. */
+  capacityPerMonth: number | null;
+  /** ISO timestamp while out of rotation, null when live. */
+  pausedAt: string | null;
+  /** Why they are paused. Always set when pausedAt is. */
+  pausedReason: string | null;
+  /**
+   * What kind of pause, which decides who lifts it. Capacity and payment
+   * pauses lift themselves; a manual one waits for a person.
+   */
+  pauseCause: 'MANUAL' | 'AT_CAPACITY' | 'PAYMENT_DUE' | null;
+
   checks: VerificationCheck[];
   portfolio: PortfolioProject[];
 }

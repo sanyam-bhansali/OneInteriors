@@ -21,41 +21,31 @@ export function OpsHeader() {
               Ops
             </span>
           </Link>
-          <div className="flex items-center gap-5">
-            <Link
-              href="/ops"
-              className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-paper)] no-underline opacity-70 hover:opacity-100"
-            >
-              Verification
-            </Link>
-            <Link
-              href="/ops/funnel"
-              className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-paper)] no-underline opacity-70 hover:opacity-100"
-            >
-              Funnel
-            </Link>
-            <Link
-              href="/ops/consultations"
-              className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-paper)] no-underline opacity-70 hover:opacity-100"
-            >
-              Calls
-            </Link>
-            <Link
-              href="/ops/applications"
-              className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-paper)] no-underline opacity-70 hover:opacity-100"
-            >
-              Applications
-            </Link>
-            <Link
-              href="/"
-              className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-paper)] no-underline opacity-70 hover:opacity-100"
-            >
-              Public site
-            </Link>
-          </div>
+          {/* Ordered by how often ops actually opens them, not alphabetically.
+              Overview first because it is where the day starts. */}
+          <nav className="flex flex-wrap items-center gap-x-5 gap-y-1">
+            <OpsLink href="/ops">Overview</OpsLink>
+            <OpsLink href="/ops/applications">Applications</OpsLink>
+            <OpsLink href="/ops/verification">Verification</OpsLink>
+            <OpsLink href="/ops/allocation">Allocation</OpsLink>
+            <OpsLink href="/ops/consultations">Calls</OpsLink>
+            <OpsLink href="/ops/funnel">Funnel</OpsLink>
+            <OpsLink href="/">Public site</OpsLink>
+          </nav>
         </div>
       </Container>
     </header>
+  );
+}
+
+function OpsLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-paper)] no-underline opacity-70 hover:opacity-100"
+    >
+      {children}
+    </Link>
   );
 }
 

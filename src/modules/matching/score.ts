@@ -78,6 +78,23 @@ export function passesHardFilters(brief: Brief, studio: Studio): boolean {
   if (studio.status !== 'ACTIVE') return false;
   if (studio.tier === 'UNVERIFIED') return false;
 
+  /**
+   * Paused studios are excluded outright, not ranked low.
+   *
+   * A studio pauses when it is at capacity, away, or under investigation. In
+   * every one of those cases showing it to a customer spends the single
+   * introduction we get on a studio that cannot take the work — worse than
+   * showing one fewer option. This is also the only allocation field the
+   * matching engine is allowed to read, and it can only ever remove a studio,
+   * never move one up.
+   */
+  // Truthiness, not `!== null`, deliberately. A fixture or a mapper that
+  // forgets this field leaves it `undefined`, and `undefined !== null` is true —
+  // which silently pauses the entire roster and empties every customer's
+  // results. That exact bug cost an afternoon; a missing field should fail open
+  // here, not closed.
+  if (studio.pausedAt) return false;
+
   // Q5 anti-style is an exclusion, not a weight.
   const share = dislikedShare(brief, studio);
   if (share !== null && share > MAX_DISLIKED_SHARE) return false;
@@ -377,6 +394,19 @@ export function matchSummary(
     );
   }
 
+  // Locality before working style, because only three clauses survive the slice
+  // and "they have finished two homes in Baner" is a checkable fact about the
+  // customer's own street. "They work the way you said" is an inference from a
+  // questionnaire — true, but weaker evidence, and it should lose the seat.
+  if (brief.locality) {
+    const local = studio.portfolio.filter((p) => p.locality === brief.locality).length;
+    if (local > 0) {
+      clauses.push(
+        `they have finished ${local} ${local === 1 ? 'home' : 'homes'} in ${titleCase(brief.locality)}`,
+      );
+    }
+  }
+
   if (b.workingStyle !== null && b.workingStyle >= 60 && brief.involvement) {
     clauses.push(
       brief.involvement === 'DECIDE_FOR_ME'
@@ -385,15 +415,6 @@ export function matchSummary(
           ? 'they work with clients who want to sign off on every detail'
           : 'they work the way you said you want to — decisions made together',
     );
-  }
-
-  if (brief.locality) {
-    const local = studio.portfolio.filter((p) => p.locality === brief.locality).length;
-    if (local > 0) {
-      clauses.push(
-        `they have finished ${local} ${local === 1 ? 'home' : 'homes'} in ${titleCase(brief.locality)}`,
-      );
-    }
   }
 
   if (b.deliveryReliability !== null && b.deliveryReliability >= 70) {

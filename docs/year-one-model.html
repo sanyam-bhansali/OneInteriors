@@ -1,0 +1,878 @@
+<title>Two-Year Unit Economics</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    /* Cool slate neutrals — a working model, not a brochure. */
+    --paper:      #f4f6f8;
+    --paper-2:    #ffffff;
+    --paper-3:    #e7ebef;
+    --ink:        #131820;
+    --ink-2:      #414c59;
+    --ink-3:      #6f7d8c;
+    --rule:       #d3dae1;
+    --rule-soft:  #e4e9ee;
+
+    /* One accent: ultramarine. Spent on the things you can change. */
+    --accent:     #2b4ea8;
+    --accent-bg:  #e5eaf7;
+
+    /* Semantic, deliberately not the accent hue. */
+    --ok:         #0f6b4f;
+    --ok-bg:      #e0f0e9;
+    --warn:       #a2620d;
+    --warn-bg:    #f8eeda;
+    --bad:        #a32c1e;
+    --bad-bg:     #fae7e4;
+
+    --display: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+    --body: 'Source Serif 4', Georgia, serif;
+    --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:     #0e1218;
+      --paper-2:   #161c24;
+      --paper-3:   #1f2731;
+      --ink:       #eef2f6;
+      --ink-2:     #b3bfcc;
+      --ink-3:     #7d8b9a;
+      --rule:      #2b343f;
+      --rule-soft: #222a34;
+      --accent:    #7fa0e8;
+      --accent-bg: #1a2540;
+      --ok:        #5fbf99;
+      --ok-bg:     #13302a;
+      --warn:      #dda64f;
+      --warn-bg:   #33270f;
+      --bad:       #e0796b;
+      --bad-bg:    #351915;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:     #0e1218;
+    --paper-2:   #161c24;
+    --paper-3:   #1f2731;
+    --ink:       #eef2f6;
+    --ink-2:     #b3bfcc;
+    --ink-3:     #7d8b9a;
+    --rule:      #2b343f;
+    --rule-soft: #222a34;
+    --accent:    #7fa0e8;
+    --accent-bg: #1a2540;
+    --ok:        #5fbf99;
+    --ok-bg:     #13302a;
+    --warn:      #dda64f;
+    --warn-bg:   #33270f;
+    --bad:       #e0796b;
+    --bad-bg:    #351915;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px 88px; }
+
+  /* ── Masthead ─────────────────────────────── */
+  .mast { padding: 40px 0 24px; border-bottom: 2px solid var(--ink); margin-bottom: 32px; }
+  .kicker {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--ink-3);
+    margin: 0 0 16px; display: flex; flex-wrap: wrap; gap: 6px 18px;
+  }
+  h1 {
+    font-family: var(--display); font-weight: 700;
+    font-size: clamp(2rem, 4.6vw, 3.1rem); line-height: 1.02;
+    letter-spacing: -.025em; margin: 0 0 14px; max-width: 20ch; text-wrap: balance;
+  }
+  .standfirst { font-size: clamp(1rem, 1.7vw, 1.18rem); color: var(--ink-2); margin: 0; max-width: 62ch; }
+
+  h2 {
+    font-family: var(--display); font-weight: 600;
+    font-size: clamp(1.35rem, 2.5vw, 1.8rem); line-height: 1.14;
+    letter-spacing: -.018em; margin: 0 0 10px; text-wrap: balance; max-width: 26ch;
+  }
+  h3 { font-family: var(--display); font-weight: 600; font-size: 1.02rem; margin: 0 0 6px; letter-spacing: -.008em; }
+
+  section { margin-bottom: 52px; }
+  p { margin: 0 0 14px; max-width: 68ch; }
+  p:last-child { margin-bottom: 0; }
+  strong { font-weight: 600; }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .15em;
+    text-transform: uppercase; color: var(--accent); margin: 0 0 12px;
+  }
+
+  /* ── Controls ─────────────────────────────── */
+  .controls {
+    background: var(--paper-2); border: 1px solid var(--rule); border-radius: 4px;
+    padding: 22px 24px; display: grid; gap: 20px 32px;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  }
+  .ctl label {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--ink-3); margin-bottom: 8px;
+  }
+  .ctl output {
+    font-family: var(--mono); font-size: 14px; font-weight: 600;
+    color: var(--accent); font-variant-numeric: tabular-nums;
+  }
+  input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; }
+  input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .ctl .note { font-family: var(--body); font-size: 12.5px; color: var(--ink-3); margin: 6px 0 0; line-height: 1.45; }
+
+  .reset {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+    background: none; border: 1px solid var(--rule); border-radius: 3px; color: var(--ink-2);
+    padding: 7px 12px; cursor: pointer;
+  }
+  .reset:hover { border-color: var(--ink-3); color: var(--ink); }
+  .reset:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ── Headline figures ─────────────────────── */
+  .figures {
+    display: grid; gap: 1px; background: var(--rule);
+    border: 1px solid var(--rule); border-radius: 4px; overflow: hidden;
+    grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
+  }
+  .fig { background: var(--paper-2); padding: 18px 20px; }
+  .fig dt {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-3); margin: 0 0 8px;
+  }
+  .fig dd {
+    margin: 0; font-family: var(--display); font-weight: 600;
+    font-size: clamp(1.5rem, 3vw, 2rem); line-height: 1;
+    letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+  }
+  .fig .sub { font-family: var(--body); font-size: 12.5px; font-weight: 400; color: var(--ink-3); margin-top: 7px; line-height: 1.4; letter-spacing: 0; }
+
+  /* ── Tables ───────────────────────────────── */
+  .scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper-2); }
+  table { width: 100%; min-width: 720px; border-collapse: collapse; font-size: 13.5px; }
+  th {
+    font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--ink-3); text-align: right;
+    padding: 12px 14px 10px; border-bottom: 1px solid var(--ink); white-space: nowrap;
+  }
+  th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: var(--paper-2); }
+  td {
+    padding: 9px 14px; border-bottom: 1px solid var(--rule-soft);
+    text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-2);
+  }
+  td:first-child { font-family: var(--body); color: var(--ink); }
+  tbody tr:last-child td { border-bottom: none; }
+  tr.phase td { background: var(--paper-3); }
+  tfoot td { border-top: 2px solid var(--ink); font-weight: 600; color: var(--ink); padding-top: 12px; background: var(--paper-2); }
+
+  /* ── Verdicts ─────────────────────────────── */
+  .verdict {
+    border: 1px solid var(--rule); border-left-width: 3px; border-radius: 3px;
+    background: var(--paper-2); padding: 20px 22px; margin-bottom: 16px;
+  }
+  .verdict.bad { border-left-color: var(--bad); }
+  .verdict.warn { border-left-color: var(--warn); }
+  .verdict.ok { border-left-color: var(--ok); }
+  .verdict .tag {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .11em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 2px; display: inline-block; margin-bottom: 10px;
+  }
+  .verdict.bad .tag { background: var(--bad-bg); color: var(--bad); }
+  .verdict.warn .tag { background: var(--warn-bg); color: var(--warn); }
+  .verdict.ok .tag { background: var(--ok-bg); color: var(--ok); }
+  .verdict p { font-size: 14.5px; }
+
+  .pill {
+    font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 2px;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .pill.ok { background: var(--ok-bg); color: var(--ok); }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); }
+  .pill.bad { background: var(--bad-bg); color: var(--bad); }
+
+  hr.rule { border: 0; border-top: 1px solid var(--rule); margin: 0 0 44px; }
+
+  footer { border-top: 2px solid var(--ink); padding-top: 20px; font-size: 13.5px; color: var(--ink-3); }
+
+  @media (max-width: 620px) { body { font-size: 15px; } .wrap { padding: 0 16px 64px; } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <p class="kicker">
+      <span>One Interiors</span><span>Pune</span><span>Year one</span><span>Working model</span>
+    </p>
+    <h1>What has to be true for year one to work.</h1>
+    <p class="standfirst">
+      Every figure below is calculated from the assumptions in the panel. Change one and the whole
+      year re-runs. Two of these inputs decide whether the business exists; the rest are detail.
+    </p>
+  </header>
+
+  <section>
+    <p class="eyebrow">The assumptions</p>
+    <h2>Drag these. Everything else follows.</h2>
+    <p style="margin-bottom:22px">
+      Defaults are the plan as written. The two that matter most are lead conversion and cost per
+      lead — together they set what a closed project costs to acquire.
+    </p>
+
+    <div class="controls" id="controls">
+      <div class="ctl">
+        <label for="cvr">Lead &rarr; closed project <output id="cvr-out">10%</output></label>
+        <input type="range" id="cvr" min="1" max="15" step="0.5" value="10">
+        <p class="note">The load-bearing number. 10% of raw leads closing a &#8377;10L project is very optimistic for this trade.</p>
+      </div>
+      <div class="ctl">
+        <label for="cpl">Cost per lead <output id="cpl-out">&#8377;200</output></label>
+        <input type="range" id="cpl" min="100" max="2500" step="50" value="200">
+        <p class="note">&#8377;200 buys a raw form-fill, not a qualified enquiry.</p>
+      </div>
+      <div class="ctl">
+        <label for="vEss">Essential project <output id="vEss-out">&#8377;7L</output></label>
+        <input type="range" id="vEss" min="4" max="12" step="0.5" value="7">
+        <p class="note">Floor of the whole range. A quarter of the roster.</p>
+      </div>
+      <div class="ctl">
+        <label for="vPre">Premium project <output id="vPre-out">&#8377;12L</output></label>
+        <input type="range" id="vPre" min="7" max="20" step="0.5" value="12">
+        <p class="note">Half the roster, and the bulk of the revenue.</p>
+      </div>
+      <div class="ctl">
+        <label for="vLux">Luxury project <output id="vLux-out">&#8377;20L</output></label>
+        <input type="range" id="vLux" min="12" max="40" step="1" value="20">
+        <p class="note">A quarter of the roster.</p>
+      </div>
+      <div class="ctl">
+        <label for="comm">Commission <output id="comm-out">5%</output></label>
+        <input type="range" id="comm" min="0" max="8" step="0.25" value="5">
+        <p class="note">Charged on every closed project, in both phases.</p>
+      </div>
+      <div class="ctl">
+        <label for="growth">Studios signed / month <output id="growth-out">20%</output></label>
+        <input type="range" id="growth" min="0" max="50" step="1" value="20">
+        <p class="note">Gross additions from month 4, before churn. Hard cap of 50 studios in the city.</p>
+      </div>
+      <div class="ctl">
+        <label for="churn">Studio churn / month <output id="churn-out">10%</output></label>
+        <input type="range" id="churn" min="0" max="20" step="1" value="10">
+        <p class="note">Leaves growth net of churn. This is the line that decides the roster size.</p>
+      </div>
+      <div class="ctl">
+        <label for="pps">Projects per studio by M12 <output id="pps-out">5.0</output></label>
+        <input type="range" id="pps" min="1" max="8" step="0.5" value="5">
+        <p class="note">Ramping from 1 in month 3. This is the demand target.</p>
+      </div>
+      <div class="ctl">
+        <label for="subs">Subscriptions from M4 <output id="subs-out">On</output></label>
+        <input type="range" id="subs" min="0" max="1" step="1" value="1">
+        <p class="note">Essential &#8377;25k &middot; Premium &#8377;50k &middot; Luxury &#8377;1L, mixed 25/50/25.</p>
+      </div>
+      <div class="ctl" style="align-self:end">
+        <button class="reset" id="reset" type="button">Reset to the plan as written</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Year one, at these settings</p>
+    <dl class="figures" id="figures"></dl>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <p class="eyebrow">Does the studio say yes?</p>
+    <h2>The take rate is what a studio actually decides on.</h2>
+    <p style="margin-bottom:20px">
+      A studio does not compare your subscription to zero. It compares what it pays you against what
+      it paid during the pilot, and against what a booked project through its own ads costs it
+      today. This is that comparison at month twelve, for a studio running at the target volume.
+    </p>
+    <div class="scroll">
+      <table id="take-table">
+        <thead>
+          <tr>
+            <th>Tier</th><th>Avg project</th><th>Subscription</th><th>Total to us</th>
+            <th>Their revenue</th><th>Take at target</th><th>Take mid-ramp</th>
+          </tr>
+        </thead>
+        <tbody id="take-body"></tbody>
+      </table>
+    </div>
+    <div id="take-verdict" style="margin-top:18px"></div>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <p class="eyebrow">Month by month</p>
+    <h2>The full year.</h2>
+    <p style="margin-bottom:20px">
+      Studios compound from month four and stop at the city cap. Projects per studio ramp from one
+      to the target over the same nine months — that ramp is where the demand growth has to come
+      from, and it is the hardest line in the table to actually deliver.
+    </p>
+    <div class="scroll">
+      <table id="month-table">
+        <thead>
+          <tr>
+            <th>Month</th><th>Studios</th><th>Proj/studio</th><th>Projects</th>
+            <th>Leads</th><th>Lead spend</th><th>Commission</th><th>Subscription</th><th>Contribution</th>
+          </tr>
+        </thead>
+        <tbody id="month-body"></tbody>
+        <tfoot id="month-foot"></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <p class="eyebrow">What the model does not carry</p>
+    <h2>Costs the plan has not priced yet.</h2>
+    <div id="gaps"></div>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <p class="eyebrow">Year two</p>
+    <h2>Pune fills up. The question is what you do with the second city.</h2>
+    <p style="margin-bottom:22px">
+      Year two starts from wherever year one ended above, so fixing the churn line up there changes
+      everything down here. Pune runs to its cap; new cities repeat the same three-month pilot
+      before anyone pays a subscription. Escrow arrives in month four &mdash; if it is legal.
+    </p>
+
+    <div class="controls">
+      <div class="ctl">
+        <label for="cities">Cities live <output id="cities-out">3</output></label>
+        <input type="range" id="cities" min="1" max="4" step="1" value="3">
+        <p class="note">Pune, plus a new city in month 1 and another in month 7. Each starts at 10 studios.</p>
+      </div>
+      <div class="ctl">
+        <label for="churn2">Churn / month <output id="churn2-out">5%</output></label>
+        <input type="range" id="churn2" min="0" max="20" step="1" value="5">
+        <p class="note">Assumes you fixed the ramp pricing. Leave it at 10% to see the cost of not.</p>
+      </div>
+      <div class="ctl">
+        <label for="escrow">Escrow fee <output id="escrow-out">1.75%</output></label>
+        <input type="range" id="escrow" min="0" max="3" step="0.25" value="1.75">
+        <p class="note">Customer-side, on project value, from month 4. Zero if it turns out you cannot hold funds.</p>
+      </div>
+      <div class="ctl">
+        <label for="adopt">Escrow take-up <output id="adopt-out">60%</output></label>
+        <input type="range" id="adopt" min="0" max="100" step="5" value="60">
+        <p class="note">Share of projects that actually run through it.</p>
+      </div>
+      <div class="ctl">
+        <label for="expert">Expert cost / month <output id="expert-out">&#8377;60k</output></label>
+        <input type="range" id="expert" min="30" max="150" step="5" value="60">
+        <p class="note">Loaded. Three calls per closed project, 45 minutes each, 120 productive hours a month.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Year two, at these settings</p>
+    <dl class="figures" id="figures2"></dl>
+  </section>
+
+  <section>
+    <div class="scroll">
+      <table id="y2-table">
+        <thead>
+          <tr>
+            <th>City</th><th>Live from</th><th>Studios at M12</th><th>Projects</th>
+            <th>Work placed</th><th>Commission</th><th>Subscription</th><th>Escrow</th>
+          </tr>
+        </thead>
+        <tbody id="y2-body"></tbody>
+        <tfoot id="y2-foot"></tfoot>
+      </table>
+    </div>
+    <div id="y2-gaps" style="margin-top:24px"></div>
+  </section>
+
+  <footer>
+    <p style="max-width:70ch">
+      Figures are in Indian lakhs and crores. Revenue is gross of GST and of every cost listed above
+      as unpriced &mdash; this is a contribution model, not a P&amp;L. Studio counts are rounded to
+      whole studios each month, projects to whole projects, so column totals can differ by one or
+      two from an unrounded calculation.
+    </p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var DEFAULTS = { cvr: 10, cpl: 200, vEss: 7, vPre: 12, vLux: 20,
+                   comm: 5, growth: 20, churn: 10, pps: 5, subs: 1 };
+  var FEES = { essential: 25000, premium: 50000, luxury: 100000 };
+  var MIX  = { essential: 0.25, premium: 0.50, luxury: 0.25 };
+  var TIERS = ['essential', 'premium', 'luxury'];
+  var START_STUDIOS = 10, CAP = 50, PILOT_MONTHS = 3, MONTHS = 12;
+
+  function el(id) { return document.getElementById(id); }
+  var ids = ['cvr', 'cpl', 'vEss', 'vPre', 'vLux', 'comm', 'growth', 'churn', 'pps', 'subs'];
+
+  /** Project value by tier, in rupees. */
+  function values(v) {
+    return { essential: v.vEss * 1e5, premium: v.vPre * 1e5, luxury: v.vLux * 1e5 };
+  }
+  /** One project's average value across the roster mix. */
+  function blendedValue(v) {
+    var val = values(v);
+    return TIERS.reduce(function (s, t) { return s + MIX[t] * val[t]; }, 0);
+  }
+
+  function inr(n) {
+    if (!isFinite(n)) return '—';
+    var abs = Math.abs(n);
+    if (abs >= 1e7) return '₹' + (n / 1e7).toFixed(2) + ' Cr';
+    if (abs >= 1e5) return '₹' + (n / 1e5).toFixed(1) + ' L';
+    if (abs >= 1000) return '₹' + Math.round(n / 1000) + 'k';
+    return '₹' + Math.round(n);
+  }
+  function num(n) { return Math.round(n).toLocaleString('en-IN'); }
+
+  function read() {
+    var v = {};
+    ids.forEach(function (k) { v[k] = parseFloat(el(k).value); });
+    return v;
+  }
+
+  function blendedFee() {
+    return MIX.essential * FEES.essential + MIX.premium * FEES.premium + MIX.luxury * FEES.luxury;
+  }
+
+  function build(v) {
+    var rows = [];
+    var totals = { projects: 0, leads: 0, spend: 0, comm: 0, subs: 0, signed: 0, lost: 0, value: 0 };
+    var avg = blendedValue(v);
+
+    // Carried unrounded month to month, so nine months of rounding does not
+    // quietly compound into a roster that never existed.
+    var exact = START_STUDIOS;
+
+    for (var m = 1; m <= MONTHS; m++) {
+      var signed = 0, lost = 0;
+
+      if (m > PILOT_MONTHS) {
+        // Churn is applied to the roster you started the month with, and
+        // signings on top. Net growth is the difference — which is why a 20%
+        // pipeline against 10% churn is a 10% business, not a 20% one.
+        lost = exact * (v.churn / 100);
+        signed = exact * (v.growth / 100);
+        exact = Math.min(CAP, exact - lost + signed);
+      }
+
+      var studios = Math.round(exact);
+
+      // Projects per studio ramps linearly from 1 in month 3 to the target.
+      var pps = m <= PILOT_MONTHS
+        ? 1
+        : 1 + (v.pps - 1) * (m - PILOT_MONTHS) / (MONTHS - PILOT_MONTHS);
+
+      var projects = Math.round(studios * pps);
+      var leads = projects / (v.cvr / 100);
+      var spend = leads * v.cpl;
+      var value = projects * avg;
+      var comm = value * (v.comm / 100);
+      var subs = (m > PILOT_MONTHS && v.subs === 1) ? studios * blendedFee() : 0;
+
+      totals.projects += projects; totals.leads += leads; totals.spend += spend;
+      totals.comm += comm; totals.subs += subs; totals.value += value;
+      totals.signed += signed; totals.lost += lost;
+
+      rows.push({ m: m, studios: studios, pps: pps, projects: projects,
+                  leads: leads, spend: spend, comm: comm, subs: subs,
+                  signed: signed, lost: lost, net: comm + subs - spend });
+    }
+    return { rows: rows, totals: totals };
+  }
+
+  function renderFigures(model, v) {
+    var t = model.totals;
+    var revenue = t.comm + t.subs;
+    var cac = t.projects ? t.spend / t.projects : 0;
+    var last = model.rows[MONTHS - 1];
+
+    var avg = blendedValue(v);
+    var items = [
+      ['Projects closed', num(t.projects), inr(t.value) + ' of work placed, averaging ' + inr(avg)],
+      ['Gross revenue', inr(revenue), inr(t.comm) + ' commission · ' + inr(t.subs) + ' subscription'],
+      ['Lead spend', inr(t.spend), num(t.leads) + ' leads at ' + inr(v.cpl) + ' each'],
+      ['Cost per closed project', inr(cac), (cac / avg * 100).toFixed(1) + '% of project value'],
+      ['Contribution', inr(revenue - t.spend), 'before expert, ops and salary costs'],
+      ['Roster at month 12', last.studios + ' studios',
+        num(t.signed) + ' signed in the year, ' + num(t.lost) + ' lost to churn'],
+      ['Month 12 run rate', inr(last.comm + last.subs),
+        num(last.projects) + ' projects at ' + last.pps.toFixed(1) + ' per studio']
+    ];
+
+    el('figures').innerHTML = items.map(function (i) {
+      return '<div class="fig"><dt>' + i[0] + '</dt><dd>' + i[1] +
+             '<div class="sub">' + i[2] + '</div></dd></div>';
+    }).join('');
+  }
+
+  /** What a studio in this tier pays us, at a given monthly project count. */
+  function takeRate(v, tier, projects) {
+    var revenue = projects * values(v)[tier];
+    var fee = v.subs === 1 ? FEES[tier] : 0;
+    var comm = revenue * (v.comm / 100);
+    return { revenue: revenue, fee: fee, comm: comm, total: fee + comm,
+             rate: revenue ? ((fee + comm) / revenue) * 100 : 0 };
+  }
+
+  function renderTake(v) {
+    // Month 6 is the honest test, not month 12. It is mid-ramp, it is where a
+    // studio decides whether the fee is worth it, and it is therefore where
+    // churn is actually generated.
+    var rampPps = 1 + (v.pps - 1) * 3 / (MONTHS - PILOT_MONTHS);
+    var pilotRate = v.comm;
+    var body = '', worstTarget = 0, worstRamp = 0;
+
+    TIERS.forEach(function (tier) {
+      var at = takeRate(v, tier, v.pps);
+      var mid = takeRate(v, tier, rampPps);
+      if (at.rate > worstTarget) worstTarget = at.rate;
+      if (mid.rate > worstRamp) worstRamp = mid.rate;
+
+      var d = at.rate - pilotRate;
+      var dm = mid.rate - pilotRate;
+      var cls = function (x) { return x <= 0.1 ? 'ok' : x < 1 ? 'warn' : 'bad'; };
+
+      body += '<tr><td>' + tier.charAt(0).toUpperCase() + tier.slice(1) + '</td>' +
+        '<td>' + inr(values(v)[tier]) + '</td>' +
+        '<td>' + (at.fee ? inr(at.fee) : '—') + '</td>' +
+        '<td>' + inr(at.total) + '</td>' +
+        '<td>' + inr(at.revenue) + '</td>' +
+        '<td><span class="pill ' + cls(d) + '">' + at.rate.toFixed(1) + '%</span></td>' +
+        '<td><span class="pill ' + cls(dm) + '">' + mid.rate.toFixed(1) + '%</span></td></tr>';
+    });
+    el('take-body').innerHTML = body;
+
+    var verdict;
+    if (v.subs === 0) {
+      verdict = { cls: 'ok', tag: 'Sellable',
+        text: 'With subscriptions off, every studio pays exactly ' + v.comm +
+              '% and nothing at all in a month when it closes nothing. That is the pilot deal, and it is easy to sign.' };
+    } else if (worstRamp > pilotRate + 1) {
+      verdict = { cls: 'bad', tag: 'This is where the churn comes from',
+        text: 'At the month-twelve target the fees are well judged &mdash; higher tiers pay more but also sell more, so the take rate lands between ' +
+              (worstTarget - 0.4).toFixed(1) + '% and ' + worstTarget.toFixed(1) +
+              '% instead of fanning out. The problem is the ramp. At month six a studio is running about ' +
+              rampPps.toFixed(1) + ' projects and paying up to <strong>' + worstRamp.toFixed(1) +
+              '%</strong> against ' + pilotRate + '% in the pilot &mdash; a fixed fee is heaviest exactly when volume is lightest. That is the same month you have assumed ' +
+              v.churn + '% monthly churn, and the two are unlikely to be a coincidence. A fee that scales in over the ramp, or waived until a studio is closing four a month, costs you little and removes the reason to leave.' };
+    } else {
+      verdict = { cls: 'ok', tag: 'Sellable',
+        text: 'The fee stays close to the pilot rate through the ramp as well as at target, so moving onto a paid tier is not a price rise at the moment a studio is deciding whether to stay.' };
+    }
+
+    el('take-verdict').innerHTML =
+      '<div class="verdict ' + verdict.cls + '"><span class="tag">' + verdict.tag + '</span><p>' + verdict.text + '</p></div>';
+  }
+
+  function renderMonths(model) {
+    el('month-body').innerHTML = model.rows.map(function (r) {
+      var phase = r.m <= PILOT_MONTHS ? ' class="phase"' : '';
+      return '<tr' + phase + '><td>Month ' + r.m + (r.m <= PILOT_MONTHS ? ' · pilot' : '') + '</td>' +
+        '<td>' + r.studios + (r.lost >= 0.5 ? ' <span style="color:var(--ink-3)">−' + Math.round(r.lost) + '</span>' : '') + '</td>' +
+        '<td>' + r.pps.toFixed(1) + '</td>' +
+        '<td>' + num(r.projects) + '</td>' +
+        '<td>' + num(r.leads) + '</td>' +
+        '<td>' + inr(r.spend) + '</td>' +
+        '<td>' + inr(r.comm) + '</td>' +
+        '<td>' + (r.subs ? inr(r.subs) : '—') + '</td>' +
+        '<td>' + inr(r.net) + '</td></tr>';
+    }).join('');
+
+    var t = model.totals;
+    el('month-foot').innerHTML = '<tr><td>Year one</td><td>—</td><td>—</td>' +
+      '<td>' + num(t.projects) + '</td><td>' + num(t.leads) + '</td>' +
+      '<td>' + inr(t.spend) + '</td><td>' + inr(t.comm) + '</td>' +
+      '<td>' + inr(t.subs) + '</td><td>' + inr(t.comm + t.subs - t.spend) + '</td></tr>';
+  }
+
+  function renderGaps(model, v) {
+    var t = model.totals;
+    // Every introduction runs through an expert call. Three calls per closed
+    // project, 45 minutes each including preparation, 120 productive hours a month.
+    var calls = t.projects * 3;
+    var hours = calls * 0.75;
+    var fte = hours / 120 / 12;
+    var expertCost = fte * 12 * 60000;
+    var everSigned = START_STUDIOS + t.signed;
+    var checksCost = everSigned * 25000;
+    var cac = t.projects ? t.spend / t.projects : 0;
+    var qualifiedEquivalent = 2500 / (v.cvr / 100);
+    var avg = blendedValue(v);
+    var last = model.rows[MONTHS - 1];
+    var net = v.growth - v.churn;
+    // Gross signings needed to reach the cap in nine months despite churn.
+    var needed = v.churn + (Math.pow(CAP / START_STUDIOS, 1 / (MONTHS - PILOT_MONTHS)) - 1) * 100;
+
+    var gaps = [
+      [last.studios >= CAP - 2 ? 'ok' : 'bad',
+       'The roster reaches ' + last.studios + ' studios, not ' + CAP,
+       'Signing ' + v.growth + '% a month against ' + v.churn + '% churn is net ' + net +
+       '% growth, and net growth is what compounds. Over the year you sign about ' + num(t.signed) +
+       ' studios and lose ' + num(t.lost) + ' &mdash; roughly ' + num(everSigned) +
+       ' verified in total to end with ' + last.studios +
+       '. To actually hit ' + CAP + ' by month twelve at this churn you would need to be signing about <strong>' +
+       needed.toFixed(0) + '% a month</strong>, which is a different business-development problem than the plan describes.'],
+      ['warn', 'The expert call is the whole mechanic, and it is not costed',
+       'Every introduction runs through an expert &mdash; there is no contact button anywhere in the product. At ' +
+       num(t.projects) + ' closed projects and three calls per close, that is about ' + num(calls) +
+       ' calls and ' + num(hours) + ' hours in the year: roughly ' + fte.toFixed(1) +
+       ' full-time experts, or about ' + inr(expertCost) +
+       ' at a loaded &#8377;60k a month. It is also the throughput ceiling &mdash; the business cannot close more projects than experts can hold calls for.'],
+      ['warn', 'Verification is paid for on every studio, including the ones who leave',
+       'Twelve checks per studio &mdash; reference calls we make, sites we visit. At ' + inr(25000) +
+       ' a studio and ' + num(everSigned) + ' studios verified across the year, that is about ' +
+       inr(checksCost) + '. Roughly ' + Math.round(t.lost / everSigned * 100) +
+       ' paise in every rupee of that is spent on studios who churn out, which is the real cost of a ' +
+       v.churn + '% churn rate and does not appear anywhere in the revenue lines.'],
+      ['warn', 'The pilot guarantees one project per studio per month',
+       'Ten studios over three months at one project each is exactly thirty projects &mdash; precisely what the model produces. There is no slack anywhere in that quarter. Miss the conversion rate at all and you owe ten studios an explanation in the first quarter, which is the worst quarter in which to owe one.'],
+      [cac > 25000 ? 'bad' : cac > 10000 ? 'warn' : 'ok',
+       'Acquisition costs ' + inr(cac) + ' per closed project',
+       'That is ' + (cac / avg * 100).toFixed(1) + '% of project value against ' +
+       v.comm.toFixed(1) + '% coming back as commission. But the partner brief sets a stop-signal at &#8377;2,500 per <em>qualified</em> lead &mdash; at ' +
+       v.cvr + '% that would be ' + inr(qualifiedEquivalent) + ' per closed project, not ' + inr(cac) +
+       '. Those two numbers describe different things and only one can be the plan. Finding out which is the first thing the pilot should measure.']
+    ];
+
+    el('gaps').innerHTML = gaps.map(function (g) {
+      return '<div class="verdict ' + g[0] + '"><span class="tag">' +
+        (g[0] === 'ok' ? 'Within range' : 'Unpriced') +
+        '</span><h3>' + g[1] + '</h3><p>' + g[2] + '</p></div>';
+    }).join('');
+  }
+
+  function labels(v) {
+    el('cvr-out').textContent = v.cvr + '%';
+    el('cpl-out').textContent = '₹' + v.cpl;
+    el('vEss-out').textContent = '₹' + v.vEss + 'L';
+    el('vPre-out').textContent = '₹' + v.vPre + 'L';
+    el('vLux-out').textContent = '₹' + v.vLux + 'L';
+    el('comm-out').textContent = v.comm + '%';
+    el('growth-out').textContent = v.growth + '%';
+    el('churn-out').textContent = v.churn + '%';
+    el('pps-out').textContent = v.pps.toFixed(1);
+    el('subs-out').textContent = v.subs === 1 ? 'On' : 'Off';
+  }
+
+  function run() {
+    var v = read();
+    var model = build(v);
+    labels(v);
+    renderFigures(model, v);
+    renderTake(v);
+    renderMonths(model);
+    renderGaps(model, v);
+
+    var v2 = read2();
+    labels2(v2);
+    renderY2(v, v2, buildY2(v, v2, model));
+  }
+
+  // ── Year two ────────────────────────────────────────────────
+  //
+  // Same machinery, three differences: Pune starts from year one's exit roster
+  // rather than from ten, new cities repeat the pilot before anyone pays a
+  // subscription, and escrow arrives as a third revenue line.
+
+  var ids2 = ['cities', 'churn2', 'escrow', 'adopt', 'expert'];
+  function read2() {
+    var v = {};
+    ids2.forEach(function (k) { v[k] = parseFloat(el(k).value); });
+    return v;
+  }
+
+  /** Roster and projects for one city over twelve months. */
+  function city(opts) {
+    var rows = [], exact = opts.start, projects = 0, studioMonths = 0, subMonths = 0, signed = 0;
+
+    for (var m = 1; m <= MONTHS; m++) {
+      if (m < opts.from) { rows.push(null); continue; }
+      var age = m - opts.from + 1;             // 1 on launch month
+      var mature = opts.start >= CAP / 2;      // Pune arrives already ramped
+
+      if (age > 1 && (mature || age > PILOT_MONTHS)) {
+        var add = exact * (opts.growth / 100);
+        exact = Math.min(CAP, exact - exact * (opts.churn / 100) + add);
+        signed += add;
+      }
+      var studios = Math.round(exact);
+
+      var pps = mature
+        ? opts.pps
+        : age <= PILOT_MONTHS
+          ? 1
+          : Math.min(opts.pps, 1 + (opts.pps - 1) * (age - PILOT_MONTHS) / (MONTHS - PILOT_MONTHS));
+
+      var p = Math.round(studios * pps);
+      projects += p;
+      studioMonths += studios;
+      // Subscriptions start after the three-month pilot; Pune is already past it.
+      if (mature || age > PILOT_MONTHS) subMonths += studios;
+
+      rows.push({ studios: studios, projects: p, escrowable: age > PILOT_MONTHS || mature });
+    }
+    return { rows: rows, projects: projects, studioMonths: studioMonths,
+             subMonths: subMonths, signed: signed, end: Math.round(exact) };
+  }
+
+  function buildY2(v1, v2, y1) {
+    var avg = blendedValue(v1);
+    var last = y1.rows[MONTHS - 1];
+    var base = { growth: v1.growth, churn: v2.churn2, pps: v1.pps };
+
+    var plan = [
+      { name: 'Pune', from: 1, start: last.studios }
+    ];
+    if (v2.cities >= 2) plan.push({ name: 'City two', from: 1, start: START_STUDIOS });
+    if (v2.cities >= 3) plan.push({ name: 'City three', from: 7, start: START_STUDIOS });
+    if (v2.cities >= 4) plan.push({ name: 'City four', from: 10, start: START_STUDIOS });
+
+    var out = plan.map(function (c) {
+      var r = city({ from: c.from, start: c.start, growth: base.growth,
+                     churn: base.churn, pps: base.pps });
+      var escrowProjects = r.rows.reduce(function (s, row) {
+        return s + (row && row.escrowable ? row.projects : 0);
+      }, 0);
+      return {
+        name: c.name, from: c.from, end: r.end, projects: r.projects,
+        value: r.projects * avg,
+        comm: r.projects * avg * (v1.comm / 100),
+        subs: v1.subs === 1 ? r.subMonths * blendedFee() : 0,
+        escrow: escrowProjects * avg * (v2.escrow / 100) * (v2.adopt / 100),
+        signed: r.signed
+      };
+    });
+
+    var t = out.reduce(function (a, c) {
+      a.projects += c.projects; a.value += c.value; a.comm += c.comm;
+      a.subs += c.subs; a.escrow += c.escrow; a.signed += c.signed; a.end += c.end;
+      return a;
+    }, { projects: 0, value: 0, comm: 0, subs: 0, escrow: 0, signed: 0, end: 0 });
+
+    return { cities: out, totals: t, avg: avg };
+  }
+
+  function renderY2(v1, v2, y2) {
+    var t = y2.totals;
+    var revenue = t.comm + t.subs + t.escrow;
+    var leads = t.projects / (v1.cvr / 100);
+    var leadSpend = leads * v1.cpl;
+    var hours = t.projects * 3 * 0.75;
+    var fte = hours / (120 * 12);
+    var expertCost = fte * 12 * (v2.expert * 1000);
+    var verifyCost = t.signed * 25000;
+    var contribution = revenue - leadSpend - expertCost - verifyCost;
+
+    el('figures2').innerHTML = [
+      ['Projects closed', num(t.projects), inr(t.value) + ' of work placed across ' + y2.cities.length + ' cities'],
+      ['Gross revenue', inr(revenue),
+        inr(t.comm) + ' commission · ' + inr(t.subs) + ' subscription · ' + inr(t.escrow) + ' escrow'],
+      ['Escrow share', (revenue ? (t.escrow / revenue * 100) : 0).toFixed(0) + '%',
+        'of revenue, on a mechanic not yet cleared legally'],
+      ['Experts needed', fte.toFixed(1) + ' FTE', num(t.projects * 3) + ' calls at ' + inr(v2.expert * 1000) + ' a month each'],
+      ['Direct costs', inr(leadSpend + expertCost + verifyCost),
+        inr(leadSpend) + ' leads · ' + inr(expertCost) + ' experts · ' + inr(verifyCost) + ' checks'],
+      ['Contribution', inr(contribution), 'before engineering, ops and your own salaries']
+    ].map(function (i) {
+      return '<div class="fig"><dt>' + i[0] + '</dt><dd>' + i[1] +
+             '<div class="sub">' + i[2] + '</div></dd></div>';
+    }).join('');
+
+    el('y2-body').innerHTML = y2.cities.map(function (c) {
+      return '<tr><td>' + c.name + '</td>' +
+        '<td>Month ' + c.from + '</td>' +
+        '<td>' + c.end + '</td>' +
+        '<td>' + num(c.projects) + '</td>' +
+        '<td>' + inr(c.value) + '</td>' +
+        '<td>' + inr(c.comm) + '</td>' +
+        '<td>' + (c.subs ? inr(c.subs) : '—') + '</td>' +
+        '<td>' + (c.escrow ? inr(c.escrow) : '—') + '</td></tr>';
+    }).join('');
+
+    el('y2-foot').innerHTML = '<tr><td>Year two</td><td>—</td><td>' + t.end + '</td>' +
+      '<td>' + num(t.projects) + '</td><td>' + inr(t.value) + '</td>' +
+      '<td>' + inr(t.comm) + '</td><td>' + inr(t.subs) + '</td><td>' + inr(t.escrow) + '</td></tr>';
+
+    // Pune's own project count against the city's organised market. The partner
+    // brief puts the winnable target at 15–20% of the organised segment; this
+    // is the sentence that says whether year two is growth or a market-share claim.
+    var pune = y2.cities[0];
+    var ORGANISED_PUNE = 18000;
+    var share = pune.projects / ORGANISED_PUNE * 100;
+
+    var gaps = [
+      [t.escrow / revenue > 0.15 ? 'bad' : 'warn',
+       'Escrow is ' + (t.escrow / revenue * 100).toFixed(0) + '% of year-two revenue and is not yet legal',
+       inr(t.escrow) + ' rests on holding client money, which in India needs an RBI-compliant partner and a structure nobody has confirmed you can have. It is listed in the partner brief as an open question needing two weeks with a lawyer. Drag the escrow fee to zero to see the year without it &mdash; that is the downside case, and it should be the one you plan against until the answer comes back.'],
+      [share > 15 ? 'bad' : share > 8 ? 'warn' : 'ok',
+       'Pune alone is ' + share.toFixed(0) + '% of the city\'s organised interior market',
+       num(pune.projects) + ' projects in Pune against roughly ' + num(ORGANISED_PUNE) +
+       ' organised projects a year. That is not a growth rate, it is a market-share claim &mdash; and it is the number a partner will push back on hardest. It matches the 15–20% ambition in the brief, but reaching it in year two rather than year five is a different assertion.'],
+      ['warn', fte.toFixed(1) + ' experts is a department, not a hire',
+       'Every introduction still runs through a call. At ' + num(t.projects * 3) +
+       ' calls you need ' + Math.ceil(fte) + ' people, plus someone managing them and a way to keep quality even across ' +
+       y2.cities.length + ' cities. It is also still the ceiling: you cannot close more projects than experts can hold calls for, so hiring lead time sets your growth rate, not demand.'],
+      ['warn', 'A second city needs the ground game, not the software',
+       'The software is city-agnostic. Verification is not &mdash; reference calls, site visits and a police check need someone physically there. Roughly ' +
+       num(t.signed) + ' new studios get verified this year across all cities. Launching a city is hiring an ops person and spending three months before revenue, which is why the model starts each one on the same three-month pilot.'],
+      ['ok', 'The moat finally has data in it',
+       'By the end of year two you have delivery variance on ' + num(t.projects) +
+       ' completed projects. That is the Proven tier, and it is the one thing a competitor cannot buy from a KYC vendor or copy in a weekend. Everything else in this plan is replicable; this is not.']
+    ];
+
+    el('y2-gaps').innerHTML = gaps.map(function (g) {
+      return '<div class="verdict ' + g[0] + '"><span class="tag">' +
+        (g[0] === 'ok' ? 'The asset' : g[0] === 'bad' ? 'Biggest risk' : 'Plan for it') +
+        '</span><h3>' + g[1] + '</h3><p>' + g[2] + '</p></div>';
+    }).join('');
+  }
+
+  function labels2(v2) {
+    el('cities-out').textContent = v2.cities;
+    el('churn2-out').textContent = v2.churn2 + '%';
+    el('escrow-out').textContent = v2.escrow + '%';
+    el('adopt-out').textContent = v2.adopt + '%';
+    el('expert-out').textContent = '₹' + v2.expert + 'k';
+  }
+
+  ids2.forEach(function (k) { el(k).addEventListener('input', run); });
+  ids.forEach(function (k) { el(k).addEventListener('input', run); });
+  el('reset').addEventListener('click', function () {
+    ids.forEach(function (k) { el(k).value = DEFAULTS[k]; });
+    run();
+  });
+
+  run();
+})();
+</script>
