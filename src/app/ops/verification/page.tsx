@@ -4,7 +4,6 @@ import { Container, TierBadge, Pill } from '@/components/ui';
 import { studioRepository } from '@/modules/studio/repository';
 import { assessTier, tierDrift } from '@/modules/verification/tiers';
 import { validateGstin } from '@/modules/verification/gstin';
-import { requireRole } from '@/modules/auth/session';
 import { OpsHeader, TierProgress } from '../ui';
 
 export const metadata: Metadata = {
@@ -22,13 +21,11 @@ export const dynamic = 'force-dynamic';
  * expired checks jump the queue, because a studio with a lapsed check is
  * currently showing a badge the evidence no longer supports.
  *
- * The role check is not decoration. This page used to rely on `middleware.ts`
- * blocking /ops outside development, which is a deployment setting rather than
- * a permission — one environment variable away from publishing every studio's
- * registration numbers alongside our own private assessment of them.
+ * Access is gated by `app/ops/layout.tsx`, which redirects. Not by
+ * `requireRole` here — that throws, and a throw in a page renders a 500 rather
+ * than sending a stray customer home. See the note on the overview page.
  */
 export default async function VerificationQueue() {
-  await requireRole('OPS');
   const studios = await studioRepository.list();
 
   const rows = studios

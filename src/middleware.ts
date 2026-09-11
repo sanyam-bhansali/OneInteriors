@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { opsWithoutAuth } from '@/lib/env';
 
 /**
  * Cheap pre-filter for /ops.
@@ -13,6 +14,12 @@ import { NextResponse, type NextRequest } from 'next/server';
  * actual work. Do not add authorisation logic here.
  */
 export function middleware(request: NextRequest) {
+  // The development bypass has to be honoured here too, or the cookie check
+  // below redirects to /sign-in before the layout ever gets to allow it.
+  // Read `opsWithoutAuth` in src/lib/env.ts before relying on this: it refuses
+  // to work once the roster is declared real.
+  if (opsWithoutAuth()) return NextResponse.next();
+
   const hasSessionCookie = Boolean(request.cookies.get('oi_session')?.value);
 
   if (!hasSessionCookie) {

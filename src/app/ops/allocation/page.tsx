@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { Container } from '@/components/ui';
-import { requireRole } from '@/modules/auth/session';
 import { studioRepository } from '@/modules/studio/repository';
 import { rosterCapacity } from '@/modules/studio/allocation';
 import { prisma } from '@/lib/prisma';
@@ -35,8 +34,6 @@ export const dynamic = 'force-dynamic';
  * by policy.
  */
 export default async function AllocationPage() {
-  await requireRole('OPS');
-
   const [studios, capacity, shownCounts] = await Promise.all([
     studioRepository.list(),
     rosterCapacity(),

@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Container } from '@/components/ui';
-import { requireRole } from '@/modules/auth/session';
 import { studioRepository } from '@/modules/studio/repository';
 import { assessTier } from '@/modules/verification/tiers';
 import { rosterCapacity } from '@/modules/studio/allocation';
@@ -37,9 +36,20 @@ export const dynamic = 'force-dynamic';
  * A dashboard that reports 0% drop-off on a step nobody has reached is worse
  * than one that admits it does not know.
  */
+/**
+ * No `requireRole` here on purpose.
+ *
+ * `app/ops/layout.tsx` gates every route under /ops and does it with a
+ * `redirect`, which is the right behaviour for a page: a customer who wanders
+ * in gets sent home rather than shown a stack trace. `requireRole` THROWS,
+ * which is right for a server action — an action is directly invocable and
+ * should fail hard — and wrong here, because Next renders the layout and the
+ * page in parallel, so the throw surfaces as a 500 before the redirect lands.
+ *
+ * Mutations still call `requireRole` themselves. A layout guard protects
+ * rendering, never writes.
+ */
 export default async function OpsOverview() {
-  await requireRole('OPS');
-
   const [studios, capacity, funnel, pendingApplications, openConsultations] = await Promise.all([
     studioRepository.list(),
     rosterCapacity(),

@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { Container } from '@/components/ui';
 import { OpsHeader } from '../ui';
-import { requireRole } from '@/modules/auth/session';
 import { funnelSummary } from '@/modules/analytics/record';
 import { worstStep } from '@/modules/analytics/events';
 
@@ -24,8 +23,9 @@ const QUESTIONS = [
   'Timeline',
 ];
 
+// Gated by `app/ops/layout.tsx`, which redirects. `requireRole` throws, and a
+// throw in a page is a 500 rather than a redirect — see the overview page.
 export default async function FunnelPage() {
-  await requireRole('OPS');
   const summary = await funnelSummary(30);
   const worst = worstStep(summary.steps);
 

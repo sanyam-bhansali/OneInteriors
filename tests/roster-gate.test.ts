@@ -1,5 +1,10 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { showUnverifiedStudios, showOtpOnScreen, rosterIsReal } from '@/lib/env';
+import {
+  showUnverifiedStudios,
+  showOtpOnScreen,
+  opsWithoutAuth,
+  rosterIsReal,
+} from '@/lib/env';
 
 /**
  * The verification gate's development bypass.
@@ -130,5 +135,66 @@ describe('showOtpOnScreen', () => {
     setEnv('1', undefined);
     expect(showUnverifiedStudios()).toBe(true);
     expect(showOtpOnScreen()).toBe(false);
+  });
+});
+
+/**
+ * The ops bypass — the widest of the three.
+ *
+ * While it is on, every studio's legal name, GSTIN and our private assessment
+ * of them is readable by anyone who guesses the URL, along with consultation
+ * requests carrying a name, phone number and email. It is a reasonable trade on
+ * a deployment where every studio is an admitted placeholder and an outright
+ * breach on one where they are not, which is exactly what the roster condition
+ * encodes.
+ */
+describe('opsWithoutAuth', () => {
+  const ORIGINAL_OPS = process.env.DEV_OPS_NO_AUTH;
+
+  function setOpsEnv(ops: string | undefined, real: string | undefined): void {
+    if (ops === undefined) delete process.env.DEV_OPS_NO_AUTH;
+    else process.env.DEV_OPS_NO_AUTH = ops;
+
+    if (real === undefined) delete process.env.NEXT_PUBLIC_ROSTER_IS_REAL;
+    else process.env.NEXT_PUBLIC_ROSTER_IS_REAL = real;
+  }
+
+  afterEach(() => {
+    if (ORIGINAL_OPS === undefined) delete process.env.DEV_OPS_NO_AUTH;
+    else process.env.DEV_OPS_NO_AUTH = ORIGINAL_OPS;
+  });
+
+  it('is off whenever the roster is real, however loudly the flag is set', () => {
+    setOpsEnv('1', '1');
+    expect(rosterIsReal()).toBe(true);
+    expect(opsWithoutAuth()).toBe(false);
+  });
+
+  it('is on for a placeholder roster when explicitly asked', () => {
+    setOpsEnv('1', undefined);
+    expect(opsWithoutAuth()).toBe(true);
+  });
+
+  it('is off by default, and treats an empty value as off', () => {
+    setOpsEnv(undefined, undefined);
+    expect(opsWithoutAuth()).toBe(false);
+    setOpsEnv('', undefined);
+    expect(opsWithoutAuth()).toBe(false);
+  });
+
+  it('accepts only "1"', () => {
+    for (const value of ['true', 'yes', 'on', '0', 'TRUE']) {
+      setOpsEnv(value, undefined);
+      expect(opsWithoutAuth()).toBe(false);
+    }
+  });
+
+  /** Three separate amounts of danger. None of them implies another. */
+  it('is independent of the other two flags', () => {
+    delete process.env.DEV_OPS_NO_AUTH;
+    delete process.env.DEV_SHOW_OTP_ON_SCREEN;
+    setEnv('1', undefined);
+    expect(showUnverifiedStudios()).toBe(true);
+    expect(opsWithoutAuth()).toBe(false);
   });
 });

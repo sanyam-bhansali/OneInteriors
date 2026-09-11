@@ -161,3 +161,41 @@ export function showOtpOnScreen(): boolean {
   if (rosterIsReal()) return false;
   return process.env.DEV_SHOW_OTP_ON_SCREEN?.trim() === '1';
 }
+
+/**
+ * Development only: open the ops console without signing in.
+ *
+ * ## What this exposes
+ *
+ * Everything under /ops, to anyone who guesses the URL. That includes studio
+ * legal names and GSTINs, our own private assessment of each of them, the
+ * customer funnel, and consultation requests — which carry a name, a phone
+ * number and an email. On a deployment with real studios or real customers on
+ * it, that is a data breach rather than a convenience.
+ *
+ * ## Why it exists
+ *
+ * The ops console is gated by a role read from Postgres, which means looking at
+ * it requires an OPS user, a verified sending domain, and a magic link — three
+ * things that are all in progress. Waiting on all three to glance at a
+ * dashboard is a poor trade while every studio on the deployment is an admitted
+ * placeholder.
+ *
+ * ## Why it cannot survive launch
+ *
+ * Same two conditions as the other scaffolding flags, and the second is the one
+ * that matters:
+ *
+ *  1. `DEV_OPS_NO_AUTH=1` is set, and
+ *  2. `rosterIsReal()` is FALSE.
+ *
+ * Declaring the roster real closes it everywhere at once, with no second edit
+ * and nobody having to remember. The day there is a real studio to expose is
+ * the day this stops working.
+ *
+ * Delete this before the first real studio. It is scaffolding.
+ */
+export function opsWithoutAuth(): boolean {
+  if (rosterIsReal()) return false;
+  return process.env.DEV_OPS_NO_AUTH?.trim() === '1';
+}

@@ -296,8 +296,16 @@ export interface RosterCapacity {
  * bad review and a studio we over-promised.
  */
 export async function rosterCapacity(city = 'pune'): Promise<RosterCapacity> {
-  await requireRole('OPS');
-
+  /**
+   * No `requireRole` here, deliberately.
+   *
+   * This is a read, called while an ops page renders, and `requireRole` throws
+   * — which turns "you are not ops" into a 500 instead of the redirect that
+   * `app/ops/layout.tsx` already performs. Every caller sits under that layout.
+   *
+   * The mutations in this file keep their own check, because a server action
+   * can be invoked directly and a layout guard does not protect writes.
+   */
   const studios = await prisma.studio.findMany({
     where: { city, status: 'ACTIVE' },
     select: { pausedAt: true, capacityPerMonth: true },

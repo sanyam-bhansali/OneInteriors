@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getCurrentUser, hasRole } from '@/modules/auth/session';
+import { opsWithoutAuth } from '@/lib/env';
 
 /**
  * Every /ops route is gated here.
@@ -18,6 +19,26 @@ import { getCurrentUser, hasRole } from '@/modules/auth/session';
  * writes, because actions are directly invocable.
  */
 export default async function OpsLayout({ children }: { children: React.ReactNode }) {
+  /**
+   * The development bypass, and the banner that makes it impossible to forget.
+   *
+   * `opsWithoutAuth()` is off unless explicitly set and refuses to work once the
+   * roster is declared real — read its comment before touching it. While it is
+   * on, everything under /ops is readable by anyone who guesses the URL.
+   */
+  if (opsWithoutAuth()) {
+    return (
+      <>
+        <div className="bg-[var(--color-atrisk)] py-2 text-center">
+          <p className="m-0 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-white">
+            Dev · ops console is open to anyone with this URL · no sign-in required
+          </p>
+        </div>
+        {children}
+      </>
+    );
+  }
+
   const user = await getCurrentUser();
 
   if (!user) redirect('/sign-in');

@@ -1,0 +1,521 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sixteen September</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Eczar:wght@400;500;600&family=Familjen+Grotesk:ital,wght@0,400..700;1,400..600&family=Spline+Sans+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    /* Cool bone, biased very slightly green toward the accent. */
+    --paper:      #f2f4f0;
+    --paper-2:    #fbfcfa;
+    --paper-3:    #e5e9e2;
+    --ink:        #161d18;
+    --ink-2:      #415045;
+    --ink-3:      #6e7d72;
+    --rule:       #d1d9cf;
+    --rule-soft:  #e2e7df;
+
+    --accent:     #1f5134;   /* deep green — commitments, done things */
+    --accent-bg:  #dfeae1;
+    --wait:       #8a6410;   /* amber — waiting on someone else */
+    --wait-bg:    #f5ebd6;
+    --stop:       #9d3a20;   /* clay — blocked, or a thing not to do */
+    --stop-bg:    #f6e2da;
+
+    --display: 'Eczar', Georgia, serif;
+    --body: 'Familjen Grotesk', 'Helvetica Neue', Arial, sans-serif;
+    --mono: 'Spline Sans Mono', ui-monospace, Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:     #10140f;
+      --paper-2:   #171d18;
+      --paper-3:   #1f2720;
+      --ink:       #eaefe8;
+      --ink-2:     #b2bfb5;
+      --ink-3:     #7d8b80;
+      --rule:      #2b352d;
+      --rule-soft: #222b24;
+      --accent:    #7bc194;
+      --accent-bg: #14301f;
+      --wait:      #d5a851;
+      --wait-bg:   #2f2611;
+      --stop:      #e08668;
+      --stop-bg:   #331a12;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:     #10140f;
+    --paper-2:   #171d18;
+    --paper-3:   #1f2720;
+    --ink:       #eaefe8;
+    --ink-2:     #b2bfb5;
+    --ink-3:     #7d8b80;
+    --rule:      #2b352d;
+    --rule-soft: #222b24;
+    --accent:    #7bc194;
+    --accent-bg: #14301f;
+    --wait:      #d5a851;
+    --wait-bg:   #2f2611;
+    --stop:      #e08668;
+    --stop-bg:   #331a12;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper); color: var(--ink);
+    font-family: var(--body); font-size: 17px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 26px 96px; }
+
+  header.mast { padding: 52px 0 30px; border-bottom: 2px solid var(--ink); margin-bottom: 44px; }
+  .kicker {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--ink-3); margin: 0 0 18px; display: flex; flex-wrap: wrap; gap: 7px 18px;
+  }
+  h1 {
+    font-family: var(--display); font-weight: 600;
+    font-size: clamp(2.3rem, 6vw, 3.7rem); line-height: 1.02; letter-spacing: -.02em;
+    margin: 0 0 16px; max-width: 17ch; text-wrap: balance;
+  }
+  .standfirst { font-size: clamp(1.03rem, 1.8vw, 1.2rem); color: var(--ink-2); margin: 0; max-width: 58ch; }
+
+  section { margin-bottom: 56px; }
+  h2 {
+    font-family: var(--display); font-weight: 600;
+    font-size: clamp(1.45rem, 3vw, 2rem); line-height: 1.12; letter-spacing: -.015em;
+    margin: 0 0 14px; max-width: 26ch; text-wrap: balance;
+  }
+  h3 { font-family: var(--body); font-weight: 700; font-size: 1.05rem; margin: 0 0 7px; }
+  p { margin: 0 0 15px; max-width: 66ch; }
+  ul { margin: 0 0 15px; padding-left: 20px; max-width: 66ch; }
+  li { margin-bottom: 7px; }
+  strong { font-weight: 700; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .15em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 11px;
+  }
+
+  /* ── The spine: weeks ─────────────────────── */
+  .week {
+    display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 22px;
+    padding: 22px 0; border-bottom: 1px solid var(--rule-soft);
+  }
+  .week:last-child { border-bottom: 0; }
+  .week .when {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em;
+    color: var(--accent); padding-top: 3px; line-height: 1.5;
+  }
+  .week .when b { display: block; color: var(--ink); font-size: 13px; letter-spacing: 0; font-weight: 700; }
+  .week h3 { margin-bottom: 8px; }
+  .week ul { margin-bottom: 0; font-size: 15.5px; }
+  @media (max-width: 620px) { .week { grid-template-columns: 1fr; gap: 8px; } }
+
+  /* ── Notes ────────────────────────────────── */
+  .note {
+    border: 1px solid var(--rule); border-left-width: 3px; border-radius: 3px;
+    background: var(--paper-2); padding: 19px 22px; margin: 22px 0;
+  }
+  .note.stop { border-left-color: var(--stop); }
+  .note.wait { border-left-color: var(--wait); }
+  .note.go   { border-left-color: var(--accent); }
+  .note .lbl {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+    display: block; margin-bottom: 8px; color: var(--ink-3);
+  }
+  .note.stop .lbl { color: var(--stop); }
+  .note.wait .lbl { color: var(--wait); }
+  .note.go .lbl   { color: var(--accent); }
+  .note p { font-size: 15px; }
+  .note p:last-child { margin-bottom: 0; }
+
+  /* ── Tables ───────────────────────────────── */
+  .scroll { overflow-x: auto; margin: 22px 0; }
+  table { width: 100%; min-width: 540px; border-collapse: collapse; font-size: 14.5px; }
+  th {
+    font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-3); text-align: left;
+    padding: 0 16px 9px 0; border-bottom: 1px solid var(--ink);
+  }
+  td { padding: 11px 16px 11px 0; border-bottom: 1px solid var(--rule-soft); color: var(--ink-2); vertical-align: top; }
+  td:first-child { color: var(--ink); font-weight: 600; }
+  th:last-child, td:last-child { padding-right: 0; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .tag {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .09em; text-transform: uppercase;
+    padding: 2px 7px; border-radius: 2px; white-space: nowrap; display: inline-block;
+  }
+  .tag.go { background: var(--accent-bg); color: var(--accent); }
+  .tag.wait { background: var(--wait-bg); color: var(--wait); }
+  .tag.stop { background: var(--stop-bg); color: var(--stop); }
+
+  hr.rule { border: 0; border-top: 1px solid var(--rule); margin: 0 0 48px; }
+  footer { border-top: 2px solid var(--ink); padding-top: 22px; font-size: 14px; color: var(--ink-3); }
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  @media (max-width: 620px) { body { font-size: 16px; } .wrap { padding: 0 18px 72px; } }
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="kicker">
+    <span>One Interiors</span><span>Pune</span><span>Go-to-market</span><span>11 Sep 2026</span>
+  </p>
+  <h1>The waitlist is how you buy supply.</h1>
+  <p class="standfirst">
+    Five days to 16 September. What can honestly be promised on that date, where the first
+    two hundred briefs come from when the obvious list is legally blocked, and the one number
+    the first month exists to measure.
+  </p>
+</header>
+
+<section>
+  <p class="eyebrow">The premise</p>
+  <h2>You are not launching a marketplace. You are collecting the evidence that lets you sign studios.</h2>
+
+  <p>
+    On 16 September the product cannot produce a quote. Not because of a bug — because
+    <strong>no studio has entered a rate card</strong>, and the pricing code refuses to invent one.
+    That refusal is correct and it is the whole trust proposition, but it means the headline
+    promise is six weeks away from being deliverable.
+  </p>
+
+  <p>
+    So invert the usual order. A waitlist of Pune homeowners who have each told you their flat,
+    their budget band, the styles they want and the ones they have ruled out is not a consolation
+    prize while you wait for supply — <strong>it is the single most persuasive thing you can put in
+    front of a studio.</strong> "Join our platform" is a weak cold open. "We have 140 briefs in
+    Baner and Kharadi, here is the budget distribution, do you want to be one of the first ten
+    studios to see them" is a different conversation entirely.
+  </p>
+
+  <div class="note go">
+    <span class="lbl">What the customer actually gets on day one</span>
+    <p>
+      The nine-question brief, the style reveal, and <strong>what their own flat costs at three
+      levels of finish</strong> — all of which work today, with zero studios, because those bands
+      are ours rather than any studio's. That is a real answer to the question they came with, and
+      it is honest about what comes next: a place in the queue, not a quote.
+    </p>
+  </div>
+
+  <div class="note stop">
+    <span class="lbl">The promise to avoid on 16 September</span>
+    <p>
+      Anything of the form "get real quotes from verified Pune studios." It is true in November and
+      false in September, and a waitlist that goes quiet for six weeks after an unfulfilled promise
+      is worse than no waitlist. Six weeks of silence turns a warm list cold and the second email
+      gets marked as spam.
+    </p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section>
+  <p class="eyebrow">Supply</p>
+  <h2>Ten studios, approached in four waves, easiest first</h2>
+
+  <p>
+    The financial model needs ten studios live with a project each in month one. Work outward
+    from the warmest relationship, because each wave's yes makes the next wave's pitch stronger —
+    by wave three you are not describing a plan, you are naming studios who already said yes.
+  </p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Wave</th><th>Who</th><th class="num">Target</th><th>The ask</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>0 · now</td>
+          <td>Hauspire</td>
+          <td class="num">1</td>
+          <td>No pitch needed. Enter the rate card this week so the whole flow can be walked end to end with real numbers. This is the unblocking action for everything downstream.</td>
+        </tr>
+        <tr>
+          <td>1 · 16–20 Sep</td>
+          <td>Urbanline</td>
+          <td class="num">1</td>
+          <td>Already applied. Approve, verify, get rates in. Time the verification honestly — four days per studio is the assumption in the plan and nobody has measured it.</td>
+        </tr>
+        <tr>
+          <td>2 · 20–30 Sep</td>
+          <td>The 20 agency clients</td>
+          <td class="num">4–6</td>
+          <td>Warmest list you have, and the one with a conflict to handle out loud. See below.</td>
+        </tr>
+        <tr>
+          <td>3 · Oct</td>
+          <td>Cold Pune studios</td>
+          <td class="num">3–4</td>
+          <td>Now armed with waitlist numbers and named references. This is the wave the waitlist exists to make possible.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>The agency-client conversation, said plainly</h3>
+  <p>
+    Twenty interior designers currently pay your agency for ads. Turning them into platform tenants
+    is the obvious move and the one most likely to go wrong quietly, because from their side it can
+    look like their marketing partner has started competing for their customers.
+  </p>
+  <p>
+    Say it first, in one sentence: <em>this is a different product, your ad spend with us is
+    unaffected, and you pay nothing unless a project closes.</em> The pilot terms make that easy —
+    <strong>5% on closed projects, no subscription for three months.</strong> There is no downside
+    for them to say yes to, which is exactly why the pilot is priced that way.
+  </p>
+
+  <div class="note wait">
+    <span class="lbl">Do not promise volume yet</span>
+    <p>
+      The subscription tiers imply 8 to 30 briefs a month. Nothing can deliver that in October, and
+      a guarantee missed in month two is a churn event in a city where forty designers know each
+      other. During the pilot promise <strong>one thing only: briefs that match, with the reasoning
+      shown</strong> — and be specific about how many are in the list today.
+    </p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section>
+  <p class="eyebrow">Demand</p>
+  <h2>Where the first two hundred briefs come from</h2>
+
+  <p>
+    Not the 20,000 records. That list was collected by Hauspire for Hauspire's purpose, and
+    marketing a different entity to it is an open question under the DPDP Act that has been unanswered
+    since v0.3 of the build plan. It is the obvious source and it is the one you cannot use until a
+    lawyer says otherwise.
+  </p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Channel</th><th class="num">Realistic</th><th>Why it works now</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Founders' own network</td>
+          <td class="num">20–40</td>
+          <td>Direct WhatsApp to people who have just taken possession. Highest intent, zero cost, and the fastest honest feedback on whether the brief is worth three minutes.</td>
+        </tr>
+        <tr>
+          <td>Society and RWA groups</td>
+          <td class="num">40–80</td>
+          <td>Target the handover-stage towers in Baner, Kharadi, Wakad and Hinjewadi. One admin's permission reaches hundreds of households at exactly the right week of their lives.</td>
+        </tr>
+        <tr>
+          <td>Instagram, organic</td>
+          <td class="num">20–40</td>
+          <td>Post the cost bands themselves — "what a 2 BHK in Baner actually costs at three levels of finish" is content nobody else in Pune publishes, and it is the product.</td>
+        </tr>
+        <tr>
+          <td>Paid test</td>
+          <td class="num">30–60</td>
+          <td>Not a growth channel yet. A measuring instrument — see below.</td>
+        </tr>
+        <tr>
+          <td>Builder handover desks</td>
+          <td class="num">Oct+</td>
+          <td>Slower to arrange, highest quality. Start the conversations now so they land in November, not so they land in September.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note go">
+    <span class="lbl">The first ₹25,000 is an instrument, not a campaign</span>
+    <p>
+      The entire financial model rests on one unverified pair of numbers: <strong>₹200 a lead at a
+      10% close rate</strong>, which implies ₹2,000 to acquire a project worth ₹12.75 lakh. The
+      kill-criteria in the build plan imply a figure twelve times higher. Both cannot be right.
+    </p>
+    <p>
+      So spend the first ₹25k with one job: measure <strong>cost per completed brief</strong>, and
+      what share of those briefs sit in the ₹7 lakh-plus band. Everything else in the plan — the
+      studio count, the subscription price, whether year one works at all — is downstream of that
+      number. Getting it in week one costs almost nothing; getting it in month four costs the year.
+    </p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section>
+  <p class="eyebrow">The five days</p>
+  <h2>What has to be true by 16 September</h2>
+
+  <div class="week">
+    <div class="when"><b>Thu 11 Sep</b>today</div>
+    <div>
+      <h3>Settle the name</h3>
+      <ul>
+        <li><strong>This is the actual blocker on the date.</strong> A waitlist needs a name, a domain and a handle, and the site is on <code>noindex</code> until one exists.</li>
+        <li>Check the <code>.in</code>, the Instagram handle and MCA availability together — a name that fails any one of the three is not a name.</li>
+        <li>Send the DPDP question and the escrow question to a lawyer the same afternoon. Both have been open since v0.3 and neither is engineering work.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="week">
+    <div class="when"><b>Fri 12 Sep</b></div>
+    <div>
+      <h3>Hauspire's rate card, and the WhatsApp template</h3>
+      <ul>
+        <li>Twenty minutes with Hauspire to enter real rates. Until that exists nobody — including you — has seen the product produce a real quote.</li>
+        <li>Submit the WhatsApp authentication template to Meta. One to two days of pure waiting, so it has to start before the weekend.</li>
+        <li>Verify the Resend sending domain. Studio approval emails currently reach exactly one address.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="week">
+    <div class="when"><b>Mon 15 Sep</b></div>
+    <div>
+      <h3>Walk the whole flow as a stranger</h3>
+      <ul>
+        <li>Brief to cost bands to waitlist confirmation, on a phone, on mobile data, not on your laptop.</li>
+        <li>Write the waitlist confirmation message. It should say what happens next and roughly when — a date you can keep, not "soon".</li>
+        <li>Draft the three RWA approach messages and the agency-client script. Send nothing yet.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="week">
+    <div class="when"><b>Tue 16 Sep</b>open</div>
+    <div>
+      <h3>Open quietly, to people you can call</h3>
+      <ul>
+        <li>Founders' network first — 20 to 40 people you could telephone if something broke. A soft open with names attached beats a launch to strangers.</li>
+        <li>Start the ₹25k paid test the same day, small and measured, purely for the CVR number.</li>
+        <li>Urbanline approved and moving through verification.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="week">
+    <div class="when"><b>Wk of 22 Sep</b></div>
+    <div>
+      <h3>RWA outreach, and the agency twenty</h3>
+      <ul>
+        <li>Societies only once the flow has survived forty real strangers.</li>
+        <li>Agency-client conversations, one at a time, conflict named in the first sentence.</li>
+        <li>First read on cost per completed brief. If it is above ₹2,500, stop buying and say so out loud.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="week">
+    <div class="when"><b>Wk of 6 Oct</b>gate</div>
+    <div>
+      <h3>The first honest decision point</h3>
+      <ul>
+        <li><strong>Gate:</strong> 150+ completed briefs, 4+ studios with rates in, cost per completed brief known and under ₹2,500, and brief completion above 40%.</li>
+        <li>Miss the brief-completion number and the problem is the quiz, not the market. Miss the cost number and the problem is the channel, and the answer is owned demand rather than more spend.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section>
+  <p class="eyebrow">Measurement</p>
+  <h2>Four numbers, and what each one would make you do</h2>
+
+  <p>
+    All four are already instrumented — the funnel view in the ops console answers the first two
+    today, and it does so from our own tables with no third-party script on the site.
+  </p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Number</th><th class="num">Watch for</th><th>What it would mean</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Brief completion</td>
+          <td class="num">&lt; 40%</td>
+          <td>The nine questions are too long, or the value is not landing before the ask. This is a product fix and a cheap one — the funnel view names the exact question losing people.</td>
+        </tr>
+        <tr>
+          <td>Cost per completed brief</td>
+          <td class="num">&gt; ₹2,500</td>
+          <td>No viable paid channel. The answer is owned demand — societies, builders, referral — not a bigger budget. This is the year-defining number.</td>
+        </tr>
+        <tr>
+          <td>Briefs in the ₹7L+ band</td>
+          <td class="num">&lt; 50%</td>
+          <td>The channel is bringing the wrong people. Cheap to fix by targeting, expensive to ignore, because a studio shown four unqualified briefs concludes the platform does not work.</td>
+        </tr>
+        <tr>
+          <td>Studio conversation → signed</td>
+          <td class="num">&lt; 1 in 4</td>
+          <td>The offer is wrong, not the pitch. Most likely the pilot terms are not as risk-free as they read, or the volume promise is not credible.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section>
+  <p class="eyebrow">Blocking</p>
+  <h2>Three decisions, none of them engineering</h2>
+
+  <div class="note stop">
+    <span class="lbl">Blocks 16 September</span>
+    <p>
+      <strong>The name.</strong> Domain, Instagram handle, the <code>noindex</code> flag and every
+      piece of outreach copy wait on it. It has been deferred since v0.3 for good reasons, and it
+      has now become the thing standing between you and a launch date. Decide it this week even if
+      the answer is imperfect.
+    </p>
+  </div>
+
+  <div class="note wait">
+    <span class="lbl">Blocks the demand plan</span>
+    <p>
+      <strong>DPDP on the 20,000 records.</strong> Until answered, the largest demand source is
+      unusable and the whole first-quarter plan runs on channels that are slower and smaller. A
+      two-hour question that has been open for a week.
+    </p>
+  </div>
+
+  <div class="note wait">
+    <span class="lbl">Blocks year two, not year one</span>
+    <p>
+      <strong>Escrow.</strong> A fifth of year-two revenue rests on holding client funds, which
+      needs an RBI-compliant partner nobody has confirmed we can have. Not urgent for 16 September —
+      overdue for the plan the business is being built against.
+    </p>
+  </div>
+
+  <div class="note go">
+    <span class="lbl">Answerable this week, for free</span>
+    <p>
+      <strong>Will studios accept milestone-gated payment?</strong> The load-bearing assumption of
+      the whole model and the one most likely to be false. Hauspire and Urbanline are both in the
+      queue and one of them is a cofounder's business. Ask both, plainly, before anyone builds
+      escrow.
+    </p>
+  </div>
+</section>
+
+<footer>
+  <p>
+    Written against build plan v0.6 and the two-year model of the same date. Figures for studio
+    counts, project values and channel yields are the model's assumptions rather than measurements —
+    the first month exists to replace them with real numbers, starting with cost per completed brief.
+  </p>
+</footer>
+
+</div>
