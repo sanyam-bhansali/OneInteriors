@@ -6,6 +6,7 @@ import { SiteHeader, SiteFooter } from '@/components/chrome';
 import { prisma } from '@/lib/prisma';
 import { formatINRCompact } from '@/lib/money';
 import { getCurrentUser } from '@/modules/auth/session';
+import { signOutAction } from '@/app/sign-in/actions';
 import { loadBrief } from '@/modules/brief/repository';
 import { quoteHistory } from '@/modules/quotation/generate';
 import { myConsultations } from '@/modules/consultation/request';
@@ -56,10 +57,26 @@ export default async function AccountPage() {
           <h1 className="display mb-3 text-[clamp(1.9rem,4vw,2.8rem)] leading-[1.03]">
             {user.name ? `Hello, ${user.name.split(' ')[0]}.` : 'Your project'}
           </h1>
-          <p className="lede mb-12 max-w-[58ch]">
+          <p className="lede mb-6 max-w-[58ch]">
             Everything you have with us, in one place. It stays here — when your project starts,
             the tracker and your payment schedule appear on this page too.
           </p>
+
+          {/* The only sign-out on the customer surface. There was none at all:
+              a signed-in customer could neither find this page nor leave it. */}
+          <div className="mb-12 flex flex-wrap items-center gap-4 border-b border-[var(--color-rule)] pb-8">
+            <span className="text-[14px] text-[var(--color-ink-3)]">
+              Signed in{user.phone ? ` as ${user.phone}` : user.email ? ` as ${user.email}` : ''}
+            </span>
+            <form action={signOutAction}>
+              <button
+                type="submit"
+                className="rounded-full border border-[var(--color-rule)] px-4 py-1.5 text-[13.5px] text-[var(--color-ink-2)] hover:border-[var(--color-ink-3)] hover:text-[var(--color-ink)]"
+              >
+                Sign out
+              </button>
+            </form>
+          </div>
 
           {/* ── Brief ────────────────────────────────────── */}
           <Section title="Your brief" action={{ href: '/quiz', label: 'Edit' }}>

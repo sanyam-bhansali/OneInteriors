@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Container } from '@/components/ui';
 import { studioRepository } from '@/modules/studio/repository';
 import { rosterCapacity } from '@/modules/studio/allocation';
+import { missingCoreRates } from '@/modules/quotation/categories';
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { OpsHeader } from '../ui';
@@ -34,10 +35,11 @@ export const dynamic = 'force-dynamic';
  * by policy.
  */
 export default async function AllocationPage() {
-  const [studios, capacity, shownCounts] = await Promise.all([
+  const [studios, capacity, shownCounts, quotable] = await Promise.all([
     studioRepository.list(),
     rosterCapacity(),
     shownLast30Days(),
+    quotableStudioIds(),
   ]);
 
   const rows: AllocationRow[] = studios
@@ -51,7 +53,11 @@ export default async function AllocationPage() {
       pausedReason: s.pausedReason,
       pauseCause: s.pauseCause,
       capacityPerMonth: s.capacityPerMonth,
-      hasRates: s.minProjectPaise !== null,
+      // The rate card, not `minProjectPaise`. That field is the project SIZE
+      // RANGE from the profile step — a similar-sounding, entirely different
+      // fact — so this row used to show a green "rates in" pill for a studio
+      // with a completely empty rate card, who could not be quoted to anybody.
+      hasRates: quotable.has(s.id),
       shown: shownCounts[s.id] ?? 0,
     }))
     // Paused first — they are invisible to customers and somebody has to decide
@@ -188,5 +194,31 @@ async function shownLast30Days(): Promise<Record<string, number>> {
     return Object.fromEntries(grouped.map((g) => [g.studioId, g._count.studioId]));
   } catch {
     return {};
+  }
+}
+
+/**
+ * Studios whose rate card can actually produce a quote.
+ *
+ * Uses `missingCoreRates`, the same function the studio's own onboarding uses
+ * to decide whether their rates step is finished — so ops and the studio cannot
+ * end up with different ideas of what "has rates" means.
+ */
+async function quotableStudioIds(): Promise<Set<string>> {
+  if (!hasDatabase()) return new Set();
+  try {
+    const rows = await prisma.studio.findMany({
+      select: { id: true, rateCard: { select: { category: true, ratePaise: true } } },
+    });
+
+    const quotable = new Set<string>();
+    for (const row of rows) {
+      const card: Record<string, number> = {};
+      for (const item of row.rateCard) card[item.category] = Number(item.ratePaise);
+      if (missingCoreRates(card).length === 0) quotable.add(row.id);
+    }
+    return quotable;
+  } catch {
+    return new Set();
   }
 }

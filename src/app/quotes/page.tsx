@@ -6,8 +6,10 @@ import { SiteHeader, SiteFooter } from '@/components/chrome';
 import { formatINR, formatINRCompact } from '@/lib/money';
 import { loadBrief } from '@/modules/brief/repository';
 import { getCurrentUser } from '@/modules/auth/session';
+import { showUnverifiedStudios } from '@/lib/env';
 import { studioRepository } from '@/modules/studio/repository';
 import { rankStudios } from '@/modules/matching/score';
+import { storeMatches } from '@/modules/matching/store';
 import { quoteBrief, storeQuotes } from '@/modules/quotation/generate';
 import { TIER } from '@/modules/quotation/tiers';
 import { narrowing } from '@/modules/quotation/narrowing';
@@ -58,7 +60,16 @@ export default async function QuotesPage() {
   // them from a business we have not checked — which is the entire thing this
   // product exists not to do.
   const studios = await studioRepository.list({ activeOnly: true });
-  const ranked = rankStudios(brief, studios).slice(0, DEFAULT_QUOTES);
+
+  /**
+   * The full ranked set is what the customer was SHOWN; the slice below is what
+   * we quote. Both matter and they are not the same number — a studio that
+   * appeared in someone's matches and did not make the quote cut still
+   * appeared, and telling them otherwise would understate the thing they pay
+   * for. So the whole ranking is persisted and only the top few are priced.
+   */
+  const shown = rankStudios(brief, studios, 9, { allowUnverified: showUnverifiedStudios() });
+  const ranked = shown.slice(0, DEFAULT_QUOTES);
 
   const result = await quoteBrief(
     brief,
@@ -83,6 +94,18 @@ export default async function QuotesPage() {
                   Without your property type or carpet area, any number we produced would carry a
                   range so wide it would mislead you more than help. Two more answers fixes it.
                 </>
+              ) : shown.length === 0 ? (
+                /* An empty roster and a roster without rates are different
+                   problems, and this screen used to blame the second for both.
+                   Telling someone "the studios matching your brief have not
+                   published rates" when no studio matched their brief at all is
+                   a specific, checkable falsehood — and the one thing this
+                   product cannot afford to be caught in. */
+                <>
+                  No studio on our roster fits this brief yet — most often that is the areas you
+                  chose, or a budget outside what anyone we have verified works at. We are adding
+                  studios every week, and your answers are saved.
+                </>
               ) : (
                 <>
                   The studios matching your brief have not published rates for all of this work
@@ -102,7 +125,15 @@ export default async function QuotesPage() {
   }
 
   await record('quote.view', { studios: result.quotes.length });
-  if (found) await storeQuotes((await briefId()) ?? '', result.quotes);
+
+  if (found) {
+    const id = (await briefId()) ?? '';
+    await storeQuotes(id, result.quotes);
+    // The only place a Match row is ever written. See modules/matching/store.ts
+    // for why it is not the match page: that ranks in the browser, on every
+    // re-render, for a brief that may not be saved yet.
+    await storeMatches(id, shown);
+  }
 
   return (
     <>
@@ -164,9 +195,7 @@ export default async function QuotesPage() {
                     propertyTypeKnown: brief.propertyType !== null,
                     areaKnown: Boolean(brief.carpetAreaSqft && brief.carpetAreaSqft > 0),
                     scopeKnown: brief.scope !== null,
-                    // Not collected yet. Stated as absent rather than assumed
-                    // present, so the line is true today.
-                    floorPlanUploaded: false,
+                    floorPlanUploaded: brief.floorPlanName !== null,
                   });
                   return (
                     <p className="m-0 mb-6 text-[13px] leading-[1.55] text-[var(--color-ink-3)]">

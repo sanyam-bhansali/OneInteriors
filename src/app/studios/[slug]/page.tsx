@@ -6,6 +6,7 @@ import { StyleScene } from '@/components/art/StyleScene';
 import { PlanFragment } from '@/components/art/PlanFragment';
 import { SiteHeader, SiteFooter } from '@/components/chrome';
 import { studioRepository } from '@/modules/studio/repository';
+import { record } from '@/modules/analytics/record';
 import { formatINRCompact } from '@/lib/money';
 import { StudioQuotation } from './StudioQuotation';
 import {
@@ -59,6 +60,17 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
   const { slug } = await params;
   const studio = await studioRepository.bySlug(slug);
   if (!studio) notFound();
+
+  /**
+   * The second stage of the studio's own funnel: someone saw them in results
+   * and opened the profile.
+   *
+   * `studioSlug` rather than an id, because the prop guard allows slugs and
+   * refuses anything that reads like a person — and a slug is what the studio
+   * dashboard queries on. The event name has existed in the vocabulary since
+   * the beginning and was never fired.
+   */
+  await record('studio.view', { studioSlug: slug });
 
   const formatDate = (iso: string | null) =>
     iso

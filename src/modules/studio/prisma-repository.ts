@@ -91,6 +91,14 @@ function toStudio(row: StudioRow): Studio {
     status: row.status as StudioStatus,
     tier: row.tier as VerificationTier,
     gstin: row.gstin,
+    gstinNotApplicable: row.gstinNotApplicable ?? false,
+    gstinNote: row.gstinNote ?? null,
+    // Read out of the JSON column the studio surface writes, rather than
+    // duplicated into a second source of the same fact. Ops needs it because
+    // "this studio has finished and is waiting on us" is the single most
+    // actionable state in the queue, and nothing on the ops side could see it.
+    submittedForReview:
+      (row.onboardingSteps as { submittedForReview?: boolean } | null)?.submittedForReview === true,
     yearsActive: row.yearsActive ?? null,
     teamSize: row.teamSize ?? null,
     minProjectPaise: row.minProjectPaise === null ? null : fromDb(row.minProjectPaise),
@@ -177,14 +185,38 @@ export class PrismaStudioRepository implements StudioRepository {
     return studios.filter((s) => TIER_ORDER[s.tier] >= floor);
   }
 
+  /**
+   * These two were the only reads in this file without a `try/catch`, which
+   * made them the only ones that turn a transient database blip into a 500.
+   *
+   * Both sit on render paths — `bySlug` on the studio's own dashboard and on
+   * the ops verification detail, `byId` wherever a studio is resolved by id —
+   * so the same connection hiccup that `list()` rides out by falling back to
+   * fixtures would take those pages down instead.
+   *
+   * Null is already the "no such studio" answer and every caller handles it, so
+   * failing to null degrades to a not-found rather than a stack trace. The
+   * error is logged, because a database outage silently rendering as "no such
+   * studio" is its own kind of lie.
+   */
   async bySlug(slug: string): Promise<Studio | null> {
-    const row = await prisma.studio.findUnique({ where: { slug }, include: INCLUDE });
-    return row ? toStudio(row) : null;
+    try {
+      const row = await prisma.studio.findUnique({ where: { slug }, include: INCLUDE });
+      return row ? toStudio(row) : null;
+    } catch (error) {
+      console.error('[studio] bySlug failed', error);
+      return null;
+    }
   }
 
   async byId(id: string): Promise<Studio | null> {
-    const row = await prisma.studio.findUnique({ where: { id }, include: INCLUDE });
-    return row ? toStudio(row) : null;
+    try {
+      const row = await prisma.studio.findUnique({ where: { id }, include: INCLUDE });
+      return row ? toStudio(row) : null;
+    } catch (error) {
+      console.error('[studio] byId failed', error);
+      return null;
+    }
   }
 
   /**

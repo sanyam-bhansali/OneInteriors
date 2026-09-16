@@ -35,6 +35,13 @@ export interface EstimateInput {
   propertyType: PropertyType | null;
   carpetAreaSqft: number | null;
   scope: ScopeType | null;
+  /**
+   * Has the customer given us the builder's floor plan?
+   *
+   * Optional because most callers do not know — and absent means absent, never
+   * assumed present. A missing field must never quietly tighten a band.
+   */
+  floorPlanUploaded?: boolean;
 }
 
 /**
@@ -184,6 +191,30 @@ export function estimate(input: EstimateInput): Estimate {
     variancePct += 0.05;
   }
 
+  /**
+   * The floor-plan credit.
+   *
+   * Be precise about what this is buying, because it is the one input here that
+   * no line of code reads. Every other number above is arithmetic on a figure
+   * the customer typed. A floor plan is a PDF.
+   *
+   * What it removes is the room-shape guess. Everything in this file after this
+   * point derives wardrobe runs, ceiling area and wall area from carpet area
+   * times a rule of thumb — a 850 sqft 2 BHK is assumed to be shaped like a
+   * typical 850 sqft 2 BHK. That assumption is usually fine and occasionally
+   * badly wrong, and the plan is what tells the expert and the studio which
+   * case they are in before either of them puts a firm number on paper.
+   *
+   * So the credit is real but deliberately small — four points, against the ten
+   * that the carpet area itself is worth. It is smaller than the thing you
+   * might be tempted to make it, and it is capped by BASE_VARIANCE below, which
+   * is the floor this model is honestly capable of: no amount of paperwork
+   * substitutes for somebody standing in the flat.
+   */
+  if (input.floorPlanUploaded) {
+    variancePct -= 0.04;
+  }
+
   const scope = input.scope ?? 'FULL_HOME';
   const bedrooms = BEDROOMS[propertyType];
   const bathrooms = BATHROOMS[propertyType];
@@ -266,9 +297,12 @@ export function estimate(input: EstimateInput): Estimate {
     bedrooms,
     bathrooms,
     quantities,
-    // Cap it. Past about 45% the number stops being useful and we should be
-    // saying "we need more from you" rather than showing a wider band.
-    variancePct: Math.min(variancePct, 0.45),
+    // Cap it at both ends. Past about 45% the number stops being useful and we
+    // should be saying "we need more from you" rather than showing a wider
+    // band. The floor is the other half of the same honesty: this model has
+    // never seen the flat, and no combination of answers should let it present
+    // itself as tighter than ±11%. A firm number comes from a site visit.
+    variancePct: Math.max(0.11, Math.min(variancePct, 0.45)),
     assumptions,
   };
 }

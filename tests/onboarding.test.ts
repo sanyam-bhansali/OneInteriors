@@ -17,6 +17,7 @@ const COMPLETE: OnboardingSnapshot = {
   yearsActive: 7,
   teamSize: 8,
   gstin: '27AAPFU0939F1ZV',
+  gstinNotApplicable: false,
   portfolioCount: MIN_PORTFOLIO_PROJECTS,
   missingRates: [],
   submittedForReview: false,
@@ -68,6 +69,32 @@ describe('assessSteps — registration', () => {
 
   it('is done once a GSTIN is recorded', () => {
     expect(step(COMPLETE, 'registration').done).toBe(true);
+  });
+
+  /**
+   * The half of the rule that was never implemented.
+   *
+   * The step's own comment has always said it "completes on a decision rather
+   * than on a value" — but the code tested only the value, and there was no
+   * field anywhere that could hold the decision. A proprietorship below the GST
+   * threshold could finish every other step and then find the submit button
+   * permanently disabled, with no ops control to let them through either. This
+   * test is the one that would have caught it.
+   */
+  it('is done when the studio has told us it has no registration', () => {
+    const declared = snapshot({ gstin: null, gstinNotApplicable: true });
+    expect(step(declared, 'registration').done).toBe(true);
+    expect(step(declared, 'registration').missing).toEqual([]);
+  });
+
+  it('lets a studio with no registration reach review', () => {
+    expect(readyForReview(snapshot({ gstin: null, gstinNotApplicable: true }))).toBe(true);
+  });
+
+  it('still refuses silence — neither a number nor a declaration', () => {
+    const silent = snapshot({ gstin: null, gstinNotApplicable: false });
+    expect(step(silent, 'registration').done).toBe(false);
+    expect(step(silent, 'registration').missing[0]).toContain('note that you do not have one');
   });
 });
 

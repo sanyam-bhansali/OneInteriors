@@ -58,25 +58,81 @@ export function ProfileForm({ defaults }: { defaults: ProfileDefaults }) {
         error={err.localities}
       />
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <Field label="Years active" name="yearsActive" type="number" defaultValue={defaults.yearsActive} />
-        <Field label="Team size" name="teamSize" type="number" defaultValue={defaults.teamSize} />
+      {/* `required`, because `assessSteps` requires them.
+          These four fields rendered as "Years active — optional" while the step
+          refused to complete without them, and `saveProfile` accepted blanks
+          and returned a green "Saved." So a studio would fill the form, be
+          told it saved, go back, and find the step still unticked with no
+          explanation of what they had done wrong. They had done nothing wrong;
+          the label was lying. */}
+      <div className="flex flex-wrap gap-x-6 gap-y-5">
+        <Field
+          label="Years active"
+          name="yearsActive"
+          type="number"
+          required
+          width="xs"
+          defaultValue={defaults.yearsActive}
+          error={err.yearsActive}
+        />
+        <Field
+          label="Team size"
+          name="teamSize"
+          type="number"
+          required
+          width="xs"
+          defaultValue={defaults.teamSize}
+          error={err.teamSize}
+        />
       </div>
 
       <div>
         <p className="label m-0 mb-2">Project size you take on</p>
         <p className="m-0 mb-3 max-w-[56ch] text-[14px] leading-relaxed text-[var(--color-ink-3)]">
-          In lakh. Be honest about the floor — it is the single most useful filter we have, and
-          getting matched below your floor wastes your time and theirs.
+          In lakh, and halves are fine — 7.5 is a perfectly normal floor. Be honest about it: it is
+          the single most useful filter we have, and getting matched below your floor wastes your
+          time and theirs.
         </p>
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <Field label="Smallest" name="minLakhs" type="number" defaultValue={defaults.minLakhs} error={err.minLakhs} />
-          <Field label="Largest" name="maxLakhs" type="number" defaultValue={defaults.maxLakhs} />
+        <div className="flex flex-wrap gap-x-6 gap-y-5">
+          {/* `step="0.5"` so the browser accepts 7.5 rather than silently
+              refusing it. A number input defaults to step=1, which makes a
+              perfectly ordinary project floor unenterable. */}
+          <Field
+            label="Smallest"
+            name="minLakhs"
+            type="number"
+            step="0.5"
+            width="xs"
+            suffix="₹ lakh"
+            required
+            defaultValue={defaults.minLakhs}
+            error={err.minLakhs}
+          />
+          <Field
+            label="Largest"
+            name="maxLakhs"
+            type="number"
+            width="xs"
+            suffix="₹ lakh"
+            step="0.5"
+            required
+            defaultValue={defaults.maxLakhs}
+            error={err.maxLakhs}
+          />
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <Field label="Website" name="website" type="url" defaultValue={defaults.website} placeholder="https://" />
+        {/* `type="text"`, not `url`. A URL input silently refuses
+            "yourstudio.com" with no hint that a scheme is required — the studio
+            sees a form that will not submit and no explanation why. */}
+        <Field
+          label="Website"
+          name="website"
+          defaultValue={defaults.website}
+          placeholder="https://yourstudio.com"
+          hint="Include the https://"
+        />
         <Field label="Instagram" name="instagram" defaultValue={defaults.instagram} placeholder="@yourstudio" />
       </div>
 

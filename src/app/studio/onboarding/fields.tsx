@@ -3,6 +3,8 @@
 /** Shared form primitives for the onboarding steps. Kept in one file so the
  *  four steps cannot drift into four slightly different-looking forms. */
 
+import { FIELD_WIDTH, type FieldWidth } from '@/components/ui/form';
+
 export function Field({
   label,
   name,
@@ -12,6 +14,10 @@ export function Field({
   error,
   hint,
   placeholder,
+  step,
+  width = 'full',
+  suffix,
+  mono = false,
 }: {
   label: string;
   name: string;
@@ -21,24 +27,48 @@ export function Field({
   error?: string;
   hint?: string;
   placeholder?: string;
+  /**
+   * For number inputs. Without it the browser assumes `step=1` and silently
+   * refuses a decimal — which made ₹7.5 lakh, an entirely ordinary project
+   * floor, impossible to enter.
+   */
+  step?: string;
+  /**
+   * How wide the box is, named after the ANSWER rather than the layout — see
+   * `FIELD_WIDTH`. Defaults to filling the column, which is right inside a
+   * two-up grid and wrong on its own: a team size of 8 does not need forty
+   * characters, and giving it forty is most of why these forms looked broken.
+   */
+  width?: FieldWidth;
+  /** A unit beside the box, so it need not bloat the label. */
+  suffix?: string;
+  mono?: boolean;
 }) {
   return (
-    <div>
+    <div className={width === 'xs' ? '' : 'w-full'}>
       <label htmlFor={name} className="label m-0 mb-2 block">
         {label}
         {required ? '' : ' — optional'}
       </label>
-      <input
-        id={name}
-        name={name}
-        type={type}
-        defaultValue={defaultValue ?? undefined}
-        required={required}
-        placeholder={placeholder}
-        aria-invalid={Boolean(error)}
-        aria-describedby={error ? `${name}-error` : hint ? `${name}-hint` : undefined}
-        className="w-full rounded-full border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-5 py-3 text-[15px] text-[var(--color-ink)] placeholder:text-[var(--color-ink-3)]"
-      />
+      <div className="flex items-center gap-2">
+        <input
+          id={name}
+          name={name}
+          type={type}
+          step={step}
+          defaultValue={defaultValue ?? undefined}
+          required={required}
+          placeholder={placeholder}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `${name}-error` : hint ? `${name}-hint` : undefined}
+          className={`${FIELD_WIDTH[width]} rounded-full border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-5 py-3 text-[15px] text-[var(--color-ink)] placeholder:text-[var(--color-ink-3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-petrol)] ${
+            mono ? 'font-[family-name:var(--font-mono)] tracking-[0.02em]' : ''
+          } ${type === 'number' ? 'tabular-nums' : ''}`}
+        />
+        {suffix ? (
+          <span className="whitespace-nowrap text-[14px] text-[var(--color-ink-3)]">{suffix}</span>
+        ) : null}
+      </div>
       <FieldNote name={name} error={error} hint={hint} />
     </div>
   );

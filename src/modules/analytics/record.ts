@@ -15,6 +15,7 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
+import type { Prisma } from '@prisma/client';
 import { hasDatabase } from '@/lib/env';
 import { readAnonKey } from '@/modules/brief/repository';
 import { getCurrentUser } from '@/modules/auth/session';
@@ -62,16 +63,37 @@ export interface FunnelSummary {
  * dashboard that cries wolf gets ignored on the day it is right.
  */
 export async function funnelSummary(sinceDays = 30, quizSteps = 9): Promise<FunnelSummary> {
-  if (!hasDatabase()) {
-    return { quizStarts: 0, quizCompletions: 0, completionRate: null, steps: [], enquiries: 0 };
-  }
+  const empty: FunnelSummary = {
+    quizStarts: 0,
+    quizCompletions: 0,
+    completionRate: null,
+    steps: [],
+    enquiries: 0,
+  };
+
+  if (!hasDatabase()) return empty;
 
   const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
 
-  const rows = await prisma.analyticsEvent.findMany({
-    where: { createdAt: { gte: since } },
-    select: { name: true, props: true },
-  });
+  /**
+   * The guard was here; the catch was not.
+   *
+   * Every sibling count on `/ops` is wrapped, so a configured-but-unmigrated
+   * database left the overview and `/ops/funnel` — which has no other data
+   * source — throwing while the rest of the page degraded. Analytics is the
+   * least important thing on either screen and should never be what takes them
+   * down.
+   */
+  let rows: { name: string; props: Prisma.JsonValue }[];
+  try {
+    rows = await prisma.analyticsEvent.findMany({
+      where: { createdAt: { gte: since } },
+      select: { name: true, props: true },
+    });
+  } catch (error) {
+    console.error('[analytics] funnelSummary failed', error);
+    return empty;
+  }
 
   const views: Record<number, number> = {};
   const completions: Record<number, number> = {};

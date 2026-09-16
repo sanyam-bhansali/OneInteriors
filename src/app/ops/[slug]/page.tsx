@@ -10,6 +10,7 @@ import { formatINRCompact } from '@/lib/money';
 import { OpsHeader, TierProgress } from '../ui';
 import { CheckRow } from './CheckRow';
 import { StatusControl } from './StatusControl';
+import { GstinControl } from './GstinControl';
 import { studioAuditTrail } from '@/modules/verification/record';
 
 export const metadata: Metadata = {
@@ -79,7 +80,9 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
                 <p className="label m-0 mb-3">GST registration</p>
                 {!studio.gstin ? (
                   <p className="m-0 text-[15px] italic text-[var(--color-ink-3)]">
-                    No GSTIN on file.
+                    {studio.gstinNotApplicable === true
+                      ? 'The studio has told us it has no GST registration.'
+                      : 'No GSTIN on file.'}
                   </p>
                 ) : gstin?.valid ? (
                   <div className="rounded-[10px] border border-[var(--color-ontrack)] bg-[var(--color-ontrack-soft)] p-4">
@@ -108,6 +111,18 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
                     </p>
                   </div>
                 )}
+
+                {/* The escape hatch. `setGstinAction` existed for months with
+                    nothing rendering it, which left a studio without GST
+                    registration stuck on both sides at once — unable to finish
+                    onboarding, and with no ops control to let them through. */}
+                <GstinControl
+                  studioId={studio.id}
+                  slug={studio.slug}
+                  current={studio.gstin}
+                  notApplicable={studio.gstinNotApplicable ?? false}
+                  note={studio.gstinNote ?? null}
+                />
               </section>
 
               {/* The checks themselves */}

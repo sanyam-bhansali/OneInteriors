@@ -38,7 +38,20 @@ export default async function VerificationQueue() {
       return { studio: s, assessment, drift, gstin, done, total };
     })
     .sort((a, b) => {
-      // Expired first, then closest to complete.
+      /**
+       * Studios waiting on us come first, ahead of even expired checks.
+       *
+       * They have done everything asked of them and are sitting still until
+       * somebody here acts. The overview now counts them in its queue and links
+       * here — and before this sort they arrived indistinguishable from every
+       * other ONBOARDING studio, which made the count worse than useless: it
+       * told ops there was something to do and then hid it.
+       */
+      const aw = a.studio.submittedForReview === true ? 0 : 1;
+      const bw = b.studio.submittedForReview === true ? 0 : 1;
+      if (aw !== bw) return aw - bw;
+
+      // Then expired, then closest to complete.
       const ax = a.assessment.expired.length > 0 ? 0 : 1;
       const bx = b.assessment.expired.length > 0 ? 0 : 1;
       if (ax !== bx) return ax - bx;
@@ -94,8 +107,21 @@ export default async function VerificationQueue() {
                       <p className="m-0 text-[12.5px] text-[var(--color-ink-3)]">
                         {studio.legalName}
                       </p>
-                      {studio.status !== 'ACTIVE' ? (
+                      {/* Three different things, and they were two.
+                          "Waiting on us" means the studio has finished and we
+                          have not. ONBOARDING means they are still filling it
+                          in — which is a normal state for a studio approved
+                          this morning, not a red one. Red is reserved for
+                          suspended and removed, where something is actually
+                          wrong. Painting a freshly approved studio in the same
+                          colour as a suspended one teaches ops to ignore the
+                          colour. */}
+                      {studio.submittedForReview === true && studio.status !== 'ACTIVE' ? (
+                        <Pill tone="petrol">Waiting on us</Pill>
+                      ) : studio.status === 'SUSPENDED' || studio.status === 'REMOVED' ? (
                         <Pill tone="atrisk">{studio.status}</Pill>
+                      ) : studio.status !== 'ACTIVE' ? (
+                        <Pill tone="neutral">{studio.status}</Pill>
                       ) : null}
                       {studio.pausedAt ? <Pill tone="atrisk">Paused</Pill> : null}
                     </td>

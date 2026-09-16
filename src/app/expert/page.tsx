@@ -9,6 +9,7 @@ import { loadBrief, readAnonKey } from '@/modules/brief/repository';
 import { getCurrentUser } from '@/modules/auth/session';
 import { studioRepository } from '@/modules/studio/repository';
 import { rankStudios } from '@/modules/matching/score';
+import { showUnverifiedStudios } from '@/lib/env';
 import { quoteBrief } from '@/modules/quotation/generate';
 import { MIN_STUDIOS, MAX_STUDIOS } from '@/modules/consultation/request';
 import { TIER } from '@/modules/quotation/tiers';
@@ -44,9 +45,22 @@ export default async function ExpertPage() {
   }
 
   const studios = await studioRepository.list({ activeOnly: true });
-  const ranked = rankStudios(brief, studios).slice(0, MAX_STUDIOS);
+  const ranked = rankStudios(brief, studios, 9, {
+    allowUnverified: showUnverifiedStudios(),
+  }).slice(0, MAX_STUDIOS);
   const result = await quoteBrief(brief, ranked.map((r) => r.studioId));
   if (!result.ok) redirect('/quotes');
+
+  /**
+   * The minimum is what the roster can actually offer.
+   *
+   * On a roster of two, one studio with an incomplete rate card left exactly
+   * one checkbox above a permanently greyed-out button asking for two picks.
+   * The customer had no way to proceed and no way to know why. The server
+   * computes the same figure independently in `requestConsultation` — this one
+   * is only so the button is not lying about what it will accept.
+   */
+  const minStudios = Math.max(1, Math.min(MIN_STUDIOS, result.quotes.length));
 
   return (
     <>
@@ -119,9 +133,34 @@ export default async function ExpertPage() {
             </p>
           </div>
 
+          {/* Studios that were ranked for this brief and could not be priced.
+              Named rather than dropped: a customer who sees two studios where
+              they expected four should be told it is about rates and not about
+              fit, and a studio absent for a reason we could state and did not
+              is the sort of silence people notice later. */}
+          {result.skipped.length > 0 ? (
+            <div className="mb-8 rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-5 py-4">
+              <p className="m-0 max-w-[58ch] text-[14.5px] leading-relaxed text-[var(--color-ink-2)]">
+                {result.skipped.length === 1
+                  ? `${result.skipped[0]!.name} suits this brief but has not published rates for all of this work yet, so we cannot put a number against their name — and a studio on this call without a quote would be one you could not compare.`
+                  : `${result.skipped.length} studios that suit this brief have not published rates for all of this work yet. We have left them out rather than show you a name with no number against it.`}
+              </p>
+            </div>
+          ) : null}
+
+          {result.quotes.length === 1 ? (
+            <div className="mb-8 rounded-[12px] border-l-[3px] border-[var(--color-brass)] bg-[var(--color-paper-2)] px-5 py-4">
+              <p className="m-0 max-w-[58ch] text-[14.5px] leading-relaxed text-[var(--color-ink)]">
+                There is one studio we can quote for this brief today, so this call is about whether
+                they are right for you rather than about choosing between two. If the answer is no,
+                we will say so — and we would rather tell you that than introduce you anyway.
+              </p>
+            </div>
+          ) : null}
+
           <ExpertForm
             briefId={id}
-            minStudios={MIN_STUDIOS}
+            minStudios={minStudios}
             maxStudios={MAX_STUDIOS}
             defaultName={user.name}
             defaultEmail={user.email}

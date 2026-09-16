@@ -4,7 +4,9 @@ import { Container } from '@/components/ui';
 import { studioRepository } from '@/modules/studio/repository';
 import { assessTier } from '@/modules/verification/tiers';
 import { rosterCapacity } from '@/modules/studio/allocation';
+import { introductionsNeedingUs } from '@/modules/studio/introduction-ops';
 import { funnelSummary } from '@/modules/analytics/record';
+import { missingCoreRates } from '@/modules/quotation/categories';
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { OpsHeader } from './ui';
@@ -50,12 +52,24 @@ export const dynamic = 'force-dynamic';
  * rendering, never writes.
  */
 export default async function OpsOverview() {
-  const [studios, capacity, funnel, pendingApplications, openConsultations] = await Promise.all([
+  const [
+    studios,
+    capacity,
+    funnel,
+    pendingApplications,
+    openConsultations,
+    awaitingReview,
+    missingRates,
+    introductionsWaiting,
+  ] = await Promise.all([
     studioRepository.list(),
     rosterCapacity(),
     funnelSummary(30),
     countApplications(),
     countConsultations(),
+    countAwaitingReview(),
+    countWithoutRateCard(),
+    introductionsNeedingUs(),
   ]);
 
   const assessed = studios.map((s) => ({ studio: s, assessment: assessTier(s) }));
@@ -63,7 +77,17 @@ export default async function OpsOverview() {
   const needsWork = assessed.filter((a) => a.assessment.blockers.length > 0).length;
   const expired = assessed.filter((a) => a.assessment.expired.length > 0).length;
   const onboarding = studios.filter((s) => s.status === 'ONBOARDING').length;
-  const noRates = studios.filter((s) => s.status === 'ACTIVE' && s.minProjectPaise === null).length;
+
+  /**
+   * `missingRates` comes from the rate-card table, not from `minProjectPaise`.
+   *
+   * The old test was `s.minProjectPaise === null`, which is the project SIZE
+   * RANGE off the profile step — a different field with a similar-sounding
+   * name. A studio could have a complete range and an entirely empty rate card
+   * and read as fine here, while being unquotable to every customer. The pill
+   * on /ops/allocation said "No rate card" off the same wrong column.
+   */
+  const noRates = missingRates;
 
   // Demand the roster could absorb this month, if every live studio filled the
   // capacity it declared. Null when too few studios have told us.
@@ -73,8 +97,17 @@ export default async function OpsOverview() {
   const todo = (
     [
       { count: pendingApplications, label: 'applications waiting on a decision', href: '/ops/applications', tone: 'warn' },
+      // The event ops most needs to act on after approval, and which had no
+      // queue item at all — a studio finished onboarding and we found out by
+      // accident.
+      { count: awaitingReview, label: 'studios have finished onboarding and are waiting on verification', href: '/ops/verification', tone: 'warn' },
       { count: expired, label: 'studios with a lapsed check still showing a badge', href: '/ops/verification', tone: 'bad' },
       { count: openConsultations, label: 'expert calls requested and not yet booked', href: '/ops/consultations', tone: 'bad' },
+      // The half of the funnel this overview could not see. An introduction
+      // with no meeting arranged is a customer who was handed over on the phone
+      // and then heard nothing — the most expensive silence in the product,
+      // because it happens after they have already said yes.
+      { count: introductionsWaiting, label: 'introductions waiting on us — no meeting, no confirmation, or no outcome', href: '/ops/introductions', tone: 'bad' },
       { count: noRates, label: 'live studios with no rate card — they cannot be quoted', href: '/ops/allocation', tone: 'bad' },
       { count: needsWork, label: 'studios one or more checks short of their next tier', href: '/ops/verification', tone: 'warn' },
       { count: capacity.unknownCapacity, label: 'live studios who have not told us their capacity', href: '/ops/allocation', tone: 'warn' },
@@ -250,11 +283,77 @@ async function countApplications(): Promise<number> {
   }
 }
 
-/** Expert calls requested and not yet scheduled. */
+/**
+ * Expert calls that still need a time putting on them.
+ *
+ * Keyed off `status`, and only `requested`. The old query was
+ * `{ scheduledFor: null }` against a column **nothing in the codebase wrote**,
+ * so it counted every consultation ever created — completed ones included — and
+ * never went down. A permanent red number on the screen ops opens first thing
+ * is worse than no number: it teaches people to ignore the queue.
+ *
+ * `scheduled` is excluded deliberately. A row on a to-do list has to disappear
+ * when you do the thing it asks for, or it is not a to-do list.
+ */
 async function countConsultations(): Promise<number> {
   if (!hasDatabase()) return 0;
   try {
-    return await prisma.consultation.count({ where: { scheduledFor: null } });
+    return await prisma.consultation.count({ where: { status: 'requested' } });
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Live studios that cannot be quoted, read from the rate card itself.
+ *
+ * "Core categories priced" is the real test — `missingCoreRates` is the same
+ * function the studio's own onboarding uses to decide whether the rates step is
+ * done, so the two surfaces cannot disagree about what "has rates" means.
+ */
+async function countWithoutRateCard(): Promise<number> {
+  if (!hasDatabase()) return 0;
+  try {
+    const rows = await prisma.studio.findMany({
+      where: { status: 'ACTIVE' },
+      select: { rateCard: { select: { category: true, ratePaise: true } } },
+    });
+    return rows.filter((row) => missingCoreRates(ratesOf(row.rateCard)).length > 0).length;
+  } catch {
+    return 0;
+  }
+}
+
+/** The shape `missingCoreRates` wants: category → paise. */
+function ratesOf(items: { category: string; ratePaise: bigint }[]): Record<string, number> {
+  const card: Record<string, number> = {};
+  for (const item of items) card[item.category] = Number(item.ratePaise);
+  return card;
+}
+
+/**
+ * Studios who have finished their side and are waiting on us.
+ *
+ * This is the event ops most needs to act on after approval, and there was no
+ * queue item for it: `onboardingSteps.submittedForReview` is written by the
+ * studio and was read by nothing on the ops side. A studio finished onboarding
+ * and we found out by accident.
+ *
+ * Read through the JSON column rather than a dedicated boolean because that is
+ * where the studio surface already writes it — a second source of the same fact
+ * is how the two get to disagree.
+ */
+async function countAwaitingReview(): Promise<number> {
+  if (!hasDatabase()) return 0;
+  try {
+    const rows = await prisma.studio.findMany({
+      where: { status: 'ONBOARDING' },
+      select: { onboardingSteps: true },
+    });
+    return rows.filter((row) => {
+      const steps = row.onboardingSteps as { submittedForReview?: boolean } | null;
+      return steps?.submittedForReview === true;
+    }).length;
   } catch {
     return 0;
   }

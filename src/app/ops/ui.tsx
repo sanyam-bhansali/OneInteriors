@@ -29,6 +29,10 @@ export function OpsHeader() {
             <OpsLink href="/ops/verification">Verification</OpsLink>
             <OpsLink href="/ops/allocation">Allocation</OpsLink>
             <OpsLink href="/ops/consultations">Calls</OpsLink>
+            {/* After the call. Everything from the handoff to whether the
+                meeting happened — the half of the funnel we charge for and,
+                until now, the only half nothing on this surface could see. */}
+            <OpsLink href="/ops/introductions">Introductions</OpsLink>
             <OpsLink href="/ops/funnel">Funnel</OpsLink>
             <OpsLink href="/">Public site</OpsLink>
           </nav>

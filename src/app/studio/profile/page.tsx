@@ -24,10 +24,10 @@ export default async function ProfileCopyPage() {
     <main className="py-10">
       <Container size="narrow">
         <Link
-          href="/studio"
+          href="/studio/listing"
           className="label mb-6 inline-block text-[var(--color-ink-3)] no-underline hover:text-[var(--color-ink)]"
         >
-          ← All steps
+          ← Your listing
         </Link>
 
         <h1 className="h1 mb-3">Your profile copy</h1>

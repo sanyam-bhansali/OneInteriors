@@ -92,7 +92,14 @@ export async function decideAction(
       intent === 'approve'
         ? `Approved. Studio created in onboarding${
             'studioSlug' in result && result.studioSlug ? ` as /${result.studioSlug}` : ''
-          }, and a sign-in link is on its way.`
+          }. ${
+            // Never claim an email sent when it did not. The studio exists now
+            // and cannot get in without this link — ops finding out here beats
+            // finding out in a week from a studio who thinks we forgot them.
+            'emailDelivered' in result && result.emailDelivered === false
+              ? 'THE SIGN-IN EMAIL DID NOT SEND — no email provider is configured. Send them a link another way before they hear about the approval from anyone else.'
+              : 'A sign-in link is on its way.'
+          }`
         : intent === 'reject'
           ? 'Rejected. Tell them yourself as well — this does not email them.'
           : 'Marked as under review.',

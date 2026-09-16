@@ -51,20 +51,36 @@ export default async function OnboardingStepPage({
   const previous = ONBOARDING_STEPS[index - 1];
 
   return (
+    /**
+     * `wide`, with the step's own identity in a sticky left rail.
+     *
+     * These four forms were the longest stacks of full-width controls in the
+     * product, in a 672px column — a studio filling in "team size: 8" got a box
+     * forty characters across, and had to scroll past the heading to remember
+     * which step they were on. The rail fixes both: it consumes the width that
+     * was empty, and it keeps "Step 2 of 5" in view while you work.
+     */
     <main className="py-10">
-      <Container size="narrow">
-        <Link
-          href="/studio"
-          className="label mb-6 inline-block text-[var(--color-ink-3)] no-underline hover:text-[var(--color-ink)]"
-        >
-          ← All steps
-        </Link>
+      <Container size="wide">
+        <div className="grid gap-x-12 gap-y-8 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+          <div className="lg:sticky lg:top-8 lg:self-start">
+            <Link
+              href="/studio"
+              className="label mb-6 inline-block text-[var(--color-ink-3)] no-underline hover:text-[var(--color-ink)]"
+            >
+              ← All steps
+            </Link>
 
-        <p className="label m-0 mb-2">
-          Step {index + 1} of {ONBOARDING_STEPS.length}
-        </p>
-        <h1 className="h1 mb-3">{STEP_LABELS[step]}</h1>
-        <p className="lede mb-9">{STEP_BLURBS[step]}</p>
+            <p className="label m-0 mb-2">
+              Step {index + 1} of {ONBOARDING_STEPS.length}
+            </p>
+            <h1 className="h1 mb-3">{STEP_LABELS[step]}</h1>
+            <p className="m-0 max-w-[40ch] text-[15.5px] leading-relaxed text-[var(--color-ink-2)]">
+              {STEP_BLURBS[step]}
+            </p>
+          </div>
+
+          <div className="max-w-[46rem]">
 
         {step === 'profile' ? (
           <ProfileForm
@@ -81,7 +97,13 @@ export default async function OnboardingStepPage({
           />
         ) : null}
 
-        {step === 'registration' ? <RegistrationForm gstin={studio.gstin} /> : null}
+        {step === 'registration' ? (
+          <RegistrationForm
+            gstin={studio.gstin}
+            notApplicable={studio.gstinNotApplicable}
+            note={studio.gstinNote}
+          />
+        ) : null}
 
         {step === 'portfolio' ? (
           <PortfolioForm
@@ -113,7 +135,7 @@ export default async function OnboardingStepPage({
           />
         ) : null}
 
-        <nav className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--color-rule)] pt-6">
+            <nav className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--color-rule)] pt-6">
           {previous ? (
             <Link
               href={`/studio/onboarding/${previous}`}
@@ -134,7 +156,9 @@ export default async function OnboardingStepPage({
           ) : (
             <span />
           )}
-        </nav>
+            </nav>
+          </div>
+        </div>
       </Container>
     </main>
   );

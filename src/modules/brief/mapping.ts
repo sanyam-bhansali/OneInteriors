@@ -39,6 +39,17 @@ export interface BriefRow {
   moveInBy: Date | null;
   lastStep: number;
   completedAt: Date | null;
+  /**
+   * Display name of the uploaded floor plan, or null.
+   *
+   * READ ONLY through this mapper. It is deliberately absent from
+   * `briefToRow`: the plan is written by the upload action, not by the quiz,
+   * and a quiz sync that round-tripped this field would set it back to null
+   * every time the customer changed an answer — silently detaching a file that
+   * still exists in the bucket. Never the path, which is a storage detail that
+   * has no business crossing to a client component.
+   */
+  floorPlanName?: string | null;
 }
 
 function isoDate(value: Date | null): string | null {
@@ -83,10 +94,16 @@ export function rowToBrief(row: BriefRow): Brief {
     moveInBy: isoDate(row.moveInBy),
     lastStep: row.lastStep,
     completedAt: row.completedAt ? row.completedAt.toISOString() : null,
+    floorPlanName: row.floorPlanName ?? null,
   };
 }
 
-/** The writable shape. Enum-typed columns are left as strings for Prisma. */
+/**
+ * The writable shape. Enum-typed columns are left as strings for Prisma.
+ *
+ * `floorPlanName` and `floorPlanPath` are absent on purpose — see the note on
+ * `BriefRow`. Adding them here would have the quiz erase an uploaded plan.
+ */
 export function briefToRow(brief: Brief) {
   return {
     propertyType: brief.propertyType,

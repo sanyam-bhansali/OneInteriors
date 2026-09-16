@@ -96,7 +96,7 @@ export async function StudioQuotation({ studio }: { studio: Studio }) {
     propertyTypeKnown: brief.propertyType !== null,
     areaKnown: Boolean(brief.carpetAreaSqft && brief.carpetAreaSqft > 0),
     scopeKnown: brief.scope !== null,
-    floorPlanUploaded: false,
+    floorPlanUploaded: brief.floorPlanName !== null,
   });
 
   return (

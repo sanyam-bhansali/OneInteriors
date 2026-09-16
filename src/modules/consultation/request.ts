@@ -17,10 +17,11 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
-import { requireRole, getCurrentUser } from '@/modules/auth/session';
+import { requireRole, getCurrentUser, hasRole } from '@/modules/auth/session';
 import { normalisePhone } from '@/modules/studio/phone';
 import { isValidEmail, normaliseEmail } from '@/modules/auth/magic-link';
 import { record } from '@/modules/analytics/record';
+import { missingCoreRates } from '@/modules/quotation/categories';
 
 export interface RequestInput {
   briefId: string;
@@ -40,6 +41,49 @@ export type RequestResult =
 export const MIN_STUDIOS = 2;
 export const MAX_STUDIOS = 5;
 
+/**
+ * How many studios could actually be quoted today.
+ *
+ * ## Why this exists, and why it is not a constant
+ *
+ * `MIN_STUDIOS = 2` is a good rule that nearly killed the launch. On a roster
+ * of two, one studio with an incomplete rate card leaves exactly one quotable
+ * studio — and `/expert` then rendered a single checkbox above a permanently
+ * greyed-out button, with copy asking the customer to pick two. No error, no
+ * explanation, and no way for anybody to request a call. The first customer
+ * would simply have bounced, and nothing in our logs would have said why.
+ *
+ * The rule is right whenever it can be satisfied and wrong when it cannot. A
+ * call with one studio is still worth having; it is a different call, and the
+ * copy says so. So the minimum is `min(MIN_STUDIOS, what exists)` — enforced on
+ * the server, because the page passing its own minimum would be a client
+ * deciding its own validation.
+ *
+ * Counted against `missingCoreRates`, the same gate onboarding uses, so a
+ * studio that this says is quotable is one the quote engine will also accept.
+ */
+export async function quotableStudioCount(): Promise<number> {
+  if (!hasDatabase()) return 0;
+
+  try {
+    const studios = await prisma.studio.findMany({
+      where: { status: 'ACTIVE', pausedAt: null },
+      select: { id: true, rateCard: { select: { category: true, ratePaise: true } } },
+    });
+
+    return studios.filter((s) => {
+      const rates: Partial<Record<string, number>> = {};
+      for (const item of s.rateCard) rates[item.category] = Number(item.ratePaise);
+      return missingCoreRates(rates as never).length === 0;
+    }).length;
+  } catch {
+    // Falling back to the strict minimum rather than to zero: a failure here
+    // must not silently relax a rule, and it must not block every request
+    // either. Two is what the rule was before this function existed.
+    return MIN_STUDIOS;
+  }
+}
+
 export async function requestConsultation(input: RequestInput): Promise<RequestResult> {
   if (!hasDatabase()) {
     return { ok: false, errors: { form: 'We cannot take requests on this deployment yet.' } };
@@ -57,8 +101,16 @@ export async function requestConsultation(input: RequestInput): Promise<RequestR
     errors.contactEmail = "That doesn't look like an email address.";
   }
 
-  if (input.studioIds.length < MIN_STUDIOS) {
-    errors.studioIds = `Pick at least ${MIN_STUDIOS} studios — the call is about choosing between them.`;
+  // The minimum is whatever the roster can actually offer — see
+  // `quotableStudioCount`. On a full roster this is 2 and nothing changes.
+  const available = await quotableStudioCount();
+  const min = Math.max(1, Math.min(MIN_STUDIOS, available));
+
+  if (input.studioIds.length < min) {
+    errors.studioIds =
+      min === 1
+        ? 'Pick the studio you want to talk about.'
+        : `Pick at least ${min} studios — the call is about choosing between them.`;
   }
   if (input.studioIds.length > MAX_STUDIOS) {
     errors.studioIds = `Pick up to ${MAX_STUDIOS}. Past that the call stops being a decision and becomes a tour.`;
@@ -99,15 +151,42 @@ export interface ConsultationRow {
   contactPhone: string | null;
   contactEmail: string | null;
   studioNames: string[];
+  /**
+   * Paired with `studioNames` by index.
+   *
+   * Needed since the expert can now record which studio they recommended and
+   * create the introduction from the same form — and that write takes an id.
+   * Kept alongside the names rather than replacing them because the card reads
+   * better with names and the form needs ids.
+   */
+  studioIds: string[];
   askedAbout: string | null;
   preferredTimes: string | null;
   status: string;
+  /** When the call is booked for, once somebody has set a time. */
+  scheduledFor: Date | null;
   createdAt: Date;
 }
 
-/** The ops queue. Oldest first — somebody has been waiting longest. */
+/**
+ * The ops queue. Oldest first — somebody has been waiting longest.
+ *
+ * `hasRole` and not `requireRole`, for the reason written out three times
+ * elsewhere in this codebase and missed here: `requireRole` THROWS, this is
+ * awaited during a page render, and Next renders a layout and its page in
+ * parallel — so the throw beats `/ops/layout.tsx`'s redirect and a signed-out
+ * visitor gets a stack trace instead of the sign-in screen.
+ *
+ * It was worse than that. `DEV_OPS_NO_AUTH=1` makes the layout return children
+ * with no user at all, so this page — the busiest one ops has — was the single
+ * route where the dev bypass produced a guaranteed 500.
+ *
+ * Returning an empty list is both safe and correct: the layout is the gate, and
+ * a non-ops caller has no consultations by definition.
+ */
 export async function listConsultations(status?: string): Promise<ConsultationRow[]> {
-  await requireRole('OPS');
+  const user = await getCurrentUser();
+  if (!hasRole(user, 'OPS')) return [];
   if (!hasDatabase()) return [];
 
   const rows = await prisma.consultation.findMany({
@@ -129,9 +208,11 @@ export async function listConsultations(status?: string): Promise<ConsultationRo
     contactPhone: r.contactPhone,
     contactEmail: r.contactEmail,
     studioNames: r.studioIds.map((id) => nameById.get(id) ?? 'Unknown studio'),
+    studioIds: r.studioIds,
     askedAbout: r.askedAbout,
     preferredTimes: r.preferredTimes,
     status: r.status,
+    scheduledFor: r.scheduledFor,
     createdAt: r.createdAt,
   }));
 }
@@ -140,6 +221,15 @@ export async function setConsultationStatus(
   id: string,
   status: 'scheduled' | 'completed' | 'no_show' | 'cancelled',
   notes?: string,
+  /**
+   * When the call is actually booked for.
+   *
+   * `scheduledFor` sat in the schema with no writer anywhere, which meant
+   * marking a call "scheduled" recorded that a decision had been made and not
+   * what the decision was. Ops could not see when their own calls were, and the
+   * overview's queue counted rows that never moved.
+   */
+  scheduledFor?: Date,
 ): Promise<{ ok: boolean }> {
   const actor = await requireRole('OPS');
 
@@ -150,6 +240,7 @@ export async function setConsultationStatus(
         status,
         expertUserId: actor.id,
         outcomeNotes: notes?.trim() || undefined,
+        ...(scheduledFor && !Number.isNaN(scheduledFor.getTime()) ? { scheduledFor } : {}),
       },
     });
 
@@ -214,9 +305,11 @@ export async function myConsultations(briefId: string): Promise<ConsultationRow[
     contactPhone: r.contactPhone,
     contactEmail: r.contactEmail,
     studioNames: [],
+    studioIds: r.studioIds,
     askedAbout: r.askedAbout,
     preferredTimes: r.preferredTimes,
     status: r.status,
+    scheduledFor: r.scheduledFor,
     createdAt: r.createdAt,
   }));
 }

@@ -51,6 +51,7 @@ export async function quoteBrief(
     propertyType: brief.propertyType,
     carpetAreaSqft: brief.carpetAreaSqft,
     scope: brief.scope,
+    floorPlanUploaded: brief.floorPlanName !== null,
   });
 
   const quotes: StudioQuote[] = [];

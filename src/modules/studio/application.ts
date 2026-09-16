@@ -17,8 +17,15 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
+import { hasDatabase } from '@/lib/env';
 import { Prisma, ApplicationStatus } from '@prisma/client';
-import { requireRole, hashIp, type AuthUser } from '@/modules/auth/session';
+import {
+  requireRole,
+  getCurrentUser,
+  hasRole,
+  hashIp,
+  type AuthUser,
+} from '@/modules/auth/session';
 import { validateGstin } from '@/modules/verification/gstin';
 import { isValidEmail, normaliseEmail, requestMagicLink } from '@/modules/auth/magic-link';
 import { lakhsToPaise } from '@/lib/money';
@@ -77,6 +84,26 @@ export async function submitApplication(input: ApplyInput): Promise<ApplyResult>
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
+  /**
+   * No database, no application.
+   *
+   * Validation runs first deliberately: a studio who typed a bad GSTIN should
+   * be told about the GSTIN, not about our infrastructure. But past this point
+   * every line touches Prisma, and without this guard `/apply` rendered a
+   * working form that threw an unhandled server-action exception on submit —
+   * the studio sees a generic error and assumes they did something wrong.
+   *
+   * `requestConsultation` has always guarded this way. This one did not.
+   */
+  if (!hasDatabase()) {
+    return {
+      ok: false,
+      errors: {
+        form: 'We cannot take applications on this deployment yet. Write to us directly and we will pick it up by hand.',
+      },
+    };
+  }
+
   // Cheap flood control. Not security — just enough that a bored person cannot
   // fill the review queue.
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -113,8 +140,17 @@ export async function submitApplication(input: ApplyInput): Promise<ApplyResult>
 
 // ── Review ─────────────────────────────────────────────────────
 
+/**
+ * The application queue.
+ *
+ * `hasRole`, not `requireRole` — same reason as `listConsultations`, and the
+ * same miss. This is awaited during the render of `/ops/applications`, and
+ * `requireRole` throws, which races the layout's redirect and turns a
+ * wrong-role visit into a 500.
+ */
 export async function listApplications(status?: ApplicationStatus) {
-  await requireRole('OPS');
+  const user = await getCurrentUser();
+  if (!hasRole(user, 'OPS')) return [];
   return prisma.studioApplication.findMany({
     where: status ? { status } : undefined,
     orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
@@ -126,7 +162,22 @@ export async function getApplication(id: string) {
   return prisma.studioApplication.findUnique({ where: { id } });
 }
 
-export type DecisionResult = { ok: true; studioSlug?: string } | { ok: false; error: string };
+export type DecisionResult =
+  | {
+      ok: true;
+      studioSlug?: string;
+      /**
+       * Did the sign-in email actually send?
+       *
+       * Approval used to report "a sign-in link is on its way" unconditionally,
+       * with the mail result discarded. With no email provider configured that
+       * sentence is false, nothing surfaces it, and the first anyone knows is a
+       * studio saying they never received anything — by which point ops has
+       * told them twice to check their spam folder.
+       */
+      emailDelivered?: boolean;
+    }
+  | { ok: false; error: string };
 
 function slugify(name: string): string {
   return name
@@ -251,9 +302,19 @@ export async function approveApplication(id: string, note: string): Promise<Deci
     await revalidateRoster();
 
     // Outside the transaction — a mail failure must not roll back the approval.
-    await requestMagicLink(result.email, { baseUrl: resolveSiteUrl() });
+    // But it must be reported: the studio is now created and cannot get in.
+    const sent = await requestMagicLink(result.email, {
+      baseUrl: resolveSiteUrl(),
+      // Land them on their own dashboard rather than the homepage, and on a
+      // sign-in page that leads with the email form they actually need.
+      next: '/studio',
+    });
 
-    return { ok: true, studioSlug: result.slug };
+    return {
+      ok: true,
+      studioSlug: result.slug,
+      emailDelivered: sent.ok ? sent.delivered !== false : false,
+    };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Could not approve.' };
   }

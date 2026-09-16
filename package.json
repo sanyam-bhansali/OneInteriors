@@ -18,13 +18,15 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "db:ops": "tsx prisma/seed-ops.ts"
+    "db:ops": "tsx prisma/seed-ops.ts",
+    "db:studio-login": "tsx prisma/seed-studio.ts",
+    "db:rates": "tsx prisma/seed-rate-cards.ts"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
     "next": "15.5.25",
     "react": "19.1.1",
     "react-dom": "19.1.1",
-    "@prisma/client": "^6.19.3",
     "server-only": "^0.0.1"
   },
   "devDependencies": {
@@ -35,11 +37,12 @@
     "@types/react-dom": "^19.1.9",
     "eslint": "^9.39.5",
     "eslint-config-next": "15.5.25",
-    "tailwindcss": "^4.1.13",
-    "typescript": "^5.9.2",
-    "vitest": "^3.2.4",
+    "pptxgenjs": "^4.0.1",
     "prisma": "^6.19.3",
-    "tsx": "^4.20.6"
+    "tailwindcss": "^4.1.13",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
   },
   "overrides": {
     "postcss": "^8.5.28",
@@ -48,8 +51,5 @@
   },
   "engines": {
     "node": "22.x"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
   }
 }

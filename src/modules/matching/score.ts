@@ -74,9 +74,47 @@ function dislikedShare(brief: Brief, studio: Studio): number | null {
 // These run before scoring. A studio failing one is not ranked low — it is not
 // shown at all. A bad match displayed at 41% still costs trust.
 
-export function passesHardFilters(brief: Brief, studio: Studio): boolean {
-  if (studio.status !== 'ACTIVE') return false;
-  if (studio.tier === 'UNVERIFIED') return false;
+/**
+ * Options that only a server may decide.
+ *
+ * `score.ts` is pure and is imported by `MatchClient`, which ranks studios **in
+ * the browser** — so it cannot read an environment variable, and the one that
+ * matters here (`DEV_SHOW_UNVERIFIED_STUDIOS`) is deliberately not
+ * `NEXT_PUBLIC_`. The decision is therefore made on the server and passed in.
+ */
+export interface RankOptions {
+  /**
+   * Let studios through that are not yet ACTIVE and not yet verified.
+   *
+   * ## Why this exists
+   *
+   * The roster query in `prisma-repository.ts` already honours
+   * `showUnverifiedStudios()` and drops its `status = 'ACTIVE'` filter — but
+   * these two lines re-applied the same gate afterwards, so the flag worked on
+   * `/studios` and silently did nothing on `/match`, `/quotes`, `/compare` and
+   * `/expert`. Those are precisely the four pages `env.ts` names as the reason
+   * the flag exists: without them the funnel cannot be walked end to end before
+   * a studio has been verified.
+   *
+   * Two gates for one decision, drifted apart. This is the same gate, made
+   * explicit, with the safe answer as the default: a caller that passes nothing
+   * gets the strict behaviour.
+   *
+   * `showUnverifiedStudios()` itself refuses to return true once the roster is
+   * declared real, so this cannot survive launch however it is passed.
+   */
+  allowUnverified?: boolean;
+}
+
+export function passesHardFilters(
+  brief: Brief,
+  studio: Studio,
+  options: RankOptions = {},
+): boolean {
+  if (!options.allowUnverified) {
+    if (studio.status !== 'ACTIVE') return false;
+    if (studio.tier === 'UNVERIFIED') return false;
+  }
 
   /**
    * Paused studios are excluded outright, not ranked low.
@@ -217,8 +255,12 @@ function scorePriorityAlignment(brief: Brief, studio: Studio): number | null {
 
 // ── Composition ────────────────────────────────────────────────
 
-export function scoreMatch(brief: Brief, studio: Studio): MatchResult | null {
-  if (!passesHardFilters(brief, studio)) return null;
+export function scoreMatch(
+  brief: Brief,
+  studio: Studio,
+  options: RankOptions = {},
+): MatchResult | null {
+  if (!passesHardFilters(brief, studio, options)) return null;
 
   const breakdown: FactorScores = {
     styleOverlap: scoreStyleOverlap(brief, studio),
@@ -258,9 +300,14 @@ export function scoreMatch(brief: Brief, studio: Studio): MatchResult | null {
   };
 }
 
-export function rankStudios(brief: Brief, studios: Studio[], limit = 9): MatchResult[] {
+export function rankStudios(
+  brief: Brief,
+  studios: Studio[],
+  limit = 9,
+  options: RankOptions = {},
+): MatchResult[] {
   return studios
-    .map((s) => scoreMatch(brief, s))
+    .map((s) => scoreMatch(brief, s, options))
     .filter((m): m is MatchResult => m !== null)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit); // never show more than ~12; scarcity of options IS the value

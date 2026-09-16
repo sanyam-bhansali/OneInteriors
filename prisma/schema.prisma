@@ -44,15 +44,15 @@ model User {
   role          UserRole  @default(CUSTOMER)
   locale        String    @default("en-IN")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime? // soft delete — DPDP erasure sets this + scrubs PII
 
   brief         Brief?
   studioMember  StudioMember?
   sessions      Session[]
   consents      Consent[]
-  auditEntries  AuditLog[]      @relation("AuditActor")
+  auditEntries  AuditLog[]     @relation("AuditActor")
   notifications Notification[]
 
   @@index([role])
@@ -60,18 +60,18 @@ model User {
 }
 
 model Session {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// SHA-256 of the session token. The cookie holds the plaintext; the database
   /// never does, so a dump cannot be replayed as a login.
-  tokenHash String   @unique
-  userAgent String?
-  ipHash    String? // hashed, never raw — DPDP minimisation
-  expiresAt DateTime
-  lastUsedAt DateTime @default(now())
-  revokedAt DateTime?
-  createdAt DateTime @default(now())
+  tokenHash  String    @unique
+  userAgent  String?
+  ipHash     String? // hashed, never raw — DPDP minimisation
+  expiresAt  DateTime
+  lastUsedAt DateTime  @default(now())
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
 
   @@index([userId])
   @@index([expiresAt])
@@ -123,8 +123,8 @@ model Consent {
   /// is before we know who they are — and asking for a phone number in order
   /// to record a consent decision would itself be collecting data we had no
   /// consent for.
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  String?
+  user    User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// The same browser token the anonymous brief uses. Claimed together.
   anonKey String?
 
@@ -200,10 +200,10 @@ model Brief {
   anonKey String? @unique
 
   // Q1
-  propertyType PropertyType?
+  propertyType   PropertyType?
   carpetAreaSqft Int?
-  locality     String? // Pune locality slug: "kharadi", "baner", "wakad"
-  possessionOn DateTime?
+  locality       String? // Pune locality slug: "kharadi", "baner", "wakad"
+  possessionOn   DateTime?
 
   // Q2
   scope ScopeType?
@@ -228,10 +228,10 @@ model Brief {
   styleDislikes String[] @default([]) // HARD FILTER, not a weight
 
   // Q6
-  adults    Int?
-  children  Int?
-  elderly   Int?
-  pets      Boolean @default(false)
+  adults        Int?
+  children      Int?
+  elderly       Int?
+  pets          Boolean @default(false)
   worksFromHome Boolean @default(false)
 
   // Q7 — ranked, index 0 = most important
@@ -254,6 +254,8 @@ model Brief {
   quotations    Quotation[]
   projects      Project[]
   consultations Consultation[]
+  prepRooms     PrepRoom[]
+  introductions Introduction[]
 
   /// Set when an anonymous brief is attached to an account. Kept for the
   /// funnel: the gap between completedAt and this is how long people take to
@@ -389,6 +391,22 @@ model Studio {
   udyamNumber String?
   panLast4    String?
 
+  /// The studio has told us it has no GST registration.
+  ///
+  /// Plenty of good Pune studios are proprietorships below the threshold, and
+  /// that is not a disqualification — it means we verify them a different way
+  /// (PAN, bank records, an extra reference call).
+  ///
+  /// This exists because the onboarding rule was always "a GSTIN, or a note
+  /// that you do not have one", and only the first half was representable. A
+  /// studio without GST could complete every other step and then sit forever on
+  /// a greyed-out submit button, with no way for ops to unblock them either.
+  /// A blank field and a declared absence are different facts and the schema
+  /// has to be able to tell them apart.
+  gstinNotApplicable Boolean @default(false)
+  /// Why, in the studio's own words. Read by whoever verifies them.
+  gstinNote          String?
+
   // Self-declared context. Shown, but never used to compute a tier — anything
   // that affects the badge has to be something we checked.
   yearsActive Int?
@@ -441,14 +459,14 @@ model Studio {
   // Derived performance — recomputed by a job, never written by hand.
   // Null until enough completed projects exist. Do NOT default these to
   // flattering values; the UI must render "not enough data".
-  completedProjects   Int   @default(0)
-  avgVarianceDays     Float?
-  upheldDisputes      Int   @default(0)
-  specComplianceRate  Float?
+  completedProjects     Int       @default(0)
+  avgVarianceDays       Float?
+  upheldDisputes        Int       @default(0)
+  specComplianceRate    Float?
   /// Mean past-client rating for communication, 1–5. Null until ~3 ratings.
-  communicationRating Float?
+  communicationRating   Float?
   /// 0 = hands-off, 1 = highly collaborative. Drives the working-style match.
-  autonomyProfile     Float?
+  autonomyProfile       Float?
   performanceComputedAt DateTime?
 
   createdAt DateTime @default(now())
@@ -464,6 +482,18 @@ model Studio {
   subscription  Subscription?
   profileDraft  ProfileDraft?
   allocations   AllocationPeriod[]
+  introductions Introduction[]
+
+  // The studio's own software. See the section at the foot of this file.
+  branding         StudioBranding?
+  products         StudioProduct[]
+  studioQuotes     StudioQuote[]
+  studioClients    StudioClient[]
+  studioStages     StudioStage[]
+  studioFields     StudioField[]
+  studioProjects   StudioProject[]
+  studioVendors    StudioVendor[]
+  studioWorkOrders StudioWorkOrder[]
 
   @@index([city, status, tier])
   /// Every customer-facing query filters paused studios out.
@@ -515,11 +545,11 @@ model VerificationCheck {
   studioId String
   studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
 
-  type       CheckType
-  result     CheckResult @default(PENDING)
-  source     String? // "gst_portal" | "idfy" | "ops:manual" | "mca"
+  type        CheckType
+  result      CheckResult @default(PENDING)
+  source      String? // "gst_portal" | "idfy" | "ops:manual" | "mca"
   evidenceUrl String? // private object storage key, never public
-  notes      String?     @db.Text
+  notes       String?     @db.Text
 
   checkedById String?
   checkedAt   DateTime?
@@ -538,18 +568,18 @@ model PortfolioProject {
   studioId String
   studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
 
-  title     String
-  locality  String?
+  title        String
+  locality     String?
   propertyType PropertyType?
-  scope     ScopeType?
-  styleTags String[]      @default([]) // must use the same vocabulary as Brief.styleLikes
-  valuePaise BigInt?
+  scope        ScopeType?
+  styleTags    String[]      @default([]) // must use the same vocabulary as Brief.styleLikes
+  valuePaise   BigInt?
   durationDays Int?
   completedOn  DateTime?
 
-  images       String[] @default([])
-  isRender     Boolean  @default(false) // a render labelled as a render is fine; passing one off is not
-  clientConsented Boolean @default(false)
+  images          String[] @default([])
+  isRender        Boolean  @default(false) // a render labelled as a render is fine; passing one off is not
+  clientConsented Boolean  @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -586,12 +616,12 @@ model Match {
   studioId String
   studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
 
-  score          Float // 0..100, over MEASURED factors only
-  factorsScored  Int // e.g. 4 — UI must say "matched on 4 of 6 factors"
-  factorsTotal   Int   @default(6)
-  breakdown      Json // { styleOverlap: 88, budgetFit: 71, ... } incl. nulls
-  reasoning      String @db.Text // the customer-facing explanation
-  engineVersion  String // "match@1.0.0" — never reinterpret an old score
+  score         Float // 0..100, over MEASURED factors only
+  factorsScored Int // e.g. 4 — UI must say "matched on 4 of 6 factors"
+  factorsTotal  Int    @default(6)
+  breakdown     Json // { styleOverlap: 88, budgetFit: 71, ... } incl. nulls
+  reasoning     String @db.Text // the customer-facing explanation
+  engineVersion String // "match@1.0.0" — never reinterpret an old score
 
   createdAt DateTime @default(now())
 
@@ -645,7 +675,7 @@ model Quotation {
   totalPaise    BigInt
   variancePct   Float? @default(15) // published band on indicative quotes
 
-  assumptions String? @db.Text
+  assumptions String?   @db.Text
   validUntil  DateTime?
 
   createdAt DateTime @default(now())
@@ -689,20 +719,30 @@ enum ProjectStatus {
 }
 
 model Project {
-  id       String @id @default(cuid())
-  briefId  String
-  brief    Brief  @relation(fields: [briefId], references: [id], onDelete: Restrict)
-  studioId String
-  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Restrict)
-  quotationId String? @unique
+  id          String     @id @default(cuid())
+  briefId     String
+  brief       Brief      @relation(fields: [briefId], references: [id], onDelete: Restrict)
+  studioId    String
+  studio      Studio     @relation(fields: [studioId], references: [id], onDelete: Restrict)
+  quotationId String?    @unique
   quotation   Quotation? @relation(fields: [quotationId], references: [id])
 
   reference String        @unique // human-readable: "OI-PN-2026-0042"
   status    ProjectStatus @default(CONTRACTED)
 
   contractValuePaise BigInt
-  // Commission model applies during the pilot; subscription studios have 0 here.
-  commissionBps      Int    @default(400) // 4.00%
+  /// Commission on a closed project, in basis points.
+  ///
+  /// 500 = 5.00%, matching `COMMISSION_BPS` in
+  /// src/modules/studio/subscription.ts and every business document. This
+  /// defaulted to 400 until a studio dashboard was about to render a take rate
+  /// computed one way against an invoice computed the other — two sources of
+  /// truth for the same rate, disagreeing silently.
+  ///
+  /// Stored per project rather than read from a constant because a studio's
+  /// rate at the moment of signing must survive a later change to the pricing
+  /// page. A row already written is never re-rated.
+  commissionBps      Int    @default(500) // 5.00%
   commissionPaise    BigInt @default(0)
   escrowFeeBps       Int    @default(175) // 1.75% customer-side
 
@@ -710,7 +750,7 @@ model Project {
   committedEndOn   DateTime // the date variance is measured against
   actualEndOn      DateTime?
 
-  contractUrl   String?
+  contractUrl      String?
   contractSignedAt DateTime?
 
   createdAt DateTime @default(now())
@@ -738,18 +778,18 @@ model Milestone {
   projectId String
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  position Int
-  title    String
+  position    Int
+  title       String
   description String? @db.Text
 
   amountPaise BigInt
   status      MilestoneStatus @default(PENDING)
 
-  dueOn       DateTime
-  submittedAt DateTime?
-  approvedAt  DateTime?
-  rejectedAt  DateTime?
-  rejectionReason String? @db.Text
+  dueOn           DateTime
+  submittedAt     DateTime?
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  rejectionReason String?   @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -766,10 +806,10 @@ model MilestoneEvidence {
   milestoneId String
   milestone   Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
 
-  kind      String // "photo" | "invoice" | "material_spec"
-  storageKey String
-  caption   String?
-  capturedAt DateTime?
+  kind         String // "photo" | "invoice" | "material_spec"
+  storageKey   String
+  caption      String?
+  capturedAt   DateTime?
   uploadedById String
 
   createdAt DateTime @default(now())
@@ -795,18 +835,18 @@ enum EscrowStatus {
 
 // Append-only ledger. Corrections are new rows, never updates.
 model EscrowTransaction {
-  id        String  @id @default(cuid())
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  id          String  @id @default(cuid())
+  projectId   String
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
   milestoneId String?
 
-  direction EscrowDirection
-  status    EscrowStatus    @default(INITIATED)
+  direction   EscrowDirection
+  status      EscrowStatus    @default(INITIATED)
   amountPaise BigInt
 
-  providerRef String? @unique // escrow partner's transaction id
+  providerRef     String? @unique // escrow partner's transaction id
   providerPayload Json?
-  failureReason String?
+  failureReason   String?
 
   initiatedAt DateTime  @default(now())
   settledAt   DateTime?
@@ -830,12 +870,12 @@ model Dispute {
   project   Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
 
   raisedByUserId String
-  category  String // "delay" | "material_substitution" | "workmanship" | "billing"
-  summary   String  @db.Text
-  status    DisputeStatus @default(OPEN)
+  category       String // "delay" | "material_substitution" | "workmanship" | "billing"
+  summary        String        @db.Text
+  status         DisputeStatus @default(OPEN)
 
-  resolution String? @db.Text
-  resolvedAt DateTime?
+  resolution   String?   @db.Text
+  resolvedAt   DateTime?
   resolvedById String?
 
   createdAt DateTime @default(now())
@@ -891,8 +931,18 @@ model Subscription {
   tier   SubscriptionTier   @default(ESSENTIAL)
   status SubscriptionStatus @default(TRIAL)
 
-  monthlyPaise      BigInt @default(0)
-  guaranteedProjects Int   @default(0)
+  monthlyPaise BigInt @default(0)
+
+  /// How many BRIEFS a tier guarantees per month. Not projects.
+  ///
+  /// The distinction is the whole promise. Whether a brief becomes a project is
+  /// the customer's decision, and we do not get to guarantee other people's
+  /// decisions — a studio told "sixteen projects" and given sixteen briefs has
+  /// been mis-sold, and will say so.
+  ///
+  /// Renamed from `guaranteedProjects`, which promised exactly the thing the
+  /// code comment in subscription.ts said we must never promise.
+  guaranteedBriefs Int @default(0)
 
   startedOn   DateTime  @default(now())
   cancelledOn DateTime?
@@ -946,21 +996,21 @@ model Consultation {
 
   /// The studios they want to talk about. Studio ids, in the order they
   /// picked them — the expert reads these before the call.
-  studioIds String[] @default([])
+  studioIds      String[] @default([])
   /// What they want to get out of it, in their own words.
-  askedAbout String? @db.Text
+  askedAbout     String?  @db.Text
   /// Free text: "weekday evenings", "Saturday morning". A slot picker would
   /// hardcode a scheduling model before we know the shape of these calls.
   preferredTimes String?
 
   scheduledFor DateTime?
   expertUserId String?
-  status       String   @default("requested") // requested | scheduled | completed | no_show | cancelled
+  status       String    @default("requested") // requested | scheduled | completed | no_show | cancelled
 
   // The expert's read is the training signal for the matching engine.
-  outcomeNotes      String? @db.Text
+  outcomeNotes        String?  @db.Text
   recommendedStudioId String?
-  matchWasCorrect   Boolean?
+  matchWasCorrect     Boolean?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -969,16 +1019,216 @@ model Consultation {
   @@map("consultations")
 }
 
+// ─────────────────────────────────────────────────────────────
+// INTRODUCTION — the handoff, and the meetings that follow
+// ─────────────────────────────────────────────────────────────
+
+/// We handed this customer to this studio.
+///
+/// ## Why this is its own table
+///
+/// It is the single event the business charges for, and until now it was
+/// recorded nowhere. The expert took a call, decided, and told somebody on
+/// WhatsApp. Three things depend on it and all three were running on trust:
+///
+///  - **Contact release.** "No studio receives your details until you tell an
+///    expert which introduction you want" is on the landing page. With no row,
+///    that promise had nothing to enforce it — it was a convention. Now it is a
+///    query.
+///  - **The commission clock.** 5% is charged on a project that came from an
+///    introduction we made. A project with no introduction behind it is either
+///    a data error or a studio that went around us, and both are worth seeing.
+///  - **The honest denominator.** Introductions per studio, and what share of
+///    them sign, is the real measure of whether matching works. The expert's
+///    `matchWasCorrect` is an opinion; this is an outcome.
+///
+/// ## Created by a person, always
+///
+/// There is deliberately no code path that creates one automatically. An
+/// introduction is a judgement made on a call — if it could be triggered by a
+/// customer action, the expert call would stop being the gate and the whole
+/// quality mechanic would quietly become optional.
+model Introduction {
+  id String @id @default(cuid())
+
+  briefId String
+  brief   Brief  @relation(fields: [briefId], references: [id], onDelete: Cascade)
+
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  /// The call this came out of. Nullable only because an introduction could one
+  /// day follow from something else; today it never does.
+  consultationId String?
+
+  introducedAt   DateTime @default(now())
+  /// The expert. A human act, recorded as one.
+  introducedById String
+
+  /// When the studio became allowed to see the customer's name and phone.
+  ///
+  /// Separate from `introducedAt` on purpose: an expert may introduce and hold
+  /// contact release until the customer has confirmed they are happy. Null
+  /// means the studio knows a brief is coming and nothing about who.
+  contactReleasedAt DateTime?
+
+  /// The customer changed their mind. Contact access ends here — see
+  /// `canSeeContact` in src/modules/studio/introduction-access.ts, which is the
+  /// only place that decision is made.
+  withdrawnAt     DateTime?
+  withdrawnReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  appointments Appointment[]
+
+  /// One introduction per studio per brief. A second one is the same
+  /// introduction, not a new one.
+  @@unique([briefId, studioId])
+  @@index([studioId, introducedAt])
+  @@map("introductions")
+}
+
+enum AppointmentKind {
+  FIRST_MEETING
+  SITE_VISIT
+  FOLLOW_UP
+}
+
+enum AppointmentStatus {
+  PROPOSED
+  CONFIRMED
+  COMPLETED
+  NO_SHOW
+  CANCELLED
+}
+
+enum NoShowParty {
+  CUSTOMER
+  STUDIO
+}
+
+/// A meeting or site visit between a customer and a studio.
+///
+/// The product promises this in four separate places — "then we set up the
+/// meeting or site visit with that studio directly" — and modelled it in none
+/// of them until now.
+///
+/// Note what this is NOT: `Consultation.scheduledFor` is the expert's own call
+/// with the customer, and a `VerificationCheck` site visit is us visiting the
+/// studio. Three different things that all involve a date and a visit, kept
+/// apart deliberately.
+model Appointment {
+  id String @id @default(cuid())
+
+  introductionId String
+  introduction   Introduction @relation(fields: [introductionId], references: [id], onDelete: Cascade)
+
+  kind   AppointmentKind
+  status AppointmentStatus @default(PROPOSED)
+
+  /// Stored UTC, rendered IST. One city today, and storing a local time anyway
+  /// is how a calendar breaks the first time anything moves.
+  startsAt     DateTime
+  durationMins Int      @default(60)
+
+  /// The flat, or the studio office. Free text because a Pune address is not a
+  /// structure worth modelling for this.
+  location String?
+
+  proposedById String
+  confirmedAt  DateTime?
+
+  /// Set only alongside `NO_SHOW`, and only by a human.
+  ///
+  /// Never inferred from an appointment passing its end time. This ends up in a
+  /// studio's delivery record, it is the first thing they will dispute, and a
+  /// missed appointment has too many innocent explanations for a cron job to
+  /// judge.
+  noShowBy NoShowParty?
+
+  /// Ops-internal. Never rendered on a studio-facing page — if a studio needs
+  /// to know something it is said to them, not left in a field they read over
+  /// our shoulder.
+  notes String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([introductionId])
+  @@index([startsAt, status])
+  @@map("appointments")
+}
+
+/// One room of the prep pack — what the customer did with it between booking
+/// the expert call and taking it.
+///
+/// ## Why this is a table and not a JSON blob on Brief
+///
+/// Because the expert reads it one room at a time on the call, and because the
+/// most valuable column here is `note` — the sentence a customer writes about
+/// their own kitchen. That is free-text about their home, it is the thing the
+/// designer most wants to have read beforehand, and burying it inside a JSON
+/// column would make it unqueryable the first time someone asks which rooms
+/// people actually write about.
+///
+/// ## What is deliberately absent
+///
+/// No score, no ranking, no completeness percentage. This is preparation, not
+/// an exam, and a customer who fills in two rooms and stops has still made
+/// their call better. Nothing here may ever be used to deprioritise them.
+model PrepRoom {
+  id      String @id @default(cuid())
+  briefId String
+  brief   Brief  @relation(fields: [briefId], references: [id], onDelete: Cascade)
+
+  /// One of ROOM_KEYS in src/modules/prepare/rooms.ts. A plain string rather
+  /// than an enum because the room set is product surface that will change more
+  /// often than the schema should, and a value this table does not recognise
+  /// should render as an unknown room, not fail a migration.
+  roomKey String
+
+  /// How many times they pressed Shuffle. The proposal is a pure function of
+  /// this plus their liked styles, so the board is reproducible from the row —
+  /// we store the input, never the generated output.
+  shuffle Int @default(0)
+
+  /// Index into the room's decision options, or null for "not decided yet",
+  /// which is a genuine and useful answer for the expert to see.
+  chosenOption Int?
+
+  /// The board the customer composed: element slugs from
+  /// src/modules/prepare/catalogue.ts, in the order they placed them.
+  ///
+  /// Slugs and not ids, because the catalogue is code rather than a table — it
+  /// is vocabulary, revised in pull requests with the reasoning attached, not
+  /// data anyone edits at runtime. A slug this array no longer recognises is
+  /// skipped when the board is read, so retiring an element never breaks a
+  /// board somebody is mid-way through.
+  items String[] @default([])
+
+  /// What the customer wrote about this room, in their own words.
+  note String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([briefId, roomKey])
+  @@index([briefId])
+  @@map("prep_rooms")
+}
+
 model Notification {
   id     String @id @default(cuid())
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  channel String // "push" | "whatsapp" | "email"
+  channel  String // "push" | "whatsapp" | "email"
   template String
-  payload Json
-  readAt  DateTime?
-  sentAt  DateTime?
+  payload  Json
+  readAt   DateTime?
+  sentAt   DateTime?
 
   createdAt DateTime @default(now())
 
@@ -1075,4 +1325,599 @@ model AnalyticsEvent {
   @@index([anonKey])
   @@index([briefId])
   @@map("analytics_events")
+}
+
+// ─────────────────────────────────────────────────────────────
+// THE STUDIO'S OWN SOFTWARE
+//
+// Everything above this line is the marketplace: our briefs, our
+// matching, our indicative quotes. Everything below belongs to the
+// STUDIO and works whether or not we ever send them a lead.
+//
+// That distinction is the whole product thesis, so it is worth
+// stating where the schema shows it. `Quotation` (above) is the
+// indicative number WE produce from a studio's rate card to make two
+// studios comparable on a customer's screen. `StudioQuote` (below) is
+// the detailed document a studio sends its own client, on its own
+// letterhead, for a project we may have had nothing to do with.
+//
+// Different authors, different audiences, different lifetimes. Naming
+// them both "quotation" would have guaranteed somebody eventually
+// wrote the wrong one to the wrong screen.
+// ─────────────────────────────────────────────────────────────
+
+/// How a line is measured. AREA is width × height in millimetres,
+/// which is how carpentry is actually quoted here — the rate is per
+/// square foot and the area comes off the drawing.
+enum QuoteUnit {
+  AREA
+  SQFT
+  RFT
+  UNIT
+}
+
+/// The two work codes every quotation in this industry carries.
+/// MODULAR is factory-made and is what a discount is usually given
+/// against; ONSITE is labour and materials at the site.
+enum StudioWorkCode {
+  MODULAR
+  ONSITE
+}
+
+enum StudioQuoteStage {
+  /// Before booking. What wins the client.
+  SALES
+  /// After design sign-off. What the work is actually built against.
+  DESIGN
+}
+
+enum StudioQuoteStatus {
+  DRAFT
+  ISSUED
+  ACCEPTED
+  DECLINED
+}
+
+/// A studio's identity on its own documents.
+///
+/// This is what makes the quotation builder white-label rather than
+/// ours with their name typed in. Nothing here is shown on the
+/// marketplace — the public profile has its own fields — because a
+/// studio's GSTIN and registered address belong on an invoice, not on
+/// a listing.
+model StudioBranding {
+  id       String @id @default(cuid())
+  studioId String @unique
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  legalName   String
+  addressLine String?
+  city        String  @default("Pune")
+  pincode     String?
+  gstin       String?
+  phone       String?
+  email       String?
+  website     String?
+
+  /// Storage path, never a public URL. Served through a signed link,
+  /// the same way floor plans are.
+  logoPath  String?
+  accentHex String  @default("#1F5C4D")
+
+  /// The studio's own words at the top of a quotation, and its own
+  /// terms at the bottom. Both default to null rather than to ours:
+  /// a document going out under their name must not carry copy they
+  /// have never read.
+  welcomeNote String? @db.Text
+  terms       String? @db.Text
+
+  /// Defaults a new quotation starts from. Basis points, so 700 = 7%.
+  feeBps              Int    @default(700)
+  discountBps         Int    @default(0)
+  bookingAdvancePaise BigInt @default(2500000)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("studio_branding")
+}
+
+/// One studio's product master.
+///
+/// Per studio, always. The alternative — a shared catalogue everyone
+/// draws from — sounds tidier and would mean a studio's own product
+/// names, rates and descriptions were visible in a table their
+/// competitors also read.
+model StudioProduct {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  name    String
+  code    StudioWorkCode @default(MODULAR)
+  unit    QuoteUnit      @default(AREA)
+  details String?        @db.Text
+
+  /// Per sqft, per rft, or per unit, depending on `unit`.
+  ratePaise BigInt
+
+  /// Which rooms this belongs in, for the first-quote builder.
+  rooms String[]
+
+  /// Starting size or count when this lands on a quotation. Millimetres.
+  defaultWidthMm  Int?
+  defaultHeightMm Int?
+  defaultQty      Int?
+
+  sortOrder Int     @default(100)
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studioId, name])
+  @@index([studioId, sortOrder])
+  @@map("studio_products")
+}
+
+/// A quotation a studio sends its own client.
+model StudioQuote {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  /// Per studio, and theirs to set — AKA-2026-014, or 2300, or
+  /// whatever their existing books use. Unique within the studio only.
+  number String
+  stage  StudioQuoteStage  @default(SALES)
+  status StudioQuoteStatus @default(DRAFT)
+
+  clientName  String
+  clientPhone String?
+  clientEmail String?
+  society     String?
+  locality    String?
+  config      String?
+  carpetSqft  Int?
+
+  /// Set when this client came from us. Null for the studio's own
+  /// work, which is most of it and must stay first-class.
+  briefId        String?
+  introductionId String?
+
+  /// The client this was written for, once there is one.
+  ///
+  /// Optional, and it stays optional. A studio often writes a quotation
+  /// straight off a phone call before deciding the enquiry is worth a
+  /// client record, and making this required would put a data-entry step
+  /// in front of the fastest thing in the product.
+  clientId String?
+  client   StudioClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  /// The figures that shaped this document, copied at creation so a
+  /// later change to the studio's defaults never rewrites a quotation
+  /// already sent.
+  feeBps              Int
+  discountBps         Int
+  onSpotPaise         BigInt @default(0)
+  bookingAdvancePaise BigInt
+
+  /// Their words on this document, snapshotted for the same reason.
+  welcomeNote String? @db.Text
+  terms       String? @db.Text
+
+  issuedOn DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines StudioQuoteLine[]
+
+  @@unique([studioId, number])
+  @@index([studioId, status, updatedAt])
+  @@map("studio_quotes")
+}
+
+/// One line of a studio's quotation.
+///
+/// Every product field is a SNAPSHOT. Editing the product master must
+/// never change a quotation already sent to a client — that is how a
+/// studio ends up in an argument it cannot win about what it quoted.
+model StudioQuoteLine {
+  id      String      @id @default(cuid())
+  quoteId String
+  quote   StudioQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  room    String
+  product String
+  code    StudioWorkCode
+  unit    QuoteUnit
+  details String?        @db.Text
+
+  widthMm  Int?
+  heightMm Int?
+
+  /// Quantity in THOUSANDTHS, as an integer.
+  ///
+  /// 34.39 sqft is 34390. Quantities here are genuinely fractional —
+  /// an area comes out at 34.39 sqft, not 34 — and a float would drift
+  /// against the money, which is integer paise. Thousandths is finer
+  /// than anyone measures and crosses the server/client boundary as a
+  /// plain number, which a Prisma Decimal does not.
+  qtyMilli Int?
+
+  ratePaise   BigInt
+  /// Stored, not computed. A designer overrides a line total often
+  /// enough that the agreed number has to be the one that prints, and
+  /// on an issued document it is a fact about that document.
+  amountPaise BigInt
+
+  sortOrder Int @default(0)
+
+  @@index([quoteId, sortOrder])
+  @@map("studio_quote_lines")
+}
+
+// ─────────────────────────────────────────────────────────────
+// RUNNING THE PRACTICE
+//
+// Clients, projects, vendors and what is owed. None of this needs
+// us: a studio that never takes a single lead from the marketplace
+// still has enquiries to chase, sites running and a carpenter waiting
+// to be paid. That is the whole point — software they would keep using
+// the day they left the roster.
+//
+// Two rules run through all of it.
+//
+//  1. NEVER STORE A TOTAL. A work order's bill, what has been paid and
+//     what is left are computed from the lines and the payments, every
+//     time. A stored total and a payments table disagree eventually,
+//     and the disagreement is always found by a vendor who has been
+//     paid twice.
+//
+//  2. WORK ORDER LINES ARE SNAPSHOTS. A line copies the vendor's rate
+//     as it was when the order was raised. Editing a rate card later
+//     must never silently reprice a bill already paid against.
+// ─────────────────────────────────────────────────────────────
+
+/// Where an enquiry came from. An enum rather than free text because
+/// "Instagram", "instagram" and "IG" in one column is a source report
+/// nobody can read, and the only reason to record a source is to count
+/// it later.
+enum ClientSource {
+  ONE_INTERIORS
+  REFERRAL
+  REPEAT_CLIENT
+  INSTAGRAM
+  WEBSITE
+  WALK_IN
+  ARCHITECT
+  OTHER
+}
+
+/// What a stage MEANS, as opposed to what it is called.
+///
+/// This enum is the whole reason a studio can rename its pipeline without
+/// breaking the software. The stage list used to be an enum — six fixed
+/// values — and a studio whose real process is "New → Calling 1 → Calling 2
+/// → Effective lead → Floor plan pending → Quotation pending → Quotation
+/// shared" could not write any of that down.
+///
+/// But Projects, the dashboard and the vendor ledger all need answers to
+/// questions that survive renaming: is this client still in play, have they
+/// signed, is the job finished, did it go. So a stage carries a `kind`, and
+/// every query in the codebase asks the kind rather than the name. A studio
+/// owns the names, the order, the colours and how many there are; the four
+/// meanings are ours.
+enum StageKind {
+  /// Still in play. Counts on the board and in "waiting on you".
+  OPEN
+  /// Signed. A project may be created from a client at this kind and no
+  /// other — that rule is what keeps the board and the project list from
+  /// disagreeing about whether a job was won.
+  WON
+  /// Handed over. Off the board, not lost.
+  DONE
+  /// Gone. Needs a reason.
+  LOST
+}
+
+/// One column of a studio's pipeline.
+///
+/// Seeded with six defaults on first read — see `myStages()` — and then
+/// entirely theirs. A studio may add, rename, reorder, recolour and delete,
+/// with two rules the software enforces: exactly one intake stage, which is
+/// where a new client lands and which cannot be deleted, and at least one
+/// stage of each kind, because deleting the last WON stage would leave no
+/// way to start a project.
+model StudioStage {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  name String
+  kind StageKind @default(OPEN)
+
+  /// One of the eight tokens in `STAGE_COLOURS`. A token and not a hex
+  /// value, so the palette stays coherent and dark mode stays possible.
+  colour    String @default("slate")
+  sortOrder Int
+
+  /// Where a new client lands. Exactly one per studio, undeletable.
+  isIntake Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  clients StudioClient[]
+
+  @@unique([studioId, name])
+  @@index([studioId, sortOrder])
+  @@map("studio_stages")
+}
+
+enum FieldType {
+  TEXT
+  NUMBER
+  DATE
+  SELECT
+}
+
+/// An extra thing a studio captures on every client.
+///
+/// Carpet area, society, possession month, BHK — every studio wants a
+/// slightly different set and none of them is worth a schema migration. The
+/// values live in `StudioClient.fields` as JSON, keyed by `key`.
+///
+/// `key` is machine-stable and `label` is not: renaming the label must never
+/// orphan the values already captured under it, which is exactly what
+/// happens if the label is the key.
+model StudioField {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  key     String
+  label   String
+  type    FieldType @default(TEXT)
+  /// SELECT only. Ignored for every other type.
+  options String[]  @default([])
+
+  /// Offer this field as a grouping on the client list. A studio working one
+  /// tower at a time groups by society; one working referrals does not.
+  groupBy Boolean @default(false)
+
+  sortOrder Int
+
+  createdAt DateTime @default(now())
+
+  @@unique([studioId, key])
+  @@index([studioId, sortOrder])
+  @@map("studio_fields")
+}
+
+/// Why a client did not go ahead. Short list on purpose: seven reasons
+/// a studio will actually pick between, not twenty it picks the first of.
+enum LostReason {
+  BUDGET
+  TIMELINE
+  WENT_ELSEWHERE
+  NO_RESPONSE
+  NOT_SERIOUS
+  POSTPONED
+  OTHER
+}
+
+model StudioClient {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  name       String
+  phone      String?
+  email      String?
+  society    String?
+  locality   String?
+  city       String  @default("Pune")
+  config     String?
+  carpetSqft Int?
+
+  source     ClientSource @default(OTHER)
+  sourceNote String?
+
+  /// The studio's own column, not one of ours. `onDelete: Restrict` because
+  /// deleting a stage that still holds clients would silently drop them off
+  /// the board — the settings screen makes you move them first.
+  stageId String
+  stage   StudioStage @relation(fields: [stageId], references: [id], onDelete: Restrict)
+
+  lostReason LostReason?
+  lostNote   String?
+
+  /// Whatever the studio defined in Settings → Fields, keyed by the field's
+  /// `key`. Untyped here and validated on write against the definitions.
+  fields Json @default("{}")
+
+  /// The only field here that earns its place every single day. A client
+  /// list without a next action is a list; with one, the dashboard can
+  /// say "four people are waiting on you".
+  nextAction   String?
+  nextActionOn DateTime?
+
+  /// Set when they came from us. Null for the studio's own work, which
+  /// is most of it and stays first-class.
+  briefId        String?
+  introductionId String?
+
+  notes String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  quotes   StudioQuote[]
+  projects StudioProject[]
+
+  /// One row per introduction, so a redelivery cannot create a second
+  /// client for the same handoff.
+  @@unique([studioId, introductionId])
+  @@index([studioId, stageId, nextActionOn])
+  @@map("studio_clients")
+}
+
+enum ProjectStage {
+  DESIGN
+  EXECUTION
+  FINISHING
+  HANDOVER
+  CLOSED
+}
+
+model StudioProject {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  clientId String
+  client   StudioClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  name  String
+  stage ProjectStage @default(DESIGN)
+
+  /// Frozen when the project is created from a won quotation, and the
+  /// figure every later number is measured against. Editing the
+  /// quotation afterwards must not move it.
+  contractPaise BigInt?
+  quoteId       String?
+
+  startedOn    DateTime?
+  targetDate   DateTime?
+  handedOverOn DateTime?
+
+  notes String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workOrders StudioWorkOrder[]
+
+  @@index([studioId, stage])
+  @@map("studio_projects")
+}
+
+/// A trade a studio subcontracts. Free text rather than an enum: every
+/// studio's list is slightly different, and an enum cannot have a value
+/// added by a user.
+model StudioVendor {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  name     String
+  trade    String
+  phone    String?
+  gstin    String?
+  notes    String? @db.Text
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rates      StudioVendorRate[]
+  workOrders StudioWorkOrder[]
+
+  @@unique([studioId, name])
+  @@index([studioId, trade])
+  @@map("studio_vendors")
+}
+
+/// What this vendor charges for one item.
+///
+/// A rate card belongs to the VENDOR, not the trade — two carpenters
+/// price the same item differently, and the card that loads onto a work
+/// order follows the vendor chosen.
+model StudioVendorRate {
+  id       String       @id @default(cuid())
+  vendorId String
+  vendor   StudioVendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  item      String
+  unit      QuoteUnit @default(SQFT)
+  ratePaise BigInt
+
+  @@unique([vendorId, item])
+  @@map("studio_vendor_rates")
+}
+
+model StudioWorkOrder {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  projectId String
+  project   StudioProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  vendorId String
+  vendor   StudioVendor @relation(fields: [vendorId], references: [id])
+
+  trade    String
+  issuedOn DateTime  @default(now())
+  dueOn    DateTime?
+  notes    String?   @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines    StudioWorkOrderLine[]
+  payments StudioVendorPayment[]
+
+  @@index([studioId, projectId])
+  @@index([vendorId])
+  @@map("studio_work_orders")
+}
+
+model StudioWorkOrderLine {
+  id          String          @id @default(cuid())
+  workOrderId String
+  workOrder   StudioWorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  description String
+  unit        QuoteUnit
+  /// Thousandths, like every other quantity in this schema.
+  qtyMilli    Int?
+  /// The vendor's rate AS IT WAS when this order was raised.
+  ratePaise   BigInt
+  amountPaise BigInt
+
+  sortOrder Int @default(0)
+
+  @@index([workOrderId, sortOrder])
+  @@map("studio_work_order_lines")
+}
+
+enum PaymentMode {
+  BANK
+  UPI
+  CASH
+  CHEQUE
+}
+
+/// Money that has left the studio.
+///
+/// Append-only in spirit: a correction is another row, never an edit.
+/// This is the table a vendor dispute turns on, and a record somebody
+/// could quietly change is not a record.
+model StudioVendorPayment {
+  id          String          @id @default(cuid())
+  workOrderId String
+  workOrder   StudioWorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  paidOn      DateTime    @default(now())
+  amountPaise BigInt
+  mode        PaymentMode @default(BANK)
+  reference   String?
+  note        String?
+
+  createdAt DateTime @default(now())
+
+  @@index([workOrderId, paidOn])
+  @@map("studio_vendor_payments")
 }

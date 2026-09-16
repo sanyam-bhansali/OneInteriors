@@ -44,6 +44,8 @@ export interface OnboardingSnapshot {
   yearsActive: number | null;
   teamSize: number | null;
   gstin: string | null;
+  /** Set when the studio has told us it has no GST registration. */
+  gstinNotApplicable: boolean;
   portfolioCount: number;
   /// Core rate categories still without a rate. Empty = quotable.
   missingRates: string[];
@@ -66,15 +68,29 @@ export function assessSteps(studio: OnboardingSnapshot): StepStatus[] {
   if (studio.minProjectPaise === null || studio.maxProjectPaise === null) {
     profileMissing.push('your project size range');
   }
-  if (!studio.yearsActive) profileMissing.push('years active');
+  // `=== null`, not falsy. A studio in its first year genuinely has zero years
+  // active, and a truthiness test would tell them the field was still empty
+  // after they had answered it correctly.
+  if (studio.yearsActive === null) profileMissing.push('years active');
   if (!studio.teamSize) profileMissing.push('team size');
 
-  // A GSTIN is not universal — a proprietorship may genuinely not have one — so
-  // this step completes on a decision rather than on a value. What we will not
-  // accept is silence, because a blank field is indistinguishable from an
-  // unfinished form to whoever picks up the file.
+  /**
+   * A GSTIN is not universal — a proprietorship may genuinely not have one — so
+   * this step completes on a DECISION rather than on a value. What we will not
+   * accept is silence, because a blank field is indistinguishable from an
+   * unfinished form to whoever picks up the file.
+   *
+   * That was always the stated rule, and for a long time only half of it was
+   * implementable: the comment described a decision while the code tested a
+   * value, and there was no field anywhere that could record "I do not have
+   * one". A studio without GST registration could finish every other step and
+   * then find the submit button permanently greyed out, with no escape hatch on
+   * the ops side either. `gstinNotApplicable` is the other half.
+   */
   const registrationMissing: string[] = [];
-  if (!studio.gstin) registrationMissing.push('a GSTIN, or a note that you do not have one');
+  if (!studio.gstin && !studio.gstinNotApplicable) {
+    registrationMissing.push('a GSTIN, or a note that you do not have one');
+  }
 
   const portfolioMissing: string[] = [];
   if (studio.portfolioCount < MIN_PORTFOLIO_PROJECTS) {

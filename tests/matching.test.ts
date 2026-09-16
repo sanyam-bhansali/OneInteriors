@@ -41,6 +41,65 @@ describe('hard filters', () => {
   });
 });
 
+/**
+ * The development gate, and the drift it caused.
+ *
+ * `DEV_SHOW_UNVERIFIED_STUDIOS` exists so the funnel can be walked end to end
+ * before any studio has been verified — `env.ts` names /match, /quotes,
+ * /compare and /expert as the pages it exists for.
+ *
+ * It was applied in two places for one decision. The repository dropped its
+ * `status = 'ACTIVE'` filter, and then these hard filters re-applied the same
+ * gate afterwards — so the flag worked on the studio directory and did nothing
+ * on all four pages it was written for. Two gates for one rule is how they come
+ * to disagree; this pins the fact that there is now one.
+ */
+describe('the unverified-studio gate', () => {
+  const onboarding: Studio = {
+    ...proven,
+    id: 'st-onboarding',
+    status: 'ONBOARDING',
+    tier: 'UNVERIFIED',
+  };
+
+  it('excludes an unverified studio by default', () => {
+    expect(passesHardFilters(baseBrief, onboarding)).toBe(false);
+  });
+
+  it('lets one through when the server says the gate is open', () => {
+    expect(passesHardFilters(baseBrief, onboarding, { allowUnverified: true })).toBe(true);
+  });
+
+  it('reaches the ranked results, not just the directory', () => {
+    const strict = rankStudios(baseBrief, [onboarding], 99);
+    const open = rankStudios(baseBrief, [onboarding], 99, { allowUnverified: true });
+
+    expect(strict).toHaveLength(0);
+    expect(open).toHaveLength(1);
+  });
+
+  /**
+   * The gate opens the verification door and nothing else. A paused studio
+   * cannot take the work whatever its tier, and a studio the customer ruled out
+   * on style is ruled out for a reason the customer gave us.
+   */
+  it('does not open any of the other hard filters', () => {
+    const paused: Studio = { ...onboarding, pausedAt: new Date().toISOString() };
+    expect(passesHardFilters(baseBrief, paused, { allowUnverified: true })).toBe(false);
+
+    const wrongArea: Brief = { ...baseBrief, locality: 'undri', styleDislikes: [] };
+    expect(passesHardFilters(wrongArea, onboarding, { allowUnverified: true })).toBe(false);
+
+    const disliked: Studio = { ...noRecord, status: 'ONBOARDING', tier: 'UNVERIFIED' };
+    expect(passesHardFilters(baseBrief, disliked, { allowUnverified: true })).toBe(false);
+  });
+
+  /** The default is the strict answer, so a forgetful caller fails safe. */
+  it('defaults to closed when no option is passed', () => {
+    expect(scoreMatch(baseBrief, onboarding)).toBeNull();
+  });
+});
+
 describe('cold start — the honesty rule', () => {
   it('returns null for factors it cannot measure rather than a default', () => {
     const permissive: Brief = { ...baseBrief, locality: 'kothrud', styleDislikes: [] };

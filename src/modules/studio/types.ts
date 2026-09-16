@@ -69,6 +69,29 @@ export interface Studio {
 
   /** Verified from the GST portal, not self-declared. Public by law. */
   gstin: string | null;
+  /**
+   * The studio has told us it has no GST registration.
+   *
+   * Distinct from a null `gstin`, which only means nobody has answered yet. Ops
+   * needs the difference: one is an unfinished form, the other is a studio to
+   * verify on PAN and bank records instead.
+   *
+   * Optional because the v0.1 fixture studios in `src/data/studios.ts` predate
+   * it and none of them needs it — nothing in matching or pricing reads this
+   * field, only the ops verification screen does. Read it as `?? false`.
+   */
+  gstinNotApplicable?: boolean;
+  gstinNote?: string | null;
+
+  /**
+   * The studio has finished its side and sent the profile for verification.
+   *
+   * Optional for the same fixture reason as the two fields above. Derived from
+   * the `onboardingSteps` JSON the studio surface writes — deliberately not a
+   * second column, because two sources of the same fact is how they come to
+   * disagree.
+   */
+  submittedForReview?: boolean;
   yearsActive: number | null;
   teamSize: number | null;
 

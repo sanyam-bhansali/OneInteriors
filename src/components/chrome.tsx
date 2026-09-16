@@ -81,6 +81,21 @@ export function SiteFooter() {
             >
               Start the brief
             </Link>
+            {/* `/account` existed with nothing anywhere linking to it — a
+                customer who signed in had no route back to their own quotes,
+                and no way to sign out.
+
+                A plain link rather than a signed-in-only one on purpose: this
+                component is imported by client components, so it cannot read
+                the session. `/account` already redirects a signed-out visitor
+                to sign-in and back, which is the same journey with one more
+                step and none of the complexity. */}
+            <Link
+              href="/account"
+              className="text-[14px] text-[var(--color-ink-2)] no-underline hover:text-[var(--color-petrol)]"
+            >
+              Your project
+            </Link>
             {/* Designers look for this in the footer, not the nav — and the
                 header is customer space. */}
             <Link

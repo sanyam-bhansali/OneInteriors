@@ -11,6 +11,11 @@
  * scribble over the real pilot cohort once that exists.
  */
 
+// Must be first: it populates DATABASE_URL before PrismaClient reads it.
+// Without this, `npm run db:seed` fails at the first query with "Environment
+// variable not found: DATABASE_URL" — a message that reads like a schema
+// problem rather than a missing import, and which cost an afternoon once.
+import './load-env';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { STUDIOS } from '../src/data/studios';
 import type { Studio } from '../src/modules/studio/types';

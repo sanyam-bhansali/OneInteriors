@@ -25,6 +25,7 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
+import { hasDatabase } from '@/lib/env';
 import { Prisma, type PauseCause } from '@prisma/client';
 import { requireRole } from '@/modules/auth/session';
 import { revalidateRoster } from './roster-cache';
@@ -179,6 +180,60 @@ export async function setCapacity(
   }
 }
 
+/**
+ * The same thing, declared by the studio itself.
+ *
+ * `setCapacity` above is ops-gated, which was always slightly odd for a number
+ * that is self-declared by definition: we were asking a studio how much work it
+ * could take and then typing the answer in on their behalf. This is the studio
+ * saying it directly, with ops retaining the override.
+ *
+ * The validation is duplicated rather than shared with `setCapacity` on
+ * purpose — the two functions differ in who may call them, and a shared helper
+ * that both delegate to is the shape where an auth check eventually gets
+ * refactored into the wrong branch.
+ */
+export async function declareCapacity(capacityPerMonth: number | null): Promise<AllocationResult> {
+  const user = await requireRole('STUDIO');
+
+  if (capacityPerMonth !== null && (!Number.isInteger(capacityPerMonth) || capacityPerMonth < 0)) {
+    return { ok: false, error: 'A whole number of projects, or leave it blank.' };
+  }
+  if (capacityPerMonth !== null && capacityPerMonth > 60) {
+    return { ok: false, error: 'That is more than two projects a working day. Check the figure.' };
+  }
+
+  const member = await prisma.studioMember.findUnique({
+    where: { userId: user.id },
+    select: { studioId: true },
+  });
+  if (!member) return { ok: false, error: 'This sign-in is not linked to a studio.' };
+
+  try {
+    await prisma.studio.update({
+      where: { id: member.studioId },
+      data: { capacityPerMonth },
+    });
+
+    // Audited, because it changes when a studio stops being shown — and the
+    // first question after an unexpected pause is "who set that".
+    await prisma.auditLog.create({
+      data: {
+        actorId: user.id,
+        action: 'studio.capacity',
+        entityType: 'Studio',
+        entityId: member.studioId,
+        after: { capacityPerMonth },
+      },
+    });
+
+    return { ok: true };
+  } catch (error) {
+    console.error('[allocation] studio capacity failed', error);
+    return { ok: false, error: 'Could not save that.' };
+  }
+}
+
 export interface SweepResult {
   pausedAtCapacity: string[];
   pausedUnpaid: string[];
@@ -306,17 +361,34 @@ export async function rosterCapacity(city = 'pune'): Promise<RosterCapacity> {
    * The mutations in this file keep their own check, because a server action
    * can be invoked directly and a layout guard does not protect writes.
    */
-  const studios = await prisma.studio.findMany({
-    where: { city, status: 'ACTIVE' },
-    select: { pausedAt: true, capacityPerMonth: true },
-  });
+  /**
+   * Guarded, like every sibling count on the same page.
+   *
+   * This was the one read on `/ops` without a `hasDatabase()` check or a
+   * try/catch, so a deployment with no `DATABASE_URL` took the overview and the
+   * allocation console down with an unhandled throw while `/ops/verification`
+   * quietly degraded to fixtures. A configuration mistake should make a page
+   * emptier, never blank.
+   */
+  const empty: RosterCapacity = { live: 0, paused: 0, declaredCapacity: 0, unknownCapacity: 0 };
+  if (!hasDatabase()) return empty;
 
-  const live = studios.filter((s) => s.pausedAt === null);
+  try {
+    const studios = await prisma.studio.findMany({
+      where: { city, status: 'ACTIVE' },
+      select: { pausedAt: true, capacityPerMonth: true },
+    });
 
-  return {
-    live: live.length,
-    paused: studios.length - live.length,
-    declaredCapacity: live.reduce((sum, s) => sum + (s.capacityPerMonth ?? 0), 0),
-    unknownCapacity: live.filter((s) => s.capacityPerMonth === null).length,
-  };
+    const live = studios.filter((s) => s.pausedAt === null);
+
+    return {
+      live: live.length,
+      paused: studios.length - live.length,
+      declaredCapacity: live.reduce((sum, s) => sum + (s.capacityPerMonth ?? 0), 0),
+      unknownCapacity: live.filter((s) => s.capacityPerMonth === null).length,
+    };
+  } catch (error) {
+    console.error('[allocation] rosterCapacity failed', error);
+    return empty;
+  }
 }

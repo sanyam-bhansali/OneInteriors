@@ -118,7 +118,14 @@ function minutesLeft(step: number): string {
   return `about ${Math.ceil(seconds / 60)} minutes left`;
 }
 
-export function QuizClient({ studios }: { studios: Studio[] }) {
+export function QuizClient({
+  studios,
+  /** Server-decided; see MatchClient. Defaults to the strict answer. */
+  allowUnverified = false,
+}: {
+  studios: Studio[];
+  allowUnverified?: boolean;
+}) {
   const router = useRouter();
   const [brief, setBrief] = useState<Brief>(EMPTY_BRIEF);
   const [step, setStep] = useState(1);
@@ -248,8 +255,8 @@ export function QuizClient({ studios }: { studios: Studio[] }) {
 
   const matchCount = useMemo(() => {
     if (!hydrated) return studios.length;
-    return rankStudios(brief, studios, 99).length;
-  }, [brief, hydrated, studios]);
+    return rankStudios(brief, studios, 99, { allowUnverified }).length;
+  }, [brief, hydrated, studios, allowUnverified]);
 
   if (!hydrated) {
     return (

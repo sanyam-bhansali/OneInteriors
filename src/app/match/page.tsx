@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { cachedRoster } from '@/modules/studio/roster-cache';
+import { showUnverifiedStudios } from '@/lib/env';
 import { MatchClient } from './MatchClient';
 
 export const metadata: Metadata = {
@@ -24,5 +25,15 @@ export const dynamic = 'force-dynamic';
 
 export default async function MatchPage() {
   const studios = await cachedRoster();
-  return <MatchClient studios={studios} />;
+
+  /**
+   * Decided here, on the server, and passed down.
+   *
+   * `MatchClient` ranks in the browser, and `DEV_SHOW_UNVERIFIED_STUDIOS` is
+   * deliberately not `NEXT_PUBLIC_` — the gate that decides which studios reach
+   * a customer belongs on the server and nowhere a visitor can edit it. So the
+   * server reads it and hands down the answer, rather than the client reading a
+   * variable that would be `undefined` in the bundle.
+   */
+  return <MatchClient studios={studios} allowUnverified={showUnverifiedStudios()} />;
 }

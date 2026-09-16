@@ -235,7 +235,18 @@ export async function setGstin(studioId: string, raw: string): Promise<RecordRes
 
       await tx.studio.update({
         where: { id: studioId },
-        data: { gstin: result.gstin, panLast4: result.parts.pan.slice(-4) },
+        data: {
+          gstin: result.gstin,
+          panLast4: result.parts.pan.slice(-4),
+          // A number and "we have no registration" are mutually exclusive
+          // answers to the same question. Leaving the declaration standing
+          // would have the ops screen render "studio says no registration,
+          // verify on PAN and bank records" directly above the GSTIN that ops
+          // had just typed in off a phone call. The studio-side `saveGstin`
+          // already clears these; this path did not.
+          gstinNotApplicable: false,
+          gstinNote: null,
+        },
       });
 
       await writeAudit(tx, actor, 'studio.gstin.set', 'Studio', studioId, before, {

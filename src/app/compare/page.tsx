@@ -10,6 +10,7 @@ import { loadBrief } from '@/modules/brief/repository';
 import { getCurrentUser } from '@/modules/auth/session';
 import { studioRepository } from '@/modules/studio/repository';
 import { rankStudios } from '@/modules/matching/score';
+import { showUnverifiedStudios } from '@/lib/env';
 import { quoteBrief } from '@/modules/quotation/generate';
 import { compareQuotes } from '@/modules/quotation/price';
 import { record } from '@/modules/analytics/record';
@@ -57,7 +58,7 @@ export default async function ComparePage({
   }
 
   const studios = await studioRepository.list({ activeOnly: true });
-  const ranked = rankStudios(brief, studios);
+  const ranked = rankStudios(brief, studios, 9, { allowUnverified: showUnverifiedStudios() });
 
   /**
    * Whom to compare: their shortlist if they made one, otherwise our top four.
@@ -93,6 +94,19 @@ export default async function ComparePage({
   if (!result.ok) redirect('/quotes');
 
   await record('compare.view', { studios: result.quotes.length });
+
+  /**
+   * One per studio, so each can see how often it reached the comparison — the
+   * stage where a shortlist becomes a decision, and the most informative drop
+   * in the studio funnel.
+   *
+   * Sequential rather than `Promise.all`: `record` already swallows its own
+   * failures, and firing three or four writes at a pooled connection to save
+   * two milliseconds on a page that has just run a quotation is a poor trade.
+   */
+  for (const quote of result.quotes) {
+    await record('studio.compared', { studioSlug: quote.studioSlug });
+  }
 
   const comparison = compareQuotes(
     result.quotes.map((q) => ({ studioId: q.studioId, quote: q.quote })),

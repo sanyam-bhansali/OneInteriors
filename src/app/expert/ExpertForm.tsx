@@ -41,10 +41,34 @@ export function ExpertForm({
           read your brief, your floor plan and every quote on your comparison — you will not have
           to explain any of it again.
         </p>
-        <p className="m-0 text-[15px] leading-relaxed text-[var(--color-ink-2)]">
+        <p className="m-0 mb-6 text-[15px] leading-relaxed text-[var(--color-ink-2)]">
           On the call we go through the studios you picked and help you choose one. If it is clear
           none of them fits, we will say that too, and go back to the roster.
         </p>
+
+        {/* The reason this screen is not the end of the page.
+            A confirmation with nothing after it is a dead end at the highest-
+            intent moment we ever get — they have just handed over a phone
+            number, and the next thing they do is go and fill in somebody
+            else's form, because waiting is not an activity. The prep pack is
+            the activity, and it makes their own call better, which is the only
+            honest reason to offer it. */}
+        <div className="border-t border-[var(--color-ontrack)]/40 pt-6">
+          <p className="m-0 mb-4 text-[15px] leading-relaxed text-[var(--color-ink-2)]">
+            While you wait, go through your home room by room — what each one costs, and the one
+            decision in each that moves the number. The calls that go well are the ones where you
+            already know which three things you are choosing between.
+          </p>
+          <a
+            href="/prepare"
+            className="inline-flex items-center justify-center rounded-full bg-[var(--color-petrol)] px-7 py-3.5 text-[15px] font-medium text-[var(--color-paper)] hover:bg-[var(--color-petrol-deep)]"
+          >
+            Prepare for the call
+          </a>
+          <p className="m-0 mt-3 text-[13.5px] text-[var(--color-ink-3)]">
+            Takes about fifteen minutes. Entirely optional, and your call is booked either way.
+          </p>
+        </div>
       </div>
     );
   }

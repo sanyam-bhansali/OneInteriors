@@ -77,8 +77,12 @@ export default function ApplyPage() {
           </Container>
         </section>
 
+        {/* `wide`, not `narrow`. The form is laid out in two columns of its own
+            — what we are asking for on the left, the boxes on the right — so it
+            needs the width the hero above it already uses. In a 672px column it
+            was a single stack of full-width pills adrift in an empty screen. */}
         <section className="py-12 sm:py-16">
-          <Container size="narrow">
+          <Container size="wide">
             <ApplyForm />
           </Container>
         </section>

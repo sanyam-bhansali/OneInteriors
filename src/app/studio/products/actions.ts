@@ -1,0 +1,73 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { rupeesToPaise } from '@/lib/money';
+import {
+  setProductRate,
+  setProductActive,
+  addProduct,
+  type SaveResult,
+} from '@/modules/studio-quote/store';
+import type { QuoteUnitName, WorkCodeName } from '@/modules/studio-quote/pricing';
+
+/**
+ * The product master's writes.
+ *
+ * Every one of these re-checks ownership inside `store.ts` — a product id
+ * arriving in a form is not proof that it belongs to the studio submitting it,
+ * and the store scopes each update by `studioId` so a stolen id matches nothing
+ * rather than editing a competitor's price list.
+ */
+
+export type State = { ok: true } | { ok: false; error: string } | { idle: true };
+export const IDLE: State = { idle: true };
+
+function done(result: SaveResult): State {
+  if (!result.ok) return result;
+  revalidatePath('/studio/products');
+  revalidatePath('/studio/quotations');
+  return { ok: true };
+}
+
+/**
+ * Rates arrive in rupees because that is what a studio thinks in, and are
+ * stored in paise because that is what the ledger is in. `rupeesToPaise` is the
+ * only conversion point — it rounds once, and it throws rather than silently
+ * truncating on something that is not a number.
+ */
+export async function saveRateAction(_prev: State, form: FormData): Promise<State> {
+  const id = String(form.get('id') ?? '');
+  const raw = String(form.get('rate') ?? '').trim();
+
+  if (!id) return { ok: false, error: 'No product.' };
+  if (raw === '') return done(await setProductRate(id, 0));
+
+  const rupees = Number(raw);
+  if (!Number.isFinite(rupees) || rupees < 0) {
+    return { ok: false, error: 'A number, please.' };
+  }
+
+  return done(await setProductRate(id, rupeesToPaise(rupees)));
+}
+
+export async function toggleActiveAction(id: string, isActive: boolean): Promise<State> {
+  return done(await setProductActive(id, isActive));
+}
+
+export async function addProductAction(_prev: State, form: FormData): Promise<State> {
+  const rupees = Number(String(form.get('rate') ?? '0').trim() || '0');
+  if (!Number.isFinite(rupees) || rupees < 0) {
+    return { ok: false, error: 'A number for the rate, please.' };
+  }
+
+  return done(
+    await addProduct({
+      name: String(form.get('name') ?? ''),
+      code: (String(form.get('code') ?? 'MODULAR') as WorkCodeName) || 'MODULAR',
+      unit: (String(form.get('unit') ?? 'AREA') as QuoteUnitName) || 'AREA',
+      ratePaise: rupeesToPaise(rupees),
+      rooms: form.getAll('rooms').map(String),
+      details: String(form.get('details') ?? ''),
+    }),
+  );
+}

@@ -22,8 +22,9 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
+import { hasDatabase } from '@/lib/env';
 import { Prisma } from '@prisma/client';
-import { requireRole, type AuthUser } from '@/modules/auth/session';
+import { getCurrentUser, hasRole, type AuthUser } from '@/modules/auth/session';
 import { validateGstin } from '@/modules/verification/gstin';
 import { missingCoreRates } from '@/modules/quotation/categories';
 import { lakhsToPaise } from '@/lib/money';
@@ -67,6 +68,8 @@ export interface StudioContext {
     portfolioCount: number;
     missingRates: string[];
     submittedForReview: boolean;
+    gstinNotApplicable: boolean;
+    gstinNote: string | null;
   };
 }
 
@@ -74,10 +77,52 @@ export interface StudioContext {
  * The signed-in user's studio. Ops and admins are deliberately *not* given a
  * studio here — an ops account editing a studio's own words through the studio
  * UI would leave an audit trail saying the studio wrote it.
+ *
+ * ## Why this reads the session rather than requiring a role
+ *
+ * `requireRole` throws, and every caller of this is a page render. Next renders
+ * a layout and its page in parallel, so a throw here beats the layout's
+ * redirect and a signed-out visitor gets a 500 instead of the sign-in screen.
+ * That is not hypothetical — it is the bug that took /ops down, and the fix
+ * there was to strip the throwing guard out of every render-path read.
+ *
+ * Returning null is the correct behaviour anyway: the callers already handle
+ * "no studio on this account", and a non-studio user has no studio by
+ * definition.
+ *
+ * Note that this is still the authorisation check for every write in this file,
+ * not just a convenience for rendering — each of them begins with
+ * `const context = await currentStudio()` and refuses on null. The role test
+ * above is what makes that safe, so it must not be weakened to a bare
+ * membership lookup.
  */
 export async function currentStudio(): Promise<StudioContext | null> {
-  const user = await requireRole('STUDIO');
+  const user = await getCurrentUser();
+  // `hasRole` is not a type predicate, so the null check has to stand on its
+  // own or `user.id` below is an error.
+  if (!user || !hasRole(user, 'STUDIO')) return null;
 
+  /**
+   * Guarded, and the guard matters more here than almost anywhere else.
+   *
+   * This is the first `await` on all six studio routes, and it was the only
+   * read on the surface with neither a `hasDatabase()` check nor a try/catch —
+   * so an unset `DATABASE_URL` or an unreachable database took the entire
+   * studio side down with an unhandled throw, while the layout wrapped around
+   * it degraded politely. Every caller already handles null, which is the
+   * honest answer to "which studio is this" when we cannot ask.
+   */
+  if (!hasDatabase()) return null;
+
+  try {
+    return await loadStudio(user);
+  } catch (error) {
+    console.error('[studio] currentStudio failed', error);
+    return null;
+  }
+}
+
+async function loadStudio(user: AuthUser): Promise<StudioContext | null> {
   const member = await prisma.studioMember.findUnique({
     where: { userId: user.id },
     include: { studio: { include: { _count: { select: { portfolio: true } } } } },
@@ -114,6 +159,8 @@ export async function currentStudio(): Promise<StudioContext | null> {
       portfolioCount: s._count.portfolio,
       missingRates: missingCoreRates(rates as never),
       submittedForReview: steps.submittedForReview === true,
+      gstinNotApplicable: s.gstinNotApplicable,
+      gstinNote: s.gstinNote,
     },
   };
 }
@@ -164,6 +211,29 @@ export async function saveProfile(input: ProfileInput): Promise<SaveResult> {
     errors.minLakhs = 'The smallest project cannot be larger than the largest.';
   }
 
+  /**
+   * These four are required by `assessSteps`, and were not validated here.
+   *
+   * The effect was a form that accepted blanks, returned a green "Saved.", and
+   * left the step unticked with "Still needed: years active, team size" back on
+   * the checklist. The studio had done exactly what the page asked and was told
+   * nothing was wrong and that something was missing, in that order. Validating
+   * at the point of saving is the only place that reads as an answer rather
+   * than a contradiction.
+   */
+  if (input.yearsActive === undefined) {
+    errors.yearsActive = 'How long have you been going? Put 0 if this is your first year.';
+  }
+  if (input.teamSize === undefined) {
+    errors.teamSize = 'How many of you are there? Including yourself.';
+  }
+  if (input.minLakhs === undefined) {
+    errors.minLakhs = 'The smallest project you will take. This is the filter that protects your time.';
+  }
+  if (input.maxLakhs === undefined) {
+    errors.maxLakhs = 'And the largest you are set up to deliver.';
+  }
+
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
   await prisma.studio.update({
@@ -173,6 +243,8 @@ export async function saveProfile(input: ProfileInput): Promise<SaveResult> {
       localities,
       website: input.website?.trim() || null,
       instagram: input.instagram?.trim() || null,
+      // `?? null` and not `|| null` — a first-year studio answers 0, and `||`
+      // would store that as "not answered".
       yearsActive: input.yearsActive ?? null,
       teamSize: input.teamSize ?? null,
       minProjectPaise: input.minLakhs ? BigInt(lakhsToPaise(input.minLakhs)) : null,
@@ -211,7 +283,41 @@ export async function saveGstin(raw: string): Promise<SaveResult> {
 
   await prisma.studio.update({
     where: { id: context.studio.id },
-    data: { gstin: result.gstin },
+    // Recording a number withdraws any earlier "we do not have one" — they are
+    // mutually exclusive answers to the same question, and leaving both set
+    // would show a verifier a contradiction to resolve by guessing.
+    data: { gstin: result.gstin, gstinNotApplicable: false, gstinNote: null },
+  });
+
+  return { ok: true };
+}
+
+/**
+ * The other answer: this studio has no GST registration.
+ *
+ * A declared absence, not a blank. The note is required because "no GSTIN" on
+ * its own tells a verifier nothing about what to check instead, and the whole
+ * point of accepting this answer is that it routes them to a different
+ * verification path rather than out of the roster.
+ */
+export async function declareNoGstin(note: string): Promise<SaveResult> {
+  const context = await currentStudio();
+  if (!context) return { ok: false, errors: { form: 'No studio is linked to this account.' } };
+
+  const trimmed = note.trim();
+  if (trimmed.length < 10) {
+    return {
+      ok: false,
+      errors: {
+        gstinNote:
+          'A sentence is enough — proprietorship below the threshold, registration in progress, whatever it is. It tells us how to verify you instead.',
+      },
+    };
+  }
+
+  await prisma.studio.update({
+    where: { id: context.studio.id },
+    data: { gstinNotApplicable: true, gstinNote: trimmed.slice(0, 500), gstin: null },
   });
 
   return { ok: true };

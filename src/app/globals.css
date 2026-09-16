@@ -285,3 +285,99 @@ p {
     scroll-behavior: auto !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   THE STUDIO APP
+   ─────────────────────────────────────────────────────────────
+   A different surface with a different job, so a different palette.
+
+   The marketplace above is warm paper and petrol — it is a place a
+   homeowner reads. This is a tool a studio owner operates for hours,
+   and it follows the reference: a sage ground so white cards lift off
+   it, a cream rail down the left, and terracotta reserved for the one
+   thing on each screen you can act on.
+
+   Scoped to `.studio-app` rather than overriding the root, so nothing
+   on the customer side moves.
+   ───────────────────────────────────────────────────────────── */
+.studio-app {
+  --s-ground: #dfe0d2;
+  --s-rail: #eceddf;
+  --s-rail-active: #d9dbc4;
+  --s-surface: #fbfbf6;
+  --s-surface-2: #f4f4ec;
+  --s-rule: #d3d5c2;
+  --s-rule-soft: #e3e4d6;
+
+  --s-ink: #232520;
+  --s-ink-2: #55584c;
+  --s-ink-3: #838775;
+
+  /* The one accent. Anything terracotta is something you can do. */
+  --s-accent: #c0613c;
+  --s-accent-deep: #a44f2e;
+  --s-accent-wash: #f6e6de;
+
+  --s-tag: #e7dcc6;
+  --s-tag-ink: #6b563a;
+
+  --s-good: #3f7a46;
+  --s-good-wash: #e0eddf;
+  --s-warn: #9a6a12;
+  --s-warn-wash: #f5eada;
+  --s-bad: #a8453a;
+  --s-bad-wash: #f6e3e0;
+
+  background: var(--s-ground);
+  color: var(--s-ink);
+
+  /* ── Why this surface has no dark mode ──────────────────────────
+     There was a `prefers-color-scheme: dark` block here that
+     repainted all of the above in charcoal and olive. On a machine
+     set to dark — which is most of them — it meant nobody ever saw
+     the palette this surface was designed in, and the reference the
+     whole scheme was taken from is a light one: paper, sage, one
+     terracotta. A dark translation of it is a different design that
+     happens to share the hues.
+
+     `color-scheme: light` is the second half. Without it the browser
+     still paints its OWN widgets dark — date pickers, select popups,
+     scrollbars, autofill — so a light page grows black dropdowns.
+     ───────────────────────────────────────────────────────────── */
+  color-scheme: light;
+}
+
+/* A card. One radius, one border, no shadow stack. */
+.s-card {
+  background: var(--s-surface);
+  border: 1px solid var(--s-rule);
+  border-radius: 12px;
+}
+
+/* A tag. Soft, quiet, never the loudest thing in a row. */
+.s-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--s-tag);
+  color: var(--s-tag-ink);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+/* Tabular figures wherever money or quantities line up in a column. */
+.s-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.s-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  color: var(--s-ink-3);
+}

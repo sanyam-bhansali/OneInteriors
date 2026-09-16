@@ -25,6 +25,20 @@ export const EVENTS = [
   'quote.view',
   'compare.view',
   'studio.view',
+  /**
+   * One per studio on a comparison, carrying `studioSlug`.
+   *
+   * Separate from `compare.view`, which counts comparisons and carries only a
+   * cardinality. This is the per-studio record, and it exists because a studio
+   * needs to know how often it reached the comparison — the stage where the
+   * shortlist becomes a decision.
+   *
+   * Why not an array prop on `compare.view`: `PropValue` is deliberately narrow
+   * and does not admit arrays, and widening it to carry one list would open the
+   * door to arbitrary structures in a field whose whole safety argument is that
+   * it holds counts and slugs.
+   */
+  'studio.compared',
   'enquiry.sent',
   'signin.requested',
   'signin.completed',

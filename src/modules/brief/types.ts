@@ -102,6 +102,15 @@ export interface Brief {
   // Q9 — timeline
   moveInBy: string | null; // ISO date
 
+  /**
+   * The builder's floor plan, by display name, once uploaded.
+   *
+   * Read-only in the domain type: uploading is its own action and the quiz must
+   * never write this back. Never the storage path — that stays server-side, and
+   * the file itself is reachable only through a short signed URL.
+   */
+  floorPlanName: string | null;
+
   // Progress
   lastStep: number;
   completedAt: string | null;
@@ -122,6 +131,7 @@ export const EMPTY_BRIEF: Brief = {
   priorityRanking: [],
   involvement: null,
   moveInBy: null,
+  floorPlanName: null,
   lastStep: 0,
   completedAt: null,
 };

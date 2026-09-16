@@ -1,33 +1,35 @@
 import type { Metadata } from 'next';
-import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Container, Button } from '@/components/ui';
 import { Wordmark } from '@/components/brand';
-import { consumeMagicLink } from '@/modules/auth/magic-link';
-import { safeNext } from '@/lib/site';
-import { claimBrief } from '@/modules/brief/repository';
-import { claimConsent } from '@/modules/consent/record';
-import { record } from '@/modules/analytics/record';
-import { prisma } from '@/lib/prisma';
 
 export const metadata: Metadata = {
-  title: 'Signing in',
+  title: 'Sign-in link',
   robots: { index: false, follow: false },
 };
 
-/**
- * Consumes the link and opens a session.
- *
- * `dynamic = 'force-dynamic'` matters: this must never be prerendered or
- * cached, and it sets a cookie.
- */
 export const dynamic = 'force-dynamic';
 
+/**
+ * Why a sign-in link did not work.
+ *
+ * ## What this page used to be
+ *
+ * It used to consume the link itself — and threw on every click, because
+ * opening a session writes a cookie and **Next refuses a cookie write during a
+ * server component render**. Email sign-in was broken for everyone, which meant
+ * studios and ops accounts could not get in at all, since those are created
+ * with an address and no phone.
+ *
+ * The consuming moved to `/auth/verify`, a Route Handler, where a cookie write
+ * is allowed. This is now only the explanation, and it deliberately has no
+ * access to a token: a page that cannot consume a link cannot accidentally
+ * start consuming one again.
+ */
 const MESSAGES: Record<string, { title: string; body: string }> = {
   invalid: {
     title: 'That link is not valid',
-    body: 'It may have been copied incompletely. Request a fresh one — they only take a moment.',
+    body: 'It may have been copied incompletely — email clients sometimes break a long link across two lines. Request a fresh one; they only take a moment.',
   },
   expired: {
     title: 'That link has expired',
@@ -35,53 +37,21 @@ const MESSAGES: Record<string, { title: string; body: string }> = {
   },
   used: {
     title: 'That link has already been used',
-    body: 'Each link works exactly once. If you are not signed in, request another.',
+    body: 'Each link works exactly once — that is what stops a forwarded email from becoming a way into your account. If you are not signed in, request another.',
   },
   no_account: {
     title: 'No account for that address',
-    body: 'Ask an admin to add you. We do not create accounts automatically.',
+    body: 'Studio and team accounts are created by invitation rather than by signing up. Ask us to add you.',
   },
 };
 
-export default async function VerifyPage({
+export default async function VerifyProblemPage({
   searchParams,
 }: {
-  searchParams: Promise<{ token?: string; next?: string }>;
+  searchParams: Promise<{ reason?: string }>;
 }) {
-  const { token, next } = await searchParams;
-  const h = await headers();
-
-  const result = await consumeMagicLink(token ?? '', {
-    userAgent: h.get('user-agent'),
-    ip: h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
-  });
-
-  if (result.ok) {
-    // Attach anything this browser did before signing in. Both are best-effort
-    // and neither may block the sign-in — a failed claim costs a brief, a
-    // failed sign-in costs the customer.
-    const { claimed, anonKey } = await claimBrief(result.userId);
-    await claimConsent(result.userId, anonKey);
-    if (claimed) await record('brief.claimed');
-    await record('signin.completed');
-
-    const user = await prisma.user.findUnique({ where: { id: result.userId } });
-
-    // Where they were headed wins, for customers. Someone who clicked "get my
-    // quotes", signed in, and landed on the marketing homepage has been sent
-    // back to the start of a journey they were four steps into — which is what
-    // this page did before, because it never read `next` at all.
-    const destination = safeNext(next ?? null);
-
-    if (user?.role === 'OPS' || user?.role === 'ADMIN') redirect(destination ?? '/ops');
-    if (user?.role === 'STUDIO') redirect(destination ?? '/studio');
-    if (destination) redirect(destination);
-    // A customer who signed in mid-funnel wants their matches, not the
-    // landing page they have already read.
-    redirect(claimed ? '/match' : '/');
-  }
-
-  const message = MESSAGES[result.reason] ?? MESSAGES.invalid;
+  const { reason } = await searchParams;
+  const message = MESSAGES[reason ?? ''] ?? MESSAGES.invalid;
 
   return (
     <main className="flex min-h-dvh flex-col justify-center py-12">

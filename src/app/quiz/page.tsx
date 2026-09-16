@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { cachedRoster } from '@/modules/studio/roster-cache';
+import { showUnverifiedStudios } from '@/lib/env';
 import { QuizClient } from './QuizClient';
 
 export const metadata: Metadata = {
@@ -17,5 +18,7 @@ export const dynamic = 'force-dynamic';
  */
 export default async function QuizPage() {
   const studios = await cachedRoster();
-  return <QuizClient studios={studios} />;
+  // The live "N studios match so far" counter ranks in the browser, so the gate
+  // is read here and handed down. See MatchClient for the full reasoning.
+  return <QuizClient studios={studios} allowUnverified={showUnverifiedStudios()} />;
 }

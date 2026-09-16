@@ -43,7 +43,23 @@ export function isValidEmail(raw: string): boolean {
 }
 
 export type RequestResult =
-  | { ok: true; devLink?: string }
+  | {
+      ok: true;
+      devLink?: string;
+      /**
+       * Did the email actually leave the building?
+       *
+       * `false` when no provider is configured, or the provider refused. This
+       * is for INTERNAL callers only — ops approving a studio needs to know the
+       * link did not send, because otherwise they tell a studio to check their
+       * inbox for a message nobody wrote.
+       *
+       * The customer-facing sign-in form must ignore it. Its message is
+       * deliberately identical whether or not an account exists, and varying it
+       * by delivery would turn the form into an account-enumeration oracle.
+       */
+      delivered?: boolean;
+    }
   | { ok: false; reason: 'invalid_email' | 'rate_limited' };
 
 /**
@@ -80,8 +96,19 @@ export async function requestMagicLink(
   });
 
   const next = safeNext(meta.next);
+
+  /**
+   * `/auth/verify` is a Route Handler, not a page.
+   *
+   * It has to be: consuming the link writes a session cookie, and Next refuses
+   * a cookie write during a server component render. This pointed at
+   * `/sign-in/verify` — a page — and every click threw "Cookies can only be
+   * modified in a Server Action or Route Handler", which meant email sign-in
+   * had never worked for anybody. `/sign-in/verify` is now the error screen
+   * that handler redirects to.
+   */
   const link =
-    `${meta.baseUrl}/sign-in/verify?token=${encodeURIComponent(token)}` +
+    `${meta.baseUrl}/auth/verify?token=${encodeURIComponent(token)}` +
     (next ? `&next=${encodeURIComponent(next)}` : '');
 
   /**
@@ -105,11 +132,14 @@ export async function requestMagicLink(
     // In development with no email provider configured, hand the link back so
     // sign-in works offline. Never in production.
     if (!sent.delivered && process.env.NODE_ENV !== 'production') {
-      return { ok: true, devLink: link };
+      return { ok: true, devLink: link, delivered: false };
     }
+    return { ok: true, delivered: sent.delivered };
   }
 
-  return { ok: true };
+  // No deliverable account. Reported as delivered so the caller cannot tell the
+  // difference — see the note on `RequestResult`.
+  return { ok: true, delivered: true };
 }
 
 export type ConsumeResult =

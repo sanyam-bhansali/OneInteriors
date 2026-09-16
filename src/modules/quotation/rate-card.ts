@@ -17,6 +17,7 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
+import { hasDatabase } from '@/lib/env';
 import { requireRole } from '@/modules/auth/session';
 import { currentStudio } from '@/modules/studio/onboarding';
 import { rupeesToPaise, fromDb, type Paise } from '@/lib/money';
@@ -25,8 +26,23 @@ import type { RateCard } from './price';
 
 export type SaveResult = { ok: true } | { ok: false; errors: Record<string, string> };
 
-/** Read one studio's card. Used by the quote engine, so it takes an id. */
+/**
+ * Read one studio's card. Used by the quote engine, so it takes an id.
+ *
+ * The `hasDatabase()` guard is not defensive decoration. Every other module in
+ * the codebase degrades to fixtures without a database; this one did not, and
+ * because it sits on the hot path of `quoteBrief()`, its absence turned
+ * `/quotes`, `/compare`, `/expert` and `/shared/[token]` into 500s on a
+ * fixture-only deployment. The roster fell back and the pricing did not, so the
+ * "it works without a database" story was only half true in exactly the place
+ * it mattered.
+ *
+ * An empty card is the honest answer: no rates means no quote, and
+ * `quoteBrief` already handles that by skipping the studio and saying so.
+ */
 export async function rateCardFor(studioId: string): Promise<RateCard> {
+  if (!hasDatabase()) return {};
+
   const items = await prisma.rateCardItem.findMany({ where: { studioId } });
 
   const card: RateCard = {};

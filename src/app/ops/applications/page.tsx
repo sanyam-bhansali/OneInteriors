@@ -35,7 +35,7 @@ export default async function ApplicationsPage() {
                 {open.length} waiting on us
               </h1>
             </div>
-            <Link href="/ops" className="label text-[var(--color-petrol)] no-underline">
+            <Link href="/ops/verification" className="label text-[var(--color-petrol)] no-underline">
               Verification queue →
             </Link>
           </div>

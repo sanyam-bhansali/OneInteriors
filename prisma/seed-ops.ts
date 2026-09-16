@@ -11,6 +11,8 @@
  * Idempotent: run it again on the same address to promote an existing user.
  */
 
+// Must be first: it populates DATABASE_URL before PrismaClient reads it.
+import './load-env';
 import { PrismaClient, UserRole } from '@prisma/client';
 
 const prisma = new PrismaClient();

@@ -18,7 +18,23 @@ export function Container({
   size?: 'default' | 'narrow' | 'wide';
   className?: string;
 }) {
-  const max = size === 'narrow' ? 'max-w-2xl' : size === 'wide' ? 'max-w-6xl' : 'max-w-4xl';
+  /**
+   * Three measures, and each one is a decision about reading rather than about
+   * screen size.
+   *
+   * `narrow` (672px) is prose — around 70 characters at our body size, which is
+   * where a line stops being comfortable. `default` (896px) is prose with
+   * something beside it. `wide` (1280px) is for layouts that genuinely have two
+   * or three columns of their own; it went up from 1152px because the ops
+   * tables and the studio listing were wrapping at widths where the screen had
+   * room to spare.
+   *
+   * Nothing here goes to full-bleed on purpose. A form field stretched to
+   * 1900px is not "using the space" — it is a 2-digit answer in a box wide
+   * enough for a paragraph, and it reads as broken. Space is used by adding a
+   * column, not by stretching one.
+   */
+  const max = size === 'narrow' ? 'max-w-2xl' : size === 'wide' ? 'max-w-7xl' : 'max-w-4xl';
   return <div className={`mx-auto w-full ${max} px-5 sm:px-6 ${className}`}>{children}</div>;
 }
 

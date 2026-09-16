@@ -49,7 +49,22 @@ function StrengthBars({ level }: { level: number }) {
   );
 }
 
-export function MatchClient({ studios }: { studios: Studio[] }) {
+export function MatchClient({
+  studios,
+  /**
+   * Whether the development gate is open, decided on the server.
+   *
+   * Not read from the environment here: this component runs in the browser, and
+   * `DEV_SHOW_UNVERIFIED_STUDIOS` is deliberately not `NEXT_PUBLIC_`, so it
+   * would be `undefined` in the bundle. Defaults to the strict answer, so a
+   * caller that forgets to pass it gets the safe behaviour rather than the
+   * permissive one.
+   */
+  allowUnverified = false,
+}: {
+  studios: Studio[];
+  allowUnverified?: boolean;
+}) {
   const [brief, setBrief] = useState<Brief>(EMPTY_BRIEF);
   const [hydrated, setHydrated] = useState(false);
 
@@ -59,8 +74,8 @@ export function MatchClient({ studios }: { studios: Studio[] }) {
   }, []);
 
   const matches = useMemo(
-    () => (hydrated ? rankStudios(brief, studios, 9) : []),
-    [brief, hydrated, studios],
+    () => (hydrated ? rankStudios(brief, studios, 9, { allowUnverified }) : []),
+    [brief, hydrated, studios, allowUnverified],
   );
   const primary = brief.styleLikes[0] ?? null;
 

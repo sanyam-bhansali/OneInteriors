@@ -8,6 +8,7 @@ import { formatINR, formatINRCompact } from '@/lib/money';
 import { briefByShareToken } from '@/modules/brief/share';
 import { cachedRoster } from '@/modules/studio/roster-cache';
 import { rankStudios } from '@/modules/matching/score';
+import { showUnverifiedStudios } from '@/lib/env';
 import { quoteBrief } from '@/modules/quotation/generate';
 import { compareQuotes } from '@/modules/quotation/price';
 import { record } from '@/modules/analytics/record';
@@ -62,7 +63,9 @@ export default async function SharedPage({
   const { brief } = shared;
 
   const studios = await cachedRoster();
-  const ranked = rankStudios(brief, studios).slice(0, MAX_COMPARE);
+  const ranked = rankStudios(brief, studios, 9, {
+    allowUnverified: showUnverifiedStudios(),
+  }).slice(0, MAX_COMPARE);
   const result = await quoteBrief(
     brief,
     ranked.map((r) => r.studioId),
