@@ -127,9 +127,38 @@ gaps (import / pool / assignment / bin / search), then team-seats-billing.
 
 ### Design direction
 
-The visual reference is **Interioring** — light, paper-white cards, sage ground,
-one terracotta accent. Instruction was *"i need the color theme of them only"*,
-resolved as: **keep our sidebar layout, take only their palette.**
+There are now **two palettes in this repo, deliberately**, and neither is
+global.
+
+**`.oi-landing` — "Tactile Assurance", the locked marketing palette.** Raw Silk
+`#EAE6DF` ground, Alabaster `#FCFCFA` cards, Deep Espresso `#2C2624` ink,
+Terracotta `#C0613C`, Muted Sage `#839073`, Hairline `#DBD5CB`. Typography is
+Instrument Serif for headlines, Instrument Sans for body and UI, IBM Plex Mono
+for **evidence only** — labels, eyebrows, money, quantities, specs, scores,
+never body copy. Squared corners everywhere except glass surfaces and what sits
+inside them. The full spec lives in the design-system folder's `CLAUDE.md`, and
+Palette A (beige/charcoal/deep terracotta/olive) is **rejected**.
+
+Two rules from it that are easy to break by accident:
+
+- **Terracotta is for high-intent actions and attention flags only.** A
+  terracotta rule or hover state costs the primary button its meaning.
+- **Never describe getting a quote as *requesting* one.** The first quote is
+  priced from the studio's own filed rate card in about three seconds; no
+  studio is asked and nobody is phoned. "Request a quote" is what every
+  lead-gen competitor says and it means *we will pass on your number*. Every
+  CTA says **get**.
+
+**`.studio-app` — the studio software palette.** Sage `#dfe0d2` ground, rail
+`#eceddf`, terracotta `#c0613c` accent, taken from the Interioring reference on
+the instruction *"i need the color theme of them only"* — keep our sidebar
+layout, take only their palette.
+
+The customer journey (`/quiz`, `/match`, `/quotes`, `/compare`, `/expert`) and
+the ops console are still on the **older paper/petrol tokens** in `@theme`.
+That is a known inconsistency, not an oversight: bringing them onto Tactile
+Assurance is a redesign of eight screens and should be its own piece of work,
+not a side-effect of a landing-page change.
 
 Tokens live in `src/app/globals.css` under a `.studio-app` scope so nothing on
 the customer side moves:

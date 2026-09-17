@@ -67,4 +67,127 @@ export const PHOTOS = {
     src: unsplash('photo-1600880292203-757bb62b4baf', 1200),
     alt: 'Two people going through drawings and quotes at a table',
   },
+
+  // ── Landing page ──────────────────────────────────────────────
+  // The same expiry applies to every one of these. The hero in
+  // particular is a placeholder for the bare-flat-to-finished-home
+  // film; until that MP4 exists, this still is what the section is
+  // judged on, so it has to be a room somebody could plausibly have
+  // finished in Kothrud.
+
+  /** Behind the frosted frame on the how-it-works spine. */
+  spine: {
+    src: unsplash('photo-1616486338812-3dadae4b4ace', 1400),
+    alt: 'A finished living room, looking through to the dining area',
+  },
+
+  /** The architect section. Dark enough for a glass card to sit on. */
+  architect: {
+    src: unsplash('photo-1616594039964-ae9021a400a0', 1400),
+    alt: 'A finished bedroom at dusk with layered lighting',
+  },
+
+  /** Why we built this. Somebody reading a drawing, not a stock handshake. */
+  film: {
+    src: unsplash('photo-1581094794329-c8112a89af12', 1400),
+    alt: 'A person going through a working drawing at a desk',
+  },
 } as const satisfies Record<string, Photo>;
+
+/**
+ * Finished work, with what it cost printed on it.
+ *
+ * Studio names here are INVENTED and must stay that way — Teakline Studio,
+ * Chitra & Co., Maya Workshop. Never a real partner's name on a marketing
+ * surface: a real studio's name beside an invented project and an invented
+ * figure is a claim about a real business that we made up.
+ *
+ * The photographs are the usual placeholders. The costs are illustrative of
+ * the published ₹5.95 L–₹27.2 L range and become real project figures when
+ * the photographs do.
+ */
+export interface FinishedProject {
+  locality: string;
+  areaSqft: number;
+  title: string;
+  note: string;
+  studio: string;
+  /** Display string, already in lakh. Mono, never wrapped. */
+  cost: string;
+  photo: Photo;
+}
+
+export const FINISHED_WORK: FinishedProject[] = [
+  {
+    locality: 'Kothrud',
+    areaSqft: 1180,
+    title: 'Kotah & cane',
+    note: 'Kotah stone floors kept, cane shutters through the living room, everything else new.',
+    studio: 'Teakline Studio',
+    cost: '₹18.4 L',
+    photo: {
+      src: unsplash('photo-1615529182904-14819c35db37', 900),
+      alt: 'A living room with cane shutters, a linen sofa and rattan pendants',
+    },
+  },
+  {
+    locality: 'Baner',
+    areaSqft: 960,
+    title: 'Oak & stone kitchen',
+    note: 'Quartz counter, 18mm BWP carcass, branded channels rated for ten years of use.',
+    studio: 'Chitra & Co.',
+    cost: '₹11.2 L',
+    photo: {
+      src: unsplash('photo-1600607686527-6fb886090705', 900),
+      alt: 'An oak kitchen with a quartz counter and black pendants',
+    },
+  },
+  {
+    locality: 'Wakad',
+    areaSqft: 1420,
+    title: 'Joinery & layers',
+    note: 'Full custom joinery, five lighting circuits, stone through the living and dining.',
+    studio: 'Teakline Studio',
+    cost: '₹24.6 L',
+    photo: {
+      src: unsplash('photo-1616594039964-ae9021a400a0', 900),
+      alt: 'A bedroom with full-height joinery and layered lighting',
+    },
+  },
+  {
+    locality: 'Kharadi',
+    areaSqft: 1050,
+    title: 'Plaster & teak',
+    note: 'Lime plaster walls, teak edging on every shutter, peripheral ceiling only.',
+    studio: 'Maya Workshop',
+    cost: '₹14.8 L',
+    photo: {
+      src: unsplash('photo-1586023492125-27b2c045efd7', 900),
+      alt: 'A bedroom with lime plaster walls and teak-edged wardrobes',
+    },
+  },
+  {
+    locality: 'Baner',
+    areaSqft: 780,
+    title: 'One-bedroom, done once',
+    note: 'A 1 BHK finished to the top band rather than a 2 BHK finished to the bottom one.',
+    studio: 'Chitra & Co.',
+    cost: '₹9.4 L',
+    photo: {
+      src: unsplash('photo-1503387762-592deb58ef4e', 900),
+      alt: 'A compact living room with built-in seating and open shelving',
+    },
+  },
+  {
+    locality: 'Aundh',
+    areaSqft: 1610,
+    title: 'Stone, brass and light',
+    note: 'Marine ply throughout, imported hardware, a site that ran four and a half months.',
+    studio: 'Maya Workshop',
+    cost: '₹27.2 L',
+    photo: {
+      src: unsplash('photo-1600880292203-757bb62b4baf', 900),
+      alt: 'A dining room with a stone table, brass fittings and layered light',
+    },
+  },
+];

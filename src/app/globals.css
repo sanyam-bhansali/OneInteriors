@@ -381,3 +381,103 @@ p {
   letter-spacing: 0.11em;
   color: var(--s-ink-3);
 }
+
+/* ─────────────────────────────────────────────────────────────
+   "TACTILE ASSURANCE" — the locked marketing palette.
+
+   Scoped to `.oi-landing` rather than overriding `:root`, for the
+   same reason `.studio-app` is scoped: the quiz, the match screens,
+   the ops console and the studio software all sit on the older
+   paper/petrol tokens, and repainting them from here would be a
+   redesign of eleven surfaces disguised as a landing-page change.
+
+   Palette A (beige / charcoal / deep terracotta / olive) is
+   rejected. Do not build new work on it.
+
+   The one rule worth restating: terracotta is for HIGH-INTENT
+   ACTIONS and attention flags only. The moment it is used for a
+   decorative rule or a hover state, the button stops reading as
+   the one thing on the screen to press.
+   ───────────────────────────────────────────────────────────── */
+.oi-landing {
+  --bg: #eae6df; /* Raw Silk — page background */
+  --card: #fcfcfa; /* Alabaster — cards, tables, quote documents */
+  --ink: #2c2624; /* Deep Espresso — primary type, dark surfaces */
+  --ink2: #6b615c; /* secondary ink on light */
+  --acc: #c0613c; /* Terracotta — high-intent actions, gap flags */
+  --sec: #839073; /* Muted Sage — verification, scores, better-spec */
+  --line: #dbd5cb; /* Hairline */
+
+  /* Warm card on glass. Used only inside glass frames. */
+  --glass: rgba(247, 242, 234, 0.76);
+
+  background: var(--bg);
+  color: var(--ink);
+
+  /* No dark mode on this surface. The palette is a light one and a
+     dark translation of it is a different design, not a variant. */
+  color-scheme: light;
+}
+
+/* Squared corners everywhere EXCEPT glass surfaces and what sits
+   inside them. That is the section language, and it is what stops
+   the page reading like every other rounded SaaS landing page. */
+.oi-glass {
+  border-radius: 26px;
+  background: var(--glass);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.oi-glass-inner {
+  border-radius: 14px;
+}
+
+/* Mono is for EVIDENCE — labels, eyebrows, money, quantities,
+   specs, counters, scores. Never for body copy. */
+.oi-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--acc);
+}
+
+.oi-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink2);
+}
+
+.oi-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  /* Money must never wrap. "₹5.95 L–₹27.2 L" broke across two lines
+     in review, orphaning the final L on a line of its own. */
+  white-space: nowrap;
+}
+
+/* Display type. Tight tracking at size, per the locked spec. */
+.oi-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  line-height: 1.06;
+}
+
+.oi-rule {
+  border-color: var(--line);
+}
+
+/* Hide the scrollbar on the horizontal rails without losing the
+   scroll itself — the drag affordance is the card cropped at the
+   edge, not a bar. */
+.oi-rail {
+  scrollbar-width: none;
+}
+.oi-rail::-webkit-scrollbar {
+  display: none;
+}

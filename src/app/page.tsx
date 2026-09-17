@@ -1,519 +1,672 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Container } from '@/components/ui';
-import { SiteHeader, SiteFooter } from '@/components/chrome';
-import { JOURNEY } from '@/modules/brief/journey';
-import { TIER, TIERS, tierRangeFor } from '@/modules/quotation/tiers';
-import { formatINRCompact } from '@/lib/money';
+import type { Metadata } from 'next';
 import { PHOTOS } from '@/lib/imagery';
-import { TIER_CHECKS } from '@/modules/studio/types';
-import { rosterIsReal } from '@/lib/env';
-import { StartCta } from '@/components/StartCta';
+import { Mark } from '@/components/brand';
+import { Wrap, Section, Eyebrow, Heading, Cta, Stat, SpecRow, PlayIcon } from '@/components/landing/parts';
+import { HowItWorks } from '@/components/landing/HowItWorks';
+import { Portfolio, Testimonials, Faq } from '@/components/landing/Interactive';
 
-const TOTAL_CHECKS = TIER_CHECKS.LISTED.length + TIER_CHECKS.VERIFIED.length;
-const SAMPLE_SQFT = 850;
-
-const TIER_PHOTO = {
-  ESSENTIAL: PHOTOS.essential,
-  PREMIUM: PHOTOS.premium,
-  LUXURY: PHOTOS.luxury,
-} as const;
+export const metadata: Metadata = {
+  title: 'One Interiors — verified interior studios in Pune',
+  description:
+    'Nine questions about your flat. Three studios matched to the answers. A first quote priced in three seconds, and an architect of your own while you compare.',
+};
 
 /**
- * The landing page.
+ * The landing page, built to the locked "Tactile Assurance" design system.
  *
- * ## What this page has to do, in order
+ * ## The one wording rule, and why it is not a detail
  *
- * A person arriving here is about to spend several lakh rupees with a stranger,
- * and the thing they are actually feeling is **fear of being cheated** — the
- * complaint corpus for this category is almost entirely about that, not about
- * taste. So the page is ordered to answer fear before it sells anything:
+ * Every call to action on this page says **get** a quote, never **request**
+ * one. The design system states it plainly: the first quote is generated from
+ * the studio's own filed rate card in about three seconds — no studio is
+ * asked, nobody is phoned — and it must never be described as requesting a
+ * quote.
  *
- *  1. **A finished room, immediately.** Not a promise, a result. This is the
- *     only emotional beat, and it goes first because someone who feels nothing
- *     will not read the argument.
- *  2. **What actually happens, named and numbered.** Uncertainty is the fear.
- *     Six named steps with honest durations turn an unknown process into a
- *     known one, and naming them gives the reader words to describe it to a
- *     spouse who was not here.
- *  3. **Price, before they have to ask.** Not knowing what something costs is
- *     the second fear, and every competitor makes you fill in a form to find
- *     out. Showing three real bands for a real flat size removes the whole
- *     "am I about to be quoted a silly number" question.
- *  4. **What we refuse to do.** The trust section is deliberately made of
- *     things that cost us something — we publish the bad numbers, we do not
- *     hold the money. Claims that cost nothing to make are read, correctly, as
- *     worthless.
+ * That is not pedantry about a verb. "Request a quote" is the exact phrase
+ * every lead-generation site in this category uses, and to a Pune homeowner who
+ * has used two of them it means *my number is about to be passed to people who
+ * will ring me*. It gives away the single thing this product does differently,
+ * in the first four words anybody reads.
  *
- * ## Typography
+ * ## Tokens
  *
- * A long headline set at display size in a narrow column wraps to two or three
- * words a line and reads as broken — which is what the first build of this
- * page did. So the display line is short enough to hold together, measures are
- * set in rem rather than `ch` (a `ch` at 80px is enormous and silently
- * overflows the container), and every long paragraph is capped near 62
- * characters, which is where reading speed peaks.
+ * Everything below sits inside `.oi-landing`, which is where the locked
+ * palette lives. It is scoped rather than global because the quiz, the match
+ * screens, the ops console and the studio software are all on the older
+ * paper/petrol tokens; repainting them from here would be a redesign of eleven
+ * surfaces disguised as a landing-page change. See `globals.css`.
+ *
+ * ## Photography
+ *
+ * Every image is licensed stock standing in for real project work, and the
+ * hero is a still where a film belongs. Both carry an expiry — see
+ * `src/lib/imagery.ts`. Replace before launch.
  */
-export default function Home() {
+
+const NAV = [
+  { href: '#how-it-works', label: 'How it works' },
+  { href: '#portfolio', label: 'Portfolio' },
+  { href: '#packages', label: 'Packages' },
+  { href: '#trust', label: 'Why trust us' },
+];
+
+const PACKAGES = [
+  {
+    name: 'Essential',
+    range: '₹5.9–9 L',
+    promise: 'Everything a flat needs to be lived in, nothing it doesn’t.',
+    specs: [
+      ['Carcass', '16MM MDF'],
+      ['Shutters', 'MATT LAMINATE'],
+      ['Hardware', 'STANDARD · 2 YR'],
+      ['Ceiling', 'PERIPHERAL ONLY'],
+    ],
+    featured: false,
+  },
+  {
+    name: 'Premium',
+    range: '₹9–16 L',
+    promise: 'Where most Pune 2 BHKs land once the kitchen is taken seriously.',
+    specs: [
+      ['Carcass', '18MM BWP'],
+      ['Shutters', 'VENEER + LAMINATE'],
+      ['Hardware', 'BRANDED · 10 YR'],
+      ['Ceiling', 'DESIGNED · 3 CIRCUITS'],
+    ],
+    featured: true,
+  },
+  {
+    name: 'Luxury',
+    range: '₹16–27 L',
+    promise: 'Custom joinery, stone, and a site that runs for four to five months.',
+    specs: [
+      ['Carcass', '18MM BWP · MARINE'],
+      ['Shutters', 'TEAK · ACRYLIC · GLASS'],
+      ['Hardware', 'IMPORTED · LIFETIME'],
+      ['Ceiling', 'LAYERED · 5 CIRCUITS'],
+    ],
+    featured: false,
+  },
+];
+
+const CHECKS = [
+  {
+    n: '01',
+    group: 'Identity',
+    title: 'GSTIN and registration verified',
+    body: 'Checked against the GST portal, not a screenshot they sent us.',
+  },
+  {
+    n: '02',
+    group: 'Work',
+    title: 'Two finished sites visited',
+    body: 'We stand in the flat. Photographs from a studio’s Instagram do not count.',
+  },
+  {
+    n: '03',
+    group: 'Clients',
+    title: 'Past clients called back',
+    body: 'Three calls, asked about delays and final versus quoted cost.',
+  },
+  {
+    n: '04',
+    group: 'Money',
+    title: 'Rate card filed with us',
+    body: 'Their own prices, on record, which is what your first quote is priced from.',
+  },
+  {
+    n: '05',
+    group: 'Labour',
+    title: 'In-house or named contractors',
+    body: 'You know who will actually be in your flat, before they arrive.',
+  },
+  {
+    n: '06',
+    group: 'After',
+    title: 'Written warranty terms',
+    body: 'On hardware, finish and workmanship — with the duration stated.',
+  },
+];
+
+export default function HomePage() {
   return (
-    <>
-      <SiteHeader />
+    // `relative` matters. The nav below is absolutely positioned, and the root
+    // layout renders the pre-launch roster banner above this page — without a
+    // positioning context here the nav would resolve against the document and
+    // sit on top of that banner.
+    <div className="oi-landing relative">
+      {/* ── Nav ── */}
+      <header className="absolute inset-x-0 top-0 z-30">
+        <Wrap>
+          <div className="flex items-center justify-between gap-6 py-5">
+            <Link href="/" className="flex items-center gap-2.5 no-underline" aria-label="One Interiors, home">
+              <Mark className="h-5 w-5 text-white" />
+              <span className="oi-display text-[19px] leading-tight text-white">One Interiors</span>
+              <span className="oi-num ml-1 hidden text-[10px] uppercase tracking-[0.18em] text-white/60 sm:inline">
+                Pune
+              </span>
+            </Link>
 
-      <main>
-        {/* ── Hero ───────────────────────────────────────────
-            Split rather than text-on-photo. Interior photography is light and
-            warm; white text over it needs a scrim heavy enough to ruin the
-            room, which defeats the point of leading with a room. */}
-        <section className="border-b border-[var(--color-rule)]">
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
-            <div className="flex items-center bg-[var(--color-paper)] px-6 py-14 sm:px-10 sm:py-20 lg:py-28 lg:pl-[max(2.5rem,calc((100vw-72rem)/2+1.5rem))] lg:pr-14">
-              <div className="w-full max-w-[34rem]">
-                <p className="m-0 mb-6 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.18em] text-[var(--color-ink-3)]">
-                  Pune · Interior design
-                </p>
-
-                {/* The fear, then the relief — in that order.
-                    "Know what your home costs before anyone visits" promised
-                    CONVENIENCE. Convenience is not what anyone is anxious about
-                    at eight lakh rupees; being left half-finished by someone
-                    who stops answering is. Naming a fear the reader already
-                    carries costs nothing and buys recognition.
-                    The line to hold: name a fear they HAVE. Never manufacture
-                    one. Scare-selling would make us the thing we are
-                    positioning against, and it would work for about a quarter. */}
-                <h1
-                  className="m-0 mb-6 font-[family-name:var(--font-display)] text-[clamp(2.5rem,5.2vw,4rem)] font-normal leading-[1.02] tracking-[-0.02em] text-[var(--color-ink)]"
-                  style={{ textWrap: 'balance' }}
+            <nav className="hidden items-center gap-7 lg:flex">
+              {NAV.map((item) => (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  className="text-[14px] text-white/75 no-underline transition-colors hover:text-white"
                 >
-                  Nine lakh rupees is a lot
-                  <br />
-                  <span className="italic text-[var(--color-petrol)]">to hand to a stranger.</span>
-                </h1>
+                  {item.label}
+                </a>
+              ))}
+              <Link
+                href="/expert"
+                className="border-b border-white/40 pb-0.5 text-[14px] text-white no-underline transition-colors hover:border-white"
+              >
+                Talk to an architect
+              </Link>
+            </nav>
 
-                <p className="m-0 mb-8 max-w-[36rem] text-[17px] leading-[1.65] text-[var(--color-ink-2)] sm:text-[18px]">
-                  So we check the studio before you meet them, show you what your flat costs before
-                  anyone visits it, and put someone on a call with you who has no stake in which
-                  one you pick. Nine questions, three minutes, and you will have real numbers.
-                </p>
+            {/* "Get", never "request". See the note at the top of this file. */}
+            <Cta href="/quiz" className="!px-5 !py-2.5 !text-[13.5px]">
+              Get my first quote
+            </Cta>
+          </div>
+        </Wrap>
+      </header>
 
-                <div className="mb-9 flex flex-wrap items-center gap-4">
-                  {/* Resumes if this browser already has a brief. A returning
-                      visitor clicking "Get my quotes" and landing on question
-                      one reads as the product having forgotten them. */}
-                  <StartCta fallbackNote="Three minutes · no sign-up to see your matches" />
-                </div>
+      {/* ── Hero ── */}
+      <section className="relative">
+        <div className="relative min-h-[max(640px,88vh)] w-full overflow-hidden">
+          <Image
+            src={PHOTOS.hero.src}
+            alt={PHOTOS.hero.alt}
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
+          />
+          <div
+            aria-hidden
+            className="absolute inset-0"
+            style={{
+              background:
+                'linear-gradient(to top, rgba(44,38,36,.88) 0%, rgba(44,38,36,.55) 42%, rgba(44,38,36,.30) 72%, rgba(44,38,36,.42) 100%)',
+            }}
+          />
 
-                {/* The trust strip. Facts with numbers in them, immediately
-                    under the button, because this is the moment of hesitation. */}
-                {/* The trust strip.
-                    Reordered so the strongest fact is first. "0% added to any
-                    quote" answers the question every visitor is silently asking
-                    about a free service — what is the catch — and it is the one
-                    a competitor cannot copy without changing how they earn.
-                    Burying it third, in three words, was wasting it. */}
-                <ul className="m-0 flex list-none flex-wrap gap-x-8 gap-y-3 border-t border-[var(--color-rule)] p-0 pt-6">
-                  <TrustFact figure="0%" label="added to any quote, ever" />
-                  <TrustFact figure="0" label="calls before you see prices" />
-                  <TrustFact figure={String(TOTAL_CHECKS)} label="checks before a studio appears" />
-                </ul>
+          <div className="absolute inset-x-0 bottom-0">
+            <Wrap className="pb-12 sm:pb-16">
+              {/* Contrast: this eyebrow sat over a plant at 40% opacity in
+                  review and could not be read. It is on the scrim now. */}
+              <p className="oi-num m-0 mb-5 text-[10.5px] uppercase tracking-[0.2em] text-white/80">
+                Bare flat → finished home · filmed in Kothrud
+              </p>
+
+              <h1 className="oi-display m-0 mb-5 max-w-[19ch] text-[clamp(2.1rem,1.3rem+3.3vw,3.7rem)] text-white">
+                Watch a Pune flat get finished. Then get quoted for yours.
+              </h1>
+
+              <p className="m-0 mb-9 max-w-[52ch] text-[16.5px] leading-[1.62] text-white/85">
+                Nine questions about your flat. Three studios matched to the answers. A first quote
+                priced in three seconds — and an architect of your own while you compare.
+              </p>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Cta href="/quiz">Get my first quote</Cta>
+                <a
+                  href="#film"
+                  className="inline-flex items-center gap-2.5 border border-white/30 px-5 py-3.5 text-[14px] text-white no-underline transition-colors hover:border-white/70"
+                >
+                  <PlayIcon />
+                  Watch the 90-second film
+                </a>
               </div>
-            </div>
+            </Wrap>
+          </div>
 
-            <div className="relative min-h-[22rem] lg:min-h-[38rem]">
-              <Image
-                src={PHOTOS.hero.src}
-                alt={PHOTOS.hero.alt}
-                fill
-                priority
-                sizes="(max-width: 1024px) 100vw, 52vw"
-                className="object-cover"
-              />
+          <div className="absolute bottom-12 right-0 hidden lg:block">
+            <Wrap>
+              <p className="oi-num m-0 text-right text-[10.5px] uppercase tracking-[0.18em] text-white/70">
+                Showreel · 06 projects
+              </p>
+            </Wrap>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Stats ──
+          Three figures, each with its provenance. The rating is real client
+          data from a studio's own finished projects, which is why it is
+          labelled as one studio's record rather than a site-wide average —
+          One Interiors has not delivered 41 projects and must not imply it. */}
+      <Section className="border-b border-[var(--line)] bg-[var(--card)]">
+        <Wrap>
+          <div className="grid divide-y divide-[var(--line)] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+            <Stat
+              figure="4.8"
+              unit="/ 5"
+              label="from 41 clients who finished a project"
+              source="One listed studio’s own record"
+            />
+            <Stat figure="68" label="briefs matched to Pune studios" />
+            <Stat
+              figure="₹5.95 L–₹27.2 L"
+              label="range of quotes compared here"
+            />
+          </div>
+
+          <div className="flex items-start gap-2.5 border-t border-[var(--line)] py-5">
+            <span style={{ color: 'var(--sec)' }} className="mt-0.5">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path
+                  d="M2.5 8.5 6 12l7.5-8"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+            <div>
+              <p className="m-0 text-[14px] font-medium">Free until you book</p>
+              <p className="m-0 text-[13px] text-[var(--ink2)]">studios pay us, never you</p>
             </div>
           </div>
-        </section>
+        </Wrap>
+      </Section>
 
-        {/* ── The journey ───────────────────────────────── */}
-        <section className="border-b border-[var(--color-rule)] bg-[var(--color-paper-2)] py-16 sm:py-24">
-          <Container size="wide">
-            <div className="mb-12 max-w-[44rem]">
-              <p className="m-0 mb-4 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-ink-3)]">
-                How it works
-              </p>
-              <h2
-                className="m-0 mb-5 font-[family-name:var(--font-display)] text-[clamp(2rem,4vw,3rem)] font-normal leading-[1.06] tracking-[-0.018em] text-[var(--color-ink)]"
-                style={{ textWrap: 'balance' }}
-              >
-                You will never wonder what happens next.
-              </h2>
-              <p className="m-0 max-w-[62ch] text-[17px] leading-[1.65] text-[var(--color-ink-2)]">                Every other enquiry you send today disappears into a call centre and comes back as a
-                salesperson. Here you can read all six steps before you start one of them.
-              </p>
+      {/* ── How it works — the pinned spine ── */}
+      <HowItWorks />
+
+      {/* ── Your architect ── */}
+      <section className="relative overflow-hidden">
+        <Image
+          src={PHOTOS.architect.src}
+          alt={PHOTOS.architect.alt}
+          fill
+          sizes="100vw"
+          className="object-cover"
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{ background: 'linear-gradient(160deg,rgba(44,38,36,.72),rgba(44,38,36,.86))' }}
+        />
+
+        <Wrap className="relative py-20 sm:py-24">
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <span className="flex items-center gap-2">
+              <Mark className="h-4 w-4 text-white/70" />
+              <span className="oi-display text-[16px] text-white/85">One Interiors</span>
+            </span>
+            <span className="oi-num text-[10px] uppercase tracking-[0.18em] text-white/55">
+              Your architect
+            </span>
+          </div>
+
+          <div className="oi-glass max-w-[720px] p-6 sm:p-8">
+            <p className="oi-label m-0 mb-3">Your architect · assigned to you</p>
+
+            <div className="mb-5 flex flex-wrap items-center gap-4">
+              <Image
+                src={PHOTOS.expert.src}
+                alt="Nikhil Bhave"
+                width={120}
+                height={120}
+                className="h-16 w-16 flex-none rounded-[12px] object-cover"
+              />
+              <div className="min-w-0">
+                <p className="oi-display m-0 text-[24px]">Nikhil Bhave</p>
+                <p className="m-0 text-[13.5px] leading-snug text-[var(--ink2)]">
+                  Stays with you from brief to handover. Paid by us, never by a studio.
+                </p>
+              </div>
             </div>
 
-            <ol className="m-0 grid list-none grid-cols-1 gap-px overflow-hidden rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-rule)] p-0 md:grid-cols-2 lg:grid-cols-3">
-              {JOURNEY.map((step, i) => (
-                <li key={step.name} className="flex flex-col bg-[var(--color-paper)] p-7">
-                  <div className="mb-5 flex items-center justify-between gap-3">
-                    <span className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.13em] text-[var(--color-petrol)]">
-                      {step.name}
-                    </span>
-                    <span className="font-[family-name:var(--font-mono)] text-[11px] tabular-nums text-[var(--color-rule)]">
-                      {String(i + 1).padStart(2, '0')}
-                    </span>
-                  </div>
-                  <h3 className="m-0 mb-2.5 font-[family-name:var(--font-display)] text-[22px] font-normal leading-[1.2] text-[var(--color-ink)]">
-                    {step.title}
-                  </h3>
-                  <p className="m-0 mb-6 flex-1 text-[14.5px] leading-[1.6] text-[var(--color-ink-2)]">
-                    {step.body}
-                  </p>
-                  <p className="m-0 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-ink-3)]">
-                    {step.duration}
-                  </p>
-                </li>
-              ))}
-            </ol>
-          </Container>
-        </section>
+            <p className="oi-label m-0 mb-3 border-t border-[var(--line)] pt-5">
+              He verifies every step
+            </p>
 
-        {/* ── Tiers ─────────────────────────────────────── */}
-        <section className="border-b border-[var(--color-rule)] py-16 sm:py-24">
-          <Container size="wide">
-            <div className="mb-12 max-w-[44rem]">
-              <p className="m-0 mb-4 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-ink-3)]">
-                What things cost
-              </p>
-              <h2
-                className="m-0 mb-5 font-[family-name:var(--font-display)] text-[clamp(2rem,4vw,3rem)] font-normal leading-[1.06] tracking-[-0.018em] text-[var(--color-ink)]"
-                style={{ textWrap: 'balance' }}
-              >                What your flat actually costs, in plain numbers.
-              </h2>
-              <p className="m-0 max-w-[62ch] text-[17px] leading-[1.65] text-[var(--color-ink-2)]">                Most people have no idea whether their budget is realistic until someone has been to
-                their home and quoted them. Here is the honest range for a typical 2 BHK at three
-                levels of finish, so you know where you stand today.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-              {TIERS.map((tier) => {
-                const definition = TIER[tier];
-                const range = tierRangeFor(tier, SAMPLE_SQFT);
-                const photo = TIER_PHOTO[tier];
-
+            <ul className="m-0 mb-6 flex list-none flex-col gap-0 p-0">
+              {[
+                ['Brief read back to you', 'Signed off'],
+                ['Shortlist and studio checks', 'Signed off'],
+                ['Quote read line by line', 'Today'],
+                ['Material samples signed off', ''],
+                ['Site visits and handover', ''],
+              ].map(([label, state]) => {
+                const done = state === 'Signed off';
+                const now = state === 'Today';
                 return (
-                  <article
-                    key={tier}
-                    className="flex flex-col overflow-hidden rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-paper-2)]"
+                  <li
+                    key={label}
+                    className="flex items-center gap-3 border-b border-[var(--line)] py-3 last:border-b-0"
                   >
-                    <div className="relative h-44">
-                      <Image
-                        src={photo.src}
-                        alt={photo.alt}
-                        fill
-                        sizes="(max-width: 768px) 100vw, 33vw"
-                        className="object-cover"
+                    {done ? (
+                      <span style={{ color: 'var(--sec)' }} className="flex-none">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                          <circle cx="8" cy="8" r="7.25" fill="currentColor" />
+                          <path
+                            d="M4.9 8.2 6.9 10.2 11.1 6"
+                            stroke="#fff"
+                            strokeWidth="1.6"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </span>
+                    ) : (
+                      <span
+                        aria-hidden
+                        className="h-4 w-4 flex-none rounded-full border"
+                        style={{
+                          borderColor: now ? 'var(--acc)' : 'var(--line)',
+                          background: now ? 'var(--acc)' : 'transparent',
+                        }}
                       />
-                    </div>
-
-                    <div className="flex flex-1 flex-col p-7">
-                      <h3 className="m-0 mb-2 font-[family-name:var(--font-display)] text-[26px] font-normal leading-none text-[var(--color-ink)]">
-                        {definition.label}
-                      </h3>
-                      <p className="m-0 mb-6 text-[15px] leading-[1.6] text-[var(--color-ink-2)]">
-                        {definition.promise}
-                      </p>
-
-                      <p className="m-0 mb-1 font-[family-name:var(--font-mono)] text-[10.5px] uppercase tracking-[0.12em] text-[var(--color-ink-3)]">
-                        2 BHK · {SAMPLE_SQFT} sqft
-                      </p>
-                      <p className="m-0 mb-6 font-[family-name:var(--font-display)] text-[26px] leading-none text-[var(--color-petrol)]">
-                        {formatINRCompact(range.lowPaise)}
-                        <span className="text-[var(--color-ink-3)]"> – </span>
-                        {formatINRCompact(range.highPaise)}
-                      </p>
-
-                      <ul className="m-0 mb-6 flex flex-1 list-none flex-col gap-2 p-0">
-                        {definition.materials.map((m) => (
-                          <li
-                            key={m}
-                            className="grid grid-cols-[12px_minmax(0,1fr)] gap-2.5 text-[14px] leading-[1.5] text-[var(--color-ink-2)]"
-                          >
-                            <span aria-hidden="true" className="text-[var(--color-brass)]">
-                              ·
-                            </span>
-                            {m}
-                          </li>
-                        ))}
-                      </ul>
-
-                      {/* The line that makes the four above it believable. */}
-                      <p className="m-0 border-t border-[var(--color-rule)] pt-4 text-[13.5px] leading-[1.55] text-[var(--color-ink-3)]">
-                        {definition.notFor}
-                      </p>
-                    </div>
-                  </article>
+                    )}
+                    <span className={`flex-1 text-[14.5px] ${state ? '' : 'text-[var(--ink2)]'}`}>
+                      {label}
+                    </span>
+                    {state ? (
+                      <span
+                        className="oi-num flex-none text-[10px] uppercase tracking-[0.14em]"
+                        style={{ color: now ? 'var(--acc)' : 'var(--ink2)' }}
+                      >
+                        {state}
+                      </span>
+                    ) : null}
+                  </li>
                 );
               })}
-            </div>
+            </ul>
 
-            <p className="m-0 mt-8 max-w-[62ch] text-[14px] leading-[1.6] text-[var(--color-ink-3)]">
-              Excluding GST, for a typical 2 BHK. Your own numbers come after the brief, priced by
-              each studio from their own rates.
-            </p>
-          </Container>
-        </section>
-
-        {/* ── Trust ─────────────────────────────────────── */}
-        <section className="border-b border-[var(--color-rule)] bg-[var(--color-paper-2)] py-16 sm:py-24">
-          <Container size="wide">
-            <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-16">
-              <div className="relative order-2 h-[22rem] overflow-hidden rounded-[14px] lg:order-1 lg:h-[28rem]">
-                <Image
-                  src={PHOTOS.verification.src}
-                  alt={PHOTOS.verification.alt}
-                  fill
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                  className="object-cover"
-                />
-              </div>
-
-              <div className="order-1 lg:order-2">
-                <p className="m-0 mb-4 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-ink-3)]">
-                  Why this is different
-                </p>
-                <h2
-                  className="m-0 mb-6 font-[family-name:var(--font-display)] text-[clamp(2rem,4vw,3rem)] font-normal leading-[1.06] tracking-[-0.018em] text-[var(--color-ink)]"
-                  style={{ textWrap: 'balance' }}
-                >                  Why you can believe the number.
-                </h2>
-                <p className="m-0 mb-9 max-w-[58ch] text-[16.5px] leading-[1.65] text-[var(--color-ink-2)]">                  A quote is only worth what the company behind it is worth. Here is what we do before
-                  a studio is allowed to send you one.
-                </p>
-
-                <div className="flex flex-col gap-8">
-                  <PromiseRow
-                    n="01"
-                    title="Somebody has actually been to their sites"
-                    body={`We run ${TOTAL_CHECKS} checks before a studio appears — GST filings, references we telephone ourselves, and two finished homes we walk through. No studio can pay to skip one.`}
-                    href="/verification"
-                    linkLabel="What we check"
-                  />
-                  <PromiseRow
-                    n="02"
-                    title="You can see how late they usually run"
-                    body="Every studio's profile carries the days they typically run past their own committed date, and any dispute upheld against them. Nobody else will show you that."
-                  />
-                  <PromiseRow
-                    n="03"
-                    title="Your money never passes through us"
-                    body="You pay the studio directly, against a milestone plan we set and check. We are not holding your deposit, and we would rather say so than imply a protection you do not have."
-                  />
-                </div>
-              </div>
-            </div>
-          </Container>
-        </section>
-
-        {/* ── How we make money ─────────────────────────
-            The unspoken objection to anything free in India is "so how are
-            they making money off me" — and left unanswered the reader fills it
-            in with the worst available explanation, which is that we sell the
-            phone number. That guess is exactly the thing they came here to
-            escape, so leaving the question open costs more than any wording
-            here could.
-
-            Stated in the present tense and true today: studios pay a share of
-            projects that actually start. It becomes a flat subscription later,
-            and this copy changes when that changes. A claim about how we earn
-            is worth nothing if it is aspirational. */}
-        <section className="border-b border-[var(--color-rule)] bg-[var(--color-paper-2)] py-16 sm:py-24">
-          <Container size="wide">
-            <div className="mb-11 max-w-[44rem]">
-              <p className="m-0 mb-4 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-ink-3)]">
-                The catch
+            <div className="oi-glass-inner flex flex-wrap items-center justify-between gap-4 bg-[var(--bg)] p-4">
+              <p className="m-0 max-w-[52ch] text-[13.5px] leading-snug">
+                <span className="oi-num mr-1 text-[15px] text-[var(--ink2)]">&ldquo;</span>
+                I&rsquo;d ask Teakline to re-quote the kitchen on 18mm BWP before you sign anything.
               </p>
-              <h2
-                className="m-0 mb-5 font-[family-name:var(--font-display)] text-[clamp(2rem,4vw,3rem)] font-normal leading-[1.06] tracking-[-0.018em] text-[var(--color-ink)]"
-                style={{ textWrap: 'balance' }}
-              >
-                How we make money, since you are not paying us.
-              </h2>
-              <p className="m-0 max-w-[62ch] text-[17px] leading-[1.65] text-[var(--color-ink-2)]">
-                Every free service is being paid for by someone. You should know who, before you
-                answer nine questions about your home.
-              </p>
+              <Cta href="/expert" intent="quiet" className="!px-4 !py-2 !text-[13px]">
+                Call Nikhil
+              </Cta>
             </div>
+          </div>
+        </Wrap>
+      </section>
 
-            <div className="grid grid-cols-1 gap-px overflow-hidden rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-rule)] md:grid-cols-3">
-              <MoneyFact
-                figure="The studio pays"
-                title="And only once a project actually starts"
-                body="A share of the project value, from the studio's side, on work that goes ahead. Nothing is added to your quote to cover it — the number you see is the number they would have charged you if you had walked into their office."
-              />
-              <MoneyFact
-                figure="Never for position"
-                title="No studio can buy its way up your list"
-                body="Order comes from how well a studio fits your brief, and nothing else. Which band a studio sits in is worked out from their own rate card, so it cannot be bought or claimed. The code that ranks studios cannot see what anyone pays."
-              />
-              <MoneyFact
-                figure="Never your details"
-                title="Your number is not the product"
-                body="We do not sell or pass on your contact details, and no studio receives them until you tell an expert which introduction you want. That is also why there is no 'contact this studio' button anywhere on this site."
-              />
-            </div>
+      {/* ── Why we built this ── */}
+      <section id="film" className="relative overflow-hidden">
+        <Image
+          src={PHOTOS.film.src}
+          alt={PHOTOS.film.alt}
+          fill
+          sizes="100vw"
+          className="object-cover"
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{ background: 'linear-gradient(105deg,rgba(44,38,36,.90) 30%,rgba(44,38,36,.55))' }}
+        />
 
-            <p className="m-0 mt-7 max-w-[64ch] text-[14px] leading-[1.6] text-[var(--color-ink-3)]">
-              If we ever change this, it will say so here before it changes anywhere else.
-            </p>
-          </Container>
-        </section>
+        <Wrap className="relative py-20 sm:py-28">
+          <p className="oi-num m-0 mb-5 text-[10.5px] uppercase tracking-[0.2em] text-white/70">
+            90 seconds · why we built this
+          </p>
 
-        {/* ── Expert ────────────────────────────────────── */}
-        <section className="border-b border-[var(--color-rule)] py-16 sm:py-24">
-          <Container size="wide">
-            <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] lg:gap-16">
-              <div>
-                <p className="m-0 mb-4 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-ink-3)]">
-                  OneExpert
-                </p>
-                <h2
-                  className="m-0 mb-6 font-[family-name:var(--font-display)] text-[clamp(2rem,4vw,3rem)] font-normal leading-[1.06] tracking-[-0.018em] text-[var(--color-ink)]"
-                  style={{ textWrap: 'balance' }}
-                >                  Then talk to someone who has no stake in your answer.
-                </h2>
-                <p className="m-0 mb-5 max-w-[58ch] text-[16.5px] leading-[1.65] text-[var(--color-ink-2)]">                  Once you have your quotes, pick the studios you want to discuss and we will call you.
-                  Whoever you speak to has already read your brief, your floor plan and every quote
-                  in front of you — you will not be explaining your flat again.
-                </p>
-                <p className="m-0 max-w-[58ch] text-[16.5px] leading-[1.65] text-[var(--color-ink-2)]">
-                  Then we set up the meeting with whichever one you choose. Free, and there is
-                  nothing to buy on the call — which is why we can tell you when none of them is
-                  right for you.
-                </p>
-              </div>
+          <h2 className="oi-display m-0 mb-5 max-w-[24ch] text-[clamp(1.75rem,1.15rem+2.3vw,2.85rem)] text-white">
+            Nobody should sign a ₹18 lakh contract they can&rsquo;t read.
+          </h2>
 
-              <div className="relative h-[20rem] overflow-hidden rounded-[14px] lg:h-[26rem]">
-                <Image
-                  src={PHOTOS.expert.src}
-                  alt={PHOTOS.expert.alt}
-                  fill
-                  sizes="(max-width: 1024px) 100vw, 42vw"
-                  className="object-cover"
-                />
-              </div>
-            </div>
-          </Container>
-        </section>
+          <p className="m-0 mb-9 max-w-[54ch] text-[16px] leading-[1.62] text-white/80">
+            Two Pune studios, one rate card each, and a promise that every number on your quote has
+            a quantity and a material behind it.
+          </p>
 
-        {/* ── Close ─────────────────────────────────────── */}
-        <section className="py-16 sm:py-24">
-          <Container size="narrow">
-            <div className="text-center">
-              <h2
-                className="m-0 mb-5 font-[family-name:var(--font-display)] text-[clamp(1.9rem,3.6vw,2.75rem)] font-normal leading-[1.08] tracking-[-0.018em] text-[var(--color-ink)]"
-                style={{ textWrap: 'balance' }}
-              >                Find out what your home costs.
-              </h2>
-              <p className="mx-auto m-0 mb-8 max-w-[46ch] text-[17px] leading-[1.65] text-[var(--color-ink-2)]">                Nine questions, three minutes, and you will have real numbers from real studios. If
-                none of it is useful, you have lost an afternoon coffee&rsquo;s worth of time.
-              </p>
-              <div className="flex flex-wrap items-center justify-center gap-4">
-                <StartCta />
-              </div>
-              <p className="m-0 mt-6 text-[14px] text-[var(--color-ink-3)]">
-                Already started?{' '}
-                <Link href="/sign-in" className="text-[var(--color-petrol)]">
-                  Sign in to pick it up
-                </Link>
-                .
-              </p>
-            </div>
-          </Container>
-        </section>
-
-        {!rosterIsReal() ? (
-          <Container size="wide">
-            <p className="m-0 mb-12 rounded-[10px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-5 py-4 text-[13px] leading-[1.6] text-[var(--color-ink-3)]">
-              Pre-launch build. The studios shown are placeholder records used to develop the
-              product — they are not real businesses. Photography on this page is stock, and will
-              be replaced with the studios&rsquo; own completed work before launch.
-            </p>
-          </Container>
-        ) : null}
-      </main>
-
-      <SiteFooter />
-    </>
-  );
-}
-
-function TrustFact({ figure, label }: { figure: string; label: string }) {
-  return (
-    <li>
-      <span className="block font-[family-name:var(--font-display)] text-[26px] leading-none text-[var(--color-ink)]">
-        {figure}
-      </span>
-      <span className="mt-1 block text-[13px] leading-snug text-[var(--color-ink-3)]">{label}</span>
-    </li>
-  );
-}
-
-function MoneyFact({
-  figure,
-  title,
-  body,
-}: {
-  figure: string;
-  title: string;
-  body: string;
-}) {
-  return (
-    <div className="flex flex-col gap-3 bg-[var(--color-paper)] p-7">
-      <p className="m-0 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.13em] text-[var(--color-petrol)]">
-        {figure}
-      </p>
-      <h3 className="m-0 font-[family-name:var(--font-display)] text-[21px] font-normal leading-[1.22] text-[var(--color-ink)]">
-        {title}
-      </h3>
-      <p className="m-0 text-[14.5px] leading-[1.6] text-[var(--color-ink-2)]">{body}</p>
-    </div>
-  );
-}
-
-function PromiseRow({
-  n,
-  title,
-  body,
-  href,
-  linkLabel,
-}: {
-  n: string;
-  title: string;
-  body: string;
-  href?: string;
-  linkLabel?: string;
-}) {
-  return (
-    <div className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-4">
-      <span className="pt-1 font-[family-name:var(--font-mono)] text-[11px] tabular-nums text-[var(--color-brass)]">
-        {n}
-      </span>
-      <div>
-        <h3 className="m-0 mb-2 font-[family-name:var(--font-display)] text-[21px] font-normal leading-[1.2] text-[var(--color-ink)]">
-          {title}
-        </h3>
-        <p className="m-0 max-w-[52ch] text-[15px] leading-[1.6] text-[var(--color-ink-2)]">
-          {body}
-        </p>
-        {href && linkLabel ? (
-          <Link
-            href={href}
-            className="mt-2.5 inline-block text-[14px] text-[var(--color-petrol)] no-underline hover:underline"
+          {/* Placeholder until the MP4 exists — see imagery.ts. */}
+          <button
+            type="button"
+            className="inline-flex cursor-pointer items-center gap-4 rounded-full border border-white/25 bg-white/5 py-2 pl-2 pr-6 text-left text-white transition-colors hover:border-white/60"
           >
-            {linkLabel} →
-          </Link>
-        ) : null}
-      </div>
+            <span
+              className="flex h-11 w-11 flex-none items-center justify-center rounded-full"
+              style={{ background: 'var(--acc)' }}
+            >
+              <PlayIcon size={14} />
+            </span>
+            <span>
+              <span className="block text-[14.5px] font-medium">Watch the film</span>
+              <span className="oi-num block text-[10px] uppercase tracking-[0.16em] text-white/60">
+                01:32 · sound on
+              </span>
+            </span>
+          </button>
+        </Wrap>
+      </section>
+
+      {/* ── Portfolio ── */}
+      <Portfolio />
+
+      {/* ── Packages ── */}
+      <section id="packages" className="border-t border-[var(--line)] py-20 sm:py-24">
+        <Wrap>
+          <Eyebrow>Packages</Eyebrow>
+          <Heading className="mb-4 max-w-[24ch]">
+            Three bands, described in materials rather than adjectives.
+          </Heading>
+
+          <p className="oi-label m-0 mb-1">Priced for a 2 BHK · 1,180 sq ft</p>
+          <p className="m-0 mb-10 text-[14px] text-[var(--ink2)]">
+            Your quiz re-costs these for your area.
+          </p>
+
+          <div className="grid gap-5 md:grid-cols-3">
+            {PACKAGES.map((band) => (
+              <article
+                key={band.name}
+                className="relative flex flex-col border bg-[var(--card)] p-6"
+                style={{
+                  borderColor: band.featured ? 'var(--acc)' : 'var(--line)',
+                }}
+              >
+                {band.featured ? (
+                  <span
+                    className="oi-num absolute -top-px right-0 px-3 py-1 text-[9.5px] uppercase tracking-[0.16em] text-white"
+                    style={{ background: 'var(--acc)' }}
+                  >
+                    Most compared
+                  </span>
+                ) : null}
+
+                <p className="oi-label m-0 mb-3">{band.name}</p>
+                <p className="oi-num m-0 mb-3 text-[26px] leading-none">{band.range}</p>
+                <p className="m-0 mb-6 min-h-[3.2em] text-[13.5px] leading-[1.55] text-[var(--ink2)]">
+                  {band.promise}
+                </p>
+
+                <div className="mb-7">
+                  {band.specs.map(([label, value]) => (
+                    <SpecRow
+                      key={label}
+                      label={label!}
+                      value={value!}
+                      better={band.name !== 'Essential'}
+                    />
+                  ))}
+                </div>
+
+                <Cta
+                  href="/quiz"
+                  intent={band.featured ? 'quote' : 'quiet'}
+                  className="mt-auto w-full"
+                >
+                  Get this quoted
+                </Cta>
+              </article>
+            ))}
+          </div>
+        </Wrap>
+      </section>
+
+      {/* ── Why trust us ── */}
+      <Section id="trust" dark className="py-20 sm:py-24">
+        <Wrap>
+          <Eyebrow onDark>Why trust us</Eyebrow>
+          <Heading className="mb-6 max-w-[26ch] text-[#f4efe8]">
+            Studios pay us. So we are strict with studios, not with you.
+          </Heading>
+
+          <p className="oi-num m-0 mb-1 text-[10.5px] uppercase tracking-[0.18em] text-white/70">
+            12 checks before a studio is listed
+          </p>
+          <p className="oi-num m-0 mb-12 text-[10.5px] uppercase tracking-[0.18em] text-white/45">
+            Each one has a named verifier
+          </p>
+
+          <div className="grid gap-x-10 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">
+            {CHECKS.map((check) => (
+              <div key={check.n} className="border-l border-white/15 pl-5">
+                <p className="oi-num m-0 mb-3 text-[10px] uppercase tracking-[0.16em] text-white/45">
+                  {check.n} · {check.group}
+                </p>
+                <p className="m-0 mb-2 text-[15px] font-medium text-[#f4efe8]">{check.title}</p>
+                <p className="m-0 text-[13.5px] leading-[1.6] text-white/60">{check.body}</p>
+              </div>
+            ))}
+          </div>
+
+          <p className="m-0 mt-14 max-w-[70ch] text-[14.5px] leading-[1.7] text-white/65">
+            The remaining six checks cover insurance, safety on site, drawing standards, material
+            sourcing, payment milestones and dispute history. Any studio that fails one is not
+            listed until it is fixed.
+          </p>
+
+          <div className="mt-8">
+            <Cta href="/verification" intent="onDark">
+              Read all twelve checks
+            </Cta>
+          </div>
+        </Wrap>
+      </Section>
+
+      {/* ── Voices ── */}
+      <Testimonials />
+
+      {/* ── FAQ ── */}
+      <Faq />
+
+      {/* ── Closing ── */}
+      <section style={{ background: 'var(--acc)' }} className="py-16 sm:py-20">
+        <Wrap>
+          <h2 className="oi-display m-0 mb-4 max-w-[24ch] text-[clamp(1.6rem,1.15rem+1.8vw,2.4rem)] text-white">
+            Nine questions. Then a quote you can actually read.
+          </h2>
+          <p className="m-0 mb-8 max-w-[56ch] text-[15.5px] leading-[1.6] text-white/85">
+            Three minutes, no phone call, and nothing payable by you at any point.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Cta href="/quiz" intent="onAccent">
+              Start the quiz
+            </Cta>
+            <Cta href="/expert" intent="onDark">
+              Talk to an architect first
+            </Cta>
+          </div>
+        </Wrap>
+      </section>
+
+      {/* ── Footer ── */}
+      <Section dark className="py-16">
+        <Wrap>
+          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr]">
+            <div>
+              <span className="mb-4 flex items-center gap-2.5">
+                <Mark className="h-5 w-5 text-white/80" />
+                <span className="oi-display text-[19px] text-[#f4efe8]">One Interiors</span>
+              </span>
+              <p className="m-0 mb-8 max-w-[34ch] text-[13.5px] leading-[1.6] text-white/60">
+                Interior studios in Pune, checked twelve ways and quoted line by line.
+              </p>
+
+              <p className="oi-num m-0 mb-3 text-[10px] uppercase tracking-[0.16em] text-white/45">
+                Talk to us
+              </p>
+              <a
+                href="mailto:hello@oneinteriors.in"
+                className="block text-[14px] text-white/75 no-underline hover:text-white"
+              >
+                hello@oneinteriors.in
+              </a>
+              <a href="tel:+912040000000" className="oi-num block text-[14px] text-white/75 no-underline hover:text-white">
+                +91 20 4000 0000
+              </a>
+              <p className="oi-num m-0 mt-2 text-[10px] uppercase tracking-[0.16em] text-white/40">
+                Mon–Sat · 10:00–19:00 IST
+              </p>
+            </div>
+
+            <nav className="flex flex-col gap-2.5">
+              <p className="oi-num m-0 mb-1 text-[10px] uppercase tracking-[0.16em] text-white/45">
+                The product
+              </p>
+              {[
+                ['#how-it-works', 'How it works'],
+                ['#portfolio', 'Portfolio'],
+                ['#packages', 'Packages'],
+                ['#faq', 'FAQ'],
+              ].map(([href, label]) => (
+                <a
+                  key={href}
+                  href={href}
+                  className="text-[14px] text-white/70 no-underline hover:text-white"
+                >
+                  {label}
+                </a>
+              ))}
+            </nav>
+
+            <nav className="flex flex-col gap-2.5">
+              <p className="oi-num m-0 mb-1 text-[10px] uppercase tracking-[0.16em] text-white/45">
+                For studios
+              </p>
+              {[
+                ['/apply', 'Apply to be listed'],
+                ['/verification', 'The twelve checks'],
+                ['/apply', 'Filing your rate card'],
+                ['/apply', 'How we are paid'],
+              ].map(([href, label], i) => (
+                <Link
+                  key={`${href}-${i}`}
+                  href={href!}
+                  className="text-[14px] text-white/70 no-underline hover:text-white"
+                >
+                  {label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+
+          <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-white/12 pt-6">
+            <p className="oi-num m-0 text-[10px] uppercase tracking-[0.16em] text-white/40">
+              © 2026 One Interiors · Pune, Maharashtra
+            </p>
+            {/* These three routes do not exist yet. Linked because the page is
+                the spec for them and a footer without them reads as a company
+                that has not thought about consent — but `/privacy` in
+                particular is overdue: `consent/policy.ts` already stamps every
+                consent row with POLICY_VERSION '2026-09-01', and that version
+                currently points at no page at all. */}
+            <div className="flex gap-6">
+              {['Privacy', 'Terms', 'How we use your brief'].map((label) => (
+                <span key={label} className="text-[13px] text-white/40">
+                  {label}
+                </span>
+              ))}
+            </div>
+          </div>
+        </Wrap>
+      </Section>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Instrument_Serif, Public_Sans, IBM_Plex_Mono } from 'next/font/google';
+import { Instrument_Serif, Instrument_Sans, IBM_Plex_Mono } from 'next/font/google';
 import { siteUrl } from '@/lib/site';
 import { RosterGateBanner } from '@/components/RosterGateBanner';
 import './globals.css';
@@ -11,7 +11,16 @@ const display = Instrument_Serif({
   display: 'swap',
 });
 
-const sans = Public_Sans({
+/**
+ * Instrument Sans, paired with Instrument Serif.
+ *
+ * Public Sans was here and is a perfectly good face; the design system locks
+ * Instrument Sans, and the pairing is the point — the two were drawn together,
+ * so a serif headline and the sans line under it share proportions rather than
+ * merely coexisting. Swapped globally rather than only on the landing page,
+ * because two sans faces on one site is the kind of drift nobody ever unwinds.
+ */
+const sans = Instrument_Sans({
   subsets: ['latin'],
   variable: '--font-sans-loaded',
   display: 'swap',
