@@ -385,7 +385,8 @@ p {
 /* ─────────────────────────────────────────────────────────────
    "TACTILE ASSURANCE" — the locked marketing palette.
 
-   Scoped to `.oi-landing` rather than overriding `:root`, for the
+   Scoped to `.oi-landing` and `.oi-app` rather than overriding
+   `:root`, for the
    same reason `.studio-app` is scoped: the quiz, the match screens,
    the ops console and the studio software all sit on the older
    paper/petrol tokens, and repainting them from here would be a
@@ -399,7 +400,17 @@ p {
    decorative rule or a hover state, the button stops reading as
    the one thing on the screen to press.
    ───────────────────────────────────────────────────────────── */
-.oi-landing {
+/* `.oi-landing` is the marketing page; `.oi-app` is everything the
+   customer uses after it — the brief, the matches, the quote, the
+   comparison, their architect. One token block for both, because
+   they are one publication: the software has to look like the thing
+   the landing page promised, or the promise was decoration.
+
+   The studio console (`.studio-app`) and the ops surface are NOT in
+   here. They are tools operated for hours by people who work for us
+   or for a studio, and they keep their own palette. */
+.oi-landing,
+.oi-app {
   --bg: #eae6df; /* Raw Silk — page background */
   --card: #fcfcfa; /* Alabaster — cards, tables, quote documents */
   --ink: #2c2624; /* Deep Espresso — primary type, dark surfaces */
@@ -436,6 +447,13 @@ p {
      indistinguishable from the locked accent at button size. The
      hover below it was already darker than both. */
   --acc-btn: #b85d3a;
+
+  /* The faintest terracotta ground, for a selected option.
+     8% over Raw Silk — the same wash the evidence board uses on its
+     active row, and the most this palette will take before the
+     colour starts competing with the button that is actually the
+     action. Ink on it clears 11:1, and --acc-ink clears 4.59:1. */
+  --acc-wash: rgba(192, 97, 60, 0.08);
 
   /* Warm card on glass. Used only inside glass frames. */
   --glass: rgba(247, 242, 234, 0.76);
@@ -775,7 +793,8 @@ p {
    the only thing that works when the background is a variable you
    do not control.
    ───────────────────────────────────────────────────────────── */
-.oi-landing :focus-visible {
+.oi-landing :focus-visible,
+.oi-app :focus-visible {
   outline: 2px solid var(--acc);
   outline-offset: 2px;
   border-radius: 2px;
@@ -784,6 +803,8 @@ p {
 /* Over photography and the espresso bands. */
 .oi-landing [data-on-dark] :focus-visible,
 .oi-landing header :focus-visible,
+.oi-app [data-on-dark] :focus-visible,
+.oi-app header :focus-visible,
 .hero-caption :focus-visible {
   outline: 2px solid #fff;
   box-shadow: 0 0 0 4px rgba(44, 38, 36, 0.65);

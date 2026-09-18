@@ -19,7 +19,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Container, Button } from '@/components/ui';
+import { Mark } from '@/components/brand';
+import { Wrap, Sheet, DocRow } from '@/components/oi';
 import { formatINRCompact } from '@/lib/money';
 import { TIER, TIERS, tierRangeFor } from '@/modules/quotation/tiers';
 import {
@@ -48,7 +49,6 @@ import {
 import { rankStudios } from '@/modules/matching/score';
 import type { Studio } from '@/modules/studio/types';
 import { StyleScene, MaterialSwatches } from '@/components/art/StyleScene';
-import { Wordmark } from '@/components/brand';
 import {
   IconStudio,
   IconApartment2,
@@ -260,38 +260,43 @@ export function QuizClient({
 
   if (!hydrated) {
     return (
-      <main className="py-16">
-        <Container size="narrow">
-          <p className="font-[family-name:var(--font-mono)] text-[12px] uppercase tracking-[0.12em] text-[var(--color-ink-3)]">
-            Loading…
-          </p>
-        </Container>
-      </main>
+      <div className="oi-app min-h-dvh bg-[var(--bg)] py-16">
+        <Wrap>
+          <p className="oi-label m-0">Loading…</p>
+        </Wrap>
+      </div>
     );
   }
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-[var(--color-paper)]">
-      <header className="sticky top-0 z-10 border-b border-[var(--color-rule)] bg-[var(--color-paper)]">
-        <Container size="wide">
+    <div className="oi-app flex h-dvh flex-col overflow-hidden bg-[var(--bg)]">
+      <header className="sticky top-0 z-10 border-b border-[var(--line)] bg-[var(--card)]">
+        <Wrap>
           <div className="flex items-center justify-between gap-4 py-3.5">
-            <Link href="/" className="no-underline" aria-label="One Interiors, home">
-              <Wordmark showCity={false} />
+            <Link
+              href="/"
+              className="flex items-center gap-2.5 no-underline"
+              aria-label="One Interiors, home"
+            >
+              <Mark className="h-[18px] w-[18px] text-[var(--ink)]" />
+              <span className="oi-display text-[17px] leading-none text-[var(--ink)]">
+                One Interiors
+              </span>
             </Link>
             {/* Time left, not a count.
                 "Question 3 of 9" answers a question nobody asked. What someone
                 deciding whether to keep going actually wants to know is how
                 much longer this is — and an honest estimate is far more
                 motivating than an index. Calibrated at roughly twenty seconds
-                a question, which is what the nine-in-three-minutes promise on
-                the landing page implies, so the two cannot contradict. */}
-            <span className="tabular label m-0">
+                a question, which is what the nine-questions promise on the
+                landing page implies, so the two cannot contradict. */}
+            <span className="oi-num text-[10.5px] uppercase tracking-[0.16em] text-[var(--ink2)]">
               {step} of {TOTAL_STEPS} · {minutesLeft(step)}
             </span>
           </div>
-        </Container>
+        </Wrap>
         <div
-          className="h-[3px] w-full bg-[var(--color-paper-3)]"
+          className="h-[3px] w-full bg-[var(--line)]"
           role="progressbar"
           aria-label="Quiz progress"
           aria-valuenow={step}
@@ -299,14 +304,17 @@ export function QuizClient({
           aria-valuemax={TOTAL_STEPS}
         >
           {/* The bar never starts empty.
-                A zero-width bar on question one reads as "you have done
-                nothing", which is both discouraging and untrue — they have
-                already decided to start, which is the hardest step. The floor
-                is a visual minimum only: the number of questions left is stated
-                in words right above it, so nothing here overstates progress. */}
+              A zero-width bar on question one reads as "you have done
+              nothing", which is both discouraging and untrue — they have
+              already decided to start, which is the hardest step. The floor is
+              a visual minimum only: the time remaining is stated in words
+              right above it, so nothing here overstates progress. */}
           <div
-            className="h-full bg-[var(--color-petrol)] transition-all duration-500 ease-out"
-            style={{ width: `${Math.max(7, (step / TOTAL_STEPS) * 100)}%` }}
+            className="h-full transition-all duration-500 ease-out"
+            style={{
+              width: `${Math.max(7, (step / TOTAL_STEPS) * 100)}%`,
+              background: 'var(--acc)',
+            }}
           />
         </div>
       </header>
@@ -315,73 +323,81 @@ export function QuizClient({
           footer that never leaves the viewport.
 
           The first build put Continue after the options AND after the running
-          profile panel, so answering a question meant scrolling down to find
-          the button — on every one of the nine. A quiz where the primary
-          action is below the fold reads as broken, however good the question
-          above it is. */}
+          brief, so answering a question meant scrolling down to find the
+          button — on every one of the nine. A quiz where the primary action is
+          below the fold reads as broken, however good the question above it. */}
       <main ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
-        <Container size="wide">
+        <Wrap>
           <div className="grid grid-cols-1 gap-9 py-8 sm:py-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-14">
-            <div key={`q-${step}`} className="rise flex flex-col gap-7">
+            <div key={`q-${step}`} className="oi-swap flex flex-col gap-7">
               <QuestionStep step={step} brief={brief} update={update} slot="ask" />
               <LiveProfile brief={brief} matchCount={matchCount} className="hidden lg:block" />
             </div>
 
-            <div key={`o-${step}`} className="rise rise-1 min-w-0">
+            <div key={`o-${step}`} className="oi-swap min-w-0">
               <QuestionStep step={step} brief={brief} update={update} slot="options" />
 
-              {/* On a phone the panel is COLLAPSED by default.
+              {/* On a phone the brief is COLLAPSED by default.
                   It is reassurance, not information the customer needs to
                   answer the question in front of them — and expanded it pushed
                   the options down far enough that the question and its answers
-                  no longer shared a screen. Available in one tap for anyone who
-                  wants to check what we have understood so far; out of the way
-                  for everyone else. On a laptop it stays open in the left
-                  column, where it costs no vertical space at all. */}
-              <details className="group mt-7 rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] lg:hidden">
+                  no longer shared a screen. One tap for anyone who wants to
+                  check what we have understood; out of the way for everyone
+                  else. On a laptop it stays open in the left column, where it
+                  costs no vertical space at all. */}
+              <details className="group mt-7 border border-[var(--line)] bg-[var(--card)] lg:hidden">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
-                  <span className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.12em] text-[var(--color-ink-3)]">
-                    What we have so far
-                  </span>
-                  <span className="font-[family-name:var(--font-mono)] text-[11px] text-[var(--color-petrol)] group-open:hidden">
+                  <span className="oi-label m-0">Your brief so far</span>
+                  <span className="oi-num text-[10.5px] uppercase tracking-[0.14em] text-[var(--acc-ink)] group-open:hidden">
                     Show
                   </span>
-                  <span className="hidden font-[family-name:var(--font-mono)] text-[11px] text-[var(--color-petrol)] group-open:inline">
+                  <span className="oi-num hidden text-[10.5px] uppercase tracking-[0.14em] text-[var(--acc-ink)] group-open:inline">
                     Hide
                   </span>
                 </summary>
-                <div className="border-t border-[var(--color-rule)] p-4">
-                  <LiveProfile brief={brief} matchCount={matchCount} />
+                <div className="border-t border-[var(--line)] p-4">
+                  <LiveProfile brief={brief} matchCount={matchCount} bare />
                 </div>
               </details>
             </div>
           </div>
-        </Container>
+        </Wrap>
       </main>
 
-      <footer className="sticky bottom-0 z-10 border-t border-[var(--color-rule)] bg-[var(--color-paper)]/95 backdrop-blur">
-        <Container size="wide">
+      <footer className="sticky bottom-0 z-10 border-t border-[var(--line)] bg-[var(--card)]/95 backdrop-blur">
+        <Wrap>
           <div className="flex items-center justify-between gap-4 py-4">
-            <Button variant="secondary" onClick={back}>
+            <button
+              type="button"
+              onClick={back}
+              className="cursor-pointer border border-[var(--line)] bg-[var(--card)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--ink)] transition-colors hover:border-[var(--ink2)]"
+            >
               Back
-            </Button>
+            </button>
 
             <div className="flex items-center gap-4">
               {!canAdvance ? (
-                <span className="hidden text-[13.5px] text-[var(--color-ink-3)] sm:inline">
+                <span className="hidden text-[13.5px] text-[var(--ink2)] sm:inline">
                   Pick an answer to continue
                 </span>
               ) : null}
-              <Button onClick={next} disabled={!canAdvance || finishing} size="lg">
+              {/* The one terracotta thing on the screen. */}
+              <button
+                type="button"
+                onClick={next}
+                disabled={!canAdvance || finishing}
+                className="cursor-pointer px-6 py-3 text-[14.5px] font-medium text-white transition-colors disabled:opacity-40"
+                style={{ background: 'var(--acc-btn)' }}
+              >
                 {finishing
-                  ? 'Saving your brief…'
+                  ? 'Writing your brief…'
                   : step === TOTAL_STEPS
                     ? 'See who fits'
                     : 'Continue'}
-              </Button>
+              </button>
             </div>
           </div>
-        </Container>
+        </Wrap>
       </footer>
     </div>
   );
@@ -474,9 +490,9 @@ function stepContent(
                   onChange={(e) =>
                     update({ carpetAreaSqft: e.target.value ? Number(e.target.value) : null })
                   }
-                  className="tabular w-32 rounded-full border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 py-2.5 text-[15px] text-[var(--color-ink)] placeholder:text-[var(--color-ink-3)]"
+                  className="oi-num w-32 rounded-full border border-[var(--line)] bg-[var(--card)] px-4 py-2.5 text-[15px] text-[var(--ink)] placeholder:text-[var(--ink2)]"
                 />
-                <span className="text-[14px] text-[var(--color-ink-3)]">sq ft</span>
+                <span className="text-[14px] text-[var(--ink2)]">sq ft</span>
               </div>
             </div>
           </div>
@@ -529,9 +545,9 @@ function stepContent(
               onChange={(styleLikes) => update({ styleLikes })}
             />
             {brief.styleLikes.length === 3 ? (
-              <p className="mt-5 rounded-[10px] bg-[var(--color-terracotta-soft)] px-4 py-3 text-[15px] leading-relaxed text-[var(--color-ink-2)]">
+              <p className="mt-5 rounded-[10px] bg-[var(--acc-wash)] px-4 py-3 text-[15px] leading-relaxed text-[var(--ink2)]">
                 So you lean{' '}
-                <strong className="font-bold text-[var(--color-ink)]">
+                <strong className="font-bold text-[var(--ink)]">
                   {brief.styleLikes.map((t) => STYLE_LABELS[t]).join(', ')}
                 </strong>
                 . That&rsquo;s the direction we&rsquo;ll match on.
@@ -603,9 +619,9 @@ function stepContent(
               type="date"
               value={brief.moveInBy?.slice(0, 10) ?? ''}
               onChange={(e) => update({ moveInBy: e.target.value || null })}
-              className="tabular rounded-full border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-5 py-3 text-[15px] text-[var(--color-ink)]"
+              className="oi-num rounded-full border border-[var(--line)] bg-[var(--card)] px-5 py-3 text-[15px] text-[var(--ink)]"
             />
-            <p className="mt-5 max-w-[48ch] text-[14.5px] leading-relaxed text-[var(--color-ink-3)]">
+            <p className="mt-5 max-w-[48ch] text-[14.5px] leading-relaxed text-[var(--ink2)]">
               A full-home project in Pune usually runs 70 to 130 days from sign-off. If your date is
               tighter than that, we&rsquo;ll say so — rather than quietly match you to someone who
               will miss it.
@@ -686,23 +702,23 @@ function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPart
               aria-pressed={selected}
               className={`rounded-[14px] border-2 p-5 text-left transition-colors ${
                 selected
-                  ? 'border-[var(--color-petrol)] bg-[var(--color-petrol-soft)]'
-                  : 'border-[var(--color-rule)] bg-[var(--color-paper-2)] hover:border-[var(--color-ink-3)]'
+                  ? 'border-[var(--acc)] bg-[var(--acc-wash)]'
+                  : 'border-[var(--line)] bg-[var(--card)] hover:border-[var(--ink2)]'
               }`}
             >
               <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <span className="font-[family-name:var(--font-display)] text-[21px] leading-none text-[var(--color-ink)]">
+                <span className="oi-display text-[21px] leading-none text-[var(--ink)]">
                   {definition.label}
                 </span>
-                <span className="tabular font-[family-name:var(--font-display)] text-[19px] leading-none text-[var(--color-petrol)]">
+                <span className="oi-num oi-display text-[19px] leading-none text-[var(--acc-ink)]">
                   {formatINRCompact(lowPaise)} – {formatINRCompact(highPaise)}
                 </span>
               </div>
-              <p className="m-0 text-[14.5px] leading-[1.5] text-[var(--color-ink-2)]">
+              <p className="m-0 text-[14.5px] leading-[1.5] text-[var(--ink2)]">
                 {definition.promise}
               </p>
               {selected ? (
-                <p className="m-0 mt-2.5 border-t border-[var(--color-rule)] pt-2.5 text-[13px] leading-[1.5] text-[var(--color-ink-3)]">
+                <p className="m-0 mt-2.5 border-t border-[var(--line)] pt-2.5 text-[13px] leading-[1.5] text-[var(--ink2)]">
                   {definition.notFor}
                 </p>
               ) : null}
@@ -710,7 +726,7 @@ function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPart
           );
         })}
 
-        <p className="m-0 mt-1 text-[13px] leading-[1.55] text-[var(--color-ink-3)]">
+        <p className="m-0 mt-1 text-[13px] leading-[1.55] text-[var(--ink2)]">
           {areaAssumed
             ? `Excluding GST, for a typical ${TYPICAL_SQFT} sqft home — tell us your carpet area on the first question and these tighten.`
             : `Excluding GST, for your ${area} sqft. Your real quotes come from each studio's own rates.`}
@@ -815,14 +831,14 @@ function priorityStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPa
                  usable name. A screen reader user was being asked to rank four
                  things called "button". */
               aria-label={`${PRIORITY_LABELS[k]} — ranked ${i + 1}. Tap to remove from the ranking.`}
-              className="flex items-center gap-3 rounded-full border-2 border-[var(--color-petrol)] bg-[var(--color-petrol-soft)] px-4 py-3 text-left text-[15px] text-[var(--color-ink)]"
+              className="flex items-center gap-3 rounded-full border-2 border-[var(--acc)] bg-[var(--acc-wash)] px-4 py-3 text-left text-[15px] text-[var(--ink)]"
             >
-              <span className="tabular flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-petrol)] font-[family-name:var(--font-mono)] text-[11px] text-[var(--color-paper)]">
+              <span className="oi-num flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--acc-ink)] oi-num text-[11px] text-white">
                 {i + 1}
               </span>
-              <Icon className="h-6 w-6 shrink-0 text-[var(--color-petrol)]" />
+              <Icon className="h-6 w-6 shrink-0 text-[var(--acc-ink)]" />
               <span className="flex-1">{PRIORITY_LABELS[k]}</span>
-              <span className="label m-0">Remove</span>
+              <span className="oi-label m-0">Remove</span>
             </button>
           );
         })}
@@ -834,10 +850,10 @@ function priorityStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPa
               type="button"
               onClick={() => update({ priorityRanking: [...ranked, k] })}
               aria-label={`${PRIORITY_LABELS[k]} — tap to rank it ${ranked.length + 1}.`}
-              className="flex items-center gap-3 rounded-full border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 py-3 text-left text-[15px] text-[var(--color-ink-2)] transition-colors hover:border-[var(--color-petrol)]"
+              className="flex items-center gap-3 rounded-full border border-[var(--line)] bg-[var(--card)] px-4 py-3 text-left text-[15px] text-[var(--ink2)] transition-colors hover:border-[var(--acc)]"
             >
               <span className="h-6 w-6 shrink-0" />
-              <Icon className="h-6 w-6 shrink-0 text-[var(--color-ink-3)]" />
+              <Icon className="h-6 w-6 shrink-0 text-[var(--ink2)]" />
               <span>{PRIORITY_LABELS[k]}</span>
             </button>
           );
@@ -858,10 +874,13 @@ function LiveProfile({
   brief,
   matchCount,
   className = '',
+  bare = false,
 }: {
   brief: Brief;
   matchCount: number;
   className?: string;
+  /** Inside the phone disclosure, which already draws the border. */
+  bare?: boolean;
 }) {
   const rows: Array<[string, string]> = [];
 
@@ -897,35 +916,41 @@ function LiveProfile({
   if (brief.involvement) rows.push(['Working style', INVOLVEMENT_LABELS[brief.involvement]]);
 
   return (
-    <aside
-      className={`rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-5 ${className}`}
+    <Sheet
+      as="section"
+      className={bare ? `border-0 bg-transparent ${className}` : `p-5 ${className}`}
     >
-      <p className="label m-0 mb-4">Your brief so far</p>
+      <p className="oi-label m-0 mb-4">Your brief so far</p>
 
       {rows.length === 0 ? (
-        <p className="m-0 text-[14px] italic text-[var(--color-ink-3)]">
-          This fills in as you answer.
+        <p className="m-0 text-[14px] text-[var(--ink2)]">
+          This fills in as you answer. Nothing is sent anywhere while you do.
         </p>
       ) : (
-        <dl className="m-0 flex flex-col gap-3.5">
+        <div className="m-0">
           {rows.map(([k, v]) => (
-            <div key={k} className="flex flex-col gap-0.5">
-              <dt className="label m-0">{k}</dt>
-              <dd className="m-0 text-[14.5px] leading-snug text-[var(--color-ink)]">{v}</dd>
-            </div>
+            <DocRow key={k} label={k} value={v.toUpperCase()} />
           ))}
-        </dl>
+        </div>
       )}
 
-      <div className="mt-5 flex items-baseline gap-2 border-t border-[var(--color-rule)] pt-4">
-        <span className="tabular font-[family-name:var(--font-display)] text-[30px] leading-none text-[var(--color-petrol)]">
+      {/* The counter is the point of this panel, and the reason it is worth
+          the column it occupies: it is the only place in the product where
+          answering a question visibly does something. Sage, because a
+          narrowing roster is verification working rather than an action to
+          take. */}
+      <div className="mt-5 flex items-baseline gap-2.5 border-t border-[var(--ink)] pt-4">
+        <span
+          className="oi-num text-[30px] leading-none"
+          style={{ color: 'var(--sec-ink)' }}
+        >
           {matchCount}
         </span>
-        <span className="text-[13.5px] text-[var(--color-ink-2)]">
+        <span className="text-[13.5px] text-[var(--ink2)]">
           studio{matchCount === 1 ? '' : 's'} still match
         </span>
       </div>
-    </aside>
+    </Sheet>
   );
 }
 
@@ -935,7 +960,7 @@ function Ask({ title, hint }: { title: string; hint?: string }) {
   return (
     <div className="lg:pt-4">
       <h1 className="h1 mb-4 max-w-[16ch]">{title}</h1>
-      {hint ? <p className="m-0 max-w-[42ch] text-[16px] leading-relaxed text-[var(--color-ink-2)]">{hint}</p> : null}
+      {hint ? <p className="m-0 max-w-[42ch] text-[16px] leading-relaxed text-[var(--ink2)]">{hint}</p> : null}
     </div>
   );
 }
@@ -972,17 +997,17 @@ function CircleTile({
          Twelve pixels of tile is not worth a hidden required field. */
       className={`relative flex h-[122px] w-[122px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-full px-3 text-center transition-all ${
         selected
-          ? 'bg-[var(--color-petrol-soft)] ring-2 ring-[var(--color-petrol)]'
-          : 'bg-[var(--color-paper-2)] hover:bg-[var(--color-paper-3)]'
+          ? 'bg-[var(--acc-wash)] ring-2 ring-[var(--acc)]'
+          : 'bg-[var(--card)] hover:bg-[var(--line)]'
       }`}
     >
       <Icon
-        className={`h-10 w-10 ${selected ? 'text-[var(--color-petrol)]' : 'text-[var(--color-ink-2)]'}`}
+        className={`h-10 w-10 ${selected ? 'text-[var(--acc-ink)]' : 'text-[var(--ink2)]'}`}
       />
-      <span className="text-[12.5px] leading-tight text-[var(--color-ink-2)]">{label}</span>
+      <span className="text-[12.5px] leading-tight text-[var(--ink2)]">{label}</span>
       {selected ? (
         <span
-          className="absolute right-3 top-4 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--color-petrol)] text-[11px] leading-none text-[var(--color-paper)]"
+          className="absolute right-3 top-4 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--acc-ink)] text-[11px] leading-none text-white"
           aria-hidden="true"
         >
           ✓
@@ -1010,8 +1035,8 @@ function Chip({
       aria-pressed={selected}
       className={`inline-flex items-center gap-2 rounded-full border px-4 py-2.5 text-[14.5px] transition-colors ${
         selected
-          ? 'border-[var(--color-petrol)] bg-[var(--color-petrol-soft)] text-[var(--color-ink)]'
-          : 'border-[var(--color-rule)] bg-[var(--color-paper-2)] text-[var(--color-ink-2)] hover:border-[var(--color-ink-3)]'
+          ? 'border-[var(--acc)] bg-[var(--acc-wash)] text-[var(--ink)]'
+          : 'border-[var(--line)] bg-[var(--card)] text-[var(--ink2)] hover:border-[var(--ink2)]'
       }`}
     >
       {Icon ? <Icon className="h-5 w-5" /> : null}
@@ -1022,7 +1047,7 @@ function Chip({
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="m-0 mb-3 font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-[0.13em] text-[var(--color-ink-3)]">
+    <p className="m-0 mb-3 oi-num text-[10px] uppercase tracking-[0.13em] text-[var(--ink2)]">
       {children}
     </p>
   );
@@ -1042,9 +1067,9 @@ function Counter({
   Icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-full bg-[var(--color-paper-2)] py-2.5 pl-5 pr-2.5">
-      <span className="flex items-center gap-3 text-[15px] text-[var(--color-ink)]">
-        <Icon className="h-6 w-6 text-[var(--color-ink-3)]" />
+    <div className="flex items-center justify-between gap-4 rounded-full bg-[var(--card)] py-2.5 pl-5 pr-2.5">
+      <span className="flex items-center gap-3 text-[15px] text-[var(--ink)]">
+        <Icon className="h-6 w-6 text-[var(--ink2)]" />
         {label}
       </span>
       <div className="flex items-center gap-2">
@@ -1052,16 +1077,16 @@ function Counter({
           type="button"
           onClick={() => onChange(Math.max(min, value - 1))}
           aria-label={`Decrease ${label}`}
-          className="h-9 w-9 rounded-full border border-[var(--color-rule)] bg-[var(--color-paper)] text-[18px] leading-none text-[var(--color-ink-2)] transition-colors hover:border-[var(--color-petrol)]"
+          className="h-9 w-9 rounded-full border border-[var(--line)] bg-[var(--bg)] text-[18px] leading-none text-[var(--ink2)] transition-colors hover:border-[var(--acc)]"
         >
           −
         </button>
-        <span className="tabular w-6 text-center text-[16px]">{value}</span>
+        <span className="oi-num w-6 text-center text-[16px]">{value}</span>
         <button
           type="button"
           onClick={() => onChange(value + 1)}
           aria-label={`Increase ${label}`}
-          className="h-9 w-9 rounded-full border border-[var(--color-rule)] bg-[var(--color-paper)] text-[18px] leading-none text-[var(--color-ink-2)] transition-colors hover:border-[var(--color-petrol)]"
+          className="h-9 w-9 rounded-full border border-[var(--line)] bg-[var(--bg)] text-[18px] leading-none text-[var(--ink2)] transition-colors hover:border-[var(--acc)]"
         >
           +
         </button>
@@ -1097,7 +1122,7 @@ function StylePicker({
   }
 
   const ring =
-    tone === 'exclude' ? 'ring-2 ring-[var(--color-atrisk)]' : 'ring-2 ring-[var(--color-petrol)]';
+    tone === 'exclude' ? 'ring-2 ring-[var(--acc-ink)]' : 'ring-2 ring-[var(--acc)]';
 
   return (
     <>
@@ -1119,8 +1144,8 @@ function StylePicker({
             >
               <StyleScene tag={tag} className="block aspect-[4/3] w-full" />
               <span
-                className={`block bg-[var(--color-paper-2)] px-3 py-2 text-[12.5px] ${
-                  isSelected ? 'font-bold text-[var(--color-ink)]' : 'text-[var(--color-ink-3)]'
+                className={`block bg-[var(--card)] px-3 py-2 text-[12.5px] ${
+                  isSelected ? 'font-bold text-[var(--ink)]' : 'text-[var(--ink2)]'
                 }`}
               >
                 {isSelected ? STYLE_LABELS[tag] : isBlocked ? 'Already picked' : `Room ${i + 1}`}
@@ -1128,7 +1153,7 @@ function StylePicker({
               {isSelected ? (
                 <span
                   className={`absolute right-2.5 top-2.5 flex h-6 w-6 items-center justify-center rounded-full text-[12px] leading-none text-white ${
-                    tone === 'exclude' ? 'bg-[var(--color-atrisk)]' : 'bg-[var(--color-petrol)]'
+                    tone === 'exclude' ? 'bg-[var(--acc-ink)]' : 'bg-[var(--acc)]'
                   }`}
                   aria-hidden="true"
                 >
@@ -1141,7 +1166,7 @@ function StylePicker({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <p className="m-0 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.1em] text-[var(--color-ink-3)]">
+        <p className="m-0 oi-num text-[11px] uppercase tracking-[0.1em] text-[var(--ink2)]">
           {selected.length} of {max} selected
         </p>
         {selected.length > 0 && tone === 'include' ? (
