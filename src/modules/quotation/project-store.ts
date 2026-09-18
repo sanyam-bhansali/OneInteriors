@@ -69,9 +69,33 @@ export interface Project {
   comparing: string[];
   /** Keyed by studio id. See StoredRead. */
   reads: Record<string, StoredRead>;
+  /**
+   * Quiz questions already put to this customer while a quote was building.
+   *
+   * Somebody pricing four studios sits through four builds, and being asked
+   * the same thing about plywood four times is the difference between a
+   * feature and an irritation.
+   */
+  askedQuestions: string[];
+  /**
+   * Line-item codes the customer has starred on the comparison.
+   *
+   * The comparison's real question is never "which total is smaller" — it is
+   * "which is better at the four things I care about". Starring is how they
+   * say which four, and the tally above the table answers on exactly those
+   * lines. Codes, not indexes, so it survives a studio being added or dropped.
+   */
+  starred: string[];
 }
 
-export const EMPTY_PROJECT: Project = { plan: null, quotes: {}, comparing: [], reads: {} };
+export const EMPTY_PROJECT: Project = {
+  plan: null,
+  quotes: {},
+  comparing: [],
+  reads: {},
+  askedQuestions: [],
+  starred: [],
+};
 
 /**
  * What the read was written against.

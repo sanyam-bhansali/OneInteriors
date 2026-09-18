@@ -32,9 +32,12 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { formatINRCompact } from '@/lib/money';
 import { compareMany, type ComparedLine } from '@/modules/quotation/first-quote';
+import { tallyStarred, starredGap } from '@/modules/quotation/starred';
 import { loadProject, saveProject, MIN_TO_COMPARE, type Project } from '@/modules/quotation/project-store';
+import type { Material } from '@/modules/materials/glossary';
 import { ratesAreReal } from '@/data/filed-rates';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
+import { Spec, MaterialPanel } from '@/components/oi/Material';
 import { Wrap, Chapter, Sheet, Quiet, Flag } from '@/components/oi';
 
 const money = (p: number | null) => (p === null ? null : formatINRCompact(p));
@@ -42,8 +45,40 @@ const money = (p: number | null) => (p === null ? null : formatINRCompact(p));
 /** One studio's column width. Wide enough for a material, narrow enough for four. */
 const COL = 'min-w-[13.5rem]';
 
+/**
+ * The star. A real button, 44px, and it says what it does.
+ *
+ * Not a decoration and not a favourite — pressing it changes the verdict at
+ * the top of the page, so the label says so.
+ */
+function Star({
+  on,
+  label,
+  onToggle,
+}: {
+  on: boolean;
+  label: string;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={on}
+      aria-label={
+        on ? `${label} — starred. Remove from your verdict` : `Star ${label} to count it in your verdict`
+      }
+      className="-ml-1.5 flex h-11 w-9 flex-none cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-[15px] leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--acc)]"
+      style={{ color: on ? 'var(--acc-ink)' : '#857b6f' }}
+    >
+      <span aria-hidden>{on ? '★' : '☆'}</span>
+    </button>
+  );
+}
+
 export function CompareClient() {
   const [project, setProject] = useState<Project | null>(null);
+  const [term, setTerm] = useState<Material | null>(null);
 
   useEffect(() => setProject(loadProject()), []);
 
@@ -62,11 +97,21 @@ export function CompareClient() {
 
   if (!project) return null;
 
-  const drop = (slug: string) => {
-    const next = { ...project, comparing: project.comparing.filter((s) => s !== slug) };
+  const save = (next: Project) => {
     setProject(next);
     saveProject(next);
   };
+
+  const drop = (slug: string) =>
+    save({ ...project, comparing: project.comparing.filter((s) => s !== slug) });
+
+  const toggleStar = (code: string) =>
+    save({
+      ...project,
+      starred: project.starred.includes(code)
+        ? project.starred.filter((c) => c !== code)
+        : [...project.starred, code],
+    });
 
   if (!comparison) {
     return (
@@ -90,6 +135,10 @@ export function CompareClient() {
   const { studios, rooms, tellingRows } = comparison;
   const cheapestTotal = Math.min(...studios.map((s) => s.quote.totalPaise));
 
+  const allLines = rooms.flatMap((r) => r.lines);
+  const tally = tallyStarred(allLines, project.starred, studios);
+  const gap = starredGap(tally);
+
   return (
     <div className="oi-app min-h-dvh bg-[var(--bg)]">
       <AppHeader />
@@ -112,7 +161,8 @@ export function CompareClient() {
           }
         >
           Every studio is priced on our line items at their own rates, so a row means the same
-          thing all the way across. Look at the materials before the totals.
+          thing all the way across. Star the lines you care about, and tap any underlined material
+          to find out what it is — and what the cheaper version of it costs you.
         </Chapter>
 
         {!ratesAreReal() ? (
@@ -160,6 +210,103 @@ export function CompareClient() {
           })}
         </div>
 
+        {/* ── Your verdict ──
+            The totals above answer "which of these different jobs costs
+            less", which is not a question anybody asked. This answers the one
+            they did: on the work I actually care about, who is better. It
+            appears only once they have starred something, because an empty
+            panel explaining a feature is worse than no panel. */}
+        {tally.codes.length > 0 ? (
+          <Sheet className="mb-10 p-6">
+            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+              <p className="oi-eyebrow m-0">
+                On your {tally.codes.length} starred line{tally.codes.length === 1 ? '' : 's'}
+              </p>
+              <button
+                type="button"
+                onClick={() => save({ ...project, starred: [] })}
+                className="oi-num cursor-pointer border-0 bg-transparent p-0 text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink2)] hover:text-[var(--ink)]"
+              >
+                Clear stars
+              </button>
+            </div>
+
+            <ul className="m-0 mb-4 flex list-none flex-col gap-2.5 p-0">
+              {tally.studios.map((s, i) => (
+                <li
+                  key={s.slug}
+                  className="flex flex-wrap items-baseline justify-between gap-x-5 gap-y-1"
+                >
+                  <span className="text-[14.5px]">
+                    {s.name}
+                    {s.missing.length > 0 ? (
+                      <span className="ml-2 text-[13px] text-[var(--ink2)]">
+                        did not quote {s.missing.join(', ')}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span
+                    className="oi-num text-[15px]"
+                    style={
+                      s.missing.length === 0 && i === 0 && tally.leader?.slug === s.slug
+                        ? { color: 'var(--sec-ink)' }
+                        : undefined
+                    }
+                  >
+                    {money(s.totalPaise)}
+                    {s.missing.length > 0 ? (
+                      <span className="ml-1.5 text-[11px] text-[var(--ink2)]">part only</span>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            {/* A studio missing a starred line is excluded from the verdict
+                rather than credited with zero — not quoting the mandir is how
+                you win a comparison you should have lost. */}
+            {tally.leader && gap !== null && gap > 0 ? (
+              <p className="m-0 border-t border-[var(--line)] pt-4 text-[14.5px] leading-[1.6]">
+                <span className="font-medium">{tally.leader.name}</span> is{' '}
+                <span className="oi-num" style={{ color: 'var(--sec-ink)' }}>
+                  {money(gap)}
+                </span>{' '}
+                cheaper than the next on the work you picked.
+              </p>
+            ) : tally.leader && gap === 0 ? (
+              <p className="m-0 border-t border-[var(--line)] pt-4 text-[14.5px] leading-[1.6]">
+                Level on price across these lines. The materials are the only thing left to
+                separate them.
+              </p>
+            ) : (
+              <p className="m-0 border-t border-[var(--line)] pt-4 text-[14px] leading-[1.6] text-[var(--ink2)]">
+                Only one studio priced all of these, so there is no comparison to make yet — star a
+                line they all quoted, or read what the others left out above.
+              </p>
+            )}
+
+            {/* Never allowed to travel alone. A price verdict with no material
+                beside it is the disease this product was built against. */}
+            {tally.caveats.length > 0 ? (
+              <p className="m-0 mt-3 max-w-[64ch] text-[13.5px] leading-[1.6]">
+                <Flag>
+                  Before you read that as better value — they are not quoting the same material on{' '}
+                  {tally.caveats.join(', ')}
+                </Flag>
+              </p>
+            ) : null}
+          </Sheet>
+        ) : (
+          <Sheet className="mb-10 p-6">
+            <p className="m-0 max-w-[62ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
+              <span className="text-[var(--ink)]">Star the lines you actually care about</span> —
+              the ☆ beside any item below — and we will total just those. The bottom row of this
+              table compares two slightly different houses; the lines you pick compare the work you
+              are buying.
+            </p>
+          </Sheet>
+        )}
+
         {/* ── Where the difference is ── */}
         {tellingRows.length > 0 ? (
           <Sheet className="mb-10 p-6">
@@ -183,7 +330,11 @@ export function CompareClient() {
                           <li key={cell.slug} className="text-[13px] leading-snug text-[var(--ink2)]">
                             <span className="text-[var(--ink)]">{studio.name}</span>
                             {' — '}
-                            {cell.spec ?? 'not quoted'}
+                            {cell.spec ? (
+                              <Spec text={cell.spec} onPick={setTerm} />
+                            ) : (
+                              'not quoted'
+                            )}
                           </li>
                         );
                       })}
@@ -249,9 +400,18 @@ export function CompareClient() {
                       scope="row"
                       className="sticky left-0 z-10 border-b border-[var(--line)] bg-[var(--card)] p-4 align-top font-normal"
                     >
-                      <span className="block text-[14.5px] font-medium">{line.label}</span>
-                      <span className="oi-num mt-1 block text-[12px] leading-snug text-[var(--ink2)]">
-                        {line.size}
+                      <span className="flex items-start gap-1.5">
+                        <Star
+                          on={project.starred.includes(line.code)}
+                          label={line.label}
+                          onToggle={() => toggleStar(line.code)}
+                        />
+                        <span className="min-w-0 pt-2.5">
+                          <span className="block text-[14.5px] font-medium">{line.label}</span>
+                          <span className="oi-num mt-1 block text-[12px] leading-snug text-[var(--ink2)]">
+                            {line.size}
+                          </span>
+                        </span>
                       </span>
                     </th>
 
@@ -277,9 +437,11 @@ export function CompareClient() {
                                   reason this screen exists; setting it as fine
                                   print would be the same mistake every quote
                                   in the Problem section makes. */}
-                              <span className="mt-1.5 block text-[13px] leading-[1.45] text-[var(--ink)]">
-                                {cell.spec}
-                              </span>
+                              <Spec
+                                text={cell.spec ?? ''}
+                                onPick={setTerm}
+                                className="mt-1.5 block text-[13px] leading-[1.45] text-[var(--ink)]"
+                              />
                             </>
                           )}
                         </td>
@@ -328,6 +490,11 @@ export function CompareClient() {
           studio, which is the only arrangement under which their reading of this is worth having.
         </p>
       </Wrap>
+
+      {/* Reference you read WHILE comparing, so it is deliberately not a
+          modal — it does not take focus and it does not stop you scrolling
+          the table behind it. Escape closes it. */}
+      <MaterialPanel material={term} onClose={() => setTerm(null)} />
 
       <AppFooter />
     </div>

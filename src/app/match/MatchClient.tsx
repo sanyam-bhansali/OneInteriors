@@ -29,7 +29,13 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { loadBrief } from '@/modules/brief/store';
 import { rankStudios, type MatchResult } from '@/modules/matching/score';
-import { loadProject, saveProject, MIN_TO_COMPARE, type Project } from '@/modules/quotation/project-store';
+import {
+  loadProject,
+  saveProject,
+  EMPTY_PROJECT,
+  MIN_TO_COMPARE,
+  type Project,
+} from '@/modules/quotation/project-store';
 import { CHECK_COUNT } from '@/components/landing/checks';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
 import { QuoteFlow, type QuoteRequest } from '@/components/oi/QuoteFlow';
@@ -55,12 +61,7 @@ export function MatchClient({
   allowUnverified: boolean;
 }) {
   const [brief, setBrief] = useState<Brief | null>(null);
-  const [project, setProject] = useState<Project>({
-    plan: null,
-    quotes: {},
-    comparing: [],
-    reads: {},
-  });
+  const [project, setProject] = useState<Project>(EMPTY_PROJECT);
   const [quoting, setQuoting] = useState<QuoteRequest | null>(null);
 
   useEffect(() => {
@@ -119,6 +120,15 @@ export function MatchClient({
           <QuoteFlow
             request={quoting}
             plan={project.plan}
+            seenQuestions={project.askedQuestions}
+            onAsked={(id) =>
+              update({
+                ...project,
+                askedQuestions: project.askedQuestions.includes(id)
+                  ? project.askedQuestions
+                  : [...project.askedQuestions, id],
+              })
+            }
             onBuilt={(quote, plan) => {
               update({
                 ...project,

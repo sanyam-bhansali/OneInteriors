@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
-import { Container, Eyebrow } from '@/components/ui';
-import { SiteHeader, SiteFooter } from '@/components/chrome';
-import { JourneyNav } from '@/components/JourneyNav';
+import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
+import { Wrap, Chapter, Sheet, Established, Flag, Tick } from '@/components/oi';
 import { BriefRescue } from '@/components/BriefRescue';
 import { prisma } from '@/lib/prisma';
 import { loadBrief, readAnonKey } from '@/modules/brief/repository';
@@ -12,6 +11,7 @@ import { rankStudios } from '@/modules/matching/score';
 import { showUnverifiedStudios } from '@/lib/env';
 import { quoteBrief } from '@/modules/quotation/generate';
 import { MIN_STUDIOS, MAX_STUDIOS } from '@/modules/consultation/request';
+import { ARCHITECT, ARCHITECT_IS_REAL, architectFacts } from '@/modules/consultation/architect';
 import { TIER } from '@/modules/quotation/tiers';
 import { PROPERTY_LABELS, PUNE_LOCALITIES, STYLE_LABELS } from '@/modules/brief/types';
 import { ExpertForm } from './ExpertForm';
@@ -35,12 +35,12 @@ export default async function ExpertPage() {
 
   if (!id) {
     return (
-      <>
-        <SiteHeader />
-        <JourneyNav reached={1} />
+      <div className="oi-app min-h-dvh bg-[var(--bg)]">
+        <AppHeader />
+        <Spine at="expert" />
         <BriefRescue destination="the expert call" />
-        <SiteFooter />
-      </>
+        <AppFooter />
+      </div>
     );
   }
 
@@ -49,7 +49,7 @@ export default async function ExpertPage() {
     allowUnverified: showUnverifiedStudios(),
   }).slice(0, MAX_STUDIOS);
   const result = await quoteBrief(brief, ranked.map((r) => r.studioId));
-  if (!result.ok) redirect('/quotes');
+  if (!result.ok) redirect('/match');
 
   /**
    * The minimum is what the roster can actually offer.
@@ -62,134 +62,176 @@ export default async function ExpertPage() {
    */
   const minStudios = Math.max(1, Math.min(MIN_STUDIOS, result.quotes.length));
 
+  const facts = [
+    brief.propertyType ? { label: 'Home', value: propertyLabel(brief.propertyType) ?? '—' } : null,
+    brief.carpetAreaSqft ? { label: 'Carpet', value: `${brief.carpetAreaSqft} sqft` } : null,
+    localityLabel(brief.locality) ? { label: 'Where', value: localityLabel(brief.locality)! } : null,
+    brief.tier ? { label: 'Level', value: TIER[brief.tier].label } : null,
+    { label: 'Quotes', value: String(result.quotes.length) },
+  ].filter((f): f is { label: string; value: string } => f !== null);
+
   return (
-    <>
-      <SiteHeader />
-      <JourneyNav />
+    <div className="oi-app min-h-dvh bg-[var(--bg)]">
+      <AppHeader />
+      <Spine
+        at="expert"
+        facts={[
+          { id: 'quote', fact: `${result.quotes.length} priced` },
+          { id: 'expert', fact: 'Reading it with you' },
+        ]}
+      />
 
-      <main className="py-10 sm:py-14">
-        <Container size="narrow">
-          <Eyebrow>OneExpert</Eyebrow>
-          <h1 className="display mb-5 max-w-[20ch] text-[clamp(2rem,4.5vw,3rem)] leading-[1.02]">
-            One call, and then we introduce you.
-          </h1>
-          <p className="lede mb-4">
-            Someone who has read your brief, your quotes and every studio&rsquo;s delivery record
-            spends half an hour helping you choose. Then we set up the meeting or site visit with
-            that studio ourselves.
-          </p>
-          <p className="m-0 mb-8 max-w-[58ch] text-[15px] leading-relaxed text-[var(--color-ink-2)]">
-            This is the only way to reach a studio through us. It is slower than a contact button,
-            and it is the reason people do not end up in a meeting with a studio that was never
-            going to suit them.
-          </p>
-
-          {/* What the expert will already know, shown back to the customer.
-              "Briefed, not a cold intro" is a claim; this is the evidence. It
-              costs a paragraph and it is the difference between the call
-              sounding like a sales callback and sounding like a consultation
-              somebody prepared for. Everything in it is drawn from the brief —
-              nothing here is aspirational. */}
-          <div className="mb-10 rounded-[14px] border-l-[3px] border-[var(--color-brass)] bg-[var(--color-paper-2)] p-6">
-            <p className="label m-0 mb-3">What they will have read before they ring</p>
-            <ul className="m-0 flex list-none flex-col gap-2 p-0">
-              <BriefLine
-                label="Your home"
-                value={[
-                  brief.propertyType ? propertyLabel(brief.propertyType) : null,
-                  brief.carpetAreaSqft ? `${brief.carpetAreaSqft} sqft` : null,
-                  localityLabel(brief.locality),
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              />
-              <BriefLine
-                label="Level"
-                value={brief.tier ? TIER[brief.tier].label : null}
-              />
-              <BriefLine
-                label="Leaning"
-                value={
-                  brief.styleLikes.length
-                    ? brief.styleLikes.map((t) => STYLE_LABELS[t]).join(', ')
-                    : null
-                }
-              />
-              <BriefLine
-                label="Ruled out"
-                value={
-                  brief.styleDislikes.length
-                    ? brief.styleDislikes.map((t) => STYLE_LABELS[t]).join(', ')
-                    : null
-                }
-              />
-              <BriefLine
-                label="Quotes in hand"
-                value={`${result.quotes.length} studios, priced from their own rates`}
-              />
-            </ul>
-            <p className="m-0 mt-4 border-t border-[var(--color-rule)] pt-3 text-[13.5px] leading-relaxed text-[var(--color-ink-3)]">
-              You will not be explaining your flat again.
+      <Wrap className="py-12">
+        <Chapter
+          eyebrow="Your architect"
+          title="One call, and then we introduce you."
+          aside={
+            <p className="oi-num m-0 whitespace-nowrap text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink2)]">
+              No studio pays them
             </p>
+          }
+        >
+          Someone who has read your brief, your quotes and every studio&rsquo;s delivery record
+          spends half an hour helping you choose. Then we set up the meeting or site visit with that
+          studio ourselves. It is slower than a contact button, and it is the reason people do not
+          end up in a meeting with a studio that was never going to suit them.
+        </Chapter>
+
+        {/* ── Who is actually going to ring ──
+            Everything else in this product is specific — a quantity on every
+            line, a named studio behind every quote. Asking for a phone number
+            on behalf of "an expert" was the one place we sounded like a sales
+            queue. */}
+        <Sheet className="mb-10 p-[clamp(22px,3vw,32px)]">
+          <div className="mb-5 flex flex-wrap items-baseline justify-between gap-x-8 gap-y-2">
+            <div>
+              <p className="oi-eyebrow m-0 mb-2">Who will ring you</p>
+              <h2 className="oi-display m-0 text-[clamp(1.4rem,1.15rem+1vw,1.85rem)]">
+                {ARCHITECT.name}
+              </h2>
+              <p className="m-0 mt-1.5 text-[14px] text-[var(--ink2)]">
+                {ARCHITECT.role} · {ARCHITECT.credential}
+              </p>
+            </div>
           </div>
 
-          {/* Studios that were ranked for this brief and could not be priced.
-              Named rather than dropped: a customer who sees two studios where
-              they expected four should be told it is about rates and not about
-              fit, and a studio absent for a reason we could state and did not
-              is the sort of silence people notice later. */}
-          {result.skipped.length > 0 ? (
-            <div className="mb-8 rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-5 py-4">
-              <p className="m-0 max-w-[58ch] text-[14.5px] leading-relaxed text-[var(--color-ink-2)]">
-                {result.skipped.length === 1
-                  ? `${result.skipped[0]!.name} suits this brief but has not published rates for all of this work yet, so we cannot put a number against their name — and a studio on this call without a quote would be one you could not compare.`
-                  : `${result.skipped.length} studios that suit this brief have not published rates for all of this work yet. We have left them out rather than show you a name with no number against it.`}
+          <p className="m-0 mb-6 max-w-[60ch] text-[15px] leading-[1.65] text-[var(--ink)]">
+            &ldquo;{ARCHITECT.says}&rdquo;
+          </p>
+
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-[var(--line)] pt-5">
+            {architectFacts().map((f) => (
+              <p key={f.label} className="m-0 flex items-baseline gap-2">
+                <span className="oi-label m-0">{f.label}</span>
+                <span className="oi-num text-[13px]">{f.value}</span>
               </p>
-            </div>
+            ))}
+          </div>
+
+          {/* Honest failure mode for unfinished content is a visible label, not
+              a plausible-looking fiction — the same rule the stock photography
+              and the placeholder films follow. */}
+          {!ARCHITECT_IS_REAL ? (
+            <p className="m-0 mt-5">
+              <Flag>
+                Pre-launch placeholder — a named architect and their real record go here before
+                anybody is asked for a phone number
+              </Flag>
+            </p>
           ) : null}
+        </Sheet>
 
-          {result.quotes.length === 1 ? (
-            <div className="mb-8 rounded-[12px] border-l-[3px] border-[var(--color-brass)] bg-[var(--color-paper-2)] px-5 py-4">
-              <p className="m-0 max-w-[58ch] text-[14.5px] leading-relaxed text-[var(--color-ink)]">
-                There is one studio we can quote for this brief today, so this call is about whether
-                they are right for you rather than about choosing between two. If the answer is no,
-                we will say so — and we would rather tell you that than introduce you anyway.
-              </p>
-            </div>
-          ) : null}
+        {/* What they will already have read. "Briefed, not a cold intro" is a
+            claim; this is the evidence, and everything in it is drawn from the
+            brief — nothing here is aspirational. */}
+        <div className="mb-10">
+          <p className="oi-label m-0 mb-3">What {firstName(ARCHITECT.name)} reads before ringing</p>
+          <Established facts={facts} />
+          <ul className="m-0 mt-4 flex list-none flex-col gap-2 p-0">
+            <Read label="Your brief, in full — including what you ruled out" />
+            <Read
+              label={
+                brief.styleLikes.length || brief.styleDislikes.length
+                  ? [
+                      brief.styleLikes.length
+                        ? `Leaning ${brief.styleLikes.map((t) => STYLE_LABELS[t]).join(', ')}`
+                        : null,
+                      brief.styleDislikes.length
+                        ? `ruled out ${brief.styleDislikes.map((t) => STYLE_LABELS[t]).join(', ')}`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')
+                  : 'Your style answers'
+              }
+            />
+            <Read label={`All ${result.quotes.length} quotes, line by line, with the materials`} />
+            <Read label="Every studio's verification standing and delivery record" />
+          </ul>
+          <p className="m-0 mt-4 max-w-[58ch] text-[13.5px] leading-[1.6] text-[var(--ink2)]">
+            You will not be explaining your flat again.
+          </p>
+        </div>
 
-          <ExpertForm
-            briefId={id}
-            minStudios={minStudios}
-            maxStudios={MAX_STUDIOS}
-            defaultName={user.name}
-            defaultEmail={user.email}
-            studios={result.quotes.map((q) => ({
-              id: q.studioId,
-              name: q.studioName,
-              lowPaise: q.quote.lowPaise,
-              highPaise: q.quote.highPaise,
-            }))}
-          />
-        </Container>
-      </main>
+        {/* Studios that were ranked for this brief and could not be priced.
+            Named rather than dropped: a customer who sees two studios where
+            they expected four should be told it is about rates and not about
+            fit, and a studio absent for a reason we could state and did not is
+            the sort of silence people notice later. */}
+        {result.skipped.length > 0 ? (
+          <Sheet className="mb-8 px-5 py-4">
+            <p className="m-0 max-w-[58ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
+              {result.skipped.length === 1
+                ? `${result.skipped[0]!.name} suits this brief but has not published rates for all of this work yet, so we cannot put a number against their name — and a studio on this call without a quote would be one you could not compare.`
+                : `${result.skipped.length} studios that suit this brief have not published rates for all of this work yet. We have left them out rather than show you a name with no number against it.`}
+            </p>
+          </Sheet>
+        ) : null}
 
-      <SiteFooter />
-    </>
+        {result.quotes.length === 1 ? (
+          <Sheet className="mb-8 px-5 py-4">
+            <p className="m-0 max-w-[58ch] text-[14.5px] leading-[1.6]">
+              There is one studio we can quote for this brief today, so this call is about whether
+              they are right for you rather than about choosing between two. If the answer is no, we
+              will say so — and we would rather tell you that than introduce you anyway.
+            </p>
+          </Sheet>
+        ) : null}
+
+        <ExpertForm
+          briefId={id}
+          minStudios={minStudios}
+          maxStudios={MAX_STUDIOS}
+          defaultName={user.name}
+          defaultEmail={user.email}
+          studios={result.quotes.map((q) => ({
+            id: q.studioId,
+            name: q.studioName,
+            lowPaise: q.quote.lowPaise,
+            highPaise: q.quote.highPaise,
+          }))}
+        />
+      </Wrap>
+
+      <AppFooter />
+    </div>
   );
 }
 
-/** One line of the call brief. Absent facts are omitted, never guessed at. */
-function BriefLine({ label, value }: { label: string; value: string | null }) {
-  if (!value) return null;
+/** One thing already read. Sage tick — this is verification, not an action. */
+function Read({ label }: { label: string }) {
   return (
-    <li className="grid grid-cols-[8.5rem_minmax(0,1fr)] gap-3 text-[14.5px] leading-snug">
-      <span className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.1em] text-[var(--color-ink-3)]">
-        {label}
+    <li className="flex items-start gap-2.5 text-[14px] leading-snug">
+      <span className="flex h-[21px] flex-none items-center">
+        <Tick style={{ color: 'var(--sec)' }} />
       </span>
-      <span className="text-[var(--color-ink)]">{value}</span>
+      <span>{label}</span>
     </li>
   );
+}
+
+function firstName(full: string): string {
+  return full.split(' ')[0] ?? full;
 }
 
 function localityLabel(slug: string | null): string | null {

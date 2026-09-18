@@ -25,8 +25,10 @@ import { useCallback, useState } from 'react';
 import { formatINRCompact } from '@/lib/money';
 import { buildFirstQuote, STANDARD_KITCHEN_RUN_MM, type FirstQuote } from '@/modules/quotation/first-quote';
 import { filedRatesFor, ratesAreReal } from '@/data/filed-rates';
+import type { Material } from '@/modules/materials/glossary';
 import type { FloorPlan } from '@/modules/quotation/project-store';
 import { Building } from './Building';
+import { Spec, MaterialPanel } from './Material';
 import { Sheet, DocRow, Tick, Flag } from './index';
 
 type Phase = 'gate' | 'building' | 'done';
@@ -171,6 +173,16 @@ export function QuoteDocument({
 }) {
   const money = (p: number) => formatINRCompact(p);
 
+  /**
+   * The document's own glossary.
+   *
+   * A quotation whose material column cannot be read is the thing this
+   * product exists to replace. Every spec here is tappable, and the same
+   * panel answers on the comparison screen — so a term learned in one place
+   * is the same term, worded the same way, in the other.
+   */
+  const [term, setTerm] = useState<Material | null>(null);
+
   return (
     <Sheet className="p-[clamp(20px,3vw,34px)]">
       <div className="mb-7 flex flex-wrap items-end justify-between gap-x-8 gap-y-3 border-b border-[var(--ink)] pb-5">
@@ -212,7 +224,7 @@ export function QuoteDocument({
               label={line.label}
               quantity={`${line.size}  ·  ${line.quantity.toLocaleString('en-IN')} ${line.unit} at ${money(line.ratePaise)} per ${line.unit}`}
               value={money(line.amountPaise)}
-              note={line.spec}
+              note={<Spec text={line.spec} onPick={setTerm} />}
             />
           ))}
         </section>
@@ -259,6 +271,12 @@ export function QuoteDocument({
           </li>
         </ul>
       </div>
+
+      <p className="oi-label m-0 mt-6 border-t border-[var(--line)] pt-4">
+        Underlined materials open an explanation — what it is, and what the cheaper version costs
+      </p>
+
+      <MaterialPanel material={term} onClose={() => setTerm(null)} />
     </Sheet>
   );
 }
@@ -269,11 +287,16 @@ export function QuoteFlow({
   request,
   plan,
   onBuilt,
+  seenQuestions,
+  onAsked,
 }: {
   request: QuoteRequest;
   /** A plan already given for an earlier studio. Skips the gate. */
   plan: FloorPlan | null;
   onBuilt: (quote: FirstQuote, plan: FloorPlan) => void;
+  /** Questions already put to this customer, so a fourth build is a fourth question. */
+  seenQuestions?: readonly string[];
+  onAsked?: (questionId: string) => void;
 }) {
   const [phase, setPhase] = useState<Phase>(plan ? 'building' : 'gate');
   const [usedPlan, setUsedPlan] = useState<FloorPlan | null>(plan);
@@ -304,7 +327,14 @@ export function QuoteFlow({
 
   if (phase === 'gate') return <Gate onReady={start} />;
   if (phase === 'building' || !quote || !usedPlan) {
-    return <Building studioName={request.studioName} onDone={finish} />;
+    return (
+      <Building
+        studioName={request.studioName}
+        onDone={finish}
+        seenQuestions={seenQuestions}
+        onAsked={onAsked}
+      />
+    );
   }
   return <QuoteDocument quote={quote} studioName={request.studioName} plan={usedPlan} />;
 }

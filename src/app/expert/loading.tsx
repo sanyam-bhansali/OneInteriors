@@ -1,6 +1,5 @@
-import { Container } from '@/components/ui';
-import { SiteHeader, SiteFooter } from '@/components/chrome';
-import { JourneyNav } from '@/components/JourneyNav';
+import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
+import { Wrap } from '@/components/oi';
 import { waitLine } from '@/lib/wait-lines';
 
 /**
@@ -15,32 +14,29 @@ import { waitLine } from '@/lib/wait-lines';
  * people booking: *is this going to be a sales call?* Everyone reading this has
  * been on the other kind. So the line names what will not happen. See
  * wait-lines.ts.
+ *
+ * It carries the same chrome and the same spine position as the loaded page,
+ * because a loading screen built out of different furniture makes the layout
+ * jump the moment content arrives, and a jump reads as a glitch.
  */
 export default function ExpertLoading() {
   return (
-    <>
-      <SiteHeader />
-      {/* Default `reached`, matching the loaded page exactly. A loading screen
-          that shows fewer tabs than the page behind it makes the nav jump the
-          moment content arrives, which reads as a glitch. */}
-      <JourneyNav />
+    <div className="oi-app min-h-dvh bg-[var(--bg)]">
+      <AppHeader />
+      <Spine at="expert" />
 
-      <main className="py-16 sm:py-24">
-        <Container size="narrow">
-          <p className="m-0 mb-6 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.15em] text-[var(--color-petrol)]">
-            OneExpert
-          </p>
-          <h1 className="m-0 mb-8 max-w-[20ch] font-[family-name:var(--font-display)] text-[clamp(1.9rem,4vw,2.8rem)] font-normal leading-[1.06] tracking-[-0.02em] text-[var(--color-ink)]">
-            Gathering everything we will have read before we ring you.
-          </h1>
+      <Wrap className="py-16">
+        <p className="oi-eyebrow m-0 mb-5">Your architect</p>
+        <h1 className="oi-display m-0 mb-8 max-w-[20ch] text-[clamp(1.75rem,1.1rem+2.1vw,2.6rem)]">
+          Gathering everything they will have read before they ring you.
+        </h1>
 
-          <p className="m-0 max-w-[54ch] border-l-2 border-[var(--color-brass)] pl-5 font-[family-name:var(--font-display)] text-[19px] leading-[1.45] text-[var(--color-ink-2)]">
-            {waitLine('expert')}
-          </p>
-        </Container>
-      </main>
+        <p className="m-0 max-w-[54ch] border-l-2 border-[var(--line)] pl-5 text-[16px] leading-[1.6] text-[var(--ink2)]">
+          {waitLine('expert')}
+        </p>
+      </Wrap>
 
-      <SiteFooter />
-    </>
+      <AppFooter />
+    </div>
   );
 }

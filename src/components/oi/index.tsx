@@ -157,8 +157,14 @@ export function DocRow({
   quantity?: string;
   /** Money or a spec. Mono, always. */
   value?: string;
-  /** The material. A sentence under the line. */
-  note?: string;
+  /**
+   * The material. A sentence under the line.
+   *
+   * A node rather than a string so the quotation can hand in a `<Spec>` — the
+   * spec with its known terms made tappable. The page that tells people to
+   * read the materials has to make the materials readable.
+   */
+  note?: React.ReactNode;
   /** Sage — marks the better spec in a comparison. Never terracotta. */
   better?: boolean;
   /** The total line: heavier rule above, larger value. */
