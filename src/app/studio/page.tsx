@@ -7,7 +7,7 @@ import { currentStudio, onboardingProgress, STEP_LABELS } from '@/modules/studio
 import { visibility } from '@/modules/studio/dashboard';
 import { myAppointments, formatSlot, upcoming, KIND_LABELS } from '@/modules/studio/introduction';
 import { myClients, BOARD_KINDS } from '@/modules/studio-practice/clients';
-import { colourOf } from '@/modules/studio-practice/vocabulary';
+import { colourOf, QUIET_AFTER_DAYS } from '@/modules/studio-practice/vocabulary';
 import { myProjects } from '@/modules/studio-practice/projects';
 import { myVendors } from '@/modules/studio-practice/vendors';
 import { myQuotes } from '@/modules/studio-quote/quotes';
@@ -76,8 +76,29 @@ export default async function StudioHome() {
   const next = upcoming(appointments).slice(0, 3);
   const liveProjects = projects.filter((p) => p.stage !== 'CLOSED');
 
+  /**
+   * Open clients nobody has spoken to in a week — or ever.
+   *
+   * This is the number the follow-up date cannot give you. A client with no
+   * `nextActionOn` never appears on an overdue list no matter how long they
+   * are ignored, so the busiest-looking board can be one where nothing is
+   * moving. An imported list starts here in its entirety, which is the point:
+   * two hundred rows that nobody has begun are exactly what a studio needs
+   * shown back to them on day two.
+   */
+  const open = clients.filter((c) => BOARD_KINDS.includes(c.stageKind));
+  const quietLine = Date.now() - QUIET_AFTER_DAYS * 86_400_000;
+  const quietClients = open.filter(
+    (c) => c.lastContactedAt === null || c.lastContactedAt.getTime() < quietLine,
+  );
+  const pool = open.filter((c) => c.assignedToId === null);
+
   const quiet =
-    due.length === 0 && owed === 0 && drafts.length === 0 && next.length === 0;
+    due.length === 0 &&
+    owed === 0 &&
+    drafts.length === 0 &&
+    next.length === 0 &&
+    quietClients.length === 0;
 
   return (
     <>
@@ -122,6 +143,34 @@ export default async function StudioHome() {
               urgent={drafts.length > 0}
             />
           </div>
+
+          {/* ── The ones going quiet ──
+              Deliberately a banner and not a fifth figure. It is not a number
+              somebody checks every morning; it is a thing that goes wrong
+              slowly and needs saying out loud when it does. */}
+          {quietClients.length > 0 ? (
+            <div className="s-card flex flex-wrap items-center gap-x-5 gap-y-2 border-l-[3px] !border-l-[var(--s-accent)] px-4 py-3">
+              <p className="m-0 max-w-[62ch] text-[14px] leading-relaxed">
+                <span className="s-num font-semibold">{quietClients.length}</span>{' '}
+                {quietClients.length === 1 ? 'client has' : 'clients have'} had no contact for over
+                a week
+                {pool.length > 0 ? (
+                  <>
+                    , and{' '}
+                    <span className="s-num font-semibold">{pool.length}</span>{' '}
+                    {pool.length === 1 ? 'has' : 'have'} nobody working on them
+                  </>
+                ) : null}
+                . These never show up as overdue, because nobody set a date.
+              </p>
+              <Link
+                href="/studio/clients"
+                className="ml-auto whitespace-nowrap rounded-[8px] border border-[var(--s-rule)] px-3 py-1.5 text-[13px] font-medium no-underline hover:border-[var(--s-ink-3)]"
+              >
+                Go through them
+              </Link>
+            </div>
+          ) : null}
 
           <div className="grid gap-5 xl:grid-cols-2">
             {/* ── Who is waiting ── */}

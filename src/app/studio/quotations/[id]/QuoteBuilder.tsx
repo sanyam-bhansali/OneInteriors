@@ -11,7 +11,8 @@ import {
 } from '@/modules/studio-quote/pricing';
 import type { QuoteRow, QuoteLineRow } from '@/modules/studio-quote/quotes';
 import type { ProductRow } from '@/modules/studio-quote/store';
-import { addLineAction, editLineAction, removeLineAction, IDLE } from '../actions';
+import { addLineAction, editLineAction, removeLineAction } from '../actions';
+import { IDLE } from '../../form-state';
 
 const input =
   'rounded-[7px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-2.5 py-1.5 text-[13.5px] text-[var(--s-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]';

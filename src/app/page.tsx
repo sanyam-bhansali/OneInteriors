@@ -1,11 +1,16 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import type { Metadata } from 'next';
-import { PHOTOS } from '@/lib/imagery';
+import { formatINRCompact } from '@/lib/money';
+import { TIER, TIERS, tierRangeFor } from '@/modules/quotation/tiers';
 import { Mark } from '@/components/brand';
-import { Wrap, Section, Eyebrow, Heading, Cta, Stat, SpecRow, PlayIcon } from '@/components/landing/parts';
+import { Wrap, Section, Eyebrow, Heading, Cta, Stat, Tick, PlayIcon } from '@/components/landing/parts';
 import { HowItWorks } from '@/components/landing/HowItWorks';
-import { Portfolio, Testimonials, Faq } from '@/components/landing/Interactive';
+import { Testimonials, Faq } from '@/components/landing/Interactive';
+import { Problem } from '@/components/landing/Problem';
+import { Trust } from '@/components/landing/Trust';
+import { Walkthrough } from '@/components/landing/Walkthrough';
+import { Portfolio } from '@/components/landing/Portfolio';
+import { HeroShowreel } from '@/components/landing/HeroShowreel';
 
 export const metadata: Metadata = {
   title: 'One Interiors — verified interior studios in Pune',
@@ -18,8 +23,8 @@ export const metadata: Metadata = {
  *
  * ## The one wording rule, and why it is not a detail
  *
- * Every call to action on this page says **get** a quote, never **request**
- * one. The design system states it plainly: the first quote is generated from
+ * Every call to action on this page says **find** or **get**, never
+ * **request**. The design system states it plainly: the first quote is generated from
  * the studio's own filed rate card in about three seconds — no studio is
  * asked, nobody is phoned — and it must never be described as requesting a
  * quote.
@@ -52,83 +57,48 @@ const NAV = [
   { href: '#trust', label: 'Why trust us' },
 ];
 
-const PACKAGES = [
-  {
-    name: 'Essential',
-    range: '₹5.9–9 L',
-    promise: 'Everything a flat needs to be lived in, nothing it doesn’t.',
-    specs: [
-      ['Carcass', '16MM MDF'],
-      ['Shutters', 'MATT LAMINATE'],
-      ['Hardware', 'STANDARD · 2 YR'],
-      ['Ceiling', 'PERIPHERAL ONLY'],
-    ],
-    featured: false,
-  },
-  {
-    name: 'Premium',
-    range: '₹9–16 L',
-    promise: 'Where most Pune 2 BHKs land once the kitchen is taken seriously.',
-    specs: [
-      ['Carcass', '18MM BWP'],
-      ['Shutters', 'VENEER + LAMINATE'],
-      ['Hardware', 'BRANDED · 10 YR'],
-      ['Ceiling', 'DESIGNED · 3 CIRCUITS'],
-    ],
-    featured: true,
-  },
-  {
-    name: 'Luxury',
-    range: '₹16–27 L',
-    promise: 'Custom joinery, stone, and a site that runs for four to five months.',
-    specs: [
-      ['Carcass', '18MM BWP · MARINE'],
-      ['Shutters', 'TEAK · ACRYLIC · GLASS'],
-      ['Hardware', 'IMPORTED · LIFETIME'],
-      ['Ceiling', 'LAYERED · 5 CIRCUITS'],
-    ],
-    featured: false,
-  },
-];
+/**
+ * The bands, read from the pricing engine rather than retyped.
+ *
+ * They used to be a hard-coded array on this page with its own ranges and its
+ * own materials, and it had already drifted: the page advertised
+ * "₹5.9–9 L / ₹9–16 L / ₹16–27 L" while `tiers.ts` — the file the quiz and
+ * every quote actually price against — put Essential at ₹700–1,100 per sq ft,
+ * which for the 1,180 sq ft the page names is ₹8.3–13 L. A visitor who read
+ * the band here and then took the quiz got a different number for the same
+ * flat, and there is no reading of that which is not us being wrong on the
+ * page that promises we are not.
+ *
+ * So the figures come from `TIER` and the range from `tierRangeFor`, which
+ * means a change to pricing cannot leave the marketing behind.
+ */
+const SAMPLE_SQFT = 1180;
 
-const CHECKS = [
-  {
-    n: '01',
-    group: 'Identity',
-    title: 'GSTIN and registration verified',
-    body: 'Checked against the GST portal, not a screenshot they sent us.',
-  },
-  {
-    n: '02',
-    group: 'Work',
-    title: 'Two finished sites visited',
-    body: 'We stand in the flat. Photographs from a studio’s Instagram do not count.',
-  },
-  {
-    n: '03',
-    group: 'Clients',
-    title: 'Past clients called back',
-    body: 'Three calls, asked about delays and final versus quoted cost.',
-  },
-  {
-    n: '04',
-    group: 'Money',
-    title: 'Rate card filed with us',
-    body: 'Their own prices, on record, which is what your first quote is priced from.',
-  },
-  {
-    n: '05',
-    group: 'Labour',
-    title: 'In-house or named contractors',
-    body: 'You know who will actually be in your flat, before they arrive.',
-  },
-  {
-    n: '06',
-    group: 'After',
-    title: 'Written warranty terms',
-    body: 'On hardware, finish and workmanship — with the duration stated.',
-  },
-];
+const PACKAGES = TIERS.map((tier) => {
+  const band = TIER[tier];
+  const { lowPaise, highPaise } = tierRangeFor(tier, SAMPLE_SQFT);
+
+  return {
+    tier,
+    name: band.label,
+    perSqft: `₹${band.perSqftFrom.toLocaleString('en-IN')}–${band.perSqftTo.toLocaleString('en-IN')}`,
+    range: `${formatINRCompact(lowPaise)}–${formatINRCompact(highPaise)}`,
+    promise: band.promise,
+    materials: band.materials,
+    // `notFor` in `tiers.ts` is two sentences: what the band is not for, and
+    // what to do instead. The card has room for the first, which is the part
+    // that stops somebody buying the wrong band.
+    //
+    // The leading "Not the band for" is stripped because the card already
+    // says "Not this band if" — left in, it rendered as "NOT THIS BAND IF —
+    // NOT THE BAND FOR VENEER…", which is the same negation twice and reads
+    // like a mistake. Derived rather than retyped, so the warning cannot
+    // drift from the one the quiz shows.
+    notFor: `${band.notFor.split('. ')[0]!.replace(/^Not the band for /, 'you want ')}.`,
+    featured: tier === 'PREMIUM',
+  };
+});
+
 
 export default function HomePage() {
   return (
@@ -167,9 +137,9 @@ export default function HomePage() {
               </Link>
             </nav>
 
-            {/* "Get", never "request". See the note at the top of this file. */}
+            {/* "Find", never "request". See the note at the top of this file. */}
             <Cta href="/quiz" className="!px-5 !py-2.5 !text-[13.5px]">
-              Get my first quote
+              Find your designer
             </Cta>
           </div>
         </Wrap>
@@ -177,72 +147,76 @@ export default function HomePage() {
 
       {/* ── Hero ── */}
       <section className="relative">
-        <div className="relative min-h-[max(640px,88vh)] w-full overflow-hidden">
-          <Image
-            src={PHOTOS.hero.src}
-            alt={PHOTOS.hero.alt}
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover"
-          />
+        <div className="relative min-h-[max(600px,80vh)] w-full overflow-hidden">
+          <HeroShowreel />
+
+          {/* The opening beat.
+              `aria-hidden` and `pointer-events-none`: it is a decoration, the
+              name is already in the nav and the H1 is already in the DOM, so
+              a screen reader announcing this would just be reading the brand
+              name twice before getting to the headline. */}
           <div
             aria-hidden
-            className="absolute inset-0"
-            style={{
-              background:
-                'linear-gradient(to top, rgba(44,38,36,.88) 0%, rgba(44,38,36,.55) 42%, rgba(44,38,36,.30) 72%, rgba(44,38,36,.42) 100%)',
-            }}
-          />
+            className="pointer-events-none absolute inset-0 flex items-center justify-center"
+          >
+            <span className="hero-wordmark oi-display text-[clamp(2.4rem,1.2rem+4.6vw,4.6rem)] text-white/95">
+              One Interiors
+            </span>
+          </div>
 
           <div className="absolute inset-x-0 bottom-0">
-            <Wrap className="pb-12 sm:pb-16">
+            <Wrap className="hero-copy pb-11 sm:pb-14">
               {/* Contrast: this eyebrow sat over a plant at 40% opacity in
                   review and could not be read. It is on the scrim now. */}
               <p className="oi-num m-0 mb-5 text-[10.5px] uppercase tracking-[0.2em] text-white/80">
-                Bare flat → finished home · filmed in Kothrud
+                Pune · 6,000 studios screened, 14 listed
               </p>
 
-              <h1 className="oi-display m-0 mb-5 max-w-[19ch] text-[clamp(2.1rem,1.3rem+3.3vw,3.7rem)] text-white">
-                Watch a Pune flat get finished. Then get quoted for yours.
+              <h1 className="oi-display m-0 mb-4 max-w-[19ch] text-[clamp(2rem,1.3rem+3vw,3.4rem)] text-white">
+                Find the right interior designer for your home.
               </h1>
 
-              <p className="m-0 mb-9 max-w-[52ch] text-[16.5px] leading-[1.62] text-white/85">
-                Nine questions about your flat. Three studios matched to the answers. A first quote
-                priced in three seconds — and an architect of your own while you compare.
+              <p className="m-0 mb-8 max-w-[52ch] text-[16px] leading-[1.6] text-white/85">
+                Answer nine questions about your flat. We match you with studios that actually fit
+                it, price the first quote off their own rate card, and give you a personal architect
+                to check every step.
               </p>
 
               <div className="flex flex-wrap items-center gap-3">
-                <Cta href="/quiz">Get my first quote</Cta>
+                <Cta href="/quiz">Find your interior designer</Cta>
                 <a
-                  href="#film"
+                  href="#walkthrough"
                   className="inline-flex items-center gap-2.5 border border-white/30 px-5 py-3.5 text-[14px] text-white no-underline transition-colors hover:border-white/70"
                 >
                   <PlayIcon />
-                  Watch the 90-second film
+                  See how it works
                 </a>
               </div>
             </Wrap>
           </div>
 
-          <div className="absolute bottom-12 right-0 hidden lg:block">
-            <Wrap>
-              <p className="oi-num m-0 text-right text-[10.5px] uppercase tracking-[0.18em] text-white/70">
-                Showreel · 06 projects
-              </p>
-            </Wrap>
-          </div>
         </div>
       </section>
 
-      {/* ── Stats ──
-          Three figures, each with its provenance. The rating is real client
-          data from a studio's own finished projects, which is why it is
-          labelled as one studio's record rather than a site-wide average —
-          One Interiors has not delivered 41 projects and must not imply it. */}
-      <Section className="border-b border-[var(--line)] bg-[var(--card)]">
+      {/* ── Reviews strip ──
+          Four cells. The quote range that used to sit in the third —
+          "₹5.95 L–₹27.2 L, range of quotes compared here" — is gone and must
+          not come back on this page: a price band stated before anybody has
+          said how big their flat is invites exactly the reading the Packages
+          section exists to prevent, and the page now makes the per-sq-ft
+          argument properly further down.
+
+          The fourth cell is a claim rather than a measurement, which is why
+          it carries a tick instead of a figure — it reads as the terms of the
+          offer, not as a fourth statistic with a number missing.
+
+          The rating is real client data from a listed studio's own finished
+          projects, which is why it is labelled as one studio's record rather
+          than a site-wide average. One Interiors has not delivered 41
+          projects and the strip must not imply that it has. */}
+      <Section className="border-y border-[var(--line)] bg-[var(--card)]">
         <Wrap>
-          <div className="grid divide-y divide-[var(--line)] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          <div className="grid divide-y divide-[var(--line)] sm:grid-cols-2 sm:divide-x lg:grid-cols-4 lg:divide-y-0">
             <Stat
               figure="4.8"
               unit="/ 5"
@@ -250,251 +224,119 @@ export default function HomePage() {
               source="One listed studio’s own record"
             />
             <Stat figure="68" label="briefs matched to Pune studios" />
-            <Stat
-              figure="₹5.95 L–₹27.2 L"
-              label="range of quotes compared here"
-            />
-          </div>
+            <Stat figure="6,000 → 14" label="Pune studios screened, currently listed" />
 
-          <div className="flex items-start gap-2.5 border-t border-[var(--line)] py-5">
-            <span style={{ color: 'var(--sec)' }} className="mt-0.5">
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path
-                  d="M2.5 8.5 6 12l7.5-8"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
-            <div>
-              <p className="m-0 text-[14px] font-medium">Free until you book</p>
-              <p className="m-0 text-[13px] text-[var(--ink2)]">studios pay us, never you</p>
+            <div className="flex flex-col gap-1.5 px-5 py-7 sm:px-8">
+              <p className="m-0 flex items-center gap-2" style={{ color: 'var(--sec)' }}>
+                <Tick />
+                <span className="text-[15px] font-medium text-[var(--ink)]">Free until you book</span>
+              </p>
+              <p className="m-0 text-[13.5px] leading-snug text-[var(--ink2)]">
+                studios pay us, never you
+              </p>
             </div>
           </div>
         </Wrap>
       </Section>
 
+      {/* ── Problem — the evidence board ── */}
+      <Problem />
+
       {/* ── How it works — the pinned spine ── */}
       <HowItWorks />
 
-      {/* ── Your architect ── */}
-      <section className="relative overflow-hidden">
-        <Image
-          src={PHOTOS.architect.src}
-          alt={PHOTOS.architect.alt}
-          fill
-          sizes="100vw"
-          className="object-cover"
-        />
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{ background: 'linear-gradient(160deg,rgba(44,38,36,.72),rgba(44,38,36,.86))' }}
-        />
+      {/* ── Why trust us — the fifteen checks ── */}
+      <Trust />
 
-        <Wrap className="relative py-20 sm:py-24">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <span className="flex items-center gap-2">
-              <Mark className="h-4 w-4 text-white/70" />
-              <span className="oi-display text-[16px] text-white/85">One Interiors</span>
-            </span>
-            <span className="oi-num text-[10px] uppercase tracking-[0.18em] text-white/55">
-              Your architect
-            </span>
-          </div>
+      {/* ── The product, step by step ──
+          This replaces the "90-second film" band, which was a play
+          button over a photograph for a film that does not exist. */}
+      <Walkthrough />
 
-          <div className="oi-glass max-w-[720px] p-6 sm:p-8">
-            <p className="oi-label m-0 mb-3">Your architect · assigned to you</p>
-
-            <div className="mb-5 flex flex-wrap items-center gap-4">
-              <Image
-                src={PHOTOS.expert.src}
-                alt="Nikhil Bhave"
-                width={120}
-                height={120}
-                className="h-16 w-16 flex-none rounded-[12px] object-cover"
-              />
-              <div className="min-w-0">
-                <p className="oi-display m-0 text-[24px]">Nikhil Bhave</p>
-                <p className="m-0 text-[13.5px] leading-snug text-[var(--ink2)]">
-                  Stays with you from brief to handover. Paid by us, never by a studio.
-                </p>
-              </div>
-            </div>
-
-            <p className="oi-label m-0 mb-3 border-t border-[var(--line)] pt-5">
-              He verifies every step
-            </p>
-
-            <ul className="m-0 mb-6 flex list-none flex-col gap-0 p-0">
-              {[
-                ['Brief read back to you', 'Signed off'],
-                ['Shortlist and studio checks', 'Signed off'],
-                ['Quote read line by line', 'Today'],
-                ['Material samples signed off', ''],
-                ['Site visits and handover', ''],
-              ].map(([label, state]) => {
-                const done = state === 'Signed off';
-                const now = state === 'Today';
-                return (
-                  <li
-                    key={label}
-                    className="flex items-center gap-3 border-b border-[var(--line)] py-3 last:border-b-0"
-                  >
-                    {done ? (
-                      <span style={{ color: 'var(--sec)' }} className="flex-none">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                          <circle cx="8" cy="8" r="7.25" fill="currentColor" />
-                          <path
-                            d="M4.9 8.2 6.9 10.2 11.1 6"
-                            stroke="#fff"
-                            strokeWidth="1.6"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </span>
-                    ) : (
-                      <span
-                        aria-hidden
-                        className="h-4 w-4 flex-none rounded-full border"
-                        style={{
-                          borderColor: now ? 'var(--acc)' : 'var(--line)',
-                          background: now ? 'var(--acc)' : 'transparent',
-                        }}
-                      />
-                    )}
-                    <span className={`flex-1 text-[14.5px] ${state ? '' : 'text-[var(--ink2)]'}`}>
-                      {label}
-                    </span>
-                    {state ? (
-                      <span
-                        className="oi-num flex-none text-[10px] uppercase tracking-[0.14em]"
-                        style={{ color: now ? 'var(--acc)' : 'var(--ink2)' }}
-                      >
-                        {state}
-                      </span>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-
-            <div className="oi-glass-inner flex flex-wrap items-center justify-between gap-4 bg-[var(--bg)] p-4">
-              <p className="m-0 max-w-[52ch] text-[13.5px] leading-snug">
-                <span className="oi-num mr-1 text-[15px] text-[var(--ink2)]">&ldquo;</span>
-                I&rsquo;d ask Teakline to re-quote the kitchen on 18mm BWP before you sign anything.
-              </p>
-              <Cta href="/expert" intent="quiet" className="!px-4 !py-2 !text-[13px]">
-                Call Nikhil
-              </Cta>
-            </div>
-          </div>
-        </Wrap>
-      </section>
-
-      {/* ── Why we built this ── */}
-      <section id="film" className="relative overflow-hidden">
-        <Image
-          src={PHOTOS.film.src}
-          alt={PHOTOS.film.alt}
-          fill
-          sizes="100vw"
-          className="object-cover"
-        />
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{ background: 'linear-gradient(105deg,rgba(44,38,36,.90) 30%,rgba(44,38,36,.55))' }}
-        />
-
-        <Wrap className="relative py-20 sm:py-28">
-          <p className="oi-num m-0 mb-5 text-[10.5px] uppercase tracking-[0.2em] text-white/70">
-            90 seconds · why we built this
-          </p>
-
-          <h2 className="oi-display m-0 mb-5 max-w-[24ch] text-[clamp(1.75rem,1.15rem+2.3vw,2.85rem)] text-white">
-            Nobody should sign a ₹18 lakh contract they can&rsquo;t read.
-          </h2>
-
-          <p className="m-0 mb-9 max-w-[54ch] text-[16px] leading-[1.62] text-white/80">
-            Two Pune studios, one rate card each, and a promise that every number on your quote has
-            a quantity and a material behind it.
-          </p>
-
-          {/* Placeholder until the MP4 exists — see imagery.ts. */}
-          <button
-            type="button"
-            className="inline-flex cursor-pointer items-center gap-4 rounded-full border border-white/25 bg-white/5 py-2 pl-2 pr-6 text-left text-white transition-colors hover:border-white/60"
-          >
-            <span
-              className="flex h-11 w-11 flex-none items-center justify-center rounded-full"
-              style={{ background: 'var(--acc)' }}
-            >
-              <PlayIcon size={14} />
-            </span>
-            <span>
-              <span className="block text-[14.5px] font-medium">Watch the film</span>
-              <span className="oi-num block text-[10px] uppercase tracking-[0.16em] text-white/60">
-                01:32 · sound on
-              </span>
-            </span>
-          </button>
-        </Wrap>
-      </section>
+      {/* ── Voices ── */}
+      <Testimonials />
 
       {/* ── Portfolio ── */}
       <Portfolio />
 
-      {/* ── Packages ── */}
-      <section id="packages" className="border-t border-[var(--line)] py-20 sm:py-24">
+      {/* ── Packages ──
+          Alabaster section, Raw Silk cards: the inversion of every other
+          band on the page, so a card reads as a thing sitting on a surface
+          rather than a panel cut out of it. */}
+      <section
+        id="packages"
+        className="border-t border-[var(--line)] bg-[var(--card)] py-16 sm:py-20"
+      >
         <Wrap>
           <Eyebrow>Packages</Eyebrow>
-          <Heading className="mb-4 max-w-[24ch]">
-            Three bands, described in materials rather than adjectives.
-          </Heading>
 
-          <p className="oi-label m-0 mb-1">Priced for a 2 BHK · 1,180 sq ft</p>
-          <p className="m-0 mb-10 text-[14px] text-[var(--ink2)]">
-            Your quiz re-costs these for your area.
-          </p>
+          {/* The pricing basis sits on the heading row rather than stacked
+              under it. Two mono lines stacked under a mono eyebrow flattened
+              the hierarchy into three grey labels in a column. */}
+          <div className="mb-10 flex flex-wrap items-end justify-between gap-x-10 gap-y-3">
+            <Heading className="max-w-[24ch]">
+              Three bands, described in materials rather than adjectives.
+            </Heading>
+            <div className="text-left sm:text-right">
+              <p className="oi-label m-0">All-in, per sq ft of carpet area</p>
+              <p className="oi-label m-0 mt-0.5 !text-[var(--ink2)]/70">
+                The quiz re-costs it for your flat
+              </p>
+            </div>
+          </div>
 
-          <div className="grid gap-5 md:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-3">
             {PACKAGES.map((band) => (
               <article
-                key={band.name}
-                className="relative flex flex-col border bg-[var(--card)] p-6"
+                key={band.tier}
+                className="relative flex flex-col bg-[var(--bg)] p-6"
                 style={{
-                  borderColor: band.featured ? 'var(--acc)' : 'var(--line)',
+                  border: band.featured ? '1.5px solid var(--acc)' : '1px solid var(--line)',
                 }}
               >
                 {band.featured ? (
+                  // `whitespace-nowrap`: at the narrowest card width this tab
+                  // wrapped to two lines and pushed itself off the top edge.
                   <span
-                    className="oi-num absolute -top-px right-0 px-3 py-1 text-[9.5px] uppercase tracking-[0.16em] text-white"
-                    style={{ background: 'var(--acc)' }}
+                    className="oi-num absolute right-6 top-[-1px] whitespace-nowrap px-3 py-1 text-[9.5px] uppercase tracking-[0.16em] text-white"
+                    style={{ background: 'var(--acc-btn)' }}
                   >
                     Most compared
                   </span>
                 ) : null}
 
-                <p className="oi-label m-0 mb-3">{band.name}</p>
-                <p className="oi-num m-0 mb-3 text-[26px] leading-none">{band.range}</p>
-                <p className="m-0 mb-6 min-h-[3.2em] text-[13.5px] leading-[1.55] text-[var(--ink2)]">
+                <p className="oi-label m-0 mb-4">{band.name}</p>
+
+                <p className="oi-num m-0 text-[26px] leading-none">
+                  {band.perSqft}
+                  <span className="text-[13px] text-[var(--ink2)]"> / sq ft</span>
+                </p>
+                <p className="oi-num m-0 mb-4 mt-2 text-[11px] uppercase tracking-[0.14em] text-[var(--ink2)]">
+                  {band.range} for {SAMPLE_SQFT.toLocaleString('en-IN')} sq ft
+                </p>
+
+                <p className="m-0 mb-6 min-h-[3.2em] text-[14.5px] leading-[1.55] text-[var(--ink2)]">
                   {band.promise}
                 </p>
 
-                <div className="mb-7">
-                  {band.specs.map(([label, value]) => (
-                    <SpecRow
-                      key={label}
-                      label={label!}
-                      value={value!}
-                      better={band.name !== 'Essential'}
-                    />
+                <ul className="m-0 mb-6 flex list-none flex-col gap-2.5 border-b border-[var(--line)] p-0 pb-6">
+                  {band.materials.map((material) => (
+                    <li key={material} className="flex items-start gap-2.5">
+                      <Tick className="mt-0.5" style={{ color: 'var(--sec)' }} />
+                      <span className="text-[13.5px] leading-[1.5]">{material}</span>
+                    </li>
                   ))}
-                </div>
+                </ul>
+
+                {/* Terracotta, because this is an attention flag — the one
+                    line on the card that stops somebody buying the wrong
+                    band. It is not an action, so it is not a button. */}
+                <p
+                  className="oi-num m-0 mb-6 text-[9.5px] uppercase leading-[1.6] tracking-[0.14em]"
+                  style={{ color: 'var(--acc-ink)', whiteSpace: 'normal' }}
+                >
+                  Not this band if — {band.notFor}
+                </p>
 
                 <Cta
                   href="/quiz"
@@ -509,69 +351,33 @@ export default function HomePage() {
         </Wrap>
       </section>
 
-      {/* ── Why trust us ── */}
-      <Section id="trust" dark className="py-20 sm:py-24">
-        <Wrap>
-          <Eyebrow onDark>Why trust us</Eyebrow>
-          <Heading className="mb-6 max-w-[26ch] text-[#f4efe8]">
-            Studios pay us. So we are strict with studios, not with you.
-          </Heading>
-
-          <p className="oi-num m-0 mb-1 text-[10.5px] uppercase tracking-[0.18em] text-white/70">
-            12 checks before a studio is listed
-          </p>
-          <p className="oi-num m-0 mb-12 text-[10.5px] uppercase tracking-[0.18em] text-white/45">
-            Each one has a named verifier
-          </p>
-
-          <div className="grid gap-x-10 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">
-            {CHECKS.map((check) => (
-              <div key={check.n} className="border-l border-white/15 pl-5">
-                <p className="oi-num m-0 mb-3 text-[10px] uppercase tracking-[0.16em] text-white/45">
-                  {check.n} · {check.group}
-                </p>
-                <p className="m-0 mb-2 text-[15px] font-medium text-[#f4efe8]">{check.title}</p>
-                <p className="m-0 text-[13.5px] leading-[1.6] text-white/60">{check.body}</p>
-              </div>
-            ))}
-          </div>
-
-          <p className="m-0 mt-14 max-w-[70ch] text-[14.5px] leading-[1.7] text-white/65">
-            The remaining six checks cover insurance, safety on site, drawing standards, material
-            sourcing, payment milestones and dispute history. Any studio that fails one is not
-            listed until it is fixed.
-          </p>
-
-          <div className="mt-8">
-            <Cta href="/verification" intent="onDark">
-              Read all twelve checks
-            </Cta>
-          </div>
-        </Wrap>
-      </Section>
-
-      {/* ── Voices ── */}
-      <Testimonials />
-
       {/* ── FAQ ── */}
       <Faq />
 
       {/* ── Closing ── */}
       <section style={{ background: 'var(--acc)' }} className="py-16 sm:py-20">
         <Wrap>
-          <h2 className="oi-display m-0 mb-4 max-w-[24ch] text-[clamp(1.6rem,1.15rem+1.8vw,2.4rem)] text-white">
-            Nine questions. Then a quote you can actually read.
-          </h2>
-          <p className="m-0 mb-8 max-w-[56ch] text-[15.5px] leading-[1.6] text-white/85">
-            Three minutes, no phone call, and nothing payable by you at any point.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <Cta href="/quiz" intent="onAccent">
-              Start the quiz
-            </Cta>
-            <Cta href="/expert" intent="onDark">
-              Talk to an architect first
-            </Cta>
+          {/* Copy left, actions right. Stacked, the two buttons sat under a
+              short paragraph on a wide terracotta field with nothing on the
+              right half of the band at all. */}
+          <div className="flex flex-wrap items-center justify-between gap-x-12 gap-y-7">
+            <div>
+              <h2 className="oi-display m-0 mb-3 max-w-[24ch] text-[clamp(1.6rem,1.15rem+1.8vw,2.4rem)] text-white">
+                Nine questions. Then a quote you can actually read.
+              </h2>
+              <p className="m-0 max-w-[56ch] text-[15.5px] leading-[1.6] text-white/85">
+                Two minutes, no phone call, and nothing payable by you at any point.
+              </p>
+            </div>
+
+            <div className="flex flex-none flex-wrap gap-3">
+              <Cta href="/quiz" intent="onAccent">
+                Start the quiz
+              </Cta>
+              <Cta href="/expert" intent="onDark">
+                Talk to an architect first
+              </Cta>
+            </div>
           </div>
         </Wrap>
       </section>
@@ -579,30 +385,17 @@ export default function HomePage() {
       {/* ── Footer ── */}
       <Section dark className="py-16">
         <Wrap>
-          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr]">
+          {/* Four columns: brand, the product, for studios, talk to us.
+              Contact was inside the brand column, which made the first column
+              twice the height of the other two and left the row lopsided. */}
+          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1.1fr]">
             <div>
               <span className="mb-4 flex items-center gap-2.5">
                 <Mark className="h-5 w-5 text-white/80" />
                 <span className="oi-display text-[19px] text-[#f4efe8]">One Interiors</span>
               </span>
-              <p className="m-0 mb-8 max-w-[34ch] text-[13.5px] leading-[1.6] text-white/60">
-                Interior studios in Pune, checked twelve ways and quoted line by line.
-              </p>
-
-              <p className="oi-num m-0 mb-3 text-[10px] uppercase tracking-[0.16em] text-white/45">
-                Talk to us
-              </p>
-              <a
-                href="mailto:hello@oneinteriors.in"
-                className="block text-[14px] text-white/75 no-underline hover:text-white"
-              >
-                hello@oneinteriors.in
-              </a>
-              <a href="tel:+912040000000" className="oi-num block text-[14px] text-white/75 no-underline hover:text-white">
-                +91 20 4000 0000
-              </a>
-              <p className="oi-num m-0 mt-2 text-[10px] uppercase tracking-[0.16em] text-white/40">
-                Mon–Sat · 10:00–19:00 IST
+              <p className="m-0 max-w-[34ch] text-[13.5px] leading-[1.6] text-white/60">
+                Interior studios in Pune, checked fifteen ways and quoted line by line.
               </p>
             </div>
 
@@ -632,7 +425,7 @@ export default function HomePage() {
               </p>
               {[
                 ['/apply', 'Apply to be listed'],
-                ['/verification', 'The twelve checks'],
+                ['/verification', 'The fifteen checks'],
                 ['/apply', 'Filing your rate card'],
                 ['/apply', 'How we are paid'],
               ].map(([href, label], i) => (
@@ -645,6 +438,27 @@ export default function HomePage() {
                 </Link>
               ))}
             </nav>
+
+            <div className="flex flex-col gap-2.5">
+              <p className="oi-num m-0 mb-1 text-[10px] uppercase tracking-[0.16em] text-white/45">
+                Talk to us
+              </p>
+              <a
+                href="mailto:hello@oneinteriors.in"
+                className="text-[14px] text-white/70 no-underline hover:text-white"
+              >
+                hello@oneinteriors.in
+              </a>
+              <a
+                href="tel:+912040000000"
+                className="oi-num text-[14px] text-white/70 no-underline hover:text-white"
+              >
+                +91 20 4000 0000
+              </a>
+              <p className="oi-num m-0 mt-1 text-[10px] uppercase tracking-[0.16em] text-white/40">
+                Mon–Sat · 10:00–19:00 IST
+              </p>
+            </div>
           </div>
 
           <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-white/12 pt-6">

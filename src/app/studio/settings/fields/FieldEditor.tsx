@@ -14,9 +14,8 @@ import {
   renameFieldAction,
   setGroupingAction,
   removeFieldAction,
-  IDLE,
-  type State,
 } from './actions';
+import { IDLE, type State } from '../../form-state';
 
 const input =
   'rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[14px] text-[var(--s-ink)] placeholder:text-[var(--s-ink-3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]';

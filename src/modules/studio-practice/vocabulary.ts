@@ -228,3 +228,20 @@ export const COMMON_TRADES = [
   'Stone & granite',
   'Hardware',
 ] as const;
+
+/**
+ * How long a deleted client sits in the bin before it is erased.
+ *
+ * Here rather than in `clients.ts` because the card that asks "delete?" is a
+ * client component, and it has to be able to say how many days it is promising
+ * without importing a `server-only` module. Importing a VALUE from one of
+ * those pulls Prisma into the browser bundle and stops the build —
+ * CONTRIBUTING §9.5, and the reason `tests/server-only-boundary.test.ts`
+ * exists.
+ *
+ * One number, so the screen and the erase cannot disagree.
+ */
+export const BIN_DAYS = 30;
+
+/** A client with no contact for this long has gone quiet. */
+export const QUIET_AFTER_DAYS = 7;

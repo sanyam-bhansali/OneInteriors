@@ -107,11 +107,19 @@ export const PHOTOS = {
  * the photographs do.
  */
 export interface FinishedProject {
+  /** Stable key, and the fragment a real project page would live at. */
+  slug: string;
   locality: string;
   areaSqft: number;
   title: string;
   note: string;
   studio: string;
+  /** "3 BHK". Mono on the card. */
+  config: string;
+  /** The building. Invented, like the studio names — see above. */
+  building: string;
+  /** Essential / Premium / Luxury, as `tiers.ts` names them. Sage on the card. */
+  band: string;
   /** Display string, already in lakh. Mono, never wrapped. */
   cost: string;
   photo: Photo;
@@ -119,8 +127,12 @@ export interface FinishedProject {
 
 export const FINISHED_WORK: FinishedProject[] = [
   {
+    slug: 'kotah-and-cane',
     locality: 'Kothrud',
     areaSqft: 1180,
+    config: '3 BHK',
+    building: 'Sanskriti Towers',
+    band: 'Premium',
     title: 'Kotah & cane',
     note: 'Kotah stone floors kept, cane shutters through the living room, everything else new.',
     studio: 'Teakline Studio',
@@ -131,8 +143,12 @@ export const FINISHED_WORK: FinishedProject[] = [
     },
   },
   {
+    slug: 'oak-and-stone-kitchen',
     locality: 'Baner',
     areaSqft: 960,
+    config: '2 BHK',
+    building: 'Amaltas Residences',
+    band: 'Premium',
     title: 'Oak & stone kitchen',
     note: 'Quartz counter, 18mm BWP carcass, branded channels rated for ten years of use.',
     studio: 'Chitra & Co.',
@@ -143,51 +159,67 @@ export const FINISHED_WORK: FinishedProject[] = [
     },
   },
   {
+    slug: 'joinery-and-layered-light',
     locality: 'Wakad',
     areaSqft: 1420,
-    title: 'Joinery & layers',
-    note: 'Full custom joinery, five lighting circuits, stone through the living and dining.',
+    config: '4 BHK',
+    building: 'Veda Vista',
+    band: 'Luxury',
+    title: 'Joinery & layered light',
+    note: 'Full custom joinery, four lighting circuits, stone through the living and dining.',
     studio: 'Teakline Studio',
-    cost: '₹24.6 L',
+    cost: '₹27.2 L',
     photo: {
       src: unsplash('photo-1616594039964-ae9021a400a0', 900),
       alt: 'A bedroom with full-height joinery and layered lighting',
     },
   },
   {
-    locality: 'Kharadi',
-    areaSqft: 1050,
-    title: 'Plaster & teak',
-    note: 'Lime plaster walls, teak edging on every shutter, peripheral ceiling only.',
+    slug: 'laminate-done-well',
+    locality: 'Hinjawadi',
+    areaSqft: 640,
+    config: '1 BHK',
+    building: 'Nirvana Greens',
+    band: 'Essential',
+    title: 'Laminate, done well',
+    note: 'Honest laminate, good hinges, no false ceiling. The lowest quote we have compared.',
     studio: 'Maya Workshop',
-    cost: '₹14.8 L',
+    cost: '₹5.95 L',
     photo: {
       src: unsplash('photo-1586023492125-27b2c045efd7', 900),
-      alt: 'A bedroom with lime plaster walls and teak-edged wardrobes',
+      alt: 'A compact bedroom with plain laminate wardrobes and a simple ceiling',
     },
   },
   {
-    locality: 'Baner',
-    areaSqft: 780,
-    title: 'One-bedroom, done once',
-    note: 'A 1 BHK finished to the top band rather than a 2 BHK finished to the bottom one.',
-    studio: 'Chitra & Co.',
-    cost: '₹9.4 L',
-    photo: {
-      src: unsplash('photo-1503387762-592deb58ef4e', 900),
-      alt: 'A compact living room with built-in seating and open shelving',
-    },
-  },
-  {
+    slug: 'quiet-art-deco',
     locality: 'Aundh',
-    areaSqft: 1610,
-    title: 'Stone, brass and light',
-    note: 'Marine ply throughout, imported hardware, a site that ran four and a half months.',
-    studio: 'Maya Workshop',
-    cost: '₹27.2 L',
+    areaSqft: 1050,
+    config: '3 BHK',
+    building: 'Ashirwad Park',
+    band: 'Premium',
+    title: 'Quiet Art Deco',
+    note: 'Fluted teak, brass inlay kept to three rooms, and a client who wanted no gloss anywhere.',
+    studio: 'Chitra & Co.',
+    cost: '₹16.8 L',
     photo: {
       src: unsplash('photo-1600880292203-757bb62b4baf', 900),
-      alt: 'A dining room with a stone table, brass fittings and layered light',
+      alt: 'A dining room with fluted panelling, brass fittings and layered light',
+    },
+  },
+  {
+    slug: 'built-for-three-generations',
+    locality: 'Kothrud',
+    areaSqft: 880,
+    config: '2 BHK',
+    building: 'Shreeji Elite',
+    band: 'Premium',
+    title: 'Built for three generations',
+    note: 'Grab rails that do not look like grab rails, no thresholds, every switch at 900mm.',
+    studio: 'Maya Workshop',
+    cost: '₹9.6 L',
+    photo: {
+      src: unsplash('photo-1503387762-592deb58ef4e', 900),
+      alt: 'A living room with built-in seating, open shelving and wide clear floor',
     },
   },
 ];

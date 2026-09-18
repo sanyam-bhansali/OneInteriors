@@ -71,6 +71,9 @@ const TIER2_CHECKS = (date: string, gstFrom: string) =>
     ['CLIENT_REFERENCE', 'PASS', 'Our team', date, '3 past clients contacted by phone'],
     ['SITE_INSPECTION', 'PASS', 'Our team', date, '2 completed sites inspected'],
     ['LITIGATION_SEARCH', 'PASS', 'eCourts + NCDRC', date, 'No matters found'],
+    ['RATE_CARD_FILED', 'PASS', 'Our pricing team', date, 'Per-sq-ft rates on record'],
+    ['WARRANTY_TERMS', 'PASS', 'Legal review', date, 'Duration stated in the contract'],
+    ['LABOUR_INSURANCE', 'PASS', 'Insurer certificate', date, 'Current at the last audit'],
   ]);
 
 const TIER1_CHECKS = (date: string) =>
@@ -87,6 +90,13 @@ const TIER1_CHECKS = (date: string) =>
     ['CLIENT_REFERENCE', 'PENDING', 'Our team', null, '1 of 3 references contacted'],
     ['SITE_INSPECTION', 'PENDING', 'Our team', null, 'Scheduled'],
     ['LITIGATION_SEARCH', 'PASS', 'eCourts + NCDRC', date, 'No matters found'],
+    ['RATE_CARD_FILED', 'PASS', 'Our pricing team', date, 'Per-sq-ft rates on record'],
+    // A Tier 1 studio is mid-verification by definition, and these two are the
+    // paperwork that most often lags. PENDING rather than absent, so the
+    // profile says which one is outstanding instead of silently showing
+    // thirteen of fifteen.
+    ['WARRANTY_TERMS', 'PENDING', 'Legal review', null, 'Draft terms received, under review'],
+    ['LABOUR_INSURANCE', 'PENDING', 'Insurer certificate', null, 'Certificate requested'],
   ]);
 
 /**

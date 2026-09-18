@@ -113,7 +113,7 @@ export async function addProject(input: {
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   const client = await prisma.studioClient.findFirst({
-    where: { id: input.clientId, studioId },
+    where: { id: input.clientId, studioId, deletedAt: null },
     select: { id: true, name: true, stage: { select: { kind: true } } },
   });
   if (!client) return { ok: false, error: 'That client is not yours.' };

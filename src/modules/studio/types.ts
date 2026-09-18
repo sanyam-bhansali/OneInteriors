@@ -26,7 +26,17 @@ export type CheckType =
   | 'UDYAM'
   | 'CLIENT_REFERENCE'
   | 'SITE_INSPECTION'
-  | 'LITIGATION_SEARCH';
+  | 'LITIGATION_SEARCH'
+  // The last three arrived with the landing page's "fifteen checks" claim.
+  // They are not decoration: the rate card is what every first quote is
+  // priced from, the warranty is the only thing a customer holds after
+  // handover, and the labour insurance covers people working inside their
+  // home. Claiming fifteen on the marketing page while performing twelve
+  // would be exactly the kind of unverifiable number this company exists to
+  // argue against — so they are checks, with verifiers, like the rest.
+  | 'RATE_CARD_FILED'
+  | 'WARRANTY_TERMS'
+  | 'LABOUR_INSURANCE';
 
 export type CheckResult = 'PENDING' | 'PASS' | 'FAIL' | 'NOT_APPLICABLE' | 'EXPIRED';
 
@@ -156,6 +166,9 @@ export const CHECK_LABELS: Record<CheckType, string> = {
   CLIENT_REFERENCE: 'Past clients contacted',
   SITE_INSPECTION: 'Completed sites inspected',
   LITIGATION_SEARCH: 'Litigation and consumer forum search',
+  RATE_CARD_FILED: 'Rate card filed and locked',
+  WARRANTY_TERMS: 'Workmanship warranty on paper',
+  LABOUR_INSURANCE: 'Labour insurance and site safety',
 };
 
 /**
@@ -184,12 +197,35 @@ export const CHECK_MEANINGS: Record<CheckType, string> = {
   CLIENT_REFERENCE: 'We telephoned past clients ourselves. We did not take a list of testimonials.',
   SITE_INSPECTION: 'We walked through finished homes they built, in person.',
   LITIGATION_SEARCH: 'We searched the courts and consumer forums for cases against them.',
+  RATE_CARD_FILED:
+    'Their own per-sq-ft prices are on record with us — it is what your first quote is built from.',
+  WARRANTY_TERMS:
+    'A written warranty on hardware, finish and workmanship, with the duration stated in the contract.',
+  LABOUR_INSURANCE:
+    'A current insurance certificate for the people who will be working inside your home.',
 };
 
 /** Which checks belong to which tier — drives the profile checklist grouping. */
 export const TIER_CHECKS: Record<Exclude<VerificationTier, 'UNVERIFIED'>, CheckType[]> = {
   LISTED: ['PAN_NAME_MATCH', 'AADHAAR_KYC', 'ADDRESS_VISIT', 'CONTACT_REACHABLE', 'CODE_OF_CONDUCT'],
-  VERIFIED: ['GSTIN_ACTIVE', 'GST_FILING_HISTORY', 'MCA_STATUS', 'UDYAM', 'CLIENT_REFERENCE', 'SITE_INSPECTION', 'LITIGATION_SEARCH'],
+  VERIFIED: [
+    'GSTIN_ACTIVE',
+    'GST_FILING_HISTORY',
+    'MCA_STATUS',
+    'UDYAM',
+    'CLIENT_REFERENCE',
+    'SITE_INSPECTION',
+    'LITIGATION_SEARCH',
+    // Adding these three to VERIFIED is a real gate, not a label change: a
+    // studio without a filed rate card, written warranty terms or current
+    // labour insurance now cannot hold the badge. That is the point — the
+    // landing page tells every visitor these are mandatory — but it does
+    // mean any live studio missing one drops to LISTED until ops records
+    // it. Tiers are computed and never assigned, so there is no override.
+    'RATE_CARD_FILED',
+    'WARRANTY_TERMS',
+    'LABOUR_INSURANCE',
+  ],
   PROVEN: [],
 };
 

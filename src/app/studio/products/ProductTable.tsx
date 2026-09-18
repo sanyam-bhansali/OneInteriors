@@ -5,7 +5,8 @@ import { paiseToRupees } from '@/lib/money';
 import { ROOM_CATEGORIES } from '@/modules/studio-quote/starter-catalogue';
 import { UNIT_LABELS, WORK_CODE_LABELS, type QuoteUnitName, type WorkCodeName } from '@/modules/studio-quote/pricing';
 import type { ProductRow } from '@/modules/studio-quote/store';
-import { saveRateAction, addProductAction, IDLE } from './actions';
+import { saveRateAction, addProductAction } from './actions';
+import { IDLE } from '../form-state';
 
 const input =
   'rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[14px] text-[var(--s-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]';

@@ -9,8 +9,11 @@ import {
   type FieldTypeName,
 } from '@/modules/studio-practice/fields';
 
-export type State = { ok: true } | { ok: false; error: string } | { idle: true };
-export const IDLE: State = { idle: true };
+// `State` and `IDLE` live in studio/form-state.ts. A 'use server'
+// file may only export async functions — and Turbopack rejects even a
+// type-only re-export here, so this import is for local use and
+// callers take the type from form-state directly.
+import type { State } from '../../form-state';
 
 function refresh() {
   revalidatePath('/studio/settings/fields');

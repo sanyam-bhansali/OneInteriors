@@ -128,6 +128,7 @@ async function shellContext(userId: string): Promise<ShellContext | null> {
       prisma.studioClient.count({
         where: {
           studioId: studio.id,
+          deletedAt: null,
           // Kinds, not names. The studio owns its column names now, so a
           // literal list here would silently stop counting the day somebody
           // renamed one. See `studio-practice/stages.ts`.

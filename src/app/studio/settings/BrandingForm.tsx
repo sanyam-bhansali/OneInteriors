@@ -3,7 +3,8 @@
 import { useActionState } from 'react';
 import { paiseToRupees } from '@/lib/money';
 import type { BrandingRow } from '@/modules/studio-quote/store';
-import { saveBrandingAction, IDLE } from './actions';
+import { saveBrandingAction } from './actions';
+import { IDLE } from '../form-state';
 
 const input =
   'w-full rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[14.5px] text-[var(--s-ink)] placeholder:text-[var(--s-ink-3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]';

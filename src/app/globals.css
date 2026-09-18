@@ -408,6 +408,35 @@ p {
   --sec: #839073; /* Muted Sage — verification, scores, better-spec */
   --line: #dbd5cb; /* Hairline */
 
+  /* ── Text-safe shades of the two accent colours ──
+     These are NOT new brand colours and never fill anything. They
+     exist because the locked palette was drawn for surfaces and
+     marks, and both accents fail WCAG AA as small text on our own
+     grounds:
+
+       #C0613C on Raw Silk    3.37:1   (AA needs 4.5:1)
+       #C0613C on Alabaster   4.08:1
+       #839073 on Raw Silk    2.72:1
+       #839073 on Alabaster   3.30:1
+
+     Every mono eyebrow, label, flag and spec value on this page is
+     small text in one of those two colours, so the page's entire
+     evidence layer — the part it argues with — was below the floor.
+     These are the same hues darkened until they clear it, used ONLY
+     where the accent is the ink. A terracotta button, a sage tick,
+     a dot, a rule or a ring still uses --acc / --sec unchanged. */
+  --acc-ink: #964c2f; /* 5.01:1 Raw Silk · 6.06:1 Alabaster · 4.59:1 on the
+                         tinted active row in the evidence board, which is the
+                         darkest ground it ever sits on */
+  --sec-ink: #616b55; /* 4.51:1 on Raw Silk, 5.46:1 on Alabaster */
+
+  /* The terracotta button fill. White on #C0613C is 4.19:1 and the
+     button label is 14.5px — normal text, so it needs 4.5:1. This is
+     the smallest darkening that clears it (4.50:1) and is all but
+     indistinguishable from the locked accent at button size. The
+     hover below it was already darker than both. */
+  --acc-btn: #b85d3a;
+
   /* Warm card on glass. Used only inside glass frames. */
   --glass: rgba(247, 242, 234, 0.76);
 
@@ -441,7 +470,7 @@ p {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.18em;
-  color: var(--acc);
+  color: var(--acc-ink);
 }
 
 .oi-label {
@@ -480,4 +509,282 @@ p {
 }
 .oi-rail::-webkit-scrollbar {
   display: none;
+}
+
+/* The snapshot swapping inside the pinned frame.
+   Rises and fades in; it never starts fully transparent for longer than a
+   frame, because a reader scrolling back up should not catch a blank card. */
+@keyframes snap-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.snap-in {
+  animation: snap-in 0.42s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .snap-in {
+    animation: none;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   The hero intro.
+
+   The photograph opens blurred and close, with the wordmark alone
+   over it; over about two seconds the blur clears, the frame
+   settles back, the wordmark leaves and the copy arrives.
+
+   ## Two rules this obeys
+
+   **The content is in the DOM from the first byte.** Every line of
+   the hero is present and readable with JavaScript off, with the
+   animation failed, or to a crawler — it is animated, never
+   mounted. An intro that gates the headline behind a timer is an
+   intro that hides the headline from anyone whose connection gave
+   up early, and the headline is the page.
+
+   **It plays once and stops.** `both` holds the end state, so a
+   reader who scrolls back to the top does not get the performance
+   again. A page that re-announces itself is a page that wastes
+   your time twice.
+
+   Built in CSS rather than React state on purpose: no hydration
+   wait, no flash of the pre-animation frame, nothing to go wrong
+   on a slow phone.
+   ───────────────────────────────────────────────────────────── */
+
+@keyframes hero-settle {
+  from {
+    /* The scale is not decoration — it is what hides the blur's edges.
+       `filter: blur()` samples outside the element as transparent, so a
+       blurred full-bleed image fades out at all four sides. Starting 12%
+       oversized pushes those soft edges past the clip, and the parent's
+       `overflow-hidden` does the rest. */
+    transform: scale(1.12);
+    filter: blur(16px) saturate(0.85);
+  }
+  to {
+    transform: none;
+    filter: none;
+  }
+}
+
+/* The wordmark holds for a beat, then lifts away. */
+@keyframes hero-wordmark {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+    letter-spacing: 0.06em;
+  }
+  26% {
+    opacity: 1;
+    transform: none;
+    letter-spacing: normal;
+  }
+  52% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-16px) scale(1.03);
+  }
+}
+
+/* The copy arrives as the wordmark goes. */
+@keyframes hero-copy {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.hero-photo {
+  animation: hero-settle 1.7s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.hero-wordmark {
+  animation: hero-wordmark 1.75s cubic-bezier(0.33, 0, 0.2, 1) both;
+}
+
+.hero-copy > * {
+  animation: hero-copy 0.9s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+/* Staggered, and the delays start after the wordmark has begun to
+   leave — the two should not be on screen fighting each other. */
+/* These four numbers are a budget, not a taste.
+   They ran to 1.66s, which meant the primary call to action sat at
+   opacity 0 for longer than most people will wait on a cold load —
+   and that is on TOP of however long the page took to arrive. The
+   copy now overlaps the wordmark's exit rather than queueing behind
+   it, and the button is on screen before the second is out. */
+.hero-copy > *:nth-child(1) { animation-delay: 0.82s; }
+.hero-copy > *:nth-child(2) { animation-delay: 0.89s; }
+.hero-copy > *:nth-child(3) { animation-delay: 0.96s; }
+.hero-copy > *:nth-child(4) { animation-delay: 1.03s; }
+
+.hero-caption {
+  animation: hero-copy 0.9s cubic-bezier(0.22, 0.61, 0.36, 1) 1.15s both;
+}
+
+/* Everything above is an entrance. Anyone who has asked for less
+   motion gets the finished frame immediately — a blurring,
+   scaling full-bleed photograph is exactly the effect that setting
+   exists for. */
+@media (prefers-reduced-motion: reduce) {
+  .hero-photo,
+  .hero-wordmark,
+  .hero-copy > *,
+  .hero-caption {
+    animation: none;
+  }
+  .hero-wordmark {
+    display: none;
+  }
+}
+
+/* The FAQ answer opening.
+   Every other transition on this page eases; this one was a hard cut,
+   which read as the page glitching rather than responding. Grid rows
+   rather than max-height: a guessed max-height either clips a long
+   answer or eases to a number far past the real one, and this measures
+   itself. */
+.oi-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.34s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.oi-reveal[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+
+.oi-reveal > * {
+  overflow: hidden;
+}
+
+/* A quote or a figure swapping in place. Short — it replaces content
+   the reader asked for, so it must not feel like a wait. */
+@keyframes oi-swap {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.oi-swap {
+  animation: oi-swap 0.32s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* Portfolio cards: prints laid on a table rather than tiles in a grid.
+   The rest angle is per-card (`--tilt`, set inline) and hover brings
+   the card square and lifts it — squaring up is the affordance, and it
+   is also what makes the metadata legible at the moment somebody
+   actually wants to read it. */
+.oi-card-tilt {
+  transform: rotate(var(--tilt, 0deg));
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.oi-card-tilt:hover,
+.oi-card-tilt:focus-within {
+  transform: rotate(0deg) translateY(-10px);
+}
+
+/* The evidence exhibits and the walkthrough scenes: stacked in one
+   grid cell, only one of them visible. Every one stays in the DOM so
+   the height does not jump when the reader changes row. */
+.oi-stack {
+  display: grid;
+}
+
+.oi-stack > * {
+  grid-area: 1 / 1;
+  transition: opacity 0.45s cubic-bezier(0.3, 0.8, 0.3, 1);
+}
+
+.oi-stack > [data-on='false'] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.oi-stack > [data-on='true'] {
+  opacity: 1;
+}
+
+/* The trust ring filling, and the rows lighting as they clear. */
+.oi-ring {
+  transition: stroke-dashoffset 0.45s cubic-bezier(0.3, 0.8, 0.3, 1);
+}
+
+.oi-check-row {
+  transition: opacity 0.35s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oi-ring,
+  .oi-check-row {
+    transition: none;
+  }
+  .oi-reveal {
+    transition: none;
+  }
+  .oi-swap {
+    animation: none;
+  }
+  /* The tilt is decoration on top of decoration. Flat, still, and the
+     hover lift goes with it — WCAG 2.3.3. */
+  .oi-card-tilt,
+  .oi-card-tilt:hover,
+  .oi-card-tilt:focus-within {
+    transform: none;
+    transition: none;
+  }
+  .oi-stack > * {
+    transition: none;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Focus, on the landing page.
+
+   The global ring is petrol on cream, which is correct everywhere
+   the page is cream. Over the hero photograph and the dark bands it
+   is a dark outline on a dark image — present, invisible, and a
+   keyboard user tabbing the filmstrip has no idea where they are.
+   WCAG 2.4.7.
+
+   Two rings rather than one colour: a light outline with a dark
+   offset shadow behind it reads against any photograph, which is
+   the only thing that works when the background is a variable you
+   do not control.
+   ───────────────────────────────────────────────────────────── */
+.oi-landing :focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Over photography and the espresso bands. */
+.oi-landing [data-on-dark] :focus-visible,
+.oi-landing header :focus-visible,
+.hero-caption :focus-visible {
+  outline: 2px solid #fff;
+  box-shadow: 0 0 0 4px rgba(44, 38, 36, 0.65);
 }

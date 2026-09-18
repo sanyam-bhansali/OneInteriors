@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { PageHead, PageBody } from '../StudioShell';
 import { myClients, BOARD_KINDS } from '@/modules/studio-practice/clients';
 import { myStages } from '@/modules/studio-practice/stages';
 import { myFields } from '@/modules/studio-practice/fields';
+import { assignableMembers, myMembershipId } from '@/modules/studio-practice/team';
 import { Board, AddClientButton, AddFirstClientButton } from './Board';
 
 export const metadata: Metadata = {
@@ -11,6 +13,9 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = 'force-dynamic';
+
+const importLink =
+  'rounded-[8px] border border-[var(--s-rule)] px-3 py-1.5 text-[13px] font-medium no-underline hover:border-[var(--s-ink-3)]';
 
 /**
  * Everyone who might become work, and everyone who already is.
@@ -29,7 +34,13 @@ export const dynamic = 'force-dynamic';
  * with no date sits at the bottom, which is a quiet argument for setting one.
  */
 export default async function ClientsPage() {
-  const [clients, stages, fields] = await Promise.all([myClients(), myStages(), myFields()]);
+  const [clients, stages, fields, members, meId] = await Promise.all([
+    myClients(),
+    myStages(),
+    myFields(),
+    assignableMembers(),
+    myMembershipId(),
+  ]);
 
   const today = new Date();
   today.setHours(23, 59, 59, 999);
@@ -46,7 +57,14 @@ export default async function ClientsPage() {
             ? 'Nothing here yet.'
             : `${open.length} open · ${clients.length} in total`
         }
-        action={<AddClientButton fields={fields} />}
+        action={
+          <>
+            <Link href="/studio/clients/import" className={importLink}>
+              Import a list
+            </Link>
+            <AddClientButton fields={fields} />
+          </>
+        }
       />
 
       <PageBody>
@@ -64,13 +82,34 @@ export default async function ClientsPage() {
             {/* A door in the body as well as the header. An empty page whose
                 only way forward is one button in a corner has no way forward
                 at all if that button is ever out of reach. */}
-            <div className="mt-5">
+            <p className="m-0 mt-3 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--s-ink-2)]">
+              If you already keep this in a spreadsheet, bring it across instead of typing it
+              again — you get to check every column before anything is saved.
+            </p>
+            <div className="mt-5 flex flex-wrap items-center gap-3">
               <AddFirstClientButton fields={fields} />
+              <Link href="/studio/clients/import" className={importLink}>
+                Import a list
+              </Link>
             </div>
           </div>
         ) : (
-          <Board clients={clients} stages={stages} fields={fields} />
+          <Board
+            clients={clients}
+            stages={stages}
+            fields={fields}
+            members={members}
+            meId={meId}
+          />
         )}
+
+        {/* Quiet, and at the bottom. A bin people can find when they need it
+            and never notice otherwise. */}
+        <p className="mt-8 mb-0 text-[13px] text-[var(--s-ink-3)]">
+          <Link href="/studio/clients/bin" className="underline">
+            Deleted clients
+          </Link>
+        </p>
       </PageBody>
     </>
   );

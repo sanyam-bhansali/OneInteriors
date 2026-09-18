@@ -11,7 +11,8 @@ import {
   type PaymentModeName,
 } from '@/modules/studio-practice/vocabulary';
 import type { WorkOrderRow, VendorRow } from '@/modules/studio-practice/vendors';
-import { addVendorAction, addWorkOrderAction, addLineAction, payAction, IDLE, type State } from './actions';
+import { addVendorAction, addWorkOrderAction, addLineAction, payAction } from './actions';
+import { IDLE, type State } from '../form-state';
 
 const input =
   'rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[13.5px] text-[var(--s-ink)] placeholder:text-[var(--s-ink-3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]';

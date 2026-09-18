@@ -10,6 +10,8 @@ import {
   LOST_LABELS,
   BOARD_KINDS,
   colourOf,
+  BIN_DAYS,
+  QUIET_AFTER_DAYS,
   type ClientSourceName,
   type LostReasonName,
 } from '@/modules/studio-practice/vocabulary';
@@ -17,7 +19,15 @@ import { groupBy } from '@/modules/studio-practice/field-values';
 import type { ClientRow } from '@/modules/studio-practice/clients';
 import type { StageRow } from '@/modules/studio-practice/stages';
 import type { FieldRow } from '@/modules/studio-practice/fields';
-import { addClientAction, updateClientAction, setStageAction, IDLE } from './actions';
+import {
+  addClientAction,
+  updateClientAction,
+  setStageAction,
+  assignAction,
+  logContactAction,
+  binAction,
+} from './actions';
+import { IDLE } from '../form-state';
 
 const input =
   'rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[14px] text-[var(--s-ink)] placeholder:text-[var(--s-ink-3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]';
@@ -39,6 +49,35 @@ function dueLabel(date: Date | null, today: Date): string | null {
   if (days === 1) return 'Tomorrow';
   if (days <= 7) return `In ${days}d`;
   return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
+/**
+ * Has this one gone quiet?
+ *
+ * The same line the server counts on — one constant, so the badge on a card
+ * and the number in the team list can never disagree. Never contacted
+ * counts — an imported list is entirely that, and those are exactly the rows
+ * somebody needs to start on.
+ */
+function quiet7(at: Date | null): boolean {
+  if (at === null) return true;
+  return Date.now() - at.getTime() > QUIET_AFTER_DAYS * 86_400_000;
+}
+
+/**
+ * How long since anybody spoke to them.
+ *
+ * "Never" and "a long time ago" read differently on purpose: one is an
+ * imported row waiting to be started, the other is somebody being dropped.
+ */
+function contactLabel(at: Date | null): string {
+  if (!at) return 'Not contacted yet';
+  const days = Math.floor((Date.now() - at.getTime()) / 86_400_000);
+  if (days <= 0) return 'Spoke today';
+  if (days === 1) return 'Spoke yesterday';
+  if (days < 7) return `Spoke ${days}d ago`;
+  if (days < 28) return `Spoke ${Math.floor(days / 7)}w ago`;
+  return `Spoke ${at.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`;
 }
 
 /** A stage's colour, as a chip. */
@@ -95,6 +134,183 @@ function CustomFields({
 }
 
 /**
+ * Who has this one, and a way to change it.
+ *
+ * ## Why "Take it" is its own button
+ *
+ * Assigning something to yourself is the single most common assignment in a
+ * small studio, and making it a two-step — open a menu, find your own name in
+ * a list of three — is enough friction that people skip it, which leaves the
+ * pool full and the counts meaningless.
+ *
+ * ## Why this is hidden in a one-person studio
+ *
+ * A sole practitioner assigning every client to themselves is a chore that
+ * produces no information. So when there is nobody to assign TO, the whole
+ * control disappears rather than sitting there saying "Unassigned" on two
+ * hundred cards.
+ */
+function Assign({
+  clientId,
+  assignedToId,
+  assignedToName,
+  members,
+  meId,
+}: {
+  clientId: string;
+  assignedToId: string | null;
+  assignedToName: string | null;
+  members: { id: string; name: string }[];
+  meId: string | null;
+}) {
+  const [busy, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  if (members.length < 2) return null;
+
+  const run = (memberId: string | null) =>
+    start(async () => {
+      const result = await assignAction([clientId], memberId);
+      setError('ok' in result && !result.ok ? result.error : null);
+    });
+
+  return (
+    <>
+      {assignedToId === null ? (
+        <>
+          <span className="s-tag !bg-[var(--s-accent-wash)] !text-[var(--s-accent-deep)]">
+            Nobody
+          </span>
+          {meId ? (
+            <button type="button" disabled={busy} onClick={() => run(meId)} className={quiet}>
+              Take it
+            </button>
+          ) : null}
+        </>
+      ) : (
+        <span className="s-tag">{assignedToName}</span>
+      )}
+
+      <select
+        aria-label="Who is working on this"
+        value={assignedToId ?? ''}
+        disabled={busy}
+        onChange={(e) => run(e.target.value === '' ? null : e.target.value)}
+        className={`${input} max-w-[8.5rem] py-1 text-[12.5px]`}
+      >
+        <option value="">Nobody</option>
+        {members.map((m) => (
+          <option key={m.id} value={m.id}>{m.name}</option>
+        ))}
+      </select>
+
+      {error ? (
+        <span role="alert" className="text-[12px] text-[var(--s-bad)]">{error}</span>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Take the whole pool at once.
+ *
+ * The honest case for this button: in a two-person studio the pool after an
+ * import is "everything", and sharing two hundred rows out one at a time is
+ * not going to happen. One click to own the lot, then hand individual ones
+ * over from the cards, is the order people actually work in.
+ *
+ * It asks first. Bulk assignment is easy to undo but annoying to notice.
+ */
+function TakeAll({ ids, meId }: { ids: string[]; meId: string }) {
+  const [busy, start] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+
+  if (!confirming) {
+    return (
+      <button type="button" onClick={() => setConfirming(true)} className={quiet}>
+        Take all {ids.length}
+      </button>
+    );
+  }
+
+  return (
+    <span className="flex items-center gap-2">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() =>
+          start(async () => {
+            await assignAction(ids, meId);
+            setConfirming(false);
+          })
+        }
+        className={primary}
+      >
+        {busy ? 'Taking…' : `Yes, all ${ids.length}`}
+      </button>
+      <button type="button" onClick={() => setConfirming(false)} className={quiet}>
+        Cancel
+      </button>
+    </span>
+  );
+}
+
+/**
+ * Delete one, with thirty days to change your mind.
+ *
+ * Two clicks, and the second one says the name. The message the module sends
+ * back when a client carries quotations or projects is shown as-is, because it
+ * names who is blocking and that is the only useful thing to know.
+ */
+function Bin({ id, name }: { id: string; name: string }) {
+  const [asking, setAsking] = useState(false);
+  const [busy, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  if (!asking) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAsking(true)}
+        className="mt-2.5 self-start text-[12.5px] text-[var(--s-ink-3)] underline hover:text-[var(--s-bad)]"
+      >
+        Delete
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-2.5 flex flex-col gap-2 border-t border-[var(--s-rule-soft)] pt-2.5">
+      <p className="m-0 text-[12.5px] text-[var(--s-ink-2)]">
+        Delete {name}? You have {BIN_DAYS} days to get them back.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() =>
+            start(async () => {
+              const result = await binAction([id]);
+              setError('ok' in result && !result.ok ? result.error : null);
+              if ('ok' in result && result.ok) setAsking(false);
+            })
+          }
+          className={quiet}
+        >
+          {busy ? 'Deleting…' : 'Yes, delete'}
+        </button>
+        <button type="button" onClick={() => { setAsking(false); setError(null); }} className={quiet}>
+          Keep
+        </button>
+      </div>
+      {error ? (
+        <p role="alert" className="m-0 text-[12.5px] text-[var(--s-bad)]">{error}</p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * One client, as a card.
  *
  * The card carries what you need on the phone: name, number, what you owe them
@@ -112,17 +328,22 @@ function Card({
   stages,
   fields,
   next,
+  members,
+  meId,
 }: {
   client: ClientRow;
   today: Date;
   stages: StageRow[];
   fields: FieldRow[];
   next: StageRow | null;
+  members: { id: string; name: string }[];
+  meId: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(updateClientAction, IDLE);
   const [moving, startMove] = useTransition();
   const [moveError, setMoveError] = useState<string | null>(null);
+  const [calling, startCall] = useTransition();
 
   useEffect(() => {
     if ('ok' in state && state.ok) setOpen(false);
@@ -185,9 +406,37 @@ function Card({
         <p className="m-0 mt-2 text-[12.5px] italic text-[var(--s-ink-3)]">No follow-up set</p>
       )}
 
+      {/* Last contact sits under the follow-up because the two answer
+          different questions: what is owed, and whether anybody is actually
+          doing it. A card can have a tidy follow-up note and not have been
+          touched in a month. */}
+      <p
+        className={`m-0 mt-1 text-[12px] ${
+          quiet7(client.lastContactedAt) ? 'font-medium text-[var(--s-accent)]' : 'text-[var(--s-ink-3)]'
+        }`}
+      >
+        {contactLabel(client.lastContactedAt)}
+      </p>
+
       <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-[var(--s-rule-soft)] pt-2.5">
+        <Assign
+          clientId={client.id}
+          assignedToId={client.assignedToId}
+          assignedToName={client.assignedToName}
+          members={members}
+          meId={meId}
+        />
         <button type="button" onClick={() => setOpen(!open)} className={quiet}>
           {open ? 'Close' : 'Update'}
+        </button>
+        <button
+          type="button"
+          disabled={calling}
+          title="Records that somebody spoke to them today"
+          onClick={() => startCall(async () => { await logContactAction(client.id); })}
+          className={quiet}
+        >
+          Spoke to them
         </button>
         {next ? (
           <button
@@ -263,6 +512,13 @@ function Card({
           ) : null}
         </form>
       ) : null}
+
+      {/* Delete lives inside the opened card, never in the always-visible
+          footer. This gets used one-handed on a phone, and a delete button
+          sitting next to "→ next stage" is a delete button pressed by
+          accident. It is reversible for thirty days, but a card that vanishes
+          mid-scroll is still alarming. */}
+      {open ? <Bin id={client.id} name={client.name} /> : null}
     </li>
   );
 }
@@ -420,10 +676,16 @@ export function Board({
   clients,
   stages,
   fields,
+  members,
+  meId,
 }: {
   clients: ClientRow[];
   stages: StageRow[];
   fields: FieldRow[];
+  /** Everyone who can be given work. One name means the controls stay hidden. */
+  members: { id: string; name: string }[];
+  /** The signed-in person's membership row, for "Take it". */
+  meId: string | null;
 }) {
   const today = useMemo(() => {
     const d = new Date();
@@ -433,6 +695,10 @@ export function Board({
 
   const groupable = fields.filter((f) => f.groupBy);
   const [grouping, setGrouping] = useState('');
+
+  // '' everyone · 'pool' nobody has taken it · a member id · 'quiet'
+  const [who, setWho] = useState('');
+  const team = members.length > 1;
 
   const board = stages.filter((s) => BOARD_KINDS.includes(s.kind));
   const closedStages = stages.filter((s) => !BOARD_KINDS.includes(s.kind));
@@ -445,26 +711,98 @@ export function Board({
     return i >= 0 && i < stages.length - 1 ? (stages[i + 1] ?? null) : null;
   };
 
-  const open = clients.filter((c) => !closedIds.has(c.stageId));
+  const allOpen = clients.filter((c) => !closedIds.has(c.stageId));
+  const pool = allOpen.filter((c) => c.assignedToId === null);
+  // Not `quiet` — that name is taken by the button class at the top of this
+  // file, and shadowing it here silently restyles every button below.
+  const quietOnes = allOpen.filter((c) => quiet7(c.lastContactedAt));
+
+  const open =
+    who === ''
+      ? allOpen
+      : who === 'pool'
+        ? pool
+        : who === 'quiet'
+          ? quietOnes
+          : allOpen.filter((c) => c.assignedToId === who);
+
   const groups =
     grouping.length > 0 ? groupBy(open, grouping) : [{ label: '', rows: open }];
 
   return (
     <div className="flex flex-col gap-6">
-      {groupable.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-2.5">
-          <span className="s-label">Group by</span>
-          <select
-            value={grouping}
-            onChange={(e) => setGrouping(e.target.value)}
-            className={`${input} py-1.5`}
+      {/* The pool is a filter on this board, not a second screen. A studio
+          that has to go somewhere else to find the clients nobody has taken
+          is a studio that never goes. */}
+      {team && pool.length > 0 ? (
+        <div className="s-card flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+          <p className="m-0 text-[14px]">
+            <span className="s-num font-semibold">{pool.length}</span>{' '}
+            {pool.length === 1 ? 'client has' : 'clients have'} nobody working on them.
+          </p>
+          <button
+            type="button"
+            onClick={() => setWho(who === 'pool' ? '' : 'pool')}
+            className={`${quiet} ml-auto`}
           >
-            <option value="">No grouping</option>
-            {groupable.map((f) => (
-              <option key={f.id} value={f.key}>{f.label}</option>
-            ))}
-          </select>
+            {who === 'pool' ? 'Show everyone' : 'Show me those'}
+          </button>
+          {meId ? <TakeAll ids={pool.map((c) => c.id)} meId={meId} /> : null}
         </div>
+      ) : null}
+
+      {(groupable.length > 0 || team || quietOnes.length > 0) ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
+          {team || quietOnes.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="s-label">Showing</span>
+              <select
+                value={who}
+                onChange={(e) => setWho(e.target.value)}
+                className={`${input} py-1.5`}
+              >
+                <option value="">Everyone ({allOpen.length})</option>
+                {quietOnes.length > 0 ? (
+                  <option value="quiet">Gone quiet ({quietOnes.length})</option>
+                ) : null}
+                {team ? <option value="pool">Nobody has taken ({pool.length})</option> : null}
+                {team
+                  ? members.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.id === meId ? `${m.name} (you)` : m.name} (
+                        {allOpen.filter((c) => c.assignedToId === m.id).length})
+                      </option>
+                    ))
+                  : null}
+              </select>
+            </div>
+          ) : null}
+
+          {groupable.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="s-label">Group by</span>
+              <select
+                value={grouping}
+                onChange={(e) => setGrouping(e.target.value)}
+                className={`${input} py-1.5`}
+              >
+                <option value="">No grouping</option>
+                {groupable.map((f) => (
+                  <option key={f.id} value={f.key}>{f.label}</option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {open.length === 0 && allOpen.length > 0 ? (
+        <p className="m-0 text-[14px] text-[var(--s-ink-2)]">
+          Nothing matches that.{' '}
+          <button type="button" onClick={() => setWho('')} className="underline">
+            Show everyone
+          </button>
+        </p>
       ) : null}
 
       {groups.map((group) => (
@@ -516,6 +854,8 @@ export function Board({
                           stages={stages}
                           fields={fields}
                           next={nextAfter(client.stageId)}
+                          members={members}
+                          meId={meId}
                         />
                       ))}
                     </ul>

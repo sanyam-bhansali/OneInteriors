@@ -101,7 +101,7 @@ export function Cta({
     'inline-flex items-center justify-center gap-2 px-6 py-3.5 text-[14.5px] font-medium no-underline transition-colors';
 
   const skin = {
-    quote: 'bg-[var(--acc)] text-white hover:bg-[#a95233]',
+    quote: 'bg-[var(--acc-btn)] text-white hover:bg-[#a95233]',
     quiet: 'border border-[var(--line)] bg-[var(--card)] text-[var(--ink)] hover:border-[var(--ink2)]',
     onDark: 'border border-white/25 text-[#efeae2] hover:border-white/60',
     onAccent: 'bg-[var(--card)] text-[var(--ink)] hover:bg-white',
@@ -168,7 +168,7 @@ export function SpecRow({
       <span className="text-[13.5px] text-[var(--ink2)]">{label}</span>
       <span
         className="oi-num text-[11.5px] uppercase tracking-[0.1em]"
-        style={better ? { color: 'var(--sec)' } : undefined}
+        style={better ? { color: 'var(--sec-ink)' } : undefined}
       >
         {value}
       </span>
@@ -177,7 +177,13 @@ export function SpecRow({
 }
 
 /** A tick in sage. Verification, never terracotta. */
-export function Tick({ className = '' }: { className?: string }) {
+export function Tick({
+  className = '',
+  style,
+}: {
+  className?: string;
+  style?: React.CSSProperties;
+}) {
   return (
     <svg
       width="15"
@@ -186,6 +192,7 @@ export function Tick({ className = '' }: { className?: string }) {
       fill="none"
       aria-hidden="true"
       className={`flex-none ${className}`}
+      style={style}
     >
       <circle cx="8" cy="8" r="7.25" stroke="currentColor" strokeWidth="1.4" />
       <path
@@ -196,6 +203,41 @@ export function Tick({ className = '' }: { className?: string }) {
         strokeLinejoin="round"
       />
     </svg>
+  );
+}
+
+/**
+ * A flag: a short terracotta bar, then what is missing.
+ *
+ * This is the page's other argument, and the counterpart to `SpecRow`. Where
+ * a spec row says what something *is* — "18MM BWP" — a flag points at what a
+ * document does not say: NO NUMBER, WHICH BRAND?, NO REPLY IN 13 DAYS.
+ *
+ * Terracotta is right here and nowhere decorative: the locked palette gives
+ * it to high-intent actions *and* gap flags, and pointing at an omission is
+ * precisely a gap flag. Mono, because it is evidence about a document.
+ *
+ * Kept as one component so the fifteen or so of these across the evidence
+ * board cannot drift into fifteen slightly different greys.
+ */
+export function Flag({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-[7px]">
+      <span
+        aria-hidden
+        className="inline-block h-[1.5px] w-4 flex-none"
+        style={{ background: 'var(--acc)' }}
+      />
+      {/* The bar stays --acc (a mark, exempt from text contrast); the
+          words use --acc-ink, which is the same hue dark enough to read
+          at 9.5px. See the token block in globals.css. */}
+      <span
+        className="oi-num text-[9.5px] uppercase tracking-[0.16em]"
+        style={{ color: 'var(--acc-ink)' }}
+      >
+        {children}
+      </span>
+    </span>
   );
 }
 

@@ -1,124 +1,35 @@
 'use client';
 
 /**
- * The three pieces of the lower page that need the browser: the portfolio
- * rail, the testimonial pager and the FAQ.
+ * The testimonial pager and the FAQ.
  *
- * Grouped in one file because they share one rule — **nothing on this page
+ * Together in one file because they share one rule — **nothing on this page
  * moves on its own.** No auto-advancing carousel, no auto-opening accordion.
  * A reader who stopped to read a quote should not have it taken away, and a
  * page that animates while you are reading it is a page you stop trusting to
- * hold still.
+ * hold still. The walkthrough further up the page obeys the same rule, which
+ * is why it is click-selected rather than on a timer.
+ *
+ * The portfolio rail used to live here too. It left when it grew a modal —
+ * see `Portfolio.tsx`.
  */
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
 import { FINISHED_WORK } from '@/lib/imagery';
 import { Wrap, Eyebrow, Heading } from './parts';
 
-// ── Portfolio ───────────────────────────────────────────────────
-
-/**
- * Six flats, with what they cost printed on them.
- *
- * The cost is the entire reason this section is not a mood gallery. Every
- * competitor shows finished rooms; almost nobody prints the figure beside one,
- * because the figure is what invites the comparison they would lose.
- *
- * The rail is cropped at the right edge on purpose — a card cut by the
- * viewport is the only drag affordance that works without being explained, and
- * it is more honest than an arrow that suggests there are exactly two more.
- */
-export function Portfolio() {
-  const rail = useRef<HTMLDivElement>(null);
-
-  const nudge = (direction: 1 | -1) => {
-    const el = rail.current;
-    if (!el) return;
-    el.scrollBy({ left: direction * Math.min(el.clientWidth * 0.8, 520), behavior: 'smooth' });
-  };
-
-  return (
-    <section id="portfolio" className="border-t border-[var(--line)] py-20 sm:py-24">
-      <Wrap>
-        <div className="mb-10 flex flex-wrap items-end justify-between gap-6">
-          <div>
-            <Eyebrow>Finished work · Pune</Eyebrow>
-            <Heading className="max-w-[22ch]">Six flats, with what they cost printed on them.</Heading>
-          </div>
-
-          <div className="flex gap-2">
-            {([-1, 1] as const).map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => nudge(d)}
-                aria-label={d === -1 ? 'Previous projects' : 'Next projects'}
-                className="flex h-10 w-10 items-center justify-center border border-[var(--line)] bg-[var(--card)] text-[var(--ink2)] transition-colors hover:border-[var(--ink2)] hover:text-[var(--ink)]"
-              >
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path
-                    d={d === -1 ? 'M10 3 5 8l5 5' : 'M6 3l5 5-5 5'}
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-            ))}
-          </div>
-        </div>
-      </Wrap>
-
-      {/* Breaks the wrap deliberately so the rail runs to the edge. */}
-      <div
-        ref={rail}
-        className="oi-rail flex snap-x snap-mandatory gap-5 overflow-x-auto px-5 pb-2 sm:px-8"
-      >
-        {FINISHED_WORK.map((project) => (
-          <article
-            key={`${project.locality}-${project.title}`}
-            className="flex w-[280px] flex-none snap-start flex-col border border-[var(--line)] bg-[var(--card)] sm:w-[330px]"
-          >
-            <Image
-              src={project.photo.src}
-              alt={project.photo.alt}
-              width={660}
-              height={480}
-              sizes="(max-width: 640px) 80vw, 330px"
-              className="aspect-[4/3] w-full object-cover"
-            />
-
-            <div className="flex flex-1 flex-col p-5">
-              <p className="oi-label m-0 mb-2">
-                {project.locality} · {project.areaSqft.toLocaleString('en-IN')} SQ FT
-              </p>
-              <h3 className="oi-display m-0 mb-2 text-[21px]">{project.title}</h3>
-              <p className="m-0 mb-5 text-[13.5px] leading-[1.55] text-[var(--ink2)]">
-                {project.note}
-              </p>
-
-              <div className="mt-auto flex items-baseline justify-between gap-3 border-t border-[var(--line)] pt-3.5">
-                <span className="text-[13px] text-[var(--ink2)]">{project.studio}</span>
-                <span className="oi-num text-[15px]">{project.cost}</span>
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
-
-      <Wrap className="mt-5">
-        <p className="oi-label m-0 text-right">
-          Drag or scroll sideways · {String(FINISHED_WORK.length).padStart(2, '0')} projects
-        </p>
-      </Wrap>
-    </section>
-  );
-}
-
 // ── Testimonials ────────────────────────────────────────────────
 
+/**
+ * Three voices, and each one is about a different thing the product does.
+ *
+ * Deliberately not three people saying it was a good experience. The first is
+ * about the comparison catching a material difference, the second about
+ * nobody phoning, the third about the architect reading the quote — which are
+ * the three claims the page makes above. A testimonial that does not
+ * corroborate a specific claim is decoration.
+ */
 const VOICES = [
   {
     quote:
@@ -128,15 +39,15 @@ const VOICES = [
   },
   {
     quote:
-      'I had the first quote before I had finished my coffee. Nobody rang me, which after four months of portal sites was the part I noticed.',
-    name: 'Rohit K.',
-    meta: '3 BHK · Kharadi · ₹21.4 L',
+      'Nobody phoned me for a week and I meant that as a compliment. The first quote was on screen before I’d finished my tea.',
+    name: 'Rohan M.',
+    meta: '3 BHK · Kothrud · ₹21.4 L',
   },
   {
     quote:
-      'Nikhil read the quotation out to me line by line and told me which one to push back on. He works for them, not for the studio, and you can tell.',
-    name: 'Meera S.',
-    meta: '2 BHK · Kothrud · ₹13.9 L',
+      'My architect sat on the call while the studio walked through the quote. She caught two lines that had no quantity against them.',
+    name: 'Meghana K.',
+    meta: '2 BHK · Wakad · ₹9.6 L',
   },
 ];
 
@@ -144,37 +55,68 @@ export function Testimonials() {
   const [at, setAt] = useState(0);
   const voice = VOICES[at]!;
 
+  // Alabaster, not Raw Silk. It sits between the dark walkthrough and the
+  // Raw Silk portfolio, and on the page ground it was the third cream band
+  // in a row — every boundary on this page should be a change of material.
   return (
-    <section className="border-t border-[var(--line)] py-20 sm:py-24">
+    <section className="border-y border-[var(--line)] bg-[var(--card)] py-16 sm:py-20">
       <Wrap>
         <Eyebrow>What it was like</Eyebrow>
 
-        <blockquote className="m-0 mb-8 max-w-[24ch]">
-          <p className="oi-display m-0 text-[clamp(1.6rem,1.1rem+1.9vw,2.4rem)]">
-            &ldquo;{voice.quote}&rdquo;
-          </p>
-        </blockquote>
+        {/* Two columns. A pull quote alone on a wide cream field is a lot of
+            empty ground, and the photograph is doing real work here — the
+            quote is about a kitchen, so the reader can see the kitchen. */}
+        <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
+          <div>
+            {/* Keyed so the quote re-enters rather than the words changing
+                underneath the reader mid-sentence. */}
+            <div key={at} className="oi-swap">
+              <blockquote className="m-0 mb-7 max-w-[22ch]">
+                <p className="oi-display m-0 text-[clamp(1.5rem,1.05rem+1.7vw,2.2rem)]">
+                  &ldquo;{voice.quote}&rdquo;
+                </p>
+              </blockquote>
 
-        <p className="m-0 text-[14.5px] font-medium">{voice.name}</p>
-        <p className="oi-label m-0 mt-1">{voice.meta}</p>
+              <div className="border-t border-[var(--line)] pt-5">
+                <p className="m-0 text-[14.5px] font-medium">{voice.name}</p>
+                <p className="oi-label m-0 mt-1">{voice.meta}</p>
+              </div>
+            </div>
 
-        <div className="mt-8 flex items-center gap-3">
-          {VOICES.map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setAt(i)}
-              aria-label={`Read voice ${i + 1}`}
-              aria-current={i === at ? 'true' : undefined}
-              className="oi-num border-0 bg-transparent p-0 text-[11px] transition-opacity"
-              style={{ color: i === at ? 'var(--acc)' : 'var(--ink2)', opacity: i === at ? 1 : 0.55 }}
-            >
-              {String(i + 1).padStart(2, '0')}
-            </button>
-          ))}
-          <span className="oi-label m-0 ml-2">
-            {String(at + 1).padStart(2, '0')} / {String(VOICES.length).padStart(2, '0')}
-          </span>
+            {/* Boxed, not bare numerals — a row of loose digits under a quote
+                does not read as something you can press. */}
+            <div className="mt-7 flex items-center gap-2">
+              {VOICES.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setAt(i)}
+                  aria-label={`Read voice ${i + 1}`}
+                  aria-current={i === at ? 'true' : undefined}
+                  className="oi-num cursor-pointer border px-3 py-1.5 text-[11px] transition-colors"
+                  style={{
+                    borderColor: i === at ? 'var(--acc)' : 'var(--line)',
+                    color: i === at ? 'var(--acc)' : 'var(--ink2)',
+                    background: 'transparent',
+                  }}
+                >
+                  {String(i + 1).padStart(2, '0')}
+                </button>
+              ))}
+              <span className="oi-label m-0 ml-3">
+                {String(at + 1).padStart(2, '0')} / {String(VOICES.length).padStart(2, '0')}
+              </span>
+            </div>
+          </div>
+
+          <Image
+            src={FINISHED_WORK[1]!.photo.src}
+            alt={FINISHED_WORK[1]!.photo.alt}
+            width={880}
+            height={640}
+            sizes="(max-width: 1024px) 100vw, 44vw"
+            className="aspect-[4/3] w-full object-cover"
+          />
         </div>
       </Wrap>
     </section>
@@ -198,23 +140,23 @@ const QUESTIONS = [
   },
   {
     q: 'How can a quote be ready in three seconds?',
-    a: 'Because nobody is asked. Every listed studio files its own rate card with us as a condition of being listed — their real prices, per item, per square foot. Your nine answers give us the quantities, we price those quantities against each studio’s filed card, and that arithmetic takes about three seconds. No studio is contacted and nobody is phoned.',
+    a: 'Because no studio is asked. Every listed studio files its own rate card with us — per sq ft for wardrobes, per running foot for kitchen, per point for electrical. Our system reads your brief, applies that studio’s rates, and writes the quote line by line. It is their pricing, not our estimate. The studio confirms or revises it after a site visit.',
   },
   {
     q: 'Can a studio pay to rank higher?',
-    a: 'No. A subscription buys volume — how many briefs a studio is shown for in a month. It can never move a studio above a better-fitting one for you. The ranking code takes no payment, fee or subscription as an input, which is the cheapest way to keep that true rather than merely promised.',
+    a: 'No. Matches are scored on your answers — locality, scope, budget band, style leaning, household — and on which of the fifteen checks the studio has cleared. There is no paid placement, and we show you the score and the reason behind it so you can argue with it. A subscription buys volume, never position.',
   },
   {
     q: 'Will my number be sold to ten contractors?',
-    a: 'No. Your brief goes to the studios you pick, when you pick them, and to nobody else. You see your matches and your first quotes before you give us a phone number at all — the quiz needs no signup.',
+    a: 'No. Your brief is visible to the three matched studios only, and your phone number is released to a studio only when you choose to be introduced. Until then the conversation happens through us, and you can stop it at any point.',
   },
   {
     q: 'What does the architect actually do?',
-    a: 'Reads your brief back to you so you know it was understood, checks the shortlist, reads the quotation line by line and tells you what to push back on, signs off material samples, and stays through site visits and handover. They are paid by us and never by a studio, which is the only arrangement under which that advice is worth having.',
+    a: 'Reads your brief back to you, checks the shortlist, goes through each quote line by line, signs off material samples against what was quoted, and attends the site visits that matter. They are on our payroll, so there is no version of this where they earn more by pushing you towards a particular studio.',
   },
   {
     q: 'Do you work outside Pune?',
-    a: 'Not yet. Every studio on this site has been visited, its GST filings checked and its past clients called — that is slow, local work and it does not scale by pressing a button. Pune first, properly.',
+    a: 'Not yet. Verification means visiting sites and calling clients, and we can only do that properly in one city at a time. Right now that city is Pune — Kothrud, Baner, Wakad, Aundh, Hinjawadi and Kharadi.',
   },
 ];
 
@@ -222,7 +164,7 @@ export function Faq() {
   const [open, setOpen] = useState<number | null>(0);
 
   return (
-    <section id="faq" className="border-t border-[var(--line)] py-20 sm:py-24">
+    <section id="faq" className="border-t border-[var(--line)] py-16 sm:py-20">
       <Wrap>
         <Eyebrow>Questions people actually ask</Eyebrow>
         <Heading className="mb-10 max-w-[18ch]">The awkward ones first.</Heading>
@@ -253,11 +195,17 @@ export function Faq() {
                   </span>
                 </button>
 
-                {on ? (
-                  <p className="m-0 max-w-[68ch] pb-6 text-[14.5px] leading-[1.7] text-[var(--ink2)]">
-                    {item.a}
-                  </p>
-                ) : null}
+                {/* Always rendered, never conditionally mounted. A conditional
+                    answer cannot animate — there is nothing to transition from
+                    — and it also hides the text from find-in-page, which is how
+                    a lot of people actually use a FAQ. */}
+                <div className="oi-reveal" data-open={on} aria-hidden={!on}>
+                  <div>
+                    <p className="m-0 max-w-[68ch] pb-6 text-[14.5px] leading-[1.7] text-[var(--ink2)]">
+                      {item.a}
+                    </p>
+                  </div>
+                </div>
               </li>
             );
           })}

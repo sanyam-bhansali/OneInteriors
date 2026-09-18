@@ -39,3 +39,18 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+
+# ── Shareholder material ──
+# The deck and its generator carry the cap table, the ESOP pool, named
+# shareholders and an individual's salary terms. None of it is needed to
+# build or run the product, and a code repository is read by contractors,
+# agencies and future hires — so it lives outside git. Keep the files; they
+# are simply not this repository's business.
+docs/shareholder-deck.pptx
+scripts/shareholder-deck.js
+
+# The standalone design bundle: one 4.9 MB HTML file with every font and
+# photograph inlined. Git keeps every version of it forever, and the two
+# files beside it — the README and the .dc.html prototype — already carry
+# the design. Regenerate it from those if it is ever needed again.
+One Interiors design system (1)/design_handoff_landing_page/One Interiors - Landing Page.html

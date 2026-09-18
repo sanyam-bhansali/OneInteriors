@@ -511,6 +511,9 @@ model StudioMember {
 
   createdAt DateTime @default(now())
 
+  /// Everything this person is working. See `StudioClient.assignedTo`.
+  clients StudioClient[]
+
   @@index([studioId])
   @@map("studio_members")
 }
@@ -530,6 +533,12 @@ enum CheckType {
   CLIENT_REFERENCE
   SITE_INSPECTION
   LITIGATION_SEARCH
+  // The landing page states fifteen mandatory checks. These are the last
+  // three, and they gate the VERIFIED tier like the rest — see the note on
+  // TIER_CHECKS in src/modules/studio/types.ts.
+  RATE_CARD_FILED
+  WARRANTY_TERMS
+  LABOUR_INSURANCE
 }
 
 enum CheckResult {
@@ -1750,6 +1759,31 @@ model StudioClient {
 
   notes String? @db.Text
 
+  /// Who is working this one.
+  ///
+  /// **Null means the pool** — nobody has taken it yet. That is a real and
+  /// common state, not a missing value: two hundred imported rows all start
+  /// there, and the pool screen exists to empty it.
+  ///
+  /// `SetNull` on delete, so removing somebody from the studio returns their
+  /// clients to the pool rather than deleting them along with the membership.
+  assignedToId String?
+  assignedTo   StudioMember? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  /// When somebody last actually spoke to them.
+  ///
+  /// Deliberately not `updatedAt`, which moves when anything at all changes —
+  /// including a bulk assignment or an import. "Nobody has called this person
+  /// in three weeks" is only true if it is measuring calls.
+  lastContactedAt DateTime?
+
+  /// Soft delete. The row stays for thirty days and is then erased along with
+  /// its history, which is what the bin screen counts down to.
+  ///
+  /// EVERY read of this table must filter on this being null. A deleted client
+  /// reappearing on the board is worse than one that never deleted.
+  deletedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1760,6 +1794,9 @@ model StudioClient {
   /// client for the same handoff.
   @@unique([studioId, introductionId])
   @@index([studioId, stageId, nextActionOn])
+  /// The board, the pool and the bin are all "this studio, not deleted".
+  @@index([studioId, deletedAt])
+  @@index([studioId, assignedToId, deletedAt])
   @@map("studio_clients")
 }
 

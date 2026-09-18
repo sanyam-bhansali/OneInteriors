@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
+import { Search } from './Search';
 
 /**
  * The frame every studio screen lives in.
@@ -121,6 +122,10 @@ export function StudioShell({
           </svg>
           <span className="truncate text-[15px] font-semibold tracking-tight">{studioName}</span>
         </div>
+
+        {/* Above the nav, because finding one person is more often what
+            somebody wants than going to a section. */}
+        <Search />
 
         <nav className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 pb-4">
           {groups.map((group, gi) => (

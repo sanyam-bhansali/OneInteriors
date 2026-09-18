@@ -208,6 +208,9 @@ const CHECK_BLOCKER_LABELS: Record<CheckType, string> = {
   CLIENT_REFERENCE: 'Client references',
   SITE_INSPECTION: 'Site inspections',
   LITIGATION_SEARCH: 'Litigation search',
+  RATE_CARD_FILED: 'Rate card on file',
+  WARRANTY_TERMS: 'Written warranty terms',
+  LABOUR_INSURANCE: 'Labour insurance',
 };
 
 function labelFor(type: CheckType, check: VerificationCheck | undefined): string {

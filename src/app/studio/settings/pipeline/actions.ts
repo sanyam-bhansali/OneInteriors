@@ -13,8 +13,11 @@ import {
   type StageKindName,
 } from '@/modules/studio-practice/stages';
 
-export type State = { ok: true } | { ok: false; error: string } | { idle: true };
-export const IDLE: State = { idle: true };
+// `State` and `IDLE` live in studio/form-state.ts. A 'use server'
+// file may only export async functions — and Turbopack rejects even a
+// type-only re-export here, so this import is for local use and
+// callers take the type from form-state directly.
+import type { State } from '../../form-state';
 
 /**
  * Every pipeline edit changes what the board looks like and what the rail
