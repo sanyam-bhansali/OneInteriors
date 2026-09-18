@@ -249,8 +249,8 @@ export function CompareClient() {
                       scope="row"
                       className="sticky left-0 z-10 border-b border-[var(--line)] bg-[var(--card)] p-4 align-top font-normal"
                     >
-                      <span className="block text-[13.5px] font-medium">{line.label}</span>
-                      <span className="oi-num mt-1 block text-[10px] uppercase tracking-[0.12em] text-[var(--ink2)]">
+                      <span className="block text-[14.5px] font-medium">{line.label}</span>
+                      <span className="oi-num mt-1 block text-[12px] leading-snug text-[var(--ink2)]">
                         {line.size}
                       </span>
                     </th>
@@ -273,7 +273,11 @@ export function CompareClient() {
                               >
                                 {money(cell.amountPaise)}
                               </span>
-                              <span className="mt-1 block text-[12px] leading-snug text-[var(--ink2)]">
+                              {/* The material, at 13px in full ink. It is the
+                                  reason this screen exists; setting it as fine
+                                  print would be the same mistake every quote
+                                  in the Problem section makes. */}
+                              <span className="mt-1.5 block text-[13px] leading-[1.45] text-[var(--ink)]">
                                 {cell.spec}
                               </span>
                             </>

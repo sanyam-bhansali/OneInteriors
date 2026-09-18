@@ -198,18 +198,19 @@ export function QuoteDocument({
 
       {quote.rooms.map((room) => (
         <section key={room.room} className="mb-7">
-          <div className="mb-1 flex items-baseline justify-between gap-4">
-            <h3 className="oi-label m-0">{room.label}</h3>
-            <span className="oi-num text-[12.5px] text-[var(--ink2)]">
-              {money(room.subtotalPaise)}
-            </span>
+          {/* The room heading was a 10.5px mono label, the same size as the
+              smallest thing on the page. It is a heading; it now reads like
+              one. */}
+          <div className="mb-2 flex items-baseline justify-between gap-4 border-b border-[var(--ink)] pb-2">
+            <h3 className="oi-display m-0 text-[17px]">{room.label}</h3>
+            <span className="oi-num text-[14px]">{money(room.subtotalPaise)}</span>
           </div>
 
           {room.lines.map((line) => (
             <DocRow
               key={line.code}
               label={line.label}
-              quantity={`${line.size} · ${line.quantity.toLocaleString('en-IN')} ${line.unit} · ${money(line.ratePaise)}/${line.unit}`}
+              quantity={`${line.size}  ·  ${line.quantity.toLocaleString('en-IN')} ${line.unit} at ${money(line.ratePaise)} per ${line.unit}`}
               value={money(line.amountPaise)}
               note={line.spec}
             />
@@ -245,7 +246,7 @@ export function QuoteDocument({
         <p className="oi-label m-0 mb-3">What this is built on</p>
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
           {quote.assumptions.map((line) => (
-            <li key={line} className="text-[13px] leading-[1.55] text-[var(--ink2)]">
+            <li key={line} className="text-[13.5px] leading-[1.6] text-[var(--ink2)]">
               {line}
             </li>
           ))}

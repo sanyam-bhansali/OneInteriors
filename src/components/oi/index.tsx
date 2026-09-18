@@ -153,11 +153,11 @@ export function DocRow({
   emphasis = false,
 }: {
   label: string;
-  /** "84 SQ FT · 18MM BWP". Mono, and the point of the row. */
+  /** "1800 × 2100 mm · 12.4 sq ft". Mono, and the point of the row. */
   quantity?: string;
   /** Money or a spec. Mono, always. */
   value?: string;
-  /** A sentence under the line, when the row needs explaining. */
+  /** The material. A sentence under the line. */
   note?: string;
   /** Sage — marks the better spec in a comparison. Never terracotta. */
   better?: boolean;
@@ -166,21 +166,29 @@ export function DocRow({
 }) {
   return (
     <div
-      className={`py-2.5 ${
+      className={`py-3.5 ${
         emphasis
-          ? 'border-t border-[var(--ink)] pt-3'
+          ? 'border-t border-[var(--ink)] pt-4'
           : 'border-b border-[var(--line)] last:border-b-0'
       }`}
     >
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-5 gap-y-1">
+        {/* The item name is INK, not secondary ink, and 15px.
+            It was 13.5px in --ink2, which put the name of the thing being
+            bought at the same weight as the note underneath it and lighter
+            than the price. On a document whose whole argument is that you can
+            read it, the line item has to be the most legible thing on the
+            row. */}
         <span
-          className={emphasis ? 'oi-label m-0' : 'text-[13.5px] text-[var(--ink2)]'}
+          className={
+            emphasis ? 'oi-label m-0' : 'text-[15px] font-medium leading-snug text-[var(--ink)]'
+          }
         >
           {label}
         </span>
         {value ? (
           <span
-            className={`oi-num ${emphasis ? 'text-[17px]' : 'text-[12.5px]'}`}
+            className={`oi-num ${emphasis ? 'text-[19px]' : 'text-[14.5px]'}`}
             style={better ? { color: 'var(--sec-ink)' } : undefined}
           >
             {value}
@@ -188,14 +196,25 @@ export function DocRow({
         ) : null}
       </div>
 
+      {/* Sentence case, 12.5px, ordinary tracking.
+          This was 10px UPPERCASE mono at 0.12em, which is the least legible
+          combination in the whole type system — and it was carrying the
+          dimensions, the quantity and the rate, i.e. the evidence. Mono stays
+          because these are figures; everything that made it hard to read has
+          gone. */}
       {quantity ? (
-        <p className="oi-num m-0 mt-1 text-[10px] uppercase tracking-[0.12em] text-[var(--ink2)]">
+        <p className="oi-num m-0 mt-1.5 text-[12.5px] leading-snug text-[var(--ink2)]">
           {quantity}
         </p>
       ) : null}
 
+      {/* The material. 13.5px and full ink — this is the sentence the Problem
+          section on the landing page says nobody else will print, so it is
+          not going to be set as fine print here. */}
       {note ? (
-        <p className="m-0 mt-1.5 text-[12.5px] leading-snug text-[var(--ink2)]">{note}</p>
+        <p className="m-0 mt-1.5 max-w-[62ch] text-[13.5px] leading-[1.5] text-[var(--ink)]">
+          {note}
+        </p>
       ) : null}
     </div>
   );

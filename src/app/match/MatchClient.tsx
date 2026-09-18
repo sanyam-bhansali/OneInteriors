@@ -31,10 +31,10 @@ import { loadBrief } from '@/modules/brief/store';
 import { rankStudios, type MatchResult } from '@/modules/matching/score';
 import { loadProject, saveProject, MIN_TO_COMPARE, type Project } from '@/modules/quotation/project-store';
 import { CHECK_COUNT } from '@/components/landing/checks';
-import { formatINRCompact } from '@/lib/money';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
 import { QuoteFlow, type QuoteRequest } from '@/components/oi/QuoteFlow';
 import { Wrap, Chapter, Sheet, Quiet } from '@/components/oi';
+import { MatchRow } from './MatchRow';
 import type { Studio } from '@/modules/studio/types';
 import type { Brief } from '@/modules/brief/types';
 
@@ -46,30 +46,6 @@ const BEDROOMS: Record<string, number> = {
   BHK_4_PLUS: 4,
   VILLA: 4,
 };
-
-function ScoreRing({ score }: { score: number }) {
-  const r = 22;
-  const c = 2 * Math.PI * r;
-  return (
-    <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden className="flex-none">
-      <circle cx="28" cy="28" r={r} fill="none" stroke="var(--line)" strokeWidth="3.5" />
-      <circle
-        cx="28"
-        cy="28"
-        r={r}
-        fill="none"
-        stroke="var(--sec)"
-        strokeWidth="3.5"
-        strokeLinecap="round"
-        strokeDasharray={`${(score / 100) * c} ${c}`}
-        transform="rotate(-90 28 28)"
-      />
-      <text x="28" y="32.5" textAnchor="middle" className="oi-num" fontSize="15" fill="var(--ink)">
-        {score}
-      </text>
-    </svg>
-  );
-}
 
 export function MatchClient({
   studios,
@@ -235,88 +211,32 @@ export function MatchClient({
             <Quiet href="/quiz">Change your answers</Quiet>
           </Sheet>
         ) : (
-          <ul className="m-0 flex list-none flex-col gap-4 p-0">
-            {matches.map((match: MatchResult) => {
+          <ul className="m-0 flex list-none flex-col gap-5 p-0">
+            {matches.map((match: MatchResult, i) => {
               const studio = byId.get(match.studioId);
-              if (!studio) return null;
+              if (!studio || !brief) return null;
 
               const stored = project.quotes[studio.slug];
-              const inCompare = comparing.includes(studio.slug);
-              const cleared = studio.checks.filter((c) => c.result === 'PASS').length;
 
               return (
-                <Sheet as="li" key={studio.id} className="p-5 sm:p-6">
-                  <div className="flex flex-wrap items-start gap-x-6 gap-y-4">
-                    <ScoreRing score={match.score} />
-
-                    <div className="min-w-0 flex-1">
-                      <h2 className="oi-display m-0 mb-1.5 text-[21px]">{studio.tradeName}</h2>
-                      {/* The reason, not the breakdown. One sentence a person
-                          can agree or disagree with. */}
-                      <p className="m-0 mb-2.5 max-w-[56ch] text-[14px] leading-[1.5] text-[var(--ink2)]">
-                        {match.reasoning[0] ?? 'Matched on your locality and scope.'}
-                      </p>
-                      <p className="oi-num m-0 text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink2)]">
-                        <span style={{ color: 'var(--sec-ink)' }}>
-                          {cleared}/{CHECK_COUNT} checks
-                        </span>
-                        {studio.completedProjects > 0
-                          ? ` · ${studio.completedProjects} projects finished`
-                          : ''}
-                        {/* How much of the score is actually evidenced. A 94
-                            built on two of six factors is not the same claim
-                            as a 94 built on six, and showing the denominator
-                            is the difference between a score and a number. */}
-                        {` · scored on ${match.factorsScored} of ${match.factorsTotal}`}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-none flex-wrap items-center gap-3">
-                      {stored ? (
-                        <>
-                          <span className="oi-num text-[17px]">
-                            {formatINRCompact(stored.quote.totalPaise)}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              update({
-                                ...project,
-                                comparing: inCompare
-                                  ? comparing.filter((s) => s !== studio.slug)
-                                  : [...comparing, studio.slug],
-                              })
-                            }
-                            className="cursor-pointer border px-4 py-2.5 text-[13.5px] font-medium transition-colors disabled:opacity-40"
-                            style={{
-                              borderColor: inCompare ? 'var(--acc)' : 'var(--line)',
-                              background: inCompare ? 'var(--acc-wash)' : 'var(--card)',
-                              color: 'var(--ink)',
-                            }}
-                          >
-                            {inCompare ? 'In compare' : 'Add to compare'}
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setQuoting(requestFor(studio))}
-                          className="cursor-pointer px-5 py-2.5 text-[13.5px] font-medium text-white transition-colors"
-                          style={{ background: 'var(--acc-btn)' }}
-                        >
-                          Get a quote
-                        </button>
-                      )}
-
-                      <Link
-                        href={`/studios/${studio.slug}`}
-                        className="text-[13.5px] text-[var(--ink2)] underline hover:text-[var(--ink)]"
-                      >
-                        {stored ? 'Open profile' : 'Look properly'}
-                      </Link>
-                    </div>
-                  </div>
-                </Sheet>
+                <MatchRow
+                  key={studio.id}
+                  studio={studio}
+                  match={match}
+                  brief={brief}
+                  rank={i + 1}
+                  quotedTotalPaise={stored?.quote.totalPaise ?? null}
+                  inCompare={comparing.includes(studio.slug)}
+                  onQuote={() => setQuoting(requestFor(studio))}
+                  onToggleCompare={() =>
+                    update({
+                      ...project,
+                      comparing: comparing.includes(studio.slug)
+                        ? comparing.filter((x) => x !== studio.slug)
+                        : [...comparing, studio.slug],
+                    })
+                  }
+                />
               );
             })}
           </ul>
