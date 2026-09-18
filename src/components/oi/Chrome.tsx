@@ -28,16 +28,24 @@ import { Mark } from '@/components/brand';
 import { rosterIsReal } from '@/lib/env';
 import { Wrap } from '@/components/landing/parts';
 
-/** The chapters of the document, in the order they are written. */
+/**
+ * The chapters of the document, in the order they are written.
+ *
+ * `id` is what a chapter IS; `href` is where it lives. They are separate
+ * because the quote has no route of its own — it renders inside the profile of
+ * whichever studio produced it, and `/match` is where every one of them is
+ * reachable from. Keying the spine on `href` instead would light "Who fits"
+ * and "The quote" together and hand React two identical keys.
+ */
 export const CHAPTERS = [
-  { href: '/quiz', name: 'Your brief' },
-  { href: '/match', name: 'Who fits' },
-  { href: '/quotes', name: 'The quote' },
-  { href: '/compare', name: 'Side by side' },
-  { href: '/expert', name: 'Your architect' },
+  { id: 'brief', href: '/quiz', name: 'Your brief' },
+  { id: 'match', href: '/match', name: 'Who fits' },
+  { id: 'quote', href: '/match', name: 'The quote' },
+  { id: 'compare', href: '/compare', name: 'Side by side' },
+  { id: 'expert', href: '/expert', name: 'Your architect' },
 ] as const;
 
-export type ChapterHref = (typeof CHAPTERS)[number]['href'];
+export type ChapterId = (typeof CHAPTERS)[number]['id'];
 
 /**
  * The header.
@@ -94,7 +102,7 @@ export function AppHeader() {
 
 export interface SpineFact {
   /** Which chapter this fact belongs to. */
-  href: ChapterHref;
+  id: ChapterId;
   /** What is now known. "2 BHK · Baner", "6 still match", "₹18.4 L". */
   fact: string;
 }
@@ -112,10 +120,10 @@ export function Spine({
   facts = [],
 }: {
   /** The chapter being read now. */
-  at: ChapterHref;
+  at: ChapterId;
   facts?: SpineFact[];
 }) {
-  const known = new Map(facts.map((f) => [f.href, f.fact]));
+  const known = new Map(facts.map((f) => [f.id, f.fact]));
 
   return (
     <nav aria-label="Your project so far" className="border-b border-[var(--line)] bg-[var(--card)]">
@@ -124,8 +132,8 @@ export function Spine({
             five chapters wrapped is a block of text, not a spine. */}
         <ol className="oi-rail m-0 flex list-none items-stretch gap-0 overflow-x-auto p-0">
           {CHAPTERS.map((chapter, i) => {
-            const fact = known.get(chapter.href);
-            const here = chapter.href === at;
+            const fact = known.get(chapter.id);
+            const here = chapter.id === at;
             const written = fact !== undefined || here;
 
             const body = (
@@ -149,7 +157,7 @@ export function Spine({
 
             return (
               <li
-                key={chapter.href}
+                key={chapter.id}
                 className="min-w-[8.5rem] flex-1 border-l border-[var(--line)] first:border-l-0"
                 style={{
                   // Terracotta marks where you are, and only there. It is the

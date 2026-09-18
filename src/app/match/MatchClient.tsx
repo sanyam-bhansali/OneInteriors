@@ -87,9 +87,20 @@ export function MatchClient({
     setProject(loadProject());
   }, []);
 
+  /**
+   * A brief with nothing in it is not a brief.
+   *
+   * `rankStudios` will happily score an empty one — it returned five studios
+   * at 100, 80, 70, 38 and 7 off a single factor out of six. Those are the
+   * roster in arbitrary order wearing numbers, and a perfect score derived
+   * from nothing is precisely the unearned figure this product exists to
+   * argue against. So the list is gated on the brief, not on the list.
+   */
+  const briefed = brief !== null && brief.propertyType !== null;
+
   const matches = useMemo(
-    () => (brief ? rankStudios(brief, studios, 6, { allowUnverified }) : []),
-    [brief, studios, allowUnverified],
+    () => (briefed && brief ? rankStudios(brief, studios, 6, { allowUnverified }) : []),
+    [briefed, brief, studios, allowUnverified],
   );
 
   const byId = useMemo(() => new Map(studios.map((s) => [s.id, s])), [studios]);
@@ -104,7 +115,9 @@ export function MatchClient({
     studioName: studio.tradeName,
     bhk: BEDROOMS[brief?.propertyType ?? 'BHK_2'] ?? 2,
     carpetAreaSqft: brief?.carpetAreaSqft ?? 850,
-    bathrooms: Math.max(1, (BEDROOMS[brief?.propertyType ?? 'BHK_2'] ?? 2) - 0),
+    // One bathroom per bedroom is what the archive's flats overwhelmingly
+    // have, and the vanity is the only line it drives.
+    bathrooms: Math.max(1, BEDROOMS[brief?.propertyType ?? 'BHK_2'] ?? 2),
   });
 
   // ── The quote, over everything ──
@@ -169,14 +182,17 @@ export function MatchClient({
     <div className="oi-app min-h-dvh bg-[var(--bg)]">
       <AppHeader />
       <Spine
-        at="/match"
+        at="match"
         facts={[
-          ...(brief?.propertyType
-            ? [{ href: '/quiz' as const, fact: `${BEDROOMS[brief.propertyType] ?? 2} BHK` }]
+          ...(briefed && brief?.propertyType
+            ? [{ id: 'brief' as const, fact: `${BEDROOMS[brief.propertyType] ?? 2} BHK` }]
             : []),
-          { href: '/match' as const, fact: `${matches.length} fit` },
+          ...(briefed ? [{ id: 'match' as const, fact: `${matches.length} fit` }] : []),
           ...(quoted.length > 0
-            ? [{ href: '/quotes' as const, fact: `${quoted.length} priced` }]
+            ? [{ id: 'quote' as const, fact: `${quoted.length} priced` }]
+            : []),
+          ...(comparing.length >= MIN_TO_COMPARE
+            ? [{ id: 'compare' as const, fact: `${comparing.length} selected` }]
             : []),
         ]}
       />
@@ -185,9 +201,11 @@ export function MatchClient({
         <Chapter
           eyebrow="Who fits"
           title={
-            matches.length === 0
-              ? 'Nobody matches yet.'
-              : `${matches.length} of the fourteen fit your brief.`
+            !briefed
+              ? 'Tell us about your flat first.'
+              : matches.length === 0
+                ? 'Nobody on the roster fits this brief.'
+                : `${matches.length} of the fourteen fit your brief.`
           }
           aside={
             <p className="oi-num m-0 whitespace-nowrap text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink2)]">
@@ -200,12 +218,21 @@ export function MatchClient({
           straight away.
         </Chapter>
 
-        {matches.length === 0 ? (
+        {!briefed ? (
           <Sheet className="p-8">
-            <p className="m-0 mb-4 text-[15px]">
-              Your brief has not been filled in yet, so there is nothing to score against.
+            <p className="m-0 mb-4 max-w-[54ch] text-[15px] leading-[1.6]">
+              Scoring studios against an empty brief would give you the roster in an arbitrary
+              order with numbers on it. Nine questions, about two minutes, and these become real.
             </p>
             <Quiet href="/quiz">Start the brief</Quiet>
+          </Sheet>
+        ) : matches.length === 0 ? (
+          <Sheet className="p-8">
+            <p className="m-0 mb-4 max-w-[54ch] text-[15px] leading-[1.6]">
+              Nothing on the roster matches this brief — usually the locality or the budget band.
+              Widening either is the quickest fix.
+            </p>
+            <Quiet href="/quiz">Change your answers</Quiet>
           </Sheet>
         ) : (
           <ul className="m-0 flex list-none flex-col gap-4 p-0">
@@ -236,6 +263,11 @@ export function MatchClient({
                         {studio.completedProjects > 0
                           ? ` · ${studio.completedProjects} projects finished`
                           : ''}
+                        {/* How much of the score is actually evidenced. A 94
+                            built on two of six factors is not the same claim
+                            as a 94 built on six, and showing the denominator
+                            is the difference between a score and a number. */}
+                        {` · scored on ${match.factorsScored} of ${match.factorsTotal}`}
                       </p>
                     </div>
 
