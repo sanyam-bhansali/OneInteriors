@@ -105,8 +105,48 @@ function spread(slug: string): number {
  * differ by about as much as two real studios do. A wider band would make the
  * comparison look more dramatic than the market is.
  */
+/**
+ * Three carcass conventions, because the comparison is meaningless without
+ * them.
+ *
+ * Every studio is quoted on OUR line items, so the label and the size are
+ * identical down every column. The only place two studios can visibly differ
+ * on something other than price is the material — and that is exactly the
+ * difference the landing page's ₹1.25 L gap turns out to be.
+ *
+ * In the real archive this comes from each studio's own Details column and is
+ * filed by `ingestQuotations`. These three profiles stand in until it has run,
+ * and they are drawn from what the archive actually contains: BWP ply with
+ * laminate is the commonest by a distance, MDF appears at the cheaper end, and
+ * the dearer quotes carry veneer and branded hardware.
+ */
+const CARCASS = [
+  {
+    board: '18mm BWP ply',
+    finish: 'laminate shutter',
+    hardware: 'soft-close hinges',
+  },
+  {
+    board: '16mm MDF',
+    finish: 'matt laminate shutter',
+    hardware: 'standard hinges',
+  },
+  {
+    board: '18mm BWP marine ply',
+    finish: 'veneer shutter',
+    hardware: 'branded soft-close · 10 yr',
+  },
+] as const;
+
+/** Which items the carcass convention actually describes. */
+const CARPENTRY = /wardrobe|loft|kitchen_base|kitchen_wall|tv_unit|console_shoe|mandir|vanity|dressing|workstation/;
+
 export function filedRatesFor(slug: string, filedOn = '2026-09-18'): StudioRates {
   const factor = 1 + spread(slug) * 0.09;
+  // Cheaper studios tend to the cheaper board, which is the whole reason a
+  // total can be lower without the studio being better value.
+  const profile =
+    CARCASS[factor < 0.97 ? 1 : factor > 1.03 ? 2 : 0] ?? CARCASS[0];
 
   return Object.fromEntries(
     Object.entries(ARCHIVE_MEDIAN).map(([code, median]) => [
@@ -114,6 +154,9 @@ export function filedRatesFor(slug: string, filedOn = '2026-09-18'): StudioRates
       {
         code,
         ratePaise: Math.round(median * factor),
+        ...(CARPENTRY.test(code)
+          ? { spec: `${profile.board} · ${profile.finish} · ${profile.hardware}` }
+          : {}),
         // 104 is a plausible archive and is NOT a real count for this studio.
         // It exists so the quote can show provenance in the shape it will have
         // once ingestion is real; `ratesAreReal()` is what says it is not yet.

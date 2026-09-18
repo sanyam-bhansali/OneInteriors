@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { rankStudios } from '@/modules/matching/score';
 import { STUDIOS } from '@/data/studios';
 import { buildFirstQuote } from '@/modules/quotation/first-quote';
-import { compareQuotes } from '@/modules/quotation/first-quote';
+import { compareQuotes, compareMany } from '@/modules/quotation/first-quote';
 import { filedRatesFor } from '@/data/filed-rates';
 import { EMPTY_BRIEF, type Brief } from '@/modules/brief/types';
-import { MAX_TO_COMPARE, MIN_TO_COMPARE } from '@/modules/quotation/project-store';
+import { MIN_TO_COMPARE } from '@/modules/quotation/project-store';
 
 /**
  * The match journey, end to end, without a browser.
@@ -184,9 +184,11 @@ describe('sending quotes to compare', () => {
   const quoteFor = (slug: string) =>
     buildFirstQuote({ ...request, kitchenRunMm: 3600, runSource: 'floor_plan' }, filedRatesFor(slug));
 
-  it('needs two, and allows at most three', () => {
+  it('needs two, and caps at nothing', () => {
+    // One quote compared with nothing is a quote. Beyond that there is no
+    // ceiling — the table scrolls sideways with the line and its material
+    // pinned, so a fourth studio costs a swipe rather than legibility.
     expect(MIN_TO_COMPARE).toBe(2);
-    expect(MAX_TO_COMPARE).toBe(3);
   });
 
   it('compares line for line, on the same lines', () => {
@@ -216,5 +218,94 @@ describe('sending quotes to compare', () => {
     expect(mandir.a).not.toBeNull();
     expect(mandir.b).toBeNull();
     expect(mandir.deltaPaise).toBeNull();
+  });
+});
+
+describe('the comparison itself', () => {
+  const request = { bhk: 2, carpetAreaSqft: 850, bathrooms: 2 };
+  const entry = (slug: string, name: string, rates = filedRatesFor(slug)) => ({
+    slug,
+    name,
+    quote: buildFirstQuote({ ...request, kitchenRunMm: 3600, runSource: 'floor_plan' as const }, rates),
+  });
+
+  it('takes any number of studios, not three', () => {
+    const many = STUDIOS.slice(0, 6).map((s) => entry(s.slug, s.tradeName));
+    const c = compareMany(many);
+    expect(c.studios).toHaveLength(6);
+    for (const room of c.rooms) {
+      for (const line of room.lines) {
+        // Every row spans every studio, or the table would ragged-edge.
+        expect(line.cells).toHaveLength(6);
+      }
+    }
+  });
+
+  it('keeps the row when only some studios priced it, and never shows zero', () => {
+    const thin = filedRatesFor(STUDIOS[1]!.slug);
+    delete thin.mandir;
+
+    const c = compareMany([
+      entry(STUDIOS[0]!.slug, 'A'),
+      entry(STUDIOS[1]!.slug, 'B', thin),
+    ]);
+
+    const mandir = c.rooms.flatMap((r) => r.lines).find((l) => l.code === 'mandir')!;
+    expect(mandir).toBeDefined();
+    const missing = mandir.cells.find((x) => x.slug === STUDIOS[1]!.slug)!;
+    // null, not 0 — a zero reads as free.
+    expect(missing.amountPaise).toBeNull();
+    expect(missing.spec).toBeNull();
+  });
+
+  it('marks the cheapest on a row, and does not when only one priced it', () => {
+    const c = compareMany([entry(STUDIOS[0]!.slug, 'A'), entry(STUDIOS[1]!.slug, 'B')]);
+    const lines = c.rooms.flatMap((r) => r.lines);
+
+    for (const line of lines) {
+      expect(line.cheapest.length).toBeGreaterThan(0);
+      const low = Math.min(
+        ...line.cells.filter((x) => x.amountPaise !== null).map((x) => x.amountPaise!),
+      );
+      for (const slug of line.cheapest) {
+        expect(line.cells.find((x) => x.slug === slug)!.amountPaise).toBe(low);
+      }
+    }
+  });
+
+  it('notices when two studios quoted different boards', () => {
+    // The whole reason this screen exists: a lower total is usually a
+    // different material, not better value.
+    const all = STUDIOS.map((s) => entry(s.slug, s.tradeName));
+    const c = compareMany(all);
+    const differing = c.rooms.flatMap((r) => r.lines).filter((l) => l.materialsDiffer);
+    expect(differing.length).toBeGreaterThan(0);
+  });
+
+  it('puts a material disagreement above a bigger price gap', () => {
+    const all = STUDIOS.slice(0, 4).map((s) => entry(s.slug, s.tradeName));
+    const { tellingRows } = compareMany(all);
+
+    expect(tellingRows.length).toBeGreaterThan(0);
+    const firstSame = tellingRows.findIndex((r) => !r.materialsDiffer);
+    const lastDiffer = tellingRows.map((r) => r.materialsDiffer).lastIndexOf(true);
+    if (firstSame !== -1 && lastDiffer !== -1) {
+      expect(lastDiffer).toBeLessThan(firstSame);
+    }
+  });
+
+  it('every compared line keeps a size, and it is the same for everyone', () => {
+    // The labels and sizes are OURS. If they ever differed per studio the
+    // row would stop meaning one thing across.
+    const a = entry(STUDIOS[0]!.slug, 'A');
+    const b = entry(STUDIOS[1]!.slug, 'B');
+    const c = compareMany([a, b]);
+
+    for (const line of c.rooms.flatMap((r) => r.lines)) {
+      expect(line.size.length).toBeGreaterThan(0);
+      const fromA = a.quote.lines.find((l) => l.code === line.code);
+      const fromB = b.quote.lines.find((l) => l.code === line.code);
+      if (fromA && fromB) expect(fromA.size).toBe(fromB.size);
+    }
   });
 });

@@ -179,7 +179,10 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
       unit,
       ratePaise: filed.ratePaise,
       amountPaise: Math.round(quantity * filed.ratePaise),
-      spec: item.spec,
+      // The studio's own description when they filed one, our canonical spec
+      // when they did not. Two studios differing here is the whole point of
+      // the comparison screen.
+      spec: filed.spec ?? item.spec,
       standard,
     });
   }
@@ -298,4 +301,117 @@ export function compareQuotes(a: FirstQuote, b: FirstQuote): ComparisonRow[] {
       deltaPaise: la && lb ? lb.amountPaise - la.amountPaise : null,
     };
   });
+}
+
+// ── Comparing any number of them ────────────────────────────────
+
+export interface ComparedLine {
+  code: string;
+  room: Room;
+  label: string;
+  /** The size is OURS and identical down every column — that is the point. */
+  size: string;
+  /** Per studio, in the order given. `null` where a studio did not price it. */
+  cells: {
+    slug: string;
+    amountPaise: Paise | null;
+    /** THIS studio's words for the material. The only column that can differ. */
+    spec: string | null;
+  }[];
+  /** Slugs holding the lowest priced amount. Plural when they tie. */
+  cheapest: string[];
+  /** Highest minus lowest, among those who priced it. Zero when one did. */
+  spreadPaise: Paise;
+  /** True when the studios did not all describe the same material. */
+  materialsDiffer: boolean;
+}
+
+export interface Comparison {
+  studios: { slug: string; name: string; quote: FirstQuote }[];
+  rooms: { room: Room; label: string; lines: ComparedLine[] }[];
+  /** The rows worth reading first: biggest money, or a material disagreement. */
+  tellingRows: ComparedLine[];
+}
+
+/**
+ * Put N quotes side by side, line for line.
+ *
+ * ## Why a row survives a studio not pricing it
+ *
+ * A missing line is usually the reason a total is lower, and a comparison that
+ * dropped it would be doing precisely what the Problem section on the landing
+ * page accuses everybody else of. So every catalogue item ANY studio priced
+ * gets a row, and the studios who did not price it show a gap rather than a
+ * zero — zero would read as free.
+ *
+ * ## Why `tellingRows` exists
+ *
+ * Twenty-three rows across four studios is ninety-two numbers, and a customer
+ * who reads all of them carefully is a customer we have failed. The telling
+ * rows are the handful where the money actually moves or where the studios
+ * disagree about the material — which is the same short list an architect
+ * would point at.
+ */
+export function compareMany(
+  entries: { slug: string; name: string; quote: FirstQuote }[],
+): Comparison {
+  const codes: string[] = [];
+  for (const entry of entries) {
+    for (const line of entry.quote.lines) {
+      if (!codes.includes(line.code)) codes.push(line.code);
+    }
+  }
+
+  const lines: ComparedLine[] = codes.map((code) => {
+    const found = entries.map((e) => ({
+      entry: e,
+      line: e.quote.lines.find((l) => l.code === code) ?? null,
+    }));
+
+    const priced = found.filter((f) => f.line !== null);
+    const amounts = priced.map((f) => f.line!.amountPaise);
+    const low = amounts.length > 0 ? Math.min(...amounts) : 0;
+    const high = amounts.length > 0 ? Math.max(...amounts) : 0;
+
+    const specs = new Set(priced.map((f) => f.line!.spec));
+    const reference = priced[0]?.line ?? null;
+
+    return {
+      code,
+      room: reference?.room ?? 'WHOLE_HOME',
+      label: reference?.label ?? code,
+      size: reference?.size ?? '',
+      cells: found.map((f) => ({
+        slug: f.entry.slug,
+        amountPaise: f.line?.amountPaise ?? null,
+        spec: f.line?.spec ?? null,
+      })),
+      // Only meaningful when more than one priced it.
+      cheapest:
+        priced.length > 1
+          ? priced.filter((f) => f.line!.amountPaise === low).map((f) => f.entry.slug)
+          : [],
+      spreadPaise: priced.length > 1 ? high - low : 0,
+      materialsDiffer: specs.size > 1,
+    };
+  });
+
+  const rooms = ROOMS.map((room) => ({
+    room,
+    label: ROOM_LABELS[room],
+    lines: lines.filter((l) => l.room === room),
+  })).filter((r) => r.lines.length > 0);
+
+  // Biggest money first, then anything where the materials disagree — a
+  // ₹4,000 row where one studio quoted MDF is worth more attention than a
+  // ₹40,000 row where everybody quoted the same board.
+  const tellingRows = [...lines]
+    .filter((l) => l.spreadPaise > 0 || l.materialsDiffer || l.cells.some((c) => c.amountPaise === null))
+    .sort((a, b) => {
+      if (a.materialsDiffer !== b.materialsDiffer) return a.materialsDiffer ? -1 : 1;
+      return b.spreadPaise - a.spreadPaise;
+    })
+    .slice(0, 5);
+
+  return { studios: entries, rooms, tellingRows };
 }

@@ -81,11 +81,15 @@ export function saveProject(project: Project): void {
 export const MIN_TO_COMPARE = 2;
 
 /**
- * At most three.
+ * No cap.
  *
- * Four columns of line items do not fit a laptop without shrinking the type to
- * the point where the specs — the entire reason for the screen — stop being
- * readable. Three is also about the number of studios anyone actually talks
- * to.
+ * There was one — three — on the reasoning that four columns do not fit a
+ * laptop without shrinking the specs past readable. That is a layout problem,
+ * and solving a layout problem by forbidding the customer something is the
+ * wrong way round. The compare table scrolls sideways with the line item and
+ * its material pinned to the left, so a fourth column costs a swipe rather
+ * than legibility.
+
+ * If somebody wants to price all fourteen and look at them together, that is
+ * a customer doing exactly what this product is for.
  */
-export const MAX_TO_COMPARE = 3;

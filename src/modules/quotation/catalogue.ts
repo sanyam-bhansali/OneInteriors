@@ -448,6 +448,16 @@ export interface FiledRate {
   fromQuotations: number;
   /** ISO date the archive was last read. */
   filedOn: string;
+  /**
+   * This studio's own words for the material on this line.
+   *
+   * Optional: a studio whose archive did not describe the item falls back to
+   * the catalogue's spec. When it IS present it is the most useful column on
+   * the comparison screen — the canonical line is the same for everybody, so
+   * the material is the only place two studios can visibly differ on
+   * something other than price.
+   */
+  spec?: string;
 }
 
 export type StudioRates = Record<string, FiledRate>;

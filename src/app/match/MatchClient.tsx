@@ -29,7 +29,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { loadBrief } from '@/modules/brief/store';
 import { rankStudios, type MatchResult } from '@/modules/matching/score';
-import { loadProject, saveProject, MAX_TO_COMPARE, MIN_TO_COMPARE, type Project } from '@/modules/quotation/project-store';
+import { loadProject, saveProject, MIN_TO_COMPARE, type Project } from '@/modules/quotation/project-store';
 import { CHECK_COUNT } from '@/components/landing/checks';
 import { formatINRCompact } from '@/lib/money';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
@@ -279,7 +279,6 @@ export function MatchClient({
                           </span>
                           <button
                             type="button"
-                            disabled={!inCompare && comparing.length >= MAX_TO_COMPARE}
                             onClick={() =>
                               update({
                                 ...project,

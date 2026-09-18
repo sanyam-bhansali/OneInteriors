@@ -25,7 +25,6 @@ import { formatINRCompact } from '@/lib/money';
 import {
   loadProject,
   saveProject,
-  MAX_TO_COMPARE,
   MIN_TO_COMPARE,
   type Project,
 } from '@/modules/quotation/project-store';
@@ -104,7 +103,6 @@ export function StudioQuotePanel({
           <div className="flex flex-wrap items-center gap-4">
             <button
               type="button"
-              disabled={!inCompare && project.comparing.length >= MAX_TO_COMPARE}
               onClick={() =>
                 update({
                   ...project,

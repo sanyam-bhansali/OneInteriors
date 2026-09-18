@@ -132,6 +132,11 @@ def read_workbook(path: Path, fallback_bhk: int) -> dict | None:
                 "room": room,
                 "product": re.sub(r"\s+", " ", product),
                 "workCode": work_code,
+                # The studio's own words for the material. This is what makes
+                # a comparison explicable: two quotes ₹1.25 L apart are
+                # usually 18mm BWP against 16mm MDF, and only this column
+                # says so.
+                "details": re.sub(r"\s+", " ", cells[3].strip())[:120] or None,
                 "widthMm": to_mm(raw[4]),
                 "heightMm": to_mm(raw[5]),
                 # The app works in paise. Doing the conversion here keeps a

@@ -63,6 +63,15 @@ export interface IngestedLine {
   product: string;
   /** "MO-01" / "NM-01", when the sheet carried one. */
   workCode: string | null;
+  /**
+   * The studio's own description of the material, verbatim.
+   *
+   * "BWP Ply with Laminate", "Shutter Wardrobe with Laminate". This is the
+   * column that makes a comparison explicable rather than merely numeric:
+   * the landing page's ₹1.25 L gap is 18mm BWP against 16mm MDF, and nothing
+   * except this string can say so.
+   */
+  details?: string | null;
   widthMm: number | null;
   heightMm: number | null;
   amountPaise: Paise;
@@ -291,6 +300,9 @@ export function ingestQuotations(
   filedOn: string,
 ): IngestResult {
   const perCode = new Map<string, number[]>();
+  // Every wording this studio used for an item, so the commonest can be
+  // filed as their spec.
+  const wording = new Map<string, Map<string, number>>();
   const unmapped = new Map<string, number>();
   const assumedCodes = new Set<string>();
 
@@ -311,6 +323,13 @@ export function ingestQuotations(
       }
 
       linesMapped += 1;
+
+      if (line.details) {
+        const seen = wording.get(code) ?? new Map<string, number>();
+        seen.set(line.details, (seen.get(line.details) ?? 0) + 1);
+        wording.set(code, seen);
+      }
+
       const list = grouped.get(code) ?? [];
       list.push(line);
       grouped.set(code, list);
@@ -344,11 +363,17 @@ export function ingestQuotations(
     const q1 = sorted[Math.floor(sorted.length * 0.25)] ?? sorted[0]!;
     const q3 = sorted[Math.floor(sorted.length * 0.75)] ?? sorted[sorted.length - 1]!;
 
+    // The commonest wording, not the first. A studio who wrote "BWP Ply with
+    // Laminate" ninety times and something odd once should be filed as the
+    // ninety.
+    const words = [...(wording.get(code)?.entries() ?? [])].sort((a, b) => b[1] - a[1])[0]?.[0];
+
     rates[code] = {
       code,
       ratePaise: Math.round(mid),
       fromQuotations: values.length,
       filedOn,
+      ...(words ? { spec: words } : {}),
     } satisfies FiledRate;
 
     evidence.push({
