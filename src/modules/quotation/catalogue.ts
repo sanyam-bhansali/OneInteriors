@@ -391,8 +391,33 @@ export const ITEM: Record<string, CatalogueItem> = Object.fromEntries(
  * measuring our contract terms rather than their prices.
  */
 export const PROFESSIONAL_FEE_BPS = 700; // 7%
-export const MODULAR_DISCOUNT_BPS = 1500; // 15% off MO
 export const GST_BPS = 1800; // 18%
+
+/**
+ * The modular discount: 10%, and the number is not 15.
+ *
+ * This said 15% until the archive was actually read. That figure came from a
+ * calibration note written against **four** quotations, all of which happened
+ * to use it. Across the 934 that parse, the distribution is:
+ *
+ *     10%  279      0%   119      20%  21      25%  15
+ *     15%  223      11%   25      12%  18      other 100
+ *      5%  173
+ *
+ * The median is 10%. Fifteen was a real number from a real sample that was
+ * too small, which is the most expensive kind of wrong — it looks sourced.
+ * At 15% we would have under-quoted every studio by 5% of the modular half,
+ * about ₹38,000 on a ₹7.7 L modular bill, and the error would have surfaced
+ * as studios quietly revising their first quotes upward after a site visit:
+ * exactly the behaviour this product exists to make impossible.
+ *
+ * It is held constant across studios on purpose. In the archive the rate is
+ * per-quote and negotiated — six files carry a rupee amount in the cell
+ * instead of a rate, and about twenty have a hand-rounded total — so letting
+ * each studio set their own would mean two comparison totals differed on
+ * bargaining rather than on what is being built.
+ */
+export const MODULAR_DISCOUNT_BPS = 1000; // 10% off MO — median of 934 quotations
 
 /**
  * How many of a studio's own quotations we read before we will price for them.
