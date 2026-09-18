@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { Container, TierBadge, Stat, Divider, Pill } from '@/components/ui';
 import { StartCta } from '@/components/StartCta';
+import { StudioQuotePanel } from '@/components/oi/StudioQuotePanel';
 import { StyleScene } from '@/components/art/StyleScene';
 import { PlanFragment } from '@/components/art/PlanFragment';
 import { SiteHeader, SiteFooter } from '@/components/chrome';
@@ -110,6 +111,19 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
                   here — every introduction runs through the expert. */}
               <StartCta size="md" />
             </div>
+          </Container>
+        </section>
+
+        {/* ── The quote ──
+            High on the page, directly under who they are and above the track
+            record, because it is what somebody arriving from their matches
+            came for. It replaces the old /quotes screen entirely: a quote is
+            this studio's pricing and belongs under this studio's evidence,
+            not in a list of everybody's totals with the materials stripped
+            out. See StudioQuotePanel. */}
+        <section className="oi-app border-b border-[var(--line)] bg-[var(--bg)] py-10">
+          <Container>
+            <StudioQuotePanel studioSlug={studio.slug} studioName={studio.tradeName} />
           </Container>
         </section>
 
