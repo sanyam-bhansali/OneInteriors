@@ -1,37 +1,39 @@
 'use client';
 
 /**
- * Specs you can tap, and the panel that answers.
+ * Specs you can tap, and the card that answers.
  *
- * ## The problem this solves
+ * ## What changed, and why
  *
- * The comparison screen's instruction is "look at the materials before the
- * totals". For most readers that instruction is unactionable: `18mm BWP
- * carcass · laminate shutter · soft-close hinges` is not information to
- * somebody who does not already know what BWP is, it is decoration that looks
- * like information. Telling somebody to read evidence they cannot read is the
- * same failure as hiding it, with better manners.
+ * This panel used to answer a tapped material with three paragraphs. It was
+ * accurate and nobody would have read it. Somebody choosing a kitchen is
+ * excited, a bit nervous and usually on a phone — an essay at that moment is
+ * not thoroughness, it is an obstacle, and an explanation nobody opens teaches
+ * exactly as much as no explanation at all.
  *
- * So every spec string in the product renders through `Spec`, which marks the
- * terms it recognises and makes each one a real button. One shared panel
- * answers, anchored at the foot of the viewport.
+ * So the answer is now **a card**: a drawing that shows the difference, one
+ * line saying what the thing is, the two sides set against each other in five
+ * words apiece, and the money as a single figure. About four seconds. The full
+ * paragraph is still there behind "the long version", for the one reader in
+ * twenty who wants it.
  *
  * ## Why one panel and not a popover per term
  *
  * There are twenty-three lines on a comparison and up to four studios, so a
- * popover per cell is ninety-odd popovers, every one of them a focus trap
- * waiting to happen. A single panel is one thing to open, one thing to close,
- * one place the eye learns to look — and it stays put while you carry on
- * reading the table behind it, which a modal would not allow.
+ * popover per cell is ninety-odd popovers, every one a focus trap waiting to
+ * happen. One panel is one thing to open, one thing to close, one place the
+ * eye learns to look — and it stays put while you carry on reading the table
+ * behind it.
  *
- * It is deliberately **not** a `<dialog>`: this is reference material you read
- * *while* comparing, not a decision you make before continuing. Trapping focus
- * would be actively wrong. Escape closes it, the close button is first in tab
- * order within it, and opening it does not move focus away from the table.
+ * It is deliberately **not** a `<dialog>`: this is reference you read *while*
+ * comparing, not a decision you make before continuing, so trapping focus
+ * would be actively wrong. Escape closes it, and opening it does not move
+ * focus away from the table.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { splitSpec, type Material } from '@/modules/materials/glossary';
+import { MaterialArt } from './MaterialArt';
 
 /**
  * A spec string with its known terms marked.
@@ -62,7 +64,7 @@ export function Spec({
             type="button"
             onClick={() => onPick(part.material)}
             title={`What ${part.material.name} means`}
-            className="cursor-pointer border-0 bg-transparent p-0 text-inherit underline decoration-dotted decoration-from-font underline-offset-[3px] hover:decoration-solid focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--acc)]"
+            className="cursor-pointer border-0 bg-transparent p-0 text-inherit underline decoration-dotted decoration-from-font underline-offset-[3px] hover:decoration-solid"
             style={{ textDecorationColor: 'var(--ink2)' }}
           >
             {part.text}
@@ -74,46 +76,97 @@ export function Spec({
 }
 
 /**
- * The body of the explanation. Separated from the panel chrome so the same
- * three paragraphs can appear inline — after a quiz answer, say — without the
- * close button and the fixed positioning coming with them.
+ * The two sides, set against each other.
+ *
+ * This pair is the whole lesson. "Survives standing water" against "Survives
+ * steam only" does more work than the paragraph it replaced, and it does it
+ * without anybody deciding to concentrate.
  */
-export function MaterialCard({ material: m }: { material: Material }) {
+function Versus({ good, bad }: { good: string; bad: string }) {
+  return (
+    <div className="grid grid-cols-2 gap-px overflow-hidden border border-[var(--line)] bg-[var(--line)]">
+      <p
+        className="m-0 bg-[var(--card)] px-3.5 py-3 text-[13.5px] leading-snug"
+        style={{ boxShadow: 'inset 3px 0 0 var(--sec)' }}
+      >
+        {good}
+      </p>
+      <p
+        className="m-0 bg-[var(--card)] px-3.5 py-3 text-[13.5px] leading-snug text-[var(--ink2)]"
+        style={{ boxShadow: 'inset 3px 0 0 var(--line)' }}
+      >
+        {bad}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The card. Drawing, one line, the two sides, the money.
+ *
+ * `compact` drops the disclosure — used inside the quote build, where the
+ * cards are arriving on a timer and nothing should invite a click.
+ */
+export function MaterialCard({
+  material: m,
+  compact = false,
+}: {
+  material: Material;
+  compact?: boolean;
+}) {
+  const [long, setLong] = useState(false);
+
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h3 className="oi-display m-0 text-[19px]">{m.name}</h3>
-        {m.standard ? (
-          <span className="oi-num text-[11px] uppercase tracking-[0.14em] text-[var(--ink2)]">
-            {m.standard}
-          </span>
-        ) : null}
-      </div>
-
-      <p className="m-0 mb-4 max-w-[64ch] text-[14.5px] leading-[1.6] text-[var(--ink)]">{m.what}</p>
-
-      <div className="mb-4">
-        <p className="oi-label m-0 mb-1.5">Where it matters</p>
-        <p className="m-0 max-w-[64ch] text-[14px] leading-[1.6] text-[var(--ink2)]">{m.matters}</p>
-      </div>
-
-      {/* The load-bearing half. A glossary that only defines terms teaches
-          vocabulary; this is the part that teaches somebody to read a
-          quotation. When the honest answer is that the downgrade costs
-          nothing, the entry says so — see the 18mm entry. */}
-      <div className="border-t border-[var(--line)] pt-4">
-        <p className="oi-label m-0 mb-1.5">
-          {m.cheaperAlt ? `Cheaper instead — ${m.cheaperAlt}` : 'If you see it downgraded'}
-        </p>
-        {m.cheaperSaves ? (
-          <p className="oi-num m-0 mb-2 text-[13px]" style={{ color: 'var(--acc-ink)' }}>
-            Saves {m.cheaperSaves}
+      <div className="mb-4 flex items-start gap-5">
+        <div className="w-[104px] flex-none sm:w-[124px]">
+          <MaterialArt art={m.art} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h3 className="oi-display m-0 text-[19px]">{m.name}</h3>
+            {m.standard ? (
+              <span className="oi-num text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink2)]">
+                {m.standard}
+              </span>
+            ) : null}
+          </div>
+          <p className="m-0 mt-1.5 max-w-[42ch] text-[14px] leading-snug text-[var(--ink2)]">
+            {m.tagline}
           </p>
-        ) : null}
-        <p className="m-0 max-w-[64ch] text-[14px] leading-[1.6] text-[var(--ink)]">
-          {m.cheaperCosts}
-        </p>
+          <p className="m-0 mt-3 flex items-baseline gap-2">
+            <span
+              className="oi-num text-[20px] leading-none"
+              style={{ color: m.moneyIs === 'saves' ? 'var(--acc-ink)' : 'var(--ink2)' }}
+            >
+              {m.money}
+            </span>
+            <span className="oi-label m-0">
+              {m.moneyIs === 'saves' ? 'to skip it' : 'either way'}
+            </span>
+          </p>
+        </div>
       </div>
+
+      <Versus good={m.good} bad={m.bad} />
+
+      {!compact ? (
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => setLong((v) => !v)}
+            aria-expanded={long}
+            className="cursor-pointer border-0 bg-transparent p-0 text-[13px] text-[var(--ink2)] underline hover:text-[var(--ink)]"
+          >
+            {long ? 'Close' : 'The long version'}
+          </button>
+          {long ? (
+            <p className="oi-swap m-0 mt-2.5 max-w-[68ch] text-[13.5px] leading-[1.6] text-[var(--ink2)]">
+              {m.detail}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -121,7 +174,7 @@ export function MaterialCard({ material: m }: { material: Material }) {
 /**
  * The panel at the foot of the screen.
  *
- * Capped at 60vh and scrollable, so on a phone it never swallows the table it
+ * Capped at 62vh and scrollable, so on a phone it never swallows the table it
  * is explaining. Escape closes it.
  */
 export function MaterialPanel({
@@ -145,13 +198,12 @@ export function MaterialPanel({
   return (
     <aside
       aria-label={`What ${m.name} means`}
-      className="oi-swap fixed inset-x-0 bottom-0 z-30 max-h-[60vh] overflow-y-auto border-t border-[var(--ink)] bg-[var(--card)]"
+      className="oi-rise-in fixed inset-x-0 bottom-0 z-30 max-h-[62vh] overflow-y-auto border-t border-[var(--ink)] bg-[var(--card)]"
       style={{ boxShadow: '0 -24px 50px -34px rgba(44,38,36,.5)' }}
     >
       <div className="mx-auto w-full max-w-[72rem] px-[clamp(16px,4vw,40px)] py-6">
-        <div className="flex items-start justify-between gap-6">
+        <div className="flex items-start justify-between gap-5">
           <div className="min-w-0 flex-1">
-            <p className="oi-eyebrow m-0 mb-3">In plain words</p>
             <MaterialCard material={m} />
           </div>
 
@@ -160,12 +212,42 @@ export function MaterialPanel({
             type="button"
             onClick={onClose}
             aria-label="Close the explanation"
-            className="-mr-2 -mt-2 flex h-11 w-11 flex-none cursor-pointer items-center justify-center border-0 bg-transparent text-[20px] leading-none text-[var(--ink2)] hover:text-[var(--ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--acc)]"
+            className="-mr-2 -mt-2 flex h-11 w-11 flex-none cursor-pointer items-center justify-center border-0 bg-transparent text-[20px] leading-none text-[var(--ink2)] hover:text-[var(--ink)]"
           >
             ✕
           </button>
         </div>
       </div>
     </aside>
+  );
+}
+
+/**
+ * The term as a chip, for places where the spec is a list rather than a
+ * sentence — the comparison table, where a paragraph per cell would be
+ * unreadable at four columns wide.
+ */
+export function MaterialChip({
+  material: m,
+  onPick,
+}: {
+  material: Material;
+  onPick: (m: Material) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(m)}
+      title={m.tagline}
+      className="inline-flex cursor-pointer items-center gap-1.5 border border-[var(--line)] bg-[var(--bg)] px-2 py-1 text-[11.5px] leading-none text-[var(--ink)] hover:border-[var(--ink2)]"
+    >
+      <span
+        aria-hidden
+        className="h-[7px] w-[7px] flex-none rounded-full"
+        // Raw sage is 2.72:1 on Raw Silk; the chip sits on it.
+        style={{ background: 'var(--sec-ink)' }}
+      />
+      {m.name}
+    </button>
   );
 }

@@ -710,6 +710,49 @@ p {
   animation: oi-swap 0.32s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 
+/* A card arriving during the ten seconds a quote is being built.
+   Longer and further than `oi-swap`, and it settles from slightly
+   under scale — this one is meant to be pleasurable rather than
+   invisible, because the wait is the moment we are trying to make
+   enjoyable rather than merely short. Overshoot is deliberate and
+   small; a bouncier curve reads as a toy. */
+@keyframes oi-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.965);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.oi-card-in {
+  animation: oi-card-in 0.62s cubic-bezier(0.16, 0.84, 0.28, 1.04) both;
+}
+
+/* The panel coming up from the foot of the screen. */
+@keyframes oi-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.oi-rise-in {
+  animation: oi-rise-in 0.42s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* The progress line under the stage sentence. Width is set inline from
+   the stage timings, so this only has to carry it smoothly. */
+.oi-progress {
+  transition: width 0.6s cubic-bezier(0.4, 0.1, 0.2, 1);
+}
+
 /* Portfolio cards: prints laid on a table rather than tiles in a grid.
    The rest angle is per-card (`--tilt`, set inline) and hover brings
    the card square and lifts it — squaring up is the affordance, and it
@@ -763,8 +806,13 @@ p {
   .oi-reveal {
     transition: none;
   }
-  .oi-swap {
+  .oi-swap,
+  .oi-card-in,
+  .oi-rise-in {
     animation: none;
+  }
+  .oi-progress {
+    transition: none;
   }
   /* The tilt is decoration on top of decoration. Flat, still, and the
      hover lift goes with it — WCAG 2.3.3. */

@@ -34,16 +34,55 @@ import { formatINRCompact } from '@/lib/money';
 import { compareMany, type ComparedLine } from '@/modules/quotation/first-quote';
 import { tallyStarred, starredGap } from '@/modules/quotation/starred';
 import { loadProject, saveProject, MIN_TO_COMPARE, type Project } from '@/modules/quotation/project-store';
-import type { Material } from '@/modules/materials/glossary';
+import { splitSpec, type Material } from '@/modules/materials/glossary';
 import { ratesAreReal } from '@/data/filed-rates';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
-import { Spec, MaterialPanel } from '@/components/oi/Material';
+import { Spec, MaterialChip, MaterialPanel } from '@/components/oi/Material';
 import { Wrap, Chapter, Sheet, Quiet, Flag } from '@/components/oi';
 
 const money = (p: number | null) => (p === null ? null : formatINRCompact(p));
 
 /** One studio's column width. Wide enough for a material, narrow enough for four. */
 const COL = 'min-w-[13.5rem]';
+
+/** The dearest price on a row, which every bar on it is scaled against. */
+function dearest(line: ComparedLine): number {
+  return Math.max(0, ...line.cells.map((c) => c.amountPaise ?? 0));
+}
+
+/**
+ * A spec rendered as chips, with whatever we do not recognise left as text.
+ *
+ * The comparison used to print the whole spec sentence in every cell. At four
+ * studios wide that is four paragraphs across one row and it is not read. The
+ * chips carry the same words in a shape the eye can skip over, and each is one
+ * tap from the card that explains it.
+ */
+function MaterialList({ text, onPick }: { text: string; onPick: (m: Material) => void }) {
+  const parts = splitSpec(text);
+  const chips = parts.filter((p) => p.kind === 'term');
+  const rest = parts
+    .filter((p) => p.kind === 'text')
+    .map((p) => p.text)
+    .join('')
+    .replace(/[·\s]+/g, ' ')
+    .trim();
+
+  if (chips.length === 0) {
+    return (
+      <span className="mt-2 block text-[12.5px] leading-snug text-[var(--ink2)]">{text}</span>
+    );
+  }
+
+  return (
+    <span className="mt-2 flex flex-wrap items-center gap-1.5">
+      {chips.map((c, i) => (
+        <MaterialChip key={i} material={(c as { material: Material }).material} onPick={onPick} />
+      ))}
+      {rest ? <span className="text-[12px] text-[var(--ink2)]">{rest}</span> : null}
+    </span>
+  );
+}
 
 /**
  * The star. A real button, 44px, and it says what it does.
@@ -160,9 +199,8 @@ export function CompareClient() {
             </p>
           }
         >
-          Every studio is priced on our line items at their own rates, so a row means the same
-          thing all the way across. Star the lines you care about, and tap any underlined material
-          to find out what it is — and what the cheaper version of it costs you.
+          Same lines, same sizes, their own rates. Star what you care about. Tap any material you
+          do not recognise.
         </Chapter>
 
         {!ratesAreReal() ? (
@@ -297,12 +335,15 @@ export function CompareClient() {
             ) : null}
           </Sheet>
         ) : (
-          <Sheet className="mb-10 p-6">
-            <p className="m-0 max-w-[62ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-              <span className="text-[var(--ink)]">Star the lines you actually care about</span> —
-              the ☆ beside any item below — and we will total just those. The bottom row of this
-              table compares two slightly different houses; the lines you pick compare the work you
-              are buying.
+          <Sheet className="mb-10 flex flex-wrap items-center gap-x-4 gap-y-2 p-5">
+            <span aria-hidden className="text-[19px] leading-none" style={{ color: '#857b6f' }}>
+              ☆
+            </span>
+            <p className="m-0 max-w-[52ch] text-[14.5px] leading-snug">
+              Star the lines you care about and we will total just those.
+              <span className="block text-[13.5px] text-[var(--ink2)]">
+                The bottom row compares two slightly different houses.
+              </span>
             </p>
           </Sheet>
         )}
@@ -417,6 +458,17 @@ export function CompareClient() {
 
                     {line.cells.map((cell) => {
                       const best = line.cheapest.includes(cell.slug);
+                      /* The bar is the point of this cell. Four prices in a
+                         row are four numbers to hold in your head; four bars
+                         are one shape, and the eye does the comparison before
+                         the reader decides to. Scaled against the dearest on
+                         THIS row, so it says "relative to its neighbours" and
+                         never "relative to the whole table". */
+                      const width =
+                        dearest(line) > 0 && cell.amountPaise !== null
+                          ? Math.max(6, Math.round((cell.amountPaise / dearest(line)) * 100))
+                          : 0;
+
                       return (
                         <td
                           key={cell.slug}
@@ -433,15 +485,25 @@ export function CompareClient() {
                               >
                                 {money(cell.amountPaise)}
                               </span>
-                              {/* The material, at 13px in full ink. It is the
-                                  reason this screen exists; setting it as fine
-                                  print would be the same mistake every quote
-                                  in the Problem section makes. */}
-                              <Spec
-                                text={cell.spec ?? ''}
-                                onPick={setTerm}
-                                className="mt-1.5 block text-[13px] leading-[1.45] text-[var(--ink)]"
-                              />
+                              <span
+                                aria-hidden
+                                className="mt-1.5 block h-[3px] bg-[var(--line)]"
+                              >
+                                <span
+                                  className="block h-full"
+                                  style={{
+                                    width: `${width}%`,
+                                    // --sec-ink: raw sage is 2.32:1 on the hairline track.
+                                    background: best ? 'var(--sec-ink)' : 'var(--ink2)',
+                                  }}
+                                />
+                              </span>
+
+                              {/* Materials as chips rather than a sentence.
+                                  At four columns a sentence per cell is a
+                                  paragraph nobody reads; a chip is a thing you
+                                  tap when you do not recognise it. */}
+                              <MaterialList text={cell.spec ?? ''} onPick={setTerm} />
                             </>
                           )}
                         </td>
@@ -484,10 +546,9 @@ export function CompareClient() {
           </Link>
         </div>
 
-        <p className="m-0 mt-6 max-w-[62ch] text-[13px] leading-[1.6] text-[var(--ink2)]">
-          Every quote here is the standard scope, priced before anybody has stood in your flat.
-          The bands say how far each could move. Your architect is paid by us and never by a
-          studio, which is the only arrangement under which their reading of this is worth having.
+        <p className="m-0 mt-6 max-w-[58ch] text-[13px] leading-[1.6] text-[var(--ink2)]">
+          Standard scope, priced before anybody has stood in your flat — the bands say how far each
+          could move. Your architect is paid by us, never by a studio.
         </p>
       </Wrap>
 

@@ -1,66 +1,61 @@
 /**
- * One question, asked while a quote is being built.
+ * One short question, asked while a quote is being built.
  *
- * ## Why a question and not a fact
+ * ## Why a question at all
  *
- * The ten seconds a quote takes are the best attention this product will ever
- * get: the customer asked for something, they want it, and they cannot do
- * anything else until it arrives. Filling that with a rotating fact is
- * wallpaper — read, forgotten before the quote lands.
+ * These ten seconds are the best attention this product will ever get: the
+ * customer asked for something, they want it, and there is nothing else to do
+ * until it lands. A question is worth more than a fact here, because answering
+ * commits you. Having guessed BWR and been told it was BWP, you own the
+ * distinction — and forty seconds later a line in your own quotation reads
+ * `18mm BWP carcass` and means something.
  *
- * A question is different, because answering commits you. Having guessed BWR
- * and been told it was BWP, you now own the distinction, and forty seconds
- * later a line in your quotation says `18mm BWP carcass` and it means
- * something. That is the whole design: the quiz exists to make the document
- * that follows it readable.
+ * **The quiz exists to make the document that follows it readable.** It is not
+ * a game and it keeps no score, because a score would make it about the
+ * customer rather than about their kitchen.
+ *
+ * ## Why every field here is short
+ *
+ * The first version of this file opened with a three-line scenario, offered
+ * options a sentence long, and answered with three paragraphs. Correct, and
+ * far too much to read while waiting — which turned the best moment in the
+ * journey into homework. Everything is now sized for a card: the question in
+ * about a dozen words, options in four or five, the answer in two lines.
+ *
+ * The test suite enforces the lengths. Prose creeping back is the regression
+ * this shape exists to prevent.
  *
  * ## The rules the questions obey
  *
- * - **Never about taste.** No "which finish is nicer". There is a correct
- *   answer and it is a fact about how a material behaves.
- * - **Never a trick.** The wrong answers are the things a reasonable person
- *   would actually choose, not nonsense.
- * - **Getting it wrong has to be interesting.** Every question's explanation
- *   is worth reading even if you got it right, and the wrong option always has
- *   a real argument for it — often it is the right answer somewhere else in
- *   the flat.
- * - **Never about the customer's budget or taste.** The jokes on this screen
- *   are at the industry's expense; so is this.
- *
- * ## One per quote, and never the same one twice
- *
- * `pickQuestion` takes the ids already seen. Somebody pricing four studios
- * gets four different questions, which is the difference between a feature and
- * an irritation.
+ * - **Never about taste.** There is a correct answer and it is a fact about
+ *   how a material behaves.
+ * - **Never a trick.** The wrong answers are things a reasonable person would
+ *   actually choose — usually the right answer somewhere else in the flat.
+ * - **Never at the customer's expense.** The jokes on this screen are at the
+ *   industry's; so is this.
  */
 
 import { MATERIALS, material, type Material } from './glossary';
 
 export interface Choice {
   id: string;
-  /** What the option says. Short — this is read under mild impatience. */
+  /** Four or five words. Read under mild impatience. */
   label: string;
   correct: boolean;
-  /**
-   * Why this one is wrong, and where it would have been right. Shown only for
-   * the option the customer actually picked, so a wrong answer gets a specific
-   * reply rather than a generic one.
-   */
+  /** A short, specific reply to this pick. About a dozen words. */
   ifPicked: string;
 }
 
 export interface Question {
   id: string;
-  /** The glossary entry this teaches. The answer panel links onward to it. */
+  /** The glossary entry this teaches. */
   materialId: string;
-  /** The situation. Concrete, in their flat, never abstract. */
-  scenario: string;
-  /** The question itself. */
+  /** The question, with its situation folded in. About a dozen words. */
   ask: string;
   choices: Choice[];
-  /** The real reason, shown however they answered. */
+  /** The real reason. Two lines at most, shown however they answered. */
   because: string;
-  /** What the cheaper choice costs, in money. Drawn from the glossary. */
+  /** What it is worth, as one short line with a figure in it. */
   stakes: string;
 }
 
@@ -68,246 +63,99 @@ export const QUESTIONS: Question[] = [
   {
     id: 'q-kitchen-board',
     materialId: 'bwp',
-    scenario:
-      'Your kitchen base units sit on a floor that gets mopped every day, and one of them is under the sink.',
-    ask: 'Which board should the carcass be?',
+    ask: 'Your kitchen base sits under the sink. Which board?',
     choices: [
-      {
-        id: 'mdf',
-        label: 'MDF — the flattest, smoothest board',
-        correct: false,
-        ifPicked:
-          'MDF is genuinely the best board in the flat — for a lacquered shutter, where its lack of grain is the point. In a base unit it holds screws poorly and swells permanently once water reaches it.',
-      },
-      {
-        id: 'bwr',
-        label: 'BWR — boiling water RESISTANT',
-        correct: false,
-        ifPicked:
-          'Close, and the right answer for every wardrobe in the flat. BWR is rated for humidity and splashing. Under a sink it is sitting in water, which is a different test.',
-      },
-      {
-        id: 'bwp',
-        label: 'BWP — boiling water PROOF',
-        correct: true,
-        ifPicked: 'Right — and the one word between the two grades is the whole specification.',
-      },
+      { id: 'mdf', label: 'MDF', correct: false, ifPicked: 'Best board in the flat — for a painted shutter, not a wet base.' },
+      { id: 'bwr', label: 'BWR — water resistant', correct: false, ifPicked: 'Right for every wardrobe. Under a sink it is out of its depth.' },
+      { id: 'bwp', label: 'BWP — waterproof', correct: true, ifPicked: 'One word between the two grades, and it is the whole spec.' },
     ],
-    because:
-      'BWR survives steam. BWP survives standing water. A kitchen base is wet along its bottom edge for years, so the two grades behave identically for about four years and then stop.',
-    stakes:
-      'BWR instead of BWP saves roughly ₹8,000–10,000 across a 2 BHK kitchen. It is the most commonly downgraded line in this city.',
+    because: 'BWR survives steam. BWP survives standing water. They behave identically for about four years, then stop.',
+    stakes: '≈ ₹9,000 saved by downgrading — the most swapped line in Pune.',
   },
   {
     id: 'q-softclose',
     materialId: 'softclose',
-    scenario:
-      'Two quotes both say “soft-close hinges” on every kitchen shutter, and one is ₹14,000 cheaper.',
-    ask: 'What actually tells the two apart?',
+    ask: 'Two quotes both say “soft-close hinges”, ₹14,000 apart. Why?',
     choices: [
-      {
-        id: 'cycles',
-        label: 'The cycle rating — 25,000 vs 80,000',
-        correct: true,
-        ifPicked: 'Right. The phrase is not a specification; the number is.',
-      },
-      {
-        id: 'feel',
-        label: 'How soft the close feels on the day',
-        correct: false,
-        ifPicked:
-          'A new 25,000-cycle hinge and a new 80,000-cycle hinge feel the same. That is exactly why the cheap one is easy to sell in a showroom.',
-      },
-      {
-        id: 'nothing',
-        label: 'Nothing — a soft-close hinge is a soft-close hinge',
-        correct: false,
-        ifPicked:
-          'Reasonable, and wrong by a factor of three. Every hinge sold is rated for a number of open-and-shut cycles, and the range on sale in Pune runs from about 25,000 to about 80,000.',
-      },
+      { id: 'cycles', label: 'The cycle rating', correct: true, ifPicked: 'Yes — the phrase is not a spec. The number is.' },
+      { id: 'feel', label: 'How soft it feels', correct: false, ifPicked: 'They feel identical when new. That is what makes the cheap one sellable.' },
+      { id: 'nothing', label: 'A hinge is a hinge', correct: false, ifPicked: 'Reasonable, and wrong by a factor of three.' },
     ],
-    because:
-      'A kitchen shutter is opened around ten times a day. 25,000 cycles is roughly seven years; 80,000 is longer than you will keep the kitchen. When the damper fails the shutter slams, and the hinge is behind a fitted shutter.',
-    stakes:
-      'Unbranded hinges save roughly ₹10,000–15,000 across a 2 BHK — and it is a line almost no quotation in this market states a rating for.',
+    because: 'Every hinge is rated in open-and-shut cycles. At ten opens a day, 25,000 is seven years and 80,000 outlasts the kitchen.',
+    stakes: '≈ ₹12,000 — and almost no quote in this market states the rating.',
   },
   {
     id: 'q-laminate',
     materialId: 'laminate',
-    scenario: 'A studio has quoted 1mm laminate throughout, and you are looking to save money.',
-    ask: 'Where can you drop to 0.8mm without regretting it?',
+    ask: 'Where can you drop from 1mm laminate to 0.8mm for free?',
     choices: [
-      {
-        id: 'wardrobe',
-        label: 'Wardrobe sides and internal shelves',
-        correct: true,
-        ifPicked: 'Right — nothing abrades a wardrobe side. This is a real saving with no cost.',
-      },
-      {
-        id: 'kitchen',
-        label: 'Kitchen shutter faces',
-        correct: false,
-        ifPicked:
-          'These are opened with wet hands, wiped daily, and caught by rings and pan handles. It is the one place the extra 0.2mm is doing visible work.',
-      },
-      {
-        id: 'nowhere',
-        label: 'Nowhere — always take the thicker one',
-        correct: false,
-        ifPicked:
-          'A defensible instinct, but 1mm on the inside of a wardrobe is money buying nothing. Knowing where a downgrade is free is as useful as knowing where it is not.',
-      },
+      { id: 'wardrobe', label: 'Wardrobe sides and shelves', correct: true, ifPicked: 'Nothing abrades a wardrobe side. Real saving, no cost.' },
+      { id: 'kitchen', label: 'Kitchen shutter faces', correct: false, ifPicked: 'Wet hands, pans and rings land here. The one place it works.' },
+      { id: 'nowhere', label: 'Nowhere — always take thicker', correct: false, ifPicked: 'Knowing where a downgrade is free is worth as much as knowing where it is not.' },
     ],
-    because:
-      'Laminate thickness is about abrasion, not appearance — the two look identical on day one and for the first few years. It only matters where hands, pans and cleaning cloths land.',
-    stakes:
-      'Dropping to 0.8mm everywhere saves roughly ₹6,000–9,000 on a 2 BHK. Dropping it only where nothing touches saves most of that and costs nothing.',
+    because: 'Thickness buys abrasion resistance, not looks. It only earns its money where hands and pans land.',
+    stakes: '≈ ₹7,000 — most of it available without giving anything up.',
   },
   {
     id: 'q-paint',
     materialId: 'primer',
-    scenario:
-      'Two painting quotes for the same flat are ₹22,000 apart, and both say “two coats emulsion”.',
-    ask: 'What is most likely missing from the cheaper one?',
+    ask: 'Two painting quotes, ₹22,000 apart, both “two coats”. What is missing?',
     choices: [
-      {
-        id: 'primer',
-        label: 'The primer coat',
-        correct: true,
-        ifPicked:
-          'Right — and it is invisible on handover day, which is precisely why it is the layer that goes.',
-      },
-      {
-        id: 'brand',
-        label: 'A cheaper brand of emulsion',
-        correct: false,
-        ifPicked:
-          'Possible, and it would show up as a smaller gap. The brand is on the invoice; the primer is not, which makes the primer the easier thing to leave out.',
-      },
-      {
-        id: 'labour',
-        label: 'Fewer painters, so it takes longer',
-        correct: false,
-        ifPicked:
-          'Painting is priced by area, not by day. A ₹22,000 gap on the same area is a materials gap, not a scheduling one.',
-      },
+      { id: 'primer', label: 'The primer coat', correct: true, ifPicked: 'Invisible on handover day, which is exactly why it goes.' },
+      { id: 'brand', label: 'A cheaper emulsion', correct: false, ifPicked: 'Possible, but the brand is on the invoice. The primer is not.' },
+      { id: 'labour', label: 'Fewer painters', correct: false, ifPicked: 'Painting is priced by area, not by day.' },
     ],
-    because:
-      'Primer is the layer that bonds the emulsion and stops bare plaster drinking it. Without it the colour goes on looking correct and then shows patchy in raking daylight, and it lifts with any tape stuck to the wall.',
-    stakes:
-      'Skipping putty and primer saves roughly ₹15,000–25,000 across a 2 BHK, and the difference is not visible on the day you take handover.',
+    because: 'Primer bonds the emulsion and stops bare plaster drinking it. Without it the colour goes patchy in raking daylight and lifts with tape.',
+    stakes: '≈ ₹20,000 — and it looks identical the day you take handover.',
   },
   {
     id: 'q-tandem',
     materialId: 'tandem',
-    scenario:
-      'Your kitchen has six drawers. One quote has tandem boxes; the other has plywood drawers on telescopic channels.',
-    ask: 'What do you actually lose with the cheaper drawer?',
+    ask: 'A ply drawer costs a third as much. What do you lose?',
     choices: [
-      {
-        id: 'extension',
-        label: 'The last 100mm — it never opens fully',
-        correct: true,
-        ifPicked:
-          'Right, and the heavy pan is always in that last 100mm. Side-mounted channels stop short; undermount runners do not.',
-      },
-      {
-        id: 'looks',
-        label: 'Nothing visible — the fronts are identical',
-        correct: false,
-        ifPicked:
-          'The fronts are identical, which is why this substitution is so easy to make. What changes is behind the front: how far it comes out and how much it will carry.',
-      },
-      {
-        id: 'softclose',
-        label: 'The soft-close',
-        correct: false,
-        ifPicked:
-          'Telescopic channels can be had with soft-close too. The difference is extension and load rating, not the damper.',
-      },
+      { id: 'extension', label: 'The last 100mm of reach', correct: true, ifPicked: 'And the heavy pan lives in that last 100mm.' },
+      { id: 'looks', label: 'Nothing — fronts are identical', correct: false, ifPicked: 'The fronts are identical. That is what makes the swap so easy.' },
+      { id: 'softclose', label: 'The soft-close', correct: false, ifPicked: 'Side channels come with soft-close too. Extension is the difference.' },
     ],
-    because:
-      'A tandem box is a rated metal drawer on undermount runners — full extension, 30kg or 50kg. A ply drawer on side channels costs about a third as much, carries less, and stops short of fully open.',
-    stakes:
-      'Roughly ₹3,500–5,000 per drawer. Worth paying in a kitchen; genuinely arguable in a bedroom, where nobody is reaching past a stockpot.',
+    because: 'Undermount runners pull fully clear and carry 30–50kg. Side-mounted channels stop short and carry less.',
+    stakes: '≈ ₹4,000 a drawer. Worth it in a kitchen, arguable in a bedroom.',
   },
   {
     id: 'q-ceiling',
     materialId: 'gypsum',
-    scenario: 'You are comparing two false-ceiling lines for the same living room.',
-    ask: 'Which question tells you which one will still be flat in five years?',
+    ask: 'Which question tells you if a false ceiling stays flat?',
     choices: [
-      {
-        id: 'framing',
-        label: 'What the framing is, and how far apart',
-        correct: true,
-        ifPicked: 'Right. The grid holds the ceiling. The board just hangs on it.',
-      },
-      {
-        id: 'board',
-        label: 'Which brand of gypsum board',
-        correct: false,
-        ifPicked:
-          'Board brands barely differ, and the board is not what sags — the frame under it is. This is the question the industry would rather you asked.',
-      },
-      {
-        id: 'thickness',
-        label: 'How thick the board is',
-        correct: false,
-        ifPicked:
-          'Board thickness is near enough standard. Two ceilings built from the same board can be five years apart in how they age, entirely because of the sections behind them.',
-      },
+      { id: 'framing', label: 'What the framing is', correct: true, ifPicked: 'The grid holds the ceiling. The board just hangs on it.' },
+      { id: 'board', label: 'Which brand of board', correct: false, ifPicked: 'The question the industry would rather you asked.' },
+      { id: 'thickness', label: 'How thick the board is', correct: false, ifPicked: 'Near enough standard. Two ceilings off the same board age years apart.' },
     ],
-    because:
-      'Galvanised iron sections at the correct spacing hold a flat ceiling for decades. Widen the spacing to save material and it sags visibly along the joints — and plaster-of-Paris instead of board cannot be opened up again if something above it needs reaching.',
-    stakes:
-      'Wider framing saves roughly ₹40–60 per square foot of ceiling, and it is not a line any quotation in this market writes down.',
+    because: 'Galvanised sections at the right spacing hold flat for decades. Widen the spacing and it sags along the joints.',
+    stakes: '≈ ₹50 a square foot — and no quote here writes it down.',
   },
   {
     id: 'q-conduit',
     materialId: 'conduit',
-    scenario:
-      'The electrical line on one quote says “concealed conduit”; the other just says “concealed wiring”.',
-    ask: 'What is the difference worth?',
+    ask: '“Concealed conduit” or “concealed wiring” — is there a difference?',
     choices: [
-      {
-        id: 'replaceable',
-        label: 'Conduit means the cable can be pulled and replaced later',
-        correct: true,
-        ifPicked: 'Right — the pipe is the point, not the hiding.',
-      },
-      {
-        id: 'safety',
-        label: 'Conduit is safer in a fire',
-        correct: false,
-        ifPicked:
-          'Not the main argument. Both are buried in masonry. The difference is what happens the day you want to change something.',
-      },
-      {
-        id: 'same',
-        label: 'They mean the same thing',
-        correct: false,
-        ifPicked:
-          'They sound identical and are not. Cable can be concealed by chasing it straight into the plaster, with no pipe around it at all.',
-      },
+      { id: 'replaceable', label: 'Conduit can be re-pulled', correct: true, ifPicked: 'The pipe is the point, not the hiding.' },
+      { id: 'safety', label: 'Conduit is safer in fire', correct: false, ifPicked: 'Both sit in masonry. The difference shows the day you change something.' },
+      { id: 'same', label: 'They are the same', correct: false, ifPicked: 'They sound identical. Cable can be chased straight into plaster.' },
     ],
-    because:
-      'Cable inside a conduit can be drawn out and a new one drawn in. Cable buried directly in plaster cannot — every future change becomes a chiselling job across a finished wall.',
-    stakes:
-      'Chasing cable directly saves roughly ₹8,000–12,000 across a 2 BHK. It is the least visible thing in the whole quotation and the most expensive one to undo.',
+    because: 'Cable in a pipe can be drawn out and replaced. Cable buried in plaster cannot — every later change is a chiselling job.',
+    stakes: '≈ ₹10,000 — the least visible line, the most expensive to undo.',
   },
 ];
 
 /**
  * Pick a question the customer has not been asked yet.
  *
- * Deterministic given `seen` and `seed`, so React re-renders do not shuffle
- * the question out from under somebody mid-read. `seed` is normally the studio
- * slug — different studio, different question, same question on a remount.
+ * Deterministic given `seen` and `seed`, so React re-renders do not shuffle the
+ * question out from under somebody mid-read. `seed` is normally the studio
+ * name — different studio, different question, same question on a remount.
  *
- * Once every question has been seen the set starts again, which is the right
- * behaviour: somebody pricing an eighth studio has earned a repeat, and the
- * alternative is a blank space.
+ * Once every question has been seen the set starts again, which is right:
+ * somebody pricing an eighth studio has earned a repeat, and the alternative is
+ * a blank space.
  */
 export function pickQuestion(seed: string, seen: readonly string[] = []): Question {
   const unseen = QUESTIONS.filter((q) => !seen.includes(q.id));
@@ -320,7 +168,7 @@ export function pickQuestion(seed: string, seen: readonly string[] = []): Questi
   return pool[Math.abs(hash) % pool.length]!;
 }
 
-/** The glossary entry a question teaches, for the "read more" line. */
+/** The glossary entry a question teaches. */
 export function questionMaterial(q: Question): Material {
   const m = material(q.materialId);
   // A question naming a material that does not exist is a build-time mistake,
@@ -328,8 +176,5 @@ export function questionMaterial(q: Question): Material {
   if (!m) throw new Error(`Question ${q.id} references unknown material ${q.materialId}`);
   return m;
 }
-
-/** Every material the quiz covers — asserted against MATERIALS in tests. */
-export const QUIZ_MATERIAL_IDS = QUESTIONS.map((q) => q.materialId);
 
 export const MATERIAL_COUNT = MATERIALS.length;

@@ -1,75 +1,85 @@
 /**
- * What the customer is actually buying.
+ * What the customer is actually buying — as cards, not as prose.
  *
  * ## Why this module exists
  *
  * The comparison screen tells the reader to look at the materials before the
  * totals. That instruction is worthless to almost everybody who receives it,
  * because "18mm BWP carcass · laminate shutter · soft-close hinges" is a
- * sentence in a language they do not speak. Telling somebody to read the
- * evidence and then handing them evidence they cannot read is the same failure
- * as not showing it at all, dressed up as transparency.
+ * sentence in a language they do not speak.
  *
- * So: one body of real, checkable material knowledge, written once and used
- * everywhere a spec string appears — tapped in the comparison table, asked as
- * a question during the ten seconds a quote is being built, and quoted back to
- * the architect before the call.
+ * ## Why it is shaped like this and not like paragraphs
  *
- * ## The rule every entry obeys
+ * The first version of this file answered that with three paragraphs per term,
+ * which solved the comprehension problem by creating a worse one. Somebody
+ * buying their first home is excited, slightly nervous, and on a phone. They
+ * are not revising. Handing them an essay at the moment they are enjoying
+ * themselves is its own kind of failure — they stop reading, and a glossary
+ * nobody reads teaches nothing at all.
  *
- * Each term says what it is, **where it actually matters**, and — this is the
- * load-bearing field — what the cheaper alternative saves and what it costs
- * you. A glossary that only defines terms teaches vocabulary. A glossary that
- * says "BWR instead of BWP saves about ₹9,000 across a 2 BHK and fails under
- * the sink" teaches somebody to read a quotation, which is the entire point.
+ * So every entry is built as **a card you can take in at a glance**:
  *
- * `cheaperCosts` is therefore not optional. If a downgrade has no real
- * consequence, the honest thing is to say so in that field — see `mm18`, where
- * the answer is that 16mm is fine and the industry pretends otherwise.
+ * - `tagline` — what it is, in about seven words.
+ * - `good` / `bad` — the two sides, five words a side. This is the whole
+ *   lesson. "Survives standing water" against "Survives steam only" does more
+ *   than the paragraph it replaced.
+ * - `money` — one mono figure. What the downgrade saves, or what it costs.
+ * - `art` — the key into the drawings. A cross-section with a water line at
+ *   the bottom teaches BWP faster than any sentence can.
+ *
+ * `detail` still holds the full explanation, because somebody who wants it
+ * deserves it — but it sits behind a disclosure nobody has to open, and
+ * nothing in the product renders it by default.
+ *
+ * The test suite enforces the lengths. Prose creeping back into the card
+ * fields is the exact regression this shape exists to prevent.
  *
  * ## Accuracy
  *
  * These are ordinary trade facts, not marketing. The IS numbers, the hinge
- * cycle ratings and the board grades are checkable, and they are written here
- * so that a studio reading this page cannot say we misdescribed their work.
- * The rupee figures are order-of-magnitude for a Pune 2 BHK and are labelled
- * as such in `cheaperSaves` rather than presented as quotations.
+ * cycle ratings and the board grades are checkable. The rupee figures are
+ * order-of-magnitude for a Pune 2 BHK and are always hedged.
  *
  * ## Why no `server-only`
  *
- * Per CONTRIBUTING §9.5 — this is pure data and pure functions, imported by
- * client components and by tests. Nothing here touches a request.
+ * Per CONTRIBUTING §9.5 — pure data and pure functions, imported by client
+ * components and by tests.
  */
 
 /** Where a term is worth arguing about, in the customer's own rooms. */
 export type Room = 'kitchen' | 'wardrobe' | 'bathroom' | 'living' | 'everywhere';
 
 export interface Material {
-  /** Stable key. Used by the quiz and by stored answers. */
+  /** Stable key. Used by the quiz, the drawings and stored answers. */
   id: string;
-  /** How it is written on screen when there is room. */
+  /** How it is written on screen. */
   name: string;
   /**
-   * Every way this appears in a spec string, longest first is NOT required —
-   * `findTerms` sorts. Matching is case-insensitive and word-bounded.
+   * Every way this appears in a spec string. `findTerms` sorts by length, so
+   * the order here does not matter. Matching is case-insensitive, word-bounded.
    */
   aliases: string[];
-  /** One sentence. What the thing is. */
-  what: string;
-  /** Where it changes the outcome. Not everywhere — that would be useless. */
-  matters: string;
+  /** What it is. About seven words. Tested for length. */
+  tagline: string;
+  /** The better side of the comparison. Five words. */
+  good: string;
+  /** The worse side. Five words. This pair IS the lesson. */
+  bad: string;
+  /** One mono figure — what the downgrade moves. Always hedged. */
+  money: string;
+  /** What the money line means: a saving, or what it costs you. */
+  moneyIs: 'saves' | 'costs';
+  /** Which drawing to show. See MaterialArt. */
+  art: string;
+  /** Where it changes the outcome. */
   rooms: Room[];
   /** The standard, where one exists and is worth citing. */
   standard: string | null;
-  /** What gets substituted when a quote is being sharpened. */
-  cheaperAlt: string | null;
-  /** Order of magnitude on a Pune 2 BHK. Always hedged, never a quotation. */
-  cheaperSaves: string | null;
   /**
-   * What the substitution actually costs you — or, honestly, that it costs
-   * you nothing. Never left vague to make the expensive option look better.
+   * The full explanation, for somebody who opens it. Never rendered by
+   * default, and never the first thing anybody sees.
    */
-  cheaperCosts: string;
+  detail: string;
 }
 
 export const MATERIALS: Material[] = [
@@ -77,214 +87,226 @@ export const MATERIALS: Material[] = [
     id: 'bwp',
     name: 'BWP ply',
     aliases: ['BWP', 'boiling water proof', 'marine ply', 'marine-ply', 'marine grade'],
-    what: 'Plywood bonded with phenol-formaldehyde resin, which does not let go when it is wet for a long time.',
-    matters:
-      'Anything standing on a floor that gets mopped, or under a sink. A kitchen base carcass is wet at the bottom edge for years, not minutes.',
+    tagline: 'Marine-grade board. Does not mind water.',
+    good: 'Survives standing water',
+    bad: 'BWR: survives steam only',
+    money: '≈ ₹9,000',
+    moneyIs: 'saves',
+    art: 'board-water',
     rooms: ['kitchen', 'bathroom'],
     standard: 'IS 710',
-    cheaperAlt: 'BWR ply',
-    cheaperSaves: 'roughly ₹8,000–10,000 across a 2 BHK kitchen',
-    cheaperCosts:
-      'BWR handles steam and splashes. It does not handle standing water. Under the sink and along the bottom rail is exactly where it goes, and it goes quietly — you find out in year four.',
+    detail:
+      'Plywood bonded with phenol-formaldehyde resin, which does not let go when it is wet for a long time. A kitchen base carcass is wet along its bottom edge for years, not minutes — so BWP and BWR behave identically for about four years and then stop. It is the most commonly downgraded line in this city, and it goes quietly: you find out in year four, under the sink.',
   },
   {
     id: 'bwr',
     name: 'BWR ply',
     aliases: ['BWR', 'boiling water resistant', 'MR grade', 'MR ply'],
-    what: 'Plywood rated to survive humidity and splashing, but not prolonged soaking.',
-    matters:
-      'Perfectly correct for wardrobes, TV units and anything in a dry room. It is only a downgrade when it turns up in a kitchen base or a bathroom.',
+    tagline: 'The everyday board. Right in dry rooms.',
+    good: 'Correct for every wardrobe',
+    bad: 'Wrong under a sink',
+    money: 'No penalty',
+    moneyIs: 'costs',
+    art: 'board-dry',
     rooms: ['wardrobe', 'living'],
     standard: 'IS 303',
-    cheaperAlt: null,
-    cheaperSaves: null,
-    cheaperCosts:
-      'Nothing, in a dry room. Paying for BWP in a bedroom wardrobe is money spent on a problem that room does not have.',
+    detail:
+      'Plywood rated to survive humidity and splashing, but not prolonged soaking. Perfectly correct for wardrobes, TV units and anything in a dry room — it is only a downgrade when it turns up in a kitchen base or a bathroom. Paying for BWP in a bedroom wardrobe is money spent on a problem that room does not have.',
   },
   {
     id: 'mdf',
     name: 'MDF',
     aliases: ['MDF', 'HDF', 'MDF-MR', 'fibreboard', 'fiberboard'],
-    what: 'Wood fibre pressed with resin into a board with no grain — flat, dense and completely uniform.',
-    matters:
-      'The right choice for a routed or lacquered shutter, because it has no grain to telegraph through paint. The wrong choice for a carcass that carries weight on screws.',
+    tagline: 'No grain at all. Perfect under paint.',
+    good: 'Best for lacquered shutters',
+    bad: 'Screws pull out under load',
+    money: 'Depends where',
+    moneyIs: 'costs',
+    art: 'grain',
     rooms: ['living', 'wardrobe'],
     standard: 'IS 12406',
-    cheaperAlt: null,
-    cheaperSaves: null,
-    cheaperCosts:
-      'Screws pull out of MDF under sustained load, and once it takes on water it swells and never comes back. In a shutter, fine. In a base unit, not.',
+    detail:
+      'Wood fibre pressed with resin into a board with no grain — flat, dense and completely uniform. The right choice for a routed or lacquered shutter, because there is no grain to telegraph through the paint. The wrong choice for a carcass: screws pull out of it under sustained load, and once it takes on water it swells and never comes back.',
   },
   {
     id: 'particle',
     name: 'Particle board',
     aliases: ['particle board', 'particleboard', 'chipboard', 'pre-laminated board'],
-    what: 'Wood chips and glue. The cheapest panel in the trade.',
-    matters:
-      'It is what flat-pack furniture is made of, and it behaves like flat-pack furniture: fine standing still, poor under load, finished the moment it gets wet.',
+    tagline: 'Chips and glue. The cheapest panel made.',
+    good: 'Fine standing still',
+    bad: 'Sags, and cannot be re-screwed',
+    money: 'Half of ply',
+    moneyIs: 'saves',
+    art: 'chips',
     rooms: ['everywhere'],
     standard: 'IS 3087',
-    // This entry is written from the other end: particle board IS the
-    // substitution, so there is nothing cheaper to name. The figure belongs in
-    // what it costs you, not in a saving.
-    cheaperAlt: null,
-    cheaperSaves: null,
-    cheaperCosts:
-      'It comes in at roughly half the cost of BWR ply, and it buys you sagging shelves within a couple of years and no second life — it cannot be re-screwed. If a quote is startlingly cheap and the board is not named, this is usually why.',
+    detail:
+      'Wood chips and glue — what flat-pack furniture is made of, and it behaves like flat-pack furniture: fine standing still, poor under load, finished the moment it gets wet. Shelves sag within a couple of years and there is no second life, because it cannot be re-screwed. If a quote is startlingly cheap and the board is not named, this is usually why.',
   },
   {
     id: 'mm18',
     name: '18mm carcass',
     aliases: ['18mm', '18 mm'],
-    what: 'The thickness of the boxes themselves — the sides, the base and the shelves.',
-    matters:
-      'Shelf sag is a thickness problem before it is a material problem. A long 18mm shelf carrying crockery is at the edge of what it can do; a 16mm one is past it.',
+    tagline: 'Board thickness. Decides whether shelves sag.',
+    good: '18mm holds a long shelf',
+    bad: '16mm is honestly fine',
+    money: '≈ ₹15,000',
+    moneyIs: 'saves',
+    art: 'shelf-sag',
     rooms: ['everywhere'],
     standard: null,
-    cheaperAlt: '16mm carcass, or a 6mm back panel instead of 12mm',
-    cheaperSaves: 'roughly ₹12,000–18,000 across a 2 BHK',
-    cheaperCosts:
-      'Honestly: 16mm is structurally fine for wardrobe shutters and short shelves, and anyone telling you otherwise is selling board. The one that matters is the back panel — a 6mm back is what makes a unit rack out of square when you push on it.',
+    detail:
+      'The thickness of the boxes themselves — sides, base and shelves. Shelf sag is a thickness problem before it is a material problem: a long 18mm shelf carrying crockery is at the edge of what it can do, and a 16mm one is past it. Honestly, though, 16mm is structurally fine for wardrobe shutters and short shelves, and anyone telling you otherwise is selling board. The one that really matters is the back panel — a 6mm back is what makes a unit rack out of square when you push on it.',
   },
   {
     id: 'laminate',
     name: 'Laminate',
     aliases: ['laminate', 'lamination', '1mm laminate', '0.8mm laminate', 'HPL'],
-    what: 'The printed, resin-saturated sheet bonded to the outside of the board. Usually 0.8mm or 1mm.',
-    matters:
-      'Thickness is about abrasion, not looks — the two are identical on day one. 1mm belongs anywhere a hand or a pan lands; 0.8mm is entirely adequate on a vertical face nobody touches.',
+    tagline: 'The outer skin. 0.8mm or 1mm.',
+    good: '1mm where hands land',
+    bad: 'Thin wears to dark core',
+    money: '≈ ₹7,000',
+    moneyIs: 'saves',
+    art: 'laminate-edge',
     rooms: ['kitchen', 'everywhere'],
     standard: 'IS 2046',
-    cheaperAlt: '0.8mm throughout',
-    cheaperSaves: 'roughly ₹6,000–9,000 across a 2 BHK',
-    cheaperCosts:
-      'On wardrobe sides and shutter faces, nothing at all. On a kitchen counter face or a frequently opened shutter edge, it wears through to the dark core and there is no repairing that.',
+    detail:
+      'The printed, resin-saturated sheet bonded to the outside of the board. Thickness is about abrasion, not looks — the two are identical on day one and for the first few years. 1mm belongs anywhere a hand or a pan lands; 0.8mm is entirely adequate on a vertical face nobody touches, so dropping it on wardrobe sides costs nothing. On a kitchen counter face it wears through to the dark core, and there is no repairing that.',
   },
   {
     id: 'edgeband',
     name: 'Edge banding',
     aliases: ['edge band', 'edge-band', 'edge banding', 'edgeband', 'beading'],
-    what: 'The PVC strip that seals the raw cut edge of a board, in 0.8mm or 2mm.',
-    matters:
-      'It is the first thing to fail on a cheap job and the first place water gets into a board. Every exposed edge in a kitchen should be 2mm.',
+    tagline: 'The strip sealing every raw cut edge.',
+    good: '2mm survives your thumb',
+    bad: 'Thin chips at the corner',
+    money: 'A few thousand',
+    moneyIs: 'saves',
+    art: 'edge-chip',
     rooms: ['kitchen', 'everywhere'],
     standard: null,
-    cheaperAlt: '0.8mm banding, or banding only on visible edges',
-    cheaperSaves: 'a few thousand rupees — it is a small line',
-    cheaperCosts:
-      'Thin banding chips at the corner where your thumb opens the shutter, and an unbanded internal edge in a kitchen is a raw board edge sitting in steam. Small money, disproportionate consequence.',
+    detail:
+      'The PVC strip that seals the raw cut edge of a board, in 0.8mm or 2mm. It is the first thing to fail on a cheap job and the first place water gets into a board, so every exposed edge in a kitchen should be 2mm. Thin banding chips at the corner where your thumb opens the shutter, and an unbanded internal edge in a kitchen is raw board sitting in steam. Small money, disproportionate consequence.',
   },
   {
     id: 'softclose',
     name: 'Soft-close hinge',
     aliases: ['soft-close', 'soft close', 'softclose', 'hinge', 'hinges'],
-    what: 'A hinge with a damper in it, rated by how many open-and-shut cycles it is guaranteed for — typically 25,000, 50,000 or 80,000.',
-    matters:
-      'The words "soft-close" are on every quote in this city and mean nothing on their own. The rating and the brand are the specification; the phrase is not.',
+    tagline: 'Everyone writes it. The rating is the spec.',
+    good: '80,000 cycles: outlasts the kitchen',
+    bad: '25,000 cycles: seven years',
+    money: '≈ ₹12,000',
+    moneyIs: 'saves',
+    art: 'cycles',
     rooms: ['kitchen', 'wardrobe'],
     standard: null,
-    cheaperAlt: 'unbranded soft-close at 25,000 cycles',
-    cheaperSaves: 'roughly ₹10,000–15,000 across a 2 BHK',
-    cheaperCosts:
-      'A kitchen shutter is opened perhaps ten times a day. 25,000 cycles is about seven years; 80,000 is longer than you will keep the kitchen. When the damper goes it slams, and replacing hinges behind fitted shutters is a joiner-day, not a spare part.',
+    detail:
+      'A hinge with a damper in it, rated by how many open-and-shut cycles it is guaranteed for — typically 25,000, 50,000 or 80,000. The words "soft-close" are on every quote in this city and mean nothing on their own. A kitchen shutter is opened around ten times a day, so 25,000 cycles is roughly seven years. When the damper goes it slams, and replacing hinges behind fitted shutters is a joiner-day, not a spare part.',
   },
   {
     id: 'tandem',
     name: 'Tandem box',
     aliases: ['tandem box', 'tandem', 'tandem box set', 'drawer box', 'undermount'],
-    what: 'A ready-made metal drawer whose runners sit underneath and pull all the way out, load-rated at 30kg or 50kg.',
-    matters:
-      'The alternative is a plywood drawer on a side-mounted telescopic channel. It costs a third as much, holds less, and stops about 100mm short of fully open — which is where the heavy pan always is.',
+    tagline: 'A rated metal drawer on hidden runners.',
+    good: 'Opens all the way out',
+    bad: 'Ply drawer stops 100mm short',
+    money: '≈ ₹4,000 a drawer',
+    moneyIs: 'saves',
+    art: 'drawer',
     rooms: ['kitchen'],
     standard: null,
-    cheaperAlt: 'ply drawer on telescopic channels',
-    cheaperSaves: 'roughly ₹3,500–5,000 per drawer',
-    cheaperCosts:
-      'You reach into the back of the drawer for the rest of your life. Worth paying for in a kitchen, genuinely arguable in a bedroom.',
+    detail:
+      'A ready-made metal drawer whose runners sit underneath and pull all the way out, load-rated at 30kg or 50kg. The alternative is a plywood drawer on side-mounted telescopic channels: a third of the cost, holds less, and stops about 100mm short of fully open — which is where the heavy pan always is. Worth paying for in a kitchen, genuinely arguable in a bedroom.',
   },
   {
     id: 'hydraulic',
     name: 'Hydraulic storage',
     aliases: ['hydraulic', 'hydraulic storage', 'gas lift', 'gas-lift'],
-    what: 'Gas struts that hold a bed base up while you get at the storage underneath.',
-    matters:
-      'Rated by the strut, and the rating has to suit the mattress. Struts sized for a 12kg foam mattress under a 35kg spring one will not hold it up, and it comes down on your arm.',
+    tagline: 'Gas struts holding the bed base up.',
+    good: 'One hand opens it',
+    bad: 'Unrated struts need two people',
+    money: '≈ ₹5,000 a bed',
+    moneyIs: 'saves',
+    art: 'strut',
     rooms: ['everywhere'],
     standard: null,
-    cheaperAlt: 'a lift-up base with no struts',
-    cheaperSaves: 'roughly ₹4,000–6,000 per bed',
-    cheaperCosts:
-      'You need two people to open it, so in practice nobody opens it and the storage you paid for goes unused.',
+    detail:
+      'Gas struts that hold a bed base up while you get at the storage underneath. Rated by the strut, and the rating has to suit the mattress — struts sized for a 12kg foam mattress under a 35kg spring one will not hold it up, and it comes down on your arm. Without them you need two people, so in practice nobody opens it and the storage you paid for goes unused.',
   },
   {
     id: 'gypsum',
-    name: 'Gypsum false ceiling',
+    name: 'False ceiling',
     aliases: ['gypsum', 'false ceiling', 'cove', 'POP'],
-    what: 'Gypsum board screwed to a suspended metal grid, usually with a cove around the edge for concealed light.',
-    matters:
-      'The board is never the question — the grid is. Galvanised iron sections at the right spacing hold a flat ceiling for decades; the cheap version sags visibly along the joints.',
+    tagline: 'Board on a metal grid, with a cove.',
+    good: 'Close framing stays flat',
+    bad: 'Wide framing cracks at joints',
+    money: '≈ ₹50 a sq ft',
+    moneyIs: 'saves',
+    art: 'ceiling-grid',
     rooms: ['living'],
     standard: null,
-    cheaperAlt: 'wider frame spacing, or plaster-of-Paris instead of board',
-    cheaperSaves: 'roughly ₹40–60 per square foot of ceiling',
-    cheaperCosts:
-      'Cracks at the joints within two or three monsoons, and POP cannot be opened up again if something above it needs reaching. Ask what the framing is, not what the board is.',
+    detail:
+      'Gypsum board screwed to a suspended metal grid, usually with a cove around the edge for concealed light. The board is never the question — the grid is. Galvanised iron sections at the right spacing hold a flat ceiling for decades; widen the spacing to save material and it sags visibly along the joints within two or three monsoons. Ask what the framing is, not what the board is.',
   },
   {
     id: 'powdercoat',
-    name: 'Powder-coated MS',
+    name: 'Powder coating',
     aliases: ['powder-coated', 'powder coated', 'MS frame', 'mild steel'],
-    what: 'Mild steel with a dry polymer coat baked on, rather than wet paint.',
-    matters:
-      'Pune has four months of monsoon. A powder coat is a sealed skin; enamel paint on mild steel is a decorative layer over something that rusts underneath it.',
+    tagline: 'A baked skin on steel, not paint.',
+    good: 'Sealed against four monsoons',
+    bad: 'Enamel rusts at the welds',
+    money: '≈ ₹3,000',
+    moneyIs: 'saves',
+    art: 'rust',
     rooms: ['everywhere'],
     standard: null,
-    cheaperAlt: 'enamel paint over primer',
-    cheaperSaves: 'roughly ₹2,000–4,000 on a safety door or mesh shutter',
-    cheaperCosts:
-      'Rust bleed at the welds after two monsoons, and it is on the outside of your front door where everybody sees it.',
+    detail:
+      'Mild steel with a dry polymer coat baked on, rather than wet paint. Pune has four months of monsoon: a powder coat is a sealed skin, while enamel on mild steel is a decorative layer over something that rusts underneath it. You get rust bleed at the welds after two monsoons, on the outside of your front door where everybody sees it.',
   },
   {
     id: 'mirror',
     name: 'Bevelled mirror',
     aliases: ['bevelled mirror', 'beveled mirror', 'bevelled', '5mm bevelled'],
-    what: 'Mirror with the edge ground back at an angle, usually 5mm glass.',
-    matters:
-      'The bevel is not decoration — grinding the edge is what stops it chipping, and a chipped mirror edge starts a crack.',
+    tagline: 'Ground edge on 5mm glass, not decoration.',
+    good: 'Ground edge will not chip',
+    bad: 'Raw edge starts a crack',
+    money: '≈ ₹2,000',
+    moneyIs: 'saves',
+    art: 'bevel',
     rooms: ['bathroom'],
     standard: null,
-    cheaperAlt: '4mm mirror with a plain cut edge',
-    cheaperSaves: 'roughly ₹1,500–3,000',
-    cheaperCosts:
-      'Thin mirror shows a slight waviness in the reflection, and an unground edge in a bathroom will chip the first time something knocks it.',
+    detail:
+      'Mirror with the edge ground back at an angle, usually 5mm glass. The bevel is not decoration — grinding the edge is what stops it chipping, and a chipped mirror edge starts a crack. Thin 4mm mirror also shows a slight waviness in the reflection.',
   },
   {
     id: 'primer',
     name: 'Putty, primer, two coats',
     aliases: ['putty', 'primer', 'two coats', 'emulsion', 'two coats emulsion'],
-    what: 'The full paint system — filler, a bonding coat, then two coats of the colour.',
-    matters:
-      'The primer is the layer that makes the emulsion stick and stops the wall drinking it. It is also invisible once the job is done, which is precisely why it is the layer that gets skipped.',
+    tagline: 'Four layers. One of them is invisible.',
+    good: 'Primer makes emulsion stick',
+    bad: 'Skipped: patchy in daylight',
+    money: '≈ ₹20,000',
+    moneyIs: 'saves',
+    art: 'layers',
     rooms: ['everywhere'],
     standard: null,
-    cheaperAlt: 'skip the primer, or one coat instead of two',
-    cheaperSaves: 'roughly ₹15,000–25,000 across a 2 BHK',
-    cheaperCosts:
-      'Patchy coverage that shows in daylight from certain angles, and paint that comes away with the tape the next time anything is stuck to the wall. It looks identical on handover day. That is the problem with it.',
+    detail:
+      'The full paint system — filler, a bonding coat, then two coats of the colour. Primer is the layer that makes the emulsion stick and stops the wall drinking it. It is also invisible once the job is done, which is precisely why it is the layer that gets skipped. You get patchy coverage that shows in raking daylight and paint that lifts with any tape stuck to the wall. It looks identical on handover day — that is the problem with it.',
   },
   {
     id: 'conduit',
     name: 'Concealed conduit',
     aliases: ['concealed conduit', 'conduit', 'modular switches', 'modular switch'],
-    what: 'Wiring run inside a pipe chased into the wall, terminating in a modular switch plate.',
-    matters:
-      'Conduit means the cable can be pulled and replaced later without breaking the wall open. Cable buried directly in plaster cannot.',
+    tagline: 'A pipe around the cable, inside the wall.',
+    good: 'Cable can be replaced later',
+    bad: 'Bare cable means chiselling',
+    money: '≈ ₹10,000',
+    moneyIs: 'saves',
+    art: 'conduit',
     rooms: ['everywhere'],
     standard: 'IS 732',
-    cheaperAlt: 'cable chased directly into the plaster',
-    cheaperSaves: 'roughly ₹8,000–12,000 across a 2 BHK',
-    cheaperCosts:
-      'Any future change — an extra point, a failed run, moving a switch — becomes a chiselling job across a finished wall. It is the least visible thing in the whole quote and the most expensive one to undo.',
+    detail:
+      'Wiring run inside a pipe chased into the wall, terminating in a modular switch plate. Conduit means the cable can be pulled and replaced later without breaking the wall open; cable buried directly in plaster cannot. Every future change — an extra point, a failed run, moving a switch — becomes a chiselling job across a finished wall. It is the least visible thing in the whole quote and the most expensive one to undo.',
   },
 ];
 
