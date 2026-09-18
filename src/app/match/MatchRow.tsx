@@ -45,6 +45,7 @@ import type { Explanation } from '@/modules/matching/explain';
 import type { Studio } from '@/modules/studio/types';
 import type { Brief } from '@/modules/brief/types';
 import { Sheet, Tick, Flag } from '@/components/oi';
+import { briefKey, type StoredRead } from '@/modules/quotation/project-store';
 import { explainAction } from './actions';
 
 // ── Small pieces ────────────────────────────────────────────────
@@ -81,18 +82,32 @@ function Strength({ label, value }: { label: string; value: number | null }) {
     <div className="flex items-center justify-between gap-4 border-b border-[var(--line)] py-2 last:border-b-0">
       <span className="text-[13.5px] text-[var(--ink2)]">{label}</span>
       {value === null ? (
-        <span className="oi-num text-[10px] uppercase tracking-[0.14em] text-[var(--ink2)]">
+        <span className="oi-num text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink2)]">
           not known yet
         </span>
       ) : (
-        <span className="flex items-end gap-[3px]" aria-label={`${level} of 4`}>
+        // `role="img"` with the label, not a bare span carrying `aria-label`:
+        // a span with no role is not reliably given its label by a screen
+        // reader, and "three of four" is the entire content here.
+        <span
+          role="img"
+          aria-label={`${level} out of 4`}
+          className="flex items-end gap-[3px]"
+        >
           {[1, 2, 3, 4].map((i) => (
             <span
               key={i}
+              aria-hidden
               className="w-[5px] rounded-[1px]"
               style={{
                 height: 6 + i * 3,
-                background: i <= level ? 'var(--sec)' : 'var(--line)',
+                // The EMPTY bars carry the meaning as much as the filled ones
+                // — you cannot read "three of four" without seeing the fourth.
+                // The hairline was 1.42:1 on Alabaster, which is a bar you
+                // cannot count. WCAG 1.4.11 wants 3:1 for a graphic that has
+                // to be understood. #857b6f clears it on BOTH grounds the bars
+                // appear on — the panel is Raw Silk, not Alabaster.
+                background: i <= level ? 'var(--sec)' : '#857b6f',
               }}
             />
           ))}
@@ -106,7 +121,7 @@ function Figure({ value, label }: { value: string; label: string }) {
   return (
     <div>
       <p className="oi-num m-0 text-[17px] leading-none">{value}</p>
-      <p className="oi-num m-0 mt-1.5 text-[9.5px] uppercase leading-snug tracking-[0.14em] text-[var(--ink2)]">
+      <p className="oi-num m-0 mt-1.5 text-[11px] uppercase leading-snug tracking-[0.12em] text-[var(--ink2)]">
         {label}
       </p>
     </div>
@@ -122,8 +137,10 @@ export function MatchRow({
   rank,
   quotedTotalPaise,
   inCompare,
+  cachedRead,
   onQuote,
   onToggleCompare,
+  onRead,
 }: {
   studio: Studio;
   match: MatchResult;
@@ -131,19 +148,35 @@ export function MatchRow({
   rank: number;
   quotedTotalPaise: number | null;
   inCompare: boolean;
+  /** Already written for this brief, if it has been. */
+  cachedRead: StoredRead | undefined;
   onQuote: () => void;
   onToggleCompare: () => void;
+  onRead: (studioId: string, read: StoredRead) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [read, setRead] = useState<Explanation | null>(null);
+
+  const key = briefKey(brief);
+  const fresh = cachedRead?.briefKey === key ? cachedRead : undefined;
+  const [read, setRead] = useState<Explanation | null>(
+    fresh ? { text: fresh.text, source: fresh.source } : null,
+  );
 
   // The assessment arrives per row, so the page fills in rather than waiting
-  // on the slowest call. Never blocks anything the reader can already use.
+  // on the slowest call, and never blocks anything already readable.
+  //
+  // Skipped entirely when one has already been written for this brief. Six
+  // rows is six paid calls, and without the cache every return to this page
+  // spends them again.
   useEffect(() => {
+    if (fresh) return;
+
     let live = true;
     explainAction(brief, studio.id)
       .then((r) => {
-        if (live && r.text) setRead(r);
+        if (!live || !r.text) return;
+        setRead(r);
+        onRead(studio.id, { text: r.text, source: r.source, briefKey: key });
       })
       .catch(() => {
         /* The row is complete without it. */
@@ -151,7 +184,9 @@ export function MatchRow({
     return () => {
       live = false;
     };
-  }, [brief, studio.id]);
+    // `onRead` and `key` are derived from props that already appear here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fresh, brief, studio.id]);
 
   const cleared = studio.checks.filter((c) => c.result === 'PASS').length;
   const localHomes = brief.locality
@@ -175,7 +210,7 @@ export function MatchRow({
           <Ring score={match.score} />
 
           <div className="min-w-0 flex-1">
-            <p className="oi-num m-0 mb-1.5 text-[9.5px] uppercase tracking-[0.16em] text-[var(--ink2)]">
+            <p className="oi-num m-0 mb-1.5 text-[11px] uppercase tracking-[0.14em] text-[var(--ink2)]">
               Best fit no. {rank}
               {' · '}
               <span style={{ color: 'var(--sec-ink)' }}>

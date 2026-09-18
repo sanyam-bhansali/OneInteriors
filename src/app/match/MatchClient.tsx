@@ -55,7 +55,12 @@ export function MatchClient({
   allowUnverified: boolean;
 }) {
   const [brief, setBrief] = useState<Brief | null>(null);
-  const [project, setProject] = useState<Project>({ plan: null, quotes: {}, comparing: [] });
+  const [project, setProject] = useState<Project>({
+    plan: null,
+    quotes: {},
+    comparing: [],
+    reads: {},
+  });
   const [quoting, setQuoting] = useState<QuoteRequest | null>(null);
 
   useEffect(() => {
@@ -227,6 +232,10 @@ export function MatchClient({
                   rank={i + 1}
                   quotedTotalPaise={stored?.quote.totalPaise ?? null}
                   inCompare={comparing.includes(studio.slug)}
+                  cachedRead={project.reads?.[studio.id]}
+                  onRead={(id, read) =>
+                    update({ ...project, reads: { ...project.reads, [id]: read } })
+                  }
                   onQuote={() => setQuoting(requestFor(studio))}
                   onToggleCompare={() =>
                     update({

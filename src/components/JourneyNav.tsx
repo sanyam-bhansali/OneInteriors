@@ -15,9 +15,16 @@ import { Container } from '@/components/ui';
  * A step the customer has not reached yet is shown but not linked, so the
  * shape of what is coming is visible without offering a dead end.
  */
+/**
+ * There is no Quotes step any more.
+ *
+ * It used to sit between Matches and Compare and point at `/quotes`, which is
+ * now a redirect back to `/match` — a nav item that bounces you to the item
+ * before it. Pricing happens inside a studio, on `/match` and on the studio's
+ * own page, so Matches is the step that covers it.
+ */
 const STEPS = [
-  { href: '/match', label: 'Matches' },
-  { href: '/quotes', label: 'Quotes' },
+  { href: '/match', label: 'Matches & quotes' },
   { href: '/compare', label: 'Compare' },
   { href: '/expert', label: 'Talk to us' },
 ] as const;

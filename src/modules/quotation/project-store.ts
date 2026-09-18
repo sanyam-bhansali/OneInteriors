@@ -46,15 +46,58 @@ export interface StoredQuote {
   quote: FirstQuote;
 }
 
+/**
+ * A written read, kept so it is not paid for twice.
+ *
+ * Six matches means six model calls, and without this every return to
+ * `/match` — back button, a reload, coming out of a quote — spends them all
+ * again. `briefKey` is what the read was written against: change the brief
+ * and the cached sentence is about a flat you no longer have, so it is
+ * discarded rather than shown.
+ */
+export interface StoredRead {
+  text: string;
+  source: 'model' | 'rules';
+  briefKey: string;
+}
+
 export interface Project {
   plan: FloorPlan | null;
   /** Keyed by studio slug. One quote per studio — regenerating replaces it. */
   quotes: Record<string, StoredQuote>;
   /** Slugs the customer has put side by side. */
   comparing: string[];
+  /** Keyed by studio id. See StoredRead. */
+  reads: Record<string, StoredRead>;
 }
 
-export const EMPTY_PROJECT: Project = { plan: null, quotes: {}, comparing: [] };
+export const EMPTY_PROJECT: Project = { plan: null, quotes: {}, comparing: [], reads: {} };
+
+/**
+ * What the read was written against.
+ *
+ * Only the fields that reach the prompt. Changing a style preference should
+ * invalidate it; renaming the uploaded floor plan should not.
+ */
+export function briefKey(brief: {
+  propertyType: string | null;
+  scope: string | null;
+  locality: string | null;
+  carpetAreaSqft: number | null;
+  budgetMaxPaise: number | null;
+  styleLikes: string[];
+  styleDislikes: string[];
+}): string {
+  return [
+    brief.propertyType,
+    brief.scope,
+    brief.locality,
+    brief.carpetAreaSqft,
+    brief.budgetMaxPaise,
+    [...brief.styleLikes].sort().join('+'),
+    [...brief.styleDislikes].sort().join('+'),
+  ].join('|');
+}
 
 export function loadProject(): Project {
   if (typeof window === 'undefined') return EMPTY_PROJECT;

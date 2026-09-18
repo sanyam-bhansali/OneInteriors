@@ -88,6 +88,7 @@ export function CompareClient() {
   }
 
   const { studios, rooms, tellingRows } = comparison;
+  const cheapestTotal = Math.min(...studios.map((s) => s.quote.totalPaise));
 
   return (
     <div className="oi-app min-h-dvh bg-[var(--bg)]">
@@ -123,8 +124,7 @@ export function CompareClient() {
         {/* ── The totals ── */}
         <div className="mb-10 grid gap-4" style={{ gridTemplateColumns: `repeat(auto-fit,minmax(15rem,1fr))` }}>
           {studios.map((s) => {
-            const cheapest = Math.min(...studios.map((x) => x.quote.totalPaise));
-            const isLowest = s.quote.totalPaise === cheapest;
+            const isLowest = s.quote.totalPaise === cheapestTotal;
             return (
               <Sheet key={s.slug} className="p-5">
                 <div className="mb-3 flex items-baseline justify-between gap-3">
