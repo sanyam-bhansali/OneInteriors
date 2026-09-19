@@ -1,26 +1,71 @@
 import { notFound } from 'next/navigation';
 import { showUnverifiedStudios } from '@/lib/env';
 import type { Metadata } from 'next';
-import { Container, TierBadge, Stat, Divider, Pill } from '@/components/ui';
 import { StartCta } from '@/components/StartCta';
 import { StudioQuotePanel } from '@/components/oi/StudioQuotePanel';
 import { StyleScene } from '@/components/art/StyleScene';
 import { PlanFragment } from '@/components/art/PlanFragment';
-import { SiteHeader, SiteFooter } from '@/components/chrome';
+import { AppHeader, AppFooter } from '@/components/oi/Chrome';
+import { Wrap, Chapter, Sheet, Quiet } from '@/components/oi';
 import { studioRepository } from '@/modules/studio/repository';
 import { record } from '@/modules/analytics/record';
 import { formatINRCompact } from '@/lib/money';
-import { StudioQuotation } from './StudioQuotation';
+import { Verified } from './Verified';
+import { Record as TrackRecord } from './Record';
 import {
-  CHECK_LABELS,
-  CHECK_MEANINGS,
   TIER_CHECKS,
   TIER_DESCRIPTIONS,
+  TIER_LABELS,
   describeDelivery,
-  type CheckResult,
-  type VerificationCheck,
 } from '@/modules/studio/types';
 import { PROPERTY_LABELS, SCOPE_LABELS, STYLE_LABELS } from '@/modules/brief/types';
+
+/**
+ * A studio's profile, in the language `/match` established.
+ *
+ * ## Why this page was rebuilt
+ *
+ * It was carrying two palettes that physically touched: the identity, record,
+ * checks and work read `--color-*` from the landing-page system, and a single
+ * bolted-on quote section read `--bg` / `--card` / `--acc` from `.oi-app`.
+ * A reader arriving from their matches crossed a visible language boundary
+ * mid-page, on the one screen where they are deciding whether to believe us.
+ *
+ * It is now one palette — `.oi-app .oi-quick`, the same as `/match` — and the
+ * sections are the same surfaces: glass, mono evidence, ticks that count in.
+ * See docs/DESIGN-LANGUAGE.md.
+ *
+ * ## The order is the argument
+ *
+ * Who they are → what they would charge you → what they have actually
+ * delivered → what we checked → what they have built. Price sits second
+ * because it is what somebody arriving from their matches came for, and
+ * everything after it exists to say whether the number is worth anything.
+ *
+ * The checks are the largest section on the page on purpose. `/match` shows
+ * six ticks beside a card and promises "+7 more on their profile"; this is
+ * where that is kept, and the verification file is the only asset here a
+ * competitor cannot buy from a KYC vendor.
+ *
+ * ## One quote, not two
+ *
+ * This page used to render `StudioQuotePanel` AND `StudioQuotation` — two
+ * components, two pricing engines, two totals that could disagree, under two
+ * headings, in two design languages. It also made the sign-in gate
+ * decorative, since the gated one sat directly below a panel that had already
+ * shown a full quote to nobody in particular.
+ *
+ * `StudioQuotePanel` survives: it is the documented direction (generate here,
+ * read here, send to `/compare` deliberately) and it feeds the comparison
+ * screen. `StudioQuotation` is deleted.
+ *
+ * ## What is deliberately still wrong
+ *
+ * This was a styling pass. `docs/FINDINGS.md` lists what it did not fix —
+ * most importantly that quotes are priced on archive rates wearing each
+ * studio's name (P1.1), and that a PAUSED studio still 404s rather than
+ * saying it is full this month (P2.1).
+ */
 
 /**
  * Explicit, because the default is easy to lose to a later refactor and this
@@ -73,7 +118,9 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
 
      `notFound()` rather than a message: the same answer for "no such studio"
      and "not live", because distinguishing them tells a stranger that a named
-     business applied to us and did not make it. */
+     business applied to us and did not make it.
+
+     PAUSED is wrongly caught by this and should not be — see FINDINGS P2.1. */
   if (studio.status !== 'ACTIVE' && !showUnverifiedStudios()) notFound();
 
   /**
@@ -82,289 +129,268 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
    *
    * `studioSlug` rather than an id, because the prop guard allows slugs and
    * refuses anything that reads like a person — and a slug is what the studio
-   * dashboard queries on. The event name has existed in the vocabulary since
-   * the beginning and was never fired.
+   * dashboard queries on.
    */
   await record('studio.view', { studioSlug: slug });
 
-  const formatDate = (iso: string | null) =>
-    iso
-      ? new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+  const totalChecks = TIER_CHECKS.LISTED.length + TIER_CHECKS.VERIFIED.length;
+  const passed = studio.checks.filter((c) => c.result === 'PASS').length;
+
+  /* Where they work. The roster card has said this from the beginning and the
+     profile never did — so the one page devoted to a studio was the one place
+     that did not say whether they come to your part of the city. */
+  const where = [...studio.localities.slice(0, 4)];
+  const band =
+    studio.minProjectPaise && studio.maxProjectPaise
+      ? `${formatINRCompact(studio.minProjectPaise)}–${formatINRCompact(studio.maxProjectPaise)}`
       : null;
 
   return (
-    <>
-      <SiteHeader />
+    <div className="oi-app oi-quick min-h-dvh bg-[var(--bg)]">
+      <AppHeader />
 
       <main>
-        {/* Identity */}
-        <PlanFragment
-          seed={studio.id}
-          styles={studio.portfolio.flatMap((p) => p.styleTags)}
-          className="block h-24 w-full sm:h-32"
-        />
-        <section className="border-y border-[var(--color-rule)] py-10">
-          <Container>
-            <div className="flex flex-wrap items-start justify-between gap-5">
-              <div className="min-w-0 flex-1">
-                <h1 className="h1 mb-2">
-                  {studio.tradeName}
-                </h1>
-                <p className="m-0 mb-4 max-w-[58ch] text-[16px] leading-relaxed text-[var(--color-ink-2)]">
-                  {studio.about}
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <TierBadge tier={studio.tier} />
-                  {studio.yearsActive ? <Pill>{studio.yearsActive} years active</Pill> : null}
-                  {studio.teamSize ? <Pill>Team of {studio.teamSize}</Pill> : null}
-                </div>
+        {/* ── Identity ──
+            The drawing is a band ABOVE the card, not behind it, and that is a
+            contrast decision rather than a compositional one.
+
+            It was behind the glass first, which looked better and was
+            unshippable: the palettes these drawings are generated from run
+            down to #22201E, so at 0.72 alpha the ground under the card's own
+            secondary text computed 3.87:1 — a fail, on a ground that changes
+            with whichever studio you are looking at. That is precisely what
+            the alpha floor in globals.css exists to prevent, and stacking art
+            under the text re-introduced it by the back door.
+
+            Above the card, every figure on this page is the measured
+            0.72-over-Raw-Silk composite that docs/DESIGN-LANGUAGE.md §4 is
+            computed against: ink2 5.56:1, acc-ink 5.76:1, sec-ink 5.19:1. */}
+        <section>
+          <PlanFragment
+            seed={studio.id}
+            styles={studio.portfolio.flatMap((p) => p.styleTags)}
+            className="block h-28 w-full sm:h-36"
+          />
+
+          <Wrap className="relative -mt-8 pb-12">
+            <div className="oi-glass p-[clamp(22px,3vw,34px)]">
+              <p className="oi-eyebrow m-0 mb-4">
+                {TIER_LABELS[studio.tier]} · {passed} of {totalChecks} checks passed
+              </p>
+
+              <h1 className="oi-display q-h1 m-0 text-[var(--ink)]">{studio.tradeName}</h1>
+
+              <p className="q-body m-0 mt-4 max-w-[58ch] text-[var(--ink2)]">{studio.about}</p>
+
+              {/* The facts that decide whether to read on, in mono because
+                  every one of them is a measured value. */}
+              <div className="mt-7 grid grid-cols-2 gap-x-6 gap-y-5 border-t border-[var(--line)] pt-6 sm:grid-cols-4">
+                <Fact
+                  label="Works in"
+                  value={where.length > 0 ? where.join(' · ') : studio.city}
+                />
+                <Fact label="Years active" value={studio.yearsActive ? `${studio.yearsActive}` : null} />
+                <Fact label="Team" value={studio.teamSize ? `${studio.teamSize} people` : null} />
+                <Fact label="Projects they take" value={band} />
               </div>
+
               {/* Resume-aware. Someone reaching this profile from their own
                   matches is mid-funnel; a hard link to /quiz would restart
                   them. There is deliberately no way to contact the studio from
                   here — every introduction runs through the expert. */}
-              <StartCta size="md" />
+              <div className="mt-7">
+                <StartCta size="md" />
+              </div>
             </div>
-          </Container>
+          </Wrap>
         </section>
 
         {/* ── The quote ──
-            High on the page, directly under who they are and above the track
-            record, because it is what somebody arriving from their matches
-            came for. It replaces the old /quotes screen entirely: a quote is
-            this studio's pricing and belongs under this studio's evidence,
-            not in a list of everybody's totals with the materials stripped
-            out. See StudioQuotePanel. */}
-        <section className="oi-app border-b border-[var(--line)] bg-[var(--bg)] py-10">
-          <Container>
+            Second, because it is what somebody arriving from their matches
+            came for. Everything below it exists to say whether the number is
+            worth anything. */}
+        <section className="border-y border-[var(--line)] py-12">
+          <Wrap>
             <StudioQuotePanel studioSlug={studio.slug} studioName={studio.tradeName} />
-          </Container>
+          </Wrap>
         </section>
 
-        {/* Track record — the numbers first, including the bad ones. */}
-        <section className="border-b border-[var(--color-rule)] bg-[var(--color-paper-2)] py-8">
-          <Container>
-            <p className="m-0 mb-5 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-ink-3)]">
-              Track record
-            </p>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-4">
-              <Stat
-                label="Completed with us"
-                value={studio.completedProjects > 0 ? String(studio.completedProjects) : null}
-                empty="None yet"
+        {/* ── Track record ── */}
+        <section className="py-14">
+          <Wrap>
+            <Chapter
+              eyebrow="Track record"
+              title="What they have actually delivered."
+              aside={
+                <span className="oi-num text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink2)]">
+                  Computed from milestone approvals
+                </span>
+              }
+            />
+
+            <Sheet className="p-[clamp(20px,2.6vw,30px)]">
+              <TrackRecord
+                completedProjects={studio.completedProjects}
+                avgVarianceDays={studio.avgVarianceDays}
+                upheldDisputes={studio.upheldDisputes}
+                specComplianceRate={studio.specComplianceRate}
               />
-              <Stat
-                label="Average variance to committed date"
-                value={
-                  studio.avgVarianceDays === null
-                    ? null
-                    : `${studio.avgVarianceDays > 0 ? '+' : ''}${Math.round(studio.avgVarianceDays)} days`
-                }
-                tone={
-                  studio.avgVarianceDays === null
-                    ? 'default'
-                    : studio.avgVarianceDays <= 10
-                      ? 'ontrack'
-                      : 'atrisk'
-                }
-              />
-              <Stat
-                label="Disputes upheld"
-                value={studio.completedProjects > 0 ? String(studio.upheldDisputes) : null}
-                tone={studio.upheldDisputes > 0 ? 'atrisk' : 'ontrack'}
-              />
-              <Stat
-                label="Materials matched the quote"
-                value={
-                  studio.specComplianceRate === null
-                    ? null
-                    : `${Math.round(studio.specComplianceRate * 100)}%`
-                }
-              />
-            </div>
-            <p className="m-0 mt-5 max-w-[64ch] border-t border-[var(--color-rule)] pt-4 text-[14px] leading-relaxed text-[var(--color-ink-2)]">
-              {describeDelivery(studio)}{' '}
-              {studio.completedProjects === 0
-                ? 'These figures only exist once a studio has completed a project on a milestone plan we monitored — so a new studio shows nothing here rather than an estimate.'
-                : 'Every figure here is computed from milestone approvals, not self-reported.'}
-            </p>
-          </Container>
+
+              <p className="q-small m-0 mt-8 max-w-[64ch] border-t border-[var(--line)] pt-5 text-[var(--ink2)]">
+                {describeDelivery(studio)}{' '}
+                {studio.completedProjects === 0
+                  ? 'These figures only exist once a studio has completed a project on a milestone plan we monitored — so a new studio shows nothing here rather than an estimate.'
+                  : 'Every figure here is computed from milestone approvals, not self-reported.'}
+              </p>
+            </Sheet>
+          </Wrap>
         </section>
 
-        {/* This studio's own number for this customer's own home.
-            Placed here rather than only on /quotes because a quote belongs
-            beside the studio it came from: the whole argument is that the same
-            brief costs different amounts at different studios, and that only
-            lands when the number sits next to their work and their checks. */}
-        <StudioQuotation studio={studio} />
-
-        {/* What we verified — a checklist with sources and dates, never a badge */}
-        <section className="border-b border-[var(--color-rule)] py-10">
-          <Container>
-            <p className="m-0 mb-2 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-ink-3)]">
-              What we verified
-            </p>
-            <h2 className="h2 mb-2">
-              {TIER_CHECKS.LISTED.length + TIER_CHECKS.VERIFIED.length} checks, each with a source and a date.
-            </h2>
-            <p className="m-0 mb-7 max-w-[62ch] text-[15px] leading-relaxed text-[var(--color-ink-2)]">
+        {/* ── What we verified — the payoff ──
+            The largest section on the page. /match promises "+N more on their
+            profile"; this is where it is kept. */}
+        <section className="border-y border-[var(--line)] py-14">
+          <Wrap>
+            <Chapter
+              eyebrow="What we verified"
+              title={`${totalChecks} checks, each with a source and a date.`}
+              aside={
+                <span className="oi-num text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink2)]">
+                  {passed} passed · {totalChecks - passed} outstanding
+                </span>
+              }
+            >
               {TIER_DESCRIPTIONS[studio.tier]} Interior design is an unregulated profession in India
               — there is no licence to check — so we verify the business and its trading history,
               and we are explicit about what that does and does not prove.
-            </p>
+            </Chapter>
 
-            <div className="grid grid-cols-1 gap-x-10 gap-y-0 sm:grid-cols-2">
-              <CheckGroup
-                title="Identity"
-                checks={studio.checks.filter((c) => TIER_CHECKS.LISTED.includes(c.type))}
-                formatDate={formatDate}
-              />
-              <CheckGroup
-                title="Trading history"
-                checks={studio.checks.filter((c) => TIER_CHECKS.VERIFIED.includes(c.type))}
-                formatDate={formatDate}
-              />
-            </div>
+            <Verified checks={studio.checks} tier={TIER_LABELS[studio.tier]} />
 
             {studio.gstin ? (
-              <p className="mt-7 border-t border-[var(--color-rule-soft)] pt-4 font-[family-name:var(--font-mono)] text-[12px] text-[var(--color-ink-3)]">
-                GSTIN {studio.gstin} · verifiable free on the GST portal
+              <p className="oi-label m-0 mt-10 border-t border-[var(--line)] pt-5">
+                GSTIN {studio.gstin} · verifiable free on the GST portal, by you, today
               </p>
             ) : null}
-          </Container>
+          </Wrap>
         </section>
 
-        {/* Portfolio, tagged so it is comparable rather than just pretty */}
-        <section className="py-10">
-          <Container>
-            <p className="m-0 mb-2 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-ink-3)]">
-              Work
-            </p>
-            <h2 className="h2 mb-7">
-              {studio.portfolio.length} projects, with budgets and timelines attached.
-            </h2>
+        {/* ── Their work ── */}
+        <section className="py-14">
+          <Wrap>
+            <Chapter
+              eyebrow="Their work"
+              title={
+                studio.portfolio.length > 0
+                  ? `${studio.portfolio.length} projects, with budgets and timelines attached.`
+                  : 'No projects published yet.'
+              }
+            />
 
-            <ul className="m-0 grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 lg:grid-cols-3">
-              {studio.portfolio.map((p) => (
-                <li key={p.id} className="lift border border-[var(--color-rule)] bg-[var(--color-paper-2)]">
-                  <div className="relative">
-                    <StyleScene
-                      tag={p.styleTags[0] ?? 'contemporary-minimal'}
-                      className="block aspect-[4/3] w-full"
-                    />
-                    <span className="absolute left-2 top-2 rounded-[2px] bg-[var(--color-paper)]/85 px-1.5 py-0.5 font-[family-name:var(--font-mono)] text-[9px] uppercase tracking-[0.09em] text-[var(--color-ink-3)]">
-                      Illustration · photo pending
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-2.5 border-t border-[var(--color-rule)] p-4">
-                    <h3 className="m-0 text-[15px] font-bold leading-snug">{p.title}</h3>
-                    <div className="flex flex-wrap gap-1.5">
-                      {p.propertyType ? <Pill>{PROPERTY_LABELS[p.propertyType]}</Pill> : null}
-                      {p.scope ? <Pill>{SCOPE_LABELS[p.scope]}</Pill> : null}
-                    </div>
-                    <dl className="m-0 flex flex-wrap gap-x-5 gap-y-1">
-                      {p.valuePaise ? (
-                        <div>
-                          <dt className="font-[family-name:var(--font-mono)] text-[9px] uppercase tracking-[0.1em] text-[var(--color-ink-3)]">
-                            Value
-                          </dt>
-                          <dd className="tabular m-0 text-[14px]">{formatINRCompact(p.valuePaise)}</dd>
-                        </div>
-                      ) : null}
-                      {p.durationDays ? (
-                        <div>
-                          <dt className="font-[family-name:var(--font-mono)] text-[9px] uppercase tracking-[0.1em] text-[var(--color-ink-3)]">
-                            Duration
-                          </dt>
-                          <dd className="tabular m-0 text-[14px]">{p.durationDays} days</dd>
-                        </div>
-                      ) : null}
-                    </dl>
-                    <p className="m-0 text-[12px] leading-snug text-[var(--color-ink-3)]">
-                      {p.styleTags.map((t) => STYLE_LABELS[t]).join(' · ')}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </Container>
+            {studio.portfolio.length === 0 ? (
+              /* An empty list under a "0 projects" heading is how a page looks
+                 broken. This says which of the two it is. */
+              <Sheet className="p-8">
+                <p className="q-body m-0 max-w-[54ch] text-[var(--ink2)]">
+                  This studio has not published any completed projects to us yet. That is normal for
+                  a studio newly on the roster, and it is why the record above is empty too — we do
+                  not fill either in from anything they tell us.
+                </p>
+                <div className="mt-5">
+                  <Quiet href="/studios">See the rest of the roster</Quiet>
+                </div>
+              </Sheet>
+            ) : (
+              <ul className="m-0 grid list-none grid-cols-1 gap-5 p-0 sm:grid-cols-2 lg:grid-cols-3">
+                {studio.portfolio.map((p) => {
+                  /* Honest about the picture. The old page stamped "photo
+                     pending" on every card regardless of `images` and
+                     `isRender` — a present value rendering as missing, which
+                     is the product's own rule inverted. */
+                  const hasPhoto = p.images.length > 0;
+                  const stamp = hasPhoto
+                    ? p.isRender
+                      ? 'Render by the studio'
+                      : 'Their photograph'
+                    : 'Drawing · photo to come';
+
+                  return (
+                    <li key={p.id} className="oi-glass overflow-hidden">
+                      <div className="relative">
+                        <StyleScene
+                          tag={p.styleTags[0] ?? 'contemporary-minimal'}
+                          className="block aspect-[4/3] w-full"
+                        />
+                        <span className="oi-stamp">{stamp}</span>
+                      </div>
+
+                      <div className="flex flex-col gap-3 border-t border-[var(--line)] p-5">
+                        <h3 className="oi-display m-0 text-[16px] leading-snug text-[var(--ink)]">
+                          {p.title}
+                        </h3>
+
+                        <p className="oi-label m-0">
+                          {[
+                            p.locality,
+                            p.propertyType ? PROPERTY_LABELS[p.propertyType] : null,
+                            p.scope ? SCOPE_LABELS[p.scope] : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </p>
+
+                        <dl className="m-0 flex flex-wrap gap-x-7 gap-y-2 border-t border-[var(--line)] pt-3">
+                          <Spec
+                            label="Value"
+                            value={p.valuePaise ? formatINRCompact(p.valuePaise) : null}
+                          />
+                          <Spec
+                            label="Took"
+                            value={p.durationDays ? `${p.durationDays} days` : null}
+                          />
+                        </dl>
+
+                        {p.styleTags.length > 0 ? (
+                          <p className="q-small m-0 text-[var(--ink2)]">
+                            {p.styleTags.map((t) => STYLE_LABELS[t]).join(' · ')}
+                          </p>
+                        ) : null}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Wrap>
         </section>
       </main>
 
-      <SiteFooter />
-    </>
-  );
-}
-
-function CheckGroup({
-  title,
-  checks,
-  formatDate,
-}: {
-  title: string;
-  checks: VerificationCheck[];
-  formatDate: (iso: string | null) => string | null;
-}) {
-  return (
-    <div className="py-2">
-      <h3 className="m-0 mb-1 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.12em] text-[var(--color-ink-3)]">
-        {title}
-      </h3>
-      <Divider />
-      <ul className="m-0 list-none p-0">
-        {checks.map((c) => (
-          <li
-            key={c.type}
-            className="flex items-start gap-3 border-b border-[var(--color-rule-soft)] py-3"
-          >
-            <ResultGlyph result={c.result} />
-            <div className="min-w-0 flex-1">
-              <p className="m-0 text-[14px] leading-snug text-[var(--color-ink)]">
-                {CHECK_LABELS[c.type]}
-              </p>
-              {/* What it means, in their language, and only when it passed.
-                  "We walked through finished homes they built" is a claim, and
-                  printing it beside a PENDING or FAILED check would be a
-                  straightforward lie. */}
-              {c.result === 'PASS' ? (
-                <p className="m-0 mt-0.5 max-w-[46ch] text-[13px] leading-snug text-[var(--color-ink-2)]">
-                  {CHECK_MEANINGS[c.type]}
-                </p>
-              ) : null}
-              <p className="m-0 mt-0.5 font-[family-name:var(--font-mono)] text-[11px] leading-snug text-[var(--color-ink-3)]">
-                {c.result === 'PENDING'
-                  ? (c.detail ?? 'In progress')
-                  : c.result === 'NOT_APPLICABLE'
-                    ? (c.detail ?? 'Not applicable')
-                    : [c.source, formatDate(c.checkedAt)].filter(Boolean).join(' · ')}
-              </p>
-              {c.detail && c.result === 'PASS' ? (
-                <p className="m-0 mt-0.5 text-[12px] leading-snug text-[var(--color-ink-3)]">
-                  {c.detail}
-                </p>
-              ) : null}
-            </div>
-          </li>
-        ))}
-      </ul>
+      <AppFooter />
     </div>
   );
 }
 
-/** Shape carries the state as well as colour — never colour alone. */
-function ResultGlyph({ result }: { result: CheckResult }) {
-  const map: Record<CheckResult, { glyph: string; cls: string; label: string }> = {
-    PASS: { glyph: '✓', cls: 'text-[var(--color-ontrack)]', label: 'Verified' },
-    PENDING: { glyph: '◍', cls: 'text-[var(--color-brass)]', label: 'In progress' },
-    FAIL: { glyph: '✕', cls: 'text-[var(--color-atrisk)]', label: 'Failed' },
-    EXPIRED: { glyph: '◍', cls: 'text-[var(--color-brass)]', label: 'Expired, re-checking' },
-    NOT_APPLICABLE: { glyph: '–', cls: 'text-[var(--color-ink-3)]', label: 'Not applicable' },
-  };
-  const { glyph, cls, label } = map[result];
+/** One measured value in the identity card. Unmeasured renders as unmeasured. */
+function Fact({ label, value }: { label: string; value: string | null }) {
   return (
-    <span className={`mt-0.5 shrink-0 text-[14px] leading-none ${cls}`} title={label}>
-      <span aria-hidden="true">{glyph}</span>
-      <span className="sr-only">{label}</span>
-    </span>
+    <div className="min-w-0">
+      <p
+        className="oi-num m-0 text-[14px] leading-snug"
+        style={{ color: value ? 'var(--ink)' : 'var(--ink2)' }}
+      >
+        {value ?? '—'}
+      </p>
+      <p className="oi-label m-0 mt-1.5">{value ? label : `${label} — not stated`}</p>
+    </div>
+  );
+}
+
+function Spec({ label, value }: { label: string; value: string | null }) {
+  if (!value) return null;
+  return (
+    <div>
+      <dt className="oi-label m-0">{label}</dt>
+      <dd className="oi-num m-0 mt-1 text-[14px] text-[var(--ink)]">{value}</dd>
+    </div>
   );
 }

@@ -1169,6 +1169,67 @@ p {
   }
 }
 
+/* ── A verification check, counting in ──
+
+   The studio profile's payoff. Same idea as the pills beside a match card and
+   deliberately a different shape: these are rows in a file somebody is
+   reading, not chips in a margin, so they hold a sentence and a source.
+
+   `data-on` latches — see Verified.tsx. A column of evidence that retracted
+   while you were reading it would be infuriating rather than alive, which is
+   the one place this screen departs from the match card.
+
+   The delay is capped for the same reason the card stagger is: fifteen checks
+   at 55ms each is 825ms, and the last one would arrive after the reader had
+   given up on it. */
+.oi-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 0.4s ease,
+    transform 0.5s cubic-bezier(0.2, 0.85, 0.25, 1);
+  transition-delay: calc(min(var(--i, 0), 9) * 0.055s);
+}
+
+.oi-check[data-on='yes'] {
+  opacity: 1;
+  transform: none;
+}
+
+/* The label on a portfolio picture, saying what the picture is.
+
+   It is never hidden. A drawing standing in for a photograph has to say so —
+   see docs/DESIGN-LANGUAGE.md §1.2 — and a photograph the studio actually
+   supplied deserves to be named as theirs rather than carrying the
+   "photo pending" stamp the old page put on every card regardless.
+
+   The plate is 0.92 and not the 0.82 used elsewhere, because this one sits on
+   artwork rather than on the page. The style palettes these drawings are
+   generated from run down to #22201E, and at 0.82 the label computed 4.06:1
+   against its own worst-case ground — a fail that only appears for some
+   studios, which is the hardest kind to catch. At 0.92 it is 5.01:1 for every
+   palette in the set. */
+.oi-stamp {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink2);
+  background: rgba(252, 252, 250, 0.92);
+  border: 1px solid rgba(219, 213, 203, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
 /* ── The far drawer — a second layer, beyond the first ──
 
    On /match this is the verification ticks, sitting outside the project

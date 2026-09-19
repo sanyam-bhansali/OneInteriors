@@ -102,6 +102,46 @@ describe('contrast, measured against the composite', () => {
     expect(contrast(INK2, faded)).toBeGreaterThanOrEqual(3);
   });
 
+  it('text never sits on glass over artwork', () => {
+    /**
+     * The studio profile's identity card was over a generated PlanFragment
+     * drawing. It looked better and was unshippable: the style palettes run
+     * down to #22201E, so at the card's 0.72 alpha the ground under its own
+     * secondary text computed 3.87:1 — a fail that appears for some studios
+     * and not others, which is the hardest kind to catch by looking.
+     *
+     * The rule is the alpha floor in §3.2 restated: a translucent surface is
+     * only measurable when what is behind it is known. Put art behind text and
+     * it stops being known.
+     */
+    const palette = readFileSync(join(ROOT, 'src/modules/brief/palettes.ts'), 'utf8');
+    const darkest = (palette.match(/#[0-9a-fA-F]{6}/g) ?? [])
+      .map((h) => h.toLowerCase())
+      .reduce((a, b) => (luminance(hex(a)) < luminance(hex(b)) ? a : b));
+
+    const overArt = over(CARD, 0.72, darkest);
+    expect(contrast(INK2, overArt), 'card glass over the darkest palette').toBeLessThan(4.5);
+
+    // …which is why the profile keeps the drawing above the card, not behind
+    // it. If this ever becomes a negative-margin overlap again, the figure
+    // above is what it costs.
+    const profile = readFileSync(join(ROOT, 'src/app/studios/[slug]/page.tsx'), 'utf8');
+    expect(profile).not.toContain('absolute inset-x-0 top-0 block h-44');
+  });
+
+  it('the portfolio stamp clears its worst-case ground, not its average one', () => {
+    // It sits ON the artwork, so 0.82 is not enough: 4.06:1 against the
+    // darkest palette. 0.92 gives 5.01:1 for every palette in the set.
+    expect(css).toContain('background: rgba(252, 252, 250, 0.92)');
+
+    const palette = readFileSync(join(ROOT, 'src/modules/brief/palettes.ts'), 'utf8');
+    const darkest = (palette.match(/#[0-9a-fA-F]{6}/g) ?? [])
+      .map((h) => h.toLowerCase())
+      .reduce((a, b) => (luminance(hex(a)) < luminance(hex(b)) ? a : b));
+
+    expect(contrast(INK2, over(CARD, 0.92, darkest))).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('the derived ink tokens are the ones the CSS actually declares', () => {
     for (const [token, value] of [
       ['--acc-ink', '#964c2f'],
