@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { showUnverifiedStudios } from '@/lib/env';
 import type { Metadata } from 'next';
 import { Container, TierBadge, Stat, Divider, Pill } from '@/components/ui';
 import { StartCta } from '@/components/StartCta';
@@ -61,6 +62,19 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
   const { slug } = await params;
   const studio = await studioRepository.bySlug(slug);
   if (!studio) notFound();
+
+  /* A public profile is for a studio that is actually on the roster.
+     `bySlug` has no status filter, so an ONBOARDING, SUSPENDED or REMOVED
+     studio's page was served to anyone who knew the slug — including its
+     legal name and its GSTIN, rendered further down — while every other
+     customer surface honours `activeOnly`. A slug is guessable from a trade
+     name, and a rejected applicant's registration details are not ours to
+     publish.
+
+     `notFound()` rather than a message: the same answer for "no such studio"
+     and "not live", because distinguishing them tells a stranger that a named
+     business applied to us and did not make it. */
+  if (studio.status !== 'ACTIVE' && !showUnverifiedStudios()) notFound();
 
   /**
    * The second stage of the studio's own funnel: someone saw them in results

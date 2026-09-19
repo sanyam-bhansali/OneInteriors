@@ -118,7 +118,35 @@ export function rosterIsReal(): boolean {
  *
  * Delete this before the first real customer. It is scaffolding.
  */
+
+/**
+ * A hard floor under every scaffolding flag.
+ *
+ * ## Why this exists, given the flags already had a guard
+ *
+ * All three dev flags were gated on `rosterIsReal()` alone, and the reasoning
+ * was sound: declaring the roster real closes them everywhere at once. The
+ * problem is what that leaves when the roster has NOT been declared real yet —
+ * which is the state a production deployment is in from first deploy until
+ * somebody remembers to set one variable.
+ *
+ * In that window, `DEV_OPS_NO_AUTH=1` opens every studio's GSTIN and every
+ * customer's name, phone and email to anyone who guesses `/ops`, and
+ * `DEV_SHOW_OTP_ON_SCREEN=1` lets anyone sign in as any phone number. Both on a
+ * live site. The safety rested entirely on a deployer remembering a second,
+ * unrelated variable, and `NEXT_PUBLIC_ROSTER_IS_REAL` is inlined at build
+ * time — so setting it in the Vercel dashboard without redeploying looks like
+ * throwing the switch and is not.
+ *
+ * So: production refuses all three outright, whatever any variable says. The
+ * roster check stays as the second condition, because it is the one that
+ * closes them on a staging deployment the day real studios land there.
+ *
+ * This cannot be turned off by configuration, which is the point.
+ */
+
 export function showUnverifiedStudios(): boolean {
+  if (isProduction()) return false;
   if (rosterIsReal()) return false;
   return process.env.DEV_SHOW_UNVERIFIED_STUDIOS?.trim() === '1';
 }
@@ -158,6 +186,11 @@ export function showUnverifiedStudios(): boolean {
  * Delete this before the first real customer. It is scaffolding.
  */
 export function showOtpOnScreen(): boolean {
+  /* Production first, unconditionally. With this on the OTP verifies nothing —
+     anyone types a number, reads the code off the page, and owns that account.
+     It is not a weakened check, it is no check, and it must not be one
+     forgotten variable away from being live. */
+  if (isProduction()) return false;
   if (rosterIsReal()) return false;
   return process.env.DEV_SHOW_OTP_ON_SCREEN?.trim() === '1';
 }
@@ -196,6 +229,10 @@ export function showOtpOnScreen(): boolean {
  * Delete this before the first real studio. It is scaffolding.
  */
 export function opsWithoutAuth(): boolean {
+  /* Production first, unconditionally. This opens studio GSTINs and customer
+     names, phones and emails to anyone who guesses the URL — a breach, not a
+     convenience, and it was one unset variable away from being reachable. */
+  if (isProduction()) return false;
   if (rosterIsReal()) return false;
   return process.env.DEV_OPS_NO_AUTH?.trim() === '1';
 }

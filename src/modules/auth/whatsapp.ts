@@ -63,7 +63,13 @@ export async function sendOtp(to: string, code: string): Promise<SendResult> {
       // Deliberately does NOT log the code in production. A console line
       // containing a live credential ends up in a log aggregator that far more
       // people can read than should ever see it.
-      console.error('[auth] No WhatsApp provider configured — OTP NOT sent to', to);
+      // Masked. The last four digits identify the line for debugging; the
+      // whole number in a log aggregator is personal data with a far wider
+      // readership than the row it came from.
+      console.error(
+        '[auth] No WhatsApp provider configured — OTP NOT sent to',
+        `•••••${to.slice(-4)}`,
+      );
       return { delivered: false, reason: 'no_provider' };
     }
     console.log(`\n[auth] WhatsApp OTP for ${to}: ${code}\n`);

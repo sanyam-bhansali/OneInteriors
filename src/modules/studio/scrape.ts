@@ -59,63 +59,203 @@ export function normaliseUrl(raw: string): string | null {
     if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
     if (!url.hostname.includes('.')) return null;
     if (isPrivateHost(url.hostname)) return null;
+    /* Only the ports a website lives on. Without this, the four distinct
+       error strings this function returns are an internal port scanner with
+       a button in the ops console. */
+    if (!ALLOWED_PORTS.has(url.port)) return null;
     return url.toString();
   } catch {
     return null;
   }
 }
 
-/** Block SSRF targets. A studio's website is never on a private network. */
+/**
+ * Block SSRF targets.
+ *
+ * ## What the first version missed, and why it mattered
+ *
+ * The check was `/^\d{1,3}(\.\d{1,3}){3}$/` — exactly four octets. Every one
+ * of these has a dot, fails that regex, is therefore not treated as an IP at
+ * all, and sailed straight through to the cloud metadata service:
+ *
+ *   127.1              → 127.0.0.1
+ *   10.1               → 10.0.0.1
+ *   0177.0.0.1         → octal, 127.0.0.1
+ *   0x7f.0.0.1         → hex, 127.0.0.1
+ *   169.254.169.254.   → trailing dot, still resolves
+ *
+ * That last one defeats the single most important entry on the list. So the
+ * hostname is now NORMALISED first — trailing dot stripped, every octet parsed
+ * in whatever base it was written, short forms expanded — and only then
+ * compared against the private ranges.
+ */
 function isPrivateHost(hostname: string): boolean {
-  const h = hostname.toLowerCase();
+  const h = hostname.toLowerCase().replace(/\.$/, '');
+
   if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.internal')) return true;
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) {
-    const [a, b] = h.split('.').map(Number);
-    if (a === 10 || a === 127 || a === 0) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 169 && b === 254) return true;
-  }
+  if (h === 'metadata' || h.endsWith('.metadata.google.internal')) return true;
   if (h.startsWith('[') || h.includes(':')) return true; // bare IPv6
+
+  const ip = toIPv4(h);
+  if (ip === null) return false;
+
+  const [a, b] = ip;
+  if (a === 10 || a === 127 || a === 0) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 169 && b === 254) return true; // link-local — cloud metadata
+  if (a === 100 && b >= 64 && b <= 127) return true; // carrier-grade NAT
+  if (a >= 224) return true; // multicast and reserved
   return false;
 }
 
+/**
+ * Parse any of the forms a browser will accept as an IPv4 address.
+ *
+ * `127.1`, `0177.0.0.1`, `0x7f.0.0.1`, `2130706433` — all of these reach the
+ * same host, and a regex over dotted-quads sees none of them. Returns the four
+ * octets, or null when the string is a genuine hostname.
+ */
+function toIPv4(host: string): [number, number, number, number] | null {
+  const parts = host.split('.');
+  if (parts.length === 0 || parts.length > 4) return null;
+
+  const nums: number[] = [];
+  for (const part of parts) {
+    if (part === '') return null;
+    let n: number;
+    if (/^0x[0-9a-f]+$/.test(part)) n = parseInt(part.slice(2), 16);
+    else if (/^0[0-7]+$/.test(part)) n = parseInt(part.slice(1), 8);
+    else if (/^\d+$/.test(part)) n = parseInt(part, 10);
+    else return null; // a letter anywhere means it is a hostname
+    if (!Number.isFinite(n) || n < 0) return null;
+    nums.push(n);
+  }
+
+  /* Short forms: the LAST part absorbs the remaining octets. 127.1 is
+     127.0.0.1, not 127.1.0.0. A bare integer is all four. */
+  const last = nums[nums.length - 1]!;
+  const lead = nums.slice(0, -1);
+  if (lead.some((n) => n > 255)) return null;
+  const remaining = 4 - lead.length;
+  if (last >= 256 ** remaining) return null;
+
+  const octets = [...lead];
+  for (let i = remaining - 1; i >= 0; i -= 1) {
+    octets.push((last >> (8 * i)) & 0xff);
+  }
+  return octets as [number, number, number, number];
+}
+
+/** Ports a studio's website is ever on. Anything else is a port scan. */
+const ALLOWED_PORTS = new Set(['', '80', '443']);
+
+/** A redirect chain long enough for real sites, short enough to bound. */
+const MAX_REDIRECTS = 4;
+
 export async function scrapeStudioSite(rawUrl: string): Promise<ScrapeResult> {
-  const url = normaliseUrl(rawUrl);
-  if (!url) return { ok: false, error: 'That does not look like a website address.' };
+  const first = normaliseUrl(rawUrl);
+  if (!first) return { ok: false, error: 'That does not look like a website address.' };
 
   let html: string;
-  let finalUrl = url;
+  let finalUrl = first;
+
+  /* One timer across the WHOLE walk, body included.
+     It used to be cleared the moment headers arrived, so a server that sent
+     headers fast and then dribbled the body forever held a serverless
+     invocation open past the timeout. */
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    const response = await fetch(url, {
-      signal: controller.signal,
-      redirect: 'follow',
-      headers: {
-        // Identify ourselves. A studio's web person should be able to see who
-        // read their site and why.
-        'User-Agent': 'OneInteriorsBot/1.0 (+https://oneinteriors.in/about-our-bot)',
-        Accept: 'text/html,application/xhtml+xml',
-      },
-    });
-    clearTimeout(timer);
+    let url = first;
+    let response: Response | null = null;
 
+    /**
+     * Follow redirects BY HAND, revalidating every hop.
+     *
+     * This is the bypass that made the rest of the validation decorative.
+     * `redirect: 'follow'` checked the first URL and then followed up to
+     * twenty more without looking at any of them — so an applicant supplied a
+     * perfectly ordinary public address that answered
+     * `302 Location: http://169.254.169.254/latest/meta-data/...` and the
+     * whole block list was skipped.
+     */
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+      response = await fetch(url, {
+        signal: controller.signal,
+        redirect: 'manual',
+        headers: {
+          // Identify ourselves. A studio's web person should be able to see who
+          // read their site and why.
+          'User-Agent': 'OneInteriorsBot/1.0 (+https://oneinteriors.in/about-our-bot)',
+          Accept: 'text/html,application/xhtml+xml',
+        },
+      });
+
+      if (response.status < 300 || response.status > 399) break;
+
+      const location = response.headers.get('location');
+      if (!location) break;
+
+      // Relative redirects are legal, so resolve against the current URL and
+      // put the result through exactly the same gate as the first one.
+      const next = normaliseUrl(new URL(location, url).toString());
+      if (!next) return { ok: false, error: 'Their site redirected somewhere we will not follow.' };
+      if (hop === MAX_REDIRECTS) {
+        return { ok: false, error: 'Their site redirected too many times.' };
+      }
+      url = next;
+    }
+
+    if (!response) return { ok: false, error: 'Could not reach their site.' };
     if (!response.ok) return { ok: false, error: `Their site returned ${response.status}.` };
+
+    /* The final URL has been through normaliseUrl on every hop, but the
+       response object is the authority on where we ended up — check it once
+       more rather than trusting the loop's bookkeeping. */
     finalUrl = response.url || url;
+    const landed = normaliseUrl(finalUrl);
+    if (!landed) return { ok: false, error: 'Their site redirected somewhere we will not follow.' };
+    finalUrl = landed;
 
     const type = response.headers.get('content-type') ?? '';
     if (!type.includes('html')) return { ok: false, error: 'That URL is not a web page.' };
 
-    const body = await response.text();
-    html = body.length > MAX_BYTES ? body.slice(0, MAX_BYTES) : body;
+    /* Read with a hard cap rather than buffering whatever arrives. The cap
+       was applied AFTER `await response.text()`, so a three-gigabyte response
+       was fully in memory before anyone measured it. */
+    html = await readCapped(response, MAX_BYTES);
   } catch (err) {
     const aborted = err instanceof Error && err.name === 'AbortError';
     return { ok: false, error: aborted ? 'Their site took too long to respond.' : 'Could not reach their site.' };
+  } finally {
+    clearTimeout(timer);
   }
 
   return { ok: true, site: extract(html, finalUrl) };
+}
+
+/** Read a body, stopping at `limit` bytes rather than after them. */
+async function readCapped(response: Response, limit: number): Promise<string> {
+  const reader = response.body?.getReader();
+  if (!reader) return (await response.text()).slice(0, limit);
+
+  const decoder = new TextDecoder();
+  let out = '';
+  let seen = 0;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    seen += value.byteLength;
+    out += decoder.decode(value, { stream: true });
+    if (seen >= limit) {
+      await reader.cancel().catch(() => {});
+      break;
+    }
+  }
+  return out.slice(0, limit);
 }
 
 /** Pure — exported so it can be tested against saved HTML without a network. */

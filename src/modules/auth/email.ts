@@ -15,6 +15,21 @@ import 'server-only';
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 
+/**
+ * Enough of an address to debug with, not enough to be personal data.
+ *
+ * "sanyam@oneinteriors.in" → "sa•••@oneinteriors.in". The domain is what
+ * tells you whether a delivery problem is Gmail or a corporate mail server;
+ * the local part is the bit that identifies a person.
+ */
+function maskEmail(address: string): string {
+  const at = address.lastIndexOf('@');
+  if (at < 1) return '•••';
+  const local = address.slice(0, at);
+  const domain = address.slice(at);
+  return `${local.slice(0, 2)}•••${domain}`;
+}
+
 export interface SendResult {
   delivered: boolean;
   reason?: string;
@@ -32,7 +47,9 @@ export async function sendMagicLink(to: string, link: string): Promise<SendResul
 
   if (!cfg) {
     if (process.env.NODE_ENV === 'production') {
-      console.error('[auth] No email provider configured — sign-in link NOT sent to', to);
+      // Masked. A raw address here lands in Vercel's logs, which have a much
+      // wider readership than the database the address is stored in.
+      console.error('[auth] No email provider configured — sign-in link NOT sent to', maskEmail(to));
       return { delivered: false, reason: 'no_provider' };
     }
     // Development: print it. Deliberately the whole link, so it is one click.
@@ -139,7 +156,7 @@ export async function sendStudioWelcome(
 
   if (!cfg) {
     if (process.env.NODE_ENV === 'production') {
-      console.error('[studio] No email provider configured — welcome NOT sent to', to);
+      console.error('[studio] No email provider configured — welcome NOT sent to', maskEmail(to));
       return { delivered: false, reason: 'no_provider' };
     }
     console.log(`\n[studio] Welcome for ${to}:\n  ${link}\n`);

@@ -18,6 +18,7 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { requireRole, getCurrentUser, hasRole } from '@/modules/auth/session';
+import { readAnonKey } from '@/modules/brief/repository';
 import { normalisePhone } from '@/modules/studio/phone';
 import { isValidEmail, normaliseEmail } from '@/modules/auth/magic-link';
 import { record } from '@/modules/analytics/record';
@@ -118,12 +119,33 @@ export async function requestConsultation(input: RequestInput): Promise<RequestR
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
-  // The brief has to be one this browser or account actually owns. A briefId
-  // from the URL is not proof of anything.
-  const brief = await prisma.brief.findUnique({
-    where: { id: input.briefId },
-    select: { id: true },
-  });
+  /* OWNERSHIP, not existence.
+     This was `findUnique({ where: { id } })` — which proves a brief exists and
+     nothing else — sitting directly under a comment promising it proved
+     ownership. Anyone who learned a brief id could attach their own name,
+     phone and email to a stranger's brief and drop it in the expert queue,
+     from an action with no authentication at all. Resolved the way
+     `signedUrlFor` does it: the signed-in user, or the anon cookie this
+     browser is actually carrying. */
+  const requester = await getCurrentUser();
+  const anonKey = await readAnonKey();
+
+  const owners = [
+    ...(requester ? [{ userId: requester.id }] : []),
+    ...(anonKey ? [{ anonKey }] : []),
+  ];
+
+  const brief =
+    owners.length === 0
+      ? null
+      : await prisma.brief.findFirst({
+          where: { id: input.briefId, OR: owners },
+          select: { id: true },
+        });
+
+  /* The same message whether it is missing or simply not theirs. Telling a
+     stranger that a brief exists but belongs to somebody else is a disclosure
+     in itself. */
   if (!brief) return { ok: false, errors: { form: 'We could not find that brief.' } };
 
   const consultation = await prisma.consultation.create({
@@ -289,12 +311,30 @@ export async function recordOutcome(
 }
 
 /** Consultations belonging to the signed-in customer, for their portal. */
+/**
+ * Consultations on a brief — the caller's own brief, and nobody else's.
+ *
+ * This took a briefId and checked only that SOMEBODY was signed in, then
+ * returned `contactName`, `contactPhone` and `contactEmail`. Its one caller
+ * happened to pass the caller's own id, so it was not exploitable — but it
+ * was one new action away from a cross-customer PII read, which is not a
+ * margin worth keeping.
+ */
 export async function myConsultations(briefId: string): Promise<ConsultationRow[]> {
   const user = await getCurrentUser();
   if (!user || !hasDatabase()) return [];
 
   const rows = await prisma.consultation.findMany({
-    where: { briefId },
+    where: {
+      briefId,
+      /* Scoped to the caller. See the header. */
+      brief: {
+        OR: [
+          ...(user ? [{ userId: user.id }] : []),
+          ...((await readAnonKey()) ? [{ anonKey: (await readAnonKey())! }] : []),
+        ],
+      },
+    },
     orderBy: { createdAt: 'desc' },
   });
 

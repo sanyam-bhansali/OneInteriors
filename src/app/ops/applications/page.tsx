@@ -16,6 +16,29 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * A link an applicant supplied, made safe to click.
+ *
+ * `a.website` is free text from the public apply form and was rendered
+ * straight into an href. React does not block `javascript:` in a string href —
+ * it warns in development and renders it in production — so an applicant could
+ * submit `javascript:…` and have it execute inside an authenticated ops
+ * session. The session cookie is httpOnly, but the script would still act AS
+ * that operator: approve applications, release customer contact details, pull
+ * the journey CSV.
+ *
+ * Anything that is not plainly http(s) renders as text rather than a link.
+ */
+function safeHref(raw: string | null): string | undefined {
+  if (!raw) return undefined;
+  try {
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export default async function ApplicationsPage() {
   const applications = await listApplications();
 
@@ -112,7 +135,7 @@ export default async function ApplicationsPage() {
                     {(a.website || a.instagram) ? (
                       <p className="m-0 mb-5 flex flex-wrap gap-4 text-[13.5px]">
                         {a.website ? (
-                          <a href={a.website} target="_blank" rel="noopener noreferrer nofollow" className="text-[var(--color-petrol)]">
+                          <a href={safeHref(a.website)} target="_blank" rel="noopener noreferrer nofollow" className="text-[var(--color-petrol)]">
                             {a.website} ↗
                           </a>
                         ) : null}

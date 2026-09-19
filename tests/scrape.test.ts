@@ -211,3 +211,52 @@ describe('extract — degrades quietly', () => {
     expect(site.localities).not.toContain('baner');
   });
 });
+
+/**
+ * The bypasses the first version of `isPrivateHost` let through.
+ *
+ * Each of these has a dot, so it failed the old four-octet regex, was
+ * therefore not treated as an IP at all, and reached the cloud metadata
+ * service from an authenticated ops session. The URL is chosen by whoever
+ * filled in the public apply form; an ops reviewer just presses the button.
+ */
+describe('SSRF — the short-form and non-canonical IP bypasses', () => {
+  const blocked = [
+    'http://127.1/',
+    'http://10.1/',
+    'http://192.168.1/',
+    'http://0177.0.0.1/',
+    'http://0x7f.0.0.1/',
+    'http://169.254.169.254./',
+    'http://169.254.169.254/latest/meta-data/',
+    'http://metadata.google.internal/',
+    'http://100.64.0.1/',
+    'http://[::1]/',
+    'http://0.0.0.0/',
+  ];
+
+  for (const url of blocked) {
+    it(`refuses ${url}`, () => {
+      expect(normaliseUrl(url)).toBeNull();
+    });
+  }
+
+  it('still allows an ordinary website', () => {
+    expect(normaliseUrl('teaklinestudio.in')).toBe('https://teaklinestudio.in/');
+    expect(normaliseUrl('https://www.chitra.co.in/work')).toBe('https://www.chitra.co.in/work');
+  });
+
+  it('refuses a port that is not a website port', () => {
+    // Four distinguishable error strings plus timing make an internal port
+    // scanner out of a button in the ops console.
+    expect(normaliseUrl('http://example.com:22/')).toBeNull();
+    expect(normaliseUrl('http://example.com:6379/')).toBeNull();
+    expect(normaliseUrl('http://example.com:5432/')).toBeNull();
+    expect(normaliseUrl('http://example.com:8080/')).toBeNull();
+  });
+
+  it('allows the two ports a website is actually on', () => {
+    expect(normaliseUrl('http://example.com:80/')).not.toBeNull();
+    expect(normaliseUrl('https://example.com:443/')).not.toBeNull();
+  });
+});

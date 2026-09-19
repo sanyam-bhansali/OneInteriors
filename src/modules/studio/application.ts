@@ -28,6 +28,7 @@ import {
 } from '@/modules/auth/session';
 import { validateGstin } from '@/modules/verification/gstin';
 import { isValidEmail, normaliseEmail, requestMagicLink } from '@/modules/auth/magic-link';
+import { revokeAllSessions } from '@/modules/auth/session';
 import { lakhsToPaise } from '@/lib/money';
 import { normalisePhone } from './phone';
 import { revalidateRoster } from './roster-cache';
@@ -294,7 +295,13 @@ export async function approveApplication(id: string, note: string): Promise<Deci
         },
       });
 
-      return { slug, email: app.email, contactName: app.contactName, tradeName: app.tradeName };
+      return {
+        slug,
+        email: app.email,
+        contactName: app.contactName,
+        tradeName: app.tradeName,
+        userId: user.id,
+      };
     });
 
     // The roster is cached for a minute; approving someone should not wait for
@@ -303,6 +310,16 @@ export async function approveApplication(id: string, note: string): Promise<Deci
 
     // Outside the transaction — a mail failure must not roll back the approval.
     // But it must be reported: the studio is now created and cannot get in.
+    /* Every existing session for this account is killed before the welcome
+       goes out.
+       This flips a live CUSTOMER account to STUDIO in place, and until now
+       nothing revoked what was already signed in. Anyone holding a session on
+       that account — a shared laptop, a session an attacker had planted,
+       a browser in an internet café — silently inherited studio access the
+       moment we approved them. `revokeAllSessions` existed and was documented
+       as "used when a role changes"; it had no callers. */
+    await revokeAllSessions(result.userId);
+
     const sent = await requestMagicLink(result.email, {
       baseUrl: resolveSiteUrl(),
       // Land them on their own dashboard rather than the homepage, and on a
