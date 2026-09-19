@@ -94,7 +94,7 @@ export function MatchClient({
      viewport is in focus. Declared here with the other hooks because the
      quote view below returns early, and a hook after a conditional return
      is the classic order-of-hooks crash. */
-  const { register, focus } = useScrollFocus<HTMLLIElement>(matches.length);
+  const { register, focus, entered } = useScrollFocus<HTMLLIElement>(matches.length);
 
   const update = (next: Project) => {
     setProject(next);
@@ -246,6 +246,7 @@ export function MatchClient({
                   key={studio.id}
                   cardRef={register(i)}
                   focus={focus[i] ?? 'near'}
+                  entered={entered[i] ?? false}
                   studio={studio}
                   match={match}
                   brief={brief}

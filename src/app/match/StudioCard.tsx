@@ -71,6 +71,7 @@ export function StudioCard({
   brief,
   rank,
   focus,
+  entered,
   quotedTotalPaise,
   inCompare,
   cachedRead,
@@ -84,6 +85,8 @@ export function StudioCard({
   brief: Brief;
   rank: number;
   focus: Focus;
+  /** Has this card been scrolled to yet? Latched — see useScrollFocus. */
+  entered: boolean;
   quotedTotalPaise: number | null;
   inCompare: boolean;
   cachedRead: StoredRead | undefined;
@@ -145,12 +148,18 @@ export function StudioCard({
     <motion.li
       ref={cardRef}
       className="q-wings list-none"
+      data-entered={entered ? 'in' : 'out'}
       initial={reduced ? false : { opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: reduced ? 0 : Math.min(rank, 5) * 0.06, ease: [0.16, 1, 0.3, 1] }}
     >
-      {/* The studio's work, parked behind the card and out on hover. */}
-      <ProjectWings projects={studio.portfolio} studioName={studio.tradeName} />
+      {/* The studio's work and the checks it passed, parked behind the card
+          and out when you reach it. */}
+      <ProjectWings
+        projects={studio.portfolio}
+        checks={studio.checks}
+        studioName={studio.tradeName}
+      />
 
       <div data-focus={focus} className="q-glass p-[clamp(20px,2.6vw,28px)]">
       {/* ── Vertical stack: mark, score, name, what they are ──

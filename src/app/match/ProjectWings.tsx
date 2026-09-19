@@ -20,6 +20,28 @@
  * Saying "photo to come" rather than shipping a grey box is the same rule the
  * rest of the product follows: an unmeasured value renders as unmeasured.
  *
+ * ## The ticks underneath
+ *
+ * Below the plates, in the same column, the checks this studio has passed
+ * arrive one at a time — a green tick and two or three words, each in its own
+ * small glass frame. Both columns run at once, so the card is flanked by work
+ * on the outside edges and proof along the bottom of both.
+ *
+ * They are the short form on purpose. The long version — what each check
+ * means, who performed it and when — is the profile's job; here there is a
+ * 12rem column and about two seconds, and fifteen rows of it would be
+ * wallpaper rather than evidence. `studioProof` decides which few appear and
+ * says how many are left.
+ *
+ * Only PASS produces a tick. A pending or expired check is not shown at all
+ * and is not counted in the "more" figure either.
+ *
+ * ## What reveals them
+ *
+ * Scrolling the card into the middle of the viewport, or hovering it, or
+ * tabbing into it. The scroll reveal latches — see `useScrollFocus` — so a
+ * card already read does not replay its animation every time it is passed.
+ *
  * ## Why they are only on wide screens
  *
  * They live in the margin beside a 40rem list. Below about 1280px that margin
@@ -37,7 +59,38 @@
  */
 
 import { formatINRCompact } from '@/lib/money';
-import type { PortfolioProject } from '@/modules/studio/types';
+import { studioProof, type ProofChip } from '@/modules/studio/proof';
+import type { PortfolioProject, VerificationCheck } from '@/modules/studio/types';
+
+/** The tick. A shape as well as a colour — the sage alone is not the signal. */
+function Tick() {
+  return (
+    <svg viewBox="0 0 16 16" className="q-tick" aria-hidden focusable="false">
+      <circle cx="8" cy="8" r="7.25" />
+      <path d="M4.6 8.3 L6.9 10.6 L11.4 5.6" />
+    </svg>
+  );
+}
+
+/**
+ * One check, one frame.
+ *
+ * `--i` is the position in this column, and the CSS turns it into a delay, so
+ * the ticks count in rather than arriving as a block. Each column indexes from
+ * zero, which is what makes the two sides run together.
+ */
+function Check({ chip, i }: { chip: ProofChip; i: number }) {
+  return (
+    <li
+      className="q-proof"
+      style={{ '--i': i } as React.CSSProperties}
+      title={chip.source ? `${chip.label} — ${chip.source}` : chip.label}
+    >
+      <Tick />
+      <span className="q-proof-text">{chip.text}</span>
+    </li>
+  );
+}
 
 function Plate({ project }: { project: PortfolioProject }) {
   return (
@@ -64,12 +117,18 @@ function Plate({ project }: { project: PortfolioProject }) {
 
 export function ProjectWings({
   projects,
+  checks,
   studioName,
 }: {
   projects: PortfolioProject[];
+  checks: VerificationCheck[];
   studioName: string;
 }) {
-  if (projects.length === 0) return null;
+  const proof = studioProof(checks);
+
+  // Nothing to fan out on either count means no wings at all, rather than two
+  // empty frames beside the card.
+  if (projects.length === 0 && proof.passed === 0) return null;
 
   const left = projects.slice(0, 2);
   const right = projects.slice(2, 4);
@@ -80,13 +139,38 @@ export function ProjectWings({
         {left.map((p) => (
           <Plate key={p.id} project={p} />
         ))}
+
+        {proof.left.length > 0 ? (
+          <ul className="q-proof-list" aria-label={`Checks ${studioName} has passed`}>
+            {proof.left.map((chip, i) => (
+              <Check key={chip.type} chip={chip} i={i} />
+            ))}
+          </ul>
+        ) : null}
       </aside>
 
-      {right.length > 0 ? (
-        <aside className="q-wing q-wing-r" aria-label={`More work by ${studioName}`}>
+      {right.length > 0 || proof.right.length > 0 ? (
+        <aside className="q-wing q-wing-r" aria-label={`More about ${studioName}`}>
           {right.map((p) => (
             <Plate key={p.id} project={p} />
           ))}
+
+          {proof.right.length > 0 ? (
+            <ul className="q-proof-list">
+              {proof.right.map((chip, i) => (
+                <Check key={chip.type} chip={chip} i={i} />
+              ))}
+
+              {/* Said rather than implied. Six ticks beside a card could read
+                  as "six checks exist"; this is the only thing on screen that
+                  stops it doing so. */}
+              {proof.more > 0 ? (
+                <li className="q-proof-more" style={{ '--i': proof.right.length } as React.CSSProperties}>
+                  +{proof.more} more on their profile
+                </li>
+              ) : null}
+            </ul>
+          ) : null}
         </aside>
       ) : null}
     </>

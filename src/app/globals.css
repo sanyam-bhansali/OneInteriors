@@ -1090,9 +1090,13 @@ p {
 }
 
 @media (min-width: 1280px) {
+  /* `bottom` as well as `top` is what gives the column the card's own height,
+     which is what lets the ticks sit at the bottom of it (margin-top: auto)
+     instead of trailing off under the next card in the list. */
   .q-wing {
     position: absolute;
     top: 26px;
+    bottom: 26px;
     width: 12rem;
     display: flex;
     flex-direction: column;
@@ -1117,6 +1121,14 @@ p {
     transform: translateX(-70%) scale(0.9);
   }
 
+  /* Three ways in, and the first is the one that matters.
+
+     `[data-entered='in']` is set once the card has been scrolled into the
+     middle of the viewport and never unset — so the work and the ticks come
+     out as you reach a studio, and stay out. Hover and focus-within remain
+     because a reader skimming with the mouse, or tabbing, should not have to
+     scroll a card into a band to see either. */
+  .q-wings[data-entered='in'] .q-wing,
   .q-wings:hover .q-wing,
   .q-wings:focus-within .q-wing {
     opacity: 1;
@@ -1131,11 +1143,118 @@ p {
   }
 }
 
+/* ── The checks, counting in under the work ──
+
+   A tick and two or three words, each in its own small frame, arriving one
+   after another down both columns at once. `--i` is the position within a
+   column and both columns index from zero, which is what makes them run
+   together rather than one side after the other.
+
+   The base delay holds them back until the plates have landed — the order
+   reads as "here is their work … and here is what we checked", which is the
+   argument the page is making. */
+.q-proof-list {
+  list-style: none;
+  margin: auto 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.q-proof {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(252, 252, 250, 0.7);
+  border: 1px solid rgba(219, 213, 203, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 10px 22px -20px rgba(44, 38, 36, 0.45);
+
+  opacity: 0;
+  transform: translateY(7px) scale(0.94);
+  transition:
+    opacity 0.34s ease,
+    transform 0.46s cubic-bezier(0.2, 0.85, 0.25, 1);
+  transition-delay: calc(0.3s + var(--i, 0) * 0.12s);
+}
+
+.q-wings[data-entered='in'] .q-proof,
+.q-wings:hover .q-proof,
+.q-wings:focus-within .q-proof {
+  opacity: 1;
+  transform: none;
+}
+
+/* The tick is a shape as well as a colour. Roughly 8% of men cannot separate
+   this sage from a warning red, so the check mark itself has to carry the
+   meaning — the disc behind it is only there to seat it.
+
+   Stroked in --sec-ink rather than --sec: the raw sage is 3.1:1 on this glass,
+   which passes 1.4.11 by a margin too thin to be worth defending. */
+.q-tick {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  fill: none;
+  stroke: var(--sec-ink);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.q-tick circle {
+  fill: rgba(131, 144, 115, 0.16);
+  stroke: none;
+}
+
+.q-proof-text {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
+  color: var(--ink);
+  min-width: 0;
+}
+
+/* Six ticks beside a card could be read as "six checks exist". This is the
+   only thing on screen that stops it being read that way, so it is not
+   decoration and it does not get hidden at small sizes. */
+.q-proof-more {
+  padding: 2px 10px 0;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink2);
+
+  opacity: 0;
+  transition: opacity 0.34s ease;
+  transition-delay: calc(0.3s + var(--i, 0) * 0.12s);
+}
+
+.q-wings[data-entered='in'] .q-proof-more,
+.q-wings:hover .q-proof-more,
+.q-wings:focus-within .q-proof-more {
+  opacity: 1;
+}
+
 /* The card has to sit above its own wings, or the panels slide out over
    the thing they belong to. */
 .q-wings > .q-glass {
   position: relative;
   z-index: 1;
+}
+
+/* Neither the work nor the ticks shrink. On a card too short to hold both,
+   the column overflows rather than squashing a photograph to fit — a squashed
+   plate reads as broken, a slight overhang reads as nothing at all. */
+.q-plate,
+.q-proof-list {
+  flex: none;
 }
 
 .q-plate {
@@ -1173,6 +1292,17 @@ p {
   }
   .q-wing > :nth-child(2) {
     transition-delay: 0s;
+  }
+
+  /* Present, not performed. `useScrollFocus` marks every card entered when the
+     OS asks for less motion, so these are visible from the start; here they
+     stop sliding and counting in. */
+  .q-proof,
+  .q-proof-more {
+    transition: none;
+    transition-delay: 0s;
+    opacity: 1;
+    transform: none;
   }
 }
 
