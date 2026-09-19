@@ -3,12 +3,17 @@
 /**
  * One studio, as a glass card.
  *
- * ## Layout
+ * ## Layout — vertical
  *
- * Top row: the match percentage on the left, the name and what they are in
- * the middle, the studio's mark on the right. Under it, the facts that decide
- * a shortlist — the quote if one exists, projects delivered, and the tags.
- * Then the written read, then everything else behind one press.
+ * One column, read top to bottom: the mark, the percentage, the name, what
+ * they are, then the facts that decide a shortlist, then the written read,
+ * then everything else behind one press.
+ *
+ * It was a wide three-across row first — score, identity, mark — which at
+ * full container width made a banner rather than a card, and put the name
+ * (the thing you are actually choosing between) in the middle of a horizontal
+ * scan instead of at the top of a vertical one. The list is width-capped so
+ * the card stays portrait at every screen size.
  *
  * ## The mark is a monogram, and that is a placeholder
  *
@@ -130,47 +135,51 @@ export function StudioCard({
   }, [studio.localities, studio.yearsActive, studio.teamSize]);
 
   return (
+    /* Two elements, and the split is load-bearing.
+       Framer Motion writes `transform` as an inline style, which beats any
+       class rule — so an entrance animation and the CSS scroll-zoom on the
+       same element means the entrance silently wins and the card never
+       zooms. The <li> owns the one-off entrance; the glass panel inside it
+       owns the scale, the lift and the depth-of-field, in CSS, for good. */
     <motion.li
       ref={cardRef}
-      data-focus={focus}
-      className="q-glass list-none p-[clamp(18px,2.6vw,26px)]"
+      className="list-none"
       initial={reduced ? false : { opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: reduced ? 0 : Math.min(rank, 5) * 0.06, ease: [0.16, 1, 0.3, 1] }}
     >
-      {/* ── Top row: score · identity · mark ── */}
-      <div className="flex items-start gap-4 sm:gap-6">
-        <div className="flex-none">
-          <p className="oi-num m-0 text-[clamp(2.1rem,1.5rem+2.2vw,3rem)] font-bold leading-none tracking-tight text-[var(--ink)]">
-            {pct}
-            <span className="text-[0.45em] align-super">%</span>
-          </p>
-          {/* The basis, never hidden. See the header. */}
-          <p className="oi-label m-0 mt-2 whitespace-nowrap">
-            {match.factorsScored} of {match.factorsTotal} factors
-          </p>
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <h3 className="oi-display q-h2 m-0 truncate text-[var(--ink)]">{studio.tradeName}</h3>
-          <p className="q-small m-0 mt-1.5 line-clamp-2 text-[var(--ink2)]">
-            {studio.about || `Interior studio in ${studio.city}.`}
-          </p>
-          {tags.length > 0 ? (
-            <p className="oi-label m-0 mt-2.5 truncate">{tags.join('  ·  ')}</p>
-          ) : null}
-        </div>
-
+      <div data-focus={focus} className="q-glass p-[clamp(20px,2.6vw,28px)]">
+      {/* ── Vertical stack: mark, score, name, what they are ──
+          Everything reads top to bottom in one column. The mark and the
+          percentage share the first line only because they are both single
+          objects rather than text — nothing after them competes for a row. */}
+      <div className="flex items-center justify-between gap-4">
         {/* Monogram, not a logo — Studio has no logo column. */}
         <div
           aria-hidden
-          className="q-mark hidden h-[58px] w-[58px] flex-none items-center justify-center sm:flex"
+          className="q-mark flex h-[56px] w-[56px] flex-none items-center justify-center"
         >
           <span className="oi-num text-[17px] font-bold tracking-wide text-[var(--ink)]">
             {monogram(studio.tradeName)}
           </span>
         </div>
+        <span className="oi-label m-0 whitespace-nowrap">
+          {match.factorsScored} of {match.factorsTotal} factors
+        </span>
       </div>
+
+      <p className="oi-num m-0 mt-5 text-[clamp(2.6rem,2rem+2.6vw,3.6rem)] font-bold leading-none tracking-tight text-[var(--ink)]">
+        {pct}
+        <span className="text-[0.42em] align-super">%</span>
+      </p>
+
+      <h3 className="oi-display q-h2 m-0 mt-3 text-[var(--ink)]">{studio.tradeName}</h3>
+
+      <p className="q-small m-0 mt-2 text-[var(--ink2)]">
+        {studio.about || `Interior studio in ${studio.city}.`}
+      </p>
+
+      {tags.length > 0 ? <p className="oi-label m-0 mt-3">{tags.join('  ·  ')}</p> : null}
 
       {/* ── The facts that decide a shortlist ── */}
       <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-4 border-t border-[var(--line)] pt-5 sm:grid-cols-3">
@@ -270,6 +279,7 @@ export function StudioCard({
           </div>
         </motion.div>
       ) : null}
+      </div>
     </motion.li>
   );
 }

@@ -898,6 +898,14 @@ p {
   font-weight: 600;
   letter-spacing: 0.14em;
 }
+
+/* The hero eyebrow. Quicksand is a soft, open face and 11px uppercase in it
+   reads as a whisper rather than a label — it needed the size back. */
+.oi-quick .q-eyebrow-lg {
+  font-size: 15px;
+  letter-spacing: 0.22em;
+  font-weight: 700;
+}
 .oi-quick .oi-num {
   font-weight: 600;
 }
@@ -934,8 +942,15 @@ p {
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.6) inset,
     0 18px 40px -28px rgba(44, 38, 36, 0.45);
+  /* Scale and lift are separate custom properties composed into one
+     transform, so the scroll-focus zoom and the hover lift can both apply
+     without one overwriting the other — which is what happens the moment
+     two rules each set `transform` directly. */
+  --q-scale: 1;
+  --q-lift: 0px;
+  transform: scale(var(--q-scale)) translateY(var(--q-lift));
   transition:
-    transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1),
     box-shadow 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
     border-color 0.32s ease,
     opacity 0.45s ease,
@@ -944,7 +959,8 @@ p {
 
 .q-glass:hover,
 .q-glass:focus-within {
-  transform: translateY(-3px);
+  --q-lift: -4px;
+  --q-scale: 1.035;
   border-color: rgba(192, 97, 60, 0.42);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.7) inset,
@@ -964,10 +980,17 @@ p {
    to full immediately, so any card somebody is actually engaging with is
    never the faded one. A card you cannot read is a bug, not an effect. */
 .q-glass[data-focus='far'] {
+  --q-scale: 0.97;
   opacity: 0.82;
   filter: blur(1.2px);
 }
-.q-glass[data-focus='near'],
+/* The card being read comes forward. 1.025 is enough to feel like it stepped
+   toward you and small enough that the type does not visibly resample. */
+.q-glass[data-focus='near'] {
+  --q-scale: 1.025;
+  opacity: 1;
+  filter: none;
+}
 .q-glass[data-focus='far']:hover,
 .q-glass[data-focus='far']:focus-within {
   opacity: 1;
@@ -1019,10 +1042,15 @@ p {
   .q-cta {
     transition: none;
   }
+  .q-glass,
   .q-glass:hover,
   .q-glass:focus-within,
+  .q-glass[data-focus='near'],
+  .q-glass[data-focus='far'],
   .q-cta:hover,
   .q-cta:active {
+    --q-scale: 1;
+    --q-lift: 0px;
     transform: none;
   }
   /* Depth-of-field is decoration. Everything stays legible and still. */

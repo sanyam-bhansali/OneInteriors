@@ -234,7 +234,7 @@ export function MatchClient({
             <Quiet href="/quiz">Change your answers</Quiet>
           </Sheet>
         ) : (
-          <ul className="m-0 mt-12 flex list-none flex-col gap-5 p-0">
+          <ul className="mx-auto m-0 mt-12 flex max-w-[40rem] list-none flex-col gap-6 p-0">
             {matches.map((match: MatchResult, i) => {
               const studio = byId.get(match.studioId);
               if (!studio || !brief) return null;
