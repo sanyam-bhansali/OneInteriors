@@ -24,9 +24,23 @@ import { prisma } from '@/lib/prisma';
 import { safeNext } from '@/lib/site';
 import { AuthChannel } from '@prisma/client';
 import { createSession, hashIp, hashToken, newToken } from './session';
-import { sendMagicLink } from './email';
+import { sendMagicLink, sendStudioWelcome } from './email';
 
 const TOKEN_TTL_MINUTES = 15;
+
+/**
+ * A link somebody did not ask for needs longer than one they did.
+ *
+ * Fifteen minutes is right for a sign-in the person triggered thirty seconds
+ * ago and is waiting on. It is wrong for an approval landing unannounced in a
+ * studio owner's inbox on a Tuesday afternoon — they read it after the site
+ * visit, the link is dead, and their first experience of us is an error page.
+ *
+ * Seven days, and the security position is unchanged: the token is still
+ * single-use, still hashed at rest, still rate-limited, and still only ever
+ * sent to an address we already approved.
+ */
+const INVITE_TTL_MINUTES = 60 * 24 * 7;
 const MAX_ATTEMPTS = 5;
 /** Per identifier, within the window below. */
 const MAX_REQUESTS = 5;
@@ -71,7 +85,18 @@ export type RequestResult =
  */
 export async function requestMagicLink(
   rawEmail: string,
-  meta: { ip?: string | null; baseUrl: string; next?: string | null },
+  meta: {
+    ip?: string | null;
+    baseUrl: string;
+    next?: string | null;
+    /**
+     * What this link is for. `invite` swaps the plain sign-in email for the
+     * welcome, and gives the token seven days instead of fifteen minutes.
+     */
+    purpose?: 'sign-in' | 'invite';
+    /** For the welcome: who it is addressed to and which studio. */
+    invite?: { contactName: string | null; studioName: string };
+  },
 ): Promise<RequestResult> {
   const email = normaliseEmail(rawEmail);
   if (!isValidEmail(email)) return { ok: false, reason: 'invalid_email' };
@@ -82,8 +107,11 @@ export async function requestMagicLink(
   });
   if (recent >= MAX_REQUESTS) return { ok: false, reason: 'rate_limited' };
 
+  const invited = meta.purpose === 'invite';
   const token = newToken();
-  const expiresAt = new Date(Date.now() + TOKEN_TTL_MINUTES * 60_000);
+  const expiresAt = new Date(
+    Date.now() + (invited ? INVITE_TTL_MINUTES : TOKEN_TTL_MINUTES) * 60_000,
+  );
 
   await prisma.loginChallenge.create({
     data: {
@@ -128,7 +156,12 @@ export async function requestMagicLink(
   const deliverable = user ? !user.deletedAt : true;
 
   if (deliverable) {
-    const sent = await sendMagicLink(email, link);
+    const sent = invited
+      ? await sendStudioWelcome(email, link, {
+          contactName: meta.invite?.contactName ?? null,
+          studioName: meta.invite?.studioName ?? 'your studio',
+        })
+      : await sendMagicLink(email, link);
     // In development with no email provider configured, hand the link back so
     // sign-in works offline. Never in production.
     if (!sent.delivered && process.env.NODE_ENV !== 'production') {

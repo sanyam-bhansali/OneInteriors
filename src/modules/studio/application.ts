@@ -294,7 +294,7 @@ export async function approveApplication(id: string, note: string): Promise<Deci
         },
       });
 
-      return { slug, email: app.email };
+      return { slug, email: app.email, contactName: app.contactName, tradeName: app.tradeName };
     });
 
     // The roster is cached for a minute; approving someone should not wait for
@@ -308,6 +308,12 @@ export async function approveApplication(id: string, note: string): Promise<Deci
       // Land them on their own dashboard rather than the homepage, and on a
       // sign-in page that leads with the email form they actually need.
       next: '/studio',
+      /* The welcome, not the plain sign-in email — and a seven-day token.
+         This link arrives unannounced, so a fifteen-minute expiry meant a
+         studio reading it after a site visit clicked a dead link as their
+         first experience of us. */
+      purpose: 'invite',
+      invite: { contactName: result.contactName, studioName: result.tradeName },
     });
 
     return {

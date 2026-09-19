@@ -122,7 +122,7 @@ export default async function ApplicationsPage() {
                       </p>
                     ) : null}
 
-                    {a.website ? <SitePanel website={a.website} /> : null}
+                    <SitePanel website={a.website ?? ''} tradeName={a.tradeName} />
 
                     <DecisionForm id={a.id} tradeName={a.tradeName} />
                   </li>

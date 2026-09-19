@@ -7,7 +7,7 @@ import {
   setReviewing,
 } from '@/modules/studio/application';
 import { requireRole } from '@/modules/auth/session';
-import { scrapeStudioSite } from '@/modules/studio/scrape';
+import { enrichStudio } from '@/modules/studio/enrich';
 
 export interface ScrapeState {
   status: 'idle' | 'done' | 'error';
@@ -22,7 +22,21 @@ export interface ScrapeState {
     startingFromPaise: number | null;
     yearsActive: number | null;
     claims: string[];
-  };
+  } | null;
+  /** Their Google listing. Published by them, unaudited, never a check. */
+  listing?: {
+    name: string;
+    address: string | null;
+    phone: string | null;
+    website: string | null;
+    rating: number | null;
+    reviewCount: number | null;
+    mapsUrl: string | null;
+  } | null;
+  /** Bare handle. Found on their own site or their listing, never scraped. */
+  instagram?: string | null;
+  /** Why a source came back empty. */
+  notes?: string[];
 }
 
 /**
@@ -42,15 +56,51 @@ export async function scrapeSiteAction(
   const url = String(formData.get('website') ?? '');
   if (!url.trim()) return { status: 'error', message: 'No website on this application.' };
 
-  const result = await scrapeStudioSite(url);
-  if (!result.ok) return { status: 'error', message: result.error };
+  /* Their site AND their Google listing, in one press.
+     Two integrations behind one button, because an ops reviewer deciding on
+     an application wants everything findable in front of them at once — and
+     because a second button labelled "also check Google" is a button that
+     gets forgotten on the applications that matter. */
+  const tradeName = String(formData.get('tradeName') ?? '');
+  const found = await enrichStudio({ tradeName, website: url });
 
-  const { title, description, emails, phones, instagram, localities, startingFromPaise, yearsActive, claims } =
-    result.site;
+  if (!found.site && !found.listing) {
+    return {
+      status: 'error',
+      message: found.notes.join(' ') || 'Nothing found on their website or on Google.',
+    };
+  }
+
+  const site = found.site;
 
   return {
     status: 'done',
-    site: { title, description, emails, phones, instagram, localities, startingFromPaise, yearsActive, claims },
+    site: site
+      ? {
+          title: site.title,
+          description: site.description,
+          emails: site.emails,
+          phones: site.phones,
+          instagram: site.instagram,
+          localities: site.localities,
+          startingFromPaise: site.startingFromPaise,
+          yearsActive: site.yearsActive,
+          claims: site.claims,
+        }
+      : null,
+    listing: found.listing
+      ? {
+          name: found.listing.name,
+          address: found.listing.address,
+          phone: found.listing.phone,
+          website: found.listing.website,
+          rating: found.listing.rating,
+          reviewCount: found.listing.reviewCount,
+          mapsUrl: found.listing.mapsUrl,
+        }
+      : null,
+    instagram: found.instagram,
+    notes: found.notes,
   };
 }
 
