@@ -23,6 +23,7 @@
 
 import Link from 'next/link';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { DUR, EASE_OUT } from '@/components/oi/motion';
 import { Wrap } from '@/components/oi';
 
 export function CompareBar({
@@ -44,7 +45,7 @@ export function CompareBar({
           initial={reduced ? false : { y: 70, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={reduced ? undefined : { y: 70, opacity: 0 }}
-          transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: DUR.bar, ease: EASE_OUT }}
           className="sticky bottom-0 z-20 border-t border-[var(--line)]"
           style={{
             background: 'rgba(252,252,250,.82)',
@@ -81,7 +82,7 @@ export function CompareBar({
               {ready ? (
                 <Link
                   href="/compare"
-                  className="q-cta inline-flex min-h-11 items-center px-6 py-3 text-[14.5px] no-underline"
+                  className="oi-cta inline-flex min-h-11 items-center px-6 py-3 text-[14.5px] no-underline"
                 >
                   Compare {selected}
                 </Link>

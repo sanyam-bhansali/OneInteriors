@@ -17,10 +17,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { animate, useReducedMotion } from 'framer-motion';
+import { DUR, EASE_OUT } from '@/components/oi/motion';
 
 export function CountUp({
   to,
-  duration = 1.2,
+  duration = DUR.count,
   className = '',
   /** What the number means, for the accessible label. */
   label,
@@ -50,7 +51,7 @@ export function CountUp({
       duration,
       // Decelerating, and nothing bouncier: this is a count, not a toy, and
       // an overshoot would briefly show a number that is not true.
-      ease: [0.16, 1, 0.3, 1],
+      ease: EASE_OUT,
       onUpdate: (v) => setShown(Math.round(v)),
     });
     return () => controls.stop();

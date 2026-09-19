@@ -39,8 +39,10 @@ import { formatINRCompact } from '@/lib/money';
 import { briefKey, type StoredRead } from '@/modules/quotation/project-store';
 import { explainAction } from './actions';
 import type { Explanation } from '@/modules/matching/explain';
+import { DUR, EASE_OUT, riseCard } from '@/components/oi/motion';
+import { Glass, revealProps } from '@/components/oi/Surfaces';
 import { ProjectWings } from './ProjectWings';
-import type { Focus } from './useScrollFocus';
+import type { Focus } from '@/components/oi/useScrollFocus';
 import type { Studio } from '@/modules/studio/types';
 import type { MatchResult } from '@/modules/matching/score';
 import type { Brief } from '@/modules/brief/types';
@@ -154,11 +156,8 @@ export function StudioCard({
        owns the scale, the lift and the depth-of-field, in CSS, for good. */
     <motion.li
       ref={cardRef}
-      className="q-wings list-none"
-      data-open={wingsOpen ? 'yes' : 'no'}
-      initial={reduced ? false : { opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: reduced ? 0 : Math.min(rank, 5) * 0.06, ease: [0.16, 1, 0.3, 1] }}
+      {...revealProps(wingsOpen, 'list-none')}
+      {...riseCard(reduced, rank)}
     >
       {/* The studio's work and the checks it passed, parked behind the card
           and out when you reach it — and back in when you leave. */}
@@ -168,7 +167,7 @@ export function StudioCard({
         studioName={studio.tradeName}
       />
 
-      <div data-focus={focus} className="q-glass p-[clamp(20px,2.6vw,28px)]">
+      <Glass focus={focus}>
       {/* ── Vertical stack: mark, score, name, what they are ──
           Everything reads top to bottom in one column. The mark and the
           percentage share the first line only because they are both single
@@ -233,7 +232,7 @@ export function StudioCard({
           <button
             type="button"
             onClick={onQuote}
-            className="q-cta min-h-11 cursor-pointer border-0 px-5 py-2.5 text-[14px]"
+            className="oi-cta min-h-11 cursor-pointer border-0 px-5 py-2.5 text-[14px]"
           >
             Get a quote
           </button>
@@ -275,7 +274,7 @@ export function StudioCard({
         <motion.div
           initial={reduced ? false : { opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
-          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: DUR.expand, ease: EASE_OUT }}
           className="overflow-hidden"
         >
           <div className="mt-5 border-t border-[var(--line)] pt-4">
@@ -299,7 +298,7 @@ export function StudioCard({
           </div>
         </motion.div>
       ) : null}
-      </div>
+      </Glass>
     </motion.li>
   );
 }

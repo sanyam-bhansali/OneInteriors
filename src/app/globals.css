@@ -446,7 +446,7 @@ p {
      verification colour everywhere else and stays so — but at 15px on Apple
      glass it is 3.1:1 and reads as grey-olive rather than as a tick, and a
      tick that does not read as green is not doing its job. 5.02:1 on that
-     glass. Used by .q-tick and nothing else. */
+     glass. Used by .oi-tick and nothing else. */
   --ok-ink: #17794a;
 
   /* The terracotta button fill. White on #C0613C is 4.19:1 and the
@@ -930,17 +930,23 @@ p {
 .q-body { font-size: 15.5px; line-height: 1.6; }
 .q-small { font-size: 13.5px; line-height: 1.5; }
 
-/* ── Glass, light ──
-   The system's existing `Glass` is dark glass over photography. These
-   cards sit on Raw Silk, so the same idea in the other direction: a warm
-   translucent sheet, one hairline, one soft shadow. Curved, because glass
-   is the one surface the locked spec allows corners on.
+/* ── CARD GLASS — the surface that holds text ──
 
-   The alpha is .72 and not lower on purpose — every text contrast on this
-   card is computed against the COMPOSITE of this fill over Raw Silk, and
-   a thinner sheet makes that composite depend on whatever scrolls behind
-   it, which is unmeasurable and therefore unshippable. */
-.q-glass {
+   Reusable; see docs/DESIGN-LANGUAGE.md §3.1. The other grade is `.oi-pill`
+   further down, and they are not interchangeable: this one carries
+   paragraphs, that one carries two or three words.
+
+   The system's existing `Glass` is dark glass over photography. These cards
+   sit on Raw Silk, so the same idea in the other direction: a warm
+   translucent sheet, one hairline, one soft shadow. Curved, because glass is
+   the one surface the locked spec allows corners on.
+
+   The alpha is .72 and MAY NOT GO LOWER. Every text contrast on this card is
+   computed against the COMPOSITE of this fill over Raw Silk, and a thinner
+   sheet makes that composite depend on whatever scrolls behind it, which is
+   unmeasurable and therefore unshippable. A more transparent surface is
+   allowed; it just cannot carry body text. */
+.oi-glass {
   position: relative;
   border-radius: 22px;
   background: rgba(252, 252, 250, 0.72);
@@ -954,9 +960,9 @@ p {
      transform, so the scroll-focus zoom and the hover lift can both apply
      without one overwriting the other — which is what happens the moment
      two rules each set `transform` directly. */
-  --q-scale: 1;
-  --q-lift: 0px;
-  transform: scale(var(--q-scale)) translateY(var(--q-lift));
+  --oi-scale: 1;
+  --oi-lift: 0px;
+  transform: scale(var(--oi-scale)) translateY(var(--oi-lift));
   transition:
     transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1),
     box-shadow 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
@@ -965,10 +971,10 @@ p {
     filter 0.45s ease;
 }
 
-.q-glass:hover,
-.q-glass:focus-within {
-  --q-lift: -4px;
-  --q-scale: 1.035;
+.oi-glass:hover,
+.oi-glass:focus-within {
+  --oi-lift: -4px;
+  --oi-scale: 1.035;
   border-color: rgba(192, 97, 60, 0.42);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.7) inset,
@@ -987,27 +993,27 @@ p {
    The real guarantee is the rule underneath: hover or focus returns a card
    to full immediately, so any card somebody is actually engaging with is
    never the faded one. A card you cannot read is a bug, not an effect. */
-.q-glass[data-focus='far'] {
-  --q-scale: 0.97;
+.oi-glass[data-focus='far'] {
+  --oi-scale: 0.97;
   opacity: 0.82;
   filter: blur(1.2px);
 }
 /* The card being read comes forward. 1.025 is enough to feel like it stepped
    toward you and small enough that the type does not visibly resample. */
-.q-glass[data-focus='near'] {
-  --q-scale: 1.025;
+.oi-glass[data-focus='near'] {
+  --oi-scale: 1.025;
   opacity: 1;
   filter: none;
 }
-.q-glass[data-focus='far']:hover,
-.q-glass[data-focus='far']:focus-within {
+.oi-glass[data-focus='far']:hover,
+.oi-glass[data-focus='far']:focus-within {
   opacity: 1;
   filter: none;
 }
 
 /* The compare CTA. One terracotta action on the screen, per the locked
    rule — this is it, so it is allowed to be the loudest thing here. */
-.q-cta {
+.oi-cta {
   border-radius: 999px;
   /* Both stops carry white text, so the LIGHTER one sets the floor: #c76a44
      measured 3.77:1 and failed AA. #b05634 clears 4.97:1 at the top, #97462a
@@ -1024,13 +1030,13 @@ p {
     box-shadow 0.24s ease,
     filter 0.24s ease;
 }
-.q-cta:hover {
+.oi-cta:hover {
   filter: brightness(1.06);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.28) inset,
     0 16px 32px -12px rgba(150, 76, 47, 0.85);
 }
-.q-cta:active {
+.oi-cta:active {
   transform: translateY(1px) scale(0.985);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.2) inset,
@@ -1046,59 +1052,75 @@ p {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .q-glass,
-  .q-cta {
+  .oi-glass,
+  .oi-cta {
     transition: none;
   }
-  .q-glass,
-  .q-glass:hover,
-  .q-glass:focus-within,
-  .q-glass[data-focus='near'],
-  .q-glass[data-focus='far'],
-  .q-cta:hover,
-  .q-cta:active {
-    --q-scale: 1;
-    --q-lift: 0px;
+  .oi-glass,
+  .oi-glass:hover,
+  .oi-glass:focus-within,
+  .oi-glass[data-focus='near'],
+  .oi-glass[data-focus='far'],
+  .oi-cta:hover,
+  .oi-cta:active {
+    --oi-scale: 1;
+    --oi-lift: 0px;
     transform: none;
   }
   /* Depth-of-field is decoration. Everything stays legible and still. */
-  .q-glass[data-focus='far'] {
+  .oi-glass[data-focus='far'] {
     opacity: 1;
     filter: none;
   }
 }
 
 /* ─────────────────────────────────────────────────────────────────────
-   PROJECT WINGS — a studio's work, out from behind the card
+   DRAWERS — content out from behind a card, either side
    ─────────────────────────────────────────────────────────────────────
 
-   Two panels parked behind the card, one either side, that slide out on
-   hover or focus. See ProjectWings.tsx.
+   Reusable. `/match` is the reference implementation (ProjectWings.tsx),
+   not the owner. See docs/DESIGN-LANGUAGE.md §2.4 and §5.2.
+
+   Put `.oi-reveal` on the element that owns the card — it is the hover
+   and focus host and carries `data-open` — then `.oi-drawer` panels
+   beside it, and `.oi-drawer-far` panels beyond those. Two layers is the
+   limit; a third has nowhere to go on any screen we support.
+
+   Three things open a drawer, and none of them latch: `data-open="yes"`
+   (the card is in the middle of the viewport), hover, and focus-within.
+   Scroll away and it shuts.
 
    ## The arithmetic, because it is the whole reason this is safe
 
-   The card list is capped at 40rem (640px) and centred inside a wrap that
-   is capped at 72rem (1152px). At a 1280px viewport that leaves
-   (1152 − 640) / 2 = 256px of margin either side. A wing is 12rem (192px)
-   plus a 16px gap = 208px, which fits inside 256px with room to spare —
-   so the panels never reach the edge of the wrap and the page body never
-   gains a horizontal scrollbar.
+   These panels live in the margin. If the sum is wrong the page gains a
+   horizontal scrollbar, so the sum is written down and any change to a
+   width or a gap has to be re-done here.
 
-   Below 1280px that margin does not exist, so the wings are display:none
-   rather than squeezed. The same work is one press away under "Their
-   work" at every width, which is why hiding them costs nothing.
+   Inner layer, gated at 1280px:
+     640 (card) + 2 × (16 gap + 192 panel)  = 1056
+
+   Outer layer, gated at 1440px:
+     640 + 2 × (16 + 192 + 12 gap + 160 panel) = 1400 exactly
+
+   1400 is why the gate is 1440 and not 1400 — the next common laptop
+   width, leaving 20px a side.
+
+   Below its gate a layer is `display: none` rather than squeezed, which
+   is only acceptable because the same content is reachable another way at
+   every width. If hiding a drawer loses information, it was never a
+   margin element.
    ───────────────────────────────────────────────────────────────────── */
 
-.q-wings {
+.oi-reveal {
   position: relative;
 }
 
-.q-wing {
+.oi-drawer {
   display: none;
 }
 
 @media (min-width: 1280px) {
-  .q-wing {
+  .oi-drawer {
     position: absolute;
     top: 26px;
     width: 12rem;
@@ -1116,11 +1138,11 @@ p {
   /* Parked BEHIND the card, then pushed outward. Starting under the card
      rather than beside it is what makes them read as emerging from it
      instead of fading in next to it. */
-  .q-wing-l {
+  .oi-drawer-l {
     right: calc(100% + 16px);
     transform: translateX(70%) scale(0.9);
   }
-  .q-wing-r {
+  .oi-drawer-r {
     left: calc(100% + 16px);
     transform: translateX(-70%) scale(0.9);
   }
@@ -1132,9 +1154,9 @@ p {
      wings out and scrolling past pulls them back in. Hover and focus-within
      open them wherever the card sits, for a reader skimming with a mouse or
      tabbing through. */
-  .q-wings[data-open='yes'] .q-wing,
-  .q-wings:hover .q-wing,
-  .q-wings:focus-within .q-wing {
+  .oi-reveal[data-open='yes'] .oi-drawer,
+  .oi-reveal:hover .oi-drawer,
+  .oi-reveal:focus-within .oi-drawer {
     opacity: 1;
     transform: translateX(0) scale(1);
     pointer-events: auto;
@@ -1142,29 +1164,22 @@ p {
 
   /* The second plate trails the first, so they fan rather than move as a
      single slab. */
-  .q-wing > :nth-child(2) {
+  .oi-drawer > :nth-child(2) {
     transition-delay: 0.06s;
   }
 }
 
-/* ── The checks, in their own column outside the work ──
+/* ── The far drawer — a second layer, beyond the first ──
 
-   Four pills a side, top-aligned with the plates and sitting beyond them, so
-   the card opens into two layers: their work immediately either side, and what
-   we checked about them outside that.
-
-   Gated at 1440px, and the figure is arithmetic rather than a round number.
-   The card is 40rem, each plate column takes 16 + 192px, each of these takes
-   12 + 160px: 640 + 2 × 380 = 1400px exactly. 1440 is the next common laptop
-   width and leaves 20px a side. Below it the plates still fan and these are
-   simply not rendered — pushed off the right edge they would put the whole
-   page into a horizontal scroll. */
-.q-proofs {
+   On /match this is the verification ticks, sitting outside the project
+   plates so the card opens into two layers. The arithmetic and the 1440px
+   gate are explained in the DRAWERS header above. */
+.oi-drawer-far {
   display: none;
 }
 
 @media (min-width: 1440px) {
-  .q-proofs {
+  .oi-drawer-far {
     position: absolute;
     top: 26px;
     width: 10rem;
@@ -1181,11 +1196,11 @@ p {
   /* Each pill is only as wide as its words — matching lengths in a column
      would read as a form, and these are statements. They align toward the
      card, so the ragged edge faces outward. */
-  .q-proofs-l {
+  .oi-drawer-far-l {
     right: calc(100% + 16px + 12rem + 12px);
     align-items: flex-end;
   }
-  .q-proofs-r {
+  .oi-drawer-far-r {
     left: calc(100% + 16px + 12rem + 12px);
     align-items: flex-start;
   }
@@ -1202,7 +1217,7 @@ p {
    as a drawer closing rather than as the animation run backwards. Closing is
    quicker than opening: a drawer that takes as long to shut as it did to open
    feels stuck. */
-.q-proof {
+.oi-pill {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1237,16 +1252,16 @@ p {
 
 /* Closed, each pill sits inward — toward the plates it came out from behind —
    so opening carries it outward rather than simply fading it up in place. */
-.q-proofs-l .q-proof {
+.oi-drawer-far-l .oi-pill {
   transform: translate(26px, 5px) scale(0.94);
 }
-.q-proofs-r .q-proof {
+.oi-drawer-far-r .oi-pill {
   transform: translate(-26px, 5px) scale(0.94);
 }
 
-.q-wings[data-open='yes'] .q-proof,
-.q-wings:hover .q-proof,
-.q-wings:focus-within .q-proof {
+.oi-reveal[data-open='yes'] .oi-pill,
+.oi-reveal:hover .oi-pill,
+.oi-reveal:focus-within .oi-pill {
   opacity: 1;
   transform: none;
   pointer-events: auto;
@@ -1264,9 +1279,9 @@ p {
    deliberate: Muted Sage is the verification colour everywhere else in the
    product, but at 15px on this glass it is 3.1:1 and reads as grey-olive
    rather than as a tick. #17794A is 5.0:1 and unmistakably a green tick, which
-   is the whole job of this mark. It is scoped to .q-tick and used nowhere
+   is the whole job of this mark. It is scoped to .oi-tick and used nowhere
    else. */
-.q-tick {
+.oi-tick {
   width: 15px;
   height: 15px;
   flex: none;
@@ -1277,12 +1292,12 @@ p {
   stroke-linejoin: round;
 }
 
-.q-tick circle {
+.oi-tick circle {
   fill: rgba(23, 121, 74, 0.14);
   stroke: none;
 }
 
-.q-proof-text {
+.oi-pill-text {
   font-family: var(--font-mono);
   font-size: 10.5px;
   letter-spacing: 0.03em;
@@ -1296,7 +1311,7 @@ p {
 /* Eight ticks beside a card could be read as "eight checks exist". This is the
    only thing on screen that stops it being read that way, so it is not
    decoration. */
-.q-proof-more {
+.oi-pill-note {
   padding: 3px 12px 0;
   font-family: var(--font-mono);
   font-size: 9.5px;
@@ -1310,16 +1325,16 @@ p {
   transition-delay: 0s;
 }
 
-.q-wings[data-open='yes'] .q-proof-more,
-.q-wings:hover .q-proof-more,
-.q-wings:focus-within .q-proof-more {
+.oi-reveal[data-open='yes'] .oi-pill-note,
+.oi-reveal:hover .oi-pill-note,
+.oi-reveal:focus-within .oi-pill-note {
   opacity: 1;
   transition-delay: calc(0.26s + var(--i, 0) * 0.09s);
 }
 
 /* The card has to sit above its own wings, or the panels slide out over
    the thing they belong to. */
-.q-wings > .q-glass {
+.oi-reveal > .oi-glass {
   position: relative;
   z-index: 1;
 }
@@ -1354,16 +1369,16 @@ p {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .q-wing {
+  .oi-drawer {
     transition: none;
   }
-  .q-wing-l,
-  .q-wing-r,
-  .q-wings:hover .q-wing,
-  .q-wings:focus-within .q-wing {
+  .oi-drawer-l,
+  .oi-drawer-r,
+  .oi-reveal:hover .oi-drawer,
+  .oi-reveal:focus-within .oi-drawer {
     transform: none;
   }
-  .q-wing > :nth-child(2) {
+  .oi-drawer > :nth-child(2) {
     transition-delay: 0s;
   }
 
@@ -1372,20 +1387,20 @@ p {
      sliding and counting in.
 
      The open-state selectors are repeated in full rather than wrapped in
-     :where(). They have to — `.q-wings[data-open='yes'] .q-proof` outweighs a
-     bare `.q-proof`, so the short form alone would lose and the delays would
+     :where(). They have to — `.oi-reveal[data-open='yes'] .oi-pill` outweighs a
+     bare `.oi-pill`, so the short form alone would lose and the delays would
      survive. Matching the specificity exactly lets source order decide, and
      this block is last. */
-  .q-proof,
-  .q-proof-more,
-  .q-proofs-l .q-proof,
-  .q-proofs-r .q-proof,
-  .q-wings[data-open='yes'] .q-proof,
-  .q-wings:hover .q-proof,
-  .q-wings:focus-within .q-proof,
-  .q-wings[data-open='yes'] .q-proof-more,
-  .q-wings:hover .q-proof-more,
-  .q-wings:focus-within .q-proof-more {
+  .oi-pill,
+  .oi-pill-note,
+  .oi-drawer-far-l .oi-pill,
+  .oi-drawer-far-r .oi-pill,
+  .oi-reveal[data-open='yes'] .oi-pill,
+  .oi-reveal:hover .oi-pill,
+  .oi-reveal:focus-within .oi-pill,
+  .oi-reveal[data-open='yes'] .oi-pill-note,
+  .oi-reveal:hover .oi-pill-note,
+  .oi-reveal:focus-within .oi-pill-note {
     transition: none;
     transition-delay: 0s;
     opacity: 1;

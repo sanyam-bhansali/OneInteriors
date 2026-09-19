@@ -71,36 +71,24 @@
  */
 
 import { formatINRCompact } from '@/lib/money';
+import { Drawer, Pill, PillNote } from '@/components/oi/Surfaces';
 import { studioProof, type ProofChip } from '@/modules/studio/proof';
 import type { PortfolioProject, VerificationCheck } from '@/modules/studio/types';
 
-/** The tick. A shape as well as a colour — the green alone is not the signal. */
-function Tick() {
-  return (
-    <svg viewBox="0 0 16 16" className="q-tick" aria-hidden focusable="false">
-      <circle cx="8" cy="8" r="7.25" />
-      <path d="M4.6 8.3 L6.9 10.6 L11.4 5.6" />
-    </svg>
-  );
-}
-
 /**
- * One check, one frame.
+ * One check, one pill.
  *
- * `--i` is the position in this column, and the CSS turns it into a delay, so
- * the ticks count in rather than arriving as a block. Each column indexes from
- * zero, which is what makes the two sides run together.
+ * The source rides along in the title rather than on the face of the pill.
+ * It is the thing that makes the claim checkable, so it must be reachable —
+ * but it is a second sentence, and the pill has room for one.
  */
 function Check({ chip, i }: { chip: ProofChip; i: number }) {
   return (
-    <li
-      className="q-proof"
-      style={{ '--i': i } as React.CSSProperties}
+    <Pill
+      i={i}
+      text={chip.text}
       title={chip.source ? `${chip.label} — ${chip.source}` : chip.label}
-    >
-      <Tick />
-      <span className="q-proof-text">{chip.text}</span>
-    </li>
+    />
   );
 }
 
@@ -149,35 +137,32 @@ export function ProjectWings({
     <>
       {/* ── Inner layer: their work ── */}
       {left.length > 0 ? (
-        <aside className="q-wing q-wing-l" aria-label={`Work by ${studioName}`}>
+        <Drawer side="left" label={`Work by ${studioName}`}>
           {left.map((p) => (
             <Plate key={p.id} project={p} />
           ))}
-        </aside>
+        </Drawer>
       ) : null}
 
       {right.length > 0 ? (
-        <aside className="q-wing q-wing-r" aria-label={`More work by ${studioName}`}>
+        <Drawer side="right" label={`More work by ${studioName}`}>
           {right.map((p) => (
             <Plate key={p.id} project={p} />
           ))}
-        </aside>
+        </Drawer>
       ) : null}
 
       {/* ── Outer layer: what we checked ── */}
       {proof.left.length > 0 ? (
-        <ul
-          className="q-proofs q-proofs-l"
-          aria-label={`Checks ${studioName} has passed`}
-        >
+        <Drawer as="ul" side="left" layer="far" label={`Checks ${studioName} has passed`}>
           {proof.left.map((chip, i) => (
             <Check key={chip.type} chip={chip} i={i} />
           ))}
-        </ul>
+        </Drawer>
       ) : null}
 
       {proof.right.length > 0 ? (
-        <ul className="q-proofs q-proofs-r">
+        <Drawer as="ul" side="right" layer="far">
           {proof.right.map((chip, i) => (
             <Check key={chip.type} chip={chip} i={i} />
           ))}
@@ -186,14 +171,9 @@ export function ProjectWings({
               "eight checks exist"; this is the only thing on screen that stops
               it doing so. */}
           {proof.more > 0 ? (
-            <li
-              className="q-proof-more"
-              style={{ '--i': proof.right.length } as React.CSSProperties}
-            >
-              +{proof.more} more on their profile
-            </li>
+            <PillNote i={proof.right.length}>+{proof.more} more on their profile</PillNote>
           ) : null}
-        </ul>
+        </Drawer>
       ) : null}
     </>
   );

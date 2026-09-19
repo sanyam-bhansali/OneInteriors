@@ -42,7 +42,7 @@ import { Wrap, Chapter, Sheet, Quiet } from '@/components/oi';
 import { StudioCard } from './StudioCard';
 import { MatchHero } from './MatchHero';
 import { CompareBar } from './CompareBar';
-import { useScrollFocus } from './useScrollFocus';
+import { useScrollFocus } from '@/components/oi/useScrollFocus';
 import { saveQuoteAction, saveDecisionAction } from './journey-actions';
 import type { Studio } from '@/modules/studio/types';
 import type { Brief } from '@/modules/brief/types';
