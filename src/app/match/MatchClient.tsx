@@ -207,7 +207,7 @@ export function MatchClient({
 
       <Wrap className="py-12">
         {briefed && matches.length > 0 ? (
-          <MatchHero fit={matches.length} roster={studios.length} checkCount={CHECK_COUNT} />
+          <MatchHero fit={matches.length} checkCount={CHECK_COUNT} />
         ) : (
           <Chapter
             eyebrow="Who fits"

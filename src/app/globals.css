@@ -1059,3 +1059,119 @@ p {
     filter: none;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+   PROJECT WINGS — a studio's work, out from behind the card
+   ─────────────────────────────────────────────────────────────────────
+
+   Two panels parked behind the card, one either side, that slide out on
+   hover or focus. See ProjectWings.tsx.
+
+   ## The arithmetic, because it is the whole reason this is safe
+
+   The card list is capped at 40rem (640px) and centred inside a wrap that
+   is capped at 72rem (1152px). At a 1280px viewport that leaves
+   (1152 − 640) / 2 = 256px of margin either side. A wing is 12rem (192px)
+   plus a 16px gap = 208px, which fits inside 256px with room to spare —
+   so the panels never reach the edge of the wrap and the page body never
+   gains a horizontal scrollbar.
+
+   Below 1280px that margin does not exist, so the wings are display:none
+   rather than squeezed. The same work is one press away under "Their
+   work" at every width, which is why hiding them costs nothing.
+   ───────────────────────────────────────────────────────────────────── */
+
+.q-wings {
+  position: relative;
+}
+
+.q-wing {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .q-wing {
+    position: absolute;
+    top: 26px;
+    width: 12rem;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    z-index: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      transform 0.5s cubic-bezier(0.2, 0.85, 0.25, 1),
+      opacity 0.4s ease;
+  }
+
+  /* Parked BEHIND the card, then pushed outward. Starting under the card
+     rather than beside it is what makes them read as emerging from it
+     instead of fading in next to it. */
+  .q-wing-l {
+    right: calc(100% + 16px);
+    transform: translateX(70%) scale(0.9);
+  }
+  .q-wing-r {
+    left: calc(100% + 16px);
+    transform: translateX(-70%) scale(0.9);
+  }
+
+  .q-wings:hover .q-wing,
+  .q-wings:focus-within .q-wing {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    pointer-events: auto;
+  }
+
+  /* The second plate trails the first, so they fan rather than move as a
+     single slab. */
+  .q-wing > :nth-child(2) {
+    transition-delay: 0.06s;
+  }
+}
+
+/* The card has to sit above its own wings, or the panels slide out over
+   the thing they belong to. */
+.q-wings > .q-glass {
+  position: relative;
+  z-index: 1;
+}
+
+.q-plate {
+  border-radius: 16px;
+  background: rgba(252, 252, 250, 0.82);
+  border: 1px solid rgba(219, 213, 203, 0.9);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 14px 30px -22px rgba(44, 38, 36, 0.4);
+  padding: 12px;
+}
+
+/* Where the photograph will go. Labelled, not disguised as one. */
+.q-plate-photo {
+  aspect-ratio: 4 / 3;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    linear-gradient(140deg, rgba(131, 144, 115, 0.16), rgba(192, 97, 60, 0.12)),
+    var(--bg);
+  border: 1px solid rgba(219, 213, 203, 0.9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .q-wing {
+    transition: none;
+  }
+  .q-wing-l,
+  .q-wing-r,
+  .q-wings:hover .q-wing,
+  .q-wings:focus-within .q-wing {
+    transform: none;
+  }
+  .q-wing > :nth-child(2) {
+    transition-delay: 0s;
+  }
+}

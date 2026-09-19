@@ -21,13 +21,10 @@ import { CountUp } from './CountUp';
 
 export function MatchHero({
   fit,
-  roster,
   checkCount,
 }: {
-  /** How many studios cleared the brief. */
+  /** How many studios cleared the brief. This is the "top N". */
   fit: number;
-  /** How many are on the roster in total. */
-  roster: number;
   checkCount: number;
 }) {
   const reduced = useReducedMotion();
@@ -45,14 +42,14 @@ export function MatchHero({
       </motion.p>
 
       <motion.p {...rise(0.06)} className="m-0 flex items-baseline justify-center gap-3">
+        <span className="oi-display q-h1 uppercase text-[var(--ink2)]" aria-hidden>
+          Top
+        </span>
         <CountUp
           to={fit}
           className="oi-num q-hero text-[var(--ink)]"
-          label={`of ${roster} studios fit your brief`}
+          label={`top ${fit} best fits for your brief`}
         />
-        <span className="oi-display q-h1 text-[var(--ink2)]" aria-hidden>
-          of {roster}
-        </span>
       </motion.p>
 
       {/* Uppercase, with the tracking opened up — caps set at display tracking
@@ -62,7 +59,7 @@ export function MatchHero({
         className="oi-display q-h1 m-0 mt-4 uppercase text-[var(--ink)]"
         style={{ letterSpacing: '0.02em' }}
       >
-        Fit your brief.
+        Best fits for your brief.
       </motion.h1>
 
       {/* Directly below the number, as the footnote to it. */}

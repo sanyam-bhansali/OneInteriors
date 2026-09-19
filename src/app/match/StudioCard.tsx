@@ -39,6 +39,7 @@ import { formatINRCompact } from '@/lib/money';
 import { briefKey, type StoredRead } from '@/modules/quotation/project-store';
 import { explainAction } from './actions';
 import type { Explanation } from '@/modules/matching/explain';
+import { ProjectWings } from './ProjectWings';
 import type { Focus } from './useScrollFocus';
 import type { Studio } from '@/modules/studio/types';
 import type { MatchResult } from '@/modules/matching/score';
@@ -143,11 +144,14 @@ export function StudioCard({
        owns the scale, the lift and the depth-of-field, in CSS, for good. */
     <motion.li
       ref={cardRef}
-      className="list-none"
+      className="q-wings list-none"
       initial={reduced ? false : { opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: reduced ? 0 : Math.min(rank, 5) * 0.06, ease: [0.16, 1, 0.3, 1] }}
     >
+      {/* The studio's work, parked behind the card and out on hover. */}
+      <ProjectWings projects={studio.portfolio} studioName={studio.tradeName} />
+
       <div data-focus={focus} className="q-glass p-[clamp(20px,2.6vw,28px)]">
       {/* ── Vertical stack: mark, score, name, what they are ──
           Everything reads top to bottom in one column. The mark and the
