@@ -26,6 +26,7 @@ import {
   assignAction,
   logContactAction,
   binAction,
+  removeDemoLeadAction,
 } from './actions';
 import { IDLE } from '../form-state';
 
@@ -374,6 +375,11 @@ function Card({
       </div>
 
       <div className="mt-2 flex flex-wrap gap-1.5">
+        {/* First in the row, because everything else on this card is a claim
+            about a person and this says there is no person. The name carries
+            "Sample" too — a badge is a rendering decision and could be lost in
+            a redesign, where the name survives into a CSV export. */}
+        {client.isDemo ? <span className="s-tag s-tag-demo">Sample</span> : null}
         <span
           className={`s-tag ${
             client.fromMarketplace ? '!bg-[var(--s-accent-wash)] !text-[var(--s-accent-deep)]' : ''
@@ -641,6 +647,56 @@ function AddClient({ label, fields }: { label: string; fields: FieldRow[] }) {
   );
 }
 
+/**
+ * The strip above the board, while the sample is on it.
+ *
+ * Three jobs, in this order: say it is not real, say what to do with it, and
+ * get out of the way. It does not explain the board — the walkthrough does
+ * that, and two panels explaining the same screen is one too many.
+ *
+ * "It is not counted in anything" is on screen rather than only in the schema
+ * because it is the studio's first question the moment they notice a lead they
+ * did not add, and the answer is the reason the sample is allowed to exist.
+ */
+function DemoStrip() {
+  const [busy, start] = useTransition();
+  const [gone, setGone] = useState(false);
+
+  // Optimistic: the row is removed the moment they press, because waiting for
+  // a round trip to watch an example disappear is a strange thing to ask.
+  if (gone) return null;
+
+  return (
+    <div className="s-card flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+      <p className="m-0 max-w-[62ch] text-[14px] leading-snug">
+        <span className="font-semibold">There is a sample lead on your board.</span>{' '}
+        <span className="text-[var(--s-ink-2)]">
+          Drag it, open it, change the date — it behaves exactly like a real one. It is not counted
+          in any of your figures.
+        </span>
+      </p>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          setGone(true);
+          start(async () => {
+            const result = await removeDemoLeadAction();
+            // Put it back if the delete failed, rather than leaving them
+            // looking at a board that will have the sample again on reload.
+            // `State` is a union carrying an idle member, so the narrowing has
+            // to test for the key before reading it — see form-state.ts.
+            if ('ok' in result && !result.ok) setGone(false);
+          });
+        }}
+        className={`${quiet} ml-auto`}
+      >
+        {busy ? 'Removing…' : 'Remove the sample'}
+      </button>
+    </div>
+  );
+}
+
 export function AddClientButton({ fields }: { fields: FieldRow[] }) {
   return <AddClient label="+ Add a client" fields={fields} />;
 }
@@ -731,6 +787,17 @@ export function Board({
 
   return (
     <div className="flex flex-col gap-6">
+      {/* What the sample is, said once, at the top.
+          The badge on the card says "this is not a person"; this says why it
+          is here and how to get rid of it. Above the board rather than beside
+          the card, because it is a statement about the screen rather than
+          about that lead — and a studio scanning for the exit should not have
+          to find a particular card first.
+
+          It disappears the moment the sample is removed, so nobody who has
+          cleared it is told about it again. */}
+      {clients.some((c) => c.isDemo) ? <DemoStrip /> : null}
+
       {/* The pool is a filter on this board, not a second screen. A studio
           that has to go somewhere else to find the clients nobody has taken
           is a studio that never goes. */}

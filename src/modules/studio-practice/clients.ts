@@ -9,7 +9,7 @@ import 'server-only';
  * nothing to do with us. We hold them as a processor.
  */
 
-import { LIVE } from './demo-lead';
+import { DEMO_LEAD, LISTED, LIVE } from './demo-lead';
 import { prisma } from '@/lib/prisma';
 import { fromDb, type Paise } from '@/lib/money';
 import { myStudioId } from '@/modules/studio-quote/store';
@@ -59,6 +59,8 @@ export interface ClientRow {
   /** Whatever the studio defined in Settings → Fields, keyed by the field key. */
   fields: FieldValues;
   updatedAt: Date;
+  /** The sample we put on an empty board. Listed, never counted — demo-lead.ts. */
+  isDemo: boolean;
 }
 
 export async function myClients(): Promise<ClientRow[]> {
@@ -66,11 +68,22 @@ export async function myClients(): Promise<ClientRow[]> {
   if (!studioId) return [];
 
   try {
+    /* An empty board gets a sample, once.
+       Same shape as `starterRowsFor` on the catalogue: create-on-first-read,
+       keyed on a zero count, so there is no migration step and no moment
+       where a studio has an account but not the thing the screen is about.
+       `seedDemoLead` is a no-op for any studio that has ever had a client,
+       including one who added a real lead and then binned it — a board that
+       re-seeds itself after somebody clears it is a board arguing with its
+       owner. */
+    await seedDemoLead(studioId);
+
     const rows = await prisma.studioClient.findMany({
+      // `LISTED`, not `LIVE`: the board shows the sample, the counts do not.
       // `deletedAt: null` on every read of this table, without exception.
       // A deleted client reappearing on the board is worse than one that
       // never deleted — see the note on the column in schema.prisma.
-      where: { studioId, deletedAt: null },
+      where: { studioId, ...LISTED },
       orderBy: [{ nextActionOn: { sort: 'asc', nulls: 'last' } }, { updatedAt: 'desc' }],
       include: {
         stage: { select: { id: true, name: true, kind: true, colour: true } },
@@ -111,6 +124,7 @@ export async function myClients(): Promise<ClientRow[]> {
         notes: row.notes,
         quoteCount: row.quotes.length,
         quotedPaise: row.quotes.length > 0 ? quoted : null,
+        isDemo: row.isDemo,
         assignedToId: row.assignedToId,
         assignedToName: row.assignedTo ? personName(row.assignedTo.user) : null,
         lastContactedAt: row.lastContactedAt,
@@ -175,6 +189,98 @@ export interface NewClientInput {
   nextActionOn?: string;
   /** Whatever the studio defined in Settings → Fields, keyed by field key. */
   custom?: Record<string, string>;
+}
+
+/**
+ * Put the sample on an empty board. Once, ever.
+ *
+ * ## Why create-on-read and not a migration
+ *
+ * Same reasoning as `starterRowsFor` on the catalogue: a studio approved
+ * before this shipped would otherwise never get one, and a migration that
+ * writes a row into every existing studio's CRM is a migration writing into
+ * somebody's live data. Creating it the first time the board is opened means
+ * there is no moment where a studio has an account but not the thing the
+ * screen is about.
+ *
+ * ## Why the guard counts ALL clients, including binned ones
+ *
+ * `LISTED` would let a studio who added a real lead, binned it, and came back
+ * find a sample waiting. `deletedAt` is deliberately not in this count: a
+ * board that re-seeds itself after somebody has cleared it is a board arguing
+ * with its owner, and the second sample would arrive with no explanation for
+ * why it had returned.
+ *
+ * Every failure is swallowed. A studio whose sample could not be created gets
+ * the empty state that existed before this feature, which is a good screen —
+ * losing the board because we could not write a demo row would be absurd.
+ */
+async function seedDemoLead(studioId: string): Promise<void> {
+  try {
+    const existing = await prisma.studioClient.count({
+      // COUNTS-EVERYTHING: the one count in the tree that must not use LIVE.
+      // It asks "has this studio ever had a client", so it deliberately sees
+      // binned rows and the sample itself. With LIVE, a studio who added a
+      // real lead and binned it would come back to a second sample arriving
+      // with no explanation for why it had returned.
+      where: { studioId },
+    });
+    if (existing > 0) return;
+
+    const stageId = await intakeStageId();
+    // No columns yet means the stage seeder has not run. It will on the next
+    // read; the sample can wait a beat rather than inventing a stage.
+    if (!stageId) return;
+
+    const followUp = new Date();
+    followUp.setDate(followUp.getDate() + DEMO_LEAD.followUpInDays);
+    followUp.setHours(12, 0, 0, 0);
+
+    await prisma.studioClient.create({
+      data: {
+        studioId,
+        stageId,
+        isDemo: true,
+        name: DEMO_LEAD.name,
+        society: DEMO_LEAD.society,
+        locality: DEMO_LEAD.locality,
+        city: DEMO_LEAD.city,
+        config: DEMO_LEAD.config,
+        carpetSqft: DEMO_LEAD.carpetSqft,
+        nextAction: DEMO_LEAD.nextAction,
+        nextActionOn: followUp,
+        notes: DEMO_LEAD.notes,
+        // OTHER, not a marketplace source. `fromMarketplace` draws a badge
+        // saying we sent them this lead, and we did not send them anybody.
+        source: 'OTHER',
+      },
+    });
+  } catch {
+    /* The board is complete without it. */
+  }
+}
+
+/**
+ * Remove the sample.
+ *
+ * A hard delete, not the soft one every other client gets. The bin exists so a
+ * studio can recover work they binned by accident; a row we invented is not
+ * work, and leaving it in the bin for thirty days would put our example in
+ * the one screen whose entire job is to hold *their* lost clients.
+ *
+ * Scoped to `isDemo: true` so this can never reach a real row, whatever it is
+ * handed.
+ */
+export async function removeDemoLead(): Promise<Result> {
+  const studioId = await myStudioId();
+  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+
+  try {
+    await prisma.studioClient.deleteMany({ where: { studioId, isDemo: true } });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Could not remove the sample. Try again.' };
+  }
 }
 
 export async function addClient(input: NewClientInput): Promise<CreateResult> {

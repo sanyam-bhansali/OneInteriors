@@ -369,6 +369,21 @@ p {
   white-space: nowrap;
 }
 
+/* The sample lead's badge.
+
+   Outlined rather than filled, and that is the whole idea: every other tag on
+   a card is a solid chip stating a fact about a real person, so the one tag
+   that means "there is no person here" should not look like the others. A
+   dashed rule reads as provisional at a glance and needs no colour to do it,
+   which also keeps it out of the accent's way — terracotta on this surface
+   means something the studio has to act on. */
+.s-tag-demo {
+  background: transparent;
+  border: 1px dashed var(--s-ink-3);
+  color: var(--s-ink-2);
+  font-style: italic;
+}
+
 /* Tabular figures wherever money or quantities line up in a column. */
 .s-num {
   font-variant-numeric: tabular-nums;

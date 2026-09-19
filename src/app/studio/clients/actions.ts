@@ -7,6 +7,7 @@ import {
   assignClients,
   logContact,
   binClients,
+  removeDemoLead,
   restoreClients,
   eraseClients,
   type ClientSourceName,
@@ -134,6 +135,22 @@ function refreshBin() {
  * says whose — that message goes straight to the person, because "cannot
  * delete" without a name is a dead end on a screen full of names.
  */
+/**
+ * Take the sample off the board.
+ *
+ * Takes no id. The module scopes the delete to `isDemo: true` within the
+ * signed-in studio, so there is no identifier a caller could supply that would
+ * reach a real client — which matters more here than the convenience, because
+ * this is the one delete in the product that does not go via the bin.
+ */
+export async function removeDemoLeadAction(): Promise<State> {
+  const result = await removeDemoLead();
+  if (!result.ok) return result;
+  revalidatePath('/studio/clients');
+  revalidatePath('/studio');
+  return { ok: true };
+}
+
 export async function binAction(ids: string[]): Promise<State> {
   if (!Array.isArray(ids) || ids.length === 0) return { ok: false, error: 'Nothing selected.' };
 

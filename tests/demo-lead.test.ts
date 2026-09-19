@@ -42,6 +42,15 @@ describe('the sample is listed, never counted', () => {
          variable would be a style change worth noticing anyway. */
       for (const m of src.matchAll(/studioClient\.count\(\s*\{([\s\S]*?)\}\s*\)/g)) {
         const arg = m[1]!;
+
+        /* One count legitimately sees everything: the guard that decides
+           whether to seed the sample at all, which asks "has this studio ever
+           had a client" and must therefore see binned rows and the sample
+           itself. It says so at the call site. Requiring the marker rather
+           than exempting the file by name means a second count added to the
+           same file is still caught. */
+        if (arg.includes('COUNTS-EVERYTHING')) continue;
+
         if (!arg.includes('LIVE')) {
           offenders.push(`${file.replace(ROOT, '')} — ${arg.trim().slice(0, 70)}…`);
         }
