@@ -1808,6 +1808,22 @@ model StudioClient {
   /// reappearing on the board is worse than one that never deleted.
   deletedAt DateTime?
 
+  /// The sample lead, put on an empty board so the screen can be learned by
+  /// using it rather than by reading about it.
+  ///
+  /// It is a real row on purpose. A painted-on example cannot be dragged
+  /// between columns, given a follow-up date or quoted from, which is the
+  /// entire lesson — the moment somebody touches a fake one it stops teaching
+  /// and starts lying.
+  ///
+  /// **Because it is real, every COUNT must exclude it.** The board lists it;
+  /// nothing tallies it. The leads walkthrough ticks its first step off
+  /// `clientCount > 0`, so a sample left in the count would congratulate a
+  /// studio for work we did on their behalf, and the morning screen would
+  /// report somebody waiting who does not exist. `demoLead.ts` holds the one
+  /// filter every count uses, so this rule lives in one place.
+  isDemo Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

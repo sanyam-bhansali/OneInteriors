@@ -9,6 +9,7 @@ import 'server-only';
  * nothing to do with us. We hold them as a processor.
  */
 
+import { LIVE } from './demo-lead';
 import { prisma } from '@/lib/prisma';
 import { fromDb, type Paise } from '@/lib/money';
 import { myStudioId } from '@/modules/studio-quote/store';
@@ -309,7 +310,10 @@ export async function clientsDueCount(): Promise<number> {
     return await prisma.studioClient.count({
       where: {
         studioId,
-        deletedAt: null,
+        // `LIVE`, not `deletedAt: null` — the sample lead ships with a
+        // follow-up date, and counting it would have the morning screen
+        // report somebody waiting on a call who does not exist.
+        ...LIVE,
         // The kind, not the name. A studio that renamed every column still
         // gets a truthful count.
         stage: { kind: { in: BOARD_KINDS } },

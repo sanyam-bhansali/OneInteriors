@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Container } from '@/components/ui';
 import { getCurrentUser, hasRole } from '@/modules/auth/session';
+import { LIVE } from '@/modules/studio-practice/demo-lead';
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { signOutAction } from '@/app/sign-in/actions';
@@ -133,7 +134,11 @@ async function shellContext(userId: string): Promise<ShellContext | null> {
       prisma.studioClient.count({
         where: {
           studioId: studio.id,
-          deletedAt: null,
+          // `LIVE`, not `deletedAt: null`. The sample lead ships with a
+          // follow-up date two days out, so without this it would put a badge
+          // on the rail the day a studio first signed in — a notification for
+          // work we invented on their behalf.
+          ...LIVE,
           // Kinds, not names. The studio owns its column names now, so a
           // literal list here would silently stop counting the day somebody
           // renamed one. See `studio-practice/stages.ts`.

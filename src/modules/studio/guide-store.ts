@@ -21,6 +21,7 @@ import 'server-only';
  * offers help rather than the one that withholds it.
  */
 
+import { LIVE } from '@/modules/studio-practice/demo-lead';
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { getCurrentUser } from '@/modules/auth/session';
@@ -76,15 +77,19 @@ export async function guideContext(): Promise<{ state: GuideState; facts: Studio
       quoteCount,
       quotesWithLines,
     ] = await Promise.all([
-      prisma.studioClient.count({ where: { studioId, deletedAt: null } }),
+      /* `LIVE` carries `isDemo: false` as well as `deletedAt: null`. The
+         sample lead on an empty board is a real row, so without it the first
+         step of this guide would tick before the studio had done anything —
+         which is the exact failure this file's header calls out. */
+      prisma.studioClient.count({ where: { studioId, ...LIVE } }),
       prisma.studioClient.count({
-        where: { studioId, deletedAt: null, nextActionOn: { not: null } },
+        where: { studioId, ...LIVE, nextActionOn: { not: null } },
       }),
       /* "Moved on" means out of the intake column — the only definition that
          survives a studio renaming its own stages, which they are encouraged
          to do on the third step of this very guide. */
       prisma.studioClient.count({
-        where: { studioId, deletedAt: null, stage: { isIntake: false } },
+        where: { studioId, ...LIVE, stage: { isIntake: false } },
       }),
       prisma.studioBranding.findUnique({
         where: { studioId },
