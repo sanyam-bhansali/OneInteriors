@@ -35,7 +35,7 @@ describe('studioProof', () => {
   });
 
   it('leads with what a homeowner weighs, not with our paperwork', () => {
-    const proof = studioProof(ALL.map((t) => check(t)));
+    const proof = studioProof(ALL.map((t) => check(t)), 4);
     const first = [proof.left[0]!.type, proof.right[0]!.type];
     expect(first).toEqual(['SITE_INSPECTION', 'CLIENT_REFERENCE']);
     // PAN and Aadhaar start our file and end this list.
@@ -45,9 +45,9 @@ describe('studioProof', () => {
   });
 
   it('deals alternately, so the two columns stay balanced', () => {
-    const proof = studioProof(ALL.map((t) => check(t)));
-    expect(proof.left).toHaveLength(3);
-    expect(proof.right).toHaveLength(3);
+    const proof = studioProof(ALL.map((t) => check(t)), 4);
+    expect(proof.left).toHaveLength(4);
+    expect(proof.right).toHaveLength(4);
     expect(Math.abs(proof.left.length - proof.right.length)).toBeLessThanOrEqual(1);
   });
 
@@ -61,10 +61,10 @@ describe('studioProof', () => {
   });
 
   it('counts the rest rather than hiding them', () => {
-    const proof = studioProof(ALL.map((t) => check(t)));
+    const proof = studioProof(ALL.map((t) => check(t)), 4);
     expect(proof.passed).toBe(15);
     expect(proof.left.length + proof.right.length + proof.more).toBe(15);
-    expect(proof.more).toBe(9);
+    expect(proof.more).toBe(7);
   });
 
   it('carries the long name and the source alongside the short one', () => {
@@ -83,7 +83,7 @@ describe('the chip vocabulary', () => {
     // catches a key added as an empty string or left as the long name.
     for (const type of ALL) {
       expect(CHECK_CHIPS[type], type).toBeTruthy();
-      expect(CHECK_CHIPS[type].length, `${type} is too long for the chip`).toBeLessThanOrEqual(20);
+      expect(CHECK_CHIPS[type].length, `${type} is too long for the chip`).toBeLessThanOrEqual(18);
     }
   });
 });

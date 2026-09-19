@@ -71,7 +71,7 @@ export function StudioCard({
   brief,
   rank,
   focus,
-  entered,
+  wingsOpen,
   quotedTotalPaise,
   inCompare,
   cachedRead,
@@ -85,8 +85,15 @@ export function StudioCard({
   brief: Brief;
   rank: number;
   focus: Focus;
-  /** Has this card been scrolled to yet? Latched — see useScrollFocus. */
-  entered: boolean;
+  /**
+   * Is this card in the middle of the viewport? Drives the wings out and, when
+   * it goes false again, back in. Not latched — see useScrollFocus.
+   *
+   * Named `wingsOpen` rather than `open` because the card already has an
+   * `open` of its own for the More/Less disclosure, and two booleans called
+   * open in one component is how the wrong one gets read.
+   */
+  wingsOpen: boolean;
   quotedTotalPaise: number | null;
   inCompare: boolean;
   cachedRead: StoredRead | undefined;
@@ -148,13 +155,13 @@ export function StudioCard({
     <motion.li
       ref={cardRef}
       className="q-wings list-none"
-      data-entered={entered ? 'in' : 'out'}
+      data-open={wingsOpen ? 'yes' : 'no'}
       initial={reduced ? false : { opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: reduced ? 0 : Math.min(rank, 5) * 0.06, ease: [0.16, 1, 0.3, 1] }}
     >
       {/* The studio's work and the checks it passed, parked behind the card
-          and out when you reach it. */}
+          and out when you reach it — and back in when you leave. */}
       <ProjectWings
         projects={studio.portfolio}
         checks={studio.checks}

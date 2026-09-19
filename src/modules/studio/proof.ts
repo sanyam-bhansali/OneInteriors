@@ -34,11 +34,17 @@ import { CHECK_LABELS, type CheckType, type VerificationCheck } from './types';
  * The chip form of each check — two or three words.
  *
  * The long name stays in `CHECK_LABELS` and rides along on every chip as its
- * title, so nothing is lost; this is only what fits on one line at 12rem.
+ * title, so nothing is lost; this is only what fits on one line.
+ *
+ * The ceiling is 18 characters, and it is measured rather than guessed: the
+ * pill is a 160px box, a tick and the padding take 46px of it, and 10.5px mono
+ * runs about 6.3px a character. Eighteen lands at 159px. The test holds the
+ * line, because a nineteenth character does not wrap — it silently ellipsises,
+ * and a truncated claim is worse than a shorter one.
  */
 export const CHECK_CHIPS: Record<CheckType, string> = {
   SITE_INSPECTION: 'Sites inspected',
-  CLIENT_REFERENCE: 'Past clients called',
+  CLIENT_REFERENCE: 'Clients called',
   LABOUR_INSURANCE: 'Labour insured',
   WARRANTY_TERMS: 'Warranty on paper',
   RATE_CARD_FILED: 'Rate card filed',
@@ -48,7 +54,7 @@ export const CHECK_CHIPS: Record<CheckType, string> = {
   GSTIN_ACTIVE: 'GST active',
   AADHAAR_KYC: 'Owner identified',
   CODE_OF_CONDUCT: 'Conduct signed',
-  MCA_STATUS: 'MCA filings current',
+  MCA_STATUS: 'MCA filings ok',
   PAN_NAME_MATCH: 'PAN matched',
   UDYAM: 'Udyam registered',
   CONTACT_REACHABLE: 'Reachable',

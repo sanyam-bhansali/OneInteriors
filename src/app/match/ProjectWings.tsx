@@ -20,35 +20,47 @@
  * Saying "photo to come" rather than shipping a grey box is the same rule the
  * rest of the product follows: an unmeasured value renders as unmeasured.
  *
- * ## The ticks underneath
+ * ## The ticks are their own column, further out
  *
- * Below the plates, in the same column, the checks this studio has passed
- * arrive one at a time — a green tick and two or three words, each in its own
- * small glass frame. Both columns run at once, so the card is flanked by work
- * on the outside edges and proof along the bottom of both.
+ * Four rounded glass pills a side, beyond the plates rather than beneath
+ * them, top-aligned with the work. So the card opens into two layers: the
+ * studio's work immediately either side, and what we checked about them
+ * outside that. Reading outward, it is "here is what they built" then "here
+ * is why you can believe it" — which is the argument the page is making, laid
+ * out left to right.
+ *
+ * Stacked under the plates they read as a footnote to the photographs, which
+ * is the wrong relationship: the checks are about the studio, not about the
+ * projects.
  *
  * They are the short form on purpose. The long version — what each check
  * means, who performed it and when — is the profile's job; here there is a
- * 12rem column and about two seconds, and fifteen rows of it would be
+ * narrow column and about two seconds, and fifteen rows of it would be
  * wallpaper rather than evidence. `studioProof` decides which few appear and
  * says how many are left.
  *
  * Only PASS produces a tick. A pending or expired check is not shown at all
  * and is not counted in the "more" figure either.
  *
- * ## What reveals them
+ * ## A drawer, not a reveal
  *
- * Scrolling the card into the middle of the viewport, or hovering it, or
- * tabbing into it. The scroll reveal latches — see `useScrollFocus` — so a
- * card already read does not replay its animation every time it is passed.
+ * Scrolling the card into the middle of the viewport opens both columns;
+ * scrolling away shuts them again. Hovering or tabbing into a card opens them
+ * wherever it sits. Nothing latches.
+ *
+ * Out and back run in the same order — plates first, ticks after — so closing
+ * reads as the drawer shutting rather than as the animation played in
+ * reverse. The delays live in both the open and closed CSS states to do it.
  *
  * ## Why they are only on wide screens
  *
  * They live in the margin beside a 40rem list. Below about 1280px that margin
  * does not exist, and an absolutely positioned panel with nowhere to go either
  * overlaps the card or pushes the page into a horizontal scroll. So the CSS
- * gates them at 1280px and they are simply not rendered as a visual layer
- * below it — the same work is one press away under "Their work" at any width.
+ * gates the plates at 1280px, and the ticks — which sit outside the plates and
+ * so need roughly 170px more a side — at 1400px. Below each threshold they are
+ * simply not rendered as a visual layer; the same work and the same checks are
+ * one press away under "Their work" at any width.
  *
  * ## Keyboard and screen readers
  *
@@ -62,7 +74,7 @@ import { formatINRCompact } from '@/lib/money';
 import { studioProof, type ProofChip } from '@/modules/studio/proof';
 import type { PortfolioProject, VerificationCheck } from '@/modules/studio/types';
 
-/** The tick. A shape as well as a colour — the sage alone is not the signal. */
+/** The tick. A shape as well as a colour — the green alone is not the signal. */
 function Tick() {
   return (
     <svg viewBox="0 0 16 16" className="q-tick" aria-hidden focusable="false">
@@ -124,9 +136,9 @@ export function ProjectWings({
   checks: VerificationCheck[];
   studioName: string;
 }) {
-  const proof = studioProof(checks);
+  const proof = studioProof(checks, 4);
 
-  // Nothing to fan out on either count means no wings at all, rather than two
+  // Nothing to fan out on either count means no wings at all, rather than
   // empty frames beside the card.
   if (projects.length === 0 && proof.passed === 0) return null;
 
@@ -135,43 +147,53 @@ export function ProjectWings({
 
   return (
     <>
-      <aside className="q-wing q-wing-l" aria-label={`Work by ${studioName}`}>
-        {left.map((p) => (
-          <Plate key={p.id} project={p} />
-        ))}
+      {/* ── Inner layer: their work ── */}
+      {left.length > 0 ? (
+        <aside className="q-wing q-wing-l" aria-label={`Work by ${studioName}`}>
+          {left.map((p) => (
+            <Plate key={p.id} project={p} />
+          ))}
+        </aside>
+      ) : null}
 
-        {proof.left.length > 0 ? (
-          <ul className="q-proof-list" aria-label={`Checks ${studioName} has passed`}>
-            {proof.left.map((chip, i) => (
-              <Check key={chip.type} chip={chip} i={i} />
-            ))}
-          </ul>
-        ) : null}
-      </aside>
-
-      {right.length > 0 || proof.right.length > 0 ? (
-        <aside className="q-wing q-wing-r" aria-label={`More about ${studioName}`}>
+      {right.length > 0 ? (
+        <aside className="q-wing q-wing-r" aria-label={`More work by ${studioName}`}>
           {right.map((p) => (
             <Plate key={p.id} project={p} />
           ))}
-
-          {proof.right.length > 0 ? (
-            <ul className="q-proof-list">
-              {proof.right.map((chip, i) => (
-                <Check key={chip.type} chip={chip} i={i} />
-              ))}
-
-              {/* Said rather than implied. Six ticks beside a card could read
-                  as "six checks exist"; this is the only thing on screen that
-                  stops it doing so. */}
-              {proof.more > 0 ? (
-                <li className="q-proof-more" style={{ '--i': proof.right.length } as React.CSSProperties}>
-                  +{proof.more} more on their profile
-                </li>
-              ) : null}
-            </ul>
-          ) : null}
         </aside>
+      ) : null}
+
+      {/* ── Outer layer: what we checked ── */}
+      {proof.left.length > 0 ? (
+        <ul
+          className="q-proofs q-proofs-l"
+          aria-label={`Checks ${studioName} has passed`}
+        >
+          {proof.left.map((chip, i) => (
+            <Check key={chip.type} chip={chip} i={i} />
+          ))}
+        </ul>
+      ) : null}
+
+      {proof.right.length > 0 ? (
+        <ul className="q-proofs q-proofs-r">
+          {proof.right.map((chip, i) => (
+            <Check key={chip.type} chip={chip} i={i} />
+          ))}
+
+          {/* Said rather than implied. Eight ticks beside a card could read as
+              "eight checks exist"; this is the only thing on screen that stops
+              it doing so. */}
+          {proof.more > 0 ? (
+            <li
+              className="q-proof-more"
+              style={{ '--i': proof.right.length } as React.CSSProperties}
+            >
+              +{proof.more} more on their profile
+            </li>
+          ) : null}
+        </ul>
       ) : null}
     </>
   );

@@ -19,22 +19,22 @@
  * enough that two cards can be in focus at once on a laptop, which is right:
  * on a screen showing three cards, blurring everything but one is seasick.
  *
- * ## `entered` is a different question from `focus`
+ * ## `open` is a different question from `focus`
  *
- * `focus` is reversible: scroll a card out of the band and it recedes again.
- * `entered` latches — once a card has been reached, it stays reached. It
- * drives the one-way reveal of the project wings and the verification ticks
- * beside them, and those must not retract and replay every time the reader
- * scrolls back up past a card they have already seen.
+ * Both track the same band, and they are separate for one reason: `focus`
+ * starts at `near` for every card, because the depth-of-field blur is
+ * decoration and a card must be readable before any observer has run. The
+ * wings are the opposite — they must start shut, or every card on screen
+ * flashes its wings open at first paint and snaps them closed a frame later
+ * when the observer reports.
  *
- * It starts `false` for everything, including the cards already on screen at
- * first paint, so the reveal happens rather than being there from the start.
- * The observer fires on mount for whatever is in the band, which turns that
- * into an animation on load instead of a pop.
+ * So `open` starts `false` for everything and is driven only by the observer.
+ * It does NOT latch. Scroll a studio away and its wings retract; scroll back
+ * and they open again. They are a drawer, not a reveal.
  *
  * ## Reduced motion
  *
- * Returns everything `near` and everything `entered`, and never observes
+ * Returns everything `near` and everything `open`, and never observes
  * anything. The blur is decoration; the content underneath is not, and
  * somebody who asked the OS for less motion should not have to scroll a card
  * into a band to read it — nor hover one to see a studio's work.
@@ -47,13 +47,13 @@ export type Focus = 'near' | 'far';
 export function useScrollFocus<T extends HTMLElement>(count: number) {
   const refs = useRef<(T | null)[]>([]);
   const [focus, setFocus] = useState<Focus[]>(() => Array(count).fill('near'));
-  const [entered, setEntered] = useState<boolean[]>(() => Array(count).fill(false));
+  const [open, setOpen] = useState<boolean[]>(() => Array(count).fill(false));
 
   useEffect(() => {
     setFocus((prev) =>
       prev.length === count ? prev : (Array(count).fill('near') as Focus[]),
     );
-    setEntered((prev) => (prev.length === count ? prev : Array(count).fill(false)));
+    setOpen((prev) => (prev.length === count ? prev : Array(count).fill(false)));
   }, [count]);
 
   useEffect(() => {
@@ -64,7 +64,7 @@ export function useScrollFocus<T extends HTMLElement>(count: number) {
        a studio's work behind a scroll gesture that will never be detected. */
     const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (still || !('IntersectionObserver' in window)) {
-      setEntered(Array(count).fill(true));
+      setOpen(Array(count).fill(true));
       return;
     }
 
@@ -88,14 +88,14 @@ export function useScrollFocus<T extends HTMLElement>(count: number) {
           return changed ? next : prev;
         });
 
-        // Latched: only ever false → true.
-        setEntered((prev) => {
+        // Not latched — it closes again on the way out.
+        setOpen((prev) => {
           const next = [...prev];
           let changed = false;
           for (const entry of entries) {
             const i = nodes.indexOf(entry.target as T);
-            if (i === -1 || !entry.isIntersecting || next[i]) continue;
-            next[i] = true;
+            if (i === -1 || next[i] === entry.isIntersecting) continue;
+            next[i] = entry.isIntersecting;
             changed = true;
           }
           return changed ? next : prev;
@@ -112,5 +112,5 @@ export function useScrollFocus<T extends HTMLElement>(count: number) {
     refs.current[i] = el;
   };
 
-  return { register, focus, entered };
+  return { register, focus, open };
 }
