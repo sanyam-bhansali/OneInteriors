@@ -65,11 +65,31 @@ function Plate({ project }: { project: PortfolioProject }) {
 export function ProjectWings({
   projects,
   studioName,
+  inline = false,
 }: {
   projects: PortfolioProject[];
   studioName: string;
+  /**
+   * Inside the card rather than beside it.
+   *
+   * The flanks now carry the verification record, which is the thing that
+   * removes doubt; the work moved in here, where somebody who has decided to
+   * look closely can look closely. A grid rather than two sliding panels — in
+   * an expanded section there is nothing to emerge from.
+   */
+  inline?: boolean;
 }) {
   if (projects.length === 0) return null;
+
+  if (inline) {
+    return (
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {projects.slice(0, 4).map((p) => (
+          <Plate key={p.id} project={p} />
+        ))}
+      </div>
+    );
+  }
 
   const left = projects.slice(0, 2);
   const right = projects.slice(2, 4);

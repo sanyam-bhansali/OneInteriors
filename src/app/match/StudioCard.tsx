@@ -40,6 +40,7 @@ import { briefKey, type StoredRead } from '@/modules/quotation/project-store';
 import { explainAction } from './actions';
 import type { Explanation } from '@/modules/matching/explain';
 import { ProjectWings } from './ProjectWings';
+import { VerificationPanel } from './VerificationPanel';
 import type { Focus } from './useScrollFocus';
 import type { Studio } from '@/modules/studio/types';
 import type { MatchResult } from '@/modules/matching/score';
@@ -149,8 +150,19 @@ export function StudioCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: reduced ? 0 : Math.min(rank, 5) * 0.06, ease: [0.16, 1, 0.3, 1] }}
     >
-      {/* The studio's work, parked behind the card and out on hover. */}
-      <ProjectWings projects={studio.portfolio} studioName={studio.tradeName} />
+      {/* ── The proof, either side ──
+          These wings held the studio's portfolio, sliding out on hover. The
+          work is now inside the card's "More", and the flanks carry the
+          verification record instead — because proof that only appears when
+          you happen to point at something is proof most readers never see,
+          and this is the part that removes doubt before anybody thinks to
+          ask a question. Not hover-gated; see .q-wing-proof. */}
+      <aside className="q-wing q-wing-proof q-wing-l" aria-label={`What we verified about ${studio.tradeName}`}>
+        <VerificationPanel checks={studio.checks} side="left" />
+      </aside>
+      <aside className="q-wing q-wing-proof q-wing-r" aria-hidden>
+        <VerificationPanel checks={studio.checks} side="right" />
+      </aside>
 
       <div data-focus={focus} className="q-glass p-[clamp(20px,2.6vw,28px)]">
       {/* ── Vertical stack: mark, score, name, what they are ──
@@ -255,6 +267,14 @@ export function StudioCard({
         </button>
       </div>
 
+      {/* Below the flanking breakpoint there is no margin to live in, so the
+          same panel becomes a band under the card rather than disappearing.
+          Proof is not a wide-screen luxury. */}
+      <div className="q-proof-stack">
+        <VerificationPanel checks={studio.checks} side="left" />
+        <VerificationPanel checks={studio.checks} side="right" />
+      </div>
+
       {open ? (
         <motion.div
           initial={reduced ? false : { opacity: 0, height: 0 }}
@@ -271,6 +291,13 @@ export function StudioCard({
                 </li>
               ))}
             </ul>
+            {studio.portfolio.length > 0 ? (
+              <div className="mt-5 border-t border-[var(--line)] pt-4">
+                <p className="oi-eyebrow m-0 mb-3">Work they have delivered</p>
+                <ProjectWings projects={studio.portfolio} studioName={studio.tradeName} inline />
+              </div>
+            ) : null}
+
             {quotedTotalPaise !== null ? (
               <button
                 type="button"

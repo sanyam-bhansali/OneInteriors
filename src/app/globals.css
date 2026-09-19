@@ -1093,7 +1093,7 @@ p {
   .q-wing {
     position: absolute;
     top: 26px;
-    width: 12rem;
+    width: 13.5rem;
     display: flex;
     flex-direction: column;
     gap: 14px;
@@ -1122,6 +1122,21 @@ p {
     opacity: 1;
     transform: translateX(0) scale(1);
     pointer-events: auto;
+  }
+
+  /* The verification wings are NOT hover-gated.
+     Proof that only appears when you happen to point at something is proof
+     most readers never see, and this panel exists to remove doubt before
+     somebody asks a question — not to reward them for exploring. They sit
+     open, always, and only lift slightly with the card. */
+  .q-wing-proof {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+  .q-wings:hover .q-wing-proof,
+  .q-wings:focus-within .q-wing-proof {
+    transform: none;
   }
 
   /* The second plate trails the first, so they fan rather than move as a
@@ -1232,5 +1247,65 @@ p {
 
   a[href]::after {
     content: '';
+  }
+}
+
+
+/* ─────────────────────────────────────────────────────────────────────
+   THE VERIFICATION PANEL
+   ─────────────────────────────────────────────────────────────────────
+
+   Flanks the studio card on wide screens; stacks under it below 1280px,
+   where there is no margin to live in. See VerificationPanel.tsx.
+
+   Deliberately quieter than the card it flanks: one hairline, a soft
+   shadow, no glass. The card is the thing being chosen and the proof is
+   the apparatus around it — giving both the same weight would make the
+   screen a competition between two objects of equal loudness.
+   ───────────────────────────────────────────────────────────────────── */
+.q-proof {
+  border-radius: 16px;
+  background: rgba(252, 252, 250, 0.86);
+  border: 1px solid rgba(219, 213, 203, 0.95);
+  box-shadow: 0 10px 28px -24px rgba(44, 38, 36, 0.4);
+  padding: 15px 16px;
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.q-proof:hover,
+.q-proof:focus-within {
+  border-color: rgba(131, 144, 115, 0.55);
+  box-shadow: 0 14px 34px -22px rgba(44, 38, 36, 0.42);
+}
+
+/* Below the flanking breakpoint the panel becomes a band under the card,
+   two columns wide so it does not turn into one very long list. */
+.q-proof-stack {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+@media (min-width: 640px) {
+  .q-proof-stack {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+@media (min-width: 1280px) {
+  /* The wings take over; the stacked copy is not rendered twice. */
+  .q-proof-stack {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .q-proof,
+  .q-proof:hover,
+  .q-proof:focus-within {
+    transition: none;
   }
 }
