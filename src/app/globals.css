@@ -1169,6 +1169,44 @@ p {
   }
 }
 
+/* ── The comparison table ──
+
+   The page's own doc comment says it exists so "the eye can travel across a
+   row". Nothing on the table helped it do that: twenty-three rows by four
+   studios is ninety-two cells with no row highlight, no column highlight and
+   nothing at all under the cursor.
+
+   Hovering a row lights the whole row, including the pinned first column,
+   which needs saying explicitly — the sticky cells carry their own background
+   to stay opaque over what scrolls beneath them, so a background on the <tr>
+   alone stops dead at the pinned column, which is precisely where the reader
+   is looking. */
+.oi-cmp tbody tr:hover > th,
+.oi-cmp tbody tr:hover > td {
+  background: var(--acc-wash);
+}
+
+/* Keyboard parity. Tabbing to the star inside a row gets the same highlight,
+   or a keyboard reader loses the one cue a mouse reader gets. */
+.oi-cmp tbody tr:focus-within > th,
+.oi-cmp tbody tr:focus-within > td {
+  background: var(--acc-wash);
+}
+
+/* The room headers are their own rows and must not light up — they are labels,
+   not data, and highlighting one suggests it is comparable across columns. */
+.oi-cmp tbody tr:hover > th[scope='colgroup'],
+.oi-cmp tbody tr:focus-within > th[scope='colgroup'] {
+  background: var(--bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oi-cmp tbody tr:hover > th,
+  .oi-cmp tbody tr:hover > td {
+    transition: none;
+  }
+}
+
 /* ── A verification check, counting in ──
 
    The studio profile's payoff. Same idea as the pills beside a match card and

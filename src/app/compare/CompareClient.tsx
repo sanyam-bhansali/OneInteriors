@@ -109,7 +109,7 @@ function Star({
         on ? `${label} — starred. Remove from your verdict` : `Star ${label} to count it in your verdict`
       }
       className="-ml-1.5 flex h-11 w-9 flex-none cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-[15px] leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--acc)]"
-      style={{ color: on ? 'var(--acc-ink)' : '#857b6f' }}
+      style={{ color: on ? 'var(--acc-ink)' : 'var(--ink2)' }}
     >
       <span aria-hidden>{on ? '★' : '☆'}</span>
     </button>
@@ -165,7 +165,7 @@ export function CompareClient() {
 
   if (!comparison) {
     return (
-      <div className="oi-app min-h-dvh bg-[var(--bg)]">
+      <div className="oi-app oi-quick min-h-dvh bg-[var(--bg)]">
         <AppHeader />
         <Spine at="compare" />
         <Wrap className="py-12">
@@ -190,7 +190,7 @@ export function CompareClient() {
   const gap = starredGap(tally);
 
   return (
-    <div className="oi-app min-h-dvh bg-[var(--bg)]">
+    <div className="oi-app oi-quick min-h-dvh bg-[var(--bg)]">
       <AppHeader />
       <Spine
         at="compare"
@@ -232,7 +232,7 @@ export function CompareClient() {
                     type="button"
                     onClick={() => drop(s.slug)}
                     aria-label={`Remove ${s.name} from the comparison`}
-                    className="oi-num cursor-pointer border-0 bg-transparent p-0 text-[9.5px] uppercase tracking-[0.16em] text-[var(--ink2)] hover:text-[var(--ink)]"
+                    className="oi-num -mr-2 -mt-2 flex min-h-11 cursor-pointer items-center rounded-full border-0 bg-transparent px-2.5 text-[9.5px] uppercase tracking-[0.16em] text-[var(--ink2)] transition-colors hover:text-[var(--ink)]"
                   >
                     Remove
                   </button>
@@ -280,7 +280,7 @@ export function CompareClient() {
                     starredCodes: [],
                   });
                 }}
-                className="oi-num cursor-pointer border-0 bg-transparent p-0 text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink2)] hover:text-[var(--ink)]"
+                className="oi-num -my-2 flex min-h-11 cursor-pointer items-center rounded-full border-0 bg-transparent px-2.5 text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink2)] transition-colors hover:text-[var(--ink)]"
               >
                 Clear stars
               </button>
@@ -353,7 +353,7 @@ export function CompareClient() {
           </Sheet>
         ) : (
           <Sheet className="mb-10 flex flex-wrap items-center gap-x-4 gap-y-2 p-5">
-            <span aria-hidden className="text-[19px] leading-none" style={{ color: '#857b6f' }}>
+            <span aria-hidden className="text-[19px] leading-none text-[var(--ink2)]">
               ☆
             </span>
             <p className="m-0 max-w-[52ch] text-[14.5px] leading-snug">
@@ -416,16 +416,112 @@ export function CompareClient() {
           </Sheet>
         ) : null}
 
-        {/* ── Every line ──
-            Scrolls sideways with the item pinned, which is what lets the
-            comparison take any number of studios rather than three. */}
-        <div className="oi-rail overflow-x-auto border border-[var(--line)] bg-[var(--card)]">
+        {/* ── Every line, on a phone ──
+            The table below is unusable under about 700px: the pinned item
+            column plus one 13.5rem studio column leaves nothing, and the rail
+            hides its own scrollbars so there is not even a cue that more
+            exists. There was no alternative layout at all — this is it.
+
+            One card per line, every studio inside it. The comparison is
+            vertical instead of horizontal, which is the right axis on a
+            phone and keeps the thing that matters: the material sits under
+            the amount, and a studio that did not quote shows as not quoted
+            rather than as a gap. */}
+        <ul className="m-0 flex list-none flex-col gap-3 p-0 md:hidden">
+          {rooms.map((room) => (
+            <li key={room.room}>
+              <p className="oi-label m-0 mb-2 mt-4 first:mt-0">{room.label}</p>
+              <ul className="m-0 flex list-none flex-col gap-3 p-0">
+                {room.lines.map((line: ComparedLine) => (
+                  <li key={line.code} className="border border-[var(--line)] bg-[var(--card)] p-4">
+                    <div className="flex items-start gap-1.5">
+                      <Star
+                        on={project.starred.includes(line.code)}
+                        label={line.label}
+                        onToggle={() => toggleStar(line.code)}
+                      />
+                      <div className="min-w-0 flex-1 pt-2.5">
+                        <p className="m-0 text-[14.5px] font-medium">{line.label}</p>
+                        <p className="oi-num m-0 mt-1 text-[12px] leading-snug text-[var(--ink2)]">
+                          {line.size}
+                        </p>
+                      </div>
+                    </div>
+
+                    <ul className="m-0 mt-3 flex list-none flex-col gap-3 border-t border-[var(--line)] p-0 pt-3">
+                      {line.cells.map((cell) => {
+                        const studio = studios.find((s) => s.slug === cell.slug)!;
+                        const best = line.cheapest.includes(cell.slug);
+                        const width =
+                          dearest(line) > 0 && cell.amountPaise !== null
+                            ? Math.max(6, Math.round((cell.amountPaise / dearest(line)) * 100))
+                            : 0;
+
+                        return (
+                          <li key={cell.slug}>
+                            <div className="flex items-baseline justify-between gap-4">
+                              <span className="text-[13.5px] text-[var(--ink2)]">{studio.name}</span>
+                              {cell.amountPaise === null ? (
+                                <Flag>Not quoted</Flag>
+                              ) : (
+                                <span
+                                  className="oi-num text-[14px]"
+                                  style={best ? { color: 'var(--sec-ink)' } : undefined}
+                                >
+                                  {money(cell.amountPaise)}
+                                </span>
+                              )}
+                            </div>
+                            {cell.amountPaise !== null ? (
+                              <>
+                                <span aria-hidden className="mt-1.5 block h-[3px] bg-[var(--line)]">
+                                  <span
+                                    className="block h-full"
+                                    style={{
+                                      width: `${width}%`,
+                                      background: best ? 'var(--sec-ink)' : 'var(--ink2)',
+                                    }}
+                                  />
+                                </span>
+                                <MaterialList text={cell.spec ?? ''} onPick={setTerm} />
+                              </>
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+
+          <li className="mt-2 flex flex-col gap-2 border-t-2 border-[var(--ink)] bg-[var(--card)] p-4">
+            <p className="oi-label m-0">Total · GST incl.</p>
+            {studios.map((s) => (
+              <span key={s.slug} className="flex items-baseline justify-between gap-4">
+                <span className="text-[13.5px] text-[var(--ink2)]">{s.name}</span>
+                <span className="oi-num text-[16px]">{money(s.quote.totalPaise)}</span>
+              </span>
+            ))}
+          </li>
+        </ul>
+
+        {/* ── Every line, with room to put it side by side ──
+            Scrolls in both directions inside its own box with the item column
+            and the studio names both pinned. The height cap is what makes the
+            sticky header work at all: `overflow-x: auto` already made this a
+            scroll container, but with no height it never scrolled vertically,
+            so `position: sticky` had nothing to stick to and the studio names
+            left the screen after the first few rows — twenty-three rows of
+            money with nothing saying whose. */}
+        <div className="oi-cmp oi-rail hidden max-h-[min(78vh,900px)] overflow-auto border border-[var(--line)] bg-[var(--card)] md:block">
           <table className="w-full border-collapse text-left">
             <thead>
               <tr>
                 <th
                   scope="col"
-                  className="oi-label sticky left-0 z-10 border-b border-[var(--ink)] bg-[var(--card)] p-4 align-bottom"
+                  className="oi-label sticky left-0 top-0 z-30 border-b border-[var(--ink)] bg-[var(--card)] p-4 align-bottom"
                 >
                   Line item
                 </th>
@@ -433,7 +529,7 @@ export function CompareClient() {
                   <th
                     key={s.slug}
                     scope="col"
-                    className={`border-b border-[var(--ink)] p-4 align-bottom ${COL}`}
+                    className={`sticky top-0 z-20 border-b border-[var(--ink)] bg-[var(--card)] p-4 align-bottom ${COL}`}
                   >
                     <span className="oi-display block text-[15px]">{s.name}</span>
                   </th>
@@ -447,7 +543,7 @@ export function CompareClient() {
                   <th
                     scope="colgroup"
                     colSpan={studios.length + 1}
-                    className="oi-label sticky left-0 bg-[var(--bg)] px-4 py-2.5 text-left"
+                    className="oi-label sticky left-0 z-10 bg-[var(--bg)] px-4 py-2.5 text-left"
                   >
                     {room.label}
                   </th>
@@ -554,10 +650,12 @@ export function CompareClient() {
 
         <div className="mt-8 flex flex-wrap items-center gap-4">
           <Quiet href="/match">Price another studio</Quiet>
+          {/* Hand-rolled with an inline background before, which meant no
+              hover, no focus ring and no minimum height. One terracotta action
+              per screen — this is it, so it uses the component that owns it. */}
           <Link
             href="/expert"
-            className="px-5 py-3 text-[14px] font-medium text-white no-underline"
-            style={{ background: 'var(--acc-btn)' }}
+            className="oi-cta inline-flex min-h-11 items-center px-5 py-3 text-[14px] no-underline"
           >
             Have an architect read these with you
           </Link>
