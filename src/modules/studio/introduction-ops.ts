@@ -200,8 +200,18 @@ export async function listIntroductions(limit = 100): Promise<OpsIntroduction[]>
 }
 
 /** How many introductions are waiting on us. For the overview. */
+/**
+ * How many introductions need a human.
+ *
+ * The limit has to match the page's, or the badge counts rows the operator
+ * cannot reach — it read 200 while `/ops/introductions` renders the default
+ * 100, so past a hundred the number on the overview pointed at introductions
+ * that were not on the screen it linked to.
+ */
+export const INTRODUCTIONS_SHOWN = 100;
+
 export async function introductionsNeedingUs(): Promise<number> {
-  const rows = await listIntroductions(200);
+  const rows = await listIntroductions(INTRODUCTIONS_SHOWN);
   return rows.filter((r) => r.needs !== null).length;
 }
 

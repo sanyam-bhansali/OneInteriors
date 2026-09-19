@@ -1,3 +1,5 @@
+import { isLive } from '@/modules/studio/features';
+import { ComingSoon } from '../ComingSoon';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { PageHead, PageBody } from '../StudioShell';
@@ -30,6 +32,11 @@ export const dynamic = 'force-dynamic';
  * See the note at the top of `ledger.ts`.
  */
 export default async function VendorsPage() {
+  /* Not in the pilot. The rail already stops linking here; this stops a
+     bookmark or a typed URL reaching a screen we are not standing behind
+     yet. Flip the flag in modules/studio/features.ts to ship it. */
+  if (!isLive('vendors')) return <ComingSoon feature="vendors" />;
+
   const [vendors, orders, projects] = await Promise.all([
     myVendors(),
     myWorkOrders(),

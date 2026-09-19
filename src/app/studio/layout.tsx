@@ -5,6 +5,7 @@ import { getCurrentUser, hasRole } from '@/modules/auth/session';
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { signOutAction } from '@/app/sign-in/actions';
+import { isLive } from '@/modules/studio/features';
 import { StudioShell, type NavGroup } from './StudioShell';
 
 /**
@@ -90,7 +91,11 @@ export default async function StudioLayout({ children }: { children: React.React
 interface ShellContext {
   tradeName: string;
   slug: string;
+  /** ACTIVE only. Governs the marketplace half of the rail. */
   live: boolean;
+  /** The real status, so PAUSED can be told apart from ONBOARDING. */
+  status: string;
+  pausedReason: string | null;
   /** Proposed times waiting on them. The only count worth a badge today. */
   toConfirm: number;
   draftQuotes: number;
@@ -111,7 +116,7 @@ async function shellContext(userId: string): Promise<ShellContext | null> {
   try {
     const member = await prisma.studioMember.findUnique({
       where: { userId },
-      select: { studio: { select: { id: true, tradeName: true, slug: true, status: true } } },
+      select: { studio: { select: { id: true, tradeName: true, slug: true, status: true, pausedReason: true } } },
     });
     if (!member) return null;
 
@@ -142,6 +147,15 @@ async function shellContext(userId: string): Promise<ShellContext | null> {
       tradeName: studio.tradeName,
       slug: studio.slug,
       live: studio.status === 'ACTIVE',
+      /* Paused and suspended are NOT "still in setup".
+         The rail used to test `=== 'ACTIVE'` and nothing else, so a paused
+         studio lost its clients, its quotations and its vendor ledger from
+         the nav and was shown a completed onboarding checklist reading
+         "0 to go." with no mention of being paused. Their records are theirs
+         and do not stop being theirs because we took them out of rotation —
+         the marketplace half is what a pause suspends. */
+      status: studio.status,
+      pausedReason: studio.pausedReason ?? null,
       toConfirm,
       draftQuotes,
       clientsDue,
@@ -167,49 +181,72 @@ async function shellContext(userId: string): Promise<ShellContext | null> {
  * that are actually in their way.
  */
 function navFor(context: ShellContext | null): NavGroup[] {
+  /* Their own software stays reachable unless they never finished setup.
+     A pause is a marketplace state: it stops us sending briefs, and it does
+     not repossess a studio's client list. */
+  const ownSoftware = context !== null && context.status !== 'ONBOARDING';
   const live = context?.live ?? false;
 
   const setup: NavGroup = {
     items: [{ icon: 'home', href: '/studio', label: 'Setup', ready: true }],
   };
 
-  if (!live) return [setup];
+  if (!ownSoftware) return [setup];
 
-  return [
-    {
-      items: [{ icon: 'home', href: '/studio', label: 'Dashboard', ready: true }],
-    },
+  /* Leads and Quotations are the pilot. Everything else shows with a "soon"
+     pill and does not link — see modules/studio/features.ts for why a pill
+     beside a working link was not enough. */
+  const groups: NavGroup[] = [
+    { items: [{ icon: 'home', href: '/studio', label: 'Dashboard', ready: true }] },
     {
       label: 'Your work',
       items: [
         {
+          icon: 'clients',
+          href: '/studio/clients',
+          label: 'Leads',
+          ready: isLive('leads'),
+          count: context?.clientsDue,
+        },
+        {
           icon: 'quote',
           href: '/studio/quotations',
           label: 'Quotations',
-          ready: true,
+          ready: isLive('quotations'),
           count: context?.draftQuotes,
         },
-        { icon: 'products', href: '/studio/products', label: 'Product master', ready: true },
-        { icon: 'clients', href: '/studio/clients', label: 'Clients', ready: true, count: context?.clientsDue },
-        { icon: 'projects', href: '/studio/projects', label: 'Projects', ready: true },
-        { icon: 'vendors', href: '/studio/vendors', label: 'Vendors', ready: true },
+        {
+          icon: 'projects',
+          href: '/studio/projects',
+          label: 'Project tracker',
+          ready: isLive('projects'),
+        },
+        { icon: 'vendors', href: '/studio/vendors', label: 'Vendors', ready: isLive('vendors') },
       ],
     },
-    {
+  ];
+
+  /* The marketplace half. A PAUSED studio keeps its own software above and
+     loses this, which is exactly what a pause means. */
+  if (live) {
+    groups.push({
       label: 'From us',
       items: [
         {
           icon: 'calendar',
           href: '/studio/calendar',
           label: 'Calendar',
-          ready: true,
+          ready: isLive('calendar'),
           count: context?.toConfirm,
         },
-        { icon: 'listing', href: '/studio/listing', label: 'Your listing', ready: true },
+        { icon: 'listing', href: '/studio/listing', label: 'Your listing', ready: isLive('listing') },
       ],
-    },
-    {
-      items: [{ icon: 'settings', href: '/studio/settings', label: 'Settings', ready: true }],
-    },
-  ];
+    });
+  }
+
+  groups.push({
+    items: [{ icon: 'settings', href: '/studio/settings', label: 'Settings', ready: true }],
+  });
+
+  return groups;
 }

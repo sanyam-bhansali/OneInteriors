@@ -513,6 +513,20 @@ model Studio {
 
 model StudioMember {
   id       String  @id @default(cuid())
+
+  /// What this person has been shown, and what they have done.
+  ///
+  /// On the MEMBER and not on the Studio, deliberately. A second person
+  /// joining an established studio has learned none of this, and showing them
+  /// a finished walkthrough because a colleague completed it two months ago is
+  /// how software gets a reputation for being impenetrable. Equally it is not
+  /// in the browser: somebody who switches laptop should not be walked through
+  /// it twice.
+  ///
+  /// Shape is `{ dismissed: string[], seen: string[] }` — see
+  /// `modules/studio/guide.ts`. Deliberately loose JSON: guides are added and
+  /// retired often, and a migration per tour step is a tax on improving them.
+  guideState Json?
   studioId String
   studio   Studio  @relation(fields: [studioId], references: [id], onDelete: Cascade)
   userId   String  @unique

@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { PageHead, PageBody } from '../StudioShell';
+import { GuidePanel } from '../GuidePanel';
+import { guideContext } from '@/modules/studio/guide-store';
 import { formatINR } from '@/lib/money';
 import { myQuotes, STATUS_LABELS, type QuoteStatusName } from '@/modules/studio-quote/quotes';
 import { myBranding, myProducts } from '@/modules/studio-quote/store';
@@ -33,6 +35,11 @@ export default async function QuotationsPage() {
   const priced = products.filter((p) => p.ratePaise > 0).length;
   const blocked = !branding || priced === 0;
 
+  /* Every step is derived from the studio's own rows — there is no way to
+     mark one done without having done it. See modules/studio/guide.ts. */
+  const { state, facts } = await guideContext();
+  const dismissed = state.dismissed.includes('quotations');
+
   return (
     <>
       <PageHead
@@ -50,33 +57,13 @@ export default async function QuotationsPage() {
       />
 
       <PageBody>
-        {/* Two things have to be true before a quotation can exist, and finding
-            that out at the print screen after building forty lines would be
-            the wrong moment. Both are one click away. */}
-        {blocked ? (
-          <div className="s-card mb-6 border-l-[3px] !border-l-[var(--s-accent)] p-5">
-            <p className="m-0 mb-2 text-[14.5px] font-semibold">Two things first.</p>
-            <ul className="m-0 flex list-none flex-col gap-2 p-0">
-              {!branding ? (
-                <li className="text-[14px] leading-relaxed text-[var(--s-ink-2)]">
-                  <Link href="/studio/settings" className="font-medium text-[var(--s-accent)]">
-                    Your studio details
-                  </Link>{' '}
-                  — a quotation carries your registered name, address and GSTIN. Ours appears
-                  nowhere on it, so we cannot fill these in for you.
-                </li>
-              ) : null}
-              {priced === 0 ? (
-                <li className="text-[14px] leading-relaxed text-[var(--s-ink-2)]">
-                  <Link href="/studio/products" className="font-medium text-[var(--s-accent)]">
-                    At least one priced product
-                  </Link>{' '}
-                  — the catalogue ships with every rate blank, because we do not set your prices.
-                </li>
-              ) : null}
-            </ul>
-          </div>
-        ) : null}
+        {/* The two prerequisites used to be a blocker card: a wall telling
+            somebody to go to two other screens and come back. They are now
+            steps one and two of the walkthrough, which is the same
+            information arranged as a way forward rather than a refusal.
+            `blocked` still governs whether the New button renders, and
+            createQuote() still enforces branding server-side. */}
+        <GuidePanel guide="quotations" facts={facts} dismissed={dismissed} />
 
         {quotes.length === 0 ? (
           <div className="s-card p-8">

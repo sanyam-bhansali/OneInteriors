@@ -445,13 +445,21 @@ export async function setQuoteStatus(
   if (!(await ownedQuote(quoteId))) return { ok: false, error: 'That quotation is not yours.' };
 
   try {
+    /* Stamped ONCE, and `issuedOn === null` is the test.
+       The condition was `status === 'ISSUED'` alone, which meant pressing
+       Reopen on a won or lost quotation sent it back to ISSUED and overwrote
+       the date the client first received it — the date any dispute turns on,
+       and the exact thing the comment here promised was stable. */
+    const current = await prisma.studioQuote.findUnique({
+      where: { id: quoteId },
+      select: { issuedOn: true },
+    });
+
     await prisma.studioQuote.update({
       where: { id: quoteId },
       data: {
         status,
-        // Stamped once. A quotation re-sent after an edit keeps the date the
-        // client first received it, which is the date any dispute turns on.
-        ...(status === 'ISSUED' ? { issuedOn: new Date() } : {}),
+        ...(status === 'ISSUED' && current?.issuedOn == null ? { issuedOn: new Date() } : {}),
       },
     });
     return { ok: true };

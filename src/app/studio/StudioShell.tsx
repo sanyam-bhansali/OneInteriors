@@ -109,7 +109,7 @@ export function StudioShell({
     .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
   return (
-    <div className="studio-app flex min-h-dvh">
+    <div className="studio-app oi-studio-shell flex min-h-dvh">
       {/* ── Rail ── */}
       <aside
         className={`fixed inset-y-0 left-0 z-40 flex w-[236px] flex-none flex-col border-r border-[var(--s-rule)] bg-[var(--s-rail)] transition-transform lg:static lg:translate-x-0 ${

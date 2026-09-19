@@ -145,16 +145,19 @@ export async function journeyRows(limit = 5000): Promise<JourneyRow[]> {
 }
 
 /** What has accumulated so far, so nobody has to ask the database. */
-export async function journeySummary(): Promise<{
-  quotes: number;
-  briefsQuoted: number;
-  comparisons: number;
-  outcomes: number;
-  placeholderRates: number;
-} | null> {
+export type JourneySummary =
+  | { ok: true; quotes: number; briefsQuoted: number; comparisons: number; outcomes: number; placeholderRates: number }
+  /* Two different causes, told apart. The page printed "no database
+     configured" for both, so under the dev bypass — where there is no session
+     at all — it claimed the database was missing when it was fine. An
+     operator debugging that would have gone looking in exactly the wrong
+     place. */
+  | { ok: false; reason: 'no-database' | 'not-ops' };
+
+export async function journeySummary(): Promise<JourneySummary> {
   const user = await getCurrentUser();
-  if (!hasRole(user, 'OPS')) return null;
-  if (!hasDatabase()) return null;
+  if (!hasRole(user, 'OPS')) return { ok: false, reason: 'not-ops' };
+  if (!hasDatabase()) return { ok: false, reason: 'no-database' };
 
   try {
     const [quotes, briefs, comparisons, outcomes, placeholder] = await Promise.all([
@@ -168,6 +171,7 @@ export async function journeySummary(): Promise<{
       prisma.firstQuote.count({ where: { ratesVersion: { startsWith: 'archive-median' } } }),
     ]);
     return {
+      ok: true,
       quotes,
       briefsQuoted: briefs,
       comparisons,
@@ -175,6 +179,6 @@ export async function journeySummary(): Promise<{
       placeholderRates: placeholder,
     };
   } catch {
-    return null;
+    return { ok: false, reason: 'no-database' };
   }
 }

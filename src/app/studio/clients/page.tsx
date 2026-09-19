@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { PageHead, PageBody } from '../StudioShell';
+import { GuidePanel } from '../GuidePanel';
+import { guideContext } from '@/modules/studio/guide-store';
 import { myClients, BOARD_KINDS } from '@/modules/studio-practice/clients';
 import { myStages } from '@/modules/studio-practice/stages';
 import { myFields } from '@/modules/studio-practice/fields';
@@ -48,6 +50,9 @@ export default async function ClientsPage() {
   const open = clients.filter((c) => BOARD_KINDS.includes(c.stageKind));
   const due = open.filter((c) => c.nextActionOn !== null && c.nextActionOn <= today).length;
 
+  const { state, facts } = await guideContext();
+  const dismissed = state.dismissed.includes('leads');
+
   return (
     <>
       <PageHead
@@ -68,6 +73,8 @@ export default async function ClientsPage() {
       />
 
       <PageBody>
+        <GuidePanel guide="leads" facts={facts} dismissed={dismissed} />
+
         {clients.length === 0 ? (
           <div className="s-card p-8">
             <p className="m-0 mb-2 text-[15.5px] font-semibold">

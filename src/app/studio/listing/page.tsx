@@ -1,3 +1,5 @@
+import { isLive } from '@/modules/studio/features';
+import { ComingSoon } from '../ComingSoon';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Container, TierBadge } from '@/components/ui';
@@ -37,6 +39,11 @@ export const dynamic = 'force-dynamic';
  * one is a single field and the other is read-only.
  */
 export default async function ListingPage() {
+  /* Not in the pilot. The rail already stops linking here; this stops a
+     bookmark or a typed URL reaching a screen we are not standing behind
+     yet. Flip the flag in modules/studio/features.ts to ship it. */
+  if (!isLive('listing')) return <ComingSoon feature="listing" />;
+
   const context = await currentStudio();
 
   if (!context) {

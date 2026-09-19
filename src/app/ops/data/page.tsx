@@ -30,9 +30,11 @@ export default async function OpsDataPage() {
           ended. One row per quote — the shape a pivot table wants.
         </p>
 
-        {summary === null ? (
+        {!summary.ok ? (
           <p className="m-0 text-[15px] text-[var(--color-ink-3)]">
-            No database configured, so nothing is being recorded.
+            {summary.reason === 'no-database'
+              ? 'No database configured, so nothing is being recorded.'
+              : 'Sign in with an ops account to see what has been recorded.'}
           </p>
         ) : (
           <>

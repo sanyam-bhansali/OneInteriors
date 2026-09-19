@@ -298,7 +298,14 @@ async function countApplications(): Promise<number> {
 async function countConsultations(): Promise<number> {
   if (!hasDatabase()) return 0;
   try {
-    return await prisma.consultation.count({ where: { status: 'requested' } });
+    /* `requested` AND `scheduled`, because that is what the page this links
+       to shows. The overview counted `requested` alone, so the badge said 2
+       and /ops/consultations opened on "4 waiting" — the same concept counted
+       two different ways, which is how an operator learns to distrust the
+       queue. A call that is booked but not yet held still needs a human. */
+    return await prisma.consultation.count({
+      where: { status: { in: ['requested', 'scheduled'] } },
+    });
   } catch {
     return 0;
   }

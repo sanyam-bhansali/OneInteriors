@@ -1175,3 +1175,62 @@ p {
     transition-delay: 0s;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+   PRINT
+   ─────────────────────────────────────────────────────────────────────
+
+   `/studio/quotations/[id]/print` states in its own header that it sits
+   outside the studio shell — "no sidebar, no chrome, nothing that would
+   land on the paper". It does not: the file is under src/app/studio with
+   no route group, so studio/layout.tsx wraps it, and there was not a
+   single @media print rule in this file. The sidebar was going onto the
+   client's PDF.
+
+   Route groups would be the tidier fix and would move the file, breaking
+   the URL that is already in quotations people have sent. This does the
+   same job and breaks nothing.
+   ───────────────────────────────────────────────────────────────────── */
+@media print {
+  /* The shell, in every form it takes. */
+  .studio-app aside,
+  .studio-app > div > button,
+  .no-print {
+    display: none !important;
+  }
+
+  /* The shell lays the page out as a sidebar plus content; on paper there
+     is no sidebar, so the grid has to collapse or the document prints in
+     a narrow column with an empty band beside it. */
+  .studio-app,
+  .studio-app > * {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+    width: auto !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  /* Ink on paper. A quotation is a commercial document and reads as one. */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Never break a line item, a room block or a total across two pages. */
+  tr,
+  .q-doc-room,
+  .q-doc-total {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  a[href]::after {
+    content: '';
+  }
+}

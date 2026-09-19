@@ -194,6 +194,20 @@ export default async function VerificationQueue() {
                 ))}
               </tbody>
             </table>
+
+            {/* The one ops page that rendered a header-only table on a fresh
+                install: five column headings over nothing, with no sentence
+                saying why. A bare skeleton reads as broken rather than
+                empty. */}
+            {rows.length === 0 ? (
+              <p className="m-0 px-5 py-8 text-[14.5px] leading-relaxed text-[var(--color-ink-2)]">
+                No studios yet. They appear here the moment an application is approved on{' '}
+                <Link href="/ops/applications" className="font-medium">
+                  Applications
+                </Link>
+                , and stay until every check is recorded.
+              </p>
+            ) : null}
           </div>
         </Container>
       </main>

@@ -24,7 +24,8 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
-import { requireRole, type AuthUser } from '@/modules/auth/session';
+import { requireRole, getCurrentUser, hasRole, type AuthUser } from '@/modules/auth/session';
+import { hasDatabase } from '@/lib/env';
 import { assessTier } from './tiers';
 import { validateGstin } from './gstin';
 import type { CheckResult, CheckType, StudioStatus } from '@/modules/studio/types';
@@ -273,9 +274,29 @@ export interface AuditEntry {
   after: unknown;
 }
 
+/**
+ * The audit trail for one studio.
+ *
+ * `hasRole`, not `requireRole` — and the difference is a live 500.
+ *
+ * This is a RENDER-path read: `/ops/[slug]` awaits it while building the page.
+ * `requireRole` throws, and a throw during render races the layout's redirect
+ * and wins, so a non-OPS visitor got a stack trace instead of a redirect — and
+ * under the dev bypass, where there is no session at all, EVERY studio detail
+ * page was a guaranteed 500. That page is what every row on `/ops/verification`
+ * and `/ops/allocation` links to.
+ *
+ * Four other comments in this codebase warn about exactly this mistake. It is
+ * now the non-throwing form the rest of the ops surface uses: no rows rather
+ * than no page, and `hasDatabase()` so an unmigrated database degrades the
+ * same way.
+ */
 export async function studioAuditTrail(studioId: string, limit = 50): Promise<AuditEntry[]> {
-  await requireRole('OPS');
+  const user = await getCurrentUser();
+  if (!hasRole(user, 'OPS')) return [];
+  if (!hasDatabase()) return [];
 
+  try {
   const rows = await prisma.auditLog.findMany({
     where: {
       OR: [
@@ -296,4 +317,7 @@ export async function studioAuditTrail(studioId: string, limit = 50): Promise<Au
     before: r.before,
     after: r.after,
   }));
+  } catch {
+    return [];
+  }
 }

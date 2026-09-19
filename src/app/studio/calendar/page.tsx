@@ -1,3 +1,5 @@
+import { isLive } from '@/modules/studio/features';
+import { ComingSoon } from '../ComingSoon';
 import type { Metadata } from 'next';
 import { Container, Pill } from '@/components/ui';
 import {
@@ -41,6 +43,11 @@ export const dynamic = 'force-dynamic';
  * absence, which is the part a component should own.
  */
 export default async function CalendarPage() {
+  /* Not in the pilot. The rail already stops linking here; this stops a
+     bookmark or a typed URL reaching a screen we are not standing behind
+     yet. Flip the flag in modules/studio/features.ts to ship it. */
+  if (!isLive('calendar')) return <ComingSoon feature="calendar" />;
+
   const all = await myAppointments();
 
   const next = upcoming(all);
