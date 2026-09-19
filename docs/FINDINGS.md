@@ -156,7 +156,8 @@ Same rule as 2.5, and the same rule `types.ts` opens with.
 | 3.1 | `createShareLinkAction` / `revokeShareLinkAction` unreferenced anywhere; no share button exists, though `/shared/[token]` does | `src/app/compare/actions.ts` |
 | 3.2 | Literal hex `#857b6f`, against the module's own "never a literal hex" rule | `CompareClient.tsx:112,356` |
 | 3.3 | Three different button treatments for one design system — `oi-cta`, `Cta`, and raw `<Link>` with inline `background: var(--acc-btn)` | `CompareClient.tsx:557`, `ExpertForm.tsx` |
-| 3.4 | "Remove" and "Clear stars" are ~12px text with no padding — under the 44px target `Star` correctly meets | `CompareClient.tsx:231,274` |
+| 3.4 | ~~"Remove" and "Clear stars" under the 44px target~~ — fixed in the styling pass | `CompareClient.tsx` |
+| 3.4b | `/expert`'s submit sits disabled below `minStudios`, which contradicts `CompareBar`'s own rule: *"A greyed-out button is a puzzle: it says no without saying why."* Compare states what is missing in words and renders no button; expert should do the same | `ExpertForm.tsx` |
 | 3.5 | Room group header `sticky left-0` without `z-10` while row headers have it — visible z-order break on horizontal scroll | `CompareClient.tsx:450` |
 | 3.6 | `MaterialList` fallback renders unknown specs as plain grey text, so "tap any material you do not recognise" is false for anything outside the 15-entry glossary | `CompareClient.tsx:72-76` |
 | 3.7 | `generateStaticParams` is dead under `dynamic = 'force-dynamic'` | `studios/[slug]/page.tsx:40,42` |

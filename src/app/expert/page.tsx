@@ -35,7 +35,7 @@ export default async function ExpertPage() {
 
   if (!id) {
     return (
-      <div className="oi-app min-h-dvh bg-[var(--bg)]">
+      <div className="oi-app oi-quick min-h-dvh bg-[var(--bg)]">
         <AppHeader />
         <Spine at="expert" />
         <BriefRescue destination="the expert call" />
@@ -71,7 +71,7 @@ export default async function ExpertPage() {
   ].filter((f): f is { label: string; value: string } => f !== null);
 
   return (
-    <div className="oi-app min-h-dvh bg-[var(--bg)]">
+    <div className="oi-app oi-quick min-h-dvh bg-[var(--bg)]">
       <AppHeader />
       <Spine
         at="expert"
@@ -102,7 +102,7 @@ export default async function ExpertPage() {
             line, a named studio behind every quote. Asking for a phone number
             on behalf of "an expert" was the one place we sounded like a sales
             queue. */}
-        <Sheet className="mb-10 p-[clamp(22px,3vw,32px)]">
+        <div className="oi-pane mb-10 p-[clamp(22px,3vw,32px)]">
           <div className="mb-5 flex flex-wrap items-baseline justify-between gap-x-8 gap-y-2">
             <div>
               <p className="oi-eyebrow m-0 mb-2">Who will ring you</p>
@@ -139,7 +139,7 @@ export default async function ExpertPage() {
               </Flag>
             </p>
           ) : null}
-        </Sheet>
+        </div>
 
         {/* What they will already have read. "Briefed, not a cold intro" is a
             claim; this is the evidence, and everything in it is drawn from the

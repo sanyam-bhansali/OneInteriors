@@ -100,8 +100,6 @@ export function ExpertForm({
     ];
   }, [studios]);
 
-  const questions = [...generated, ...STANDARD];
-
   /** Ticked questions first, then whatever they wrote. One paragraph for ops. */
   const composed = [
     ...asks.map((q) => `• ${q}`),
@@ -146,8 +144,7 @@ export function ExpertForm({
           </p>
           <a
             href="/prepare"
-            className="inline-block px-6 py-3 text-[14.5px] font-medium text-white no-underline"
-            style={{ background: 'var(--acc-btn)' }}
+            className="oi-cta inline-flex min-h-11 items-center px-6 py-3 text-[14.5px] no-underline"
           >
             Prepare for the call
           </a>
@@ -234,45 +231,40 @@ export function ExpertForm({
           requirement&rdquo;.
         </p>
 
+        {/* ── The two that came from their own numbers ──
+            Separated from the canned list, and labelled, because they are not
+            the same kind of thing. "Why is Teakline about ₹1.2 L more than
+            Chitra & Co.?" is the question the customer has already been
+            asking themselves since the compare screen, with both studios named
+            and the gap in rupees — computed from their quotes, not written by
+            us and hoping to land.
+
+            They were mixed into the standard list wearing a 10px grey caption.
+            A question we derived from this person's own spread is the single
+            most persuasive thing on the page, and it read as a footnote. */}
+        {generated.length > 0 ? (
+          <div className="mb-5">
+            <p className="oi-eyebrow m-0 mb-3">From your own quotes</p>
+            <ul className="m-0 flex list-none flex-col gap-2 p-0">
+              {generated.map((q) => (
+                <li key={q}>
+                  <Ask q={q} on={asks.includes(q)} onToggle={() => toggleAsk(q)} derived />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {generated.length > 0 ? (
+          <p className="oi-eyebrow m-0 mb-3">Things most people ask</p>
+        ) : null}
+
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
-          {questions.map((q, i) => {
-            const on = asks.includes(q);
-            const fromYours = i < generated.length;
-            return (
-              <li key={q}>
-                <button
-                  type="button"
-                  onClick={() => toggleAsk(q)}
-                  aria-pressed={on}
-                  className="flex w-full min-h-11 cursor-pointer items-start gap-3 border px-4 py-3 text-left text-[14px] leading-snug transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--acc)]"
-                  style={{
-                    borderColor: on ? 'var(--sec)' : 'var(--line)',
-                    background: on ? 'rgba(131,144,115,.09)' : 'var(--card)',
-                  }}
-                >
-                  <span className="flex h-[19px] flex-none items-center">
-                    {on ? (
-                      <Tick style={{ color: 'var(--sec)' }} />
-                    ) : (
-                      <span
-                        aria-hidden
-                        className="h-[13px] w-[13px] rounded-full border"
-                        style={{ borderColor: 'var(--line)' }}
-                      />
-                    )}
-                  </span>
-                  <span className="min-w-0">
-                    {q}
-                    {fromYours ? (
-                      <span className="oi-num ml-2 whitespace-nowrap text-[10px] uppercase tracking-[0.14em] text-[var(--ink2)]">
-                        from your quotes
-                      </span>
-                    ) : null}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
+          {STANDARD.map((q) => (
+            <li key={q}>
+              <Ask q={q} on={asks.includes(q)} onToggle={() => toggleAsk(q)} />
+            </li>
+          ))}
         </ul>
 
         <div className="mt-5">
@@ -342,8 +334,7 @@ export function ExpertForm({
         <button
           type="submit"
           disabled={pending || picked.length < minStudios}
-          className="cursor-pointer px-7 py-3.5 text-[15px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
-          style={{ background: 'var(--acc-btn)' }}
+          className="oi-cta min-h-11 cursor-pointer border-0 px-7 py-3.5 text-[15px] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {pending ? 'Sending…' : 'Request the call'}
         </button>
@@ -354,6 +345,59 @@ export function ExpertForm({
         </p>
       </div>
     </form>
+  );
+}
+
+/**
+ * One question the customer can hand to the architect.
+ *
+ * `derived` marks the ones computed from this customer's own quote spread
+ * rather than written by us. It gets a sage rule down its left edge and the
+ * label sits above the group rather than inside each row: a badge on every
+ * item in a group of two says the same thing twice and competes with the
+ * question itself, which is the part worth reading.
+ *
+ * Both states are a shape as well as a colour — a tick or an empty ring — per
+ * docs/DESIGN-LANGUAGE.md §4.4. Sage is verification and better-spec here,
+ * never an action, so the button that submits is terracotta and these are not.
+ */
+function Ask({
+  q,
+  on,
+  onToggle,
+  derived = false,
+}: {
+  q: string;
+  on: boolean;
+  onToggle: () => void;
+  derived?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={on}
+      className="flex min-h-11 w-full cursor-pointer items-start gap-3 border px-4 py-3 text-left text-[14px] leading-snug transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--acc)]"
+      style={{
+        borderColor: on ? 'var(--sec)' : 'var(--line)',
+        background: on ? 'rgba(131,144,115,.09)' : 'var(--card)',
+        borderLeftWidth: derived ? 3 : 1,
+        borderLeftColor: derived ? 'var(--sec)' : on ? 'var(--sec)' : 'var(--line)',
+      }}
+    >
+      <span className="flex h-[19px] flex-none items-center">
+        {on ? (
+          <Tick style={{ color: 'var(--sec)' }} />
+        ) : (
+          <span
+            aria-hidden
+            className="h-[13px] w-[13px] rounded-full border"
+            style={{ borderColor: 'var(--line)' }}
+          />
+        )}
+      </span>
+      <span className="min-w-0">{q}</span>
+    </button>
   );
 }
 
