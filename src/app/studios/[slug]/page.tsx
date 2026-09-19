@@ -166,11 +166,13 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
             0.72-over-Raw-Silk composite that docs/DESIGN-LANGUAGE.md §4 is
             computed against: ink2 5.56:1, acc-ink 5.76:1, sec-ink 5.19:1. */}
         <section>
-          <PlanFragment
-            seed={studio.id}
-            styles={studio.portfolio.flatMap((p) => p.styleTags)}
-            className="block h-28 w-full sm:h-36"
-          />
+          <div className="oi-band">
+            <PlanFragment
+              seed={studio.id}
+              styles={studio.portfolio.flatMap((p) => p.styleTags)}
+              className="block h-20 w-full sm:h-24"
+            />
+          </div>
 
           <Wrap className="relative -mt-8 pb-12">
             <div className="oi-pane p-[clamp(22px,3vw,34px)]">
@@ -236,11 +238,13 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
                 specComplianceRate={studio.specComplianceRate}
               />
 
-              <p className="q-small m-0 mt-8 max-w-[64ch] border-t border-[var(--line)] pt-5 text-[var(--ink2)]">
-                {describeDelivery(studio)}{' '}
-                {studio.completedProjects === 0
-                  ? 'These figures only exist once a studio has completed a project on a milestone plan we monitored — so a new studio shows nothing here rather than an estimate.'
-                  : 'Every figure here is computed from milestone approvals, not self-reported.'}
+              {/* One line, not two. describeDelivery() already states there
+                  is no record; the sentence that followed it explained the
+                  same fact at length, and the four cells above had each
+                  already named their own missing measurement. Three ways of
+                  saying nothing has been measured is two too many. */}
+              <p className="q-small m-0 mt-8 max-w-[58ch] border-t border-[var(--line)] pt-5 text-[var(--ink2)]">
+                {describeDelivery(studio)}
               </p>
             </Sheet>
           </Wrap>
@@ -260,18 +264,26 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
                 </span>
               }
             >
-              {TIER_DESCRIPTIONS[studio.tier]} Interior design is an unregulated profession in India
-              — there is no licence to check — so we verify the business and its trading history,
-              and we are explicit about what that does and does not prove.
+              {TIER_DESCRIPTIONS[studio.tier]}
             </Chapter>
 
             <Verified checks={studio.checks} tier={TIER_LABELS[studio.tier]} />
 
-            {studio.gstin ? (
-              <p className="oi-label m-0 mt-10 border-t border-[var(--line)] pt-5">
-                GSTIN {studio.gstin} · verifiable free on the GST portal, by you, today
-              </p>
-            ) : null}
+            <div className="mt-10 flex flex-wrap items-baseline justify-between gap-x-8 gap-y-3 border-t border-[var(--line)] pt-5">
+              {studio.gstin ? (
+                <p className="oi-label m-0">
+                  GSTIN {studio.gstin} · verifiable free on the GST portal, by you, today
+                </p>
+              ) : (
+                <span />
+              )}
+              {/* The "interior design is unregulated in India" argument was a
+                  paragraph at the top of this section, before the reader had
+                  seen any evidence. It is a good argument and it belongs where
+                  somebody who has just read the file might want it — and in
+                  full on /verification, which is a page we already have. */}
+              <Quiet href="/verification">Why we check these, and what it does not prove</Quiet>
+            </div>
           </Wrap>
         </section>
 

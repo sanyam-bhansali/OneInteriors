@@ -1169,6 +1169,35 @@ p {
   }
 }
 
+/* The generated drawing at the head of a studio profile.
+
+   On its own it read as a pale grey plate sitting above the page rather than
+   part of it — the drawings are built from the style palettes, which are
+   material colours and deliberately not the product's own, so an untreated
+   band is the one place on the page speaking a third palette.
+
+   Tinted into Raw Silk and faded out at the bottom edge, so it hands over to
+   the page instead of stopping. Nothing reads on top of it, so unlike the
+   card this can safely be decoration. */
+.oi-band {
+  position: relative;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.oi-band > * {
+  opacity: 0.55;
+  mix-blend-mode: multiply;
+}
+
+.oi-band::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(234, 230, 223, 0) 35%, var(--bg) 100%);
+}
+
 /* ── The comparison table ──
 
    The page's own doc comment says it exists so "the eye can travel across a

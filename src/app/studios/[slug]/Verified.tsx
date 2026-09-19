@@ -57,17 +57,17 @@ const COMMERCIAL: CheckType[] = ['RATE_CARD_FILED', 'WARRANTY_TERMS', 'LABOUR_IN
 const GROUPS: { title: string; blurb: string; types: CheckType[] }[] = [
   {
     title: 'Who they are',
-    blurb: 'That the business and the people behind it are real, and findable.',
+    blurb: 'Real people, at a real address.',
     types: TIER_CHECKS.LISTED,
   },
   {
     title: 'How they trade',
-    blurb: 'That it is a working business with a history, not a dormant registration.',
+    blurb: 'A working business, not a dormant registration.',
     types: TIER_CHECKS.VERIFIED.filter((t) => !COMMERCIAL.includes(t)),
   },
   {
     title: 'What protects you',
-    blurb: 'What you hold after handover, and who covers the people in your home.',
+    blurb: 'What you hold after handover.',
     types: COMMERCIAL,
   },
 ];
@@ -125,22 +125,25 @@ function Row({ check, i, on }: { check: VerificationCheck; i: number; on: boolea
       className="oi-check"
       data-on={on ? 'yes' : 'no'}
       style={{ '--i': i } as React.CSSProperties}
+      /* What the check means, in the customer's language. It used to print
+         under every row, which is fifteen explanatory sentences stacked in one
+         column and read as a wall — the same mistake the material glossary
+         made and fixed ("cards, not prose", 350 words down to 87).
+
+         The group blurb above already says what the group proves, so the
+         per-row sentence was mostly restating it one check at a time. Kept
+         here rather than deleted: the words are good and a disclosure can
+         surface them again if the section ever needs to teach rather than
+         evidence. Only on PASS — "we walked through finished homes they
+         built" beside a PENDING check is a straightforward lie. */
+      title={check.result === 'PASS' ? CHECK_MEANINGS[check.type] : undefined}
     >
       <Glyph result={check.result} />
       <div className="min-w-0">
-        <p className="m-0 text-[14px] font-semibold leading-snug text-[var(--ink)]">
+        <p className="m-0 text-[13.5px] font-semibold leading-snug text-[var(--ink)]">
           {CHECK_LABELS[check.type]}
         </p>
-
-        {/* Only when it passed. "We walked through finished homes they built"
-            printed beside a PENDING check is a straightforward lie. */}
-        {check.result === 'PASS' ? (
-          <p className="m-0 mt-1 max-w-[44ch] text-[13px] leading-snug text-[var(--ink2)]">
-            {CHECK_MEANINGS[check.type]}
-          </p>
-        ) : null}
-
-        {provenance ? <p className="oi-label m-0 mt-1.5">{provenance}</p> : null}
+        {provenance ? <p className="oi-label m-0 mt-1">{provenance}</p> : null}
       </div>
     </li>
   );
@@ -188,7 +191,7 @@ export function Verified({ checks, tier }: { checks: VerificationCheck[]; tier: 
         return (
           <section key={group.title}>
             <h3 className="oi-eyebrow m-0">{group.title}</h3>
-            <p className="m-0 mt-2 max-w-[34ch] text-[13px] leading-snug text-[var(--ink2)]">
+            <p className="m-0 mt-1.5 max-w-[30ch] text-[12.5px] leading-snug text-[var(--ink2)]">
               {group.blurb}
             </p>
             <ul className="m-0 mt-5 flex list-none flex-col gap-4 border-t border-[var(--line)] p-0 pt-5">

@@ -323,6 +323,38 @@ describe('the namespace is not shared with the landing page', () => {
   });
 });
 
+describe('prose does not creep back in', () => {
+  /**
+   * The glossary's rule, applied to the profile.
+   *
+   * `glossary.ts` says it directly: "The test suite enforces the lengths.
+   * Prose creeping back into the card fields is the exact regression this
+   * shape exists to prevent." The verification section made the same mistake
+   * the glossary had already made and fixed — fifteen rows each carrying an
+   * explanatory sentence, which is a wall rather than a file.
+   *
+   * The meaning still rides on the row as its title, so nothing is lost.
+   */
+  it('the verification rows do not render a sentence under every check', () => {
+    const src = readFileSync(join(ROOT, 'src/app/studios/[slug]/Verified.tsx'), 'utf8');
+
+    // It may be handed to `title`; it may not be rendered as visible copy.
+    expect(src).toContain('title={check.result');
+    expect(src).not.toMatch(/<p[^>]*>\s*\{CHECK_MEANINGS/);
+  });
+
+  it('the group captions stay captions', () => {
+    const src = readFileSync(join(ROOT, 'src/app/studios/[slug]/Verified.tsx'), 'utf8');
+    const blurbs = [...src.matchAll(/blurb:\s*'([^']+)'/g)].map((m) => m[1]!);
+
+    expect(blurbs.length).toBeGreaterThan(0);
+    for (const b of blurbs) {
+      // A caption names the group. An argument belongs on /verification.
+      expect(b.split(/\s+/).length, `"${b}" has grown into a sentence`).toBeLessThanOrEqual(9);
+    }
+  });
+});
+
 describe('the traps the doc lists', () => {
   it('the glass transform is composed from custom properties', () => {
     // Two rules both setting `transform` is the sharpest trap here: the
