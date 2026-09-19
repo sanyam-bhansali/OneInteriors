@@ -41,6 +41,7 @@ import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
 import { QuoteFlow, type QuoteRequest } from '@/components/oi/QuoteFlow';
 import { Wrap, Chapter, Sheet, Quiet } from '@/components/oi';
 import { MatchRow } from './MatchRow';
+import { saveQuoteAction, saveDecisionAction } from './journey-actions';
 import type { Studio } from '@/modules/studio/types';
 import type { Brief } from '@/modules/brief/types';
 
@@ -130,6 +131,14 @@ export function MatchClient({
               })
             }
             onBuilt={(quote, plan) => {
+              /* The durable copy, written behind the screen.
+                 Deliberately not awaited: sessionStorage below has already
+                 put the quote in front of the customer, and a slow or
+                 unreachable database must not hold up a document they are
+                 looking at. If it fails we lose a row, which is where this
+                 product was before the table existed. */
+              void saveQuoteAction({ studioSlug: quoting.studioSlug, quote, plan });
+
               update({
                 ...project,
                 plan,
@@ -247,14 +256,16 @@ export function MatchClient({
                     update({ ...project, reads: { ...project.reads, [id]: read } })
                   }
                   onQuote={() => setQuoting(requestFor(studio))}
-                  onToggleCompare={() =>
-                    update({
-                      ...project,
-                      comparing: comparing.includes(studio.slug)
-                        ? comparing.filter((x) => x !== studio.slug)
-                        : [...comparing, studio.slug],
-                    })
-                  }
+                  onToggleCompare={() => {
+                    const next = comparing.includes(studio.slug)
+                      ? comparing.filter((x) => x !== studio.slug)
+                      : [...comparing, studio.slug];
+                    update({ ...project, comparing: next });
+                    void saveDecisionAction({
+                      comparedSlugs: next,
+                      starredCodes: project.starred,
+                    });
+                  }}
                 />
               );
             })}

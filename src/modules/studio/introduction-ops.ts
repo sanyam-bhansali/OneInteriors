@@ -67,6 +67,16 @@ export interface OpsIntroduction {
   appointments: OpsAppointment[];
 
   /**
+   * Whether this brief has been recorded as won, and by whom.
+   *
+   * `wonHere` is the only one the card acts on; `wonByOther` exists so a row
+   * can say "another studio got this" rather than offering a button that would
+   * silently overwrite a decision somebody already recorded.
+   */
+  wonHere: boolean;
+  wonByOther: boolean;
+
+  /**
    * What, if anything, this row is waiting on us for. Null when nothing is.
    *
    * Computed here rather than in the page so the overview count and the list
@@ -102,7 +112,15 @@ export async function listIntroductions(limit = 100): Promise<OpsIntroduction[]>
         contactReleasedAt: true,
         consultationId: true,
         studio: { select: { id: true, tradeName: true, slug: true } },
-        brief: { select: { locality: true, propertyType: true } },
+        brief: {
+          select: {
+            locality: true,
+            propertyType: true,
+            /* The outcome, so a row can show what was already decided rather
+               than offering to decide it again. */
+            quoteDecision: { select: { wonByStudioId: true } },
+          },
+        },
         appointments: {
           orderBy: { startsAt: 'asc' },
           select: {
@@ -168,6 +186,10 @@ export async function listIntroductions(limit = 100): Promise<OpsIntroduction[]>
         locality: row.brief.locality,
         propertyType: row.brief.propertyType,
         appointments,
+        wonHere: row.brief.quoteDecision?.wonByStudioId === row.studio.id,
+        wonByOther:
+          row.brief.quoteDecision?.wonByStudioId != null &&
+          row.brief.quoteDecision.wonByStudioId !== row.studio.id,
         needs: whatItNeeds(row.withdrawnAt, appointments),
       };
     });

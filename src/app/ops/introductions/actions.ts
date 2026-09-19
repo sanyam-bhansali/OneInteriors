@@ -1,6 +1,9 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { prisma } from '@/lib/prisma';
+import { requireRole } from '@/modules/auth/session';
+import { recordOutcome } from '@/modules/quotation/journey-repository';
 import {
   releaseContactDetails,
   withdrawIntroduction,
@@ -108,5 +111,47 @@ export async function arrangeAction(input: {
     location: input.location,
   });
   if (!result.ok) return { ok: false, error: result.error };
+  return done();
+}
+
+/**
+ * This studio got the work.
+ *
+ * The column every stored quote exists to eventually fill. Without it we have
+ * a record of what we priced and no record of what worked — homework nobody
+ * marks — and the question the business actually has to answer one day is
+ * which quotes turned into projects and what those had in common.
+ *
+ * Ops records it because ops is the only party who reliably finds out. The
+ * studio knows, but a studio marking its own win in its own CRM is a claim
+ * about money it owes us, and the source is stored precisely so the two can be
+ * told apart later.
+ *
+ * There is deliberately no "mark as lost". Most briefs never reach a decision
+ * at all, and a screen with a Lost button gets one pressed on every quiet row
+ * — after which the data says we lose nearly everything. Silence stays
+ * silence.
+ */
+export async function recordWonAction(introductionId: string): Promise<Result> {
+  await requireRole('OPS');
+
+  const intro = await prisma.introduction.findUnique({
+    where: { id: introductionId },
+    select: { briefId: true, studioId: true, withdrawnAt: true },
+  });
+  if (!intro) return { ok: false, error: 'That introduction no longer exists.' };
+  if (intro.withdrawnAt) {
+    return {
+      ok: false,
+      error: 'This introduction was withdrawn. It cannot also be the one that won.',
+    };
+  }
+
+  await recordOutcome({
+    briefId: intro.briefId,
+    wonByStudioId: intro.studioId,
+    source: 'OPS_RECORDED',
+  });
+
   return done();
 }

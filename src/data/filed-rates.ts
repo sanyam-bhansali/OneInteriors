@@ -82,6 +82,19 @@ export function ratesAreReal(): boolean {
 }
 
 /**
+ * What produced a stored quote.
+ *
+ * Every row in `first_quotes` is priced on whatever this file held on the day
+ * it was built. Right now that is one studio's archive medians wearing another
+ * studio's name, and in a year nobody reading the table will remember that
+ * unless the row says so. Bump this whenever the rate source changes —
+ * `archive-median@1` → `filed@1` when ingestion runs for real — so a later
+ * analysis can tell the placeholder period apart from the honest one instead
+ * of averaging them together.
+ */
+export const RATES_VERSION = 'archive-median@1';
+
+/**
  * A stable number in roughly [-1, 1] from a slug.
  *
  * Deterministic on purpose: the same studio must show the same rates on every

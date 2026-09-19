@@ -36,6 +36,7 @@ import { tallyStarred, starredGap } from '@/modules/quotation/starred';
 import { loadProject, saveProject, MIN_TO_COMPARE, type Project } from '@/modules/quotation/project-store';
 import { splitSpec, type Material } from '@/modules/materials/glossary';
 import { ratesAreReal } from '@/data/filed-rates';
+import { saveDecisionAction } from '@/app/match/journey-actions';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
 import { Spec, MaterialChip, MaterialPanel } from '@/components/oi/Material';
 import { Wrap, Chapter, Sheet, Quiet, Flag } from '@/components/oi';
@@ -141,16 +142,26 @@ export function CompareClient() {
     saveProject(next);
   };
 
-  const drop = (slug: string) =>
-    save({ ...project, comparing: project.comparing.filter((s) => s !== slug) });
+  const drop = (slug: string) => {
+    const comparing = project.comparing.filter((s) => s !== slug);
+    save({ ...project, comparing });
+    void saveDecisionAction({ comparedSlugs: comparing, starredCodes: project.starred });
+  };
 
-  const toggleStar = (code: string) =>
-    save({
-      ...project,
-      starred: project.starred.includes(code)
-        ? project.starred.filter((c) => c !== code)
-        : [...project.starred, code],
-    });
+  /**
+   * A star is the most direct statement of intent in the whole product.
+   *
+   * Not what somebody said they wanted in the quiz, before they had seen a
+   * price — which work they checked the price of twice. It used to live only
+   * in sessionStorage and evaporate with the tab.
+   */
+  const toggleStar = (code: string) => {
+    const starred = project.starred.includes(code)
+      ? project.starred.filter((c) => c !== code)
+      : [...project.starred, code];
+    save({ ...project, starred });
+    void saveDecisionAction({ comparedSlugs: project.comparing, starredCodes: starred });
+  };
 
   if (!comparison) {
     return (
@@ -262,7 +273,13 @@ export function CompareClient() {
               </p>
               <button
                 type="button"
-                onClick={() => save({ ...project, starred: [] })}
+                onClick={() => {
+                  save({ ...project, starred: [] });
+                  void saveDecisionAction({
+                    comparedSlugs: project.comparing,
+                    starredCodes: [],
+                  });
+                }}
                 className="oi-num cursor-pointer border-0 bg-transparent p-0 text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink2)] hover:text-[var(--ink)]"
               >
                 Clear stars

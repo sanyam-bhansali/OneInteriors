@@ -34,6 +34,7 @@ export function OpsHeader() {
                 until now, the only half nothing on this surface could see. */}
             <OpsLink href="/ops/introductions">Introductions</OpsLink>
             <OpsLink href="/ops/funnel">Funnel</OpsLink>
+            <OpsLink href="/ops/data">Data</OpsLink>
             <OpsLink href="/">Public site</OpsLink>
           </nav>
         </div>

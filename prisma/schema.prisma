@@ -257,6 +257,10 @@ model Brief {
   prepRooms     PrepRoom[]
   introductions Introduction[]
 
+  /// What the brief actually led to. See "THE CUSTOMER JOURNEY, KEPT".
+  firstQuotes   FirstQuote[]
+  quoteDecision QuoteDecision?
+
   /// Set when an anonymous brief is attached to an account. Kept for the
   /// funnel: the gap between completedAt and this is how long people take to
   /// decide we are worth a phone number.
@@ -483,6 +487,12 @@ model Studio {
   profileDraft  ProfileDraft?
   allocations   AllocationPeriod[]
   introductions Introduction[]
+
+  /// First quotes generated against this studio, and the briefs it won.
+  /// `wonQuoteDecisions` is named because a Studio reaches QuoteDecision
+  /// twice — once through its quotes, once as the winner.
+  firstQuotes       FirstQuote[]
+  wonQuoteDecisions QuoteDecision[] @relation("FirstQuoteWinner")
 
   // The studio's own software. See the section at the foot of this file.
   branding         StudioBranding?
@@ -1957,4 +1967,191 @@ model StudioVendorPayment {
 
   @@index([workOrderId, paidOn])
   @@map("studio_vendor_payments")
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// THE CUSTOMER JOURNEY, KEPT
+//
+// Everything below records what a customer actually did with the quotes
+// we gave them. Until this existed, the single richest signal in the
+// product was thrown away: the generated quotes, which studios were put
+// side by side and which lines mattered lived in sessionStorage and died
+// when the tab closed. The brief survived; what the brief led to did not.
+//
+// ## Why this is worth a table rather than an event
+//
+// `AnalyticsEvent` already records that a quote was viewed. That answers
+// "how many" and can never answer "which" — it carries no amounts, no
+// lines and no materials, and by design it holds numbers and slugs only.
+// The question this business eventually has to answer is *which quotes
+// turned into work, and what did the ones that won have in common* — and
+// that needs the quote itself, not a counter that one happened.
+//
+// ## The rule these tables obey
+//
+// A quote with no outcome teaches nothing. `FirstQuoteSet.wonByStudioId`
+// is the column everything here exists to eventually fill; recording the
+// quotes without it would be collecting homework nobody marks. It is
+// nullable because most briefs never reach a decision, and an unfilled
+// outcome must read as unknown rather than as a loss.
+//
+// ## What is deliberately NOT here
+//
+// The floor plan file (it is in a private bucket, and its object path is
+// already on Brief). Anything the studio wrote. And any judgement about
+// why one quote beat another — that is an inference, and inferences do
+// not belong in the same table as facts.
+// ─────────────────────────────────────────────────────────────────────
+
+/// One studio, priced once, against one brief.
+///
+/// Regenerating replaces the row rather than adding a second: the customer
+/// has one quote per studio at any moment and a history of supersedes would
+/// make every later query ask "which one did they actually see?".
+model FirstQuote {
+  id      String @id @default(cuid())
+  briefId String
+  brief   Brief  @relation(fields: [briefId], references: [id], onDelete: Cascade)
+
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  // The commercial shape, in paise. Stored rather than recomputed, because
+  // the rate card behind it moves and a quote is a thing we said on a day.
+  modularPaise         BigInt
+  nonModularPaise      BigInt
+  modularDiscountPaise BigInt
+  professionalFeePaise BigInt
+  gstPaise             BigInt
+  totalPaise           BigInt
+  lowPaise             BigInt
+  highPaise            BigInt
+  variancePct          Float
+
+  /// The one measurement that genuinely comes from the plan, and the single
+  /// biggest mover of the total. Null when a standard kitchen was assumed.
+  kitchenRunMm Int?
+
+  /// Where that number came from: the plan, the customer's tape measure, or
+  /// our standard. It is why the band is ±10% or ±16%, so it has to survive.
+  runSource RunSource
+
+  /// Catalogue codes this studio had filed no rate for. A quote that silently
+  /// omits work is the defect the whole product argues against, so the gaps
+  /// are recorded as explicitly as the prices.
+  notPriced String[] @default([])
+
+  /// Which rate data produced this. While `ratesAreReal()` is false every row
+  /// here is priced on archive medians wearing a studio's name, and a year
+  /// from now nobody will remember that unless the row says so.
+  ratesVersion String
+
+  builtAt   DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines FirstQuoteLine[]
+
+  /// One quote per studio per brief. Regenerating updates in place.
+  @@unique([briefId, studioId])
+  @@index([briefId, totalPaise])
+  @@index([studioId, builtAt])
+  @@map("first_quotes")
+}
+
+/// A line of a first quote, with its quantity and its material.
+///
+/// The lines are kept in full, not summarised to a room subtotal. A total
+/// without the lines under it is precisely what the landing page holds up as
+/// the thing wrong with every other quote in this market, and storing it that
+/// way would make our own records worse than the document we showed.
+model FirstQuoteLine {
+  id      String     @id @default(cuid())
+  quoteId String
+  quote   FirstQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  /// Catalogue code — the reason a row means the same thing across studios.
+  code  String
+  room  String
+  label String
+
+  /// MO / NM. Which half of the total this falls in.
+  work String
+
+  /// "1800 × 2100 mm", "104 sq ft". What the customer was shown.
+  size     String
+  quantity Float
+  unit     String
+
+  ratePaise   BigInt
+  amountPaise BigInt
+
+  /// THIS studio's own wording for the material. The only column that can
+  /// differ between two studios on the same code, and therefore the only one
+  /// that can ever explain a price gap.
+  spec String
+
+  /// False when a real kitchen run was supplied and this line used it.
+  standard Boolean @default(true)
+
+  @@unique([quoteId, code])
+  @@index([code])
+  @@map("first_quote_lines")
+}
+
+/// What the customer did with the quotes, and how it ended.
+///
+/// One row per brief. Starring and comparing are revisions of a single
+/// opinion rather than a log of separate acts — somebody who stars a line and
+/// unstars it has not told us two things.
+model QuoteDecision {
+  id      String @id @default(cuid())
+  briefId String @unique
+  brief   Brief  @relation(fields: [briefId], references: [id], onDelete: Cascade)
+
+  /// Studio slugs put side by side, in the order they were added.
+  comparedSlugs String[] @default([])
+
+  /// Catalogue codes the customer starred on the comparison.
+  ///
+  /// The most direct statement of intent anywhere in the product: not what
+  /// they said they wanted in the quiz, but which work they checked the price
+  /// of twice. Worth more than the brief for understanding a customer, and it
+  /// was being discarded.
+  starredCodes String[] @default([])
+
+  /// Set when we know. Null means unknown, never "lost" — most briefs simply
+  /// never reach a decision, and an unfilled outcome that reads as a loss
+  /// would poison every rate this is eventually used to calculate.
+  wonByStudioId String?
+  wonByStudio   Studio? @relation("FirstQuoteWinner", fields: [wonByStudioId], references: [id], onDelete: SetNull)
+
+  /// How we came to know. An outcome with no provenance is a rumour.
+  outcomeSource OutcomeSource?
+  decidedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([wonByStudioId])
+  @@map("quote_decisions")
+}
+
+/// Where the kitchen run came from, which is what sets the band.
+enum RunSource {
+  /// Read from the floor plan they uploaded. ±10%.
+  FLOOR_PLAN
+  /// They measured it themselves. ±12%.
+  CUSTOMER
+  /// Nobody measured; the standard 4400mm was used. ±16%.
+  STANDARD
+}
+
+/// How we learned who won. Never inferred from silence.
+enum OutcomeSource {
+  /// Ops recorded it after the introduction.
+  OPS_RECORDED
+  /// The studio marked the introduced client won in their own CRM.
+  STUDIO_CRM
+  /// The customer told us.
+  CUSTOMER_REPORTED
 }

@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import {
   releaseContactAction,
+  recordWonAction,
   withdrawAction,
   confirmAppointmentAction,
   closeAppointmentAction,
@@ -141,6 +142,37 @@ export function IntroductionCard({
           >
             Release contact details
           </button>
+        </div>
+      ) : null}
+
+      {/* ── The outcome ──
+          Every stored quote exists to eventually fill this in. Without it we
+          have a record of what we priced and none of what worked.
+
+          There is deliberately no "mark as lost". Most briefs never reach a
+          decision, and a Lost button gets pressed on every quiet row — after
+          which the data says we lose nearly everything. Silence stays
+          silence. */}
+      {!intro.withdrawnAt ? (
+        <div className="mb-3">
+          {intro.wonHere ? (
+            <p className="m-0 text-[13.5px] text-[var(--color-ontrack)]">
+              Recorded as won by {intro.studioName}.
+            </p>
+          ) : intro.wonByOther ? (
+            <p className="m-0 text-[13.5px] text-[var(--color-ink-3)]">
+              Another studio was recorded as winning this brief.
+            </p>
+          ) : (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => run(() => recordWonAction(intro.id))}
+              className={btn}
+            >
+              {intro.studioName} got the work
+            </button>
+          )}
         </div>
       ) : null}
 
