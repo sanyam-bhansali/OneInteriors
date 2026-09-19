@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Instrument_Serif, Instrument_Sans, IBM_Plex_Mono } from 'next/font/google';
+import { Instrument_Serif, Instrument_Sans, IBM_Plex_Mono, Quicksand } from 'next/font/google';
 import { siteUrl } from '@/lib/site';
 import { RosterGateBanner } from '@/components/RosterGateBanner';
 import './globals.css';
@@ -23,6 +23,24 @@ const display = Instrument_Serif({
 const sans = Instrument_Sans({
   subsets: ['latin'],
   variable: '--font-sans-loaded',
+  display: 'swap',
+});
+
+/**
+ * Quicksand — rounded, warm, and deliberately not the locked pairing.
+ *
+ * Loaded globally so the variable exists everywhere, but bound to the font
+ * tokens only inside `.oi-quick`, which today is just the match screen. That
+ * scope is the whole point: swapping the face app-wide in one go would leave
+ * /quiz and /compare either side of it in Instrument, and a customer walking
+ * that journey feels the change even if they cannot name it. When the face is
+ * approved for the rest of the product, move the class up to <body> and every
+ * screen follows in one line.
+ */
+const rounded = Quicksand({
+  weight: ['400', '500', '600', '700'],
+  subsets: ['latin'],
+  variable: '--font-rounded-loaded',
   display: 'swap',
 });
 
@@ -76,7 +94,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // var(--font-display) silently inherits the body sans instead.
     //
     // The symptom is that the serif simply never appears and nothing errors.
-    <html lang="en-IN" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
+    <html lang="en-IN" className={`${display.variable} ${sans.variable} ${mono.variable} ${rounded.variable}`}>
       <body>
         {/* The verification-gate warning lives HERE, not in SiteHeader.
             It was in SiteHeader, and it silently vanished on /match — the one

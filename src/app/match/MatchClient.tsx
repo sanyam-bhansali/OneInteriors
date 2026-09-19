@@ -26,7 +26,6 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { loadBrief } from '@/modules/brief/store';
 import { rankStudios, type MatchResult } from '@/modules/matching/score';
 import {
@@ -40,7 +39,10 @@ import { CHECK_COUNT } from '@/components/landing/checks';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
 import { QuoteFlow, type QuoteRequest } from '@/components/oi/QuoteFlow';
 import { Wrap, Chapter, Sheet, Quiet } from '@/components/oi';
-import { MatchRow } from './MatchRow';
+import { StudioCard } from './StudioCard';
+import { MatchHero } from './MatchHero';
+import { CompareBar } from './CompareBar';
+import { useScrollFocus } from './useScrollFocus';
 import { saveQuoteAction, saveDecisionAction } from './journey-actions';
 import type { Studio } from '@/modules/studio/types';
 import type { Brief } from '@/modules/brief/types';
@@ -87,6 +89,12 @@ export function MatchClient({
   );
 
   const byId = useMemo(() => new Map(studios.map((s) => [s.id, s])), [studios]);
+
+  /* Depth of field down the list — whatever is near the middle of the
+     viewport is in focus. Declared here with the other hooks because the
+     quote view below returns early, and a hook after a conditional return
+     is the classic order-of-hooks crash. */
+  const { register, focus } = useScrollFocus<HTMLLIElement>(matches.length);
 
   const update = (next: Project) => {
     setProject(next);
@@ -179,7 +187,7 @@ export function MatchClient({
   const comparing = project.comparing;
 
   return (
-    <div className="oi-app min-h-dvh bg-[var(--bg)]">
+    <div className="oi-app oi-quick min-h-dvh bg-[var(--bg)]">
       <AppHeader />
       <Spine
         at="match"
@@ -198,25 +206,16 @@ export function MatchClient({
       />
 
       <Wrap className="py-12">
-        <Chapter
-          eyebrow="Who fits"
-          title={
-            !briefed
-              ? 'Tell us about your flat first.'
-              : matches.length === 0
-                ? 'Nobody on the roster fits this brief.'
-                : `${matches.length} of the fourteen fit your brief.`
-          }
-          aside={
-            <p className="oi-num m-0 whitespace-nowrap text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink2)]">
-              Nobody can pay to sit higher
-            </p>
-          }
-        >
-          Scored on your answers — locality, scope, budget band, style, household — and on how many
-          of the {CHECK_COUNT} checks they have cleared. Open one to read it properly, or price it
-          straight away.
-        </Chapter>
+        {briefed && matches.length > 0 ? (
+          <MatchHero fit={matches.length} roster={studios.length} checkCount={CHECK_COUNT} />
+        ) : (
+          <Chapter
+            eyebrow="Who fits"
+            title={
+              !briefed ? 'Tell us about your flat first.' : 'Nobody on the roster fits this brief.'
+            }
+          />
+        )}
 
         {!briefed ? (
           <Sheet className="p-8">
@@ -235,7 +234,7 @@ export function MatchClient({
             <Quiet href="/quiz">Change your answers</Quiet>
           </Sheet>
         ) : (
-          <ul className="m-0 flex list-none flex-col gap-5 p-0">
+          <ul className="m-0 mt-12 flex list-none flex-col gap-5 p-0">
             {matches.map((match: MatchResult, i) => {
               const studio = byId.get(match.studioId);
               if (!studio || !brief) return null;
@@ -243,12 +242,14 @@ export function MatchClient({
               const stored = project.quotes[studio.slug];
 
               return (
-                <MatchRow
+                <StudioCard
                   key={studio.id}
+                  cardRef={register(i)}
+                  focus={focus[i] ?? 'near'}
                   studio={studio}
                   match={match}
                   brief={brief}
-                  rank={i + 1}
+                  rank={i}
                   quotedTotalPaise={stored?.quote.totalPaise ?? null}
                   inCompare={comparing.includes(studio.slug)}
                   cachedRead={project.reads?.[studio.id]}
@@ -273,31 +274,7 @@ export function MatchClient({
         )}
       </Wrap>
 
-      {/* The compare bar. Appears only once there is something to compare,
-          and says what is missing rather than sitting there disabled. */}
-      {quoted.length > 0 ? (
-        <div className="sticky bottom-0 z-20 border-t border-[var(--line)] bg-[var(--card)]/95 backdrop-blur">
-          <Wrap>
-            <div className="flex flex-wrap items-center justify-between gap-4 py-4">
-              <p className="m-0 text-[13.5px] text-[var(--ink2)]">
-                <span className="oi-num text-[var(--ink)]">{comparing.length}</span> selected ·{' '}
-                {comparing.length < MIN_TO_COMPARE
-                  ? 'pick one more to put them side by side'
-                  : 'ready to compare line for line'}
-              </p>
-              {comparing.length >= MIN_TO_COMPARE ? (
-                <Link
-                  href="/compare"
-                  className="px-5 py-2.5 text-[13.5px] font-medium text-white no-underline"
-                  style={{ background: 'var(--acc-btn)' }}
-                >
-                  Compare {comparing.length}
-                </Link>
-              ) : null}
-            </div>
-          </Wrap>
-        </div>
-      ) : null}
+      <CompareBar selected={comparing.length} minimum={MIN_TO_COMPARE} priced={quoted.length} />
 
       <AppFooter />
     </div>
