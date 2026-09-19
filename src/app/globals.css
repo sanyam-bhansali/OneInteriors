@@ -946,7 +946,7 @@ p {
    sheet makes that composite depend on whatever scrolls behind it, which is
    unmeasurable and therefore unshippable. A more transparent surface is
    allowed; it just cannot carry body text. */
-.oi-glass {
+.oi-pane {
   position: relative;
   border-radius: 22px;
   background: rgba(252, 252, 250, 0.72);
@@ -971,8 +971,8 @@ p {
     filter 0.45s ease;
 }
 
-.oi-glass:hover,
-.oi-glass:focus-within {
+.oi-pane:hover,
+.oi-pane:focus-within {
   --oi-lift: -4px;
   --oi-scale: 1.035;
   border-color: rgba(192, 97, 60, 0.42);
@@ -993,20 +993,20 @@ p {
    The real guarantee is the rule underneath: hover or focus returns a card
    to full immediately, so any card somebody is actually engaging with is
    never the faded one. A card you cannot read is a bug, not an effect. */
-.oi-glass[data-focus='far'] {
+.oi-pane[data-focus='far'] {
   --oi-scale: 0.97;
   opacity: 0.82;
   filter: blur(1.2px);
 }
 /* The card being read comes forward. 1.025 is enough to feel like it stepped
    toward you and small enough that the type does not visibly resample. */
-.oi-glass[data-focus='near'] {
+.oi-pane[data-focus='near'] {
   --oi-scale: 1.025;
   opacity: 1;
   filter: none;
 }
-.oi-glass[data-focus='far']:hover,
-.oi-glass[data-focus='far']:focus-within {
+.oi-pane[data-focus='far']:hover,
+.oi-pane[data-focus='far']:focus-within {
   opacity: 1;
   filter: none;
 }
@@ -1052,15 +1052,15 @@ p {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .oi-glass,
+  .oi-pane,
   .oi-cta {
     transition: none;
   }
-  .oi-glass,
-  .oi-glass:hover,
-  .oi-glass:focus-within,
-  .oi-glass[data-focus='near'],
-  .oi-glass[data-focus='far'],
+  .oi-pane,
+  .oi-pane:hover,
+  .oi-pane:focus-within,
+  .oi-pane[data-focus='near'],
+  .oi-pane[data-focus='far'],
   .oi-cta:hover,
   .oi-cta:active {
     --oi-scale: 1;
@@ -1068,7 +1068,7 @@ p {
     transform: none;
   }
   /* Depth-of-field is decoration. Everything stays legible and still. */
-  .oi-glass[data-focus='far'] {
+  .oi-pane[data-focus='far'] {
     opacity: 1;
     filter: none;
   }
@@ -1081,7 +1081,7 @@ p {
    Reusable. `/match` is the reference implementation (ProjectWings.tsx),
    not the owner. See docs/DESIGN-LANGUAGE.md §2.4 and §5.2.
 
-   Put `.oi-reveal` on the element that owns the card — it is the hover
+   Put `.oi-wings` on the element that owns the card — it is the hover
    and focus host and carries `data-open` — then `.oi-drawer` panels
    beside it, and `.oi-drawer-far` panels beyond those. Two layers is the
    limit; a third has nowhere to go on any screen we support.
@@ -1111,7 +1111,7 @@ p {
    margin element.
    ───────────────────────────────────────────────────────────────────── */
 
-.oi-reveal {
+.oi-wings {
   position: relative;
 }
 
@@ -1154,9 +1154,9 @@ p {
      wings out and scrolling past pulls them back in. Hover and focus-within
      open them wherever the card sits, for a reader skimming with a mouse or
      tabbing through. */
-  .oi-reveal[data-open='yes'] .oi-drawer,
-  .oi-reveal:hover .oi-drawer,
-  .oi-reveal:focus-within .oi-drawer {
+  .oi-wings[data-open='yes'] .oi-drawer,
+  .oi-wings:hover .oi-drawer,
+  .oi-wings:focus-within .oi-drawer {
     opacity: 1;
     transform: translateX(0) scale(1);
     pointer-events: auto;
@@ -1320,9 +1320,9 @@ p {
   transform: translate(-26px, 5px) scale(0.94);
 }
 
-.oi-reveal[data-open='yes'] .oi-pill,
-.oi-reveal:hover .oi-pill,
-.oi-reveal:focus-within .oi-pill {
+.oi-wings[data-open='yes'] .oi-pill,
+.oi-wings:hover .oi-pill,
+.oi-wings:focus-within .oi-pill {
   opacity: 1;
   transform: none;
   pointer-events: auto;
@@ -1386,16 +1386,16 @@ p {
   transition-delay: 0s;
 }
 
-.oi-reveal[data-open='yes'] .oi-pill-note,
-.oi-reveal:hover .oi-pill-note,
-.oi-reveal:focus-within .oi-pill-note {
+.oi-wings[data-open='yes'] .oi-pill-note,
+.oi-wings:hover .oi-pill-note,
+.oi-wings:focus-within .oi-pill-note {
   opacity: 1;
   transition-delay: calc(0.26s + var(--i, 0) * 0.09s);
 }
 
 /* The card has to sit above its own wings, or the panels slide out over
    the thing they belong to. */
-.oi-reveal > .oi-glass {
+.oi-wings > .oi-pane {
   position: relative;
   z-index: 1;
 }
@@ -1435,8 +1435,8 @@ p {
   }
   .oi-drawer-l,
   .oi-drawer-r,
-  .oi-reveal:hover .oi-drawer,
-  .oi-reveal:focus-within .oi-drawer {
+  .oi-wings:hover .oi-drawer,
+  .oi-wings:focus-within .oi-drawer {
     transform: none;
   }
   .oi-drawer > :nth-child(2) {
@@ -1448,7 +1448,7 @@ p {
      sliding and counting in.
 
      The open-state selectors are repeated in full rather than wrapped in
-     :where(). They have to — `.oi-reveal[data-open='yes'] .oi-pill` outweighs a
+     :where(). They have to — `.oi-wings[data-open='yes'] .oi-pill` outweighs a
      bare `.oi-pill`, so the short form alone would lose and the delays would
      survive. Matching the specificity exactly lets source order decide, and
      this block is last. */
@@ -1456,12 +1456,12 @@ p {
   .oi-pill-note,
   .oi-drawer-far-l .oi-pill,
   .oi-drawer-far-r .oi-pill,
-  .oi-reveal[data-open='yes'] .oi-pill,
-  .oi-reveal:hover .oi-pill,
-  .oi-reveal:focus-within .oi-pill,
-  .oi-reveal[data-open='yes'] .oi-pill-note,
-  .oi-reveal:hover .oi-pill-note,
-  .oi-reveal:focus-within .oi-pill-note {
+  .oi-wings[data-open='yes'] .oi-pill,
+  .oi-wings:hover .oi-pill,
+  .oi-wings:focus-within .oi-pill,
+  .oi-wings[data-open='yes'] .oi-pill-note,
+  .oi-wings:hover .oi-pill-note,
+  .oi-wings:focus-within .oi-pill-note {
     transition: none;
     transition-delay: 0s;
     opacity: 1;

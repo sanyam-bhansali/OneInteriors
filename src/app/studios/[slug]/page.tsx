@@ -173,7 +173,7 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
           />
 
           <Wrap className="relative -mt-8 pb-12">
-            <div className="oi-glass p-[clamp(22px,3vw,34px)]">
+            <div className="oi-pane p-[clamp(22px,3vw,34px)]">
               <p className="oi-eyebrow m-0 mb-4">
                 {TIER_LABELS[studio.tier]} · {passed} of {totalChecks} checks passed
               </p>
@@ -315,7 +315,7 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
                     : 'Drawing · photo to come';
 
                   return (
-                    <li key={p.id} className="oi-glass overflow-hidden">
+                    <li key={p.id} className="oi-pane overflow-hidden">
                       <div className="relative">
                         <StyleScene
                           tag={p.styleTags[0] ?? 'contemporary-minimal'}

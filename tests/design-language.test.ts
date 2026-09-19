@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { DUR, STAGGER, STAGGER_CAP, stagger, rise, riseCard, EASE_OUT } from '@/components/oi/motion';
 
@@ -227,6 +227,102 @@ describe('the motion vocabulary', () => {
 
 // ── The rules that are invisible until they break ──────────────────
 
+describe('the namespace is not shared with the landing page', () => {
+  /**
+   * The bug this exists to prevent, because it shipped.
+   *
+   * The match surfaces were renamed out of `.q-*` into `.oi-*` without
+   * checking what `.oi-*` already contained. Two names were occupied:
+   *
+   *   `.oi-glass`  — the landing page's glass over photography, used by
+   *                  HowItWorks, Portfolio, Problem and snapshots. Those
+   *                  frames silently inherited the match card's hover-scale
+   *                  and transform.
+   *
+   *   `.oi-reveal` — the FAQ accordion: `display: grid; grid-template-rows:
+   *                  0fr`, opening on `data-open="true"`. The match card
+   *                  writes `data-open="yes"`, so EVERY CARD ON /match
+   *                  collapsed to zero height with its contents clipped.
+   *
+   * Nothing caught it. Typecheck passes — they are strings. Lint passes. The
+   * class-existence check passed, because both names were very much defined;
+   * it only ever asked whether a used class exists, never whether a name was
+   * already spoken for. That is the asymmetry this test closes.
+   */
+  const LANDING_OWNED = [
+    'oi-glass',
+    'oi-glass-inner',
+    'oi-reveal',
+    'oi-rail',
+    'oi-swap',
+    'oi-rise-in',
+    'oi-card-in',
+    'oi-card-tilt',
+    'oi-ring',
+    'oi-check-row',
+    'oi-progress',
+    'oi-rule',
+    'oi-stack',
+    'oi-landing',
+  ];
+
+  const NEW_SYSTEM_FILES = [
+    'src/components/oi/Surfaces.tsx',
+    'src/app/match/StudioCard.tsx',
+    'src/app/match/ProjectWings.tsx',
+    'src/app/match/MatchHero.tsx',
+    'src/app/studios/[slug]/page.tsx',
+    'src/app/studios/[slug]/Verified.tsx',
+    'src/app/studios/[slug]/Record.tsx',
+  ];
+
+  it('no new-language file reaches for a landing-owned class', () => {
+    for (const file of NEW_SYSTEM_FILES) {
+      const src = readFileSync(join(ROOT, file), 'utf8');
+      // Only className strings — prose in the doc comments names them freely,
+      // and explaining the collision is exactly what those comments are for.
+      const classes = [...src.matchAll(/className=(?:"|'|\{`)([^"'`]*)/g)]
+        .flatMap((m) => m[1]!.split(/\s+/))
+        .filter(Boolean);
+
+      for (const owned of LANDING_OWNED) {
+        expect(classes, `${file} uses landing-owned .${owned}`).not.toContain(owned);
+      }
+    }
+  });
+
+  it('the classes the new system owns are not reached for by the landing page', () => {
+    // The same check from the other side. If a landing component starts using
+    // .oi-pane it inherits a scroll-focus depth-of-field it has no data-focus
+    // for, and the collision is back with the roles reversed.
+    const OURS = ['oi-pane', 'oi-wings', 'oi-drawer', 'oi-drawer-far', 'oi-pill', 'oi-tick'];
+    const dir = join(ROOT, 'src/components/landing');
+    const walk = (d: string): string[] =>
+      readdirSync(d, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)],
+      );
+
+    for (const file of walk(dir).filter((f) => f.endsWith('.tsx'))) {
+      const src = readFileSync(file, 'utf8');
+      const classes = [...src.matchAll(/className=(?:"|'|\{`)([^"'`]*)/g)]
+        .flatMap((m) => m[1]!.split(/\s+/))
+        .filter(Boolean);
+      for (const ours of OURS) {
+        expect(classes, `${file} uses .${ours}, which the match system owns`).not.toContain(ours);
+      }
+    }
+  });
+
+  it('the FAQ accordion still opens on its own attribute value', () => {
+    // It opens on data-open="true"; the drawers open on data-open="yes". Two
+    // different vocabularies on one attribute name is what made the collision
+    // silent rather than loud — the card was not just styled wrongly, it was
+    // styled by a rule whose open state it could never satisfy.
+    expect(css).toContain(".oi-reveal[data-open='true']");
+    expect(css).toContain(".oi-wings[data-open='yes']");
+  });
+});
+
 describe('the traps the doc lists', () => {
   it('the glass transform is composed from custom properties', () => {
     // Two rules both setting `transform` is the sharpest trap here: the
@@ -238,22 +334,22 @@ describe('the traps the doc lists', () => {
 
   it('a faded card recovers on hover and on keyboard focus', () => {
     // A card you cannot read is a bug, not an effect.
-    expect(css).toContain(".oi-glass[data-focus='far']:hover");
-    expect(css).toContain(".oi-glass[data-focus='far']:focus-within");
+    expect(css).toContain(".oi-pane[data-focus='far']:hover");
+    expect(css).toContain(".oi-pane[data-focus='far']:focus-within");
   });
 
   it('the reduced-motion block repeats the open-state selectors in full', () => {
     /**
      * Specificity, not style. `.oi-pill` is (0,1,0) and
-     * `.oi-reveal[data-open='yes'] .oi-pill` is (0,3,0) — so the short form
+     * `.oi-wings[data-open='yes'] .oi-pill` is (0,3,0) — so the short form
      * alone loses, the delays survive, and the build ships claiming an
      * accessibility feature it does not have. Wrapping in :where() makes it
      * worse: that zeroes the specificity you need.
      */
     const block = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
-    expect(block).toContain(".oi-reveal[data-open='yes'] .oi-pill");
-    expect(block).toContain('.oi-reveal:hover .oi-pill');
-    expect(block).toContain('.oi-reveal:focus-within .oi-pill');
+    expect(block).toContain(".oi-wings[data-open='yes'] .oi-pill");
+    expect(block).toContain('.oi-wings:hover .oi-pill');
+    expect(block).toContain('.oi-wings:focus-within .oi-pill');
   });
 
   it('the card glass alpha has not been thinned', () => {

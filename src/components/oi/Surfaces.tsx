@@ -53,7 +53,7 @@ export function Glass({
     <div
       data-focus={focus}
       style={style}
-      className={`oi-glass ${padded ? 'p-[clamp(20px,2.6vw,28px)]' : ''} ${className}`}
+      className={`oi-pane ${padded ? 'p-[clamp(20px,2.6vw,28px)]' : ''} ${className}`}
     >
       {children}
     </div>
@@ -76,7 +76,7 @@ export function Glass({
  */
 export function revealProps(open?: boolean, className = '') {
   return {
-    className: `oi-reveal ${className}`.trim(),
+    className: `oi-wings ${className}`.trim(),
     'data-open': open ? ('yes' as const) : ('no' as const),
   };
 }
@@ -86,8 +86,8 @@ export function revealProps(open?: boolean, className = '') {
  * says whether the drawers are open.
  *
  * Everything that slides out must be a descendant of this, because the CSS
- * opens on `.oi-reveal:hover`, `.oi-reveal:focus-within` and
- * `.oi-reveal[data-open='yes']`.
+ * opens on `.oi-wings:hover`, `.oi-wings:focus-within` and
+ * `.oi-wings[data-open='yes']`.
  *
  * `as` exists because the host is usually a semantic element already — the
  * `<li>` of a list, a `<section>` — and wrapping one in a div to get a hover

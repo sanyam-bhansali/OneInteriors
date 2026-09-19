@@ -433,7 +433,7 @@ five-word verdicts outperforms an accurate paragraph.
 
 Page-agnostic surfaces are `.oi-*` and may be used anywhere:
 
-`.oi-glass` `.oi-reveal` `.oi-drawer(-l/-r)` `.oi-drawer-far(-l/-r)`
+`.oi-pane` `.oi-wings` `.oi-drawer(-l/-r)` `.oi-drawer-far(-l/-r)`
 `.oi-pill` `.oi-pill-text` `.oi-pill-note` `.oi-tick` `.oi-cta`
 
 `.q-*` is the Quicksand type scale and `/match` content, and is **not**
