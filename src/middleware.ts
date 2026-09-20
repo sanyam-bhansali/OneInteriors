@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { opsWithoutAuth } from '@/lib/env';
-import { audienceFor, route } from '@/lib/host';
+import { audienceFor, isAlwaysAllowed, route } from '@/lib/host';
 
 /**
  * Two jobs: put each hostname in front of its own product, and keep a
@@ -74,8 +74,19 @@ export function middleware(request: NextRequest) {
   // Applies on whichever host is serving ops: the ops subdomain, where the
   // path has just been rewritten from `/`, or any host at all when the split
   // is not configured.
+  /* `isAlwaysAllowed` first, and it is load-bearing.
+
+     Without it, `audienceFor(host) === 'ops'` makes this true for EVERY path
+     on the ops host — including `/sign-in`. The filter then finds no cookie
+     and redirects to `/sign-in`, which is the page it just refused, which
+     redirects again. ERR_TOO_MANY_REDIRECTS, and the console unreachable by
+     any route, including the one that exists to let you back in.
+
+     Step 1 already returned `next` for these paths. This is the same list,
+     applied to a second decision that had quietly stopped honouring it. */
   const servingOps =
-    path === '/ops' || path.startsWith('/ops/') || audienceFor(host) === 'ops';
+    !isAlwaysAllowed(path) &&
+    (path === '/ops' || path.startsWith('/ops/') || audienceFor(host) === 'ops');
 
   if (!servingOps) return NextResponse.next();
 

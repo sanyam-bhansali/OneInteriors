@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { audienceFor, normaliseHost, route, type HostEnv } from '@/lib/host';
+import { audienceFor, isAlwaysAllowed, normaliseHost, route, type HostEnv } from '@/lib/host';
 import { siteUrlFor, siteUrlForHost } from '@/lib/site';
 
 /**
@@ -245,5 +245,57 @@ describe('a hidden path answers 404, not 200 with a 404 page', () => {
       rewrite?.[0],
       'rewrite to /404 must pass { status: 404 }, or it serves a 404 page with a 200 status',
     ).toMatch(/status:\s*404/);
+  });
+});
+
+describe('the cookie pre-filter cannot redirect to the page it is refusing', () => {
+  /**
+   * ERR_TOO_MANY_REDIRECTS on ops.oneinteriors.in/sign-in, live.
+   *
+   * The pre-filter's own condition was
+   *
+   *     path === '/ops' || path.startsWith('/ops/') || audienceFor(host) === 'ops'
+   *
+   * and on the ops subdomain that last clause is true for EVERY path — so it
+   * fired on `/sign-in`, found no session cookie, and redirected to
+   * `/sign-in`. Which it then refused again.
+   *
+   * The console was unreachable by any route, including the only route that
+   * exists to let you back in. Every routing test here passed throughout,
+   * because `route()` correctly returns `next` for /sign-in: the bug was in a
+   * SECOND decision, further down the same function, that had stopped
+   * honouring the same allow-list.
+   *
+   * So the invariant is asserted directly: nothing the filter redirects to may
+   * itself be something the filter would act on.
+   */
+  it('every path the filter redirects to is on the always-allowed list', () => {
+    expect(isAlwaysAllowed('/sign-in')).toBe(true);
+  });
+
+  it('the allow-list covers the whole auth round trip', () => {
+    // Redeeming the link is the other half. If /auth/verify were filtered, the
+    // link would bounce to sign-in and the session would never be written.
+    for (const p of ['/sign-in', '/auth/verify', '/api/health']) {
+      expect(isAlwaysAllowed(p), p).toBe(true);
+    }
+  });
+
+  it('the middleware applies that list to the pre-filter, not only to routing', () => {
+    // Source-level, because middleware cannot run here — and because the
+    // failure was precisely that one of the two decisions dropped the check.
+    const src = readFileSync(join(__dirname, '..', 'src/middleware.ts'), 'utf8');
+    const filter = /const servingOps =[\s\S]*?;/.exec(src);
+    expect(filter, 'servingOps should still exist').not.toBeNull();
+    expect(
+      filter?.[0],
+      'servingOps must exclude always-allowed paths, or /sign-in redirects to itself',
+    ).toMatch(/isAlwaysAllowed/);
+  });
+
+  it('ops paths are still filtered — the fix must not open the console', () => {
+    // The obvious wrong fix is to loosen the condition until the loop stops.
+    expect(isAlwaysAllowed('/ops')).toBe(false);
+    expect(isAlwaysAllowed('/ops/applications')).toBe(false);
   });
 });
