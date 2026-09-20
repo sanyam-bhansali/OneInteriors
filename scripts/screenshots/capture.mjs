@@ -25,6 +25,7 @@
  */
 
 import { spawn } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { BY_FLOW, ROUTES } from './routes.mjs';
@@ -98,8 +99,48 @@ async function waitForServer(timeoutMs = 120_000) {
  * prisma/guard-destructive.ts, and the same reasoning: the hostname in the
  * connection string is the thing that actually decides whose data this is.
  */
+function envFileValue(key) {
+  /* Read it the way Next will read it, from the file, rather than trusting the
+     shell. See the comment on assertLocalDatabase. Same parsing rules as
+     prisma/load-env.ts: strip one layer of matching quotes, and only treat
+     ' #' as a comment on an unquoted value, because a database password may
+     legitimately contain a hash. */
+  for (const file of ['.env.local', '.env']) {
+    const path = join(process.cwd(), file);
+    if (!existsSync(path)) continue;
+    for (const rawLine of readFileSync(path, 'utf8').split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith('#')) continue;
+      const eq = line.indexOf('=');
+      if (eq === -1 || line.slice(0, eq).trim() !== key) continue;
+      let value = line.slice(eq + 1).trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) return value.slice(1, -1);
+      const hash = value.indexOf(' #');
+      return hash === -1 ? value : value.slice(0, hash).trim();
+    }
+  }
+  return '';
+}
+
 function assertLocalDatabase() {
-  const raw = process.env.DATABASE_URL ?? '';
+  /**
+   * Ask the FILE, not the shell.
+   *
+   * The first version of this checked `process.env.DATABASE_URL`, which is
+   * exactly the wrong thing and gave a confident all-clear while pointing at
+   * production. Next loads `.env.local` itself at startup, so clearing the
+   * variable in your terminal changes nothing about what the server connects
+   * to — it only hides it from the guard.
+   *
+   * A check that can be satisfied without changing the behaviour it guards is
+   * worse than no check, because it is trusted.
+   */
+  const shell = process.env.DATABASE_URL ?? '';
+  const fromFile = envFileValue('DATABASE_URL');
+  const raw = shell || fromFile;
   let host = '';
   try { host = new URL(raw).hostname.toLowerCase(); } catch { /* unparseable */ }
 
@@ -111,21 +152,32 @@ function assertLocalDatabase() {
 
   if (!raw) {
     console.log(
-      'No DATABASE_URL — the app will serve fixture studios.\n' +
-      'Good enough for most screens; the ones needing rows will show empty states.\n',
+      'No DATABASE_URL anywhere — the app will serve fixture studios.\n' +
+      'Good enough for most screens; the ones needing rows show empty states.\n',
     );
     return;
   }
 
+  const where = shell ? 'your shell' : '.env.local';
+
   console.error(
-    `\n✖ Refusing to run: DATABASE_URL points at a REMOTE database (${host}).\n\n` +
-    '  These screenshots are meant to be shared, and against production they would\n' +
-    '  contain real studios, real GSTINs and real customer names. Opening a client\n' +
-    '  board would also WRITE the sample lead into production.\n\n' +
-    '  Point it at a local Postgres for this, or unset it entirely to run on\n' +
-    '  fixtures:\n\n' +
-    '      $env:DATABASE_URL=""      # PowerShell\n' +
-    '      DATABASE_URL= npm run shots   # bash\n',
+    `\n✖ Refusing to run: DATABASE_URL points at a REMOTE database.\n\n` +
+    `      host:  ${host}\n` +
+    `      from:  ${where}\n\n` +
+    '  These screenshots are made to be shared, and against production they\n' +
+    '  would carry real studios, real GSTINs and real customer names. Opening a\n' +
+    '  client board would also WRITE -- the sample lead seeds itself onto any\n' +
+    '  empty board the moment that page renders.\n\n' +
+    (shell
+      ? '  Unset it in this terminal, or point it at a local Postgres.\n'
+      : '  Note that clearing it in your terminal will NOT help: Next reads\n' +
+        '  .env.local itself at startup. Two options that actually work:\n\n' +
+        '    1. Fixtures only -- rename .env.local for the run:\n\n' +
+        '         Rename-Item .env.local .env.local.off\n' +
+        '         npm run shots\n' +
+        '         Rename-Item .env.local.off .env.local\n\n' +
+        '    2. A local Postgres -- point DATABASE_URL and DIRECT_URL at it in\n' +
+        '       .env.local, then seed it. See scripts/screenshots/README.md.\n'),
   );
   process.exit(1);
 }
@@ -137,9 +189,30 @@ async function main() {
 
   if (!keepServer) {
     log(`Starting dev server on ${PORT} with the development bypasses on…`);
+
+    /**
+     * Run Next's own entry point with this Node, rather than going through npm.
+     *
+     * `spawn('npm.cmd', …)` fails on Windows with EINVAL: since the fix for
+     * CVE-2024-27980, Node refuses to spawn a .cmd file unless `shell: true`,
+     * and turning the shell on means every path with a space in it -- which on
+     * Windows is most of them -- has to be quoted correctly by hand.
+     *
+     * Calling the bin directly sidesteps both. It is also one less process in
+     * the tree, which matters because npm on Windows does not reliably pass a
+     * kill down to its child, so the old version could leave a dev server
+     * holding the port after this script exited.
+     */
+    const nextBin = join(process.cwd(), 'node_modules', 'next', 'dist', 'bin', 'next');
+    if (!existsSync(nextBin)) {
+      throw new Error(
+        `Could not find Next at ${nextBin}.\nRun \`npm install\` first.`,
+      );
+    }
+
     server = spawn(
-      process.platform === 'win32' ? 'npm.cmd' : 'npm',
-      ['run', 'dev', '--', '--port', String(PORT)],
+      process.execPath,
+      [nextBin, 'dev', '--port', String(PORT)],
       {
         env: {
           ...process.env,
@@ -155,11 +228,18 @@ async function main() {
           OPS_HOST: '',
           PUBLIC_HOST: '',
         },
-        stdio: 'ignore',
+        stdio: process.env.SHOT_VERBOSE === '1' ? 'inherit' : 'ignore',
         shell: false,
       },
     );
-    server.on('error', (e) => { throw e; });
+    server.on('error', (e) => {
+      throw new Error(
+        `Could not start the dev server: ${e.message}\n` +
+        'Try `npm run dev` on its own — if that fails, this will too, and its ' +
+        'output says why. SHOT_VERBOSE=1 shows the server output through this ' +
+        'script.',
+      );
+    });
   }
 
   try {

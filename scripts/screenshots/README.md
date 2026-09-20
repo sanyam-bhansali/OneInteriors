@@ -18,18 +18,25 @@ by default. Against production these screenshots would carry real studios, real
 GSTINs and real customer names — and opening a client board would *write* the
 sample lead into production.
 
-Two honest options:
+**Clearing `DATABASE_URL` in your terminal does not work**, and it is worth
+knowing why: Next reads `.env.local` itself at startup, so an unset shell
+variable hides the connection from a naive check without changing what the
+server connects to. The guard reads the file for this reason.
 
-**Fixtures only** — no database at all. Most pages render; the ones that need
-rows show their empty state, and the README says which those were.
+Two options that actually work:
 
+**Fixtures only** — move the file aside for the run. Most pages render; the
+ones that need rows show their empty state, and the generated README says
+which those were.
+
+```powershell
+Rename-Item .env.local .env.local.off
+npm run shots
+Rename-Item .env.local.off .env.local
 ```
-DATABASE_URL= npm run shots          # bash
-$env:DATABASE_URL=""; npm run shots  # PowerShell
-```
 
-**A local Postgres** — fuller screens. Point `DATABASE_URL` and `DIRECT_URL` at
-it, then:
+**A local Postgres** — fuller screens. Point `DATABASE_URL` and `DIRECT_URL` in
+`.env.local` at it, then:
 
 ```
 npm run db:deploy
@@ -41,6 +48,15 @@ npm run db:studio-login -- you@example.com northlight-studio --live
 
 That last one is the only way a `StudioMember` gets created, which is what the
 whole `/studio` section needs.
+
+## If it will not start
+
+`SHOT_VERBOSE=1 npm run shots` passes the dev server's own output through, which
+is usually where the real reason is.
+
+The script runs Next's binary with your Node rather than going through npm,
+because `spawn('npm.cmd')` fails on Windows with `EINVAL` — since the fix for
+CVE-2024-27980 Node refuses to spawn a `.cmd` without a shell.
 
 ## What it does with the dev flags
 
