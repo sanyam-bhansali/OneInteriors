@@ -14,13 +14,15 @@
     "audit": "npm audit --omit=dev",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
+    "db:migrate": "tsx prisma/guard-destructive.ts \"prisma migrate dev\" && prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "db:ops": "tsx prisma/seed-ops.ts",
     "db:studio-login": "tsx prisma/seed-studio.ts",
-    "db:rates": "tsx prisma/seed-rate-cards.ts"
+    "db:rates": "tsx prisma/seed-rate-cards.ts",
+    "guard:destructive": "tsx prisma/guard-destructive.ts",
+    "db:reset": "tsx prisma/guard-destructive.ts \"prisma migrate reset\" && prisma migrate reset"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
