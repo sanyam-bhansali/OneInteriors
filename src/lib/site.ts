@@ -94,6 +94,65 @@ export function resolveSiteUrl(
   return LOCAL;
 }
 
+/**
+ * The base URL a magic link for this audience must point at.
+ *
+ * Sessions are host-only — `session.ts` sets no cookie `domain` — which is
+ * what keeps an ops session from ever being sent to the studio host. The price
+ * of that is exact: **a link redeemed on the wrong host writes a cookie the
+ * right host will never see.** The studio would sign in successfully, land on
+ * `studio.oneinteriors.in`, and be asked to sign in again, with nothing on
+ * screen explaining why.
+ *
+ * So the invite that goes to a studio owner points at the studio host, and
+ * everything else at the public site. Falls back to `resolveSiteUrl()` when
+ * the split is not configured, which is how it behaves in development and on
+ * every preview deployment.
+ */
+export function siteUrlFor(
+  audience: 'studio' | 'ops' | 'public',
+  env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+): string {
+  const host =
+    audience === 'studio'
+      ? firstPresent(env.STUDIO_HOST)
+      : audience === 'ops'
+        ? firstPresent(env.OPS_HOST)
+        : firstPresent(env.PUBLIC_HOST);
+
+  return host ? withProtocol(host) : resolveSiteUrl(env);
+}
+
+/**
+ * The base URL for a link that must come back to the host it started on.
+ *
+ * Used by sign-in, where the audience is whoever is standing in front of the
+ * form: a studio owner at `studio.oneinteriors.in` gets a link back there, an
+ * ops person at `ops.` gets one back there.
+ *
+ * The host is read from the request header rather than from the form, and it
+ * is checked against the configured set before being trusted. `Host` is
+ * attacker-controlled on some stacks, and an unchecked value here would put an
+ * arbitrary domain inside an email we send — which is a phishing link with our
+ * name on it. Anything unrecognised falls back to `resolveSiteUrl()`.
+ */
+export function siteUrlForHost(
+  host: string | null | undefined,
+  env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+): string {
+  const h = (host ?? '').split(':')[0]?.trim().toLowerCase() ?? '';
+  if (!h) return resolveSiteUrl(env);
+
+  for (const key of ['STUDIO_HOST', 'OPS_HOST', 'PUBLIC_HOST'] as const) {
+    const configured = firstPresent(env[key]);
+    if (!configured) continue;
+    const c = configured.replace(/^https?:\/\//i, '').split('/')[0]!.toLowerCase();
+    if (h === c || h === `www.${c}`) return withProtocol(configured);
+  }
+
+  return resolveSiteUrl(env);
+}
+
 function withProtocol(host: string): string {
   return /^https?:\/\//i.test(host) ? host : `https://${host}`;
 }

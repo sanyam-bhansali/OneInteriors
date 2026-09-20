@@ -32,7 +32,7 @@ import { revokeAllSessions } from '@/modules/auth/session';
 import { lakhsToPaise } from '@/lib/money';
 import { normalisePhone } from './phone';
 import { revalidateRoster } from './roster-cache';
-import { resolveSiteUrl } from '@/lib/site';
+import { siteUrlFor } from '@/lib/site';
 
 export type ApplyResult =
   | { ok: true; id: string }
@@ -321,7 +321,11 @@ export async function approveApplication(id: string, note: string): Promise<Deci
     await revokeAllSessions(result.userId);
 
     const sent = await requestMagicLink(result.email, {
-      baseUrl: resolveSiteUrl(),
+      /* The studio host, not the public one. The cookie this link writes is
+         host-only, so a link redeemed on the apex would sign them in somewhere
+         `studio.oneinteriors.in` cannot see — and they would be asked to sign
+         in again with no explanation. See `siteUrlFor`. */
+      baseUrl: siteUrlFor('studio'),
       // Land them on their own dashboard rather than the homepage, and on a
       // sign-in page that leads with the email form they actually need.
       next: '/studio',

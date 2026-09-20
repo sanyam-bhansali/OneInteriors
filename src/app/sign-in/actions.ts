@@ -5,7 +5,7 @@ import { requestMagicLink } from '@/modules/auth/magic-link';
 import { requestOtp, verifyOtp } from '@/modules/auth/otp';
 import { signOut } from '@/modules/auth/session';
 import { redirect } from 'next/navigation';
-import { resolveSiteUrl } from '@/lib/site';
+import { siteUrlForHost } from '@/lib/site';
 import { hasDatabase } from '@/lib/env';
 import { claimBrief } from '@/modules/brief/repository';
 import { claimConsent } from '@/modules/consent/record';
@@ -41,7 +41,15 @@ export async function requestSignInLink(
   try {
     result = await requestMagicLink(email, {
       ip: h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
-      baseUrl: resolveSiteUrl(),
+      /* Back to the host they signed in FROM.
+         Sessions are host-only, so a studio owner who signs in at
+         studio.oneinteriors.in must be returned there — a link to the apex
+         would write a cookie the studio host cannot read, and they would be
+         asked to sign in again with nothing on screen explaining why.
+
+         The header is already in scope for the IP above, and it is the
+         request's own host rather than anything the form supplied. */
+      baseUrl: siteUrlForHost(h.get('host')),
       // Carried into the emailed link so the customer lands back where they
       // were, not on the homepage. Validated inside requestMagicLink.
       next: String(formData.get('next') ?? '') || null,
