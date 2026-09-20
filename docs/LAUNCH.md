@@ -334,11 +334,37 @@ host variables.
 
 - [ ] **8.2** Leave `CUSTOMER_LIVE` **unset**. That is what keeps the
       marketplace closed.
-- [ ] **8.3** Delete any `DEV_SHOW_UNVERIFIED_STUDIOS`, `DEV_SHOW_OTP_ON_SCREEN`,
-      `DEV_OPS_NO_AUTH` from Vercel. The code refuses them in production
-      anyway, but they should not be there to be refused.
-- [ ] **8.4** Confirm `DATABASE_URL`, `DIRECT_URL`, `SESSION_SECRET` and the
-      Supabase variables are all present.
+- [ ] **8.3** Delete all nine dev-flag entries — `DEV_SHOW_UNVERIFIED_STUDIOS`,
+      `DEV_SHOW_OTP_ON_SCREEN`, `DEV_OPS_NO_AUTH`, each on Production, Preview
+      and Development. Also delete `REDIS_URL`: nothing in `src/` reads it.
+
+> **These are inert, not dangerous.** All three call `isProduction()` *before*
+> reading their own variable (`src/lib/env.ts`), and Vercel builds — Production
+> and Preview alike — run with `NODE_ENV=production`. So nothing was exposed.
+> Delete them anyway: a flag that says "open ops without auth" sitting on a
+> Production environment is something the next person has to re-derive the
+> safety of, and one refactor could make it true.
+
+- [ ] **8.4** Confirm `DATABASE_URL` and `DIRECT_URL` are present, plus
+      `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+      (Storage — floor plans and verification photos).
+
+> **`SESSION_SECRET` is not needed and never was.** Sessions are opaque
+> 256-bit random tokens; the database stores only a SHA-256 of each, and the
+> role is read fresh from Postgres on every request. There is nothing to sign,
+> so there is no secret to configure. Same for `SUPABASE_SECRET_KEY` — nothing
+> in `src/` reads it. Setting either changes nothing.
+
+- [ ] **8.7 CHECK:** `DATABASE_URL` is scoped **Production only**, not
+      "Production and Preview".
+
+> **Why this one matters.** Shared across both, every preview deployment reads
+> and writes the **live** database. A branch that adds a column, a test that
+> creates rows, an agent run against a preview URL — all of it lands in the
+> data a studio is relying on, and previews are the builds nobody watches.
+> Either give Preview its own Supabase branch or leave it with no
+> `DATABASE_URL` at all, in which case the app serves fixture studios, which is
+> a perfectly good state for a preview to be in.
 - [ ] **8.5** **Do NOT set the three `*_HOST` variables on Preview.** Previews
       rely on the unrecognised-host fallback to keep `/studio` and `/ops`
       reachable. Set them on Preview and you break your own testing.
