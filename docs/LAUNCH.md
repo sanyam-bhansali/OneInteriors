@@ -116,6 +116,32 @@ transfer.
 - [ ] **3.5** Supabase → Database → Backups. Confirm a backup exists from
       *after* the migration. If not, take one.
 
+### If a migration fails partway (error P3018)
+
+A failed migration is recorded as started-and-failed, and **every later
+migration is blocked until it is cleared**. Nothing applied, so nothing needs
+undoing — Postgres rolls back a failed statement — but Prisma will not move on
+until you say so.
+
+- [ ] **3.6** Read the `Database error` line. It names the real problem.
+      `42P01 relation "X" does not exist` almost always means the SQL used a
+      Prisma **model** name where the **table** name was required. This schema
+      maps every model to snake_case: `StudioClient` is `studio_clients`.
+- [ ] **3.7** Fix the migration file. Do **not** edit the database by hand.
+- [ ] **3.8** Clear the failed record:
+  ```
+  npx prisma migrate resolve --rolled-back 20260920100000_studio_client_demo
+  ```
+  Use `--rolled-back`, never `--applied`. `--applied` tells Prisma the work was
+  done, so the corrected SQL is skipped forever and the column never appears —
+  a far worse state than the failure, because everything looks fine until a
+  page 500s on a missing column.
+- [ ] **3.9** Run `npm run db:deploy` again, and confirm with
+      `npx prisma migrate status`.
+- [ ] **3.10** `npm run test` before you retry. `tests/migration-names.test.ts`
+      checks every migration's identifiers against the schema's `@@map`s and
+      names the exact substitution needed.
+
 ---
 
 ## Stage 4 — Rotate the leaked key

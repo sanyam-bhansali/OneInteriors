@@ -83,6 +83,8 @@ describe('the sample is listed, never counted', () => {
     const dir = join(ROOT, 'prisma/migrations/20260920100000_studio_client_demo');
     const sql = readFileSync(join(dir, 'migration.sql'), 'utf8');
     expect(sql).toContain('ADD COLUMN "isDemo" BOOLEAN NOT NULL DEFAULT false');
+    // The mapped table name, not the model name. See the suite below.
+    expect(sql).toContain('ALTER TABLE "studio_clients"');
   });
 });
 
