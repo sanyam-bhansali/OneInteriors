@@ -299,3 +299,40 @@ describe('the cookie pre-filter cannot redirect to the page it is refusing', () 
     expect(isAlwaysAllowed('/ops/applications')).toBe(false);
   });
 });
+
+describe('the sign-in page offers only what the host can deliver', () => {
+  /**
+   * `ops.oneinteriors.in/sign-in` showed the customer WhatsApp form — name,
+   * mobile number, "send me a code" — as the primary action.
+   *
+   * It could never have worked. Every customer route 404s on the ops and
+   * studio hosts, so a customer who completed that form would have signed in
+   * and landed nowhere. And an offer that cannot be accepted is worse than no
+   * offer: the person reasonably concludes they are in the right place and
+   * keeps trying.
+   *
+   * The cause was that the page picked its variant from `next` alone, which is
+   * absent when somebody simply types the hostname. The host is the fact that
+   * was always available and was not consulted.
+   */
+  it('treats studio. and ops. as staff-only', () => {
+    expect(audienceFor(STUDIO, SPLIT)).toBe('studio');
+    expect(audienceFor(OPS, SPLIT)).toBe('ops');
+  });
+
+  it('leaves the shared origin serving both, since there it really does', () => {
+    // One origin in development and on previews: /sign-in is the only sign-in
+    // there is, so it must keep offering the phone form.
+    expect(audienceFor('localhost', {})).toBe('all');
+    expect(audienceFor(PREVIEW, SPLIT)).toBe('all');
+  });
+
+  it('the page asks the host, not only the query string', () => {
+    const src = readFileSync(join(__dirname, '..', 'src/app/sign-in/page.tsx'), 'utf8');
+    expect(src, 'sign-in must derive staffHost from the Host header').toMatch(
+      /audienceFor\(\s*\(await headers\(\)\)\.get\('host'\)\s*\)/,
+    );
+    // And the staff variant must be reachable from the host alone.
+    expect(src).toMatch(/const forStaff\s*=\s*\n?\s*staffHost/);
+  });
+});

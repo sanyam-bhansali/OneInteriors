@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { audienceFor } from '@/lib/host';
 import { Container } from '@/components/ui';
 import { Wordmark } from '@/components/brand';
 import { getCurrentUser } from '@/modules/auth/session';
@@ -122,7 +124,22 @@ export default async function SignInPage({
    * have landed on the staff page with no phone form anywhere on it, which is
    * this exact bug with the roles reversed. Match the route, not the prefix.
    */
+  /**
+   * The hostname decides first, and it has to.
+   *
+   * This used to read `destination` alone, which works when somebody is bounced
+   * here from a page they wanted — but somebody typing `ops.oneinteriors.in`
+   * has no `next` at all, so it fell through and offered them the WhatsApp OTP.
+   * On the ops and studio hosts that form **cannot succeed**: a customer signs
+   * in and lands nowhere, because every customer route 404s on those hosts.
+   * An offer that cannot be accepted is worse than no offer, because the person
+   * reasonably concludes they are in the right place.
+   */
+  const audience = audienceFor((await headers()).get('host'));
+  const staffHost = audience === 'studio' || audience === 'ops';
+
   const forStaff =
+    staffHost ||
     destination === '/studio' ||
     destination?.startsWith('/studio/') ||
     destination === '/ops' ||
@@ -164,15 +181,19 @@ export default async function SignInPage({
               used once, which is why.
             </p>
 
-            {/* The phone form is still reachable, but it cannot sign anyone into
-                a studio account, so it is not offered here as an alternative. */}
-            <p className="m-0 mt-6 text-[13.5px] leading-relaxed text-[var(--color-ink-3)]">
-              Looking for your own quotes as a customer?{' '}
-              <a href="/sign-in" className="text-[var(--color-petrol)]">
-                Sign in by phone instead
-              </a>
-              .
-            </p>
+            {/* Only on the shared origin, where /sign-in really does serve both
+                audiences. On studio. and ops. there is no customer sign-in to
+                point at — every customer route 404s there — so pointing at one
+                would send someone in a circle. */}
+            {staffHost ? null : (
+              <p className="m-0 mt-6 text-[13.5px] leading-relaxed text-[var(--color-ink-3)]">
+                Looking for your own quotes as a customer?{' '}
+                <a href="/sign-in" className="text-[var(--color-petrol)]">
+                  Sign in by phone instead
+                </a>
+                .
+              </p>
+            )}
           </div>
         </Container>
       </main>
