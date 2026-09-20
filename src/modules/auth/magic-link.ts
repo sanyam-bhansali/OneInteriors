@@ -223,6 +223,19 @@ export async function consumeMagicLink(
       await tx.user.update({ where: { id: user.id }, data: { emailVerified: new Date() } });
     }
 
+    /* Redeeming a link clears any password lock on this account.
+       This is the whole reason the lock can be permanent rather than timed: a
+       timed lock is one an attacker waits out, but this one needs proof of the
+       mailbox to lift, which is exactly what has just happened. Without this
+       line an ops account locked on a Friday stays locked forever, and the
+       recovery email we send them does nothing. */
+    if (user.failedSignIns > 0 || user.lockedOutAt !== null) {
+      await tx.user.update({
+        where: { id: user.id },
+        data: { failedSignIns: 0, lockedOutAt: null },
+      });
+    }
+
     return { ok: true as const, userId: user.id };
   });
 

@@ -7,6 +7,7 @@ import { getCurrentUser } from '@/modules/auth/session';
 import { safeNext } from '@/lib/site';
 import { signOutAction } from './actions';
 import { SignInForm } from './SignInForm';
+import { PasswordForm } from './PasswordForm';
 import { OtpForm } from './OtpForm';
 
 export const metadata: Metadata = {
@@ -143,6 +144,11 @@ export default async function SignInPage({
             </p>
 
             <SignInForm next={destination} />
+
+            {/* Ops only. Collapsed, because almost everyone here is a studio
+                owner for whom a password field is a dead end that looks like
+                the main event. The role check is on the server. */}
+            <PasswordForm />
 
             <p className="m-0 mt-10 border-t border-[var(--color-rule)] pt-5 text-[13.5px] leading-relaxed text-[var(--color-ink-3)]">
               If the link has expired, ask for another — they last fifteen minutes and can only be

@@ -44,6 +44,19 @@ model User {
   role          UserRole  @default(CUSTOMER)
   locale        String    @default("en-IN")
 
+  /// scrypt, `s1$N$r$p$salt$hash`. OPS accounts only — see
+  /// modules/auth/password.ts for why studios stay magic-link-only. Null for
+  /// everyone who has not set one, which is the normal state.
+  passwordHash  String?
+  passwordSetAt DateTime?
+  /// Consecutive failed password attempts. Cleared on any successful sign-in,
+  /// including by magic link.
+  failedSignIns Int       @default(0)
+  /// Set when the attempt limit is reached. Password sign-in stays refused
+  /// until a magic link is redeemed — deliberately not a timed lock, which an
+  /// attacker simply waits out.
+  lockedOutAt   DateTime?
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime? // soft delete — DPDP erasure sets this + scrubs PII

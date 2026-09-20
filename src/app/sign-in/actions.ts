@@ -3,6 +3,7 @@
 import { headers } from 'next/headers';
 import { requestMagicLink } from '@/modules/auth/magic-link';
 import { requestOtp, verifyOtp } from '@/modules/auth/otp';
+import { signInWithPassword } from '@/modules/auth/password-signin';
 import { signOut } from '@/modules/auth/session';
 import { redirect } from 'next/navigation';
 import { siteUrlForHost } from '@/lib/site';
@@ -86,6 +87,61 @@ export async function requestSignInLink(
 export async function signOutAction(): Promise<void> {
   await signOut();
   redirect('/');
+}
+
+// ── Ops sign-in: email + password ──────────────────────────────
+//
+// A second door into the console, for one reason: a magic link is only as
+// available as outbound email, and when email broke, ops — the place you go to
+// find out why things are broken — was unreachable. Ops accounts only; studios
+// and customers keep the link, which is enforced on the role in
+// modules/auth/password.ts, not here and not in the form.
+
+export interface PasswordState {
+  status: 'idle' | 'error';
+  message?: string;
+}
+
+export async function signInWithPasswordAction(
+  _prev: PasswordState,
+  formData: FormData,
+): Promise<PasswordState> {
+  if (!hasDatabase()) {
+    console.error('[sign-in] DATABASE_URL is not set on this deployment.');
+    return { status: 'error', message: UNAVAILABLE };
+  }
+
+  const h = await headers();
+  let result: Awaited<ReturnType<typeof signInWithPassword>>;
+
+  try {
+    result = await signInWithPassword(
+      String(formData.get('email') ?? ''),
+      String(formData.get('password') ?? ''),
+      {
+        userAgent: h.get('user-agent'),
+        ip: h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+        // The lockout email has to point at the host they are signing in on.
+        // Sessions are host-only, so a link to the apex writes a cookie
+        // ops.oneinteriors.in cannot read.
+        baseUrl: siteUrlForHost(h.get('host')),
+      },
+    );
+  } catch (error) {
+    console.error('[sign-in] signInWithPassword threw:', error);
+    return { status: 'error', message: UNAVAILABLE };
+  }
+
+  if (!result.ok) {
+    return { status: 'error', message: result.message };
+  }
+
+  await record('signin.completed');
+  /* Only ops accounts reach here, so the destination is the console. `next` is
+     deliberately not honoured: it arrives from the query string, and an
+     open redirect on the one form that mints an ops session is not worth the
+     convenience. */
+  redirect('/ops');
 }
 
 // ── Customer sign-in: phone + WhatsApp OTP ─────────────────────
