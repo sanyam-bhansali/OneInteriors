@@ -62,6 +62,16 @@ to know now, not after the DNS is half-cut-over.
 > broken build on Vercel does not replace the running deployment — it just
 > fails, so you would be live on old code without realising.
 
+> **Done on 20 Sep.** Compiled in 4.7s, 23/23 static pages, middleware
+> 34.5 kB.
+>
+> One thing to carry to Stage 9: `/studios/[slug]` built as **● SSG** with 8
+> paths prerendered, although the page sets `dynamic = 'force-dynamic'`.
+> `generateStaticParams` still runs at build time. `force-dynamic` should win
+> at request time, but that is a should — when your first studio goes ACTIVE,
+> confirm their profile appears **without a redeploy**. If it does not, the
+> fix is to drop `generateStaticParams` from that page.
+
 ---
 
 ## Stage 2 — Push the code
@@ -78,6 +88,9 @@ There are **6 commits** waiting.
 > unrecognised hostname is treated as one-origin, so both products are
 > reachable, but `CUSTOMER_LIVE` still gates the marketplace. That is
 > deliberate — see `src/lib/host.ts`.
+
+> **Done on 20 Sep.** `5dcd7ac..dfc7133` pushed to `origin/main`. 2.3 and 2.4
+> still need your eyes on the Vercel dashboard.
 
 ---
 
@@ -158,21 +171,57 @@ until you say so.
 
 ---
 
-## Stage 4 — Rotate the leaked key
+## Stage 4 — The Supabase secret key
 
-`sb_secret_IJ7AQgl…` was pasted into a chat. That key **bypasses Row Level
-Security entirely** — it is the one credential where a leak means the whole
-database, including every studio's clients.
+**Decided on 20 Sep: not rotating now.** What went through a chat was a
+truncated fragment — the `sb_secret_` prefix and a few characters — and a
+truncated key does not authenticate. (The fragment itself is no longer
+written down anywhere in this repo; there is no reason to keep even part of
+it.) The full key lives in two places, both of them fine:
+`.env.local` (gitignored, confirmed untracked) and Vercel's environment
+store.
 
-- [ ] **4.1** Supabase → Project Settings → API Keys → roll the `service_role`
-      / secret key.
-- [ ] **4.2** Update `SUPABASE_SECRET_KEY` in Vercel (Production).
-- [ ] **4.3** Update it in your local `.env.local`.
-- [ ] **4.4 CHECK:** redeploy and confirm the app still reads the database.
-      A wrong secret key usually shows as empty lists rather than an error, so
-      check a page that definitely has rows.
+This is a judgement, not an oversight, and the judgement rests on one
+assumption. Check it, then move on:
 
-Do this **before** any studio's real client data is in there, not after.
+- [ ] **4.1 CHECK:** the full key has never been pasted anywhere with
+      retention — a chat, a ticket, a shared doc, a screenshot, a Slack
+      message, a terminal whose scrollback syncs. If it has, rotate; §4.4
+      below is how.
+- [ ] **4.2 CHECK:** `git log --all -S "sb_secret" -- . ` returns nothing.
+      A key that reached a commit is public even if the branch never shipped,
+      and removing it later means rewriting history.
+- [ ] **4.3** Put a date on it. Rotate on **first studio onboarded, or
+      31 Dec 2026, whichever comes first.** A deferred rotation with no date
+      is a rotation that never happens.
+
+> **Why the date matters more than the fragment.** Right now the database
+> holds fixtures and your own test rows. The moment studio #1 is live it
+> holds a real practice's client list — names, addresses, what they are
+> spending. The secret key bypasses Row Level Security entirely, so from
+> that day the blast radius stops being yours and starts being theirs.
+
+### 4.4 When you do rotate — nothing breaks
+
+**`SUPABASE_SECRET_KEY` is not used by this application.** There is no
+reference to it in `src/`, and `@supabase/supabase-js` is not a dependency.
+The app reaches Postgres through **Prisma and the connection string**; it
+never speaks to Supabase's REST API. So:
+
+- [ ] Supabase → Project Settings → API Keys → roll the `service_role` /
+      secret key.
+
+That is the whole procedure. No Vercel env change, no `.env.local` change,
+no redeploy, nothing to smoke-test — because nothing reads it.
+
+> **Not using it does not make a leak safe.** The key authenticates against
+> Supabase's own API regardless of what our code does with it; an attacker
+> holding one does not need our app. Our non-use only means rotation is
+> free, which is an argument *for* doing it, not against.
+>
+> Do not delete `SUPABASE_SECRET_KEY` from `.env.example` on the strength of
+> this. It is documented there precisely so the next person knows what it is
+> and why it must not be handed to the browser.
 
 ---
 

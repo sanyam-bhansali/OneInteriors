@@ -33,17 +33,20 @@ If the build fails, paste me the whole log rather than the last line.
 
 ---
 
-### 0.2 Rotate the Supabase secret key
+### 0.2 The Supabase secret key — deferred, deliberately
 
-**Two minutes. Do it even though nothing uses it.**
+**Decided 20 Sep: not rotating yet.** See `docs/LAUNCH.md` Stage 4 for the
+reasoning and the deadline. Short version: what came through a chat was a
+truncated fragment, which does not authenticate, and the full key is only in
+`.env.local` (untracked) and Vercel.
 
-`sb_secret_IJ7AQgl…` came through this chat. That key **bypasses Row Level
-Security entirely** — it is the one credential that would undo the lockdown we
-put on all 25 tables. Nothing in the codebase needs it and `SUPABASE_SECRET_KEY`
-is deliberately blank, so rotating costs you nothing.
+Rotate on **first studio onboarded, or 31 Dec 2026, whichever comes first** —
+because from that day the database holds a real practice's client list rather
+than fixtures.
 
-Supabase dashboard → Project Settings → API Keys → roll the secret key. Do not
-paste the new one anywhere, including to me.
+Rotating is one step and breaks nothing: Supabase → Project Settings → API
+Keys → roll the secret key. No redeploy, because nothing in `src/` reads
+`SUPABASE_SECRET_KEY`. Do not paste the new one anywhere, including to me.
 
 ---
 
