@@ -5,6 +5,7 @@ import { claimBrief } from '@/modules/brief/repository';
 import { claimConsent } from '@/modules/consent/record';
 import { record } from '@/modules/analytics/record';
 import { prisma } from '@/lib/prisma';
+import { shouldSetPassword } from '@/modules/auth/password';
 
 /**
  * Consume a sign-in link and open a session.
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: result.userId },
-    select: { role: true },
+    select: { role: true, passwordHash: true },
   });
 
   /**
@@ -82,6 +83,26 @@ export async function GET(request: NextRequest) {
         : claimed
           ? '/match'
           : '/');
+
+  /**
+   * A staff account with no password yet is asked for one, once, here.
+   *
+   * This is the whole point of putting it on THIS redirect rather than on a
+   * settings page: a studio's first link is the email telling them they are on
+   * the roster, and that is the only moment we can be sure they are reading
+   * anything we send. Thirty seconds now, against an email nobody opens later.
+   *
+   * `first=1` changes the wording and offers a skip — the screen refuses to be
+   * a wall in front of somebody who came to read their approval on a phone
+   * between site visits. Where they were going is carried through, so setting
+   * a password drops them exactly where this link would have taken them.
+   */
+  if (user && shouldSetPassword(user)) {
+    const url = new URL('/set-password', request.url);
+    url.searchParams.set('next', destination);
+    url.searchParams.set('first', '1');
+    return NextResponse.redirect(url);
+  }
 
   return NextResponse.redirect(new URL(destination, request.url));
 }

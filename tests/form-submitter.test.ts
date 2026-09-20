@@ -30,6 +30,12 @@ function tsx(dir: string): string[] {
 }
 
 describe('no submit button carries its value and disables itself', () => {
+  /* 30s, not the 5s default. This walks every .tsx in the tree, and the tree
+     lives on a mounted filesystem whose speed varies by an order of magnitude
+     between runs — measured at 1.1s and at 6.8s on the same machine. A
+     tree-walking assertion that fails on a slow day teaches people to re-run
+     the suite until it passes, which is how a real failure gets waved
+     through. */
   it('across every client component', () => {
     const offenders: string[] = [];
 
@@ -55,7 +61,7 @@ describe('no submit button carries its value and disables itself', () => {
       'these submit buttons disable themselves while carrying the form value, ' +
         'so FormData can lose it; move the value to a hidden input set via a ref in onClick',
     ).toEqual([]);
-  });
+  }, 30_000);
 });
 
 describe('the decision form sends an intent that survives the pending render', () => {

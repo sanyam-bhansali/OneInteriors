@@ -1,5 +1,5 @@
 /**
- * Passwords, for ops accounts only.
+ * Passwords, for staff accounts.
  *
  * No `server-only` — CONTRIBUTING §9.5. Every decision here is pure, and these
  * are the decisions worth testing exhaustively, because none of them fail
@@ -8,32 +8,34 @@
  *
  * ## Why passwords exist here at all, given magic links work
  *
- * They exist because magic links have a single point of failure that this
- * system has already hit: **if email breaks, nobody can reach ops.** That is
- * not hypothetical — `EMAIL_FROM` pointed at a sandbox sender for weeks and
- * every outbound message 403'd. During that window the console was
- * unreachable, and the console is where you go to find out why things are
+ * Two reasons, and they are different for the two audiences.
+ *
+ * For **ops**, it is a second door. Magic links have a single point of failure
+ * this project has already hit: `EMAIL_FROM` pointed at a sandbox sender and
+ * every outbound message 403'd, so for that whole window the console was
+ * unreachable — and the console is where you go to find out why things are
  * broken.
  *
- * So a password is a second door. It is not a better door.
+ * For **studios**, it is about the daily cost. A studio owner signs in to work,
+ * repeatedly, often from a site visit on a phone. An emailed link means leaving
+ * the app, finding an inbox, waiting, coming back — every single time. That is
+ * a toll on the people we are asking to run their practice here.
  *
- * ## Why only ops
+ * ## Why customers are not included
  *
- * Adding a password to an account is adding a thing that can be guessed,
- * reused from a breached site, or phished. That trade is worth it for one or
- * two accounts the operator controls and needs under any conditions. It is not
- * worth it across every studio owner, where it would also make us the people
- * who run password resets for a hundred small businesses.
+ * A customer signs in rarely, usually once per decision. A password they set
+ * eight months ago and have since forgotten is strictly worse for them than a
+ * link: it is one more thing to fail at before they can see their quotes. They
+ * keep the WhatsApp OTP and the emailed link.
  *
- * Studios stay magic-link-only. `canUsePassword` is the one place that rule
- * lives.
+ * `canUsePassword` is the one place that line is drawn.
  *
  * ## scrypt, from node:crypto
  *
  * Argon2id would be the better primitive, and it is a native dependency to
  * install, patch and keep building on Vercel's runtime. scrypt is memory-hard,
  * in the standard library, and its parameters are tunable — which is enough
- * for a handful of operator accounts behind a five-attempt lock. The hash
+ * behind a five-attempt lock that needs a mailbox to lift. The hash
  * format is versioned precisely so the cost can be raised later without
  * invalidating anyone.
  */
@@ -88,9 +90,33 @@ export interface PasswordFields {
   lockedOutAt: Date | null;
 }
 
-/** Who may sign in with a password at all. */
+/**
+ * Who may sign in with a password at all.
+ *
+ * Staff accounts — the people who sign in to work, repeatedly, often from a
+ * site visit on a phone. For them the emailed link is friction on every single
+ * sign-in: leave the app, find the inbox, wait, come back.
+ *
+ * **Customers are deliberately not here.** They sign in rarely, usually once
+ * per decision, and a password they set eight months ago and have since
+ * forgotten is worse for them than a link — it is a thing to fail at before
+ * they can see their quotes. They keep the WhatsApp OTP and the link.
+ */
+const PASSWORD_ROLES = ['OPS', 'STUDIO', 'ADMIN'] as const;
+
 export function canUsePassword(role: string): boolean {
-  return role === 'OPS';
+  return (PASSWORD_ROLES as readonly string[]).includes(role);
+}
+
+/**
+ * Should this account be asked to set a password before going anywhere else?
+ *
+ * True exactly once: the first time a staff account redeems a link and has no
+ * password yet. That first link is the approval email, so the question arrives
+ * at the one moment the studio is already paying attention to us.
+ */
+export function shouldSetPassword(user: { role: string; passwordHash: string | null }): boolean {
+  return canUsePassword(user.role) && user.passwordHash === null;
 }
 
 /**

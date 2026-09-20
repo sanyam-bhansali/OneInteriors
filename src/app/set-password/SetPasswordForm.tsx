@@ -6,7 +6,13 @@ import { setPasswordAction, type SecurityState } from './actions';
 
 const INITIAL: SecurityState = { status: 'idle' };
 
-export function SecurityForm({ hasPassword }: { hasPassword: boolean }) {
+export function SetPasswordForm({
+  hasPassword,
+  next,
+}: {
+  hasPassword: boolean;
+  next: string;
+}) {
   const [state, action, pending] = useActionState(setPasswordAction, INITIAL);
 
   const field =
@@ -14,6 +20,7 @@ export function SecurityForm({ hasPassword }: { hasPassword: boolean }) {
 
   return (
     <form action={action} className="flex max-w-[460px] flex-col gap-4">
+      <input type="hidden" name="next" value={next} />
       {hasPassword ? (
         <div>
           <label htmlFor="current" className="label m-0 mb-2 block">

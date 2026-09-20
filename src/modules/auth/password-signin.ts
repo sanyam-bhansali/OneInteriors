@@ -9,11 +9,12 @@ import 'server-only';
  *
  * ## The shape of every failure is the same
  *
- * Wrong password, no password set, not an ops account, no such user at all,
- * already locked — one outcome, one message, no timing tell worth chasing.
- * A sign-in form that distinguishes them is a tool for discovering which
- * addresses are ops accounts, and an ops address is worth phishing: it reaches
- * every studio's GSTIN and every customer's phone number.
+ * Wrong password, no password set, an account type that does not use one, no
+ * such user at all, already locked — one outcome, one message, no timing tell
+ * worth chasing. A form that distinguishes them is a tool for discovering
+ * which addresses are staff accounts, and a staff address is worth phishing:
+ * ops reaches every studio's GSTIN and every customer's phone number, and a
+ * studio account reaches that studio's whole client list.
  *
  * ## Why the lock is not timed
  *
@@ -28,10 +29,17 @@ import { prisma } from '@/lib/prisma';
 import { createSession } from './session';
 import { sendMagicLink } from './email';
 import { requestMagicLink, normaliseEmail, isValidEmail } from './magic-link';
-import { decideSignIn, verifyPassword, hashPassword, passwordProblem } from './password';
+import {
+  canUsePassword,
+  decideSignIn,
+  hashPassword,
+  passwordProblem,
+  verifyPassword,
+} from './password';
 
 export type PasswordSignInResult =
-  | { ok: true }
+  /** `role` and `mustSetPassword` decide where the caller sends them. */
+  | { ok: true; role: string; mustSetPassword: false }
   | { ok: false; message: string; locked?: boolean };
 
 /**
@@ -88,7 +96,10 @@ export async function signInWithPassword(
       data: { failedSignIns: 0, lockedOutAt: null },
     });
     await createSession(user.id, meta);
-    return { ok: true };
+    /* Signing in WITH a password means one is set, by definition — so this is
+       never the first-run case. Stated rather than inferred, because the
+       caller branches on it. */
+    return { ok: true, role: user.role, mustSetPassword: false };
   }
 
   if (outcome.kind === 'refused') {
@@ -141,8 +152,10 @@ export async function setOwnPassword(
     select: { id: true, role: true, passwordHash: true },
   });
 
-  if (!user || user.role !== 'OPS') {
-    return { ok: false, message: 'Only ops accounts can set a password.' };
+  if (!user || !canUsePassword(user.role)) {
+    /* Customers reach this only by URL, and the honest answer is that their
+       account does not use a password — not that they did something wrong. */
+    return { ok: false, message: 'This account signs in by link, not by password.' };
   }
 
   /* Changing an existing password requires the old one. Without this, anyone
@@ -184,5 +197,4 @@ export async function clearLockout(userId: string): Promise<void> {
   });
 }
 
-/** Re-exported so the sign-in page can decide whether to show the field. */
 export { sendMagicLink };

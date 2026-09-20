@@ -1,46 +1,38 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState } from 'react';
 import { Button } from '@/components/ui';
 import { signInWithPasswordAction, type PasswordState } from './actions';
 
 const INITIAL: PasswordState = { status: 'idle' };
 
 /**
- * Email and password, for ops accounts.
+ * Email and password. Studios and ops.
  *
- * ## Why this is collapsed by default
+ * ## Why this is open by default and the link is the fallback
  *
- * Almost everyone who reaches /sign-in is a studio owner or a customer, and
- * for them a password field is a dead end that looks like the main event —
- * they would try to set one, fail, and conclude the site is broken. The link
- * above stays the obvious path; this opens for the handful of people it is
- * for.
+ * It was the other way round when only ops had passwords, and that was right
+ * then. It is wrong now: a studio owner signs in to work, repeatedly, often
+ * from a site visit on a phone, and they set a password on their very first
+ * visit. Making them find a disclosure to reach the normal way in would put
+ * the daily path behind the exceptional one.
  *
- * ## Why it does not say "ops sign-in"
+ * The emailed link stays directly underneath, unhidden, because it is what
+ * somebody who has forgotten their password needs and they should not have to
+ * hunt for it while frustrated.
  *
- * A labelled ops entrance tells a stranger where to aim. The wording is
- * deliberately flat, and the role check happens on the server in
- * modules/auth/password.ts, never here — a hidden field is not a control.
+ * ## Why nothing here says "staff" or "ops"
+ *
+ * A labelled entrance tells a stranger where to aim. The wording is flat, and
+ * the role check happens on the server in modules/auth/password.ts — a form
+ * that only renders for some people is not a control, because the action is
+ * directly invocable.
  */
 export function PasswordForm() {
-  const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(signInWithPasswordAction, INITIAL);
 
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="mt-1 self-start border-0 bg-transparent p-0 text-[13.5px] text-[var(--color-ink-3)] underline underline-offset-4 hover:text-[var(--color-ink-2)]"
-      >
-        Sign in with a password instead
-      </button>
-    );
-  }
-
   return (
-    <form action={action} className="mt-1 flex flex-col gap-3 border-t border-[var(--color-rule)] pt-5">
+    <form action={action} className="flex flex-col gap-3">
       <div>
         <label htmlFor="pw-email" className="label m-0 mb-2 block">
           Email address
@@ -81,14 +73,6 @@ export function PasswordForm() {
       <Button type="submit" size="lg" disabled={pending}>
         {pending ? 'Checking…' : 'Sign in'}
       </Button>
-
-      <button
-        type="button"
-        onClick={() => setOpen(false)}
-        className="self-start border-0 bg-transparent p-0 text-[13.5px] text-[var(--color-ink-3)] underline underline-offset-4 hover:text-[var(--color-ink-2)]"
-      >
-        Email me a link instead
-      </button>
     </form>
   );
 }

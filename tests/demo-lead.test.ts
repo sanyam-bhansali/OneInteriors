@@ -61,7 +61,9 @@ describe('the sample is listed, never counted', () => {
       offenders,
       'these count the sample lead; spread ...LIVE from modules/studio-practice/demo-lead',
     ).toEqual([]);
-  });
+    // Same reason as tests/form-submitter.test.ts: this walks the tree, and
+    // the tree is on a mounted filesystem with very uneven speed.
+  }, 30_000);
 
   it('LIVE excludes the sample AND the deleted, because one without the other is a bug', () => {
     expect(LIVE).toEqual({ deletedAt: null, isDemo: false });

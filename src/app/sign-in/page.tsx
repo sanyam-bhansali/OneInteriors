@@ -139,16 +139,25 @@ export default async function SignInPage({
 
             <h1 className="h1 mb-3">Sign in</h1>
             <p className="m-0 mb-8 text-[16px] leading-relaxed text-[var(--color-ink-2)]">
-              Studio and team accounts sign in by email — we send a link, you click it. Use the
-              address we approved you on.
+              Studio and team accounts sign in with the email address we
+              approved you on.
             </p>
 
-            <SignInForm next={destination} />
-
-            {/* Ops only. Collapsed, because almost everyone here is a studio
-                owner for whom a password field is a dead end that looks like
-                the main event. The role check is on the server. */}
+            {/* The daily path first. Studios and ops set a password on their
+                first visit, so this is what they use every time after. */}
             <PasswordForm />
+
+            {/* And the way back in, never hidden — somebody who has forgotten
+                their password should not have to hunt for this while
+                frustrated. It is also the whole first-run path, before any
+                password exists. */}
+            <div className="mt-8 border-t border-[var(--color-rule)] pt-6">
+              <p className="m-0 mb-4 text-[14px] leading-relaxed text-[var(--color-ink-2)]">
+                Forgotten your password, or signing in for the first time? We
+                will email you a link instead.
+              </p>
+              <SignInForm next={destination} />
+            </div>
 
             <p className="m-0 mt-10 border-t border-[var(--color-rule)] pt-5 text-[13.5px] leading-relaxed text-[var(--color-ink-3)]">
               If the link has expired, ask for another — they last fifteen minutes and can only be

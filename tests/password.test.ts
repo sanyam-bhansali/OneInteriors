@@ -6,13 +6,18 @@ import {
   hashPassword,
   isLockedOut,
   passwordProblem,
+  shouldSetPassword,
   verifyPassword,
 } from '@/modules/auth/password';
 
 /**
- * Passwords guard the one account that sees everything: every studio's legal
- * name and GSTIN, every customer's name, phone and email. So the tests here
- * are about the failure modes that do not show up in a browser.
+ * Passwords now guard both staff surfaces: ops, which sees every studio's
+ * legal name and GSTIN and every customer's name, phone and email; and each
+ * studio account, which sees that practice's entire client list.
+ *
+ * So the tests here are about the failure modes that do not show up in a
+ * browser — a comparison that leaks timing, a lock that counts wrong, a form
+ * that quietly tells you which addresses are real.
  */
 
 const GOOD = 'harbour-lantern-quiet-42';
@@ -78,27 +83,54 @@ describe('hashing', () => {
 });
 
 describe('who may use a password at all', () => {
-  it('is ops, and only ops', () => {
-    expect(canUsePassword('OPS')).toBe(true);
-    for (const role of ['CUSTOMER', 'STUDIO', 'ADMIN', 'ops', '']) {
-      expect(canUsePassword(role), role).toBe(false);
+  it('is staff: ops, studios, admins', () => {
+    for (const role of ['OPS', 'STUDIO', 'ADMIN']) {
+      expect(canUsePassword(role), role).toBe(true);
     }
   });
 
-  it('refuses a studio even when the password is right', () => {
+  it('is never a customer', () => {
     /**
-     * The rule has to live in the decision, not only in the UI. A studio
-     * account that somehow acquired a passwordHash must still not be able to
-     * sign in with it — otherwise "studios are magic-link-only" is a claim
-     * about a form, not about the system.
+     * A customer signs in rarely, usually once per decision. A password set
+     * eight months ago and since forgotten is strictly worse for them than a
+     * link — one more thing to fail at before they can see their quotes.
+     *
+     * The rule lives in the decision, not in the UI. A CUSTOMER row that
+     * somehow acquired a passwordHash still cannot sign in with it, because
+     * "customers are link-only" has to be a fact about the system rather than
+     * a claim about which form renders.
      */
-    const studio = {
-      role: 'STUDIO',
+    const customer = {
+      role: 'CUSTOMER',
       passwordHash: 'anything',
       failedSignIns: 0,
       lockedOutAt: null,
     };
-    expect(decideSignIn(studio, true)).toEqual({ kind: 'refused' });
+    expect(canUsePassword('CUSTOMER')).toBe(false);
+    expect(decideSignIn(customer, true)).toEqual({ kind: 'refused' });
+  });
+
+  it('matches the role exactly, never by case', () => {
+    for (const role of ['ops', 'studio', 'Ops', '']) {
+      expect(canUsePassword(role), role).toBe(false);
+    }
+  });
+});
+
+describe('being asked to set one, once', () => {
+  it('asks a studio with no password yet', () => {
+    // This fires on the approval link — the one email a new studio definitely
+    // reads, and the only moment we can count on their attention.
+    expect(shouldSetPassword({ role: 'STUDIO', passwordHash: null })).toBe(true);
+    expect(shouldSetPassword({ role: 'OPS', passwordHash: null })).toBe(true);
+  });
+
+  it('stops asking once one is set', () => {
+    expect(shouldSetPassword({ role: 'STUDIO', passwordHash: 's1$...' })).toBe(false);
+  });
+
+  it('never asks a customer, who would have nowhere to use it', () => {
+    expect(shouldSetPassword({ role: 'CUSTOMER', passwordHash: null })).toBe(false);
   });
 });
 
@@ -157,8 +189,8 @@ describe('the form cannot be used to enumerate accounts', () => {
   it('answers identically for wrong role, no password, and locked', () => {
     /**
      * If "no such account" and "wrong password" are distinguishable, the sign-in
-     * form becomes a tool for discovering which email addresses are ops
-     * accounts — and an ops address is worth phishing. All three refusals are
+     * form becomes a tool for discovering which email addresses are staff
+     * accounts — and a staff address is worth phishing. All three refusals are
      * one indistinguishable outcome.
      */
     const base = { passwordHash: 'h', failedSignIns: 0, lockedOutAt: null };

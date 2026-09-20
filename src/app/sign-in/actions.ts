@@ -89,13 +89,17 @@ export async function signOutAction(): Promise<void> {
   redirect('/');
 }
 
-// ── Ops sign-in: email + password ──────────────────────────────
+// ── Staff sign-in: email + password ────────────────────────────
 //
-// A second door into the console, for one reason: a magic link is only as
-// available as outbound email, and when email broke, ops — the place you go to
-// find out why things are broken — was unreachable. Ops accounts only; studios
-// and customers keep the link, which is enforced on the role in
-// modules/auth/password.ts, not here and not in the form.
+// Studios and ops. For ops it is a second door, because a magic link is only
+// as available as outbound email — and when email broke, the console you would
+// use to find out why was unreachable. For studios it is the daily path: they
+// sign in to work, repeatedly, often from a site visit, and an emailed link
+// means leaving the app every single time.
+//
+// Customers are excluded, enforced on the role in modules/auth/password.ts —
+// not here and not by which form renders, because a server action is directly
+// invocable.
 
 export interface PasswordState {
   status: 'idle' | 'error';
@@ -137,11 +141,17 @@ export async function signInWithPasswordAction(
   }
 
   await record('signin.completed');
-  /* Only ops accounts reach here, so the destination is the console. `next` is
-     deliberately not honoured: it arrives from the query string, and an
-     open redirect on the one form that mints an ops session is not worth the
+
+  /* By role, not by assumption. This said `redirect('/ops')` when ops were the
+     only accounts with passwords; leaving it that way once studios have them
+     would drop every studio owner on a console they cannot open, which the
+     /ops layout would then bounce to the homepage — a successful sign-in that
+     looks like a failed one.
+
+     `next` from the query string is still deliberately not honoured: an open
+     redirect on a form that mints a staff session is not worth the
      convenience. */
-  redirect('/ops');
+  redirect(result.role === 'OPS' || result.role === 'ADMIN' ? '/ops' : '/studio');
 }
 
 // ── Customer sign-in: phone + WhatsApp OTP ─────────────────────
