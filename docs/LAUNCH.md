@@ -104,17 +104,31 @@ transfer.
 > ```
 > npx prisma db push          # reconciles the DB to the schema
 > npm run db:migrate          # = prisma migrate dev
+> npm run db:reset            # = prisma migrate reset
 > ```
 >
-> Your database contains a `waitlist`-related object created outside Prisma —
-> the dashboard shows a `waitlist_grant_insert_only` migration that is not one
-> of ours. Prisma does not know that object exists. `migrate deploy` is safe
-> because it only applies migration files and never drops anything. The two
-> commands above reconcile the database *to the schema*, and a table that is
-> not in `schema.prisma` is a table they will remove.
+> `db:migrate` and `db:reset` now refuse on their own — a guard checks the
+> hostname in the connection string and only allows localhost. `npx prisma db
+> push` typed directly bypasses that, because there is no npm script in front
+> of it to guard.
+>
+> `migrate deploy` is safe: it only applies migration files and never drops
+> anything. The three above reconcile the database *to the schema*, so
+> anything not in `schema.prisma` is removed.
 
 - [ ] **3.5** Supabase → Database → Backups. Confirm a backup exists from
       *after* the migration. If not, take one.
+
+> **Done on 20 Sep.** 23 migrations applied, `Database schema is up to date!`
+> The first attempt at `20260920100000_studio_client_demo` failed on a table
+> name and was resolved as rolled-back; the corrected one applied at 12:57.
+> Two rows for that migration in `_prisma_migrations` is the correct end
+> state — Prisma keeps the failed attempt as history.
+>
+> `prisma migrate dev` will still warn that this migration "was modified after
+> it was applied", forever. It checksums every row including the rolled-back
+> one, which holds the old SQL's checksum. `migrate deploy` and `migrate
+> status` ignore rolled-back rows. Harmless; ignore it.
 
 ### If a migration fails partway (error P3018)
 
@@ -174,6 +188,11 @@ domain that is "added" but not verified sends nothing, silently.
       domain** — `hello@oneinteriors.in` works, a Gmail address does not.
 - [ ] **5.4** Send yourself a test from the Resend dashboard and confirm it
       arrives, and is not in spam.
+
+> **Done on 19 Sep.** `oneinteriors.in` verified, DKIM and SPF both green,
+> sending region Tokyo (which is where Resend processes, not where mail is
+> delivered — it costs about 100ms from the Mumbai deployment and is not
+> worth changing).
 
 > **If it lands in spam:** add a DMARC record at your DNS provider —
 > `_dmarc` TXT `v=DMARC1; p=none; rua=mailto:you@oneinteriors.in`. Start at
