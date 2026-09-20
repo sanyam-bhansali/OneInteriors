@@ -1,4 +1,5 @@
 import 'server-only';
+import { isFault, readEmailConfig } from './email-config';
 
 /**
  * Outbound email.
@@ -35,22 +36,20 @@ export interface SendResult {
   reason?: string;
 }
 
+/** The decision lives in a sibling without `server-only` so it can be tested. */
 function config() {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.EMAIL_FROM?.trim();
-  if (!apiKey || !from) return null;
-  return { apiKey, from };
+  return readEmailConfig(process.env);
 }
 
 export async function sendMagicLink(to: string, link: string): Promise<SendResult> {
   const cfg = config();
 
-  if (!cfg) {
+  if (isFault(cfg)) {
     if (process.env.NODE_ENV === 'production') {
       // Masked. A raw address here lands in Vercel's logs, which have a much
       // wider readership than the database the address is stored in.
-      console.error('[auth] No email provider configured — sign-in link NOT sent to', maskEmail(to));
-      return { delivered: false, reason: 'no_provider' };
+      console.error(`[auth] ${cfg.message} — sign-in link NOT sent to`, maskEmail(to));
+      return { delivered: false, reason: cfg.reason };
     }
     // Development: print it. Deliberately the whole link, so it is one click.
     console.log(`\n[auth] Sign-in link for ${to}:\n  ${link}\n`);
@@ -154,10 +153,10 @@ export async function sendStudioWelcome(
     'One Interiors',
   ].join('\n');
 
-  if (!cfg) {
+  if (isFault(cfg)) {
     if (process.env.NODE_ENV === 'production') {
-      console.error('[studio] No email provider configured — welcome NOT sent to', maskEmail(to));
-      return { delivered: false, reason: 'no_provider' };
+      console.error(`[studio] ${cfg.message} — welcome NOT sent to`, maskEmail(to));
+      return { delivered: false, reason: cfg.reason };
     }
     console.log(`\n[studio] Welcome for ${to}:\n  ${link}\n`);
     return { delivered: false, reason: 'dev_console' };
