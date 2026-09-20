@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useRef, useState } from 'react';
 import { decideAction, type DecisionState } from './actions';
 
 // The shared <Button> takes no name/value, and the decision has to travel with
@@ -23,6 +23,26 @@ export function DecisionForm({ id, tradeName }: { id: string; tradeName: string 
   const [note, setNote] = useState('');
   const [confirming, setConfirming] = useState(false);
 
+  /**
+   * The intent travels in a hidden field, written straight to the DOM.
+   *
+   * It used to ride on the submit button's own `name`/`value`, which is the
+   * tidier way and did not work: these buttons carry `disabled={pending}`, a
+   * DISABLED CONTROL IS EXCLUDED FROM FormData, and the pending re-render can
+   * land before the submitter's value is read. `intent` then arrived empty and
+   * the server answered "Unknown action." for approve, reject and mark-as-
+   * reviewing alike.
+   *
+   * Setting `.value` through a ref inside onClick is synchronous, so the field
+   * is populated before the submit event is dispatched. React state would not
+   * do — the update is batched and may not reach the DOM in time, which is the
+   * same race in a different costume.
+   */
+  const intentRef = useRef<HTMLInputElement>(null);
+  const send = (intent: string) => () => {
+    if (intentRef.current) intentRef.current.value = intent;
+  };
+
   if (state.status === 'done') {
     return (
       <p className="m-0 rounded-[10px] bg-[var(--color-ontrack-soft)] px-4 py-3 text-[14px] text-[var(--color-ontrack)]">
@@ -34,6 +54,7 @@ export function DecisionForm({ id, tradeName }: { id: string; tradeName: string 
   return (
     <form action={action} className="border-t border-[var(--color-rule)] pt-5">
       <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="intent" ref={intentRef} defaultValue="" />
 
       {state.status === 'error' ? (
         <p role="alert" className="m-0 mb-3 rounded-[10px] bg-[var(--color-atrisk-soft)] px-4 py-2.5 text-[14px] text-[var(--color-atrisk)]">
@@ -60,7 +81,7 @@ export function DecisionForm({ id, tradeName }: { id: string; tradeName: string 
             <span className="text-[14px] text-[var(--color-ink-2)]">
               Create <strong>{tradeName}</strong> and email them a sign-in link?
             </span>
-            <button type="submit" name="intent" value="approve" disabled={pending} className={PRIMARY}>
+            <button type="submit" onClick={send('approve')} disabled={pending} className={PRIMARY}>
               {pending ? 'Approving…' : 'Yes, approve'}
             </button>
             <button
@@ -78,8 +99,7 @@ export function DecisionForm({ id, tradeName }: { id: string; tradeName: string 
             </button>
             <button
               type="submit"
-              name="intent"
-              value="reject"
+              onClick={send('reject')}
               disabled={pending || note.trim().length < 10}
               title={note.trim().length < 10 ? 'A reason is required to reject.' : undefined}
               className={GHOST}
@@ -88,8 +108,7 @@ export function DecisionForm({ id, tradeName }: { id: string; tradeName: string 
             </button>
             <button
               type="submit"
-              name="intent"
-              value="reviewing"
+              onClick={send('reviewing')}
               disabled={pending}
               className="text-[13.5px] text-[var(--color-ink-3)] underline"
             >
