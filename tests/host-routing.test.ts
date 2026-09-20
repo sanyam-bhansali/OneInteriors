@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { audienceFor, normaliseHost, route, type HostEnv } from '@/lib/host';
 import { siteUrlFor, siteUrlForHost } from '@/lib/site';
 
@@ -208,5 +210,40 @@ describe('magic-link base URLs', () => {
   it('falls back rather than throwing on a missing header', () => {
     expect(siteUrlForHost(null, env)).toBe('https://oneinteriors.in');
     expect(siteUrlForHost('', env)).toBe('https://oneinteriors.in');
+  });
+});
+
+// ── The status code, not just the body ───────────────────────────────
+
+describe('a hidden path answers 404, not 200 with a 404 page', () => {
+  it('the middleware sets an explicit status on the notFound rewrite', () => {
+    /**
+     * Caught in production with curl, invisible in a browser.
+     *
+     * `NextResponse.rewrite(new URL('/404', ...))` with no init serves the
+     * 404 BODY under a 200 STATUS. On studio.oneinteriors.in, /ops, /match
+     * and /studios each rendered "404: This page could not be found." and
+     * each returned HTTP 200. Every manual check passed, because a browser
+     * shows you the body.
+     *
+     * Nothing leaked — the wall itself held. The cost is that each hidden
+     * path becomes a crawlable, indexable page, which is the opposite of
+     * what the host split is for: the marketplace we are keeping out of
+     * sight would be advertised to search engines from the studio host.
+     *
+     * This is asserted against the source because middleware cannot run in
+     * this suite. A source assertion that catches a real regression beats a
+     * runtime test that does not exist.
+     */
+    const src = readFileSync(join(__dirname, '..', 'src/middleware.ts'), 'utf8');
+    // To the end of the statement, not to the first `)` — the first one
+    // closes `new URL(...)` and the init object we care about comes after it.
+    const rewrite = /NextResponse\.rewrite\(\s*new URL\('\/404'[^;]*/.exec(src);
+
+    expect(rewrite, 'the notFound branch should rewrite to /404').not.toBeNull();
+    expect(
+      rewrite?.[0],
+      'rewrite to /404 must pass { status: 404 }, or it serves a 404 page with a 200 status',
+    ).toMatch(/status:\s*404/);
   });
 });

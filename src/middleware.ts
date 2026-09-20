@@ -37,11 +37,24 @@ export function middleware(request: NextRequest) {
   const decision = route(host, path);
 
   if (decision.kind === 'notFound') {
-    // `rewrite` to a path with no route, rather than NextResponse.error():
-    // the visitor gets the app's own 404 page rather than a bare edge error,
-    // and the URL they typed stays in the bar so they can see what they got
-    // wrong.
-    return NextResponse.rewrite(new URL('/404', request.url));
+    /* `rewrite` to a path with no route, rather than NextResponse.error():
+       the visitor gets the app's own 404 page rather than a bare edge error,
+       and the URL they typed stays in the bar so they can see what they got
+       wrong.
+
+       The explicit `status` is not decoration. Without it a rewrite serves the
+       404 BODY with a 200 STATUS — a soft 404 — which was live on
+       studio.oneinteriors.in and looked completely correct in a browser,
+       because a browser shows you the body. Verified with curl: /ops, /match
+       and /studios each rendered "404: This page could not be found." under
+       HTTP 200.
+
+       Nothing leaked, so this is not a hole. What it costs is that every
+       hidden path is a crawlable, indexable 200 — the customer marketplace we
+       are deliberately keeping out of sight would be advertised to search
+       engines from the studio subdomain — and no uptime check or log filter
+       can tell these apart from real pages. */
+    return NextResponse.rewrite(new URL('/404', request.url), { status: 404 });
   }
 
   if (decision.kind === 'redirect') {
