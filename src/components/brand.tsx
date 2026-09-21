@@ -48,6 +48,23 @@ const MARK_H = 412;
 const MARK_D =
   'M145.0 410.9C65.0 405.1 16.8 357.4 2.3 269.5C0.7 259.8 0.5 251.9 0.5 205.0C0.5 146.1 0.5 146.4 7.2 122.5C15.7 92.5 28.3 70.6 48.9 49.9C76.6 22.2 110.1 6.3 151.0 1.5C207.7 -5.2 259.9 13.9 290.8 52.7C311.7 79.1 324.0 111.3 328.0 150.5C329.8 167.8 328.8 261.7 326.7 274.0C319.7 315.1 306.9 342.1 283.5 365.6C256.3 392.9 222.3 407.7 179.0 411.0C164.1 412.1 161.8 412.1 145.0 410.9ZM136.5 303.8C136.7 303.6 137.2 288.3 137.6 269.7L138.3 236.0L162.7 236.0L187.0 236.0L187.0 270.0L187.0 304.0L218.5 304.0L250.0 304.0L250.0 235.4L250.0 166.8L207.8 123.9C184.6 100.3 165.1 81.1 164.4 81.2C163.8 81.4 145.1 99.1 122.9 120.6C100.7 142.1 80.8 161.2 78.8 163.0L75.0 166.2L75.0 235.4L75.0 304.5L105.6 304.3C122.4 304.2 136.3 304.0 136.5 303.8Z';
 
+/**
+ * The logo itself — the word "one", all three letters, exactly as drawn.
+ *
+ * This is the whole mark. Not the o on its own, not a monogram: the
+ * house and the key only mean anything while the word they sit inside is
+ * intact, so nothing here ever takes one letter out of it.
+ *
+ * "interiors" is set BESIDE this in `Wordmark` rather than baked into
+ * the path, because at header size a stacked two-line lockup shrinks the
+ * word to nothing. Same two pieces as the artwork, laid out for the
+ * space they are actually going into.
+ */
+const WORD_W = 1072;
+const WORD_H = 412;
+const WORD_D =
+  'M145.0 410.9C65.0 405.1 16.8 357.4 2.3 269.5C0.7 259.8 0.5 251.9 0.5 205.0C0.5 146.1 0.5 146.4 7.2 122.5C15.7 92.5 28.3 70.6 48.9 49.9C76.6 22.2 110.1 6.3 151.0 1.5C207.7 -5.2 259.9 13.9 290.8 52.7C311.7 79.1 324.0 111.3 328.0 150.5C329.8 167.8 328.8 261.7 326.7 274.0C319.7 315.1 306.9 342.1 283.5 365.6C256.3 392.9 222.3 407.7 179.0 411.0C164.1 412.1 161.8 412.1 145.0 410.9ZM887.5 410.3C877.4 409.5 864.6 407.7 855.0 405.5C785.6 390.2 745.0 333.5 737.9 242.0C736.4 221.5 737.3 167.5 739.4 153.1C749.1 88.4 779.0 44.7 830.8 19.0C871.9 -1.4 927.1 -4.7 972.7 10.5C1009.9 22.9 1039.4 51.6 1054.6 90.0C1065.5 117.7 1069.8 143.6 1070.7 186.2L1071.3 213.0L951.9 213.0C870.2 213.0 831.3 213.3 828.6 214.1C823.2 215.6 816.7 222.4 815.1 228.3C813.3 234.6 814.1 245.8 816.7 250.2C817.7 252.0 820.5 254.8 822.9 256.5C826.9 259.3 827.8 259.5 839.3 260.0L851.5 260.5L851.8 298.2L852.0 336.0L867.5 336.0L883.0 336.0L883.0 314.0L883.0 292.0L892.0 292.0L901.0 292.0L901.0 304.5L901.0 317.1L909.2 316.8L917.5 316.5L917.8 304.2L918.1 292.0L927.0 292.0L936.0 292.0L936.0 314.0L936.0 336.0L954.0 336.0L972.0 336.0L972.0 297.5L972.0 259.0L1022.0 259.0L1072.0 259.0L1072.0 266.4C1072.0 282.8 1065.2 310.8 1056.9 328.8C1032.4 381.8 977.3 411.7 905.6 410.8C897.9 410.7 889.7 410.5 887.5 410.3ZM389.2 405.2C388.2 404.5 388.0 364.0 388.2 205.9L388.5 7.5L443.8 7.2L499.0 7.0L499.1 32.7C499.1 53.1 499.4 58.1 500.3 56.7C509.3 42.8 512.3 38.7 517.8 32.8C540.1 9.2 571.8 -1.7 607.6 1.9C623.7 3.4 633.3 6.0 645.5 12.0C666.9 22.4 681.6 39.8 689.9 64.6C696.2 83.4 696.0 77.3 696.1 248.4C696.1 334.0 695.8 404.4 695.5 405.0C695.1 405.6 675.5 406.0 639.9 406.0L585.0 406.0L584.8 251.8L584.5 97.5L552.3 97.3L520.0 97.1L519.4 99.8C516.2 114.4 512.1 122.6 503.7 131.0C491.9 142.8 476.5 148.0 453.5 148.0L441.0 148.0L441.0 173.5L441.0 199.0L469.5 199.0L498.0 199.0L498.0 302.5L498.0 406.0L444.2 406.0C414.7 406.0 389.9 405.6 389.2 405.2ZM136.5 303.8C136.7 303.6 137.2 288.3 137.6 269.7L138.3 236.0L162.7 236.0L187.0 236.0L187.0 270.0L187.0 304.0L218.5 304.0L250.0 304.0L250.0 235.4L250.0 166.8L207.8 123.9C184.6 100.3 165.1 81.1 164.4 81.2C163.8 81.4 145.1 99.1 122.9 120.6C100.7 142.1 80.8 161.2 78.8 163.0L75.0 166.2L75.0 235.4L75.0 304.5L105.6 304.3C122.4 304.2 136.3 304.0 136.5 303.8ZM965.0 156.5C965.0 139.6 960.2 118.2 953.3 104.0C943.2 83.3 925.1 72.7 902.4 74.4C872.7 76.6 854.4 95.6 847.0 132.2C845.9 137.6 844.7 147.0 844.3 153.0L843.7 164.0L904.3 164.0L965.0 164.0L965.0 156.5Z';
+
 /** The full lockup: "one" over "interiors". */
 const LOGO_W = 1072;
 const LOGO_H = 560;
@@ -93,8 +110,25 @@ export function Logotype({
 }
 
 /**
- * Lockup. The city sits as a locality tag rather than a tagline — this is a
- * one-city product and saying so is a trust signal, not a limitation.
+ * The header lockup: the logo, then "interiors" beside it.
+ *
+ * ## Why "interiors" is type and not part of the path
+ *
+ * The artwork stacks it under "one". At 26px of header that would leave
+ * the second line about 6px tall — present, illegible, and making the
+ * logo look like it had a shadow. Set beside the mark it reads at any
+ * size, tracks with the page's own font, and lets the mark stay as large
+ * as the header allows.
+ *
+ * The logo is never split. `Logotype` holds the stacked artwork for the
+ * places that have room for it.
+ *
+ * ## The city
+ *
+ * A locality tag rather than a tagline — this is a one-city product and
+ * saying so is a trust signal, not a limitation. It is the first thing
+ * to go when the space runs out, because the name never breaks and the
+ * city can.
  */
 export function Wordmark({
   className = '',
@@ -104,17 +138,24 @@ export function Wordmark({
   showCity?: boolean;
 }) {
   return (
-    <span className={`inline-flex items-center gap-2.5 ${className}`}>
-      <Mark className="h-[26px] w-[26px] shrink-0 text-[var(--color-petrol)]" />
-      {/* `whitespace-nowrap` on the name, and the city hidden below 400px.
-          Under Quicksand — a noticeably wider face than Instrument Sans —
-          the wordmark broke to two lines at 375px and left "Pune"
-          stranded between the logo and the nav, which reads as a broken
-          header rather than as a tight one. The name is one thing and
-          must never break; the city is the part that can go. */}
+    <span className={`inline-flex items-baseline gap-2.5 ${className}`}>
+      {/* Height-locked, width auto: the artwork is 2.6:1, and pinning
+          both axes on a square would squash it. */}
+      <svg
+        viewBox={`0 0 ${WORD_W} ${WORD_H}`}
+        className="h-[22px] w-auto shrink-0 self-center text-[var(--color-ink)]"
+        role="img"
+        aria-label="One Interiors"
+      >
+        <path fillRule="evenodd" fill="currentColor" d={WORD_D} />
+      </svg>
+
       <span className="flex items-baseline gap-2">
-        <span className="font-[family-name:var(--font-display)] whitespace-nowrap text-[21px] leading-none tracking-[-0.01em] text-[var(--color-ink)]">
-          One Interiors
+        {/* Tracked and lowercase, the way the artwork sets it. Weight
+            300 so it sits under the mark rather than competing with it —
+            the logo is the loud part and this is the noun. */}
+        <span className="whitespace-nowrap text-[19px] font-light leading-none tracking-[0.08em] text-[var(--color-ink)]">
+          interiors
         </span>
         {showCity ? (
           <span className="hidden font-[family-name:var(--font-mono)] text-[9.5px] uppercase tracking-[0.18em] text-[var(--color-ink-3)] min-[400px]:inline">
