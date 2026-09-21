@@ -43,12 +43,27 @@ function assertLocal() {
 
   if (local) return;
 
+  /* The same named override as the capture script, and the same reasoning.
+     What is being weighed here is narrower though: this prints a WORKING
+     SESSION TOKEN to a terminal. Scrollback, shell history, screen shares.
+     A two-hour session for your own account on your own machine is a small
+     thing to expose; it is still worth having said so out loud. */
+  if (process.env.SHOT_ALLOW_REMOTE?.trim() === host) {
+    console.warn(
+      `\n⚠ Minting a session against a REMOTE database (${host}).\n` +
+      '  The token below is real. Do not paste it anywhere public.\n',
+    );
+    return;
+  }
+
   console.error(
     `\n✖ Refusing to mint a session against a remote database (${host || 'unreadable'}).\n\n` +
     '  This prints a working session token to your terminal, where it lands in\n' +
     '  scrollback, in shell history if you paste it, and in any screen share.\n' +
     '  That is an acceptable trade for a local database full of fixtures and\n' +
-    '  not for one holding a studio\'s real client list.\n',
+    '  not for one holding a studio\'s real client list.\n\n' +
+    `  If you have weighed that and want to anyway:\n\n` +
+    `      $env:SHOT_ALLOW_REMOTE="${host}"; npm run db:session -- <email>\n`,
   );
   process.exit(1);
 }

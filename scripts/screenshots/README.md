@@ -49,6 +49,26 @@ npm run db:studio-login -- you@example.com northlight-studio --live
 That last one is the only way a `StudioMember` gets created, which is what the
 whole `/studio` section needs.
 
+## The quickest run, if you have no local Postgres
+
+Your own database, knowingly, with the studio pages included:
+
+```powershell
+$env:SHOT_ALLOW_REMOTE="aws-0-ap-south-1.pooler.supabase.com"
+npm run db:session -- you@example.com     # prints SHOT_COOKIE
+$env:SHOT_COOKIE="<the value it printed>"
+npm run shots
+```
+
+The guard names the host back at you so you cannot do this by accident. What
+you are agreeing to: **every screenshot will contain real rows.** Today that
+is eight invented studios plus the Hauspire and Urbanline applications, whose
+contact details came from those businesses' own websites. Read the output
+before it goes anywhere.
+
+Opening a client board will also seed the sample lead into that database. It
+is marked, excluded from every count, and removable — but it is a write.
+
 ## The studio pages need a session
 
 `DEV_OPS_NO_AUTH` opens `/ops` and nothing else. There is deliberately no

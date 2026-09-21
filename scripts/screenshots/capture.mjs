@@ -151,6 +151,25 @@ function assertLocalDatabase() {
 
   if (local) return;
 
+  /* A deliberate, named override — same shape as ALLOW_DESTRUCTIVE_AGAINST in
+     prisma/guard-destructive.ts, and for the same reason: a guard exists to
+     stop accidents, not to forbid a decision somebody makes with their eyes
+     open. Naming the exact host is the point. You cannot set it without
+     reading which database you are about to photograph.
+
+     What you are agreeing to: the screenshots will contain whatever that
+     database holds. Today that is eight invented studios and two real
+     applications with contact details taken from those businesses' own
+     websites. Check the output before sharing it anywhere. */
+  if (process.env.SHOT_ALLOW_REMOTE?.trim() === host) {
+    console.warn(
+      `\n⚠ Screenshotting a REMOTE database (${host}).\n` +
+      '  Allowed because SHOT_ALLOW_REMOTE names this exact host.\n' +
+      '  Every page captured will show real rows. Read them before sharing.\n',
+    );
+    return;
+  }
+
   if (!raw) {
     console.log(
       'No DATABASE_URL anywhere — the app will serve fixture studios.\n' +
@@ -169,16 +188,18 @@ function assertLocalDatabase() {
     '  would carry real studios, real GSTINs and real customer names. Opening a\n' +
     '  client board would also WRITE -- the sample lead seeds itself onto any\n' +
     '  empty board the moment that page renders.\n\n' +
-    (shell
-      ? '  Unset it in this terminal, or point it at a local Postgres.\n'
-      : '  Note that clearing it in your terminal will NOT help: Next reads\n' +
-        '  .env.local itself at startup. Two options that actually work:\n\n' +
-        '    1. Fixtures only -- rename .env.local for the run:\n\n' +
-        '         Rename-Item .env.local .env.local.off\n' +
-        '         npm run shots\n' +
-        '         Rename-Item .env.local.off .env.local\n\n' +
-        '    2. A local Postgres -- point DATABASE_URL and DIRECT_URL at it in\n' +
-        '       .env.local, then seed it. See scripts/screenshots/README.md.\n'),
+    '  Clearing it in your terminal will NOT help: Next reads .env.local\n' +
+    '  itself at startup. Three options that do:\n\n' +
+    '    1. Fixtures only -- move .env.local aside for the run:\n\n' +
+    '         Rename-Item .env.local .env.local.off\n' +
+    '         npm run shots\n' +
+    '         Rename-Item .env.local.off .env.local\n\n' +
+    '       The studio pages are skipped, because they need a session.\n\n' +
+    '    2. A local Postgres -- everything captures. See the README.\n\n' +
+    `    3. Go ahead against this one, knowingly:\n\n` +
+    `         $env:SHOT_ALLOW_REMOTE="${host}"     # PowerShell\n` +
+    `         SHOT_ALLOW_REMOTE="${host}" npm run shots   # bash\n\n` +
+    '       The screenshots will then contain real rows.\n',
   );
   process.exit(1);
 }
