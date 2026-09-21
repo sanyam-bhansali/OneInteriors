@@ -43,7 +43,7 @@ export default function ApplyStartPage() {
         <DoodleGround className="text-[var(--ink)]" opacity={0.04} />
 
         <Container size="wide" className="relative">
-          <div className="grid grid-cols-1 gap-10 py-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-16 lg:py-14">
+          <div className="grid grid-cols-1 gap-8 py-7 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-14 lg:py-9">
             {/* ── Left: why we are asking. Sticky. ─────────────── */}
             <div className="lg:sticky lg:top-8 lg:self-start">
               <Link

@@ -45,8 +45,8 @@ export function Stepper({
   const pct = Math.round((furthest / steps.length) * 100);
 
   return (
-    <nav aria-label="Application progress" className="mb-9">
-      <div className="mb-6">
+    <nav aria-label="Application progress" className="mb-6">
+      <div className="mb-4">
         <div className="mb-2 flex items-baseline justify-between">
           <span className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-ink-2)]">
             Step {current + 1} of {steps.length}
@@ -115,13 +115,11 @@ export function Stepper({
                 />
               </div>
 
-              <span
-                className={`mt-2.5 text-center text-[13px] leading-snug ${
-                  here ? 'font-bold text-[var(--color-ink)]' : 'text-[var(--color-ink-2)]'
-                }`}
-              >
-                {s.label}
-              </span>
+              {/* The label is for screen readers only. At five steps the
+                  visible ones wrapped to two lines on anything narrow and
+                  cost more height than they were worth — and the heading
+                  directly below already names the step you are on. */}
+              <span className="sr-only">{s.label}</span>
             </li>
           );
         })}
