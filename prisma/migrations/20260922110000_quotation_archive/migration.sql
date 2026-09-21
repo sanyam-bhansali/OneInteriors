@@ -70,3 +70,18 @@ ALTER TABLE "quotation_archives" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "quotation_archives" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "quotation_files" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "quotation_files" FORCE ROW LEVEL SECURITY;
+
+-- The REVOKE is not belt-and-braces on top of RLS, it is the other half.
+--
+-- Supabase sets ALTER DEFAULT PRIVILEGES on the public schema, so a table
+-- created after the lockdown migration arrives with anon and authenticated
+-- already granted -- and that lockdown was a one-time sweep of the tables that
+-- existed in September, so it does nothing for these two. RLS with no
+-- permissive policy stops the rows being read; this stops the grant existing
+-- in the first place, which is what a future migration adding a policy would
+-- otherwise quietly open.
+--
+-- tests/security-invariants.test.ts is what caught this missing, which is
+-- precisely what that test was written for.
+REVOKE ALL ON "quotation_archives" FROM anon, authenticated;
+REVOKE ALL ON "quotation_files" FROM anon, authenticated;
