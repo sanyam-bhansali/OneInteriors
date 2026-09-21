@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { startTransition, useActionState, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui';
 import { FIELD_WIDTH, type FieldWidth } from '@/components/ui/form';
 import { LOCALITIES_BY_ZONE } from '@/modules/brief/types';
@@ -243,6 +243,46 @@ export function ApplyForm() {
       action={action}
       ref={form}
       onChange={saveDraft}
+      /**
+       * Enter must advance, not submit — and not fire the site lookup.
+       *
+       * Pressing Enter in a text field activates the form's first submit
+       * button. For most of this form that was the ONLY submit button:
+       * "Fill this in from my website". So typing an email on step 2 and
+       * hitting Enter ran a scrape of whatever was in the website field,
+       * burned a rate-limit slot, and did not advance.
+       *
+       * The lookup is a plain button now (see SiteLookup), and this
+       * turns Enter into Continue everywhere except the last step, where
+       * submitting is what Enter should do.
+       */
+      onSubmit={(e) => {
+        if (!last) {
+          e.preventDefault();
+          go(step + 1);
+        }
+      }}
+      /**
+       * And Enter has to be handled explicitly, because removing the
+       * submit button removed implicit submission with it.
+       *
+       * A browser only submits on Enter when the form has a default
+       * button, or when it has exactly one field. This form has neither
+       * on steps 1 to 4 — so after the fix above, Enter did nothing at
+       * all. Trading a wrong action for no action is not a fix.
+       *
+       * A textarea is left alone: Enter there is a new paragraph, which
+       * is the one place in this form somebody writes prose. Buttons are
+       * left alone too, so Enter still activates the one under focus.
+       */
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter') return;
+        const el = e.target as HTMLElement;
+        if (el.tagName === 'TEXTAREA' || el.tagName === 'BUTTON') return;
+        if (last) return; // Let it submit.
+        e.preventDefault();
+        go(step + 1);
+      }}
       className="rounded-[16px] border border-[var(--color-rule)] bg-[var(--card,#fcfcfa)] p-5 sm:p-7"
     >
       <Stepper
@@ -323,7 +363,7 @@ export function ApplyForm() {
             {err.localities}
           </p>
         ) : null}
-        <ZonePicker />
+        <ZonePicker restored={restored} />
       </div>
 
       <div hidden={step !== 3} className="flex flex-col gap-5">
@@ -449,7 +489,7 @@ export function ApplyForm() {
  * itself, which is also what FormData reads and what the draft restore
  * writes into. A mirrored copy would need reconciling with all three.
  */
-function ZonePicker() {
+function ZonePicker({ restored }: { restored: boolean }) {
   /* Starts CLOSED. Opening the first zone by default put sixteen pills
      on screen before anybody had chosen a zone, and made this the
      tallest step in the form by a wide margin. Six headings is the
@@ -470,9 +510,18 @@ function ZonePicker() {
     setCounts(next);
   }
 
-  // Once on mount, so a restored draft shows its counts immediately
-  // rather than waiting for the first click.
-  useEffect(recount, []);
+  /**
+   * On mount AND whenever a draft lands.
+   *
+   * Mount alone was wrong, and the reason is ordering: React runs CHILD
+   * effects before parent ones, so this counted before `ApplyForm` had
+   * written the saved localities into the checkboxes. A studio came back
+   * to a restored application, three areas genuinely ticked, and read
+   * "Open the zones you work in and tick the areas" with no badges —
+   * exactly the hidden-selection failure the counts exist to prevent,
+   * and worse, because the data was right and the display was lying.
+   */
+  useEffect(recount, [restored]);
 
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
@@ -607,6 +656,7 @@ function SiteLookup({
   const [state, action, pending] = useActionState(lookupSiteAction, {
     status: 'idle',
   } as LookupState);
+  const [used, setUsed] = useState(false);
 
   /** Write a value in the way React's own inputs would see it. */
   function put(name: string, value: string) {
@@ -622,7 +672,23 @@ function SiteLookup({
     if (state.status !== 'found') return;
     if (state.about) put('about', state.about);
     if (state.instagram) put('instagram', state.instagram);
+    if (state.yearsActive) put('yearsActive', String(state.yearsActive));
+    if (state.minLakhs) put('minLakhs', String(state.minLakhs));
+
+    /* Ticking areas is the longest job in the form, so this is the part
+       that actually saves somebody time. Additive: it ticks what the
+       site named and leaves anything already chosen alone. */
+    if (state.localities?.length) {
+      const el = form.current;
+      for (const slug of state.localities) {
+        const box = el?.querySelector<HTMLInputElement>(
+          `input[name="localities"][value="${slug}"]`,
+        );
+        if (box && !box.checked) box.checked = true;
+      }
+    }
     onFilled();
+    setUsed(true);
   }
 
   const aboutHasContent = Boolean(
@@ -631,37 +697,67 @@ function SiteLookup({
 
   return (
     <div className="mt-1">
-      {/* `formAction` on the button rather than a nested <form>: the whole
-          application is already one form, and a form inside a form is
-          invalid HTML that browsers silently unnest. */}
+      {/* `type="button"`, and the action called by hand.
+          
+          As a submit button this was the form's FIRST submit control, so
+          Enter anywhere in the application fired it — a scrape of the
+          website field from the middle of the "who do we speak to" step.
+          A plain button cannot be reached by Enter, and the form's own
+          onSubmit now turns Enter into Continue.
+          
+          `startTransition` because a `useActionState` action must be
+          dispatched inside one; called bare it throws. */}
       <button
-        type="submit"
-        formAction={action}
+        type="button"
+        onClick={() => {
+          const el = form.current;
+          if (!el) return;
+          const data = new FormData();
+          data.set('website', String(new FormData(el).get('website') ?? ''));
+          startTransition(() => action(data));
+        }}
         disabled={pending}
         className="rounded-full border border-[var(--color-rule)] bg-[var(--color-paper-3)] px-5 py-2.5 text-[14px] text-[var(--color-ink)] hover:border-[var(--color-petrol)] disabled:opacity-50"
       >
         {pending ? 'Reading your site…' : 'Fill this in from my website'}
       </button>
       <p className="m-0 mt-2 text-[13px] leading-relaxed text-[var(--color-ink-2)]">
-        Optional. We read it and offer what we find — keeping it is your call.
+        {pending
+          ? 'This can take up to ten seconds — some sites are slow to answer.'
+          : 'Optional. We read it and offer what we find — keeping it is your call.'}
       </p>
 
       {state.status === 'found' ? (
-        <div className="mt-4 rounded-[12px] border border-[var(--color-ontrack)] bg-[var(--color-paper-3)] p-5">
+        <div className="mt-4 rounded-[12px] border border-[var(--color-ontrack)] bg-[var(--color-paper)] p-4">
           <p className="label m-0 mb-2 text-[var(--color-ink-2)]">From your site</p>
+
           {state.about ? (
-            <p className="m-0 mb-3 text-[14.5px] leading-relaxed text-[var(--color-ink)]">
-              “{state.about}”
-            </p>
-          ) : null}
-          {state.instagram ? (
-            <p className="m-0 mb-3 text-[14px] text-[var(--color-ink-2)]">
-              Instagram: <strong className="text-[var(--color-ink)]">{state.instagram}</strong>
+            <p className="m-0 mb-2 text-[14px] leading-relaxed text-[var(--color-ink)]">
+              &ldquo;{state.about.slice(0, 180)}
+              {state.about.length > 180 ? '…' : ''}&rdquo;
             </p>
           ) : null}
 
-          {aboutHasContent && state.about ? (
-            <p className="m-0 text-[13.5px] leading-relaxed text-[var(--color-ink-2)]">
+          {/* Everything else as one compact line. Four separate rows for
+              four short facts made the panel taller than the step. */}
+          <ul className="m-0 mb-3 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-[13.5px] text-[var(--color-ink-2)]">
+            {state.instagram ? <li>Instagram {state.instagram}</li> : null}
+            {state.yearsActive ? <li>{state.yearsActive} years active</li> : null}
+            {state.minLakhs ? <li>From ₹{state.minLakhs} L</li> : null}
+            {state.localityLabels?.length ? (
+              <li>
+                Areas: {state.localityLabels.slice(0, 6).join(', ')}
+                {state.localityLabels.length > 6 ? ` +${state.localityLabels.length - 6}` : ''}
+              </li>
+            ) : null}
+          </ul>
+
+          {used ? (
+            <p className="m-0 text-[13.5px] text-[var(--color-ontrack)]">
+              Added. Everything is editable — check the later steps before you send.
+            </p>
+          ) : aboutHasContent && state.about ? (
+            <p className="m-0 text-[13px] leading-relaxed text-[var(--color-ink-2)]">
               You have already written a description, so this will not replace it. Clear that box
               first if you would rather use this one.
             </p>
