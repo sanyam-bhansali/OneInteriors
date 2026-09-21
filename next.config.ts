@@ -60,10 +60,42 @@ const nextConfig: NextConfig = {
      * analytics, no tag manager, no external fonts. If that ever changes, this
      * header is where it has to be declared, which is the point.
      */
+    /**
+     * `'unsafe-eval'`, in development only.
+     *
+     * ## What this fixes
+     *
+     * Next's dev server implements Hot Module Replacement and React Refresh
+     * with `eval`. With no `'unsafe-eval'` in the policy, Chrome refuses it,
+     * `main-app.js` throws on load, and **React never hydrates** — so every
+     * `useEffect` in the app silently does not run.
+     *
+     * That does not look like a CSP problem from the outside. It looks like
+     * two unrelated bugs: `/quiz` stuck forever on "Loading…" because the
+     * effect that sets `hydrated` never fires, and the pinned how-it-works
+     * spine on the landing page not responding to scroll because its observer
+     * is never attached. Both pages render their server HTML perfectly, so
+     * nothing appears broken until you interact. The only evidence is one
+     * EvalError in the console.
+     *
+     * ## Why production is unaffected, and must stay that way
+     *
+     * A production build contains no `eval` — it is a dev-server mechanism
+     * only. So this weakening is invisible to users and the deployed policy is
+     * exactly as strict as it was. `NODE_ENV` is set by Next itself, never by
+     * us, which is what makes it safe to branch on: it is 'development' under
+     * `next dev` and 'production' under `next build`, and there is no way to
+     * get a production build carrying this.
+     *
+     * tests/security-invariants.test.ts asserts the production policy has no
+     * 'unsafe-eval' in it, so this cannot quietly leak out later.
+     */
+    const dev = process.env.NODE_ENV === 'development';
+
     const csp = [
       "default-src 'self'",
       // Next inlines hydration data; see above.
-      "script-src 'self' 'unsafe-inline'",
+      `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ''}`,
       // Tailwind and the design tokens set styles inline.
       "style-src 'self' 'unsafe-inline'",
       // Supabase storage for floor plans and portfolio images; Unsplash for

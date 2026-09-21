@@ -183,6 +183,37 @@ describe('security headers', () => {
     expect(config).toContain('Strict-Transport-Security');
   });
 
+  it("allows 'unsafe-eval' only under a development check", () => {
+    /**
+     * Next's dev server needs `eval` for HMR and React Refresh. Without it the
+     * client bundle throws on load and React never hydrates — which presents
+     * as pages that render correctly and then do nothing, because every
+     * `useEffect` in the app silently fails to run. It cost an evening once.
+     *
+     * A production build contains no `eval`, so the allowance is dev-only and
+     * must stay that way: 'unsafe-eval' in a shipped policy hands any XSS the
+     * ability to build new code out of strings, which is most of what a CSP
+     * exists to prevent.
+     *
+     * Asserted on the source rather than on a served header because the
+     * config is not importable here. What it checks is the shape: every
+     * occurrence of 'unsafe-eval' must sit behind the `dev` flag.
+     */
+    const occurrences = config.match(/'unsafe-eval'/g) ?? [];
+
+    for (const _ of occurrences) {
+      expect(
+        config,
+        "'unsafe-eval' must be gated on a development check, never unconditional",
+      ).toMatch(/dev\s*\?\s*"\s*'unsafe-eval'"\s*:\s*''/);
+    }
+
+    expect(
+      config,
+      'the dev flag must come from NODE_ENV, which Next sets and we never do',
+    ).toMatch(/const dev = process\.env\.NODE_ENV === 'development'/);
+  });
+
   it('grants no permission the app does not use', () => {
     // camera=(self) and geolocation=(self) were allowed for features that do
     // not exist — useful only to somebody who finds an injection.
