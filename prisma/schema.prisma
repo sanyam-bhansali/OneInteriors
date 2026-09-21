@@ -424,6 +424,25 @@ model Studio {
   /// Why, in the studio's own words. Read by whoever verifies them.
   gstinNote          String?
 
+  /// What a studio with fewer than three completed projects has instead.
+  ///
+  /// The portfolio step asked for three finished projects and accepted nothing
+  /// else, so a young practice was approved, invested half an hour, and then
+  /// stopped dead on a step it could not pass — and it learned the requirement
+  /// only *after* being accepted, which reads as a bait-and-switch even though
+  /// it is not one.
+  ///
+  /// Three is still the bar for being listed. This is the same shape as
+  /// `gstinNotApplicable`: a declared, reviewable alternative rather than a
+  /// blank. Work in progress, a project completed under a previous practice, a
+  /// site we can go and stand in — all of them are things ops can check, and a
+  /// three-year-old practice with two finished flats and one running is exactly
+  /// the kind of studio we should want.
+  ///
+  /// Set means "we have read what they have and we will judge it ourselves".
+  /// It unblocks submission; it does not confer the tier.
+  portfolioShortfallNote String? @db.Text
+
   // Self-declared context. Shown, but never used to compute a tier — anything
   // that affects the badge has to be something we checked.
   yearsActive Int?

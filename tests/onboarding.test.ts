@@ -19,6 +19,7 @@ const COMPLETE: OnboardingSnapshot = {
   gstin: '27AAPFU0939F1ZV',
   gstinNotApplicable: false,
   portfolioCount: MIN_PORTFOLIO_PROJECTS,
+  portfolioShortfallNote: null,
   missingRates: [],
   submittedForReview: false,
 };
@@ -131,14 +132,57 @@ describe('assessSteps — portfolio', () => {
 
   it('counts down, and gets the singular right at one short', () => {
     const one = step(snapshot({ portfolioCount: MIN_PORTFOLIO_PROJECTS - 1 }), 'portfolio');
-    expect(one.missing[0]).toBe('1 more completed project');
+    expect(one.missing[0]).toBe('1 more completed project, or a note about what else you have');
 
     const two = step(snapshot({ portfolioCount: MIN_PORTFOLIO_PROJECTS - 2 }), 'portfolio');
-    expect(two.missing[0]).toBe('2 more completed projects');
+    expect(two.missing[0]).toBe('2 more completed projects, or a note about what else you have');
   });
 
   it('does not complain when they add extras', () => {
     expect(step(snapshot({ portfolioCount: 12 }), 'portfolio').done).toBe(true);
+  });
+});
+
+/**
+ * The escape hatch.
+ *
+ * These exist because the failure they prevent is not a crash — it is a young
+ * practice sitting on a greyed-out submit button after we approved them, which
+ * nothing would have alerted us to.
+ */
+describe('assessSteps — portfolio shortfall', () => {
+  const note = 'Two finished, a third handing over in November, and a Wakad site you can visit.';
+
+  it('lets a short studio through once it has explained what it does have', () => {
+    const s = snapshot({ portfolioCount: 1, portfolioShortfallNote: note });
+    expect(step(s, 'portfolio').done).toBe(true);
+    expect(readyForReview(s)).toBe(true);
+  });
+
+  it('still needs at least one project — a note alone is not a portfolio', () => {
+    const s = snapshot({ portfolioCount: 0, portfolioShortfallNote: note });
+    expect(step(s, 'portfolio').done).toBe(false);
+    expect(step(s, 'portfolio').missing[0]).toBe('at least one project');
+  });
+
+  it('rejects a note too short to route a verifier anywhere', () => {
+    expect(
+      step(snapshot({ portfolioCount: 2, portfolioShortfallNote: 'soon' }), 'portfolio').done,
+    ).toBe(false);
+  });
+
+  it('is not fooled by whitespace', () => {
+    expect(
+      step(snapshot({ portfolioCount: 2, portfolioShortfallNote: '   '.repeat(40) }), 'portfolio')
+        .done,
+    ).toBe(false);
+  });
+
+  it('changes nothing for a studio that has its three', () => {
+    // The hatch must not become a second, quieter route to the same place for
+    // somebody who never needed it.
+    const s = snapshot({ portfolioCount: MIN_PORTFOLIO_PROJECTS, portfolioShortfallNote: null });
+    expect(step(s, 'portfolio').done).toBe(true);
   });
 });
 

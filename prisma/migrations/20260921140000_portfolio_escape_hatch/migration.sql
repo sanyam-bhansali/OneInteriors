@@ -1,0 +1,21 @@
+-- An escape hatch for the portfolio step.
+--
+-- The table is "studios", not "Studio" -- every model in this schema carries an
+-- @@map to snake_case, while columns are NOT mapped and stay camelCase. That is
+-- why "portfolioShortfallNote" is correct here and "portfolio_shortfall_note"
+-- would not be. See tests/migration-names.test.ts, which checks this
+-- mechanically.
+--
+-- Nullable, so every existing row is valid the moment this runs and no studio's
+-- checklist changes: a studio with three projects never reads this column, and
+-- a studio with fewer sees exactly what it saw before until it writes one.
+--
+-- This is deliberately the same shape as "gstinNotApplicable"/"gstinNote" --
+-- a declared, reviewable alternative rather than a blank -- with one
+-- difference: there is no boolean. A note that exists IS the declaration, so
+-- the two cannot drift apart the way a flag and its explanation can.
+--
+-- No RLS work needed: studios already carries policies from the lockdown
+-- migration and they apply to new columns unchanged.
+ALTER TABLE "studios"
+  ADD COLUMN "portfolioShortfallNote" TEXT;

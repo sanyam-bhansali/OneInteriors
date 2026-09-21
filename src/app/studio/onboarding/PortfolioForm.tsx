@@ -9,7 +9,12 @@ import {
   SCOPE_LABELS,
 } from '@/modules/brief/types';
 import { formatINRCompact } from '@/lib/money';
-import { addProjectAction, removeProjectAction, type StepState } from './actions';
+import {
+  addProjectAction,
+  removeProjectAction,
+  declarePortfolioShortfallAction,
+  type StepState,
+} from './actions';
 import { Field, Select, Chips, Check, SaveBar } from './fields';
 
 const INITIAL: StepState = { status: 'idle' };
@@ -27,9 +32,12 @@ export interface ProjectRow {
 export function PortfolioForm({
   projects,
   minimum,
+  shortfallNote,
 }: {
   projects: ProjectRow[];
   minimum: number;
+  /** What they have told us they have instead, if they have told us. */
+  shortfallNote: string | null;
 }) {
   const [adding, setAdding] = useState(projects.length === 0);
   const [state, action, pending] = useActionState(addProjectAction, INITIAL);
@@ -62,6 +70,13 @@ export function PortfolioForm({
             <ProjectItem key={p.id} project={p} />
           ))}
         </ul>
+      ) : null}
+
+      {/* The escape hatch, shown only to the studio that needs it — and only
+          once they have put up at least one project, because before that the
+          honest instruction is "add a project", not "explain yourself". */}
+      {short > 0 && projects.length > 0 ? (
+        <ShortfallForm note={shortfallNote} />
       ) : null}
 
       {adding ? (
@@ -137,6 +152,77 @@ export function PortfolioForm({
         </button>
       )}
     </div>
+  );
+}
+
+/**
+ * For the practice that does not have three yet.
+ *
+ * ## Why this is not a "skip" button
+ *
+ * A skip records nothing, so ops opens the file and finds an absence — which
+ * is indistinguishable from an unfinished form. What we want is the one thing
+ * a young studio can actually offer instead of a third finished flat: a site
+ * we can walk into. That is checkable, and checking it is what we do anyway.
+ *
+ * ## Why it is not shown to everyone
+ *
+ * A studio with three projects never sees this, because offering an exemption
+ * to somebody who does not need one invites them to take it. It appears the
+ * moment the arithmetic says they are short, and disappears when they are not.
+ */
+function ShortfallForm({ note }: { note: string | null }) {
+  const [state, action, pending] = useActionState(declarePortfolioShortfallAction, INITIAL);
+  const err = state.errors ?? {};
+
+  return (
+    <form
+      action={action}
+      className="flex flex-col gap-5 rounded-[14px] border border-dashed border-[var(--color-rule)] bg-[var(--color-paper-2)] p-6"
+    >
+      <div>
+        <p className="h3 m-0 mb-2">Not three yet?</p>
+        <p className="m-0 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--color-ink-2)]">
+          Tell us what you do have — work in progress, a project you finished under a previous
+          practice, a site we could come and stand in. A practice three years old with two finished
+          flats and one running is exactly the kind of studio we want, and we would rather read
+          this than have you stop here.
+        </p>
+      </div>
+
+      <div>
+        <label htmlFor="portfolioShortfallNote" className="label m-0 mb-2 block">
+          What you have instead
+        </label>
+        <textarea
+          id="portfolioShortfallNote"
+          name="portfolioShortfallNote"
+          rows={4}
+          defaultValue={note ?? ''}
+          placeholder="Two finished — the Wakad 2 BHK and a kitchen in Baner. A third handing over in November, and you are welcome to see it now. I ran two more at my last practice; the client would vouch for one of them."
+          className="w-full rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper)] px-5 py-4 text-[15.5px] leading-relaxed"
+        />
+        {err.portfolioShortfallNote ? (
+          <p role="alert" className="m-0 mt-1.5 text-[13.5px] text-[var(--color-atrisk)]">
+            {err.portfolioShortfallNote}
+          </p>
+        ) : null}
+      </div>
+
+      {note ? (
+        <p className="m-0 text-[14px] leading-relaxed text-[var(--color-ontrack)]">
+          Recorded — this step will not hold you up. It is read by a person, not scored, and it
+          does not by itself put you on the roster.
+        </p>
+      ) : null}
+
+      <SaveBar
+        pending={pending}
+        saved={state.status === 'saved'}
+        formError={err.form}
+        label="Save this"
+      />
+    </form>
   );
 }
 

@@ -31,6 +31,14 @@ export const STEP_BLURBS: Record<OnboardingStep, string> = {
 /** Enough projects that a customer sees a pattern rather than one lucky job. */
 export const MIN_PORTFOLIO_PROJECTS = 3;
 
+/**
+ * The shortest account of a short portfolio worth reading.
+ *
+ * Same threshold as the GSTIN note, and for the same reason: a sentence routes
+ * a verifier somewhere, a word does not.
+ */
+export const MIN_SHORTFALL_NOTE = 40;
+
 /** The minimum description length worth publishing. */
 export const MIN_ABOUT_LENGTH = 80;
 export const MAX_ABOUT_LENGTH = 1200;
@@ -47,6 +55,11 @@ export interface OnboardingSnapshot {
   /** Set when the studio has told us it has no GST registration. */
   gstinNotApplicable: boolean;
   portfolioCount: number;
+  /**
+   * What a studio with fewer than three completed projects has instead, in
+   * their own words. Null means they have not told us.
+   */
+  portfolioShortfallNote: string | null;
   /// Core rate categories still without a rate. Empty = quotable.
   missingRates: string[];
   submittedForReview: boolean;
@@ -92,10 +105,44 @@ export function assessSteps(studio: OnboardingSnapshot): StepStatus[] {
     registrationMissing.push('a GSTIN, or a note that you do not have one');
   }
 
+  /**
+   * Three completed projects, **or** one project and an account of what else
+   * there is.
+   *
+   * This step used to accept nothing but the three, which made it the only
+   * dead end left in onboarding after the GSTIN one was fixed. A young
+   * practice was approved, spent half an hour on the other four steps, and
+   * then sat on a permanently greyed-out submit button — having learned the
+   * requirement only *after* we accepted them.
+   *
+   * So the bar has not moved: three finished projects is still what a listed
+   * studio shows a customer. What changed is that falling short is now a
+   * conversation rather than a wall, on the same principle as
+   * `gstinNotApplicable` — a declared, reviewable alternative beats a blank,
+   * because a blank is indistinguishable from an unfinished form to whoever
+   * picks up the file.
+   *
+   * **At least one project is still required**, and that is not arbitrary. The
+   * note describes work; the project is work we can look at. A file with
+   * neither gives a verifier nothing to start from, and a profile with nothing
+   * in it cannot be published under any judgement we might make.
+   *
+   * Note what this deliberately does *not* do: it does not mark the studio
+   * verified, and it does not touch the tier. It unblocks submission, which
+   * hands the decision to a person — which at ten studios is affordable and is
+   * the right place for it.
+   */
   const portfolioMissing: string[] = [];
+  const shortfallNote = studio.portfolioShortfallNote?.trim() ?? '';
   if (studio.portfolioCount < MIN_PORTFOLIO_PROJECTS) {
-    const short = MIN_PORTFOLIO_PROJECTS - studio.portfolioCount;
-    portfolioMissing.push(`${short} more completed project${short === 1 ? '' : 's'}`);
+    if (studio.portfolioCount === 0) {
+      portfolioMissing.push('at least one project');
+    } else if (shortfallNote.length < MIN_SHORTFALL_NOTE) {
+      const short = MIN_PORTFOLIO_PROJECTS - studio.portfolioCount;
+      portfolioMissing.push(
+        `${short} more completed project${short === 1 ? '' : 's'}, or a note about what else you have`,
+      );
+    }
   }
 
   const profile: StepStatus = {

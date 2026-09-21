@@ -215,6 +215,28 @@ export default function ApplyPage() {
                 </div>
               ))}
             </div>
+
+            {/* The bar, stated before the application rather than discovered
+                after approval.
+
+                A studio used to learn about the three projects at step three
+                of five, having already been accepted and having already spent
+                half an hour — which reads as a bait-and-switch even though it
+                was never meant as one. Saying it here costs a paragraph. Not
+                saying it costs the trust of the studio it surprises. */}
+            <div className="mt-9 border-l-2 border-[var(--color-petrol)] pl-6">
+              <p className="m-0 mb-2 text-[16.5px] font-bold leading-snug text-[var(--color-ink)]">
+                One thing worth knowing now.
+              </p>
+              <p className="m-0 max-w-[54ch] text-[15px] leading-relaxed text-[var(--color-ink-2)]">
+                A listed studio shows <strong>three completed projects</strong> — real homes, with
+                photographs and a client we can ring. If you are not there yet, say so on the form.
+                Work in progress, a project you finished under a previous practice, a site we can
+                come and stand in: all of it counts for something, and a person reads it. We would
+                rather have that conversation than lose a practice that will be excellent in two
+                years.
+              </p>
+            </div>
           </Container>
         </section>
 
@@ -307,9 +329,16 @@ const NOT_FOR_YOU = [
     title: 'You quote low and revise up.',
     body: 'We publish the gap between the quoted number and the final one, on your profile, permanently. That is the point of the list, and it cuts both ways.',
   },
+  // The third bullet here used to read "You cannot yet show three finished
+  // projects… it is the one thing we cannot work around." That was true when it
+  // was written and is not true now: the portfolio step takes a declared
+  // shortfall, reviewed by a person. Leaving the line up would have been the
+  // worse kind of dishonesty — turning away exactly the young practices the
+  // escape hatch was built to keep. The bar itself is stated below the list
+  // instead, where it belongs: a requirement with a door, not a filter.
   {
-    title: 'You cannot yet show three finished projects.',
-    body: 'Three completed homes, with photographs and a client we can ring. It is the one thing we cannot work around — come back when you have them, and we will still be here.',
+    title: 'You want to be ranked higher than you are.',
+    body: 'Nobody can pay to sit above anyone. Position comes out of the match and nothing else, and there is no product on this page that changes that.',
   },
 ];
 

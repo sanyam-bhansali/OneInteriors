@@ -28,7 +28,7 @@ import { getCurrentUser, hasRole, type AuthUser } from '@/modules/auth/session';
 import { validateGstin } from '@/modules/verification/gstin';
 import { missingCoreRates } from '@/modules/quotation/categories';
 import { lakhsToPaise } from '@/lib/money';
-import { onboardingProgress, MIN_ABOUT_LENGTH } from './onboarding-steps';
+import { onboardingProgress, MIN_ABOUT_LENGTH, MIN_SHORTFALL_NOTE } from './onboarding-steps';
 import {
   STYLE_TAGS,
   PUNE_LOCALITIES,
@@ -41,6 +41,7 @@ export {
   STEP_LABELS,
   STEP_BLURBS,
   MIN_PORTFOLIO_PROJECTS,
+  MIN_SHORTFALL_NOTE,
   assessSteps,
   onboardingProgress,
   readyForReview,
@@ -70,6 +71,7 @@ export interface StudioContext {
     submittedForReview: boolean;
     gstinNotApplicable: boolean;
     gstinNote: string | null;
+    portfolioShortfallNote: string | null;
   };
 }
 
@@ -161,6 +163,7 @@ async function loadStudio(user: AuthUser): Promise<StudioContext | null> {
       submittedForReview: steps.submittedForReview === true,
       gstinNotApplicable: s.gstinNotApplicable,
       gstinNote: s.gstinNote,
+      portfolioShortfallNote: s.portfolioShortfallNote,
     },
   };
 }
@@ -318,6 +321,50 @@ export async function declareNoGstin(note: string): Promise<SaveResult> {
   await prisma.studio.update({
     where: { id: context.studio.id },
     data: { gstinNotApplicable: true, gstinNote: trimmed.slice(0, 500), gstin: null },
+  });
+
+  return { ok: true };
+}
+
+/**
+ * A studio with fewer than three finished projects, telling us what it has
+ * instead.
+ *
+ * ## Why this is a write and not a checkbox
+ *
+ * The parallel is `declareNoGstin`, and the reasoning is the same: we are not
+ * waiving the requirement, we are routing the studio to a person. "Two
+ * finished, one handing over in November, and you are welcome to come and see
+ * the Wakad site" is something ops can act on. A ticked box is not.
+ *
+ * So there is no boolean here. The note IS the declaration, which means the
+ * flag and its explanation cannot drift apart — a failure the GSTIN pair can
+ * still have in principle and this one cannot.
+ *
+ * ## What it does not do
+ *
+ * It does not mark anything verified and it does not touch the tier. It
+ * unblocks the submit button, and everything after that is a judgement a
+ * person makes with this text in front of them.
+ */
+export async function declarePortfolioShortfall(note: string): Promise<SaveResult> {
+  const context = await currentStudio();
+  if (!context) return { ok: false, errors: { form: 'No studio is linked to this account.' } };
+
+  const trimmed = note.trim();
+  if (trimmed.length < MIN_SHORTFALL_NOTE) {
+    return {
+      ok: false,
+      errors: {
+        portfolioShortfallNote:
+          'A couple of sentences. What is finished, what is running, and anywhere we could go and look — that is what we read.',
+      },
+    };
+  }
+
+  await prisma.studio.update({
+    where: { id: context.studio.id },
+    data: { portfolioShortfallNote: trimmed.slice(0, 1500) },
   });
 
   return { ok: true };

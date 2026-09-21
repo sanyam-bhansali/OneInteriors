@@ -93,6 +93,7 @@ function toStudio(row: StudioRow): Studio {
     gstin: row.gstin,
     gstinNotApplicable: row.gstinNotApplicable ?? false,
     gstinNote: row.gstinNote ?? null,
+    portfolioShortfallNote: row.portfolioShortfallNote ?? null,
     // Read out of the JSON column the studio surface writes, rather than
     // duplicated into a second source of the same fact. Ops needs it because
     // "this studio has finished and is waiting on us" is the single most

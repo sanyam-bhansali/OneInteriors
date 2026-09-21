@@ -94,6 +94,7 @@ export default async function WorkPage() {
           <div className="max-w-[46rem]">
         <PortfolioForm
           minimum={MIN_PORTFOLIO_PROJECTS}
+          shortfallNote={context.studio.portfolioShortfallNote}
           projects={projects.map((p) => ({
             id: p.id,
             title: p.title,

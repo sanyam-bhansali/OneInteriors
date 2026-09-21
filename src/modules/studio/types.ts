@@ -94,6 +94,19 @@ export interface Studio {
   gstinNote?: string | null;
 
   /**
+   * What a studio with fewer than three completed projects says it has
+   * instead, in its own words.
+   *
+   * Ops reads this; nothing computes on it. A studio that wrote one has
+   * *declared* a shortfall rather than left the step unfinished, and those are
+   * different facts — the first is a judgement waiting to be made, the second
+   * is a studio still typing.
+   *
+   * Optional for the same fixture reason as the GSTIN pair above.
+   */
+  portfolioShortfallNote?: string | null;
+
+  /**
    * The studio has finished its side and sent the profile for verification.
    *
    * Optional for the same fixture reason as the two fields above. Derived from

@@ -125,6 +125,26 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
                 />
               </section>
 
+              {/* The portfolio shortfall, if they declared one.
+                  Rendered only when it exists, and deliberately not styled as
+                  a warning: a studio that wrote this is being straight with
+                  us, and it is a judgement to make rather than a problem to
+                  flag. What it is NOT is a waiver — the three-project bar for
+                  being listed is unchanged, and this is the text you weigh it
+                  against. */}
+              {studio.portfolioShortfallNote ? (
+                <section className="mb-8">
+                  <p className="label m-0 mb-3">Fewer than three projects — what they have</p>
+                  <blockquote className="m-0 border-l-2 border-[var(--color-brass)] bg-[var(--color-paper-2)] py-3 pl-5 pr-4 text-[15px] leading-relaxed whitespace-pre-line text-[var(--color-ink)]">
+                    {studio.portfolioShortfallNote}
+                  </blockquote>
+                  <p className="m-0 mt-2.5 text-[13px] leading-snug text-[var(--color-ink-2)]">
+                    Their words, unedited. It let them submit; it does not count towards the badge
+                    and nothing scores on it.
+                  </p>
+                </section>
+              ) : null}
+
               {/* The checks themselves */}
               <section>
                 <p className="label m-0 mb-3">Checks</p>

@@ -108,6 +108,7 @@ export default async function OnboardingStepPage({
         {step === 'portfolio' ? (
           <PortfolioForm
             minimum={MIN_PORTFOLIO_PROJECTS}
+            shortfallNote={studio.portfolioShortfallNote}
             projects={(await listProjects()).map((p) => ({
               id: p.id,
               title: p.title,

@@ -173,6 +173,14 @@ export function ApplyForm() {
             placeholder="Warm, material-led homes. We supervise our own carpentry rather than subcontracting site management."
             className="w-full max-w-[60ch] rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 py-3 text-[15px] leading-relaxed"
           />
+          {/* The pitch page states the three-project bar and says to mention it
+              here if you are short of it. This is the only free-text box on the
+              form, so it has to invite that — otherwise the instruction lands
+              nowhere and a young practice quietly does not apply. */}
+          <p className="m-0 mt-2 max-w-[60ch] text-[13.5px] leading-relaxed text-[var(--color-ink-2)]">
+            Fewer than three finished projects? Say so here — what is running, what you finished
+            elsewhere, anywhere we could come and look. It is read, not scored.
+          </p>
         </div>
         <Field
           label="How did you hear about us?"

@@ -7,6 +7,7 @@ import {
   saveProfile,
   saveGstin,
   declareNoGstin,
+  declarePortfolioShortfall,
   addProject,
   removeProject,
   submitForReview,
@@ -113,6 +114,26 @@ export async function declareNoGstinAction(
   formData: FormData,
 ): Promise<StepState> {
   const result = await declareNoGstin(String(formData.get('gstinNote') ?? ''));
+  if (!result.ok) return { status: 'error', errors: result.errors };
+  refresh();
+  return { status: 'saved' };
+}
+
+/**
+ * The other answer to the portfolio step.
+ *
+ * Exactly parallel to `declareNoGstinAction`, and for the same reason: until
+ * this existed, a practice with two finished projects could complete every
+ * other step and never submit — and it found that out only after we had
+ * approved it, which is the worst possible moment.
+ */
+export async function declarePortfolioShortfallAction(
+  _prev: StepState,
+  formData: FormData,
+): Promise<StepState> {
+  const result = await declarePortfolioShortfall(
+    String(formData.get('portfolioShortfallNote') ?? ''),
+  );
   if (!result.ok) return { status: 'error', errors: result.errors };
   refresh();
   return { status: 'saved' };
