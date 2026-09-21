@@ -40,12 +40,30 @@ export interface ScrapeState {
 }
 
 /**
- * Read the applicant's website. Ops-only — this makes an outbound request from
- * our server on a URL a stranger supplied, so it is gated on the role, not just
- * on the page being unlisted.
+ * Look the applicant up. Ops-only — this makes an outbound request from our
+ * server on a URL a stranger supplied, so it is gated on the role, not just on
+ * the page being unlisted.
  *
  * The Date and the 'website-claim' marker are dropped here: what crosses to the
  * client is plain data the UI labels for itself.
+ *
+ * ## A website is not required, and used not to be optional
+ *
+ * This refused outright when the application carried no website —
+ * "No website on this application." — which was exactly backwards. The studio
+ * with no website is the one where there is least to go on and where the
+ * Google listing is the ONLY independent trace of the business; the studio
+ * with a polished site is the one that needs us least.
+ *
+ * `SitePanel` had always passed `tradeName` for precisely this, with a comment
+ * saying a studio without a website still gets its listing looked up. The
+ * guard on the line below made that comment a lie for months, and the first
+ * real applicant to arrive without a website is what surfaced it.
+ *
+ * `enrichStudio` already handles an absent website properly: it skips the
+ * fetch, records "No website on the application, so nothing to read", and runs
+ * the Google lookup regardless. So there was never anything to fix downstream
+ * — only this early return to delete.
  */
 export async function scrapeSiteAction(
   _prev: ScrapeState,
@@ -53,16 +71,23 @@ export async function scrapeSiteAction(
 ): Promise<ScrapeState> {
   await requireRole('OPS');
 
-  const url = String(formData.get('website') ?? '');
-  if (!url.trim()) return { status: 'error', message: 'No website on this application.' };
+  const url = String(formData.get('website') ?? '').trim();
+  const tradeName = String(formData.get('tradeName') ?? '').trim();
+
+  // The trade name is what Google is searched by, so with neither a name nor a
+  // site there is genuinely nothing to look up. In practice this cannot happen
+  // — the application form requires a trade name — but a server action is a
+  // public endpoint and does not get to assume its own UI called it.
+  if (!url && !tradeName) {
+    return { status: 'error', message: 'Nothing to look up — no website and no name.' };
+  }
 
   /* Their site AND their Google listing, in one press.
      Two integrations behind one button, because an ops reviewer deciding on
      an application wants everything findable in front of them at once — and
      because a second button labelled "also check Google" is a button that
      gets forgotten on the applications that matter. */
-  const tradeName = String(formData.get('tradeName') ?? '');
-  const found = await enrichStudio({ tradeName, website: url });
+  const found = await enrichStudio({ tradeName, website: url || null });
 
   if (!found.site && !found.listing) {
     return {

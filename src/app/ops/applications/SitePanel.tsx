@@ -30,8 +30,11 @@ export function SitePanel({
     <div className="mb-5">
       <form action={action}>
         <input type="hidden" name="website" value={website} />
-        {/* Google is searched by name, so a studio with no website still
-            gets a listing looked up. */}
+        {/* Google is searched by name, so a studio with no website still gets
+            a listing looked up. This was true of the intent and false of the
+            code until Sept 26 — `scrapeSiteAction` refused outright on an
+            empty website, which turned off the lookup for exactly the
+            applicants who needed it most. */}
         <input type="hidden" name="tradeName" value={tradeName} />
         <button
           type="submit"

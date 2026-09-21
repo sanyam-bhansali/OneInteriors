@@ -17,6 +17,7 @@
     "db:migrate": "tsx prisma/guard-destructive.ts \"prisma migrate dev\" && prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "db:unseed": "tsx prisma/unseed-fixtures.ts",
     "db:studio": "prisma studio",
     "db:ops": "tsx prisma/seed-ops.ts",
     "db:studio-login": "tsx prisma/seed-studio.ts",
