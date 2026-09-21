@@ -302,17 +302,52 @@ async function main() {
        *   SHOT_COOKIE=<value> npm run shots
        */
       if (process.env.SHOT_COOKIE) {
+        /* `url`, not `domain` + `path`.
+           Playwright accepts either form, and the domain form does not apply
+           cleanly to a bare IP host — the cookie was accepted without error
+           and then never sent, so all twenty-one studio pages bounced exactly
+           as they had with no cookie at all. A silent no-op is the worst
+           possible failure here, because it is indistinguishable from the
+           session simply not being valid. */
         await context.addCookies([{
           name: 'oi_session',
           value: process.env.SHOT_COOKIE,
-          domain: '127.0.0.1',
-          path: '/',
+          url: BASE,
           httpOnly: true,
           sameSite: 'Lax',
         }]);
       }
 
       const page = await context.newPage();
+
+      /**
+       * Prove the session works before walking forty-eight routes with it.
+       *
+       * `/set-password` needs only a signed-in user of any staff role, so it
+       * separates the two failures that otherwise look identical: a cookie
+       * that is not being sent, and a session that is real but belongs to an
+       * account without a StudioMember. Both end at /sign-in, and forty-two
+       * identical bounce lines tell you nothing about which.
+       *
+       * Checked once per viewport, before anything is captured.
+       */
+      if (process.env.SHOT_COOKIE && vp.key === VIEWPORTS[0].key) {
+        const probe = await page.goto(`${BASE}/set-password`, {
+          waitUntil: 'domcontentloaded', timeout: 30_000,
+        });
+        const landedOnSignIn = page.url().includes('/sign-in');
+        if (landedOnSignIn) {
+          log(
+            '\n⚠ The session is not being accepted — /set-password bounced to sign-in.\n' +
+            '  Either SHOT_COOKIE is stale (they last two hours) or it is for an\n' +
+            '  account that no longer exists. Mint a fresh one:\n\n' +
+            '      npm run db:session -- you@example.com\n\n' +
+            '  Continuing; everything behind a sign-in will be skipped.\n',
+          );
+        } else {
+          log(`  ✓ session accepted (${probe?.status() ?? '?'} on /set-password)\n`);
+        }
+      }
 
       /* /match, /quotes and /compare rank in the browser from a brief held in
          sessionStorage. Without one they render the "tell us about your flat

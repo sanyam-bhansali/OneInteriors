@@ -55,10 +55,21 @@ Your own database, knowingly, with the studio pages included:
 
 ```powershell
 $env:SHOT_ALLOW_REMOTE="aws-0-ap-south-1.pooler.supabase.com"
+
+# The account needs a StudioMember row, or /studio/* bounces even with a
+# perfectly good session. An OPS account is not enough -- ops and studio are
+# different memberships, and db:studio-login is the only thing that creates
+# the studio one.
+npm run db:studio-login -- you@example.com northlight-studio --live
+
 npm run db:session -- you@example.com     # prints SHOT_COOKIE
 $env:SHOT_COOKIE="<the value it printed>"
 npm run shots
 ```
+
+The run prints `✓ session accepted` before it starts capturing. If it warns
+instead, the token is stale — they last two hours — and nothing behind a
+sign-in will be captured.
 
 The guard names the host back at you so you cannot do this by accident. What
 you are agreeing to: **every screenshot will contain real rows.** Today that
