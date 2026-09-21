@@ -295,55 +295,21 @@ export default function ApplyPage() {
           </Container>
         </section>
 
-        {/* ── 5 · The honest filter ────────────────────────────── */}
-        <section className="border-b border-[var(--color-rule)] py-14 sm:py-20">
-          <Container size="narrow">
-            {/* No card. This should read like somebody being straight with
-                you, which means it should not look designed. */}
-            <ScrollReveal>
-              <Eyebrow>Before you apply</Eyebrow>
-              <h2 className="h1 mb-8 max-w-[22ch]">This is probably not for you if…</h2>
-            </ScrollReveal>
+        {/* ── 5 · REMOVED — "This is probably not for you if…"
+            ─────────────────────────────────────────────────────────
+            Three bullets telling a studio why they might not belong
+            here, immediately before the button asking them to apply.
+            Gone at Sanyam's call.
 
-            <div className="flex flex-col gap-7 border-y border-[var(--color-rule)] py-8">
-              {NOT_FOR_YOU.map((n, i) => (
-                <ScrollReveal key={n.title} delay={70 * i}>
-                  <p className="m-0 mb-1.5 text-[16.5px] font-bold leading-snug text-[var(--color-ink)]">
-                    {n.title}
-                  </p>
-                  <p className="m-0 max-w-[54ch] text-[15px] leading-relaxed text-[var(--color-ink-2)]">
-                    {n.body}
-                  </p>
-                </ScrollReveal>
-              ))}
-            </div>
+            The three-projects notice that sat at the foot of it has NOT
+            gone with it — it has moved into §6, beside the steps. That
+            one is not a filter, it is a fact a studio needs BEFORE they
+            apply: the bar used to be discovered at step three of five,
+            after approval and after half an hour of typing, which reads
+            as a bait-and-switch even though it was never meant as one.
+            Deleting it would put that trap straight back.
 
-            {/* The bar, stated before the application rather than discovered
-                after approval.
-
-                A studio used to learn about the three projects at step three
-                of five, having already been accepted and having already spent
-                half an hour — which reads as a bait-and-switch even though it
-                was never meant as one. Saying it here costs a paragraph. Not
-                saying it costs the trust of the studio it surprises. */}
-            <ScrollReveal
-              delay={120}
-              className="mt-9 border-l-2 border-[var(--color-petrol)] pl-6"
-            >
-              <p className="m-0 mb-2 text-[16.5px] font-bold leading-snug text-[var(--color-ink)]">
-                One thing worth knowing now.
-              </p>
-              <p className="m-0 max-w-[54ch] text-[15px] leading-relaxed text-[var(--color-ink-2)]">
-                A listed studio shows <strong>three completed projects</strong> — real homes, with
-                photographs and a client we can ring. If you are not there yet, say so on the form.
-                Work in progress, a project you finished under a previous practice, a site we can
-                come and stand in: all of it counts for something, and a person reads it. We would
-                rather have that conversation than lose a practice that will be excellent in two
-                years.
-              </p>
-            </ScrollReveal>
-          </Container>
-        </section>
+            `NOT_FOR_YOU` is deleted rather than left unused. */}
 
         {/* ── 6 · What happens next, then the button ───────────── */}
         <section className="py-14 sm:py-20">
@@ -359,13 +325,38 @@ export default function ApplyPage() {
                 <ApplyCta />
               </ScrollReveal>
 
-              <ol className="m-0 flex list-none flex-col gap-6 p-0">
-                {STEPS.map((s, i) => (
-                  <ScrollReveal key={s.n} as="li" delay={70 * i}>
-                    <Step n={s.n} title={s.title} body={s.body} />
-                  </ScrollReveal>
-                ))}
-              </ol>
+              <div>
+                <ol className="m-0 flex list-none flex-col gap-6 p-0">
+                  {STEPS.map((s, i) => (
+                    <ScrollReveal key={s.n} as="li" delay={70 * i}>
+                      <Step n={s.n} title={s.title} body={s.body} />
+                    </ScrollReveal>
+                  ))}
+                </ol>
+
+                {/* Moved here when the "not for you" section went. It
+                    belongs beside the steps anyway: it is an instruction
+                    about the form, not a warning about the product, and
+                    it has to be read BEFORE somebody applies rather than
+                    discovered at step three of five after we have
+                    already accepted them. */}
+                <ScrollReveal
+                  delay={120}
+                  className="mt-8 border-l-2 border-[var(--color-petrol)] pl-6"
+                >
+                  <p className="m-0 mb-2 text-[16.5px] font-bold leading-snug text-[var(--color-ink)]">
+                    One thing worth knowing now.
+                  </p>
+                  <p className="m-0 max-w-[54ch] text-[15px] leading-relaxed text-[var(--color-ink-2)]">
+                    A listed studio shows <strong>three completed projects</strong> — real homes,
+                    with photographs and a client we can ring. If you are not there yet, say so on
+                    the form. Work in progress, a project you finished under a previous practice, a
+                    site we can come and stand in: all of it counts for something, and a person
+                    reads it. We would rather have that conversation than lose a practice that will
+                    be excellent in two years.
+                  </p>
+                </ScrollReveal>
+              </div>
             </div>
 
             <p className="m-0 mt-14 border-t border-[var(--color-rule)] pt-6 text-[14px] leading-relaxed text-[var(--color-ink-2)]">
@@ -449,27 +440,6 @@ const STEPS = [
   },
 ];
 
-const NOT_FOR_YOU = [
-  {
-    title: 'You are after volume.',
-    body: 'We would rather send you four projects you want than forty you do not. If your model needs a full funnel every week, this will feel thin.',
-  },
-  {
-    title: 'You quote low and revise up.',
-    body: 'We publish the gap between the quoted number and the final one, on your profile, permanently. That is the point of the list, and it cuts both ways.',
-  },
-  // The third bullet here used to read "You cannot yet show three finished
-  // projects… it is the one thing we cannot work around." That was true when it
-  // was written and is not true now: the portfolio step takes a declared
-  // shortfall, reviewed by a person. Leaving the line up would have been the
-  // worse kind of dishonesty — turning away exactly the young practices the
-  // escape hatch was built to keep. The bar itself is stated below the list
-  // instead, where it belongs: a requirement with a door, not a filter.
-  {
-    title: 'You want to be ranked higher than you are.',
-    body: 'Nobody can pay to sit above anyone. Position comes out of the match and nothing else, and there is no product on this page that changes that.',
-  },
-];
 
 // ── Pieces ──────────────────────────────────────────────────────
 
