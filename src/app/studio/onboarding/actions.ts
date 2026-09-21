@@ -12,6 +12,7 @@ import {
   removeProject,
   submitForReview,
 } from '@/modules/studio/onboarding';
+import { uploadQuotations } from '@/modules/studio/quotation-archive-store';
 
 export interface StepState {
   status: 'idle' | 'saved' | 'error';
@@ -137,6 +138,38 @@ export async function declarePortfolioShortfallAction(
   if (!result.ok) return { status: 'error', errors: result.errors };
   refresh();
   return { status: 'saved' };
+}
+
+export interface UploadState {
+  status: 'idle' | 'saved' | 'error';
+  message?: string;
+  /** Files that did not store, each named and with a reason. */
+  skipped?: string[];
+}
+
+/**
+ * Take a batch of past quotations from the signed-in studio.
+ *
+ * `formData.getAll` rather than `get`, because this is a multiple file input
+ * and `get` would silently take only the first — a studio selecting thirty
+ * files and having one stored, with no error, is the kind of bug that is found
+ * by a confused email three weeks later.
+ */
+export async function uploadQuotationsAction(
+  _prev: UploadState,
+  formData: FormData,
+): Promise<UploadState> {
+  const files = formData.getAll('quotations').filter((v): v is File => v instanceof File);
+
+  const result = await uploadQuotations(files);
+  if (!result.ok) return { status: 'error', message: result.error };
+
+  refresh();
+  return {
+    status: 'saved',
+    message: `${result.stored} file${result.stored === 1 ? '' : 's'} sent. Somebody here will read them — you do not need to wait.`,
+    skipped: result.skipped,
+  };
 }
 
 export async function addProjectAction(

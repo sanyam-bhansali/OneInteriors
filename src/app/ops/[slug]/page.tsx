@@ -12,6 +12,8 @@ import { CheckRow } from './CheckRow';
 import { StatusControl } from './StatusControl';
 import { GstinControl } from './GstinControl';
 import { HideControl } from './HideControl';
+import { ArchiveReview } from './ArchiveReview';
+import { archivesForStudio } from '@/modules/studio/quotation-archive-store';
 import { studioAuditTrail } from '@/modules/verification/record';
 
 export const metadata: Metadata = {
@@ -145,6 +147,19 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
                   </p>
                 </section>
               ) : null}
+
+              {/* What they sent us to build their rate card from. Sits with
+                  GSTIN rather than with the checks because it is the same kind
+                  of thing: evidence a person has to open and read, not a box
+                  the software can tick. */}
+              <section className="mb-8">
+                <p className="label m-0 mb-1">Their past quotations</p>
+                <p className="m-0 mb-4 max-w-[60ch] text-[13px] leading-relaxed text-[var(--color-ink-2)]">
+                  Open these, pull the line items out, and run them through the ingestion. Links
+                  last five minutes and are not in the page source.
+                </p>
+                <ArchiveReview archives={await archivesForStudio(studio.id)} />
+              </section>
 
               {/* The checks themselves */}
               <section>

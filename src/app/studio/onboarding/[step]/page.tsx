@@ -18,6 +18,10 @@ import { RegistrationForm } from '../RegistrationForm';
 import { PortfolioForm } from '../PortfolioForm';
 import { ReviewPanel } from '../ReviewPanel';
 import { RateCardForm } from '../RateCardForm';
+import { ArchivePanel, type ArchiveView } from '../ArchivePanel';
+import { myArchive } from '@/modules/studio/quotation-archive-store';
+import { quotationUploadEnabled } from '@/modules/storage/quotation-archive';
+import { MIN_QUOTATIONS_FOR_RATES } from '@/modules/quotation/catalogue';
 import { myRateCard } from '@/modules/quotation/rate-card';
 import { CATEGORY, RATE_CATEGORIES } from '@/modules/quotation/categories';
 import { paiseToRupees } from '@/lib/money';
@@ -123,7 +127,17 @@ export default async function OnboardingStepPage({
         ) : null}
 
         {step === 'rates' ? (
-          <RateCardForm values={await rateCardValues()} />
+          <div className="flex flex-col gap-8">
+            {/* Offered above the form, never instead of it. Until rates exist
+                the form is the only route forward, so hiding it behind "we are
+                reading your files" would block a studio on us for a week. */}
+            <ArchivePanel
+              archive={await archiveView()}
+              minForRates={MIN_QUOTATIONS_FOR_RATES}
+              enabled={quotationUploadEnabled()}
+            />
+            <RateCardForm values={await rateCardValues()} />
+          </div>
         ) : null}
 
         {step === 'review' ? (
@@ -170,6 +184,26 @@ export default async function OnboardingStepPage({
  * whole percent for the design fee. Basis points are a storage detail and must
  * never surface in a form field.
  */
+/**
+ * What the studio has sent us, shaped for the panel.
+ *
+ * Only the fields the studio may see. Deliberately NOT the storage paths —
+ * they identify objects in a private bucket holding every studio's
+ * confidential pricing, and there is no reason for one to reach a browser.
+ */
+async function archiveView(): Promise<ArchiveView | null> {
+  const archive = await myArchive();
+  if (!archive) return null;
+
+  return {
+    state: archive.state,
+    quotationCount: archive.quotationCount,
+    fileCount: archive.fileCount,
+    note: archive.note,
+    files: archive.files.map((f) => ({ id: f.id, filename: f.filename, bytes: f.bytes })),
+  };
+}
+
 async function rateCardValues(): Promise<Record<string, number | null>> {
   const card = await myRateCard();
   const values: Record<string, number | null> = {};

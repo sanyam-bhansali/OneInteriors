@@ -557,6 +557,9 @@ model Studio {
   studioVendors    StudioVendor[]
   studioWorkOrders StudioWorkOrder[]
 
+  /// Past quotations the studio sent us, for deriving their rate card.
+  quotationArchives QuotationArchive[]
+
   @@index([city, status, tier])
   /// Every customer-facing query filters paused studios out.
   @@index([pausedAt])
@@ -564,7 +567,7 @@ model Studio {
 }
 
 model StudioMember {
-  id       String  @id @default(cuid())
+  id String @id @default(cuid())
 
   /// What this person has been shown, and what they have done.
   ///
@@ -579,11 +582,11 @@ model StudioMember {
   /// `modules/studio/guide.ts`. Deliberately loose JSON: guides are added and
   /// retired often, and a migration per tour step is a tax on improving them.
   guideState Json?
-  studioId String
-  studio   Studio  @relation(fields: [studioId], references: [id], onDelete: Cascade)
-  userId   String  @unique
-  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  isOwner  Boolean @default(false)
+  studioId   String
+  studio     Studio  @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  userId     String  @unique
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isOwner    Boolean @default(false)
 
   createdAt DateTime @default(now())
 
@@ -2236,4 +2239,96 @@ enum OutcomeSource {
   STUDIO_CRM
   /// The customer told us.
   CUSTOMER_REPORTED
+}
+
+// ─────────────────────────────────────────────────────────────
+// QUOTATION ARCHIVE
+//
+// A studio's own past quotations, sent so we can derive their rate card
+// instead of asking them to type forty numbers from memory.
+//
+// `modules/quotation/ingest.ts` is what turns those quotations into rates, and
+// it has existed and been tested for a long time against a real archive — 934
+// quotations, 25,592 line items, 412 distinct spellings of about twenty
+// products. What did not exist was any way for a studio to actually send us
+// anything. These two models are that missing half.
+//
+// The extraction itself is deliberately NOT automated here. Quotation formats
+// vary wildly between studios, a parser that is wrong is worse than no parser
+// because it produces a plausible rate rather than an error, and at ten
+// studios a person reading the files is both affordable and more accurate.
+// So: the studio uploads whatever they have, ops pulls the rows out, and
+// `ingestQuotations` does the arithmetic.
+// ─────────────────────────────────────────────────────────────
+
+enum ArchiveState {
+  /// Files are in. Nobody has looked yet.
+  RECEIVED
+  /// Ops is reading them.
+  READING
+  /// Rates were derived and filed against the studio's rate card.
+  FILED
+  /// Not usable — too few, unreadable, or not quotations. `note` says why.
+  REJECTED
+}
+
+model QuotationArchive {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  state ArchiveState @default(RECEIVED)
+
+  /// How many quotations ops counted once they opened the files.
+  ///
+  /// Deliberately not a count of FILES: one workbook can hold two hundred
+  /// quotations and one PDF can hold a single one, so file count says nothing
+  /// about whether there is enough here to derive a rate from. Null until
+  /// somebody has actually looked.
+  quotationCount Int?
+
+  /// What ops wants the studio to know — why it was rejected, what is missing,
+  /// what to send instead. Shown to the studio verbatim, so it is written for
+  /// them rather than for us.
+  note String? @db.Text
+
+  /// The IngestReport from `ingestQuotations`, kept whole.
+  ///
+  /// Stored rather than recomputed because it is evidence: which rate came
+  /// from how many quotations, the quartile spread behind each one, and the
+  /// product strings we could not place. When a studio disputes a number a
+  /// year from now, this is the answer.
+  report Json?
+
+  uploadedAt DateTime  @default(now())
+  reviewedAt DateTime?
+  updatedAt  DateTime  @updatedAt
+
+  files QuotationFile[]
+
+  @@index([studioId, uploadedAt])
+  @@index([state])
+  @@map("quotation_archives")
+}
+
+model QuotationFile {
+  id        String           @id @default(cuid())
+  archiveId String
+  archive   QuotationArchive @relation(fields: [archiveId], references: [id], onDelete: Cascade)
+
+  /// Object path in the private quotation bucket. Never a public URL — these
+  /// are somebody's commercial pricing, and they are served only through a
+  /// short-lived signed link to ops. Same rule as floor plans.
+  path String
+
+  /// What the studio called it. Shown back to them so they can tell which
+  /// file we could not read, and useful to ops for exactly the same reason.
+  filename    String
+  contentType String
+  bytes       Int
+
+  uploadedAt DateTime @default(now())
+
+  @@index([archiveId])
+  @@map("quotation_files")
 }

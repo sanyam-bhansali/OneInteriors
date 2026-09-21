@@ -9,6 +9,11 @@ import {
   type RecordResult,
 } from '@/modules/verification/record';
 import type { CheckResult, CheckType, StudioStatus } from '@/modules/studio/types';
+import {
+  reviewArchive,
+  signedUrlForArchiveFile,
+} from '@/modules/studio/quotation-archive-store';
+import type { ArchiveState } from '@/modules/studio/quotation-archive';
 
 /**
  * Thin wrappers. All authorisation, validation and audit logging live in
@@ -91,6 +96,49 @@ export async function setHiddenAsTestAction(
     }
   }
   return result;
+}
+
+/**
+ * Ops records what they found in a studio's quotation archive.
+ */
+export async function reviewArchiveAction(
+  _prev: RecordResult | null,
+  formData: FormData,
+): Promise<RecordResult> {
+  const raw = String(formData.get('quotationCount') ?? '').trim();
+  const parsed = raw === '' ? null : Number(raw);
+
+  if (parsed !== null && !Number.isInteger(parsed)) {
+    return { ok: false, error: 'The quotation count has to be a whole number, or blank.' };
+  }
+
+  const result = await reviewArchive(
+    String(formData.get('archiveId') ?? ''),
+    String(formData.get('state') ?? '') as ArchiveState,
+    parsed,
+    String(formData.get('note') ?? ''),
+  );
+
+  if (result.ok) {
+    revalidatePath('/ops');
+    // The studio's own rates step shows this state back to them, so it has to
+    // be invalidated too — otherwise ops marks an archive rejected and the
+    // studio keeps being told we are reading it.
+    revalidatePath('/studio/onboarding/rates');
+  }
+  return result;
+}
+
+/**
+ * Mint a five-minute link to one stored quotation file.
+ *
+ * Returns the URL to the caller rather than rendering it into the page: a
+ * signed URL in the HTML sits there for anyone with the tab open, gets pasted
+ * into bug reports, and survives in the cache. The role check is inside
+ * `signedUrlForFile`, which is the single access boundary for that bucket.
+ */
+export async function openArchiveFileAction(fileId: string): Promise<string | null> {
+  return signedUrlForArchiveFile(fileId);
 }
 
 export async function setGstinAction(
