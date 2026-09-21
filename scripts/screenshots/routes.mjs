@@ -118,6 +118,15 @@ export const ROUTES = [
     needs: 'Nothing.',
   },
 
+  {
+    flow: '00-entry', n: 10, path: '/apply/start', name: 'apply-form',
+    title: 'The application form',
+    does: 'What we ask, and only what decides the answer. Split from the pitch because one page asking somebody to decide AND to type does neither well.',
+    who: 'A studio that has read the pitch and wants in.',
+    before: 'The Apply button on /apply.', after: 'Ops reviews it.',
+    needs: 'Nothing.',
+  },
+
   // ── 01 · The customer journey ─────────────────────────────────
   {
     flow: '01-customer', n: 1, path: '/quiz', name: 'quiz',
