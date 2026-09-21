@@ -1,7 +1,10 @@
 'use client';
 
 import { useActionState, useEffect, useState } from 'react';
-import { passwordChecks, passwordScore, MIN_PASSWORD } from '@/modules/auth/password';
+/* From `password-rules`, NOT `password`. That file imports node:crypto
+   for scrypt, and webpack follows the whole module into the client
+   bundle — the build fails with UnhandledSchemeError. */
+import { passwordChecks, passwordScore, MIN_PASSWORD } from '@/modules/auth/password-rules';
 import { setPasswordAction, type SecurityState } from './actions';
 
 const INITIAL: SecurityState = { status: 'idle' };
