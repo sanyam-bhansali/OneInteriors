@@ -244,17 +244,107 @@ export function decideSignIn(
  * type for THIS product, which are exactly the things an attacker guesses
  * first.
  */
+export const MIN_PASSWORD = 12;
+export const MAX_PASSWORD = 200;
+
+/** Things somebody would plausibly type for THIS product. */
+const OBVIOUS = ['oneinteriors', 'password', 'qwerty', 'admin', 'letmein', '123456'];
+
+export interface PasswordCheck {
+  id: 'length' | 'distinct' | 'notObvious' | 'trimmed';
+  /** Shown on screen. Present tense, so an unmet rule reads as a goal. */
+  label: string;
+  ok: boolean;
+}
+
+/**
+ * The rules, itemised — the same predicates `passwordProblem` decides on.
+ *
+ * ## Why this exists rather than a checklist in the component
+ *
+ * A strength meter that disagrees with the server is worse than none: it
+ * either blocks somebody for a rule that is not enforced, or tells them
+ * they are fine and then the submit fails. Both read as the product
+ * being broken.
+ *
+ * So the screen and the server read the same four predicates. Add a rule
+ * here and the checklist grows by itself.
+ *
+ * ## What is deliberately NOT in here
+ *
+ * "One capital, one number, one symbol." Composition rules push people
+ * toward `Password1!` and a sticky note; length is what actually costs a
+ * guesser time. Twelve characters behind a five-attempt lock is not the
+ * weak link, and a mockup asking for a special character is asking for a
+ * worse password.
+ */
+export function passwordChecks(plain: string): PasswordCheck[] {
+  const p = plain.normalize('NFKC');
+  const flat = p.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  return [
+    {
+      id: 'length',
+      label: `At least ${MIN_PASSWORD} characters`,
+      ok: p.length >= MIN_PASSWORD && p.length <= MAX_PASSWORD,
+    },
+    {
+      id: 'distinct',
+      label: 'A few different characters',
+      ok: new Set(p).size >= 5,
+    },
+    {
+      id: 'notObvious',
+      label: 'Nothing guessable — not the product name',
+      ok: p.length > 0 && !OBVIOUS.some((bad) => flat.includes(bad)),
+    },
+    {
+      id: 'trimmed',
+      label: 'No space at the start or end',
+      ok: p.length > 0 && p.trim().length === p.length,
+    },
+  ];
+}
+
+/**
+ * 0–4, for the bar. Just the count of rules met.
+ *
+ * Not an entropy estimate, and it does not pretend to be one. A meter
+ * that says "strong" about something the server will accept is honest;
+ * one that scores a rejected password 3/4 is a lie with a gradient on it.
+ */
+export function passwordScore(plain: string): number {
+  return passwordChecks(plain).filter((c) => c.ok).length;
+}
+
+/**
+ * Is this password acceptable to set?
+ *
+ * Length first, and length mostly. Composition rules ("one capital, one
+ * symbol") push people toward `Password1!` and a sticky note; length is what
+ * actually costs a guesser time. Twelve characters with a five-attempt lock in
+ * front of it is not the weak link in this system.
+ *
+ * The rejected-list is short and specific: the things someone would plausibly
+ * type for THIS product, which are exactly the things an attacker guesses
+ * first.
+ *
+ * Decides on the same predicates as `passwordChecks`, so the screen and
+ * the server cannot drift apart. The messages stay bespoke because "rule
+ * 2 failed" helps nobody.
+ */
 export function passwordProblem(plain: string): string | null {
   const p = plain.normalize('NFKC');
-  if (p.length < 12) return 'Use at least 12 characters.';
-  if (p.length > 200) return 'That is longer than 200 characters.';
-  if (p.trim().length !== p.length) return 'Remove the space at the start or end.';
+  if (p.length > MAX_PASSWORD) return `That is longer than ${MAX_PASSWORD} characters.`;
 
-  const flat = p.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const OBVIOUS = ['oneinteriors', 'password', 'qwerty', 'admin', 'letmein', '123456'];
-  if (OBVIOUS.some((bad) => flat.includes(bad))) {
+  const failed = passwordChecks(plain).filter((c) => !c.ok);
+  if (failed.length === 0) return null;
+
+  const first = failed[0]!.id;
+  if (first === 'length') return `Use at least ${MIN_PASSWORD} characters.`;
+  if (first === 'trimmed') return 'Remove the space at the start or end.';
+  if (first === 'notObvious') {
     return 'That contains something guessable. Avoid the product name and common words.';
   }
-  if (new Set(p).size < 5) return 'Use a few more different characters.';
-  return null;
+  return 'Use a few more different characters.';
 }

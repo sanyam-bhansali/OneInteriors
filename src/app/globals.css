@@ -1077,6 +1077,88 @@ p {
     0 6px 14px -10px rgba(150, 76, 47, 0.8);
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+   FORM FIELD — the focus ring, and the shake
+   ─────────────────────────────────────────────────────────────────────
+
+   The glow is the browser's own focus ring, made to match the brand
+   rather than replacing it: the outline stays, at 2px, so keyboard
+   focus is never softer than the default. A `box-shadow` halo alone —
+   which is what most "premium" form CSS does — is thinner than the
+   ring it removes, and on a light card it can disappear entirely. */
+.oi-input {
+  /* Sunken at rest, paper when focused. The field you are typing in is
+     the brightest thing on the card, which is a signal rather than a
+     finish: on a page with four identical boxes, colour is the fastest
+     way to say which one has the caret. */
+  background: var(--sunken, var(--color-paper-2));
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.22s ease;
+}
+.oi-input:hover:not(:focus) {
+  border-color: var(--color-ink-3);
+}
+.oi-input:focus {
+  background: var(--card, #fff);
+  outline: 2px solid var(--acc-p, var(--color-petrol));
+  outline-offset: 0;
+  border-color: transparent;
+  box-shadow: 0 0 0 5px rgba(169, 79, 46, 0.12);
+}
+
+/* The rejection shake.
+
+   Three small returns, not a wobble: 420ms and ±5px is enough to draw
+   the eye back to the form without anything moving far enough to be
+   unreadable mid-animation. It is paired with a `role="alert"`, never
+   used alone — motion is not a message, and somebody with reduced
+   motion on or a screen reader open gets nothing from it. */
+@keyframes oi-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  18% {
+    transform: translateX(-5px);
+  }
+  38% {
+    transform: translateX(5px);
+  }
+  58% {
+    transform: translateX(-3px);
+  }
+  78% {
+    transform: translateX(2px);
+  }
+}
+.oi-shake {
+  animation: oi-shake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+/* A one-shot entrance for a page whose whole content is one object.
+
+   Distinct from `.oi-enter` / `.oi-enter-in`, which are driven by
+   ScrollReveal and need JavaScript to add the second class. This runs
+   from a keyframe, so a server-rendered page animates on first paint
+   with no client component — and because it animates FROM a hidden
+   state TO the default one, a browser that ignores the animation shows
+   the finished card rather than nothing. */
+@keyframes oi-card-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.oi-card-in {
+  animation: oi-card-in 560ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
 /* The monogram standing in for a logo. Studio has no logo column; see
    StudioCard. */
 .q-mark {
@@ -1087,8 +1169,20 @@ p {
 
 @media (prefers-reduced-motion: reduce) {
   .oi-pane,
-  .oi-cta {
+  .oi-cta,
+  .oi-input {
     transition: none;
+  }
+  /* The alert carries the message; the shake was only ever emphasis. */
+  .oi-shake {
+    animation: none;
+  }
+  /* `both` would leave the card at the FROM frame — invisible — if the
+     animation is cancelled, so it is replaced rather than disabled. */
+  .oi-card-in {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
   .oi-pane,
   .oi-pane:hover,
