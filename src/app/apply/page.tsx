@@ -42,32 +42,78 @@ export default function ApplyPage() {
     <>
       <SiteHeader />
 
-      <main>
-        {/* ── 1 · Hero ─────────────────────────────────────────── */}
-        <section className="relative overflow-hidden border-b border-[var(--color-rule)]">
-          <div className="grid-ground grid-ground-fade absolute inset-0" aria-hidden="true" />
-          <Container size="wide" className="relative">
-            <div className="grid grid-cols-1 items-center gap-10 py-14 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:gap-16 lg:py-20">
-              <div>
-                <Eyebrow>For interior studios · Pune</Eyebrow>
-                <h1 className="display mb-6 max-w-[15ch]">
-                  We only work with studios we can{' '}
-                  <span className="text-[var(--color-petrol)]">stand behind</span>.
-                </h1>
-                <p className="lede mb-5 max-w-[46ch]">
-                  You won&rsquo;t get a lead from us. You&rsquo;ll get a customer who has already
-                  seen your work, read your quote, and asked to meet you — at their flat, at a
-                  time they picked.
-                </p>
-                <p className="m-0 mb-8 max-w-[44ch] text-[16px] leading-relaxed text-[var(--color-ink)]">
-                  One introduction, one studio. Nobody else gets called.
-                </p>
+      {/* The scope. `oi-tactile` swaps the palette to the brand colour
+          system, `oi-quick` swaps all three font tokens to Quicksand.
+          Both are opt-in classes rather than edits to the global tokens,
+          so the customer landing page and the rest of the product are
+          untouched until somebody decides otherwise — and rolling this
+          out further is moving these two words up the tree. */}
+      <main className="oi-tactile oi-quick">
+        {/* ── 1 · Hero ─────────────────────────────────────────────
+            Centred, and down to four lines.
 
-                <ApplyCta />
+            It was a two-column hero: argument on the left, the
+            introduction card on the right. Centring it means there is no
+            right-hand column to put anything in, which is the whole
+            reason the card moved to §1b — not because it stopped being
+            the argument.
+
+            The copy lost a paragraph deliberately. "You won't get a lead
+            from us / you'll get a customer who has already seen your
+            work, read your quote, and asked to meet you, at their flat,
+            at a time they picked" is three claims in one breath, and a
+            centred measure cannot carry that without becoming a wall.
+            What is left is the two that a studio owner can disagree
+            with — a customer rather than a lead, and one studio rather
+            than eight. The detail is directly below, in the card, where
+            it is shown instead of asserted. */}
+        <section className="relative overflow-hidden border-b border-[var(--color-rule)]">
+          <div
+            className="grid-ground grid-ground-fade t-breathe absolute inset-0"
+            aria-hidden="true"
+          />
+          <Container size="wide" className="relative">
+            <div className="mx-auto flex max-w-[54rem] flex-col items-center py-16 text-center sm:py-24">
+              <div className="t-rise t-rise-1">
+                <Eyebrow>For interior studios · Pune</Eyebrow>
               </div>
 
-              {/* The artifact, in the hero. It is the argument, so it does not
-                  wait until the reader has scrolled to find it. */}
+              <h1 className="display t-rise t-rise-2 mt-3 mb-6 max-w-[17ch]">
+                We only work with studios we can{' '}
+                {/* `--acc` rather than `--acc-d`: this is display size, which
+                    is where the base terracotta is legible and at its best. */}
+                <span className="text-[var(--color-terracotta)]">stand behind</span>.
+              </h1>
+
+              <p className="lede t-rise t-rise-3 mb-4 max-w-[40ch]">
+                Not a lead. A customer who has already read your quote and asked for you by name.
+              </p>
+
+              <p className="t-rise t-rise-4 m-0 mb-9 max-w-[34ch] text-[17px] leading-relaxed text-[var(--color-ink)]">
+                One introduction, one studio. Nobody else gets called.
+              </p>
+
+              <div className="t-rise t-rise-5">
+                <ApplyCta />
+              </div>
+            </div>
+          </Container>
+        </section>
+
+        {/* ── 1b · The artifact ────────────────────────────────────
+            The introduction, rendered as the thing it actually is.
+
+            This is still the strongest element on the page and it is
+            still above everything that argues in words — nobody argues
+            with the object itself. It is out of the hero because the
+            hero is centred now, not because it was demoted.
+
+            Bark does the same thing and it was the single best finding
+            in the onboarding research: publish one complete, unedited
+            example of the demand before asking for anything. */}
+        <section className="border-b border-[var(--color-rule)] py-14 sm:py-16">
+          <Container size="wide">
+            <div className="mx-auto max-w-[36rem]">
               <IntroductionCard />
             </div>
           </Container>
@@ -386,7 +432,8 @@ function IntroductionCard() {
         </p>
       </Glass>
 
-      <p className="m-0 mt-4 max-w-[42ch] text-[14px] leading-relaxed text-[var(--color-ink-2)]">
+      {/* Centred now, because the card is centred now. */}
+      <p className="m-0 mx-auto mt-5 max-w-[46ch] text-center text-[14.5px] leading-relaxed text-[var(--color-ink-2)]">
         That is the whole thing. No dialler, no credits, no call queue. You read it, and you
         accept or you pass.
       </p>
@@ -410,16 +457,34 @@ function Fact({ k, v }: { k: string; v: string }) {
   );
 }
 
+/**
+ * The one action on the page.
+ *
+ * ## The colour is the deep terracotta, not the bright one
+ *
+ * `--acc` (#C0613C) is the brand terracotta and it is for surfaces and
+ * fills. `--on-acc` on it measures **4.0:1**, which the brand document
+ * marks red — large text only. This label is 15.5px, so it uses
+ * `--acc-d` (#A94F2E) at **5.2:1**, which passes AA at any size.
+ *
+ * That is the single easiest thing to get wrong with this palette, and
+ * getting it wrong makes the most important control on the page the
+ * hardest thing on it to read.
+ *
+ * `--on-acc` (#FFF8F1) rather than pure white, because the system says
+ * so and because a warm ink on a warm ground is what stops the button
+ * looking like it was pasted in from another site.
+ */
 function ApplyCta() {
   return (
-    <div>
+    <div className="flex flex-col items-center">
       <Link
         href="/apply/start"
-        className="inline-flex min-h-[48px] items-center justify-center bg-[var(--color-petrol)] px-7 text-[15.5px] font-bold text-white transition-colors hover:bg-[var(--color-petrol-ink,var(--color-petrol))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-petrol)]"
+        className="t-cta inline-flex min-h-[52px] items-center justify-center rounded-full bg-[var(--acc-d,#a94f2e)] px-9 text-[16px] font-bold text-[var(--on-acc,#fff8f1)] no-underline hover:bg-[var(--acc-p,#8f4126)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--acc-p,#8f4126)]"
       >
         Apply to join
       </Link>
-      <p className="m-0 mt-3 font-[family-name:var(--font-mono)] text-[11.5px] uppercase tracking-[0.14em] text-[var(--color-ink-2)]">
+      <p className="m-0 mt-4 font-[family-name:var(--font-mono)] text-[11.5px] uppercase tracking-[0.14em] text-[var(--color-ink-2)]">
         About 10 minutes · Nothing you send is published
       </p>
     </div>

@@ -25,7 +25,11 @@ export default function ApplyStartPage() {
     <>
       <SiteHeader />
 
-      <main>
+      {/* Same scope as /apply. The form is the second half of one page as
+          far as a studio is concerned, and a font and palette that change
+          when you press the button would read as landing on a different
+          site. */}
+      <main className="oi-tactile oi-quick">
         <section className="border-b border-[var(--color-rule)] py-10 sm:py-12">
           <Container size="wide">
             <Link

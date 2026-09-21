@@ -1609,3 +1609,222 @@ p {
     content: '';
   }
 }
+/* ─────────────────────────────────────────────────────────────────────
+   TACTILE ASSURANCE — the brand colour system, scoped
+   ─────────────────────────────────────────────────────────────────────
+
+   Every value below is lifted verbatim from `docs/brand-colour-system.html`,
+   including the measured contrast ratios in the comments. Nothing here is
+   eyeballed, and nothing should be changed without changing that document
+   first.
+
+   ## Why a class and not the global tokens
+
+   The running app drifted into a warm cream ground and petrol teal. Moving
+   the global tokens would restyle forty screens in one commit with no way
+   to look at any of them first. This rebinds them for one scope, exactly
+   as `.oi-quick` does for the font — rolling it out is moving the class up
+   the tree, rolling it back is deleting it.
+
+   Used together on the studio-facing pages: `class="oi-tactile oi-quick"`.
+
+   ## The one rule that is easy to get wrong
+
+   **There are two terracottas and they are not interchangeable.**
+
+   `--acc` (#C0613C) is for SURFACES AND FILLS. `#FFF8F1` on it measures
+   **4.0:1** — the brand document marks that red, "large text only".
+   `--acc-d` (#A94F2E) is for SMALL TEXT AND BUTTONS, where the same ink
+   measures **5.2:1** and passes AA at any size.
+
+   So: a button is `--acc-d`. A big flat block of colour can be `--acc`. A
+   14px label in terracotta is `--acc-d` or it is illegible. Sage has the
+   identical split — `--sec` fills, `--sec-d` (5.5:1) for text — and sage
+   on Alabaster at 3.3:1 is graphics and icons only.
+   ───────────────────────────────────────────────────────────────────── */
+.oi-tactile {
+  /* ── Ground ── */
+  --bg: #eae6df; /* Raw Silk — page ground */
+  --card: #fcfcfa; /* Alabaster — raised surface */
+  --sunken: #efeae1; /* inputs, incoming messages */
+  --line: #dbd5cb; /* hairline */
+
+  /* ── Ink ── */
+  --ink: #2c2624; /* Deep Espresso — primary type */
+  --ink2: #6b615c; /* secondary copy, information · 4.8:1 */
+  --ink3: #9a8f86; /* mono labels on glass */
+  --ink-dis: #b8aea6; /* disabled controls, never text */
+
+  /* ── Terracotta · high-intent actions only ── */
+  --acc: #c0613c; /* surfaces and fills */
+  --acc-d: #a94f2e; /* small text, buttons, hover · 5.2:1 */
+  --acc-p: #8f4126; /* pressed */
+  --acc-w: rgba(192, 97, 60, 0.08); /* active row wash */
+
+  /* ── Muted Sage · verification and success ── */
+  --sec: #839073; /* ticks and fills */
+  --sec-d: #5f6b52; /* small text, success · 5.5:1 */
+  --sec-w: rgba(131, 144, 115, 0.14);
+
+  /* ── State ── */
+  --err: #8c2f22; /* destructive — NEVER --acc · 8.0:1 */
+  --warn: #8a6220; /* pending, expiring. Ochre, not yellow · 5.8:1 */
+
+  /* ── Type on colour ── */
+  --on-acc: #fff8f1; /* on terracotta */
+  --on-dark: #f6f1e8; /* on espresso · 14.0:1 */
+  --acc-dark: #e0a98c; /* terracotta on espresso · 7.3:1 */
+  --sec-dark: #b9c4a9; /* sage on espresso · 8.2:1 */
+  --line-dark: rgba(252, 252, 250, 0.16);
+
+  /* ── Glass ── */
+  --glass-warm: rgba(247, 242, 234, 0.82); /* blur(18px) */
+  --glass-dark: rgba(36, 29, 26, 0.5); /* blur(22px) */
+  --glass-line: #e2d9cb;
+
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* The app's own token names, repointed at the brand ones.
+   Shared components — SiteHeader, Eyebrow, Button, Container — reach for
+   `--color-*`. Rather than fork every one of them for this scope, the
+   Tailwind tokens are aliased here, so anything asking for petrol gets
+   terracotta and anything asking for paper gets Raw Silk. One place to
+   read, one place to undo. */
+.oi-tactile {
+  --color-paper: var(--bg);
+  --color-paper-2: var(--sunken);
+  --color-paper-3: var(--card);
+
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink2);
+
+  /* NOT `var(--ink3)`, and this is measured rather than cautious.
+     #9A8F86 on Raw Silk is **2.54:1** — below even the 3:1 floor for
+     large text. The brand document is right about it: ink3 is for "mono
+     labels on glass only", where the composite is lighter. But
+     `--color-ink-3` is used across this app on the PAGE ground, so
+     aliasing it to ink3 would put a dozen labels below the large-text
+     floor at a stroke. It points at ink2 (4.84:1) instead, and --ink3
+     stays available by its own name for the glass surfaces it was
+     drawn for. */
+  --color-ink-3: var(--ink2);
+
+  --color-rule: var(--line);
+  --color-rule-soft: #e4dfd6;
+
+  /* Petrol was the old primary. Everything reaching for it now gets
+     terracotta — and the DEEP cut, because most of those references are
+     a button or small text, where the base fails AA.
+
+     Measured on Raw Silk:
+       --acc   #C0613C  3.37:1  display sizes only
+       --acc-d #A94F2E  4.39:1  JUST under AA as TEXT on the ground
+       --acc-p #8F4126  5.72:1  passes as text anywhere
+
+     Counting the uses on /apply decided it: petrol appears five times as
+     TEXT and once as a button background. So the alias is the PRESSED
+     cut, which passes as text at 5.72:1 and also carries #FFF8F1 at
+     6.76:1 if anything paints with it. The button asks for `--acc-d`
+     by name instead, because #A94F2E is what the brand document
+     specifies for a terracotta button and measures 5.19:1 there.
+
+     Worth reporting upstream: the brand document lists `--acc-d` as
+     "small text, hover". On Alabaster that is true — 5.32:1. On Raw
+     Silk, which is the actual page ground, it is 4.39:1 and misses. The
+     document's own numbers are for the card surface. */
+  --color-petrol: var(--acc-p);
+  --color-petrol-deep: #7a3720;
+  --color-petrol-soft: var(--acc-w);
+
+  --color-terracotta: var(--acc);
+  --color-terracotta-soft: var(--acc-w);
+
+  --color-ontrack: var(--sec-d);
+  --color-atrisk: var(--err);
+  --color-brass: var(--warn);
+}
+
+/* ── Calm motion ──────────────────────────────────────────────────────
+
+   One rule for the whole scope: nothing travels more than fourteen
+   pixels and nothing is quick. A studio owner working out whether we are
+   serious is not entertained by a page that bounces.
+
+   Everything here is inert under `prefers-reduced-motion`, enforced once
+   at the foot of the block rather than per animation. */
+
+.oi-tactile .t-rise {
+  animation: t-rise 720ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* Staggered so the eye is led down the page rather than hit with all of
+   it at once. 90ms apart is under the threshold where it reads as a queue
+   of things arriving. */
+.oi-tactile .t-rise-1 { animation-delay: 60ms; }
+.oi-tactile .t-rise-2 { animation-delay: 150ms; }
+.oi-tactile .t-rise-3 { animation-delay: 240ms; }
+.oi-tactile .t-rise-4 { animation-delay: 330ms; }
+.oi-tactile .t-rise-5 { animation-delay: 420ms; }
+
+@keyframes t-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The button. Lifts on hover, sits back down when pressed — the press has
+   to travel further than the hover or it does not register as a press. */
+.oi-tactile .t-cta {
+  transition:
+    transform 260ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    box-shadow 260ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    background-color 200ms ease;
+  box-shadow: 0 1px 2px rgba(44, 38, 36, 0.12);
+}
+.oi-tactile .t-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px -12px rgba(143, 65, 38, 0.6);
+}
+.oi-tactile .t-cta:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px rgba(44, 38, 36, 0.16);
+}
+
+/* A slow breath on the ground behind the hero. Eighteen seconds is long
+   enough to be felt rather than watched — faster and it becomes a thing
+   on the page competing with the words. */
+.oi-tactile .t-breathe {
+  animation: t-breathe 18s ease-in-out infinite;
+}
+@keyframes t-breathe {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.72;
+    transform: scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oi-tactile .t-rise,
+  .oi-tactile .t-breathe {
+    animation: none;
+  }
+  .oi-tactile .t-cta {
+    transition: background-color 200ms ease;
+  }
+  .oi-tactile .t-cta:hover,
+  .oi-tactile .t-cta:active {
+    transform: none;
+  }
+}
