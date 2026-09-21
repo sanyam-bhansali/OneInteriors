@@ -908,6 +908,25 @@ p {
    weight, so body sits at 500 and headings at 700 to hold the same
    presence on the page. */
 .oi-quick {
+  /**
+   * `font-family` as well as the variables above, and this line is not
+   * redundant.
+   *
+   * `body` carries `font-family: var(--font-sans)`. A `var()` is resolved
+   * against the element it is WRITTEN on, so body resolves it from
+   * `:root` and every descendant then inherits the already-computed
+   * "Instrument Sans" — not the variable. Rebinding `--font-sans` inside
+   * this class therefore changes nothing for ordinary body text; only
+   * elements that re-read the variable themselves (`.display`, `.oi-*`)
+   * pick it up.
+   *
+   * That is exactly what happened on /apply: the headline turned to
+   * Quicksand and every paragraph, label and button stayed Instrument
+   * Sans, which reads as a font that did not load rather than as a
+   * choice. Re-declaring the family here re-resolves it in this scope
+   * and the whole subtree follows.
+   */
+  font-family: var(--font-sans);
   font-weight: 500;
   letter-spacing: 0.005em;
 }

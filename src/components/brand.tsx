@@ -56,12 +56,18 @@ export function Wordmark({
   return (
     <span className={`inline-flex items-center gap-2.5 ${className}`}>
       <Mark className="h-[26px] w-[26px] shrink-0 text-[var(--color-petrol)]" />
+      {/* `whitespace-nowrap` on the name, and the city hidden below 400px.
+          Under Quicksand — a noticeably wider face than Instrument Sans —
+          the wordmark broke to two lines at 375px and left "Pune"
+          stranded between the logo and the nav, which reads as a broken
+          header rather than as a tight one. The name is one thing and
+          must never break; the city is the part that can go. */}
       <span className="flex items-baseline gap-2">
-        <span className="font-[family-name:var(--font-display)] text-[21px] leading-none tracking-[-0.01em] text-[var(--color-ink)]">
+        <span className="font-[family-name:var(--font-display)] whitespace-nowrap text-[21px] leading-none tracking-[-0.01em] text-[var(--color-ink)]">
           One Interiors
         </span>
         {showCity ? (
-          <span className="font-[family-name:var(--font-mono)] text-[9.5px] uppercase tracking-[0.18em] text-[var(--color-ink-3)]">
+          <span className="hidden font-[family-name:var(--font-mono)] text-[9.5px] uppercase tracking-[0.18em] text-[var(--color-ink-3)] min-[400px]:inline">
             Pune
           </span>
         ) : null}

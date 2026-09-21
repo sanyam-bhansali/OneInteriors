@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Container, Eyebrow } from '@/components/ui';
 import { SiteHeader, SiteFooter } from '@/components/chrome';
 import { Glass } from '@/components/oi/Surfaces';
+import { DoodleGround } from '@/components/oi/DoodleGround';
 import { CHECK_LABELS, TIER_CHECKS } from '@/modules/studio/types';
 
 export const metadata: Metadata = {
@@ -39,16 +40,22 @@ const TOTAL_CHECKS = TIER_CHECKS.LISTED.length + TIER_CHECKS.VERIFIED.length;
  */
 export default function ApplyPage() {
   return (
-    <>
+    /* The scope wraps the HEADER and FOOTER too, not just <main>.
+       It did not at first, and the nav's Start button stayed petrol teal
+       on an otherwise terracotta page — one teal pill in the top right
+       of every screenshot. Chrome is part of the page; scoping a theme
+       to the content and leaving the furniture behind is how you get a
+       page that looks half-converted. */
+    <div className="oi-tactile oi-quick">
       <SiteHeader />
 
-      {/* The scope. `oi-tactile` swaps the palette to the brand colour
-          system, `oi-quick` swaps all three font tokens to Quicksand.
-          Both are opt-in classes rather than edits to the global tokens,
-          so the customer landing page and the rest of the product are
-          untouched until somebody decides otherwise — and rolling this
-          out further is moving these two words up the tree. */}
-      <main className="oi-tactile oi-quick">
+      <main className="relative">
+        {/* Behind the whole page rather than per section, so it does not
+            restart at every band — a pattern that resets is a pattern you
+            notice. Sections with their own fill (the comparison table,
+            the benefit cards) sit on top of it, which is what gives the
+            page its layers. */}
+        <DoodleGround className="text-[var(--ink)]" />
         {/* ── 1 · Hero ─────────────────────────────────────────────
             Centred, and down to four lines.
 
@@ -68,9 +75,18 @@ export default function ApplyPage() {
             than eight. The detail is directly below, in the card, where
             it is shown instead of asserted. */}
         <section className="relative overflow-hidden border-b border-[var(--color-rule)]">
+          {/* The engineering grid is gone from here. It and the doodle
+              field are both "faint repeating texture", and two of those
+              stacked is noise rather than depth. What is left is a soft
+              warm bloom behind the headline, which gives the hero its
+              own centre of gravity without adding a second pattern. */}
           <div
-            className="grid-ground grid-ground-fade t-breathe absolute inset-0"
+            className="t-breathe pointer-events-none absolute inset-0"
             aria-hidden="true"
+            style={{
+              background:
+                'radial-gradient(60% 55% at 50% 38%, rgba(192,97,60,0.10), transparent 70%)',
+            }}
           />
           <Container size="wide" className="relative">
             <div className="mx-auto flex max-w-[54rem] flex-col items-center py-16 text-center sm:py-24">
@@ -78,19 +94,31 @@ export default function ApplyPage() {
                 <Eyebrow>For interior studios · Pune</Eyebrow>
               </div>
 
-              <h1 className="display t-rise t-rise-2 mt-3 mb-6 max-w-[17ch]">
+              <h1 className="display t-rise t-rise-2 mt-4 mb-7 max-w-[17ch]">
                 We only work with studios we can{' '}
                 {/* `--acc` rather than `--acc-d`: this is display size, which
                     is where the base terracotta is legible and at its best. */}
                 <span className="text-[var(--color-terracotta)]">stand behind</span>.
               </h1>
 
-              <p className="lede t-rise t-rise-3 mb-4 max-w-[40ch]">
+              {/* Measures widened and the breaks placed by hand.
+                  At 40ch the lede broke as "...read your quote and asked /
+                  for you by name", orphaning three words, and the line
+                  below left "gets called." alone. Centred text shows a bad
+                  break far more than ranged-left does, because both ragged
+                  edges move. `text-balance` handles most of it; the
+                  explicit <br> on the second line is because two short
+                  clauses either side of a full stop should break AT the
+                  full stop or not at all. */}
+              <p className="lede t-rise t-rise-3 mb-5 max-w-[46ch] text-balance">
                 Not a lead. A customer who has already read your quote and asked for you by name.
               </p>
 
-              <p className="t-rise t-rise-4 m-0 mb-9 max-w-[34ch] text-[17px] leading-relaxed text-[var(--color-ink)]">
-                One introduction, one studio. Nobody else gets called.
+              <p className="t-rise t-rise-4 m-0 mb-10 text-[17px] leading-relaxed text-[var(--color-ink)]">
+                One introduction, one studio.
+                <br className="hidden sm:block" />{' '}
+                <span className="sm:hidden"> </span>
+                Nobody else gets called.
               </p>
 
               <div className="t-rise t-rise-5">
@@ -111,7 +139,10 @@ export default function ApplyPage() {
             Bark does the same thing and it was the single best finding
             in the onboarding research: publish one complete, unedited
             example of the demand before asking for anything. */}
-        <section className="border-b border-[var(--color-rule)] py-14 sm:py-16">
+        {/* py-20 to match every other band. It was py-16, which is the
+            kind of eight-pixel inconsistency nobody can name but
+            everybody feels as the page not being quite square. */}
+        <section className="border-b border-[var(--color-rule)] py-14 sm:py-20">
           <Container size="wide">
             <div className="mx-auto max-w-[36rem]">
               <IntroductionCard />
@@ -325,7 +356,7 @@ export default function ApplyPage() {
       </main>
 
       <SiteFooter />
-    </>
+    </div>
   );
 }
 
