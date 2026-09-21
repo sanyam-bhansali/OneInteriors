@@ -46,7 +46,7 @@ describe('the list itself', () => {
       'kharadi', 'baner', 'wakad', 'hinjewadi', 'kothrud', 'viman-nagar',
       'aundh', 'hadapsar', 'balewadi', 'undri', 'ravet', 'magarpatta',
     ];
-    const slugs = new Set(PUNE_LOCALITIES.map((l) => l.slug));
+    const slugs = new Set<string>(PUNE_LOCALITIES.map((l) => l.slug));
     for (const s of ORIGINAL) expect(slugs.has(s), s).toBe(true);
   });
 
@@ -58,7 +58,7 @@ describe('the list itself', () => {
   });
 
   it('covers west Pune properly, since that is where the studios are', () => {
-    const slugs = new Set(PUNE_LOCALITIES.map((l) => l.slug));
+    const slugs = new Set<string>(PUNE_LOCALITIES.map((l) => l.slug));
     for (const s of [
       'baner', 'balewadi', 'aundh', 'pashan', 'sus', 'bavdhan',
       'wakad', 'hinjewadi', 'punawale', 'tathawade', 'ravet', 'thergaon',
