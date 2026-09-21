@@ -34,8 +34,42 @@ export function Stepper({
   furthest: number;
   onGo: (i: number) => void;
 }) {
+  /**
+   * The bar underneath the circles.
+   *
+   * Steps done, out of total — so it moves in thirds and every jump is
+   * earned by finishing something. A bar that creeps as you type is
+   * guessing, and a guess that runs ahead of the work is the reason
+   * progress bars are distrusted.
+   */
+  const pct = Math.round((furthest / steps.length) * 100);
+
   return (
-    <nav aria-label="Application progress" className="mb-10">
+    <nav aria-label="Application progress" className="mb-9">
+      <div className="mb-6">
+        <div className="mb-2 flex items-baseline justify-between">
+          <span className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-ink-2)]">
+            Step {current + 1} of {steps.length}
+          </span>
+          <span className="tabular font-[family-name:var(--font-mono)] text-[11px] tracking-[0.1em] text-[var(--color-ink-2)]">
+            {pct}%
+          </span>
+        </div>
+        <div
+          className="h-1.5 overflow-hidden rounded-full bg-[var(--color-rule)]"
+          role="progressbar"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Application progress"
+        >
+          <div
+            className="h-full rounded-full bg-[var(--color-ontrack)] transition-[width] duration-500 ease-out motion-reduce:transition-none"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+
       <ol className="m-0 flex list-none items-start justify-center gap-0 p-0">
         {steps.map((s, i) => {
           const done = i < furthest;

@@ -11,7 +11,12 @@ import {
   type FieldWidth,
 } from '@/components/ui/form';
 import { LOCALITIES_BY_ZONE } from '@/modules/brief/types';
-import { submitApplicationAction, type ApplyState } from './actions';
+import {
+  submitApplicationAction,
+  lookupSiteAction,
+  type ApplyState,
+  type LookupState,
+} from './actions';
 import { Stepper } from './Stepper';
 
 const INITIAL: ApplyState = { status: 'idle' };
@@ -296,6 +301,7 @@ export function ApplyForm() {
           <Field label="Website" name="website" type="url" placeholder="https://" />
           <Field label="Instagram" name="instagram" placeholder="@akarastudio" />
         </FieldRow>
+        <SiteLookup form={form} onFilled={saveDraft} />
       </FormSection>
 
       <FormSection title="You" hint="Who we'll actually be speaking to.">
@@ -326,29 +332,18 @@ export function ApplyForm() {
             {err.localities}
           </p>
         ) : null}
-        {/* Grouped by zone, because sixty-four pills in one wrap is a wall
-            rather than a choice — nobody reads to the end of it, and the ones
-            at the bottom never get ticked. The zone headings also tell a
-            studio how matching actually works: we show you to customers in
-            your part of Pune, so ticking the zone you work in is enough. */}
-        <div className="flex flex-col gap-5">
-          {LOCALITIES_BY_ZONE.map((group) => (
-            <fieldset key={group.zone} className="m-0 border-0 p-0">
-              <legend className="label m-0 mb-2.5 p-0">{group.label}</legend>
-              <div className="flex flex-wrap gap-2">
-                {group.localities.map((l) => (
-                  <label
-                    key={l.slug}
-                    className="cursor-pointer rounded-full border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 py-2 text-[14.5px] text-[var(--color-ink-2)] has-[:checked]:border-[var(--color-petrol)] has-[:checked]:bg-[var(--color-petrol-soft)] has-[:checked]:text-[var(--color-ink)] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--color-petrol)]"
-                  >
-                    <input type="checkbox" name="localities" value={l.slug} className="sr-only" />
-                    {l.label}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          ))}
-        </div>
+        {/* One zone open at a time, and a count on every heading.
+
+            Sixty-four pills in one wrap is a wall: nobody reads to the
+            end of it, and the ones at the bottom never get ticked. The
+            zone headings were already there to break it up, but all six
+            open at once is still sixty-four things on screen.
+
+            Collapsed, a studio sees six choices — West, East, Central —
+            opens the one or two they work in, and is done. The count
+            beside each heading means a closed zone still reports what is
+            inside it, so nothing they have picked can hide. */}
+        <ZonePicker />
       </FormSection>
       </div>
 
@@ -540,6 +535,258 @@ function Field({
       ) : hint ? (
         <p id={`${name}-hint`} className="m-0 mt-1.5 max-w-[52ch] text-[13px] leading-snug text-[var(--color-ink-3)]">
           {hint}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The area picker: six zones, one open at a time.
+ *
+ * ## Why a count on a closed heading is the whole trick
+ *
+ * A collapsed section that hides a ticked box is worse than no
+ * collapsing at all — somebody scrolls past "East Pune" with two areas
+ * selected inside it and has no way to know. The count means a closed
+ * zone still reports what is in it, so nothing can hide.
+ *
+ * ## Uncontrolled, deliberately
+ *
+ * The checkboxes are plain DOM inputs with no React value. The count is
+ * read off the form after each change rather than mirrored into state,
+ * so there is exactly one source of truth for what is ticked — the form
+ * itself, which is also what FormData reads and what the draft restore
+ * writes into. A mirrored copy would need reconciling with all three.
+ */
+function ZonePicker() {
+  const [open, setOpen] = useState<string | null>(LOCALITIES_BY_ZONE[0]?.zone ?? null);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const wrap = useRef<HTMLDivElement | null>(null);
+
+  function recount() {
+    const el = wrap.current;
+    if (!el) return;
+    const next: Record<string, number> = {};
+    for (const group of LOCALITIES_BY_ZONE) {
+      next[group.zone] = group.localities.filter(
+        (l) => el.querySelector<HTMLInputElement>(`input[value="${l.slug}"]`)?.checked,
+      ).length;
+    }
+    setCounts(next);
+  }
+
+  // Once on mount, so a restored draft shows its counts immediately
+  // rather than waiting for the first click.
+  useEffect(recount, []);
+
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+
+  return (
+    <div ref={wrap} onChange={recount}>
+      <p className="m-0 mb-4 text-[14.5px] text-[var(--color-ink-2)]">
+        {total === 0 ? (
+          'Open the zones you work in and tick the areas.'
+        ) : (
+          <>
+            <strong className="text-[var(--color-ink)]">
+              {total} area{total === 1 ? '' : 's'}
+            </strong>{' '}
+            selected. Add more, or carry on.
+          </>
+        )}
+      </p>
+
+      <div className="flex flex-col gap-2">
+        {LOCALITIES_BY_ZONE.map((group) => {
+          const isOpen = open === group.zone;
+          const n = counts[group.zone] ?? 0;
+
+          return (
+            <div
+              key={group.zone}
+              className="overflow-hidden rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper-3)]"
+            >
+              <button
+                type="button"
+                onClick={() => setOpen(isOpen ? null : group.zone)}
+                aria-expanded={isOpen}
+                className="flex w-full items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-[var(--color-paper-2)]"
+              >
+                <span className="flex items-baseline gap-3">
+                  <span className="text-[15.5px] font-bold text-[var(--color-ink)]">
+                    {group.label}
+                  </span>
+                  <span className="text-[13px] text-[var(--color-ink-2)]">
+                    {group.localities.length} areas
+                  </span>
+                </span>
+
+                <span className="flex items-center gap-3">
+                  {n > 0 ? (
+                    <span className="tabular rounded-full bg-[var(--color-ontrack)] px-2.5 py-0.5 font-[family-name:var(--font-mono)] text-[11px] text-white">
+                      {n}
+                    </span>
+                  ) : null}
+                  <Chevron open={isOpen} />
+                </span>
+              </button>
+
+              {/* `hidden` rather than unmounting. An unmounted checkbox
+                  leaves the form, so closing a zone would silently drop
+                  everything ticked inside it. */}
+              <div hidden={!isOpen} className="border-t border-[var(--color-rule)] px-5 py-4">
+                <div className="flex flex-wrap gap-2">
+                  {group.localities.map((l) => (
+                    <label
+                      key={l.slug}
+                      className="cursor-pointer rounded-full border border-[var(--color-rule)] bg-[var(--color-paper)] px-4 py-2 text-[14.5px] text-[var(--color-ink-2)] has-[:checked]:border-[var(--color-petrol)] has-[:checked]:bg-[var(--color-petrol-soft)] has-[:checked]:font-bold has-[:checked]:text-[var(--color-ink)] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--color-petrol)]"
+                    >
+                      <input
+                        type="checkbox"
+                        name="localities"
+                        value={l.slug}
+                        className="sr-only"
+                      />
+                      {l.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      className={`h-4 w-4 shrink-0 text-[var(--color-ink-2)] transition-transform duration-200 motion-reduce:transition-none ${
+        open ? 'rotate-180' : ''
+      }`}
+    >
+      <path
+        d="M3.5 6 L8 10.5 L12.5 6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/**
+ * "Fill this in from my website."
+ *
+ * ## An offer, never an autofill
+ *
+ * What comes back is scraped text about somebody's business, not a fact
+ * we have checked. It lands in the description box only when they press
+ * Use this, and it is theirs to edit or ignore — the same rule
+ * `enrich.ts` applies for ops, for the same reason.
+ *
+ * Silently overwriting a description a studio had already typed would be
+ * the worst version of this, so the button refuses when the box has
+ * content and says why.
+ *
+ * ## Why a button and not a fetch on blur
+ *
+ * This is the one public caller of the site scraper. Firing on blur, or
+ * on a debounce while somebody types a URL, turns one applicant into
+ * dozens of outbound requests from our server. One press, one fetch —
+ * see the note on `lookupSiteAction`.
+ */
+function SiteLookup({
+  form,
+  onFilled,
+}: {
+  form: React.RefObject<HTMLFormElement | null>;
+  onFilled: () => void;
+}) {
+  const [state, action, pending] = useActionState(lookupSiteAction, {
+    status: 'idle',
+  } as LookupState);
+
+  /** Write a value in the way React's own inputs would see it. */
+  function put(name: string, value: string) {
+    const el = form.current?.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+      `[name="${name}"]`,
+    );
+    if (!el) return;
+    el.value = value;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  function accept() {
+    if (state.status !== 'found') return;
+    if (state.about) put('about', state.about);
+    if (state.instagram) put('instagram', state.instagram);
+    onFilled();
+  }
+
+  const aboutHasContent = Boolean(
+    form.current?.querySelector<HTMLTextAreaElement>('[name="about"]')?.value.trim(),
+  );
+
+  return (
+    <div className="mt-1">
+      {/* `formAction` on the button rather than a nested <form>: the whole
+          application is already one form, and a form inside a form is
+          invalid HTML that browsers silently unnest. */}
+      <button
+        type="submit"
+        formAction={action}
+        disabled={pending}
+        className="rounded-full border border-[var(--color-rule)] bg-[var(--color-paper-3)] px-5 py-2.5 text-[14px] text-[var(--color-ink)] hover:border-[var(--color-petrol)] disabled:opacity-50"
+      >
+        {pending ? 'Reading your site…' : 'Fill this in from my website'}
+      </button>
+      <p className="m-0 mt-2 max-w-[52ch] text-[13px] leading-relaxed text-[var(--color-ink-2)]">
+        Optional. We read the page you linked and offer what we find — you decide whether to keep
+        it.
+      </p>
+
+      {state.status === 'found' ? (
+        <div className="mt-4 rounded-[12px] border border-[var(--color-ontrack)] bg-[var(--color-paper-3)] p-5">
+          <p className="label m-0 mb-2 text-[var(--color-ink-2)]">From your site</p>
+          {state.about ? (
+            <p className="m-0 mb-3 text-[14.5px] leading-relaxed text-[var(--color-ink)]">
+              “{state.about}”
+            </p>
+          ) : null}
+          {state.instagram ? (
+            <p className="m-0 mb-3 text-[14px] text-[var(--color-ink-2)]">
+              Instagram: <strong className="text-[var(--color-ink)]">{state.instagram}</strong>
+            </p>
+          ) : null}
+
+          {aboutHasContent && state.about ? (
+            <p className="m-0 text-[13.5px] leading-relaxed text-[var(--color-ink-2)]">
+              You have already written a description, so this will not replace it. Clear that box
+              first if you would rather use this one.
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={accept}
+              className="rounded-full bg-[var(--acc-d,#a94f2e)] px-5 py-2 text-[14px] font-bold text-[var(--on-acc,#fff8f1)]"
+            >
+              Use this
+            </button>
+          )}
+        </div>
+      ) : null}
+
+      {state.status === 'nothing' || state.status === 'error' ? (
+        <p role="status" className="m-0 mt-3 text-[13.5px] leading-relaxed text-[var(--color-ink-2)]">
+          {state.message}
         </p>
       ) : null}
     </div>
