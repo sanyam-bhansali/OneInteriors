@@ -151,7 +151,12 @@ export async function decideAction(
               : 'A sign-in link is on its way.'
           }`
         : intent === 'reject'
-          ? 'Rejected. Tell them yourself as well — this does not email them.'
+          ? /* It emails them now, with the reason you typed, verbatim. Say
+               plainly when it did not — a rejection nobody received is the
+               exact silence /apply promises we will not send. */
+            'emailDelivered' in result && result.emailDelivered === false
+            ? 'Rejected — but THE EMAIL DID NOT SEND. They have heard nothing. Tell them yourself.'
+            : 'Rejected. They have been emailed the reason you gave, word for word.'
           : 'Marked as under review.',
   };
 }

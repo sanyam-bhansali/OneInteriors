@@ -37,10 +37,27 @@ export default function ApplyStartPage() {
 
             <Eyebrow>Applying to One Interiors</Eyebrow>
             <h1 className="h1 mb-4 max-w-[20ch]">Tell us about your practice.</h1>
-            <p className="m-0 max-w-[52ch] text-[16px] leading-relaxed text-[var(--color-ink-2)]">
+            <p className="m-0 mb-6 max-w-[52ch] text-[16px] leading-relaxed text-[var(--color-ink-2)]">
               About ten minutes. Nothing here is published — this is between you and us. We reply
               within a week either way, with a reason.
             </p>
+
+            {/* The shape of the ask, before the first field.
+                Fifteen fields look like a wall; five required fields and ten
+                optional ones look like ten minutes. The fields already say
+                "— optional" individually, but that is only discoverable by
+                scrolling, and the decision to start or close the tab is made
+                before any scrolling happens. */}
+            <div className="max-w-[52ch] border-l-2 border-[var(--color-petrol)] pl-5">
+              <p className="m-0 mb-1.5 text-[15.5px] font-bold leading-snug text-[var(--color-ink)]">
+                Five things are required.
+              </p>
+              <p className="m-0 text-[15px] leading-relaxed text-[var(--color-ink-2)]">
+                The studio&rsquo;s name, your name, an email, a mobile number, and the areas you
+                work in. Everything else is marked optional — it helps us understand you, and you
+                can leave it blank.
+              </p>
+            </div>
           </Container>
         </section>
 

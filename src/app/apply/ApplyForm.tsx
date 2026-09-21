@@ -42,8 +42,9 @@ export function ApplyForm() {
       <div className="mx-auto max-w-[62ch] rounded-[14px] border border-[var(--color-ontrack)] bg-[var(--color-ontrack-soft)] p-8">
         <h2 className="h2 mb-3">Thank you — we&rsquo;ve got it.</h2>
         <p className="m-0 mb-3 text-[16px] leading-relaxed text-[var(--color-ink-2)]">
-          We read every application ourselves. You&rsquo;ll hear from us within a week, either way
-          — and if it&rsquo;s a no, we&rsquo;ll tell you why rather than going quiet.
+          A confirmation is on its way to the address you gave — check the spam folder if it is
+          not there in a minute. We read every application ourselves, and you will hear back
+          within a week either way. If it is a no, we tell you why rather than going quiet.
         </p>
         <p className="m-0 text-[15px] leading-relaxed text-[var(--color-ink-2)]">
           If it&rsquo;s a yes, we&rsquo;ll email you a sign-in link and you&rsquo;ll build your

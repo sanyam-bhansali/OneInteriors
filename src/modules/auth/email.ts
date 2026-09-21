@@ -190,3 +190,161 @@ export async function sendStudioWelcome(
     return { delivered: false, reason: 'network' };
   }
 }
+
+/**
+ * The acknowledgement a studio gets the moment they apply.
+ *
+ * ## Why this exists
+ *
+ * Until now, applying produced silence. A studio filled in fifteen fields,
+ * saw a green box, and received nothing — no record, no reference, no
+ * evidence it had happened at all. Close the tab and there was no proof.
+ *
+ * Meanwhile `/apply` promised, in as many words:
+ *
+ *   "You'll hear from us within a week, either way — and if it's a no, we'll
+ *    tell you why rather than going quiet."
+ *
+ * A business deciding whether we are real reads silence as the answer. This
+ * is the cheapest possible fix for the most expensive possible impression.
+ *
+ * ## What it deliberately does not do
+ *
+ * No "thanks for your interest, we'll be in touch shortly" with no date on
+ * it. It says **a week**, because the page said a week, and a promise made on
+ * a page has to be repeated in the inbox where it can be held against us.
+ */
+export async function sendApplicationReceived(
+  to: string,
+  studio: { contactName: string | null; studioName: string },
+): Promise<SendResult> {
+  const cfg = config();
+  const greeting = studio.contactName ? `Hello ${studio.contactName},` : 'Hello,';
+
+  const text = [
+    greeting,
+    '',
+    `We have your application for ${studio.studioName}. This is just to say it`,
+    'arrived — a person reads every one, and that person is not a filter.',
+    '',
+    'What happens next:',
+    '',
+    '  · We read it, and usually ring you before deciding. That call is us',
+    '    understanding your practice, not testing you.',
+    '  · You hear back within a week, either way.',
+    '  · If it is a no, we tell you why. Pune is a small market and a studio',
+    '    who was turned down deserves to know what for.',
+    '',
+    'Nothing you sent is published anywhere, and we do not share it.',
+    '',
+    'If anything changes — a new project finished, a number that was wrong —',
+    'just reply to this. A person reads it.',
+    '',
+    'One Interiors',
+  ].join('\n');
+
+  if (isFault(cfg)) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error(`[apply] ${cfg.message} — acknowledgement NOT sent to`, maskEmail(to));
+      return { delivered: false, reason: cfg.reason };
+    }
+    console.log(`\n[apply] Acknowledgement for ${to}\n`);
+    return { delivered: false, reason: 'dev_console' };
+  }
+
+  return send(cfg, to, `We have your application — ${studio.studioName}`, text, '[apply]');
+}
+
+/**
+ * The email a studio gets when we say no.
+ *
+ * ## Why this is not optional
+ *
+ * `/apply` promises a reason rather than silence, and `rejectApplication`
+ * already refuses to run without one — ops must type at least ten characters
+ * explaining themselves. That reason was then stored in the database and
+ * shown to nobody.
+ *
+ * So we were collecting the honesty and not delivering it.
+ *
+ * ## Why the reason goes in verbatim
+ *
+ * It was written by a person for this studio. Rewriting it into something
+ * softer would make it generic, and a generic rejection is the thing we said
+ * we would not send. Ops knows it will be read — that is the point of making
+ * them type it.
+ */
+export async function sendApplicationRejected(
+  to: string,
+  studio: { contactName: string | null; studioName: string },
+  reason: string,
+): Promise<SendResult> {
+  const cfg = config();
+  const greeting = studio.contactName ? `Hello ${studio.contactName},` : 'Hello,';
+
+  const text = [
+    greeting,
+    '',
+    `We are not able to add ${studio.studioName} to the roster at the moment.`,
+    '',
+    'The reason, plainly:',
+    '',
+    reason.trim(),
+    '',
+    'We keep the list small, which means saying no to studios who are doing',
+    'good work. It is not a judgement on your practice.',
+    '',
+    'If the reason above is something that changes — a project finished, a',
+    'registration completed — write to us and we will look again. We mean',
+    'that; it is not a polite ending.',
+    '',
+    'One Interiors',
+  ].join('\n');
+
+  if (isFault(cfg)) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error(`[apply] ${cfg.message} — rejection NOT sent to`, maskEmail(to));
+      return { delivered: false, reason: cfg.reason };
+    }
+    console.log(`\n[apply] Rejection for ${to}: ${reason}\n`);
+    return { delivered: false, reason: 'dev_console' };
+  }
+
+  return send(cfg, to, `About your application — ${studio.studioName}`, text, '[apply]');
+}
+
+/**
+ * The one place an email is actually posted.
+ *
+ * Extracted because there are now four senders and they had begun to differ
+ * in small ways — a `.catch()` here, a different slice length there. A retry
+ * policy or a provider change should be one edit, not four.
+ */
+async function send(
+  cfg: { apiKey: string; from: string },
+  to: string,
+  subject: string,
+  text: string,
+  tag: string,
+): Promise<SendResult> {
+  try {
+    const res = await fetch(RESEND_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${cfg.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from: cfg.from, to, subject, text }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error(`${tag} Resend ${res.status}: ${body.slice(0, 300)}`);
+      return { delivered: false, reason: `provider_${res.status}` };
+    }
+    return { delivered: true };
+  } catch (err) {
+    console.error(`${tag} send failed:`, err instanceof Error ? err.message : err);
+    return { delivered: false, reason: 'network' };
+  }
+}

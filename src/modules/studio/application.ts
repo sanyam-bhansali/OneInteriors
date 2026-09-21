@@ -28,6 +28,7 @@ import {
 } from '@/modules/auth/session';
 import { validateGstin } from '@/modules/verification/gstin';
 import { isValidEmail, normaliseEmail, requestMagicLink } from '@/modules/auth/magic-link';
+import { sendApplicationReceived, sendApplicationRejected } from '@/modules/auth/email';
 import { revokeAllSessions } from '@/modules/auth/session';
 import { lakhsToPaise } from '@/lib/money';
 import { normalisePhone } from './phone';
@@ -35,7 +36,9 @@ import { revalidateRoster } from './roster-cache';
 import { siteUrlFor } from '@/lib/site';
 
 export type ApplyResult =
-  | { ok: true; id: string }
+  /** `emailDelivered` false means the row was written but the acknowledgement
+   *  did not send — the application stands, the studio just heard nothing. */
+  | { ok: true; id: string; emailDelivered: boolean }
   | { ok: false; errors: Record<string, string> };
 
 export interface ApplyInput {
@@ -136,7 +139,27 @@ export async function submitApplication(input: ApplyInput): Promise<ApplyResult>
     },
   });
 
-  return { ok: true, id: application.id };
+  /**
+   * Acknowledge it, and do not let a mail failure lose the application.
+   *
+   * The row is already written. If Resend is down, the right outcome is a
+   * studio who applied successfully and did not get an email — not a studio
+   * who is told their application failed when it did not. So this is after
+   * the create, and its failure is logged rather than thrown.
+   *
+   * The delivery result is returned so ops can see, on the applications
+   * screen, that this one never got its acknowledgement and may need a
+   * personal note.
+   */
+  const ack = await sendApplicationReceived(email, {
+    contactName,
+    studioName: tradeName,
+  }).catch((e) => {
+    console.error('[apply] acknowledgement threw:', e);
+    return { delivered: false, reason: 'threw' as const };
+  });
+
+  return { ok: true, id: application.id, emailDelivered: ack.delivered };
 }
 
 // ── Review ─────────────────────────────────────────────────────
@@ -361,10 +384,20 @@ export async function rejectApplication(id: string, reason: string): Promise<Dec
     return { ok: false, error: 'Give a reason. They will ask, and Pune is a small market.' };
   }
 
+  /* Read before the transaction rather than capturing out of the closure.
+     A `let` assigned only inside an async callback is invisible to TypeScript's
+     control-flow analysis, which narrows it to `never` afterwards — and working
+     around that with a cast would be hiding a real fact about when the value
+     exists. Reading first is simpler and the row is not changing underneath us
+     in the milliseconds between. */
+  const app = await prisma.studioApplication.findUnique({
+    where: { id },
+    select: { email: true, contactName: true, tradeName: true, status: true },
+  });
+  if (!app) return { ok: false, error: 'That application no longer exists.' };
+
   try {
     await prisma.$transaction(async (tx) => {
-      const app = await tx.studioApplication.findUniqueOrThrow({ where: { id } });
-
       await tx.studioApplication.update({
         where: { id },
         data: {
@@ -387,7 +420,28 @@ export async function rejectApplication(id: string, reason: string): Promise<Dec
       });
     });
 
-    return { ok: true };
+    /**
+     * Send the reason. Outside the transaction, deliberately.
+     *
+     * An email inside a transaction holds a database connection open for the
+     * length of an HTTP call to a third party, and a slow provider becomes a
+     * slow database. Worse, a transaction that rolls back after the send has
+     * already gone out leaves a studio holding a rejection for a decision the
+     * database does not record.
+     *
+     * The reverse failure is the safe one: rejected in our records, email did
+     * not send, and the result says so.
+     */
+    const sent = await sendApplicationRejected(
+      app.email,
+      { contactName: app.contactName, studioName: app.tradeName },
+      trimmed,
+    ).catch((e) => {
+      console.error('[apply] rejection email threw:', e);
+      return { delivered: false };
+    });
+
+    return { ok: true, emailDelivered: sent.delivered };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Could not reject.' };
   }
