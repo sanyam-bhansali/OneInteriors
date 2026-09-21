@@ -1847,3 +1847,62 @@ p {
     transform: none;
   }
 }
+
+/* ── Scroll entrance, and the card lift ───────────────────────────────
+
+   `oi-enter` is applied by ScrollReveal only once it knows it can
+   animate — never on the server, never before the effect runs. So the
+   default state of any element using it is VISIBLE, and JavaScript
+   failing cannot hide content. See the note in ScrollReveal.tsx.
+
+   Global rather than scoped to .oi-tactile: an entrance has no palette,
+   and /match will want the same one. */
+.oi-enter {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0);
+}
+.oi-enter-in {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 640ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 640ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* The card lift.
+
+   Two things move, and both are small. The card rises 3px and its shadow
+   grows to suggest it has come off the page; the top rule brightens to
+   the accent so the eye is told WHICH card without the card having to
+   shout. A scale() is deliberately not used — scaling a card with a
+   border resamples the border and it goes soft, which is the single
+   clearest tell of a cheap hover. */
+.oi-lift {
+  transition:
+    transform 320ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    box-shadow 320ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    border-color 320ms ease;
+  box-shadow: 0 1px 2px rgba(44, 38, 36, 0.05);
+  will-change: transform;
+}
+.oi-lift:hover,
+.oi-lift:focus-within {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 34px -18px rgba(44, 38, 36, 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oi-enter,
+  .oi-enter-in {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .oi-lift {
+    transition: box-shadow 200ms ease;
+  }
+  .oi-lift:hover,
+  .oi-lift:focus-within {
+    transform: none;
+  }
+}

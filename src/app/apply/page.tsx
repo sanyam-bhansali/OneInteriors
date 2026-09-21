@@ -4,6 +4,7 @@ import { Container, Eyebrow } from '@/components/ui';
 import { SiteHeader, SiteFooter } from '@/components/chrome';
 import { Glass } from '@/components/oi/Surfaces';
 import { DoodleGround } from '@/components/oi/DoodleGround';
+import { ScrollReveal } from '@/components/oi/ScrollReveal';
 import { CHECK_LABELS, TIER_CHECKS } from '@/modules/studio/types';
 
 export const metadata: Metadata = {
@@ -144,20 +145,22 @@ export default function ApplyPage() {
             everybody feels as the page not being quite square. */}
         <section className="border-b border-[var(--color-rule)] py-14 sm:py-20">
           <Container size="wide">
-            <div className="mx-auto max-w-[36rem]">
+            <ScrollReveal className="mx-auto max-w-[36rem]">
               <IntroductionCard />
-            </div>
+            </ScrollReveal>
           </Container>
         </section>
 
         {/* ── 2 · The contrast ─────────────────────────────────── */}
         <section className="border-b border-[var(--color-rule)] py-14 sm:py-20">
           <Container size="wide">
-            <Eyebrow>What this is not</Eyebrow>
-            <h2 className="h1 mb-3 max-w-[20ch]">This is not a leads platform.</h2>
-            <p className="m-0 mb-10 max-w-[48ch] text-[16px] leading-relaxed text-[var(--color-ink-2)]">
-              You have been on those. Here is the difference, plainly.
-            </p>
+            <ScrollReveal>
+              <Eyebrow>What this is not</Eyebrow>
+              <h2 className="h1 mb-3 max-w-[20ch]">This is not a leads platform.</h2>
+              <p className="m-0 mb-10 max-w-[48ch] text-[16px] leading-relaxed text-[var(--color-ink-2)]">
+                You have been on those. Here is the difference, plainly.
+              </p>
+            </ScrollReveal>
 
             {/* Two lists rather than a bordered table, and the left one is
                 deliberately recessed. The recession does the arguing — red
@@ -170,7 +173,10 @@ export default function ApplyPage() {
                 content a studio is meant to read and recognise. Fading the
                 thing you want them to recognise is self-defeating as well as
                 inaccessible. */}
-            <div className="grid grid-cols-1 gap-px overflow-hidden border border-[var(--color-rule)] bg-[var(--color-rule)] md:grid-cols-2">
+            <ScrollReveal
+              delay={90}
+              className="grid grid-cols-1 gap-px overflow-hidden border border-[var(--color-rule)] bg-[var(--color-rule)] md:grid-cols-2"
+            >
               <div className="bg-[var(--color-paper-2)] p-7 sm:p-9">
                 <p className="label m-0 mb-5 text-[var(--color-ink-2)]">
                   Where you have been listed
@@ -200,32 +206,43 @@ export default function ApplyPage() {
                   ))}
                 </ul>
               </div>
-            </div>
+            </ScrollReveal>
           </Container>
         </section>
 
         {/* ── 3 · What you get ─────────────────────────────────── */}
         <section className="border-b border-[var(--color-rule)] py-14 sm:py-20">
           <Container size="wide">
-            <Eyebrow>What you get</Eyebrow>
-            <h2 className="h1 mb-10 max-w-[22ch]">
-              Four things you do not get anywhere else.
-            </h2>
+            <ScrollReveal>
+              <Eyebrow>What you get</Eyebrow>
+              <h2 className="h1 mb-10 max-w-[22ch]">
+                Four things you do not get anywhere else.
+              </h2>
+            </ScrollReveal>
 
+            {/* Staggered 80ms apart, so four cards arrive as a sequence
+                rather than as a block. The last one lands 240ms after
+                the first, which is under the threshold where a reader
+                starts waiting for it. */}
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {BENEFITS.map((b, i) => (
-                <div
+                <ScrollReveal
                   key={b.title}
-                  className="border-t-2 border-[var(--color-petrol)] bg-[var(--color-paper-2)] p-7"
+                  delay={80 * i}
+                  className="oi-lift group border-t-2 border-[var(--color-petrol)] bg-[var(--color-paper-3)] p-7"
                 >
-                  <span className="tabular mb-4 block font-[family-name:var(--font-mono)] text-[11px] tracking-[0.18em] text-[var(--color-petrol)]">
+                  {/* The number is the thing that moves on hover, not the
+                      card's text. A small, single, cheap change reads as
+                      responsiveness; several at once reads as a website
+                      showing off. */}
+                  <span className="tabular mb-4 block font-[family-name:var(--font-mono)] text-[11px] tracking-[0.18em] text-[var(--color-petrol)] transition-transform duration-300 group-hover:translate-x-1">
                     {String(i + 1).padStart(2, '0')}
                   </span>
                   <p className="h3 mb-2">{b.title}</p>
                   <p className="m-0 text-[15px] leading-relaxed text-[var(--color-ink-2)]">
                     {b.body}
                   </p>
-                </div>
+                </ScrollReveal>
               ))}
             </div>
           </Container>
@@ -235,7 +252,7 @@ export default function ApplyPage() {
         <section className="border-b border-[var(--color-rule)] py-14 sm:py-20">
           <Container size="wide">
             <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-16">
-              <div>
+              <ScrollReveal>
                 <Eyebrow>Verification</Eyebrow>
                 <h2 className="h1 mb-5 max-w-[20ch]">
                   The badge is work we did so they don&rsquo;t have to.
@@ -256,18 +273,24 @@ export default function ApplyPage() {
                 >
                   See all {TOTAL_CHECKS} →
                 </Link>
-              </div>
+              </ScrollReveal>
 
-              <ul className="m-0 grid list-none grid-cols-1 gap-x-6 gap-y-2.5 self-center p-0 sm:grid-cols-2">
-                {[...TIER_CHECKS.LISTED, ...TIER_CHECKS.VERIFIED].map((c) => (
-                  <li key={c} className="grid grid-cols-[16px_minmax(0,1fr)] items-start gap-2">
-                    <Check />
-                    <span className="font-[family-name:var(--font-mono)] text-[11.5px] leading-[1.5] tracking-[0.02em] text-[var(--color-ink-2)]">
-                      {CHECK_LABELS[c]}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <ScrollReveal
+                delay={120}
+                as="div"
+                className="self-center rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-paper-3)] p-6"
+              >
+                <ul className="m-0 grid list-none grid-cols-1 gap-x-6 gap-y-2.5 p-0 sm:grid-cols-2">
+                  {[...TIER_CHECKS.LISTED, ...TIER_CHECKS.VERIFIED].map((c) => (
+                    <li key={c} className="grid grid-cols-[16px_minmax(0,1fr)] items-start gap-2">
+                      <Check />
+                      <span className="font-[family-name:var(--font-mono)] text-[11.5px] leading-[1.5] tracking-[0.02em] text-[var(--color-ink-2)]">
+                        {CHECK_LABELS[c]}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </ScrollReveal>
             </div>
           </Container>
         </section>
@@ -277,19 +300,21 @@ export default function ApplyPage() {
           <Container size="narrow">
             {/* No card. This should read like somebody being straight with
                 you, which means it should not look designed. */}
-            <Eyebrow>Before you apply</Eyebrow>
-            <h2 className="h1 mb-8 max-w-[22ch]">This is probably not for you if…</h2>
+            <ScrollReveal>
+              <Eyebrow>Before you apply</Eyebrow>
+              <h2 className="h1 mb-8 max-w-[22ch]">This is probably not for you if…</h2>
+            </ScrollReveal>
 
             <div className="flex flex-col gap-7 border-y border-[var(--color-rule)] py-8">
-              {NOT_FOR_YOU.map((n) => (
-                <div key={n.title}>
+              {NOT_FOR_YOU.map((n, i) => (
+                <ScrollReveal key={n.title} delay={70 * i}>
                   <p className="m-0 mb-1.5 text-[16.5px] font-bold leading-snug text-[var(--color-ink)]">
                     {n.title}
                   </p>
                   <p className="m-0 max-w-[54ch] text-[15px] leading-relaxed text-[var(--color-ink-2)]">
                     {n.body}
                   </p>
-                </div>
+                </ScrollReveal>
               ))}
             </div>
 
@@ -301,7 +326,10 @@ export default function ApplyPage() {
                 half an hour — which reads as a bait-and-switch even though it
                 was never meant as one. Saying it here costs a paragraph. Not
                 saying it costs the trust of the studio it surprises. */}
-            <div className="mt-9 border-l-2 border-[var(--color-petrol)] pl-6">
+            <ScrollReveal
+              delay={120}
+              className="mt-9 border-l-2 border-[var(--color-petrol)] pl-6"
+            >
               <p className="m-0 mb-2 text-[16.5px] font-bold leading-snug text-[var(--color-ink)]">
                 One thing worth knowing now.
               </p>
@@ -313,7 +341,7 @@ export default function ApplyPage() {
                 rather have that conversation than lose a practice that will be excellent in two
                 years.
               </p>
-            </div>
+            </ScrollReveal>
           </Container>
         </section>
 
@@ -321,22 +349,22 @@ export default function ApplyPage() {
         <section className="py-14 sm:py-20">
           <Container size="wide">
             <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16">
-              <div>
+              {/* The CTA is centred in the hero and ranged left here on
+                  purpose: it is the same action, but here it sits beside
+                  the five steps as the end of a sequence rather than as
+                  an opening offer. */}
+              <ScrollReveal className="flex flex-col items-start [&_.flex-col.items-center]:items-start">
                 <Eyebrow>What happens next</Eyebrow>
                 <h2 className="h1 mb-6 max-w-[16ch]">Ten minutes, then it is with us.</h2>
                 <ApplyCta />
-              </div>
+              </ScrollReveal>
 
               <ol className="m-0 flex list-none flex-col gap-6 p-0">
-                <Step n="01" title="You apply" body="Ten minutes. Nothing you send here is published." />
-                <Step n="02" title="We reply within a week" body="Either way, with a reason. A call before any decision." />
-                <Step
-                  n="03"
-                  title="We verify"
-                  body={`${TOTAL_CHECKS} checks — identity, GST filing history, references we ring, and two finished sites we visit.`}
-                />
-                <Step n="04" title="You build your profile" body="Your work, your words, your rates. We help you shape it." />
-                <Step n="05" title="You go live" body="Matched to customers whose brief actually fits what you do." />
+                {STEPS.map((s, i) => (
+                  <ScrollReveal key={s.n} as="li" delay={70 * i}>
+                    <Step n={s.n} title={s.title} body={s.body} />
+                  </ScrollReveal>
+                ))}
               </ol>
             </div>
 
@@ -394,6 +422,30 @@ const BENEFITS = [
   {
     title: 'Software to run the rest of your practice',
     body: 'Your leads, your projects, quotations priced off your own rate card, and a PDF that goes out with your logo on it — not ours. Yours whether we send you work that month or not.',
+  },
+];
+
+const STEPS = [
+  { n: '01', title: 'You apply', body: 'Ten minutes. Nothing you send here is published.' },
+  {
+    n: '02',
+    title: 'We reply within a week',
+    body: 'Either way, with a reason. A call before any decision.',
+  },
+  {
+    n: '03',
+    title: 'We verify',
+    body: `${TOTAL_CHECKS} checks — identity, GST filing history, references we ring, and two finished sites we visit.`,
+  },
+  {
+    n: '04',
+    title: 'You build your profile',
+    body: 'Your work, your words, your rates. We help you shape it.',
+  },
+  {
+    n: '05',
+    title: 'You go live',
+    body: 'Matched to customers whose brief actually fits what you do.',
   },
 ];
 
@@ -541,9 +593,15 @@ function Check() {
   );
 }
 
+/**
+ * A div, not an li. The `<li>` is now the `ScrollReveal` that wraps this,
+ * so each step can be staggered independently — nesting one inside the
+ * other would be invalid markup and screen readers would report the
+ * count twice.
+ */
 function Step({ n, title, body }: { n: string; title: string; body: string }) {
   return (
-    <li className="grid grid-cols-[34px_minmax(0,1fr)] gap-4 border-b border-[var(--color-rule)] pb-6 last:border-0 last:pb-0">
+    <div className="grid grid-cols-[34px_minmax(0,1fr)] gap-4 border-b border-[var(--color-rule)] pb-6">
       <span className="tabular font-[family-name:var(--font-mono)] text-[12px] leading-[1.6] text-[var(--color-petrol)]">
         {n}
       </span>
@@ -555,6 +613,6 @@ function Step({ n, title, body }: { n: string; title: string; body: string }) {
           {body}
         </p>
       </div>
-    </li>
+    </div>
   );
 }
