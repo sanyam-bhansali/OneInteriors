@@ -378,10 +378,28 @@ describe('the traps the doc lists', () => {
      * accessibility feature it does not have. Wrapping in :where() makes it
      * worse: that zeroes the specificity you need.
      */
-    const block = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
-    expect(block).toContain(".oi-wings[data-open='yes'] .oi-pill");
-    expect(block).toContain('.oi-wings:hover .oi-pill');
-    expect(block).toContain('.oi-wings:focus-within .oi-pill');
+    /**
+     * `lastIndexOf` used to find this block, which worked only while it
+     * was the last one in the file. It stopped being: /apply added its
+     * own reduced-motion blocks for the scroll entrance and the card
+     * lift, and the assertion then read the wrong block and failed — with
+     * the /match CSS completely intact.
+     *
+     * So: search every reduced-motion block for the one that governs the
+     * wings. That is the invariant the test is actually about, and it no
+     * longer cares how many other blocks exist or what order they sit in.
+     */
+    const blocks = css
+      .split('@media (prefers-reduced-motion: reduce)')
+      .slice(1)
+      .map((b) => `@media (prefers-reduced-motion: reduce)${b}`);
+
+    expect(blocks.length, 'no reduced-motion block at all').toBeGreaterThan(0);
+
+    const wings = blocks.find((b) => b.includes(".oi-wings[data-open='yes'] .oi-pill"));
+    expect(wings, 'no reduced-motion block re-declares the wings open state').toBeDefined();
+    expect(wings).toContain('.oi-wings:hover .oi-pill');
+    expect(wings).toContain('.oi-wings:focus-within .oi-pill');
   });
 
   it('the card glass alpha has not been thinned', () => {
