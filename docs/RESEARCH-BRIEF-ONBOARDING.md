@@ -85,6 +85,45 @@ Do them in order. If you run out of time, the early ones matter most.
 10. **Etsy** seller onboarding — "open your shop, then fill it."
 11. **Fiverr** seller onboarding — gig-first ordering.
 
+### Tier 5 — the galleries: Mobbin and Dribbble
+
+Do these **last**, and treat them differently from everything above.
+
+12. **Mobbin** — `mobbin.com/explore/web/flows/onboarding`, and the mobile
+    equivalent. Aim for **50 flows**. It returns `403` to automated browsers,
+    so a real Chrome with a signed-in session is the only way in — which is
+    why it is on your list and not ours.
+
+13. **Dribbble** — `dribbble.com/search/onboarding`.
+
+**Read these with a sharper filter than the rest**, for two reasons.
+
+**Mobbin is real product screenshots, but overwhelmingly consumer mobile.**
+Fifty flows there will mostly be variations on *signup → personalise →
+paywall → home*. That is not our shape: we onboard a business owner onto a
+two-sided marketplace where the payoff lands two weeks later. So do not
+report the fifty. Report only what survives this question:
+
+> *Would this still make sense if the user were a 45-year-old running a
+> twelve-person interior studio, deciding whether we are worth their Tuesday?*
+
+Most personalisation quizzes, streaks and illustration carousels will not
+survive it. Some things will — progress models, how a long form is broken up,
+how a wait is explained, how an empty state teaches. Those are what we want.
+
+**Dribbble is concept art, not shipped product.** Those are portfolio pieces:
+invented apps, no users, no drop-off data, optimised to look good in a grid.
+Treat it as a source of **visual and copy ideas only**, never as evidence that
+a flow works. If a Dribbble shot suggests something, say explicitly that it is
+unvalidated.
+
+For both, the useful output is not a catalogue. It is: **"here are the six
+things I saw repeatedly that would survive contact with a studio owner, and
+here is the one nobody is doing."**
+
+Where Mobbin lets you filter by category, prefer **B2B, SaaS, Finance,
+Productivity and Marketplace** over Social, Dating, Health and Games.
+
 ---
 
 ## Rules while you work
@@ -92,6 +131,10 @@ Do them in order. If you run out of time, the early ones matter most.
 **Do not create accounts, and do not enter passwords.** Walk as far as the
 public flow goes. Where a wall stops you, say so and record what was visible
 up to that point — that is still useful data.
+
+**Sessions the user is already signed into are fair game** — that is the point
+of using their browser. Mobbin in particular is only reachable that way; it
+returns `403` to anything automated.
 
 **If the user is present and willing to sign up themselves**, ask them. Many
 of these flows only reveal their structure after the wall, and the user's own
