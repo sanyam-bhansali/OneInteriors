@@ -28,6 +28,11 @@ import {
   type NoShowPartyName,
 } from './appointment-rules';
 
+/* The board bridge. Lives in `studio-practice` because the row it writes is
+   practice data, not marketplace data — see the folder-rule note at the top
+   of that file for why it is the one thing there that takes a studio id. */
+import { bridgeIntroduction, redactWithdrawn } from '@/modules/studio-practice/bridge';
+
 export type IntroResult = { ok: true; id: string } | { ok: false; error: string };
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -114,13 +119,35 @@ export async function createIntroduction(input: {
         },
       });
 
+      /**
+       * Put them on the studio's board — but only if contact was released.
+       *
+       * This is the hook `docs/STUDIO-CRM.md` specified and nobody wired:
+       * a lead that arrives already filled in from the brief. Without it a
+       * studio's board can only hold what they typed themselves, which is
+       * every other CRM they could buy, minus the one thing we have.
+       *
+       * Gated on `releaseContact` because `StudioClient.name` is required and
+       * a board is a surface where a leaked name is invisible to everyone
+       * except the person it belongs to. When it is false, the bridge runs
+       * later from `releaseContactDetails` instead — same function, same
+       * transaction discipline.
+       *
+       * The outcome is recorded rather than acted on. A card that failed to
+       * appear is a row we can backfill; an introduction rolled back because
+       * of it is a business event that did not happen.
+       */
+      const bridged = releaseContact
+        ? await bridgeIntroduction(tx, created.id)
+        : ({ kind: 'failed', reason: 'Contact not released yet.' } as const);
+
       await tx.auditLog.create({
         data: {
           actorId: actor.id,
           action: 'introduction.create',
           entityType: 'Introduction',
           entityId: created.id,
-          after: { briefId, studioId, releaseContact },
+          after: { briefId, studioId, releaseContact, board: bridged.kind },
         },
       });
 
@@ -144,12 +171,19 @@ export async function releaseContactDetails(introductionId: string): Promise<Act
         where: { id: introductionId },
         data: { contactReleasedAt: new Date() },
       });
+
+      /* The other half of the bridge. Release is the moment the studio is
+         allowed to know who this is, so it is the moment the card can exist.
+         Idempotent: an introduction released twice finds its own card. */
+      const bridged = await bridgeIntroduction(tx, introductionId);
+
       await tx.auditLog.create({
         data: {
           actorId: actor.id,
           action: 'introduction.release',
           entityType: 'Introduction',
           entityId: introductionId,
+          after: { board: bridged.kind },
         },
       });
     });
@@ -183,6 +217,12 @@ export async function withdrawIntroduction(
         where: { id: introductionId },
         data: { withdrawnAt: new Date(), withdrawnReason: trimmed },
       });
+
+      /* The board card carries a name, a phone number and an email, and the
+         customer has just asked to be forgotten by this studio. Redacted
+         rather than binned: the bin is a 30-day holding area with a restore
+         button that still renders the name. See `redactWithdrawn`. */
+      await redactWithdrawn(tx, introductionId);
 
       await tx.appointment.updateMany({
         where: { introductionId, status: { in: ['PROPOSED', 'CONFIRMED'] } },
