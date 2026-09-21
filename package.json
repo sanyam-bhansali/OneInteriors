@@ -23,7 +23,8 @@
     "db:rates": "tsx prisma/seed-rate-cards.ts",
     "guard:destructive": "tsx prisma/guard-destructive.ts",
     "db:reset": "tsx prisma/guard-destructive.ts \"prisma migrate reset\" && prisma migrate reset",
-    "shots": "node scripts/screenshots/capture.mjs"
+    "shots": "node scripts/screenshots/capture.mjs",
+    "db:session": "tsx prisma/seed-session.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
