@@ -25,12 +25,13 @@ export const metadata: Metadata = {
  * this body served under a 200 — was live on three routes in September and had
  * Google indexing "page not found" as real pages. Warm words, honest status.
  *
- * ## Why it does not promise a specific page is coming
+ * ## The wording, which was chosen rather than typed
  *
- * "We are working on it" is true of the product and false of a mistyped URL,
- * and a message that greets a typo with "coming soon" is a small lie told
- * hundreds of times. So the tone is warm and the claim is about us building
- * generally, never about this address in particular.
+ * "Still working on it" covers both cases honestly — a typo, and a page that
+ * genuinely does not exist yet — because in neither case are we claiming this
+ * particular address is on its way. What it avoids is "we have not built that
+ * yet", which reads as an admission the product is unfinished when most of the
+ * people seeing this page have simply mistyped a URL.
  *
  * ## Why there is no site header
  *
@@ -54,13 +55,13 @@ export default function NotFound() {
         </h1>
 
         <p className="lede mb-4 max-w-[46ch]">
-          This page is not here. Either the address has a typo in it, or it is something we have
-          not built yet.
+          There is nothing at this address yet. Either the link has a typo in it, or it is
+          something we are still working on.
         </p>
 
         <p className="m-0 mb-10 max-w-[48ch] text-[16px] leading-relaxed text-[var(--color-ink-2)]">
           We are a small team putting this together carefully rather than quickly, and there is
-          more of it arriving. In the meantime, everything that does exist starts from the front
+          more of it arriving. In the meantime, everything that is ready starts from the front
           page.
         </p>
 
