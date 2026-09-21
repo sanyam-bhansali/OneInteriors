@@ -49,6 +49,46 @@ npm run db:studio-login -- you@example.com northlight-studio --live
 That last one is the only way a `StudioMember` gets created, which is what the
 whole `/studio` section needs.
 
+## The studio pages need a session
+
+`DEV_OPS_NO_AUTH` opens `/ops` and nothing else. There is deliberately no
+equivalent for `/studio` — adding an auth bypass to the product so that a
+screenshot script could work is the wrong trade — so without a session all
+twenty-one `/studio/*` routes redirect to sign-in.
+
+The script **skips** those rather than saving a picture of the sign-in page.
+An earlier version screenshotted first and checked afterwards, which meant it
+filed twenty-one sign-in pages under "the studio dashboard" and counted them
+as captured. That is the one thing this tool exists not to do.
+
+To capture them, hand it your own session:
+
+1. Point `.env.local` at a **local** Postgres, then:
+
+   ```
+   npm run db:deploy
+   npm run db:seed
+   npx tsx prisma/seed-rate-cards.ts
+   npx tsx prisma/seed-applications.ts
+   npm run db:studio-login -- you@example.com northlight-studio --live
+   ```
+
+2. `npm run dev -- --port 3111`, sign in at `http://127.0.0.1:3111/sign-in`
+   (with no email provider the link prints to the server console).
+
+3. Copy the `oi_session` cookie — DevTools → Application → Cookies — and:
+
+   ```
+   SHOT_REUSE=1 SHOT_COOKIE=<the value> npm run shots
+   ```
+
+   `SHOT_REUSE=1` uses the dev server you already have running, so the session
+   stays valid.
+
+Sessions are opaque random tokens and the database stores only a SHA-256 of
+each, so this is your real session passed to a browser you control. Nothing
+about it is weakened, and it expires the way any other session does.
+
 ## If it will not start
 
 `SHOT_VERBOSE=1 npm run shots` passes the dev server's own output through, which

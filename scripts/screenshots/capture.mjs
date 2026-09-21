@@ -245,7 +245,13 @@ async function main() {
 
   try {
     await waitForServer();
-    log('Server is up.\n');
+    log('Server is up.');
+    log(
+      process.env.SHOT_COOKIE
+        ? 'Using the session you passed — the studio pages should render.\n'
+        : 'No SHOT_COOKIE, so /studio/* will redirect to sign-in and be skipped.\n' +
+          'See scripts/screenshots/README.md to capture those too.\n',
+    );
 
     await rm(OUT, { recursive: true, force: true });
     const browser = await chromium.launch();
@@ -256,10 +262,35 @@ async function main() {
       const context = await browser.newContext({
         viewport: { width: vp.width, height: vp.height },
         deviceScaleFactor: 2,
-        // The studio host variant of /sign-in is chosen by the Host header.
-        // Everything else is host-agnostic here because the split is off.
         locale: 'en-IN',
       });
+
+      /**
+       * A session, if you have one.
+       *
+       * `DEV_OPS_NO_AUTH` opens /ops and nothing else — there is deliberately
+       * no equivalent for /studio, and adding one would mean a new auth bypass
+       * in the product so that a screenshot script could work, which is the
+       * wrong trade.
+       *
+       * So the session comes from OUTSIDE: sign in locally in your own
+       * browser, copy the `oi_session` cookie, and pass it here. Sessions are
+       * opaque random tokens whose SHA-256 is what the database stores, so
+       * this is your real session and nothing about it is weakened.
+       *
+       *   SHOT_COOKIE=<value> npm run shots
+       */
+      if (process.env.SHOT_COOKIE) {
+        await context.addCookies([{
+          name: 'oi_session',
+          value: process.env.SHOT_COOKIE,
+          domain: '127.0.0.1',
+          path: '/',
+          httpOnly: true,
+          sameSite: 'Lax',
+        }]);
+      }
+
       const page = await context.newPage();
 
       /* /match, /quotes and /compare rank in the browser from a brief held in
@@ -309,25 +340,37 @@ async function main() {
             }
           }
 
+          /* CHECK BEFORE CAPTURING. This used to screenshot first and test
+             afterwards, which meant every /studio/* route -- all twenty-one of
+             them -- wrote a picture of the sign-in page and was then counted
+             as captured. The whole point of this script is that it does not
+             hand you a sign-in page and let you believe it is the product, and
+             it was doing exactly that. Order matters more than the check. */
+          const wanted = r.path.split('?')[0];
+          const bounced = landed.startsWith('/sign-in') && !wanted.startsWith('/sign-in');
+
+          if (bounced) {
+            problems.push(
+              `${r.flow}/${r.name} [${vp.key}] — redirected to ${landed}, so NOT saved. ` +
+              `Needs: ${r.needs}`,
+            );
+            log(`  ${'skip'.padEnd(4)} ${vp.key.padEnd(7)} ${r.flow}/${r.name} → ${landed}`);
+            continue;
+          }
+
+          if (status >= 400) {
+            problems.push(
+              `${r.flow}/${r.name} [${vp.key}] — HTTP ${status}, so NOT saved. Needs: ${r.needs}`,
+            );
+            log(`  ${status} ${vp.key.padEnd(7)} ${r.flow}/${r.name} (not saved)`);
+            continue;
+          }
+
           await page.screenshot({ path: file, fullPage: true });
           captured.push({ ...r, vp: vp.key, status, landed, file });
         } catch (err) {
           problems.push(`${r.flow}/${r.name} [${vp.key}] — ${String(err).split('\n')[0]}`);
           continue;
-        }
-
-        /* A redirect to sign-in means the bypass did not apply, and a picture
-           of a sign-in page filed under "the studio dashboard" is worse than
-           no picture at all. */
-        const wanted = r.path.split('?')[0];
-        const bounced = landed.startsWith('/sign-in') && !wanted.startsWith('/sign-in');
-        if (bounced) {
-          problems.push(
-            `${r.flow}/${r.name} [${vp.key}] — bounced to ${landed}. ` +
-            `Needs: ${r.needs}`,
-          );
-        } else if (status >= 400) {
-          problems.push(`${r.flow}/${r.name} [${vp.key}] — HTTP ${status}. Needs: ${r.needs}`);
         }
 
         log(`  ${status} ${vp.key.padEnd(7)} ${r.flow}/${r.name}`);
@@ -344,9 +387,19 @@ async function main() {
       log(`\n${problems.length} route(s) did not capture cleanly:\n`);
       for (const p of problems) log(`  · ${p}`);
       log(
-        '\nUsually this is missing data rather than a broken page. Try:\n' +
+        '\nThis is almost always missing DATA rather than a broken page.\n\n' +
+        'The studio surface in particular cannot be captured without a\n' +
+        'database: DEV_OPS_NO_AUTH opens /ops only, and there is no equivalent\n' +
+        'for /studio, so every /studio/* route redirects to sign-in. Those\n' +
+        'pages need a real StudioMember row, which only db:studio-login\n' +
+        'creates. With a local Postgres:\n\n' +
+        '  npm run db:deploy\n' +
         '  npm run db:seed\n' +
-        '  npm run db:studio-login -- you@example.com northlight-studio --live\n',
+        '  npx tsx prisma/seed-rate-cards.ts\n' +
+        '  npx tsx prisma/seed-applications.ts\n' +
+        '  npm run db:studio-login -- you@example.com northlight-studio --live\n\n' +
+        'Then sign in once in a browser at the same port, and re-run with\n' +
+        'SHOT_REUSE=1 so the session cookie survives.\n',
       );
     }
   } finally {
