@@ -336,3 +336,42 @@ describe('the sign-in page offers only what the host can deliver', () => {
     expect(src).toMatch(/const forStaff\s*=\s*\n?\s*staffHost/);
   });
 });
+
+describe('the whole sign-in round trip is reachable on every host', () => {
+  /**
+   * `/set-password` was not on the allow-list, so ops.oneinteriors.in 404'd
+   * it. Redeeming an approval link signed you in, redirected you to choose a
+   * password, and dead-ended on the page meant to finish the job — a real
+   * session, and nothing at the address.
+   *
+   * Second time a path in this round trip has been missed; `/sign-in` was left
+   * out of the cookie pre-filter and redirected to itself. So this asserts the
+   * whole journey rather than the page that happened to break, on every host,
+   * including the ones a studio never sees.
+   */
+  it('covers every step from clicking the link to being signed in', () => {
+    const JOURNEY = ['/sign-in', '/auth/verify', '/set-password', '/sign-in/verify'];
+    for (const host of [STUDIO, OPS, APEX, PREVIEW]) {
+      for (const path of JOURNEY) {
+        expect(route(host, path, SPLIT), `${host} ${path}`).toEqual({ kind: 'next' });
+      }
+    }
+  });
+
+  it('is the same list the cookie pre-filter skips', () => {
+    // Being routable is not enough — the /ops pre-filter runs afterwards, and
+    // a path it acts on will bounce a signed-out visitor to /sign-in even
+    // though route() let it through.
+    for (const path of ['/sign-in', '/auth/verify', '/set-password']) {
+      expect(isAlwaysAllowed(path), path).toBe(true);
+    }
+  });
+
+  it('does not accidentally open anything else', () => {
+    // '/set-password' must not make '/set-password-reset' or '/settings'
+    // reachable. `under` matches the exact path or a '/' boundary.
+    expect(isAlwaysAllowed('/set-password-reset')).toBe(false);
+    expect(isAlwaysAllowed('/settings')).toBe(false);
+    expect(isAlwaysAllowed('/set-password/confirm')).toBe(true);
+  });
+});

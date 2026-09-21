@@ -136,8 +136,32 @@ const CUSTOMER_APP = [
  */
 const PUBLIC_PAGES = ['/studios', '/verification'];
 
-/** Always reachable, on every host. Auth, health, assets, and the webhooks. */
-const ALWAYS = ['/api', '/auth', '/sign-in', '/_next', '/favicon', '/robots.txt', '/sitemap.xml'];
+/**
+ * Always reachable, on every host. Auth, health, assets, and the webhooks.
+ *
+ * ## This list is the whole sign-in round trip, not just the sign-in page
+ *
+ * `/set-password` was missing and the ops host 404'd it — so redeeming an
+ * approval link signed you in, redirected you to choose a password, and hit a
+ * dead end on the page that was supposed to finish the job. The session was
+ * real; there was simply nothing at the address.
+ *
+ * That is the second time a path in this round trip has been left off.
+ * `/sign-in` was missing from the cookie pre-filter and redirected to itself.
+ * The pattern to watch for: anything `/auth/verify` can hand somebody, or that
+ * a signed-out person must reach to become signed in, belongs here — a page
+ * being reachable is not the same as it being ON A HOST.
+ */
+const ALWAYS = [
+  '/api',
+  '/auth',
+  '/sign-in',
+  '/set-password',
+  '/_next',
+  '/favicon',
+  '/robots.txt',
+  '/sitemap.xml',
+];
 
 function under(path: string, prefixes: string[]): boolean {
   return prefixes.some((p) => path === p || path.startsWith(`${p}/`));
