@@ -42,6 +42,13 @@ export function middleware(request: NextRequest) {
        and the URL they typed stays in the bar so they can see what they got
        wrong.
 
+       "The app's own 404 page" is `app/not-found.tsx`, which for a long time
+       did not exist — so this rewrite landed on Next's built-in "404: This
+       page could not be found.", in the framework's font, on white, with no
+       way back. A studio owner who typed `ops.` meaning `studio.` met
+       something that looked like the site was broken. It now lands on a real
+       page in our own language.
+
        The explicit `status` is not decoration. Without it a rewrite serves the
        404 BODY with a 200 STATUS — a soft 404 — which was live on
        studio.oneinteriors.in and looked completely correct in a browser,

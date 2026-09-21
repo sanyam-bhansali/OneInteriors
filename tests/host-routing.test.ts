@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { audienceFor, isAlwaysAllowed, normaliseHost, route, type HostEnv } from '@/lib/host';
 import { siteUrlFor, siteUrlForHost } from '@/lib/site';
@@ -245,6 +245,25 @@ describe('a hidden path answers 404, not 200 with a 404 page', () => {
       rewrite?.[0],
       'rewrite to /404 must pass { status: 404 }, or it serves a 404 page with a 200 status',
     ).toMatch(/status:\s*404/);
+  });
+
+  it('has a not-found page of our own for that rewrite to land on', () => {
+    /**
+     * Without `app/not-found.tsx`, the rewrite above lands on Next's built-in
+     * "404: This page could not be found." — the framework's font, on white,
+     * with no link anywhere. That is what every miss looked like for months.
+     *
+     * Asserted on the file rather than on its contents, because the copy will
+     * change and the point is only that the page exists and is ours. It must
+     * NOT set its own status: Next returns 404 for this file automatically,
+     * and anything that overrides it reintroduces the soft 404 the test above
+     * exists to prevent.
+     */
+    const path = join(__dirname, '..', 'src/app/not-found.tsx');
+    expect(existsSync(path), 'src/app/not-found.tsx should exist').toBe(true);
+
+    const src = readFileSync(path, 'utf8');
+    expect(src, 'the not-found page must not set a status itself').not.toMatch(/status:\s*200/);
   });
 });
 
