@@ -34,6 +34,12 @@
  *   npm run db:unseed -- --delete
  */
 
+// Must be first: it populates DATABASE_URL before PrismaClient reads it.
+// Same import, same reason, as every other script in this directory — see the
+// note in seed.ts about the afternoon it cost. Leaving it out fails at the
+// first query with "Environment variable not found: DATABASE_URL", which reads
+// like a schema problem rather than a missing line.
+import './load-env';
 import { PrismaClient } from '@prisma/client';
 import { STUDIOS } from '../src/data/studios';
 
