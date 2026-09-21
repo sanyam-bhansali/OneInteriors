@@ -107,6 +107,20 @@ export interface Studio {
   portfolioShortfallNote?: string | null;
 
   /**
+   * When ops marked this row as a test record. Null — the normal case — means
+   * it is a real studio.
+   *
+   * Set means it is hidden from the roster, from matching and from every ops
+   * count. Not a status: see the field's note in schema.prisma for why a test
+   * fixture must not be filed as REMOVED.
+   *
+   * Optional for the same fixture reason as the fields above — none of the
+   * invented studios in `src/data/studios.ts` is hidden, and reading it as
+   * `?? null` is correct everywhere.
+   */
+  hiddenAsTestAt?: string | null;
+
+  /**
    * The studio has finished its side and sent the profile for verification.
    *
    * Optional for the same fixture reason as the two fields above. Derived from

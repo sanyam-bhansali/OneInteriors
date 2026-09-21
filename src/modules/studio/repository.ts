@@ -28,6 +28,22 @@ export interface StudioQuery {
   /** Omit to get every status — the ops console needs the suspended ones too. */
   activeOnly?: boolean;
   minTier?: VerificationTier;
+  /**
+   * Include rows ops has marked as test records.
+   *
+   * **Defaults to false, and that default is the whole point.** A hidden test
+   * studio must vanish from the roster, from matching, from `/expert`, and
+   * from every ops count — which is a long list of call sites to remember, and
+   * exactly the kind of list that gets one entry added to it next month and
+   * forgotten.
+   *
+   * So the filter lives here and is on unless something asks for it off. A new
+   * page written a year from now inherits the right behaviour by doing
+   * nothing, and the one screen that genuinely needs the hidden rows — the
+   * ops console's own list of them, which is how you unhide — has to say so
+   * out loud.
+   */
+  includeHidden?: boolean;
 }
 
 export interface StudioRepository {
@@ -46,6 +62,7 @@ const TIER_ORDER: Record<VerificationTier, number> = {
 };
 
 function matches(studio: Studio, q: StudioQuery): boolean {
+  if (!q.includeHidden && studio.hiddenAsTestAt) return false;
   if (q.city && studio.city !== q.city) return false;
   if (q.locality && !studio.localities.includes(q.locality)) return false;
   if (q.activeOnly && studio.status !== 'ACTIVE') return false;
@@ -80,8 +97,17 @@ export class FixtureStudioRepository implements StudioRepository {
     return this.studios.find((s) => s.id === id) ?? null;
   }
 
+  /**
+   * Note this filters and `bySlug`/`byId` do not.
+   *
+   * `allSlugs` feeds `generateStaticParams`, so a hidden studio must not get a
+   * prerendered page built for it. The single-row lookups stay unfiltered
+   * because `/ops/[slug]` is how you get the row back, and a page you cannot
+   * open is a hiding mechanism with no undo. The public profile does its own
+   * check — see the `notFound()` gate in `app/studios/[slug]/page.tsx`.
+   */
   async allSlugs(): Promise<string[]> {
-    return this.studios.map((s) => s.slug);
+    return this.studios.filter((s) => !s.hiddenAsTestAt).map((s) => s.slug);
   }
 }
 

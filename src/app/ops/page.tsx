@@ -54,6 +54,7 @@ export const dynamic = 'force-dynamic';
 export default async function OpsOverview() {
   const [
     studios,
+    withHidden,
     capacity,
     funnel,
     pendingApplications,
@@ -63,6 +64,11 @@ export default async function OpsOverview() {
     introductionsWaiting,
   ] = await Promise.all([
     studioRepository.list(),
+    // The ONE read in the app that asks for hidden rows, because this is where
+    // you get one back. Everything else — the roster, matching, /expert, every
+    // count above — inherits the exclusion from the repository by saying
+    // nothing, which is the point of the default.
+    studioRepository.list({ includeHidden: true }),
     rosterCapacity(),
     funnelSummary(30),
     countApplications(),
@@ -73,6 +79,10 @@ export default async function OpsOverview() {
   ]);
 
   const assessed = studios.map((s) => ({ studio: s, assessment: assessTier(s) }));
+
+  // Derived from the one list that includes them, so it cannot disagree with
+  // what `studios` excluded.
+  const hidden = withHidden.filter((s) => s.hiddenAsTestAt);
 
   const needsWork = assessed.filter((a) => a.assessment.blockers.length > 0).length;
   const expired = assessed.filter((a) => a.assessment.expired.length > 0).length;
@@ -213,7 +223,42 @@ export default async function OpsOverview() {
             ) : null}
           </section>
 
-          <p className="m-0 max-w-[64ch] text-[13.5px] leading-relaxed text-[var(--color-ink-3)]">
+          {/* The undo. Hiding a row removes it from every other surface, so if
+              it were not listed here it could not be got back — which would
+              make "hidden" a euphemism for deleted. Deliberately plain and at
+              the bottom: it is housekeeping, not a queue. */}
+          {hidden.length > 0 ? (
+            <section className="mt-10 border-t border-[var(--color-rule)] pt-6">
+              <p className="label m-0 mb-1">Hidden test records ({hidden.length})</p>
+              <p className="m-0 mb-4 max-w-[60ch] text-[13.5px] leading-relaxed text-[var(--color-ink-2)]">
+                Not on the roster, not matchable, and in none of the numbers above. Open one to
+                put it back.
+              </p>
+              <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+                {hidden.map((s) => (
+                  <li key={s.id}>
+                    <Link
+                      href={`/ops/${s.slug}`}
+                      className="text-[14px] text-[var(--color-ink)] underline decoration-[var(--color-rule)] underline-offset-4 hover:decoration-[var(--color-petrol)]"
+                    >
+                      {s.tradeName}
+                    </Link>{' '}
+                    <span className="text-[12.5px] text-[var(--color-ink-2)]">
+                      · hidden{' '}
+                      {s.hiddenAsTestAt
+                        ? new Date(s.hiddenAsTestAt).toLocaleDateString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                          })
+                        : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          <p className="m-0 mt-8 max-w-[64ch] text-[13.5px] leading-relaxed text-[var(--color-ink-3)]">
             Every figure here is computed from our own tables. No third-party analytics script runs
             on the site, and nothing that resembles a name, email or phone number is written to an
             event row.

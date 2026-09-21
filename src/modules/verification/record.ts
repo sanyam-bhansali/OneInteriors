@@ -205,6 +205,85 @@ export async function setStudioStatus(
   }
 }
 
+/**
+ * Mark a studio row as a test record, or put it back.
+ *
+ * ## Why this is not a status
+ *
+ * Every `StudioStatus` is a statement about a real studio, and two of them —
+ * SUSPENDED and REMOVED — carry an appeal that `/verification` promises will
+ * be decided by someone who did not make the original call. Filing something
+ * you created while testing under REMOVED puts a fiction into the column that
+ * appeal reads. Do it twice and "removed" stops meaning anything.
+ *
+ * So hiding is a separate axis: not a judgement about a studio, a statement
+ * that there is no studio.
+ *
+ * ## Why no reason is demanded
+ *
+ * `setStudioStatus` requires ten characters because a studio can appeal it.
+ * Nobody appeals this — there is nobody to appeal. Demanding an explanation
+ * for tidying up your own test data is ceremony that teaches people to type
+ * "test" ten times, and a required field answered meaninglessly is worse than
+ * no field.
+ *
+ * It is still audited, because an ops account making a studio disappear from
+ * the roster is exactly the action a log exists for. If this is ever used on
+ * something real, the audit trail is what finds it.
+ *
+ * ## Why it is reversible
+ *
+ * Deleting is not, and "I was sure it was a test" is a thing people are sure
+ * of right up until they are wrong. `unhide` is one click away and the row is
+ * untouched in the meantime.
+ */
+export async function setHiddenAsTest(
+  studioId: string,
+  hidden: boolean,
+): Promise<RecordResult> {
+  const actor = await requireRole('OPS');
+
+  try {
+    const refusal = await prisma.$transaction(async (tx) => {
+      const before = await tx.studio.findUniqueOrThrow({
+        where: { id: studioId },
+        select: { hiddenAsTestAt: true, tradeName: true, status: true },
+      });
+
+      // A live studio being hidden is the one case worth refusing. ACTIVE
+      // means it has passed verification and can be matched to a customer,
+      // which a test record cannot have done — so this is far likelier to be a
+      // mis-click on the wrong row than a genuine intent, and the cost of
+      // being wrong is a real studio silently vanishing from the roster.
+      if (hidden && before.status === 'ACTIVE') {
+        return 'This studio is ACTIVE — it has been verified and can be matched to a customer, so it is not a test record. Change its status first if you really mean this.';
+      }
+
+      const hiddenAsTestAt = hidden ? new Date() : null;
+      await tx.studio.update({ where: { id: studioId }, data: { hiddenAsTestAt } });
+
+      await writeAudit(
+        tx,
+        actor,
+        hidden ? 'studio.hidden_as_test' : 'studio.unhidden',
+        'Studio',
+        studioId,
+        { hiddenAsTestAt: before.hiddenAsTestAt?.toISOString() ?? null },
+        { hiddenAsTestAt: hiddenAsTestAt?.toISOString() ?? null, tradeName: before.tradeName },
+      );
+
+      return null;
+    });
+
+    return refusal ? { ok: false, error: refusal } : { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : 'Could not change this.',
+    };
+  }
+}
+
 // ── GSTIN ──────────────────────────────────────────────────────
 
 /**

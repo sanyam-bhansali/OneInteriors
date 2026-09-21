@@ -123,6 +123,15 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
      PAUSED is wrongly caught by this and should not be — see FINDINGS P2.1. */
   if (studio.status !== 'ACTIVE' && !showUnverifiedStudios()) notFound();
 
+  /* A test record has no public page at all, and unlike the status gate this
+     one has NO development bypass. `showUnverifiedStudios()` exists to show
+     unverified studios while the whole roster is admitted placeholders; a row
+     hidden as a test is not an unverified studio, it is not a studio, and
+     there is no mode in which it should render. `bySlug` stays unfiltered so
+     ops can still open the row and put it back — this is where the public side
+     says no. */
+  if (studio.hiddenAsTestAt) notFound();
+
   /**
    * The second stage of the studio's own funnel: someone saw them in results
    * and opened the profile.

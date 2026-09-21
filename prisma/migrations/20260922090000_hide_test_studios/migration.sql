@@ -1,0 +1,22 @@
+-- Let ops hide a studio row that was only ever a test.
+--
+-- The table is "studios", not "Studio" -- every model in this schema carries an
+-- @@map to snake_case, while columns are NOT mapped and stay camelCase. See
+-- tests/migration-names.test.ts, which checks this mechanically.
+--
+-- Nullable with no default, so every existing row reads as "not hidden" and
+-- nothing changes the moment this runs.
+--
+-- Deliberately NOT a StudioStatus value. Every status is a statement about a
+-- real studio -- ONBOARDING, SUSPENDED, REMOVED all carry consequences and an
+-- appeal path -- and filing a test fixture under REMOVED would put a fiction in
+-- the column the appeals process reads. This is a separate axis: not a
+-- judgement about a studio, a statement that there is no studio.
+--
+-- No RLS work needed: studios already carries policies from the lockdown
+-- migration and they apply to new columns unchanged.
+-- No index. Prisma cannot express a partial index in schema.prisma, so adding
+-- one here would show up as drift on every subsequent `migrate diff`, and a
+-- full index on a nullable column of a table holding tens of rows buys nothing.
+ALTER TABLE "studios"
+  ADD COLUMN "hiddenAsTestAt" TIMESTAMP(3);

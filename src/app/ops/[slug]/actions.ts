@@ -5,6 +5,7 @@ import {
   recordCheck,
   setGstin,
   setStudioStatus,
+  setHiddenAsTest,
   type RecordResult,
 } from '@/modules/verification/record';
 import type { CheckResult, CheckType, StudioStatus } from '@/modules/studio/types';
@@ -58,6 +59,36 @@ export async function setStatusAction(
     revalidatePath(`/studios/${slug}`);
     revalidatePath('/studios');
     revalidatePath('/');
+  }
+  return result;
+}
+
+/**
+ * Hide a test row, or put it back.
+ *
+ * Revalidates the same paths as a status change and for the same reason: the
+ * roster, the home page and the studio's own profile all read a list this row
+ * has just left or rejoined, and a cached page showing a hidden studio is the
+ * exact failure this feature exists to prevent.
+ */
+export async function setHiddenAsTestAction(
+  _prev: RecordResult | null,
+  formData: FormData,
+): Promise<RecordResult> {
+  const slug = String(formData.get('slug') ?? '');
+  const result = await setHiddenAsTest(
+    String(formData.get('studioId') ?? ''),
+    formData.get('hidden') === '1',
+  );
+
+  if (result.ok) {
+    revalidatePath('/ops');
+    revalidatePath('/studios');
+    revalidatePath('/');
+    if (slug) {
+      revalidatePath(`/ops/${slug}`);
+      revalidatePath(`/studios/${slug}`);
+    }
   }
   return result;
 }

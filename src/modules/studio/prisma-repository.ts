@@ -94,6 +94,7 @@ function toStudio(row: StudioRow): Studio {
     gstinNotApplicable: row.gstinNotApplicable ?? false,
     gstinNote: row.gstinNote ?? null,
     portfolioShortfallNote: row.portfolioShortfallNote ?? null,
+    hiddenAsTestAt: row.hiddenAsTestAt ? row.hiddenAsTestAt.toISOString() : null,
     // Read out of the JSON column the studio surface writes, rather than
     // duplicated into a second source of the same fact. Ops needs it because
     // "this studio has finished and is waiting on us" is the single most
@@ -163,6 +164,21 @@ export class PrismaStudioRepository implements StudioRepository {
      */
     if (query.activeOnly && !showUnverifiedStudios()) {
       where.status = 'ACTIVE';
+    }
+
+    /**
+     * Test records, hidden unless asked for — and asked for in exactly one
+     * place, the ops console's list of hidden rows.
+     *
+     * Same argument as the gate above, which is why it sits beside it: this is
+     * the one query every roster read passes through, so "does not appear
+     * anywhere" is enforced once instead of being remembered at each call
+     * site. `showUnverifiedStudios()` does NOT bypass it — that flag exists to
+     * show unverified *studios* during development, and a test fixture is not
+     * an unverified studio, it is not a studio.
+     */
+    if (!query.includeHidden) {
+      where.hiddenAsTestAt = null;
     }
 
     let rows;
@@ -240,7 +256,12 @@ export class PrismaStudioRepository implements StudioRepository {
    */
   async allSlugs(): Promise<string[]> {
     try {
-      const rows = await prisma.studio.findMany({ select: { slug: true } });
+      // Hidden test records get no prerendered page. `bySlug` stays unfiltered
+      // so ops can still open one and put it back.
+      const rows = await prisma.studio.findMany({
+        where: { hiddenAsTestAt: null },
+        select: { slug: true },
+      });
       return rows.map((r) => r.slug);
     } catch (error) {
       console.error(

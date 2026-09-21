@@ -462,6 +462,26 @@ model Studio {
   /// tells ops whether the ball is in our court or theirs.
   onboardingSteps Json?
 
+  /// This row is a test record, not a business. Set = hidden everywhere.
+  ///
+  /// Distinct from `status`, deliberately. Every StudioStatus is a statement
+  /// about a real studio: ONBOARDING is one that is filling its profile in,
+  /// SUSPENDED is one under investigation, REMOVED is one we threw off for
+  /// misrepresentation or a pattern of upheld disputes. Using REMOVED to tidy
+  /// away something you made while testing puts a fiction in the same column
+  /// the appeals process reads, and the words stop meaning anything.
+  ///
+  /// So this is a separate axis: not a judgement about a studio, a statement
+  /// that there is no studio. It hides the row from the roster, from matching
+  /// and from every ops count, while leaving it intact and reversible — which
+  /// deletion is not, and which matters when the thing you hid turns out to
+  /// have been real after all.
+  ///
+  /// A timestamp rather than a boolean, for the same reason
+  /// `portfolioShortfallNote` has no companion flag: one field cannot disagree
+  /// with itself, and knowing WHEN something was hidden is free.
+  hiddenAsTestAt DateTime?
+
   // Commercial
   minProjectPaise BigInt?
   maxProjectPaise BigInt?

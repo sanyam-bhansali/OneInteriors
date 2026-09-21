@@ -11,6 +11,7 @@ import { OpsHeader, TierProgress } from '../ui';
 import { CheckRow } from './CheckRow';
 import { StatusControl } from './StatusControl';
 import { GstinControl } from './GstinControl';
+import { HideControl } from './HideControl';
 import { studioAuditTrail } from '@/modules/verification/record';
 
 export const metadata: Metadata = {
@@ -212,6 +213,18 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
 
                 <Divider className="my-4" />
                 <StatusControl studioId={studio.id} slug={studio.slug} status={studio.status} />
+
+                {/* A separate axis from status, and separated on screen to
+                    match. Status says something about a studio; this says
+                    there is no studio. */}
+                <div className="mt-4">
+                  <HideControl
+                    studioId={studio.id}
+                    slug={studio.slug}
+                    hiddenAt={studio.hiddenAsTestAt ?? null}
+                    tradeName={studio.tradeName}
+                  />
+                </div>
               </div>
 
               {/* Who changed what, when. The appeal the /verification page
