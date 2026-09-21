@@ -13,7 +13,7 @@
  */
 
 import type { Brief, PriorityFactor } from '@/modules/brief/types';
-import { STYLE_LABELS } from '@/modules/brief/types';
+import { STYLE_LABELS, zoneOf } from '@/modules/brief/types';
 import type { Studio } from '@/modules/studio/types';
 import { MIN_PROJECTS_FOR_RELIABILITY } from '@/modules/studio/types';
 
@@ -142,8 +142,32 @@ export function passesHardFilters(
     if (studio.minProjectPaise > brief.budgetMaxPaise * 2) return false;
   }
 
+  /**
+   * Locality, by ZONE rather than by exact match.
+   *
+   * This used to require the studio to have ticked the customer's exact
+   * locality, which was reasonable while the list had twelve entries: a studio
+   * ticking six covered half of Pune, so overlap was the normal case.
+   *
+   * The list is now sixty-four, because studios and customers both wanted
+   * their actual neighbourhood rather than the nearest famous one. At that
+   * size an exact-match filter is a trap — ticking six covers a tenth of the
+   * city, and a customer in Pashan would be told nobody matches while three
+   * studios who work in Baner, ten minutes away, sat excluded.
+   *
+   * So the hard filter asks the honest question — does this studio work in
+   * this part of Pune — and the exact locality stays where it belongs, as a
+   * scoring bonus further down: "they have finished four homes in Kharadi" is
+   * worth saying, and is not worth excluding everyone else over.
+   *
+   * A studio whose ticked localities are all unknown to us (an older row, a
+   * slug since retired) yields no zones, and we fail OPEN rather than hiding
+   * them — the same reasoning as the `pausedAt` note above.
+   */
   if (brief.locality && studio.localities.length > 0) {
-    if (!studio.localities.includes(brief.locality)) return false;
+    const wanted = zoneOf(brief.locality);
+    const served = new Set(studio.localities.map(zoneOf).filter(Boolean));
+    if (wanted && served.size > 0 && !served.has(wanted)) return false;
   }
 
   return true;

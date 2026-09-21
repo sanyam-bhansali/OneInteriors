@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import { PUNE_LOCALITIES } from '@/modules/brief/types';
+import { LOCALITIES_BY_ZONE } from '@/modules/brief/types';
 import { saveProfileAction, type StepState } from './actions';
 import { Field, Chips, SaveBar } from './fields';
 
@@ -53,7 +53,9 @@ export function ProfileForm({ defaults }: { defaults: ProfileDefaults }) {
         label="Areas you take projects in"
         name="localities"
         hint="Only where you genuinely work. We match on this, so an area you added optimistically becomes a drive you did not want."
-        options={PUNE_LOCALITIES.map((l) => ({ value: l.slug, label: l.label }))}
+        options={LOCALITIES_BY_ZONE.flatMap((g) =>
+          g.localities.map((l) => ({ value: l.slug, label: l.label })),
+        )}
         selected={defaults.localities}
         error={err.localities}
       />

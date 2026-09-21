@@ -29,6 +29,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { BY_FLOW, ROUTES } from './routes.mjs';
+import { installBrief, NEEDS_BRIEF } from './seed-brief.mjs';
 
 /**
  * Playwright is loaded at run time, not imported at the top.
@@ -261,6 +262,12 @@ async function main() {
       });
       const page = await context.newPage();
 
+      /* /match, /quotes and /compare rank in the browser from a brief held in
+         sessionStorage. Without one they render the "tell us about your flat
+         first" gate — at HTTP 200, which is why this script used to file it as
+         a success. Fixture studios are enough; no database is involved. */
+      await installBrief(page);
+
       for (const r of ROUTES) {
         const dir = join(OUT, r.flow, vp.key);
         await mkdir(dir, { recursive: true });
@@ -286,6 +293,21 @@ async function main() {
             window.scrollTo(0, 0);
           });
           await page.waitForTimeout(600);
+
+          /* An empty state at 200 is the failure this script was blind to.
+             Check before writing the file, not after. */
+          if (NEEDS_BRIEF.has(r.path)) {
+            const gated = await page.evaluate(() =>
+              /Tell us about your flat first|Start the brief/i.test(document.body.innerText),
+            );
+            if (gated) {
+              problems.push(
+                `${r.flow}/${r.name} [${vp.key}] — rendered the empty-brief gate at HTTP ${status}. ` +
+                'Needs: the demo brief in sessionStorage (scripts/screenshots/seed-brief.mjs).',
+              );
+              continue;
+            }
+          }
 
           await page.screenshot({ path: file, fullPage: true });
           captured.push({ ...r, vp: vp.key, status, landed, file });

@@ -10,7 +10,7 @@ import {
   FIELD_WIDTH,
   type FieldWidth,
 } from '@/components/ui/form';
-import { PUNE_LOCALITIES } from '@/modules/brief/types';
+import { LOCALITIES_BY_ZONE } from '@/modules/brief/types';
 import { submitApplicationAction, type ApplyState } from './actions';
 
 const INITIAL: ApplyState = { status: 'idle' };
@@ -104,22 +104,34 @@ export function ApplyForm() {
 
       <FormSection
         title="Where you work"
-        hint="Only the areas you genuinely take projects in — we match on this, so a long list costs you rather than helps."
+        hint="The areas you genuinely take projects in. We match customers to studios working in the same part of Pune, so ticking your zone properly matters more than ticking everything."
       >
         {err.localities ? (
           <p role="alert" className="m-0 text-[13.5px] text-[var(--color-atrisk)]">
             {err.localities}
           </p>
         ) : null}
-        <div className="flex flex-wrap gap-2">
-          {PUNE_LOCALITIES.map((l) => (
-            <label
-              key={l.slug}
-              className="cursor-pointer rounded-full border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 py-2 text-[14.5px] text-[var(--color-ink-2)] has-[:checked]:border-[var(--color-petrol)] has-[:checked]:bg-[var(--color-petrol-soft)] has-[:checked]:text-[var(--color-ink)] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--color-petrol)]"
-            >
-              <input type="checkbox" name="localities" value={l.slug} className="sr-only" />
-              {l.label}
-            </label>
+        {/* Grouped by zone, because sixty-four pills in one wrap is a wall
+            rather than a choice — nobody reads to the end of it, and the ones
+            at the bottom never get ticked. The zone headings also tell a
+            studio how matching actually works: we show you to customers in
+            your part of Pune, so ticking the zone you work in is enough. */}
+        <div className="flex flex-col gap-5">
+          {LOCALITIES_BY_ZONE.map((group) => (
+            <fieldset key={group.zone} className="m-0 border-0 p-0">
+              <legend className="label m-0 mb-2.5 p-0">{group.label}</legend>
+              <div className="flex flex-wrap gap-2">
+                {group.localities.map((l) => (
+                  <label
+                    key={l.slug}
+                    className="cursor-pointer rounded-full border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 py-2 text-[14.5px] text-[var(--color-ink-2)] has-[:checked]:border-[var(--color-petrol)] has-[:checked]:bg-[var(--color-petrol-soft)] has-[:checked]:text-[var(--color-ink)] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--color-petrol)]"
+                  >
+                    <input type="checkbox" name="localities" value={l.slug} className="sr-only" />
+                    {l.label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
           ))}
         </div>
       </FormSection>

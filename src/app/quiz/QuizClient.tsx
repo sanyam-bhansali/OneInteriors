@@ -28,7 +28,8 @@ import {
   INVOLVEMENT_LABELS,
   PRIORITY_LABELS,
   PROPERTY_LABELS,
-  PUNE_LOCALITIES,
+  LOCALITIES_BY_ZONE,
+  localityLabel,
   SCOPE_LABELS,
   STYLE_LABELS,
   STYLE_TAGS,
@@ -467,7 +468,7 @@ function stepContent(
             <div>
               <FieldLabel>Locality</FieldLabel>
               <div className="flex flex-wrap gap-2">
-                {PUNE_LOCALITIES.map((l) => (
+                {LOCALITIES_BY_ZONE.flatMap((g) => g.localities).map((l) => (
                   <Chip
                     key={l.slug}
                     selected={brief.locality === l.slug}
@@ -885,7 +886,7 @@ function LiveProfile({
   const rows: Array<[string, string]> = [];
 
   if (brief.propertyType) {
-    const loc = PUNE_LOCALITIES.find((l) => l.slug === brief.locality)?.label;
+    const loc = localityLabel(brief.locality);
     rows.push(['Home', `${PROPERTY_LABELS[brief.propertyType]}${loc ? ` · ${loc}` : ''}`]);
   }
   if (brief.scope) rows.push(['Scope', SCOPE_LABELS[brief.scope]]);
