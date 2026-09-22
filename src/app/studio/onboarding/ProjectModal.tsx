@@ -95,12 +95,39 @@ export function ProjectModal({
   const [state, action, pending] = useActionState(addProjectAction, INITIAL);
   const [stage, setStage] = useState(0);
   const [images, setImages] = useState<string[]>([]);
+
+  /**
+   * The three things `addProject` refuses on, held here so the button can
+   * say what is short BEFORE it is pressed.
+   *
+   * This modal was reported as "not working": the studio filled it in,
+   * pressed Add, and nothing visible happened. Every one of its rejections
+   * is for something that was never asked for on screen — no style picked,
+   * neither permission box ticked — so the honest fix is not a better error
+   * message after the fact, it is not letting somebody reach the end
+   * believing they are finished. Same arrangement as step one.
+   */
+  const [title, setTitle] = useState('');
+  const [styles, setStyles] = useState<string[]>([]);
+  const [consented, setConsented] = useState(false);
+  const [isRender, setIsRender] = useState(false);
   const dialog = useRef<HTMLDivElement>(null);
   const firstField = useRef<HTMLInputElement>(null);
 
   const err = state.errors ?? {};
   /* `form` already renders on its own above. */
   const fieldErrors = Object.entries(err).filter(([k]) => k !== 'form');
+
+  /* One entry per thing, never per stage — the lesson from the profile step,
+     where "years and team size" as one line made a working select look
+     broken. Each leaves the list the moment it is satisfied. */
+  const missing = [
+    title.trim().length < 3 ? { what: 'a project name', stage: 0 } : null,
+    styles.length === 0 ? { what: 'at least one style', stage: 3 } : null,
+    !consented && !isRender
+      ? { what: 'the client\u2019s permission, or a render mark', stage: 3 }
+      : null,
+  ].filter((m): m is { what: string; stage: number } => m !== null);
 
   /* A successful add closes the modal and resets it, so the next "Add
      project" opens on an empty stage one rather than on the last one filled
@@ -109,6 +136,10 @@ export function ProjectModal({
     if (state.status !== 'saved') return;
     setStage(0);
     setImages([]);
+    setTitle('');
+    setStyles([]);
+    setConsented(false);
+    setIsRender(false);
     onClose();
   }, [state, onClose]);
 
@@ -199,6 +230,8 @@ export function ProjectModal({
                 ref={firstField}
                 label="Project name"
                 name="title"
+                value={title}
+                onChange={setTitle}
                 placeholder="The Kharadi 3 BHK"
                 error={err.title}
                 required
@@ -266,7 +299,20 @@ export function ProjectModal({
                       key={value}
                       className="oi-chip inline-flex cursor-pointer items-center rounded-full border border-[var(--color-rule)] px-4 py-2 text-[14px] text-[var(--color-ink-2)] has-[:checked]:border-transparent has-[:checked]:bg-[var(--color-petrol)] has-[:checked]:text-white"
                     >
-                      <input type="checkbox" name="styleTags" value={value} className="sr-only" />
+                      <input
+                        type="checkbox"
+                        name="styleTags"
+                        value={value}
+                        checked={styles.includes(value)}
+                        onChange={() =>
+                          setStyles((prev) =>
+                            prev.includes(value)
+                              ? prev.filter((v) => v !== value)
+                              : [...prev, value],
+                          )
+                        }
+                        className="sr-only"
+                      />
                       {label}
                     </label>
                   ))}
@@ -289,11 +335,15 @@ export function ProjectModal({
                 </p>
                 <Check
                   name="clientConsented"
+                  checked={consented}
+                  onChange={setConsented}
                   label="The client is happy for this to be shown"
                   hint="We may call them. Nothing here is published before you approve your own profile."
                 />
                 <Check
                   name="isRender"
+                  checked={isRender}
+                  onChange={setIsRender}
                   label="These are renders, not photographs"
                   /* The rule, stated as a rule. It is enforced in
                      `addProject` and it is the one thing on this screen we
@@ -361,13 +411,40 @@ export function ProjectModal({
               )}
 
               {last ? (
-                <button
-                  type="submit"
-                  disabled={pending}
-                  className="oi-save inline-flex items-center gap-2 rounded-[11px] bg-[var(--color-petrol)] px-6 py-2.5 text-[14.5px] font-medium text-[var(--color-paper)] disabled:opacity-50"
-                >
-                  {pending ? 'Adding…' : 'Add this project'}
-                </button>
+                /* The list is the control, the same rule the step footer
+                   follows. A button that looks alive, is pressed, and does
+                   nothing is what this modal was reported as — and the cause
+                   was never the button, it was three requirements that were
+                   only stated by refusing. */
+                <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
+                  {missing.length > 0 ? (
+                    <p className="m-0 max-w-[30ch] text-right text-[13px] leading-relaxed text-[var(--color-ink-2)]">
+                      Still needed:{' '}
+                      {missing.map((m, i) => (
+                        <span key={m.what}>
+                          {i > 0 ? ', ' : ''}
+                          {/* Each one is a way back to where it is fixed, so
+                              a requirement on a stage behind you is one click
+                              rather than a hunt. */}
+                          <button
+                            type="button"
+                            onClick={() => setStage(m.stage)}
+                            className="underline underline-offset-2 hover:text-[var(--color-ink)]"
+                          >
+                            {m.what}
+                          </button>
+                        </span>
+                      ))}
+                    </p>
+                  ) : null}
+                  <button
+                    type="submit"
+                    disabled={pending || missing.length > 0}
+                    className="oi-save inline-flex items-center gap-2 rounded-[11px] bg-[var(--color-petrol)] px-6 py-2.5 text-[14.5px] font-medium text-[var(--color-paper)] disabled:cursor-not-allowed disabled:bg-[var(--color-ink-3)] disabled:opacity-60"
+                  >
+                    {pending ? 'Adding…' : 'Add this project'}
+                  </button>
+                </div>
               ) : (
                 /* `type="button"`. As a submit it would be the form's first
                    submit control, so Enter in the title field would post an
@@ -635,6 +712,8 @@ const Text = function Text({
   ref,
   label,
   name,
+  value,
+  onChange,
   type = 'text',
   placeholder,
   hint,
@@ -646,6 +725,9 @@ const Text = function Text({
   ref?: React.Ref<HTMLInputElement>;
   label: string;
   name: string;
+  /** Controlled only where something watches the value. */
+  value?: string;
+  onChange?: (v: string) => void;
   type?: string;
   placeholder?: string;
   hint?: string;
@@ -667,6 +749,7 @@ const Text = function Text({
           name={name}
           type={type}
           step={step}
+          {...(onChange ? { value: value ?? '', onChange: (e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value) } : {})}
           placeholder={placeholder}
           aria-invalid={Boolean(error)}
           className={`oi-input w-full rounded-[11px] border border-[var(--color-rule)] px-4 py-2.5 text-[14.5px] ${
@@ -727,12 +810,26 @@ function Select({
   );
 }
 
-function Check({ name, label, hint }: { name: string; label: string; hint: string }) {
+function Check({
+  name,
+  label,
+  hint,
+  checked,
+  onChange,
+}: {
+  name: string;
+  label: string;
+  hint: string;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+}) {
   return (
     <label className="flex cursor-pointer items-start gap-3">
       <input
         type="checkbox"
         name={name}
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
         className="mt-0.5 h-[17px] w-[17px] flex-none accent-[var(--color-petrol)]"
       />
       <span className="min-w-0">

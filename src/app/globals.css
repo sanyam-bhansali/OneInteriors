@@ -2450,3 +2450,18 @@ p {
     transition: none;
   }
 }
+
+/* The `hidden` attribute must beat a display utility.
+ *
+ * The onboarding stages and the application steps both stay mounted and
+ * hide with `hidden`, and several of them also carry `flex` for their
+ * layout. An author-level `display:flex` outranks the user agent's
+ * `[hidden] { display: none }`, so a stage would remain on screen while
+ * the code believed it was hidden — every field visible at once, and the
+ * form apparently duplicated.
+ *
+ * `until-found` is excluded so find-in-page can still reveal content that
+ * opts into it. */
+[hidden]:not([hidden='until-found']) {
+  display: none !important;
+}
