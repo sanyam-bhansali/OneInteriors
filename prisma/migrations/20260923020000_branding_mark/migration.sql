@@ -1,0 +1,24 @@
+-- The studio's wish about our attribution mark, kept separately from their
+-- right to have it honoured.
+--
+-- ## Why a wish and not a setting
+--
+-- Whether the mark appears is two facts: what the studio asked for, and what
+-- their subscription allows. Collapsing them into one boolean means something
+-- has to rewrite this column every time a tier changes -- and the thing that
+-- remembers to do that is the thing that will one day forget, leaving a
+-- downgraded studio still white-labelled or an upgraded one still marked.
+--
+-- So this stores only the wish. `showsOurMark()` in modules/studio-quote/
+-- mark.ts combines it with the tier at render time, which means a downgrade
+-- restores the mark on its own and a later upgrade restores their choice,
+-- with nothing scheduled and nothing to reconcile.
+ALTER TABLE "studio_branding" ADD COLUMN "hideOurMark" BOOLEAN NOT NULL DEFAULT false;
+
+-- No RLS block: studio_branding was created by the initial migration and is
+-- already covered by the lockdown sweep. Adding a column does not change
+-- that, and tests/security-invariants.test.ts only requires the pairing on
+-- migrations that make a new table.
+--
+-- That test greps raw SQL without stripping comments, so the phrase it looks
+-- for must not appear in prose here either.

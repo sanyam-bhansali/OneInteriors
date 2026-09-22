@@ -6,6 +6,9 @@ import { myBranding } from '@/modules/studio-quote/store';
 import { UNIT_LABELS, formatQty, WORK_CODE_LABELS } from '@/modules/studio-quote/pricing';
 import { ROOM_CATEGORIES } from '@/modules/studio-quote/starter-catalogue';
 import { PrintButton } from './PrintButton';
+import { myTier } from '@/modules/studio-quote/store';
+import { signedLogoUrl } from '@/modules/storage/studio-logo';
+import { showsOurMark, MARK_TEXT } from '@/modules/studio-quote/mark';
 
 export const metadata: Metadata = {
   title: 'Quotation',
@@ -30,6 +33,25 @@ export const dynamic = 'force-dynamic';
  * in", and it is why the copy fields in Settings start empty rather than with a
  * template.
  *
+ * ## The one qualification, added deliberately
+ *
+ * A single attribution line now sits in the footer: "Prepared with One
+ * Interiors". It does not breach the rule above, because that rule is about
+ * our WORDS and our TERMS — the things that commit a studio to a promise. An
+ * attribution commits them to nothing; it is a software credit, the same
+ * shape as the line at the foot of a form built with Typeform.
+ *
+ * Three constraints keep it on the right side of the line, and they are
+ * enforced by where it is rendered rather than by anybody remembering:
+ * beneath their GSTIN and never in the header, never inside the terms block,
+ * and never at the weight of their own name. A client must come away knowing
+ * which software was used and must NOT come away wondering whether we are a
+ * party to their contract — on an Indian quotation, two business names near a
+ * GSTIN invites exactly that question.
+ *
+ * Studios on Premium can remove it. See `modules/studio-quote/mark.ts` for
+ * why the wish and the entitlement are stored separately.
+ *
  * ## Why print rather than a generated PDF
  *
  * The browser's own print-to-PDF, styled with `@media print`. A server-side
@@ -43,9 +65,30 @@ export const dynamic = 'force-dynamic';
  */
 export default async function PrintPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [quote, branding] = await Promise.all([getQuote(id), myBranding()]);
+  const [quote, branding, tier] = await Promise.all([getQuote(id), myBranding(), myTier()]);
 
   if (!quote) notFound();
+
+  /* Signed at render, valid five minutes — long enough for the browser to
+     fetch it into the page and for print-to-PDF to embed it. */
+  const logoUrl = await signedLogoUrl(branding?.logoPath ?? null);
+  const showMark = showsOurMark({ tier, hideRequested: branding?.hideOurMark ?? false });
+  /**
+   * Their colour, theirs alone — and checked before it reaches a style block.
+   *
+   * `accentHex` is studio-supplied text and this interpolates it into
+   * `<style>`, where React does NOT escape: it is raw CSS, not a text node.
+   * A value like `red; } body { display:none } .x {` would close the rule and
+   * write arbitrary CSS into a document going to their client.
+   *
+   * So it is matched against a hex colour and anything else falls back. A
+   * validator at the settings form would not be enough — this page must be
+   * safe against whatever is already in the column, including rows written
+   * before that validator existed.
+   */
+  const accent = /^#[0-9a-fA-F]{6}$/.test(branding?.accentHex?.trim() ?? '')
+    ? branding!.accentHex.trim()
+    : '#1F5C4D';
 
   const totals = totalsFor(quote);
   const rooms = ROOM_CATEGORIES.map((room) => ({
@@ -69,6 +112,10 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
         {/* ── Letterhead ── */}
         <header className="head">
           <div>
+            {logoUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={logoUrl} alt="" className="logo" />
+            ) : null}
             <h1>{branding?.legalName ?? 'Your studio'}</h1>
             <p className="muted">
               {[branding?.addressLine, branding?.city, branding?.pincode]
@@ -208,6 +255,11 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
             All figures in Indian rupees. This quotation is an estimate against the scope described
             above; any change to that scope changes the figure.
           </p>
+
+          {/* Below their name and their GSTIN, outside the terms, at the
+              smallest weight on the page. See the note at the top of this
+              file for why this is an attribution and not our words. */}
+          {showMark ? <p className="mark">{MARK_TEXT}</p> : null}
         </footer>
       </article>
 
@@ -228,6 +280,15 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
         .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
         .strong { font-weight: 600; }
         .label { font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: .13em; color: #7b8085; margin: 0 0 3px; }
+        /* Bounded both ways: a tall logo would push the whole letterhead
+           down the page, a wide one would collide with the quote number. */
+        .logo { max-height: 52px; max-width: 220px; width: auto; height: auto; display: block; margin: 0 0 10px; object-fit: contain; }
+        /* Their accent, used where it reads as theirs: the rule under the
+           letterhead and the total. Never on the type, which has to stay
+           legible in grayscale on somebody's office printer. */
+        .head { border-bottom: 2px solid ${accent}; }
+        .sheet h2 { color: ${accent}; }
+        .mark { margin-top: 10px; font-size: 9px; letter-spacing: .06em; color: #9aa0a4; }
 
         .head { display: flex; justify-content: space-between; gap: 32px; align-items: flex-start;
                 border-bottom: 2px solid #16181a; padding-bottom: 16px; }

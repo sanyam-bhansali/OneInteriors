@@ -18,6 +18,7 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
+import { storeLogo, removeLogo } from '@/modules/storage/studio-logo';
 import { hasDatabase } from '@/lib/env';
 import { getCurrentUser, hasRole } from '@/modules/auth/session';
 import { fromDb, toDb, type Paise } from '@/lib/money';
@@ -233,6 +234,8 @@ export interface BrandingRow {
   website: string | null;
   logoPath: string | null;
   accentHex: string;
+  /** Their wish about our mark. Whether it is honoured is `showsOurMark()`. */
+  hideOurMark: boolean;
   welcomeNote: string | null;
   terms: string | null;
   feeBps: number;
@@ -265,6 +268,7 @@ export async function myBranding(): Promise<BrandingRow | null> {
       email: row.email,
       website: row.website,
       logoPath: row.logoPath,
+      hideOurMark: row.hideOurMark,
       accentHex: row.accentHex,
       welcomeNote: row.welcomeNote,
       terms: row.terms,
@@ -339,4 +343,91 @@ export async function saveBranding(input: BrandingInput): Promise<SaveResult> {
     console.error('[studio-quote] saveBranding failed', error);
     return { ok: false, error: 'That did not save.' };
   }
+}
+
+
+// ── Logo and the attribution mark ──────────────────────────────
+
+/**
+ * Replace the studio's logo.
+ *
+ * Store first, update the row, remove the old object last. That order is the
+ * whole of the care here: removing first means a failed upload leaves a
+ * branding row pointing at a file that is gone, and every document they print
+ * until somebody notices has a broken image where their name should be.
+ */
+export async function replaceLogo(file: File): Promise<SaveResult> {
+  const studioId = await myStudioId();
+  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+
+  const existing = await prisma.studioBranding.findUnique({
+    where: { studioId },
+    select: { logoPath: true },
+  });
+  if (!existing) {
+    return { ok: false, error: 'Fill in your studio details first — the logo goes with them.' };
+  }
+
+  const stored = await storeLogo(studioId, file);
+  if (!stored.ok) return { ok: false, error: stored.error };
+
+  await prisma.studioBranding.update({
+    where: { studioId },
+    data: { logoPath: stored.path },
+  });
+
+  await removeLogo(existing.logoPath);
+  return { ok: true };
+}
+
+export async function clearLogo(): Promise<SaveResult> {
+  const studioId = await myStudioId();
+  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+
+  const existing = await prisma.studioBranding.findUnique({
+    where: { studioId },
+    select: { logoPath: true },
+  });
+  if (!existing?.logoPath) return { ok: true };
+
+  await prisma.studioBranding.update({ where: { studioId }, data: { logoPath: null } });
+  await removeLogo(existing.logoPath);
+  return { ok: true };
+}
+
+/**
+ * Record what the studio wants about our mark.
+ *
+ * Stored whatever their tier is, and deliberately so — see the column comment
+ * and `showsOurMark()`. Saving the wish for a studio who cannot yet act on it
+ * is what makes an upgrade take effect without anybody revisiting this screen.
+ */
+export async function setHideOurMark(hide: boolean): Promise<SaveResult> {
+  const studioId = await myStudioId();
+  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+
+  await prisma.studioBranding.update({
+    where: { studioId },
+    data: { hideOurMark: hide },
+  });
+  return { ok: true };
+}
+
+/**
+ * The tier this studio is on, for the mark and for anything else that gates.
+ *
+ * Null when they have no subscription row at all, which `tierMayRemoveMark`
+ * treats as unentitled — the safe direction.
+ */
+export async function myTier(): Promise<string | null> {
+  const studioId = await myStudioId();
+  if (!studioId) return null;
+  const sub = await prisma.subscription.findUnique({
+    where: { studioId },
+    select: { tier: true, status: true },
+  });
+  if (!sub) return null;
+  /* A cancelled subscription is not a tier. Reading `tier` alone would leave
+     a studio white-labelled for as long as the row survived their leaving. */
+  return sub.status === 'CANCELLED' ? null : sub.tier;
 }

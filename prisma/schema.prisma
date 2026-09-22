@@ -1548,6 +1548,19 @@ model StudioBranding {
   welcomeNote String? @db.Text
   terms       String? @db.Text
 
+  /// Does the studio want our attribution mark off their documents?
+  ///
+  /// A WISH, not the outcome. Whether the mark actually appears is this
+  /// combined with their subscription tier, decided at render time by
+  /// `showsOurMark()` in modules/studio-quote/mark.ts.
+  ///
+  /// Kept apart deliberately: one boolean would have to be rewritten on every
+  /// tier change by something that remembered to, and the thing that remembers
+  /// is the thing that will one day forget — leaving a downgraded studio still
+  /// white-labelled. This way a downgrade restores the mark on its own, and a
+  /// later upgrade restores their choice.
+  hideOurMark Boolean @default(false)
+
   /// Defaults a new quotation starts from. Basis points, so 700 = 7%.
   feeBps              Int    @default(700)
   discountBps         Int    @default(0)
