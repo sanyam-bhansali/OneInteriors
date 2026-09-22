@@ -14,6 +14,7 @@ import {
   type LostReasonName,
 } from '@/modules/studio-practice/clients';
 import { isCallOutcome } from '@/modules/studio-practice/event-copy';
+import { mergeClients } from '@/modules/studio-practice/merge';
 
 // `State` and `IDLE` live in studio/form-state.ts. A 'use server'
 // file may only export async functions — and Turbopack rejects even a
@@ -215,5 +216,23 @@ export async function eraseAction(ids: string[]): Promise<State> {
   const result = await eraseClients(ids);
   if (!result.ok) return result;
   refreshBin();
+  return { ok: true };
+}
+
+/**
+ * Fold a duplicate card into this one.
+ *
+ * Both ids come from the browser and neither is trusted — `mergeClients`
+ * reads both under the studio scope before anything moves, so a pair of
+ * guessed ids folds nothing.
+ */
+export async function mergeAction(keepId: string, loserId: string): Promise<State> {
+  const result = await mergeClients(keepId, loserId);
+  if (!result.ok) return result;
+
+  refresh();
+  revalidatePath(`/studio/clients/${keepId}`);
+  revalidatePath(`/studio/clients/${loserId}`);
+  revalidatePath('/studio/clients/bin');
   return { ok: true };
 }

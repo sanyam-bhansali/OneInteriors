@@ -219,3 +219,76 @@ export async function leadAnalytics(): Promise<LeadAnalytics | null> {
     return null;
   }
 }
+
+/**
+ * The three numbers the board leads with.
+ *
+ * ## Why not just call `leadAnalytics()`
+ *
+ * That runs thirteen counts and two groupBys, which is right for a page whose
+ * whole job is numbers and wasteful on the one screen a studio opens twenty
+ * times a day. This is three.
+ *
+ * ## Why these three
+ *
+ * They are the only figures on either screen that describe a PROBLEM. Total,
+ * open and won all go up and can never be bad news, so they teach nobody
+ * anything at a glance — they belong on the analytics page where somebody has
+ * gone looking. These three go down when the studio does its job, which is
+ * what makes them worth putting where the work happens.
+ *
+ * Counted in SQL rather than from the board's loaded rows for the same reason
+ * as everywhere else: `myClients()` takes 400, so a derived "overdue" would
+ * silently stop counting at 400 and read as an improvement.
+ */
+export interface BoardCounts {
+  overdue: number;
+  pooled: number;
+  quiet: number;
+}
+
+export async function boardCounts(): Promise<BoardCounts> {
+  const studioId = await myStudioId();
+  if (!studioId) return { overdue: 0, pooled: 0, quiet: 0 };
+
+  try {
+    const now = new Date();
+    const quietBefore = new Date(now.getTime() - 7 * DAY);
+
+    const openIds = (
+      await prisma.studioStage.findMany({
+        where: { studioId, kind: { in: ['OPEN', 'WON'] } },
+        select: { id: true },
+      })
+    ).map((s) => s.id);
+
+    /* Bail before three counts that can only return zero. A studio whose
+       pipeline has no open columns has bigger problems than this strip. */
+    if (openIds.length === 0) return { overdue: 0, pooled: 0, quiet: 0 };
+
+    const [overdue, pooled, quiet] = await Promise.all([
+      prisma.studioClient.count({
+        where: { studioId, ...LIVE, stageId: { in: openIds }, nextActionOn: { lt: now } },
+      }),
+      prisma.studioClient.count({
+        where: { studioId, ...LIVE, stageId: { in: openIds }, assignedToId: null },
+      }),
+      prisma.studioClient.count({
+        where: {
+          studioId,
+          ...LIVE,
+          stageId: { in: openIds },
+          /* Never contacted counts as quiet, and is the loudest version of
+             it — `lastContactedAt` is written only by logContact, so this
+             measures conversations rather than keystrokes. */
+          OR: [{ lastContactedAt: null }, { lastContactedAt: { lt: quietBefore } }],
+        },
+      }),
+    ]);
+
+    return { overdue, pooled, quiet };
+  } catch (error) {
+    console.error('[analytics] board counts failed', error);
+    return { overdue: 0, pooled: 0, quiet: 0 };
+  }
+}

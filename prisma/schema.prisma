@@ -1895,6 +1895,21 @@ model StudioClient {
   projects StudioProject[]
   events   StudioClientEvent[]
 
+  /// Where this row went when somebody merged it into another.
+  ///
+  /// Set on the LOSER, alongside `deletedAt`. Two reasons it is a column and
+  /// not just a timeline entry: the board has to be able to send somebody
+  /// from an old link to the row that survived, and a merge performed by
+  /// mistake has to be undoable by reading one field rather than parsing
+  /// prose.
+  ///
+  /// `onDelete: SetNull` so erasing the survivor does not cascade into
+  /// deleting the record of the merge — the loser is already soft-deleted and
+  /// its history is the only account of what happened.
+  mergedIntoId String?
+  mergedInto   StudioClient?  @relation("ClientMerge", fields: [mergedIntoId], references: [id], onDelete: SetNull)
+  mergedFrom   StudioClient[] @relation("ClientMerge")
+
   /// One row per introduction, so a redelivery cannot create a second
   /// client for the same handoff.
   @@unique([studioId, introductionId])

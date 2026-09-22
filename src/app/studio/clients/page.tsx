@@ -8,6 +8,8 @@ import { myStages } from '@/modules/studio-practice/stages';
 import { myFields } from '@/modules/studio-practice/fields';
 import { assignableMembers, myMembershipId } from '@/modules/studio-practice/team';
 import { myViews } from '@/modules/studio-practice/saved-views';
+import { boardCounts } from '@/modules/studio-practice/analytics';
+import { NeedsAttention } from './NeedsAttention';
 import { Board, AddClientButton, AddFirstClientButton } from './Board';
 
 export const metadata: Metadata = {
@@ -37,13 +39,17 @@ const importLink =
  * with no date sits at the bottom, which is a quiet argument for setting one.
  */
 export default async function ClientsPage() {
-  const [clients, stages, fields, members, meId, views] = await Promise.all([
+  const [clients, stages, fields, members, meId, views, counts] = await Promise.all([
     myClients(),
     myStages(),
     myFields(),
     assignableMembers(),
     myMembershipId(),
     myViews(),
+    /* Three counts in SQL, not derived from the 400 rows above — a derived
+       "overdue" would silently stop counting at 400 and read as an
+       improvement. */
+    boardCounts(),
   ]);
 
   const today = new Date();
@@ -75,6 +81,11 @@ export default async function ClientsPage() {
       />
 
       <PageBody>
+        {/* Above everything, and gone entirely when there is nothing wrong. */}
+        <div className="mb-5 empty:mb-0">
+          <NeedsAttention counts={counts} />
+        </div>
+
         <GuidePanel guide="leads" facts={facts} dismissed={dismissed} />
 
         {clients.length === 0 ? (

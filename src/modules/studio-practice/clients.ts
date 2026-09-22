@@ -832,7 +832,20 @@ export async function restoreClients(ids: string[]): Promise<Result> {
 
     const { count } = await prisma.studioClient.updateMany({
       where: { id: { in: ids }, studioId, deletedAt: { not: null } },
-      data: { deletedAt: null },
+      data: {
+        deletedAt: null,
+        /* Cleared, or a restored card comes back still pointing at the one it
+           was merged into — two live rows, one of them claiming to be a
+           redirect to the other.
+           
+           Worth being plain about what this does and does not undo: the card
+           and its own history come back, but the quotations and projects that
+           moved during the merge do NOT return, because they now belong to
+           the surviving card and pulling them back would break whatever has
+           been done with them since. `merge.ts` records both sides, so the
+           account of what went where survives either way. */
+        mergedIntoId: null,
+      },
     });
     if (count === 0) return { ok: false, error: 'Nothing to restore.' };
 

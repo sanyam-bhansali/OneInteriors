@@ -7,8 +7,10 @@ import { timelineFor } from '@/modules/studio-practice/events';
 import { SOURCE_LABELS } from '@/modules/studio-practice/vocabulary';
 import { paiseToLakhs } from '@/lib/money';
 import { marketplaceContextFor } from '@/modules/studio-practice/marketplace-context';
+import { duplicatesOf } from '@/modules/studio-practice/merge';
 import { Timeline } from './Timeline';
 import { BriefPanel } from './BriefPanel';
+import { Duplicates } from './Duplicates';
 import { LogContact } from './LogContact';
 
 export const metadata: Metadata = {
@@ -47,9 +49,10 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   /* Both in parallel. The brief panel only exists for a marketplace lead,
      and marketplaceContextFor returns null for everything else without a
      second round trip to find that out. */
-  const [events, brief] = await Promise.all([
+  const [events, brief, dupes] = await Promise.all([
     timelineFor(id),
     client.fromMarketplace ? marketplaceContextFor(id) : Promise.resolve(null),
+    duplicatesOf(id),
   ]);
 
   return (
@@ -91,6 +94,14 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             {/* Above the history and above the call button, because reading
                 it is what should happen BEFORE the first call — which is the
                 whole reason a marketplace lead is worth more than a cold one. */}
+            {/* Above the brief and the call button, because merging first
+                means the call is logged against the card that survives. */}
+            {dupes.length > 0 ? (
+              <div className="mb-5">
+                <Duplicates clientId={client.id} clientName={client.name} candidates={dupes} />
+              </div>
+            ) : null}
+
             {brief ? (
               <div className="mb-5">
                 <BriefPanel ctx={brief} />
