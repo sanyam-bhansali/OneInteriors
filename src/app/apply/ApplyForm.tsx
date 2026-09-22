@@ -110,7 +110,16 @@ const LABELS: Record<string, string> = {
   gstin: 'your GSTIN',
 };
 
-const DRAFT_KEY = 'oi.apply.draft';
+/**
+ * Bumped whenever the fields change shape.
+ *
+ * A draft written by an older version of this form can no longer be applied
+ * safely to a newer one, and the failure is invisible and per-browser: the
+ * device with the stale draft cannot submit while every other device can.
+ * Changing the key retires every old draft at once, which costs somebody a
+ * half-finished form and saves them an application they cannot send.
+ */
+const DRAFT_KEY = 'oi.apply.draft.v2';
 
 /**
  * The studio application, as a five-step wizard over one form.
@@ -170,15 +179,46 @@ export function ApplyForm() {
       if (!el) return;
 
       for (const [name, value] of Object.entries(saved)) {
-        if (name.startsWith('$')) continue;
+        /**
+         * Only names this form actually has, and only in the shape the
+         * control expects.
+         *
+         * Both guards are load-bearing and neither was here.
+         *
+         * The name went straight into a CSS selector. A saved key with a
+         * bracket or a quote in it — from an older shape of this form, or
+         * from anything else that has ever written to this key — makes
+         * `querySelectorAll` throw a SyntaxError, and the whole restore is
+         * abandoned silently.
+         *
+         * Worse, the shape was assumed. `localities` is a set of checkboxes;
+         * if a draft holds it as a string rather than an array, the else
+         * branch wrote that string into the first checkbox's `value`. The
+         * box then submits a value the server does not recognise, the studio
+         * is told to pick an area they can see is already ticked, and the
+         * application cannot be sent from that browser — while the same form
+         * works perfectly on any device without that draft.
+         *
+         * A field this form no longer has is skipped rather than restored,
+         * which is also why the allow-list is derived from the DOM rather
+         * than from a hard-coded list that would drift.
+         */
+        if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(name)) continue;
+
         const nodes = el.querySelectorAll<HTMLInputElement>(`[name="${name}"]`);
         if (nodes.length === 0) continue;
-        if (Array.isArray(value)) {
+
+        const isCheckable = nodes[0]!.type === 'checkbox' || nodes[0]!.type === 'radio';
+
+        if (isCheckable) {
+          /* A lone string is tolerated as a one-element selection rather
+             than written over the control's value. */
+          const chosen = Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
           nodes.forEach((n) => {
-            n.checked = value.includes(n.value);
+            n.checked = chosen.includes(n.value);
           });
-        } else if (nodes[0]) {
-          nodes[0].value = value;
+        } else if (typeof value === 'string') {
+          nodes[0]!.value = value;
         }
       }
       setRestored(true);

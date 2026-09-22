@@ -1,3 +1,14 @@
+import 'server-only';
+
+// Server-only for two reasons, and the second is the one that bites.
+//
+// It fetches arbitrary URLs with our network position, which must never
+// happen from a browser. And it uses a regex lookbehind, which iOS Safari
+// below 16.4 throws on at PARSE time — not at call time. A module like that
+// reaching a client bundle does not break the feature that uses it; it
+// breaks every component in the same chunk, on those devices only, with no
+// error anybody sees. This import makes that a build failure instead.
+
 /**
  * Website scraping — prefill, never proof.
  *
