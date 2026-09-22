@@ -1,9 +1,10 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { RATE_CATEGORIES, CATEGORY, CORE_CATEGORIES } from '@/modules/quotation/categories';
 import { saveRatesAction, type StepState } from './actions';
 import { SaveBar } from './fields';
+import { QuotePreview } from './QuotePreview';
 
 const INITIAL: StepState = { status: 'idle' };
 
@@ -37,6 +38,20 @@ export function RateCardForm({ values }: { values: Record<string, number | null>
   const [state, action, pending] = useActionState(saveRatesAction, INITIAL);
   const err = state.errors ?? {};
 
+  /**
+   * The rates, held here so the preview can price them as they are typed.
+   *
+   * Controlled only because something watches them. Every other input in this
+   * flow stays uncontrolled for the reason ProfileForm gives — a render
+   * between the keystroke and the character is a cost with no return — and
+   * here there is a return: the quote beside the form moves.
+   */
+  const [rupees, setRupees] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      RATE_CATEGORIES.map((c) => [c, values[c] != null ? String(values[c]) : '']),
+    ),
+  );
+
   const missingCore = CORE_CATEGORIES.filter((c) => values[c] == null).length;
 
   return (
@@ -62,7 +77,8 @@ export function RateCardForm({ values }: { values: Record<string, number | null>
         </span>
       </summary>
 
-    <div className="flex flex-col gap-8 px-6 pb-6">
+    <div className="grid gap-6 px-6 pb-6 xl:grid-cols-[minmax(0,1fr)_18rem] xl:gap-8">
+      <div className="flex flex-col gap-8">
       <div className="rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper-3)] p-6">
         <p className="label m-0 mb-2">Read this first</p>
         <p className="m-0 mb-3 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--color-ink-2)]">
@@ -91,7 +107,13 @@ export function RateCardForm({ values }: { values: Record<string, number | null>
           </p>
           <div className="flex flex-col gap-5">
             {CORE_CATEGORIES.map((c) => (
-              <RateField key={c} category={c} value={values[c] ?? null} error={err[c]} />
+              <RateField
+                key={c}
+                category={c}
+                value={rupees[c] ?? ''}
+                onChange={(v) => setRupees((prev) => ({ ...prev, [c]: v }))}
+                error={err[c]}
+              />
             ))}
           </div>
         </div>
@@ -105,13 +127,26 @@ export function RateCardForm({ values }: { values: Record<string, number | null>
           </p>
           <div className="flex flex-col gap-5">
             {RATE_CATEGORIES.filter((c) => !CATEGORY[c].core).map((c) => (
-              <RateField key={c} category={c} value={values[c] ?? null} error={err[c]} />
+              <RateField
+                key={c}
+                category={c}
+                value={rupees[c] ?? ''}
+                onChange={(v) => setRupees((prev) => ({ ...prev, [c]: v }))}
+                error={err[c]}
+              />
             ))}
           </div>
         </div>
 
         <SaveBar pending={pending} saved={state.status === 'saved'} formError={err.form} label="Save and continue" />
       </form>
+      </div>
+
+      {/* Beside the boxes, not below them. The whole value is watching a
+          number move while you change the one that moves it. */}
+      <div className="xl:sticky xl:top-8 xl:self-start">
+        <QuotePreview rupees={rupees} />
+      </div>
     </div>
     </details>
   );
@@ -120,10 +155,12 @@ export function RateCardForm({ values }: { values: Record<string, number | null>
 function RateField({
   category,
   value,
+  onChange,
   error,
 }: {
   category: string;
-  value: number | null;
+  value: string;
+  onChange: (v: string) => void;
   error?: string;
 }) {
   const definition = CATEGORY[category as keyof typeof CATEGORY];
@@ -153,7 +190,8 @@ function RateField({
           type="number"
           step={isPercent ? '0.25' : '1'}
           min="0"
-          defaultValue={value ?? undefined}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
           placeholder="—"
           aria-invalid={Boolean(error)}
           className="oi-input w-40 rounded-full border border-[var(--color-rule)] px-5 py-2.5 text-[15px] tabular-nums text-[var(--color-ink)]"

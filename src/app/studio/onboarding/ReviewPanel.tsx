@@ -299,6 +299,88 @@ function Completion({
   );
 }
 
+/**
+ * Where the application has got to, once it has been sent.
+ *
+ * ## Why a tracker rather than a sentence
+ *
+ * "We will be in touch within a week" is true and answers nothing a studio
+ * actually wants to know, which is *where has it got to*. A week of silence
+ * against a sentence reads as having been forgotten; a week of silence
+ * against a visible stage reads as a stage taking a week.
+ *
+ * ## The stages are honest about what we do not know
+ *
+ * Only the first is marked done, because only the first is something we can
+ * observe from here — their side is finished. Everything after it happens in
+ * a calendar and on phone calls, and a tracker that lit "Reference calls" up
+ * green on a timer would be inventing progress. The rest are shown as what
+ * is coming, not as what is happening.
+ *
+ * When ops gains a screen that records which check has been done, this reads
+ * from that. Until then it says less rather than guessing.
+ */
+function Tracker() {
+  const stages = [
+    {
+      title: 'Sent',
+      body: 'Your side is complete. Nothing further is needed from you right now.',
+      done: true,
+    },
+    { title: 'Registration checked', body: 'Against the public GST and company records.' },
+    { title: 'Two clients called', body: 'We ask you who, and tell you what we will ask them.' },
+    { title: 'Two sites visited', body: 'In person, and only unannounced if you agree to that.' },
+    { title: 'You approve the profile', body: 'Every word of it, before a customer sees any.' },
+  ];
+
+  return (
+    <ol className="m-0 mt-6 flex list-none flex-col p-0">
+      {stages.map((stage, i) => (
+        <li key={stage.title} className="relative flex gap-3.5 pb-5 last:pb-0">
+          {/* The rail, drawn behind the markers and stopped before the last
+              one so it does not trail off the bottom of the list. */}
+          {i < stages.length - 1 ? (
+            <span
+              aria-hidden="true"
+              className="absolute left-[10px] top-5 h-full w-px bg-[var(--color-rule)]"
+            />
+          ) : null}
+
+          <span
+            className={`relative z-10 mt-0.5 grid h-5 w-5 flex-none place-items-center rounded-full ${
+              stage.done
+                ? 'bg-[var(--color-ontrack)] text-white'
+                : 'border border-[var(--color-rule)] bg-[var(--color-paper)]'
+            }`}
+          >
+            {stage.done ? (
+              <>
+                <span className="sr-only">Done:</span>
+                <Tick small />
+              </>
+            ) : (
+              <span className="sr-only">To come:</span>
+            )}
+          </span>
+
+          <span className="min-w-0">
+            <span
+              className={`block text-[14px] font-medium ${
+                stage.done ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-2)]'
+              }`}
+            >
+              {stage.title}
+            </span>
+            <span className="block text-[12.5px] leading-relaxed text-[var(--color-ink-3)]">
+              {stage.body}
+            </span>
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function Submitted() {
   return (
     <div className="rounded-[16px] border border-[var(--color-ontrack)] bg-[var(--color-ontrack-soft)] p-8">
@@ -311,6 +393,8 @@ function Submitted() {
         You can keep editing anything — nothing is locked. And you will see your finished profile
         and approve it before a single customer does.
       </p>
+
+      <Tracker />
     </div>
   );
 }

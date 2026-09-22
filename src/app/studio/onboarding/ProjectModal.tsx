@@ -108,6 +108,10 @@ export function ProjectModal({
    * believing they are finished. Same arrangement as step one.
    */
   const [title, setTitle] = useState('');
+  /* For the card beside the stages. Locality and the render mark are the two
+     things a customer reads off a project tile before anything else, so they
+     are worth reflecting as they are typed. */
+  const [locality, setLocality] = useState('');
   const [styles, setStyles] = useState<string[]>([]);
   const [consented, setConsented] = useState(false);
   const [isRender, setIsRender] = useState(false);
@@ -148,6 +152,7 @@ export function ProjectModal({
     setStage(0);
     setImages([]);
     setTitle('');
+    setLocality('');
     setStyles([]);
     setConsented(false);
     setIsRender(false);
@@ -273,7 +278,13 @@ export function ProjectModal({
                 required
               />
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Text label="Where" name="locality" placeholder="Baner, Pune" />
+                <Text
+                  label="Where"
+                  name="locality"
+                  value={locality}
+                  onChange={setLocality}
+                  placeholder="Baner, Pune"
+                />
                 <Select label="Property type" name="propertyType" options={PROPERTY_LABELS} />
               </div>
               <Select label="What you did" name="scope" options={SCOPE_LABELS} />
@@ -393,6 +404,18 @@ export function ProjectModal({
                 ) : null}
               </div>
             </div>
+
+            {/* What the card will look like on the grid behind this modal.
+                Four stages is long enough that somebody loses sight of what
+                they are making; this is the thing being made. */}
+            <ProjectCardPreview
+              title={title}
+              locality={locality}
+              cover={images[0]}
+              photoCount={images.length}
+              styles={styles}
+              isRender={isRender}
+            />
 
             {/* The URLs travel with the form. Hidden inputs rather than a
                 JSON blob, so the order in the DOM is the order that arrives
@@ -879,5 +902,85 @@ function Check({
         </span>
       </span>
     </label>
+  );
+}
+
+
+/**
+ * The project as it will sit on the grid, while it is still being entered.
+ *
+ * ## Why it earns its space in a modal
+ *
+ * A project takes four stages to enter, and by the style step somebody has
+ * lost sight of what they are making. The card is the thing a customer
+ * actually meets — a photograph, a name, a place — and none of that is
+ * visible while filling in dimensions and dates.
+ *
+ * It is the same shape as `ProjectCard` on the grid behind, deliberately, so
+ * nothing about the finished article is a surprise. The render badge in
+ * particular: a studio ticking "these are renders" should see the label
+ * appear on the picture, because that label is the whole of our honesty rule
+ * and it has to be visibly a consequence of their own tick.
+ */
+function ProjectCardPreview({
+  title,
+  locality,
+  cover,
+  photoCount,
+  styles,
+  isRender,
+}: {
+  title: string;
+  locality: string;
+  cover: string | undefined;
+  photoCount: number;
+  styles: string[];
+  isRender: boolean;
+}) {
+  return (
+    <div className="mt-5 border-t border-[var(--color-rule)] pt-4">
+      <p className="label m-0 mb-2.5 flex items-center gap-2 text-[var(--color-ink-3)]">
+        How it will look
+        <span aria-hidden="true" className="oi-live-dot" />
+      </p>
+
+      <div className="max-w-[19rem] overflow-hidden rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-paper)]">
+        <div className="relative aspect-[4/3] overflow-hidden bg-[var(--color-paper-3)]">
+          {cover ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={cover} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center text-[12.5px] text-[var(--color-ink-3)]">
+              No photographs yet
+            </span>
+          )}
+
+          {isRender ? (
+            <span className="absolute left-2.5 top-2.5 rounded-full bg-[var(--color-ink)]/85 px-2.5 py-1 text-[11px] font-medium text-white">
+              Render
+            </span>
+          ) : null}
+          {photoCount > 1 ? (
+            <span className="absolute right-2.5 top-2.5 rounded-full bg-[var(--color-ink)]/75 px-2 py-0.5 text-[11px] text-white">
+              {photoCount}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="px-4 py-3">
+          <p className="m-0 truncate text-[15px] font-medium text-[var(--color-ink)]">
+            {title.trim() || <span className="text-[var(--color-ink-3)]">Untitled project</span>}
+          </p>
+          <p className="m-0 truncate text-[13px] text-[var(--color-ink-2)]">
+            {locality.trim() || 'No location given'}
+          </p>
+          {styles.length > 0 ? (
+            <p className="m-0 mt-1.5 truncate text-[12px] text-[var(--color-ink-3)]">
+              {styles.map((v) => STYLE_LABELS[v as keyof typeof STYLE_LABELS] ?? v).join(' · ')}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }
