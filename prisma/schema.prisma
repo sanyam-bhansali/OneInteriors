@@ -553,6 +553,7 @@ model Studio {
   studioClients      StudioClient[]
   studioClientEvents StudioClientEvent[]
   studioSavedViews   StudioSavedView[]
+  studioForm         StudioForm?
   studioStages       StudioStage[]
   studioFields       StudioField[]
   studioProjects     StudioProject[]
@@ -2077,6 +2078,55 @@ model StudioSavedView {
   @@unique([memberId, name])
   @@index([memberId, createdAt])
   @@map("studio_saved_views")
+}
+
+/// A studio's public enquiry form.
+///
+/// ## Why the fields are fixed
+///
+/// There is no field schema here — no JSON list of questions, no builder. A
+/// form builder is a second product, and AxLeads' own known-gaps list shows
+/// where that road ends: its forms are operator-managed because letting a
+/// client define fields meant an import could reference a field that had been
+/// hidden, and *"nothing about this is recoverable without deleting the leads
+/// and starting again"*.
+///
+/// So the questions are the six an interiors enquiry actually needs, decided
+/// once, in `capture-fields.ts`. What a studio controls is the wording around
+/// them and whether the form is on at all — which is the part they would
+/// actually change.
+///
+/// ## One per studio, created on first read
+///
+/// Same shape as the stage seeder and the starter catalogue: there is no
+/// migration step and no moment where a studio has an account but not the
+/// thing the screen is about.
+model StudioForm {
+  id String @id @default(cuid())
+
+  studioId String @unique
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  /// The public path segment. Defaults to the studio's own slug, and is
+  /// separate from it so a studio can rotate the link — the reason to rotate
+  /// is that the old one is being abused, and rotating the studio's slug
+  /// would break its public profile too.
+  slug String @unique
+
+  /// What the page says above the fields. Theirs to change, because it is
+  /// the only part a visitor reads before deciding whether to fill it in.
+  headline String
+  blurb    String @db.Text
+
+  /// Off means the page says the studio is not taking enquiries, rather than
+  /// 404ing — a dead link somebody printed on a card is worse than a page
+  /// that explains itself.
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("studio_forms")
 }
 
 /// One request against a rate-limited thing.

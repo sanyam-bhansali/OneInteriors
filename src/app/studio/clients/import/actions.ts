@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { importClients } from '@/modules/studio-practice/clients';
 import { parseCsv, planImport, type ColumnKey } from '@/modules/studio-practice/csv';
+import { setFormActive } from '@/modules/studio-practice/capture';
 
 /**
  * Writing an import.
@@ -85,4 +86,17 @@ export async function importCsvAction(text: string, mapping: string[]): Promise<
     skippedNoName: plan.skippedNoName,
     duplicatesInFile: plan.duplicatesInFile,
   };
+}
+
+/**
+ * Turn the public enquiry form on or off.
+ *
+ * Lives beside the import action because the control lives on the import
+ * page — both are "how a lead gets in" — and a studio that pauses the form
+ * has done so deliberately, so there is nothing to confirm.
+ */
+export async function setFormActiveAction(active: boolean): Promise<{ ok: boolean }> {
+  const result = await setFormActive(active);
+  if (result.ok) revalidatePath('/studio/clients/import');
+  return result;
 }

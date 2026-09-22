@@ -157,6 +157,17 @@ const ALWAYS = [
   '/auth',
   '/sign-in',
   '/set-password',
+  /**
+   * The studios' own enquiry forms.
+   *
+   * Third time this list has been the answer, and the first where the person
+   * reaching it has no account at all. A studio copies this link from the
+   * studio host and pastes it into an Instagram bio, where it is opened by
+   * strangers on whichever host the link carries — so it has to answer on all
+   * of them or the link is dead for everybody except the studio that tested
+   * it while signed in.
+   */
+  '/f',
   '/_next',
   '/favicon',
   '/robots.txt',

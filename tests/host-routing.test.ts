@@ -393,4 +393,22 @@ describe('the whole sign-in round trip is reachable on every host', () => {
     expect(isAlwaysAllowed('/settings')).toBe(false);
     expect(isAlwaysAllowed('/set-password/confirm')).toBe(true);
   });
+
+  it('answers a studio enquiry form on every host', () => {
+    /**
+     * Third time this list has been the answer, and the first where the
+     * person reaching it has no account at all.
+     *
+     * A studio copies `/f/<slug>` from the studio host and pastes it into an
+     * Instagram bio, where strangers open it on whatever host the link
+     * carries. Off this list it is dead for everybody except the studio that
+     * tested it while signed in — which is exactly how the `/set-password`
+     * and `/sign-in` failures went unnoticed.
+     */
+    expect(isAlwaysAllowed('/f/teakline-studio')).toBe(true);
+    expect(isAlwaysAllowed('/f')).toBe(true);
+
+    /* And it must not open anything adjacent. */
+    expect(isAlwaysAllowed('/faq')).toBe(false);
+  });
 });

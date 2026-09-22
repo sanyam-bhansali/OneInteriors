@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { PageHead, PageBody } from '../../StudioShell';
+import { myCaptureForm } from '@/modules/studio-practice/capture';
 import { Import } from './Import';
+import { CaptureLink } from './CaptureLink';
 
 export const metadata: Metadata = {
   title: 'Import clients',
@@ -21,7 +23,14 @@ export const metadata: Metadata = {
  * are sent. See the note in `actions.ts` for why it is the text and not the
  * rows.
  */
-export default function ImportPage() {
+export const dynamic = 'force-dynamic';
+
+export default async function ImportPage() {
+  /* Created on first read, like the stage seeder — no migration step, and no
+     moment where a studio has an account but not the thing the screen is
+     about. */
+  const form = await myCaptureForm();
+
   return (
     <>
       <PageHead
@@ -38,6 +47,7 @@ export default function ImportPage() {
       />
 
       <PageBody>
+        {form ? <CaptureLink slug={form.slug} active={form.active} /> : null}
         <Import />
       </PageBody>
     </>
