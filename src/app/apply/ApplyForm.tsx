@@ -4,6 +4,7 @@ import { startTransition, useActionState, useEffect, useRef, useState } from 're
 import { Button } from '@/components/ui';
 import { FIELD_WIDTH, type FieldWidth } from '@/components/ui/form';
 import { LOCALITIES_BY_ZONE } from '@/modules/brief/types';
+import { normalisePhone } from '@/modules/studio/phone';
 import {
   submitApplicationAction,
   lookupSiteAction,
@@ -141,6 +142,11 @@ export function ApplyForm() {
   const [step, setStep] = useState(0);
   const [furthest, setFurthest] = useState(0);
   const [missing, setMissing] = useState<string[]>([]);
+  /* Whether the phone box had anything in it when the check last ran, so
+     "still needed" and "that is not a number" can be told apart. The form is
+     uncontrolled, so this is recorded at check time rather than per
+     keystroke — nothing here needs to re-render as somebody types. */
+  const [phoneTyped, setPhoneTyped] = useState(false);
   const [restored, setRestored] = useState(false);
 
   /**
@@ -220,10 +226,38 @@ export function ApplyForm() {
     const el = form.current;
     if (!el) return [];
     const data = new FormData(el);
-    return STEPS[i]!.needs.filter((name) => {
+    /* `string[]`, not the inferred type. STEPS is `as const`, so a step with
+       an empty `needs` infers `never[]` and nothing can be pushed onto it. */
+    const gaps: string[] = [...STEPS[i]!.needs].filter((name) => {
       const values = data.getAll(name).filter((v) => typeof v === 'string' && v.trim() !== '');
       return values.length === 0;
     });
+
+    /**
+     * The one format checked before the end, because it is the one that was
+     * costing applications.
+     *
+     * The division everywhere else in this file is deliberate: the client
+     * checks presence, the server checks validity, and a client-side rule the
+     * server does not share is how a form refuses something that would have
+     * been accepted. This does not break that rule — it calls the SAME pure
+     * function the server calls, so the two cannot drift.
+     *
+     * It earns the exception because a mistyped mobile is not a typo the
+     * applicant can see. An email with no @ looks wrong on the screen; a
+     * nine-digit phone number looks exactly like a ten-digit one, and being
+     * sent back for it three steps later is how somebody gives up.
+     */
+    const phone = String(data.get('phone') ?? '').trim();
+    if (
+      (STEPS[i]!.needs as readonly string[]).includes('phone') &&
+      !gaps.includes('phone') &&
+      normalisePhone(phone) === null
+    ) {
+      gaps.push('phone');
+    }
+
+    return gaps;
   }
 
   /**
@@ -287,6 +321,9 @@ export function ApplyForm() {
       return;
     }
     const gaps = missingOn(step);
+    setPhoneTyped(
+      String(new FormData(form.current!).get('phone') ?? '').trim().length > 0,
+    );
     setMissing(gaps);
     if (gaps.length > 0) {
       form.current?.querySelector<HTMLElement>(`[name="${gaps[0]}"]`)?.focus();
@@ -398,7 +435,11 @@ export function ApplyForm() {
           role="alert"
           className="m-0 mb-5 rounded-[10px] bg-[var(--color-atrisk-soft)] px-4 py-2.5 text-[14px] text-[var(--color-atrisk)]"
         >
-          Still needed: {missing.map((m) => LABELS[m] ?? m).join(', ')}.
+          {/* "Still needed" is wrong for a number that IS there and is not a
+              number, so that one case gets its own sentence. */}
+          {missing.length === 1 && missing[0] === 'phone' && phoneTyped
+            ? 'That mobile number does not look right — ten digits, starting 6 to 9.'
+            : `Still needed: ${missing.map((m) => LABELS[m] ?? m).join(', ')}.`}
         </p>
       ) : null}
 

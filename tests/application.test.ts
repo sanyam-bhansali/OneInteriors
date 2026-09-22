@@ -26,6 +26,29 @@ describe('normalisePhone', () => {
     expect(normalisePhone('0919876543210')).toBe('+919876543210');
   });
 
+  /**
+   * Reported as "clients are not able to submit the apply form".
+   *
+   * Eleven digits with a leading zero is one of the two commonest ways an
+   * Indian writes a mobile, and it was refused — a studio typing their own
+   * number correctly was told it was not a number. The applications lost to
+   * it never reached anybody to be counted, which is why it went unnoticed.
+   */
+  it('accepts a mobile written with the STD-style leading zero', () => {
+    expect(normalisePhone('09876543210')).toBe('+919876543210');
+    expect(normalisePhone('0 98765 43210')).toBe('+919876543210');
+    expect(normalisePhone('0-98765-43210')).toBe('+919876543210');
+  });
+
+  it('still refuses a landline written the same way', () => {
+    /* The reason the fix strips one zero and re-tests rather than accepting
+       eleven digits: 020 is Pune, and this is the same shape as the mobile
+       above. It strips to 2025678900, fails the 6-9 rule, and stays refused
+       — nothing can send an SMS to it. */
+    expect(normalisePhone('020 2567 8900')).toBeNull();
+    expect(normalisePhone('04412345678')).toBeNull();
+  });
+
   it('rejects numbers not starting 6-9 — no Indian mobile does', () => {
     expect(normalisePhone('5876543210')).toBeNull();
     expect(normalisePhone('1234567890')).toBeNull();
