@@ -12,6 +12,7 @@ import {
   type FiledRateView,
 } from '@/modules/quotation/analysis-states';
 import { RateReview } from './RateReview';
+import { reanalyseArchiveAction, type RateDecision } from './actions';
 
 export interface ArchiveRow {
   id: string;
@@ -90,7 +91,12 @@ function ArchiveCard({ archive }: { archive: ArchiveRow }) {
       {/* What the reader did, before what ops did. Two axes: an archive can
           be fully read and still untouched by a person, which is the normal
           case and the whole reason these are separate columns. */}
-      <AnalysisLine state={archive.analysisState} error={archive.analysisError} />
+      <AnalysisLine
+        archiveId={archive.id}
+        state={archive.analysisState}
+        error={archive.analysisError}
+        hasFiles={archive.files.length > 0}
+      />
 
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
         <p className="m-0 text-[14.5px] text-[var(--color-ink)]">
@@ -254,9 +260,29 @@ function ArchiveCard({ archive }: { archive: ArchiveRow }) {
  * failure in our terms ("the reader timed out", a status code), which is
  * useful to somebody who can act on it and alarming to somebody who cannot.
  */
-function AnalysisLine({ state, error }: { state: string; error: string | null }) {
-  if (!isAnalysisState(state) || state === 'NOT_STARTED') return null;
-  const copy = ANALYSIS_COPY[state];
+function AnalysisLine({
+  archiveId,
+  state,
+  error,
+  hasFiles,
+}: {
+  archiveId: string;
+  state: string;
+  error: string | null;
+  hasFiles: boolean;
+}) {
+  const [result, action, pending] = useActionState<RateDecision | null, FormData>(
+    reanalyseArchiveAction,
+    null,
+  );
+
+  /* NOT_STARTED is shown here, unlike on the studio's side, because it is
+     the state ops most needs to act on: files sitting unread because the
+     background run never happened. */
+  const known = isAnalysisState(state) ? state : 'NOT_STARTED';
+  const copy = ANALYSIS_COPY[known];
+
+  if (!hasFiles) return null;
 
   return (
     <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -274,6 +300,33 @@ function AnalysisLine({ state, error }: { state: string; error: string | null })
       {error ? (
         <span className="font-[family-name:var(--font-mono)] text-[11.5px] text-[var(--color-ink-3)]">
           {error}
+        </span>
+      ) : null}
+
+      {/* Always offered, not only after a failure. A successful read can
+          still be a bad one — a template nobody has seen, half the lines
+          missed — and the person best placed to notice is the one looking
+          at the documents. Re-reading supersedes the pending rates rather
+          than adding to them. */}
+      <form action={action} className="ml-auto">
+        <input type="hidden" name="archiveId" value={archiveId} />
+        <button
+          type="submit"
+          disabled={pending || known === 'READING'}
+          className="text-[12px] text-[var(--color-ink-3)] underline underline-offset-2 hover:text-[var(--color-petrol)] disabled:no-underline disabled:opacity-50"
+        >
+          {pending ? 'Starting…' : known === 'READING' ? 'Reading…' : 'Read them again'}
+        </button>
+      </form>
+
+      {result ? (
+        <span
+          role="status"
+          className={`w-full text-[12.5px] ${
+            result.ok ? 'text-[var(--color-ontrack)]' : 'text-[var(--color-atrisk)]'
+          }`}
+        >
+          {result.ok ? result.message : result.error}
         </span>
       ) : null}
     </div>

@@ -14,7 +14,13 @@ import {
   signedUrlForArchiveFile,
 } from '@/modules/studio/quotation-archive-store';
 import type { ArchiveState } from '@/modules/studio/quotation-archive';
-import { approveRates, rejectRate } from '@/modules/quotation/filed-rate-store';
+import { after } from 'next/server';
+import {
+  approveRates,
+  rejectRate,
+  requestReanalysis,
+  analyseArchive,
+} from '@/modules/quotation/filed-rate-store';
 
 /**
  * Thin wrappers. All authorisation, validation and audit logging live in
@@ -210,4 +216,37 @@ export async function rejectRateAction(
   revalidatePath('/ops', 'layout');
   revalidatePath('/studio/onboarding', 'layout');
   return { ok: true, message: 'Refused. The studio sees your note.' };
+}
+
+
+/**
+ * Read an archive again.
+ *
+ * The work runs in `after()` because it is minutes, not seconds — twenty
+ * documents through the extractor would time out the action and leave ops
+ * looking at a failure that did not happen. `requestReanalysis` marks the
+ * archive READING first so the screen changes on the press, and the state it
+ * leaves behind is one that can simply be pressed again if the background
+ * work never ran.
+ *
+ * `analyseArchive` never throws; its failures land in `analysisState`. The
+ * catch is for an unhandled rejection reaching a serverless function, where
+ * it would take the instance down with it.
+ */
+export async function reanalyseArchiveAction(
+  _prev: RateDecision | null,
+  formData: FormData,
+): Promise<RateDecision> {
+  const archiveId = String(formData.get('archiveId') ?? '');
+
+  const result = await requestReanalysis(archiveId);
+  if (!result.ok) return { ok: false, error: result.error };
+
+  after(() => analyseArchive(archiveId).catch(() => {}));
+
+  revalidatePath('/ops', 'layout');
+  return {
+    ok: true,
+    message: 'Reading them again. Refresh in a minute or two — it carries on without you.',
+  };
 }

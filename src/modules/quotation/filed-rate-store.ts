@@ -241,6 +241,52 @@ function view(row: {
   };
 }
 
+/**
+ * Ops asks for an archive to be read again.
+ *
+ * ## Why a retry is needed at all
+ *
+ * Extraction fails on things nobody can predict: a scan at an angle, a
+ * password-protected export, a batch that hit the API while it was having a
+ * bad minute. Without this the only way back was asking the studio to upload
+ * the same twenty documents a second time, which is both insulting and the
+ * thing most likely to lose them.
+ *
+ * ## The role check is here, not at the caller
+ *
+ * `analyseArchive` takes an archive id and no session — it is called from the
+ * studio upload path where `currentStudio()` has already established whose
+ * archive it is. Reached by id from an ops screen, nothing else would scope
+ * it, so the guard belongs next to the write rather than in the action. An
+ * action is a route by another name.
+ *
+ * ## Marking it READING before the work starts
+ *
+ * So the screen changes the moment the button is pressed. `analyseArchive`
+ * sets the same state again when it begins, which is harmless and means a
+ * press whose background work never ran leaves the archive in a state that
+ * can simply be pressed again.
+ */
+export async function requestReanalysis(archiveId: string): Promise<ReviewResult> {
+  await requireRole('OPS');
+
+  const archive = await prisma.quotationArchive.findUnique({
+    where: { id: archiveId },
+    select: { id: true, _count: { select: { files: true } } },
+  });
+  if (!archive) return { ok: false, error: 'That archive is not there any more.' };
+  if (archive._count.files === 0) {
+    return { ok: false, error: 'There are no files on this archive to read.' };
+  }
+
+  await prisma.quotationArchive.update({
+    where: { id: archiveId },
+    data: { analysisState: 'READING', analysisError: null },
+  });
+
+  return { ok: true, live: 0 };
+}
+
 // ── Ops decisions ──────────────────────────────────────────────
 
 export type ReviewResult = { ok: true; live: number } | { ok: false; error: string };
