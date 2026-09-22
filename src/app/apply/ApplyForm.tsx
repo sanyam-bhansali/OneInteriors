@@ -32,38 +32,70 @@ const INITIAL: ApplyState = { status: 'idle' };
  * `needs` drives the check before advancing. Moving a field between steps
  * is editing this array and nothing else.
  */
+/**
+ * `needs` is what this step will not let you past without. `owns` is every
+ * field the SERVER can reject that lives on this step.
+ *
+ * The two are not the same list and conflating them was a bug. `needs` is an
+ * emptiness check — `missingOn` only asks whether something was typed. The
+ * server checks whether what was typed is real: an email that parses, a
+ * ten-digit mobile, a GSTIN whose checksum holds. So a malformed-but-present
+ * value walks through every step and fails at the end.
+ *
+ * `owns` is what sends the applicant back to the field that failed. It must
+ * name every key `submitApplication` can put in `errors`, including `gstin`,
+ * which is optional and therefore appears in no `needs` list at all.
+ */
 const STEPS = [
   {
     label: 'Studio',
     heading: 'What are you called?',
     lede: 'The name you work under.',
     needs: ['tradeName'],
+    owns: ['tradeName'],
   },
   {
     label: 'You',
     heading: 'Who do we speak to?',
     lede: 'One person, so nothing falls between two inboxes.',
     needs: ['contactName', 'phone', 'email'],
+    owns: ['contactName', 'phone', 'email'],
   },
   {
     label: 'Areas',
     heading: 'Which parts of Pune?',
     lede: 'We match customers to studios working in their area.',
     needs: ['localities'],
+    owns: ['localities'],
   },
   {
     label: 'Numbers',
     heading: 'How big is the practice?',
     lede: 'All optional. Nothing here decides anything on its own.',
     needs: [],
+    owns: ['gstin'],
   },
   {
     label: 'Your work',
     heading: 'How would you describe it?',
     lede: 'Plain words beat a brochure. We write the polished version with you later.',
     needs: [],
+    owns: [],
   },
 ] as const;
+
+/**
+ * Which step a server-rejected field lives on, or null if nothing claims it.
+ *
+ * Null is handled rather than assumed away: a new validation added to
+ * `submitApplication` without a matching entry in `owns` would otherwise
+ * silently route nowhere, which is the failure this whole change is about.
+ * An unclaimed key still gets its message printed in the summary.
+ */
+function stepOwning(field: string): number | null {
+  const i = STEPS.findIndex((s) => (s.owns as readonly string[]).includes(field));
+  return i === -1 ? null : i;
+}
 
 /** Human names for the required fields, for the error line. */
 const LABELS: Record<string, string> = {
@@ -72,6 +104,9 @@ const LABELS: Record<string, string> = {
   email: 'your email',
   phone: 'your mobile',
   localities: 'at least one area',
+  /* Not a required field, so it appears in no `needs` list — but the server
+     can still reject it, and the summary needs a name for it. */
+  gstin: 'your GSTIN',
 };
 
 const DRAFT_KEY = 'oi.apply.draft';
@@ -99,6 +134,8 @@ const DRAFT_KEY = 'oi.apply.draft';
 export function ApplyForm() {
   const [state, action, pending] = useActionState(submitApplicationAction, INITIAL);
   const err = state.errors ?? {};
+  /* `form` is the one key that already renders above the steps on its own. */
+  const fieldErrors = Object.entries(err).filter(([k]) => k !== 'form');
 
   const form = useRef<HTMLFormElement | null>(null);
   const [step, setStep] = useState(0);
@@ -188,6 +225,58 @@ export function ApplyForm() {
       return values.length === 0;
     });
   }
+
+  /**
+   * A rejected submit must land you on the field that was rejected.
+   *
+   * ## The bug this fixes
+   *
+   * Every step stays mounted and hidden, and each field's error renders
+   * beside the field. That is right on the step you are looking at and
+   * useless on the step you are not: submit from step five and an error on
+   * `email` renders into a `hidden` div on step two. Nothing appears, nothing
+   * scrolls, the button un-greys, and the form has silently refused you.
+   *
+   * It was reachable with a perfectly ordinary mistake, because the client
+   * gate (`missingOn`) only checks that a field is non-empty while the server
+   * checks that it is valid. A mistyped email, a nine-digit mobile or a GSTIN
+   * with a bad checksum all pass the first and fail the second — and
+   * `submitApplication` sets no `errors.form` for any of them, so the one
+   * message that does render above the steps stayed empty too.
+   *
+   * ## Why it moves the step rather than surfacing the message in place
+   *
+   * Because the fix has to end with the cursor in the box that is wrong. A
+   * summary alone tells somebody their email is malformed while leaving them
+   * on a screen with no email field on it, and they then have to work out
+   * which of five steps to go back to. The summary below is the belt; this is
+   * the braces.
+   */
+  useEffect(() => {
+    if (state.status !== 'error') return;
+    const fields = Object.keys(state.errors ?? {}).filter((k) => k !== 'form');
+
+    /* The earliest step with a problem, so somebody fixing several works
+       forwards through the form the way they filled it in. */
+    const target = fields
+      .map(stepOwning)
+      .filter((i): i is number => i !== null)
+      .sort((a, b) => a - b)[0];
+
+    if (target === undefined) return;
+
+    setStep(target);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    /* After the step has been painted, or the field is still `hidden` and
+       refuses focus — the same reason `required` could not be used here. */
+    const first = fields.find((f) => stepOwning(f) === target);
+    if (!first) return;
+    const timer = setTimeout(() => {
+      form.current?.querySelector<HTMLElement>(`[name="${first}"]`)?.focus();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [state]);
 
   function go(next: number) {
     // Backwards is always free. Nobody should have to fix a field to
@@ -320,6 +409,30 @@ export function ApplyForm() {
         >
           {err.form}
         </p>
+      ) : null}
+
+      {/* Outside the step divs, so it cannot be the thing that is hidden.
+          Every field error is repeated here as well as beside its field: the
+          effect above moves to the first one, and this says how many others
+          are waiting, which a single focused field cannot. */}
+      {fieldErrors.length > 0 ? (
+        <div
+          role="alert"
+          className="mb-5 rounded-[10px] bg-[var(--color-atrisk-soft)] px-4 py-3"
+        >
+          <p className="m-0 mb-1 text-[14px] font-semibold text-[var(--color-atrisk)]">
+            {fieldErrors.length === 1
+              ? 'One thing needs fixing before this can go.'
+              : `${fieldErrors.length} things need fixing before this can go.`}
+          </p>
+          <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+            {fieldErrors.map(([name, message]) => (
+              <li key={name} className="text-[14px] leading-relaxed text-[var(--color-atrisk)]">
+                <span className="font-medium">{LABELS[name] ?? name}</span> — {message}
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
 
       {/* Every step stays MOUNTED and is only hidden — see the note on the
