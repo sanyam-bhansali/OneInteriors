@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { signOutAction } from '@/app/sign-in/actions';
 import { isLive } from '@/modules/studio/features';
+import { crmIsOpen } from '@/modules/studio/standing';
 import { StudioShell, type NavGroup } from './StudioShell';
 
 /**
@@ -96,6 +97,16 @@ interface ShellContext {
   live: boolean;
   /** The real status, so PAUSED can be told apart from ONBOARDING. */
   status: string;
+  /**
+   * Have they handed their side back to us?
+   *
+   * The rail needs this for the same reason the dashboard does: a studio is
+   * ONBOARDING right up until ops approves them, so status alone cannot tell
+   * "still filling the form" from "finished and waiting on us". Without it the
+   * rail collapsed to Setup for the whole review week — on the very screen
+   * that had just told them their side was complete.
+   */
+  submittedForReview: boolean;
   pausedReason: string | null;
   /** Proposed times waiting on them. The only count worth a badge today. */
   toConfirm: number;
@@ -125,7 +136,21 @@ async function shellContext(userId: string): Promise<ShellContext | null> {
   try {
     const member = await prisma.studioMember.findUnique({
       where: { userId },
-      select: { studio: { select: { id: true, tradeName: true, slug: true, status: true, pausedReason: true } } },
+      select: {
+        studio: {
+          select: {
+            id: true,
+            tradeName: true,
+            slug: true,
+            status: true,
+            pausedReason: true,
+            /* Read raw rather than through `currentStudio()`, which this
+               function deliberately avoids — see the note above. The shape is
+               the same one `prisma-repository.ts` reads. */
+            onboardingSteps: true,
+          },
+        },
+      },
     });
     if (!member) return null;
 
@@ -181,6 +206,9 @@ async function shellContext(userId: string): Promise<ShellContext | null> {
          and do not stop being theirs because we took them out of rotation —
          the marketplace half is what a pause suspends. */
       status: studio.status,
+      submittedForReview:
+        (studio.onboardingSteps as { submittedForReview?: boolean } | null)?.submittedForReview ===
+        true,
       pausedReason: studio.pausedReason ?? null,
       toConfirm,
       draftQuotes,
@@ -210,8 +238,17 @@ async function shellContext(userId: string): Promise<ShellContext | null> {
 function navFor(context: ShellContext | null): NavGroup[] {
   /* Their own software stays reachable unless they never finished setup.
      A pause is a marketplace state: it stops us sending briefs, and it does
-     not repossess a studio's client list. */
-  const ownSoftware = context !== null && context.status !== 'ONBOARDING';
+     not repossess a studio's client list.
+
+     `crmIsOpen`, not `status !== 'ONBOARDING'`. The rule that the software
+     opens on submission rather than on approval lives in one pure function,
+     and the rail reading its own version of it was the bug: the dashboard
+     opened, the navigation did not, and a studio who had just been told
+     "your side is complete" was left with a rail holding Setup and nothing
+     else. One rule, one place — modules/studio/standing.ts. */
+  const ownSoftware =
+    context !== null &&
+    crmIsOpen({ status: context.status, submittedForReview: context.submittedForReview });
   const live = context?.live ?? false;
 
   const setup: NavGroup = {

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { rupeesToPaise } from '@/lib/money';
 import { saveBranding } from '@/modules/studio-quote/store';
+import { replaceLogo, clearLogo, setHideOurMark } from '@/modules/studio-quote/store';
 
 // `State` and `IDLE` live in studio/form-state.ts. A 'use server'
 // file may only export async functions — and Turbopack rejects even a
@@ -58,4 +59,64 @@ export async function saveBrandingAction(_prev: State, form: FormData): Promise<
   revalidatePath('/studio/settings');
   revalidatePath('/studio/quotations');
   return { ok: true };
+}
+
+// ── Logo and the attribution mark ──────────────────────────────
+
+export interface BrandAssetState {
+  status: 'idle' | 'saved' | 'error';
+  error?: string;
+}
+
+/**
+ * Take a new logo.
+ *
+ * Its own action and its own `<form>`, because a file input cannot live
+ * inside the branding form — HTML has no nested forms, and putting the file
+ * on the main form would mean every save of a phone number re-uploaded the
+ * logo.
+ */
+export async function uploadLogoAction(
+  _prev: BrandAssetState,
+  form: FormData,
+): Promise<BrandAssetState> {
+  const file = form.get('logo');
+  if (!(file instanceof File) || file.size === 0) {
+    return { status: 'error', error: 'Choose an image first.' };
+  }
+
+  const result = await replaceLogo(file);
+  if (!result.ok) return { status: 'error', error: result.error };
+
+  revalidatePath('/studio', 'layout');
+  return { status: 'saved' };
+}
+
+export async function clearLogoAction(
+  _prev: BrandAssetState,
+  _form: FormData,
+): Promise<BrandAssetState> {
+  const result = await clearLogo();
+  if (!result.ok) return { status: 'error', error: result.error };
+
+  revalidatePath('/studio', 'layout');
+  return { status: 'saved' };
+}
+
+/**
+ * Record what they want about our mark.
+ *
+ * Stored whatever their tier is — see `showsOurMark()`. Saving the wish for a
+ * studio who cannot yet act on it is what makes an upgrade take effect
+ * without anybody coming back to this screen.
+ */
+export async function setMarkAction(
+  _prev: BrandAssetState,
+  form: FormData,
+): Promise<BrandAssetState> {
+  const result = await setHideOurMark(form.get('hide') === 'on');
+  if (!result.ok) return { status: 'error', error: result.error };
+
+  revalidatePath('/studio', 'layout');
+  return { status: 'saved' };
 }

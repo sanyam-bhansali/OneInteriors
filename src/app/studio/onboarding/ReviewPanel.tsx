@@ -394,6 +394,29 @@ function Submitted() {
         and approve it before a single customer does.
       </p>
 
+      {/**
+       * The way out of this screen.
+       *
+       * Submitting opens the practice software — see `modules/studio/standing.ts`
+       * — but this page was the last thing a studio saw and said nothing about
+       * it, so the week of verification read as a week of being parked. The
+       * navigation carries them too; this is the one that is in front of them
+       * at the moment it becomes true.
+       */}
+      <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-[var(--color-ontrack)]/25 pt-5">
+        <Link
+          href="/studio"
+          className="inline-flex items-center gap-2 rounded-[12px] bg-[var(--color-petrol)] px-6 py-3 text-[15px] font-medium text-[var(--color-paper)]"
+        >
+          Open your software
+          <span aria-hidden="true">→</span>
+        </Link>
+        <p className="m-0 max-w-[42ch] text-[13.5px] leading-relaxed text-[var(--color-ink-2)]">
+          Your clients, your quotations and your rates are open now and are yours whatever we
+          decide. Briefs from us start when you are on the roster.
+        </p>
+      </div>
+
       <Tracker />
     </div>
   );

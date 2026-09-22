@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { PageBody } from '../StudioShell';
-import { myBranding } from '@/modules/studio-quote/store';
+import { myBranding, myTier } from '@/modules/studio-quote/store';
+import { logoUploadEnabled, signedLogoUrl } from '@/modules/storage/studio-logo';
 import { BrandingForm } from './BrandingForm';
+import { LogoAndMark } from './LogoAndMark';
 
 export const metadata: Metadata = {
   title: 'Settings',
@@ -29,6 +31,13 @@ export const dynamic = 'force-dynamic';
 export default async function SettingsPage() {
   const branding = await myBranding();
 
+  /* In parallel: neither depends on the other, and the signed URL is a round
+     trip to storage that should not sit behind a subscription lookup. */
+  const [logoUrl, tier] = await Promise.all([
+    signedLogoUrl(branding?.logoPath ?? null),
+    myTier(),
+  ]);
+
   return (
     <>
       <PageBody>
@@ -46,6 +55,19 @@ export default async function SettingsPage() {
         ) : null}
 
         <BrandingForm branding={branding} />
+
+        {/* Below the form, because both of these hang off the branding row the
+            form creates — and because a file picker at the top of a page of
+            text fields is the thing everybody tries first and cannot use. */}
+        <div className="mt-6">
+          <LogoAndMark
+            logoUrl={logoUrl}
+            hasBranding={branding !== null}
+            uploadEnabled={logoUploadEnabled()}
+            tier={tier}
+            hideRequested={branding?.hideOurMark ?? false}
+          />
+        </div>
       </PageBody>
     </>
   );

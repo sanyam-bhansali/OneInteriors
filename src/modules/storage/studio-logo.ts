@@ -24,27 +24,19 @@ import 'server-only';
  */
 
 import { supabaseConfig } from '@/lib/env';
+import { MAX_LOGO_BYTES, MAX_LOGO_MB, LOGO_TYPES, ACCEPTED_LOGO } from './logo-limits';
 
 const BUCKET = 'studio-logos';
-const MAX_BYTES = 2 * 1024 * 1024;
 const SIGNED_URL_SECONDS = 300;
 
-/**
- * SVG is deliberately absent.
- *
- * It is the best format for a logo and it is also a script-bearing document:
- * an SVG can carry JavaScript, and this one would be rendered inside a page
- * that shows a studio's pricing. Sanitising SVG properly is its own project,
- * and a PNG at 2x prints indistinguishably on paper.
- */
-const ALLOWED = new Map<string, string>([
-  ['image/png', 'png'],
-  ['image/jpeg', 'jpg'],
-  ['image/webp', 'webp'],
-]);
+/* From the pure sibling, so the number in the settings copy and the number
+   in this check cannot drift. See logo-limits.ts for why it is separate. */
+const MAX_BYTES = MAX_LOGO_BYTES;
 
-export const ACCEPTED_LOGO = 'PNG, JPG or WebP';
-export const MAX_LOGO_MB = MAX_BYTES / 1024 / 1024;
+const ALLOWED = new Map(Object.entries(LOGO_TYPES));
+
+/* Re-exported so server callers have one import for the whole feature. */
+export { ACCEPTED_LOGO, MAX_LOGO_MB } from './logo-limits';
 
 function secretKey(): string | null {
   const key = process.env.SUPABASE_SECRET_KEY?.trim();
