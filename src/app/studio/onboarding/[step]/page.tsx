@@ -207,6 +207,7 @@ export default async function OnboardingStepPage({
         {step === 'portfolio' ? (
           <PortfolioForm
             uploadEnabled={imageUploadEnabled()}
+            continueHref="/studio/onboarding/rates?done=portfolio"
             minimum={MIN_PORTFOLIO_PROJECTS}
             shortfallNote={studio.portfolioShortfallNote}
             projects={(await listProjects()).map((p) => ({

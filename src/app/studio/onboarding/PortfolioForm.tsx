@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useActionState, useState } from 'react';
 import { formatINRCompact } from '@/lib/money';
 import { removeProjectAction, declarePortfolioShortfallAction, type StepState } from './actions';
@@ -42,12 +43,23 @@ export function PortfolioForm({
   minimum,
   shortfallNote,
   uploadEnabled,
+  continueHref,
 }: {
   projects: ProjectRow[];
   minimum: number;
   /** What they have told us they have instead, if they have told us. */
   shortfallNote: string | null;
   uploadEnabled: boolean;
+  /**
+   * Where "Save and continue" goes, when there is anywhere to continue to.
+   *
+   * This component is also the whole of `/studio/work`, which is a studio
+   * managing their portfolio long after onboarding. A button there offering
+   * to move them on to Your rates would be moving them through a flow they
+   * finished months ago, so the step passes this and the standalone page
+   * does not.
+   */
+  continueHref?: string;
 }) {
   const [adding, setAdding] = useState(false);
   const short = projects.length < minimum;
@@ -115,11 +127,77 @@ export function PortfolioForm({
           to somebody who does not need one invites them to take it. */}
       {short && projects.length > 0 ? <ShortfallForm note={shortfallNote} /> : null}
 
+      {/* Nothing to continue past on an empty step — the empty state is one
+          button and the only sensible next action is pressing it. */}
+      {continueHref && projects.length > 0 ? (
+        <Continue
+          href={continueHref}
+          ready={projects.length >= minimum || Boolean(shortfallNote)}
+          remaining={minimum - projects.length}
+        />
+      ) : null}
+
       <ProjectModal
         open={adding}
         onClose={() => setAdding(false)}
         uploadEnabled={uploadEnabled}
       />
+    </div>
+  );
+}
+
+/**
+ * The way out of this step.
+ *
+ * ## Why this exists when the footer already has a Continue
+ *
+ * Because on this step it was the only one, and it sits below a grid of
+ * cards, a shortfall form and a tally — a long way past where somebody stops
+ * looking. Every other step in the flow ends in a full-width "Save and
+ * continue"; this one ended in a link that a studio who had just added their
+ * third project would never scroll to. The report was "it is stuck on that
+ * page", and being stuck and being unable to find the door look identical
+ * from the inside.
+ *
+ * ## Nothing to save
+ *
+ * A project is written when the modal closes, so there is no unsaved state
+ * here and this is a link rather than a submit. It carries `?done=portfolio`
+ * the same way the footer does, so the next step opens on its acknowledgement
+ * — and re-derives the claim before printing it.
+ */
+function Continue({
+  href,
+  ready,
+  remaining,
+}: {
+  href: string;
+  ready: boolean;
+  remaining: number;
+}) {
+  if (!ready) {
+    return (
+      <p className="m-0 border-t border-[var(--color-rule)] pt-5 text-[14px] text-[var(--color-ink-2)]">
+        {remaining === 1
+          ? 'One more project and you can move on.'
+          : `${remaining} more projects and you can move on.`}{' '}
+        Or tell us what you have instead, above.
+      </p>
+    );
+  }
+
+  return (
+    <div className="border-t border-[var(--color-rule)] pt-5">
+      <Link
+        href={href}
+        className="oi-save inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-[var(--color-petrol)] px-7 py-3.5 text-[15px] font-medium text-[var(--color-paper)] no-underline"
+      >
+        Save and continue
+        <span aria-hidden="true">→</span>
+      </Link>
+      <p className="m-0 mt-2.5 text-center text-[13px] text-[var(--color-ink-3)]">
+        Everything here is already saved. You can come back and add more at any time.
+      </p>
     </div>
   );
 }
