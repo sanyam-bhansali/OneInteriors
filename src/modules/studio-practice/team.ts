@@ -80,7 +80,7 @@ function quietBefore(): Date {
  * unusable. The local part of the email is what everybody calls each other in
  * a small office anyway.
  */
-function displayName(name: string | null, email: string | null): string {
+export function displayName(name: string | null, email: string | null): string {
   if (name && name.trim().length > 0) return name.trim();
   if (email) return email.split('@')[0] ?? email;
   return 'Someone';

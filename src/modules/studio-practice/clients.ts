@@ -28,6 +28,16 @@ export type { ClientSourceName, LostReasonName, StageKindName } from './vocabula
 
 import { BOARD_KINDS, BIN_DAYS } from './vocabulary';
 import type { ClientSourceName, LostReasonName, StageKindName } from './vocabulary';
+import { record, recordMany } from './events';
+import { displayName } from './team';
+import {
+  assignedSummary,
+  contactSummary,
+  createdSummary,
+  lostSummary,
+  stageSummary,
+  type CallOutcomeId,
+} from './event-copy';
 
 export interface ClientRow {
   id: string;
@@ -329,6 +339,15 @@ export async function addClient(input: NewClientInput): Promise<CreateResult> {
       },
       select: { id: true },
     });
+
+    await record({
+      studioId,
+      clientId: row.id,
+      kind: 'CREATED',
+      summary: createdSummary('typed', input.source === 'ONE_INTERIORS' ? 'OTHER' : input.source),
+      meta: { source: input.source },
+    });
+
     return { ok: true, id: row.id };
   } catch (error) {
     return saveFailed('addClient', error);
@@ -376,6 +395,16 @@ export async function updateClient(input: UpdateClientInput): Promise<Result> {
   }
 
   try {
+    /* Where it was, read before we move it. The timeline says "Moved from
+       Enquiry to Quoted", and after the update there is nothing left to ask.
+       Only fetched when a stage move is actually happening. */
+    const before = input.stageId
+      ? await prisma.studioClient.findFirst({
+          where: { id: input.id, studioId, deletedAt: null },
+          select: { stageId: true, stage: { select: { name: true } } },
+        })
+      : null;
+
     // `updateMany` scoped by studioId: an id from a form is not proof of
     // ownership, and this simply matches nothing when it is not theirs.
     const { count } = await prisma.studioClient.updateMany({
@@ -401,6 +430,28 @@ export async function updateClient(input: UpdateClientInput): Promise<Result> {
     });
 
     if (count === 0) return { ok: false, error: 'That client is not yours.' };
+
+    /* Only the stage move and the loss are worth a line. An edited follow-up
+       date or a retyped notes box is housekeeping, and a timeline padded with
+       housekeeping is one nobody reads — which costs us the entries that do
+       matter. AxLeads logs every field edit and its detail pages are mostly
+       noise as a result. */
+    if (input.stageId && kind) {
+      const to = (await myStages()).find((s) => s.id === input.stageId);
+      if (to) {
+        await record({
+          studioId,
+          clientId: input.id,
+          kind: kind === 'LOST' ? 'LOST' : 'STAGE_CHANGED',
+          summary:
+            kind === 'LOST'
+              ? lostSummary(input.lostReason ?? null, input.notes)
+              : stageSummary(before?.stage.name ?? null, to.name),
+          meta: { fromStageId: before?.stageId ?? null, toStageId: to.id, kind },
+        });
+      }
+    }
+
     return { ok: true };
   } catch (error) {
     return saveFailed('updateClient', error);
@@ -465,11 +516,44 @@ export async function assignClients(ids: string[], memberId: string | null): Pro
   }
 
   try {
-    const { count } = await prisma.studioClient.updateMany({
+    /* Read the ids back before the write. `updateMany` returns a count and a
+       count cannot say WHICH rows it touched — the same problem AxLeads hits
+       on its bulk claim — and a timeline row against a lead that was not
+       actually updated is a lie in a permanent record. */
+    const targets = await prisma.studioClient.findMany({
       where: { id: { in: ids }, studioId, deletedAt: null },
+      select: { id: true },
+    });
+    if (targets.length === 0) return { ok: false, error: 'None of those are yours.' };
+
+    const { count } = await prisma.studioClient.updateMany({
+      where: { id: { in: targets.map((t) => t.id) }, studioId, deletedAt: null },
       data: { assignedToId: memberId },
     });
     if (count === 0) return { ok: false, error: 'None of those are yours.' };
+
+    /* One row per lead, not one per action. Each lead's own history has to
+       show what happened to IT; the record of the bulk action itself is a
+       different thing. */
+    const toName = memberId
+      ? ((await prisma.studioMember.findUnique({
+          where: { id: memberId },
+          select: { user: { select: { name: true, email: true } } },
+        })) ?? null)
+      : null;
+
+    await recordMany(
+      targets.map((t) => ({
+        studioId,
+        clientId: t.id,
+        kind: 'ASSIGNED' as const,
+        summary: assignedSummary(
+          toName ? displayName(toName.user?.name ?? null, toName.user?.email ?? null) : null,
+        ),
+        meta: { toMemberId: memberId },
+      })),
+    );
+
     return { ok: true };
   } catch (error) {
     return saveFailed('assignClients', error);
@@ -484,7 +568,20 @@ export async function assignClients(ids: string[], memberId: string | null): Pro
  * as contact, the quiet list would empty itself every time somebody tidied up
  * the board, and it would stop meaning anything within a week.
  */
-export async function logContact(id: string): Promise<Result> {
+export async function logContact(
+  id: string,
+  /**
+   * What the contact produced. Optional, so the one-tap "I rang them" on the
+   * board keeps working exactly as it did.
+   *
+   * When it IS given, the timeline gets a line worth reading — "Called — no
+   * answer" rather than a bare timestamp. That distinction is the whole
+   * difference between a log and a record: a stack of "contacted" entries
+   * tells a studio how busy they were, not what is happening.
+   */
+  outcome?: CallOutcomeId,
+  note?: string | null,
+): Promise<Result> {
   const studioId = await myStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
@@ -494,6 +591,15 @@ export async function logContact(id: string): Promise<Result> {
       data: { lastContactedAt: new Date() },
     });
     if (count === 0) return { ok: false, error: 'That client is not yours.' };
+
+    await record({
+      studioId,
+      clientId: id,
+      kind: 'CONTACTED',
+      summary: contactSummary(outcome ?? 'spoke', note),
+      meta: outcome ? { outcome } : undefined,
+    });
+
     return { ok: true };
   } catch (error) {
     return saveFailed('logContact', error);
@@ -536,11 +642,30 @@ export async function binClients(ids: string[]): Promise<Result> {
       };
     }
 
+    const targets = await prisma.studioClient.findMany({
+      where: { id: { in: ids }, studioId, deletedAt: null },
+      select: { id: true },
+    });
+
     const { count } = await prisma.studioClient.updateMany({
       where: { id: { in: ids }, studioId, deletedAt: null },
       data: { deletedAt: new Date() },
     });
     if (count === 0) return { ok: false, error: 'None of those are yours.' };
+
+    /* Recorded even though the row is now invisible. The bin is reversible,
+       so a restored client has to be able to show that it was deleted on the
+       14th and brought back on the 16th — which is exactly the sequence
+       somebody will later want to explain. */
+    await recordMany(
+      targets.map((t) => ({
+        studioId,
+        clientId: t.id,
+        kind: 'BINNED' as const,
+        summary: `Deleted — erased automatically after ${BIN_DAYS} days`,
+      })),
+    );
+
     return { ok: true };
   } catch (error) {
     return saveFailed('binClients', error);
@@ -553,11 +678,26 @@ export async function restoreClients(ids: string[]): Promise<Result> {
   if (ids.length === 0) return { ok: false, error: 'Nothing selected.' };
 
   try {
+    const targets = await prisma.studioClient.findMany({
+      where: { id: { in: ids }, studioId, deletedAt: { not: null } },
+      select: { id: true },
+    });
+
     const { count } = await prisma.studioClient.updateMany({
       where: { id: { in: ids }, studioId, deletedAt: { not: null } },
       data: { deletedAt: null },
     });
     if (count === 0) return { ok: false, error: 'Nothing to restore.' };
+
+    await recordMany(
+      targets.map((t) => ({
+        studioId,
+        clientId: t.id,
+        kind: 'RESTORED' as const,
+        summary: 'Brought back out of the bin',
+      })),
+    );
+
     return { ok: true };
   } catch (error) {
     return saveFailed('restoreClients', error);
@@ -683,6 +823,13 @@ export async function importClients(rows: ImportRow[]): Promise<ImportResult | {
       return { ok: true, written: 0, alreadyHere: rows.length };
     }
 
+    /* Stamped before the write, so the read-back that gives each imported
+       row its first timeline line can find exactly this batch. A second
+       earlier than the createMany, which is the safe direction: catching a
+       row from an overlapping import would give it a duplicate CREATED line,
+       and missing one would give it none. */
+    const startedAt = new Date();
+
     const result = await prisma.studioClient.createMany({
       data: fresh.map((r) => ({
         studioId,
@@ -701,6 +848,25 @@ export async function importClients(rows: ImportRow[]): Promise<ImportResult | {
       })),
       skipDuplicates: true,
     });
+
+    /* `createMany` does not return ids, so the rows have to be read back to
+       give each one its own first line. Bounded by the same batch that was
+       just written, and worth the query: an imported lead with a blank
+       history looks like a lead nobody ever did anything about. */
+    if (result.count > 0) {
+      const written = await prisma.studioClient.findMany({
+        where: { studioId, sourceNote: IMPORT_NOTE, createdAt: { gte: startedAt } },
+        select: { id: true },
+      });
+      await recordMany(
+        written.map((w) => ({
+          studioId,
+          clientId: w.id,
+          kind: 'CREATED' as const,
+          summary: createdSummary('imported', IMPORT_SOURCE),
+        })),
+      );
+    }
 
     return { ok: true, written: result.count, alreadyHere: rows.length - result.count };
   } catch (error) {
@@ -728,6 +894,73 @@ export interface FoundClient {
  * should find nothing here and go to the bin, rather than find a row that
  * behaves oddly everywhere else.
  */
+/**
+ * One client, for the detail page.
+ *
+ * Scoped by `studioId` from the session, so an id guessed or pasted from
+ * somewhere else simply returns null rather than 403ing — a 403 would confirm
+ * the row exists, which is the enumeration leak AxLeads' scope module refuses
+ * for the same reason.
+ *
+ * `LISTED` rather than `LIVE`: the sample lead has a detail page like anything
+ * else, because a studio poking at the sample to see how the product works is
+ * the sample doing its job.
+ */
+export async function clientById(id: string): Promise<ClientRow | null> {
+  const studioId = await myStudioId();
+  if (!studioId) return null;
+
+  try {
+    const row = await prisma.studioClient.findFirst({
+      where: { id, studioId, ...LISTED },
+      include: {
+        stage: { select: { id: true, name: true, kind: true, colour: true } },
+        assignedTo: { select: { id: true, user: { select: { name: true, email: true } } } },
+        quotes: { select: { id: true, lines: { select: { amountPaise: true } } } },
+      },
+    });
+    if (!row) return null;
+
+    const quoted = row.quotes.reduce(
+      (sum, q) => sum + q.lines.reduce((s, l) => s + fromDb(l.amountPaise), 0),
+      0,
+    );
+
+    return {
+      id: row.id,
+      name: row.name,
+      phone: row.phone,
+      email: row.email,
+      society: row.society,
+      locality: row.locality,
+      config: row.config,
+      carpetSqft: row.carpetSqft,
+      source: row.source as ClientSourceName,
+      sourceNote: row.sourceNote,
+      stageId: row.stage.id,
+      stageName: row.stage.name,
+      stageKind: row.stage.kind as StageKindName,
+      stageColour: row.stage.colour,
+      lostReason: row.lostReason as LostReasonName | null,
+      nextAction: row.nextAction,
+      nextActionOn: row.nextActionOn,
+      fromMarketplace: row.briefId !== null || row.introductionId !== null,
+      notes: row.notes,
+      quoteCount: row.quotes.length,
+      quotedPaise: row.quotes.length > 0 ? quoted : null,
+      isDemo: row.isDemo,
+      assignedToId: row.assignedToId,
+      assignedToName: row.assignedTo ? personName(row.assignedTo.user) : null,
+      lastContactedAt: row.lastContactedAt,
+      fields: readValues(row.fields),
+      updatedAt: row.updatedAt,
+    };
+  } catch (error) {
+    console.error('[studio-practice] clientById failed', error);
+    return null;
+  }
+}
+
 export async function findClients(query: string): Promise<FoundClient[]> {
   const studioId = await myStudioId();
   if (!studioId) return [];

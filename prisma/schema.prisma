@@ -547,15 +547,16 @@ model Studio {
   wonQuoteDecisions QuoteDecision[] @relation("FirstQuoteWinner")
 
   // The studio's own software. See the section at the foot of this file.
-  branding         StudioBranding?
-  products         StudioProduct[]
-  studioQuotes     StudioQuote[]
-  studioClients    StudioClient[]
-  studioStages     StudioStage[]
-  studioFields     StudioField[]
-  studioProjects   StudioProject[]
-  studioVendors    StudioVendor[]
-  studioWorkOrders StudioWorkOrder[]
+  branding           StudioBranding?
+  products           StudioProduct[]
+  studioQuotes       StudioQuote[]
+  studioClients      StudioClient[]
+  studioClientEvents StudioClientEvent[]
+  studioStages       StudioStage[]
+  studioFields       StudioField[]
+  studioProjects     StudioProject[]
+  studioVendors      StudioVendor[]
+  studioWorkOrders   StudioWorkOrder[]
 
   /// Past quotations the studio sent us, for deriving their rate card.
   quotationArchives QuotationArchive[]
@@ -592,6 +593,9 @@ model StudioMember {
 
   /// Everything this person is working. See `StudioClient.assignedTo`.
   clients StudioClient[]
+
+  /// What they have done. SetNull on removal, so a leaver's history stays.
+  clientEvents StudioClientEvent[]
 
   @@index([studioId])
   @@map("studio_members")
@@ -1884,6 +1888,7 @@ model StudioClient {
 
   quotes   StudioQuote[]
   projects StudioProject[]
+  events   StudioClientEvent[]
 
   /// One row per introduction, so a redelivery cannot create a second
   /// client for the same handoff.
@@ -1893,6 +1898,128 @@ model StudioClient {
   @@index([studioId, deletedAt])
   @@index([studioId, assignedToId, deletedAt])
   @@map("studio_clients")
+}
+
+/// What kind of thing happened to a lead.
+///
+/// Kept deliberately short. AxLeads carries twenty kinds and several of them
+/// exist only because a feature was planned — COLD_TRIGGER_SENT and
+/// HOT_ALERTED are written by code paths that have never run in production.
+/// An enum value that nothing writes is a promise on a timeline that never
+/// keeps it, so these are only the events something already emits.
+///
+/// Adding a kind is a migration, on purpose: it forces the question of who
+/// writes it and what the line reads like before it can be rendered.
+enum ClientEventKind {
+  /// The lead arrived. The payload says how — typed, imported, or from us.
+  CREATED
+  /// Moved between columns. Payload carries the from/to stage names.
+  STAGE_CHANGED
+  /// Somebody rang, messaged or met them. The only writer of lastContactedAt.
+  CONTACTED
+  /// Given to a person, or returned to the pool.
+  ASSIGNED
+  /// Free text the studio wrote against this lead.
+  NOTE
+  /// A quotation was written for them.
+  QUOTED
+  /// Marked lost. Payload carries the reason.
+  LOST
+  /// Soft-deleted, or brought back out of the bin.
+  BINNED
+  RESTORED
+  /// The customer asked One Interiors to withdraw the introduction.
+  WITHDRAWN
+}
+
+/// Who did it.
+///
+/// `SYSTEM` is load-bearing rather than decorative: a timeline that renders
+/// every line as "you" would credit a studio member with the introduction
+/// bridge creating a card at 2am. When the actor is us, the line has to say
+/// so, because the studio's reading of their own history depends on knowing
+/// which half they were responsible for.
+enum EventActor {
+  MEMBER
+  SYSTEM
+}
+
+/// One line of a lead's history.
+///
+/// ## Why this exists
+///
+/// Before this table, a lead's entire past was a single overwritable `notes`
+/// column and `lastContactedAt` — one timestamp, which is not a log. Edits
+/// were not even written to `AuditLog`. So "what happened with the Kothari
+/// enquiry" had no answer beyond whatever the last person to touch it
+/// remembered, and the studio's own record of its work disappeared every time
+/// somebody retyped the notes box.
+///
+/// It is also the foundation the rest of the CRM stands on: call outcomes,
+/// stage history and the assignment trail are all reads of this table rather
+/// than three more columns on the client.
+///
+/// ## Append-only by convention
+///
+/// Nothing updates a row here and nothing deletes one except the cascade from
+/// its client. A history you can edit is a history you cannot rely on, and the
+/// entire point is to be relied on in an argument about what was promised.
+///
+/// The exception is the cascade itself: erasing a client from the bin takes
+/// its timeline with it, because keeping a detailed record of somebody after
+/// deleting them at their own request is the opposite of what the delete was
+/// for.
+model StudioClientEvent {
+  id String @id @default(cuid())
+
+  /// Denormalised from the client on purpose. Every read here is "this
+  /// studio's", the same as everywhere else in studio-practice, and joining
+  /// through studio_clients to prove ownership on a table this chatty would
+  /// make the cheapest query in the module the most expensive.
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  clientId String
+  client   StudioClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  kind  ClientEventKind
+  actor EventActor      @default(MEMBER)
+
+  /// The member who did it. Null for SYSTEM, and null for a member who has
+  /// since left — `onDelete: SetNull`, because losing the fact that a stage
+  /// change happened is worse than losing who made it.
+  byId String?
+  by   StudioMember? @relation(fields: [byId], references: [id], onDelete: SetNull)
+
+  /// The name at the time, kept alongside the id.
+  ///
+  /// A timeline is a historical record, so it has to survive the person
+  /// leaving. Reading the name through the relation would silently rewrite
+  /// two years of history to "Unknown" the day somebody is removed from the
+  /// team — the id is for linking, this is for reading.
+  byName String?
+
+  /// One line, already written, in the studio's own vocabulary.
+  ///
+  /// Composed at write time rather than rendered from `meta` at read time.
+  /// A stage rename would otherwise retroactively change what the timeline
+  /// says happened, and "moved to Quoted" has to keep saying Quoted even
+  /// after the column is renamed to Priced — that is what makes it a record
+  /// rather than a view.
+  summary String @db.Text
+
+  /// The structured version, for anything that needs to compute rather than
+  /// display: from/to stage ids, a call outcome, a lost reason.
+  meta Json?
+
+  createdAt DateTime @default(now())
+
+  /// The timeline read: one client, newest first.
+  @@index([clientId, createdAt])
+  /// "What has this studio been doing", and the per-member activity read.
+  @@index([studioId, createdAt])
+  @@index([studioId, kind, createdAt])
+  @@map("studio_client_events")
 }
 
 enum ProjectStage {

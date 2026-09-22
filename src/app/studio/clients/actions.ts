@@ -13,6 +13,7 @@ import {
   type ClientSourceName,
   type LostReasonName,
 } from '@/modules/studio-practice/clients';
+import { isCallOutcome } from '@/modules/studio-practice/event-copy';
 
 // `State` and `IDLE` live in studio/form-state.ts. A 'use server'
 // file may only export async functions — and Turbopack rejects even a
@@ -116,10 +117,22 @@ export async function assignAction(ids: string[], memberId: string | null): Prom
  * `lastContactedAt`, and that column is what the quiet counts are built on. An
  * edit to a follow-up note is not evidence anybody called.
  */
-export async function logContactAction(id: string): Promise<State> {
-  const result = await logContact(id);
+export async function logContactAction(
+  id: string,
+  /* Both optional, so the board's one-tap button is unchanged. The detail
+     page passes them; the card does not. */
+  outcome?: string,
+  note?: string | null,
+): Promise<State> {
+  /* Validated against the list rather than cast. An outcome arriving from a
+     form is a string, and an unrecognised one would be written verbatim into
+     a permanent record that nothing can edit afterwards. */
+  const checked = outcome && isCallOutcome(outcome) ? outcome : undefined;
+
+  const result = await logContact(id, checked, note ?? null);
   if (!result.ok) return result;
   refresh();
+  revalidatePath(`/studio/clients/${id}`);
   return { ok: true };
 }
 

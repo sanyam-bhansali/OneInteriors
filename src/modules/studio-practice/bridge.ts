@@ -74,6 +74,8 @@ import 'server-only';
 import type { Prisma } from '@prisma/client';
 import { paiseToLakhs, fromDb } from '@/lib/money';
 import { cardFacts, FIRST_ACTION, firstActionOn, type BriefFacts } from './bridge-facts';
+import { record } from './events';
+import { createdSummary } from './event-copy';
 import { DEFAULT_STAGES } from './vocabulary';
 
 /** What a bridge attempt did, for the audit trail. Never thrown. */
@@ -224,6 +226,21 @@ export async function bridgeIntroduction(db: Db, introductionId: string): Promis
       select: { id: true },
     });
 
+    /* SYSTEM, explicitly. A timeline that credited a studio member with a
+       card the bridge made at 2am would be quietly wrong about the one thing
+       the studio needs this record for: which half of their history they were
+       responsible for. `by: null` is the three-state convention — not
+       "work it out", but "it was us". */
+    await record({
+      studioId: intro.studioId,
+      clientId: created.id,
+      kind: 'CREATED',
+      summary: createdSummary('introduced', 'ONE_INTERIORS'),
+      meta: { introductionId: intro.id, briefId: intro.briefId },
+      by: null,
+      db,
+    });
+
     return { kind: 'created', clientId: created.id };
   } catch (error) {
     console.error('[bridge] introduction → board failed', introductionId, error);
@@ -279,7 +296,28 @@ export async function redactWithdrawn(db: Db, introductionId: string): Promise<B
       },
     });
 
-    return result.count > 0 ? { kind: 'existing', clientId: '' } : { kind: 'no_contact' };
+    if (result.count === 0) return { kind: 'no_contact' };
+
+    /* The redaction itself goes on the record. A card that silently turns
+       into "Withdrawn enquiry" reads as a bug; a line saying the customer
+       asked us to withdraw it reads as what happened — and the studio keeps
+       every entry they wrote before that point. */
+    const card = await db.studioClient.findFirst({
+      where: { introductionId },
+      select: { id: true, studioId: true },
+    });
+    if (card) {
+      await record({
+        studioId: card.studioId,
+        clientId: card.id,
+        kind: 'WITHDRAWN',
+        summary: 'The customer asked One Interiors to withdraw the introduction',
+        by: null,
+        db,
+      });
+    }
+
+    return { kind: 'existing', clientId: card?.id ?? '' };
   } catch (error) {
     console.error('[bridge] redact on withdrawal failed', introductionId, error);
     return { kind: 'failed', reason: 'That did not save.' };
