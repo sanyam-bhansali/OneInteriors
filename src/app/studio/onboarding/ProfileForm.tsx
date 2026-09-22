@@ -91,7 +91,12 @@ export function ProfileForm({ defaults }: { defaults: ProfileDefaults }) {
 
   const describedOk = about.trim().length >= MIN_ABOUT_LENGTH;
   const areasOk = localities.length > 0;
-  const detailsOk = years !== '' && team !== '';
+  /* Zero years is a real answer and zero people is not — `count()` on the
+     server rejects a team of nobody, and a free text box can now express one
+     where a dropdown starting at 1 could not. Matching that here means the
+     button does not go live for a value the save will refuse. */
+  const teamOk = team !== '' && Number(team) >= 1;
+  const detailsOk = years !== '' && teamOk;
   const budgetOk = minLakhs !== '' && maxLakhs !== '';
 
   /**
@@ -112,7 +117,7 @@ export function ProfileForm({ defaults }: { defaults: ProfileDefaults }) {
     !describedOk ? 'a description' : null,
     !areasOk ? 'at least one area' : null,
     years === '' ? 'years active' : null,
-    team === '' ? 'team size' : null,
+    !teamOk ? 'team size' : null,
     minLakhs === '' ? 'your smallest project' : null,
     maxLakhs === '' ? 'your largest project' : null,
   ].filter((m): m is string => m !== null);
@@ -179,33 +184,32 @@ export function ProfileForm({ defaults }: { defaults: ProfileDefaults }) {
         done={detailsOk}
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Picker
+          <Count
             label="Years active"
             name="yearsActive"
             value={years}
             onChange={setYears}
-            placeholder="Select years"
+            placeholder="14"
+            suffix="years"
+            max={80}
             error={err.yearsActive}
-            /* From 0, because a studio in its first year is a real answer and
-               was briefly unrepresentable here — `count()` rejected zero and
-               the step then asked for a field they had filled in. */
-            options={range(0, 30).map((n) => ({
-              value: String(n),
-              label: n === 0 ? 'Our first year' : `${n} year${n === 1 ? '' : 's'}`,
-            }))}
+            /* Said out loud because zero is a real answer and looks like a
+               refusal to answer. A studio in its first year was briefly
+               unrepresentable here — `count()` rejected zero, so the step
+               asked again for a field they had filled in correctly. */
+            hint="0 if this is your first year."
           />
-          <Picker
+          <Count
             label="Team size"
             name="teamSize"
             value={team}
             onChange={setTeam}
-            placeholder="Select team size"
+            placeholder="9"
+            suffix="people"
+            min={1}
+            max={500}
             error={err.teamSize}
             hint="Including yourself."
-            options={range(1, 50).map((n) => ({
-              value: String(n),
-              label: `${n} ${n === 1 ? 'person' : 'people'}`,
-            }))}
           />
         </div>
       </Section>
@@ -304,36 +308,53 @@ function Needed({ when }: { when: boolean }) {
   );
 }
 
-function range(from: number, to: number): number[] {
-  return Array.from({ length: to - from + 1 }, (_, i) => from + i);
-}
-
 /**
- * A select that looks like the text inputs beside it.
+ * A number somebody types, with its unit on the field.
  *
- * The values are exact integers, never bands. "5–10 years" would have to be
- * stored as one number or a new column, and storing the lower bound means the
- * profile says five when they said five-to-ten — a small lie that nobody can
- * later tell from a true five.
+ * ## Why this replaced a dropdown
+ *
+ * Both of these were selects of exact integers — 0 to 30 years, 1 to 50
+ * people. The values were right and the control was wrong: choosing "11
+ * people" meant opening a fifty-item list and scrolling most of the way down
+ * it, which is slower than typing two characters and feels broken long before
+ * anybody works out that it isn't. A dropdown is for a short list of things
+ * somebody is choosing between, not for an arbitrary number they already
+ * know.
+ *
+ * The data contract is unchanged, which is the part worth keeping: these
+ * still post exact integers, never bands. "5–10 years" would have to be
+ * stored as one number, and storing the lower bound makes the profile say
+ * five when they said five-to-ten — a small lie nobody can later tell from a
+ * true five.
+ *
+ * ## `inputMode="numeric"` as well as `type="number"`
+ *
+ * The type gets the validation and the spinner; the input mode is what
+ * actually raises a numeric keypad on Android, which ignores the type alone
+ * often enough to matter on a form most studios will fill in on a phone.
  */
-function Picker({
+function Count({
   label,
   name,
   value,
   onChange,
-  options,
   placeholder,
+  suffix,
   hint,
   error,
+  min = 0,
+  max,
 }: {
   label: string;
   name: string;
   value: string;
   onChange: (v: string) => void;
-  options: { value: string; label: string }[];
   placeholder: string;
+  suffix: string;
   hint?: string;
   error?: string;
+  min?: number;
+  max: number;
 }) {
   return (
     <div>
@@ -342,30 +363,29 @@ function Picker({
         <Needed when={value === ''} />
       </label>
       <div className="relative">
-        <select
+        <input
           id={name}
           name={name}
+          type="number"
+          inputMode="numeric"
+          step="1"
+          min={min}
+          max={max}
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          /* Digits only, and the empty string kept as itself. Stripping
+             non-digits here rather than rejecting on submit means a pasted
+             "12 people" becomes 12 instead of an error about a field they
+             filled in. */
+          onChange={(e) => onChange(e.target.value.replace(/[^\d]/g, ''))}
+          placeholder={placeholder}
           aria-invalid={Boolean(error)}
-          className={`oi-input w-full appearance-none rounded-[11px] border border-[var(--color-rule)] py-2.5 pl-4 pr-10 text-[14.5px] ${
-            value === '' ? 'text-[var(--color-ink-3)]' : 'text-[var(--color-ink)]'
-          }`}
-        >
-          <option value="">{placeholder}</option>
-          {options.map((o) => (
-            <option key={o.value} value={o.value} className="text-[var(--color-ink)]">
-              {o.label}
-            </option>
-          ))}
-        </select>
+          className="oi-input tabular-nums w-full rounded-[11px] border border-[var(--color-rule)] py-2.5 pl-4 pr-20 text-[14.5px]"
+        />
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--color-ink-3)]"
+          className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[13.5px] text-[var(--color-ink-3)]"
         >
-          <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="M4 6.5 L8 10.5 L12 6.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          {suffix}
         </span>
       </div>
       {hint && !error ? (
