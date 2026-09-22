@@ -50,8 +50,16 @@ export function AreaPicker({
   const [query, setQuery] = useState('');
   const [showAll, setShowAll] = useState(false);
 
+  /* Keyed by `string`, not by the union of known slugs.
+     `PUNE_LOCALITIES` is a const array, so inference narrows the key to the
+     sixty literal slugs — and then `bySlug.get(slug)` fails to compile,
+     because `selected` is string[] and can legitimately hold a slug this
+     build does not know about: a locality retired since the studio saved its
+     profile, or one added by hand. Widening here rather than casting at the
+     call site, so the lookup keeps returning `undefined` for an unknown slug
+     and the caller keeps falling back to the raw value. */
   const bySlug = useMemo(
-    () => new Map(PUNE_LOCALITIES.map((l) => [l.slug, l])),
+    () => new Map<string, (typeof PUNE_LOCALITIES)[number]>(PUNE_LOCALITIES.map((l) => [l.slug, l])),
     [],
   );
 

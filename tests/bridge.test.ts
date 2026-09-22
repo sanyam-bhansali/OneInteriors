@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
@@ -132,7 +132,6 @@ describe('the bridge cannot be reached from the studio surface', () => {
    * it. If that ever stops being true, this fails.
    */
   it('is not imported by anything under src/app/studio', () => {
-    const { readdirSync, statSync } = require('node:fs') as typeof import('node:fs');
     const offenders: string[] = [];
 
     const walk = (dir: string) => {
