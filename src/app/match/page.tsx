@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { cachedRoster } from '@/modules/studio/roster-cache';
 import { showUnverifiedStudios } from '@/lib/env';
+import { resolveRatesForMany } from '@/modules/quotation/resolve-rates';
 import { MatchClient } from './MatchClient';
 
 export const metadata: Metadata = {
@@ -35,5 +36,24 @@ export default async function MatchPage() {
    * server reads it and hands down the answer, rather than the client reading a
    * variable that would be `undefined` in the bundle.
    */
-  return <MatchClient studios={studios} allowUnverified={showUnverifiedStudios()} />;
+  /**
+   * Resolved on the server, per studio, and handed down.
+   *
+   * Same reasoning as `allowUnverified` above: the ranking runs in the
+   * browser but the rates live in Postgres, and a client component cannot
+   * read them. A studio that has not filed an archive resolves to the
+   * placeholder table, so this changes nothing for the roster as it stands
+   * and everything for a studio the moment ops approves their rates.
+   */
+  const filedRates = await resolveRatesForMany(studios.map((s) => s.slug));
+
+  return (
+    <MatchClient
+      studios={studios}
+      allowUnverified={showUnverifiedStudios()}
+      filedRates={Object.fromEntries(
+        Object.entries(filedRates).map(([slug, r]) => [slug, r.rates]),
+      )}
+    />
+  );
 }

@@ -8,6 +8,8 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
+import { after } from 'next/server';
+import { analyseArchive } from '@/modules/quotation/filed-rate-store';
 import { requireRole } from '@/modules/auth/session';
 import { currentStudio } from './onboarding';
 import {
@@ -20,6 +22,16 @@ import {
 import type { ArchiveState, ArchiveSummary } from './quotation-archive';
 
 export interface ArchiveDetail extends ArchiveSummary {
+  /**
+   * What the automatic reader has done with this archive.
+   *
+   * A separate axis from `state`, which is what OPS has done. They move
+   * independently and the normal case needs both — read by the machine and
+   * still waiting on a person. See `quotation/analysis-states.ts`.
+   */
+  analysisState: string;
+  /** For ops, not the studio. Extraction fails in ways worth reading. */
+  analysisError: string | null;
   id: string;
   uploadedAt: string;
   files: { id: string; filename: string; bytes: number; path: string }[];
@@ -28,6 +40,9 @@ export interface ArchiveDetail extends ArchiveSummary {
 function toDetail(row: {
   id: string;
   state: string;
+  /** What the automatic reader has done. Separate axis — see analysis-states.ts. */
+  analysisState: string;
+  analysisError: string | null;
   quotationCount: number | null;
   note: string | null;
   uploadedAt: Date;
@@ -36,6 +51,8 @@ function toDetail(row: {
   return {
     id: row.id,
     state: row.state as ArchiveState,
+    analysisState: row.analysisState,
+    analysisError: row.analysisError,
     quotationCount: row.quotationCount,
     note: row.note,
     fileCount: row.files.length,
@@ -139,15 +156,39 @@ export async function uploadQuotations(files: File[]): Promise<UploadOutcome> {
       select: { id: true },
     });
 
+    let archiveId: string;
     if (open) {
       await prisma.quotationFile.createMany({
         data: stored.map((f) => ({ archiveId: open.id, ...f })),
       });
+      archiveId = open.id;
     } else {
-      await prisma.quotationArchive.create({
+      const created = await prisma.quotationArchive.create({
         data: { studioId: context.studio.id, files: { create: stored } },
+        select: { id: true },
       });
+      archiveId = created.id;
     }
+
+    /**
+     * Start reading them, without making the studio wait.
+     *
+     * Twenty documents through the extractor is minutes, not seconds, so it
+     * cannot happen inside this request — the upload would time out and the
+     * studio would be told their files failed when they are sitting safely
+     * in the bucket.
+     *
+     * `after()` runs once the response is sent. It is best-effort by nature:
+     * a cold start killed mid-flight leaves the archive at NOT_STARTED,
+     * which is a state ops can see and re-run from, and is exactly where
+     * every archive sat before this existed. Nothing is lost by it not
+     * running — only time.
+     *
+     * `analyseArchive` never throws; its failures land in `analysisState`.
+     * The `catch` is belt and braces for an unhandled rejection reaching a
+     * serverless function, where it would take the instance down.
+     */
+    after(() => analyseArchive(archiveId).catch(() => {}));
   } catch {
     // The objects are in the bucket but unreferenced. Remove them rather than
     // leaving files nobody can find and nobody can delete.

@@ -11,6 +11,8 @@ import {
 const INITIAL: UploadState = { status: 'idle' };
 
 export interface ArchiveView {
+  /** What the automatic reader has done, as opposed to what ops has. */
+  analysisState: string;
   state: ArchiveState;
   quotationCount: number | null;
   fileCount: number;
@@ -69,9 +71,24 @@ export function ArchivePanel({
         so anything you can open, we can.
       </p>
 
+      {/* This paragraph used to say "read by us and nobody else". That became
+          untrue the moment the extractor was switched on: the documents go to
+          Anthropic's API whole, because whole documents extract far more
+          reliably from the layouts studios actually use than stripped line
+          items do.
+
+          The choice was made deliberately and the disclosure is the other
+          half of it. A studio handing over their back catalogue is handing
+          over their pricing and their clients' names, and finding out later
+          where it went would be a betrayal of exactly the trust this page
+          asks for. It is stated here, before the upload control, not in a
+          policy nobody opens. */}
       <p className="m-0 mb-5 max-w-[62ch] text-[13.5px] leading-relaxed text-[var(--color-ink-2)]">
-        They are read by us and nobody else. Not published, not shown to another studio, not shown
-        to a customer, and never used for anything but building the rates below.
+        They are never published, never shown to another studio, never shown to a customer, and
+        never used for anything but building the rates below. To read them we send them to
+        Anthropic, the company whose software does the reading — they are not used to train
+        anything, and nobody there is looking at your pricing. If you would rather they did not
+        leave us, say so and we will read them by hand instead.
       </p>
 
       {archive ? (

@@ -25,6 +25,7 @@ import { useCallback, useState } from 'react';
 import { formatINRCompact } from '@/lib/money';
 import { buildFirstQuote, STANDARD_KITCHEN_RUN_MM, type FirstQuote } from '@/modules/quotation/first-quote';
 import { filedRatesFor, ratesAreReal } from '@/data/filed-rates';
+import type { StudioRates } from '@/modules/quotation/catalogue';
 import type { Material } from '@/modules/materials/glossary';
 import type { FloorPlan } from '@/modules/quotation/project-store';
 import { Building } from './Building';
@@ -289,8 +290,17 @@ export function QuoteFlow({
   onBuilt,
   seenQuestions,
   onAsked,
+  filedRates,
 }: {
   request: QuoteRequest;
+  /**
+   * This studio's rates, resolved on the server.
+   *
+   * Optional, and the fallback below is load-bearing rather than defensive:
+   * most of the roster has not filed an archive, and this component also runs
+   * on a journey restored from browser storage where no server pass happened.
+   */
+  filedRates?: StudioRates;
   /** A plan already given for an earlier studio. Skips the gate. */
   plan: FloorPlan | null;
   onBuilt: (quote: FirstQuote, plan: FloorPlan) => void;
@@ -318,12 +328,17 @@ export function QuoteFlow({
         kitchenRunMm: usedPlan.kitchenRunMm,
         runSource: usedPlan.source,
       },
-      filedRatesFor(request.studioSlug),
+      /* The studio's own filed rates when the server resolved them, and the
+         placeholder table otherwise. The fallback is not defensive tidiness:
+         most of the roster has not filed an archive yet, and this component
+         also runs on a journey restored from storage where no server pass
+         happened. See `resolve-rates.ts` for why the two coexist. */
+      filedRates ?? filedRatesFor(request.studioSlug),
     );
     setQuote(built);
     setPhase('done');
     onBuilt(built, usedPlan);
-  }, [usedPlan, request, onBuilt]);
+  }, [usedPlan, request, onBuilt, filedRates]);
 
   if (phase === 'gate') return <Gate onReady={start} />;
   if (phase === 'building' || !quote || !usedPlan) {

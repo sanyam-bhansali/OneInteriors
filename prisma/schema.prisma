@@ -70,6 +70,7 @@ model User {
   /// Documents this person reviewed. SetNull on the other side — removing an
   /// ops account must not delete the record of what they decided.
   reviewedDocs  StudioDocument[] @relation("StudioDocumentReviewer")
+  reviewedRates StudioFiledRate[] @relation("FiledRateReviewer")
 
   @@index([role])
   @@map("users")
@@ -600,6 +601,7 @@ model Studio {
   /// Past quotations the studio sent us, for deriving their rate card.
   quotationArchives QuotationArchive[]
   documents         StudioDocument[]
+  filedRates        StudioFiledRate[]
 
   @@index([city, status, tier])
   /// Every customer-facing query filters paused studios out.
@@ -2626,7 +2628,19 @@ model QuotationArchive {
   reviewedAt DateTime?
   updatedAt  DateTime  @updatedAt
 
-  files QuotationFile[]
+  /// Where automatic reading has got to, separate from `state`.
+  ///
+  /// `state` describes what OPS has done. This describes what the MACHINE has
+  /// done, and they move independently: an archive can be read automatically
+  /// and still be waiting on a person, which is the normal case and the one
+  /// this split exists to represent. See `analysis-states.ts`.
+  analysisState String    @default("NOT_STARTED")
+  /// For ops, not for the studio. Extraction fails in ways worth reading.
+  analysisError String?   @db.Text
+  analysedAt    DateTime?
+
+  files      QuotationFile[]
+  filedRates StudioFiledRate[]
 
   @@index([studioId, uploadedAt])
   @@index([state])
@@ -2706,4 +2720,67 @@ model StudioDocument {
   @@index([studioId])
   @@index([studioId, state])
   @@map("studio_documents")
+}
+
+
+/// One rate, for one catalogue item, derived from one studio's own quotations.
+///
+/// ## Why this table exists
+///
+/// `src/data/filed-rates.ts` says in its own header that the per-studio
+/// variation in it is a placeholder, to be replaced by what
+/// `ingestQuotations()` derives from each studio's archive. That function has
+/// been written and tested for some time; there was simply nowhere to put its
+/// output. This is that place, and the placeholder file stays as the fallback
+/// for a studio that has not filed.
+///
+/// ## Nothing here reaches a customer unreviewed
+///
+/// Rows land as PENDING. A rate read out of a PDF by a model is evidence, not
+/// a price — see `analysis-states.ts` for the whole progression.
+model StudioFiledRate {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  /// The archive this was derived from, so a rate can always be traced back
+  /// to the documents behind it. SetNull: deleting an archive must not
+  /// silently remove the rates a customer is being quoted at.
+  archiveId String?
+  archive   QuotationArchive? @relation(fields: [archiveId], references: [id], onDelete: SetNull)
+
+  /// A catalogue item code. Text, not a relation — the catalogue lives in
+  /// code because it is the one thing identical for every studio, and a row
+  /// for a code since retired must stay readable rather than break a join.
+  code String
+
+  /// Per sqft of face for AREA, per unit for UNIT, per sqft carpet, per bath.
+  ratePaise BigInt
+
+  /// How many of the studio's quotations this ONE rate came from.
+  ///
+  /// Per rate and not per archive, which is the point: a studio can file
+  /// forty quotations of which three mention a mandir. The kitchen rate is
+  /// then solid and the mandir rate is one designer's mood, and without this
+  /// they look identical on the screen ops approves them from.
+  fromQuotations Int
+
+  /// The studio's own words for the material on this line. The canonical line
+  /// is identical for everybody, so this is the only place two studios can
+  /// visibly differ on something other than price.
+  spec String?
+
+  /// PENDING · LIVE · REJECTED · SUPERSEDED. See `analysis-states.ts`.
+  state String  @default("PENDING")
+  /// Why it was rejected, in words ops writes for the studio.
+  note  String? @db.Text
+
+  derivedAt    DateTime  @default(now())
+  reviewedAt   DateTime?
+  reviewedById String?
+  reviewedBy   User?     @relation("FiledRateReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([studioId, state])
+  @@index([archiveId])
+  @@map("studio_filed_rates")
 }

@@ -26,6 +26,8 @@ import { PositioningForm } from '../PositioningForm';
 import { ArchivePanel, type ArchiveView } from '../ArchivePanel';
 import { myArchive } from '@/modules/studio/quotation-archive-store';
 import { myDocuments } from '@/modules/studio/documents';
+import { FiledRatesPanel } from '../FiledRatesPanel';
+import { myFiledRates } from '@/modules/quotation/filed-rate-store';
 import { proofUploadEnabled } from '@/modules/storage/business-proof';
 import { imageUploadEnabled } from '@/modules/storage/portfolio-images';
 import { quotationUploadEnabled } from '@/modules/storage/quotation-archive';
@@ -99,6 +101,12 @@ export default async function OnboardingStepPage({
    * have not done is worse than saying nothing, and it is precisely the
    * confusion the rest of this flow is built to avoid.
    */
+  /* Fetched once for the rates step and shared: ArchivePanel needs the files
+     and FiledRatesPanel needs the analysis state, and two calls would be two
+     reads of the same row. Null everywhere else, so no other step pays for
+     it. */
+  const archive = step === 'rates' ? await archiveView() : null;
+
   const doneParam = (await searchParams).done;
   const claimed = typeof doneParam === 'string' && isStep(doneParam) ? doneParam : null;
   const justFinished =
@@ -230,7 +238,7 @@ export default async function OnboardingStepPage({
                 the form is the only route forward, so hiding it behind "we are
                 reading your files" would block a studio on us for a week. */}
             <ArchivePanel
-              archive={await archiveView()}
+              archive={archive}
               minForRates={MIN_QUOTATIONS_FOR_RATES}
               enabled={quotationUploadEnabled()}
             />
@@ -243,6 +251,16 @@ export default async function OnboardingStepPage({
               priceLevel={studio.priceLevel}
               minLakhs={studio.minProjectPaise ? paiseToLakhs(fromDb(studio.minProjectPaise)) : null}
               maxLakhs={studio.maxProjectPaise ? paiseToLakhs(fromDb(studio.maxProjectPaise)) : null}
+            />
+            {/* What their own quotations produced. Above the manual table
+                because it is the answer to the same question, arrived at
+                from evidence rather than from memory — see the note on
+                FiledRatesPanel. The table below stays for whatever the
+                archive did not cover. */}
+            <FiledRatesPanel
+              analysisState={archive?.analysisState ?? 'NOT_STARTED'}
+              filesHeld={archive?.fileCount ?? 0}
+              rates={await myFiledRates(studio.id)}
             />
             <RateCardForm values={await rateCardValues()} />
           </div>
@@ -291,6 +309,7 @@ async function archiveView(): Promise<ArchiveView | null> {
 
   return {
     state: archive.state,
+    analysisState: archive.analysisState,
     quotationCount: archive.quotationCount,
     fileCount: archive.fileCount,
     note: archive.note,

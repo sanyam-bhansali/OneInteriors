@@ -38,6 +38,7 @@ import {
 import { CHECK_COUNT } from '@/components/landing/checks';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
 import { QuoteFlow, type QuoteRequest } from '@/components/oi/QuoteFlow';
+import type { StudioRates } from '@/modules/quotation/catalogue';
 import { Wrap, Chapter, Sheet, Quiet } from '@/components/oi';
 import { StudioCard } from './StudioCard';
 import { MatchHero } from './MatchHero';
@@ -59,9 +60,19 @@ const BEDROOMS: Record<string, number> = {
 export function MatchClient({
   studios,
   allowUnverified,
+  filedRates,
 }: {
   studios: Studio[];
   allowUnverified: boolean;
+  /**
+   * Resolved rates per studio slug, from the server.
+   *
+   * Threaded rather than fetched here because this is a client component and
+   * the live rates live in Postgres. Absent for any studio that has not filed
+   * an archive, which is most of them — `QuoteFlow` falls back to the
+   * placeholder table per studio, not for the whole page.
+   */
+  filedRates?: Record<string, StudioRates>;
 }) {
   const [brief, setBrief] = useState<Brief | null>(null);
   const [project, setProject] = useState<Project>(EMPTY_PROJECT);
@@ -127,6 +138,7 @@ export function MatchClient({
           </button>
 
           <QuoteFlow
+            filedRates={filedRates?.[quoting.studioSlug]}
             request={quoting}
             plan={project.plan}
             seenQuestions={project.askedQuestions}
