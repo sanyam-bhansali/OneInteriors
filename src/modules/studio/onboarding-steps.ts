@@ -197,3 +197,72 @@ export function readyForReview(studio: OnboardingSnapshot): boolean {
     .filter((s) => s.step !== 'review')
     .every((s) => s.done);
 }
+
+// ── The gate ───────────────────────────────────────────────────
+
+/**
+ * What a step is, from where the studio currently stands.
+ *
+ * - `done` — every requirement met. Always revisitable.
+ * - `current` — the first step that is not done. The one to work on.
+ * - `open` — not done, but everything before it is. Reachable.
+ * - `locked` — something earlier is unfinished.
+ */
+export type StepGate = 'done' | 'current' | 'open' | 'locked';
+
+/**
+ * Why locking is DERIVED and never stored.
+ *
+ * The obvious build keeps a `completedSteps` array on the studio and ticks
+ * entries off. It is wrong here for a reason the brief itself raises: *"if a
+ * required field is removed, dependent steps get locked again."*
+ *
+ * A stored flag cannot do that without somebody remembering to clear it on
+ * every path that can empty a field — the profile form, the rate card, a
+ * project being deleted, an admin edit. Miss one and a studio walks to Review
+ * with a tick against a step that is no longer true, and the submit fails
+ * with no explanation.
+ *
+ * `assessSteps` reads the data every time, so removing a field re-locks
+ * whatever depended on it with no bookkeeping at all. The cost is that
+ * completion cannot be faked for a demo. That is a feature.
+ */
+export function gateFor(steps: StepStatus[], step: OnboardingStep): StepGate {
+  const index = ONBOARDING_STEPS.indexOf(step);
+  const status = steps.find((s) => s.step === step);
+  if (!status) return 'locked';
+
+  const firstOpen = steps.findIndex((s) => !s.done);
+
+  if (status.done) return 'done';
+  if (index === firstOpen) return 'current';
+
+  /* Everything before it is finished, so it is reachable even though it is
+     not the first thing to do — which happens when an earlier step was
+     completed out of order. */
+  const earlierAllDone = steps.slice(0, index).every((s) => s.done);
+  return earlierAllDone ? 'open' : 'locked';
+}
+
+/** The step a studio should be taken to. Never `review` unless it is earned. */
+export function firstIncomplete(steps: StepStatus[]): OnboardingStep {
+  return steps.find((s) => !s.done)?.step ?? ONBOARDING_STEPS[ONBOARDING_STEPS.length - 1]!;
+}
+
+/**
+ * How far along, as a whole percent.
+ *
+ * Counted in completed STEPS, not in fields. A bar that creeps as you type is
+ * guessing, and a guess that runs ahead of the work is the reason progress
+ * bars are distrusted — the same argument the apply form's rail makes.
+ *
+ * Rounded, but never to 100 unless every step is genuinely done: four of five
+ * is 80, and 99.5 rounding up to 100 beside an unfinished step is the one
+ * value this must never show.
+ */
+export function percentComplete(steps: StepStatus[]): number {
+  if (steps.length === 0) return 0;
+  const done = steps.filter((s) => s.done).length;
+  if (done === steps.length) return 100;
+  return Math.min(99, Math.round((done / steps.length) * 100));
+}

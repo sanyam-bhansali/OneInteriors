@@ -45,8 +45,12 @@ export {
   assessSteps,
   onboardingProgress,
   readyForReview,
+  gateFor,
+  firstIncomplete,
+  percentComplete,
   type OnboardingStep,
   type StepStatus,
+  type StepGate,
 } from './onboarding-steps';
 
 export interface StudioContext {

@@ -1,5 +1,4 @@
-import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { Container } from '@/components/ui';
 import { fromDb, paiseToLakhs } from '@/lib/money';
@@ -11,8 +10,12 @@ import {
   STEP_LABELS,
   STEP_BLURBS,
   MIN_PORTFOLIO_PROJECTS,
+  gateFor,
+  firstIncomplete,
   type OnboardingStep,
 } from '@/modules/studio/onboarding';
+import { StepRail } from '../StepRail';
+import { StepFooter } from '../StepFooter';
 import { ProfileForm } from '../ProfileForm';
 import { RegistrationForm } from '../RegistrationForm';
 import { PortfolioForm } from '../PortfolioForm';
@@ -50,9 +53,28 @@ export default async function OnboardingStepPage({
 
   const { studio } = context;
   const { steps } = onboardingProgress(studio);
+
+  /**
+   * The lock, enforced where it cannot be walked around.
+   *
+   * The rail renders a locked step as a non-link, which is the right shape
+   * for the interface and is not a control: the URL is still typeable, still
+   * bookmarkable, and still reachable from a stale tab left open before an
+   * earlier step was emptied.
+   *
+   * So the gate is checked on the server on every request, and a locked step
+   * bounces to whatever is genuinely next. `replace` rather than a push, so
+   * the back button does not land somebody straight back on the locked page
+   * they were just moved off.
+   */
+  if (gateFor(steps, step) === 'locked') {
+    redirect(`/studio/onboarding/${firstIncomplete(steps)}`);
+  }
+
   const index = ONBOARDING_STEPS.indexOf(step);
   const next = ONBOARDING_STEPS[index + 1];
   const previous = ONBOARDING_STEPS[index - 1];
+  const status = steps[index]!;
 
   return (
     /**
@@ -68,23 +90,42 @@ export default async function OnboardingStepPage({
       <Container size="wide">
         <div className="grid gap-x-12 gap-y-8 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
           <div className="lg:sticky lg:top-8 lg:self-start">
-            <Link
-              href="/studio"
-              className="label mb-6 inline-block text-[var(--color-ink-3)] no-underline hover:text-[var(--color-ink)]"
-            >
-              ← All steps
-            </Link>
-
-            <p className="label m-0 mb-2">
-              Step {index + 1} of {ONBOARDING_STEPS.length}
-            </p>
-            <h1 className="h1 mb-3">{STEP_LABELS[step]}</h1>
-            <p className="m-0 max-w-[40ch] text-[15.5px] leading-relaxed text-[var(--color-ink-2)]">
-              {STEP_BLURBS[step]}
-            </p>
+            <StepRail steps={steps} current={step} />
           </div>
 
           <div className="max-w-[46rem]">
+            <header className="mb-7">
+              <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <h1 className="h1 m-0">{STEP_LABELS[step]}</h1>
+                {/* "Saved" and "done" are two different claims, and this
+                    codebase has already been bitten by conflating them: the
+                    profile form once returned a green "Saved." for a blank
+                    required field, so a studio was told it worked and then
+                    found the step still unticked with no explanation.
+
+                    So the badge only ever appears when the step genuinely
+                    passes `assessSteps`. Anything less says nothing here and
+                    lists what is missing in the footer instead. */}
+                {status.done ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-ontrack-soft)] px-2.5 py-1 text-[12.5px] font-medium text-[var(--color-ontrack)]">
+                    <svg viewBox="0 0 16 16" aria-hidden="true" className="h-3 w-3">
+                      <path
+                        d="M3.5 8.5 L6.5 11.5 L12.5 5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    Complete
+                  </span>
+                ) : null}
+              </div>
+              <p className="m-0 max-w-[54ch] text-[15.5px] leading-relaxed text-[var(--color-ink-2)]">
+                {STEP_BLURBS[step]}
+              </p>
+            </header>
 
         {step === 'profile' ? (
           <ProfileForm
@@ -150,28 +191,7 @@ export default async function OnboardingStepPage({
           />
         ) : null}
 
-            <nav className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--color-rule)] pt-6">
-          {previous ? (
-            <Link
-              href={`/studio/onboarding/${previous}`}
-              className="text-[14.5px] text-[var(--color-ink-3)] no-underline hover:text-[var(--color-ink)]"
-            >
-              ← {STEP_LABELS[previous]}
-            </Link>
-          ) : (
-            <span />
-          )}
-          {next ? (
-            <Link
-              href={`/studio/onboarding/${next}`}
-              className="text-[14.5px] text-[var(--color-petrol)] no-underline hover:underline"
-            >
-              {STEP_LABELS[next]} →
-            </Link>
-          ) : (
-            <span />
-          )}
-            </nav>
+            <StepFooter status={status} previous={previous} next={next} />
           </div>
         </div>
       </Container>
