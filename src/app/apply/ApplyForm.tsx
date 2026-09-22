@@ -98,6 +98,40 @@ function stepOwning(field: string): number | null {
   return i === -1 ? null : i;
 }
 
+/**
+ * The same application, as an email, prefilled from what is on the form.
+ *
+ * The escape hatch for a submission that will not go. Built from the live
+ * FormData rather than from state, because most of this form is uncontrolled
+ * and the DOM is the only place the answers actually are.
+ *
+ * Length-capped: a mailto that exceeds what the browser or the mail client
+ * will accept silently opens an empty message, which would be a second
+ * disappearance on top of the first.
+ */
+function mailtoFallback(el: HTMLFormElement | null): string {
+  const to = 'studios@oneinteriors.in';
+  if (!el) return `mailto:${to}?subject=Studio%20application`;
+
+  const data = new FormData(el);
+  const lines: string[] = [];
+  for (const [label, name] of [
+    ['Studio', 'tradeName'],
+    ['Contact', 'contactName'],
+    ['Mobile', 'phone'],
+    ['Email', 'email'],
+    ['Areas', 'localities'],
+    ['GSTIN', 'gstin'],
+    ['About', 'about'],
+  ] as const) {
+    const values = data.getAll(name).filter((v): v is string => typeof v === 'string' && v.trim() !== '');
+    if (values.length > 0) lines.push(`${label}: ${values.join(', ')}`);
+  }
+
+  const body = lines.join('\n').slice(0, 1500);
+  return `mailto:${to}?subject=${encodeURIComponent('Studio application (the form would not send)')}&body=${encodeURIComponent(body)}`;
+}
+
 /** Human names for the required fields, for the error line. */
 const LABELS: Record<string, string> = {
   tradeName: 'the studio name',
@@ -157,6 +191,24 @@ export function ApplyForm() {
      keystroke — nothing here needs to re-render as somebody types. */
   const [phoneTyped, setPhoneTyped] = useState(false);
   const [restored, setRestored] = useState(false);
+  /**
+   * The submit was pressed and nothing came back.
+   *
+   * ## Why a form needs this at all
+   *
+   * `useActionState` reports pending and it reports a result. It cannot
+   * report "the request never arrived", and that is a real state: a tab left
+   * open across a deployment posts to an action id that no longer exists, a
+   * privacy extension blocks the POST, a captive portal eats it. In every one
+   * of those the button does nothing, forever, with nothing on screen — which
+   * is exactly how this was reported, and the applications lost to it are
+   * invisible because nobody can tell us about a form that did not respond.
+   *
+   * So the form watches itself. If a submission neither fails nor succeeds
+   * within a few seconds, it says so and gives a way round. That is worth
+   * more than diagnosing the cause, because it works whatever the cause is.
+   */
+  const [stalled, setStalled] = useState(false);
 
   /**
    * Draft to sessionStorage on every change, and restore on load.
@@ -352,6 +404,30 @@ export function ApplyForm() {
     return () => clearTimeout(timer);
   }, [state]);
 
+  /**
+   * Watch a submission that never resolves.
+   *
+   * Keyed on `pending` going true: that is the only moment we know a request
+   * left the browser. If it has not become false, and no result has arrived,
+   * within the window below, something between here and the server ate it.
+   *
+   * Eight seconds is chosen to be longer than this action has ever taken —
+   * it writes one row and sends one email — and short enough that somebody
+   * has not yet given up and closed the tab.
+   */
+  useEffect(() => {
+    if (!pending) return;
+    setStalled(false);
+    const timer = setTimeout(() => setStalled(true), 8000);
+    return () => clearTimeout(timer);
+  }, [pending]);
+
+  /* Any answer at all clears it, including a rejection — a form that tells
+     somebody their GSTIN is wrong has not stalled. */
+  useEffect(() => {
+    if (state.status !== 'idle') setStalled(false);
+  }, [state]);
+
   function go(next: number) {
     // Backwards is always free. Nobody should have to fix a field to
     // re-read the one before it.
@@ -426,7 +502,11 @@ export function ApplyForm() {
         if (!last) {
           e.preventDefault();
           go(step + 1);
+          return;
         }
+        /* A fresh attempt. Cleared again by the watchdog effects the moment
+           anything comes back. */
+        setStalled(false);
       }}
       /**
        * And Enter has to be handled explicitly, because removing the
@@ -481,6 +561,40 @@ export function ApplyForm() {
             ? 'That mobile number does not look right — ten digits, starting 6 to 9.'
             : `Still needed: ${missing.map((m) => LABELS[m] ?? m).join(', ')}.`}
         </p>
+      ) : null}
+
+      {stalled ? (
+        /**
+         * The message a silent failure never had.
+         *
+         * Deliberately not styled as an error: nothing the applicant did is
+         * wrong, and blaming them for a request that vanished would be the
+         * second insult. It offers the two things that actually recover the
+         * situation — reload and try once more, or send the same details to
+         * an address that is not behind this form at all.
+         *
+         * The mail link carries what they typed, so somebody who has spent
+         * ten minutes on this does not spend another ten retyping it.
+         */
+        <div
+          role="alert"
+          className="m-0 mb-5 rounded-[10px] border border-[var(--color-brass)]/40 bg-[var(--color-brass-soft)] px-4 py-3"
+        >
+          <p className="m-0 mb-1 text-[14px] font-semibold text-[var(--color-ink)]">
+            This is taking longer than it should.
+          </p>
+          <p className="m-0 text-[13.5px] leading-relaxed text-[var(--color-ink-2)]">
+            Nothing you did is wrong. Reload the page and press send again — that fixes it most
+            of the time. If it still will not go,{' '}
+            <a
+              href={mailtoFallback(form.current)}
+              className="text-[var(--color-petrol)] underline underline-offset-4"
+            >
+              email it to us instead
+            </a>{' '}
+            and we will enter it by hand. We would rather have your application than a tidy form.
+          </p>
+        </div>
       ) : null}
 
       {err.form ? (
