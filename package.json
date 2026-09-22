@@ -18,6 +18,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:unseed": "tsx prisma/unseed-fixtures.ts",
+    "roster:check": "tsx prisma/roster-check.ts",
     "db:studio": "prisma studio",
     "db:ops": "tsx prisma/seed-ops.ts",
     "db:studio-login": "tsx prisma/seed-studio.ts",
