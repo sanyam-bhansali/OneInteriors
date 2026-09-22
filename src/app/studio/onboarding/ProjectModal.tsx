@@ -12,12 +12,38 @@ import { PROPERTY_LABELS, SCOPE_LABELS, STYLE_LABELS } from '@/modules/brief/typ
 const INITIAL: StepState = { status: 'idle' };
 const IMAGES_INITIAL: ImagesState = { status: 'idle' };
 
+/**
+ * `owns` is every key `addProject` can reject that lives on this stage.
+ *
+ * Without it this modal repeats the bug the application form had: each error
+ * renders beside its field, every stage but one is `hidden`, so submitting
+ * from the last stage with a bad title puts the message in a div nobody can
+ * see and the button appears to do nothing at all.
+ *
+ * It must name every key the server can return. `clientConsented` carries the
+ * render/consent rule and is the likeliest rejection of the four, since it
+ * fires whenever neither box is ticked.
+ */
 const STAGES = [
-  { label: 'Basic info', hint: 'Project details' },
-  { label: 'Photographs', hint: 'Show the work' },
-  { label: 'The numbers', hint: 'Budget, timing' },
-  { label: 'Style', hint: 'How it reads' },
+  { label: 'Basic info', hint: 'Project details', owns: ['title'] },
+  { label: 'Photographs', hint: 'Show the work', owns: [] },
+  { label: 'The numbers', hint: 'Budget, timing', owns: ['completedOn'] },
+  { label: 'Style', hint: 'How it reads', owns: ['styleTags', 'clientConsented'] },
 ] as const;
+
+/** Which stage a rejected field lives on, or null if nothing claims it. */
+function stageOwning(field: string): number | null {
+  const i = STAGES.findIndex((s) => (s.owns as readonly string[]).includes(field));
+  return i === -1 ? null : i;
+}
+
+/** What to call each field in the summary. */
+const FIELD_LABELS: Record<string, string> = {
+  title: 'Project name',
+  styleTags: 'Style',
+  clientConsented: 'Permission',
+  completedOn: 'Finished on',
+};
 
 /**
  * Adding one project, four stages deep.
@@ -73,6 +99,8 @@ export function ProjectModal({
   const firstField = useRef<HTMLInputElement>(null);
 
   const err = state.errors ?? {};
+  /* `form` already renders on its own above. */
+  const fieldErrors = Object.entries(err).filter(([k]) => k !== 'form');
 
   /* A successful add closes the modal and resets it, so the next "Add
      project" opens on an empty stage one rather than on the last one filled
@@ -83,6 +111,28 @@ export function ProjectModal({
     setImages([]);
     onClose();
   }, [state, onClose]);
+
+  /**
+   * A rejected submit lands on the stage that was rejected.
+   *
+   * The button is on the last stage and every other stage is `hidden`, so
+   * without this an error on the title renders into a div on stage one and
+   * nothing happens on screen: no message, no movement, the button just
+   * un-greys. That is exactly the failure the application form had, reported
+   * as "I click send and it returns nothing".
+   *
+   * Earliest stage first, so somebody fixing two things works forwards
+   * through the modal the way they filled it in.
+   */
+  useEffect(() => {
+    if (state.status !== 'error') return;
+    const target = Object.keys(state.errors ?? {})
+      .filter((k) => k !== 'form')
+      .map(stageOwning)
+      .filter((i): i is number => i !== null)
+      .sort((a, b) => a - b)[0];
+    if (target !== undefined) setStage(target);
+  }, [state]);
 
   useEffect(() => {
     if (!open) return;
@@ -229,6 +279,14 @@ export function ProjectModal({
               </fieldset>
 
               <div className="flex flex-col gap-3 rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-4">
+                {/* Said before the boxes, not discovered by pressing the
+                    button. One of the two is required and neither is ticked
+                    by default, so without this line the commonest way to
+                    reach the end of this modal is with a project that will be
+                    refused for a rule nobody stated. */}
+                <p className="m-0 text-[13px] font-medium text-[var(--color-ink-2)]">
+                  Tick at least one of these.
+                </p>
                 <Check
                   name="clientConsented"
                   label="The client is happy for this to be shown"
@@ -261,6 +319,26 @@ export function ProjectModal({
               <p role="alert" className="m-0 mt-4 rounded-[10px] bg-[var(--color-atrisk-soft)] px-4 py-2.5 text-[14px] text-[var(--color-atrisk)]">
                 {err.form}
               </p>
+            ) : null}
+
+            {/* Outside the stage divs, so it cannot be the thing that is
+                hidden. The effect above moves to the first problem; this says
+                how many others are waiting, which one focused stage cannot. */}
+            {fieldErrors.length > 0 ? (
+              <div role="alert" className="mt-4 rounded-[10px] bg-[var(--color-atrisk-soft)] px-4 py-3">
+                <p className="m-0 mb-1 text-[13.5px] font-semibold text-[var(--color-atrisk)]">
+                  {fieldErrors.length === 1
+                    ? 'One thing to fix before this can be added.'
+                    : `${fieldErrors.length} things to fix before this can be added.`}
+                </p>
+                <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+                  {fieldErrors.map(([name, message]) => (
+                    <li key={name} className="text-[13.5px] leading-relaxed text-[var(--color-atrisk)]">
+                      <span className="font-medium">{FIELD_LABELS[name] ?? name}</span> — {message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
 
             <footer className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-rule)] pt-5">

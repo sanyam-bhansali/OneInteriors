@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useActionState, useState } from 'react';
 import { savePositioningAction, type StepState } from './actions';
 import { Section } from './Section';
@@ -95,12 +96,16 @@ export function PositioningForm({
               <span className="text-[15px] text-[var(--color-ink-3)]">Not set yet</span>
             )}
           </p>
-          <a
+          {/* `Link`, not an anchor. A bare `<a>` here is a full document
+              reload, which on a step that holds two unsaved radio choices
+              throws them away — the studio comes back and finds their
+              positioning reset. */}
+          <Link
             href="/studio/onboarding/profile"
             className="text-[13.5px] text-[var(--color-petrol)] underline underline-offset-4"
           >
             Change it on Your studio
-          </a>
+          </Link>
         </div>
 
         {/* The guidance the brief asked for, stated as a pattern we have

@@ -1354,6 +1354,32 @@ p {
   border-color: var(--color-petrol-deep);
 }
 
+/* A chip that wraps its own hidden checkbox.
+ *
+ * This has to live here rather than as `has-[:checked]:bg-…` utilities on
+ * the element, and the reason is specificity by source order: `.oi-chip`
+ * above sets a background, and it is written AFTER Tailwind's utility layer
+ * in this file. Both are single-class selectors, so the later one wins and
+ * the checked state silently never painted — the chip toggled correctly and
+ * looked identical either way, which is the worst kind of wrong for a
+ * control whose entire job is to show what is selected.
+ *
+ * Keeping the rule beside `.oi-chip` means the two cannot be reordered apart. */
+.oi-chip:has(:checked) {
+  background: var(--color-petrol);
+  border-color: var(--color-petrol);
+  color: #fff;
+}
+.oi-chip:has(:checked):hover {
+  background: var(--color-petrol-deep);
+  border-color: var(--color-petrol-deep);
+}
+/* Hiding the input takes its focus ring with it, so the chip carries one. */
+.oi-chip:has(:focus-visible) {
+  outline: 2px solid var(--color-petrol);
+  outline-offset: 2px;
+}
+
 /* The step's one action. Lifts a little on hover and presses in on
    click — the scale is 1.008 rather than the 1.03 a mockup usually
    asks for, because a full-width button growing 3% moves its edges
