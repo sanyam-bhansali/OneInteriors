@@ -60,7 +60,7 @@ export function RateCardForm({ values }: { values: Record<string, number | null>
           </div>
         </div>
 
-        <SaveBar pending={pending} saved={state.status === 'saved'} formError={err.form} label="Save rates" />
+        <SaveBar pending={pending} saved={state.status === 'saved'} formError={err.form} label="Save and continue" />
       </form>
     </div>
   );

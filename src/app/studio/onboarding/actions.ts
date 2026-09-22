@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { RATE_CATEGORIES, CATEGORY } from '@/modules/quotation/categories';
 import { saveRateCard, type RateInput } from '@/modules/quotation/rate-card';
 import {
@@ -13,6 +14,10 @@ import {
   addProject,
   removeProject,
   submitForReview,
+  currentStudio,
+  onboardingProgress,
+  ONBOARDING_STEPS,
+  type OnboardingStep,
 } from '@/modules/studio/onboarding';
 import { uploadQuotations } from '@/modules/studio/quotation-archive-store';
 import { uploadBusinessProof, withdrawDocument } from '@/modules/studio/documents';
@@ -76,6 +81,51 @@ function refresh() {
   revalidatePath('/studio/onboarding', 'layout');
 }
 
+/**
+ * Move to the next step, if this one is genuinely finished.
+ *
+ * ## Why the button has to do this
+ *
+ * It says "Save and continue" and it only ever saved. The studio pressed it,
+ * the page stayed where it was, and the only way forward was a Continue link
+ * further down that they had already scrolled past. A label that describes
+ * something the control does not do is the same defect as a field marked
+ * optional that the step requires — the person does what the page asked and
+ * the page does not do what it said.
+ *
+ * ## It re-derives rather than assuming
+ *
+ * A successful write is not the same fact as a finished step. They coincide
+ * for these two forms today, because `saveProfile` and `saveRegistration`
+ * each validate exactly what `assessSteps` requires — but that is an
+ * agreement between two files, not a guarantee, and the moment a requirement
+ * is added to one and not the other this would carry somebody forward out of
+ * a step that is still short. So it asks the same function the rail and the
+ * lock ask, and stays put if the answer is no.
+ *
+ * ## `redirect` must not be inside a try
+ *
+ * It signals by throwing, which Next catches upstream. Wrapped in a
+ * try/catch — including one several frames up — it is swallowed and the
+ * redirect silently does not happen. Nothing here catches, and nothing that
+ * calls it may either.
+ */
+async function continueFrom(step: OnboardingStep): Promise<void> {
+  const context = await currentStudio();
+  if (!context) return;
+
+  const { steps } = onboardingProgress(context.studio);
+  const index = ONBOARDING_STEPS.indexOf(step);
+  const next = ONBOARDING_STEPS[index + 1];
+
+  if (!next || steps[index]?.done !== true) return;
+
+  /* Carries which step was just finished, so the next page can acknowledge
+     it — and that page re-checks the claim before printing anything. See
+     StepArrival. */
+  redirect(`/studio/onboarding/${next}?done=${step}`);
+}
+
 export async function saveProfileAction(
   _prev: StepState,
   formData: FormData,
@@ -93,6 +143,7 @@ export async function saveProfileAction(
 
   if (!result.ok) return { status: 'error', errors: result.errors };
   refresh();
+  await continueFrom('profile');
   return { status: 'saved' };
 }
 
@@ -150,6 +201,7 @@ export async function saveRegistrationAction(
   });
   if (!result.ok) return { status: 'error', errors: result.errors };
   refresh();
+  await continueFrom('registration');
   return { status: 'saved' };
 }
 
@@ -343,5 +395,9 @@ export async function saveRatesAction(
   if (!result.ok) return { status: 'error', errors: result.errors };
 
   refresh();
+  /* Only once every core category has a rate — `continueFrom` checks that
+     through `assessSteps`, so a studio filling in three of the six saves
+     them and stays put with the rest still listed. */
+  await continueFrom('rates');
   return { status: 'saved' };
 }
