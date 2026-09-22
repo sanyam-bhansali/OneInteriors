@@ -188,6 +188,40 @@ export async function setStudioStatus(
       await tx.studio.update({ where: { id: studioId }, data: { status } });
       const tier = await refreshTier(tx, studioId);
 
+      /**
+       * Tell them they are on the roster.
+       *
+       * Written here, inside the same transaction as the status change,
+       * because those two facts must not be able to disagree: a studio who
+       * is ACTIVE and was never told is a studio wondering for a week why
+       * nothing happened, and a notification written outside the
+       * transaction is one that survives a rolled-back approval.
+       *
+       * Only on the way IN to ACTIVE. Re-saving an already-active studio —
+       * which ops does when correcting a tier or a note — must not send a
+       * second congratulations.
+       */
+      if (status === 'ACTIVE' && before.status !== 'ACTIVE') {
+        const members = await tx.studioMember.findMany({
+          where: { studioId },
+          select: { userId: true },
+        });
+
+        if (members.length > 0) {
+          await tx.notification.createMany({
+            data: members.map((m) => ({
+              userId: m.userId,
+              /* In-app. Email is sent separately by whatever calls this, and
+                 deliberately not from inside a transaction — a mail provider
+                 having a bad minute must not roll back an approval. */
+              channel: 'push',
+              template: 'studio.approved',
+              payload: { studioId, tradeName: before.tradeName },
+            })),
+          });
+        }
+      }
+
       await writeAudit(
         tx,
         actor,

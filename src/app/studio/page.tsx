@@ -4,6 +4,9 @@ import { Container } from '@/components/ui';
 import { PageHead, PageBody } from './StudioShell';
 import { formatINR, formatINRCompact } from '@/lib/money';
 import { redirect } from 'next/navigation';
+import { crmIsOpen, standingOf, STANDING_COPY } from '@/modules/studio/standing';
+import { myAnnouncements } from '@/modules/studio/announcements';
+import { StandingBanner } from './StandingBanner';
 import { currentStudio, onboardingProgress, firstIncomplete } from '@/modules/studio/onboarding';
 import { visibility } from '@/modules/studio/dashboard';
 import { myAppointments, formatSlot, upcoming, KIND_LABELS } from '@/modules/studio/introduction';
@@ -55,7 +58,25 @@ export default async function StudioHome() {
   }
 
   const { studio } = context;
-  if (studio.status !== 'ACTIVE') return <Setup studio={studio} />;
+
+  /**
+   * The software opens when they submit, not when we approve.
+   *
+   * It used to be `status !== 'ACTIVE'`, which parked a studio on a holding
+   * screen for the week we spend calling their clients — at exactly the
+   * moment they are most interested, and most likely to start a competitor's
+   * trial instead. It also had the incentive backwards: the CRM is what makes
+   * them want to stay, and withholding it until our paperwork is done means
+   * the waiting week is spent somewhere else.
+   *
+   * What is still gated is anything that turns on being VERIFIED — the
+   * roster, matching, briefs. Those are claims about a studio we have
+   * checked, and `receivesBriefs()` is the one line that decides them. See
+   * `modules/studio/standing.ts`.
+   */
+  if (!crmIsOpen({ status: studio.status, submittedForReview: studio.submittedForReview })) {
+    return <Setup studio={studio} />;
+  }
 
   const [clients, projects, vendors, quotes, briefs, appointments] = await Promise.all([
     myClients(),
@@ -101,8 +122,25 @@ export default async function StudioHome() {
     next.length === 0 &&
     quietClients.length === 0;
 
+  /* Where they stand, and anything we have told them that they have not read.
+     Both sit above the dashboard rather than inside it: a studio arriving to
+     find out whether they were approved should not have to look for it. */
+  const standing = standingOf({
+    status: studio.status,
+    submittedForReview: studio.submittedForReview,
+  });
+  const announcements = await myAnnouncements();
+  const approval = announcements.find((a) => a.template === 'studio.approved') ?? null;
+
   return (
     <>
+      <StandingBanner
+        standing={standing}
+        label={STANDING_COPY[standing].label}
+        detail={STANDING_COPY[standing].detail}
+        approval={approval ? { id: approval.id } : null}
+      />
+
       <PageHead
         title={quiet ? 'Nothing needs you right now.' : 'Today'}
         sub={
@@ -364,19 +402,38 @@ function Setup({
 }) {
   const { steps } = onboardingProgress(studio);
 
-  if (studio.submittedForReview) {
+  /**
+   * Not onboarding, and not active either — suspended or removed.
+   *
+   * This branch used to hold the "With us now" screen for a studio who had
+   * submitted, along with a promise that the software would open "the day you
+   * go live". Both are gone: a submitted studio now reaches the dashboard,
+   * and the sentence became untrue the moment they did.
+   *
+   * What is left is the case nothing else covers. A suspended studio must not
+   * be redirected into onboarding — there is no step for them to finish —
+   * and must not be told anything that sounds like a decision, because a
+   * suspension is investigated and appealable and this screen is not where
+   * that is settled.
+   */
+  if (studio.status !== 'ONBOARDING') {
     return (
       <main className="py-14">
         <Container size="narrow">
           <p className="label m-0 mb-3">{studio.tradeName}</p>
-          <h1 className="display mb-5 text-[clamp(2rem,5vw,3rem)] leading-[1.05]">With us now.</h1>
-          <p className="m-0 mb-6 max-w-[54ch] text-[17px] leading-relaxed text-[var(--color-ink-2)]">
-            You have finished your side. We are verifying — company records, GST filing history,
-            two reference calls and a visit to two completed sites.
-          </p>
-          <p className="m-0 max-w-[54ch] text-[16px] leading-relaxed text-[var(--color-ink-2)]">
-            About a week, and we call you either way. The rest of the software — quotations,
-            clients, your vendor ledger — opens the day you go live.
+          <h1 className="display mb-5 text-[clamp(2rem,5vw,3rem)] leading-[1.05]">
+            Your account is paused.
+          </h1>
+          <p className="m-0 max-w-[54ch] text-[17px] leading-relaxed text-[var(--color-ink-2)]">
+            Somebody here will have been in touch, or is about to be. If this is a surprise,
+            write to{' '}
+            <a
+              href="mailto:studios@oneinteriors.in"
+              className="text-[var(--color-petrol)] underline underline-offset-4"
+            >
+              studios@oneinteriors.in
+            </a>{' '}
+            and a person will answer — this is not decided by software.
           </p>
         </Container>
       </main>
