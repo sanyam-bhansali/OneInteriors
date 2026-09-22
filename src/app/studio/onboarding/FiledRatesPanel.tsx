@@ -6,8 +6,8 @@ import {
   CONFIDENCE_COPY,
   MIN_QUOTATIONS_TO_START,
   isAnalysisState,
+  type FiledRateView,
 } from '@/modules/quotation/analysis-states';
-import type { FiledRateView } from '@/modules/quotation/filed-rate-store';
 import { formatINR } from '@/lib/money';
 
 /**

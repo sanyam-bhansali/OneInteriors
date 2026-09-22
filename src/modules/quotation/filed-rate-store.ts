@@ -22,7 +22,8 @@ import { requireRole, getCurrentUser } from '@/modules/auth/session';
 import { ingestQuotations } from './ingest';
 import { extractArchive } from './extract-agent';
 import type { StudioRates } from './catalogue';
-import { confidenceOf, type Confidence } from './analysis-states';
+import { confidenceOf } from './analysis-states';
+import type { FiledRateView } from './analysis-states';
 
 /**
  * Read an archive and file what it yields, as PENDING.
@@ -146,16 +147,9 @@ async function fileRates(
 
 // ── Reading ────────────────────────────────────────────────────
 
-export interface FiledRateView {
-  id: string;
-  code: string;
-  ratePaise: number;
-  fromQuotations: number;
-  confidence: Confidence;
-  spec: string | null;
-  state: string;
-  note: string | null;
-}
+/* Re-exported so server callers have one import for the whole feature; the
+   shape itself lives in the pure module so client components can reach it. */
+export type { FiledRateView } from './analysis-states';
 
 /**
  * The rates in force for a studio, for the quoting engine.
@@ -181,13 +175,39 @@ export async function liveRatesFor(studioId: string): Promise<StudioRates> {
   return out;
 }
 
-/** What the studio sees back. Their own rates, so no role check beyond theirs. */
+/**
+ * What the studio sees back. Their own rates, so no role check beyond theirs.
+ *
+ * ## Why this swallows a database error
+ *
+ * It took the rates step down with a 500 in production. Code deploys the
+ * moment it is pushed; a migration runs when somebody runs it, and in the
+ * window between the two this queried a table that did not exist yet. Prisma
+ * threw, the throw reached the page render, and a studio filling in their
+ * rate card got an application error on a step that had nothing to do with
+ * this feature.
+ *
+ * An empty list is the honest answer to "what have we derived for you" when
+ * we cannot ask. The panel then renders its not-started state, which is
+ * exactly right, and the six manual boxes underneath keep working — so the
+ * step degrades to what it was before this feature existed rather than
+ * failing shut.
+ *
+ * The same reasoning as the `hasDatabase()` guard in `currentStudio`, and the
+ * same mistake it was added for: a read on a render path must not be able to
+ * take the page with it.
+ */
 export async function myFiledRates(studioId: string): Promise<FiledRateView[]> {
-  const rows = await prisma.studioFiledRate.findMany({
-    where: { studioId, state: { in: ['PENDING', 'LIVE'] } },
-    orderBy: [{ state: 'asc' }, { code: 'asc' }],
-  });
-  return rows.map(view);
+  try {
+    const rows = await prisma.studioFiledRate.findMany({
+      where: { studioId, state: { in: ['PENDING', 'LIVE'] } },
+      orderBy: [{ state: 'asc' }, { code: 'asc' }],
+    });
+    return rows.map(view);
+  } catch (error) {
+    console.error('[rates] myFiledRates failed', error);
+    return [];
+  }
 }
 
 /** Everything ops needs to judge one archive's output. */

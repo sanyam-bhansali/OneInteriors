@@ -108,3 +108,28 @@ export const CONFIDENCE_COPY: Record<Confidence, string> = {
   fair: 'A handful of quotes. Reasonable, worth a glance',
   solid: 'Enough quotes for the median to mean something',
 };
+
+/**
+ * One derived rate, as a screen sees it.
+ *
+ * Here rather than beside the store that builds it, for the reason
+ * CONTRIBUTING §9.5 gives and `tests/server-only-boundary.test.ts` enforces:
+ * a client component that needs this shape must be able to reach it without
+ * importing from a `server-only` module. A type import is erased and would
+ * survive, but the moment somebody reaches for `CONFIDENCE_COPY` beside it
+ * the route stops building — so the vocabulary and the shape live together,
+ * in the file with no I/O in it.
+ *
+ * No storage key and no archive id: this is what a rate looks like to
+ * somebody reading it, and neither of those is theirs to know.
+ */
+export interface FiledRateView {
+  id: string;
+  code: string;
+  ratePaise: number;
+  fromQuotations: number;
+  confidence: Confidence;
+  spec: string | null;
+  state: string;
+  note: string | null;
+}

@@ -73,13 +73,23 @@ export async function myArchive(): Promise<ArchiveDetail | null> {
   const context = await currentStudio();
   if (!context) return null;
 
-  const row = await prisma.quotationArchive.findFirst({
-    where: { studioId: context.studio.id },
-    orderBy: { uploadedAt: 'desc' },
-    include: WITH_FILES,
-  });
+  /* Guarded for the same reason `myFiledRates` is: this row gained columns
+     in a migration, and between a push and that migration running, selecting
+     them throws and takes the whole rates step down with a 500. Null is what
+     "no archive" already means everywhere that calls this, so the page
+     degrades to the state it had before rather than failing shut. */
+  try {
+    const row = await prisma.quotationArchive.findFirst({
+      where: { studioId: context.studio.id },
+      orderBy: { uploadedAt: 'desc' },
+      include: WITH_FILES,
+    });
 
-  return row ? toDetail(row) : null;
+    return row ? toDetail(row) : null;
+  } catch (error) {
+    console.error('[archive] myArchive failed', error);
+    return null;
+  }
 }
 
 /** Every archive a given studio has sent. Ops only. */
