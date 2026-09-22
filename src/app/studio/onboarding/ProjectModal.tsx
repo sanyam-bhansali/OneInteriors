@@ -112,6 +112,17 @@ export function ProjectModal({
   const [consented, setConsented] = useState(false);
   const [isRender, setIsRender] = useState(false);
   const dialog = useRef<HTMLDivElement>(null);
+  /**
+   * Did a person ask to add this project?
+   *
+   * Same trap the application form was caught by: Next and Add are one
+   * ternary at one position, so React reconciles them as the same element
+   * and flips its `type`. The click that moves to the last stage then lands
+   * on a submit button and posts the form. Distinct keys stop the
+   * reconciliation; this is the guarantee that survives whatever a future
+   * refactor does to the markup.
+   */
+  const askedToAdd = useRef(false);
   const firstField = useRef<HTMLInputElement>(null);
 
   const err = state.errors ?? {};
@@ -234,6 +245,15 @@ export function ProjectModal({
             so nothing is lost by switching this off. */}
         <form
           noValidate
+          onSubmit={(e) => {
+            /* Nothing asked to add. A stray default action from the stage
+               that just advanced is not a person finishing a project. */
+            if (!askedToAdd.current) {
+              e.preventDefault();
+              return;
+            }
+            askedToAdd.current = false;
+          }}
           action={action}
           className="grid grid-cols-1 gap-0 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]"
         >
@@ -432,7 +452,7 @@ export function ProjectModal({
                    nothing is what this modal was reported as — and the cause
                    was never the button, it was three requirements that were
                    only stated by refusing. */
-                <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
+                <div key="add" className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
                   {missing.length > 0 ? (
                     <p className="m-0 max-w-[30ch] text-right text-[13px] leading-relaxed text-[var(--color-ink-2)]">
                       Still needed:{' '}
@@ -455,6 +475,9 @@ export function ProjectModal({
                   ) : null}
                   <button
                     type="submit"
+                    onClick={() => {
+                      askedToAdd.current = true;
+                    }}
                     disabled={pending || missing.length > 0}
                     className="oi-save inline-flex items-center gap-2 rounded-[11px] bg-[var(--color-petrol)] px-6 py-2.5 text-[14.5px] font-medium text-[var(--color-paper)] disabled:cursor-not-allowed disabled:bg-[var(--color-ink-3)] disabled:opacity-60"
                   >
@@ -466,6 +489,7 @@ export function ProjectModal({
                    submit control, so Enter in the title field would post an
                    empty project instead of moving on. */
                 <button
+                  key="next"
                   type="button"
                   onClick={() => setStage((s) => s + 1)}
                   className="oi-save inline-flex items-center gap-2 rounded-[11px] bg-[var(--color-petrol)] px-6 py-2.5 text-[14.5px] font-medium text-[var(--color-paper)]"

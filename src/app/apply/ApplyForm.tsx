@@ -211,6 +211,32 @@ export function ApplyForm() {
   const [stalled, setStalled] = useState(false);
 
   /**
+   * Did a person actually ask to send this?
+   *
+   * ## The bug this exists for
+   *
+   * Continue and Send are one ternary at one position in the tree, so React
+   * reconciles them as the SAME button element and simply changes its `type`
+   * from "button" to "submit". Pressing Continue on step 4 therefore runs:
+   * click → state update → synchronous re-render → the element under the
+   * finger is now a submit button → the browser applies the click's default
+   * action to it → the form posts. The applicant never pressed Send and
+   * never saw step 5.
+   *
+   * It was there all along and was masked: native validation was refusing
+   * the submit for an unrelated reason, so the accidental post was silently
+   * cancelled along with the deliberate ones. Turning validation off to fix
+   * the real bug let this one through, which is how a masked fault usually
+   * announces itself.
+   *
+   * Distinct `key`s on the two buttons fix the mechanism — React now
+   * replaces the node instead of mutating it. This flag is the guarantee:
+   * a submission that no control set is not a submission, whatever future
+   * reconciliation does.
+   */
+  const askedToSend = useRef(false);
+
+  /**
    * Draft to sessionStorage on every change, and restore on load.
    *
    * The sharpest line in the onboarding research is the Acorns critique:
@@ -536,6 +562,14 @@ export function ApplyForm() {
           go(step + 1);
           return;
         }
+        /* On the last step, but nothing asked to send. A stray default
+           action, an autofill, a synthetic submit — none of them are a
+           person deciding to apply. */
+        if (!askedToSend.current) {
+          e.preventDefault();
+          return;
+        }
+        askedToSend.current = false;
         /* A fresh attempt. Cleared again by the watchdog effects the moment
            anything comes back. */
         setStalled(false);
@@ -557,7 +591,13 @@ export function ApplyForm() {
         if (e.key !== 'Enter') return;
         const el = e.target as HTMLElement;
         if (el.tagName === 'TEXTAREA' || el.tagName === 'BUTTON') return;
-        if (last) return; // Let it submit.
+        if (last) {
+          /* Enter on the last step is a person choosing to send, so it
+             counts as intent — without this the guard above would swallow
+             it and Enter would do nothing. */
+          askedToSend.current = true;
+          return;
+        }
         e.preventDefault();
         go(step + 1);
       }}
@@ -768,12 +808,25 @@ export function ApplyForm() {
           short form feel like a contract. */}
       <div className="mt-7 border-t border-[var(--color-rule)] pt-5">
         <div className="flex flex-wrap items-center gap-4">
+          {/* Distinct keys, and they are the fix rather than a formality.
+              Without them these are one element whose `type` flips, and the
+              click that advanced to step 5 lands on a submit button. With
+              them React unmounts one and mounts the other, so the in-flight
+              click has nothing left to act on. */}
           {last ? (
-            <Button type="submit" size="lg" disabled={pending}>
+            <Button
+              key="send"
+              type="submit"
+              size="lg"
+              disabled={pending}
+              onClick={() => {
+                askedToSend.current = true;
+              }}
+            >
               {pending ? 'Sending…' : 'Send it to One Interiors'}
             </Button>
           ) : (
-            <Button type="button" size="lg" onClick={() => go(step + 1)}>
+            <Button key="continue" type="button" size="lg" onClick={() => go(step + 1)}>
               Continue
             </Button>
           )}
