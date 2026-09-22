@@ -6,7 +6,9 @@ import { clientById } from '@/modules/studio-practice/clients';
 import { timelineFor } from '@/modules/studio-practice/events';
 import { SOURCE_LABELS } from '@/modules/studio-practice/vocabulary';
 import { paiseToLakhs } from '@/lib/money';
+import { marketplaceContextFor } from '@/modules/studio-practice/marketplace-context';
 import { Timeline } from './Timeline';
+import { BriefPanel } from './BriefPanel';
 import { LogContact } from './LogContact';
 
 export const metadata: Metadata = {
@@ -42,7 +44,13 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   const client = await clientById(id);
   if (!client) notFound();
 
-  const events = await timelineFor(id);
+  /* Both in parallel. The brief panel only exists for a marketplace lead,
+     and marketplaceContextFor returns null for everything else without a
+     second round trip to find that out. */
+  const [events, brief] = await Promise.all([
+    timelineFor(id),
+    client.fromMarketplace ? marketplaceContextFor(id) : Promise.resolve(null),
+  ]);
 
   return (
     <>
@@ -80,6 +88,15 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_260px]">
           {/* ── The history ── */}
           <div className="order-2 min-w-0 lg:order-1">
+            {/* Above the history and above the call button, because reading
+                it is what should happen BEFORE the first call — which is the
+                whole reason a marketplace lead is worth more than a cold one. */}
+            {brief ? (
+              <div className="mb-5">
+                <BriefPanel ctx={brief} />
+              </div>
+            ) : null}
+
             <div className="mb-5">
               <LogContact clientId={client.id} lastContactedAt={client.lastContactedAt} />
             </div>

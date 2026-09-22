@@ -29,6 +29,9 @@ import {
   removeDemoLeadAction,
 } from './actions';
 import { IDLE } from '../form-state';
+import { SavedViews } from './SavedViews';
+import type { SavedView } from '@/modules/studio-practice/saved-views';
+import type { ViewFilters } from '@/modules/studio-practice/view-filters';
 
 const input =
   'rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[14px] text-[var(--s-ink)] placeholder:text-[var(--s-ink-3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]';
@@ -734,6 +737,7 @@ export function Board({
   fields,
   members,
   meId,
+  views,
 }: {
   clients: ClientRow[];
   stages: StageRow[];
@@ -742,6 +746,8 @@ export function Board({
   members: { id: string; name: string }[];
   /** The signed-in person's membership row, for "Take it". */
   meId: string | null;
+  /** This person's named filters. Empty until they save one. */
+  views: SavedView[];
 }) {
   const today = useMemo(() => {
     const d = new Date();
@@ -750,10 +756,31 @@ export function Board({
   }, []);
 
   const groupable = fields.filter((f) => f.groupBy);
-  const [grouping, setGrouping] = useState('');
+
+  /* The starred view decides what the board opens with, so it seeds the
+     state rather than being applied afterwards — applying it in an effect
+     would render the unfiltered board first and then rearrange it under
+     somebody already reaching for a card. */
+  const opening = views.find((v) => v.isDefault)?.filters ?? {};
+  const [grouping, setGrouping] = useState(opening.groupBy ?? '');
 
   // '' everyone · 'pool' nobody has taken it · a member id · 'quiet'
-  const [who, setWho] = useState('');
+  const [who, setWho] = useState(opening.who ?? '');
+
+  /* What the two controls above add up to, in the shape a saved view holds.
+     Empty strings are dropped so an unfiltered board compares equal to a
+     view carrying no filters at all. */
+  const currentView: ViewFilters = {
+    ...(who ? { who } : {}),
+    ...(grouping ? { groupBy: grouping } : {}),
+  };
+
+  const applyView = (f: ViewFilters) => {
+    setWho(f.who ?? '');
+    setGrouping(f.groupBy ?? '');
+  };
+
+  const nameOf = (id: string) => members.find((m) => m.id === id)?.name ?? null;
   const team = members.length > 1;
 
   const board = stages.filter((s) => BOARD_KINDS.includes(s.kind));
@@ -817,6 +844,13 @@ export function Board({
           {meId ? <TakeAll ids={pool.map((c) => c.id)} meId={meId} /> : null}
         </div>
       ) : null}
+
+      <SavedViews
+        views={views}
+        current={currentView}
+        onApply={applyView}
+        memberName={nameOf}
+      />
 
       {(groupable.length > 0 || team || quietOnes.length > 0) ? (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">

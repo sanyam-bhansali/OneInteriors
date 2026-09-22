@@ -552,6 +552,7 @@ model Studio {
   studioQuotes       StudioQuote[]
   studioClients      StudioClient[]
   studioClientEvents StudioClientEvent[]
+  studioSavedViews   StudioSavedView[]
   studioStages       StudioStage[]
   studioFields       StudioField[]
   studioProjects     StudioProject[]
@@ -596,6 +597,9 @@ model StudioMember {
 
   /// What they have done. SetNull on removal, so a leaver's history stays.
   clientEvents StudioClientEvent[]
+
+  /// Their own saved views. Cascade — see the model.
+  savedViews StudioSavedView[]
 
   @@index([studioId])
   @@map("studio_members")
@@ -2020,6 +2024,59 @@ model StudioClientEvent {
   @@index([studioId, createdAt])
   @@index([studioId, kind, createdAt])
   @@map("studio_client_events")
+}
+
+/// A filter somebody saved and named.
+///
+/// ## Per MEMBER, not per studio
+///
+/// "My overdue kitchens in Baner" is a person's working view, not a studio
+/// policy. Sharing them would mean one person's tidy-up rearranges everybody
+/// else's morning, and the first thing anyone would ask for is a way to make
+/// one private — which is this, without the extra column.
+///
+/// The cost is that a studio cannot hand a new joiner a set of views. That is
+/// a real gap and the right time to close it is when somebody asks, with a
+/// `sharedAt` column, rather than by making every view shared today.
+///
+/// ## Why the filters are JSON
+///
+/// The filter shape belongs to the board and changes with it. Columns would
+/// mean a migration every time a filter is added, and a saved view referencing
+/// a filter that no longer exists has to degrade quietly — ignoring a key it
+/// does not recognise — rather than fail to load. JSON makes that the default
+/// behaviour instead of something to remember.
+model StudioSavedView {
+  id String @id @default(cuid())
+
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  /// Whose view. Cascades: a member who leaves takes their views with them,
+  /// because a named view nobody can explain is clutter on everybody's screen.
+  memberId String
+  member   StudioMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  name String
+
+  /// `{ assigned, stageIds, due, quiet, source, groupBy }` — whatever the
+  /// board understands today. Unknown keys are ignored on read.
+  filters Json @default("{}")
+
+  /// The one that loads when the board opens. At most one per member, which
+  /// is enforced by the write path clearing the others in the same
+  /// transaction rather than by a partial unique index — Prisma cannot
+  /// express one, and a raw index here would drift from the schema silently.
+  isDefault Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One name per person. A second "Overdue" is somebody meaning to edit the
+  /// first and getting two instead.
+  @@unique([memberId, name])
+  @@index([memberId, createdAt])
+  @@map("studio_saved_views")
 }
 
 enum ProjectStage {

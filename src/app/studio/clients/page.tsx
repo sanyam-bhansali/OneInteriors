@@ -7,6 +7,7 @@ import { myClients, BOARD_KINDS } from '@/modules/studio-practice/clients';
 import { myStages } from '@/modules/studio-practice/stages';
 import { myFields } from '@/modules/studio-practice/fields';
 import { assignableMembers, myMembershipId } from '@/modules/studio-practice/team';
+import { myViews } from '@/modules/studio-practice/saved-views';
 import { Board, AddClientButton, AddFirstClientButton } from './Board';
 
 export const metadata: Metadata = {
@@ -36,12 +37,13 @@ const importLink =
  * with no date sits at the bottom, which is a quiet argument for setting one.
  */
 export default async function ClientsPage() {
-  const [clients, stages, fields, members, meId] = await Promise.all([
+  const [clients, stages, fields, members, meId, views] = await Promise.all([
     myClients(),
     myStages(),
     myFields(),
     assignableMembers(),
     myMembershipId(),
+    myViews(),
   ]);
 
   const today = new Date();
@@ -107,6 +109,7 @@ export default async function ClientsPage() {
             fields={fields}
             members={members}
             meId={meId}
+            views={views}
           />
         )}
 
