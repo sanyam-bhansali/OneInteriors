@@ -14,6 +14,8 @@ import { GstinControl } from './GstinControl';
 import { HideControl } from './HideControl';
 import { ArchiveReview } from './ArchiveReview';
 import { archivesForStudio } from '@/modules/studio/quotation-archive-store';
+import { ratesForReview } from '@/modules/quotation/filed-rate-store';
+import type { ArchiveRow } from './ArchiveReview';
 import { studioAuditTrail } from '@/modules/verification/record';
 
 export const metadata: Metadata = {
@@ -158,7 +160,7 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
                   Open these, pull the line items out, and run them through the ingestion. Links
                   last five minutes and are not in the page source.
                 </p>
-                <ArchiveReview archives={await archivesForStudio(studio.id)} />
+                <ArchiveReview archives={await archivesWithRates(studio.id)} />
               </section>
 
               {/* The checks themselves */}
@@ -326,5 +328,32 @@ function Field({ label, value, mono = false }: { label: string; value: string; m
         {value}
       </dd>
     </div>
+  );
+}
+
+
+/**
+ * Each archive with the rates derived from it.
+ *
+ * Fetched here rather than inside the client component because the rates are
+ * in Postgres and that component runs in the browser. One query per archive:
+ * a studio has one or two, and a join would trade a readable pair of calls
+ * for a shape both callers would then have to understand.
+ */
+async function archivesWithRates(studioId: string): Promise<ArchiveRow[]> {
+  const archives = await archivesForStudio(studioId);
+
+  return Promise.all(
+    archives.map(async (a) => ({
+      id: a.id,
+      state: a.state,
+      quotationCount: a.quotationCount,
+      note: a.note,
+      uploadedAt: a.uploadedAt,
+      files: a.files,
+      analysisState: a.analysisState,
+      analysisError: a.analysisError,
+      pendingRates: await ratesForReview(a.id),
+    })),
   );
 }

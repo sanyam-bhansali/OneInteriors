@@ -6,6 +6,12 @@ import type { RecordResult } from '@/modules/verification/record';
 // Values AND types from the pure module, never from the `server-only` store —
 // see tests/server-only-boundary.test.ts for what that costs.
 import { MIN_QUOTATIONS_TO_SEND, type ArchiveState } from '@/modules/studio/quotation-archive';
+import {
+  ANALYSIS_COPY,
+  isAnalysisState,
+  type FiledRateView,
+} from '@/modules/quotation/analysis-states';
+import { RateReview } from './RateReview';
 
 export interface ArchiveRow {
   id: string;
@@ -14,6 +20,11 @@ export interface ArchiveRow {
   note: string | null;
   uploadedAt: string;
   files: { id: string; filename: string; bytes: number }[];
+  /** What the automatic reader did, separate from what ops has done. */
+  analysisState: string;
+  analysisError: string | null;
+  /** Derived and awaiting a person. Empty when nothing has been read. */
+  pendingRates: FiledRateView[];
 }
 
 const STATES: { value: ArchiveState; label: string; help: string }[] = [
@@ -76,6 +87,11 @@ function ArchiveCard({ archive }: { archive: ArchiveRow }) {
 
   return (
     <div className="rounded-[10px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-5">
+      {/* What the reader did, before what ops did. Two axes: an archive can
+          be fully read and still untouched by a person, which is the normal
+          case and the whole reason these are separate columns. */}
+      <AnalysisLine state={archive.analysisState} error={archive.analysisError} />
+
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
         <p className="m-0 text-[14.5px] text-[var(--color-ink)]">
           {archive.files.length} file{archive.files.length === 1 ? '' : 's'}
@@ -211,6 +227,55 @@ function ArchiveCard({ archive }: { archive: ArchiveRow }) {
           Record what you found
         </button>
       )}
+
+      {/* Below the file list and the record form, because the judgement it
+          asks for depends on having opened the files first. */}
+      {archive.pendingRates.length > 0 ? (
+        <div className="mt-5">
+          <RateReview
+            archiveId={archive.id}
+            rates={archive.pendingRates}
+            quotationsRead={archive.quotationCount}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * What the reader made of this archive.
+ *
+ * Separate from the state ops sets, and shown above it, because it is the
+ * thing that happened first. An archive can be fully read and still untouched
+ * by a person — that is the normal case, and one column could not say it.
+ *
+ * The error is shown verbatim to ops and never to the studio: it names the
+ * failure in our terms ("the reader timed out", a status code), which is
+ * useful to somebody who can act on it and alarming to somebody who cannot.
+ */
+function AnalysisLine({ state, error }: { state: string; error: string | null }) {
+  if (!isAnalysisState(state) || state === 'NOT_STARTED') return null;
+  const copy = ANALYSIS_COPY[state];
+
+  return (
+    <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <span
+        className={`rounded-full px-2.5 py-0.5 text-[11.5px] font-medium ${
+          state === 'READ'
+            ? 'bg-[var(--color-ontrack-soft)] text-[var(--color-ontrack)]'
+            : state === 'FAILED'
+              ? 'bg-[var(--color-brass-soft)] text-[var(--color-brass)]'
+              : 'bg-[var(--color-paper-3)] text-[var(--color-ink-2)]'
+        }`}
+      >
+        {copy.label}
+      </span>
+      {error ? (
+        <span className="font-[family-name:var(--font-mono)] text-[11.5px] text-[var(--color-ink-3)]">
+          {error}
+        </span>
+      ) : null}
     </div>
   );
 }

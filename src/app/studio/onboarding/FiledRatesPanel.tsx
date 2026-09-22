@@ -52,6 +52,20 @@ export function FiledRatesPanel({
   const live = rates.filter((r) => r.state === 'LIVE');
   const pending = rates.filter((r) => r.state === 'PENDING');
 
+  /**
+   * Nothing sent, nothing derived — so nothing to say.
+   *
+   * It reported "Not read yet · 0 files held" to studios who had sent
+   * nothing and, on a deployment without storage, had no way to send
+   * anything. A status line about work that cannot begin is worse than
+   * silence: it implies something is in progress and invites the question
+   * "where do I upload?", which is what it got.
+   *
+   * The panel above this one makes the offer. This one reports on it, and
+   * only once there is something to report.
+   */
+  if (filesHeld === 0 && rates.length === 0) return null;
+
   return (
     <div className="flex flex-col gap-4">
       <div

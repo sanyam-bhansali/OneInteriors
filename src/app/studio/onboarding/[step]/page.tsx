@@ -242,6 +242,17 @@ export default async function OnboardingStepPage({
               minForRates={MIN_QUOTATIONS_FOR_RATES}
               enabled={quotationUploadEnabled()}
             />
+
+            {/* Directly under the control it reports on. It sat three
+                sections lower, so a studio read "0 files held" with no
+                upload box in sight and asked where to send them — a status
+                line separated from its action is a status line about
+                nothing. */}
+            <FiledRatesPanel
+              analysisState={archive?.analysisState ?? 'NOT_STARTED'}
+              filesHeld={archive?.fileCount ?? 0}
+              rates={await myFiledRates(studio.id)}
+            />
             {/* Positioning first: it is what the studio thinks this step is
                 asking, it is quick, and it blocks nothing. The rate table
                 follows, because it is the half the product cannot work
@@ -251,16 +262,6 @@ export default async function OnboardingStepPage({
               priceLevel={studio.priceLevel}
               minLakhs={studio.minProjectPaise ? paiseToLakhs(fromDb(studio.minProjectPaise)) : null}
               maxLakhs={studio.maxProjectPaise ? paiseToLakhs(fromDb(studio.maxProjectPaise)) : null}
-            />
-            {/* What their own quotations produced. Above the manual table
-                because it is the answer to the same question, arrived at
-                from evidence rather than from memory — see the note on
-                FiledRatesPanel. The table below stays for whatever the
-                archive did not cover. */}
-            <FiledRatesPanel
-              analysisState={archive?.analysisState ?? 'NOT_STARTED'}
-              filesHeld={archive?.fileCount ?? 0}
-              rates={await myFiledRates(studio.id)}
             />
             <RateCardForm values={await rateCardValues()} />
           </div>

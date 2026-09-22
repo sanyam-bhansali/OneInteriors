@@ -14,6 +14,7 @@ import {
   signedUrlForArchiveFile,
 } from '@/modules/studio/quotation-archive-store';
 import type { ArchiveState } from '@/modules/studio/quotation-archive';
+import { approveRates, rejectRate } from '@/modules/quotation/filed-rate-store';
 
 /**
  * Thin wrappers. All authorisation, validation and audit logging live in
@@ -156,4 +157,57 @@ export async function setGstinAction(
     revalidatePath(`/studios/${slug}`);
   }
   return result;
+}
+
+
+// ── Derived rates ──────────────────────────────────────────────
+
+export type RateDecision = { ok: true; message: string } | { ok: false; error: string };
+
+/**
+ * Put an archive's derived rates into force.
+ *
+ * The whole set at once, because a half-approved archive prices a home from
+ * two different readings — `approveRates` explains why that matters on a
+ * screen whose entire purpose is comparing studios on identical lines.
+ *
+ * The role check lives in the store, not here. An action is a route by
+ * another name and route handlers get added in a hurry; the guard belongs
+ * next to the write it guards.
+ */
+export async function approveRatesAction(
+  _prev: RateDecision | null,
+  formData: FormData,
+): Promise<RateDecision> {
+  const result = await approveRates(String(formData.get('archiveId') ?? ''));
+  if (!result.ok) return { ok: false, error: result.error };
+
+  revalidatePath('/ops', 'layout');
+  revalidatePath('/studio/onboarding', 'layout');
+  return {
+    ok: true,
+    message: `${result.live} ${result.live === 1 ? 'rate is' : 'rates are'} now live. Their quotes are built from these.`,
+  };
+}
+
+/**
+ * Refuse one derived rate, with a reason the studio reads.
+ *
+ * Per rate rather than per archive, because that is the shape of the
+ * failures: nineteen good rates and a mandir read off three quotes, one of
+ * which was for a temple room the size of a bedroom.
+ */
+export async function rejectRateAction(
+  _prev: RateDecision | null,
+  formData: FormData,
+): Promise<RateDecision> {
+  const result = await rejectRate(
+    String(formData.get('rateId') ?? ''),
+    String(formData.get('note') ?? ''),
+  );
+  if (!result.ok) return { ok: false, error: result.error };
+
+  revalidatePath('/ops', 'layout');
+  revalidatePath('/studio/onboarding', 'layout');
+  return { ok: true, message: 'Refused. The studio sees your note.' };
 }

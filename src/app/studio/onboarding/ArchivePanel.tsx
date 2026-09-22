@@ -57,7 +57,39 @@ export function ArchivePanel({
   const [chosen, setChosen] = useState(0);
   const input = useRef<HTMLInputElement>(null);
 
-  if (!enabled && !archive) return null;
+  /**
+   * Off, and saying so.
+   *
+   * This used to `return null`, which made the whole offer disappear on any
+   * deployment without a storage key — no control, no explanation, and a
+   * studio with no way to know the feature existed. It was reported as
+   * "where is the option to upload", which is the only question somebody can
+   * ask about a thing that is not there.
+   *
+   * A missing environment variable should cost a feature and say what it
+   * cost, not remove a page silently. Same posture as the business-proof and
+   * portfolio-image controls, which both name the fallback.
+   */
+  if (!enabled && !archive) {
+    return (
+      <div className="rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-6">
+        <p className="label m-0 mb-2 text-[var(--color-petrol)]">Instead of typing all of this</p>
+        <p className="h3 m-0 mb-3">Send us your past quotations.</p>
+        <p className="m-0 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--color-ink-2)]">
+          {MIN_QUOTATIONS_TO_SEND} or more and we read them and fill this page in from what you
+          actually charged. Sending them from here is not switched on yet — email them to{' '}
+          <a
+            href="mailto:studios@oneinteriors.in?subject=Our%20past%20quotations"
+            className="text-[var(--color-petrol)] underline underline-offset-4"
+          >
+            studios@oneinteriors.in
+          </a>{' '}
+          and we will do the same thing by hand. Any format. It does not hold this step up — the
+          rates below still work.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-[14px] border border-[var(--color-petrol)] bg-[var(--color-paper-2)] p-6">
