@@ -1,7 +1,12 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { CALL_OUTCOMES, ago, type CallOutcomeId } from '@/modules/studio-practice/event-copy';
+import {
+  CALL_OUTCOMES,
+  OUTCOME_FOLLOWUP,
+  ago,
+  type CallOutcomeId,
+} from '@/modules/studio-practice/event-copy';
 import { logContactAction } from '../actions';
 
 /**
@@ -94,18 +99,38 @@ export function LogContact({
       />
 
       <div className="flex flex-wrap gap-2">
-        {CALL_OUTCOMES.map((o) => (
-          <button
-            key={o.id}
-            type="button"
-            disabled={pending}
-            onClick={() => log(o.id)}
-            className="rounded-full border border-[var(--s-rule)] px-3 py-1.5 text-[13px] transition-colors hover:border-[var(--s-ink-3)] hover:bg-[var(--s-rail-active)]/60 disabled:opacity-50"
-          >
-            {o.label}
-          </button>
-        ))}
+        {CALL_OUTCOMES.map((o) => {
+          const f = OUTCOME_FOLLOWUP[o.id];
+          return (
+            <button
+              key={o.id}
+              type="button"
+              disabled={pending}
+              onClick={() => log(o.id)}
+              /* The consequence, before the click. Each of these sets the
+                 lead's next action, and a button that silently rewrites
+                 somebody's follow-up is a button they stop trusting. */
+              title={
+                f === 'clear'
+                  ? 'Clears the follow-up'
+                  : f
+                    ? `Sets: ${f.action}`
+                    : 'Leaves the follow-up as it is'
+              }
+              className="rounded-full border border-[var(--s-rule)] px-3 py-1.5 text-[13px] transition-colors hover:border-[var(--s-ink-3)] hover:bg-[var(--s-rail-active)]/60 disabled:opacity-50"
+            >
+              {o.label}
+            </button>
+          );
+        })}
       </div>
+
+      {/* Said once, in words, rather than only in a tooltip nobody hovers on
+          a phone. */}
+      <p className="m-0 mt-2.5 text-[12px] leading-relaxed text-[var(--s-ink-3)]">
+        Whichever you pick sets what to do next and when — except &ldquo;Not
+        interested&rdquo;, which clears the follow-up rather than inventing one.
+      </p>
 
       {error ? (
         <p role="alert" className="m-0 mt-3 text-[13px] text-[var(--s-danger,#98371f)]">

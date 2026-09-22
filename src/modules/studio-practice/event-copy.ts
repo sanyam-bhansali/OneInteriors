@@ -86,6 +86,85 @@ export function isCallOutcome(v: string): v is CallOutcomeId {
   return CALL_OUTCOMES.some((o) => o.id === v);
 }
 
+/**
+ * What the call produced, and what that means somebody has to do.
+ *
+ * ## Why an outcome sets the next action
+ *
+ * "Log a call" that only stamps a date is a diary, and a diary is a thing you
+ * fill in rather than a thing that helps. The point of asking what happened
+ * is that the answer decides the next move — somebody who asked for a
+ * quotation needs a quotation, and the studio should not have to remember
+ * that separately from recording the call.
+ *
+ * So every outcome carries the work it implies and when it is due, and
+ * `logContact` writes both. AxLeads does the same with its call reactions,
+ * and it is the single feature that makes its call log worth keeping.
+ *
+ * ## Why these hours
+ *
+ * Not a uniform 24. Somebody who asked for a quotation is comparing studios
+ * this week and a day late is a lost job; somebody who said "call me after
+ * Diwali" does not want to hear from you tomorrow. The deadline is the
+ * promise implied by the conversation, so it varies with the conversation.
+ *
+ * ## Three outcomes, not two
+ *
+ * A `Followup` sets a task. `'clear'` REMOVES whatever task was there, which
+ * is different from leaving it alone: a lead who has just said they are not
+ * interested must not keep "Try them again" due tomorrow, because that task
+ * is now a promise to annoy somebody. `null` would leave it standing.
+ *
+ * Nothing here maps to `null` today. It stays in the type because an outcome
+ * that genuinely implies neither is easy to imagine — "left a voicemail"
+ * while a callback is already booked — and the alternative is inventing work,
+ * which is how a follow-up list fills with things nobody intends to do and
+ * stops being read.
+ */
+export interface Followup {
+  action: string;
+  /** Hours from now. */
+  dueInHours: number;
+}
+
+export const OUTCOME_FOLLOWUP: Record<CallOutcomeId, Followup | 'clear' | null> = {
+  /* Ringing again the same hour is harassment; three days is forgetting.
+     Tomorrow is the answer nobody argues with. */
+  no_answer: { action: 'Try them again', dueInHours: 24 },
+  spoke: { action: 'Follow up on that conversation', dueInHours: 72 },
+  /* They named the terms. Honouring them the next working day is the whole
+     of the promise. */
+  busy: { action: 'Ring them back as agreed', dueInHours: 24 },
+  met: { action: 'Send what you discussed', dueInHours: 24 },
+  /* After a site visit the studio has measurements and the customer is
+     waiting on a number. This is the moment a job is won or drifts. */
+  site_visit: { action: 'Send the quotation', dueInHours: 48 },
+  messaged: { action: 'Check whether they replied', dueInHours: 48 },
+  /* Cleared, not skipped. They have said no; a task saying otherwise is a
+     promise to annoy them. The stage is untouched — saying "not interested"
+     on a call is not the same as marking the lead lost, and only the person
+     looking at it should decide that. */
+  not_interested: 'clear',
+};
+
+/** The due date an outcome implies, or null. */
+export function followupDue(outcome: CallOutcomeId, now: Date = new Date()): Date | null {
+  const f = OUTCOME_FOLLOWUP[outcome];
+  if (!f || f === 'clear') return null;
+
+  const due = new Date(now.getTime() + f.dueInHours * 60 * 60 * 1000);
+  /* 10am, not the hour the call happened. A task due at 19:40 sorts into the
+     evening of a day nobody is working, and the board orders on this. */
+  due.setHours(10, 0, 0, 0);
+
+  /* Rounding back to 10am can pull the due date into the past when the call
+     was late at night — `+24h` from 23:00 is tomorrow 23:00, floored to
+     tomorrow 10:00, which is still ahead. But `+0` cases and daylight edges
+     are not worth reasoning about twice: if it landed behind now, push a day. */
+  if (due.getTime() <= now.getTime()) due.setDate(due.getDate() + 1);
+  return due;
+}
+
 export function contactSummary(outcome: CallOutcomeId, note?: string | null): string {
   const base = CALL_OUTCOMES.find((o) => o.id === outcome)?.logs ?? 'Contacted them';
   const tidy = note?.trim();

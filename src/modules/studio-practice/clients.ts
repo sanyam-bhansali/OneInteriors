@@ -34,6 +34,8 @@ import {
   assignedSummary,
   contactSummary,
   createdSummary,
+  followupDue,
+  OUTCOME_FOLLOWUP,
   lostSummary,
   stageSummary,
   type CallOutcomeId,
@@ -670,9 +672,42 @@ export async function logContact(
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   try {
+    const now = new Date();
+
+    /**
+     * The outcome decides the next move, and writes it.
+     *
+     * "Log a call" that only stamps a date is a diary. The reason to ask what
+     * happened is that the answer says what to do next — somebody who asked
+     * for a quotation needs a quotation, and a studio should not have to
+     * remember that separately from recording the call.
+     *
+     * Only when an outcome was actually given. The board's one-tap button
+     * passes none, and inventing work from "somebody pressed a button" is how
+     * a follow-up list fills with things nobody intends to do.
+     *
+     * `not_interested` maps to null on purpose — see OUTCOME_FOLLOWUP.
+     */
+    const implied = outcome ? OUTCOME_FOLLOWUP[outcome] : null;
+    const followup = implied && implied !== 'clear' ? implied : null;
+    const due = outcome ? followupDue(outcome, now) : null;
+
     const { count } = await prisma.studioClient.updateMany({
       where: { id, studioId, deletedAt: null },
-      data: { lastContactedAt: new Date() },
+      data: {
+        lastContactedAt: now,
+        /* Both or neither, which is the rule addClient already enforces: an
+           action with no date never surfaces on "waiting on you", and a date
+           with no action is a reminder to do nothing. */
+        ...(followup && due
+          ? { nextAction: followup.action, nextActionOn: due }
+          : implied === 'clear'
+            ? /* They have said no. A task saying otherwise is a promise to
+                 annoy them, so it goes — both columns, because one without
+                 the other is the state addClient refuses. */
+              { nextAction: null, nextActionOn: null }
+            : {}),
+      },
     });
     if (count === 0) return { ok: false, error: 'That client is not yours.' };
 
@@ -680,14 +715,42 @@ export async function logContact(
       studioId,
       clientId: id,
       kind: 'CONTACTED',
-      summary: contactSummary(outcome ?? 'spoke', note),
-      meta: outcome ? { outcome } : undefined,
+      /* The task is named in the same line as the call, so the timeline reads
+         as cause and effect rather than two entries a second apart. */
+      summary:
+        contactSummary(outcome ?? 'spoke', note) +
+        (followup && due
+          ? ` · ${followup.action} by ${dueWord(due, now)}`
+          : implied === 'clear'
+            ? ' · follow-up cleared'
+            : ''),
+      meta: outcome ? { outcome, nextAction: followup?.action ?? null } : undefined,
     });
 
     return { ok: true };
   } catch (error) {
     return saveFailed('logContact', error);
   }
+}
+
+/**
+ * "tomorrow", "Friday", "3 Oct".
+ *
+ * A date on a task nobody has to decode. Within the week the weekday is what
+ * people actually plan by; beyond it, the date is.
+ */
+function dueWord(due: Date, now: Date): string {
+  const days = Math.round((due.getTime() - startOfDay(now).getTime()) / 86_400_000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'tomorrow';
+  if (days < 7) return due.toLocaleDateString('en-IN', { weekday: 'long' });
+  return due.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
+function startOfDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
 }
 
 /**
