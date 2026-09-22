@@ -3,7 +3,8 @@
 import { headers } from 'next/headers';
 import { submitApplication } from '@/modules/studio/application';
 import { scrapeStudioSite } from '@/modules/studio/scrape';
-import { check, record, keyFor, type Attempt } from '@/modules/studio/lookup-limit';
+import { consume, addressOf, bucketFor, waitPhrase } from '@/modules/rate-limit/store';
+import { LOOKUP_LIMIT } from '@/modules/studio/lookup-limit';
 import { PUNE_LOCALITIES } from '@/modules/brief/types';
 
 export interface ApplyState {
@@ -58,8 +59,11 @@ export async function submitApplicationAction(
  *     ranges are blocked including the octal, hex, short-form and
  *     trailing-dot tricks, and redirects are followed by hand with every
  *     hop revalidated. That is the SSRF half and it was already there.
- *  2. This limiter, which stops it being used as a free open relay. See
- *     `lookup-limit.ts` for what it honestly does and does not cover.
+ *  2. This limiter, which stops it being used as a free open relay. It is
+ *     now shared across instances — see `rate-limit/store.ts`. It used to
+ *     be an in-memory Map, which reset on every cold start and was enforced
+ *     separately in each concurrently running lambda, so a caller spreading
+ *     requests got a multiple of the quota.
  *  3. It only ever runs on an explicit button press. Nothing fetches on
  *     blur, on debounce, or while somebody is typing a URL one character
  *     at a time.
@@ -84,9 +88,6 @@ export interface LookupState {
   localityLabels?: string[];
 }
 
-/** Per-instance, per-address. Cleared by any cold start. */
-const attempts = new Map<string, Attempt>();
-
 export async function lookupSiteAction(
   _prev: LookupState,
   formData: FormData,
@@ -97,21 +98,20 @@ export async function lookupSiteAction(
   }
 
   const h = await headers();
-  const key = keyFor(h.get('x-forwarded-for'));
-  const now = Date.now();
 
-  const verdict = check(now, attempts.get(key));
+  /* Namespaced, so the lookup and the public capture form cannot spend each
+     other's allowance — both are keyed by address and a bare IP would make
+     them one quota. */
+  const verdict = await consume(
+    bucketFor('lookup', addressOf(h.get('x-forwarded-for'))),
+    LOOKUP_LIMIT,
+  );
   if (!verdict.allowed) {
-    const mins = Math.ceil(verdict.retryInSeconds / 60);
     return {
       status: 'error',
-      message: `That is a few lookups in a short time. Try again in about ${mins} minute${mins === 1 ? '' : 's'}, or just type it in — it is only a shortcut.`,
+      message: `That is a few lookups in a short time. Try again ${waitPhrase(verdict.retryInSeconds)}, or just type it in — it is only a shortcut.`,
     };
   }
-  attempts.set(key, record(now, attempts.get(key)));
-
-  // Keep the map from growing without bound on a long-lived instance.
-  if (attempts.size > 5000) attempts.clear();
 
   const result = await scrapeStudioSite(website);
   if (!result.ok) {

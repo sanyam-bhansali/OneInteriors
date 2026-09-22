@@ -2079,6 +2079,41 @@ model StudioSavedView {
   @@map("studio_saved_views")
 }
 
+/// One request against a rate-limited thing.
+///
+/// ## Why rows rather than a counter
+///
+/// A counter per window is one row and one upsert, and it is a FIXED window:
+/// somebody can spend the whole quota at 09:59:59 and the whole of the next
+/// one at 10:00:01, which is double the rate at exactly the moment an
+/// automated caller lands. `lookup-limit.ts` already refuses that trade for
+/// the in-memory limiter and the reasoning does not change here.
+///
+/// So each attempt is a row and the window slides. The cost is a delete of
+/// expired rows on every consume, which is one indexed range delete — cheap,
+/// and it keeps the table from growing without a cron.
+///
+/// ## Why this is not per-tenant
+///
+/// The bucket is whatever the caller says it is: an IP, a form id, a studio.
+/// The table is infrastructure, not domain data, and scoping it to a studio
+/// would make it useless for the case it exists for — an unauthenticated
+/// stranger posting to a public form, who belongs to no studio at all.
+model RateLimitHit {
+  id String @id @default(cuid())
+
+  /// Namespaced by the caller: `form:<id>`, `ip:<addr>`, `lookup:<addr>`.
+  /// Namespacing is the caller's job so two features cannot collide on a
+  /// bare IP and silently share a quota.
+  bucket String
+
+  createdAt DateTime @default(now())
+
+  /// The only query: count and prune one bucket's recent rows.
+  @@index([bucket, createdAt])
+  @@map("rate_limit_hits")
+}
+
 enum ProjectStage {
   DESIGN
   EXECUTION
