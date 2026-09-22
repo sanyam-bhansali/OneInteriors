@@ -67,6 +67,9 @@ model User {
   consents      Consent[]
   auditEntries  AuditLog[]     @relation("AuditActor")
   notifications Notification[]
+  /// Documents this person reviewed. SetNull on the other side — removing an
+  /// ops account must not delete the record of what they decided.
+  reviewedDocs  StudioDocument[] @relation("StudioDocumentReviewer")
 
   @@index([role])
   @@map("users")
@@ -399,6 +402,18 @@ model Studio {
   city       String   @default("pune")
   localities String[] @default([]) // areas they serve
 
+  /// Street address, for verification rather than for display.
+  ///
+  /// Nullable because every studio on the roster predates the field. A NOT
+  /// NULL with a default would put an invented address in the column that
+  /// verification reads, and ops cannot tell a default from a real answer.
+  addressLine String?
+
+  /// Six digits, as text. Never an integer: that drops the leading zero a
+  /// large share of Indian pincodes start with, and nothing is computed from
+  /// one — it is an identifier that happens to be made of digits.
+  pincode     String?
+
   status StudioStatus     @default(ONBOARDING)
   tier   VerificationTier @default(UNVERIFIED)
 
@@ -562,6 +577,7 @@ model Studio {
 
   /// Past quotations the studio sent us, for deriving their rate card.
   quotationArchives QuotationArchive[]
+  documents         StudioDocument[]
 
   @@index([city, status, tier])
   /// Every customer-facing query filters paused studios out.
@@ -2615,4 +2631,57 @@ model QuotationFile {
 
   @@index([archiveId])
   @@map("quotation_files")
+}
+
+/// A file a studio sent to back up its registration.
+///
+/// ## Why a table and not a `proofUrl` column on Studio
+///
+/// Because more than one is the normal answer. A GST certificate AND a Udyam
+/// registration AND a shop licence is an ordinary set for a Pune practice,
+/// and a single column would mean each upload silently erased the last — the
+/// studio would see their newest file and have no idea the others were gone.
+///
+/// ## `kind` and `state` are strings, not enums
+///
+/// Unlike `QuotationArchive`, which uses `ArchiveState`. The values here are
+/// a list we expect to extend as often as somebody sends a document type we
+/// had not thought of, and every addition to a Postgres enum is a migration
+/// that has to ship before the code that writes the value. The trade is
+/// deliberate: `document-kinds.ts` holds the allowed values and is the thing
+/// to read.
+model StudioDocument {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  /// What the studio says it is. A claim — nobody has opened it yet.
+  kind String
+
+  storageKey   String
+  /// Kept because it is often the only thing telling two scans apart, and it
+  /// is what ops reads before deciding whether to open anything.
+  originalName String
+  contentType  String
+  bytes        Int
+
+  /// RECEIVED until a person looks. Deliberately not "PENDING", which reads
+  /// as a queue position we are not promising.
+  state String @default("RECEIVED")
+
+  /// Shown to the studio verbatim, so it is written for them and not for us.
+  note String? @db.Text
+
+  reviewedAt   DateTime?
+  reviewedById String?
+  reviewedBy   User?     @relation("StudioDocumentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime  @default(now())
+  /// Soft delete. A withdrawn upload stays for the audit trail and stops
+  /// counting toward anything — see the partial index.
+  deletedAt DateTime?
+
+  @@index([studioId])
+  @@index([studioId, state])
+  @@map("studio_documents")
 }

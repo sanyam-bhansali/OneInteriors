@@ -1381,6 +1381,25 @@ p {
   transform: none;
 }
 
+/* The drop zone. Border and background are set per-state in the markup;
+   this carries the transition and the keyboard ring.
+
+   `focus-within`, because the focusable thing is the file input hidden
+   inside the label — without this the box takes keyboard focus and shows
+   nothing at all, which is the usual cost of hiding a native input. */
+.oi-drop {
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+}
+.oi-drop:hover {
+  border-color: var(--color-ink-3);
+}
+.oi-drop:focus-within {
+  outline: 2px solid var(--color-petrol);
+  outline-offset: 2px;
+}
+
 /* The rejection shake.
 
    Three small returns, not a wobble: 420ms and ±5px is enough to draw
@@ -1447,7 +1466,8 @@ p {
   .oi-sec,
   .oi-sec-n,
   .oi-chip,
-  .oi-save {
+  .oi-save,
+  .oi-drop {
     transition: none;
   }
   .oi-chip:active,

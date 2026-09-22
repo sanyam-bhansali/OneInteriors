@@ -18,6 +18,8 @@ const COMPLETE: OnboardingSnapshot = {
   teamSize: 8,
   gstin: '27AAPFU0939F1ZV',
   gstinNotApplicable: false,
+  addressLine: '301 Skyview, Baner Road',
+  pincode: '411045',
   portfolioCount: MIN_PORTFOLIO_PROJECTS,
   portfolioShortfallNote: null,
   missingRates: [],
@@ -96,6 +98,31 @@ describe('assessSteps — registration', () => {
     const silent = snapshot({ gstin: null, gstinNotApplicable: false });
     expect(step(silent, 'registration').done).toBe(false);
     expect(step(silent, 'registration').missing[0]).toContain('note that you do not have one');
+  });
+
+  /**
+   * The address is required and the uploaded document is not.
+   *
+   * Worth asserting rather than assuming, because the pair is easy to get
+   * backwards: the certificate feels like the important one, and making it
+   * compulsory would stop a studio who has everything else and cannot find
+   * the PDF at nine in the evening. A GSTIN says a registration exists; the
+   * address is the only field that says where to go and look.
+   */
+  it('needs an address as well as the registration answer', () => {
+    const noAddress = snapshot({ addressLine: null });
+    expect(step(noAddress, 'registration').done).toBe(false);
+    expect(step(noAddress, 'registration').missing).toContain('your studio address');
+
+    const noPincode = snapshot({ pincode: null });
+    expect(step(noPincode, 'registration').done).toBe(false);
+    expect(step(noPincode, 'registration').missing).toContain('a pincode');
+  });
+
+  it('treats whitespace as absent', () => {
+    /* A space is what a studio leaves behind when they clear a field, and
+       `!null` and `!' '` are not the same test. */
+    expect(step(snapshot({ addressLine: '   ' }), 'registration').done).toBe(false);
   });
 });
 

@@ -80,6 +80,8 @@ export interface StudioContext {
     submittedForReview: boolean;
     gstinNotApplicable: boolean;
     gstinNote: string | null;
+    addressLine: string | null;
+    pincode: string | null;
     portfolioShortfallNote: string | null;
   };
 }
@@ -172,6 +174,8 @@ async function loadStudio(user: AuthUser): Promise<StudioContext | null> {
       submittedForReview: steps.submittedForReview === true,
       gstinNotApplicable: s.gstinNotApplicable,
       gstinNote: s.gstinNote,
+      addressLine: s.addressLine,
+      pincode: s.pincode,
       portfolioShortfallNote: s.portfolioShortfallNote,
     },
   };
@@ -336,6 +340,102 @@ export async function saveProfile(input: ProfileInput): Promise<SaveResult> {
       teamSize: input.teamSize ?? null,
       minProjectPaise: input.minLakhs ? BigInt(lakhsToPaise(input.minLakhs)) : null,
       maxProjectPaise: input.maxLakhs ? BigInt(lakhsToPaise(input.maxLakhs)) : null,
+    },
+  });
+
+  return { ok: true };
+}
+
+/**
+ * The whole registration step, in one write.
+ *
+ * ## Why this exists next to `saveGstin` and `declareNoGstin` rather than
+ * replacing them
+ *
+ * Those two are still the ops-side path and still the smallest correct unit:
+ * ops records a number for a studio without touching their address. This is
+ * the studio-facing path, where the screen has one button and therefore has
+ * to be one transaction.
+ *
+ * ## Everything is validated before anything is written
+ *
+ * The obvious build is to call the three existing functions in a row. It is
+ * also wrong: a good address followed by a rejected GSTIN leaves the address
+ * saved and the form showing an error, so pressing the button again re-saves
+ * a field that was already fine — and if the studio then walks away, half the
+ * step is recorded and the page never said so. Collecting the errors first
+ * means the step either moves or does not.
+ *
+ * ## The two GST answers stay mutually exclusive
+ *
+ * Recording a number clears the note and vice versa, the same rule the
+ * separate functions enforce. Leaving both set shows whoever verifies them a
+ * contradiction, and a person resolving that by guessing is the failure the
+ * field was added to prevent.
+ */
+export async function saveRegistration(input: {
+  addressLine: string;
+  pincode: string;
+  /** Which answer the studio is giving to the GST question. */
+  answer: 'has' | 'none';
+  gstin: string;
+  gstinNote: string;
+}): Promise<SaveResult> {
+  const context = await currentStudio();
+  if (!context) return { ok: false, errors: { form: 'No studio is linked to this account.' } };
+
+  const errors: Record<string, string> = {};
+
+  const addressLine = input.addressLine?.trim() ?? '';
+  const pincode = input.pincode?.trim() ?? '';
+
+  if (addressLine.length < 8) {
+    errors.addressLine = 'Enough that somebody could find you — building, street, area.';
+  }
+  /* First digit non-zero: no Indian pincode starts with one, so this is a
+     free catch for a transposed digit or a phone number pasted by mistake. */
+  if (!/^[1-9][0-9]{5}$/.test(pincode)) {
+    errors.pincode = 'Six digits. Pune pincodes start 41.';
+  }
+
+  let gstin: string | null = null;
+  let gstinNote: string | null = null;
+
+  if (input.answer === 'has') {
+    const result = validateGstin(input.gstin ?? '');
+    if (!result.valid) {
+      errors.gstin = result.reason;
+    } else {
+      const clash = await prisma.studio.findFirst({
+        where: { gstin: result.gstin, id: { not: context.studio.id } },
+        select: { id: true },
+      });
+      if (clash) {
+        errors.gstin = 'Another studio is already registered with this GSTIN. Talk to us.';
+      } else {
+        gstin = result.gstin;
+      }
+    }
+  } else {
+    const note = input.gstinNote?.trim() ?? '';
+    if (note.length < 10) {
+      errors.gstinNote =
+        'A sentence is enough — proprietorship below the threshold, registration in progress, whatever it is. It tells us how to verify you instead.';
+    } else {
+      gstinNote = note.slice(0, 500);
+    }
+  }
+
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+
+  await prisma.studio.update({
+    where: { id: context.studio.id },
+    data: {
+      addressLine,
+      pincode,
+      gstin,
+      gstinNotApplicable: input.answer === 'none',
+      gstinNote,
     },
   });
 

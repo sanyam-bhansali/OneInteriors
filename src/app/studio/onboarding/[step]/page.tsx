@@ -24,6 +24,8 @@ import { ReviewPanel } from '../ReviewPanel';
 import { RateCardForm } from '../RateCardForm';
 import { ArchivePanel, type ArchiveView } from '../ArchivePanel';
 import { myArchive } from '@/modules/studio/quotation-archive-store';
+import { myDocuments } from '@/modules/studio/documents';
+import { proofUploadEnabled } from '@/modules/storage/business-proof';
 import { quotationUploadEnabled } from '@/modules/storage/quotation-archive';
 import { MIN_QUOTATIONS_FOR_RATES } from '@/modules/quotation/catalogue';
 import { myRateCard } from '@/modules/quotation/rate-card';
@@ -179,9 +181,24 @@ export default async function OnboardingStepPage({
 
         {step === 'registration' ? (
           <RegistrationForm
-            gstin={studio.gstin}
-            notApplicable={studio.gstinNotApplicable}
-            note={studio.gstinNote}
+            defaults={{
+              tradeName: studio.tradeName,
+              legalName: studio.legalName,
+              /* From the signed-in user, not the studio row. The studio has
+                 no contact person of its own — the person filling this in IS
+                 the contact, which is what the membership means. */
+              contactName: context.user.name ?? null,
+              email: context.user.email ?? null,
+              phone: context.user.phone ?? null,
+              addressLine: studio.addressLine,
+              pincode: studio.pincode,
+              city: 'pune',
+              gstin: studio.gstin,
+              notApplicable: studio.gstinNotApplicable,
+              note: studio.gstinNote,
+            }}
+            documents={await myDocuments()}
+            uploadEnabled={proofUploadEnabled()}
           />
         ) : null}
 

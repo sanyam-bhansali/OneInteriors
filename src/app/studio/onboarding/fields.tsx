@@ -223,6 +223,7 @@ export function SaveBar({
   label = 'Save and continue',
   draft,
   missing,
+  formId,
 }: {
   pending: boolean;
   saved: boolean;
@@ -237,6 +238,16 @@ export function SaveBar({
    * for each.
    */
   missing?: string[];
+  /**
+   * The form this button submits, when it is not inside one.
+   *
+   * The registration step needs the document upload — a `<form>` of its own,
+   * because a file needs its own submit — to sit *between* the fields and the
+   * button. HTML has no nested forms, so containment cannot express that
+   * layout. `form="id"` can, and it is the reason this prop exists rather
+   * than the sections being reordered to suit the markup.
+   */
+  formId?: string;
 }) {
   const blocked = missing !== undefined && missing.length > 0;
 
@@ -263,6 +274,7 @@ export function SaveBar({
 
       <button
         type="submit"
+        form={formId}
         disabled={pending || blocked}
         /**
          * Full width, because on this step it is the only thing to do next.

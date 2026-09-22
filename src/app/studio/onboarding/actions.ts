@@ -6,6 +6,7 @@ import { saveRateCard, type RateInput } from '@/modules/quotation/rate-card';
 import {
   saveProfile,
   saveProfileDraft,
+  saveRegistration,
   saveGstin,
   declareNoGstin,
   declarePortfolioShortfall,
@@ -14,6 +15,7 @@ import {
   submitForReview,
 } from '@/modules/studio/onboarding';
 import { uploadQuotations } from '@/modules/studio/quotation-archive-store';
+import { uploadBusinessProof, withdrawDocument } from '@/modules/studio/documents';
 
 export interface StepState {
   status: 'idle' | 'saved' | 'error';
@@ -126,6 +128,69 @@ export async function saveProfileDraftAction(formData: FormData): Promise<void> 
     minLakhs: lakhs(formData.get('minLakhs')),
     maxLakhs: lakhs(formData.get('maxLakhs')),
   });
+}
+
+export async function saveRegistrationAction(
+  _prev: StepState,
+  formData: FormData,
+): Promise<StepState> {
+  /* Anything that is not the literal 'none' is 'has'. The radio only ever
+     sends one of the two, so this is about a hand-made POST: defaulting an
+     unrecognised value to "I have a GSTIN" means the number is validated,
+     while defaulting the other way would record "not registered" for a studio
+     that never said so. */
+  const answer = String(formData.get('answer') ?? 'has') === 'none' ? 'none' : 'has';
+
+  const result = await saveRegistration({
+    addressLine: String(formData.get('addressLine') ?? ''),
+    pincode: String(formData.get('pincode') ?? ''),
+    answer,
+    gstin: String(formData.get('gstin') ?? ''),
+    gstinNote: String(formData.get('gstinNote') ?? ''),
+  });
+  if (!result.ok) return { status: 'error', errors: result.errors };
+  refresh();
+  return { status: 'saved' };
+}
+
+/**
+ * Take one business-proof document.
+ *
+ * `formData.get` and not `getAll`: this control takes one file at a time, on
+ * purpose. A multiple input here would let somebody select four scans and
+ * have them all filed as a GST certificate, because the kind is chosen once
+ * for the whole batch — and a document filed as the wrong thing is worse than
+ * a document not sent, since nobody goes looking for it.
+ */
+export async function uploadProofAction(
+  _prev: ProofState,
+  formData: FormData,
+): Promise<ProofState> {
+  const file = formData.get('proof');
+  if (!(file instanceof File) || file.size === 0) {
+    return { status: 'error', message: 'Choose a file first.' };
+  }
+
+  const result = await uploadBusinessProof(String(formData.get('kind') ?? ''), file);
+  if (!result.ok) return { status: 'error', message: result.error };
+
+  refresh();
+  return { status: 'saved' };
+}
+
+export interface ProofState {
+  status: 'idle' | 'saved' | 'error';
+  message?: string;
+}
+
+export async function withdrawProofAction(
+  _prev: ProofState,
+  formData: FormData,
+): Promise<ProofState> {
+  const result = await withdrawDocument(String(formData.get('id') ?? ''));
+  if (!result.ok) return { status: 'error', message: result.error };
+  refresh();
+  return { status: 'saved' };
 }
 
 export async function saveGstinAction(

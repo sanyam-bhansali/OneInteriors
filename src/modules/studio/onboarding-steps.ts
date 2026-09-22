@@ -54,6 +54,9 @@ export interface OnboardingSnapshot {
   gstin: string | null;
   /** Set when the studio has told us it has no GST registration. */
   gstinNotApplicable: boolean;
+  /** Street address. Null on every studio that predates the field. */
+  addressLine: string | null;
+  pincode: string | null;
   portfolioCount: number;
   /**
    * What a studio with fewer than three completed projects has instead, in
@@ -104,6 +107,22 @@ export function assessSteps(studio: OnboardingSnapshot): StepStatus[] {
   if (!studio.gstin && !studio.gstinNotApplicable) {
     registrationMissing.push('a GSTIN, or a note that you do not have one');
   }
+
+  /**
+   * And where the practice actually is.
+   *
+   * Required because this step is verification, and verification means
+   * somebody goes and stands somewhere. A GSTIN alone tells us a registration
+   * exists; it does not tell us the studio does.
+   *
+   * The uploaded certificate is deliberately NOT required. It is the most
+   * useful thing on the step and it is also the one thing a studio may not
+   * have to hand on the evening they fill this in — making it compulsory
+   * would stop somebody who is otherwise finished, and we can ask for it by
+   * email. A document is evidence we want, not a gate.
+   */
+  if (!studio.addressLine?.trim()) registrationMissing.push('your studio address');
+  if (!studio.pincode?.trim()) registrationMissing.push('a pincode');
 
   /**
    * Three completed projects, **or** one project and an account of what else
