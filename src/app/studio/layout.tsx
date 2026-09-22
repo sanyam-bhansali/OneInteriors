@@ -101,6 +101,14 @@ interface ShellContext {
   toConfirm: number;
   draftQuotes: number;
   clientsDue: number;
+  /**
+   * Leads nobody has taken. The badge on the Pool tab.
+   *
+   * Open columns only: an unassigned client sitting in "Handed over" is not
+   * work going undone, and counting it would put a number on the rail that
+   * never goes back to zero — which teaches a studio to stop reading badges.
+   */
+  clientsPooled: number;
 }
 
 /**
@@ -126,7 +134,7 @@ async function shellContext(userId: string): Promise<ShellContext | null> {
     const endOfToday = new Date();
     endOfToday.setHours(23, 59, 59, 999);
 
-    const [toConfirm, draftQuotes, clientsDue] = await Promise.all([
+    const [toConfirm, draftQuotes, clientsDue, clientsPooled] = await Promise.all([
       prisma.appointment.count({
         where: { status: 'PROPOSED', introduction: { studioId: studio.id } },
       }),
@@ -144,6 +152,19 @@ async function shellContext(userId: string): Promise<ShellContext | null> {
           // renamed one. See `studio-practice/stages.ts`.
           stage: { kind: { in: ['OPEN', 'WON'] } },
           nextActionOn: { lte: endOfToday },
+        },
+      }),
+      prisma.studioClient.count({
+        where: {
+          studioId: studio.id,
+          /* LIVE, like every other counter here. The sample lead is a real
+             row and is deliberately unassigned, so without this a brand-new
+             studio would be told one lead is going untouched — a number we
+             invented about work we invented. tests/demo-lead.test.ts fails
+             any studioClient.count that omits it. */
+          ...LIVE,
+          assignedToId: null,
+          stage: { kind: { in: ['OPEN', 'WON'] } },
         },
       }),
     ]);
@@ -164,6 +185,7 @@ async function shellContext(userId: string): Promise<ShellContext | null> {
       toConfirm,
       draftQuotes,
       clientsDue,
+      clientsPooled,
     };
   } catch (error) {
     console.error('[studio] shell context failed', error);
@@ -212,6 +234,34 @@ function navFor(context: ShellContext | null): NavGroup[] {
           label: 'Leads',
           ready: isLive('leads'),
           count: context?.clientsDue,
+          /**
+           * Leads is a section, not a page.
+           *
+           * The board is one view of the same data; the pool is the work
+           * nobody has taken; analytics is whether any of it is working. They
+           * were reachable before only as a footer link on the board, a
+           * filter in a dropdown, and nowhere respectively — which is a good
+           * way to build features a studio never discovers.
+           *
+           * There is deliberately no "Board" child: the section row IS the
+           * board. A parent and a first child pointing at the same href is
+           * two controls for one destination, and whichever one somebody
+           * clicks they will wonder what the other did.
+           *
+           * Order is the order of a working day: what is nobody's, where does
+           * more come from, how is it going, what did I throw away.
+           */
+          children: [
+            {
+              href: '/studio/clients/pool',
+              label: 'Pool',
+              ready: isLive('leads'),
+              count: context?.clientsPooled,
+            },
+            { href: '/studio/clients/import', label: 'Import', ready: isLive('leads') },
+            { href: '/studio/clients/analytics', label: 'Analytics', ready: isLive('leads') },
+            { href: '/studio/clients/bin', label: 'Bin', ready: isLive('leads') },
+          ],
         },
         {
           icon: 'quote',

@@ -65,6 +65,19 @@ function Icon({ name }: { name: IconName }) {
   );
 }
 
+/**
+ * A row under a section — Pool, Analytics, Bin.
+ *
+ * No icon on purpose. A second column of icons at this indent competes with
+ * the section's own, and the eye stops being able to find the top level.
+ */
+export interface NavChild {
+  href: string;
+  label: string;
+  ready: boolean;
+  count?: number;
+}
+
 export interface NavItem {
   icon: IconName;
   href: string;
@@ -72,11 +85,154 @@ export interface NavItem {
   ready: boolean;
   /** Shown as a pill on the right of the row. Zero renders nothing. */
   count?: number;
+  /**
+   * Sub-tabs. A section with children is still a link to its own page —
+   * Leads goes to the board — and the children appear beneath it.
+   *
+   * They are revealed rather than hidden behind a click by default: a studio
+   * that never opens the disclosure never learns Pool and Analytics exist,
+   * and a feature nobody finds may as well not be built. So the section
+   * expands whenever anything inside it is the current page, and the chevron
+   * only exists to open it from elsewhere.
+   */
+  children?: NavChild[];
 }
 
 export interface NavGroup {
   label?: string;
   items: NavItem[];
+}
+
+/**
+ * One nav row, plus its sub-tabs when it has any.
+ *
+ * ## Why the section is a link AND a disclosure
+ *
+ * Making the parent a pure toggle would put a dead click on the row somebody
+ * reaches for most — "Leads" means the board, and a studio that clicks it and
+ * gets an accordion instead of their work will click it twice every time
+ * forever. So the row navigates, and a separate chevron opens the section from
+ * somewhere else in the app.
+ *
+ * ## Why it is open by default when you are inside it
+ *
+ * A collapsed section hides Pool and Analytics from a studio who has never
+ * heard of them, and a feature nobody finds may as well not exist. Being on
+ * any page in the section reveals the whole section, so the second visit
+ * teaches what the first one hid.
+ *
+ * The manual toggle is therefore an override, not the source of truth: `null`
+ * means "follow the URL", and only an explicit click pins it either way.
+ */
+function Section({
+  item,
+  activeHref,
+  pathname,
+  onNavigate,
+}: {
+  item: NavItem;
+  activeHref: string | undefined;
+  pathname: string;
+  onNavigate: () => void;
+}) {
+  const children = item.children?.filter((c) => c.ready) ?? [];
+  const inSection = pathname === item.href || pathname.startsWith(item.href + '/');
+  const [pinned, setPinned] = useState<boolean | null>(null);
+  const expanded = children.length > 0 && (pinned ?? inSection);
+
+  /* The parent lights up for its own page, and stays lit — more quietly —
+     while you are on a child. Going fully dark on /studio/clients/pool would
+     lose the answer to "where am I". */
+  const exact = activeHref === item.href;
+  const panelId = `nav-${item.href.replace(/\W+/g, '-')}`;
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center">
+        <Link
+          href={item.href}
+          onClick={onNavigate}
+          aria-current={exact ? 'page' : undefined}
+          className={`flex min-w-0 flex-1 items-center gap-3 rounded-[9px] px-2.5 py-2 text-[14.5px] no-underline transition-colors ${
+            exact
+              ? 'bg-[var(--s-rail-active)] font-medium text-[var(--s-ink)] [&>svg]:text-[var(--s-accent)]'
+              : inSection
+                ? 'font-medium text-[var(--s-ink)] hover:bg-[var(--s-rail-active)]/60 [&>svg]:text-[var(--s-accent)]'
+                : 'text-[var(--s-ink-2)] hover:bg-[var(--s-rail-active)]/60'
+          }`}
+        >
+          <Icon name={item.icon} />
+          <span className="truncate">{item.label}</span>
+          {item.count ? (
+            <span className="s-num ml-auto rounded-full bg-[var(--s-accent)] px-1.5 py-px text-[11px] font-semibold text-white">
+              {item.count}
+            </span>
+          ) : null}
+        </Link>
+
+        {children.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => setPinned(!expanded)}
+            aria-expanded={expanded}
+            aria-controls={panelId}
+            className="grid h-8 w-7 flex-none place-items-center rounded-[7px] text-[var(--s-ink-3)] transition-colors hover:bg-[var(--s-rail-active)]/60 hover:text-[var(--s-ink)]"
+          >
+            <span className="sr-only">
+              {expanded ? `Hide ${item.label} tabs` : `Show ${item.label} tabs`}
+            </span>
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              className={`transition-transform duration-200 motion-reduce:transition-none ${
+                expanded ? 'rotate-90' : ''
+              }`}
+            >
+              <path d="M6 3.5 L10.5 8 L6 12.5" />
+            </svg>
+          </button>
+        ) : null}
+      </div>
+
+      {expanded ? (
+        <div
+          id={panelId}
+          /* Indented to the parent's label, not its icon, so the sub-tabs read
+             as belonging to the word rather than floating in the gutter. The
+             rule down the left is what makes the group one object. */
+          className="ml-[19px] flex flex-col gap-0.5 border-l border-[var(--s-rule)] pl-2.5"
+        >
+          {children.map((child) => (
+            <Link
+              key={child.href}
+              href={child.href}
+              onClick={onNavigate}
+              aria-current={activeHref === child.href ? 'page' : undefined}
+              className={`flex items-center gap-2 rounded-[8px] px-2.5 py-1.5 text-[13.5px] no-underline transition-colors ${
+                activeHref === child.href
+                  ? 'bg-[var(--s-rail-active)] font-medium text-[var(--s-ink)]'
+                  : 'text-[var(--s-ink-2)] hover:bg-[var(--s-rail-active)]/60'
+              }`}
+            >
+              <span className="truncate">{child.label}</span>
+              {child.count ? (
+                <span className="s-num ml-auto rounded-full bg-[var(--s-rail-active)] px-1.5 py-px text-[11px] font-semibold text-[var(--s-ink-2)]">
+                  {child.count}
+                </span>
+              ) : null}
+            </Link>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function StudioShell({
@@ -105,6 +261,7 @@ export function StudioShell({
    */
   const activeHref = groups
     .flatMap((g) => g.items)
+    .flatMap((i) => [i, ...(i.children ?? [])])
     .filter((i) => i.ready && (pathname === i.href || pathname.startsWith(i.href + '/')))
     .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
@@ -135,25 +292,13 @@ export function StudioShell({
               ) : null}
               {group.items.map((item) =>
                 item.ready ? (
-                  <Link
+                  <Section
                     key={item.href}
-                    href={item.href}
-                    onClick={() => setOpen(false)}
-                    aria-current={activeHref === item.href ? 'page' : undefined}
-                    className={`flex items-center gap-3 rounded-[9px] px-2.5 py-2 text-[14.5px] no-underline transition-colors ${
-                      activeHref === item.href
-                        ? 'bg-[var(--s-rail-active)] font-medium text-[var(--s-ink)] [&>svg]:text-[var(--s-accent)]'
-                        : 'text-[var(--s-ink-2)] hover:bg-[var(--s-rail-active)]/60'
-                    }`}
-                  >
-                    <Icon name={item.icon} />
-                    <span className="truncate">{item.label}</span>
-                    {item.count ? (
-                      <span className="ml-auto rounded-full bg-[var(--s-accent)] px-1.5 py-px text-[11px] font-semibold text-white s-num">
-                        {item.count}
-                      </span>
-                    ) : null}
-                  </Link>
+                    item={item}
+                    activeHref={activeHref}
+                    pathname={pathname}
+                    onNavigate={() => setOpen(false)}
+                  />
                 ) : (
                   <span
                     key={item.href}
