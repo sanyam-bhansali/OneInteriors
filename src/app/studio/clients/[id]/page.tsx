@@ -91,11 +91,12 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_260px]">
           {/* ── The history ── */}
           <div className="order-2 min-w-0 lg:order-1">
-            {/* Above the history and above the call button, because reading
-                it is what should happen BEFORE the first call — which is the
-                whole reason a marketplace lead is worth more than a cold one. */}
-            {/* Above the brief and the call button, because merging first
-                means the call is logged against the card that survives. */}
+            {/* Duplicates first: merging before anything else means the call
+                is logged against the card that survives.
+
+                Then the brief, above the call button, because reading it is
+                what should happen BEFORE the first call — the whole reason a
+                marketplace lead is worth more than a cold one. */}
             {dupes.length > 0 ? (
               <div className="mb-5">
                 <Duplicates clientId={client.id} clientName={client.name} candidates={dupes} />

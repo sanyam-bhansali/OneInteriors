@@ -30,6 +30,7 @@ import {
 } from './actions';
 import { IDLE } from '../form-state';
 import { SavedViews } from './SavedViews';
+import { DragBoard, DragHandle, DropColumn, useCardDrag } from './Dnd';
 import type { SavedView } from '@/modules/studio-practice/saved-views';
 import type { ViewFilters } from '@/modules/studio-practice/view-filters';
 
@@ -334,6 +335,7 @@ function Card({
   next,
   members,
   meId,
+  draggable,
 }: {
   client: ClientRow;
   today: Date;
@@ -342,6 +344,13 @@ function Card({
   next: StageRow | null;
   members: { id: string; name: string }[];
   meId: string | null;
+  /**
+   * Off while a move is in flight for this card.
+   *
+   * Dragging a card that is already being written produces two moves racing
+   * each other, and the loser silently wins on the next refresh.
+   */
+  draggable: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(updateClientAction, IDLE);
@@ -356,19 +365,45 @@ function Card({
   const late = overdue(client.nextActionOn, today);
   const shown = fields.filter((f) => client.fields[f.key]);
 
+  /* The ref goes on the card because the card is what moves; the listeners
+     go on the handle because only the handle should start a drag. See the
+     docblock in Dnd.tsx for why that split is not optional. */
+  const { cardRef, handleProps, isDragging } = useCardDrag(
+    client.id,
+    client.stageId,
+    !draggable,
+  );
+
   return (
-    <li className={`s-card p-3 ${late ? '!border-[var(--s-accent)]' : ''}`}>
+    <li
+      ref={cardRef}
+      /* Faded in place rather than removed. Pulling the node out reflows
+         every card below it the instant a drag starts, so the column jumps
+         under the cursor. */
+      className={`s-card p-3 ${late ? '!border-[var(--s-accent)]' : ''} ${
+        isDragging ? 'opacity-40' : ''
+      }`}
+    >
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="m-0 truncate text-[14.5px] font-semibold">{client.name}</p>
-          {client.phone ? (
-            <a
-              href={`tel:${client.phone}`}
-              className="s-num text-[12.5px] text-[var(--s-accent)] no-underline"
-            >
-              {client.phone}
-            </a>
-          ) : null}
+        <div className="flex min-w-0 items-start gap-1.5">
+          <span className="mt-0.5 flex-none">
+            <DragHandle
+              label={`Move ${client.name} to another column`}
+              disabled={!draggable}
+              {...handleProps}
+            />
+          </span>
+          <div className="min-w-0">
+            <p className="m-0 truncate text-[14.5px] font-semibold">{client.name}</p>
+            {client.phone ? (
+              <a
+                href={`tel:${client.phone}`}
+                className="s-num text-[12.5px] text-[var(--s-accent)] no-underline"
+              >
+                {client.phone}
+              </a>
+            ) : null}
+          </div>
         </div>
         {client.quotedPaise ? (
           <span className="s-num flex-none text-[13px] font-semibold">
@@ -798,12 +833,65 @@ export function Board({
   };
 
   const nameOf = (id: string) => members.find((m) => m.id === id)?.name ?? null;
+
+  /**
+   * Where a dragged card has been put, before the server agrees.
+   *
+   * Keyed by client id. Without this the card snaps back to its old column
+   * for the length of a round trip and then jumps to the new one, which
+   * reads as the drag having failed.
+   *
+   * Cleared per-card rather than wholesale: two people moving two cards at
+   * once must not clear each other's optimism, and `revalidatePath` will
+   * deliver the real rows shortly either way.
+   */
+  const [moved, setMoved] = useState<Record<string, string>>({});
+  const [inFlight, setInFlight] = useState<Record<string, true>>({});
+  const [dragError, setDragError] = useState<string | null>(null);
+  const [, startDrag] = useTransition();
+
+  const stageOf = (c: ClientRow) => moved[c.id] ?? c.stageId;
+
+  function moveCard(clientId: string, stageId: string) {
+    setDragError(null);
+    setMoved((m) => ({ ...m, [clientId]: stageId }));
+    setInFlight((f) => ({ ...f, [clientId]: true }));
+
+    startDrag(async () => {
+      const result = await setStageAction(clientId, stageId);
+
+      setInFlight((f) => {
+        const next = { ...f };
+        delete next[clientId];
+        return next;
+      });
+
+      /* The override is dropped either way.
+         
+         On failure it puts the card back where it was — leaving the
+         optimistic position standing after a refusal is the worst of both,
+         because the screen says one thing and the next reload says another.
+         
+         On success it has to go too, and that is the less obvious half: the
+         server action revalidates, so `clients` arrives carrying the new
+         stage. Keeping the override would then pin the card to OUR guess
+         for as long as the page lives — including if somebody else moved it
+         somewhere different a moment later. */
+      setMoved((m) => {
+        const next = { ...m };
+        delete next[clientId];
+        return next;
+      });
+
+      if ('error' in result) setDragError(result.error);
+    });
+  }
   const team = members.length > 1;
 
   const board = stages.filter((s) => BOARD_KINDS.includes(s.kind));
   const closedStages = stages.filter((s) => !BOARD_KINDS.includes(s.kind));
   const closedIds = new Set(closedStages.map((s) => s.id));
-  const closed = clients.filter((c) => closedIds.has(c.stageId));
+  const closed = clients.filter((c) => closedIds.has(stageOf(c)));
 
   /** The next column along, in the studio's order. Null at the end. */
   const nextAfter = (stageId: string): StageRow | null => {
@@ -811,7 +899,7 @@ export function Board({
     return i >= 0 && i < stages.length - 1 ? (stages[i + 1] ?? null) : null;
   };
 
-  const allOpen = clients.filter((c) => !closedIds.has(c.stageId));
+  const allOpen = clients.filter((c) => !closedIds.has(stageOf(c)));
   const pool = allOpen.filter((c) => c.assignedToId === null);
   // Not `quiet` — that name is taken by the button class at the top of this
   // file, and shadowing it here silently restyles every button below.
@@ -923,6 +1011,16 @@ export function Board({
         </p>
       ) : null}
 
+      {dragError ? (
+        <p role="alert" className="m-0 text-[13px] text-[var(--s-bad)]">
+          {dragError}
+        </p>
+      ) : null}
+
+      <DragBoard
+        onMove={moveCard}
+        labelFor={(id) => clients.find((c) => c.id === id)?.name ?? 'this lead'}
+      >
       {groups.map((group) => (
         <section key={group.label || 'all'} className="flex flex-col gap-2">
           {group.label ? (
@@ -934,13 +1032,21 @@ export function Board({
 
           <div className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-2">
             {board.map((stage) => {
-              const items = group.rows.filter((c) => c.stageId === stage.id);
+              const items = group.rows.filter((c) => stageOf(c) === stage.id);
               const due = items.filter((c) => overdue(c.nextActionOn, today)).length;
               const c = colourOf(stage.colour);
 
               return (
-                <section
+                <DropColumn
                   key={stage.id}
+                  /* Namespaced by group. When the board is grouped, EVERY
+                     group draws the same columns — a bare stage id would
+                     register five droppables sharing one id and dnd-kit
+                     could not tell them apart. The real stage id travels in
+                     the droppable's data. */
+                  dropId={`${group.label || 'all'}::${stage.id}`}
+                  stageId={stage.id}
+                  stageName={stage.name}
                   className="flex w-[17.5rem] flex-none snap-start flex-col gap-2 rounded-[12px] bg-[var(--s-surface-2)] p-2.5"
                 >
                   <div className="flex items-baseline justify-between gap-2 px-1">
@@ -974,16 +1080,18 @@ export function Board({
                           next={nextAfter(client.stageId)}
                           members={members}
                           meId={meId}
+                          draggable={!inFlight[client.id]}
                         />
                       ))}
                     </ul>
                   )}
-                </section>
+                </DropColumn>
               );
             })}
           </div>
         </section>
       ))}
+      </DragBoard>
 
       {closed.length > 0 ? (
         <details>
