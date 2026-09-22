@@ -28,7 +28,12 @@ import { getCurrentUser, hasRole, type AuthUser } from '@/modules/auth/session';
 import { validateGstin } from '@/modules/verification/gstin';
 import { missingCoreRates } from '@/modules/quotation/categories';
 import { lakhsToPaise } from '@/lib/money';
-import { onboardingProgress, MIN_ABOUT_LENGTH, MIN_SHORTFALL_NOTE } from './onboarding-steps';
+import {
+  onboardingProgress,
+  MIN_ABOUT_LENGTH,
+  MAX_ABOUT_LENGTH,
+  MIN_SHORTFALL_NOTE,
+} from './onboarding-steps';
 import {
   STYLE_TAGS,
   PUNE_LOCALITIES,
@@ -195,6 +200,81 @@ export interface ProfileInput {
   teamSize?: number;
   minLakhs?: number;
   maxLakhs?: number;
+}
+
+/**
+ * Keep what has been typed so far, without judging it.
+ *
+ * ## Why this exists alongside `saveProfile`
+ *
+ * `saveProfile` is deliberately all-or-nothing: it refuses to write anything
+ * unless every field `assessSteps` needs is present and valid, because a form
+ * that accepts blanks and answers "Saved." is how a studio ends up told that
+ * nothing is wrong and that something is missing, in that order. The comment
+ * on that function is the record of it happening.
+ *
+ * That makes it exactly the wrong function to autosave with. Called every few
+ * seconds while somebody is halfway through, it would store nothing at all —
+ * so the one thing autosave is for, not losing work to a closed tab, would
+ * not happen — and it would paint the form red for fields they have not
+ * reached yet.
+ *
+ * So the two paths are split by what they are for. This one **writes and
+ * never validates**; the Save button **validates and never partially
+ * writes**. Neither claims anything about the other.
+ *
+ * ## Why a partial write is safe here
+ *
+ * Because completeness in this model is derived, never stored. Every one of
+ * these columns is nullable and `assessSteps` recomputes the step from
+ * whatever is in them on every render, so a half-filled profile is an
+ * ordinary state the model already knows how to describe — it comes back as
+ * an unticked step with a list of what is short, which is true. There is no
+ * flag here that a partial write could desynchronise, which is the whole
+ * reason the derived design was chosen.
+ *
+ * ## An empty field means empty
+ *
+ * A blank arrives as `null` rather than being skipped. Treating blank as "no
+ * change" would make a cleared field impossible to clear: the studio deletes
+ * their team size, the autosave ignores it, and the old number reappears when
+ * they reload. Re-locking whatever depended on that field is correct and is
+ * handled by `gateFor` without any bookkeeping.
+ *
+ * Returns nothing a caller should show. Autosave is background work, and a
+ * background failure is not the studio's problem to read about mid-sentence —
+ * the Save button is still there and still says what is wrong.
+ */
+export async function saveProfileDraft(input: ProfileInput): Promise<{ ok: boolean }> {
+  const context = await currentStudio();
+  if (!context) return { ok: false };
+
+  const localities = input.localities.filter((l) =>
+    PUNE_LOCALITIES.some((p) => p.slug === l),
+  );
+
+  await prisma.studio.update({
+    where: { id: context.studio.id },
+    data: {
+      /* Truncated rather than refused. The column has a limit and the draft
+         has no right to reject anything, so the one lossy case is capped at
+         the same length the validator would demand, where the Save button
+         will explain it properly. */
+      about: input.about?.trim().slice(0, MAX_ABOUT_LENGTH) || null,
+      localities,
+      website: input.website?.trim() || null,
+      instagram: input.instagram?.trim() || null,
+      // `?? null` throughout, not `|| null` — 0 is a real answer for years
+      // active, and for a studio in its first year `||` would store it as
+      // unanswered every time the autosave ran.
+      yearsActive: input.yearsActive ?? null,
+      teamSize: input.teamSize ?? null,
+      minProjectPaise: input.minLakhs ? BigInt(lakhsToPaise(input.minLakhs)) : null,
+      maxProjectPaise: input.maxLakhs ? BigInt(lakhsToPaise(input.maxLakhs)) : null,
+    },
+  });
+
+  return { ok: true };
 }
 
 export async function saveProfile(input: ProfileInput): Promise<SaveResult> {

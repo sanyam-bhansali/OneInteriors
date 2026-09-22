@@ -1,9 +1,10 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useRef } from 'react';
 import { LOCALITIES_BY_ZONE } from '@/modules/brief/types';
-import { saveProfileAction, type StepState } from './actions';
+import { saveProfileAction, saveProfileDraftAction, type StepState } from './actions';
 import { Field, Chips, SaveBar } from './fields';
+import { useAutosave } from './useAutosave';
 
 const INITIAL: StepState = { status: 'idle' };
 
@@ -22,8 +23,14 @@ export function ProfileForm({ defaults }: { defaults: ProfileDefaults }) {
   const [state, action, pending] = useActionState(saveProfileAction, INITIAL);
   const err = state.errors ?? {};
 
+  /* The longest form in the product, and the one somebody is most likely to
+     walk away from half-finished — the description alone is a paragraph they
+     have to compose. See useAutosave for what this does and does not claim. */
+  const form = useRef<HTMLFormElement>(null);
+  const draft = useAutosave(form, saveProfileDraftAction, { pending });
+
   return (
-    <form action={action} className="flex flex-col gap-8">
+    <form ref={form} action={action} className="flex flex-col gap-8">
       <div>
         <label htmlFor="about" className="label m-0 mb-2 block">
           How would you describe what you do?
@@ -138,7 +145,12 @@ export function ProfileForm({ defaults }: { defaults: ProfileDefaults }) {
         <Field label="Instagram" name="instagram" defaultValue={defaults.instagram} placeholder="@yourstudio" />
       </div>
 
-      <SaveBar pending={pending} saved={state.status === 'saved'} formError={err.form} />
+      <SaveBar
+        pending={pending}
+        saved={state.status === 'saved'}
+        formError={err.form}
+        draft={draft}
+      />
     </form>
   );
 }

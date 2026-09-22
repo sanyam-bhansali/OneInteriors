@@ -15,6 +15,7 @@ import {
   type OnboardingStep,
 } from '@/modules/studio/onboarding';
 import { StepRail } from '../StepRail';
+import { StepArrival } from '../StepArrival';
 import { StepFooter } from '../StepFooter';
 import { ProfileForm } from '../ProfileForm';
 import { RegistrationForm } from '../RegistrationForm';
@@ -42,8 +43,10 @@ function isStep(value: string): value is OnboardingStep {
 
 export default async function OnboardingStepPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ step: string }>;
+  searchParams: Promise<{ done?: string | string[] }>;
 }) {
   const { step } = await params;
   if (!isStep(step)) notFound();
@@ -76,6 +79,27 @@ export default async function OnboardingStepPage({
   const previous = ONBOARDING_STEPS[index - 1];
   const status = steps[index]!;
 
+  /**
+   * "You just finished X" — checked against the data, not believed.
+   *
+   * `?done=` is a hint from the Continue link and nothing more. Anybody can
+   * type it, and a stale tab can carry one for a step that has since been
+   * emptied, so three things must hold before it is worth printing:
+   *
+   * - it names a real step (not a typo, not an array from `?done=a&done=b`)
+   * - it is the step immediately before this one, so Continue is the only
+   *   thing that can produce it
+   * - that step genuinely passes `assessSteps` right now
+   *
+   * The last is the one that matters. Congratulating somebody for work they
+   * have not done is worse than saying nothing, and it is precisely the
+   * confusion the rest of this flow is built to avoid.
+   */
+  const doneParam = (await searchParams).done;
+  const claimed = typeof doneParam === 'string' && isStep(doneParam) ? doneParam : null;
+  const justFinished =
+    claimed !== null && claimed === previous && steps[index - 1]?.done === true ? claimed : null;
+
   return (
     /**
      * `wide`, with the step's own identity in a sticky left rail.
@@ -94,6 +118,17 @@ export default async function OnboardingStepPage({
           </div>
 
           <div className="max-w-[46rem]">
+            {justFinished ? (
+              <StepArrival
+                finished={STEP_LABELS[justFinished]}
+                /* Position, not completeness: "two steps after this one" is
+                   true however much of them is already filled in, whereas a
+                   count of what is outstanding would change under a studio
+                   who had completed a later step out of order. */
+                remaining={ONBOARDING_STEPS.length - index - 1}
+              />
+            ) : null}
+
             <header className="mb-7">
               <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                 <h1 className="h1 m-0">{STEP_LABELS[step]}</h1>

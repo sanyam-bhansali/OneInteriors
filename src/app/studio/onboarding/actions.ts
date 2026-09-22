@@ -5,6 +5,7 @@ import { RATE_CATEGORIES, CATEGORY } from '@/modules/quotation/categories';
 import { saveRateCard, type RateInput } from '@/modules/quotation/rate-card';
 import {
   saveProfile,
+  saveProfileDraft,
   saveGstin,
   declareNoGstin,
   declarePortfolioShortfall,
@@ -91,6 +92,40 @@ export async function saveProfileAction(
   if (!result.ok) return { status: 'error', errors: result.errors };
   refresh();
   return { status: 'saved' };
+}
+
+/**
+ * The autosave counterpart to `saveProfileAction`.
+ *
+ * Same FormData, same parsers, different promise: this one stores what is
+ * there and reports nothing. See `saveProfileDraft` for why the two paths are
+ * separate rather than one function with a `validate` flag.
+ *
+ * ## It deliberately does not `refresh()`
+ *
+ * Every other action here revalidates the layout, which is right when a
+ * person has pressed a button and is waiting to see the rail tick over. This
+ * one runs on a timer while they are still typing, and re-rendering the
+ * server tree underneath a form somebody is in the middle of filling is a
+ * class of bug worth not having at all — a re-rendered `defaultValue` racing
+ * a keystroke is the kind of thing that loses one character a minute and is
+ * never reproducible.
+ *
+ * The consequence is that the rail, the header badge and the footer list stay
+ * as they were until the studio presses Save. That is the honest reading
+ * anyway: what autosave has done is keep their work, not finish the step.
+ */
+export async function saveProfileDraftAction(formData: FormData): Promise<void> {
+  await saveProfileDraft({
+    about: String(formData.get('about') ?? ''),
+    localities: formData.getAll('localities').map(String),
+    website: String(formData.get('website') ?? ''),
+    instagram: String(formData.get('instagram') ?? ''),
+    yearsActive: numFromZero(formData.get('yearsActive')),
+    teamSize: count(formData.get('teamSize')),
+    minLakhs: lakhs(formData.get('minLakhs')),
+    maxLakhs: lakhs(formData.get('maxLakhs')),
+  });
 }
 
 export async function saveGstinAction(

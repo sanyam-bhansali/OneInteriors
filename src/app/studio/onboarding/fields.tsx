@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { FIELD_WIDTH, type FieldWidth } from '@/components/ui/form';
+import type { DraftState } from './useAutosave';
 
 export function Field({
   label,
@@ -220,11 +221,14 @@ export function SaveBar({
   saved,
   formError,
   label = 'Save and continue',
+  draft,
 }: {
   pending: boolean;
   saved: boolean;
   formError?: string;
   label?: string;
+  /** Present only on steps wired to `useAutosave`. */
+  draft?: DraftState;
 }) {
   return (
     <div className="border-t border-[var(--color-rule)] pt-6">
@@ -242,8 +246,55 @@ export function SaveBar({
           {pending ? 'Saving…' : label}
         </button>
         <SavedFlash pending={pending} saved={saved} />
+        {draft ? <DraftStatus state={draft} /> : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * What autosave has and has not done.
+ *
+ * ## The wording is the point
+ *
+ * It says **"Draft saved"**, never "Saved" on its own, and never anything
+ * with "complete" in it. The draft write does not validate, so all it can
+ * honestly promise is that what is in the boxes is also on our server. A
+ * studio reading a bare "Saved" beside a half-filled form would reasonably go
+ * away believing the step was finished, which is the exact confusion this
+ * step has already produced once — see the note on `saveProfile`.
+ *
+ * ## Why 'typing' shows nothing
+ *
+ * A "Saving…" that appears on every keystroke is a flicker in the corner of
+ * somebody's eye while they are trying to write a paragraph. The quiet state
+ * between a keystroke and the save is genuinely nothing worth reporting.
+ *
+ * ## Why a failure is this quiet
+ *
+ * Their work is still in front of them, the next pause retries, and the Save
+ * button is untouched. An alert would be interrupting somebody mid-sentence
+ * to tell them about a problem they cannot act on and that will probably have
+ * resolved itself before they finish the line.
+ */
+function DraftStatus({ state }: { state: DraftState }) {
+  if (state === 'clean' || state === 'typing') return null;
+
+  return (
+    <span
+      role="status"
+      aria-live="polite"
+      /* Deliberately the quietest ink in the palette, failure included. This
+         is a status line, not a claim about the step, and it sits next to a
+         button that is the thing to read. */
+      className="text-[13.5px] text-[var(--color-ink-3)]"
+    >
+      {state === 'saving'
+        ? 'Saving…'
+        : state === 'saved'
+          ? 'Draft saved'
+          : 'Could not save just now — we will keep trying.'}
+    </span>
   );
 }
 

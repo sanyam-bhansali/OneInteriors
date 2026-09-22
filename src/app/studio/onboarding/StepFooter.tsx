@@ -75,7 +75,11 @@ export function StepFooter({
 
         {next && status.done ? (
           <Link
-            href={`/studio/onboarding/${next}`}
+            /* Tells the next page which step was just finished, so it can
+               acknowledge it. Only ever a hint — the page re-derives whether
+               that step actually passes before it prints anything. See
+               StepArrival. */
+            href={`/studio/onboarding/${next}?done=${status.step}`}
             className="inline-flex items-center gap-2 rounded-full bg-[var(--color-petrol)] px-6 py-2.5 text-[14.5px] font-medium text-[var(--color-paper)] no-underline transition-colors hover:bg-[var(--color-petrol-deep)]"
           >
             Continue
