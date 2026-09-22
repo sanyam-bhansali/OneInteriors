@@ -365,24 +365,34 @@ function Card({
   const late = overdue(client.nextActionOn, today);
   const shown = fields.filter((f) => client.fields[f.key]);
 
-  /* The ref goes on the card because the card is what moves; the listeners
-     go on the handle because only the handle should start a drag. See the
-     docblock in Dnd.tsx for why that split is not optional. */
-  const { cardRef, handleProps, isDragging } = useCardDrag(
+  /* Listeners on the card AND on the handle; the ARIA attributes on the
+     handle alone. See the docblock in Dnd.tsx — pulling the card is the
+     gesture people actually try, and the controls on it still click. */
+  const { cardRef, cardProps, handleProps, handleRef, isDragging } = useCardDrag(
     client.id,
     client.stageId,
-    !draggable,
+    /* Not while it is open. An expanded card is a form, and a form is mostly
+       whitespace between controls — every press on that whitespace would
+       otherwise be a press on a draggable card. Nobody reorganises a board
+       and fills in a field in the same gesture. */
+    !draggable || open,
   );
 
   return (
     <li
       ref={cardRef}
+      {...cardProps}
       /* Faded in place rather than removed. Pulling the node out reflows
          every card below it the instant a drag starts, so the column jumps
-         under the cursor. */
-      className={`s-card p-3 ${late ? '!border-[var(--s-accent)]' : ''} ${
-        isDragging ? 'opacity-40' : ''
-      }`}
+         under the cursor.
+
+         `touch-manipulation` rather than `touch-none`: the board scrolls
+         sideways and the page scrolls down, and a card that swallowed both
+         would trap a phone. The 200ms hold is what separates a swipe from a
+         pick-up — see CardTouchSensor. */
+      className={`s-card touch-manipulation p-3 ${draggable && !open ? 'cursor-grab active:cursor-grabbing' : ''} ${
+        late ? '!border-[var(--s-accent)]' : ''
+      } ${isDragging ? 'opacity-40' : ''}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-1.5">
@@ -390,6 +400,7 @@ function Card({
             <DragHandle
               label={`Move ${client.name} to another column`}
               disabled={!draggable}
+              handleRef={handleRef}
               {...handleProps}
             />
           </span>

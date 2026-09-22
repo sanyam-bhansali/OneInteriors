@@ -13,30 +13,108 @@ import {
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
+  type PointerSensorOptions,
+  type TouchSensorOptions,
 } from '@dnd-kit/core';
+
+/**
+ * Controls inside a card that must keep their own gesture.
+ *
+ * A card holds a phone link, a stage button, a contact button and a delete.
+ * Pressing any of those is a click, never the start of a drag, and the check
+ * is `closest` rather than an equality test because the press usually lands on
+ * an icon or a span inside the control rather than the control itself.
+ */
+const CONTROLS = 'a,button,input,select,textarea,label,summary,[role="button"],[contenteditable]';
+
+/**
+ * Should this press start a drag?
+ *
+ * `currentTarget` is the element the listener is attached to, which is what
+ * lets one static activator serve both the card and its handle: the handle
+ * always drags, and the card drags only when the press did not land on a
+ * control — including the handle itself, whose own listener has already
+ * claimed the same bubbling event.
+ */
+function pressStartsDrag(event: { target: EventTarget | null; currentTarget: EventTarget | null }) {
+  const target = event.target;
+  if (!(target instanceof Element)) return true;
+
+  const from = event.currentTarget;
+  if (from instanceof Element && from.hasAttribute('data-drag-handle')) return true;
+
+  return target.closest(CONTROLS) === null;
+}
+
+/**
+ * The card body drags, and the controls on it still work.
+ *
+ * dnd-kit's own PointerSensor activates on any primary press. That is why the
+ * board originally put the listeners on the handle alone — and why nothing
+ * happened when somebody did the obvious thing and pulled the card, which is
+ * how every other board they have used behaves. Overriding the activator is
+ * the narrow fix: same sensor, one extra question before it says yes.
+ */
+class CardPointerSensor extends PointerSensor {
+  static activators = [
+    {
+      eventName: 'onPointerDown' as const,
+      handler: (event: React.PointerEvent, { onActivation }: PointerSensorOptions) => {
+        const native = event.nativeEvent;
+        if (!native.isPrimary || native.button !== 0) return false;
+        if (!pressStartsDrag(event)) return false;
+        onActivation?.({ event: native });
+        return true;
+      },
+    },
+  ];
+}
+
+/** The same question, for a finger. The 200ms hold still applies. */
+class CardTouchSensor extends TouchSensor {
+  static activators = [
+    {
+      eventName: 'onTouchStart' as const,
+      handler: (event: React.TouchEvent, { onActivation }: TouchSensorOptions) => {
+        const native = event.nativeEvent;
+        if (native.touches.length > 1) return false;
+        if (!pressStartsDrag(event)) return false;
+        onActivation?.({ event: native });
+        return true;
+      },
+    },
+  ];
+}
 
 /**
  * Dragging a card between columns.
  *
- * ## A handle, not the whole card
+ * ## The card drags. So does the handle.
  *
- * The obvious build puts the drag listeners on the card itself. It is wrong
- * here for three separate reasons, each of which is a bug somebody would
- * report:
+ * This was handle-only at first, for three reasons that were all true and
+ * added up to the wrong build:
  *
  * 1. dnd-kit's `attributes` include `role="button"` and `tabIndex={0}`. On a
  *    card that already contains a phone link, a move button, a contact
  *    button and a delete, that is a button wrapping four buttons — invalid,
  *    and it makes the whole card a tab stop ahead of the controls inside it.
- * 2. On touch, listeners on the card fight the column's horizontal scroll.
- *    A delay constraint helps and does not fix it: every scroll still has a
- *    quarter-second where the board feels stuck.
- * 3. A dragging card cannot be `aria-hidden`, because it still contains
- *    focusable elements — so the announcement has to come from somewhere
- *    else anyway.
+ * 2. Listeners on the card start a drag when somebody presses the phone link.
+ * 3. On touch they fight the column's horizontal scroll.
  *
- * A handle solves all three at once: one small control that is the only
- * draggable thing, leaving every other gesture on the card exactly as it was.
+ * What none of that reckoned with is that a kanban board teaches its own
+ * gesture: people pull the card. They did, nothing moved, and they reported
+ * the feature as broken — which it effectively was, because a 12px grip is
+ * not discoverable and is not what anybody reaches for.
+ *
+ * So the listeners are on both, and the three objections are answered
+ * separately rather than by withholding the gesture. The `attributes` — the
+ * role, the tab stop — stay on the handle alone, so (1) never arises. (2) is
+ * `pressStartsDrag`, which refuses any press that landed on a control. (3) is
+ * the touch sensor's existing 200ms hold: a swipe across the card scrolls,
+ * a hold picks it up.
+ *
+ * The handle stays, and is not decoration. It is the keyboard affordance and
+ * the visible sign that a card can be moved at all.
  *
  * ## Three sensors
  *
@@ -73,8 +151,8 @@ export function DragBoard({
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(CardPointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(CardTouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
     useSensor(KeyboardSensor),
   );
 
@@ -187,15 +265,16 @@ export function DropColumn({
 }
 
 /**
- * The card's own ref, and the props for its handle.
+ * The card's ref, and the two sets of props that make it draggable.
  *
- * Split deliberately: dnd-kit measures the element it is given, so the ref
- * belongs on the card (the whole card is what moves), while the listeners
- * belong on the handle (only the handle should start a drag). Giving both to
- * the same element is the shape this file's docblock exists to argue against.
+ * The same listeners go on both the card and its handle; the ARIA attributes
+ * go on the handle only. That split is the whole of the accessibility
+ * argument in this file's docblock — a card wearing `role="button"` would be
+ * a button containing four buttons, while a card wearing only pointer
+ * listeners is just an element people can pull.
  */
 export function useCardDrag(clientId: string, stageId: string, disabled?: boolean) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } = useDraggable({
     id: clientId,
     disabled,
     /* Carried so `onDragEnd` can tell a real move from a drop back into the
@@ -206,8 +285,22 @@ export function useCardDrag(clientId: string, stageId: string, disabled?: boolea
   return {
     /** Goes on the card. */
     cardRef: setNodeRef,
+    /**
+     * Also goes on the card. Listeners without attributes, and harmless when
+     * the press lands on a control — see `pressStartsDrag`.
+     */
+    cardProps: listeners ?? {},
     /** Goes on the handle button, and nowhere else. */
     handleProps: { ...attributes, ...listeners },
+    /**
+     * Also the handle, and not optional now that the card carries listeners.
+     *
+     * KeyboardSensor refuses a keydown whose target is not the activator
+     * node — but only if it HAS one. Without this ref it has none, the guard
+     * is skipped, and a space typed into any field inside the card bubbles up
+     * to the card's own onKeyDown and picks the card up.
+     */
+    handleRef: setActivatorNodeRef,
     isDragging,
   };
 }
@@ -222,15 +315,22 @@ export function useCardDrag(clientId: string, stageId: string, disabled?: boolea
 export function DragHandle({
   label,
   disabled,
+  handleRef,
   ...props
 }: {
   label: string;
   disabled?: boolean;
+  handleRef?: (element: HTMLElement | null) => void;
 } & React.HTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       type="button"
+      ref={handleRef}
       disabled={disabled}
+      /* Read by `pressStartsDrag`: this is the one control inside a card that
+         a press SHOULD drag from, and the one the card's own listener must
+         keep its hands off when the same event bubbles up. */
+      data-drag-handle=""
       /* `touch-none` is what lets the 200ms hold become a drag instead of the
          browser claiming the gesture for scrolling. Scoped to this button, so
          the rest of the card and the column still scroll normally. */
