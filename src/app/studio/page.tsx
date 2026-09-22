@@ -3,7 +3,8 @@ import type { Metadata } from 'next';
 import { Container } from '@/components/ui';
 import { PageHead, PageBody } from './StudioShell';
 import { formatINR, formatINRCompact } from '@/lib/money';
-import { currentStudio, onboardingProgress, STEP_LABELS } from '@/modules/studio/onboarding';
+import { redirect } from 'next/navigation';
+import { currentStudio, onboardingProgress, firstIncomplete } from '@/modules/studio/onboarding';
 import { visibility } from '@/modules/studio/dashboard';
 import { myAppointments, formatSlot, upcoming, KIND_LABELS } from '@/modules/studio/introduction';
 import { myClients, BOARD_KINDS } from '@/modules/studio-practice/clients';
@@ -361,8 +362,7 @@ function Setup({
 }: {
   studio: NonNullable<Awaited<ReturnType<typeof currentStudio>>>['studio'];
 }) {
-  const { steps, done, total } = onboardingProgress(studio);
-  const remaining = steps.filter((s) => !s.done);
+  const { steps } = onboardingProgress(studio);
 
   if (studio.submittedForReview) {
     return (
@@ -383,44 +383,24 @@ function Setup({
     );
   }
 
-  return (
-    <main className="py-14">
-      <Container size="narrow">
-        <p className="label m-0 mb-3">{studio.tradeName}</p>
-        <h1 className="display mb-5 text-[clamp(2rem,5vw,3rem)] leading-[1.05]">
-          {done === 0 ? `Welcome. ${total} steps.` : `${total - done} to go.`}
-        </h1>
-        <p className="m-0 mb-10 max-w-[54ch] text-[17px] leading-relaxed text-[var(--color-ink-2)]">
-          This is the part only you can do. Take your time over the description and the projects —
-          those are what a customer reads before deciding to meet you. Everything saves as you go.
-        </p>
-
-        <ol className="m-0 flex list-none flex-col gap-5 p-0">
-          {remaining.map((s) => (
-            <li key={s.step}>
-              <Link
-                href={`/studio/onboarding/${s.step}`}
-                className="block border-l-2 border-[var(--color-rule)] pl-5 no-underline hover:border-[var(--color-petrol)]"
-              >
-                <span className="block font-[family-name:var(--font-display)] text-[21px] leading-tight text-[var(--color-ink)]">
-                  {STEP_LABELS[s.step]}
-                </span>
-                {s.missing.length > 0 ? (
-                  <span className="mt-1 block text-[15px] leading-relaxed text-[var(--color-ink-3)]">
-                    {s.missing.join(', ')}
-                  </span>
-                ) : null}
-              </Link>
-            </li>
-          ))}
-        </ol>
-
-        {done > 0 ? (
-          <p className="m-0 mt-10 text-[14.5px] text-[var(--color-ink-3)]">
-            {done} of {total} done.
-          </p>
-        ) : null}
-      </Container>
-    </main>
-  );
+  /**
+   * Straight into the flow, rather than a screen about the flow.
+   *
+   * This used to be a checklist: a heading counting what was left, and the
+   * unfinished steps as links. It was a second progress view competing with
+   * the rail inside onboarding, and the two did not agree — this one counted
+   * steps remaining while the rail counted steps done, and its one-line
+   * summaries restated rules the step itself states more precisely. A studio
+   * signing in had to read a page about the work before reaching the work.
+   *
+   * So there is nothing here now. An unfinished studio lands on whatever
+   * step is genuinely next, which is the only thing this screen was ever
+   * for. The rail that arrives with it lists all five, ticks what is done,
+   * and is the single account of progress.
+   *
+   * `submittedForReview` above is kept, because that is a real and different
+   * state rather than a duplicate of one: their side is finished, ours has
+   * not, and there is no step to send them to.
+   */
+  redirect(`/studio/onboarding/${firstIncomplete(steps)}`);
 }

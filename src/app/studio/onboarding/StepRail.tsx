@@ -43,12 +43,12 @@ export function StepRail({
 
   return (
     <div>
-      <Link
-        href="/studio"
-        className="label mb-6 inline-block text-[var(--color-ink-3)] no-underline hover:text-[var(--color-ink)]"
-      >
-        ← All steps
-      </Link>
+      {/* No "← All steps" link any more.
+          It pointed at /studio, which was a second checklist of these same
+          five steps — and now that /studio sends an unfinished studio
+          straight back into the flow, following it would land you on the
+          step you were already on. The rail below IS all the steps, which is
+          what made the link redundant even before it became circular. */}
 
       <div className="mb-6">
         <div className="mb-2 flex items-baseline justify-between gap-3">
