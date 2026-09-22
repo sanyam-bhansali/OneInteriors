@@ -8,8 +8,33 @@ import { Section, Counter } from './Section';
 import { AreaPicker } from './AreaPicker';
 import { SiteLookup } from './SiteLookup';
 import { useAutosave } from './useAutosave';
+import { StudioPreview } from './StudioPreview';
 
 const INITIAL: StepState = { status: 'idle' };
+
+/**
+ * Sentences a studio can drop into the description.
+ *
+ * ## Why these and not encouraging ones
+ *
+ * The hardest part of this box is not the writing, it is the first line — and
+ * the thing that unsticks somebody is a concrete sentence they can agree or
+ * disagree with, not a prompt. So each of these is a real, specific claim
+ * about how a practice works.
+ *
+ * Two of the five are things a studio does NOT do. That is deliberate and it
+ * is the most useful half: a profile that suits everybody suits nobody, and a
+ * studio who writes down the job they turn away is the one a customer
+ * believes about the rest. They are inserted as a starting point, never as
+ * the finished sentence — the studio edits what lands.
+ */
+const QUICK_LINES = [
+  'We take full-home turnkey projects, not single rooms.',
+  'We supervise our own carpentry rather than subcontracting site management.',
+  'We work mostly on 2 and 3 BHK apartments.',
+  'We are not the right studio for a full classical or high-gloss look.',
+  'We take on fewer projects at a time, which is why we are not the cheapest.',
+] as const;
 
 export interface ProfileDefaults {
   about: string | null;
@@ -53,7 +78,14 @@ export interface ProfileDefaults {
  * a client-side rule the server does not share is how a form ends up
  * refusing something that would have been accepted.
  */
-export function ProfileForm({ defaults }: { defaults: ProfileDefaults }) {
+export function ProfileForm({
+  defaults,
+  tradeName,
+}: {
+  defaults: ProfileDefaults;
+  /** For the preview card. Their name is set at approval and not editable here. */
+  tradeName: string;
+}) {
   const [state, action, pending] = useActionState(saveProfileAction, INITIAL);
   const err = state.errors ?? {};
 
@@ -123,7 +155,16 @@ export function ProfileForm({ defaults }: { defaults: ProfileDefaults }) {
   ].filter((m): m is string => m !== null);
 
   return (
-    <form ref={form} action={action} className="flex flex-col gap-4">
+    /**
+     * The form, and beside it the thing the form makes.
+     *
+     * Three columns on a wide screen once the step rail is counted, which is
+     * the most this page can carry — so the preview drops below the form at
+     * anything narrower rather than squeezing both. A preview at 200px wide
+     * is not a preview of anything.
+     */
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_19rem] xl:gap-8">
+      <form ref={form} action={action} className="flex flex-col gap-4">
       <Section
         n={1}
         title="Studio description"
@@ -142,6 +183,32 @@ export function ProfileForm({ defaults }: { defaults: ProfileDefaults }) {
           placeholder="We do warm, material-led homes — mostly 2 and 3 BHK. We supervise our own carpentry rather than subcontracting site management, which is why we take fewer projects at a time. We are not the right studio if you want a full classical or high-gloss look."
           className="oi-input w-full rounded-[12px] border border-[var(--color-rule)] px-4 py-3.5 text-[15.5px] leading-relaxed"
         />
+
+        {/* Under the box, not above it: the box is where somebody starts, and
+            a row of suggestions above it reads as the task. */}
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          <span className="label m-0 mr-1 text-[var(--color-ink-3)]">Drop in a line</span>
+          {QUICK_LINES.map((line) => (
+            <button
+              key={line}
+              type="button"
+              onClick={() =>
+                setAbout((prev) => {
+                  /* Appended as its own sentence, and never twice. A studio
+                     clicking the same chip again means they lost track, not
+                     that they want it said twice. */
+                  if (prev.includes(line)) return prev;
+                  return prev.trim() ? `${prev.trim()} ${line}` : line;
+                })
+              }
+              className="oi-chip rounded-full border border-[var(--color-rule)] px-3 py-1 text-[12.5px] text-[var(--color-ink-2)]"
+            >
+              {/* The first few words. The whole sentence would make five
+                  chips into a paragraph of their own. */}
+              {line.split(' ').slice(0, 4).join(' ')}…
+            </button>
+          ))}
+        </div>
 
         <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
           <span id="about-count">
@@ -281,7 +348,23 @@ export function ProfileForm({ defaults }: { defaults: ProfileDefaults }) {
         label="Save and continue"
         missing={missing}
       />
-    </form>
+      </form>
+
+      {/* Sticky, because the description is the field it reflects and that
+          field is at the top — scrolling to the budget boxes should not take
+          the card off screen. */}
+      <div className="xl:sticky xl:top-8 xl:self-start">
+        <StudioPreview
+          tradeName={tradeName}
+          about={about}
+          localities={localities}
+          yearsActive={years}
+          teamSize={team}
+          minLakhs={minLakhs}
+          maxLakhs={maxLakhs}
+        />
+      </div>
+    </div>
   );
 }
 

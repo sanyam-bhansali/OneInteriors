@@ -129,7 +129,10 @@ export default async function OnboardingStepPage({
             <StepRail steps={steps} current={step} />
           </div>
 
-          <div className="max-w-[46rem]">
+          {/* Wider than the other steps' 46rem: step one carries a live
+              preview column beside the form. The inner components keep their
+              own measures, so nothing else stretches. */}
+          <div className="max-w-[46rem] xl:max-w-[68rem]">
             {justFinished ? (
               <StepArrival
                 finished={STEP_LABELS[justFinished]}
@@ -176,6 +179,7 @@ export default async function OnboardingStepPage({
 
         {step === 'profile' ? (
           <ProfileForm
+            tradeName={studio.tradeName}
             defaults={{
               about: studio.about,
               localities: studio.localities,

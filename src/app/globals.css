@@ -2465,3 +2465,46 @@ p {
 [hidden]:not([hidden='until-found']) {
   display: none !important;
 }
+
+/* The live preview beside step one's form.
+
+   `oi-live-dot` is the only moving thing on the page, which is the
+   point: it says the card to its right is reflecting what you type
+   rather than showing a saved state. Two rings, because a single
+   pulsing dot reads as a loading spinner. */
+@keyframes oi-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  70%,
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+.oi-live-dot {
+  position: relative;
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-ontrack);
+}
+.oi-live-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--color-ontrack);
+  animation: oi-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The dot stays, the pulse goes. It is still the marker for "this is
+     live"; it just stops asking for attention. */
+  .oi-live-dot::after {
+    animation: none;
+    opacity: 0;
+  }
+}
