@@ -147,6 +147,13 @@ export function checkExtraction(raw: unknown): ExtractCheck {
       continue;
     }
 
+    const kept = withoutTotals(lines, reference, issues);
+
+    if (kept.length === 0) {
+      issues.push({ reference, reason: 'Nothing left once totals were removed.' });
+      continue;
+    }
+
     quotations.push({
       quotationId: reference,
       /* 3 BHK when the document does not say. `ingestQuotations` uses bhk for
@@ -155,11 +162,72 @@ export function checkExtraction(raw: unknown): ExtractCheck {
          so it is worth knowing it is here. */
       bhk: typeof q.bhk === 'number' && q.bhk >= 1 && q.bhk <= 5 ? Math.round(q.bhk) : 3,
       dated: typeof q.dated === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(q.dated) ? q.dated : null,
-      lines,
+      lines: kept,
     });
   }
 
   return { quotations, issues };
+}
+
+/**
+ * Remove the grand total, which the size cap does not catch.
+ *
+ * ## Why a cap was never going to be enough
+ *
+ * `MAX_LINE_RUPEES` is ₹25 lakh, and a 3 BHK turnkey job totals ₹12–20
+ * lakh. The single most damaging row in the document therefore sat
+ * comfortably inside the limit and was admitted as a line item — where it
+ * lands in a median and drags it further than fifty small errors would. A
+ * test caught this; reading the file did not.
+ *
+ * ## The structural test
+ *
+ * A grand total equals the sum of everything else. So for each line, compare
+ * it against the sum of the OTHER lines: if the two agree within a couple of
+ * per cent, that line is not an item, it is the arithmetic. This needs no
+ * knowledge of layout, wording or language, which is what makes it hold for
+ * a template nobody has seen.
+ *
+ * ## Why three lines, and why one pass
+ *
+ * With two lines, "one equals the other" is two rooms that happened to cost
+ * the same, and dropping one would be a real item lost. Three is where the
+ * coincidence stops being plausible.
+ *
+ * And exactly one line is removed, the largest qualifying one. A document
+ * carrying both a subtotal and a grand total would otherwise see the
+ * subtotal qualify on the second pass and vanish too, taking a genuine
+ * reading of the section with it. One pass removes the arithmetic; anything
+ * further starts removing the quotation.
+ */
+function withoutTotals(
+  lines: IngestedLine[],
+  reference: string,
+  issues: ExtractIssue[],
+): IngestedLine[] {
+  if (lines.length < 3) return lines;
+
+  const sum = lines.reduce((t, l) => t + l.amountPaise, 0);
+
+  let worst: { index: number; amount: number } | null = null;
+  for (const [index, l] of lines.entries()) {
+    const rest = sum - l.amountPaise;
+    if (rest <= 0) continue;
+    /* Two per cent, which covers a rounded "say" figure and a line or two of
+       tax-inclusive drift without reaching a real item. */
+    if (Math.abs(l.amountPaise - rest) / rest > 0.02) continue;
+    if (!worst || l.amountPaise > worst.amount) worst = { index, amount: l.amountPaise };
+  }
+
+  if (!worst) return lines;
+
+  const removed = lines[worst.index]!;
+  issues.push({
+    reference,
+    reason: `"${removed.product}" matched the sum of every other line, so it was read as a total and dropped.`,
+  });
+
+  return lines.filter((_, i) => i !== worst!.index);
 }
 
 function dimension(v: unknown): number | null {
