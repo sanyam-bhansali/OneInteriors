@@ -94,11 +94,27 @@ export function ProfileForm({ defaults }: { defaults: ProfileDefaults }) {
   const detailsOk = years !== '' && team !== '';
   const budgetOk = minLakhs !== '' && maxLakhs !== '';
 
+  /**
+   * One entry per FIELD, never per section.
+   *
+   * This was written as four entries, one of which read "years and team
+   * size". Answering years then changed nothing on screen — the line still
+   * named it, because team size was also outstanding — so the select looked
+   * like it had not registered the answer. It had. The sentence was wrong,
+   * which is this file's recurring failure mode and the reason the note on
+   * `saveProfile` exists at all: the studio does the right thing and the
+   * page tells them they did not.
+   *
+   * The rule that follows: an item leaves this list the moment the thing it
+   * names is done, and nothing in it stands for two things at once.
+   */
   const missing = [
     !describedOk ? 'a description' : null,
     !areasOk ? 'at least one area' : null,
-    !detailsOk ? 'years and team size' : null,
-    !budgetOk ? 'your project range' : null,
+    years === '' ? 'years active' : null,
+    team === '' ? 'team size' : null,
+    minLakhs === '' ? 'your smallest project' : null,
+    maxLakhs === '' ? 'your largest project' : null,
   ].filter((m): m is string => m !== null);
 
   return (
@@ -265,6 +281,29 @@ export function ProfileForm({ defaults }: { defaults: ProfileDefaults }) {
   );
 }
 
+/**
+ * A quiet marker on the field that is still empty.
+ *
+ * It disappears the instant the field is answered, which is the property
+ * that matters: the fix for "years and team size" as one line was to make
+ * every claim on this page belong to exactly one field, and this is the same
+ * rule applied where somebody is actually looking. Two selects side by side
+ * are the easiest place in the form to misread which one is outstanding.
+ *
+ * Deliberately not an asterisk. An asterisk marks a field as required
+ * forever, including after it has been filled in, so it cannot answer the
+ * question somebody is asking here — which is not "what is required" but
+ * "what is left".
+ */
+function Needed({ when }: { when: boolean }) {
+  if (!when) return null;
+  return (
+    <span className="rounded-full bg-[var(--color-brass-soft)] px-2 py-0.5 text-[10.5px] font-medium normal-case tracking-normal text-[var(--color-brass)]">
+      Needed
+    </span>
+  );
+}
+
 function range(from: number, to: number): number[] {
   return Array.from({ length: to - from + 1 }, (_, i) => from + i);
 }
@@ -298,8 +337,9 @@ function Picker({
 }) {
   return (
     <div>
-      <label htmlFor={name} className="label m-0 mb-1.5 block">
+      <label htmlFor={name} className="label m-0 mb-1.5 flex items-center gap-2">
         {label}
+        <Needed when={value === ''} />
       </label>
       <div className="relative">
         <select
@@ -358,8 +398,9 @@ function Money({
 }) {
   return (
     <div>
-      <label htmlFor={name} className="label m-0 mb-1.5 block">
+      <label htmlFor={name} className="label m-0 mb-1.5 flex items-center gap-2">
         {label}
+        <Needed when={value === ''} />
       </label>
       <div className="relative">
         <span
