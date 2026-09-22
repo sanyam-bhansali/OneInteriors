@@ -313,6 +313,29 @@ export function Import() {
             </li>
           </ul>
 
+          {/* Loud, and separate from the counts above, because it is the one
+              problem on this screen that importing will NOT solve. Excel
+              stored those numbers as numbers and the digits are gone from
+              the file — so this says what to do about it rather than just
+              reporting a number, since an error that names a cause without a
+              remedy is just blame. */}
+          {plan.mangledPhones > 0 ? (
+            <div className="mt-3 rounded-[10px] border border-[var(--s-bad)]/35 bg-[var(--s-bad)]/[0.06] px-3.5 py-3">
+              <p className="m-0 mb-1 text-[13.5px] font-medium text-[var(--s-bad)]">
+                <span className="s-num">{plan.mangledPhones}</span>{' '}
+                {plan.mangledPhones === 1 ? 'phone number was' : 'phone numbers were'} damaged by
+                Excel before we saw the file.
+              </p>
+              <p className="m-0 text-[12.5px] leading-relaxed text-[var(--s-ink-2)]">
+                They look like <span className="font-[family-name:var(--font-mono)]">9.87E+09</span>
+                . Excel read the column as numbers and kept only the first few digits, so the rest
+                are not in this file to recover. Go back to the original, format the phone column as{' '}
+                <strong>Text</strong> before opening it, and export again. You can import now and
+                those rows will simply have no number.
+              </p>
+            </div>
+          ) : null}
+
           <p className="s-label mt-4 mb-2">The first few, as they will be saved</p>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-[13.5px]">

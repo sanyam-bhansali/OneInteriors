@@ -189,6 +189,43 @@ export function normalisePhone(raw: string): string | null {
   return digits;
 }
 
+/**
+ * A phone number Excel already destroyed.
+ *
+ * ## Why this is detection, not repair
+ *
+ * Open a CSV of phone numbers in Excel and it reads the column as numbers.
+ * `9876543210` becomes `9.87654E+09`, and that is not a display quirk — the
+ * value is stored with six significant digits. Save the file again and the
+ * remaining four are gone from the file itself.
+ *
+ * So there is nothing to recover. `normalisePhone` correctly returns null,
+ * and without this the row would be counted as "no phone", which reads as an
+ * incomplete record rather than a broken one. A studio told two hundred rows
+ * imported, with eighty silently phoneless, has been handed a list they
+ * cannot ring and no reason why.
+ *
+ * ## What the person can actually do about it
+ *
+ * Nothing to the file they have — the digits are not in it. They have to go
+ * back to the source, format the phone column as Text BEFORE opening it, or
+ * export it again. The import screen says that, because an error that names
+ * a cause without a remedy is just blame.
+ *
+ * Reading `.xlsx` directly would sidestep the whole problem, since the
+ * workbook keeps the original value. That needs SheetJS and is the right fix
+ * when somebody adds it.
+ */
+export function looksDestroyed(raw: string): boolean {
+  const v = raw.trim();
+  if (v.length === 0) return false;
+
+  /* `9.87654E+09`, `9.88E+9`, `9876543210.0` — Excel's three ways of saying
+     "this was a number". The last one IS recoverable and normalisePhone
+     already handles it, so it is deliberately not matched here. */
+  return /^\d(\.\d+)?e\+?\d+$/i.test(v);
+}
+
 /** Title Case, for lists typed entirely in capitals — which is most of them. */
 export function tidyName(raw: string): string {
   const name = raw.trim().replace(/\s+/g, ' ');
@@ -221,6 +258,13 @@ export interface ImportPlan {
   duplicatesInFile: number;
   /** Total data rows read, excluding the header. */
   read: number;
+  /**
+   * Phone numbers Excel destroyed before the file ever reached us.
+   *
+   * NOT a row we can fix, which is why it is counted separately from every
+   * other skip. See `looksDestroyed`.
+   */
+  mangledPhones: number;
 }
 
 /**
@@ -233,7 +277,13 @@ export interface ImportPlan {
  */
 export function planImport(rows: string[][], mapping: ColumnKey[]): ImportPlan {
   const [, ...body] = rows;
-  const plan: ImportPlan = { rows: [], skippedNoName: 0, duplicatesInFile: 0, read: body.length };
+  const plan: ImportPlan = {
+    rows: [],
+    skippedNoName: 0,
+    duplicatesInFile: 0,
+    mangledPhones: 0,
+    read: body.length,
+  };
 
   const seenPhones = new Set<string>();
 
@@ -249,7 +299,15 @@ export function planImport(rows: string[][], mapping: ColumnKey[]): ImportPlan {
       continue;
     }
 
-    const phone = normalisePhone(pick('phone'));
+    /* Counted before normalising, because normalisePhone correctly returns
+       null for `9.88E+09` and a null is indistinguishable from a blank
+       column. The difference matters: one is a row with no phone, the other
+       is a row whose phone has been destroyed and cannot be recovered from
+       this file at all. */
+    const rawPhone = pick('phone');
+    if (looksDestroyed(rawPhone)) plan.mangledPhones += 1;
+
+    const phone = normalisePhone(rawPhone);
 
     // Within the file only. Matching against what is already in the database
     // happens at write time, where the rows to compare against actually are.
@@ -279,5 +337,13 @@ export function planImport(rows: string[][], mapping: ColumnKey[]): ImportPlan {
 }
 
 /** Every imported row carries this, so an import can always be told apart later. */
+/**
+ * What an imported row's source is when nobody says.
+ *
+ * OTHER, and that is a real cost worth naming: a studio importing two years
+ * of Instagram enquiries loses the fact that they came from Instagram, which
+ * is the one thing the analytics page exists to tell them. It is the default
+ * rather than the rule — `importClients` takes a source, and the screen asks.
+ */
 export const IMPORT_SOURCE: ClientSourceName = 'OTHER';
 export const IMPORT_NOTE = 'Imported from a spreadsheet';

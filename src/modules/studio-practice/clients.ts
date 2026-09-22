@@ -16,7 +16,7 @@ import { myStudioId } from '@/modules/studio-quote/store';
 import { myStages, intakeStageId } from './stages';
 import { myFields } from './fields';
 import { cleanValues, problemSentence, readValues, type FieldValues } from './field-values';
-import { IMPORT_SOURCE, IMPORT_NOTE, type ImportRow } from './csv';
+import { IMPORT_SOURCE, IMPORT_NOTE, normalisePhone, type ImportRow } from './csv';
 
 export type { ImportRow, ColumnKey, ImportPlan } from './csv';
 export { parseCsv, guessMapping, planImport, COLUMN_LABELS } from './csv';
@@ -199,7 +199,39 @@ export interface NewClientInput {
   nextActionOn?: string;
   /** Whatever the studio defined in Settings → Fields, keyed by field key. */
   custom?: Record<string, string>;
+  /**
+   * Add it anyway, despite a matching phone number.
+   *
+   * The three-state convention again: absent means "check", true means "the
+   * person has seen the match and says they are different people". Never
+   * defaulted to true — a duplicate check nobody can fail is decoration.
+   */
+  force?: boolean;
 }
+
+/** A client who already has this phone number. */
+export interface DuplicateOf {
+  id: string;
+  name: string;
+  stageName: string;
+  /** Null when nobody has taken them. */
+  assignedToName: string | null;
+  /** True when they are sitting in the bin, which changes the advice. */
+  deleted: boolean;
+}
+
+export type AddResult =
+  | { ok: true; id: string }
+  | { ok: false; error: string }
+  /**
+   * Not an error. A question.
+   *
+   * Two people in one family really do share a number, and a builder's office
+   * number reaches four flats. So this hands back WHO it matched and lets the
+   * person decide, rather than refusing — AxLeads answers the same case with
+   * a 409 carrying `duplicateOfId` and a `?force=true` escape.
+   */
+  | { ok: false; duplicate: DuplicateOf };
 
 /**
  * Put the sample on an empty board. Once, ever.
@@ -293,7 +325,7 @@ export async function removeDemoLead(): Promise<Result> {
   }
 }
 
-export async function addClient(input: NewClientInput): Promise<CreateResult> {
+export async function addClient(input: NewClientInput): Promise<AddResult> {
   const studioId = await myStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
@@ -306,6 +338,54 @@ export async function addClient(input: NewClientInput): Promise<CreateResult> {
   const on = input.nextActionOn?.trim() || null;
   if (action && !on) return { ok: false, error: 'When will you do that?' };
   if (on && !action) return { ok: false, error: 'What will you do on that day?' };
+
+  /**
+   * Has this number been added before?
+   *
+   * The import path has skipped duplicate phones since the day it shipped and
+   * the Add form has never checked at all — so the reliable way to get two
+   * cards for one person was to type the second one by hand, which is also the
+   * likeliest way. Two people ringing the same lead from two cards is how a
+   * studio looks disorganised to the one customer they were trying to win.
+   *
+   * Matched on the normalised ten digits, which is the whole reason
+   * `normalisePhone` strips prefixes: a list where half carry +91 has no
+   * duplicates in it as far as any `WHERE phone =` is concerned.
+   *
+   * Includes BINNED clients deliberately. Somebody re-adding a person they
+   * deleted last week wants to restore that card and its history, not start
+   * a second one — and the answer says which it is.
+   */
+  const typedPhone = input.phone?.trim() ?? '';
+  if (typedPhone.length > 0 && input.force !== true) {
+    const digits = normalisePhone(typedPhone);
+    if (digits) {
+      const match = await prisma.studioClient.findFirst({
+        where: { studioId, phone: digits, isDemo: false },
+        orderBy: { deletedAt: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          deletedAt: true,
+          stage: { select: { name: true } },
+          assignedTo: { select: { user: { select: { name: true, email: true } } } },
+        },
+      });
+
+      if (match) {
+        return {
+          ok: false,
+          duplicate: {
+            id: match.id,
+            name: match.name,
+            stageName: match.stage.name,
+            assignedToName: match.assignedTo ? personName(match.assignedTo.user) : null,
+            deleted: match.deletedAt !== null,
+          },
+        };
+      }
+    }
+  }
 
   // Where a new client lands is the studio's choice, not ours. `myStages()`
   // seeds the six defaults on first read, so this is never null for a studio
@@ -325,7 +405,11 @@ export async function addClient(input: NewClientInput): Promise<CreateResult> {
         studioId,
         stageId,
         name,
-        phone: input.phone?.trim() || null,
+        /* The normalised ten digits, not what they typed. A card saved as
+           "+91 98765 43210" is invisible to the duplicate check that looks
+           for "9876543210", so the next person to type it gets a second
+           card — the exact bug this block was added to prevent. */
+        phone: typedPhone.length > 0 ? (normalisePhone(typedPhone) ?? typedPhone) : null,
         society: input.society?.trim() || null,
         config: input.config?.trim() || null,
         // A studio cannot mark its own walk-in as one of ours. That flag is set
@@ -791,7 +875,20 @@ export interface ImportResult {
  * overwrites somebody's work — so the safe thing is to leave the existing row
  * exactly as it is and say how many were left.
  */
-export async function importClients(rows: ImportRow[]): Promise<ImportResult | { ok: false; error: string }> {
+export async function importClients(
+  rows: ImportRow[],
+  /**
+   * Where this batch came from, chosen on the import screen.
+   *
+   * Defaults to OTHER so the old call shape still works, but the screen now
+   * asks — a studio importing two years of Instagram enquiries as OTHER
+   * loses the only fact the analytics page needs from them.
+   *
+   * ONE_INTERIORS is refused the same way `addClient` refuses it: a studio
+   * cannot mark its own spreadsheet as leads we sent.
+   */
+  source: ClientSourceName = IMPORT_SOURCE,
+): Promise<ImportResult | { ok: false; error: string }> {
   const studioId = await myStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
   if (rows.length === 0) return { ok: false, error: 'Nothing to import.' };
@@ -841,7 +938,7 @@ export async function importClients(rows: ImportRow[]): Promise<ImportResult | {
         locality: r.locality,
         config: r.config,
         notes: r.notes,
-        source: IMPORT_SOURCE,
+        source: source === 'ONE_INTERIORS' ? 'OTHER' : source,
         sourceNote: IMPORT_NOTE,
         // Unassigned on purpose. See the note above.
         assignedToId: null,

@@ -54,9 +54,35 @@ export async function addClientAction(_prev: State, form: FormData): Promise<Sta
     nextAction: str(form, 'nextAction'),
     nextActionOn: str(form, 'nextActionOn'),
     custom: custom(form),
+    /* Only ever true because the person ticked the box the previous refusal
+       put in front of them. */
+    force: str(form, 'force') === '1',
   });
 
-  if (!result.ok) return result;
+  if (!result.ok) {
+    /* A duplicate is a question, not a mistake — two people in one family
+       share a number, and a builder's office number reaches four flats. So
+       it names WHO it matched and offers the override, rather than refusing
+       and leaving somebody to work out why. */
+    if ('duplicate' in result) {
+      const d = result.duplicate;
+      const where = d.deleted
+        ? 'is in your bin'
+        : d.assignedToName
+          ? `is in ${d.stageName}, with ${d.assignedToName}`
+          : `is in ${d.stageName}`;
+
+      return {
+        ok: false,
+        error: `${d.name} already has that number and ${where}.${
+          d.deleted ? ' Restoring them keeps everything you recorded before.' : ''
+        }`,
+        askAgain: { label: 'Different person — add anyway', field: 'force' },
+      };
+    }
+    return result;
+  }
+
   refresh();
   return { ok: true };
 }

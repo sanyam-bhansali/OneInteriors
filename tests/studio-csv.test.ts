@@ -6,8 +6,7 @@ import {
   normalisePhone,
   tidyName,
   planImport,
-  type ColumnKey,
-} from '@/modules/studio-practice/csv';
+  type ColumnKey, looksDestroyed } from '@/modules/studio-practice/csv';
 
 /**
  * These tests are the import.
@@ -212,5 +211,59 @@ describe('the import plan', () => {
   it('ignores a column mapped to skip', () => {
     const plan = planImport(rows, MAPPING);
     expect(Object.values(plan.rows[0]!)).not.toContain('1');
+  });
+});
+
+describe('looksDestroyed', () => {
+  /**
+   * Excel stores a phone column as numbers, so 9876543210 becomes
+   * 9.87654E+09 — six significant digits, and the rest are gone from the
+   * FILE. There is nothing to recover.
+   *
+   * Without this, normalisePhone correctly returns null and the row counts as
+   * "no phone", which reads as an incomplete record rather than a broken one.
+   * A studio told two hundred rows imported, eighty of them silently
+   * phoneless, has a list they cannot ring and no reason why.
+   */
+  it('recognises what Excel did', () => {
+    expect(looksDestroyed('9.87654E+09')).toBe(true);
+    expect(looksDestroyed('9.88e+9')).toBe(true);
+    expect(looksDestroyed('9.88E09')).toBe(true);
+  });
+
+  it('leaves the recoverable case alone', () => {
+    /* `9876543210.0` still HAS its digits, and normalisePhone handles it.
+       Flagging it would send somebody back to a file that is fine. */
+    expect(looksDestroyed('9876543210.0')).toBe(false);
+    expect(normalisePhone('9876543210.0')).toBe('9876543210');
+  });
+
+  it('is not tripped by ordinary cells', () => {
+    expect(looksDestroyed('9876543210')).toBe(false);
+    expect(looksDestroyed('')).toBe(false);
+    expect(looksDestroyed('call his office')).toBe(false);
+  });
+});
+
+describe('planImport counts the damage separately', () => {
+  it('tells a destroyed number apart from a missing one', () => {
+    const plan = planImport(
+      [
+        ['Name', 'Phone'],
+        ['Anita', '9.87654E+09'],
+        ['Ravi', '9876543210'],
+        ['Meera', ''],
+      ],
+      ['name', 'phone'],
+    );
+
+    expect(plan.mangledPhones).toBe(1);
+    /* Meera is not damage — she is a row somebody left blank. */
+    expect(plan.read).toBe(3);
+    /* The row still imports. A studio would rather have the name and ring
+       round for the number than lose the lead entirely. */
+    expect(plan.rows).toHaveLength(3);
+    expect(plan.rows[0]?.phone).toBeNull();
+    expect(plan.rows[1]?.phone).toBe('9876543210');
   });
 });

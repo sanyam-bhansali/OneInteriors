@@ -20,7 +20,23 @@
  * cannot come back by copy-paste.
  */
 
-export type State = { ok: true } | { ok: false; error: string } | { idle: true };
+export type State =
+  | { ok: true }
+  | { ok: false; error: string }
+  /**
+   * A refusal the person can overrule.
+   *
+   * Added for the duplicate-phone check on Add client, where "this number is
+   * already on your board" is a question rather than a mistake — two people
+   * in one family really do share a number.
+   *
+   * It carries `error` as well, so every existing `'error' in result` branch
+   * keeps working and a form that has not been taught about `askAgain`
+   * simply shows the sentence. The forms that HAVE been taught render the
+   * override beside it.
+   */
+  | { ok: false; error: string; askAgain: { label: string; field: string } }
+  | { idle: true };
 
 /**
  * The state a form is in before anybody has submitted it.

@@ -641,9 +641,26 @@ function AddClient({ label, fields }: { label: string; fields: FieldRow[] }) {
         </div>
 
         {'ok' in state && !state.ok ? (
-          <p role="alert" className="m-0 text-[12.5px] text-[var(--s-bad)]">
-            {state.error}
-          </p>
+          <div role="alert" className="flex flex-col gap-2">
+            <p className="m-0 text-[12.5px] text-[var(--s-bad)]">{state.error}</p>
+
+            {/* The override, beside the reason and only after it.
+                A "add anyway" checkbox sitting on the form before anybody has
+                been warned is a checkbox everybody ticks out of habit, which
+                is the same as having no duplicate check at all. It appears
+                once, attached to the specific refusal it overrules. */}
+            {'askAgain' in state ? (
+              <label className="flex items-center gap-2 text-[12.5px] text-[var(--s-ink-2)]">
+                <input
+                  type="checkbox"
+                  name={state.askAgain.field}
+                  value="1"
+                  className="h-3.5 w-3.5 accent-[var(--s-accent)]"
+                />
+                {state.askAgain.label}
+              </label>
+            ) : null}
+          </div>
         ) : null}
       </form>
     </div>
