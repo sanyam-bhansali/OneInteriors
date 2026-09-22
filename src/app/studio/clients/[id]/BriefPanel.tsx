@@ -107,7 +107,7 @@ export function BriefPanel({ ctx }: { ctx: MarketplaceContext }) {
             {ctx.dislikes.map((d) => (
               <li
                 key={d}
-                className="rounded-full border border-[var(--s-danger,#98371f)]/30 px-2.5 py-1 text-[12.5px] text-[var(--s-danger,#98371f)]"
+                className="rounded-full border border-[var(--s-bad)]/30 px-2.5 py-1 text-[12.5px] text-[var(--s-bad)]"
               >
                 {d}
               </li>

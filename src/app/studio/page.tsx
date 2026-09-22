@@ -165,7 +165,7 @@ export default async function StudioHome() {
               </p>
               <Link
                 href="/studio/clients"
-                className="ml-auto whitespace-nowrap rounded-[8px] border border-[var(--s-rule)] px-3 py-1.5 text-[13px] font-medium no-underline hover:border-[var(--s-ink-3)]"
+                className="ml-auto whitespace-nowrap s-btn-ghost no-underline"
               >
                 Go through them
               </Link>

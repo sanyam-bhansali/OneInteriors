@@ -73,7 +73,7 @@ export default async function LeadAnalyticsPage() {
             </p>
             <Link
               href="/studio/clients/import"
-              className="mt-5 inline-block rounded-[8px] border border-[var(--s-rule)] px-3.5 py-2 text-[13.5px] font-medium no-underline hover:border-[var(--s-ink-3)]"
+              className="s-btn-ghost mt-5 no-underline"
             >
               Import a spreadsheet
             </Link>
@@ -169,9 +169,9 @@ function winNote(data: LeadAnalytics): string {
 }
 
 function toneClass(tone: string): string {
-  if (tone === 'bad') return 'text-[var(--s-danger,#98371f)]';
+  if (tone === 'bad') return 'text-[var(--s-bad)]';
   if (tone === 'warn') return 'text-[var(--s-warn,#8a6220)]';
-  if (tone === 'good') return 'text-[var(--s-ok,#4a6a4f)]';
+  if (tone === 'good') return 'text-[var(--s-good)]';
   return '';
 }
 
@@ -210,7 +210,7 @@ function Sources({ data }: { data: LeadAnalytics }) {
                   style={{ width: `${(s.total / max) * 100}%` }}
                 >
                   <div
-                    className="h-full rounded-full bg-[var(--s-ok,#4a6a4f)]"
+                    className="h-full rounded-full bg-[var(--s-good)]"
                     style={{ width: `${s.total > 0 ? (s.won / s.total) * 100 : 0}%` }}
                   />
                 </div>

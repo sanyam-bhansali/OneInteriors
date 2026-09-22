@@ -73,7 +73,7 @@ export function PoolList({
         </p>
         <Link
           href="/studio/clients"
-          className="mt-5 inline-block rounded-[8px] border border-[var(--s-rule)] px-3.5 py-2 text-[13.5px] font-medium no-underline hover:border-[var(--s-ink-3)]"
+          className="s-btn-ghost mt-5 no-underline"
         >
           Back to the board
         </Link>
@@ -106,7 +106,7 @@ export function PoolList({
                 type="button"
                 disabled={pending}
                 onClick={() => assign(myMemberId)}
-                className="rounded-[8px] bg-[var(--s-accent)] px-3.5 py-1.5 text-[13.5px] font-medium text-white disabled:opacity-50"
+                className="s-btn disabled:opacity-50"
               >
                 {pending ? 'Taking…' : `Take ${picked.size === 1 ? 'it' : 'these'}`}
               </button>
@@ -119,7 +119,7 @@ export function PoolList({
                 if (e.target.value) assign(e.target.value);
                 e.target.value = '';
               }}
-              className="rounded-[8px] border border-[var(--s-rule)] bg-transparent px-2.5 py-1.5 text-[13.5px] disabled:opacity-50"
+              className="s-input disabled:opacity-50"
             >
               <option value="" disabled>
                 Give to…
@@ -137,14 +137,14 @@ export function PoolList({
       </div>
 
       {error ? (
-        <p role="alert" className="m-0 text-[13.5px] text-[var(--s-danger,#98371f)]">
+        <p role="alert" className="m-0 text-[13.5px] text-[var(--s-bad)]">
           {error}
         </p>
       ) : null}
 
       <ul className="m-0 flex list-none flex-col gap-px overflow-hidden rounded-[12px] border border-[var(--s-rule)] bg-[var(--s-rule)] p-0">
         {rows.map((row) => (
-          <li key={row.id} className="bg-[var(--s-card,var(--s-rail))]">
+          <li key={row.id} className="bg-[var(--s-surface)]">
             <div className="flex items-center gap-3 px-3.5 py-3">
               <input
                 type="checkbox"

@@ -47,7 +47,7 @@ export function Timeline({ rows }: { rows: EventRow[] }) {
 
           <span
             aria-hidden="true"
-            className={`relative z-10 mt-1.5 h-[11px] w-[11px] flex-none rounded-full border-2 border-[var(--s-bg,var(--s-rail))] ${dot(
+            className={`relative z-10 mt-1.5 h-[11px] w-[11px] flex-none rounded-full border-2 border-[var(--s-surface)] ${dot(
               toneFor(e.kind),
             )}`}
           />
@@ -76,7 +76,7 @@ export function Timeline({ rows }: { rows: EventRow[] }) {
 }
 
 function dot(tone: string): string {
-  if (tone === 'good') return 'bg-[var(--s-ok,#4a6a4f)]';
+  if (tone === 'good') return 'bg-[var(--s-good)]';
   if (tone === 'accent') return 'bg-[var(--s-accent)]';
   return 'bg-[var(--s-ink-3)]';
 }

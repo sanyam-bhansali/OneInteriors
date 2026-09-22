@@ -94,7 +94,7 @@ export function Duplicates({
                     type="button"
                     disabled={pending}
                     onClick={() => merge(c.id)}
-                    className="rounded-[7px] bg-[var(--s-accent)] px-2.5 py-1 text-[12.5px] font-medium text-white disabled:opacity-50"
+                    className="s-btn px-2.5 py-1 text-[12.5px] disabled:opacity-50"
                   >
                     {pending ? 'Merging…' : `Merge into ${clientName}`}
                   </button>
@@ -110,7 +110,7 @@ export function Duplicates({
                 <button
                   type="button"
                   onClick={() => setConfirming(c.id)}
-                  className="rounded-[7px] border border-[var(--s-rule)] px-2.5 py-1 text-[12.5px] font-medium hover:border-[var(--s-ink-3)]"
+                  className="s-btn-ghost px-2.5 py-1 text-[12.5px]"
                 >
                   Same person
                 </button>

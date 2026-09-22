@@ -47,7 +47,7 @@ function Tick({ done }: { done: boolean }) {
               background: 'var(--color-ontrack)',
               color: '#fff',
             }
-          : { borderColor: 'var(--s-line)', color: 'transparent' }
+          : { borderColor: 'var(--s-rule)', color: 'transparent' }
       }
     >
       ✓
@@ -86,7 +86,7 @@ export function GuidePanel({
       <button
         type="button"
         onClick={() => toggle(true)}
-        className="mb-5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-[10px] border border-[var(--s-line)] bg-[var(--s-card)] px-4 text-[13.5px] font-medium text-[var(--s-ink-2)] hover:text-[var(--s-ink)]"
+        className="mb-5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-[10px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-4 text-[13.5px] font-medium text-[var(--s-ink-2)] hover:text-[var(--s-ink)]"
       >
         <span className="font-[family-name:var(--font-mono)] text-[11px] tracking-[0.08em]">
           {done}/{def.steps.length}
@@ -101,7 +101,7 @@ export function GuidePanel({
   return (
     <section
       aria-label={def.title}
-      className="mb-6 rounded-[14px] border border-[var(--s-line)] bg-[var(--s-card)] p-6"
+      className="mb-6 rounded-[14px] border border-[var(--s-rule)] bg-[var(--s-surface)] p-6"
     >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
         <div className="min-w-0">
@@ -135,7 +135,7 @@ export function GuidePanel({
           return (
             <li
               key={step.id}
-              className="flex items-start gap-3 border-t border-[var(--s-line)] py-3.5 first:border-t-0 first:pt-0"
+              className="flex items-start gap-3 border-t border-[var(--s-rule)] py-3.5 first:border-t-0 first:pt-0"
               style={{ opacity: isDone ? 0.62 : 1 }}
             >
               <Tick done={isDone} />
@@ -162,8 +162,8 @@ export function GuidePanel({
                   className="inline-flex min-h-11 flex-none items-center rounded-[10px] px-4 text-[13.5px] font-medium no-underline"
                   style={
                     isNext
-                      ? { background: 'var(--s-ink)', color: 'var(--s-card)' }
-                      : { border: '1px solid var(--s-line)', color: 'var(--s-ink)' }
+                      ? { background: 'var(--s-ink)', color: 'var(--s-surface)' }
+                      : { border: '1px solid var(--s-rule)', color: 'var(--s-ink)' }
                   }
                 >
                   {step.cta ?? 'Open'}

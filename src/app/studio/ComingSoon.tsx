@@ -30,26 +30,26 @@ export function ComingSoon({ feature }: { feature: keyof typeof COMING_SOON }) {
     <>
       <PageHead title={copy.title} sub="Not in this release." />
       <PageBody>
-        <div className="max-w-[46rem] rounded-[14px] border border-[var(--s-line)] bg-[var(--s-card)] p-7">
+        <div className="max-w-[46rem] rounded-[14px] border border-[var(--s-rule)] bg-[var(--s-surface)] p-7">
           <p className="label m-0 mb-3">What it will do</p>
           <p className="m-0 mb-5 text-[15.5px] leading-relaxed text-[var(--s-ink)]">{copy.what}</p>
 
           {copy.meanwhile ? (
-            <p className="m-0 mb-6 border-l-2 border-[var(--s-line)] pl-4 text-[14.5px] leading-relaxed text-[var(--s-ink-2)]">
+            <p className="m-0 mb-6 border-l-2 border-[var(--s-rule)] pl-4 text-[14.5px] leading-relaxed text-[var(--s-ink-2)]">
               {copy.meanwhile}
             </p>
           ) : null}
 
-          <div className="flex flex-wrap items-center gap-3 border-t border-[var(--s-line)] pt-6">
+          <div className="flex flex-wrap items-center gap-3 border-t border-[var(--s-rule)] pt-6">
             <Link
               href="/studio/clients"
-              className="inline-flex min-h-11 items-center rounded-[10px] bg-[var(--s-ink)] px-5 text-[14.5px] font-medium text-[var(--s-card)] no-underline"
+              className="inline-flex min-h-11 items-center rounded-[10px] bg-[var(--s-ink)] px-5 text-[14.5px] font-medium text-[var(--s-surface)] no-underline"
             >
               Go to your leads
             </Link>
             <Link
               href="/studio"
-              className="inline-flex min-h-11 items-center rounded-[10px] border border-[var(--s-line)] px-5 text-[14.5px] font-medium text-[var(--s-ink)] no-underline"
+              className="inline-flex min-h-11 items-center rounded-[10px] border border-[var(--s-rule)] px-5 text-[14.5px] font-medium text-[var(--s-ink)] no-underline"
             >
               Dashboard
             </Link>

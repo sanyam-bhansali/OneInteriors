@@ -97,7 +97,7 @@ export function CaptureLink({ slug, active }: { slug: string; active: boolean })
         <button
           type="button"
           onClick={copy}
-          className="rounded-[8px] border border-[var(--s-rule)] px-3 py-2 text-[13px] font-medium hover:border-[var(--s-ink-3)]"
+          className="s-btn-ghost"
         >
           {copied ? 'Copied' : 'Copy'}
         </button>

@@ -291,42 +291,84 @@ p {
    ─────────────────────────────────────────────────────────────
    A different surface with a different job, so a different palette.
 
-   The marketplace above is warm paper and petrol — it is a place a
-   homeowner reads. This is a tool a studio owner operates for hours,
-   and it follows the reference: a sage ground so white cards lift off
-   it, a cream rail down the left, and terracotta reserved for the one
-   thing on each screen you can act on.
+   The marketplace is warm paper and petrol — a place a homeowner
+   reads. This is a tool a studio owner operates for hours, and it is
+   now warm ivory rather than the sage it started as: an off-white
+   ground, white cards that lift off it on a hairline rather than a
+   colour change, deep charcoal type, and terracotta reserved for the
+   one thing on each screen you can act on.
+
+   ## Why the sage went
+
+   Sage was taken from a reference board, and it cost more than it
+   bought. A coloured ground means every card, every chip and every
+   input is reading against a tint rather than against white, so every
+   contrast decision on this surface had to be made twice — and the
+   grey that looked right on sage (#838775) measures 3.46:1 on it,
+   below AA, on the ten-pixel labels it was used for.
+
+   Ivory is the same warmth with none of that: white is white, and the
+   hierarchy is carried by a hairline and a shadow instead of by hue.
+
+   ## Two terracottas, and the reason
+
+   The brand terracotta is #C0613C and it does not pass as text (3.5:1
+   on the worst ground here) or behind white (4.19:1). That is not a
+   reason to abandon it, it is a reason to be precise about where it
+   goes — the same split `.oi-tactile` already makes between `--acc`
+   and `--acc-d`.
+
+   So `--s-accent` is the DARKER cut, because it is the one that ends
+   up as button backgrounds and as text. `--s-accent-bright` is the
+   brand value and is for fills, dots and washes where nothing has to
+   be read against it.
+
+   Every value below is measured. Worst case on any of the five
+   grounds: ink 14.73, ink-2 6.65, ink-3 4.83, accent 4.69, white on
+   accent 5.62.
 
    Scoped to `.studio-app` rather than overriding the root, so nothing
    on the customer side moves.
    ───────────────────────────────────────────────────────────── */
 .studio-app {
-  --s-ground: #dfe0d2;
-  --s-rail: #eceddf;
-  --s-rail-active: #d9dbc4;
-  --s-surface: #fbfbf6;
-  --s-surface-2: #f4f4ec;
-  --s-rule: #d3d5c2;
-  --s-rule-soft: #e3e4d6;
+  --s-ground: #f5f2ed;
+  --s-rail: #fbf9f6;
+  --s-rail-active: #efeae2;
+  --s-surface: #ffffff;
+  --s-surface-2: #f0ede7;
+  --s-rule: #e7e2da;
+  --s-rule-soft: #f0ece5;
 
-  --s-ink: #232520;
-  --s-ink-2: #55584c;
-  --s-ink-3: #838775;
+  --s-ink: #1c1b19;
+  --s-ink-2: #56524b;
+  /* 4.83:1 on the worst ground. The old #838775 was 3.46 and carried
+     `.s-label` at ten and a half pixels. */
+  --s-ink-3: #6a655c;
 
   /* The one accent. Anything terracotta is something you can do. */
-  --s-accent: #c0613c;
-  --s-accent-deep: #a44f2e;
-  --s-accent-wash: #f6e6de;
+  --s-accent: #a44f2e;
+  /* Brand #C0613C. Fills, dots and washes only — never text, never
+     behind white. See the note above. */
+  --s-accent-bright: #c0613c;
+  --s-accent-deep: #8f4126;
+  --s-accent-wash: #fbf0ea;
 
-  --s-tag: #e7dcc6;
+  --s-tag: #f1ebe1;
   --s-tag-ink: #6b563a;
 
-  --s-good: #3f7a46;
-  --s-good-wash: #e0eddf;
-  --s-warn: #9a6a12;
-  --s-warn-wash: #f5eada;
-  --s-bad: #a8453a;
-  --s-bad-wash: #f6e3e0;
+  --s-good: #3a7241;
+  --s-good-wash: #e9f0e8;
+  --s-warn: #7e5910;
+  --s-warn-wash: #f7efdf;
+  --s-bad: #9e4035;
+  --s-bad-wash: #f9e9e6;
+
+  /* Soft elevation, as two stops rather than one blur.
+     A single large shadow reads as a drop shadow from 2014; a 1px
+     contact shadow plus a wide, very light ambient one is what makes a
+     card look like it is resting on the page. */
+  --s-lift: 0 1px 2px rgba(28, 27, 25, 0.04), 0 1px 3px rgba(28, 27, 25, 0.03);
+  --s-lift-2: 0 1px 2px rgba(28, 27, 25, 0.05), 0 4px 12px -4px rgba(28, 27, 25, 0.08);
 
   background: var(--s-ground);
   color: var(--s-ink);
@@ -347,11 +389,15 @@ p {
   color-scheme: light;
 }
 
-/* A card. One radius, one border, no shadow stack. */
+/* A card. One radius, one hairline, one soft lift.
+   The shadow is what earns the white: on an ivory ground a bordered
+   white box is nearly invisible, and pushing the border darker to
+   compensate makes a grid of cards read as a table of cells. */
 .s-card {
   background: var(--s-surface);
   border: 1px solid var(--s-rule);
   border-radius: 12px;
+  box-shadow: var(--s-lift);
 }
 
 /* A tag. Soft, quiet, never the loudest thing in a row. */
@@ -361,11 +407,11 @@ p {
   gap: 4px;
   background: var(--s-tag);
   color: var(--s-tag-ink);
-  border-radius: 999px;
-  padding: 2px 9px;
-  font-size: 12px;
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 11.5px;
   font-weight: 500;
-  line-height: 1.5;
+  line-height: 1.55;
   white-space: nowrap;
 }
 
@@ -395,6 +441,139 @@ p {
   text-transform: uppercase;
   letter-spacing: 0.11em;
   color: var(--s-ink-3);
+}
+
+/* ── The rest of the kit ──────────────────────────────────────
+
+   Everything below is a class rather than a Tailwind string repeated
+   across forty files, because these are the shapes that have to stay
+   identical for the surface to read as one product. A button whose
+   radius is 8px on one screen and 10px on another is the difference
+   between software and a set of pages.
+   ───────────────────────────────────────────────────────────── */
+
+/* The one loud action on a screen. */
+.s-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 9px;
+  padding: 7px 13px;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  background: var(--s-accent);
+  color: #fff;
+  box-shadow: var(--s-lift);
+  transition:
+    background-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.1s ease;
+}
+.s-btn:hover {
+  background: var(--s-accent-deep);
+  box-shadow: var(--s-lift-2);
+}
+.s-btn:active {
+  transform: translateY(0.5px);
+}
+.s-btn:disabled {
+  opacity: 0.45;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* Everything else. Quiet by default, because a screen where four
+   things shout has no primary action. */
+.s-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 9px;
+  padding: 7px 12px;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  background: var(--s-surface);
+  color: var(--s-ink-2);
+  border: 1px solid var(--s-rule);
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+.s-btn-ghost:hover {
+  border-color: var(--s-ink-3);
+  color: var(--s-ink);
+}
+.s-btn-ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* One input shape, everywhere. */
+.s-input {
+  width: 100%;
+  border-radius: 9px;
+  border: 1px solid var(--s-rule);
+  background: var(--s-surface);
+  padding: 7px 11px;
+  font-size: 13.5px;
+  color: var(--s-ink);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.s-input::placeholder {
+  color: var(--s-ink-3);
+}
+.s-input:focus {
+  outline: 2px solid var(--s-accent);
+  outline-offset: 0;
+  border-color: transparent;
+  box-shadow: 0 0 0 4px var(--s-accent-wash);
+}
+
+/* A status dot. Never the only signal — it always sits beside a word,
+   because colour alone is not information a colour-blind reader gets. */
+.s-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 999px;
+}
+
+/* Skeletons, for anything that loads. */
+@keyframes s-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+.s-skeleton {
+  background: var(--s-surface-2);
+  border-radius: 6px;
+  animation: s-pulse 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .s-skeleton {
+    animation: none;
+  }
+  .s-btn,
+  .s-btn:active,
+  .s-btn-ghost,
+  .s-input {
+    transition: none;
+    transform: none;
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────

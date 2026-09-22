@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 const importLink =
-  'rounded-[8px] border border-[var(--s-rule)] px-3 py-1.5 text-[13px] font-medium no-underline hover:border-[var(--s-ink-3)]';
+  's-btn-ghost no-underline';
 
 /**
  * Everyone who might become work, and everyone who already is.

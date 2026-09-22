@@ -63,7 +63,7 @@ export function LogContact({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="rounded-[8px] bg-[var(--s-accent)] px-3.5 py-2 text-[13.5px] font-medium text-white"
+          className="s-btn"
         >
           Log a contact
         </button>
@@ -133,7 +133,7 @@ export function LogContact({
       </p>
 
       {error ? (
-        <p role="alert" className="m-0 mt-3 text-[13px] text-[var(--s-danger,#98371f)]">
+        <p role="alert" className="m-0 mt-3 text-[13px] text-[var(--s-bad)]">
           {error}
         </p>
       ) : null}

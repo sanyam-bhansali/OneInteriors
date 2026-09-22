@@ -73,7 +73,10 @@ export const STAGE_COLOURS: Record<ColourToken, { dot: string; wash: string; ink
   blue: { dot: '#3b74b8', wash: '#e4edf7', ink: '#2c557f' },
   teal: { dot: '#2f8a80', wash: '#dff0ed', ink: '#23655e' },
   green: { dot: '#3f7a46', wash: '#e0eddf', ink: '#2e5a34' },
-  amber: { dot: '#c08a23', wash: '#f6ecd6', ink: '#7d5a12' },
+  /* Darkened from #c08a23, which measured 2.73:1 against the ivory board
+     ground — below the 3:1 a UI graphic needs. It was fine on the sage this
+     surface used to be. */
+  amber: { dot: '#a8760f', wash: '#f6ecd6', ink: '#7d5a12' },
   orange: { dot: '#c0613c', wash: '#f6e6de', ink: '#8a4429' },
   rose: { dot: '#a8453a', wash: '#f6e3e0', ink: '#7d332b' },
   violet: { dot: '#7a5aa8', wash: '#ece5f5', ink: '#56407a' },

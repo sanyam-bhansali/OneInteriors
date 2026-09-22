@@ -80,7 +80,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         action={
           <Link
             href="/studio/clients"
-            className="rounded-[8px] border border-[var(--s-rule)] px-3 py-1.5 text-[13px] font-medium no-underline hover:border-[var(--s-ink-3)]"
+            className="s-btn-ghost no-underline"
           >
             Back to the board
           </Link>

@@ -114,7 +114,7 @@ export function SavedViews({
               type="button"
               disabled={pending}
               onClick={() => run(() => deleteViewAction(v.id))}
-              className="pr-2.5 pl-0.5 text-[var(--s-ink-3)] hover:text-[var(--s-danger,#98371f)] disabled:opacity-50"
+              className="pr-2.5 pl-0.5 text-[var(--s-ink-3)] hover:text-[var(--s-bad)] disabled:opacity-50"
             >
               <span className="sr-only">Delete the view {v.name}</span>×
             </button>
@@ -146,12 +146,12 @@ export function SavedViews({
             autoFocus
             maxLength={40}
             placeholder={describe(current, memberName)}
-            className="rounded-[8px] border border-[var(--s-rule)] bg-transparent px-3 py-1.5 text-[13.5px]"
+            className="s-input"
           />
           <button
             type="submit"
             disabled={pending || name.trim().length < 2}
-            className="rounded-[8px] bg-[var(--s-accent)] px-3 py-1.5 text-[13px] font-medium text-white disabled:opacity-50"
+            className="s-btn disabled:opacity-50"
           >
             {pending ? 'Saving…' : 'Save'}
           </button>
@@ -170,7 +170,7 @@ export function SavedViews({
       ) : null}
 
       {error ? (
-        <p role="alert" className="m-0 text-[13px] text-[var(--s-danger,#98371f)]">
+        <p role="alert" className="m-0 text-[13px] text-[var(--s-bad)]">
           {error}
         </p>
       ) : null}
