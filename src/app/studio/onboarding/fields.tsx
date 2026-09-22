@@ -3,6 +3,7 @@
 /** Shared form primitives for the onboarding steps. Kept in one file so the
  *  four steps cannot drift into four slightly different-looking forms. */
 
+import { useEffect, useRef, useState } from 'react';
 import { FIELD_WIDTH, type FieldWidth } from '@/components/ui/form';
 
 export function Field({
@@ -240,10 +241,84 @@ export function SaveBar({
         >
           {pending ? 'Saving…' : label}
         </button>
-        {saved && !pending ? (
-          <span className="text-[14px] text-[var(--color-ontrack)]">Saved.</span>
-        ) : null}
+        <SavedFlash pending={pending} saved={saved} />
       </div>
     </div>
+  );
+}
+
+/**
+ * "Saved" — briefly, and meaning only that.
+ *
+ * ## Why it goes away
+ *
+ * It used to be a permanent green "Saved." beside the button. Permanent is
+ * the wrong shape for this: it is still sitting there two minutes later while
+ * the studio edits three more fields, so by the time it matters it is stale,
+ * and a studio that has typed something and not pressed Save is looking at a
+ * word that says they have. A flash is a receipt for an event, which is what
+ * a save is.
+ *
+ * ## Why it does not say "complete"
+ *
+ * This is the distinction this file has been bitten by. `saveProfile` once
+ * accepted a blank required field and returned a green "Saved." — true, and
+ * read as "this step is finished", so a studio went away and came back to
+ * find the step still unticked. The write landing and the step passing are
+ * two claims, and only one of them is being made here. The other is the
+ * badge in the page header and the list in the footer, both of which are
+ * re-derived on the server after every save.
+ *
+ * ## Why it keys on the pending edge
+ *
+ * `saved` stays true across consecutive saves, so an animation watching it
+ * fires once and never again — the second save would be silent, which is
+ * worse than no feedback, because the studio has now been taught the flash
+ * means something. Watching pending fall from true gives one flash per
+ * submission.
+ */
+function SavedFlash({ pending, saved }: { pending: boolean; saved: boolean }) {
+  const [visible, setVisible] = useState(false);
+  const wasPending = useRef(false);
+
+  useEffect(() => {
+    const justFinished = wasPending.current && !pending;
+    wasPending.current = pending;
+    if (!justFinished || !saved) return;
+
+    setVisible(true);
+    const timer = setTimeout(() => setVisible(false), 2600);
+    return () => clearTimeout(timer);
+  }, [pending, saved]);
+
+  return (
+    /* `status`, not `alert`: a successful save is not an interruption, and a
+       screen reader should finish the sentence it is on before announcing it.
+       The node is always mounted so the live region exists before it has
+       anything to say — one appearing with content already in it is a region
+       many readers will not announce. */
+    <span
+      role="status"
+      aria-live="polite"
+      className={`inline-flex items-center gap-1.5 text-[14px] text-[var(--color-ontrack)] transition-opacity duration-500 motion-reduce:transition-none ${
+        visible ? 'opacity-100' : 'opacity-0'
+      }`}
+    >
+      {visible ? (
+        <>
+          <svg viewBox="0 0 16 16" aria-hidden="true" className="h-3.5 w-3.5">
+            <path
+              d="M3.5 8.5 L6.5 11.5 L12.5 5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          Saved
+        </>
+      ) : null}
+    </span>
   );
 }

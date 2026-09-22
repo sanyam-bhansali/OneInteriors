@@ -183,11 +183,18 @@ export default async function OnboardingStepPage({
 
         {step === 'review' ? (
           <ReviewPanel
-            ready={steps.filter((s) => s.step !== 'review').every((s) => s.done)}
             alreadySubmitted={studio.submittedForReview}
-            missing={steps
-              .filter((s) => s.step !== 'review' && !s.done)
-              .flatMap((s) => s.missing)}
+            /* Review itself is excluded: it is the step being stood on, and
+               it passes precisely when the other four do, so including it
+               would be a row that only ever restates its own siblings. */
+            sections={steps
+              .filter((s) => s.step !== 'review')
+              .map((s) => ({
+                step: s.step,
+                label: STEP_LABELS[s.step],
+                done: s.done,
+                missing: s.missing,
+              }))}
           />
         ) : null}
 
