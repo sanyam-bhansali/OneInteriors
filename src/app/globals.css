@@ -1287,6 +1287,100 @@ p {
   box-shadow: 0 0 0 5px rgba(169, 79, 46, 0.12);
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+   GUIDED SETUP — the numbered section card, and the area chip
+   ─────────────────────────────────────────────────────────────────────
+
+   A card per question rather than one long stack. The shadow is two
+   layers and very nearly nothing: a 1px contact shadow that separates
+   the card from the ground, and a wide soft one that gives it a
+   height. A single 0 4px 12px is what makes a card look like a 2016
+   Material card, because the contact edge is missing and the whole
+   thing appears to hover. */
+.oi-sec {
+  box-shadow:
+    0 1px 2px rgba(38, 32, 25, 0.04),
+    0 8px 24px -16px rgba(38, 32, 25, 0.18);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.24s ease;
+}
+
+/* Not a hover lift. The card is not clickable, and a card that moves
+   under the pointer promises a click that does not exist — so the only
+   thing that changes is the one telling you the caret is in here. */
+.oi-sec:focus-within {
+  border-color: var(--color-ink-3);
+  box-shadow:
+    0 1px 2px rgba(38, 32, 25, 0.05),
+    0 14px 34px -18px rgba(38, 32, 25, 0.26);
+}
+
+/* The number turns into a tick when the section is satisfied. Colour
+   and glyph both change, because a green circle and a grey circle are
+   the same circle to anybody who cannot tell them apart. */
+.oi-sec-n {
+  transition:
+    background-color 0.26s ease,
+    color 0.26s ease;
+}
+
+.oi-chip {
+  background: var(--color-paper-2);
+  cursor: pointer;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    transform 0.14s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.oi-chip:hover {
+  border-color: var(--color-ink-3);
+  background: var(--color-paper-3);
+}
+/* Down, not up. A chip that grows on press reads as being picked up;
+   these are being put into the row above, and a small press-in is what
+   a button that commits something feels like. */
+.oi-chip:active {
+  transform: scale(0.96);
+}
+.oi-chip-on {
+  background: var(--color-petrol);
+  border: 1px solid var(--color-petrol);
+  color: #fff;
+}
+.oi-chip-on:hover {
+  background: var(--color-petrol-deep);
+  border-color: var(--color-petrol-deep);
+}
+
+/* The step's one action. Lifts a little on hover and presses in on
+   click — the scale is 1.008 rather than the 1.03 a mockup usually
+   asks for, because a full-width button growing 3% moves its edges
+   several pixels and the whole page appears to breathe. */
+.oi-save {
+  box-shadow: 0 8px 20px -12px rgba(26, 96, 104, 0.7);
+  transition:
+    background-color 0.18s ease,
+    transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.24s ease;
+}
+.oi-save:hover:not(:disabled) {
+  background: var(--color-petrol-deep);
+  transform: scale(1.008);
+  box-shadow: 0 14px 28px -12px rgba(26, 96, 104, 0.85);
+}
+.oi-save:active:not(:disabled) {
+  transform: scale(0.994);
+  box-shadow: 0 5px 12px -10px rgba(26, 96, 104, 0.8);
+}
+/* No shadow on the disabled state. A raised dead button still reads as
+   pressable, and the lift is the only thing saying it is not. */
+.oi-save:disabled {
+  box-shadow: none;
+  transform: none;
+}
+
 /* The rejection shake.
 
    Three small returns, not a wobble: 420ms and ±5px is enough to draw
@@ -1349,8 +1443,17 @@ p {
 @media (prefers-reduced-motion: reduce) {
   .oi-pane,
   .oi-cta,
-  .oi-input {
+  .oi-input,
+  .oi-sec,
+  .oi-sec-n,
+  .oi-chip,
+  .oi-save {
     transition: none;
+  }
+  .oi-chip:active,
+  .oi-save:hover:not(:disabled),
+  .oi-save:active:not(:disabled) {
+    transform: none;
   }
   /* The alert carries the message; the shake was only ever emphasis. */
   .oi-shake {

@@ -222,6 +222,7 @@ export function SaveBar({
   formError,
   label = 'Save and continue',
   draft,
+  missing,
 }: {
   pending: boolean;
   saved: boolean;
@@ -229,24 +230,69 @@ export function SaveBar({
   label?: string;
   /** Present only on steps wired to `useAutosave`. */
   draft?: DraftState;
+  /**
+   * What is still short, in the studio's words. Omitted entirely on steps
+   * that do not compute it — an empty array means "nothing missing", which is
+   * a different claim from "not checked", and the button behaves differently
+   * for each.
+   */
+  missing?: string[];
 }) {
+  const blocked = missing !== undefined && missing.length > 0;
+
   return (
-    <div className="border-t border-[var(--color-rule)] pt-6">
+    /**
+     * Sticky, so the action is never below the fold on a six-section page.
+     *
+     * The blur and the top rule are what stop it reading as a floating bar
+     * over content: it is the bottom edge of the form, and the card scrolls
+     * up behind it.
+     */
+    /* A solid ground, not a translucent one. `bg-[var(--color-paper)]/85`
+       reads as the obvious choice and does not work: Tailwind's opacity
+       modifier needs a colour it can parse, and a bare CSS variable is not
+       one — the alpha is dropped and the bar renders fully opaque anyway, or
+       not at all. Matching the page ground exactly gets the same result with
+       nothing to go wrong underneath it. */
+    <div className="sticky bottom-0 -mx-1 mt-2 border-t border-[var(--color-rule)] bg-[var(--color-paper)] px-1 py-4">
       {formError ? (
         <p role="alert" className="m-0 mb-3 rounded-[10px] bg-[var(--color-atrisk-soft)] px-4 py-2.5 text-[14.5px] text-[var(--color-atrisk)]">
           {formError}
         </p>
       ) : null}
-      <div className="flex flex-wrap items-center gap-4">
-        <button
-          type="submit"
-          disabled={pending}
-          className="inline-flex items-center justify-center rounded-full bg-[var(--color-petrol)] px-7 py-3.5 text-[15px] font-medium text-[var(--color-paper)] transition-colors hover:bg-[var(--color-petrol-deep)] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {pending ? 'Saving…' : label}
-        </button>
-        <SavedFlash pending={pending} saved={saved} />
-        {draft ? <DraftStatus state={draft} /> : null}
+
+      <button
+        type="submit"
+        disabled={pending || blocked}
+        /**
+         * Full width, because on this step it is the only thing to do next.
+         *
+         * `disabled` and not merely styled: a button that looks dead and
+         * submits anyway teaches somebody that the greying means nothing,
+         * and then they stop reading it on the step where it matters.
+         */
+        className="oi-save inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-[var(--color-petrol)] px-7 py-3.5 text-[15px] font-medium text-[var(--color-paper)] disabled:cursor-not-allowed disabled:bg-[var(--color-ink-3)] disabled:opacity-60"
+      >
+        {pending ? 'Saving…' : label}
+        {pending || blocked ? null : <span aria-hidden="true">→</span>}
+      </button>
+
+      {/* The explanation is not optional decoration — it is the half of the
+          disabled state that makes it usable. A padlock with "complete all
+          required fields" says the same thing as the grey, which is that
+          something is wrong, and nothing at all about what. Naming them
+          turns the button into a checklist. */}
+      <div className="mt-2.5 flex min-h-[20px] flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center">
+        {blocked ? (
+          <p className="m-0 text-[13px] text-[var(--color-ink-2)]">
+            Still needed: {missing.join(', ')}.
+          </p>
+        ) : (
+          <>
+            <SavedFlash pending={pending} saved={saved} />
+            {draft ? <DraftStatus state={draft} /> : null}
+          </>
+        )}
       </div>
     </div>
   );

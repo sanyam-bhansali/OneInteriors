@@ -1,9 +1,12 @@
 'use client';
 
-import { useActionState, useRef } from 'react';
-import { LOCALITIES_BY_ZONE } from '@/modules/brief/types';
+import { useActionState, useEffect, useRef, useState } from 'react';
+import { MIN_ABOUT_LENGTH, MAX_ABOUT_LENGTH } from '@/modules/studio/onboarding-steps';
 import { saveProfileAction, saveProfileDraftAction, type StepState } from './actions';
-import { Field, Chips, SaveBar } from './fields';
+import { SaveBar } from './fields';
+import { Section, Counter } from './Section';
+import { AreaPicker } from './AreaPicker';
+import { SiteLookup } from './SiteLookup';
 import { useAutosave } from './useAutosave';
 
 const INITIAL: StepState = { status: 'idle' };
@@ -19,138 +22,412 @@ export interface ProfileDefaults {
   maxLakhs: number | null;
 }
 
+/**
+ * Step one, as a guided setup rather than a form.
+ *
+ * ## Why the sections are controlled and the rest is not
+ *
+ * Four values are held in React state — the description, the areas, and the
+ * two numbers the CTA depends on — and everything else stays uncontrolled
+ * with a `defaultValue`. The split is not stylistic: the ticks, the counter
+ * and the disabled button all have to recompute as somebody types, and those
+ * four are the only inputs anything watches. Controlling the rest would buy
+ * nothing and would put a render between every keystroke and the character
+ * appearing.
+ *
+ * ## The CTA is disabled, and says what for
+ *
+ * A greyed-out button with no explanation is the most reliable way to lose
+ * somebody in an onboarding flow, and this file already carries the scar: the
+ * four numeric fields once rendered as "optional" while the step refused to
+ * complete without them. So the disabled state is always paired with the list
+ * of what is short, and each section shows its own tick so the list can be
+ * found on the page without reading it.
+ *
+ * ## It is not the real check
+ *
+ * `saveProfile` validates everything again and is the thing that decides.
+ * What is here is a courtesy so that somebody is told on the screen they are
+ * looking at — the same division `missingOn` makes in the application form,
+ * and for the same reason. It deliberately tests only presence, never format;
+ * a client-side rule the server does not share is how a form ends up
+ * refusing something that would have been accepted.
+ */
 export function ProfileForm({ defaults }: { defaults: ProfileDefaults }) {
   const [state, action, pending] = useActionState(saveProfileAction, INITIAL);
   const err = state.errors ?? {};
 
-  /* The longest form in the product, and the one somebody is most likely to
-     walk away from half-finished — the description alone is a paragraph they
-     have to compose. See useAutosave for what this does and does not claim. */
   const form = useRef<HTMLFormElement>(null);
   const draft = useAutosave(form, saveProfileDraftAction, { pending });
 
+  const [about, setAbout] = useState(defaults.about ?? '');
+  const [localities, setLocalities] = useState<string[]>(defaults.localities);
+  const [years, setYears] = useState(defaults.yearsActive?.toString() ?? '');
+  const [team, setTeam] = useState(defaults.teamSize?.toString() ?? '');
+  const [minLakhs, setMinLakhs] = useState(defaults.minLakhs?.toString() ?? '');
+  const [maxLakhs, setMaxLakhs] = useState(defaults.maxLakhs?.toString() ?? '');
+
+  /**
+   * Tell the form an area was picked.
+   *
+   * `AreaPicker` holds its selection in React state and writes it out as
+   * hidden inputs. Setting an input's value from code fires no `input` or
+   * `change` event — that only happens for a real edit by a person — so the
+   * one listener `useAutosave` puts on the form never hears about the single
+   * most important field on this step. Areas are what the matcher filters on.
+   *
+   * In an effect rather than in the click handler, because the hidden inputs
+   * do not exist until React has committed the new state, and a save fired
+   * before that would send the previous selection.
+   */
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    form.current?.dispatchEvent(new Event('change', { bubbles: true }));
+  }, [localities]);
+
+  const describedOk = about.trim().length >= MIN_ABOUT_LENGTH;
+  const areasOk = localities.length > 0;
+  const detailsOk = years !== '' && team !== '';
+  const budgetOk = minLakhs !== '' && maxLakhs !== '';
+
+  const missing = [
+    !describedOk ? 'a description' : null,
+    !areasOk ? 'at least one area' : null,
+    !detailsOk ? 'years and team size' : null,
+    !budgetOk ? 'your project range' : null,
+  ].filter((m): m is string => m !== null);
+
   return (
-    <form ref={form} action={action} className="flex flex-col gap-8">
-      <div>
-        <label htmlFor="about" className="label m-0 mb-2 block">
-          How would you describe what you do?
-        </label>
-        <p className="m-0 mb-3 max-w-[56ch] text-[14px] leading-relaxed text-[var(--color-ink-3)]">
-          Write it the way you would say it to someone at a site visit. Customers read this before
-          they read anything else, and the ones that sound like a brochure get skipped. Say what
-          you are actually good at, and what you do not take on.
-        </p>
+    <form ref={form} action={action} className="flex flex-col gap-4">
+      <Section
+        n={1}
+        title="Studio description"
+        hint="Write it the way you would say it at a site visit. Customers read this before anything else, and the ones that sound like a brochure get skipped. Say what you are good at, and what you do not take on."
+        done={describedOk}
+      >
         <textarea
           id="about"
           name="about"
           rows={6}
-          defaultValue={defaults.about ?? ''}
+          value={about}
+          onChange={(e) => setAbout(e.target.value)}
+          maxLength={MAX_ABOUT_LENGTH}
           aria-invalid={Boolean(err.about)}
+          aria-describedby="about-count"
           placeholder="We do warm, material-led homes — mostly 2 and 3 BHK. We supervise our own carpentry rather than subcontracting site management, which is why we take fewer projects at a time. We are not the right studio if you want a full classical or high-gloss look."
-          className="w-full rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-5 py-4 text-[15.5px] leading-relaxed"
+          className="oi-input w-full rounded-[12px] border border-[var(--color-rule)] px-4 py-3.5 text-[15.5px] leading-relaxed"
         />
+
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <span id="about-count">
+            <Counter value={about.trim().length} min={MIN_ABOUT_LENGTH} max={MAX_ABOUT_LENGTH} />
+          </span>
+          {/* Offered here rather than on the Links section, because this is
+              the box it fills and an offer to help is worth nothing two
+              questions away from the thing it helps with. */}
+          <SiteLookup
+            onFound={(text) => setAbout(text)}
+            hasText={about.trim().length > 0}
+          />
+        </div>
+
         {err.about ? (
-          <p role="alert" className="m-0 mt-1.5 text-[13.5px] text-[var(--color-atrisk)]">
+          <p role="alert" className="m-0 mt-2 text-[13.5px] text-[var(--color-atrisk)]">
             {err.about}
           </p>
         ) : null}
-      </div>
+      </Section>
 
-      <Chips
-        label="Areas you take projects in"
-        name="localities"
-        hint="Only where you genuinely work. We match on this, so an area you added optimistically becomes a drive you did not want."
-        options={LOCALITIES_BY_ZONE.flatMap((g) =>
-          g.localities.map((l) => ({ value: l.slug, label: l.label })),
-        )}
-        selected={defaults.localities}
-        error={err.localities}
-      />
-
-      {/* `required`, because `assessSteps` requires them.
-          These four fields rendered as "Years active — optional" while the step
-          refused to complete without them, and `saveProfile` accepted blanks
-          and returned a green "Saved." So a studio would fill the form, be
-          told it saved, go back, and find the step still unticked with no
-          explanation of what they had done wrong. They had done nothing wrong;
-          the label was lying. */}
-      <div className="flex flex-wrap gap-x-6 gap-y-5">
-        <Field
-          label="Years active"
-          name="yearsActive"
-          type="number"
-          required
-          width="xs"
-          defaultValue={defaults.yearsActive}
-          error={err.yearsActive}
+      <Section
+        n={2}
+        title="Areas you serve"
+        hint="Only where you genuinely work. We match on this, so an area added optimistically becomes a drive you did not want."
+        done={areasOk}
+      >
+        <AreaPicker
+          name="localities"
+          selected={localities}
+          onChange={setLocalities}
+          error={err.localities}
         />
-        <Field
-          label="Team size"
-          name="teamSize"
-          type="number"
-          required
-          width="xs"
-          defaultValue={defaults.teamSize}
-          error={err.teamSize}
-        />
-      </div>
+      </Section>
 
-      <div>
-        <p className="label m-0 mb-2">Project size you take on</p>
-        <p className="m-0 mb-3 max-w-[56ch] text-[14px] leading-relaxed text-[var(--color-ink-3)]">
-          In lakh, and halves are fine — 7.5 is a perfectly normal floor. Be honest about it: it is
-          the single most useful filter we have, and getting matched below your floor wastes your
-          time and theirs.
-        </p>
-        <div className="flex flex-wrap gap-x-6 gap-y-5">
-          {/* `step="0.5"` so the browser accepts 7.5 rather than silently
-              refusing it. A number input defaults to step=1, which makes a
-              perfectly ordinary project floor unenterable. */}
-          <Field
+      <Section
+        n={3}
+        title="The practice"
+        hint="Both are shown on your profile. Neither decides anything on its own."
+        done={detailsOk}
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Picker
+            label="Years active"
+            name="yearsActive"
+            value={years}
+            onChange={setYears}
+            placeholder="Select years"
+            error={err.yearsActive}
+            /* From 0, because a studio in its first year is a real answer and
+               was briefly unrepresentable here — `count()` rejected zero and
+               the step then asked for a field they had filled in. */
+            options={range(0, 30).map((n) => ({
+              value: String(n),
+              label: n === 0 ? 'Our first year' : `${n} year${n === 1 ? '' : 's'}`,
+            }))}
+          />
+          <Picker
+            label="Team size"
+            name="teamSize"
+            value={team}
+            onChange={setTeam}
+            placeholder="Select team size"
+            error={err.teamSize}
+            hint="Including yourself."
+            options={range(1, 50).map((n) => ({
+              value: String(n),
+              label: `${n} ${n === 1 ? 'person' : 'people'}`,
+            }))}
+          />
+        </div>
+      </Section>
+
+      <Section
+        n={4}
+        title="Typical project budget"
+        hint="In lakh, and halves are fine — 7.5 is a perfectly normal floor. It is the single most useful filter we have, and being matched below your floor wastes your time and theirs."
+        done={budgetOk}
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Money
             label="Smallest"
             name="minLakhs"
-            type="number"
-            step="0.5"
-            width="xs"
-            suffix="₹ lakh"
-            required
-            defaultValue={defaults.minLakhs}
+            value={minLakhs}
+            onChange={setMinLakhs}
+            placeholder="5"
             error={err.minLakhs}
           />
-          <Field
+          <Money
             label="Largest"
             name="maxLakhs"
-            type="number"
-            width="xs"
-            suffix="₹ lakh"
-            step="0.5"
-            required
-            defaultValue={defaults.maxLakhs}
+            value={maxLakhs}
+            onChange={setMaxLakhs}
+            placeholder="40"
             error={err.maxLakhs}
           />
         </div>
-      </div>
+      </Section>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        {/* `type="text"`, not `url`. A URL input silently refuses
-            "yourstudio.com" with no hint that a scheme is required — the studio
-            sees a form that will not submit and no explanation why. */}
-        <Field
-          label="Website"
-          name="website"
-          defaultValue={defaults.website}
-          placeholder="https://yourstudio.com"
-          hint="Include the https://"
-        />
-        <Field label="Instagram" name="instagram" defaultValue={defaults.instagram} placeholder="@yourstudio" />
-      </div>
+      <Section
+        n={5}
+        title="Links"
+        optional
+        hint="Somewhere a customer can see more of your work."
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* `type="text"`, not `url`. A URL input silently refuses
+              "yourstudio.com" with no hint that a scheme is required — the
+              studio sees a form that will not submit and no explanation. */}
+          <WithIcon icon={<LinkIcon />}>
+            <input
+              name="website"
+              type="text"
+              defaultValue={defaults.website ?? ''}
+              placeholder="https://yourstudio.com"
+              aria-label="Website"
+              className="oi-input w-full rounded-[11px] border border-[var(--color-rule)] py-2.5 pl-10 pr-4 text-[14.5px]"
+            />
+          </WithIcon>
+          <WithIcon icon={<InstagramIcon />}>
+            <input
+              name="instagram"
+              type="text"
+              defaultValue={defaults.instagram ?? ''}
+              placeholder="@yourstudio"
+              aria-label="Instagram"
+              className="oi-input w-full rounded-[11px] border border-[var(--color-rule)] py-2.5 pl-10 pr-4 text-[14.5px]"
+            />
+          </WithIcon>
+        </div>
+      </Section>
 
       <SaveBar
         pending={pending}
         saved={state.status === 'saved'}
         formError={err.form}
         draft={draft}
+        label="Save and continue"
+        missing={missing}
       />
     </form>
+  );
+}
+
+function range(from: number, to: number): number[] {
+  return Array.from({ length: to - from + 1 }, (_, i) => from + i);
+}
+
+/**
+ * A select that looks like the text inputs beside it.
+ *
+ * The values are exact integers, never bands. "5–10 years" would have to be
+ * stored as one number or a new column, and storing the lower bound means the
+ * profile says five when they said five-to-ten — a small lie that nobody can
+ * later tell from a true five.
+ */
+function Picker({
+  label,
+  name,
+  value,
+  onChange,
+  options,
+  placeholder,
+  hint,
+  error,
+}: {
+  label: string;
+  name: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  placeholder: string;
+  hint?: string;
+  error?: string;
+}) {
+  return (
+    <div>
+      <label htmlFor={name} className="label m-0 mb-1.5 block">
+        {label}
+      </label>
+      <div className="relative">
+        <select
+          id={name}
+          name={name}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          aria-invalid={Boolean(error)}
+          className={`oi-input w-full appearance-none rounded-[11px] border border-[var(--color-rule)] py-2.5 pl-4 pr-10 text-[14.5px] ${
+            value === '' ? 'text-[var(--color-ink-3)]' : 'text-[var(--color-ink)]'
+          }`}
+        >
+          <option value="">{placeholder}</option>
+          {options.map((o) => (
+            <option key={o.value} value={o.value} className="text-[var(--color-ink)]">
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--color-ink-3)]"
+        >
+          <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M4 6.5 L8 10.5 L12 6.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+      </div>
+      {hint && !error ? (
+        <p className="m-0 mt-1.5 text-[13px] text-[var(--color-ink-3)]">{hint}</p>
+      ) : null}
+      {error ? (
+        <p role="alert" className="m-0 mt-1.5 text-[13.5px] text-[var(--color-atrisk)]">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** A rupee figure in lakh, with both ends of the unit on the field. */
+function Money({
+  label,
+  name,
+  value,
+  onChange,
+  placeholder,
+  error,
+}: {
+  label: string;
+  name: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  error?: string;
+}) {
+  return (
+    <div>
+      <label htmlFor={name} className="label m-0 mb-1.5 block">
+        {label}
+      </label>
+      <div className="relative">
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[15px] text-[var(--color-ink-3)]"
+        >
+          ₹
+        </span>
+        <input
+          id={name}
+          name={name}
+          type="number"
+          /* `step="0.5"` so the browser accepts 7.5. A number input defaults
+             to step=1, which makes an ordinary project floor unenterable and
+             gives no reason why. */
+          step="0.5"
+          min="0"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          aria-invalid={Boolean(error)}
+          className="oi-input tabular-nums w-full rounded-[11px] border border-[var(--color-rule)] py-2.5 pl-9 pr-14 text-[14.5px]"
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[13.5px] text-[var(--color-ink-3)]"
+        >
+          lakh
+        </span>
+      </div>
+      {error ? (
+        <p role="alert" className="m-0 mt-1.5 text-[13.5px] text-[var(--color-atrisk)]">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function WithIcon({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="relative">
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-ink-3)]"
+      >
+        {icon}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+function LinkIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-[15px] w-[15px]" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M6.6 9.4a2.6 2.6 0 0 0 3.7 0l2.3-2.3a2.6 2.6 0 0 0-3.7-3.7l-1 1" strokeLinecap="round" />
+      <path d="M9.4 6.6a2.6 2.6 0 0 0-3.7 0L3.4 8.9a2.6 2.6 0 0 0 3.7 3.7l1-1" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function InstagramIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-[15px] w-[15px]" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="2.4" y="2.4" width="11.2" height="11.2" rx="3.4" />
+      <circle cx="8" cy="8" r="2.7" />
+      <circle cx="11.3" cy="4.7" r="0.75" fill="currentColor" stroke="none" />
+    </svg>
   );
 }
