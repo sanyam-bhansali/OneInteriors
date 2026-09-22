@@ -220,7 +220,23 @@ export function ProjectModal({
           </button>
         </header>
 
-        <form action={action} className="grid grid-cols-1 gap-0 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]">
+        {/* Native validation off, for the reason ApplyForm sets out at
+            length: every stage but one is `hidden`, and a browser that finds
+            an invalid control on submit refuses to submit and then cannot
+            focus it to explain why. The result is a button that does nothing
+            at all, forever, with nothing on screen.
+        
+            The traps here are the date and the two number inputs. A partial
+            date, or a number left in a bad-input state — which is easy on a
+            phone keyboard — sits on a hidden stage and silently cancels
+            every submit from the last one. Presence is checked by `missing`
+            above and `addProject` validates everything again on the server,
+            so nothing is lost by switching this off. */}
+        <form
+          noValidate
+          action={action}
+          className="grid grid-cols-1 gap-0 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]"
+        >
           <StageRail stage={stage} onPick={setStage} />
 
           <div className="min-w-0 px-6 py-5">

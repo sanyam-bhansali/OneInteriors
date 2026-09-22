@@ -498,6 +498,38 @@ export function ApplyForm() {
        * turns Enter into Continue everywhere except the last step, where
        * submitting is what Enter should do.
        */
+      /**
+       * Native constraint validation OFF. This is the fix for a form that
+       * did nothing at all on iOS.
+       *
+       * Every step stays mounted and all but one is `hidden`. When the
+       * browser validates on submit and finds an invalid control, it refuses
+       * to submit and tries to focus that control to show its bubble. A
+       * hidden control cannot be focused, so the bubble never appears — the
+       * submission is cancelled and NOTHING happens. No pending state, no
+       * error, no console entry the applicant would ever see.
+       *
+       * The field that did it was `website`, typed as `url`. A studio
+       * entering `sanyaminteriors.com` — which is how people write their own
+       * address — produced an invalid control on step 1, and the submit
+       * button on step 5 stopped working permanently. Anyone who left the
+       * website blank, or typed the scheme, sailed through. That is the
+       * "works on some devices" pattern: it was never the device, it was
+       * what had been typed on it.
+       *
+       * This codebase already knew. ProfileForm carries the note "`type=
+       * "text"`, not `url`. A URL input silently refuses 'yourstudio.com'
+       * with no hint that a scheme is required" — the lesson was learned on
+       * the onboarding forms and never carried across to the one strangers
+       * use.
+       *
+       * `noValidate` rather than only fixing the one input, because the same
+       * trap is set by `number` with a bad-input value and by anything else
+       * added later. Nothing is lost: `missingOn` checks presence on the
+       * step being left, and `submitApplication` validates everything again
+       * on the server, which is the check that decides.
+       */
+      noValidate
       onSubmit={(e) => {
         if (!last) {
           e.preventDefault();
@@ -636,7 +668,16 @@ export function ApplyForm() {
         <Field label="Studio name" name="tradeName" required error={err.tradeName} width="md" />
         <Field label="Registered name, if different" name="legalName" width="md" />
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <Field label="Website" name="website" type="url" placeholder="https://" width="full" />
+          {/* `text`, not `url`. Even with validation off, a `url` input on
+              iOS offers a keyboard with no space bar and autocapitalises
+              nothing useful — and it is the field that broke submission
+              outright. The server does not require a scheme either. */}
+          <Field
+            label="Website"
+            name="website"
+            placeholder="yourstudio.com"
+            width="full"
+          />
           <Field label="Instagram" name="instagram" placeholder="@akarastudio" width="full" />
         </div>
         <SiteLookup form={form} onFilled={saveDraft} />
