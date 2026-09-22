@@ -502,6 +502,28 @@ model Studio {
   maxProjectPaise BigInt?
   designFeePaise  BigInt?
 
+  /// What the studio actually sells — turnkey, design plus execution, or
+  /// design only. See `modules/studio/positioning.ts` for the values.
+  ///
+  /// The more load-bearing of this pair: a design-only practice should not be
+  /// quoted for execution, and until this existed nothing could tell us it
+  /// was one. The matcher can act on a column; it cannot act on a sentence in
+  /// the description.
+  offering   String?
+
+  /// How the studio wants to be read: budget, mid, premium, luxury.
+  ///
+  /// Deliberately NOT derived from `minProjectPaise`/`maxProjectPaise`, which
+  /// looks derivable and is not. The range is what they will take on; this is
+  /// positioning. A practice whose floor is low because it does the occasional
+  /// small job for a repeat client is not thereby budget-friendly, and
+  /// computing it would put a claim in a customer's hands that the studio
+  /// never made.
+  ///
+  /// Self-declared, shown, never scored — the same rule as `yearsActive` and
+  /// everything else on this side of the model.
+  priceLevel String?
+
   // ── Allocation ──
   //
   // What a subscription actually buys is VOLUME — how many briefs a studio is

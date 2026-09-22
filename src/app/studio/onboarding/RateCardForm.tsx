@@ -7,12 +7,62 @@ import { SaveBar } from './fields';
 
 const INITIAL: StepState = { status: 'idle' };
 
+/**
+ * The six numbers that make a quote.
+ *
+ * ## Why this survived a redesign that asked for it to be deleted
+ *
+ * The brief for this step said to remove the per-square-foot rates
+ * completely, as internal costing that does not belong in onboarding. They
+ * are not internal costing. `generate.ts` calls `rateCardFor(studioId)` and
+ * prices the customer's actual work with them; a studio whose rates do not
+ * cover the job is skipped from the comparison with a reason. These six
+ * numbers are the entire mechanism by which a first quote arrives in three
+ * seconds without anybody being phoned, which is the product.
+ *
+ * So the page changed and the table stayed. Positioning — what you sell and
+ * where you sit — now comes first, because that is what the studio thinks
+ * they are being asked and it is quick. This follows, framed as what it
+ * actually is rather than as a cost sheet.
+ *
+ * ## It is collapsed once it is filled in
+ *
+ * Six numbers somebody has already entered do not need to be the tallest
+ * thing on the screen every time they come back to change their price level.
+ * Open while anything is missing, shut when it is done, and openable either
+ * way — never hidden, because a studio must always be able to see what we
+ * will quote on their behalf.
+ */
 export function RateCardForm({ values }: { values: Record<string, number | null> }) {
   const [state, action, pending] = useActionState(saveRatesAction, INITIAL);
   const err = state.errors ?? {};
 
+  const missingCore = CORE_CATEGORIES.filter((c) => values[c] == null).length;
+
   return (
-    <div className="flex flex-col gap-8">
+    <details open={missingCore > 0} className="oi-sec rounded-[16px] border border-[var(--color-rule)] bg-[var(--color-paper)]">
+      <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-3 px-6 py-5">
+        <span className="min-w-0">
+          <span className="block text-[15.5px] font-semibold text-[var(--color-ink)]">
+            What we quote on your behalf
+          </span>
+          <span className="block text-[13.5px] leading-relaxed text-[var(--color-ink-2)]">
+            Six rates. They are what turns a customer&rsquo;s brief into a figure in about three
+            seconds, without anybody phoning you.
+          </span>
+        </span>
+        <span
+          className={`flex-none rounded-full px-3 py-1 text-[12.5px] font-medium ${
+            missingCore === 0
+              ? 'bg-[var(--color-ontrack-soft)] text-[var(--color-ontrack)]'
+              : 'bg-[var(--color-brass-soft)] text-[var(--color-brass)]'
+          }`}
+        >
+          {missingCore === 0 ? 'All six in' : `${missingCore} still needed`}
+        </span>
+      </summary>
+
+    <div className="flex flex-col gap-8 px-6 pb-6">
       <div className="rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper-3)] p-6">
         <p className="label m-0 mb-2">Read this first</p>
         <p className="m-0 mb-3 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--color-ink-2)]">
@@ -63,6 +113,7 @@ export function RateCardForm({ values }: { values: Record<string, number | null>
         <SaveBar pending={pending} saved={state.status === 'saved'} formError={err.form} label="Save and continue" />
       </form>
     </div>
+    </details>
   );
 }
 
@@ -105,7 +156,7 @@ function RateField({
           defaultValue={value ?? undefined}
           placeholder="—"
           aria-invalid={Boolean(error)}
-          className="w-40 rounded-full border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-5 py-2.5 text-[15px] tabular-nums text-[var(--color-ink)]"
+          className="oi-input w-40 rounded-full border border-[var(--color-rule)] px-5 py-2.5 text-[15px] tabular-nums text-[var(--color-ink)]"
         />
         <span className="text-[14px] text-[var(--color-ink-3)]">{suffix}</span>
       </div>

@@ -7,6 +7,7 @@ import {
   listProjects,
   MIN_PORTFOLIO_PROJECTS,
 } from '@/modules/studio/onboarding';
+import { imageUploadEnabled } from '@/modules/storage/portfolio-images';
 import { PortfolioForm } from '../onboarding/PortfolioForm';
 
 export const metadata: Metadata = {
@@ -93,6 +94,7 @@ export default async function WorkPage() {
 
           <div className="max-w-[46rem]">
         <PortfolioForm
+          uploadEnabled={imageUploadEnabled()}
           minimum={MIN_PORTFOLIO_PROJECTS}
           shortfallNote={context.studio.portfolioShortfallNote}
           projects={projects.map((p) => ({
@@ -104,6 +106,7 @@ export default async function WorkPage() {
             valuePaise: p.valuePaise === null ? null : fromDb(p.valuePaise),
             completedOn: p.completedOn ? p.completedOn.toISOString() : null,
             isRender: p.isRender,
+            images: p.images,
           }))}
         />
 

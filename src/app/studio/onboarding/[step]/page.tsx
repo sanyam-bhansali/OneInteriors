@@ -22,10 +22,12 @@ import { RegistrationForm } from '../RegistrationForm';
 import { PortfolioForm } from '../PortfolioForm';
 import { ReviewPanel } from '../ReviewPanel';
 import { RateCardForm } from '../RateCardForm';
+import { PositioningForm } from '../PositioningForm';
 import { ArchivePanel, type ArchiveView } from '../ArchivePanel';
 import { myArchive } from '@/modules/studio/quotation-archive-store';
 import { myDocuments } from '@/modules/studio/documents';
 import { proofUploadEnabled } from '@/modules/storage/business-proof';
+import { imageUploadEnabled } from '@/modules/storage/portfolio-images';
 import { quotationUploadEnabled } from '@/modules/storage/quotation-archive';
 import { MIN_QUOTATIONS_FOR_RATES } from '@/modules/quotation/catalogue';
 import { myRateCard } from '@/modules/quotation/rate-card';
@@ -204,6 +206,7 @@ export default async function OnboardingStepPage({
 
         {step === 'portfolio' ? (
           <PortfolioForm
+            uploadEnabled={imageUploadEnabled()}
             minimum={MIN_PORTFOLIO_PROJECTS}
             shortfallNote={studio.portfolioShortfallNote}
             projects={(await listProjects()).map((p) => ({
@@ -215,6 +218,7 @@ export default async function OnboardingStepPage({
               valuePaise: p.valuePaise === null ? null : fromDb(p.valuePaise),
               completedOn: p.completedOn ? p.completedOn.toISOString() : null,
               isRender: p.isRender,
+              images: p.images,
             }))}
           />
         ) : null}
@@ -228,6 +232,16 @@ export default async function OnboardingStepPage({
               archive={await archiveView()}
               minForRates={MIN_QUOTATIONS_FOR_RATES}
               enabled={quotationUploadEnabled()}
+            />
+            {/* Positioning first: it is what the studio thinks this step is
+                asking, it is quick, and it blocks nothing. The rate table
+                follows, because it is the half the product cannot work
+                without — see the note on RateCardForm. */}
+            <PositioningForm
+              offering={studio.offering}
+              priceLevel={studio.priceLevel}
+              minLakhs={studio.minProjectPaise ? paiseToLakhs(fromDb(studio.minProjectPaise)) : null}
+              maxLakhs={studio.maxProjectPaise ? paiseToLakhs(fromDb(studio.maxProjectPaise)) : null}
             />
             <RateCardForm values={await rateCardValues()} />
           </div>

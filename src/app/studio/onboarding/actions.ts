@@ -13,6 +13,8 @@ import {
   declarePortfolioShortfall,
   addProject,
   removeProject,
+  uploadProjectImages,
+  savePositioning,
   submitForReview,
   currentStudio,
   onboardingProgress,
@@ -343,8 +345,59 @@ export async function addProjectAction(
     completedOn: String(formData.get('completedOn') ?? ''),
     clientConsented: formData.get('clientConsented') === 'on',
     isRender: formData.get('isRender') === 'on',
+    /* Already uploaded — these are URLs we issued, in the order the studio
+       arranged them. addProject re-checks that we issued them, because this
+       array ends up in an img src on a public page. */
+    images: formData.getAll('images').map(String),
   });
 
+  if (!result.ok) return { status: 'error', errors: result.errors };
+  refresh();
+  return { status: 'saved' };
+}
+
+export interface ImagesState {
+  status: 'idle' | 'saved' | 'error';
+  /** Public URLs, in the order they were accepted. */
+  urls?: string[];
+  /** One message per file that did not store. */
+  skipped?: string[];
+}
+
+/**
+ * Photographs for a project still being filled in.
+ *
+ * `getAll`, not `get` — this is a multiple input and a drop of eight files,
+ * and `get` would silently take the first. A studio selecting eight pictures
+ * and having one appear, with no error, is the kind of bug that surfaces as a
+ * confused email three weeks later.
+ *
+ * No `refresh()`. Nothing on the server has changed that any page renders —
+ * the project row does not exist yet, and the URLs live in the modal until it
+ * does.
+ */
+export async function uploadProjectImagesAction(
+  _prev: ImagesState,
+  formData: FormData,
+): Promise<ImagesState> {
+  const files = formData.getAll('images').filter((v): v is File => v instanceof File && v.size > 0);
+  if (files.length === 0) return { status: 'error', skipped: ['Choose a picture first.'] };
+
+  const result = await uploadProjectImages(files);
+  if (result.urls.length === 0) {
+    return { status: 'error', skipped: result.skipped };
+  }
+  return { status: 'saved', urls: result.urls, skipped: result.skipped };
+}
+
+export async function savePositioningAction(
+  _prev: StepState,
+  formData: FormData,
+): Promise<StepState> {
+  const result = await savePositioning({
+    offering: String(formData.get('offering') ?? ''),
+    priceLevel: String(formData.get('priceLevel') ?? ''),
+  });
   if (!result.ok) return { status: 'error', errors: result.errors };
   refresh();
   return { status: 'saved' };

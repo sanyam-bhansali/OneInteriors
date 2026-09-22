@@ -29,6 +29,12 @@ import { validateGstin } from '@/modules/verification/gstin';
 import { missingCoreRates } from '@/modules/quotation/categories';
 import { lakhsToPaise } from '@/lib/money';
 import {
+  isOurImageUrl,
+  MAX_IMAGES_PER_PROJECT,
+  storePortfolioImage,
+} from '@/modules/storage/portfolio-images';
+import { isOffering, isPriceLevel } from './positioning';
+import {
   onboardingProgress,
   MIN_ABOUT_LENGTH,
   MAX_ABOUT_LENGTH,
@@ -82,6 +88,9 @@ export interface StudioContext {
     gstinNote: string | null;
     addressLine: string | null;
     pincode: string | null;
+    /** Positioning. Self-declared, shown, never scored. */
+    offering: string | null;
+    priceLevel: string | null;
     portfolioShortfallNote: string | null;
   };
 }
@@ -176,6 +185,8 @@ async function loadStudio(user: AuthUser): Promise<StudioContext | null> {
       gstinNote: s.gstinNote,
       addressLine: s.addressLine,
       pincode: s.pincode,
+      offering: s.offering,
+      priceLevel: s.priceLevel,
       portfolioShortfallNote: s.portfolioShortfallNote,
     },
   };
@@ -565,6 +576,13 @@ export interface ProjectInput {
   completedOn?: string;
   clientConsented: boolean;
   isRender: boolean;
+  /**
+   * Public URLs from `storePortfolioImage`, in display order.
+   *
+   * The first is the cover. Order is the whole meaning of this array, which
+   * is why reordering is a rewrite of it rather than a column on a row.
+   */
+  images?: string[];
 }
 
 // Derived from the label maps rather than retyped, so these can never drift
@@ -602,6 +620,18 @@ export async function addProject(input: ProjectInput): Promise<SaveResult> {
       'Confirm the client is happy for this to be shown, or mark it as a render.';
   }
 
+  /**
+   * Only URLs we issued.
+   *
+   * This array is rendered straight into `<img src>` on a public profile, so
+   * an arbitrary string arriving from a form would be a way to have our own
+   * pages load somebody else's tracker — and to let a studio point at an
+   * image they do not control which later becomes something else. Filtered
+   * rather than rejected: a URL that fails this test is one we did not write,
+   * so dropping it loses nothing the studio put there.
+   */
+  const images = (input.images ?? []).filter(isOurImageUrl).slice(0, MAX_IMAGES_PER_PROJECT);
+
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
   await prisma.portfolioProject.create({
@@ -619,10 +649,51 @@ export async function addProject(input: ProjectInput): Promise<SaveResult> {
       completedOn,
       isRender: input.isRender,
       clientConsented: input.clientConsented,
+      images,
     },
   });
 
   return { ok: true };
+}
+
+/**
+ * Take photographs for a project that does not exist yet.
+ *
+ * ## Why they are uploaded before the project is created
+ *
+ * The modal collects a project over four stages and writes the row once, at
+ * the end. Pictures cannot wait for that: a studio drags in eight files and
+ * has to see them appear, reorder them and pick a cover before they will
+ * press anything. So the bytes go up first and the URLs are held in the
+ * modal until the row is written.
+ *
+ * The cost is an orphan. Cancel the modal after uploading and the objects
+ * stay in the bucket with nothing referencing them. That is deliberate and it
+ * is the right way round: the alternative — creating a draft row so the
+ * pictures have somewhere to hang — puts half-finished projects in the table
+ * that `assessSteps` counts, and a studio would see "1 of 3 added" for a
+ * project they abandoned. A few stranded kilobytes are cheaper than a
+ * portfolio count that lies.
+ *
+ * Returns what stored and what did not, per file, so eight pictures with one
+ * HEIC among them lose the HEIC and nothing else.
+ */
+export async function uploadProjectImages(
+  files: File[],
+): Promise<{ urls: string[]; skipped: string[] }> {
+  const context = await currentStudio();
+  if (!context) return { urls: [], skipped: [] };
+
+  const urls: string[] = [];
+  const skipped: string[] = [];
+
+  for (const file of files.slice(0, MAX_IMAGES_PER_PROJECT)) {
+    const result = await storePortfolioImage(context.studio.id, file);
+    if (result.ok) urls.push(result.url);
+    else skipped.push(result.error);
+  }
+
+  return { urls, skipped };
 }
 
 export async function removeProject(id: string): Promise<SaveResult> {
@@ -637,6 +708,44 @@ export async function removeProject(id: string): Promise<SaveResult> {
   if (!project) return { ok: false, errors: { form: 'That project is not yours.' } };
 
   await prisma.portfolioProject.delete({ where: { id } });
+  return { ok: true };
+}
+
+/**
+ * How the studio positions itself.
+ *
+ * ## Why this is a separate write from the rate card
+ *
+ * They are on the same step and they are different kinds of fact. The rate
+ * card is arithmetic the quoting engine runs; this is a claim shown to a
+ * customer. Saving them together would mean a studio who picks "turnkey" and
+ * has not filled in a wardrobe rate gets neither stored, and would tie a
+ * positioning choice to the completeness of a price list.
+ *
+ * Neither field is required by `assessSteps`. The step completes on the rate
+ * card, because that is the thing without which nothing works — a studio with
+ * no offering set is merely undescribed, while a studio with no rates cannot
+ * be quoted at all.
+ */
+export async function savePositioning(input: {
+  offering: string;
+  priceLevel: string;
+}): Promise<SaveResult> {
+  const context = await currentStudio();
+  if (!context) return { ok: false, errors: { form: 'No studio is linked to this account.' } };
+
+  /* Unrecognised becomes null rather than an error. These arrive from cards
+     that can only emit the known values, so anything else is a hand-made POST
+     — and the useful response to that is to store nothing, not to explain our
+     vocabulary to it. */
+  await prisma.studio.update({
+    where: { id: context.studio.id },
+    data: {
+      offering: isOffering(input.offering) ? input.offering : null,
+      priceLevel: isPriceLevel(input.priceLevel) ? input.priceLevel : null,
+    },
+  });
+
   return { ok: true };
 }
 

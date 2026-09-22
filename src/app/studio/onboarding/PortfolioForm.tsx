@@ -1,21 +1,10 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import {
-  STYLE_TAGS,
-  STYLE_LABELS,
-  PUNE_LOCALITIES,
-  PROPERTY_LABELS,
-  SCOPE_LABELS,
-} from '@/modules/brief/types';
 import { formatINRCompact } from '@/lib/money';
-import {
-  addProjectAction,
-  removeProjectAction,
-  declarePortfolioShortfallAction,
-  type StepState,
-} from './actions';
-import { Field, Select, Chips, Check, SaveBar } from './fields';
+import { removeProjectAction, declarePortfolioShortfallAction, type StepState } from './actions';
+import { SaveBar } from './fields';
+import { ProjectModal } from './ProjectModal';
 
 const INITIAL: StepState = { status: 'idle' };
 
@@ -27,131 +16,259 @@ export interface ProjectRow {
   valuePaise: number | null;
   completedOn: string | null;
   isRender: boolean;
+  images: string[];
 }
 
+/**
+ * The portfolio step, as a portfolio rather than a form.
+ *
+ * ## Two states, and the empty one is the important one
+ *
+ * This page used to open on sixteen controls whether or not the studio had
+ * added anything, so the first thing a practice saw on the step about their
+ * work was a wall of inputs. Now there is nothing to read until there is
+ * something to show: the empty state is a sentence and one button, and the
+ * form it opens is a modal that closes again.
+ *
+ * ## The count is the whole progress indicator
+ *
+ * "2 of 3 added" and a row of three marks. Three is the bar for being listed
+ * and it is stated everywhere it applies, because a studio who finds out
+ * about it on the fourth screen reads it as a bait-and-switch — which is the
+ * reason `portfolioShortfallNote` exists at all.
+ */
 export function PortfolioForm({
   projects,
   minimum,
   shortfallNote,
+  uploadEnabled,
 }: {
   projects: ProjectRow[];
   minimum: number;
   /** What they have told us they have instead, if they have told us. */
   shortfallNote: string | null;
+  uploadEnabled: boolean;
 }) {
-  const [adding, setAdding] = useState(projects.length === 0);
-  const [state, action, pending] = useActionState(addProjectAction, INITIAL);
-  const err = state.errors ?? {};
-
-  const short = Math.max(0, minimum - projects.length);
+  const [adding, setAdding] = useState(false);
+  const short = projects.length < minimum;
 
   return (
-    <div className="flex flex-col gap-9">
-      <div>
-        <p className="m-0 max-w-[62ch] text-[15.5px] leading-relaxed text-[var(--color-ink-2)]">
-          {short > 0 ? (
-            <>
-              We need <strong>{minimum}</strong> completed projects — {short} more to go. Three is
-              the point at which a customer can see a pattern rather than one lucky job, and it is
-              also the minimum for us to say anything honest about your delivery.
-            </>
-          ) : (
-            <>
-              That is enough to publish. Add more if you want — the ones you would most like to be
-              judged on are the ones worth adding.
-            </>
-          )}
-        </p>
+    <div className="flex flex-col gap-6">
+      {projects.length === 0 ? (
+        <EmptyState onAdd={() => setAdding(true)} minimum={minimum} />
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="h3 m-0">
+                {projects.length === 1
+                  ? 'One project so far'
+                  : `${projects.length} projects so far`}
+              </p>
+              <p className="m-0 mt-0.5 text-[14px] text-[var(--color-ink-2)]">
+                {short
+                  ? `${minimum - projects.length} more and this step is done.`
+                  : 'Enough to be listed. Add more if you have them — a customer reads all of it.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="oi-save inline-flex flex-none items-center gap-2 rounded-[11px] bg-[var(--color-petrol)] px-5 py-2.5 text-[14.5px] font-medium text-[var(--color-paper)]"
+            >
+              <span aria-hidden="true">+</span> Add a project
+            </button>
+          </div>
+
+          <ul className="m-0 grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 lg:grid-cols-3">
+            {projects.map((project) => (
+              <ProjectCard key={project.id} project={project} />
+            ))}
+
+            {/* The slot for the next one, sized like the cards beside it so
+                the grid does not end on a ragged edge while they are still
+                short of three. */}
+            <li>
+              <button
+                type="button"
+                onClick={() => setAdding(true)}
+                className="oi-addcard flex h-full min-h-[13rem] w-full flex-col items-center justify-center gap-2 rounded-[14px] border-2 border-dashed border-[var(--color-rule)] px-5 py-6 text-center"
+              >
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-[var(--color-petrol)] text-[18px] leading-none text-white">
+                  +
+                </span>
+                <span className="text-[14.5px] font-medium text-[var(--color-ink)]">
+                  Add another
+                </span>
+                <span className="text-[13px] text-[var(--color-ink-3)]">
+                  {short ? `${minimum - projects.length} to go` : 'Show more of your work'}
+                </span>
+              </button>
+            </li>
+          </ul>
+
+          <Tally count={projects.length} minimum={minimum} />
+        </>
+      )}
+
+      {/* Only when the arithmetic says they are short. Offering an exemption
+          to somebody who does not need one invites them to take it. */}
+      {short && projects.length > 0 ? <ShortfallForm note={shortfallNote} /> : null}
+
+      <ProjectModal
+        open={adding}
+        onClose={() => setAdding(false)}
+        uploadEnabled={uploadEnabled}
+      />
+    </div>
+  );
+}
+
+function EmptyState({ onAdd, minimum }: { onAdd: () => void; minimum: number }) {
+  return (
+    <div className="rounded-[16px] border border-dashed border-[var(--color-rule)] bg-[var(--color-paper-2)] px-6 py-12 text-center">
+      <p className="h2 m-0 mb-2">Show us what you have built</p>
+      <p className="mx-auto m-0 mb-6 max-w-[46ch] text-[15px] leading-relaxed text-[var(--color-ink-2)]">
+        {minimum} finished projects, with photographs. This is the part of your profile a customer
+        actually reads — more than the description, more than the years.
+      </p>
+      <button
+        type="button"
+        onClick={onAdd}
+        className="oi-save inline-flex items-center gap-2 rounded-[12px] bg-[var(--color-petrol)] px-7 py-3.5 text-[15px] font-medium text-[var(--color-paper)]"
+      >
+        <span aria-hidden="true">+</span> Add your first project
+      </button>
+      <p className="m-0 mt-4 text-[13px] text-[var(--color-ink-3)]">
+        Takes about three minutes each. You can come back and add more later.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * How many, against how many are needed.
+ *
+ * Marks rather than a percentage bar. Three is a number somebody can hold in
+ * their head, and "2 of 3" with two filled marks says the same thing as "67%"
+ * without asking anybody to divide.
+ */
+function Tally({ count, minimum }: { count: number; minimum: number }) {
+  const enough = count >= minimum;
+
+  return (
+    <div
+      className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-[12px] px-5 py-3.5 ${
+        enough
+          ? 'bg-[var(--color-ontrack-soft)]'
+          : 'bg-[var(--color-paper-2)]'
+      }`}
+    >
+      <p
+        className={`m-0 text-[14px] ${
+          enough ? 'text-[var(--color-ontrack)]' : 'text-[var(--color-ink-2)]'
+        }`}
+      >
+        {enough
+          ? 'Enough to be listed. A customer sees all of them.'
+          : 'Three finished projects is the bar for being listed.'}
+      </p>
+      <p className="m-0 flex items-center gap-2 text-[13.5px] font-medium text-[var(--color-ink)]">
+        <span className="flex gap-1" aria-hidden="true">
+          {Array.from({ length: Math.max(minimum, count) }, (_, i) => (
+            <span
+              key={i}
+              className={`h-1.5 w-6 rounded-full ${
+                i < count ? 'bg-[var(--color-ontrack)]' : 'bg-[var(--color-rule)]'
+              }`}
+            />
+          ))}
+        </span>
+        {count} of {minimum} added
+      </p>
+    </div>
+  );
+}
+
+function ProjectCard({ project }: { project: ProjectRow }) {
+  const [state, action, pending] = useActionState(removeProjectAction, INITIAL);
+  const cover = project.images[0];
+
+  return (
+    <li className="oi-projcard group relative overflow-hidden rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-paper)]">
+      <div className="relative aspect-[4/3] overflow-hidden bg-[var(--color-paper-3)]">
+        {cover ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={cover}
+            alt=""
+            className="oi-projimg h-full w-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          /* Named, not a grey rectangle. A studio who added a project before
+             photographs were switched on needs to know which one is short,
+             and "no photographs yet" is the only honest label for it. */
+          <span className="flex h-full w-full flex-col items-center justify-center gap-1 text-[var(--color-ink-3)]">
+            <svg viewBox="0 0 24 24" aria-hidden="true" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.4">
+              <rect x="3" y="5" width="18" height="14" rx="2.5" />
+              <circle cx="8.5" cy="10" r="1.6" />
+              <path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5" strokeLinejoin="round" />
+            </svg>
+            <span className="text-[12.5px]">No photographs yet</span>
+          </span>
+        )}
+
+        {project.isRender ? (
+          /* On the card, not in a detail view. A render labelled as a render
+             is fine; the label has to travel with the picture or it is not
+             doing anything. */
+          <span className="absolute left-2.5 top-2.5 rounded-full bg-[var(--color-ink)]/85 px-2.5 py-1 text-[11px] font-medium text-white">
+            Render
+          </span>
+        ) : null}
+
+        {project.images.length > 1 ? (
+          <span className="absolute right-2.5 top-2.5 rounded-full bg-[var(--color-ink)]/75 px-2 py-0.5 text-[11px] text-white">
+            {project.images.length}
+          </span>
+        ) : null}
       </div>
 
-      {projects.length > 0 ? (
-        <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
-          {projects.map((p) => (
-            <ProjectItem key={p.id} project={p} />
-          ))}
-        </ul>
-      ) : null}
+      <div className="flex items-start justify-between gap-3 px-4 py-3.5">
+        <span className="min-w-0">
+          <span className="block truncate text-[15px] font-medium text-[var(--color-ink)]">
+            {project.title}
+          </span>
+          <span className="block truncate text-[13px] text-[var(--color-ink-2)]">
+            {[
+              project.locality,
+              project.valuePaise ? formatINRCompact(project.valuePaise) : null,
+            ]
+              .filter(Boolean)
+              .join(' · ') || 'No location given'}
+          </span>
+        </span>
 
-      {/* The escape hatch, shown only to the studio that needs it — and only
-          once they have put up at least one project, because before that the
-          honest instruction is "add a project", not "explain yourself". */}
-      {short > 0 && projects.length > 0 ? (
-        <ShortfallForm note={shortfallNote} />
-      ) : null}
-
-      {adding ? (
-        <form action={action} className="flex flex-col gap-7 rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-6">
-          <p className="h3 m-0">Add a project</p>
-
-          <Field
-            label="What do you call it?"
-            name="title"
-            required
-            error={err.title}
-            hint="However you refer to it internally is fine — 'The Kharadi 3 BHK', a client surname, a building name."
-          />
-
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <Select
-              label="Area"
-              name="locality"
-              options={PUNE_LOCALITIES.map((l) => ({ value: l.slug, label: l.label }))}
-            />
-            <Select
-              label="Property"
-              name="propertyType"
-              options={Object.entries(PROPERTY_LABELS).map(([value, label]) => ({ value, label }))}
-            />
-          </div>
-
-          <Select
-            label="Scope"
-            name="scope"
-            options={Object.entries(SCOPE_LABELS).map(([value, label]) => ({ value, label }))}
-          />
-
-          <Chips
-            label="Style"
-            name="styleTags"
-            hint="Pick from this list even if none is a perfect fit. Customers choose from exactly these words, so a style you invent here is a customer you never meet."
-            options={STYLE_TAGS.map((t) => ({ value: t, label: STYLE_LABELS[t] }))}
-            error={err.styleTags}
-          />
-
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-            <Field label="Value (₹ lakh)" name="valueLakhs" type="number" />
-            <Field label="Days taken" name="durationDays" type="number" />
-            <Field label="Completed on" name="completedOn" type="date" error={err.completedOn} />
-          </div>
-
-          {/* The honesty rules, as checkboxes, because a rule that is only in a
-              policy document is not a rule. */}
-          <div className="flex flex-col gap-4 border-t border-[var(--color-rule)] pt-5">
-            <Check
-              label="The client is happy for this to be shown"
-              name="clientConsented"
-              hint="Their home, their call. We do not need their name on the profile — only that you asked."
-              error={err.clientConsented}
-            />
-            <Check
-              label="These are renders, not photographs"
-              name="isRender"
-              hint="A render labelled as a render is completely fine. A render passed off as a finished room is the one thing that gets a studio removed."
-            />
-          </div>
-
-          <SaveBar pending={pending} saved={state.status === 'saved'} formError={err.form} label="Add project" />
+        <form action={action}>
+          <input type="hidden" name="id" value={project.id} />
+          <button
+            type="submit"
+            disabled={pending}
+            aria-label={`Remove ${project.title}`}
+            className="grid h-7 w-7 flex-none place-items-center rounded-full text-[var(--color-ink-3)] transition-colors hover:bg-[var(--color-atrisk-soft)] hover:text-[var(--color-atrisk)] disabled:opacity-40"
+          >
+            {pending ? '…' : '×'}
+          </button>
         </form>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className="self-start rounded-full border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-6 py-3 text-[15px] text-[var(--color-ink)] hover:border-[var(--color-ink-3)]"
-        >
-          Add another project
-        </button>
-      )}
-    </div>
+      </div>
+
+      {state.errors?.form ? (
+        <p role="alert" className="m-0 px-4 pb-3 text-[12.5px] text-[var(--color-atrisk)]">
+          {state.errors.form}
+        </p>
+      ) : null}
+    </li>
   );
 }
 
@@ -164,12 +281,6 @@ export function PortfolioForm({
  * is indistinguishable from an unfinished form. What we want is the one thing
  * a young studio can actually offer instead of a third finished flat: a site
  * we can walk into. That is checkable, and checking it is what we do anyway.
- *
- * ## Why it is not shown to everyone
- *
- * A studio with three projects never sees this, because offering an exemption
- * to somebody who does not need one invites them to take it. It appears the
- * moment the arithmetic says they are short, and disappears when they are not.
  */
 function ShortfallForm({ note }: { note: string | null }) {
   const [state, action, pending] = useActionState(declarePortfolioShortfallAction, INITIAL);
@@ -200,7 +311,7 @@ function ShortfallForm({ note }: { note: string | null }) {
           rows={4}
           defaultValue={note ?? ''}
           placeholder="Two finished — the Wakad 2 BHK and a kitchen in Baner. A third handing over in November, and you are welcome to see it now. I ran two more at my last practice; the client would vouch for one of them."
-          className="w-full rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper)] px-5 py-4 text-[15.5px] leading-relaxed"
+          className="oi-input w-full rounded-[12px] border border-[var(--color-rule)] px-5 py-4 text-[15.5px] leading-relaxed"
         />
         {err.portfolioShortfallNote ? (
           <p role="alert" className="m-0 mt-1.5 text-[13.5px] text-[var(--color-atrisk)]">
@@ -223,58 +334,5 @@ function ShortfallForm({ note }: { note: string | null }) {
         label="Save this"
       />
     </form>
-  );
-}
-
-function ProjectItem({ project }: { project: ProjectRow }) {
-  const [state, action, pending] = useActionState(removeProjectAction, INITIAL);
-
-  return (
-    <li className="flex flex-wrap items-baseline justify-between gap-3 rounded-[10px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-5 py-4">
-      <span className="min-w-0">
-        <span className="block text-[15.5px] text-[var(--color-ink)]">
-          {project.title}
-          {project.isRender ? (
-            <span className="ml-2 rounded-full bg-[var(--color-paper-3)] px-2 py-0.5 font-[family-name:var(--font-mono)] text-[9.5px] uppercase tracking-[0.12em] text-[var(--color-ink-3)]">
-              Render
-            </span>
-          ) : null}
-        </span>
-        <span className="block text-[13.5px] text-[var(--color-ink-3)]">
-          {[
-            PUNE_LOCALITIES.find((l) => l.slug === project.locality)?.label,
-            project.valuePaise ? formatINRCompact(project.valuePaise) : null,
-            project.completedOn
-              ? new Date(project.completedOn).toLocaleDateString('en-IN', {
-                  month: 'short',
-                  year: 'numeric',
-                })
-              : null,
-            project.styleTags
-              .map((t) => STYLE_LABELS[t as keyof typeof STYLE_LABELS])
-              .filter(Boolean)
-              .join(', '),
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-        </span>
-        {state.status === 'error' ? (
-          <span role="alert" className="mt-1 block text-[13px] text-[var(--color-atrisk)]">
-            {state.errors?.form}
-          </span>
-        ) : null}
-      </span>
-
-      <form action={action}>
-        <input type="hidden" name="id" value={project.id} />
-        <button
-          type="submit"
-          disabled={pending}
-          className="text-[13.5px] text-[var(--color-ink-3)] underline underline-offset-4 hover:text-[var(--color-atrisk)] disabled:opacity-40"
-        >
-          {pending ? 'Removing…' : 'Remove'}
-        </button>
-      </form>
-    </li>
   );
 }

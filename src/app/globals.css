@@ -2302,3 +2302,125 @@ p {
     transform: none;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+   PORTFOLIO BUILDER — cards, tiles, and the modal
+   ───────────────────────────────────────────────────────────────────── */
+
+.oi-projcard {
+  box-shadow:
+    0 1px 2px rgba(38, 32, 25, 0.04),
+    0 8px 24px -16px rgba(38, 32, 25, 0.18);
+  transition:
+    box-shadow 0.24s ease,
+    border-color 0.2s ease;
+}
+.oi-projcard:hover {
+  border-color: var(--color-ink-3);
+  box-shadow:
+    0 1px 2px rgba(38, 32, 25, 0.05),
+    0 16px 34px -18px rgba(38, 32, 25, 0.3);
+}
+
+/* The picture grows inside the card; the CARD does not move.
+
+   A card that lifts on hover promises a click, and these are not
+   clickable — the only controls on them are the remove button and, in
+   time, an edit. Scaling the image inside `overflow:hidden` gives the
+   life without the promise. */
+.oi-projimg {
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.oi-projcard:hover .oi-projimg {
+  transform: scale(1.04);
+}
+
+.oi-addcard {
+  background: var(--color-paper-2);
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+}
+.oi-addcard:hover {
+  border-color: var(--color-petrol);
+  background: var(--color-petrol-soft);
+}
+
+/* A dragged tile. `grab` at rest and `grabbing` while held is the only
+   affordance saying these can be rearranged, short of a sentence. */
+.oi-tile {
+  cursor: grab;
+}
+.oi-tile:active {
+  cursor: grabbing;
+}
+
+/* The modal. Both halves animate: the backdrop fades and the panel
+   rises a little, because a panel that appears at full size with no
+   travel reads as a page change rather than as something opening on
+   top of what you were looking at. */
+@keyframes oi-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes oi-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.oi-modal-wrap {
+  animation: oi-fade-in 0.18s ease both;
+}
+.oi-modal {
+  animation: oi-modal-in 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oi-projcard,
+  .oi-projimg,
+  .oi-addcard {
+    transition: none;
+  }
+  .oi-projcard:hover .oi-projimg {
+    transform: none;
+  }
+  /* Replaced rather than disabled: `both` would leave the panel at the
+     FROM frame — offset and transparent — if the animation is cancelled. */
+  .oi-modal-wrap,
+  .oi-modal {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* A selectable card that wraps a hidden radio. The tint and the border
+   carry the state; this adds the hover and the keyboard ring, which
+   hiding the input would otherwise take with it. */
+.oi-pick {
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+}
+.oi-pick:hover {
+  border-color: var(--color-ink-3);
+}
+.oi-pick:has(:focus-visible) {
+  outline: 2px solid var(--color-petrol);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oi-pick {
+    transition: none;
+  }
+}
