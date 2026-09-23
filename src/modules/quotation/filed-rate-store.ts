@@ -24,6 +24,7 @@ import { extractArchive } from './extract-agent';
 import type { StudioRates } from './catalogue';
 import { confidenceOf } from './analysis-states';
 import type { FiledRateView } from './analysis-states';
+import { productsFromArchive, bridgeSummary } from '@/modules/studio-quote/from-archive';
 
 /**
  * Read an archive and file what it yields, as PENDING.
@@ -284,12 +285,14 @@ export async function requestReanalysis(archiveId: string): Promise<ReviewResult
     data: { analysisState: 'READING', analysisError: null },
   });
 
-  return { ok: true, live: 0 };
+  return { ok: true, live: 0, catalogue: null };
 }
 
 // ── Ops decisions ──────────────────────────────────────────────
 
-export type ReviewResult = { ok: true; live: number } | { ok: false; error: string };
+export type ReviewResult =
+  | { ok: true; live: number; catalogue: string | null }
+  | { ok: false; error: string };
 
 /**
  * Put a set of derived rates into force.
@@ -310,7 +313,7 @@ export async function approveRates(archiveId: string): Promise<ReviewResult> {
 
   const pending = await prisma.studioFiledRate.findMany({
     where: { archiveId, state: 'PENDING' },
-    select: { id: true, studioId: true, code: true },
+    select: { id: true, studioId: true, code: true, ratePaise: true, fromQuotations: true, spec: true },
   });
   if (pending.length === 0) return { ok: false, error: 'Nothing pending on this archive.' };
 
@@ -337,7 +340,102 @@ export async function approveRates(archiveId: string): Promise<ReviewResult> {
     });
   });
 
-  return { ok: true, live: pending.length };
+  /**
+   * The same rates, into their own product master.
+   *
+   * Outside the transaction above, and deliberately. What that transaction
+   * protects is the thing customers are quoted on — half a set of live rates
+   * would price one home from two readings. The product master is the
+   * studio's own working catalogue: filling it is a convenience, and a
+   * failure there must not roll back an approval ops has just made.
+   *
+   * So it runs after, it reports rather than throws, and the worst case is a
+   * studio typing rates we could have filled in — which is exactly where they
+   * were before this existed.
+   */
+  const catalogue = await fillProductMaster(studioId, pending);
+
+  return { ok: true, live: pending.length, catalogue };
+}
+
+/**
+ * Fill the studio's CRM product master from what was just approved.
+ *
+ * Returns a sentence for ops, or null if nothing could be written. The rules
+ * — create what is missing, price what is blank, never touch a rate the
+ * studio typed — are all in `from-archive.ts`, which is pure and tested.
+ */
+async function fillProductMaster(
+  studioId: string,
+  approved: { code: string; ratePaise: bigint; fromQuotations: number; spec: string | null }[],
+): Promise<string | null> {
+  try {
+    const existing = await prisma.studioProduct.findMany({
+      where: { studioId },
+      select: { id: true, name: true, ratePaise: true },
+    });
+
+    const result = productsFromArchive(
+      approved.map((r) => ({
+        code: r.code,
+        ratePaise: fromDb(r.ratePaise),
+        fromQuotations: r.fromQuotations,
+        spec: r.spec,
+      })),
+      existing.map((p) => ({ id: p.id, name: p.name, ratePaise: fromDb(p.ratePaise) })),
+    );
+
+    if (result.unknownCodes.length > 0) {
+      /* Loud, because it means the catalogue and the extractor have drifted:
+         a rate we can quote a customer on but cannot put in the studio's own
+         list is a quotation they could not reproduce. */
+      console.error('[filed-rates] codes with no catalogue item', result.unknownCodes);
+    }
+
+    if (result.create.length === 0 && result.priceExisting.length === 0) {
+      return bridgeSummary(result);
+    }
+
+    await prisma.$transaction([
+      ...(result.create.length > 0
+        ? [
+            prisma.studioProduct.createMany({
+              data: result.create.map((p) => ({
+                studioId,
+                name: p.name,
+                code: p.code,
+                unit: p.unit,
+                details: p.details,
+                ratePaise: toDb(p.ratePaise),
+                rooms: p.rooms as string[],
+                defaultWidthMm: p.defaultWidthMm,
+                defaultHeightMm: p.defaultHeightMm,
+                defaultQty: p.defaultQty,
+                sortOrder: p.sortOrder,
+                /* Derived from their own documents, so by definition part of
+                   what they fit as standard. They can untick any of it. */
+                inStandardBuild: true,
+              })),
+              /* Against the (studioId, name) unique index. A race with the
+                 studio adding the same product by hand should skip, not
+                 fail an approval. */
+              skipDuplicates: true,
+            }),
+          ]
+        : []),
+      ...result.priceExisting.map((p) =>
+        prisma.studioProduct.update({
+          where: { id: p.id },
+          data: { ratePaise: toDb(p.ratePaise), inStandardBuild: true },
+        }),
+      ),
+    ]);
+
+    return bridgeSummary(result);
+  } catch (error) {
+    console.error('[filed-rates] fillProductMaster failed', error);
+    return null;
+  }
 }
 
 /**
@@ -375,5 +473,5 @@ export async function rejectRate(id: string, note: string): Promise<ReviewResult
     },
   });
 
-  return { ok: true, live: 0 };
+  return { ok: true, live: 0, catalogue: null };
 }

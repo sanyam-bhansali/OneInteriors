@@ -31,6 +31,7 @@
  */
 
 import type { RoomCategory } from './starter-catalogue';
+import { standardKitchenRunMm } from '@/modules/quotation/first-quote';
 
 /** The configurations that cover essentially every flat in Pune. */
 export const CONFIGS = ['1 BHK', '2 BHK', '3 BHK', '4 BHK'] as const;
@@ -69,6 +70,21 @@ const BEDROOMS: Record<ConfigName, string[]> = {
 
 export function bedroomCount(config: ConfigName): number {
   return BEDROOMS[config].length;
+}
+
+/**
+ * The run to assume when a studio has not measured the kitchen.
+ *
+ * The same ladder the customer-facing first quote uses, imported rather than
+ * repeated. Two standard kitchens that disagree would mean a studio's own
+ * builder and the quote we generate on their behalf pricing the same flat
+ * differently — which is the one comparison a studio is guaranteed to make.
+ *
+ * `first-quote.ts` is pure and carries no `server-only`, so importing it here
+ * is safe: this module is read by the browser.
+ */
+export function standardRunFor(config: ConfigName): number {
+  return standardKitchenRunMm(Number(config.charAt(0)));
 }
 
 export interface HomeConfig {
@@ -213,7 +229,12 @@ export function planQuotation(home: HomeConfig, catalogue: CatalogueProduct[]): 
     for (const product of usable) {
       if (!product.rooms.includes(room.category)) continue;
 
-      const runWidth = takesKitchenRun(product) ? home.kitchenRunMm : null;
+      /* Measured if they gave it, the standard for this configuration if not.
+         A base run with no width at all would price at zero and look like a
+         kitchen nobody quoted, which is worse than a stated assumption. */
+      const runWidth = takesKitchenRun(product)
+        ? (home.kitchenRunMm ?? standardRunFor(home.config))
+        : null;
 
       lines.push({
         room: room.name,
@@ -247,7 +268,7 @@ export function planQuotation(home: HomeConfig, catalogue: CatalogueProduct[]): 
 
   if (home.kitchenRunMm == null && usable.some(takesKitchenRun)) {
     notes.push(
-      'No kitchen run, so the base, wall and loft lines carry standard widths. Measure it and rebuild to size them properly.',
+      `No kitchen run, so the base, wall and loft lines are sized to ${standardRunFor(home.config)}mm — what a ${home.config} usually has. Measure it and rebuild: this is the number that moves the total most.`,
     );
   }
 

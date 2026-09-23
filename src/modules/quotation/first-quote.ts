@@ -48,11 +48,51 @@ function sqft(widthMm: number, heightMm: number): number {
 /**
  * The kitchen platform run we assume when nobody has told us.
  *
- * The median of the calibration flats (3410, 3960, 4870, 5240) is about
- * 4,400mm. Using the median rather than the mean keeps one very large kitchen
- * from pushing every standard quote up.
+ * ## Why this is a ladder and not one number
+ *
+ * It was 4,400mm for every flat — the median of the calibration set (3410,
+ * 3960, 4870, 5240), chosen as a median rather than a mean so one very large
+ * kitchen could not push every standard quote up.
+ *
+ * One number across every configuration is wrong in both directions at once,
+ * and the kitchen run moves the total more than anything else in the
+ * catalogue. A 1 BHK priced on a 4,400mm platform is quoted a kitchen it does
+ * not have room for; a 4 BHK on the same number is quoted short, which is the
+ * direction that produces a cheerful first quote and an argument later.
+ *
+ * The ladder keeps 4,400 at 3 BHK, because that is the size the calibration
+ * actually centres on and nothing measured should move when this changes. The
+ * others step around it at the spacing the calibration flats show — roughly
+ * 500mm a bedroom.
+ *
+ * Every one of these is still a guess, and the quote says so: a standard
+ * kitchen widens the band to ±16% and the assumption is printed on the
+ * document. The ladder makes the guess less wrong, not right.
  */
-export const STANDARD_KITCHEN_RUN_MM = 4400;
+const STANDARD_RUN_BY_BHK: Record<number, number> = {
+  1: 3300,
+  2: 3900,
+  3: 4400,
+  4: 5000,
+};
+
+/** The 3 BHK figure, which is where the calibration set centres. */
+export const STANDARD_KITCHEN_RUN_MM = STANDARD_RUN_BY_BHK[3]!;
+
+/**
+ * The run to assume for a flat of this size.
+ *
+ * Clamped rather than extrapolated at both ends. A 5 BHK is a house and a
+ * standard kitchen is already the wrong tool for it; stepping the ladder on
+ * would put a made-up 5,500mm platform on a document, which is a worse answer
+ * than the largest one we have actually seen.
+ */
+export function standardKitchenRunMm(bhk: number): number {
+  const rounded = Math.round(bhk);
+  if (rounded <= 1) return STANDARD_RUN_BY_BHK[1]!;
+  if (rounded >= 4) return STANDARD_RUN_BY_BHK[4]!;
+  return STANDARD_RUN_BY_BHK[rounded]!;
+}
 
 export interface QuoteInput {
   /** 1–5. Decides which bedrooms are in scope. */
@@ -124,7 +164,7 @@ function variance(input: QuoteInput): number {
 }
 
 export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuote {
-  const runMm = input.kitchenRunMm ?? STANDARD_KITCHEN_RUN_MM;
+  const runMm = input.kitchenRunMm ?? standardKitchenRunMm(input.bhk);
   const measured = input.runSource !== 'standard';
 
   const lines: QuoteLine[] = [];
@@ -228,7 +268,7 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
     assumptions.push(`Kitchen priced on the ${Math.round(runMm)}mm platform run you gave us.`);
   } else {
     assumptions.push(
-      `No floor plan yet, so the kitchen is priced on a standard ${STANDARD_KITCHEN_RUN_MM}mm platform run — the median of the flats we have quoted. This is the number most likely to move.`,
+      `No floor plan yet, so the kitchen is priced on a standard ${runMm}mm platform run — what a ${input.bhk} BHK usually has. This is the number most likely to move.`,
     );
   }
 

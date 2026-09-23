@@ -23,7 +23,7 @@
 
 import { useCallback, useState } from 'react';
 import { formatINRCompact } from '@/lib/money';
-import { buildFirstQuote, STANDARD_KITCHEN_RUN_MM, type FirstQuote } from '@/modules/quotation/first-quote';
+import { buildFirstQuote, standardKitchenRunMm, type FirstQuote } from '@/modules/quotation/first-quote';
 import { filedRatesFor, ratesAreReal } from '@/data/filed-rates';
 import type { StudioRates } from '@/modules/quotation/catalogue';
 import type { Material } from '@/modules/materials/glossary';
@@ -47,13 +47,37 @@ export interface QuoteRequest {
 const input =
   'w-full border border-[var(--line)] bg-[var(--card)] px-3 py-2.5 text-[14px] text-[var(--ink)] placeholder:text-[var(--ink2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--acc)]';
 
-function Gate({ onReady }: { onReady: (plan: FloorPlan) => void }) {
+/**
+ * The gate.
+ *
+ * ## Why the way through is on the first screen now
+ *
+ * It used to read "Send us the floor plan", with the standard-kitchen path
+ * two presses further on, behind "I haven't got the plan to hand". That is
+ * the right emphasis and the wrong gate: most people arriving here do not
+ * have a PDF of their flat on the device they are browsing on, and a screen
+ * that asks for one before showing anything is a screen a good share of them
+ * leave at.
+ *
+ * So all three ways are visible at once, in the order of how much they
+ * improve the answer, and each says what it costs: a plan gives ±10%, a
+ * measured run ±12%, the standard kitchen ±16%. Nobody has to guess which
+ * button is the one that lets them through, and nobody is misled about what
+ * the quick one is worth.
+ *
+ * The standard run is sized to their configuration — see
+ * `standardKitchenRunMm`. A 1 BHK and a 4 BHK do not have the same kitchen,
+ * and quoting them as if they did was the largest avoidable error in the
+ * whole build.
+ */
+function Gate({ onReady, bhk }: { onReady: (plan: FloorPlan) => void; bhk: number }) {
   const [fileName, setFileName] = useState<string | null>(null);
   const [runMm, setRunMm] = useState('');
   const [noPlan, setNoPlan] = useState(false);
 
   const typed = Number(runMm);
   const runIsSane = Number.isFinite(typed) && typed >= 1500 && typed <= 9000;
+  const standardRun = standardKitchenRunMm(bhk);
 
   return (
     <Sheet className="mx-auto max-w-[36rem] p-[clamp(22px,3vw,32px)]">
@@ -104,8 +128,29 @@ function Gate({ onReady }: { onReady: (plan: FloorPlan) => void }) {
               onClick={() => setNoPlan(true)}
               className="cursor-pointer border-0 bg-transparent p-0 text-[13.5px] text-[var(--ink2)] underline hover:text-[var(--ink)]"
             >
-              I haven&rsquo;t got the plan to hand
+              I know my kitchen measurement
             </button>
+          </div>
+
+          {/* One press, from the first screen. Most people do not have a
+              floor plan on the phone they are reading this on, and the
+              alternative to this button is not a better quote — it is no
+              quote and a closed tab. */}
+          <div className="mt-6 border-t border-[var(--line)] pt-5">
+            <button
+              type="button"
+              onClick={() =>
+                onReady({ fileName: null, kitchenRunMm: standardRun, source: 'standard' })
+              }
+              className="cursor-pointer border border-[var(--line)] bg-transparent px-5 py-2.5 text-[14px] font-medium text-[var(--ink)] transition-colors hover:border-[var(--ink)]"
+            >
+              Price it now on a standard {bhk} BHK kitchen
+            </button>
+            <p className="m-0 mt-2.5 text-[12.5px] leading-snug text-[var(--ink2)]">
+              A {standardRun.toLocaleString('en-IN')}mm platform, which is what a {bhk} BHK usually
+              has. Every other size in the quote is standard anyway — this is the one the plan
+              would change. It widens the band from ±10% to ±16%, and the document says so.
+            </p>
           </div>
         </>
       ) : (
@@ -142,13 +187,13 @@ function Gate({ onReady }: { onReady: (plan: FloorPlan) => void }) {
               onClick={() =>
                 onReady({
                   fileName: null,
-                  kitchenRunMm: STANDARD_KITCHEN_RUN_MM,
+                  kitchenRunMm: standardRun,
                   source: 'standard',
                 })
               }
               className="cursor-pointer border-0 bg-transparent p-0 text-[13.5px] text-[var(--ink2)] underline hover:text-[var(--ink)]"
             >
-              Use a standard kitchen instead
+              Use a standard {bhk} BHK kitchen instead
             </button>
           </div>
 
@@ -340,7 +385,7 @@ export function QuoteFlow({
     onBuilt(built, usedPlan);
   }, [usedPlan, request, onBuilt, filedRates]);
 
-  if (phase === 'gate') return <Gate onReady={start} />;
+  if (phase === 'gate') return <Gate onReady={start} bhk={request.bhk} />;
   if (phase === 'building' || !quote || !usedPlan) {
     return (
       <Building

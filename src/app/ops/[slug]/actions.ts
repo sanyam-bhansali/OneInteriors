@@ -190,9 +190,23 @@ export async function approveRatesAction(
 
   revalidatePath('/ops', 'layout');
   revalidatePath('/studio/onboarding', 'layout');
+  /* The studio's own catalogue was filled from the same rates, so the page
+     that shows it has to be refreshed too — otherwise a studio who happens to
+     have their product master open sees the old blanks. */
+  revalidatePath('/studio/products');
+  revalidatePath('/studio/quotations', 'layout');
+
   return {
     ok: true,
-    message: `${result.live} ${result.live === 1 ? 'rate is' : 'rates are'} now live. Their quotes are built from these.`,
+    /* Two sentences, because approving does two things now and ops should be
+       able to say which. The second is null when the product master could not
+       be written, which is survivable — see `fillProductMaster`. */
+    message: [
+      `${result.live} ${result.live === 1 ? 'rate is' : 'rates are'} now live. Their quotes are built from these.`,
+      result.catalogue,
+    ]
+      .filter(Boolean)
+      .join(' '),
   };
 }
 

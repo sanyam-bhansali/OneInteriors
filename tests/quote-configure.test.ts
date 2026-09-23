@@ -4,6 +4,7 @@ import {
   roomsFor,
   bedroomCount,
   isConfigName,
+  standardRunFor,
   type CatalogueProduct,
   type HomeConfig,
 } from '@/modules/studio-quote/configure';
@@ -145,12 +146,32 @@ describe('planQuotation', () => {
     expect(lines[0]!.widthMm).toBe(600);
   });
 
-  it('falls back to the standard width when the run is unmeasured, and says so', () => {
+  it('falls back to the standard run for the configuration, and says so', () => {
+    /**
+     * The standard run wins over the product's own default width here, and
+     * that is deliberate: a base run is as wide as the kitchen, so the
+     * product's "usual" width is meaningless for it while the configuration's
+     * is a real estimate. The note names the number rather than hiding it.
+     */
     const { lines, notes } = planQuotation(home({ kitchenRunMm: null }), [
       product({ name: 'Base cabinets', rooms: ['Kitchen'], defaultWidthMm: 3000, defaultHeightMm: 750 }),
     ]);
-    expect(lines[0]!.widthMm).toBe(3000);
+    expect(lines[0]!.widthMm).toBe(standardRunFor('3 BHK'));
     expect(notes.some((n) => n.includes('kitchen run'))).toBe(true);
+    expect(notes.some((n) => n.includes(String(standardRunFor('3 BHK'))))).toBe(true);
+  });
+
+  it('gives a smaller flat a smaller standard kitchen', () => {
+    /* One number for every configuration was wrong in both directions: a
+       1 BHK quoted a platform it has no room for, a 4 BHK quoted short. */
+    expect(standardRunFor('1 BHK')).toBeLessThan(standardRunFor('2 BHK'));
+    expect(standardRunFor('2 BHK')).toBeLessThan(standardRunFor('3 BHK'));
+    expect(standardRunFor('3 BHK')).toBeLessThan(standardRunFor('4 BHK'));
+  });
+
+  it('keeps the 3 BHK figure the calibration set centres on', () => {
+    /* Nothing measured should move when the ladder was introduced. */
+    expect(standardRunFor('3 BHK')).toBe(4400);
   });
 
   it('ignores products that are not marked standard, and inactive ones', () => {

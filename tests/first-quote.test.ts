@@ -4,6 +4,7 @@ import {
   compareQuotes,
   itemsFor,
   STANDARD_KITCHEN_RUN_MM,
+  standardKitchenRunMm,
   type QuoteInput,
 } from '@/modules/quotation/first-quote';
 import {
@@ -116,16 +117,37 @@ describe('the kitchen is the only thing the plan changes', () => {
     expect(large.totalPaise).toBeGreaterThan(small.totalPaise);
   });
 
-  it('falls back to the standard run when there is no plan', () => {
+  it('falls back to the standard run for THAT configuration when there is no plan', () => {
+    /* Per BHK, not one number for everybody — see `standardKitchenRunMm`. The
+       explicit figure here is the 2 BHK one because BASE is a 2 BHK, and
+       using the 3 BHK constant would pass only by accident. */
     const q = buildFirstQuote(
       { ...BASE, kitchenRunMm: null, runSource: 'standard' },
       ratesFor(100_00),
     );
     const explicit = buildFirstQuote(
-      { ...BASE, kitchenRunMm: STANDARD_KITCHEN_RUN_MM, runSource: 'standard' },
+      { ...BASE, kitchenRunMm: standardKitchenRunMm(BASE.bhk), runSource: 'standard' },
       ratesFor(100_00),
     );
     expect(q.totalPaise).toBe(explicit.totalPaise);
+  });
+
+  it('a bigger flat with no plan is quoted a bigger kitchen', () => {
+    /* The whole point of the ladder. Same rates, same everything else — only
+       the assumed platform differs, and it must differ. */
+    const two = buildFirstQuote(
+      { ...BASE, bhk: 2, kitchenRunMm: null, runSource: 'standard' },
+      ratesFor(100_00),
+    );
+    const four = buildFirstQuote(
+      { ...BASE, bhk: 4, kitchenRunMm: null, runSource: 'standard' },
+      ratesFor(100_00),
+    );
+
+    const kitchenOf = (q: ReturnType<typeof buildFirstQuote>) =>
+      q.lines.filter((l) => l.room === 'KITCHEN').reduce((a, l) => a + l.amountPaise, 0);
+
+    expect(kitchenOf(four)).toBeGreaterThan(kitchenOf(two));
   });
 
   it('marks kitchen lines as standard until a real run is supplied', () => {
@@ -230,5 +252,42 @@ describe('comparing two studios', () => {
     const priced = rows.filter((r) => r.deltaPaise !== null);
     expect(priced.length).toBeGreaterThan(0);
     expect(priced.every((r) => r.deltaPaise! > 0)).toBe(true);
+  });
+});
+
+describe('standardKitchenRunMm', () => {
+  /**
+   * One assumed kitchen for every flat was wrong twice over. The run moves
+   * the total more than anything else in the catalogue, so a 1 BHK priced on
+   * a 4,400mm platform is quoted a kitchen it has no room for, and a 4 BHK on
+   * the same number is quoted short — the direction that produces a cheerful
+   * first quote and an argument on site.
+   */
+  it('steps up with the configuration', () => {
+    expect(standardKitchenRunMm(1)).toBeLessThan(standardKitchenRunMm(2));
+    expect(standardKitchenRunMm(2)).toBeLessThan(standardKitchenRunMm(3));
+    expect(standardKitchenRunMm(3)).toBeLessThan(standardKitchenRunMm(4));
+  });
+
+  it('keeps 3 BHK where the calibration set centres', () => {
+    /* Nothing that was measured against the archive should move because the
+       ladder was introduced. */
+    expect(standardKitchenRunMm(3)).toBe(4400);
+    expect(STANDARD_KITCHEN_RUN_MM).toBe(4400);
+  });
+
+  it('clamps rather than extrapolating at both ends', () => {
+    /* A 5 BHK is a house, and a standard kitchen is already the wrong tool.
+       Stepping the ladder on would print a platform nobody has ever seen. */
+    expect(standardKitchenRunMm(5)).toBe(standardKitchenRunMm(4));
+    expect(standardKitchenRunMm(9)).toBe(standardKitchenRunMm(4));
+    expect(standardKitchenRunMm(0)).toBe(standardKitchenRunMm(1));
+  });
+
+  it('stays inside the range the calibration flats actually covered', () => {
+    for (const bhk of [1, 2, 3, 4]) {
+      expect(standardKitchenRunMm(bhk)).toBeGreaterThanOrEqual(3410 - 200);
+      expect(standardKitchenRunMm(bhk)).toBeLessThanOrEqual(5240);
+    }
   });
 });
