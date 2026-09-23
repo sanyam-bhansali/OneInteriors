@@ -7,6 +7,7 @@ to be wrapped with Capacitor for Play Store and App Store from the same codebase
 - **Architecture:** [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
 - **Dependencies:** [`docs/DEPENDENCIES.md`](./docs/DEPENDENCIES.md) — why anything is pinned or overridden
 - **Database:** [`docs/DATABASE.md`](./docs/DATABASE.md) — Supabase + Prisma setup
+- **Data architecture:** [`docs/DATA-ARCHITECTURE.md`](./docs/DATA-ARCHITECTURE.md) — where every fact is stored, how tenants are isolated, and the plan to 100 studios
 - **What I need from you:** [`docs/WHAT-I-NEED-FROM-YOU.md`](./docs/WHAT-I-NEED-FROM-YOU.md) — everything blocking the build
 - **Deploy checklist:** [`docs/DEPLOY-CHECKLIST.md`](./docs/DEPLOY-CHECKLIST.md) — run before every production deploy
 - **Future scope:** [`docs/FUTURE-SCOPE.md`](./docs/FUTURE-SCOPE.md) — what's deferred, why, and the trigger to build it
