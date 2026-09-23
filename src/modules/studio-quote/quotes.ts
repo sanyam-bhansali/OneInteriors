@@ -23,6 +23,8 @@ import {
   type QuoteUnitName,
   type WorkCodeName,
 } from './pricing';
+import { planQuotation, type CatalogueProduct, type HomeConfig } from './configure';
+import type { ComparableLine } from './revision';
 
 export type QuoteStatusName = 'DRAFT' | 'ISSUED' | 'ACCEPTED' | 'DECLINED';
 export type QuoteStageName = 'SALES' | 'DESIGN';
@@ -61,6 +63,10 @@ export interface QuoteRow {
   locality: string | null;
   config: string | null;
   carpetSqft: number | null;
+  kitchenRunMm: number | null;
+  bathrooms: number | null;
+  /** The lines as the client first received them. Empty until issued. */
+  issuedLines: ComparableLine[];
   fromMarketplace: boolean;
   feeBps: number;
   discountBps: number;
@@ -172,6 +178,9 @@ export async function getQuote(id: string): Promise<QuoteRow | null> {
       locality: row.locality,
       config: row.config,
       carpetSqft: row.carpetSqft,
+      kitchenRunMm: row.kitchenRunMm,
+      bathrooms: row.bathrooms,
+      issuedLines: readIssued(row.issuedLines),
       fromMarketplace: row.briefId !== null || row.introductionId !== null,
       feeBps: row.feeBps,
       discountBps: row.discountBps,
@@ -308,136 +317,6 @@ async function ownedQuote(quoteId: string): Promise<string | null> {
   return row?.id ?? null;
 }
 
-export interface AddLineInput {
-  quoteId: string;
-  room: string;
-  productId: string;
-}
-
-/**
- * Put a product on a quotation.
- *
- * Copies the product's name, rate, unit and defaults onto the line as a
- * SNAPSHOT. Editing the product master afterwards must never change a quotation
- * already sent — that is how a studio ends up in an argument it cannot win
- * about what it quoted.
- */
-export async function addLine(input: AddLineInput): Promise<ActionResult> {
-  const studioId = await myStudioId();
-  if (!studioId) return { ok: false, error: 'No studio on this account.' };
-  if (!(await ownedQuote(input.quoteId))) return { ok: false, error: 'That quotation is not yours.' };
-
-  const product = await prisma.studioProduct.findFirst({
-    where: { id: input.productId, studioId },
-  });
-  if (!product) return { ok: false, error: 'That product is not yours.' };
-
-  try {
-    const last = await prisma.studioQuoteLine.findFirst({
-      where: { quoteId: input.quoteId },
-      orderBy: { sortOrder: 'desc' },
-      select: { sortOrder: true },
-    });
-
-    const ratePaise = fromDb(product.ratePaise);
-    const line: QuoteLineInput = {
-      unit: product.unit as QuoteUnitName,
-      code: product.code as WorkCodeName,
-      ratePaise,
-      widthMm: product.defaultWidthMm,
-      heightMm: product.defaultHeightMm,
-      qtyMilli: product.defaultQty ? product.defaultQty * 1000 : null,
-    };
-
-    await prisma.studioQuoteLine.create({
-      data: {
-        quoteId: input.quoteId,
-        room: input.room,
-        product: product.name,
-        code: product.code,
-        unit: product.unit,
-        details: product.details,
-        widthMm: product.defaultWidthMm,
-        heightMm: product.defaultHeightMm,
-        qtyMilli: line.qtyMilli ?? null,
-        ratePaise: product.ratePaise,
-        amountPaise: toDb(lineAmount(line)),
-        sortOrder: (last?.sortOrder ?? 0) + 10,
-      },
-    });
-
-    await touch(input.quoteId);
-    return { ok: true };
-  } catch (error) {
-    console.error('[studio-quote] addLine failed', error);
-    return { ok: false, error: 'That did not save.' };
-  }
-}
-
-export interface EditLineInput {
-  lineId: string;
-  widthMm?: number | null;
-  heightMm?: number | null;
-  qtyMilli?: number | null;
-  ratePaise?: Paise;
-  /** Null clears the override and returns the line to rate × quantity. */
-  agreedPaise?: Paise | null;
-}
-
-export async function editLine(input: EditLineInput): Promise<ActionResult> {
-  const studioId = await myStudioId();
-  if (!studioId) return { ok: false, error: 'No studio on this account.' };
-
-  const line = await prisma.studioQuoteLine.findFirst({
-    where: { id: input.lineId, quote: { studioId } },
-  });
-  if (!line) return { ok: false, error: 'That line is not yours.' };
-
-  const next: QuoteLineInput = {
-    unit: line.unit as QuoteUnitName,
-    code: line.code as WorkCodeName,
-    ratePaise: input.ratePaise ?? fromDb(line.ratePaise),
-    widthMm: input.widthMm !== undefined ? input.widthMm : line.widthMm,
-    heightMm: input.heightMm !== undefined ? input.heightMm : line.heightMm,
-    qtyMilli: input.qtyMilli !== undefined ? input.qtyMilli : line.qtyMilli,
-    amountPaise: input.agreedPaise !== undefined ? input.agreedPaise : undefined,
-  };
-
-  try {
-    await prisma.studioQuoteLine.update({
-      where: { id: input.lineId },
-      data: {
-        widthMm: next.widthMm ?? null,
-        heightMm: next.heightMm ?? null,
-        qtyMilli: next.qtyMilli ?? null,
-        ratePaise: toDb(next.ratePaise),
-        amountPaise: toDb(lineAmount(next)),
-      },
-    });
-
-    await touch(line.quoteId);
-    return { ok: true };
-  } catch (error) {
-    console.error('[studio-quote] editLine failed', error);
-    return { ok: false, error: 'That did not save.' };
-  }
-}
-
-export async function removeLine(lineId: string): Promise<ActionResult> {
-  const studioId = await myStudioId();
-  if (!studioId) return { ok: false, error: 'No studio on this account.' };
-
-  const line = await prisma.studioQuoteLine.findFirst({
-    where: { id: lineId, quote: { studioId } },
-    select: { id: true, quoteId: true },
-  });
-  if (!line) return { ok: false, error: 'That line is not yours.' };
-
-  await prisma.studioQuoteLine.delete({ where: { id: lineId } });
-  await touch(line.quoteId);
-  return { ok: true };
-}
-
 export async function setQuoteStatus(
   quoteId: string,
   status: QuoteStatusName,
@@ -452,14 +331,45 @@ export async function setQuoteStatus(
        and the exact thing the comment here promised was stable. */
     const current = await prisma.studioQuote.findUnique({
       where: { id: quoteId },
-      select: { issuedOn: true },
+      select: { issuedOn: true, issuedLines: true },
     });
+
+    const firstIssue = status === 'ISSUED' && current?.issuedOn == null;
+
+    /**
+     * The copy the client receives, frozen on the way out.
+     *
+     * Taken on the FIRST issue only, guarded by `issuedLines` as well as
+     * `issuedOn`. Re-sending a revised quotation must not overwrite it — the
+     * whole value of the snapshot is that it is the version somebody is
+     * holding while asking what changed, and a snapshot that updates itself
+     * answers "nothing" every time.
+     */
+    const snapshot =
+      firstIssue && current?.issuedLines == null
+        ? await prisma.studioQuoteLine.findMany({
+            where: { quoteId },
+            orderBy: { sortOrder: 'asc' },
+            select: { room: true, product: true, amountPaise: true },
+          })
+        : null;
 
     await prisma.studioQuote.update({
       where: { id: quoteId },
       data: {
         status,
-        ...(status === 'ISSUED' && current?.issuedOn == null ? { issuedOn: new Date() } : {}),
+        ...(firstIssue ? { issuedOn: new Date() } : {}),
+        ...(snapshot
+          ? {
+              issuedLines: snapshot.map((l) => ({
+                room: l.room,
+                product: l.product,
+                // Plain number, not BigInt: Json cannot hold one, and this is
+                // read back by `readIssued` which expects exactly this shape.
+                amountPaise: fromDb(l.amountPaise),
+              })),
+            }
+          : {}),
       },
     });
     return { ok: true };
@@ -468,7 +378,303 @@ export async function setQuoteStatus(
   }
 }
 
-/** The list sorts on `updatedAt`, so a line edit has to move the parent. */
-async function touch(quoteId: string): Promise<void> {
-  await prisma.studioQuote.update({ where: { id: quoteId }, data: { updatedAt: new Date() } });
+// ── The whole quotation at once ────────────────────────────────
+
+/**
+ * Reading the frozen issued copy back.
+ *
+ * Defensive rather than trusting, because this column is Json: it was written
+ * by an older version of this file at some point in the past, and the shape a
+ * Json column holds is whatever was true the day it was written. A snapshot
+ * that cannot be read produces an empty comparison — "we cannot show what
+ * changed" — rather than a page that will not load.
+ */
+function readIssued(value: unknown): ComparableLine[] {
+  if (!Array.isArray(value)) return [];
+
+  const lines: ComparableLine[] = [];
+  for (const raw of value) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const row = raw as Record<string, unknown>;
+    if (typeof row.room !== 'string' || typeof row.product !== 'string') continue;
+    if (typeof row.amountPaise !== 'number' || !Number.isFinite(row.amountPaise)) continue;
+    lines.push({ room: row.room, product: row.product, amountPaise: row.amountPaise });
+  }
+  return lines;
+}
+
+/** One line as the builder hands it back. `id` is absent on a new line. */
+export interface SaveLineInput {
+  id?: string;
+  room: string;
+  product: string;
+  code: WorkCodeName;
+  unit: QuoteUnitName;
+  details?: string | null;
+  widthMm?: number | null;
+  heightMm?: number | null;
+  qtyMilli?: number | null;
+  ratePaise: Paise;
+  /** The agreed figure, overriding the arithmetic. Null returns the line to rate × quantity. */
+  agreedPaise?: Paise | null;
+}
+
+/** A line that survives the trip back from a browser. */
+function cleanLine(raw: SaveLineInput): SaveLineInput | null {
+  const room = String(raw.room ?? '').trim();
+  const product = String(raw.product ?? '').trim();
+  if (room.length === 0 || product.length === 0) return null;
+
+  const code: WorkCodeName = raw.code === 'ONSITE' ? 'ONSITE' : 'MODULAR';
+  const unit: QuoteUnitName =
+    raw.unit === 'SQFT' || raw.unit === 'RFT' || raw.unit === 'UNIT' ? raw.unit : 'AREA';
+
+  const whole = (value: unknown): number | null => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+    const n = Math.round(value);
+    /* Refused, not clamped. A negative width is a typo and a hundred-metre
+       wardrobe is a slipped decimal point; both should come back as a line
+       somebody looks at again rather than a number that prints. */
+    return n > 0 && n < 100_000_000 ? n : null;
+  };
+
+  const money = (value: unknown): Paise => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
+    const n = Math.round(value);
+    return n >= 0 ? n : 0;
+  };
+
+  return {
+    id: typeof raw.id === 'string' && raw.id.length > 0 ? raw.id : undefined,
+    room: room.slice(0, 80),
+    product: product.slice(0, 200),
+    code,
+    unit,
+    details: typeof raw.details === 'string' ? raw.details.slice(0, 2_000) : null,
+    widthMm: whole(raw.widthMm),
+    heightMm: whole(raw.heightMm),
+    qtyMilli: whole(raw.qtyMilli),
+    ratePaise: money(raw.ratePaise),
+    agreedPaise: raw.agreedPaise == null ? null : money(raw.agreedPaise),
+  };
+}
+
+/**
+ * Save the whole quotation in one go.
+ *
+ * ## Why this replaced a save per line
+ *
+ * The builder used to write each row on its own the moment it changed. Nothing
+ * was ever unsaved, which sounds like the safe choice and was the wrong one:
+ * pricing a job is forty lines of arithmetic where each number depends on the
+ * last, and forty round trips means the total on screen lags behind the
+ * figures being discussed. A designer needs to see what a change costs while
+ * the client is still asking.
+ *
+ * So the builder holds the lines, recalculates as they type, and this writes
+ * the result — one transaction, one `updatedAt`, one entry in the client's
+ * sense of what happened.
+ *
+ * ## Diffed rather than deleted and recreated
+ *
+ * The obvious build deletes every line and inserts the new set. It is shorter,
+ * and it throws away the ids — which the issued comparison does not need, but
+ * anything later that references a line would. Matching on id keeps a line the
+ * same line across an edit, which is what it is.
+ */
+export async function saveQuoteLines(
+  quoteId: string,
+  rawLines: SaveLineInput[],
+): Promise<ActionResult> {
+  if (!(await ownedQuote(quoteId))) return { ok: false, error: 'That quotation is not yours.' };
+
+  if (rawLines.length > 500) {
+    return { ok: false, error: 'That is more lines than a quotation can hold.' };
+  }
+
+  const lines = rawLines.map(cleanLine).filter((l): l is SaveLineInput => l !== null);
+
+  try {
+    const existing = await prisma.studioQuoteLine.findMany({
+      where: { quoteId },
+      select: { id: true },
+    });
+    const existingIds = new Set(existing.map((l) => l.id));
+
+    /* Ids the browser sent that are not on this quotation are dropped to
+       new lines rather than trusted. An id in a payload is not proof of
+       anything, and writing to one would be writing to another studio's
+       quotation. */
+    const kept = new Set<string>();
+
+    const writes = lines.map((line, index) => {
+      const amountPaise = toDb(
+        lineAmount({
+          unit: line.unit,
+          code: line.code,
+          ratePaise: line.ratePaise,
+          widthMm: line.widthMm,
+          heightMm: line.heightMm,
+          qtyMilli: line.qtyMilli,
+          amountPaise: line.agreedPaise ?? undefined,
+        }),
+      );
+
+      const data = {
+        room: line.room,
+        product: line.product,
+        code: line.code,
+        unit: line.unit,
+        details: line.details ?? null,
+        widthMm: line.widthMm ?? null,
+        heightMm: line.heightMm ?? null,
+        qtyMilli: line.qtyMilli ?? null,
+        ratePaise: toDb(line.ratePaise),
+        amountPaise,
+        /* Position in the array IS the order. The builder lets lines be moved,
+           and a sort key derived from anything else would fight it. */
+        sortOrder: (index + 1) * 10,
+      };
+
+      if (line.id && existingIds.has(line.id)) {
+        kept.add(line.id);
+        return prisma.studioQuoteLine.update({ where: { id: line.id }, data });
+      }
+      return prisma.studioQuoteLine.create({ data: { ...data, quoteId } });
+    });
+
+    const gone = [...existingIds].filter((id) => !kept.has(id));
+
+    await prisma.$transaction([
+      ...(gone.length > 0
+        ? [prisma.studioQuoteLine.deleteMany({ where: { id: { in: gone }, quoteId } })]
+        : []),
+      ...writes,
+      prisma.studioQuote.update({ where: { id: quoteId }, data: { updatedAt: new Date() } }),
+    ]);
+
+    return { ok: true };
+  } catch (error) {
+    console.error('[studio-quote] saveQuoteLines failed', error);
+    return { ok: false, error: 'That did not save. Nothing was changed.' };
+  }
+}
+
+export interface ApplyConfigInput {
+  quoteId: string;
+  home: HomeConfig;
+}
+
+export type ApplyResult =
+  | { ok: true; added: number; notes: string[] }
+  | { ok: false; error: string };
+
+/**
+ * Build the standard quotation for this flat, from this studio's catalogue.
+ *
+ * ## It replaces, and it says so before it does
+ *
+ * Applying a configuration over existing lines discards them. That is the
+ * behaviour anybody wants — "I picked 2 BHK and it is a 3" is the common case
+ * — but it is destructive, so the builder asks first when there is anything to
+ * lose. Doing it silently here, and confirming in the UI, keeps the
+ * destructive step in one place instead of two.
+ *
+ * ## The configuration is kept
+ *
+ * Kitchen run and bathroom count are written onto the quotation, not just used
+ * and forgotten. A studio who rebuilds after correcting one rate should not be
+ * asked to measure the kitchen again.
+ */
+export async function applyConfiguration(input: ApplyConfigInput): Promise<ApplyResult> {
+  const studioId = await myStudioId();
+  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+  if (!(await ownedQuote(input.quoteId))) {
+    return { ok: false, error: 'That quotation is not yours.' };
+  }
+
+  try {
+    const products = await prisma.studioProduct.findMany({
+      where: { studioId },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
+
+    const catalogue: CatalogueProduct[] = products.map((p) => ({
+      id: p.id,
+      name: p.name,
+      code: p.code as WorkCodeName,
+      unit: p.unit as QuoteUnitName,
+      details: p.details,
+      ratePaise: fromDb(p.ratePaise),
+      rooms: p.rooms,
+      defaultWidthMm: p.defaultWidthMm,
+      defaultHeightMm: p.defaultHeightMm,
+      defaultQty: p.defaultQty,
+      inStandardBuild: p.inStandardBuild,
+      isActive: p.isActive,
+      sortOrder: p.sortOrder,
+    }));
+
+    const { lines, notes } = planQuotation(input.home, catalogue);
+
+    await prisma.$transaction([
+      prisma.studioQuoteLine.deleteMany({ where: { quoteId: input.quoteId } }),
+      ...lines.map((line, index) =>
+        prisma.studioQuoteLine.create({
+          data: {
+            quoteId: input.quoteId,
+            room: line.room,
+            product: line.product,
+            code: line.code,
+            unit: line.unit,
+            details: line.details,
+            widthMm: line.widthMm,
+            heightMm: line.heightMm,
+            qtyMilli: line.qtyMilli,
+            ratePaise: toDb(line.ratePaise),
+            amountPaise: toDb(
+              lineAmount({
+                unit: line.unit,
+                code: line.code,
+                ratePaise: line.ratePaise,
+                widthMm: line.widthMm,
+                heightMm: line.heightMm,
+                qtyMilli: line.qtyMilli,
+              }),
+            ),
+            sortOrder: (index + 1) * 10,
+          },
+        }),
+      ),
+      prisma.studioQuote.update({
+        where: { id: input.quoteId },
+        data: {
+          config: input.home.config,
+          kitchenRunMm: input.home.kitchenRunMm,
+          bathrooms: input.home.bathrooms,
+          updatedAt: new Date(),
+        },
+      }),
+    ]);
+
+    return { ok: true, added: lines.length, notes };
+  } catch (error) {
+    console.error('[studio-quote] applyConfiguration failed', error);
+    return { ok: false, error: 'That did not build. Nothing was changed.' };
+  }
+}
+
+/** Start again from nothing, keeping the client and the terms. */
+export async function clearQuoteLines(quoteId: string): Promise<ActionResult> {
+  if (!(await ownedQuote(quoteId))) return { ok: false, error: 'That quotation is not yours.' };
+
+  try {
+    await prisma.$transaction([
+      prisma.studioQuoteLine.deleteMany({ where: { quoteId } }),
+      prisma.studioQuote.update({ where: { id: quoteId }, data: { updatedAt: new Date() } }),
+    ]);
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'That did not save.' };
+  }
 }

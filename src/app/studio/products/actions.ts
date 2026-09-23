@@ -5,6 +5,7 @@ import { rupeesToPaise } from '@/lib/money';
 import {
   setProductRate,
   setProductActive,
+  setProductStandard,
   addProduct,
   type SaveResult,
 } from '@/modules/studio-quote/store';
@@ -73,4 +74,15 @@ export async function addProductAction(_prev: State, form: FormData): Promise<St
       details: String(form.get('details') ?? ''),
     }),
   );
+}
+
+/**
+ * Tick a product into the standard build.
+ *
+ * What this decides: whether the quotation builder puts it on the page when a
+ * studio presses "Build the 3 BHK". See `StandardCell` for why it lives on
+ * the product rather than in a list of its own.
+ */
+export async function toggleStandardAction(id: string, standard: boolean): Promise<State> {
+  return done(await setProductStandard(id, standard));
 }

@@ -65,11 +65,11 @@ model User {
   studioMember  StudioMember?
   sessions      Session[]
   consents      Consent[]
-  auditEntries  AuditLog[]     @relation("AuditActor")
+  auditEntries  AuditLog[]        @relation("AuditActor")
   notifications Notification[]
   /// Documents this person reviewed. SetNull on the other side — removing an
   /// ops account must not delete the record of what they decided.
-  reviewedDocs  StudioDocument[] @relation("StudioDocumentReviewer")
+  reviewedDocs  StudioDocument[]  @relation("StudioDocumentReviewer")
   reviewedRates StudioFiledRate[] @relation("FiledRateReviewer")
 
   @@index([role])
@@ -413,7 +413,7 @@ model Studio {
   /// Six digits, as text. Never an integer: that drops the leading zero a
   /// large share of Indian pincodes start with, and nothing is computed from
   /// one — it is an identifier that happens to be made of digits.
-  pincode     String?
+  pincode String?
 
   status StudioStatus     @default(ONBOARDING)
   tier   VerificationTier @default(UNVERIFIED)
@@ -510,7 +510,7 @@ model Studio {
   /// quoted for execution, and until this existed nothing could tell us it
   /// was one. The matcher can act on a column; it cannot act on a sentence in
   /// the description.
-  offering   String?
+  offering String?
 
   /// How the studio wants to be read: budget, mid, premium, luxury.
   ///
@@ -1599,6 +1599,17 @@ model StudioProduct {
   defaultHeightMm Int?
   defaultQty      Int?
 
+  /// Does this go on the quotation when a studio applies a
+  /// configuration?
+  ///
+  /// The difference between a catalogue and a standard specification.
+  /// A studio sells forty products and puts about twenty-five of them
+  /// on nearly every 3 BHK; this marks which. Off by default, because
+  /// a build we assembled from guesses is worse than an empty one —
+  /// the studio ticks what they actually fit as standard, once, and
+  /// every later quotation starts from their own practice.
+  inStandardBuild Boolean @default(false)
+
   sortOrder Int     @default(100)
   isActive  Boolean @default(true)
 
@@ -1629,6 +1640,32 @@ model StudioQuote {
   locality    String?
   config      String?
   carpetSqft  Int?
+
+  /// The kitchen run, in millimetres: base + wall + loft are all
+  /// priced on it.
+  ///
+  /// One measurement that sets three line widths, which is why it is
+  /// a field on the quotation rather than three numbers typed three
+  /// times. Kept after the build so re-applying a configuration does
+  /// not ask for it again.
+  kitchenRunMm Int?
+
+  /// How many bathrooms get a vanity. Counted, not derived from the
+  /// BHK: a 2 BHK with three bathrooms is ordinary in Pune.
+  bathrooms Int?
+
+  /// The lines as the client first received them.
+  ///
+  /// Written once, when the quotation is issued, and never again — so
+  /// "what changed since we sent it" has something true to compare
+  /// against. A revision history would be the general version of this
+  /// and is not what anybody asks for: the question in the room is
+  /// always about the document the client is holding.
+  ///
+  /// Json rather than a table because it is a frozen copy that is
+  /// never queried across rows, and a table of snapshots invites
+  /// somebody to edit one.
+  issuedLines Json?
 
   /// Set when this client came from us. Null for the studio's own
   /// work, which is most of it and must stay first-class.
@@ -2734,7 +2771,6 @@ model StudioDocument {
   @@index([studioId, state])
   @@map("studio_documents")
 }
-
 
 /// One rate, for one catalogue item, derived from one studio's own quotations.
 ///

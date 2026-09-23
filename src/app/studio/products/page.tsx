@@ -43,6 +43,7 @@ export default async function ProductsPage() {
   const products = await myProducts();
   const priced = products.filter((p) => p.ratePaise > 0).length;
   const blank = products.length - priced;
+  const standard = products.filter((p) => p.inStandardBuild).length;
 
   return (
     <>
@@ -65,8 +66,29 @@ export default async function ProductsPage() {
               We have given you the shape of a catalogue — what the line is called, how it is
               measured, and whether it is factory or site work. Every rate is blank on purpose: we
               told you we would never suggest a figure, and a default you accept in a hurry is a
-              price we set. A product with no rate simply does not appear when you build a
-              quotation.
+              price we set. A product with no rate still lands on a quotation when you build one —
+              at zero, flagged — because a line you can see is unfinished is better than one that
+              silently went missing.
+            </p>
+          </div>
+        ) : null}
+
+        {/* The highest-leverage control in the studio software, and one
+            nobody would find on their own: a catalogue with nothing ticked
+            makes "Build the 3 BHK" produce an empty quotation. Said once, at
+            the top, and only while it is still true. */}
+        {products.length > 0 && standard === 0 ? (
+          <div className="s-card mb-6 border-l-[3px] !border-l-[var(--s-accent)] p-5">
+            <p className="m-0 mb-2 text-[14.5px] font-semibold">
+              Tick what you fit as standard.
+            </p>
+            <p className="m-0 max-w-[68ch] text-[14px] leading-relaxed text-[var(--s-ink-2)]">
+              Most of a quotation is the same twenty-five lines every time — base and wall
+              cabinets, a wardrobe in each bedroom, a vanity in each bathroom, false ceiling,
+              painting. Tick those here and the quotation builder assembles a whole 3 BHK in one
+              press, sized and priced from this list, for you to correct rather than type. It is
+              a different question from whether you sell something: a walk-in wardrobe is priced,
+              active, and not standard.
             </p>
           </div>
         ) : null}

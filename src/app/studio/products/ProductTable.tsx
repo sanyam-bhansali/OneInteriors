@@ -1,11 +1,11 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useState, useTransition } from 'react';
 import { paiseToRupees } from '@/lib/money';
 import { ROOM_CATEGORIES } from '@/modules/studio-quote/starter-catalogue';
 import { UNIT_LABELS, WORK_CODE_LABELS, type QuoteUnitName, type WorkCodeName } from '@/modules/studio-quote/pricing';
 import type { ProductRow } from '@/modules/studio-quote/store';
-import { saveRateAction, addProductAction } from './actions';
+import { saveRateAction, addProductAction, toggleStandardAction } from './actions';
 import { IDLE } from '../form-state';
 
 const input =
@@ -52,6 +52,60 @@ function RateCell({ product }: { product: ProductRow }) {
         <span className="text-[12.5px] text-[var(--s-bad)]">{state.error}</span>
       ) : null}
     </form>
+  );
+}
+
+/**
+ * Is this part of what the studio fits as standard?
+ *
+ * ## Why a tick here rather than a list somewhere else
+ *
+ * The quotation builder can assemble a 3 BHK in one press, and what it
+ * assembles is exactly the products ticked here. That makes this column the
+ * highest-leverage control in the studio software: twenty-five ticks, once,
+ * turn every future quotation from an hour of typing into a few corrections.
+ *
+ * It is a separate question from the rate and from whether the product is
+ * sold at all. A walk-in wardrobe is priced, active, and not standard. Writing
+ * it as a second list would be a second list to keep in step with the first;
+ * as a tick beside the rate it is maintained in the place a studio already
+ * visits when their practice changes.
+ *
+ * Saves on change, with no confirmation. A tick that needs a Save button is a
+ * tick people forget to press, and the cost of an accidental one is a line on
+ * the next build that they delete.
+ */
+function StandardCell({ product }: { product: ProductRow }) {
+  const [on, setOn] = useState(product.inStandardBuild);
+  const [pending, start] = useTransition();
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-[var(--s-ink-2)]">
+      <input
+        type="checkbox"
+        checked={on}
+        disabled={pending}
+        onChange={(e) => {
+          const next = e.target.checked;
+          setOn(next);
+          setFailed(false);
+          start(async () => {
+            const result = await toggleStandardAction(product.id, next);
+            /* Put back on failure. A tick that stayed ticked while the write
+               failed is a product the studio believes is in their standard
+               build and is not. */
+            if (result && 'ok' in result && !result.ok) {
+              setOn(!next);
+              setFailed(true);
+            }
+          });
+        }}
+        className="h-[15px] w-[15px] accent-[var(--s-accent)]"
+      />
+      Standard
+      {failed ? <span className="text-[var(--s-bad)]">not saved</span> : null}
+    </label>
   );
 }
 
@@ -150,7 +204,8 @@ export function ProductTable({ products }: { products: ProductRow[] }) {
           <div className="flex items-baseline justify-between gap-4 border-b border-[var(--s-rule)] bg-[var(--s-surface-2)] px-5 py-3">
             <h2 className="m-0 text-[15px] font-semibold">{group.room}</h2>
             <span className="s-label">
-              {group.items.filter((p) => p.ratePaise > 0).length} of {group.items.length} priced
+              {group.items.filter((p) => p.ratePaise > 0).length} of {group.items.length} priced ·{' '}
+              {group.items.filter((p) => p.inStandardBuild).length} standard
             </span>
           </div>
 
@@ -177,6 +232,7 @@ export function ProductTable({ products }: { products: ProductRow[] }) {
                   ) : null}
                 </div>
 
+                <StandardCell product={p} />
                 <RateCell product={p} />
               </li>
             ))}

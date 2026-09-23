@@ -2,16 +2,16 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { rupeesToPaise } from '@/lib/money';
 import {
   createQuote,
-  addLine,
-  editLine,
-  removeLine,
   setQuoteStatus,
+  saveQuoteLines,
+  applyConfiguration,
+  clearQuoteLines,
   type QuoteStatusName,
+  type SaveLineInput,
 } from '@/modules/studio-quote/quotes';
-import { QTY_SCALE } from '@/modules/studio-quote/pricing';
+import type { HomeConfig } from '@/modules/studio-quote/configure';
 
 // `State` and `IDLE` live in studio/form-state.ts. A 'use server'
 // file may only export async functions — and Turbopack rejects even a
@@ -46,69 +46,60 @@ export async function createQuoteAction(_prev: State, form: FormData): Promise<S
   redirect(`/studio/quotations/${result.id}`);
 }
 
-export async function addLineAction(quoteId: string, room: string, productId: string): Promise<State> {
-  const result = await addLine({ quoteId, room, productId });
+/**
+ * The per-line writes that used to live here are gone.
+ *
+ * `addLineAction`, `editLineAction` and `removeLineAction` each wrote one row
+ * the moment it changed. The builder now holds the lines and sends them
+ * together through `saveLinesAction`, and keeping the old path alongside it
+ * would be two ways to write a quotation line that round differently the
+ * first time one of them is changed and the other is not.
+ *
+ * Recoverable from git history if a single-line write is ever wanted again.
+ */
+
+export async function setStatusAction(quoteId: string, status: QuoteStatusName): Promise<State> {
+  const result = await setQuoteStatus(quoteId, status);
   if (!result.ok) return result;
   refresh(quoteId);
   return { ok: true };
 }
 
 /**
- * Edit one line.
+ * The builder's Save: the whole quotation, in one call.
  *
- * Dimensions arrive in millimetres and quantities in whole units; the quantity
- * is scaled to thousandths here, at the edge, so the store never has to guess
- * which unit it was handed.
+ * Takes an array rather than a FormData. This is the one place in the studio
+ * surface that does, and the reason is that the payload is forty rows of
+ * numbers with an order that matters — serialising that through form fields
+ * means `lines[7].widthMm` string keys and a parser to match, which is a
+ * second place for the shape to be wrong.
  *
- * An empty "agreed" field CLEARS the override rather than setting zero — those
- * are different answers, and conflating them would silently zero a line the
- * moment somebody tabbed through it.
+ * The array is still untrusted. `saveQuoteLines` cleans every field and
+ * refuses ids that are not on this quotation; nothing here assumes the
+ * browser sent what the builder renders.
  */
-export async function editLineAction(_prev: State, form: FormData): Promise<State> {
-  const lineId = str(form, 'lineId');
-  const quoteId = str(form, 'quoteId');
-  if (!lineId) return { ok: false, error: 'No line.' };
-
-  const num = (k: string): number | null => {
-    const raw = str(form, k);
-    if (raw === '') return null;
-    const n = Number(raw);
-    return Number.isFinite(n) && n >= 0 ? n : null;
-  };
-
-  const width = num('widthMm');
-  const height = num('heightMm');
-  const qty = num('qty');
-  const rate = num('rate');
-  const agreedRaw = str(form, 'agreed');
-
-  if (str(form, 'rate') !== '' && rate === null) {
-    return { ok: false, error: 'The rate needs to be a number.' };
-  }
-
-  const result = await editLine({
-    lineId,
-    widthMm: width,
-    heightMm: height,
-    qtyMilli: qty === null ? null : Math.round(qty * QTY_SCALE),
-    ratePaise: rate === null ? undefined : rupeesToPaise(rate),
-    agreedPaise: agreedRaw === '' ? null : rupeesToPaise(Number(agreedRaw)),
-  });
-
+export async function saveLinesAction(quoteId: string, lines: SaveLineInput[]): Promise<State> {
+  const result = await saveQuoteLines(quoteId, lines);
   if (!result.ok) return result;
   refresh(quoteId);
   return { ok: true };
 }
 
-export async function removeLineAction(lineId: string, quoteId: string): Promise<State> {
-  const result = await removeLine(lineId);
+export type BuildState =
+  | { ok: true; added: number; notes: string[] }
+  | { ok: false; error: string }
+  | null;
+
+/** Build the standard quotation for this flat. Replaces whatever is there. */
+export async function applyConfigAction(quoteId: string, home: HomeConfig): Promise<BuildState> {
+  const result = await applyConfiguration({ quoteId, home });
   if (!result.ok) return result;
   refresh(quoteId);
-  return { ok: true };
+  return result;
 }
 
-export async function setStatusAction(quoteId: string, status: QuoteStatusName): Promise<State> {
-  const result = await setQuoteStatus(quoteId, status);
+export async function clearLinesAction(quoteId: string): Promise<State> {
+  const result = await clearQuoteLines(quoteId);
   if (!result.ok) return result;
   refresh(quoteId);
   return { ok: true };

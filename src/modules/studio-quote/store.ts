@@ -63,6 +63,8 @@ export interface ProductRow {
   defaultQty: number | null;
   sortOrder: number;
   isActive: boolean;
+  /** Does this go on the quotation when a configuration is applied? */
+  inStandardBuild: boolean;
 }
 
 /**
@@ -112,6 +114,7 @@ function toProductRow(row: {
   defaultQty: number | null;
   sortOrder: number;
   isActive: boolean;
+  inStandardBuild: boolean;
 }): ProductRow {
   return {
     id: row.id,
@@ -128,6 +131,7 @@ function toProductRow(row: {
     defaultQty: row.defaultQty,
     sortOrder: row.sortOrder,
     isActive: row.isActive,
+    inStandardBuild: row.inStandardBuild,
   };
 }
 
@@ -154,6 +158,34 @@ export async function setProductRate(productId: string, ratePaise: Paise): Promi
     return { ok: true };
   } catch (error) {
     console.error('[studio-quote] setProductRate failed', error);
+    return { ok: false, error: 'That did not save.' };
+  }
+}
+
+/**
+ * Is this part of what the studio fits as standard?
+ *
+ * Separate from `isActive`, and the difference is load-bearing. Active means
+ * "I sell this"; standard means "I put it on nearly every job". A walk-in
+ * wardrobe is firmly the first and firmly not the second, and collapsing them
+ * would either drop it from the catalogue or put one in every bedroom of every
+ * flat.
+ */
+export async function setProductStandard(
+  productId: string,
+  inStandardBuild: boolean,
+): Promise<SaveResult> {
+  const studioId = await myStudioId();
+  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+
+  try {
+    const { count } = await prisma.studioProduct.updateMany({
+      where: { id: productId, studioId },
+      data: { inStandardBuild },
+    });
+    if (count === 0) return { ok: false, error: 'That product is not yours.' };
+    return { ok: true };
+  } catch {
     return { ok: false, error: 'That did not save.' };
   }
 }
