@@ -11,7 +11,7 @@ import {
   type QuoteStatusName,
   type SaveLineInput,
 } from '@/modules/studio-quote/quotes';
-import type { HomeConfig } from '@/modules/studio-quote/configure';
+import { isConfigName, type HomeConfig } from '@/modules/studio-quote/configure';
 
 // `State` and `IDLE` live in studio/form-state.ts. A 'use server'
 // file may only export async functions — and Turbopack rejects even a
@@ -27,22 +27,60 @@ function refresh(quoteId?: string) {
   if (quoteId) revalidatePath(`/studio/quotations/${quoteId}`);
 }
 
+/**
+ * Start a quotation — and, unless asked not to, build it.
+ *
+ * ## Why the build happens here rather than on the next screen
+ *
+ * Because "new quotation" followed by an empty page is the difference
+ * between a builder and a filing cabinet. The facts the build needs — who it
+ * is for, how big the flat is, how long the kitchen is — are the same facts
+ * anybody types when starting one, so asking for them once and arriving at
+ * forty priced lines is strictly better than asking for them once, arriving
+ * at nothing, and asking for them again.
+ *
+ * Blank is still one press away, for the one-room job where a standard build
+ * is noise.
+ *
+ * ## The build failing does not fail the creation
+ *
+ * A studio whose catalogue has nothing marked standard gets an empty
+ * quotation rather than an error and no quotation. They are then on the
+ * builder, where the panel says what to tick and where — which is a better
+ * place to learn it than a form they have just been bounced out of.
+ */
 export async function createQuoteAction(_prev: State, form: FormData): Promise<State> {
   const carpet = Number(str(form, 'carpetSqft'));
+  const config = str(form, 'config');
 
   const result = await createQuote({
     clientName: str(form, 'clientName'),
     clientPhone: str(form, 'clientPhone'),
     society: str(form, 'society'),
-    config: str(form, 'config'),
+    config,
     carpetSqft: Number.isFinite(carpet) && carpet > 0 ? Math.round(carpet) : undefined,
   });
 
   if (!result.ok) return result;
 
+  if (str(form, 'build') === 'yes' && isConfigName(config)) {
+    const run = Number(str(form, 'kitchenRunMm'));
+    const baths = Number(str(form, 'bathrooms'));
+
+    await applyConfiguration({
+      quoteId: result.id,
+      home: {
+        config,
+        kitchenRunMm: Number.isFinite(run) && run > 0 ? Math.round(run) : null,
+        bathrooms: Number.isFinite(baths) && baths >= 0 ? Math.round(baths) : 2,
+        study: str(form, 'study') === 'yes',
+      },
+    });
+  }
+
   refresh();
   // Straight into the builder. A confirmation screen between "new quotation"
-  // and "add the first line" buys nobody anything.
+  // and "the quotation" buys nobody anything.
   redirect(`/studio/quotations/${result.id}`);
 }
 

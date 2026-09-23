@@ -5,8 +5,8 @@ import { GuidePanel } from '../GuidePanel';
 import { guideContext } from '@/modules/studio/guide-store';
 import { formatINR } from '@/lib/money';
 import { myQuotes, STATUS_LABELS, type QuoteStatusName } from '@/modules/studio-quote/quotes';
-import { myBranding, myProducts } from '@/modules/studio-quote/store';
-import { NewQuote } from './NewQuote';
+import { myProducts } from '@/modules/studio-quote/store';
+import { StartQuote } from './NewQuote';
 
 export const metadata: Metadata = {
   title: 'Quotations',
@@ -30,10 +30,17 @@ const TONE: Record<QuoteStatusName, string> = {
  * and this is a work surface.
  */
 export default async function QuotationsPage() {
-  const [quotes, branding, products] = await Promise.all([myQuotes(), myBranding(), myProducts()]);
+  const [quotes, products] = await Promise.all([myQuotes(), myProducts()]);
 
   const priced = products.filter((p) => p.ratePaise > 0).length;
-  const blocked = !branding || priced === 0;
+  const standard = products.filter((p) => p.inStandardBuild).length;
+
+  /* Branding is no longer read here, and the button is no longer gated on it.
+     `myBranding()` seeds the row from the registration step, so a studio who
+     has onboarded has one; the genuine remaining case — quoting before
+     registering — is refused by `createQuote` server-side, with a sentence
+     naming the step to finish. A page that hides its only control because a
+     prerequisite MIGHT be missing is a page with nothing on it. */
 
   /* Every step is derived from the studio's own rows — there is no way to
      mark one done without having done it. See modules/studio/guide.ts. */
@@ -46,13 +53,13 @@ export default async function QuotationsPage() {
         title="Quotations"
         sub={
           quotes.length === 0
-            ? 'Nothing written yet.'
+            ? 'Tell it about the flat and it writes the first draft.'
             : `${quotes.length} · ${quotes.filter((q) => q.status === 'DRAFT').length} still in draft`
         }
         action={
-          <div className="relative">
-            <NewQuote blocked={blocked} />
-          </div>
+          quotes.length > 0 ? (
+            <StartQuote priced={priced} standard={standard} total={products.length} compact />
+          ) : null
         }
       />
 
@@ -65,12 +72,17 @@ export default async function QuotationsPage() {
             createQuote() still enforces branding server-side. */}
         <GuidePanel guide="quotations" facts={facts} dismissed={dismissed} />
 
+        {/* The empty state IS the builder.
+            It used to be a paragraph explaining that quotations live here,
+            with the only way to make one hidden behind a button that removed
+            itself whenever the catalogue was unpriced — so the first screen
+            of the feature was a description of a filing cabinet with no
+            drawer. Now the first screen writes a quotation. */}
         {quotes.length === 0 ? (
-          <div className="s-card p-8">
-            <p className="m-0 mb-2 text-[15.5px] font-semibold">
-              Every quotation you write lives here.
-            </p>
-            <p className="m-0 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--s-ink-2)]">
+          <div className="flex flex-col gap-4">
+            <StartQuote priced={priced} standard={standard} total={products.length} />
+
+            <p className="m-0 max-w-[68ch] px-1 text-[13.5px] leading-relaxed text-[var(--s-ink-3)]">
               Yours, on your letterhead, for your own clients as much as the ones we introduce. We
               never see what you charge on one and we take nothing from a project that did not come
               through us.
