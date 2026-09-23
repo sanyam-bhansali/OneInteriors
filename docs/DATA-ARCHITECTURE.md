@@ -114,17 +114,24 @@ give them one rule rather than two copies.
 
 ### 4.1 The mechanism
 
-One user belongs to one studio. `StudioMember.userId` is unique, and three
+One user belongs to one studio. `StudioMember.userId` is unique, and two
 helpers resolve it:
 
-- `currentStudio()` — `modules/studio/onboarding.ts:121`
-- `myStudioId()` — `modules/studio-quote/store.ts:36`
-- `myStudioId()` — `modules/studio/dashboard.ts:44` ← **a second, weaker copy**
+- `myStudioId()` — `modules/studio/tenancy.ts`, the primitive. Re-exported
+  from `studio-quote/store.ts`, which is where it used to live.
+- `currentStudio()` — `modules/studio/onboarding.ts`, the same resolution plus
+  the whole onboarding context.
+
+There was a third: a copy in `dashboard.ts` with the STUDIO role check missing
+and no callers. A second, weaker copy of the function that decides whose data
+you are looking at is not a duplication worth tolerating — whichever one a
+reader finds first becomes the one they call. It is gone.
 
 Every studio-scoped query is `where: { studioId }`, and every write that takes
 an id from a form re-checks ownership before using it — `ownedQuote()`,
 `findFirst({ id, studioId })`, or an `updateMany` scoped by both. A full scan
-of all 26 studio-owned models found **no cross-tenant leak today.**
+of all studio-owned models found **no cross-tenant leak**, and
+`tests/tenant-scope.test.ts` now runs that scan on every build.
 
 ### 4.2 The honest part
 
@@ -149,7 +156,17 @@ which is why the lockdown has not eroded — but it is a regex over migration
 SQL. It proves the statements were written; it does not prove a policy exists,
 because none do.
 
-**At 50–100 studios this is the central risk.** §7 says what to do about it.
+**What now stands in for the missing floor** is
+`tests/tenant-scope.test.ts`: every Prisma call on a studio-owned table must be
+scoped, role-guarded, or excused in writing. It is a static scan rather than a
+proof — it cannot know that a variable called `studioId` holds the session's
+studio — but it makes the *absence* of scoping impossible to introduce quietly,
+and it was proven against real injected regressions rather than assumed to
+work.
+
+That is a good second line. It is not a floor: policies keyed on a session
+variable, with Prisma connecting as a non-owner role, is the only version where
+a forgotten `where` fails closed. See §7.4.
 
 ---
 
@@ -205,13 +222,13 @@ Properties worth keeping:
 - Deletes are best-effort. An orphaned object costs kilobytes; a failed delete
   that took the row with it would cost the document.
 
-**The one soft spot:** `signedLogoUrl(path)` (`studio-logo.ts:108`) signs any
-path handed to it. Today every caller passes `StudioBranding.logoPath` read off
-the already-authorised studio's own row, so no browser-supplied id reaches it —
-and the function says so in a comment. But that invariant is convention, not
-code. One future caller passing a request parameter turns it into a
-cross-studio read. Low impact (a logo is on their van), but it is the only
-bucket where the boundary is a comment.
+**The soft spot, now closed:** `signedLogoUrl(path)` used to sign any path
+handed to it, on the argument that every caller passes `StudioBranding.logoPath`
+read off the already-authorised studio's own row. That was true, and it was a
+comment rather than a check — one future caller passing a request parameter
+would have turned it into a cross-studio read. It now refuses any path outside
+`studio_<yourStudioId>/`, with ops passing through. Every bucket's boundary is
+code.
 
 ### 5.3 Storage at 100 studios
 
@@ -255,41 +272,55 @@ that are permanently at their defaults.
 
 ## 7. The plan for 50–100 studios
 
-Ranked by what actually bites, not by effort.
+Ranked by what actually bites, not by effort. **Everything in P0, P1 and P2 was
+done on 23 Sep 2026** — each item below says what it turned into, so this reads
+as a record rather than a wishlist. What remains open is §7.4.
 
-### P0 — before the roster grows
+### P0 — before the roster grows ✅
 
-**1. A second line of defence under tenancy.**
-Today one forgotten `where` is a cross-tenant leak. Two options, and they
-compose:
+**1. A second line of defence under tenancy.** → `tests/tenant-scope.test.ts`
 
-- *Cheap and immediate:* a test that walks every `prisma.<model>.<op>` call on
-  the 26 studio-owned models and fails the build if the `where` has no
-  `studioId` (or is not preceded by an ownership check). The audit that found
-  the current state clean was manual; make it a test and it stays clean.
-- *Proper:* give Prisma a non-owner role and write RLS policies keyed on a
-  session variable (`SET LOCAL app.studio_id`), with a `withStudio()` wrapper
-  opening the transaction. This is the AxLeads pattern (`withTenant()`), it is
-  known to work, and it is the only version where a forgotten `where` fails
-  closed.
+Every `prisma.<model>.<op>` call on a studio-owned table is scanned, and the
+build fails unless it is scoped by `studioId` (or by the session's `userId`),
+guarded by an OPS/ADMIN role check, or listed in `ALLOWED` with a reason. The
+model list is **derived from `schema.prisma`**, so a new studio-owned table is
+covered the day it is added rather than the day somebody remembers.
 
-**2. Index `StudioQuote.clientId`.**
-The leads board loads up to 400 clients and includes their quotes, so Postgres
-runs `WHERE clientId IN (400 ids)` against an **unindexed column** on every
-board render. One `@@index([clientId])`, one migration. This is the single
-cheapest performance fix in the system.
+It was tested by regression, not by assumption: a deliberately unscoped query
+was added to two different modules and the test caught both. The first version
+did not — it excused any file containing `hasRole(`, which is inside
+`myStudioId()` itself, so most of the codebase walked through. The guard now
+matches on the ROLE, not the function.
 
-**3. Stop seeding on read.**
-`myProducts()`, `myStages()` and `seedDemoLead()` each check-and-maybe-write on
-every page load. They are idempotent and cheap today, but they turn every read
-into a write-capable transaction through the pooler, and `/studio/quotations`
-calls two of them concurrently. Move provisioning to approval time — the same
-place `fillProductMaster` already runs — with a one-off backfill for existing
-studios.
+There is also a test that fails if `CREATE POLICY` ever appears, because that
+would mean this file's premise had changed and the header needs rewriting.
+
+*Still the right next step, unblocked by the above:* a non-owner Prisma role
+with RLS policies keyed on `SET LOCAL app.studio_id`. That is the only version
+where a forgotten `where` fails closed rather than being caught by a scan. See
+§7.4.
+
+**2. Index `StudioQuote.clientId`.** → `20260923060000_quote_client_index`
+
+Done. `CONCURRENTLY` is deliberately not used — Prisma runs migrations in a
+transaction and cannot — which is noted in the migration for whenever the table
+is large enough to care.
+
+**3. Stop seeding on read.** → `modules/studio/provision.ts`
+
+`provisionWorkspace()` writes the starter catalogue and the pipeline once, when
+the application is approved, beside the `Studio`, `User` and `StudioMember`
+rows. It never throws: a studio who signs in to an empty catalogue is a smaller
+problem than an approval that failed because a starter row would not insert.
+
+The lazy paths in `myProducts()` and `myStages()` are **kept and relabelled as
+a migration path** — they are the only thing standing between a studio created
+before this existed and an empty product master. Delete them once no studio
+predates provisioning.
 
 ### P1 — before it hurts
 
-**4. Reconcile the three rate stores.**
+**4. Reconcile the three rate stores.** — **STILL OPEN**, see §7.4.
 Decide which one is the source of truth. The honest answer is
 `StudioFiledRate` (derived from their own documents, reviewed by ops), with
 `StudioProduct` as the studio's editable working copy and `RateCardItem`
@@ -297,35 +328,80 @@ retired or explicitly relabelled as the indicative marketplace bucket. Whatever
 is decided, one document should be able to answer "what does this studio charge
 for a wardrobe?" without asking which screen you are on.
 
-**5. Bound the unbounded reads.**
-76 `findMany` calls have no `take`. The ones on studio-scoped hot paths:
-`archivesForStudio`, `liveRatesFor`, `myFiledRates`, and several in
-`studio-practice/clients.ts`. A `take` on each is minutes of work and removes a
-whole class of future incident.
+**5. Bound the unbounded reads.** ✅
 
-**6. Fix the archive extractor's memory profile.**
-`extract-agent.ts:167` downloads every file of an archive **sequentially, into
-base64, in one serverless invocation**. Worst case with the current caps is
-roughly a gigabyte in memory. Process in batches, or stream, or move it to a
-queue.
+`archivesForStudio` (100 — and it carries every file row of every archive, so
+unbounded it grows quadratically), `liveRatesFor` (200, on the pricing path),
+`myFiledRates` (100), `ratesForReview` (100), and the extractor's file read
+(120). Each `take` carries a comment saying what the number means, so nobody
+later reads it as a page size.
 
-**7. Aggregate the board's quoted value.**
-`clients.ts:93` sums every line of every quote of every one of 400 clients in
-JavaScript. Cost grows with quote history, not with client count — so it gets
-worse precisely as a studio succeeds. Use a grouped aggregate.
+**6. Fix the archive extractor's memory profile.** ✅
 
-### P2 — hygiene, worth a quiet afternoon
+It already batched by COUNT — four files — which says nothing about size: four
+25 MB PDFs is ~133 MB of base64 in one invocation. It now batches by **bytes**
+as well (18 MB of encoded data per request), releases each batch before
+fetching the next, and still sends an oversized single file on its own rather
+than skipping it.
 
-8. Collapse the duplicate `myStudioId()` in `dashboard.ts` into the one in
-   `studio-quote/store.ts` (it is missing the STUDIO role check).
-9. Give `signedLogoUrl` an explicit studio check so the boundary is code.
-10. Drop the dead columns; decide whether the performance block should be
-    written or removed, because a tier computed from permanent defaults is
-    worse than no tier.
-11. Re-sync `StudioBranding` identity when the registration changes.
-12. Use `readSteps()` in the four places that re-cast the JSON.
-13. Set `connection_limit=1` explicitly on `DATABASE_URL` in production (the
-    docs say to; verify Vercel actually has it).
+**7. Aggregate the board's quoted value.** ✅
+
+`quotedPerClient()` does it in two queries — one to map quotes to clients, one
+`groupBy` with a `_sum` — over the index added in item 2. Scoped by `studioId`
+as well as by the id list, because an id list assembled from a previous query
+is still a list of ids.
+
+### P2 — hygiene ✅
+
+8. **One tenancy helper.** → `modules/studio/tenancy.ts`. The weaker copy in
+   `dashboard.ts` is gone (it had no callers and no STUDIO role check);
+   `studio-quote/store.ts` re-exports the canonical one, so no import had to
+   move.
+9. **`signedLogoUrl` checks the prefix.** A path that is not
+   `studio_<yourStudioId>/…` is refused, whoever handed it over. Ops pass
+   through. `myFiledRates` got the same treatment — it took a `studioId`
+   parameter with no authorisation of its own, in a file that also exports
+   OPS-guarded functions.
+10. **Dead columns dropped** → `20260923070000_drop_dead_studio_columns`:
+    `cin`, `udyamNumber`, `designFeePaise`, `performanceComputedAt`. Verified
+    zero readers and zero writers first. `panLast4` was KEPT — it has a writer
+    and is a record of what was verified. The performance block was kept too,
+    and the reason is item 4 of §7.4.
+11. **Branding re-syncs from the registration.** `saveRegistration` pushes the
+    identity through to `StudioBranding` — and only from there, because that is
+    the screen ops verifies against the registries. Quotations already issued
+    are untouched: they carry their own snapshot.
+12. **One reader for the JSON.** → `modules/studio/submitted.ts`. Four inline
+    casts of an untyped Json column replaced by one defensive function. A cast
+    is not a check.
+13. `connection_limit=1` on `DATABASE_URL` — **still to verify in Vercel**, see
+    §7.4.
+
+### 7.4 What is still open
+
+1. **RLS policies with a non-owner Prisma role.** The scan test is a good
+   second line; policies would be a floor. Until then, item 1's test is the
+   whole of the enforcement.
+2. **The three rate stores.** Unchanged and still the largest conceptual
+   duplication in the system. The decision to make: `StudioFiledRate` is the
+   source of truth (derived from their own documents, reviewed by ops),
+   `StudioProduct` is their editable working copy, and `RateCardItem` is
+   either retired or relabelled as the indicative marketplace bucket.
+3. **`Quotation` / `QuotationLineItem`** look retired — written by the
+   marketplace path, read nowhere in `app/studio/*`. Confirm and remove.
+4. **Nothing writes the performance block.** `completedProjects`,
+   `avgVarianceDays`, `upheldDisputes`, `specComplianceRate`,
+   `communicationRating`, `autonomyProfile` have no writer anywhere, and both
+   the matching score and the verification tier read them as fact. No studio is
+   flattered — a zero is a zero — but two ranked outputs are ranking on a
+   constant. Either the recompute job gets written or the inputs come out of
+   the score. Recorded in the schema beside the columns so it cannot be
+   forgotten again.
+5. **`Studio.slug` copied into `StudioForm.slug`** — latent divergence if a
+   slug ever changes.
+6. **`PAUSED` exists twice**, as a status and as `pausedAt`/`pauseCause`.
+7. **`/ops/applications` renders the frozen application** as though it were
+   current.
 
 ### What does NOT need to change
 
@@ -345,13 +421,15 @@ Mostly, yes. The structure holds: one tenancy link, one derivation of
 onboarding state, one pricing module used by both sides of the marketplace, and
 an audit that found no leak.
 
-The two places it is **not** clear, and both are worth fixing before the roster
-grows rather than after:
+One of the two places it was not clear has been closed, and one has not:
 
-1. **What a studio charges** has three answers in three tables with nothing
-   reconciling them.
-2. **What protects one studio from another** is application code alone, while
-   the presence of `ENABLE ROW LEVEL SECURITY` on thirty tables suggests
-   otherwise to anybody reading the migrations.
+1. **What protects one studio from another** is still application code — but it
+   is no longer only a habit. `tests/tenant-scope.test.ts` fails the build on
+   any unscoped query, was proven against real regressions, and states in its
+   own header that row-level security is not doing this job. Policies remain
+   the proper floor.
+2. **What a studio charges** still has three answers in three tables with
+   nothing reconciling them. This is now the largest open question in the
+   system and it is a product decision, not a refactor.
 
-Everything else on the list is maintenance.
+Everything else is maintenance, and §7.4 lists it.

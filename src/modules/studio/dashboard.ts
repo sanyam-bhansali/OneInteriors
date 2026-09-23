@@ -18,7 +18,6 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
-import { getCurrentUser } from '@/modules/auth/session';
 import { splitReasoning, matchHistoryBegins } from '@/modules/matching/store';
 import { FACTOR_LABELS, type FactorKey } from '@/modules/matching/score';
 import { buildFunnel, diagnose, type FunnelCounts, type FunnelStep, type Diagnosis } from './dashboard-funnel';
@@ -33,24 +32,12 @@ export {
 } from './dashboard-funnel';
 export type { FunnelStep, FunnelStage, Diagnosis, FunnelCounts } from './dashboard-funnel';
 
-/**
- * The signed-in user's studio id, or null. Never takes one from the client.
- *
- * `getCurrentUser` rather than `requireRole`, for the reason written out in
- * `introduction.ts`: `requireRole` throws, this is a render-path read, and a
- * layout and its page render in parallel — so a throw here produces a 500 in
- * place of the layout's redirect. Returning null is both safe and correct.
+/*
+ * `myStudioId()` used to be defined here — a copy of the one in
+ * `studio-quote/store.ts` with the STUDIO role check missing, and with no
+ * callers. It is now `modules/studio/tenancy.ts`, once. Import it from there.
  */
-export async function myStudioId(): Promise<string | null> {
-  const user = await getCurrentUser();
-  if (!user || !hasDatabase()) return null;
 
-  const member = await prisma.studioMember.findUnique({
-    where: { userId: user.id },
-    select: { studioId: true },
-  });
-  return member?.studioId ?? null;
-}
 
 export function monthStart(offset = 0): Date {
   const now = new Date();

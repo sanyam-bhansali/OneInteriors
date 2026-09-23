@@ -100,6 +100,12 @@ export async function archivesForStudio(studioId: string): Promise<ArchiveDetail
     where: { studioId },
     orderBy: { uploadedAt: 'desc' },
     include: WITH_FILES,
+    /* A studio files an archive every few months, so a hundred is a decade of
+       history and more than any screen shows. The cap is not about today's
+       volume — it is that this read carries every FILE row of every archive
+       with it, so an unbounded version grows quadratically with nothing to
+       stop it. */
+    take: 100,
   });
 
   return rows.map(toDetail);

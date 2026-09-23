@@ -450,7 +450,57 @@ export async function saveRegistration(input: {
     },
   });
 
+  /**
+   * And through to the letterhead.
+   *
+   * `StudioBranding` snapshots these facts the first time a quotation needs
+   * them, which is right — the name and address on a document are facts about
+   * the day it was sent, and a live join would let a correction in 2027
+   * silently rewrite what a client received in 2026.
+   *
+   * But a snapshot taken once and never refreshed means a GSTIN corrected
+   * here keeps printing the old one for ever. So a correction on the
+   * registration step pushes through to the branding row, and only from here:
+   * this is the screen whose values ops verifies against the public
+   * registries, so it is the only place the identity may change. Quotations
+   * already issued are untouched — they carry their own snapshot.
+   */
+  await syncBrandingIdentity(context.studio.id).catch((error) => {
+    /* A letterhead that is one edit behind is a smaller problem than a
+       registration that would not save. */
+    console.error('[onboarding] branding sync failed', error);
+  });
+
   return { ok: true };
+}
+
+/**
+ * Push the registration's identity into the branding row, if there is one.
+ *
+ * Deliberately does not CREATE the row — `myBranding()` owns that, and
+ * creating one here would mean a studio who has never raised a quotation
+ * carries a letterhead nothing has looked at.
+ */
+async function syncBrandingIdentity(studioId: string): Promise<void> {
+  const studio = await prisma.studio.findUnique({
+    where: { id: studioId },
+    select: { legalName: true, tradeName: true, addressLine: true, city: true, pincode: true, gstin: true },
+  });
+  if (!studio) return;
+
+  const legalName = studio.legalName?.trim() || studio.tradeName?.trim();
+  if (!legalName) return;
+
+  await prisma.studioBranding.updateMany({
+    where: { studioId },
+    data: {
+      legalName,
+      addressLine: studio.addressLine,
+      city: studio.city ? studio.city.replace(/\b\w/g, (c) => c.toUpperCase()) : 'Pune',
+      pincode: studio.pincode,
+      gstin: studio.gstin,
+    },
+  });
 }
 
 /**

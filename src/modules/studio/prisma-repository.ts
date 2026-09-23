@@ -32,6 +32,7 @@ import type {
 import type { StudioQuery, StudioRepository } from './repository';
 import type { PropertyType, ScopeType, StyleTag } from '@/modules/brief/types';
 import { STYLE_TAGS } from '@/modules/brief/types';
+import { hasSubmittedForReview } from '@/modules/studio/submitted';
 
 const INCLUDE = {
   verifications: true,
@@ -100,7 +101,7 @@ function toStudio(row: StudioRow): Studio {
     // "this studio has finished and is waiting on us" is the single most
     // actionable state in the queue, and nothing on the ops side could see it.
     submittedForReview:
-      (row.onboardingSteps as { submittedForReview?: boolean } | null)?.submittedForReview === true,
+      hasSubmittedForReview(row.onboardingSteps),
     yearsActive: row.yearsActive ?? null,
     teamSize: row.teamSize ?? null,
     minProjectPaise: row.minProjectPaise === null ? null : fromDb(row.minProjectPaise),

@@ -10,6 +10,7 @@ import { missingCoreRates } from '@/modules/quotation/categories';
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { OpsHeader } from './ui';
+import { hasSubmittedForReview } from '@/modules/studio/submitted';
 
 export const metadata: Metadata = {
   title: 'Overview',
@@ -402,10 +403,7 @@ async function countAwaitingReview(): Promise<number> {
       where: { status: 'ONBOARDING' },
       select: { onboardingSteps: true },
     });
-    return rows.filter((row) => {
-      const steps = row.onboardingSteps as { submittedForReview?: boolean } | null;
-      return steps?.submittedForReview === true;
-    }).length;
+    return rows.filter((row) => hasSubmittedForReview(row.onboardingSteps)).length;
   } catch {
     return 0;
   }

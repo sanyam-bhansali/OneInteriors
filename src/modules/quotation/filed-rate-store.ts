@@ -18,7 +18,8 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 import { toDb, fromDb, type Paise } from '@/lib/money';
-import { requireRole, getCurrentUser } from '@/modules/auth/session';
+import { requireRole, getCurrentUser, hasRole } from '@/modules/auth/session';
+import { myStudioId } from '@/modules/studio/tenancy';
 import { ingestQuotations } from './ingest';
 import { extractArchive } from './extract-agent';
 import type { StudioRates } from './catalogue';
@@ -161,6 +162,11 @@ export type { FiledRateView } from './analysis-states';
 export async function liveRatesFor(studioId: string): Promise<StudioRates> {
   const rows = await prisma.studioFiledRate.findMany({
     where: { studioId, state: 'LIVE' },
+    /* One LIVE row per catalogue item is the invariant (a partial unique
+       index enforces it), so this can never legitimately exceed the
+       catalogue. The cap is what stops a broken invariant becoming an
+       unbounded read on the pricing path. */
+    take: 200,
   });
 
   const out: StudioRates = {};
@@ -199,10 +205,31 @@ export async function liveRatesFor(studioId: string): Promise<StudioRates> {
  * take the page with it.
  */
 export async function myFiledRates(studioId: string): Promise<FiledRateView[]> {
+  /**
+   * Checked here, not trusted from the caller.
+   *
+   * This took a studioId as a parameter with no authorisation of its own, in
+   * a file that also exports OPS-guarded functions — so it read as though it
+   * were one of them. Every caller passes the session's own studio today; the
+   * check is what keeps that true when somebody adds the twentieth caller.
+   *
+   * Ops pass through, because reviewing these is their job.
+   */
+  const mine = await myStudioId();
+  if (mine !== studioId) {
+    const user = await getCurrentUser();
+    if (!hasRole(user, 'OPS') && !hasRole(user, 'ADMIN')) return [];
+  }
+
   try {
     const rows = await prisma.studioFiledRate.findMany({
       where: { studioId, state: { in: ['PENDING', 'LIVE'] } },
       orderBy: [{ state: 'asc' }, { code: 'asc' }],
+      /* Two states across a 23-item catalogue. Anything approaching this cap
+         means the state machine has stopped superseding, which is worth
+         finding out about from a truncated screen rather than from a slow
+         one. */
+      take: 100,
     });
     return rows.map(view);
   } catch (error) {
@@ -217,6 +244,8 @@ export async function ratesForReview(archiveId: string): Promise<FiledRateView[]
   const rows = await prisma.studioFiledRate.findMany({
     where: { archiveId, state: 'PENDING' },
     orderBy: { code: 'asc' },
+    // One archive yields at most one rate per catalogue item.
+    take: 100,
   });
   return rows.map(view);
 }

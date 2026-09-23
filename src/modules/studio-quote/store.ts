@@ -19,34 +19,22 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 import { storeLogo, removeLogo } from '@/modules/storage/studio-logo';
-import { hasDatabase } from '@/lib/env';
-import { getCurrentUser, hasRole } from '@/modules/auth/session';
 import { fromDb, toDb, type Paise } from '@/lib/money';
 import { starterRowsFor } from './starter-catalogue';
 import type { QuoteUnitName, WorkCodeName } from './pricing';
 
 /**
- * The signed-in user's studio id, or null.
+ * The tenancy primitive, re-exported.
  *
- * `getCurrentUser` and not `requireRole`, for the reason written out three
- * times elsewhere: `requireRole` throws, these are render-path reads, and Next
- * renders a layout and its page in parallel — so the throw beats the layout's
- * redirect and produces a 500 where a redirect belongs.
+ * It used to be implemented here, which put the function that decides whose
+ * data you are looking at inside a quotation module — and left room for the
+ * second, weaker copy that turned up in `studio/dashboard.ts`. One
+ * implementation now, in `modules/studio/tenancy.ts`, re-exported here so the
+ * twenty-odd files that import it from this path did not all have to change.
  */
-export async function myStudioId(): Promise<string | null> {
-  const user = await getCurrentUser();
-  if (!user || !hasRole(user, 'STUDIO') || !hasDatabase()) return null;
+import { myStudioId } from '@/modules/studio/tenancy';
 
-  try {
-    const member = await prisma.studioMember.findUnique({
-      where: { userId: user.id },
-      select: { studioId: true },
-    });
-    return member?.studioId ?? null;
-  } catch {
-    return null;
-  }
-}
+export { myStudioId };
 
 // ── Product master ─────────────────────────────────────────────
 
@@ -70,11 +58,17 @@ export interface ProductRow {
 /**
  * The studio's catalogue, seeding it on first read.
  *
- * Seeding here rather than at approval time because approval happens on the
- * ops side and a studio approved last month would otherwise have no catalogue
- * at all. Idempotent: `createMany` with `skipDuplicates` against the
- * `(studioId, name)` unique index, so a studio that deleted a line does not get
- * it handed back on the next page load.
+ * ## The seed here is a migration path, not the provisioning
+ *
+ * New studios get their catalogue from `provisionWorkspace()` when they are
+ * approved. This branch exists for every studio created before that function
+ * did — without it they would open an empty product master with no way to
+ * fill it.
+ *
+ * It costs one indexed count per read, which is the price of not stranding
+ * them. Delete it once no studio predates provisioning. Idempotent:
+ * `createMany` with `skipDuplicates` against the `(studioId, name)` unique
+ * index, so a studio who deleted a line does not get it handed back.
  */
 export async function myProducts(): Promise<ProductRow[]> {
   const studioId = await myStudioId();

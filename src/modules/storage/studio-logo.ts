@@ -24,6 +24,8 @@ import 'server-only';
  */
 
 import { supabaseConfig } from '@/lib/env';
+import { getCurrentUser, hasRole } from '@/modules/auth/session';
+import { myStudioId } from '@/modules/studio/tenancy';
 import { MAX_LOGO_BYTES, MAX_LOGO_MB, LOGO_TYPES, ACCEPTED_LOGO } from './logo-limits';
 
 const BUCKET = 'studio-logos';
@@ -99,17 +101,35 @@ export async function storeLogo(studioId: string, file: File): Promise<LogoResul
 /**
  * A short-lived link to a stored logo.
  *
- * No role check, unlike the other private buckets, and the reason is worth
- * stating: this is only ever called while rendering a document for the studio
- * that owns the logo, from a path read off their own branding row. There is
- * no id arriving from a browser for an attacker to change — the caller has
- * already established whose branding it is.
+ * ## The check is in the path, and now it is enforced
+ *
+ * Every object in this bucket is written to `studio_<studioId>/…`, and this
+ * function refuses any path that is not the signed-in studio's own prefix.
+ *
+ * It did not, until now. The argument was that callers only ever pass
+ * `StudioBranding.logoPath` read off the already-authorised studio's own row,
+ * so no browser-supplied id could reach it — which was true, and was a
+ * comment rather than a check. One future caller passing a request parameter
+ * would have turned it into a cross-studio read of the roster, which is the
+ * thing the bucket is private to prevent. `docs/DATA-ARCHITECTURE.md` called
+ * this out as the one bucket whose boundary was convention.
+ *
+ * Ops can sign any path: they review these.
  */
 export async function signedLogoUrl(path: string | null): Promise<string | null> {
   if (!path) return null;
   const config = supabaseConfig();
   const key = secretKey();
   if (!config || !key) return null;
+
+  const user = await getCurrentUser();
+  if (!hasRole(user, 'OPS') && !hasRole(user, 'ADMIN')) {
+    const studioId = await myStudioId();
+    /* Prefix, exactly as `storeLogo` writes it. A path that does not start
+       with this studio's own folder is not theirs to read, whoever handed it
+       over. */
+    if (!studioId || !path.startsWith(`studio_${studioId}/`)) return null;
+  }
 
   try {
     const response = await fetch(

@@ -84,6 +84,9 @@ export async function myStages(): Promise<StageRow[]> {
       include: { _count: { select: { clients: true } } },
     });
 
+    /* Same migration path as the catalogue: `provisionWorkspace()` writes
+       these at approval now, and this branch only catches studios created
+       before it existed. See modules/studio/provision.ts. */
     if (rows.length === 0) {
       await prisma.studioStage.createMany({
         data: DEFAULT_STAGES.map((s, i) => ({

@@ -420,8 +420,6 @@ model Studio {
 
   // Registry identifiers — verified, not self-declared
   gstin       String? @unique
-  cin         String? @unique
-  udyamNumber String?
   panLast4    String?
 
   /// The studio has told us it has no GST registration.
@@ -501,7 +499,6 @@ model Studio {
   // Commercial
   minProjectPaise BigInt?
   maxProjectPaise BigInt?
-  designFeePaise  BigInt?
 
   /// What the studio actually sells — turnkey, design plus execution, or
   /// design only. See `modules/studio/positioning.ts` for the values.
@@ -553,6 +550,15 @@ model Studio {
   // Derived performance — recomputed by a job, never written by hand.
   // Null until enough completed projects exist. Do NOT default these to
   // flattering values; the UI must render "not enough data".
+  //
+  // NOTHING WRITES THESE YET. The job named above does not exist, so every
+  // studio sits at the defaults and the matching score and the verification
+  // tier both read them as fact. That is safe in the sense that no studio is
+  // flattered — a zero is a zero — but it means two ranked outputs are
+  // currently ranking on a constant. Either the job gets written or the
+  // inputs come out of the score; see docs/DATA-ARCHITECTURE.md §6.
+  // `performanceComputedAt` was dropped in 20260923070000: a timestamp for a
+  // computation that never runs is worse than no timestamp.
   completedProjects     Int       @default(0)
   avgVarianceDays       Float?
   upheldDisputes        Int       @default(0)
@@ -561,7 +567,6 @@ model Studio {
   communicationRating   Float?
   /// 0 = hands-off, 1 = highly collaborative. Drives the working-style match.
   autonomyProfile       Float?
-  performanceComputedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1702,6 +1707,11 @@ model StudioQuote {
 
   @@unique([studioId, number])
   @@index([studioId, status, updatedAt])
+  /// The leads board loads up to 400 clients and includes their
+  /// quotes, so Postgres runs `WHERE clientId IN (400 ids)` on every
+  /// render. Without this it is 400 sequential scans of the studio's
+  /// whole quotation history.
+  @@index([clientId])
   @@map("studio_quotes")
 }
 

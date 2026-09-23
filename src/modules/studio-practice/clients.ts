@@ -100,19 +100,32 @@ export async function myClients(): Promise<ClientRow[]> {
       include: {
         stage: { select: { id: true, name: true, kind: true, colour: true } },
         assignedTo: { select: { id: true, user: { select: { name: true, email: true } } } },
-        quotes: { select: { id: true, lines: { select: { amountPaise: true } } } },
       },
       take: 400,
     });
 
+    /**
+     * What has been quoted, per client — as one grouped aggregate.
+     *
+     * This used to ride along on the query above as
+     * `quotes: { select: { lines: { select: { amountPaise } } } }`, and the
+     * sum was done in JavaScript. That pulls every line of every quotation of
+     * all four hundred clients into the process to produce four hundred
+     * numbers, so the board got slower as a studio wrote more quotations —
+     * the cost grew with their success rather than with their client count.
+     *
+     * Postgres does the arithmetic now, over an indexed `clientId` (added in
+     * `20260923060000_quote_client_index` for exactly this). Still summed
+     * from the lines rather than stored: a quotation edited this morning has
+     * to show through on the board this morning.
+     */
+    const { totals: quotedByClient, counts: countsByClient } = await quotedPerClient(
+      studioId,
+      rows.map((r) => r.id),
+    );
+
     return rows.map((row) => {
-      // The value shown against a client is what has been QUOTED, summed from
-      // the lines rather than stored — the same rule as everywhere else, and it
-      // means a quotation edited today shows through immediately.
-      const quoted = row.quotes.reduce(
-        (sum, q) => sum + q.lines.reduce((s, l) => s + fromDb(l.amountPaise), 0),
-        0,
-      );
+      const quoted = quotedByClient.get(row.id) ?? 0;
 
       return {
         id: row.id,
@@ -134,8 +147,8 @@ export async function myClients(): Promise<ClientRow[]> {
         nextActionOn: row.nextActionOn,
         fromMarketplace: row.briefId !== null || row.introductionId !== null,
         notes: row.notes,
-        quoteCount: row.quotes.length,
-        quotedPaise: row.quotes.length > 0 ? quoted : null,
+        quoteCount: countsByClient.get(row.id) ?? 0,
+        quotedPaise: (countsByClient.get(row.id) ?? 0) > 0 ? quoted : null,
         isDemo: row.isDemo,
         assignedToId: row.assignedToId,
         assignedToName: row.assignedTo ? personName(row.assignedTo.user) : null,
@@ -1178,4 +1191,58 @@ export async function findClients(query: string): Promise<FoundClient[]> {
     console.error('[studio-practice] findClients failed', error);
     return [];
   }
+}
+
+/**
+ * Quoted value and quotation count per client, in two grouped queries.
+ *
+ * Scoped by `studioId` as well as by the ids, because an id list assembled
+ * from a previous query is still a list of ids — and the rule in this
+ * codebase is that the tenant scope goes on the query, not on the reasoning
+ * about the query. `tests/tenant-scope.test.ts` enforces it.
+ *
+ * Returns empty maps rather than throwing. A board that renders without the
+ * value column is a board; a board that 500s because an aggregate failed is
+ * not.
+ */
+async function quotedPerClient(
+  studioId: string,
+  clientIds: string[],
+): Promise<{ totals: Map<string, number>; counts: Map<string, number> }> {
+  const totals = new Map<string, number>();
+  const counts = new Map<string, number>();
+  if (clientIds.length === 0) return { totals, counts };
+
+  try {
+    const quotes = await prisma.studioQuote.findMany({
+      where: { studioId, clientId: { in: clientIds } },
+      select: { id: true, clientId: true },
+    });
+    if (quotes.length === 0) return { totals, counts };
+
+    const byQuote = new Map(quotes.map((q) => [q.id, q.clientId]));
+
+    for (const quote of quotes) {
+      if (!quote.clientId) continue;
+      counts.set(quote.clientId, (counts.get(quote.clientId) ?? 0) + 1);
+    }
+
+    /* One SUM per quotation, done by Postgres, rather than every line of
+       every quotation crossing the wire to be added up here. */
+    const sums = await prisma.studioQuoteLine.groupBy({
+      by: ['quoteId'],
+      where: { quoteId: { in: quotes.map((q) => q.id) } },
+      _sum: { amountPaise: true },
+    });
+
+    for (const row of sums) {
+      const clientId = byQuote.get(row.quoteId);
+      if (!clientId) continue;
+      totals.set(clientId, (totals.get(clientId) ?? 0) + fromDb(row._sum.amountPaise ?? BigInt(0)));
+    }
+  } catch (error) {
+    console.error('[studio-practice] quotedPerClient failed', error);
+  }
+
+  return { totals, counts };
 }

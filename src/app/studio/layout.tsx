@@ -9,6 +9,7 @@ import { signOutAction } from '@/app/sign-in/actions';
 import { isLive } from '@/modules/studio/features';
 import { crmIsOpen } from '@/modules/studio/standing';
 import { StudioShell, type NavGroup } from './StudioShell';
+import { hasSubmittedForReview } from '@/modules/studio/submitted';
 
 /**
  * The studio surface's auth gate, and its frame.
@@ -206,9 +207,7 @@ async function shellContext(userId: string): Promise<ShellContext | null> {
          and do not stop being theirs because we took them out of rotation —
          the marketplace half is what a pause suspends. */
       status: studio.status,
-      submittedForReview:
-        (studio.onboardingSteps as { submittedForReview?: boolean } | null)?.submittedForReview ===
-        true,
+      submittedForReview: hasSubmittedForReview(studio.onboardingSteps),
       pausedReason: studio.pausedReason ?? null,
       toConfirm,
       draftQuotes,

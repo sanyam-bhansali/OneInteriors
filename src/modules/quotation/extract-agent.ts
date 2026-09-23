@@ -62,6 +62,25 @@ const API_VERSION = '2023-06-01';
  */
 const FILES_PER_REQUEST = 4;
 
+/**
+ * How much base64 one request may carry.
+ *
+ * Four files was the only limit, and four files is not a size: the cap on an
+ * upload is 25 MB each, so a batch could reach 100 MB of bytes — about 133 MB
+ * once base64 has added its third — held in one serverless invocation, on top
+ * of whatever the request body builder copies. That is a memory ceiling
+ * somebody discovers in production, on the largest archive, which is the one
+ * most worth reading.
+ *
+ * 18 MB of encoded data per request keeps a batch comfortably inside a normal
+ * function's memory and inside the model's own request limits. A single file
+ * larger than this still goes on its own — see the loop.
+ */
+const MAX_BATCH_BASE64 = 18 * 1024 * 1024;
+
+/** An archive accumulates across uploads, so the read needs a ceiling too. */
+const MAX_FILES_PER_ARCHIVE = 120;
+
 /** Long, because these are multi-page documents and the reply is long. */
 const TIMEOUT_MS = 180_000;
 const MAX_TOKENS = 8000;
@@ -143,6 +162,7 @@ export async function extractArchive(archiveId: string): Promise<ExtractResult> 
   const files = await prisma.quotationFile.findMany({
     where: { archiveId },
     orderBy: { uploadedAt: 'asc' },
+    take: MAX_FILES_PER_ARCHIVE,
   });
   if (files.length === 0) return { ok: false, error: 'This archive has no files.' };
 
@@ -158,16 +178,41 @@ export async function extractArchive(archiveId: string): Promise<ExtractResult> 
   const all: unknown[] = [];
   let filesRead = 0;
 
-  for (let i = 0; i < sendable.length; i += FILES_PER_REQUEST) {
-    const batch = sendable.slice(i, i + FILES_PER_REQUEST);
+  /**
+   * Batched by BYTES as well as by count, and each batch released before the
+   * next is fetched.
+   *
+   * The count alone said nothing about memory — four 25 MB PDFs is 133 MB of
+   * base64 in one invocation. So a batch closes when it reaches either four
+   * documents or `MAX_BATCH_BASE64`, and `blocks` goes out of scope at the
+   * end of each iteration so the collector can take it before the next
+   * download starts.
+   *
+   * A single file bigger than the budget still goes on its own rather than
+   * being skipped: one oversized document is exactly the case where a studio
+   * would otherwise never find out why their archive read short.
+   */
+  let index = 0;
+  while (index < sendable.length) {
     const blocks: unknown[] = [];
+    const inBatch: string[] = [];
+    let batchBytes = 0;
 
-    for (const file of batch) {
+    while (index < sendable.length && inBatch.length < FILES_PER_REQUEST) {
+      const file = sendable[index]!;
+
       const bytes = await download(config.url, key, file.path);
       if (!bytes) {
         skipped.push(`${file.filename} — we could not fetch it back from storage.`);
+        index += 1;
         continue;
       }
+
+      /* Over budget and this batch already has something in it: leave the
+         file for the next round rather than pushing the batch over. `index`
+         is deliberately not advanced. */
+      if (inBatch.length > 0 && batchBytes + bytes.length > MAX_BATCH_BASE64) break;
+
       const kind = SENDABLE.get(file.contentType)!;
       blocks.push({
         type: kind === 'pdf' ? 'document' : 'image',
@@ -177,17 +222,26 @@ export async function extractArchive(archiveId: string): Promise<ExtractResult> 
          can be pointed back at the document it came from. Ops approving a
          rate needs to be able to open the thing it was read out of. */
       blocks.push({ type: 'text', text: `Document reference: ${file.filename}` });
+
+      batchBytes += bytes.length;
+      inBatch.push(file.filename);
+      index += 1;
     }
 
     if (blocks.length === 0) continue;
 
     const batchResult = await callOnce(blocks);
+    /* Emptied before the next batch is fetched. Without this the previous
+       batch's bytes are still reachable while the next one downloads, which
+       doubles the peak for no reason. */
+    blocks.length = 0;
+
     if (!batchResult.ok) {
-      skipped.push(`${batch.length} document(s) could not be read: ${batchResult.error}`);
+      skipped.push(`${inBatch.length} document(s) could not be read: ${batchResult.error}`);
       continue;
     }
     if (Array.isArray(batchResult.parsed)) all.push(...batchResult.parsed);
-    filesRead += batch.length;
+    filesRead += inBatch.length;
   }
 
   if (all.length === 0) {

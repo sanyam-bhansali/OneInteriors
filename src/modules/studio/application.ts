@@ -32,6 +32,7 @@ import { sendApplicationReceived, sendApplicationRejected } from '@/modules/auth
 import { revokeAllSessions } from '@/modules/auth/session';
 import { lakhsToPaise } from '@/lib/money';
 import { normalisePhone } from './phone';
+import { provisionWorkspace } from './provision';
 import { revalidateRoster } from './roster-cache';
 import { siteUrlFor } from '@/lib/site';
 
@@ -320,12 +321,24 @@ export async function approveApplication(id: string, note: string): Promise<Deci
 
       return {
         slug,
+        studioId: studio.id,
         email: app.email,
         contactName: app.contactName,
         tradeName: app.tradeName,
         userId: user.id,
       };
     });
+
+    /**
+     * The workspace, provisioned once, here.
+     *
+     * Their starter catalogue and their pipeline. Both used to be seeded
+     * lazily on every page read — see `modules/studio/provision.ts` for why
+     * that had to stop. It never throws: a studio who signs in to an empty
+     * catalogue is a smaller problem than an approval that failed because a
+     * starter row would not insert.
+     */
+    await provisionWorkspace(result.studioId);
 
     // The roster is cached for a minute; approving someone should not wait for
     // that to expire.
