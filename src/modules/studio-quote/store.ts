@@ -135,6 +135,60 @@ function toProductRow(row: {
   };
 }
 
+/**
+ * Build the branding row from what onboarding already established.
+ *
+ * Returns null when there is not enough to build one — a studio with no
+ * registered name has not finished onboarding, and inventing a document
+ * identity for them would put a blank at the top of a quotation.
+ *
+ * `create` rather than `upsert`, inside a catch: two page loads racing each
+ * other both find no row and both try to write one, and the loser of that
+ * race should return the winner's row rather than an error.
+ */
+async function seedBrandingFrom(studioId: string) {
+  const studio = await prisma.studio.findUnique({
+    where: { id: studioId },
+    select: {
+      legalName: true,
+      tradeName: true,
+      addressLine: true,
+      city: true,
+      pincode: true,
+      gstin: true,
+      website: true,
+    },
+  });
+
+  const legalName = studio?.legalName?.trim() || studio?.tradeName?.trim();
+  if (!studio || !legalName) return null;
+
+  const data = {
+    studioId,
+    legalName,
+    addressLine: studio.addressLine,
+    /* The studio row stores a slug-ish city ("pune"); a document wants it
+       written the way a person would. Only the first letter, because "Navi
+       Mumbai" must not become "Navi mumbai". */
+    city: studio.city
+      ? studio.city.replace(/\b\w/g, (c) => c.toUpperCase())
+      : 'Pune',
+    pincode: studio.pincode,
+    gstin: studio.gstin,
+    /* No phone on the studio row — the number a client rings is a contact
+       choice, not a registration fact, so it stays a Settings field. */
+    website: studio.website ?? null,
+  };
+
+  try {
+    return await prisma.studioBranding.create({ data });
+  } catch {
+    /* Lost a race, or the row appeared between the read and the write. Either
+       way the row that exists is the right one. */
+    return prisma.studioBranding.findUnique({ where: { studioId } });
+  }
+}
+
 export type SaveResult = { ok: true } | { ok: false; error: string };
 
 /** Set one product's rate. The only field a studio changes often. */
@@ -282,12 +336,44 @@ export interface BrandingRow {
  * a quotation cannot go out under a name nobody has confirmed, and the
  * quotation screens use this null to send them to Settings first.
  */
+/**
+ * The studio's document identity, seeded from onboarding on first read.
+ *
+ * ## Why this is not a form the studio fills in
+ *
+ * It used to be. Settings opened with "Who the quotation comes from" and
+ * asked for a registered name, an address, a city, a PIN and a GSTIN — every
+ * one of which the studio had already typed during onboarding, because the
+ * registration step is where we ask for exactly those facts and then go and
+ * check them against the public registries.
+ *
+ * Asking twice is worse than it sounds. The two copies drift, and when they
+ * do, the address we verified and the address printed on a client's quotation
+ * are different addresses — with no way to tell which is which afterwards. It
+ * also meant a studio who had finished onboarding could not raise a
+ * quotation: `createQuote` refuses without a branding row, and the branding
+ * row only existed once somebody had filled in a form nothing had pointed
+ * them at.
+ *
+ * So the identity comes from the `Studio` row, copied once, here. What
+ * Settings keeps is what onboarding genuinely does not ask about: the logo,
+ * the accent, the opening note, the terms, the fee, the discount, the advance
+ * and our mark.
+ *
+ * ## Copied rather than joined
+ *
+ * A quotation is a document, and the name on a document is a fact about the
+ * day it was sent. Reading the studio row live would mean a studio correcting
+ * their registered name in 2027 silently rewriting what a client received in
+ * 2026. The copy is the record.
+ */
 export async function myBranding(): Promise<BrandingRow | null> {
   const studioId = await myStudioId();
   if (!studioId) return null;
 
   try {
-    const row = await prisma.studioBranding.findUnique({ where: { studioId } });
+    const row = (await prisma.studioBranding.findUnique({ where: { studioId } })) ??
+      (await seedBrandingFrom(studioId));
     if (!row) return null;
 
     return {
@@ -314,12 +400,13 @@ export async function myBranding(): Promise<BrandingRow | null> {
   }
 }
 
+/**
+ * What Settings may change.
+ *
+ * The registered name, address and GSTIN are absent on purpose — they come
+ * from the registration step. See `saveBranding`.
+ */
 export interface BrandingInput {
-  legalName: string;
-  addressLine?: string;
-  city?: string;
-  pincode?: string;
-  gstin?: string;
   phone?: string;
   email?: string;
   website?: string;
@@ -330,14 +417,24 @@ export interface BrandingInput {
   bookingAdvancePaise: Paise;
 }
 
+/**
+ * Save the document settings.
+ *
+ * ## What this deliberately cannot change
+ *
+ * The registered name, the address and the GSTIN. Those come from the
+ * registration step and are checked against the public registries; editing
+ * them here would mean the address we verified and the address on a client's
+ * quotation could differ, with nothing to say which is which. `myBranding`
+ * seeds them, `seedBrandingFrom` explains it, and the Settings page shows
+ * them as facts with a link to where they are actually changed.
+ *
+ * So this writes only what a studio genuinely decides about their document:
+ * how a client reaches them, their words, and their commercial terms.
+ */
 export async function saveBranding(input: BrandingInput): Promise<SaveResult> {
   const studioId = await myStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
-
-  const legalName = input.legalName.trim();
-  if (legalName.length < 2) {
-    return { ok: false, error: 'Your registered name goes at the top of every quotation.' };
-  }
 
   // Basis points, so a percentage is always an integer. 10000 bps is 100%, and
   // a fee above that is a typo rather than a pricing strategy.
@@ -349,11 +446,6 @@ export async function saveBranding(input: BrandingInput): Promise<SaveResult> {
   }
 
   const data = {
-    legalName,
-    addressLine: input.addressLine?.trim() || null,
-    city: input.city?.trim() || 'Pune',
-    pincode: input.pincode?.trim() || null,
-    gstin: input.gstin?.trim().toUpperCase() || null,
     phone: input.phone?.trim() || null,
     email: input.email?.trim() || null,
     website: input.website?.trim() || null,
@@ -365,11 +457,23 @@ export async function saveBranding(input: BrandingInput): Promise<SaveResult> {
   };
 
   try {
-    await prisma.studioBranding.upsert({
-      where: { studioId },
-      create: { studioId, ...data },
-      update: data,
-    });
+    /* Seeded first, so there is a row to update. A studio can reach Settings
+       before anything has read `myBranding()` — from a bookmark, or straight
+       after signing in — and an upsert here would have to invent a legal name
+       to satisfy the create branch. */
+    const existing =
+      (await prisma.studioBranding.findUnique({ where: { studioId }, select: { studioId: true } })) ??
+      (await seedBrandingFrom(studioId));
+
+    if (!existing) {
+      return {
+        ok: false,
+        error:
+          'Finish your registration first — a quotation has to carry the name we checked you against.',
+      };
+    }
+
+    await prisma.studioBranding.update({ where: { studioId }, data });
     return { ok: true };
   } catch (error) {
     console.error('[studio-quote] saveBranding failed', error);

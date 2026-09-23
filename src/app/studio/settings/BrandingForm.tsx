@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useActionState } from 'react';
 import { paiseToRupees } from '@/lib/money';
 import type { BrandingRow } from '@/modules/studio-quote/store';
@@ -89,44 +90,78 @@ function Block({
  * a document going out under somebody else's name must not carry words they
  * have never read.
  */
+/** One established fact, as it will print. */
+function Fact({ label, value, mono }: { label: string; value: string | null; mono?: boolean }) {
+  return (
+    <div>
+      <dt className="s-label m-0">{label}</dt>
+      <dd className={`m-0 text-[14px] text-[var(--s-ink,#1c1b19)] ${mono ? 's-num' : ''}`}>
+        {value && value.length > 0 ? (
+          value
+        ) : (
+          <span className="text-[var(--s-ink-3,#6a655c)]">Not given</span>
+        )}
+      </dd>
+    </div>
+  );
+}
+
 export function BrandingForm({ branding }: { branding: BrandingRow | null }) {
   const [state, action, pending] = useActionState(saveBrandingAction, IDLE);
 
   return (
     <form action={action} className="flex max-w-[52rem] flex-col gap-5">
-      <Block
-        title="Who the quotation comes from"
-        note="Exactly as on your GST certificate or company registration — this is the name at the top of the document and the one a client will pay."
-      >
-        <Field
-          label="Registered name"
-          name="legalName"
-          required
-          defaultValue={branding?.legalName}
-          placeholder="Akara Design Studio Private Limited"
-          width="md"
-        />
-        <Field
-          label="Address"
-          name="addressLine"
-          defaultValue={branding?.addressLine}
-          placeholder="Office 4, Lane 7, Kalyani Nagar"
-          width="md"
-        />
-        <div className="flex flex-wrap gap-4">
-          <Field label="City" name="city" defaultValue={branding?.city ?? 'Pune'} width="sm" />
-          <Field label="PIN" name="pincode" defaultValue={branding?.pincode} width="xs" mono />
+      {/**
+        * Shown, not asked for.
+        *
+        * Every field in this block used to be an input, and every one of them
+        * had already been typed on the registration step — where we ask for
+        * exactly these facts and then check them against the public
+        * registries. Two copies of an address drift, and when they do, the
+        * address we verified and the address on a client's quotation are
+        * different addresses with nothing to say which is which.
+        *
+        * So this is the registration, read back. Changing it means changing
+        * the registration, which is right: the name at the top of a quotation
+        * is the name a client pays, and it should not be editable in a
+        * settings page without the check that goes with it.
+        */}
+      <section className="rounded-[14px] border border-[var(--s-line,#dbd5cb)] bg-[var(--s-surface-2,#f0ede7)] p-6">
+        <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 className="m-0 text-[16px] font-semibold text-[var(--s-ink,#1c1b19)]">
+            Who the quotation comes from
+          </h2>
+          <Link
+            href="/studio/onboarding/registration"
+            className="text-[13px] font-medium text-[var(--s-accent)] underline underline-offset-4"
+          >
+            Change in your registration
+          </Link>
         </div>
-        <Field
-          label="GSTIN"
-          name="gstin"
-          defaultValue={branding?.gstin}
-          placeholder="27AAPFU0939F1ZV"
-          width="sm"
-          mono
-          hint="Printed on the quotation. Separate from the one we verify you against — this one is yours to state."
-        />
-      </Block>
+        <p className="m-0 mb-4 max-w-[62ch] text-[13.5px] leading-relaxed text-[var(--s-ink-2,#56524b)]">
+          From what you gave us during onboarding — the same details we check against the GST and
+          company records. We do not ask for them twice, because two copies of an address end up
+          disagreeing and only one of them is the one we verified.
+        </p>
+
+        {branding ? (
+          <dl className="m-0 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
+            <Fact label="Registered name" value={branding.legalName} />
+            <Fact
+              label="Address"
+              value={[branding.addressLine, branding.city, branding.pincode]
+                .filter(Boolean)
+                .join(', ')}
+            />
+            <Fact label="GSTIN" value={branding.gstin} mono />
+          </dl>
+        ) : (
+          <p className="m-0 text-[13.5px] leading-relaxed text-[var(--s-ink-2,#56524b)]">
+            Nothing yet — finish the registration step and it appears here, and on every quotation
+            you send.
+          </p>
+        )}
+      </section>
 
       <Block title="How a client reaches you">
         <div className="flex flex-wrap gap-4">

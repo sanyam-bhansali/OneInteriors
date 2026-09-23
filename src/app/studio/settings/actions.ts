@@ -39,11 +39,8 @@ export async function saveBrandingAction(_prev: State, form: FormData): Promise<
   }
 
   const result = await saveBranding({
-    legalName: str('legalName'),
-    addressLine: str('addressLine'),
-    city: str('city'),
-    pincode: str('pincode'),
-    gstin: str('gstin'),
+    /* No registered name, address or GSTIN: those are the registration
+       step's, and Settings shows them rather than asking again. */
     phone: str('phone'),
     email: str('email'),
     website: str('website'),

@@ -265,15 +265,22 @@ export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
    * Branding is required, not optional.
    *
    * A quotation with no registered name on it is a document a client cannot
-   * act on and a studio cannot stand behind. Better to send them to Settings
-   * once than to let them build forty lines and discover it at the print
-   * screen.
+   * act on and a studio cannot stand behind, so this refuses rather than
+   * letting somebody build forty lines and discover it at the print screen.
+   *
+   * It is almost never reached now. `myBranding()` seeds the row from the
+   * registration step, so a studio who has finished onboarding has one
+   * whether or not they have ever opened Settings — which is what this used
+   * to send them to, for a form asking them to retype facts we already held.
+   * What is left here is the genuine case: a studio quoting before they have
+   * registered.
    */
   const branding = await myBranding();
   if (!branding) {
     return {
       ok: false,
-      error: 'Set your studio details first — a quotation has to carry your registered name.',
+      error:
+        'Finish your registration first — a quotation has to carry the name we checked you against.',
     };
   }
 

@@ -1,14 +1,20 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { computeTotals, isUnpriced } from '@/modules/studio-quote/pricing';
+import { formatINR } from '@/lib/money';
+import { computeTotals, isUnpriced, lineAmount } from '@/modules/studio-quote/pricing';
 import { compareToIssued, byRoom, type ComparableLine } from '@/modules/studio-quote/revision';
-import { lineAmount } from '@/modules/studio-quote/pricing';
 import type { QuoteRow } from '@/modules/studio-quote/quotes';
 import type { ProductRow } from '@/modules/studio-quote/store';
 import type { SaveLineInput } from '@/modules/studio-quote/quotes';
 import { saveLinesAction } from '../actions';
-import { ConfigureBar, RoomSection, type EditableLine } from './QuoteLines';
+import {
+  ConfigurePanel,
+  AddLinePanel,
+  RoomSection,
+  type AddSize,
+  type EditableLine,
+} from './QuoteLines';
 import { TotalsPanel, DocumentPreview, ChangesPanel } from './QuotePanels';
 
 /**
@@ -180,7 +186,7 @@ export function QuoteBuilder({
     });
   }, []);
 
-  const add = useCallback((room: string, product: ProductRow) => {
+  const add = useCallback((room: string, product: ProductRow, size: AddSize) => {
     setLines((current) => {
       const line: EditableLine = {
         key: freshKey(),
@@ -189,10 +195,9 @@ export function QuoteBuilder({
         code: product.code,
         unit: product.unit,
         details: product.details,
-        widthMm: product.unit === 'AREA' ? product.defaultWidthMm : null,
-        heightMm: product.unit === 'AREA' ? product.defaultHeightMm : null,
-        qtyMilli:
-          product.unit === 'AREA' ? null : product.defaultQty != null ? product.defaultQty * 1000 : null,
+        widthMm: size.widthMm,
+        heightMm: size.heightMm,
+        qtyMilli: size.qtyMilli,
         ratePaise: product.ratePaise,
         agreedPaise: null,
       };
@@ -235,11 +240,54 @@ export function QuoteBuilder({
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+    /**
+     * Controls on the left, the document on the right.
+     *
+     * The shape of the builder this module is descended from, and it is the
+     * right one: everything that CHANGES the quotation sits in one rail — the
+     * flat, the line being added, the save — and the whole of the main area is
+     * the quotation itself. The previous layout scattered the controls through
+     * the rooms and put the money in a sidebar, which meant the thing being
+     * read and the thing being operated were interleaved.
+     */
+    <div className="grid gap-5 lg:grid-cols-[21rem_minmax(0,1fr)]">
+      <aside className="flex flex-col gap-4 lg:sticky lg:top-5 lg:max-h-[calc(100dvh-2.5rem)] lg:self-start lg:overflow-y-auto">
+        <ConfigurePanel quote={quote} hasLines={lines.length > 0} />
+        <AddLinePanel rooms={roomOrder} products={products} onAdd={add} />
+
+        {/* In the rail, beside everything that made it dirty. */}
+        <div className="s-card p-4">
+          <div className="mb-2 flex items-baseline justify-between gap-3">
+            <span className="s-label">What the client pays</span>
+            <span className="s-num text-[17px] font-semibold">
+              {formatINR(totals.totalPaise)}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving || !dirty}
+            className="w-full rounded-[8px] bg-[var(--s-ink)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--s-surface)] disabled:opacity-30"
+          >
+            {saving ? 'Saving…' : dirty ? 'Save the quotation' : 'Saved'}
+          </button>
+          {error ? (
+            <p role="alert" className="m-0 mt-2 text-[12.5px] text-[var(--s-bad)]">
+              {error}
+            </p>
+          ) : null}
+          <p className="m-0 mt-2 text-[12px] leading-snug text-[var(--s-ink-3)]">
+            {dirty
+              ? 'Unsaved. Figures on screen are live; the stored copy is not.'
+              : 'Everything on screen is stored.'}
+          </p>
+        </div>
+      </aside>
+
       <div className="min-w-0">
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Tab on={tab === 'lines'} onClick={() => setTab('lines')}>
-            Lines
+            Quotation
             {lines.length > 0 ? <Count n={lines.length} /> : null}
           </Tab>
           <Tab on={tab === 'document'} onClick={() => setTab('document')}>
@@ -257,8 +305,6 @@ export function QuoteBuilder({
 
         {tab === 'lines' ? (
           <div className="flex flex-col gap-4">
-            <ConfigureBar quote={quote} hasLines={lines.length > 0} />
-
             {unpriced > 0 ? (
               <p className="s-card m-0 border-l-[3px] !border-l-[var(--s-warn)] px-4 py-3 text-[13.5px] leading-relaxed text-[var(--s-ink-2)]">
                 {unpriced} {unpriced === 1 ? 'line has' : 'lines have'} no figure yet — a
@@ -268,13 +314,13 @@ export function QuoteBuilder({
             ) : null}
 
             {lines.length === 0 ? (
-              <div className="s-card p-5">
-                <p className="m-0 mb-1.5 text-[14.5px] font-semibold">Nothing on it yet.</p>
+              <div className="s-card p-6">
+                <p className="m-0 mb-1.5 text-[15px] font-semibold">Nothing on it yet.</p>
                 <p className="m-0 max-w-[62ch] text-[14px] leading-relaxed text-[var(--s-ink-2)]">
-                  Build the standard quotation for this flat from the bar above, or add lines one
-                  at a time below. Either way the sizes and rates come from your own product list
-                  as a starting point and every one of them is editable here — changing a line
-                  never changes your catalogue, and changing your catalogue never changes a
+                  Build the standard quotation for this flat from the panel on the left, or add
+                  lines one at a time. Either way the sizes and rates come from your own product
+                  list as a starting point and every one of them is editable here — changing a
+                  line never changes your catalogue, and changing your catalogue never changes a
                   quotation you have already sent.
                 </p>
               </div>
@@ -285,20 +331,16 @@ export function QuoteBuilder({
                 key={room}
                 room={room}
                 lines={priced.filter((l) => l.room === room)}
-                products={products}
                 onUpdate={update}
                 onRemove={remove}
                 onDuplicate={duplicate}
                 onMove={move}
-                onAdd={add}
               />
             ))}
 
-            <AddRoom
-              existing={roomOrder}
-              products={products}
-              onAdd={(room, product) => add(room, product)}
-            />
+            {lines.length > 0 ? (
+              <TotalsPanel quote={quote} totals={totals} rooms={rooms} />
+            ) : null}
           </div>
         ) : null}
 
@@ -319,93 +361,17 @@ export function QuoteBuilder({
           <ChangesPanel summary={revision} issuedOn={quote.issuedOn} />
         ) : null}
       </div>
-
-      <aside className="lg:sticky lg:top-5 lg:self-start">
-        <TotalsPanel quote={quote} totals={totals} rooms={rooms} />
-      </aside>
-
-      {/* The save bar. Fixed, because the thing it is about is forty lines
-          long and a button at the bottom of forty lines is a button nobody
-          sees until they have scrolled past the reason to press it. */}
-      {dirty || saving || error ? (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--s-rule)] bg-[var(--s-surface)] px-5 py-3 shadow-[0_-6px_20px_rgba(0,0,0,.06)]">
-          <div className="mx-auto flex max-w-[72rem] flex-wrap items-center justify-between gap-3">
-            <p className="m-0 text-[13.5px] text-[var(--s-ink-2)]">
-              {error ? (
-                <span role="alert" className="text-[var(--s-bad)]">
-                  {error}
-                </span>
-              ) : saving ? (
-                'Saving…'
-              ) : (
-                'Unsaved changes on this quotation.'
-              )}
-            </p>
-            <button
-              type="button"
-              onClick={save}
-              disabled={saving}
-              className="rounded-[8px] bg-[var(--s-accent)] px-5 py-2 text-[14px] font-medium text-white hover:bg-[var(--s-accent-deep)] disabled:opacity-40"
-            >
-              {saving ? 'Saving…' : 'Save the quotation'}
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Clears the fixed bar so it never sits on top of the last line. */}
-      {dirty || saving || error ? <div className="h-16 lg:col-span-2" /> : null}
     </div>
   );
 }
 
-/** A room that is not on the quotation yet. */
-function AddRoom({
-  existing,
-  products,
-  onAdd,
-}: {
-  existing: string[];
-  products: ProductRow[];
-  onAdd: (room: string, product: ProductRow) => void;
-}) {
-  const [name, setName] = useState('');
-
-  /* The first usable product is what the new room gets, because a room with
-     nothing in it would vanish on the next render — rooms are derived from
-     the lines, deliberately, so there is no such thing as an empty one. */
-  const seed = products.find((p) => p.isActive && p.ratePaise > 0) ?? products[0];
-  if (!seed) return null;
-
-  const clean = name.trim();
-  const clash = existing.some((r) => r.toLowerCase() === clean.toLowerCase());
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (clean.length === 0 || clash) return;
-        onAdd(clean, seed);
-        setName('');
-      }}
-      className="flex flex-wrap items-center gap-2"
-    >
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Another room — terrace, passage, puja…"
-        className="min-w-[16rem] flex-1 rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[13.5px] placeholder:text-[var(--s-ink-3)]"
-      />
-      <button
-        type="submit"
-        disabled={clean.length === 0 || clash}
-        className="rounded-[8px] border border-[var(--s-rule)] px-4 py-2 text-[13.5px] font-medium hover:border-[var(--s-ink-3)] disabled:opacity-40"
-      >
-        {clash ? 'Already there' : 'Add a room'}
-      </button>
-    </form>
-  );
-}
+/*
+ * `AddRoom` used to live here: a text box under the last room that created
+ * one by seeding it with an arbitrary product, because a room with no lines
+ * cannot exist when rooms are derived from the lines. `AddLinePanel` asks for
+ * the room and the product together, which is the same act without the
+ * invented seed line. Recoverable from git history.
+ */
 
 function Tab({
   on,
