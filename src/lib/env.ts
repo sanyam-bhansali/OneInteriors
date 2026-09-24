@@ -236,3 +236,18 @@ export function opsWithoutAuth(): boolean {
   if (rosterIsReal()) return false;
   return process.env.DEV_OPS_NO_AUTH?.trim() === '1';
 }
+
+/**
+ * Shared secret for POST /api/waitlist, used by the pre-launch page at
+ * oneinteriors.in — a separate deployment.
+ *
+ * It is a bearer token rather than a database credential on purpose. A
+ * Supabase service_role key handed to a marketing landing page would let that
+ * page read every user, brief and quote in this project; this lets it add a
+ * row to one table. When absent the route refuses every request, because a
+ * missing variable must never be the thing that opens an endpoint.
+ */
+export function waitlistIngestToken(): string | null {
+  const t = process.env.WAITLIST_INGEST_TOKEN?.trim();
+  return t ? t : null;
+}

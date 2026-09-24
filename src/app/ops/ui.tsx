@@ -34,6 +34,9 @@ export function OpsHeader() {
                 until now, the only half nothing on this surface could see. */}
             <OpsLink href="/ops/introductions">Introductions</OpsLink>
             <OpsLink href="/ops/funnel">Funnel</OpsLink>
+            {/* Pre-launch signups from oneinteriors.in, and which society
+                WhatsApp group each one came through. */}
+            <OpsLink href="/ops/waitlist">Waitlist</OpsLink>
             <OpsLink href="/ops/data">Data</OpsLink>
             <OpsLink href="/">Public site</OpsLink>
           </nav>

@@ -2843,3 +2843,52 @@ model StudioFiledRate {
   @@index([archiveId])
   @@map("studio_filed_rates")
 }
+
+// ─────────────────────────────────────────────────────────────
+// WAITLIST — the pre-launch landing page
+// ─────────────────────────────────────────────────────────────
+// Fed by oneinteriors.in (a separate deployment) through
+// POST /api/waitlist, authenticated with WAITLIST_INGEST_TOKEN.
+//
+// That page deliberately holds no database credential. A Supabase
+// service_role key would let a marketing landing page read every user,
+// brief and quote in this project; a bearer token scoped to one route
+// lets it do exactly one thing — add a name to this table.
+
+model WaitlistSignup {
+  id String @id @default(cuid())
+
+  name String
+
+  /// E.164, as everywhere else in this schema. Unique, so someone who
+  /// signs up twice updates their row instead of appearing twice — the
+  /// total gets quoted to studios and has to mean people, not form
+  /// submissions.
+  phone String? @unique
+  email String? @unique
+
+  /// Their pick from the four style cards. Useful when deciding which
+  /// studios to recruit first.
+  style String?
+  city  String  @default("Pune")
+
+  /// Which share link brought them (?s=baner-greens). The campaign is
+  /// one WhatsApp message per society, and this column is the only way
+  /// to know which of those groups actually worked.
+  via    String?
+  source String  @default("waitlist-landing")
+
+  /// What they were told when they handed over the number, and that
+  /// they were told it. Consent does not survive a material change to
+  /// the wording, and that is only knowable if the version in force at
+  /// the time was written down — the same rule as Consent.policyVersion.
+  notifyConsent Boolean @default(true)
+  policyVersion String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([via])
+  @@map("waitlist_signups")
+}
