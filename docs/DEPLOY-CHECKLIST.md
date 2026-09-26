@@ -20,7 +20,20 @@ Settings → Environment Variables. **Env changes need a redeploy to take effect
 | `NEXT_PUBLIC_ROSTER_IS_REAL` | **Leave unset** | Setting it to `1` hides the "these studios are placeholders" notice while the roster is still invented |
 | `OPS_PREVIEW` | **Leave unset** | `1` exposes the unauthenticated ops console publicly |
 
-Do **not** set `SUPABASE_SECRET_KEY`. Nothing uses it, and it bypasses RLS.
+`SUPABASE_SECRET_KEY` **is required**, and this line used to say the opposite.
+
+It said "do not set it, nothing uses it, and it bypasses RLS." The second
+clause stopped being true the day storage was built: seven modules read it —
+every one of the five buckets plus the archive extractor and the ops readiness
+screen. Following the old instruction does not produce an error. It produces a
+studio surface where business proof, portfolio images, quotation archives and
+logos all quietly report themselves as "not switched on", and a studio asking
+where the upload button went.
+
+The third clause is still true and is the reason for the care: this key
+bypasses row-level security, so it is server-only. It must never be prefixed
+`NEXT_PUBLIC_`, and `tests/security-invariants.test.ts` fails the build if it
+ever reaches a client component.
 
 ### Settings
 
@@ -59,6 +72,11 @@ npm audit          # must be 0
 CI runs all of these on every PR (`.github/workflows/ci.yml`). If CI is green,
 this is a formality — but run it before a release tag anyway.
 
+- [ ] **Migrations applied to production BEFORE the push.** Vercel deploys on
+      push, so pushing first opens a window where new code runs against the
+      old schema. That is not hypothetical: it is how the rates page 500'd in
+      production earlier this month. Run `npm run db:deploy`, confirm it, then
+      push.
 - [ ] Migrations reviewed, reversible or rollback written down
 - [ ] Money paths: integer paise, `applyBps` for rates, `splitAcross` for splits — no bare `*` or `/`
 - [ ] No new customer-facing claim that isn't backed by a row
@@ -85,7 +103,24 @@ this is a formality — but run it before a release tag anyway.
 
 Stated plainly so nobody discovers them by accident:
 
-- **`/ops` has no authentication.** It is 404'd outside development by `src/middleware.ts` and carries a red banner. That is a lock on a door, not a security model — it comes out in the PR that adds real auth (OI-3).
-- **No auth at all yet.** No accounts, no sessions. The quiz is session-scoped in the browser and nothing is persisted server-side.
-- **Briefs are not stored.** `sessionStorage` only, so they do not survive a device change. Server-side persistence is OI-4.
-- **The delivery figures are fixture data.** Every number on the site is currently invented, which is what the pre-launch notice says.
+Three entries that used to sit here — "`/ops` has no authentication", "no auth
+at all yet", "briefs are not stored" — were all fixed and none of them was
+struck out. A gaps list nobody prunes is read as fiction, including the entries
+that are still true. What follows is current as of 26 Sep 2026.
+
+- **Tenant isolation is application code, not row-level security.** Thirty
+  tables have RLS enabled and forced, and there are zero policies; Prisma
+  connects as the owner, for whom RLS is not enforced. Every
+  `where: { studioId }` is the only thing between two studios' data.
+  `tests/tenant-scope.test.ts` fails the build on an unscoped query, which is
+  a good second line and not a floor. See `docs/DATA-ARCHITECTURE.md` §4.2.
+- **Nothing writes the studio performance block.** `completedProjects`,
+  `avgVarianceDays`, `upheldDisputes`, `specComplianceRate`,
+  `communicationRating` and `autonomyProfile` have no writer anywhere, and
+  both the matching score and the verification tier read them as fact. No
+  studio is flattered — a zero is a zero — but two ranked outputs are
+  currently ranking on a constant.
+- **A studio's rate has three homes.** `RateCardItem`, `StudioFiledRate` and
+  `StudioProduct.ratePaise`, with nothing reconciling them.
+- **The delivery figures are fixture data** until the real cohort goes in,
+  which is what the pre-launch notice says.
