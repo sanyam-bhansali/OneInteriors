@@ -1583,76 +1583,7 @@ demoSlide(
 }
 
 /* ====================================================================== */
-/* 18 — the agreement                                                     */
-/* ====================================================================== */
-{
-  const s = light();
-  mark(s);
-  eyebrow(s, 'The paperwork');
-  title(s, 'Eight pages, and nothing buried in them.');
-  standfirst(
-    s,
-    'You are leaving today with the whole agreement. These are the clauses worth reading first, because they are the ones that would annoy you if you found them later.',
-    { w: 10.6 },
-  );
-
-  const clauses = [
-    ['2.4', 'No payment of any kind can improve your position in a homeowner’s results.'],
-    ['4.3', 'Nothing is charged on your own clients, and the software is free for those projects.'],
-    ['4.5', 'An introduction carries commission for twelve months, however the contract comes about.'],
-    ['5', 'Your data is used to run this and nothing else. Never sold, never shown to another studio.'],
-    ['9.2', 'We can remove your listing at any time. Software you have paid for runs to the end of the period.'],
-    ['9.6', 'Fees are not refunded on termination.'],
-  ];
-
-  clauses.forEach(([n, t], i) => {
-    const x = M + (i % 2) * 5.95;
-    const y = 3.5 + Math.floor(i / 2) * 1.0;
-    s.addText(n, {
-      x,
-      y,
-      w: 0.8,
-      h: 0.8,
-      fontFace: MONO,
-      fontSize: 15,
-      color: ACC,
-      isTextBox: true,
-      margin: 0,
-      valign: 'middle',
-    });
-    s.addText(t, {
-      x: x + 0.85,
-      y,
-      w: 4.75,
-      h: 0.8,
-      fontFace: SANS,
-      fontSize: 12.5,
-      color: INK,
-      isTextBox: true,
-      margin: 0,
-      valign: 'middle',
-      lineSpacingMultiple: 1.18,
-    });
-  });
-
-  foot(s, 'Take it to your CA. We would rather you read it properly than sign it today.');
-
-  s.addNotes(
-    [
-      'Hand them the printed agreement at this slide, not at the door.',
-      '',
-      'Read 9.2 and 9.6 aloud yourself. A studio that hears the unflattering',
-      'clauses from you trusts the flattering ones. A studio that finds them',
-      'alone at eleven at night does not.',
-      '',
-      'Never push for a signature in the first meeting. "Take it to your CA" is',
-      'a stronger close than a pen.',
-    ].join('\n'),
-  );
-}
-
-/* ====================================================================== */
-/* 19 — next fourteen days                                                */
+/* 18 — next fourteen days                                                */
 /* ====================================================================== */
 {
   const s = light();
@@ -1743,7 +1674,7 @@ demoSlide(
 }
 
 /* ====================================================================== */
-/* 20 — close                                                             */
+/* 19 — close                                                             */
 /* ====================================================================== */
 {
   const s = dark();
