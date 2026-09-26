@@ -73,7 +73,7 @@ The Studio warrants, for as long as this Agreement is in force, that:
 (e) it will not misrepresent its relationship with One Interiors, and will not
     describe itself as endorsed, guaranteed or employed by One Interiors.
 
-## 4. Introductions, commission and non-circumvention
+## 4. Introductions and commission
 
 4.1 An "**Introduced Client**" is a homeowner whose brief One Interiors sent to
 the Studio, or who contacted the Studio through the platform.
@@ -87,35 +87,40 @@ billing cycle in which that threshold is crossed. In this Agreement a
 "**billing cycle**" is a calendar month, and commission that falls due in a
 month is payable by the **10th** day of the month following.
 
-**[DECIDE — adjustment if the project stops.]** As drafted, the Studio pays
-commission on the *full* contract value once it has collected a fifth of it.
-If the homeowner then cancels at, say, 30%, the Studio has paid 5% of a
-project that was never built. That is the clause a studio's lawyer will find,
-and an unanswered version of it is what turns a cancellation into a public
-argument. Two workable answers: One Interiors refunds the commission
-attributable to the uncompleted balance, or the Studio may set it off against
-commission on its next Introduced Client. Pick one and it stops being a
-dispute.
+**Commission is earned on introduction and signature, not on completion.** If
+the project is afterwards cancelled, reduced, varied or abandoned, for any
+reason and by either the homeowner or the Studio, commission that has fallen
+due under this clause **remains payable and is not refundable**, in whole or
+in part.
+
+The parties record why this is reasonable rather than leaving it to be argued
+later. What One Interiors provides is the introduction and the verification
+behind it, and that is complete when the homeowner signs. At the point
+commission falls due, the Studio has received a fifth of the contract value
+against little or no delivered work, and **retains 15% of the contract value
+after commission**.
+
+The Studio is responsible for its own terms with the homeowner, and should
+ensure the sums it collects before commencement are non-refundable to the
+extent it wishes to be protected against a cancellation.
 
 4.3 **One Interiors charges nothing on the Studio's own clients.** A homeowner
 the Studio found by any other means is entirely the Studio's, no commission is
 payable, and the Studio's use of the software for that project is free of
 charge.
 
-4.4 **Non-circumvention.** For **[DECIDE: 12 / 18 / 24] months** after an
-introduction, the Studio will not take that homeowner — or an immediate family
-member of that homeowner for the same property — off the platform in order to
-avoid commission, whether directly, through an associate, through another
-entity, or by asking the homeowner to re-approach it independently. Commission
-remains payable on any such engagement.
+4.4 **Reporting.** The Studio will tell One Interiors within 7 days when an
+Introduced Client signs, and what the contract value is. It will also tell One
+Interiors when that client's payments reach 20% of the contract value, since
+that is what triggers 4.2. One Interiors may ask for reasonable evidence of
+either and the Studio will provide it.
 
-4.5 The Studio will tell One Interiors within 7 days when an Introduced Client
-signs, and what the contract value is. It will also tell One Interiors when
-that client's payments reach 20% of the contract value, since that is what
-triggers 4.2. One Interiors may ask for reasonable evidence of either and the
-Studio will provide it.
+This clause carries the whole of the commission arrangement. There is no
+non-circumvention term in this Agreement, so nothing else obliges the Studio
+to bring an introduction back through the platform. Failure to report an
+Introduced Client who has signed is a material breach for the purposes of 9.4.
 
-4.6 GST is payable on commission in addition, against a valid tax invoice.
+4.5 GST is payable on commission in addition, against a valid tax invoice.
 
 ## 5. Data
 
@@ -240,8 +245,8 @@ is not cured within 15 days of written notice, or on the other's insolvency.
 
 (c) commission already accrued remains payable;
 
-(d) clauses 4.4 (non-circumvention), 5 (data), 7 (IP), 8 (confidentiality),
-    10 (liability) and 11 (law) survive;
+(d) clauses 5 (data), 7 (IP), 8 (confidentiality), 10 (liability) and
+    11 (law) survive;
 
 (e) the Studio may request its data export under 5.5;
 
@@ -314,14 +319,34 @@ Points One Interiors has taken a deliberate position on:
    means something if it can remove a studio quickly. Please confirm this is
    enforceable as drafted and advise whether 9.6 needs an answer to keep it so.
 
-2. **Clause 4.2 takes the whole commission at a 20% collection trigger.**
-   Please advise whether that survives without the adjustment flagged in the
-   clause, and draft whichever adjustment One Interiors picks. The exposure is
-   a cancelled project on which full commission has already been paid.
+2. **Clause 4.2 takes the whole commission at a 20% collection trigger, with
+   no refund on cancellation.** This is a deliberate commercial decision: the
+   service sold is the introduction, it is complete on signature, and the
+   Studio retains 15% of contract value after paying it. The reasoning is
+   stated in the clause rather than left implicit, so that it reads as
+   considered rather than one-sided.
 
-3. **Clause 4.4 is the main commercial protection.** Please advise on a
-   duration that is enforceable in India — an over-long restraint may be read
-   down, and a read-down clause protects nobody.
+   Please confirm it holds as drafted. The residual exposure is a Studio that
+   has to refund the homeowner on cancellation under *its own* terms and is
+   then out of pocket by the commission — the clause puts that risk on the
+   Studio and tells it how to manage it, but please say if that needs to be
+   more explicit to be safe.
+
+3. **There is deliberately no non-circumvention clause.** A draft carried one
+   and One Interiors removed it, so this is a decision rather than an
+   oversight.
+
+   The consequence should be understood: commission depends entirely on the
+   Studio reporting under 4.4. Nothing in this Agreement prevents a Studio
+   from taking an introduced homeowner off the platform and contracting with
+   them directly, and there is no contractual remedy if it does.
+
+   If One Interiors later wants protection without a restraint of trade,
+   please advise on the narrower version — a bare undertaking not to SOLICIT
+   an Introduced Client to contract off-platform for the purpose of avoiding
+   commission. That is a much easier clause to defend than a period-based
+   restraint, and it closes the deliberate evasion while leaving the
+   homeowner's freedom to choose untouched.
 
 4. **Clause 5.2 discloses a third-party AI provider by design.** The software
    already tells studios this before they upload. It should stay; please word
