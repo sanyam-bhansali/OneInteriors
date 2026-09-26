@@ -240,7 +240,23 @@ receiving party, was already lawfully held, or must be disclosed by law.
 9.1 This Agreement begins on the date above and continues until terminated.
 
 9.2 **One Interiors may terminate, suspend or de-list the Studio at any time,
-for any reason or none, with immediate effect and at its sole discretion.**
+for any reason or none, and at its sole discretion.** When it does, notice
+takes effect as follows.
+
+(a) **Listing, matching and introductions end immediately.** The Studio comes
+    off the marketplace on notice, and nothing in (b) delays that.
+
+(b) **A paid software subscription runs to the end of the period already paid
+    for.** On a monthly plan the Studio's software access ends at the end of
+    that month; on a longer plan, at the end of the paid term. Until then the
+    Studio keeps the software and its own data in it, so that a studio
+    removed mid-cycle can finish what it is working on and export.
+
+(c) **(b) does not apply** where One Interiors terminates under 9.4 for the
+    Studio's material breach, where the Studio owes money that is overdue, or
+    where continued access would expose a homeowner, One Interiors or the
+    platform to harm or legal risk. In those cases software access ends
+    immediately as well.
 
 9.3 The Studio may terminate on **30 days'** written notice.
 
@@ -266,9 +282,10 @@ is not cured within 15 days of written notice, or on the other's insolvency.
     every reference, badge and mark within 14 days.
 
 9.6 **No refund.** Subscription and software fees are not refundable, in whole
-or in part, on any termination — including where One Interiors terminates
-under 9.2 and the Studio is not in breach. Fees already paid are earned when
-paid.
+or in part, on any termination. Where One Interiors terminates and the Studio
+is not in breach, what the Studio gets is the run-out period in 9.2(b) — the
+service it paid for, to the end of the period it paid for — and not a refund
+of it.
 
 ## 10. Liability, and who is responsible for the work
 
@@ -431,22 +448,25 @@ Points One Interiors has taken a deliberate position on:
    publication of figures that may not flatter it. Please confirm the consent
    is adequately informed as drafted.
 
-8. **Clause 9.6 — no refund on a termination the Studio did not cause — is a
-   commercial decision, taken knowingly.**
+8. **9.2 and 9.6 together — terminate at will, refund nothing — are the
+   commercial position, and 9.2(b) is the deliberate softening of it.**
 
-   9.2 lets One Interiors terminate at any time for any reason or none, and
-   9.6 says no fee is refunded when it does. The two read together are the
-   most one-sided pair in the document: a studio can pay an annual
-   subscription in month one, be de-listed in month two through no fault of
-   its own, and recover nothing.
+   An earlier draft let One Interiors terminate with immediate effect and
+   refund nothing, which meant a studio could pay for a period and lose both
+   the listing and the software inside it, through no fault of its own. The
+   split in 9.2 was written to answer that: the **listing** goes immediately,
+   because a marketplace that cannot remove a studio at once is no protection
+   to a homeowner, but the **software** the studio has already paid for runs
+   to the end of that period. No money leaves One Interiors, and the studio
+   gets what it bought.
 
-   Please advise on enforceability — in particular whether it is at risk as
-   an unconscionable term in a standard-form contract, and whether it changes
-   the analysis if the Studio is a proprietorship rather than a company.
-   Whether the fee can fairly be described as "earned when paid" when the
-   service it buys is then withdrawn is the question to answer.
+   Two things to confirm. First, that the run-out in 9.2(b) is enough to keep
+   9.6 out of unconscionability territory in a standard-form contract,
+   including where the Studio is a proprietorship rather than a company —
+   monthly plans are covered comfortably, but a studio eleven months into an
+   annual plan is not, and please advise whether a longer term needs a
+   pro-rata answer rather than a run-out.
 
-   The practical mitigation, if you advise the clause is exposed, is to leave
-   the no-refund rule in place but let access run to the end of the paid
-   period where One Interiors terminates without breach. No money leaves, and
-   the term stops looking punitive.
+   Second, that the carve-outs in 9.2(c) are drawn tightly enough to be used
+   and widely enough to be useful. "Harm or legal risk" is the one doing the
+   work, and it is the one a terminated studio would attack.
