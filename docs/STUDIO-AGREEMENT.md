@@ -120,7 +120,13 @@ non-circumvention term in this Agreement, so nothing else obliges the Studio
 to bring an introduction back through the platform. Failure to report an
 Introduced Client who has signed is a material breach for the purposes of 9.4.
 
-4.5 GST is payable on commission in addition, against a valid tax invoice.
+4.5 GST is payable on commission **in addition, at the rate applicable from
+time to time**, against a valid tax invoice carrying One Interiors' GSTIN and
+the correct SAC code.
+
+The rate is deliberately not written into this Agreement. It is set by law,
+it changes, and a figure typed here would be wrong the day it moves while
+still looking authoritative.
 
 ## 5. Data
 
@@ -308,6 +314,29 @@ under the Arbitration and Conciliation Act, 1996, seated at Pune, in English.
 **Signed for One Interiors**  ·  Name / Title / Date / Signature
 
 **Signed for the Studio**  ·  Name / Title / Date / Signature
+
+---
+
+## For the CA, before the advocate
+
+**GST on the commission is 18%** — commission, brokerage and intermediary
+services sit at the standard rate. Two things to confirm before the first
+invoice goes out:
+
+1. **Which SAC.** Candidates are 9961/9962 (commission agents in wholesale and
+   retail trade) and 997159 / 9971.39 (intermediary and referral services).
+   Both are 18%, so the rate does not turn on it — but the invoice has to
+   carry the right one, and a 6-digit code is mandatory above ₹5 crore
+   turnover.
+
+2. **Whether registration is compulsory regardless of turnover.** Section 24
+   requires registration for a person making taxable supplies *as an agent of
+   another*. One Interiors' position is that it is not an agent — clause 10.1
+   says it is not a party to the works contract and does not supply the works
+   — so it sells an introduction service to the Studio and the ordinary
+   ₹20 lakh threshold should apply. That reading is worth confirming, because
+   it is the same clause that carries the liability shield and the two should
+   not be argued differently.
 
 ---
 
