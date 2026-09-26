@@ -142,26 +142,17 @@ One Interiors will:
     Studio's own rates, and running the Studio's own workspace;
 
 (b) **not publish them**, not show them to another studio, and not disclose
-    them to any third party except as set out in 5.2 below or where compelled
-    by law;
+    them to any third party — other than to service providers engaged to
+    operate the platform, who are bound in writing to the same confidentiality
+    and may not use the data for their own purposes — or where compelled by
+    law;
 
 (c) **not sell, licence, rent or trade them**, and not use them to train any
     general-purpose model.
 
 One Interiors does not publish, and will not publish, the Studio's rates.
 
-### 5.2 Automated reading, stated plainly
-
-To read the Studio's uploaded past quotations and turn them into a rate card,
-One Interiors sends those documents to a third-party artificial-intelligence
-provider under a commercial agreement that prohibits that provider from using
-them to train its models.
-
-The Studio acknowledges this. If the Studio would rather this did not happen,
-it may decline and enter its rates by hand instead, and nothing about its
-listing changes.
-
-### 5.3 Homeowners' personal data
+### 5.2 Homeowners' personal data
 
 Both parties are responsible for their own compliance with the Digital
 Personal Data Protection Act, 2023.
@@ -174,7 +165,7 @@ purpose.
 
 Neither party will use the other's contacts for marketing without consent.
 
-### 5.4 Published performance
+### 5.3 Published performance
 
 The Studio agrees that once it has delivered projects through the platform,
 its public profile may carry **the average number of days past its own
@@ -184,7 +175,7 @@ Interiors' process.
 One Interiors will show the Studio these figures before they are published,
 and will correct any that are wrong.
 
-### 5.5 Getting the Studio's data back
+### 5.4 Getting the Studio's data back
 
 On termination, One Interiors will give the Studio a machine-readable export of
 its clients, quotations and product list within 30 days of a written request.
@@ -254,7 +245,7 @@ is not cured within 15 days of written notice, or on the other's insolvency.
 (d) clauses 5 (data), 7 (IP), 8 (confidentiality), 10 (liability) and
     11 (law) survive;
 
-(e) the Studio may request its data export under 5.5;
+(e) the Studio may request its data export under 5.4;
 
 (f) the Studio stops describing itself as a One Interiors studio and removes
     every reference, badge and mark within 14 days.
@@ -377,9 +368,26 @@ Points One Interiors has taken a deliberate position on:
    restraint, and it closes the deliberate evasion while leaving the
    homeowner's freedom to choose untouched.
 
-4. **Clause 5.2 discloses a third-party AI provider by design.** The software
-   already tells studios this before they upload. It should stay; please word
-   it so it is accurate under the DPDP Act.
+4. **The AI-processing disclosure was removed at One Interiors' instruction,
+   and 5.1(b) had to be reworded because of it.**
+
+   A draft carried a clause stating plainly that uploaded quotations are sent
+   to a third-party AI provider to be read. It was removed. 5.1(b) had pointed
+   at it as the sole exception to "no third-party disclosure", so without the
+   rewording the Agreement would have prohibited the processing the product
+   performs on every archive upload — a breach on day one, by the drafting
+   rather than by anyone's conduct. It now permits service providers under
+   written confidentiality.
+
+   Two things to check. First, whether a generic service-provider carve-out is
+   sufficient consent under the DPDP Act when those documents carry
+   homeowners' names and addresses, or whether specific disclosure is needed.
+   Second, that the Agreement does not now say LESS than the software says:
+   the upload screen still tells studios, in terms, that the documents go to
+   an AI provider. The product being more forthcoming than the contract is the
+   safe direction, but the two should not contradict each other, and the
+   clause that survives in 5.1(c) — no training of general-purpose models —
+   should be read against what that provider's terms actually allow.
 
 5. **Clause 10.1 is the most important clause in the document.** Please make
    sure it holds against a homeowner who tries to join One Interiors to a
