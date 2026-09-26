@@ -79,8 +79,23 @@ The Studio warrants, for as long as this Agreement is in force, that:
 the Studio, or who contacted the Studio through the platform.
 
 4.2 The Studio pays One Interiors **5% of the contract value** for each
-Introduced Client who signs with the Studio, payable within **[DECIDE: 7 / 15 /
-30] days** of the Studio receiving each payment milestone from that client.
+Introduced Client who signs with the Studio.
+
+The **whole** of that commission falls due once the Studio has received **20%
+or more of the contract value** from that client, and is payable in the same
+billing cycle in which that threshold is crossed. In this Agreement a
+"**billing cycle**" is a calendar month, and commission that falls due in a
+month is payable by the **[DECIDE: 7th / 10th]** day of the month following.
+
+**[DECIDE — adjustment if the project stops.]** As drafted, the Studio pays
+commission on the *full* contract value once it has collected a fifth of it.
+If the homeowner then cancels at, say, 30%, the Studio has paid 5% of a
+project that was never built. That is the clause a studio's lawyer will find,
+and an unanswered version of it is what turns a cancellation into a public
+argument. Two workable answers: One Interiors refunds the commission
+attributable to the uncompleted balance, or the Studio may set it off against
+commission on its next Introduced Client. Pick one and it stops being a
+dispute.
 
 4.3 **One Interiors charges nothing on the Studio's own clients.** A homeowner
 the Studio found by any other means is entirely the Studio's, no commission is
@@ -95,8 +110,10 @@ entity, or by asking the homeowner to re-approach it independently. Commission
 remains payable on any such engagement.
 
 4.5 The Studio will tell One Interiors within 7 days when an Introduced Client
-signs, and what the contract value is. One Interiors may ask for reasonable
-evidence and the Studio will provide it.
+signs, and what the contract value is. It will also tell One Interiors when
+that client's payments reach 20% of the contract value, since that is what
+triggers 4.2. One Interiors may ask for reasonable evidence of either and the
+Studio will provide it.
 
 4.6 GST is payable on commission in addition, against a valid tax invoice.
 
@@ -297,18 +314,23 @@ Points One Interiors has taken a deliberate position on:
    means something if it can remove a studio quickly. Please confirm this is
    enforceable as drafted and advise whether 9.6 needs an answer to keep it so.
 
-2. **Clause 4.4 is the main commercial protection.** Please advise on a
+2. **Clause 4.2 takes the whole commission at a 20% collection trigger.**
+   Please advise whether that survives without the adjustment flagged in the
+   clause, and draft whichever adjustment One Interiors picks. The exposure is
+   a cancelled project on which full commission has already been paid.
+
+3. **Clause 4.4 is the main commercial protection.** Please advise on a
    duration that is enforceable in India — an over-long restraint may be read
    down, and a read-down clause protects nobody.
 
-3. **Clause 5.2 discloses a third-party AI provider by design.** The software
+4. **Clause 5.2 discloses a third-party AI provider by design.** The software
    already tells studios this before they upload. It should stay; please word
    it so it is accurate under the DPDP Act.
 
-4. **Clause 10.1 is the most important clause in the document.** Please make
+5. **Clause 10.1 is the most important clause in the document.** Please make
    sure it holds against a homeowner who tries to join One Interiors to a
    claim against a studio.
 
-5. **Clause 5.4 is unusual and deliberate** — the Studio agrees in advance to
+6. **Clause 5.4 is unusual and deliberate** — the Studio agrees in advance to
    publication of figures that may not flatter it. Please confirm the consent
    is adequately informed as drafted.
