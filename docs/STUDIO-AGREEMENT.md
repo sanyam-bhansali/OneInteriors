@@ -85,7 +85,7 @@ The **whole** of that commission falls due once the Studio has received **20%
 or more of the contract value** from that client, and is payable in the same
 billing cycle in which that threshold is crossed. In this Agreement a
 "**billing cycle**" is a calendar month, and commission that falls due in a
-month is payable by the **[DECIDE: 7th / 10th]** day of the month following.
+month is payable by the **10th** day of the month following.
 
 **[DECIDE — adjustment if the project stops.]** As drafted, the Studio pays
 commission on the *full* contract value once it has collected a fifth of it.
