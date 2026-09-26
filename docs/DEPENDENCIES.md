@@ -135,3 +135,41 @@ npm outdated             # what has moved on
 If `npm audit` ever reports something, resolve it the same way: work out whether
 we are actually exposed, prefer an override to a major upgrade, and write down
 what you decided here.
+
+## `lucide-react` — added 26 Sep 2026
+
+The studio surface had around twenty hand-drawn inline SVGs, each defined
+locally in the file that used it, at `strokeWidth={1.5}`. They were fine and
+they were twenty separate drawings of things like a phone and a pin, with no
+way to be sure two files drew the same concept the same way.
+
+Lucide is the set the onboarding mockup was built against, so adopting it
+matches the intended design exactly rather than approximating it, and its
+house geometry — 24×24, stroke 2, round caps and joins — is what makes those
+icons read as friendly rather than technical. That roundness is the point:
+this surface is a person setting up their business, not a control panel.
+
+**Tree-shaken per icon.** Every icon is its own module, so importing six costs
+six; the package's size on npm is not the size in the bundle. That is the only
+reason a 1.4MB dependency is acceptable for something we were already drawing
+by hand.
+
+**Pinned loosely (`^1.48.0`)** because the icon set only ever grows — new
+icons are added, existing paths are stable. A minor bump cannot change a shape
+already in use.
+
+Rules for using it here:
+
+- `size: 18, strokeWidth: 2, absoluteStrokeWidth: true` beside body copy;
+  `size: 24` for a panel's own icon. `absoluteStrokeWidth` keeps the line the
+  same weight when the size changes, which is what stops a 24px icon looking
+  heavier than an 18px one beside it.
+- Colour comes from `currentColor` via a Tailwind text class, never a `stroke`
+  prop, so an icon inherits the state of the thing it sits in.
+- An icon labels a **choice** — upload or type by hand — or marks a panel.
+  It does not decorate a sequence: four icons across four numbered steps is
+  four shapes to decode where only the order matters.
+
+The hand-drawn SVGs elsewhere in `src/app/studio` are not a second system to
+keep; they are the previous one, and should move across as those files are
+touched.

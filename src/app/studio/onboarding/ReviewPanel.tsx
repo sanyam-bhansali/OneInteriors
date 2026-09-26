@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Clock, Users } from 'lucide-react';
 import { useActionState } from 'react';
 import { submitForReviewAction, type StepState } from './actions';
 
@@ -62,34 +63,30 @@ export function ReviewPanel({
         </p>
         <ol className="m-0 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2">
           <Next
-            n="01"
+            n={1}
             title="Registration"
             body="We check your GSTIN against the public GST record, and the company details against the registry."
-            icon={<DocIcon />}
           />
           <Next
-            n="02"
+            n={2}
             title="Two reference calls"
             body="We call two of your past clients. We will ask you who, and tell you what we are going to ask them."
-            icon={<PhoneIcon />}
           />
           <Next
-            n="03"
+            n={3}
             title="Two site visits"
             body="We stand in two finished projects. In person, and unannounced only if you agree to that."
-            icon={<PinIcon />}
           />
           <Next
-            n="04"
+            n={4}
             title="You approve it"
             body="We assemble the profile and you read every word before a single customer does."
-            icon={<CheckIcon />}
           />
         </ol>
       </section>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Aside title="Usually under a week" icon={<ClockIcon />}>
+        <Aside title="Usually under a week" icon={<Clock {...ICON} />}>
           {/* The brief said 24–72 hours. That is not what the process above
               takes — two reference calls and two site visits cannot be
               scheduled inside three days — and a stated turnaround we miss is
@@ -97,7 +94,7 @@ export function ReviewPanel({
           Reference calls and site visits take as long as your clients and your sites are
           available. We tell you where it has got to rather than leaving you to wonder.
         </Aside>
-        <Aside title="Not everyone is approved" icon={<PeopleIcon />}>
+        <Aside title="Not everyone is approved" icon={<Users {...ICON} />}>
           If it is a no, we tell you why rather than going quiet. A curated roster only means
           anything if it can say no.
         </Aside>
@@ -422,27 +419,24 @@ function Submitted() {
   );
 }
 
-function Next({
-  n,
-  title,
-  body,
-  icon,
-}: {
-  n: string;
-  title: string;
-  body: string;
-  icon: React.ReactNode;
-}) {
+/**
+ * One of the four checks.
+ *
+ * The number and nothing else, in a tinted disc.
+ *
+ * An icon went in here first and came out again: four line icons across four
+ * cards is four shapes to decode where the only thing that matters is the
+ * order they happen in. Icons earn their place where they label a CHOICE —
+ * upload or type — not where they decorate a sequence.
+ *
+ * Mono for the number, like every other counter on this surface.
+ */
+function Next({ n, title, body }: { n: number; title: string; body: string }) {
   return (
     <li className="rounded-[13px] border border-[var(--color-rule)] bg-[var(--color-paper)] px-5 py-4">
-      <div className="mb-2.5 flex items-center justify-between gap-3">
-        <span className="grid h-9 w-9 place-items-center rounded-full bg-[var(--color-paper-3)] text-[var(--color-ink-2)]">
-          {icon}
-        </span>
-        <span className="font-[family-name:var(--font-mono)] text-[11px] tabular-nums text-[var(--color-ink-3)]">
-          {n}
-        </span>
-      </div>
+      <span className="mb-2.5 grid h-8 w-8 place-items-center rounded-full bg-[var(--color-petrol-soft)] font-[family-name:var(--font-mono)] text-[13px] font-medium tabular-nums text-[var(--color-petrol)]">
+        {n}
+      </span>
       <p className="m-0 text-[15px] font-medium text-[var(--color-ink)]">{title}</p>
       <p className="m-0 mt-1 text-[13.5px] leading-relaxed text-[var(--color-ink-2)]">{body}</p>
     </li>
@@ -500,63 +494,18 @@ function Tick({ small }: { small?: boolean }) {
   );
 }
 
-const ICON = {
-  className: 'h-[17px] w-[17px]',
-  fill: 'none',
-  stroke: 'currentColor',
-  strokeWidth: 1.5,
-} as const;
+/**
+ * The house icon size on this surface.
+ *
+ * 18px at stroke 2 with round caps — lucide's own geometry rather than the
+ * 1.5 these were drawn at, which reads as precise and a little cold. The
+ * mockup this was matched to is deliberately rounder, and at this size a
+ * thinner stroke disappears against the body copy beside it.
+ */
+const ICON = { size: 18, strokeWidth: 2, absoluteStrokeWidth: true } as const;
 
-function DocIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true" {...ICON} strokeLinejoin="round">
-      <path d="M11.5 2.5H6.2a1.7 1.7 0 0 0-1.7 1.7v11.6a1.7 1.7 0 0 0 1.7 1.7h7.6a1.7 1.7 0 0 0 1.7-1.7V6.5l-4-4Z" />
-      <path d="M11.5 2.5v4h4M7.4 11h5.2M7.4 13.8h3.4" strokeLinecap="round" />
-    </svg>
-  );
-}
 
-function PhoneIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true" {...ICON} strokeLinejoin="round">
-      <path d="M6.3 3.2 8 3.6l.9 3-1.6 1.2a9.4 9.4 0 0 0 3.9 3.9l1.2-1.6 3 .9.4 1.7a1.5 1.5 0 0 1-1.6 1.8C9.1 14.1 5.9 10.9 4.5 4.8A1.5 1.5 0 0 1 6.3 3.2Z" />
-    </svg>
-  );
-}
 
-function PinIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true" {...ICON} strokeLinejoin="round">
-      <path d="M10 17.5s5.5-5 5.5-9a5.5 5.5 0 1 0-11 0c0 4 5.5 9 5.5 9Z" />
-      <circle cx="10" cy="8.3" r="2.1" />
-    </svg>
-  );
-}
 
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true" {...ICON} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="10" cy="10" r="7.2" />
-      <path d="M6.6 10.2 8.9 12.5 13.4 8" />
-    </svg>
-  );
-}
 
-function ClockIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true" {...ICON} strokeLinecap="round">
-      <circle cx="10" cy="10" r="7.2" />
-      <path d="M10 6v4.3l2.7 1.6" />
-    </svg>
-  );
-}
 
-function PeopleIcon() {
-  return (
-    <svg viewBox="0 0 20 20" aria-hidden="true" {...ICON} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="8" cy="7.4" r="2.6" />
-      <path d="M3.3 15.6a4.8 4.8 0 0 1 9.4 0" />
-      <path d="M13.4 5.2a2.6 2.6 0 0 1 .3 4.9M14.6 11.6a4.4 4.4 0 0 1 2.4 3.6" />
-    </svg>
-  );
-}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useRef, useState } from 'react';
+import { UploadCloud } from 'lucide-react';
 import { uploadQuotationsAction, type UploadState } from './actions';
 import {
   MIN_QUOTATIONS_TO_SEND,
@@ -9,6 +10,9 @@ import {
 } from '@/modules/studio/quotation-archive';
 
 const INITIAL: UploadState = { status: 'idle' };
+
+/** The size a panel icon sits at on this surface. See ReviewPanel for the note. */
+const PANEL_ICON = { size: 24, strokeWidth: 2, absoluteStrokeWidth: true } as const;
 
 export interface ArchiveView {
   /** What the automatic reader has done, as opposed to what ops has. */
@@ -73,6 +77,7 @@ export function ArchivePanel({
   if (!enabled && !archive) {
     return (
       <div className="rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-6">
+        <UploadCloud {...PANEL_ICON} className="mb-3 text-[var(--color-ink-3)]" />
         <p className="label m-0 mb-2 text-[var(--color-petrol)]">Instead of typing all of this</p>
         <p className="h3 m-0 mb-3">Send us your past quotations.</p>
         <p className="m-0 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--color-ink-2)]">
@@ -93,6 +98,10 @@ export function ArchivePanel({
 
   return (
     <div className="rounded-[14px] border border-[var(--color-petrol)] bg-[var(--color-paper-2)] p-6">
+      {/* Above the eyebrow, not beside the heading. The icon is the thing the
+          eye lands on first when a studio is scanning for the shortcut, and
+          the words underneath are what tell them it is one. */}
+      <UploadCloud {...PANEL_ICON} className="mb-3 text-[var(--color-petrol)]" />
       <p className="label m-0 mb-2 text-[var(--color-petrol)]">Instead of typing all of this</p>
       <p className="h3 m-0 mb-3">Send us your past quotations.</p>
 
