@@ -78,9 +78,9 @@ The Studio warrants, for as long as this Agreement is in force, that:
 4.1 An "**Introduced Client**" is a homeowner whose brief One Interiors sent to
 the Studio, or who contacted the Studio through the platform.
 
-4.2 The Studio pays One Interiors **[DECIDE: __%] of the contract value** for
-each Introduced Client who signs with the Studio, payable within **[DECIDE: 7 /
-15 / 30] days** of the Studio receiving each payment milestone from that client.
+4.2 The Studio pays One Interiors **5% of the contract value** for each
+Introduced Client who signs with the Studio, payable within **[DECIDE: 7 / 15 /
+30] days** of the Studio receiving each payment milestone from that client.
 
 4.3 **One Interiors charges nothing on the Studio's own clients.** A homeowner
 the Studio found by any other means is entirely the Studio's, no commission is
