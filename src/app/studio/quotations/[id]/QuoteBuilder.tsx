@@ -253,7 +253,13 @@ export function QuoteBuilder({
     <div className="grid gap-5 lg:grid-cols-[21rem_minmax(0,1fr)]">
       <aside className="flex flex-col gap-4 lg:sticky lg:top-5 lg:max-h-[calc(100dvh-2.5rem)] lg:self-start lg:overflow-y-auto">
         <ConfigurePanel quote={quote} hasLines={lines.length > 0} />
-        <AddLinePanel rooms={roomOrder} products={products} onAdd={add} />
+        <AddLinePanel
+          rooms={roomOrder}
+          products={products}
+          quoteConfig={quote.config}
+          baths={quote.bathrooms}
+          onAdd={add}
+        />
 
         {/* In the rail, beside everything that made it dirty. */}
         <div className="s-card p-4">

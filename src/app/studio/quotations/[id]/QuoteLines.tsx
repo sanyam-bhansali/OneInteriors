@@ -13,12 +13,14 @@ import {
 import {
   CONFIGS,
   isConfigName,
+  roomsFor,
   standardRunFor,
   type ConfigName,
 } from '@/modules/studio-quote/configure';
 import type { QuoteRow } from '@/modules/studio-quote/quotes';
 import type { ProductRow } from '@/modules/studio-quote/store';
 import { applyConfigAction, clearLinesAction, type BuildState } from '../actions';
+import { Combobox } from './Combobox';
 
 const field =
   'rounded-[7px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-2.5 py-1.5 text-[13.5px] text-[var(--s-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]';
@@ -545,27 +547,79 @@ function Icon({
 export function AddLinePanel({
   rooms,
   products,
+  quoteConfig,
+  baths,
   onAdd,
 }: {
   rooms: string[];
   products: ProductRow[];
+  /** `Studio.config` — "3 BHK" or whatever was set. Drives the room suggestions. */
+  quoteConfig: string | null;
+  baths: number | null;
   onAdd: (room: string, product: ProductRow, size: AddSize) => void;
 }) {
   const active = useMemo(() => products.filter((p) => p.isActive), [products]);
 
+  /**
+   * The rooms offered, in one list.
+   *
+   * Three sources, in this order and deduplicated: the rooms already on the
+   * quotation, then the rooms this configuration implies, then nothing —
+   * whatever the studio types becomes a new one.
+   *
+   * The middle source is the fix. The old control offered only what was
+   * already on the quotation, so an empty quotation offered nothing at all
+   * and the studio invented a room name that the rest of the software had
+   * never heard of. `roomsFor` is the same function the Build button uses,
+   * which is what keeps a hand-added Kitchen and a built Kitchen the same
+   * Kitchen rather than two rooms that happen to look alike.
+   */
+  const roomOptions = useMemo(() => {
+    const config = isConfigName(quoteConfig) ? quoteConfig : '3 BHK';
+    const suggested = roomsFor({
+      config,
+      kitchenRunMm: null,
+      bathrooms: baths ?? 2,
+      study: true,
+    }).map((r) => r.name);
+
+    const seen = new Set<string>();
+    const out: { value: string; label: string; hint?: string }[] = [];
+
+    for (const name of [...rooms, ...suggested]) {
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        value: name,
+        label: name,
+        /* Says which rooms are already costed, so adding a second wardrobe to
+           the master is a deliberate act rather than a surprise. */
+        hint: rooms.includes(name) ? 'on this quotation' : undefined,
+      });
+    }
+    return out;
+  }, [rooms, quoteConfig, baths]);
+
+  const productOptions = useMemo(
+    () =>
+      active.map((p) => ({
+        value: p.id,
+        label: p.name,
+        /* Unpriced products are offered, marked. Hiding them makes a studio
+           think the software lost one. */
+        hint: p.ratePaise > 0 ? `₹${paiseToRupees(p.ratePaise)}` : 'no rate',
+        hintWarns: p.ratePaise === 0,
+      })),
+    [active],
+  );
+
   const [room, setRoom] = useState(rooms[0] ?? '');
-  const [newRoom, setNewRoom] = useState('');
-  const [query, setQuery] = useState('');
   const [productId, setProductId] = useState<string | null>(null);
   const [width, setWidth] = useState('');
   const [height, setHeight] = useState('');
   const [qty, setQty] = useState('');
 
-  const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (q === '') return active.slice(0, 10);
-    return active.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 10);
-  }, [active, query]);
 
   const product = active.find((p) => p.id === productId) ?? null;
 
@@ -591,7 +645,7 @@ export function AddLinePanel({
           ? Math.round((product.ratePaise * size.qtyMilli) / QTY_SCALE)
           : 0;
 
-  const targetRoom = newRoom.trim() !== '' ? newRoom.trim() : room;
+  const targetRoom = room.trim();
   const canAdd = product !== null && targetRoom.length > 0;
 
   if (active.length === 0) return null;
@@ -601,76 +655,31 @@ export function AddLinePanel({
       <h2 className="s-label m-0 mb-3">Add a line</h2>
 
       <div className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1">
-          <span className="s-label">Room</span>
-          {rooms.length > 0 ? (
-            <select
-              value={room}
-              onChange={(e) => {
-                setRoom(e.target.value);
-                setNewRoom('');
-              }}
-              className={field}
-            >
-              {rooms.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          ) : null}
-          <input
-            value={newRoom}
-            onChange={(e) => setNewRoom(e.target.value)}
-            placeholder={rooms.length > 0 ? 'or a new room — terrace, passage…' : 'Kitchen'}
-            className={`${field} mt-1`}
-          />
-        </label>
+        <Combobox
+          label="Room"
+          value={room}
+          options={roomOptions}
+          placeholder="Kitchen"
+          onChange={setRoom}
+          allowCustom
+          customHint={(t) => `Add “${t}” as a new room`}
+        />
 
-        <label className="flex flex-col gap-1">
-          <span className="s-label">Product</span>
-          <input
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setProductId(null);
-            }}
-            placeholder="Type to search your products"
-            className={field}
-          />
-        </label>
+        <Combobox
+          label="Product"
+          value={productId ?? ''}
+          options={productOptions}
+          placeholder="Type to search your products"
+          onChange={(id) => {
+            setProductId(id);
+            setWidth('');
+            setHeight('');
+            setQty('');
+          }}
+          emptyNote="Nothing in your product list matches that. Add it in your products and it will be here next time."
+        />
 
-        {product === null ? (
-          <ul className="m-0 flex max-h-[13rem] list-none flex-col gap-1 overflow-y-auto p-0">
-            {matches.map((p) => (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setProductId(p.id);
-                    setQuery(p.name);
-                    setWidth('');
-                    setHeight('');
-                    setQty('');
-                  }}
-                  className="flex w-full items-baseline justify-between gap-2 rounded-[7px] px-2.5 py-1.5 text-left text-[13px] hover:bg-[var(--s-surface-2)]"
-                >
-                  <span className="min-w-0 truncate">{p.name}</span>
-                  <span
-                    className={`s-num flex-none text-[12px] ${p.ratePaise > 0 ? 'text-[var(--s-ink-3)]' : 'text-[var(--s-warn)]'}`}
-                  >
-                    {p.ratePaise > 0 ? `₹${paiseToRupees(p.ratePaise)}` : 'no rate'}
-                  </span>
-                </button>
-              </li>
-            ))}
-            {matches.length === 0 ? (
-              <li className="px-2.5 py-1.5 text-[12.5px] text-[var(--s-ink-3)]">
-                Nothing in your product list matches that.
-              </li>
-            ) : null}
-          </ul>
-        ) : (
+        {product === null ? null : (
           <>
             <p className="m-0 text-[12px] text-[var(--s-ink-3)]">
               <span className="s-num">{UNIT_LABELS[product.unit]}</span> ·{' '}
@@ -732,8 +741,6 @@ export function AddLinePanel({
                 disabled={!canAdd}
                 onClick={() => {
                   onAdd(targetRoom, product, size);
-                  setNewRoom('');
-                  setQuery('');
                   setProductId(null);
                   setWidth('');
                   setHeight('');
@@ -743,15 +750,8 @@ export function AddLinePanel({
               >
                 + Add to {targetRoom || 'the quotation'}
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setProductId(null);
-                  setQuery('');
-                }}
-                className={quiet}
-              >
-                Back
+              <button type="button" onClick={() => setProductId(null)} className={quiet}>
+                Clear
               </button>
             </div>
           </>
