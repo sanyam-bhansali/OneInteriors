@@ -1,11 +1,13 @@
 'use client';
 
 import { useMemo, useRef, useState, useTransition } from 'react';
+import { ChevronDown, ChevronUp, Copy, X } from 'lucide-react';
 import { formatINR, paiseToRupees, rupeesToPaise } from '@/lib/money';
 import {
   UNIT_LABELS,
   areaMilli,
   formatQty,
+  lineAmount,
   QTY_SCALE,
   type QuoteUnitName,
   type WorkCodeName,
@@ -26,6 +28,16 @@ const field =
   'rounded-[7px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-2.5 py-1.5 text-[13.5px] text-[var(--s-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]';
 const quiet =
   'rounded-[7px] border border-[var(--s-rule)] px-2.5 py-1.5 text-[12.5px] font-medium hover:border-[var(--s-ink-3)] disabled:opacity-40';
+
+/**
+ * A control inside a table cell.
+ *
+ * Transparent until it is touched. Forty bordered boxes in a grid is a form
+ * that happens to have rows; a quotation should read as a document you can
+ * edit, with the border appearing where the cursor is.
+ */
+const cell =
+  'w-full rounded-[5px] border border-transparent bg-transparent px-1.5 py-1 text-[13px] text-[var(--s-ink)] placeholder:text-[var(--s-ink-3)] hover:border-[var(--s-rule)] focus:border-[var(--s-accent)] focus:bg-[var(--s-surface)] focus-visible:outline-none';
 
 /**
  * One line, as the builder holds it.
@@ -250,6 +262,33 @@ function StartBlank({ quoteId, hasLines }: { quoteId: string; hasLines: boolean 
  * work that came to nothing — so removing the last line removes the room, and
  * that is the behaviour rather than a bug in it.
  */
+/**
+ * A room, as a table.
+ *
+ * ## Why a table and not a stack of cards
+ *
+ * Because a quotation IS a table, and the studio reading it has been reading
+ * tables for years. Cards put every line's labels beside every line's values,
+ * so forty lines is forty repetitions of "W mm" and "Rate" — and nothing lines
+ * up, which is the one thing a column of money has to do. A header row says it
+ * once and the figures sit under each other where they can be compared and
+ * added up by eye.
+ *
+ * This is the layout the hosted builder uses, and the reason it uses it.
+ *
+ * ## The columns, and one that is not here
+ *
+ * Hauspire's table carries a `Discounted` column beside `Amount`, because it
+ * applies the modular discount line by line. Ours applies it once, to the
+ * modular half of the total, which is what `computeTotals` does and what the
+ * document prints — so a per-line discount column here would be a number with
+ * nothing behind it.
+ *
+ * What occupies that space instead is the same shape for a different fact:
+ * when a studio has overridden a line, the calculated figure shows struck
+ * through beside the agreed one. Same glance, same meaning — "this is not
+ * what the arithmetic said" — without inventing a discount we do not apply.
+ */
 export function RoomSection({
   room,
   lines,
@@ -257,6 +296,7 @@ export function RoomSection({
   onRemove,
   onDuplicate,
   onMove,
+  onAddTo,
 }: {
   room: string;
   lines: PricedLine[];
@@ -264,49 +304,105 @@ export function RoomSection({
   onRemove: (key: string) => void;
   onDuplicate: (key: string) => void;
   onMove: (key: string, by: -1 | 1) => void;
+  /** Focuses the rail's add control with this room already chosen. */
+  onAddTo?: (room: string) => void;
 }) {
   const total = lines.reduce((a, l) => a + l.amountPaise, 0);
 
   return (
     <section className="s-card overflow-hidden">
-      <div className="flex items-baseline justify-between gap-4 bg-[var(--s-surface-2)] px-4 py-2.5">
-        <h2 className="m-0 text-[14.5px] font-semibold">{room}</h2>
-        <span className="s-num s-label">{formatINR(total)}</span>
+      <div className="flex items-baseline justify-between gap-4 bg-[var(--s-accent)] px-4 py-2">
+        <h2 className="m-0 text-[13.5px] font-semibold uppercase tracking-[0.06em] text-white">
+          {room}
+        </h2>
+        <span className="s-num text-[12.5px] text-white/70">
+          {lines.length} {lines.length === 1 ? 'line' : 'lines'}
+        </span>
       </div>
 
-      <ul className="m-0 flex list-none flex-col p-0">
-        {lines.map((line, i) => (
-          <LineRow
-            key={line.key}
-            line={line}
-            first={i === 0}
-            last={i === lines.length - 1}
-            onUpdate={onUpdate}
-            onRemove={onRemove}
-            onDuplicate={onDuplicate}
-            onMove={onMove}
-          />
-        ))}
-      </ul>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[54rem] border-collapse text-[13px]">
+          <thead>
+            <tr className="border-b border-[var(--s-rule)] bg-[var(--s-surface-2)] text-left">
+              <Th className="w-[3.5rem] text-center">#</Th>
+              <Th className="min-w-[11rem]">Product</Th>
+              <Th className="w-[6.5rem]">Work</Th>
+              <Th className="min-w-[9rem]">Details</Th>
+              <Th className="w-[6rem] text-right">Qty</Th>
+              <Th className="w-[5.5rem] text-right">W</Th>
+              <Th className="w-[5.5rem] text-right">H</Th>
+              <Th className="w-[6.5rem] text-right">Rate</Th>
+              <Th className="w-[8rem] text-right">Amount</Th>
+              <Th className="w-[5.5rem]" />
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map((line, i) => (
+              <LineRow
+                key={line.key}
+                n={i + 1}
+                line={line}
+                first={i === 0}
+                last={i === lines.length - 1}
+                onUpdate={onUpdate}
+                onRemove={onRemove}
+                onDuplicate={onDuplicate}
+                onMove={onMove}
+              />
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t border-[var(--s-rule)] bg-[var(--s-surface-2)]">
+              <td colSpan={8} className="px-3 py-2">
+                <span className="text-[13px] font-medium">{room} — sub-total</span>
+                {onAddTo ? (
+                  <button
+                    type="button"
+                    onClick={() => onAddTo(room)}
+                    className="ml-3 rounded-[6px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-2 py-0.5 text-[12px] font-medium hover:border-[var(--s-ink-3)]"
+                  >
+                    + add item
+                  </button>
+                ) : null}
+              </td>
+              <td className="s-num px-3 py-2 text-right text-[13.5px] font-semibold">
+                {formatINR(total)}
+              </td>
+              <td />
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </section>
   );
 }
 
+function Th({ children, className = '' }: { children?: React.ReactNode; className?: string }) {
+  return (
+    <th
+      scope="col"
+      className={`px-3 py-2 font-[family-name:var(--font-mono)] text-[10px] font-medium uppercase tracking-[0.11em] text-[var(--s-ink-3)] ${className}`}
+    >
+      {children}
+    </th>
+  );
+}
+
 /**
- * One line, edited in place.
+ * One line, edited where it sits.
  *
  * Every field writes straight to the parent's state, so the sq ft beside a
- * width, the amount at the end of the row and the total in the sidebar all
- * move on the same keystroke. That is the whole point of the rewrite: a
- * designer widening a wardrobe to see what it costs should not have to press
- * anything to find out.
+ * width, the amount at the end of the row and the total in the rail all move
+ * on the same keystroke. That is the point of the whole rewrite: a designer
+ * widening a wardrobe to see what it costs should not have to press anything
+ * to find out.
  *
- * The inputs are uncontrolled-by-value on purpose — they hold text, not
- * numbers. A controlled numeric input cannot hold "18" on the way to "1800"
- * without fighting the person typing it, and cannot hold an empty string at
- * all.
+ * The inputs hold TEXT, not numbers. A controlled numeric input cannot hold
+ * "18" on the way to "1800" without fighting the person typing it, and cannot
+ * hold an empty string at all.
  */
 function LineRow({
+  n,
   line,
   first,
   last,
@@ -315,6 +411,7 @@ function LineRow({
   onDuplicate,
   onMove,
 }: {
+  n: number;
   line: PricedLine;
   first: boolean;
   last: boolean;
@@ -327,168 +424,202 @@ function LineRow({
   const overridden = line.agreedPaise != null;
 
   const whole = (raw: string): number | null => {
-    const trimmed = raw.trim();
-    if (trimmed === '') return null;
-    const n = Number(trimmed);
-    return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+    const t = raw.trim();
+    if (t === '') return null;
+    const v = Number(t);
+    return Number.isFinite(v) && v > 0 ? Math.round(v) : null;
   };
 
-  return (
-    <li className="border-b border-[var(--s-rule-soft)] px-4 py-3 last:border-b-0">
-      <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
-        <div className="min-w-[12rem] flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[14px] font-medium">{line.product}</span>
-            {overridden ? (
-              <span className="s-tag" title="This figure was agreed, not calculated">
-                agreed
-              </span>
-            ) : null}
-          </div>
-          <span className="s-label">
-            {UNIT_LABELS[line.unit]} · {line.code === 'MODULAR' ? 'Modular' : 'On-site'}
-          </span>
-        </div>
+  /* The arithmetic this line WOULD have come to. Shown struck through beside
+     an agreed figure, so an override is visible rather than silent. */
+  const calculated = lineAmount({
+    unit: line.unit,
+    code: line.code,
+    ratePaise: line.ratePaise,
+    widthMm: line.widthMm,
+    heightMm: line.heightMm,
+    qtyMilli: line.qtyMilli,
+  });
 
+  return (
+    <tr className="border-b border-[var(--s-rule-soft)] align-top last:border-b-0">
+      <td className="px-2 py-2">
+        <div className="flex items-center gap-0.5">
+          <span className="s-num w-4 text-right text-[12px] text-[var(--s-ink-3)]">{n}</span>
+          <div className="flex flex-col">
+            <Icon label={`Move ${line.product} up`} disabled={first} onClick={() => onMove(line.key, -1)}>
+              <ChevronUp size={12} strokeWidth={2.5} absoluteStrokeWidth />
+            </Icon>
+            <Icon label={`Move ${line.product} down`} disabled={last} onClick={() => onMove(line.key, 1)}>
+              <ChevronDown size={12} strokeWidth={2.5} absoluteStrokeWidth />
+            </Icon>
+          </div>
+        </div>
+      </td>
+
+      <td className="px-3 py-2">
+        <input
+          value={line.product}
+          onChange={(e) => onUpdate(line.key, { product: e.target.value })}
+          aria-label="Product name"
+          className={`${cell} font-medium`}
+        />
+        {overridden ? (
+          <span className="s-tag mt-1" title="This figure was agreed, not calculated">
+            agreed
+          </span>
+        ) : null}
+      </td>
+
+      <td className="px-3 py-2">
+        <select
+          value={line.code}
+          onChange={(e) => onUpdate(line.key, { code: e.target.value as WorkCodeName })}
+          aria-label="Modular or on-site"
+          className={cell}
+        >
+          <option value="MODULAR">Modular</option>
+          <option value="ONSITE">On-site</option>
+        </select>
+      </td>
+
+      <td className="px-3 py-2">
+        <textarea
+          value={line.details ?? ''}
+          onChange={(e) => onUpdate(line.key, { details: e.target.value })}
+          rows={2}
+          aria-label="What this line includes"
+          placeholder="18mm BWP carcass · laminate · soft-close"
+          className={`${cell} resize-y text-[12px] leading-snug`}
+        />
+      </td>
+
+      <td className="px-3 py-2 text-right">
         {area ? (
-          <>
-            <Num
-              label="W mm"
-              value={line.widthMm}
-              width="5rem"
-              onChange={(v) => onUpdate(line.key, { widthMm: whole(v) })}
-            />
-            <Num
-              label="H mm"
-              value={line.heightMm}
-              width="5rem"
-              onChange={(v) => onUpdate(line.key, { heightMm: whole(v) })}
-            />
-            <div className="flex flex-col gap-1">
-              <span className="s-label">Sq ft</span>
-              <span className="s-num px-1 py-1.5 text-[13.5px] text-[var(--s-ink-2)]">
-                {line.widthMm && line.heightMm
-                  ? formatQty(areaMilli(line.widthMm, line.heightMm))
-                  : '—'}
-              </span>
-            </div>
-          </>
+          <span className="s-num text-[12.5px] text-[var(--s-ink-3)]">
+            {line.widthMm && line.heightMm
+              ? `${formatQty(areaMilli(line.widthMm, line.heightMm))} ft²`
+              : '—'}
+          </span>
         ) : (
           <Num
-            label="Qty"
             value={line.qtyMilli != null ? line.qtyMilli / QTY_SCALE : null}
-            width="5.5rem"
             onChange={(v) => {
-              const n = Number(v.trim());
+              const num = Number(v.trim());
               onUpdate(line.key, {
-                qtyMilli: v.trim() === '' || !Number.isFinite(n) ? null : Math.round(n * QTY_SCALE),
+                qtyMilli:
+                  v.trim() === '' || !Number.isFinite(num) ? null : Math.round(num * QTY_SCALE),
               });
             }}
           />
         )}
+      </td>
 
+      <td className="px-3 py-2 text-right">
+        {area ? (
+          <Num value={line.widthMm} onChange={(v) => onUpdate(line.key, { widthMm: whole(v) })} />
+        ) : (
+          <span className="text-[var(--s-ink-3)]">—</span>
+        )}
+      </td>
+
+      <td className="px-3 py-2 text-right">
+        {area ? (
+          <Num value={line.heightMm} onChange={(v) => onUpdate(line.key, { heightMm: whole(v) })} />
+        ) : (
+          <span className="text-[var(--s-ink-3)]">—</span>
+        )}
+      </td>
+
+      <td className="px-3 py-2 text-right">
         <Num
-          label="Rate ₹"
           value={line.ratePaise > 0 ? paiseToRupees(line.ratePaise) : null}
-          width="6rem"
           onChange={(v) => {
-            const n = Number(v.trim());
+            const num = Number(v.trim());
             onUpdate(line.key, {
-              ratePaise: v.trim() === '' || !Number.isFinite(n) || n < 0 ? 0 : rupeesToPaise(n),
+              ratePaise: v.trim() === '' || !Number.isFinite(num) || num < 0 ? 0 : rupeesToPaise(num),
             });
           }}
         />
+      </td>
 
+      <td className="px-3 py-2 text-right">
+        {/* The agreed figure is the editable one, because it is the one that
+            prints. Empty hands the line back to rate × quantity. */}
         <Num
-          label="Agreed ₹"
           value={line.agreedPaise != null ? paiseToRupees(line.agreedPaise) : null}
-          width="6.5rem"
-          placeholder="—"
+          placeholder={calculated > 0 ? String(paiseToRupees(calculated)) : '—'}
+          bold
           onChange={(v) => {
-            const n = Number(v.trim());
-            /* Empty CLEARS the override rather than setting zero. They are
-               different answers, and conflating them zeroes a line the moment
-               somebody tabs through it. */
+            const num = Number(v.trim());
             onUpdate(line.key, {
-              agreedPaise: v.trim() === '' || !Number.isFinite(n) || n < 0 ? null : rupeesToPaise(n),
+              agreedPaise:
+                v.trim() === '' || !Number.isFinite(num) || num < 0 ? null : rupeesToPaise(num),
             });
           }}
         />
-
-        <div className="flex flex-col gap-1">
-          <span className="s-label">Amount</span>
-          <span className="s-num px-1 py-1.5 text-[14px] font-semibold">
-            {line.amountPaise > 0 ? formatINR(line.amountPaise) : '—'}
+        {overridden && calculated > 0 && calculated !== line.agreedPaise ? (
+          <span className="s-num mt-0.5 block text-[11px] text-[var(--s-ink-3)] line-through">
+            {formatINR(calculated)}
           </span>
-        </div>
+        ) : null}
+      </td>
 
-        <div className="flex items-center gap-0.5">
-          <Icon label={`Move ${line.product} up`} disabled={first} onClick={() => onMove(line.key, -1)}>
-            ↑
-          </Icon>
-          <Icon label={`Move ${line.product} down`} disabled={last} onClick={() => onMove(line.key, 1)}>
-            ↓
-          </Icon>
+      <td className="px-2 py-2">
+        <div className="flex items-center justify-end gap-0.5">
           <Icon label={`Duplicate ${line.product}`} onClick={() => onDuplicate(line.key)}>
-            ⧉
+            <Copy size={13} strokeWidth={2} absoluteStrokeWidth />
           </Icon>
           <Icon label={`Remove ${line.product}`} danger onClick={() => onRemove(line.key)}>
-            ×
+            <X size={14} strokeWidth={2.5} absoluteStrokeWidth />
           </Icon>
         </div>
-      </div>
-    </li>
+      </td>
+    </tr>
   );
 }
 
+/**
+ * A number in a table cell.
+ *
+ * Text in the box, number in the state. Feeding the parsed value back in
+ * would rewrite "18" on the way to "1800" and turn "" into "0" while the
+ * caret jumps. The initial text comes from the value once and is then the
+ * input's own; it re-syncs only when the value changes from OUTSIDE, which is
+ * what a rebuild looks like.
+ */
 function Num({
-  label,
   value,
-  width,
   placeholder,
+  bold,
   onChange,
 }: {
-  label: string;
   value: number | null;
-  width: string;
   placeholder?: string;
+  bold?: boolean;
   onChange: (raw: string) => void;
 }) {
-  /**
-   * Text in the box, number in the state.
-   *
-   * The input holds whatever was typed and the parent holds what it parses
-   * to. Feeding the parsed value back in would rewrite "18" to "18" on the
-   * way to "1800" — harmless — and "" to "0" — not — while the caret jumps.
-   * The initial text comes from the value once and is then the input's own.
-   */
   const [text, setText] = useState(value != null ? String(value) : '');
   const known = useRef(value);
 
-  /* Re-sync only when the value changed from OUTSIDE, which is what a rebuild
-     or an undo looks like. A change we caused ourselves leaves the text alone. */
   if (known.current !== value) {
     known.current = value;
-    const expected = Number(text.trim());
-    const same = text.trim() === '' ? value == null : Number.isFinite(expected) && expected === value;
+    const typed = Number(text.trim());
+    const same = text.trim() === '' ? value == null : Number.isFinite(typed) && typed === value;
     if (!same) setText(value != null ? String(value) : '');
   }
 
   return (
-    <label className="flex flex-col gap-1">
-      <span className="s-label">{label}</span>
-      <input
-        value={text}
-        inputMode="decimal"
-        placeholder={placeholder}
-        onChange={(e) => {
-          setText(e.target.value);
-          onChange(e.target.value);
-        }}
-        style={{ width }}
-        className={`${field} s-num text-right`}
-      />
-    </label>
+    <input
+      value={text}
+      inputMode="decimal"
+      placeholder={placeholder}
+      onChange={(e) => {
+        setText(e.target.value);
+        onChange(e.target.value);
+      }}
+      className={`${cell} s-num text-right ${bold ? 'font-semibold' : ''}`}
+    />
   );
 }
 
