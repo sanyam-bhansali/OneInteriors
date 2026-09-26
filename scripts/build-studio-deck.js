@@ -348,7 +348,7 @@ function demoSlide(n, heading, bullets, notes) {
   const s = light();
   mark(s);
   eyebrow(s, 'The problem');
-  title(s, 'A lead is not the expensive part.\nThe eight that go nowhere are.');
+  title(s, 'A lead is not the expensive part.\nThe ones that go nowhere are.');
   standfirst(
     s,
     'You already have enquiries. What you do not have is a way to tell, on the first call, which one is real — so the cost of a booked project is not the ad that produced it, it is everything spent on the ones that did not.',
