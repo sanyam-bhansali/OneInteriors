@@ -1147,9 +1147,9 @@ demoSlide(
   );
 
   const bands = [
-    ['Essential', '₹700 – ₹1,100', 'Branded laminate, standard soft-close hardware, modular kitchen, ceiling in the main rooms.'],
-    ['Premium', '₹1,100 – ₹1,800', 'Veneer and acrylic where it is touched, Hettich or Häfele throughout, designed lighting, quartz counters.'],
-    ['Luxury', '₹1,800 – ₹3,200', 'Imported veneer and stone, furniture designed for the room, automation, a dedicated designer throughout.'],
+    ['Essential', '₹1,200 – ₹1,500', 'Furnishing only. The work gets made and fitted, well, with nothing spent on show.'],
+    ['Premium', '₹1,500 – ₹2,500', 'Furnishing, plus a designer and project management through the build, plus pieces designed for the room rather than picked off a list.'],
+    ['Luxury', '₹2,500 and above', 'Everything in Premium, in premium materials — veneer, leatherette, the specified finishes rather than the available ones.'],
   ];
 
   bands.forEach(([n, rate, mats], i) => {
@@ -1179,11 +1179,11 @@ demoSlide(
     });
     s.addText(mats, {
       x: x + 0.35,
-      y: 4.52,
+      y: 4.5,
       w: 2.85,
-      h: 0.88,
+      h: 0.95,
       fontFace: SANS,
-      fontSize: 11,
+      fontSize: 10.5,
       color: INK2,
       isTextBox: true,
       margin: 0,
@@ -1249,34 +1249,54 @@ demoSlide(
 }
 
 /* ====================================================================== */
-/* 15 — the money                                                         */
+/* 15 — the rate card, already discounted                                 */
 /* ====================================================================== */
 {
   const s = light();
   mark(s);
-  eyebrow(s, 'What it costs');
-  title(s, 'A subscription, and five percent.');
+  eyebrow(s, 'The rate card');
+  title(s, 'What each band costs — and what it costs you to start.');
   standfirst(
     s,
-    'The subscription is what we charge to hold your place on a capped roster and to show you briefs. The five percent is only ever on a project you actually close through us.',
-    { w: 10.6 },
+    'The subscription holds your place on a capped roster and puts briefs in front of you. The five percent is only ever on a project you actually close through us. For the first three months the subscription is discounted to a rupee.',
+    { w: 10.9, h: 0.85 },
   );
 
-  /* The three bands — same order and same names as the slide before, so the
-     band they just placed themselves in is the row they read here. */
-  const bands = [
-    ['Essential', '₹25,000', '8 briefs a month', '₹700 – ₹1,100 a square foot'],
-    ['Premium', '₹50,000', '16 briefs a month', '₹1,100 – ₹1,800 a square foot'],
-    ['Luxury', '₹1,00,000', '30 briefs a month', '₹1,800 – ₹3,200 a square foot'],
+  /* A rate card is a table and should look like one: the eye compares down a
+     column, and the discount only reads as a discount beside the price it
+     came off. */
+  const COLS = [M, M + 3.9, M + 6.9, M + 9.55];
+  const HEADS = ['Band', 'Your rate', 'Subscription', 'First 3 months'];
+
+  HEADS.forEach((h, i) => {
+    s.addText(h.toUpperCase(), {
+      x: COLS[i],
+      y: 3.5,
+      w: 3.4,
+      h: 0.3,
+      fontFace: MONO,
+      fontSize: 9.5,
+      charSpacing: 1.8,
+      color: INK2,
+      isTextBox: true,
+      margin: 0,
+    });
+  });
+
+  const rows = [
+    ['Essential', 'Furnishing only', '₹1,200 – ₹1,500 /sqft', '₹25,000', '₹1'],
+    ['Premium', '+ designer and project management', '₹1,500 – ₹2,500 /sqft', '₹49,000', '₹1'],
+    ['Luxury', '+ premium materials', '₹2,500 and above', '₹99,000', '₹1'],
   ];
 
-  bands.forEach(([n, fee, briefs, who], i) => {
-    const x = M + i * 3.85;
-    card(s, x, 3.35, 3.55, 2.5, i === 1 ? { fill: 'F3E7E0' } : {});
-    s.addText(n, {
-      x: x + 0.35,
-      y: 3.58,
-      w: 2.9,
+  rows.forEach(([name, note, rate, fee], i) => {
+    const y = 3.92 + i * 0.94;
+    card(s, M - 0.3, y, 11.9, 0.86, i === 1 ? { fill: 'F3E7E0' } : {});
+
+    s.addText(name, {
+      x: COLS[0],
+      y: y + 0.08,
+      w: 3.6,
       h: 0.34,
       fontFace: SERIF,
       fontSize: 19,
@@ -1284,58 +1304,77 @@ demoSlide(
       isTextBox: true,
       margin: 0,
     });
-    s.addText([{ text: fee }, { text: ' /month', options: { fontSize: 12, color: INK2 } }], {
-      x: x + 0.35,
-      y: 4.0,
-      w: 3,
-      h: 0.48,
-      fontFace: MONO,
-      fontSize: 20,
-      color: INK,
-      isTextBox: true,
-      margin: 0,
-    });
-    s.addText(briefs, {
-      x: x + 0.35,
-      y: 4.58,
-      w: 2.9,
-      h: 0.3,
-      fontFace: MONO,
-      fontSize: 12,
-      color: ACC,
-      isTextBox: true,
-      margin: 0,
-    });
-    s.addText(who, {
-      x: x + 0.35,
-      y: 4.98,
-      w: 2.85,
-      h: 0.72,
-      fontFace: MONO,
+    s.addText(note, {
+      x: COLS[0],
+      y: y + 0.44,
+      w: 3.7,
+      h: 0.32,
+      fontFace: SANS,
       fontSize: 11,
       color: INK2,
       isTextBox: true,
       margin: 0,
-      lineSpacingMultiple: 1.2,
+    });
+    s.addText(rate, {
+      x: COLS[1],
+      y: y + 0.22,
+      w: 3,
+      h: 0.42,
+      fontFace: MONO,
+      fontSize: 13,
+      color: INK,
+      isTextBox: true,
+      margin: 0,
+      valign: 'middle',
+    });
+    s.addText(
+      [
+        { text: fee, options: { strike: true } },
+        { text: ' /mo', options: { fontSize: 11 } },
+      ],
+      {
+      x: COLS[2],
+      y: y + 0.22,
+      w: 2.5,
+      h: 0.42,
+      fontFace: MONO,
+      fontSize: 16,
+      color: INK2,
+      isTextBox: true,
+      margin: 0,
+      valign: 'middle',
+    },
+    );
+    s.addText([{ text: '₹1' }, { text: ' /mo', options: { fontSize: 11, color: INK2 } }], {
+      x: COLS[3],
+      y: y + 0.22,
+      w: 2.4,
+      h: 0.42,
+      fontFace: MONO,
+      fontSize: 22,
+      color: ACC,
+      isTextBox: true,
+      margin: 0,
+      valign: 'middle',
     });
   });
 
-  card(s, M, 6.08, 11.6, 0.82, { fill: 'E4DFD7' });
+  card(s, M - 0.3, 6.58, 11.9, 0.6, { fill: 'E4DFD7' });
   s.addText(
     [
-      { text: 'Briefs, not projects. ', options: { bold: true, color: INK } },
+      { text: 'Plus 5% of the contract value ', options: { bold: true, color: INK } },
       {
-        text: 'We control how many homeowners see you. We do not control whether they choose you, and we will not promise you something the homeowner decides.',
+        text: 'on a project you close through us — during the discounted months as well. Nothing on your own clients, ever.',
         options: { color: INK2 },
       },
     ],
     {
-      x: M + 0.42,
-      y: 6.2,
-      w: 10.8,
-      h: 0.58,
+      x: M,
+      y: 6.62,
+      w: 11.2,
+      h: 0.52,
       fontFace: SANS,
-      fontSize: 12.5,
+      fontSize: 12,
       isTextBox: true,
       margin: 0,
       valign: 'middle',
@@ -1344,21 +1383,22 @@ demoSlide(
 
   s.addNotes(
     [
-      'Do not apologise for the number. Read it flat.',
+      'The whole commercial offer on one page. Let them read it before you talk.',
       '',
-      'Let them place themselves in a band — ask "what is your average project?"',
-      'and let them point. A studio that chooses its own tier argues with it far',
-      'less afterwards.',
+      'Read the struck-through column out loud — "Premium is forty-nine thousand',
+      'a month" — and only then the rupee. A discount only lands beside the price',
+      'it came off; if you lead with the rupee it sounds free, and free is what',
+      'people do not value.',
       '',
-      'The footer is a promise you must not soften: we guarantee BRIEFS, never',
-      'projects. If you promise projects in the room, the first bad month ends',
-      'the relationship.',
+      'Then the line that does the work: "the five percent still applies in those',
+      'three months. We earn when you earn, and nothing when you do not."',
       '',
-      'Next slide is the discount. Do not mention it yet.',
+      'Next slide is the terms — what happens in month four. Do not skip it.',
     ].join('\n'),
   );
 }
 
+/* ====================================================================== */
 /* ====================================================================== */
 /* 15 — the offer                                                         */
 /* ====================================================================== */
@@ -1373,51 +1413,29 @@ demoSlide(
     { color: ONDARK, w: 10.2, y: 2.15 },
   );
 
-  const bands = [
-    ['Essential', '₹25,000'],
-    ['Premium', '₹50,000'],
-    ['Luxury', '₹1,00,000'],
-  ];
-
-  bands.forEach(([n, was], i) => {
-    const x = M + i * 3.85;
-    s.addShape(p.ShapeType.rect, {
-      x,
-      y: 3.45,
-      w: 3.55,
-      h: 1.65,
-      fill: { color: '3A3230' },
-      line: { color: '4C4340', width: 0.75 },
-    });
-    s.addText(n, {
-      x: x + 0.35,
-      y: 3.62,
-      w: 2.9,
-      h: 0.3,
-      fontFace: MONO,
-      fontSize: 10.5,
-      charSpacing: 1.8,
-      color: 'FFFFFF',
-      isTextBox: true,
-      margin: 0,
-    });
-    s.addText(
-      [
-        { text: was, options: { strike: true, color: ONDARK, fontSize: 15 } },
-        { text: '   ₹1', options: { color: ACC, fontSize: 27 } },
-        { text: ' /month', options: { color: ONDARK, fontSize: 12 } },
-      ],
-      {
-        x: x + 0.35,
-        y: 4.02,
-        w: 3.1,
-        h: 0.7,
-        fontFace: MONO,
-        isTextBox: true,
-        margin: 0,
-        valign: 'middle',
-      },
-    );
+  s.addText('₹1', {
+    x: M,
+    y: 3.15,
+    w: 3,
+    h: 1.5,
+    fontFace: SERIF,
+    fontSize: 96,
+    color: ACC,
+    isTextBox: true,
+    margin: 0,
+  });
+  s.addText('a month, whichever band\nyou choose, for three months', {
+    x: M + 2.1,
+    y: 3.62,
+    w: 4.6,
+    h: 0.8,
+    fontFace: SANS,
+    fontSize: 13.5,
+    color: ONDARK,
+    isTextBox: true,
+    margin: 0,
+    valign: 'middle',
+    lineSpacingMultiple: 1.24,
   });
 
   const terms = [
@@ -1427,7 +1445,7 @@ demoSlide(
   ];
 
   terms.forEach((t, i) => {
-    const y = 5.45 + i * 0.52;
+    const y = 5.15 + i * 0.58;
     s.addShape(p.ShapeType.ellipse, {
       x: M + 0.02,
       y: y + 0.13,
@@ -1455,8 +1473,8 @@ demoSlide(
       'This is the ask. Slow down.',
       '',
       'Frame it exactly as the slide does — a DISCOUNT, not a free trial. "You',
-      'are signing up at Premium. Premium is fifty thousand. For the first three',
-      'months we are charging you one rupee for it."',
+      'are signing up at Premium. Premium is forty-nine thousand. For the first',
+      'three months we are charging you one rupee for it."',
       '',
       'Be straight about why it is a rupee and not zero: so the payment method is',
       'set up and month four is automatic. Studios respect that answer. Do not be',
@@ -1475,10 +1493,10 @@ demoSlide(
   const s = light();
   mark(s);
   eyebrow(s, 'What it actually works out at');
-  title(s, 'The fee stops mattering at four projects.');
+  title(s, 'The fee stops mattering at three projects.');
   standfirst(
     s,
-    'Essential, at a ₹7 lakh average project. The subscription is fixed, so every project you close makes it a smaller share of what you earned.',
+    'Essential, at a ₹12 lakh project — roughly a 2 BHK furnished at ₹1,350 a square foot. The subscription is fixed, so every project you close makes it a smaller share of what you earned.',
     { w: 10.4 },
   );
 
@@ -1488,7 +1506,7 @@ demoSlide(
       {
         name: 'Total we take, as % of your revenue',
         labels: ['1 project', '2 projects', '3 projects', '4 projects', '5 projects'],
-        values: [8.6, 6.8, 6.2, 5.9, 5.7],
+        values: [7.1, 6.0, 5.7, 5.5, 5.4],
       },
     ],
     {
@@ -1531,7 +1549,7 @@ demoSlide(
     margin: 0,
   });
   s.addText(
-    'At one project a month we are expensive, and we should be — you have barely used us.\n\nAt four we cost under six percent of what you billed, and we found every one of those four.\n\nWe would rather show you this than have you work it out in month five.',
+    'At one project a month we are expensive, and we should be — you have barely used us.\n\nAt three we cost under six percent of what you billed, and we found every one of those three.\n\nWe would rather show you this than have you work it out in month five.',
     {
       x: M + 7.88,
       y: 4.05,
@@ -1547,7 +1565,7 @@ demoSlide(
     },
   );
 
-  foot(s, 'Premium and Luxury land in the same place — the fee rises with the band, and so does the typical project.');
+  foot(s, 'Premium and Luxury land in the same place — the fee rises with the band, and so does the size of the project.');
 
   s.addNotes(
     [

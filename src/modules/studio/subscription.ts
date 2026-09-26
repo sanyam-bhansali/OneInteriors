@@ -30,12 +30,17 @@ export interface TierTerms {
   /** Monthly fee in paise. */
   monthlyPaise: Paise;
   /**
-   * Briefs a month we undertake to show them for.
+   * Briefs a month this band is allocated.
    *
-   * Not projects. We control how many customers see a studio; we do not control
-   * whether a customer picks them, and promising closed projects would be
-   * promising something the customer decides. The distinction has to survive
-   * into the contract or the first shortfall conversation goes badly.
+   * An internal allocation target, **not a number we promise a studio.** It
+   * was removed from the sales deck on 26 Sep 2026: a guaranteed brief count
+   * is a commitment we cannot keep in the first months, when the constraint is
+   * homeowner demand rather than how we divide it, and a promise broken in
+   * month two costs more than the one it won in month one.
+   *
+   * What we do say out loud is the shape of it — a subscription buys volume
+   * and never position. Keep that distinction: we control how many customers
+   * see a studio, never whether one picks them.
    */
   guaranteedBriefs: number;
   /** The typical project size this band is built around, in paise. */
@@ -43,31 +48,54 @@ export interface TierTerms {
 }
 
 /**
- * Fees as set in the year-one plan.
+ * Fees, and what a band means.
+ *
+ * Revised 26 Sep 2026, when the bands were redefined for the partner pitch.
+ * Two changes worth understanding rather than just reading.
+ *
+ * **A band is a rate per square foot, not a project size.** ₹25 lakh on a
+ * 2 BHK is about ₹2,800/sqft and is Luxury; the same ₹25 lakh on a 4 BHK is
+ * about ₹1,500 and is Premium. Banding on project value would put those two
+ * studios in the same place, and they are not doing the same work. What the
+ * band actually describes is scope: Essential is furnishing, Premium adds a
+ * designer and project management, Luxury adds the premium materials.
+ *
+ * **Premium and Luxury moved to 49k and 99k** from 50k and 1L. Ending a price
+ * below the round number is worth more in a room than the thousand it costs.
  *
  * The mix assumed across a city is roughly 25% Essential, 50% Premium, 25%
- * Luxury — see the financial model. Note that the fee rises with the band and
- * so does the typical project value, which is what keeps the effective take
- * rate flat across tiers rather than punishing the biggest studios.
+ * Luxury — see the financial model. The fee rises with the band and so does
+ * the typical project, which is what keeps the effective take rate flat across
+ * tiers rather than punishing the biggest studios.
+ *
+ * NOTE: `src/modules/quotation/tiers.ts` carries a DIFFERENT set of per-sqft
+ * bands (₹700–1,100 / 1,100–1,800 / 1,800–3,200) under the same three names.
+ * Those are the customer-facing quoting bands and they drive real quote
+ * generation, so they were deliberately not changed here. The two need to be
+ * reconciled before a homeowner and a studio ever compare notes on what
+ * "Premium" means.
  */
 export const TIER_TERMS: Record<SubscriptionTierName, TierTerms> = {
   ESSENTIAL: {
     label: 'Essential',
     monthlyPaise: 25_000_00,
     guaranteedBriefs: 8,
-    typicalProjectPaise: 7_00_000_00,
+    /** ~₹1,200–1,500/sqft, furnishing only. A 2 BHK lands near ₹12 lakh. */
+    typicalProjectPaise: 12_00_000_00,
   },
   PREMIUM: {
     label: 'Premium',
-    monthlyPaise: 50_000_00,
+    monthlyPaise: 49_000_00,
     guaranteedBriefs: 16,
-    typicalProjectPaise: 12_00_000_00,
+    /** ~₹1,500–2,500/sqft, with a designer and project management. */
+    typicalProjectPaise: 18_00_000_00,
   },
   LUXURY: {
     label: 'Luxury',
-    monthlyPaise: 1_00_000_00,
+    monthlyPaise: 99_000_00,
     guaranteedBriefs: 30,
-    typicalProjectPaise: 20_00_000_00,
+    /** ₹2,500/sqft and up, in premium materials. */
+    typicalProjectPaise: 30_00_000_00,
   },
 };
 
