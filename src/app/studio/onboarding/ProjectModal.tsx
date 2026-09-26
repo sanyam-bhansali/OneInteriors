@@ -8,6 +8,8 @@ import {
   type StepState,
 } from './actions';
 import { PROPERTY_LABELS, SCOPE_LABELS, STYLE_LABELS } from '@/modules/brief/types';
+import { X } from 'lucide-react';
+import { INLINE_ICON } from './icon-sizes';
 
 const INITIAL: StepState = { status: 'idle' };
 const IMAGES_INITIAL: ImagesState = { status: 'idle' };
@@ -230,9 +232,7 @@ export function ProjectModal({
             aria-label="Close"
             className="-mr-1 -mt-1 grid h-9 w-9 flex-none place-items-center rounded-full text-[var(--color-ink-3)] transition-colors hover:bg-[var(--color-paper-2)] hover:text-[var(--color-ink)]"
           >
-            <svg viewBox="0 0 16 16" aria-hidden="true" className="h-4 w-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-              <path d="M4 4 L12 12 M12 4 L4 12" />
-            </svg>
+            <X {...INLINE_ICON} />
           </button>
         </header>
 
@@ -904,7 +904,6 @@ function Check({
     </label>
   );
 }
-
 
 /**
  * The project as it will sit on the grid, while it is still being entered.

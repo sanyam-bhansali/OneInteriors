@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Check } from 'lucide-react';
+import { DISC_ICON } from './icon-sizes';
 
 /**
  * The acknowledgement you land on after finishing a step.
@@ -63,16 +65,7 @@ export function StepArrival({ finished, remaining }: { finished: string; remaini
     >
       <div className="flex items-start gap-3 rounded-[12px] border border-[var(--color-ontrack)]/30 bg-[var(--color-ontrack-soft)] px-5 py-3.5">
         <span className="mt-0.5 grid h-5 w-5 flex-none place-items-center rounded-full bg-[var(--color-ontrack)] text-white">
-          <svg viewBox="0 0 16 16" aria-hidden="true" className="h-3 w-3">
-            <path
-              d="M3.5 8.5 L6.5 11.5 L12.5 5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <Check {...DISC_ICON} />
         </span>
         <p className="m-0 text-[14.5px] leading-relaxed text-[var(--color-ink)]">
           <span className="font-semibold">{finished} is done.</span>{' '}

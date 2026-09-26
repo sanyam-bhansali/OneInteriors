@@ -10,6 +10,8 @@ import {
   type DocumentKind,
 } from '@/modules/studio/document-kinds';
 import type { StudioDocumentView } from '@/modules/studio/documents';
+import { FileText, UploadCloud } from 'lucide-react';
+import { INLINE_ICON, PANEL_ICON } from './icon-sizes';
 
 const INITIAL: ProofState = { status: 'idle' };
 
@@ -130,7 +132,7 @@ export function ProofUpload({
               className="sr-only"
               disabled={pending}
             />
-            <UploadGlyph />
+            <UploadCloud {...PANEL_ICON} />
             <span className="mt-2.5 text-[15px] font-medium text-[var(--color-ink)]">
               {pending ? 'Sending…' : 'Drag a file here'}
             </span>
@@ -182,7 +184,7 @@ function DocumentRow({ doc }: { doc: StudioDocumentView }) {
 
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[11px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 py-3">
-      <FileGlyph />
+      <FileText {...INLINE_ICON} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[14.5px] text-[var(--color-ink)]">
           {doc.filename}
@@ -239,38 +241,3 @@ function kb(bytes: number): string {
     : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
-function UploadGlyph() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="h-7 w-7 text-[var(--color-ink-3)]"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M5.5 16.5A3.5 3.5 0 0 1 6 9.6a5 5 0 0 1 9.6-1.4 3.9 3.9 0 0 1 .6 7.8" />
-      <path d="M12 12v7" />
-      <path d="M9.2 14.4 12 11.6l2.8 2.8" />
-    </svg>
-  );
-}
-
-function FileGlyph() {
-  return (
-    <svg
-      viewBox="0 0 20 20"
-      aria-hidden="true"
-      className="h-5 w-5 flex-none text-[var(--color-ink-3)]"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinejoin="round"
-    >
-      <path d="M11.5 2.5H6.2a1.7 1.7 0 0 0-1.7 1.7v11.6a1.7 1.7 0 0 0 1.7 1.7h7.6a1.7 1.7 0 0 0 1.7-1.7V6.5l-4-4Z" />
-      <path d="M11.5 2.5v4h4" />
-    </svg>
-  );
-}

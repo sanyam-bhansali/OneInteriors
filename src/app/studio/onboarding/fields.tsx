@@ -6,6 +6,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { FIELD_WIDTH, type FieldWidth } from '@/components/ui/form';
 import type { DraftState } from './useAutosave';
+/* Aliased: this file exports its own `Check`, which is a checkbox field. */
+import { Check as CheckMark } from 'lucide-react';
+import { DISC_ICON } from './icon-sizes';
 
 export function Field({
   label,
@@ -415,16 +418,7 @@ function SavedFlash({ pending, saved }: { pending: boolean; saved: boolean }) {
     >
       {visible ? (
         <>
-          <svg viewBox="0 0 16 16" aria-hidden="true" className="h-3.5 w-3.5">
-            <path
-              d="M3.5 8.5 L6.5 11.5 L12.5 5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <CheckMark {...DISC_ICON} />
           Saved
         </>
       ) : null}

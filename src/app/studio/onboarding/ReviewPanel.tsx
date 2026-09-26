@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { Clock, Users } from 'lucide-react';
 import { useActionState } from 'react';
 import { submitForReviewAction, type StepState } from './actions';
+import { Check, Clock, Users } from 'lucide-react';
+import { DISC_ICON } from './icon-sizes';
 
 const INITIAL: StepState = { status: 'idle' };
 
@@ -196,7 +197,7 @@ function Completion({
                 : 'bg-[var(--color-paper-3)] text-[var(--color-ink-2)]'
             }`}
           >
-            {ready ? <Tick /> : <span className="text-[13px] font-semibold">{done}</span>}
+            {ready ? <Check {...DISC_ICON} /> : <span className="text-[13px] font-semibold">{done}</span>}
           </span>
           <div className="min-w-0">
             <p className="m-0 text-[16px] font-semibold text-[var(--color-ink)]">
@@ -251,7 +252,7 @@ function Completion({
               {section.done ? (
                 <>
                   <span className="sr-only">Complete:</span>
-                  <Tick small />
+                  <Check size={11} strokeWidth={3} absoluteStrokeWidth />
                 </>
               ) : (
                 <>
@@ -353,7 +354,7 @@ function Tracker() {
             {stage.done ? (
               <>
                 <span className="sr-only">Done:</span>
-                <Tick small />
+                <Check size={11} strokeWidth={3} absoluteStrokeWidth />
               </>
             ) : (
               <span className="sr-only">To come:</span>
@@ -470,7 +471,7 @@ function Benefit({ title, children }: { title: string; children: React.ReactNode
     <li>
       <p className="m-0 flex items-center gap-2 text-[14.5px] font-medium text-[var(--color-ink)]">
         <span className="grid h-[18px] w-[18px] flex-none place-items-center rounded-full bg-[var(--color-ontrack)] text-white">
-          <Tick small />
+          <Check size={11} strokeWidth={3} absoluteStrokeWidth />
         </span>
         {title}
       </p>
@@ -479,20 +480,6 @@ function Benefit({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Tick({ small }: { small?: boolean }) {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true" className={small ? 'h-2.5 w-2.5' : 'h-3.5 w-3.5'}>
-      <path
-        d="M3.5 8.5 L6.5 11.5 L12.5 5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 /**
  * The house icon size on this surface.

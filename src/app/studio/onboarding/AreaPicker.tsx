@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { PUNE_LOCALITIES } from '@/modules/brief/types';
+import { X } from 'lucide-react';
+import { DISC_ICON } from './icon-sizes';
 
 /**
  * Where the studio takes projects.
@@ -119,10 +121,7 @@ export function AreaPicker({
           aria-hidden="true"
           className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-ink-3)]"
         >
-          <svg viewBox="0 0 16 16" className="h-[15px] w-[15px]" fill="none" stroke="currentColor" strokeWidth="1.7">
-            <circle cx="7" cy="7" r="4.6" />
-            <path d="M10.4 10.4 L14 14" strokeLinecap="round" />
-          </svg>
+          <X {...DISC_ICON} />
         </span>
         <input
           type="search"

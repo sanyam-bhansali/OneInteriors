@@ -2,6 +2,8 @@
 
 import { PUNE_LOCALITIES } from '@/modules/brief/types';
 import { MIN_ABOUT_LENGTH } from '@/modules/studio/onboarding-steps';
+import { MapPin } from 'lucide-react';
+import { INLINE_ICON } from './icon-sizes';
 
 /**
  * What a customer will see, while the studio is still typing it.
@@ -66,7 +68,7 @@ export function StudioPreview({
           <p className="h3 m-0 text-[19px] leading-tight">{tradeName}</p>
 
           <p className="m-0 mt-1 flex items-start gap-1.5 text-[13px] leading-snug text-[var(--color-ink-2)]">
-            <PinIcon />
+            <MapPin {...INLINE_ICON} />
             <span>
               {labels.length > 0 ? (
                 <>
@@ -142,19 +144,3 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PinIcon() {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      aria-hidden="true"
-      className="mt-[3px] h-3 w-3 flex-none text-[var(--color-ink-3)]"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinejoin="round"
-    >
-      <path d="M8 14.5s4.5-4.2 4.5-7.5a4.5 4.5 0 1 0-9 0c0 3.3 4.5 7.5 4.5 7.5Z" />
-      <circle cx="8" cy="6.8" r="1.7" />
-    </svg>
-  );
-}

@@ -14,6 +14,8 @@ import {
   type Offering,
   type PriceLevel,
 } from '@/modules/studio/positioning';
+import { Check, Lightbulb } from 'lucide-react';
+import { DISC_ICON, INLINE_ICON } from './icon-sizes';
 
 const INITIAL: StepState = { status: 'idle' };
 
@@ -218,16 +220,7 @@ function Card({
         }`}
       >
         {checked ? (
-          <svg viewBox="0 0 16 16" className="h-2.5 w-2.5">
-            <path
-              d="M3.5 8.5 L6.5 11.5 L12.5 5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <Check {...DISC_ICON} />
         ) : null}
       </span>
 
@@ -245,11 +238,7 @@ function Insight({ children }: { children: React.ReactNode }) {
   return (
     <div className="mt-3 flex items-start gap-2.5 rounded-[11px] bg-[var(--color-ontrack-soft)] px-4 py-3">
       <span aria-hidden="true" className="mt-px flex-none text-[var(--color-ontrack)]">
-        <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <circle cx="8" cy="8" r="6.2" />
-          <path d="M8 7.4v4" strokeLinecap="round" />
-          <circle cx="8" cy="5" r="0.8" fill="currentColor" stroke="none" />
-        </svg>
+        <Lightbulb {...INLINE_ICON} />
       </span>
       <p className="m-0 max-w-[58ch] text-[13.5px] leading-relaxed text-[var(--color-ink-2)]">
         {children}

@@ -6,6 +6,8 @@ import { formatINRCompact } from '@/lib/money';
 import { removeProjectAction, declarePortfolioShortfallAction, type StepState } from './actions';
 import { SaveBar } from './fields';
 import { ProjectModal } from './ProjectModal';
+import { Image as ImageIcon } from 'lucide-react';
+import { PANEL_ICON } from './icon-sizes';
 
 const INITIAL: StepState = { status: 'idle' };
 
@@ -288,11 +290,7 @@ function ProjectCard({ project }: { project: ProjectRow }) {
              photographs were switched on needs to know which one is short,
              and "no photographs yet" is the only honest label for it. */
           <span className="flex h-full w-full flex-col items-center justify-center gap-1 text-[var(--color-ink-3)]">
-            <svg viewBox="0 0 24 24" aria-hidden="true" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.4">
-              <rect x="3" y="5" width="18" height="14" rx="2.5" />
-              <circle cx="8.5" cy="10" r="1.6" />
-              <path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5" strokeLinejoin="round" />
-            </svg>
+            <ImageIcon {...PANEL_ICON} />
             <span className="text-[12.5px]">No photographs yet</span>
           </span>
         )}

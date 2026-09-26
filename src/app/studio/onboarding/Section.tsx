@@ -1,5 +1,9 @@
 'use client';
 
+import { Check } from 'lucide-react';
+import { DISC_ICON } from './icon-sizes';
+
+
 /**
  * One numbered block of a guided setup.
  *
@@ -48,7 +52,7 @@ export function Section({
               : 'bg-[var(--color-paper-3)] text-[var(--color-ink-2)]'
           }`}
         >
-          {done ? <Tick /> : n}
+          {done ? <Check {...DISC_ICON} /> : n}
         </span>
 
         <div className="min-w-0 flex-1">
@@ -71,20 +75,6 @@ export function Section({
   );
 }
 
-function Tick() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true" className="h-[13px] w-[13px]">
-      <path
-        d="M3.5 8.5 L6.5 11.5 L12.5 5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 /**
  * How long the description is, against the length that actually matters.

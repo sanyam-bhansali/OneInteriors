@@ -9,6 +9,8 @@ import { AreaPicker } from './AreaPicker';
 import { SiteLookup } from './SiteLookup';
 import { useAutosave } from './useAutosave';
 import { StudioPreview } from './StudioPreview';
+import { Link2 } from 'lucide-react';
+import { INLINE_ICON } from './icon-sizes';
 
 const INITIAL: StepState = { status: 'idle' };
 
@@ -317,7 +319,7 @@ export function ProfileForm({
           {/* `type="text"`, not `url`. A URL input silently refuses
               "yourstudio.com" with no hint that a scheme is required — the
               studio sees a form that will not submit and no explanation. */}
-          <WithIcon icon={<LinkIcon />}>
+          <WithIcon icon={<Link2 {...INLINE_ICON} />}>
             <input
               name="website"
               type="text"
@@ -557,15 +559,14 @@ function WithIcon({ icon, children }: { icon: React.ReactNode; children: React.R
   );
 }
 
-function LinkIcon() {
-  return (
-    <svg viewBox="0 0 16 16" className="h-[15px] w-[15px]" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M6.6 9.4a2.6 2.6 0 0 0 3.7 0l2.3-2.3a2.6 2.6 0 0 0-3.7-3.7l-1 1" strokeLinecap="round" />
-      <path d="M9.4 6.6a2.6 2.6 0 0 0-3.7 0L3.4 8.9a2.6 2.6 0 0 0 3.7 3.7l1-1" strokeLinecap="round" />
-    </svg>
-  );
-}
-
+/**
+ * Instagram, drawn here rather than imported.
+ *
+ * lucide carries no brand marks at all — Instagram, Facebook, LinkedIn and
+ * the rest were removed from the set over trademark, so there is nothing to
+ * import. Every other icon on this surface comes from the library; this one
+ * cannot, and that is the reason rather than an oversight.
+ */
 function InstagramIcon() {
   return (
     <svg viewBox="0 0 16 16" className="h-[15px] w-[15px]" fill="none" stroke="currentColor" strokeWidth="1.5">

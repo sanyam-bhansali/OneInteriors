@@ -6,6 +6,8 @@ import { SaveBar } from './fields';
 import { Section } from './Section';
 import { ProofUpload } from './ProofUpload';
 import type { StudioDocumentView } from '@/modules/studio/documents';
+import { Check, ShieldCheck } from 'lucide-react';
+import { DISC_ICON, INLINE_ICON } from './icon-sizes';
 
 const INITIAL: StepState = { status: 'idle' };
 const FORM_ID = 'registration';
@@ -295,10 +297,7 @@ function Reassurance() {
   return (
     <div className="flex items-start gap-3 rounded-[14px] border border-[var(--color-ontrack)]/25 bg-[var(--color-ontrack-soft)] px-5 py-4">
       <span className="mt-0.5 flex-none text-[var(--color-ontrack)]">
-        <svg viewBox="0 0 18 18" aria-hidden="true" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.6">
-          <path d="M9 1.9 3.4 4.1v4.3c0 3.3 2.3 6.4 5.6 7.7 3.3-1.3 5.6-4.4 5.6-7.7V4.1L9 1.9Z" strokeLinejoin="round" />
-          <path d="M6.4 8.9 8.2 10.7 11.7 7.2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <ShieldCheck {...INLINE_ICON} />
       </span>
       <div className="min-w-0">
         <p className="m-0 text-[14.5px] font-semibold text-[var(--color-ink)]">
@@ -444,16 +443,7 @@ function Choice({
 function TickCircle() {
   return (
     <span className="mt-[3px] grid h-[15px] w-[15px] flex-none place-items-center rounded-full bg-[var(--color-ontrack)] text-white">
-      <svg viewBox="0 0 16 16" aria-hidden="true" className="h-2.5 w-2.5">
-        <path
-          d="M3.5 8.5 L6.5 11.5 L12.5 5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <Check {...DISC_ICON} />
     </span>
   );
 }

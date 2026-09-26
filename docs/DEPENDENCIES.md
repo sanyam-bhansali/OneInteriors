@@ -170,6 +170,26 @@ Rules for using it here:
   It does not decorate a sequence: four icons across four numbered steps is
   four shapes to decode where only the order matters.
 
-The hand-drawn SVGs elsewhere in `src/app/studio` are not a second system to
-keep; they are the previous one, and should move across as those files are
-touched.
+### The sweep, and the one exception
+
+Onboarding is fully converted: seventeen hand-drawn SVGs across thirteen files
+are now twelve lucide imports and one shared `icon-sizes.ts`. Six of the
+seventeen were the same tick, redrawn six times at three different stroke
+weights, which is the argument for a set in one line.
+
+**`ProfileForm` still draws Instagram by hand, and has to.** lucide carries no
+brand marks at all — Instagram, Facebook, LinkedIn and the rest were removed
+from the set over trademark. There is nothing to import, so the glyph stays
+with a comment saying why, and it is the only inline SVG left under
+`src/app/studio/onboarding`.
+
+Two collisions worth knowing about if you convert more files:
+
+- `fields.tsx` exports its own `Check`, which is a **checkbox field**, not a
+  tick. The icon is imported there as `CheckMark`.
+- `PortfolioForm` imports lucide's `Image` as `ImageIcon`, because `Image` is
+  also `next/image`.
+
+The hand-drawn SVGs elsewhere in `src/app/studio` — the CRM, the drag handle —
+are not a second system to keep; they are the previous one, and should move
+across as those files are touched.
