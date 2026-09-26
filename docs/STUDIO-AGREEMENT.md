@@ -301,11 +301,7 @@ Agreement, or any statement it made that was untrue.
 10.3 Neither party is liable to the other for indirect or consequential loss,
 or for loss of profit.
 
-10.4 One Interiors' total liability under this Agreement is limited to the
-commission it actually received from the Studio in the **12 months** before the
-claim.
-
-10.5 Nothing in this clause limits liability that cannot be limited by law,
+10.4 Nothing in this clause limits liability that cannot be limited by law,
 including for fraud or death or personal injury caused by negligence.
 
 ## 11. General
@@ -411,13 +407,24 @@ Points One Interiors has taken a deliberate position on:
    Studio that loses a quotation in an outage, or misses a client deadline
    while the software is down, and says the undertaking in 6.3 was breached.
 
-   Clauses 10.3 and 10.4 are now the only things standing between that and a
-   damages claim — no indirect or consequential loss, and a cap at the
-   commission received in the preceding twelve months. They were drafted as a
-   backstop and are now the front line, so please confirm they carry that
-   weight, and flag if the cap should be reconsidered now that the warranty
-   position has changed. A studio paying nothing in commission has a cap of
-   nil, which may itself be argued to be unreasonable.
+   **Clause 10.3 is now the only thing standing between that and a damages
+   claim.** It excludes indirect and consequential loss and loss of profit,
+   and nothing else limits what One Interiors can be ordered to pay.
+
+   There was a cap — total liability limited to the commission received from
+   that Studio in the preceding twelve months — and it was removed at One
+   Interiors' instruction after the exposure was explained. That is a
+   decision, not an oversight, but it is the one we would most like a second
+   opinion on. Direct loss a Studio could plead is not fanciful: fees paid,
+   a lost quotation reconstructed, a client deadline missed while the
+   software was down.
+
+   Please advise whether to reinstate a cap, and in what form. The version
+   that was removed had a real defect — a Studio that has paid no commission
+   had a cap of nil, and a nil cap invites a court to disregard the clause
+   entirely — so a floor ("the greater of commission received in the
+   preceding twelve months, or ₹X") is likely the better drafting if a cap
+   returns at all.
 
 5. **The AI-processing disclosure was removed at One Interiors' instruction,
    and 5.1(b) had to be reworded because of it.**
