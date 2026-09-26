@@ -54,3 +54,5 @@ scripts/shareholder-deck.js
 # files beside it — the README and the .dc.html prototype — already carry
 # the design. Regenerate it from those if it is ever needed again.
 One Interiors design system (1)/design_handoff_landing_page/One Interiors - Landing Page.html
+
+docs/*.pdf
