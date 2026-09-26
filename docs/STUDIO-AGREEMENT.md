@@ -118,12 +118,37 @@ Interiors when that client's payments reach 20% of the contract value, since
 that is what triggers 4.2. One Interiors may ask for reasonable evidence of
 either and the Studio will provide it.
 
-This clause carries the whole of the commission arrangement. There is no
-non-circumvention term in this Agreement, so nothing else obliges the Studio
-to bring an introduction back through the platform. Failure to report an
-Introduced Client who has signed is a material breach for the purposes of 9.4.
+Failure to report an Introduced Client who has signed is a material breach for
+the purposes of 9.4.
 
-4.5 GST is payable on commission **in addition, at the rate applicable from
+4.5 **The introduction lasts twelve months.**
+
+(a) Where an Introduced Client signs with the Studio **within 12 months** of
+    the introduction, commission under 4.2 is payable **however that contract
+    came about** — through the platform, directly between the Studio and the
+    homeowner, off the platform, through an intermediary, or in the name of
+    an associate, affiliate or related entity of the Studio.
+
+(b) The Studio will not solicit or encourage an Introduced Client to contract
+    off the platform for the purpose of avoiding commission, and will not
+    represent to an Introduced Client that dealing directly is cheaper
+    because no commission is payable. It is not.
+
+(c) **This is not a restraint on the Studio's trade and is not intended as
+    one.** It does not stop the Studio working for anyone, on any terms, at
+    any time, and it gives One Interiors no say in whether the homeowner and
+    the Studio deal with each other. It fixes only who pays what, and only
+    for twelve months.
+
+(d) **After twelve months from the introduction, nothing is payable** on a
+    contract signed with that homeowner, whatever its origin.
+
+(e) This clause survives termination, so that terminating is not a route
+    around it. Where One Interiors terminates under 9.2 and the Studio is not
+    in breach, (a) applies only to an Introduced Client introduced **before**
+    that termination.
+
+4.6 GST is payable on commission **in addition, at the rate applicable from
 time to time**, against a valid tax invoice carrying One Interiors' GSTIN and
 the correct SAC code.
 
@@ -273,8 +298,8 @@ is not cured within 15 days of written notice, or on the other's insolvency.
 
 (c) commission already accrued remains payable;
 
-(d) clauses 5 (data), 7 (IP), 8 (confidentiality), 10 (liability) and
-    11 (law) survive;
+(d) clauses 4.5 (the twelve-month tail on an introduction), 5 (data), 7 (IP),
+    8 (confidentiality), 10 (liability) and 11 (law) survive;
 
 (e) the Studio may request its data export under 5.4;
 
@@ -381,21 +406,32 @@ Points One Interiors has taken a deliberate position on:
    Studio and tells it how to manage it, but please say if that needs to be
    more explicit to be safe.
 
-3. **There is deliberately no non-circumvention clause.** A draft carried one
-   and One Interiors removed it, so this is a decision rather than an
-   oversight.
+3. **Clause 4.5 is drafted as a fee that follows the introduction, not as a
+   restraint of trade. Please confirm it lands on the right side of s.27 of
+   the Indian Contract Act, 1872.**
 
-   The consequence should be understood: commission depends entirely on the
-   Studio reporting under 4.4. Nothing in this Agreement prevents a Studio
-   from taking an introduced homeowner off the platform and contracting with
-   them directly, and there is no contractual remedy if it does.
+   An earlier draft had no non-circumvention term at all, which left
+   commission depending entirely on the Studio's own reporting under 4.4 and
+   gave One Interiors no remedy against a studio that took an introduced
+   homeowner off the platform. 4.5 was added to close that.
 
-   If One Interiors later wants protection without a restraint of trade,
-   please advise on the narrower version — a bare undertaking not to SOLICIT
-   an Introduced Client to contract off-platform for the purpose of avoiding
-   commission. That is a much easier clause to defend than a period-based
-   restraint, and it closes the deliberate evasion while leaving the
-   homeowner's freedom to choose untouched.
+   It was written deliberately as a **payment obligation rather than a
+   prohibition**, because s.27 voids agreements in restraint of trade and a
+   clause barring the Studio from contracting with a homeowner for a period
+   is the version most likely to fail. 4.5 stops nothing: the homeowner and
+   the Studio may deal however they like, and 4.5(c) says so in terms. What
+   it fixes is who pays what, for twelve months. Please confirm that
+   characterisation holds, and that 4.5(b) — the no-solicitation limb, which
+   *is* a prohibition, though a narrow one aimed at deliberate evasion —
+   does not drag the rest of the clause into s.27 with it.
+
+   Two drafting points to check. Twelve months runs **from the introduction**
+   rather than from signature or from termination, which is the shorter and
+   more defensible of the options but means a slow-moving homeowner can run
+   the clock out honestly; confirm One Interiors is content with that. And
+   4.5(a) reaches contracts signed in the name of an associate or related
+   entity — please confirm that is wide enough to catch the obvious
+   workaround without being so wide it is unenforceable for uncertainty.
 
 4. **There is no warranty disclaimer for the software.** A draft carried the
    usual one — provided as is, not warranted uninterrupted or error-free, no
