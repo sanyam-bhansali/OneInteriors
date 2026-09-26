@@ -145,23 +145,34 @@ function dark() {
   return s;
 }
 
-/* Wordmark stand-in: the artwork is an SVG path in brand.tsx and PowerPoint
-   would need it rasterised. Set as type, it still reads as the brand because
-   the serif/mono pairing is the brand. */
-function mark(s, onDark = false) {
-  s.addText('one interiors', {
-    x: W - M - 3,
-    y: 0.5,
-    w: 3,
-    h: 0.3,
-    fontFace: SERIF,
-    fontSize: 12.5,
-    charSpacing: 1,
-    color: onDark ? ONDARK : INK2,
-    align: 'right',
-    isTextBox: true,
-    margin: 0,
+/*
+ * The real logotype, on every slide.
+ *
+ * Rasterised from the LOGO_D path in src/components/brand.tsx by
+ * scripts/build-deck-logo.js rather than redrawn, so the deck cannot drift
+ * from the product. Two colourways because a single one would be invisible on
+ * half the slides: ink on the beige grounds, light on the espresso ones.
+ *
+ * The artwork is 1072 x 560, so height is always width / 1.914 — pinning both
+ * axes independently would squash it.
+ */
+const LOGO_INK = path.join(REPO, 'docs', 'assets', 'logo-ink.png');
+const LOGO_LIGHT = path.join(REPO, 'docs', 'assets', 'logo-light.png');
+const LOGO_RATIO = 1072 / 560;
+
+function logo(s, { x, y, w, onDark = false }) {
+  s.addImage({
+    path: onDark ? LOGO_LIGHT : LOGO_INK,
+    x,
+    y,
+    w,
+    h: w / LOGO_RATIO,
   });
+}
+
+/** The running corner mark, opposite the eyebrow. */
+function mark(s, onDark = false) {
+  logo(s, { x: W - M - 0.95, y: 0.45, w: 0.95, onDark });
 }
 
 /** The three demo hand-off slides all look identical on purpose. */
@@ -252,11 +263,11 @@ function demoSlide(n, heading, bullets, notes) {
 /* ====================================================================== */
 {
   const s = dark();
-  mark(s, true);
+  logo(s, { x: M, y: 0.8, w: 2.1, onDark: true });
 
   s.addText('For the studio', {
     x: M,
-    y: 2.05,
+    y: 2.2,
     w: 5,
     h: 0.3,
     fontFace: MONO,
@@ -1825,7 +1836,7 @@ demoSlide(
 /* ====================================================================== */
 {
   const s = dark();
-  mark(s, true);
+  logo(s, { x: M, y: 0.8, w: 1.75, onDark: true });
 
   s.addText(
     [
