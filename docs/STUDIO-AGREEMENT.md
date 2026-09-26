@@ -189,8 +189,18 @@ use the software while this Agreement is in force.
 Studio's name. **One Interiors is not responsible for their contents**,
 including any figure, specification or commitment in them.
 
-6.3 The software is provided **as is**. One Interiors does not warrant that it
-will be uninterrupted or error-free, and may change or withdraw features.
+6.3 **Maintenance and updates.** One Interiors maintains the software and
+updates it, including to improve performance, security and reliability.
+Updates may change how a feature behaves, and One Interiors may add, change or
+withdraw features.
+
+Where One Interiors plans maintenance it expects to interrupt the service, it
+will give the Studio reasonable notice and will schedule it outside Indian
+business hours where it practically can.
+
+The software is otherwise provided **as is**. One Interiors does not warrant
+that it will be uninterrupted or error-free, and **gives no service-level or
+uptime commitment** unless one is agreed separately in writing.
 
 6.4 One Interiors' attribution appears on quotations produced using the
 software. The Studio may remove it on a paid plan. **[DECIDE: confirm this is
