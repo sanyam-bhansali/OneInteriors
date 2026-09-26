@@ -2,8 +2,11 @@
 
 **DRAFT — NOT YET REVIEWED BY A LAWYER.** This is a structured starting point,
 not legal advice. It must be reviewed by an advocate admitted in India before
-it is sent to any studio. Clauses marked **[DECIDE]** need a commercial answer
-from One Interiors before review.
+it is sent to any studio.
+
+Every commercial decision the draft was waiting on has been taken. What is
+left for the advocate is drafting and enforceability, not intent — the notes
+at the end say which decisions were deliberate and where the exposure sits.
 
 ---
 
@@ -262,9 +265,10 @@ is not cured within 15 days of written notice, or on the other's insolvency.
 (f) the Studio stops describing itself as a One Interiors studio and removes
     every reference, badge and mark within 14 days.
 
-9.6 **[DECIDE]** Where One Interiors terminates under 9.2 and the Studio is
-not in breach, does One Interiors refund any unused subscription? A short
-answer here avoids the argument later.
+9.6 **No refund.** Subscription and software fees are not refundable, in whole
+or in part, on any termination — including where One Interiors terminates
+under 9.2 and the Studio is not in breach. Fees already paid are earned when
+paid.
 
 ## 10. Liability, and who is responsible for the work
 
@@ -426,3 +430,23 @@ Points One Interiors has taken a deliberate position on:
 7. **Clause 5.3 is unusual and deliberate** — the Studio agrees in advance to
    publication of figures that may not flatter it. Please confirm the consent
    is adequately informed as drafted.
+
+8. **Clause 9.6 — no refund on a termination the Studio did not cause — is a
+   commercial decision, taken knowingly.**
+
+   9.2 lets One Interiors terminate at any time for any reason or none, and
+   9.6 says no fee is refunded when it does. The two read together are the
+   most one-sided pair in the document: a studio can pay an annual
+   subscription in month one, be de-listed in month two through no fault of
+   its own, and recover nothing.
+
+   Please advise on enforceability — in particular whether it is at risk as
+   an unconscionable term in a standard-form contract, and whether it changes
+   the analysis if the Studio is a proprietorship rather than a company.
+   Whether the fee can fairly be described as "earned when paid" when the
+   service it buys is then withdrawn is the question to answer.
+
+   The practical mitigation, if you advise the clause is exposed, is to leave
+   the no-refund rule in place but let access run to the end of the paid
+   period where One Interiors terminates without breach. No money leaves, and
+   the term stops looking punitive.
