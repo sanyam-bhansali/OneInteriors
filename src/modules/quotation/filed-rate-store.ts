@@ -160,14 +160,29 @@ export type { FiledRateView } from './analysis-states';
  * the partial unique index means there is at most one live row per item.
  */
 export async function liveRatesFor(studioId: string): Promise<StudioRates> {
-  const rows = await prisma.studioFiledRate.findMany({
-    where: { studioId, state: 'LIVE' },
-    /* One LIVE row per catalogue item is the invariant (a partial unique
-       index enforces it), so this can never legitimately exceed the
-       catalogue. The cap is what stops a broken invariant becoming an
-       unbounded read on the pricing path. */
-    take: 200,
-  });
+  /**
+   * An empty set is a meaningful answer here, and a throw is not.
+   *
+   * The caller's whole job is choosing between a studio's filed rates and the
+   * placeholder table, so "I could not read the filed ones" has a correct
+   * response — use the placeholder — and it is the caller who should make it.
+   * `myFiledRates` next door has said exactly this for a while; this one was
+   * on the pricing path and had no such protection, which took `/match` down
+   * with it.
+   */
+  const rows = await prisma.studioFiledRate
+    .findMany({
+      where: { studioId, state: 'LIVE' },
+      /* One LIVE row per catalogue item is the invariant (a partial unique
+         index enforces it), so this can never legitimately exceed the
+         catalogue. The cap is what stops a broken invariant becoming an
+         unbounded read on the pricing path. */
+      take: 200,
+    })
+    .catch((error: unknown) => {
+      console.error('[rates] liveRatesFor failed, falling back', studioId, error);
+      return [];
+    });
 
   const out: StudioRates = {};
   for (const row of rows) {

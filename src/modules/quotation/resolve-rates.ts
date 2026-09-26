@@ -29,6 +29,7 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
+import { hasDatabase } from '@/lib/env';
 import { filedRatesFor } from '@/data/filed-rates';
 import { liveRatesFor } from './filed-rate-store';
 import type { StudioRates } from './catalogue';
@@ -39,10 +40,37 @@ export interface ResolvedRates {
   realCodes: string[];
 }
 
+/**
+ * ## Every path out of here returns rates
+ *
+ * This function used to reach for Prisma with no guard and no catch, so a
+ * database that was absent — or merely having a bad minute — took `/match`
+ * down with a 500 rather than falling back to the placeholder table. That is
+ * exactly backwards for a resolver whose entire job is to let a filed rate and
+ * an invented one coexist: the fallback IS the feature, and it was the one
+ * case that did not work.
+ *
+ * It was found by walking the customer flow with no database, where the
+ * documented behaviour is fixture studios. Nine quiz steps passed and the page
+ * they lead to was the one that broke.
+ *
+ * In production the same hole is worse: a dropped connection would blank the
+ * comparison screen for every customer mid-journey, when showing placeholder
+ * rates — already labelled as such — would have carried them through.
+ */
 export async function resolveRatesFor(slug: string): Promise<ResolvedRates> {
   const placeholder = filedRatesFor(slug);
 
-  const studio = await prisma.studio.findUnique({ where: { slug }, select: { id: true } });
+  /* No database configured at all: fixtures. Documented in DATABASE.md as a
+     first-class way to run this app, so it cannot be an error path. */
+  if (!hasDatabase()) return { rates: placeholder, realCodes: [] };
+
+  const studio = await prisma.studio
+    .findUnique({ where: { slug }, select: { id: true } })
+    .catch((error: unknown) => {
+      console.error('[rates] studio lookup failed, using placeholder', slug, error);
+      return null;
+    });
   if (!studio) return { rates: placeholder, realCodes: [] };
 
   const live = await liveRatesFor(studio.id);
