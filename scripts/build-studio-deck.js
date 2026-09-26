@@ -1400,7 +1400,7 @@ demoSlide(
 
 /* ====================================================================== */
 /* ====================================================================== */
-/* 15 — the offer                                                         */
+/* 16 — the offer                                                         */
 /* ====================================================================== */
 {
   const s = dark();
@@ -1487,7 +1487,7 @@ demoSlide(
 }
 
 /* ====================================================================== */
-/* 16 — the maths                                                         */
+/* 17 — the maths                                                         */
 /* ====================================================================== */
 {
   const s = light();
@@ -1578,113 +1578,6 @@ demoSlide(
       'Do not hide the first bar. Showing that we are expensive at low volume is',
       'what makes the rest of the chart believable — and it sets up the real',
       'message: this only works if you use it.',
-    ].join('\n'),
-  );
-}
-
-/* ====================================================================== */
-/* 17 — what we ask                                                       */
-/* ====================================================================== */
-{
-  const s = light();
-  mark(s);
-  eyebrow(s, 'What we need from you');
-  title(s, 'Three things, and one of them is the whole of next week.');
-  standfirst(s, 'None of this is onerous. All of it is in the agreement.', { w: 9 });
-
-  const asks = [
-    [
-      'A real rate card',
-      'Twenty minutes, or twenty old quotations for us to read. Until it is filed we cannot quote on your behalf, and until we can quote you are not really listed.',
-      ACC,
-    ],
-    [
-      'Tell us when a project signs',
-      'Within seven days, with the contract value — and again when the client’s payments reach 20%, because that is what triggers the invoice.',
-      INK,
-    ],
-    [
-      'Keep the work yours',
-      'The portfolio is your own work, the rates are your real rates, and anything that stops being true gets corrected within seven days.',
-      INK,
-    ],
-  ];
-
-  asks.forEach(([h, b, c], i) => {
-    const y = 3.3 + i * 1.12;
-    card(s, M, y, 11.6, 0.98, i === 0 ? { fill: 'F3E7E0' } : {});
-    s.addText(String(i + 1), {
-      x: M + 0.42,
-      y: y + 0.22,
-      w: 0.5,
-      h: 0.56,
-      fontFace: MONO,
-      fontSize: 19,
-      color: c,
-      isTextBox: true,
-      margin: 0,
-      valign: 'middle',
-    });
-    s.addText(h, {
-      x: M + 1.0,
-      y: y + 0.22,
-      w: 3.3,
-      h: 0.56,
-      fontFace: SERIF,
-      fontSize: 18,
-      color: INK,
-      isTextBox: true,
-      margin: 0,
-      valign: 'middle',
-    });
-    s.addText(b, {
-      x: M + 4.45,
-      y: y + 0.18,
-      w: 6.75,
-      h: 0.64,
-      fontFace: SANS,
-      fontSize: 12,
-      color: INK2,
-      isTextBox: true,
-      margin: 0,
-      valign: 'middle',
-      lineSpacingMultiple: 1.18,
-    });
-  });
-
-  card(s, M, 6.55, 11.6, 0.62, { fill: 'E4DFD7' });
-  s.addText(
-    [
-      { text: 'And one thing we ask you not to do. ', options: { bold: true, color: INK } },
-      {
-        text: 'If we introduce a homeowner, the commission is payable for twelve months however the contract comes about. You are free to work with anyone, on any terms — we only fix who pays what.',
-        options: { color: INK2 },
-      },
-    ],
-    {
-      x: M + 0.42,
-      y: 6.59,
-      w: 10.8,
-      h: 0.54,
-      fontFace: SANS,
-      fontSize: 11.5,
-      isTextBox: true,
-      margin: 0,
-      valign: 'middle',
-    },
-  );
-
-  s.addNotes(
-    [
-      'Say the bottom box out loud. It is clause 4.5 and it is the one a studio',
-      'must not be surprised by later.',
-      '',
-      'The framing that keeps it friendly: "We are not stopping you doing',
-      'anything. If we introduced them, we get paid, and that is it. After twelve',
-      'months, nothing."',
-      '',
-      'The rate card ask is the one to press on. Get a date in the diary for it',
-      'before you leave the room — everything else is blocked behind it.',
     ].join('\n'),
   );
 }
