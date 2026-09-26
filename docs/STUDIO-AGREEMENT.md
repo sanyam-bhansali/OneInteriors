@@ -198,9 +198,15 @@ Where One Interiors plans maintenance it expects to interrupt the service, it
 will give the Studio reasonable notice and will schedule it outside Indian
 business hours where it practically can.
 
-6.4 One Interiors' attribution appears on quotations produced using the
-software. The Studio may remove it on a paid plan. **[DECIDE: confirm this is
-the commercial intent, and what the plan costs.]**
+6.4 **Attribution.** One Interiors' attribution appears on quotations produced
+using the software. It is a single line, it sits below the Studio's GSTIN, and
+it commits the Studio to nothing.
+
+Removing it is available on a **paid plan**. The plans and their charges are
+as One Interiors publishes or notifies from time to time, and are not part of
+this Agreement — so that a change of price is a change of price, not an
+amendment to a signed contract. One Interiors will give notice before a charge
+the Studio is already paying goes up.
 
 ## 7. Intellectual property
 
@@ -211,8 +217,8 @@ Interiors' property. Nothing here transfers any of it.
 7.2 The Studio's portfolio, images, designs, drawings and brand remain the
 Studio's. The Studio grants One Interiors a licence to display them on the
 platform and in marketing that features the Studio, for as long as this
-Agreement is in force and for **[DECIDE: 6 / 12] months** afterwards for
-material already published.
+Agreement is in force and for **6 months** afterwards for material already
+published.
 
 7.3 Neither party may use the other's name or marks outside this Agreement
 without written consent.
