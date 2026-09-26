@@ -198,10 +198,6 @@ Where One Interiors plans maintenance it expects to interrupt the service, it
 will give the Studio reasonable notice and will schedule it outside Indian
 business hours where it practically can.
 
-The software is otherwise provided **as is**. One Interiors does not warrant
-that it will be uninterrupted or error-free, and **gives no service-level or
-uptime commitment** unless one is agreed separately in writing.
-
 6.4 One Interiors' attribution appears on quotations produced using the
 software. The Studio may remove it on a paid plan. **[DECIDE: confirm this is
 the commercial intent, and what the plan costs.]**
@@ -378,7 +374,25 @@ Points One Interiors has taken a deliberate position on:
    restraint, and it closes the deliberate evasion while leaving the
    homeowner's freedom to choose untouched.
 
-4. **The AI-processing disclosure was removed at One Interiors' instruction,
+4. **There is no warranty disclaimer for the software.** A draft carried the
+   usual one — provided as is, not warranted uninterrupted or error-free, no
+   service-level commitment — and it was removed at One Interiors'
+   instruction. Another decision rather than an oversight.
+
+   What 6.3 now says, unqualified, is that One Interiors maintains the
+   software and updates it. Please advise on the exposure. The concern is a
+   Studio that loses a quotation in an outage, or misses a client deadline
+   while the software is down, and says the undertaking in 6.3 was breached.
+
+   Clauses 10.3 and 10.4 are now the only things standing between that and a
+   damages claim — no indirect or consequential loss, and a cap at the
+   commission received in the preceding twelve months. They were drafted as a
+   backstop and are now the front line, so please confirm they carry that
+   weight, and flag if the cap should be reconsidered now that the warranty
+   position has changed. A studio paying nothing in commission has a cap of
+   nil, which may itself be argued to be unreasonable.
+
+5. **The AI-processing disclosure was removed at One Interiors' instruction,
    and 5.1(b) had to be reworded because of it.**
 
    A draft carried a clause stating plainly that uploaded quotations are sent
@@ -399,10 +413,10 @@ Points One Interiors has taken a deliberate position on:
    clause that survives in 5.1(c) — no training of general-purpose models —
    should be read against what that provider's terms actually allow.
 
-5. **Clause 10.1 is the most important clause in the document.** Please make
+6. **Clause 10.1 is the most important clause in the document.** Please make
    sure it holds against a homeowner who tries to join One Interiors to a
    claim against a studio.
 
-6. **Clause 5.4 is unusual and deliberate** — the Studio agrees in advance to
+7. **Clause 5.3 is unusual and deliberate** — the Studio agrees in advance to
    publication of figures that may not flatter it. Please confirm the consent
    is adequately informed as drafted.
