@@ -293,82 +293,130 @@ p {
 
    The marketplace is warm paper and petrol — a place a homeowner
    reads. This is a tool a studio owner operates for hours, and it is
-   now warm ivory rather than the sage it started as: an off-white
-   ground, white cards that lift off it on a hairline rather than a
-   colour change, deep charcoal type, and terracotta reserved for the
-   one thing on each screen you can act on.
+   now the forest green the studio surface was themed to on 26 Sep
+   2026, on an off-white ground: white cards that lift off it on a
+   hairline rather than a colour change, near-black type, and one
+   green reserved for the thing on each screen you can act on.
 
-   ## Why the sage went
+   ## What this replaced, and what is unchanged
 
-   Sage was taken from a reference board, and it cost more than it
-   bought. A coloured ground means every card, every chip and every
-   input is reading against a tint rather than against white, so every
-   contrast decision on this surface had to be made twice — and the
-   grey that looked right on sage (#838775) measures 3.46:1 on it,
-   below AA, on the ten-pixel labels it was used for.
+   Terracotta. `#C0613C` is still the customer-facing brand — the
+   marketing site, the quote document, the comparison screen — and
+   none of it moved. What changed is the surface a STUDIO works on,
+   which is a different product used by a different person for hours
+   at a time rather than minutes.
 
-   Ivory is the same warmth with none of that: white is white, and the
-   hierarchy is carried by a hairline and a shadow instead of by hue.
+   The typefaces did not change. Instrument Serif, Instrument Sans and
+   IBM Plex Mono are the system, and the mono-for-evidence rule — money,
+   specs, quantities, counters — is the single most distinctive thing
+   on any of these screens. A colour is repaintable; that rule is not.
 
-   ## Two terracottas, and the reason
+   ## One green, where terracotta needed two
 
-   The brand terracotta is #C0613C and it does not pass as text (3.5:1
-   on the worst ground here) or behind white (4.19:1). That is not a
-   reason to abandon it, it is a reason to be precise about where it
-   goes — the same split `.oi-tactile` already makes between `--acc`
-   and `--acc-d`.
+   Terracotta needed a split: `#C0613C` fails as text (3.5:1) and
+   behind white (4.19:1), so `--s-accent` had to be a darker cut with
+   the brand value demoted to fills and dots.
 
-   So `--s-accent` is the DARKER cut, because it is the one that ends
-   up as button backgrounds and as text. `--s-accent-bright` is the
-   brand value and is for fills, dots and washes where nothing has to
-   be read against it.
+   `#16423C` needs no such apology. It measures 9.95:1 as text on the
+   worst ground here and 11.18:1 white-on-green as a button, so the
+   same token is both, and there is one fewer decision to get wrong.
+   `--s-accent-bright` survives for dots and small fills where the deep
+   green reads as black at 8px.
 
-   Every value below is measured. Worst case on any of the five
-   grounds: ink 14.73, ink-2 6.65, ink-3 4.83, accent 4.69, white on
-   accent 5.62.
+   ## Every value below is measured
+
+   Worst case on any of the four grounds: ink 15.79, ink-2 6.73,
+   ink-3 4.72, accent 9.95, white on accent 11.18.
+
+   `--s-ink-3` is #646c78 and NOT Tailwind's gray-500 (#6b7280), which
+   measures 4.30 and would fail AA on the ten-and-a-half pixel
+   `.s-label` it carries. That is the same mistake the sage palette
+   made, caught the same way — by measuring rather than by eye.
+
+   `--s-good` is a brighter, more saturated green than the brand on
+   purpose. Success and brand being the same hue is tolerable only if
+   they are far apart in lightness, which they are.
 
    Scoped to `.studio-app` rather than overriding the root, so nothing
    on the customer side moves.
    ───────────────────────────────────────────────────────────── */
 .studio-app {
-  --s-ground: #f5f2ed;
-  --s-rail: #fbf9f6;
-  --s-rail-active: #efeae2;
+  --s-ground: #f9f8f6;
+  --s-rail: #ffffff;
+  --s-rail-active: #eef3f1;
   --s-surface: #ffffff;
-  --s-surface-2: #f0ede7;
-  --s-rule: #e7e2da;
-  --s-rule-soft: #f0ece5;
+  --s-surface-2: #f3f4f6;
+  --s-rule: #e5e7eb;
+  --s-rule-soft: #f1f2f4;
 
-  --s-ink: #1c1b19;
-  --s-ink-2: #56524b;
-  /* 4.83:1 on the worst ground. The old #838775 was 3.46 and carried
-     `.s-label` at ten and a half pixels. */
-  --s-ink-3: #6a655c;
+  --s-ink: #111827;
+  --s-ink-2: #4b5563;
+  /* 4.72:1 on the worst ground. Tailwind's gray-500 is 4.30 and
+     carries `.s-label` at ten and a half pixels — see the note. */
+  --s-ink-3: #646c78;
 
-  /* The one accent. Anything terracotta is something you can do. */
-  --s-accent: #a44f2e;
-  /* Brand #C0613C. Fills, dots and washes only — never text, never
-     behind white. See the note above. */
-  --s-accent-bright: #c0613c;
-  --s-accent-deep: #8f4126;
-  --s-accent-wash: #fbf0ea;
+  /* The one accent. Anything green is something you can do. Text and
+     button background, both, because it measures for both. */
+  --s-accent: #16423c;
+  /* For dots, chips and small fills, where the deep green reads as
+     black. Never text. */
+  --s-accent-bright: #1d5c53;
+  --s-accent-deep: #0f2e2a;
+  --s-accent-wash: #edf3f1;
 
-  --s-tag: #f1ebe1;
-  --s-tag-ink: #6b563a;
+  --s-tag: #f1f2f4;
+  --s-tag-ink: #4b5563;
 
-  --s-good: #3a7241;
-  --s-good-wash: #e9f0e8;
+  --s-good: #2e7d32;
+  --s-good-wash: #e8f4e9;
   --s-warn: #7e5910;
   --s-warn-wash: #f7efdf;
   --s-bad: #9e4035;
   --s-bad-wash: #f9e9e6;
 
-  /* Soft elevation, as two stops rather than one blur.
-     A single large shadow reads as a drop shadow from 2014; a 1px
-     contact shadow plus a wide, very light ambient one is what makes a
-     card look like it is resting on the page. */
-  --s-lift: 0 1px 2px rgba(28, 27, 25, 0.04), 0 1px 3px rgba(28, 27, 25, 0.03);
-  --s-lift-2: 0 1px 2px rgba(28, 27, 25, 0.05), 0 4px 12px -4px rgba(28, 27, 25, 0.08);
+  /* ── The customer tokens, remapped for this surface ──────────
+     Onboarding was written against the CUSTOMER palette — around 440
+     references to `--color-ink-2`, `--color-petrol`, `--color-paper`
+     and friends — while the rest of the studio software uses `--s-*`.
+     Same product, two vocabularies, and a studio crossed the seam
+     between them in their first ten minutes: cream and teal while
+     onboarding, then a different surface once they were in.
+
+     Rather than rewrite four hundred class strings — a large, purely
+     mechanical diff with a real chance of a typo landing in a screen
+     nobody reloads for a month — the customer tokens are re-pointed at
+     the studio ones for anything inside `.studio-app`. One place to
+     read, one place to change.
+
+     This is a BRIDGE, not the destination. New studio code uses `--s-*`
+     directly. When onboarding is next touched file by file, the
+     references should move across and this block should shrink.
+     ──────────────────────────────────────────────────────────── */
+  --color-paper: var(--s-surface);
+  --color-paper-2: var(--s-surface-2);
+  --color-paper-3: var(--s-rail-active);
+  --color-ink: var(--s-ink);
+  --color-ink-2: var(--s-ink-2);
+  --color-ink-3: var(--s-ink-3);
+  --color-rule: var(--s-rule);
+  --color-rule-soft: var(--s-rule-soft);
+
+  /* "Petrol" was already a dark blue-green, so the rename is smaller
+     than it looks: it is now the studio green, and it is still the
+     one thing on a screen you can act on. */
+  --color-petrol: var(--s-accent);
+  --color-petrol-deep: var(--s-accent-deep);
+  --color-petrol-soft: var(--s-accent-wash);
+
+  --color-ontrack: var(--s-good);
+  --color-ontrack-soft: var(--s-good-wash);
+  --color-brass: var(--s-warn);
+  --color-brass-soft: var(--s-warn-wash);
+  --color-atrisk: var(--s-bad);
+  --color-atrisk-soft: var(--s-bad-wash);
+
+  --s-lift: 0 1px 2px rgba(17, 24, 39, 0.04), 0 1px 3px rgba(17, 24, 39, 0.03);
+  --s-lift-2: 0 1px 2px rgba(17, 24, 39, 0.05), 0 4px 12px -4px rgba(17, 24, 39, 0.08);
 
   background: var(--s-ground);
   color: var(--s-ink);
