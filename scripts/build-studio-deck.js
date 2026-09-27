@@ -540,7 +540,7 @@ function demoSlide(n, heading, bullets, notes) {
   );
 
   const steps = [
-    ['OneQuiz', 'Nine questions, about three minutes. They learn the vocabulary as they answer — we never ask a first-time buyer a question they cannot answer.'],
+    ['OneBrief', 'Nine questions, about three minutes. They learn the vocabulary as they answer, and choose their finish level with real ranges for their own carpet area attached to it.'],
     ['OneMatch', 'Studios ranked by fit, each with the sentence explaining why. Nobody can pay to sit higher.'],
     ['OneQuote', 'A full quotation generated from your own filed rate card in about three seconds. Nobody phones you. You are not asked for anything.'],
     ['OneCompare', 'Your quote beside two others — and the materials behind them. Carcass, shutter, hardware.'],
@@ -620,7 +620,7 @@ demoSlide(
   'Walk the homeowner’s journey, as a homeowner. Do not explain the screens — let them watch.',
   [
     'The brief — answer three or four questions out loud, then skip to the end',
-    'The tier screen — show that the budget band is chosen with real numbers on screen',
+    'The budget question — the one screen to slow down on, because the bands carry real ₹ ranges for their own carpet area',
     'The matches — read one match reason aloud, and point at "nobody can pay to sit higher"',
     'The quote — open it. This is the moment. A full quotation, their rates, no phone call',
     'The comparison — show the materials row, not just the totals',
