@@ -23,8 +23,16 @@ jobs:
           node-version: 22
           cache: npm
 
+      # `postinstall` runs `prisma generate`, which loads prisma.config.ts →
+      # prisma/load-env.ts, and that exits when DATABASE_URL is unset. Generate
+      # never connects, so a placeholder is enough — and it is set on this step
+      # only, so the build below still runs in fixtures mode. Without it every
+      # run since 7 Sep died here, before a single check ran.
       - name: Install
         run: npm ci
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
 
       - name: Typecheck
         run: npm run typecheck

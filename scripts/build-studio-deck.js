@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- plain Node script, run directly, outside the Next module graph */
+
 /**
  * The studio onboarding deck.
  *
@@ -17,7 +19,9 @@ const pptx = require('pptxgenjs');
 const fs = require('fs');
 const path = require('path');
 
-const REPO = '/sessions/wonderful-laughing-albattani/mnt/OneInteriors';
+// Relative to this file. It was an absolute path into the sandbox the script
+// was first written in, so it could not run on anybody's machine.
+const REPO = path.join(__dirname, '..');
 const OUT = path.join(REPO, 'docs', 'One-Interiors-Studio-Deck.pptx');
 
 /* ---- palette: "Tactile Assurance", locked in CLAUDE.md ---------------- */
