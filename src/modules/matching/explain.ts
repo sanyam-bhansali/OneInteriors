@@ -85,9 +85,12 @@ function factsAsPrompt(brief: Brief, studio: Studio, match: MatchResult): string
     `Customer brief: ${brief.propertyType ?? 'unknown property type'}, ${
       brief.carpetAreaSqft ? `${brief.carpetAreaSqft} sq ft carpet` : 'area not given'
     }, locality ${brief.locality ?? 'not given'}, scope ${brief.scope ?? 'not given'}.`,
+    // The top band has a floor and no ceiling; "not given" would be false.
     brief.budgetMaxPaise
       ? `Budget up to about ₹${paiseToLakhs(brief.budgetMaxPaise).toFixed(1)} lakh.`
-      : 'Budget not given.',
+      : brief.budgetMinPaise
+        ? `Budget from about ₹${paiseToLakhs(brief.budgetMinPaise).toFixed(1)} lakh, with no upper limit (the Luxury band).`
+        : 'Budget not given.',
     brief.styleLikes.length > 0
       ? `Leaning towards: ${brief.styleLikes.join(', ')}.`
       : 'No style leaning given.',

@@ -17,7 +17,12 @@ import { STYLE_LABELS, zoneOf } from '@/modules/brief/types';
 import type { Studio } from '@/modules/studio/types';
 import { MIN_PROJECTS_FOR_RELIABILITY } from '@/modules/studio/types';
 
-export const ENGINE_VERSION = 'match@1.0.0';
+/**
+ * 1.0.1 (29 Sep 2026): budget fit scores an open-ended budget — the Luxury
+ * band has a floor and no ceiling — instead of returning null for it. Every
+ * brief that has both ends scores exactly as it did under 1.0.0.
+ */
+export const ENGINE_VERSION = 'match@1.0.1';
 
 export const WEIGHTS = {
   styleOverlap: 25,
@@ -189,7 +194,7 @@ function scoreStyleOverlap(brief: Brief, studio: Studio): number | null {
 }
 
 function scoreBudgetFit(brief: Brief, studio: Studio): number | null {
-  if (brief.budgetMinPaise === null || brief.budgetMaxPaise === null) return null;
+  if (brief.budgetMinPaise === null) return null;
 
   // Prefer the studio's ACTUAL delivered values over their claimed range.
   // Claimed ranges are aspirational; delivered values are not.
@@ -209,6 +214,21 @@ function scoreBudgetFit(brief: Brief, studio: Studio): number | null {
     hi = studio.maxProjectPaise;
   } else {
     return null;
+  }
+
+  /**
+   * The top band is a floor, not a range.
+   *
+   * Luxury has no ceiling (₹2,500/sq ft and up), so choosing it sets a
+   * minimum and no maximum. Scoring that as "unmeasured" would drop the
+   * budget factor for every Luxury customer — the one group for whom a studio
+   * that only does ₹8 lakh flats is most plainly wrong. So the question
+   * becomes: how much of what this studio delivers sits at or above the floor?
+   */
+  if (brief.budgetMaxPaise === null) {
+    if (hi <= lo) return hi >= brief.budgetMinPaise ? 100 : 0;
+    const above = Math.max(0, hi - Math.max(lo, brief.budgetMinPaise));
+    return clamp((above / (hi - lo)) * 100);
   }
 
   const overlap = rangeOverlap(brief.budgetMinPaise, brief.budgetMaxPaise, lo, hi);

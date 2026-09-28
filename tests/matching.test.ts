@@ -182,3 +182,41 @@ describe('ranking', () => {
     expect(results[0].engineVersion).toMatch(/^match@\d+\.\d+\.\d+$/);
   });
 });
+
+/**
+ * The Luxury band has a floor and no ceiling (₹2,500/sq ft and up), so a
+ * Luxury brief carries `budgetMinPaise` and `budgetMaxPaise: null`. Under
+ * 1.0.0 that returned null for budget fit — the factor quietly dropped out for
+ * exactly the customers for whom an ₹8 lakh studio is most plainly wrong.
+ */
+describe('an open-ended budget (the top band)', () => {
+  const floorOnly: Brief = { ...baseBrief, budgetMinPaise: lakhsToPaise(30), budgetMaxPaise: null };
+
+  const withWork = (values: number[]): Studio => ({
+    ...proven,
+    portfolio: values.map((v, i) => ({
+      ...proven.portfolio[0]!,
+      id: `v${i}`,
+      valuePaise: lakhsToPaise(v),
+    })),
+  });
+
+  it('is still measured', () => {
+    const result = scoreMatch(floorOnly, withWork([28, 35, 40, 45]));
+    expect(result?.breakdown.budgetFit).not.toBeNull();
+  });
+
+  it('scores work entirely above the floor as a full fit', () => {
+    expect(scoreMatch(floorOnly, withWork([32, 36, 40, 44]))?.breakdown.budgetFit).toBe(100);
+  });
+
+  it('scores work entirely below the floor as no fit', () => {
+    expect(scoreMatch(floorOnly, withWork([8, 10, 12, 14]))?.breakdown.budgetFit).toBe(0);
+  });
+
+  it('leaves a brief with both ends scoring exactly as before', () => {
+    const both = scoreMatch(baseBrief, proven);
+    expect(both?.breakdown.budgetFit).not.toBeNull();
+    expect(both?.engineVersion).toBe('match@1.0.1');
+  });
+});
