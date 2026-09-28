@@ -28,6 +28,7 @@ import {
   STYLE_TAGS,
   type Brief,
   type Involvement,
+  type PriorityFactor,
   type PropertyType,
   type ScopeType,
   type StyleTag,
@@ -36,6 +37,7 @@ import {
 const PROPERTY_TYPES: PropertyType[] = ['BHK_1', 'BHK_2', 'BHK_3', 'BHK_4_PLUS', 'VILLA'];
 const SCOPES: ScopeType[] = ['FULL_HOME', 'KITCHEN_WARDROBE', 'SINGLE_ROOM', 'RENOVATION'];
 const INVOLVEMENTS: Involvement[] = ['DECIDE_FOR_ME', 'COLLABORATE', 'APPROVE_EVERYTHING'];
+const PRIORITIES = new Set<string>(['BUDGET', 'SPEED', 'DESIGN_AMBITION', 'MATERIAL_QUALITY']);
 
 type Locality = (typeof PUNE_LOCALITIES)[number]['slug'];
 const LOCALITY_SLUGS = new Set<string>(PUNE_LOCALITIES.map((l) => l.slug));
@@ -66,11 +68,31 @@ function tags(value: unknown): StyleTag[] {
 }
 
 /**
+ * The ranking, in order, with anything unrecognised or repeated dropped.
+ *
+ * Order is the whole meaning of this field — index 0 is what matters most — so
+ * it is filtered in place rather than rebuilt from the allowed list.
+ */
+function priorities(value: unknown): PriorityFactor[] {
+  if (!Array.isArray(value)) return [];
+  return [
+    ...new Set(value.filter((p): p is PriorityFactor => typeof p === 'string' && PRIORITIES.has(p))),
+  ];
+}
+
+/**
  * A brief containing only what we recognise.
  *
  * Returns a real `Brief`, so callers keep their types — the fields that
  * matter to the prompt are the ones rebuilt here, and everything else falls
  * back to `EMPTY_BRIEF`.
+ *
+ * **Every field the matching engine reads must survive this.** The server
+ * re-scores the brief it rebuilds here, and the card beside it was scored in
+ * the browser on the brief as the customer wrote it. `priorityRanking` used to
+ * be dropped, so the server scored a different brief: the card said 55% and
+ * the sentence under it said 53%, on the same studio, on the same screen.
+ * `tests/match-summary.test.ts` now scores both and requires them to agree.
  */
 export function sanitiseBrief(input: unknown): Brief {
   const raw = (input ?? {}) as Partial<Brief>;
@@ -99,5 +121,6 @@ export function sanitiseBrief(input: unknown): Brief {
     budgetMaxPaise: money(raw.budgetMaxPaise),
     styleLikes: tags(raw.styleLikes),
     styleDislikes: tags(raw.styleDislikes),
+    priorityRanking: priorities(raw.priorityRanking),
   };
 }

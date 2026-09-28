@@ -149,6 +149,23 @@ export function itemsFor(bhk: number): CatalogueItem[] {
 }
 
 /**
+ * Where the kitchen run really came from.
+ *
+ * A source only counts if it came with a number. The quote gate once offered
+ * a floor-plan upload that nothing read: it recorded `source: 'floor_plan'`
+ * with `kitchenRunMm: null`, and the quote then priced the standard run while
+ * printing the ±10% band and "read from your floor plan". A plan that was not
+ * read is not a measurement — and journeys restored from a customer's browser
+ * can still carry that old shape, so the rule lives here, not in the gate.
+ */
+export function runSourceOf(plan: {
+  kitchenRunMm: number | null;
+  source: QuoteInput['runSource'];
+}): QuoteInput['runSource'] {
+  return plan.kitchenRunMm === null ? 'standard' : plan.source;
+}
+
+/**
  * How wide the doubt is.
  *
  * A first quote is the standard scope priced properly, before anybody has
@@ -157,15 +174,16 @@ export function itemsFor(bhk: number): CatalogueItem[] {
  * it is worth four points — and no amount of paperwork gets below the floor,
  * because the remaining doubt is design decisions nobody has made yet.
  */
-function variance(input: QuoteInput): number {
-  if (input.runSource === 'floor_plan') return 0.1;
-  if (input.runSource === 'customer') return 0.12;
+function variance(source: QuoteInput['runSource']): number {
+  if (source === 'floor_plan') return 0.1;
+  if (source === 'customer') return 0.12;
   return 0.16;
 }
 
 export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuote {
+  const source = runSourceOf({ kitchenRunMm: input.kitchenRunMm, source: input.runSource });
   const runMm = input.kitchenRunMm ?? standardKitchenRunMm(input.bhk);
-  const measured = input.runSource !== 'standard';
+  const measured = source !== 'standard';
 
   const lines: QuoteLine[] = [];
   const notPriced: string[] = [];
@@ -246,7 +264,7 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
   const gstPaise = Math.round((beforeTax * GST_BPS) / 10_000);
   const totalPaise = beforeTax + gstPaise;
 
-  const variancePct = variance(input);
+  const variancePct = variance(source);
 
   const rooms = ROOMS.map((room) => {
     const roomLines = lines.filter((l) => l.room === room);
@@ -260,11 +278,11 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
 
   const assumptions: string[] = [];
 
-  if (input.runSource === 'floor_plan') {
+  if (source === 'floor_plan') {
     assumptions.push(
       `Kitchen priced on a ${Math.round(runMm)}mm platform run read from your floor plan.`,
     );
-  } else if (input.runSource === 'customer') {
+  } else if (source === 'customer') {
     assumptions.push(`Kitchen priced on the ${Math.round(runMm)}mm platform run you gave us.`);
   } else {
     assumptions.push(

@@ -439,6 +439,14 @@ function buildReasoning(brief: Brief, studio: Studio, breakdown: FactorScores): 
  *
  * Capped at three clauses. A fourth is read as boilerplate, and the honest
  * detail lives in `reasoning` directly below it on the page.
+ *
+ * ## No number in the sentence
+ *
+ * It used to open with "82% match — because…". The card already prints the
+ * score in large type directly above, so the sentence carried a second copy
+ * of it — and the moment the two were computed from different inputs, the
+ * customer saw two different percentages for one studio. The number lives in
+ * one place on the card; the sentence says why.
  */
 export function matchSummary(
   brief: Brief,
@@ -494,7 +502,7 @@ export function matchSummary(
 
   if (clauses.length === 0) return null;
 
-  return `${result.score}% match — because ${clauses.slice(0, 3).join('; ')}.`;
+  return `Because ${clauses.slice(0, 3).join('; ')}.`;
 }
 
 // ── Helpers ────────────────────────────────────────────────────

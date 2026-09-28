@@ -35,7 +35,6 @@ import {
   MIN_TO_COMPARE,
   type Project,
 } from '@/modules/quotation/project-store';
-import { CHECK_COUNT } from '@/components/landing/checks';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
 import { QuoteFlow, type QuoteRequest } from '@/components/oi/QuoteFlow';
 import type { StudioRates } from '@/modules/quotation/catalogue';
@@ -106,6 +105,14 @@ export function MatchClient({
      quote view below returns early, and a hook after a conditional return
      is the classic order-of-hooks crash. */
   const { register, focus, open } = useScrollFocus<HTMLLIElement>(matches.length);
+
+  /* The quote replaces the whole page, but the scroll offset survived the
+     swap: pressing "Get a quote" on the third card opened the gate already
+     scrolled past its heading, on the one screen whose first line explains
+     what it is asking for. Both ways — opening a quote and coming back. */
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [quoting]);
 
   const update = (next: Project) => {
     setProject(next);
@@ -219,7 +226,7 @@ export function MatchClient({
 
       <Wrap className="py-12">
         {briefed && matches.length > 0 ? (
-          <MatchHero fit={matches.length} checkCount={CHECK_COUNT} />
+          <MatchHero fit={matches.length} />
         ) : (
           <Chapter
             eyebrow="Who fits"

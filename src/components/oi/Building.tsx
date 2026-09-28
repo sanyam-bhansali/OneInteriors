@@ -56,17 +56,52 @@ export interface Stage {
 }
 
 /**
- * Ten and a half seconds, weighted towards the two stages that sound like the
- * hard parts — reading the plan and pricing off the rate card — because those
- * are the two a customer would expect to take the longest.
+ * The stages, describing what this build is actually doing.
+ *
+ * ## Why these are computed, not constant
+ *
+ * They used to be one fixed list: "Reading your floor plan", "Measuring the
+ * kitchen platform run", "Applying the studio's own filed rates". On most
+ * builds none of the three was true — no plan had been given, the kitchen was
+ * the standard one, and the rates were placeholder archive medians. The
+ * animation was narrating work the product was not doing, on the screen that
+ * sets up the one document whose promise is that it says what it assumed.
+ *
+ * Still about ten and a half seconds, weighted towards pricing, which is the
+ * stage a customer expects to take longest.
  */
-export const DEFAULT_STAGES: Stage[] = [
-  { label: 'Reading your floor plan', ms: 2600 },
-  { label: 'Measuring the kitchen platform run', ms: 1700 },
-  { label: 'Sizing each room against the standard template', ms: 1800 },
-  { label: 'Applying the studio’s own filed rates', ms: 2600 },
-  { label: 'Writing the quotation, line by line', ms: 1800 },
-];
+export function stagesFor({
+  bhk,
+  measured,
+  ratesAreReal,
+}: {
+  bhk: number;
+  /** A kitchen run the customer gave us, rather than the standard one. */
+  measured: boolean;
+  /** Whether the rates are the studio's own filed card, or placeholders. */
+  ratesAreReal: boolean;
+}): Stage[] {
+  return [
+    {
+      label: measured
+        ? 'Taking the kitchen platform run you measured'
+        : `Sizing a standard ${bhk} BHK kitchen`,
+      ms: 2400,
+    },
+    { label: 'Sizing each room against the standard template', ms: 2200 },
+    { label: 'Giving every line a quantity', ms: 1600 },
+    {
+      label: ratesAreReal
+        ? 'Applying the studio’s own filed rates'
+        : 'Pricing on archive rates — this studio has not filed its own yet',
+      ms: 2600,
+    },
+    { label: 'Writing the quotation, line by line', ms: 1700 },
+  ];
+}
+
+/** The safe default: nothing measured, nothing real. */
+export const DEFAULT_STAGES: Stage[] = stagesFor({ bhk: 2, measured: false, ratesAreReal: false });
 
 /**
  * The jokes, reduced to one quiet line under the progress.

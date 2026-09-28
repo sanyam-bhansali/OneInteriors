@@ -3,6 +3,7 @@ import {
   buildFirstQuote,
   compareQuotes,
   itemsFor,
+  runSourceOf,
   STANDARD_KITCHEN_RUN_MM,
   standardKitchenRunMm,
   type QuoteInput,
@@ -289,5 +290,38 @@ describe('standardKitchenRunMm', () => {
       expect(standardKitchenRunMm(bhk)).toBeGreaterThanOrEqual(3410 - 200);
       expect(standardKitchenRunMm(bhk)).toBeLessThanOrEqual(5240);
     }
+  });
+});
+
+/**
+ * A plan that was never read is not a measurement.
+ *
+ * The quote gate offered a floor-plan upload that nothing read. It recorded
+ * `source: 'floor_plan'` with no kitchen run, and the quote then priced the
+ * standard run while claiming ±10% and "read from your floor plan". Journeys
+ * restored from a customer's browser can still carry that shape.
+ */
+describe('an unread floor plan', () => {
+  const unread: QuoteInput = { ...BASE, kitchenRunMm: null, runSource: 'floor_plan' };
+
+  it('is priced exactly like the standard kitchen', () => {
+    const standard = buildFirstQuote({ ...unread, runSource: 'standard' }, ratesFor(100_00));
+    const q = buildFirstQuote(unread, ratesFor(100_00));
+
+    expect(q.totalPaise).toBe(standard.totalPaise);
+    expect(q.variancePct).toBe(0.16);
+  });
+
+  it('never claims the plan was read', () => {
+    const q = buildFirstQuote(unread, ratesFor(100_00));
+    expect(q.assumptions.join(' ')).not.toMatch(/floor plan\./);
+    expect(q.assumptions[0]).toMatch(/^No floor plan yet/);
+    expect(q.lines.filter((l) => l.room === 'KITCHEN').every((l) => l.standard)).toBe(true);
+  });
+
+  it('keeps a real reading as a reading', () => {
+    expect(runSourceOf({ kitchenRunMm: 3410, source: 'floor_plan' })).toBe('floor_plan');
+    expect(runSourceOf({ kitchenRunMm: null, source: 'floor_plan' })).toBe('standard');
+    expect(runSourceOf({ kitchenRunMm: null, source: 'customer' })).toBe('standard');
   });
 });

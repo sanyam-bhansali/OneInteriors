@@ -22,11 +22,9 @@ import { CountUp } from '@/components/oi/CountUp';
 
 export function MatchHero({
   fit,
-  checkCount,
 }: {
   /** How many studios cleared the brief. This is the "top N". */
   fit: number;
-  checkCount: number;
 }) {
   const reduced = useReducedMotion();
 
@@ -57,13 +55,21 @@ export function MatchHero({
         Best fits for your brief.
       </motion.h1>
 
-      {/* Directly below the number, as the footnote to it. */}
+      {/* Directly below the number, as the footnote to it.
+
+          It must name only what the engine reads. It used to say "household"
+          and "how many of the checks they have cleared" — neither is scored:
+          the household is passed to the studio, and verification is a filter
+          (only verified studios appear), not a factor. Nor is it "all fifteen":
+          a LISTED studio has cleared five. Each card lists its own checks, so
+          the footnote points there rather than quoting a number that is true
+          of some cards and not others. */}
       <motion.p
         {...rise(reduced, 0.22)}
         className="q-body mx-auto m-0 mt-6 max-w-[46ch] text-[var(--ink2)]"
       >
-        Scored on your answers — locality, scope, budget band, style, household — and on how many
-        of the {checkCount} checks they have cleared.
+        Ranked on your answers — your area, budget band, scope and the styles you chose. Every
+        studio here has cleared our checks; each card shows which.
       </motion.p>
     </header>
   );

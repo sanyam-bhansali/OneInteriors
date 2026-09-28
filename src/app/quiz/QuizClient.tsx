@@ -23,6 +23,7 @@ import { Mark } from '@/components/brand';
 import { Wrap, Sheet, DocRow } from '@/components/oi';
 import { formatINRCompact } from '@/lib/money';
 import { TIER, TIERS, tierRangeFor } from '@/modules/quotation/tiers';
+import { ratesAreReal } from '@/data/filed-rates';
 import {
   EMPTY_BRIEF,
   INVOLVEMENT_LABELS,
@@ -730,7 +731,13 @@ function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPart
         <p className="m-0 mt-1 text-[13px] leading-[1.55] text-[var(--ink2)]">
           {areaAssumed
             ? `Excluding GST, for a typical ${TYPICAL_SQFT} sqft home — tell us your carpet area on the first question and these tighten.`
-            : `Excluding GST, for your ${area} sqft. Your real quotes come from each studio's own rates.`}
+            : // Derived, not written as a constant (FINDINGS 1.1): until studios'
+              // own filed rates are live, "their own rates" would be false.
+              `Excluding GST, for your ${area} sqft. ${
+                ratesAreReal()
+                  ? "Your real quotes come from each studio's own rates."
+                  : 'Your quotes follow, line by line.'
+              }`}
         </p>
       </div>
     ),
@@ -751,7 +758,7 @@ function householdStep(brief: Brief, update: (p: Partial<Brief>) => void): StepP
     ask: (
       <Ask
         title="Who's going to live there?"
-        hint="This drives the practical side of the match — storage, durability, how the space actually gets used."
+        hint="Your studio sees this before your first meeting, so the design starts from how you actually live."
       />
     ),
     options: (
@@ -814,7 +821,7 @@ function priorityStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPa
          Both lines now ask the same question, in the same direction. */
       <Ask
         title="What matters most to you here?"
-        hint="Tap them in order, starting with the most important. This single answer does more matching work than any other."
+        hint="Tap them in order, starting with the most important. Your first choice gets extra weight when we rank studios."
       />
     ),
     options: (

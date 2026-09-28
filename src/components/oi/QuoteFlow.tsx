@@ -23,14 +23,19 @@
 
 import { useCallback, useState } from 'react';
 import { formatINRCompact } from '@/lib/money';
-import { buildFirstQuote, standardKitchenRunMm, type FirstQuote } from '@/modules/quotation/first-quote';
+import {
+  buildFirstQuote,
+  runSourceOf,
+  standardKitchenRunMm,
+  type FirstQuote,
+} from '@/modules/quotation/first-quote';
 import { filedRatesFor, ratesAreReal } from '@/data/filed-rates';
 import type { StudioRates } from '@/modules/quotation/catalogue';
 import type { Material } from '@/modules/materials/glossary';
 import type { FloorPlan } from '@/modules/quotation/project-store';
-import { Building } from './Building';
+import { Building, stagesFor } from './Building';
 import { Spec, MaterialPanel } from './Material';
-import { Sheet, DocRow, Tick, Flag } from './index';
+import { Sheet, DocRow, Flag } from './index';
 
 type Phase = 'gate' | 'building' | 'done';
 
@@ -50,20 +55,19 @@ const input =
 /**
  * The gate.
  *
- * ## Why the way through is on the first screen now
+ * ## Why there is no floor-plan upload here, for now
  *
- * It used to read "Send us the floor plan", with the standard-kitchen path
- * two presses further on, behind "I haven't got the plan to hand". That is
- * the right emphasis and the wrong gate: most people arriving here do not
- * have a PDF of their flat on the device they are browsing on, and a screen
- * that asks for one before showing anything is a screen a good share of them
- * leave at.
+ * There was one: "Send us the floor plan", a file input, and a "Build my
+ * quote" button that promised ±10%. Nothing read the file. Its name was
+ * recorded, the kitchen was priced on the standard run anyway, and the
+ * document then said "Kitchen priced on a platform run read from your floor
+ * plan" — a measurement nobody took, printed on the one page whose whole
+ * claim is that it says what it assumed.
  *
- * So all three ways are visible at once, in the order of how much they
- * improve the answer, and each says what it costs: a plan gives ±10%, a
- * measured run ±12%, the standard kitchen ±16%. Nobody has to guess which
- * button is the one that lets them through, and nobody is misled about what
- * the quick one is worth.
+ * Reading a plan properly — Claude reads it, the customer confirms what was
+ * read — is Phase 2 of `docs/CUSTOMER-JOURNEY-PLAN.md`, and it moves into the
+ * brief so it sizes every studio's quote at once. Until then the gate offers
+ * only what is true: a kitchen they measured (±12%) or a standard one (±16%).
  *
  * The standard run is sized to their configuration — see
  * `standardKitchenRunMm`. A 1 BHK and a 4 BHK do not have the same kitchen,
@@ -71,9 +75,7 @@ const input =
  * whole build.
  */
 function Gate({ onReady, bhk }: { onReady: (plan: FloorPlan) => void; bhk: number }) {
-  const [fileName, setFileName] = useState<string | null>(null);
   const [runMm, setRunMm] = useState('');
-  const [noPlan, setNoPlan] = useState(false);
 
   const typed = Number(runMm);
   const runIsSane = Number.isFinite(typed) && typed >= 1500 && typed <= 9000;
@@ -83,125 +85,62 @@ function Gate({ onReady, bhk }: { onReady: (plan: FloorPlan) => void; bhk: numbe
     <Sheet className="mx-auto max-w-[36rem] p-[clamp(22px,3vw,32px)]">
       <p className="oi-eyebrow m-0 mb-4">Before we price it</p>
       <h2 className="oi-display m-0 mb-3 text-[clamp(1.5rem,1.2rem+1.2vw,2rem)]">
-        Send us the floor plan.
+        One number decides most of the quote.
       </h2>
       <p className="m-0 mb-6 text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-        One number on it decides most of the quote — the length of your kitchen platform. With the
-        plan we price your kitchen; without it we price a typical one and say so.
+        The length of your kitchen platform. Measure it and we price your kitchen; skip it and we
+        price a typical one for a {bhk} BHK, and say so on the quote.
       </p>
 
-      {!noPlan ? (
-        <>
-          <label className="mb-5 block">
-            <span className="oi-label mb-2 block">Floor plan · PDF or photo</span>
-            <input
-              type="file"
-              accept=".pdf,image/*"
-              onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
-              className={input}
-            />
-          </label>
+      {/* One press, first. Most people are not standing in their kitchen with
+          a tape measure, and the alternative to this button is not a better
+          quote — it is no quote and a closed tab. */}
+      <button
+        type="button"
+        onClick={() => onReady({ fileName: null, kitchenRunMm: standardRun, source: 'standard' })}
+        className="cursor-pointer px-6 py-3 text-[14.5px] font-medium text-white transition-colors"
+        style={{ background: 'var(--acc-btn)' }}
+      >
+        Price it now on a standard {bhk} BHK kitchen
+      </button>
+      <p className="m-0 mt-2.5 text-[12.5px] leading-snug text-[var(--ink2)]">
+        A {standardRun.toLocaleString('en-IN')}mm platform, which is what a {bhk} BHK usually has.
+        Every other size in the quote is standard anyway. The range is ±16%, and the document says
+        so.
+      </p>
 
-          {fileName ? (
-            <p className="m-0 mb-5 flex items-center gap-2.5 text-[13.5px]">
-              <Tick style={{ color: 'var(--sec)' }} />
-              <span>{fileName}</span>
-            </p>
-          ) : null}
+      <div className="mt-7 border-t border-[var(--line)] pt-5">
+        <label className="mb-2 block">
+          <span className="oi-label mb-2 block">Or tell us your kitchen platform, in mm</span>
+          <input
+            inputMode="numeric"
+            value={runMm}
+            onChange={(e) => setRunMm(e.target.value.replace(/\D/g, ''))}
+            placeholder="e.g. 3600"
+            className={`${input} oi-num`}
+          />
+        </label>
+        <p className="m-0 mb-4 text-[13px] leading-snug text-[var(--ink2)]">
+          Measure the run your counter sits on. Most Pune flats are between 3,000 and 5,500mm. A
+          rough number is worth more than none, and it narrows the range to ±12%.
+        </p>
 
-          <div className="flex flex-wrap items-center gap-4">
-            <button
-              type="button"
-              disabled={!fileName}
-              onClick={() =>
-                onReady({ fileName, kitchenRunMm: null, source: 'floor_plan' })
-              }
-              className="cursor-pointer px-6 py-3 text-[14.5px] font-medium text-white transition-colors disabled:opacity-40"
-              style={{ background: 'var(--acc-btn)' }}
-            >
-              Build my quote
-            </button>
-            {/* The way through. Quiet, but never hidden — a gate with no
-                visible exit is a gate people leave the site at. */}
-            <button
-              type="button"
-              onClick={() => setNoPlan(true)}
-              className="cursor-pointer border-0 bg-transparent p-0 text-[13.5px] text-[var(--ink2)] underline hover:text-[var(--ink)]"
-            >
-              I know my kitchen measurement
-            </button>
-          </div>
-
-          {/* One press, from the first screen. Most people do not have a
-              floor plan on the phone they are reading this on, and the
-              alternative to this button is not a better quote — it is no
-              quote and a closed tab. */}
-          <div className="mt-6 border-t border-[var(--line)] pt-5">
-            <button
-              type="button"
-              onClick={() =>
-                onReady({ fileName: null, kitchenRunMm: standardRun, source: 'standard' })
-              }
-              className="cursor-pointer border border-[var(--line)] bg-transparent px-5 py-2.5 text-[14px] font-medium text-[var(--ink)] transition-colors hover:border-[var(--ink)]"
-            >
-              Price it now on a standard {bhk} BHK kitchen
-            </button>
-            <p className="m-0 mt-2.5 text-[12.5px] leading-snug text-[var(--ink2)]">
-              A {standardRun.toLocaleString('en-IN')}mm platform, which is what a {bhk} BHK usually
-              has. Every other size in the quote is standard anyway — this is the one the plan
-              would change. It widens the band from ±10% to ±16%, and the document says so.
-            </p>
-          </div>
-        </>
-      ) : (
-        <>
-          <label className="mb-2 block">
-            <span className="oi-label mb-2 block">
-              How long is your kitchen platform, in mm?
-            </span>
-            <input
-              inputMode="numeric"
-              value={runMm}
-              onChange={(e) => setRunMm(e.target.value.replace(/\D/g, ''))}
-              placeholder="e.g. 3600"
-              className={`${input} oi-num`}
-            />
-          </label>
-          <p className="m-0 mb-6 text-[13px] leading-snug text-[var(--ink2)]">
-            Measure the run your counter sits on. Most Pune flats are between 3,000 and 5,500mm. A
-            rough number is worth more than none.
+        {/* Says what is missing rather than sitting greyed out — a disabled
+            button is a puzzle that says no without saying why. */}
+        {runIsSane ? (
+          <button
+            type="button"
+            onClick={() => onReady({ fileName: null, kitchenRunMm: typed, source: 'customer' })}
+            className="cursor-pointer border border-[var(--ink)] bg-transparent px-5 py-2.5 text-[14px] font-medium text-[var(--ink)]"
+          >
+            Build it on {typed.toLocaleString('en-IN')}mm
+          </button>
+        ) : runMm ? (
+          <p className="m-0 text-[13px] text-[var(--ink2)]">
+            That is outside 1,500–9,000mm — check the number, or use the standard kitchen above.
           </p>
-
-          <div className="flex flex-wrap items-center gap-4">
-            <button
-              type="button"
-              disabled={!runIsSane}
-              onClick={() => onReady({ fileName: null, kitchenRunMm: typed, source: 'customer' })}
-              className="cursor-pointer px-6 py-3 text-[14.5px] font-medium text-white transition-colors disabled:opacity-40"
-              style={{ background: 'var(--acc-btn)' }}
-            >
-              Build my quote
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                onReady({
-                  fileName: null,
-                  kitchenRunMm: standardRun,
-                  source: 'standard',
-                })
-              }
-              className="cursor-pointer border-0 bg-transparent p-0 text-[13.5px] text-[var(--ink2)] underline hover:text-[var(--ink)]"
-            >
-              Use a standard {bhk} BHK kitchen instead
-            </button>
-          </div>
-
-          <p className="m-0 mt-5 border-t border-[var(--line)] pt-4">
-            <Flag>A standard kitchen widens the quote from ±10% to ±16%</Flag>
-          </p>
-        </>
-      )}
+        ) : null}
+      </div>
     </Sheet>
   );
 }
@@ -309,11 +248,9 @@ export function QuoteDocument({
             </li>
           ))}
           <li className="text-[13px] leading-[1.55] text-[var(--ink2)]">
-            {plan.source === 'floor_plan'
-              ? `Read from ${plan.fileName ?? 'your floor plan'}.`
-              : plan.source === 'customer'
-                ? 'Kitchen run as you measured it.'
-                : 'No plan and no measurement — a standard kitchen was used.'}
+            {runSourceOf(plan) === 'customer'
+              ? 'Kitchen run as you measured it.'
+              : 'No measurement — a standard kitchen was used.'}
           </li>
         </ul>
       </div>
@@ -371,7 +308,7 @@ export function QuoteFlow({
         carpetAreaSqft: request.carpetAreaSqft,
         bathrooms: request.bathrooms,
         kitchenRunMm: usedPlan.kitchenRunMm,
-        runSource: usedPlan.source,
+        runSource: runSourceOf(usedPlan),
       },
       /* The studio's own filed rates when the server resolved them, and the
          placeholder table otherwise. The fallback is not defensive tidiness:
@@ -390,6 +327,11 @@ export function QuoteFlow({
     return (
       <Building
         studioName={request.studioName}
+        stages={stagesFor({
+          bhk: request.bhk,
+          measured: usedPlan !== null && runSourceOf(usedPlan) === 'customer',
+          ratesAreReal: ratesAreReal(),
+        })}
         onDone={finish}
         seenQuestions={seenQuestions}
         onAsked={onAsked}
