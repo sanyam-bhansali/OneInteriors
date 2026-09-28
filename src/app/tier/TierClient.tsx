@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Container, Button } from '@/components/ui';
 import { Wordmark } from '@/components/brand';
 import { formatINRCompact } from '@/lib/money';
-import { TIER, tiersForBudget, type Tier } from '@/modules/quotation/tiers';
+import { TIER, tierRangeFor, tiersForBudget, type Tier } from '@/modules/quotation/tiers';
 import { loadBrief, saveBrief } from '@/modules/brief/store';
 import { saveBriefAction, trackAction } from '../quiz/actions';
 import type { Brief } from '@/modules/brief/types';
@@ -112,8 +112,7 @@ export function TierClient({ initial }: { initial: Brief }) {
           <div className="mb-10 grid grid-cols-1 gap-5 md:grid-cols-3">
             {offered.map(({ tier, fit }) => {
               const definition = TIER[tier];
-              const low = Math.round(definition.perSqftFrom * area * 100);
-              const high = Math.round(definition.perSqftTo * area * 100);
+              const { lowPaise: low, highPaise: high } = tierRangeFor(tier, area);
               const active = picked === tier;
 
               return (
@@ -149,9 +148,14 @@ export function TierClient({ initial }: { initial: Brief }) {
                   </div>
 
                   <p className="m-0 font-[family-name:var(--font-display)] text-[23px] leading-none text-[var(--color-petrol)]">
+                    {high === null ? 'From ' : null}
                     {formatINRCompact(low)}
-                    <span className="text-[var(--color-ink-3)]"> – </span>
-                    {formatINRCompact(high)}
+                    {high === null ? null : (
+                      <>
+                        <span className="text-[var(--color-ink-3)]"> – </span>
+                        {formatINRCompact(high)}
+                      </>
+                    )}
                   </p>
 
                   <p className="m-0 text-[14.5px] leading-[1.55] text-[var(--color-ink-2)]">

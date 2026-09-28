@@ -713,7 +713,9 @@ function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPart
                   {definition.label}
                 </span>
                 <span className="oi-num oi-display text-[19px] leading-none text-[var(--acc-ink)]">
-                  {formatINRCompact(lowPaise)} – {formatINRCompact(highPaise)}
+                  {highPaise === null
+                    ? `From ${formatINRCompact(lowPaise)}`
+                    : `${formatINRCompact(lowPaise)} – ${formatINRCompact(highPaise)}`}
                 </span>
               </div>
               <p className="m-0 text-[14.5px] leading-[1.5] text-[var(--ink2)]">
@@ -897,10 +899,13 @@ function LiveProfile({
     rows.push(['Home', `${PROPERTY_LABELS[brief.propertyType]}${loc ? ` · ${loc}` : ''}`]);
   }
   if (brief.scope) rows.push(['Scope', SCOPE_LABELS[brief.scope]]);
-  if (brief.budgetMinPaise && brief.budgetMaxPaise) {
+  if (brief.budgetMinPaise) {
     rows.push([
       'Budget',
-      `${formatINRCompact(brief.budgetMinPaise)} – ${formatINRCompact(brief.budgetMaxPaise)}`,
+      // The top band has no ceiling, so it is a floor, not a range.
+      brief.budgetMaxPaise
+        ? `${formatINRCompact(brief.budgetMinPaise)} – ${formatINRCompact(brief.budgetMaxPaise)}`
+        : `From ${formatINRCompact(brief.budgetMinPaise)}`,
     ]);
   }
   if (brief.styleLikes.length) {

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { formatINRCompact } from '@/lib/money';
-import { TIER, TIERS, tierRangeFor } from '@/modules/quotation/tiers';
+import { TIER, TIERS, perSqftLabel, tierRangeFor } from '@/modules/quotation/tiers';
 import { Mark } from '@/components/brand';
 import { Wrap, Section, Eyebrow, Heading, Cta, Stat, Tick, PlayIcon } from '@/components/landing/parts';
 import { HowItWorks } from '@/components/landing/HowItWorks';
@@ -63,8 +63,8 @@ const NAV = [
  * They used to be a hard-coded array on this page with its own ranges and its
  * own materials, and it had already drifted: the page advertised
  * "₹5.9–9 L / ₹9–16 L / ₹16–27 L" while `tiers.ts` — the file the quiz and
- * every quote actually price against — put Essential at ₹700–1,100 per sq ft,
- * which for the 1,180 sq ft the page names is ₹8.3–13 L. A visitor who read
+ * every quote actually price against — put Essential at a different per-sq-ft
+ * band altogether. A visitor who read
  * the band here and then took the quiz got a different number for the same
  * flat, and there is no reading of that which is not us being wrong on the
  * page that promises we are not.
@@ -81,8 +81,12 @@ const PACKAGES = TIERS.map((tier) => {
   return {
     tier,
     name: band.label,
-    perSqft: `₹${band.perSqftFrom.toLocaleString('en-IN')}–${band.perSqftTo.toLocaleString('en-IN')}`,
-    range: `${formatINRCompact(lowPaise)}–${formatINRCompact(highPaise)}`,
+    perSqft: perSqftLabel(tier),
+    // Luxury has no ceiling, so its range is a floor: "from ₹29.5 L".
+    range:
+      highPaise === null
+        ? `From ${formatINRCompact(lowPaise)}`
+        : `${formatINRCompact(lowPaise)}–${formatINRCompact(highPaise)}`,
     promise: band.promise,
     materials: band.materials,
     // `notFor` in `tiers.ts` is two sentences: what the band is not for, and

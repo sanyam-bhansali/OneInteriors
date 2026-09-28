@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   TIER,
   TIERS,
+  perSqftLabel,
   tierForPerSqft,
   tierRangeFor,
   studioTierFrom,
@@ -31,9 +32,9 @@ describe('tier definitions', () => {
 
 describe('tierForPerSqft', () => {
   it('places a rate in the right band', () => {
-    expect(tierForPerSqft(850)).toBe('ESSENTIAL');
-    expect(tierForPerSqft(1400)).toBe('PREMIUM');
-    expect(tierForPerSqft(2400)).toBe('LUXURY');
+    expect(tierForPerSqft(1400)).toBe('ESSENTIAL');
+    expect(tierForPerSqft(2100)).toBe('PREMIUM');
+    expect(tierForPerSqft(2800)).toBe('LUXURY');
   });
 
   it('puts a boundary figure in the higher band', () => {
@@ -56,18 +57,30 @@ describe('tierRangeFor', () => {
     expect(large.lowPaise).toBeGreaterThan(small.lowPaise);
   });
 
-  it('produces figures that match the Pune market', () => {
-    // A 2 BHK at 850 sqft in Premium should land in the 9–15 lakh region,
-    // which is where studios in this segment actually advertise.
-    const { lowPaise, highPaise } = tierRangeFor('PREMIUM', 850);
-    expect(paiseToLakhs(lowPaise)).toBeGreaterThan(8);
-    expect(paiseToLakhs(highPaise)).toBeLessThan(16);
+  it('prices the bands set on 29 Sep: 1,200 / 1,800 / 2,500 per sq ft', () => {
+    // A 1,000 sq ft home: Essential ₹12–18 L, Premium ₹18–25 L, Luxury from ₹25 L.
+    const essential = tierRangeFor('ESSENTIAL', 1000);
+    const premium = tierRangeFor('PREMIUM', 1000);
+    const luxury = tierRangeFor('LUXURY', 1000);
+
+    expect(paiseToLakhs(essential.lowPaise)).toBe(12);
+    expect(paiseToLakhs(essential.highPaise!)).toBe(18);
+    expect(paiseToLakhs(premium.lowPaise)).toBe(18);
+    expect(paiseToLakhs(premium.highPaise!)).toBe(25);
+    expect(paiseToLakhs(luxury.lowPaise)).toBe(25);
   });
 
-  it('always returns low below high', () => {
+  it('gives the top band a floor and no invented ceiling', () => {
+    expect(TIER.LUXURY.perSqftTo).toBeNull();
+    expect(tierRangeFor('LUXURY', 1150).highPaise).toBeNull();
+    expect(perSqftLabel('LUXURY')).toBe('₹2,500 and up');
+    expect(perSqftLabel('PREMIUM')).toBe('₹1,800–2,500');
+  });
+
+  it('always returns low below high where there is a high', () => {
     for (const tier of TIERS) {
       const range = tierRangeFor(tier, 1150);
-      expect(range.lowPaise).toBeLessThan(range.highPaise);
+      if (range.highPaise !== null) expect(range.lowPaise).toBeLessThan(range.highPaise);
     }
   });
 });
@@ -81,9 +94,9 @@ describe('tierRangeFor', () => {
 describe('studioTierFrom', () => {
   it('derives the band from what the studio actually charges', () => {
     const area = 1150;
-    expect(studioTierFrom(lakhsToPaise(10), area)).toBe('ESSENTIAL');
-    expect(studioTierFrom(lakhsToPaise(16), area)).toBe('PREMIUM');
-    expect(studioTierFrom(lakhsToPaise(25), area)).toBe('LUXURY');
+    expect(studioTierFrom(lakhsToPaise(18), area)).toBe('ESSENTIAL'); // ≈ ₹1,565/sq ft
+    expect(studioTierFrom(lakhsToPaise(25), area)).toBe('PREMIUM'); // ≈ ₹2,174/sq ft
+    expect(studioTierFrom(lakhsToPaise(32), area)).toBe('LUXURY'); // ≈ ₹2,783/sq ft
   });
 
   it('survives a missing area rather than dividing by zero', () => {
@@ -111,9 +124,9 @@ describe('tiersForBudget', () => {
   });
 
   it('marks bands the budget clears as within reach', () => {
-    // ₹14L on 1150 sqft clears Essential and reaches into Premium, without
-    // having outgrown either.
-    const offered = tiersForBudget(lakhsToPaise(14), 1150);
+    // ₹24L on 1150 sqft clears Essential (₹13.8–20.7 L) and reaches into
+    // Premium (₹20.7–28.75 L), without having outgrown either.
+    const offered = tiersForBudget(lakhsToPaise(24), 1150);
     expect(offered.find((o) => o.tier === 'ESSENTIAL')?.withinBudget).toBe(true);
     expect(offered.find((o) => o.tier === 'PREMIUM')?.withinBudget).toBe(true);
     expect(offered.find((o) => o.tier === 'LUXURY')?.withinBudget).toBe(false);
@@ -148,8 +161,14 @@ describe('tiersForBudget', () => {
   });
 
   it('marks the band the budget actually lands in', () => {
-    // ₹14 lakh on 1150 sqft sits inside Premium's range.
-    const offered = tiersForBudget(lakhsToPaise(14), 1150);
+    // ₹24 lakh on 1150 sqft sits inside Premium's range.
+    const offered = tiersForBudget(lakhsToPaise(24), 1150);
     expect(offered.find((o) => o.tier === 'PREMIUM')?.fit).toBe('within');
+  });
+
+  it('never marks the open top band as outgrown', () => {
+    // Luxury has no ceiling, so no budget clears it.
+    const offered = tiersForBudget(lakhsToPaise(500), 1150);
+    expect(offered.find((o) => o.tier === 'LUXURY')?.fit).toBe('within');
   });
 });

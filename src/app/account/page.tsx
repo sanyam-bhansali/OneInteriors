@@ -110,7 +110,9 @@ export default async function AccountPage() {
                   value={
                     brief.budgetMinPaise && brief.budgetMaxPaise
                       ? `${formatINRCompact(brief.budgetMinPaise)}–${formatINRCompact(brief.budgetMaxPaise)}`
-                      : null
+                      : brief.budgetMinPaise
+                        ? `From ${formatINRCompact(brief.budgetMinPaise)}`
+                        : null
                   }
                 />
                 <Fact

@@ -1151,8 +1151,8 @@ demoSlide(
   );
 
   const bands = [
-    ['Essential', '₹1,200 – ₹1,500', 'Furnishing only. The work gets made and fitted, well, with nothing spent on show.'],
-    ['Premium', '₹1,500 – ₹2,500', 'Furnishing, plus a designer and project management through the build, plus pieces designed for the room rather than picked off a list.'],
+    ['Essential', '₹1,200 – ₹1,800', 'Furnishing only. The work gets made and fitted, well, with nothing spent on show.'],
+    ['Premium', '₹1,800 – ₹2,500', 'Furnishing, plus a designer and project management through the build, plus pieces designed for the room rather than picked off a list.'],
     ['Luxury', '₹2,500 and above', 'Everything in Premium, in premium materials — veneer, leatherette, the specified finishes rather than the available ones.'],
   ];
 
@@ -1215,7 +1215,7 @@ demoSlide(
       { text: '₹25 L on a 2 BHK', options: { bold: true, color: INK } },
       { text: ' is about ₹2,800 a square foot — that is Luxury.    ', options: { color: INK2 } },
       { text: '₹25 L on a 4 BHK', options: { bold: true, color: INK } },
-      { text: ' is about ₹1,500 — that is Premium.', options: { color: INK2 } },
+      { text: ' is about ₹1,500 — that is Essential.', options: { color: INK2 } },
     ],
     {
       x: M + 0.42,
@@ -1288,8 +1288,8 @@ demoSlide(
   });
 
   const rows = [
-    ['Essential', 'Furnishing only', '₹1,200 – ₹1,500 /sqft', '₹25,000', '₹1'],
-    ['Premium', '+ designer and project management', '₹1,500 – ₹2,500 /sqft', '₹49,000', '₹1'],
+    ['Essential', 'Furnishing only', '₹1,200 – ₹1,800 /sqft', '₹25,000', '₹1'],
+    ['Premium', '+ designer and project management', '₹1,800 – ₹2,500 /sqft', '₹49,000', '₹1'],
     ['Luxury', '+ premium materials', '₹2,500 and above', '₹99,000', '₹1'],
   ];
 

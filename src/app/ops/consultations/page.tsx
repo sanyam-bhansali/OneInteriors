@@ -188,7 +188,9 @@ async function PrepCard({
           value={
             brief?.budgetMinPaise && brief?.budgetMaxPaise
               ? `${formatINRCompact(fromDb(brief.budgetMinPaise))}–${formatINRCompact(fromDb(brief.budgetMaxPaise))}`
-              : null
+              : brief?.budgetMinPaise
+                ? `From ${formatINRCompact(fromDb(brief.budgetMinPaise))}`
+                : null
           }
         />
         <Fact

@@ -55,7 +55,7 @@ export interface TierTerms {
  *
  * **A band is a rate per square foot, not a project size.** ₹25 lakh on a
  * 2 BHK is about ₹2,800/sqft and is Luxury; the same ₹25 lakh on a 4 BHK is
- * about ₹1,500 and is Premium. Banding on project value would put those two
+ * about ₹1,500 and is Essential. Banding on project value would put those two
  * studios in the same place, and they are not doing the same work. What the
  * band actually describes is scope: Essential is furnishing, Premium adds a
  * designer and project management, Luxury adds the premium materials.
@@ -68,26 +68,25 @@ export interface TierTerms {
  * the typical project, which is what keeps the effective take rate flat across
  * tiers rather than punishing the biggest studios.
  *
- * NOTE: `src/modules/quotation/tiers.ts` carries a DIFFERENT set of per-sqft
- * bands (₹700–1,100 / 1,100–1,800 / 1,800–3,200) under the same three names.
- * Those are the customer-facing quoting bands and they drive real quote
- * generation, so they were deliberately not changed here. The two need to be
- * reconciled before a homeowner and a studio ever compare notes on what
- * "Premium" means.
+ * **One set of boundaries, since 29 Sep 2026:** ₹1,200–1,800 / 1,800–2,500 /
+ * 2,500 and up, the same as the customer bands in
+ * `src/modules/quotation/tiers.ts`. Until then the two files carried different
+ * numbers under the same three names, and "Premium" meant one thing to a
+ * studio and another to the homeowner being matched to it.
  */
 export const TIER_TERMS: Record<SubscriptionTierName, TierTerms> = {
   ESSENTIAL: {
     label: 'Essential',
     monthlyPaise: 25_000_00,
     guaranteedBriefs: 8,
-    /** ~₹1,200–1,500/sqft, furnishing only. A 2 BHK lands near ₹12 lakh. */
+    /** ₹1,200–1,800/sqft, furnishing only. An 800 sqft 2 BHK lands near ₹12 lakh. */
     typicalProjectPaise: 12_00_000_00,
   },
   PREMIUM: {
     label: 'Premium',
     monthlyPaise: 49_000_00,
     guaranteedBriefs: 16,
-    /** ~₹1,500–2,500/sqft, with a designer and project management. */
+    /** ₹1,800–2,500/sqft, with a designer and project management. */
     typicalProjectPaise: 18_00_000_00,
   },
   LUXURY: {
