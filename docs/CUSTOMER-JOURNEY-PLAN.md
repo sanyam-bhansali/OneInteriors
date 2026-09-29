@@ -450,6 +450,22 @@ own. The customer side stays closed (`CUSTOMER_LIVE`) throughout.
 Phases 2 and 3 can run in parallel once Phase 1 is in. Phase 4 can start on
 fixtures while real studios fill in their profiles.
 
+**Progress, 29 September** (branch `claude/detailed-review-planning-048ed8`):
+
+- **Phase 0 — done.** CI runs; waitlist lockdown; one score per card;
+  the false claims removed; bands at ₹1,200 / 1,800 / 2,500 (engine
+  `match@1.0.1` for the open top band); possession replaces move-in.
+- **Phase 1 — done, one item moved.** Name first; eleven screens in seven
+  chapters; locality search and society; home needs and language; the
+  contact screen with consent and `/privacy`; Google sign-in (needs the
+  OAuth client); "Welcome, Sanyam" and the brief held for any tab; the
+  written read given the whole brief; `/tier` retired. **The scope item
+  checklist moves to Phase 2**, because what it lists is the catalogue's
+  scope membership, which Phase 2 builds.
+- **Migrations to deploy:** `20260929100000_waitlist_signups_lockdown`,
+  `20260929110000_brief_possession_status`,
+  `20260929120000_brief_contact_and_home`, `20260929130000_auth_identities`.
+
 ---
 
 ## 15. Data changes
