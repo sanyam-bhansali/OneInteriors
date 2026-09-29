@@ -469,12 +469,23 @@ fixtures while real studios fill in their profiles.
   total lands against the chosen band; archive threshold 50 with a
   per-item floor of 8; Excel quotations read. The per-studio modular
   discount moves to Phase 3 with the curated discount.
+- **Phase 3 — done.** "How you work" matching profile; curated discount
+  (ops) on every quote; portfolio area, society, tags, photo rooms and
+  picker consent; band proposed from rates and finished homes, confirmed
+  by ops; 15 fixture studios across every band, zone and scope;
+  `/ops/coverage`.
+- **Phase 4 — mostly done.** `match@2.0.0` (§5) with evidence per factor,
+  the timing line, "like your home", widenings, "why not the others", one
+  server ranker and stored matches. Waiting: the photo style picker and
+  Style DNA (licensed images), and "one band up" (your yes).
 - **Migrations to deploy:** `20260929100000_waitlist_signups_lockdown`,
   `20260929110000_brief_possession_status`,
   `20260929120000_brief_contact_and_home`, `20260929130000_auth_identities`,
   `20260929140000_brief_scope_selection`,
   `20260929150000_brief_floor_plan_reading`,
-  `20260929160000_studio_payment_phases`.
+  `20260929160000_studio_payment_phases`,
+  `20260929170000_studio_matching_profile`,
+  `20260929180000_portfolio_matching_fields`, `20260929190000_studio_band`.
 
 ---
 

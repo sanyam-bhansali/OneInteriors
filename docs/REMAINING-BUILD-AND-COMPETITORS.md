@@ -40,23 +40,23 @@ civil block**
 
 | Feature | State |
 |---|---|
-| Onboarding "matching profile": work mix (modular / carpentry / mixed), scopes + minimums, city-wide, lead time, durations, how they work, specialisms, languages, materials, warranty, curated discount, payment phases, intro video | 🔨 |
-| Portfolio: carpet area, society, household/needs tags, room-tagged photos, picker consent | 🔨 |
-| Studio band computed from rates, ops confirms | 🔨 |
-| Fixtures grown to ~15 studios across bands, zones and scopes | 🔨 |
-| Coverage grid for ops (band × zone × scope) | 🔨 |
+| Onboarding "matching profile": work mix (modular / carpentry / mixed), scopes + minimums, city-wide, lead time, durations, how they work, specialisms, languages, materials, warranty, curated discount, payment phases, intro video | ✅ "How you work" step; curated discount recorded by ops and on every quote |
+| Portfolio: carpet area, society, household/needs tags, room-tagged photos, picker consent | ✅ |
+| Studio band computed from rates, ops confirms | ✅ rates on a reference home + finished homes; ops confirms on the studio page |
+| Fixtures grown to ~15 studios across bands, zones and scopes | ✅ 15, held to a roster contract by a test |
+| Coverage grid for ops (band × zone × scope) | ✅ `/ops/coverage` |
 
 ### Phase 4 — matching v2 and the match page
 
 | Feature | State |
 |---|---|
-| Engine `match@2.0.0`: band / scope / zone filters, style from photos, priorities with their own signals, similar work, working style, household & needs, timeline from possession, confidence-adjusted ranking | 🔨 on fixtures |
-| Server-side ranking, matches stored | 🔨 |
+| Engine `match@2.0.0`: band / scope / zone filters, style from photos, priorities with their own signals, similar work, working style, household & needs, timeline from possession, confidence-adjusted ranking | ✅ (style from the brief's styles with neighbour credit; from photos when the picker lands) |
+| Server-side ranking, matches stored | ✅ one server ranker for every surface; Match rows stored on page load |
 | Photo style picker (licensed + portfolio), this-or-that, swipe on phones | 🔨 structure · ⏳ licensed images |
 | Style DNA card, shareable | 🔨 |
-| Evidence per factor, "their work like yours", timeline line on every card | 🔨 |
-| Fewer than three: city-wide widening; "one band up" | 🔨 · ⏳ your yes on "one band up" |
-| "Why not the others" | 🔨 |
+| Evidence per factor, "their work like yours", timeline line on every card | ✅ |
+| Fewer than three: city-wide widening; "one band up" | ✅ "other parts of Pune" live; "one band up" built, switched off · ⏳ your yes |
+| "Why not the others" | ✅ |
 
 ### Phase 5 — compare
 
