@@ -1,3 +1,4 @@
+import { currentOffer } from '@/modules/consultation/offer-store';
 import type { Metadata } from 'next';
 import { publicStudios } from '@/modules/studio/public';
 import { CompareClient } from './CompareClient';
@@ -30,9 +31,13 @@ export default async function ComparePage() {
      roster and rates come from here, for the fit block, which ranks exactly
      as the match page does (same gate, same rates). */
   const studios = await cachedRoster();
-  const rates = await resolveRatesForMany(studios.map((s) => s.slug));
+  const [rates, offer] = await Promise.all([
+    resolveRatesForMany(studios.map((s) => s.slug)),
+    currentOffer(),
+  ]);
   return (
     <CompareClient
+      offer={offer}
       studios={publicStudios(studios)}
       allowUnverified={showUnverifiedStudios()}
       filedRates={Object.fromEntries(Object.entries(rates).map(([slug, r]) => [slug, r.rates]))}

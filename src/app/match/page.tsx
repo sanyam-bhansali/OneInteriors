@@ -1,3 +1,4 @@
+import { currentOffer } from '@/modules/consultation/offer-store';
 import type { Metadata } from 'next';
 import { publicStudios } from '@/modules/studio/public';
 import { cachedRoster } from '@/modules/studio/roster-cache';
@@ -31,7 +32,7 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function MatchPage() {
-  const [studios, saved] = await Promise.all([cachedRoster(), loadBrief()]);
+  const [studios, saved, offer] = await Promise.all([cachedRoster(), loadBrief(), currentOffer()]);
 
   /**
    * Decided here, on the server, and passed down.
@@ -75,6 +76,7 @@ export default async function MatchPage() {
 
   return (
     <MatchClient
+      offer={offer}
       studios={publicStudios(studios)}
       allowUnverified={allowUnverified}
       /* The brief as we hold it, for a tab that has none — a new tab, another

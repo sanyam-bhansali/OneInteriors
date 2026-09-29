@@ -28,6 +28,8 @@
  * as ₹0, which reads as free — makes it a decision.
  */
 
+import { ExpertPitch } from '@/components/oi/ExpertPitch';
+import type { OfferState } from '@/modules/consultation/offer';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { formatINRCompact } from '@/lib/money';
@@ -127,10 +129,13 @@ export function CompareClient({
   studios: roster = [],
   allowUnverified = false,
   filedRates,
+  offer,
 }: {
   studios?: Studio[];
   allowUnverified?: boolean;
   filedRates?: Record<string, StudioRates>;
+  /** The expert call's launch offer, from the server. */
+  offer?: OfferState;
 } = {}) {
   const [project, setProject] = useState<Project | null>(null);
   const [brief, setBrief] = useState<Brief | null>(null);
@@ -691,17 +696,17 @@ export function CompareClient({
           </table>
         </div>
 
+        {offer ? (
+          <ExpertPitch
+            offer={offer}
+            lead="Every studio here comes with the same benefits through us"
+            className="mt-10 max-w-[44rem]"
+          />
+        ) : null}
+
         <div className="mt-8 flex flex-wrap items-center gap-4">
           <Quiet href="/match">Price another studio</Quiet>
-          {/* Hand-rolled with an inline background before, which meant no
-              hover, no focus ring and no minimum height. One terracotta action
-              per screen — this is it, so it uses the component that owns it. */}
-          <Link
-            href="/expert"
-            className="oi-cta inline-flex min-h-11 items-center px-5 py-3 text-[14px] no-underline"
-          >
-            Have an architect read these with you
-          </Link>
+          {/* The one terracotta action on this screen is the expert pitch above. */}
         </div>
 
         <p className="m-0 mt-6 max-w-[58ch] text-[13px] leading-[1.6] text-[var(--ink2)]">

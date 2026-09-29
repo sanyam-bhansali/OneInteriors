@@ -11,6 +11,8 @@ import { Trust } from '@/components/landing/Trust';
 import { Walkthrough } from '@/components/landing/Walkthrough';
 import { Portfolio } from '@/components/landing/Portfolio';
 import { HeroShowreel } from '@/components/landing/HeroShowreel';
+import { WhyThroughUs } from '@/components/landing/WhyThroughUs';
+import { currentOffer } from '@/modules/consultation/offer-store';
 
 export const metadata: Metadata = {
   title: 'One Interiors — verified interior studios in Pune',
@@ -104,7 +106,11 @@ const PACKAGES = TIERS.map((tier) => {
 });
 
 
-export default function HomePage() {
+/** Hourly, so the expert-call offer's count stays true without making the page dynamic. */
+export const revalidate = 3600;
+
+export default async function HomePage() {
+  const offer = await currentOffer();
   return (
     // `relative` matters. The nav below is absolutely positioned, and the root
     // layout renders the pre-launch roster banner above this page — without a
@@ -354,6 +360,9 @@ export default function HomePage() {
           </div>
         </Wrap>
       </section>
+
+      {/* ── Why book through us — the benefits and the expert call ── */}
+      <WhyThroughUs offer={offer} />
 
       {/* ── FAQ ── */}
       <Faq />

@@ -32,6 +32,7 @@
  * figure this whole product exists to argue against.
  */
 
+import { BenefitChips } from '@/components/oi/ExpertPitch';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -252,6 +253,10 @@ export function StudioCard({
           <p className="q-small m-0 text-[var(--ink2)]">Reading your brief against their work…</p>
         )}
       </div>
+
+      {/* What booking this studio through us brings, on the card itself —
+          the moment a customer sees a name is the moment they could ring it. */}
+      <BenefitChips limit={4} className="mt-5 border-t border-[var(--line)] pt-4" />
 
       {/* ── Actions ── */}
       <div className="mt-5 flex flex-wrap items-center gap-2.5">

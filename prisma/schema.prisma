@@ -388,6 +388,16 @@ model Brief {
   /// The referral code this customer arrived through, if any — set once,
   /// never by its own owner.
   referredByCode String?
+
+  /// The follow-up call to a customer who finished the brief and did not
+  /// book the expert call (ops/follow-ups). Covered by DATA_PROCESSING, which
+  /// already tells them we use their number to reach them about their matches
+  /// and their call. Outcome: BOOKED | CALL_BACK | NO_ANSWER | NOT_INTERESTED.
+  followUpOutcome String?
+  followUpNote    String?   @db.Text
+  followedUpAt    DateTime?
+  /// Calls made without reaching them (NO_ANSWER / CALL_BACK). Stops at three.
+  followUpTries   Int       @default(0)
 }
 
 // ─────────────────────────────────────────────────────────────

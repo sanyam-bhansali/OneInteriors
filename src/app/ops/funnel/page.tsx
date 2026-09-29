@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { journeyCounts } from '@/modules/analytics/journey-store';
+import { CALL_TARGET, callRate, journeyStages } from '@/modules/analytics/journey';
 import { Container } from '@/components/ui';
 import { OpsHeader } from '../ui';
 import { funnelSummary } from '@/modules/analytics/record';
@@ -26,7 +28,9 @@ const QUESTIONS = [
 // Gated by `app/ops/layout.tsx`, which redirects. `requireRole` throws, and a
 // throw in a page is a 500 rather than a redirect — see the overview page.
 export default async function FunnelPage() {
-  const summary = await funnelSummary(30);
+  const [summary, journey] = await Promise.all([funnelSummary(30), journeyCounts(30)]);
+  const stages = journeyStages(journey);
+  const toCall = callRate(journey);
   const worst = worstStep(summary.steps);
 
   return (
@@ -34,8 +38,43 @@ export default async function FunnelPage() {
       <OpsHeader />
       <main className="py-8">
         <Container size="wide">
+          <p className="label m-0 mb-2">Last 30 days · briefs started in the window</p>
+          <h1 className="h1 mb-3">The journey, brief to signed</h1>
+          <p className="m-0 mb-6 max-w-[66ch] text-[15px] leading-relaxed text-[var(--color-ink-2)]">
+            The pilot&rsquo;s number is finished brief → booked expert call, target{' '}
+            {Math.round(CALL_TARGET.low * 100)}–{Math.round(CALL_TARGET.high * 100)}%.{' '}
+            {toCall === null ? (
+              'No finished briefs yet.'
+            ) : (
+              <strong>
+                Now {Math.round(toCall.rate * 100)}% —{' '}
+                {toCall.verdict === 'below' ? 'below target' : toCall.verdict === 'on' ? 'on target' : 'above target'}.
+              </strong>
+            )}
+          </p>
+          <table className="mb-14 w-full border-collapse text-[14.5px]">
+            <thead>
+              <tr className="border-b border-[var(--color-ink)] text-left">
+                <th className="py-2 font-normal">Stage</th>
+                <th className="py-2 text-right font-normal">People</th>
+                <th className="py-2 text-right font-normal">Of the stage before</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stages.map((st) => (
+                <tr key={st.key} className="border-b border-[var(--color-rule)]">
+                  <td className="py-2">{st.label}</td>
+                  <td className="py-2 text-right tabular-nums">{st.count}</td>
+                  <td className="py-2 text-right tabular-nums text-[var(--color-ink-2)]">
+                    {st.fromPrevious === null ? '—' : `${Math.round(st.fromPrevious * 100)}%`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
           <p className="label m-0 mb-2">Last 30 days</p>
-          <h1 className="h1 mb-8">Where the quiz loses people</h1>
+          <h2 className="h2 mb-8">Where the quiz loses people</h2>
 
           <div className="mb-10 grid grid-cols-2 gap-6 sm:grid-cols-4">
             <Stat label="Quiz starts" value={summary.quizStarts} />

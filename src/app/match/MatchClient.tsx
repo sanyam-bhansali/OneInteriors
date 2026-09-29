@@ -25,6 +25,8 @@
  * shortcut to it, not a second home for it.
  */
 
+import { ExpertPitch } from '@/components/oi/ExpertPitch';
+import type { OfferState } from '@/modules/consultation/offer';
 import { useEffect, useMemo, useState } from 'react';
 import { loadBrief, saveBrief } from '@/modules/brief/store';
 import { cleanName } from '@/modules/brief/steps';
@@ -144,8 +146,11 @@ export function MatchClient({
   allowUnverified,
   filedRates,
   savedBrief = null,
+  offer,
 }: {
   studios: Studio[];
+  /** The expert call's launch offer, counted on the server (offer-store.ts). */
+  offer: OfferState;
   allowUnverified: boolean;
   /** The server's copy, used when this tab holds no brief. See page.tsx. */
   savedBrief?: Brief | null;
@@ -391,6 +396,13 @@ export function MatchClient({
           />
 
           {built ? (
+            <ExpertPitch
+              offer={offer}
+              lead={`Before you ring ${quoting.studioName}`}
+              className="mt-10 max-w-[40rem]"
+            />
+          ) : null}
+          {built ? (
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <Quiet href={`/studios/${quoting.studioSlug}`}>
                 See this on {quoting.studioName}&rsquo;s page
@@ -505,6 +517,10 @@ export function MatchClient({
             })}
           </ul>
         )}
+
+        {briefed && matches.length > 0 ? (
+          <ExpertPitch offer={offer} className="mx-auto mt-10 max-w-[40rem]" />
+        ) : null}
 
         {/* Fewer than three: said plainly, with named one-tap widenings and
             what each adds — never a silent loosening of what they asked for. */}

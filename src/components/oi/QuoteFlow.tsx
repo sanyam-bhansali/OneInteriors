@@ -21,6 +21,7 @@
  * down the road who would have guessed a number over the phone.
  */
 
+import { showcase } from '@/modules/portal/benefits';
 import { useCallback, useState } from 'react';
 import { formatINRCompact } from '@/lib/money';
 import {
@@ -339,6 +340,18 @@ export function QuoteDocument({
       <p className="oi-label m-0 mt-6 border-t border-[var(--line)] pt-4 print:hidden">
         Underlined materials open an explanation — what it is, and what the cheaper version costs
       </p>
+
+      {/* Printed too: quotes get forwarded and carried into studio meetings,
+          and the PDF is where a customer is most likely to go direct. */}
+      <div className="mt-6 border-t border-[var(--line)] pt-4">
+        <p className="m-0 mb-1.5 text-[13.5px] font-semibold text-[var(--ink)]">
+          Book this quote through One Interiors to keep:
+        </p>
+        <p className="m-0 text-[13px] leading-[1.6] text-[var(--ink2)]">
+          {showcase().map((b) => b.short).join(' · ')}. Start with your expert call at
+          oneinteriors.in/expert — {studioName} is introduced to you through us.
+        </p>
+      </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--ink)] pt-4">
         <p className="m-0 flex items-center gap-2 text-[12.5px] text-[var(--ink2)]">

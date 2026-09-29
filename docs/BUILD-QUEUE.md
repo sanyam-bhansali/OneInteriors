@@ -20,6 +20,7 @@ Legend: ✅ done · 🔨 next · ⏳ waits on the owner (named)
 | 3 | **"Rates not filed yet"** at launch — a studio without its own live rates is shown without a borrowed price once the roster is real | No placeholder price under a real studio's name (§7.3) | ✅ |
 | 4 | **Send the browser only what the page shows** — the match page stops receiving full studio records | Privacy and page weight (§5.8) | ✅ ops-only fields stripped; ranking stays in the browser for instant widenings |
 | 4a | **No studio is approved without its quotations** — at least 50 of its own read into approved rates and a product master; the onboarding rates step needs 50 sent, and `setStudioStatus` refuses Active until then | The owner's rule, 30 Sep: every customer price is the studio's real number | ✅ blockers shown beside the status control |
+| 4b | **The pilot's conversion plan** — customers choose the expert call over ringing a studio: "Why book through us" on the home page; benefit chips on every studio card; the expert pitch after the matches, after a quote and on the comparison; "Directly, or through us" on each studio profile; the benefits printed on the quote; the call shown as ~~₹5,000~~ **free for the first 1,000** (real count); the 24-hour follow-up call list (`/ops/follow-ups`); the journey funnel against the 40–50% target (`/ops/funnel`) | The owner's pilot goal: 40–50 of every 100 take the expert call. Restrictions are held in `docs/FUTURE-REQUIREMENTS.md` | ✅ |
 
 ## P2 — Answers that change the result
 
@@ -74,5 +75,7 @@ colleagues covering (`npm run db:expert -- <email> "<name>"` for each).
 
 Still open: Google / Apple / Meta credentials · WhatsApp verification and the
 OTP template · Swarupa's years in practice and COA number (shown once given) ·
-a lawyer's read of `/privacy` · running `npm run db:deploy` then
-`npm run db:expert` · the Pinterest board (item 10).
+a lawyer's read of `/privacy` and the studio agreement's non-circumvention
+and price-parity clauses · running `npm run db:deploy` then `npm run db:expert`
+· rupee values for the cab, shoot and hamper (for a "worth up to ₹X" total)
+· who makes the follow-up calls · the Pinterest board (item 10).

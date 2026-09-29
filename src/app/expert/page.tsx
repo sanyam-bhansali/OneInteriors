@@ -1,4 +1,7 @@
 import { redirect } from 'next/navigation';
+import { CallOffer } from '@/components/oi/CallOffer';
+import { BenefitChips } from '@/components/oi/ExpertPitch';
+import { currentOffer } from '@/modules/consultation/offer-store';
 import type { Metadata } from 'next';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
 import { Wrap, Chapter, Sheet, Established, Flag, Tick } from '@/components/oi';
@@ -47,9 +50,10 @@ export default async function ExpertPage() {
 
   const studios = await studioRepository.list({ activeOnly: true });
   const ranked = (await rankOnServer(brief, studios, 9)).slice(0, MAX_STUDIOS);
-  const [result, slots] = await Promise.all([
+  const [result, slots, callOffer] = await Promise.all([
     quoteBrief(brief, ranked.map((r) => r.studioId)),
     availableSlots(),
+    currentOffer(),
   ]);
   /* The quotes the customer actually saw, compared studios first and
      pre-ticked (plan §9). Priced afresh only when none are stored — a brief
@@ -139,6 +143,9 @@ export default async function ExpertPage() {
           <p className="m-0 mb-6 max-w-[60ch] text-[15px] leading-[1.65] text-[var(--ink)]">
             &ldquo;{ARCHITECT.says}&rdquo;
           </p>
+
+          <CallOffer offer={callOffer} className="mb-5" />
+          <BenefitChips className="mb-6" />
 
           <div className="flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-[var(--line)] pt-5">
             {architectFacts().map((f) => (

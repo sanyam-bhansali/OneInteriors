@@ -32,6 +32,11 @@ export interface Benefit {
   /** The sentence the customer reads — the terms. Null: not shown until written. */
   terms: string | null;
   unlocksAt: Stage;
+  /**
+   * The few words for a strip — "Up to ₹50,000 cashback". Rupees first
+   * where there are rupees: that is what makes going direct feel like a loss.
+   */
+  short?: string;
 }
 
 export const BENEFITS: Benefit[] = [
@@ -40,6 +45,7 @@ export const BENEFITS: Benefit[] = [
     title: 'Verified studios',
     terms: 'Every studio you are shown has cleared our checks, each with its source and date.',
     unlocksAt: 'START',
+    short: 'Verified studios only',
   },
   {
     id: 'instant-quote',
@@ -58,12 +64,14 @@ export const BENEFITS: Benefit[] = [
     title: 'An expert who is not selling',
     terms: 'No studio pays our experts. They are there to help you choose, not to sell you one.',
     unlocksAt: 'BRIEF_DONE',
+    short: 'An architect who is not selling',
   },
   {
     id: 'curated-discount',
     title: 'One Interiors curated discount',
     terms: 'Studios that offer one show it as its own line on your quote — the same for every customer, never a struck-through price.',
     unlocksAt: 'SIGNED',
+    short: 'Negotiated studio discounts',
   },
   // Terms written by the owner, 30 Sep 2026 (§17.3).
   {
@@ -72,6 +80,7 @@ export const BENEFITS: Benefit[] = [
     terms:
       'Up to ₹50,000 back once you have signed with a studio through us and paid its first payment phase. If the project is cancelled before 20% of its value has been paid to the studio, the cashback is cancelled.',
     unlocksAt: 'SIGNED',
+    short: 'Up to ₹50,000 cashback',
   },
   {
     id: 'referral',
@@ -79,18 +88,21 @@ export const BENEFITS: Benefit[] = [
     terms:
       'Refer a friend. When their project with a studio chosen through us has its 20% advance paid, you get ₹10,000 — for every project that closes.',
     unlocksAt: 'START',
+    short: '₹10,000 for every friend who builds',
   },
   {
     id: 'free-cab',
     title: 'Free cab to a studio',
     terms: 'After your expert call, when a studio meeting is scheduled, we book your cab to the studio — the first trip, from anywhere in Pune.',
     unlocksAt: 'INTRODUCED',
+    short: 'Free cab to the studio',
   },
   {
     id: 'tracker',
     title: 'Project tracker',
     terms: 'Every stage of your home here, with its planned date, what is done and what has happened on site.',
     unlocksAt: 'SIGNED',
+    short: 'Your project tracked, stage by stage',
   },
   {
     id: 'cinematic-shoot',
@@ -98,14 +110,47 @@ export const BENEFITS: Benefit[] = [
     terms:
       'When a studio chosen through us completes your home, we film it — a cinematic video, with a testimonial from you if you would like to give one, both yours to keep.',
     unlocksAt: 'HANDOVER',
+    short: 'A cinematic film of your finished home',
   },
   {
     id: 'onehamper',
     title: 'OneHamper',
     terms: 'At handover, every home built through us gets OneHamper — a gift from us.',
     unlocksAt: 'HANDOVER',
+    short: 'OneHamper at handover',
   },
 ];
+
+/**
+ * What booking through One Interiors gets you, for the surfaces a customer
+ * sees before they have decided — the home page, the studio cards, the quote,
+ * the compare page, a studio's profile. Money first, then the service.
+ */
+export const SHOWCASE_ORDER = [
+  'cashback',
+  'curated-discount',
+  'free-cab',
+  'unbiased-expert',
+  'tracker',
+  'cinematic-shoot',
+  'onehamper',
+  'referral',
+] as const;
+
+export interface ShowcaseItem {
+  id: string;
+  short: string;
+  title: string;
+  terms: string;
+}
+
+/** The showcase list: benefits with terms and a short label, in `SHOWCASE_ORDER`. */
+export function showcase(benefits: Benefit[] = BENEFITS): ShowcaseItem[] {
+  return SHOWCASE_ORDER.flatMap((id) => {
+    const b = benefits.find((x) => x.id === id);
+    return b && b.terms && b.short ? [{ id: b.id, short: b.short, title: b.title, terms: b.terms }] : [];
+  });
+}
 
 export interface BenefitState {
   id: string;

@@ -1,4 +1,6 @@
 import { notFound } from 'next/navigation';
+import { DirectVsUs } from '@/components/oi/DirectVsUs';
+import { currentOffer } from '@/modules/consultation/offer-store';
 import { showUnverifiedStudios } from '@/lib/env';
 import type { Metadata } from 'next';
 import { StartCta } from '@/components/StartCta';
@@ -104,6 +106,7 @@ export async function generateMetadata({
 }
 
 export default async function StudioProfile({ params }: { params: Promise<{ slug: string }> }) {
+  const offer = await currentOffer();
   const { slug } = await params;
   const studio = await studioRepository.bySlug(slug);
   if (!studio) notFound();
@@ -223,6 +226,14 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
         <section className="border-y border-[var(--line)] py-12">
           <Wrap>
             <StudioQuotePanel studioSlug={studio.slug} studioName={studio.tradeName} />
+          </Wrap>
+        </section>
+
+        {/* ── Directly, or through us ── right after the quote, where the
+            decision to ring them is made. */}
+        <section className="py-12">
+          <Wrap>
+            <DirectVsUs studioName={studio.tradeName} offer={offer} />
           </Wrap>
         </section>
 
