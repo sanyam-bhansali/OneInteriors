@@ -357,7 +357,15 @@ it keeps its loud "placeholder rates" flag and leads with fit.
 
 ---
 
-## 10. After the call — a visible ending
+## 10. After the call — a visible ending, and the customer's own portal
+
+**Owner's direction, 29 September:** once the expert call is booked, the
+customer has **their own portal**, signed in with their Google account,
+holding all their information — and a **mood board** and a **3D design**
+feature they can configure themselves until the call. The 3D design tool is
+being built separately by the owner and is integrated when ready; the mood
+board builds on the room boards that already exist in `/prepare` (`PrepRoom`),
+which fold into the portal (§11).
 
 Today the journey ends at "someone will call you". The customer never sees the
 introduction, the meeting, or anything after. **"Your home"** (`/account`)
@@ -557,7 +565,7 @@ not decoration.
 3. **Swipe your style.** On a phone the style photos become cards: right for love, left for not-for-me, up for never. Twenty swipes take under a minute and carry far more signal than "pick three". Buttons and keys do the same on a laptop. *Phase 4.*
 4. **Your Style DNA.** A card at the end of the taste chapter: their styles as shares ("Warm Modern 45% · Japandi 30% · Indian Contemporary 25%"), a five-colour palette and three materials drawn from what they loved. One tap shares it to WhatsApp — delight for them, reach for us. *Phase 4.*
 5. **Built in 9.6 seconds.** The quote build shows a live stopwatch and what it is doing — reading the plan, counting 38 lines, pricing on each studio's own rates — so "quotation in 10 seconds" is something they watch happen. *Phase 2.*
-6. **Walk the quote, room by room.** The quote opens as their floor plan: tap the kitchen to see its lines, materials and price. The 3D dollhouse of their own flat (LEARNINGS §1.2) follows later. *Phase 2, 3D later.*
+6. **Walk the quote, room by room.** The quote opens as their floor plan: tap the kitchen to see its lines, materials and price. *Phase 2.* The 3D view is **paused** — the owner is building a separate 3D design tool, which becomes part of the customer portal (§10) when it is ready.
 7. **Materials you can almost touch.** Every spec opens a close-up photo, what the cheaper alternative looks like, and the price difference per sq ft. *Phase 5.*
 8. **Listen to the comparison.** The comparison summary in their language, read aloud for a parent who would rather hear it. *Phase 5.*
 9. **Meet them before you meet them.** A 20–30 second intro video from each studio on its card, and project walkthrough films. The cinematic handover shoot feeds this with consent: every finished project makes the next match more vivid. *Studio profile field; Phase 4.*

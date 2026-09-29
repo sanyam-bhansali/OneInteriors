@@ -110,7 +110,24 @@ One canonical catalogue, **our stable codes**, extended from theirs:
 - Integer paise, basis points, the 7% fee, the modular discount, GST, and the ± band by what we measured. Their `pricing.ts` is floating-point rupees with stages rounded one by one, so it is not carried over.
 - Each studio's LIVE filed rate per code. An item a studio has no rate for is **named, not guessed**. There are no placeholder rates under a real studio's name (plan §7.3).
 
-### 4.4 What the customer sees that comes from their app
+### 4.4 What the customer sees — the platform quotation format
+
+One format for every studio (owner's decision, 29 Sep):
+
+- **Header:** the studio's logo and name (their `StudioBranding`, already
+  collected), prepared for the customer by name, their home, the date.
+- **Body:** room by room, in the order real quotes use; each line with size,
+  quantity, rate and the studio's own specification text; factory and site
+  work shown as the studio quotes them.
+- **Totals:** subtotal, fee, the studio's own discount if it gives one, GST,
+  total, and the ± band with what it depends on.
+- **Payment phases:** the studio's own stages, amounts computed exactly
+  (`splitAcross`, so they sum to the total).
+- **Footer:** "Powered by One Interiors" with our logo — the same mark rule
+  the studio-side quotation already uses (`studio-quote/mark.ts`).
+- **PDF:** the same document, downloadable and shareable.
+
+From the Hauspire app specifically:
 
 - The **room-by-room** document, in the order real quotes use (their `ITEM_ORDER`).
 - The **specification line** under each item ("BWP plywood carcass, HDHMR shutters…"), from the studio's own filed spec where they have one.
@@ -145,6 +162,32 @@ What has to change for your plan:
 ---
 
 ## 6. Decisions
+
+**Settled by the owner on 29 September:** the recommendations below are
+adopted (GST shown as its own line; each studio's own modular discount and
+payment schedule; the reader and rules ported into this codebase; no Gemini
+for now), with three additions that shape everything else:
+
+- **Every studio is different, so nothing is hard-wired to modular.** Hauspire
+  is a factory-modular plus carpentry practice. Some studios are only modular,
+  some are entirely carpenter-made, most are a mix. A studio's **work mix** is
+  read from its own 50–100 quotations — which lines it quotes as factory work
+  and which as site work, at what rates, with what discount and payment
+  phases — and *every detail of how it prices is filled in from that archive*,
+  then confirmed by the studio. Nothing assumes a modular discount exists, or
+  that a kitchen is factory-made.
+- **One quotation format across the platform.** Every quote a customer sees
+  or downloads carries **the studio's logo**, and **"Powered by One
+  Interiors"** with our logo. Same structure for every studio, so quotes can
+  be compared, with each studio's own identity on it.
+- **Payment phases are the studio's own**, taken from their quotations where
+  they state them and asked for in the studio profile where they do not, and
+  printed on the quotation and its PDF.
+
+The 3D view of the flat is **paused**: the owner is developing a separate
+tool, to be integrated when ready (see `CUSTOMER-JOURNEY-PLAN.md` §10).
+
+The original recommendations, for the record:
 
 1. **GST on the customer quote.** Our first quote adds 18%; the Hauspire app shows none. Recommended: show it as its own line, as today — the customer pays it, and a total without it reads cheaper than the studio's real quote.
 2. **Modular discount.** 10% (the median of 934 real quotes) as a fixed rule, or each studio's own figure from its archive? Recommended: each studio's own, read from its quotations, falling back to 10%. It is part of the studio's pricing, not ours.
