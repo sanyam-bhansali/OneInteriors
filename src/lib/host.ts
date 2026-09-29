@@ -155,6 +155,8 @@ const PUBLIC_PAGES = ['/studios', '/verification'];
 const ALWAYS = [
   '/api',
   '/auth',
+  // Referral links (modules/portal/referral.ts) — valid on any host.
+  '/r',
   '/sign-in',
   '/set-password',
   /**

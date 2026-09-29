@@ -16,7 +16,8 @@ import { signedUrlFor } from '@/modules/storage/floor-plan';
 import { propertyLabel, scopeLabel, PUNE_LOCALITIES } from '@/modules/brief/types';
 import { yourHome } from '@/modules/portal/home';
 import { trackersForBrief } from '@/modules/portal/tracker-store';
-import { benefitsPass, STAGES, type Stage } from '@/modules/portal/benefits';
+import { BENEFITS, benefitsPass, referralsLive, STAGES, type Stage } from '@/modules/portal/benefits';
+import { referralCodeFor, referralCount } from '@/modules/brief/repository';
 import { prepForBrief } from '@/modules/prepare/prep';
 import { slotLabel } from '@/modules/consultation/slots';
 import { CheckInForm, ShareButton } from './HomeParts';
@@ -57,6 +58,8 @@ export default async function AccountPage() {
   const home = await yourHome(row?.id ?? null, briefDone);
   const rooms = row ? await prepForBrief(row.id) : [];
   const trackers = row ? await trackersForBrief(row.id) : [];
+  const referralCode = referralsLive() ? await referralCodeFor(user.id, user.name) : null;
+  const referral = referralCode ? { code: referralCode, count: await referralCount(referralCode) } : null;
   const pass = benefitsPass(home.stage);
   // The owner's 3D design tool (plan §10), linked once it exists. Never a
   // placeholder: nothing is shown until there is somewhere to go.
@@ -346,6 +349,22 @@ export default async function AccountPage() {
               ))}
             </ul>
           </Section>
+
+          {/* ── OneReferrals — on no screen until its terms are written ── */}
+          {referral ? (
+            <Section title="Refer a friend">
+              <p className="m-0 mb-3 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--color-ink-2)]">
+                {BENEFITS.find((b) => b.id === 'referral')?.terms}
+              </p>
+              <p className="m-0 font-[family-name:var(--font-mono)] text-[18px] tracking-[0.06em] text-[var(--color-ink)]">
+                {referral.code}
+              </p>
+              <p className="m-0 mt-1 text-[13.5px] text-[var(--color-ink-3)]">
+                Share oneinteriors.in/r/{referral.code}
+                {referral.count > 0 ? ` · ${referral.count} ${referral.count === 1 ? 'friend has' : 'friends have'} started a brief with it` : ''}
+              </p>
+            </Section>
+          ) : null}
 
           {/* ── Share ────────────────────────────────────── */}
           {briefDone ? (

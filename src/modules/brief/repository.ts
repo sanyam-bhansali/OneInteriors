@@ -25,6 +25,7 @@ import 'server-only';
  * sessionStorage exactly as before.
  */
 
+import { cleanCode, counts, makeCode, REFERRAL_COOKIE } from '@/modules/portal/referral';
 import { libraryReading, shareable, societyKey, type LibraryReading } from '@/modules/floorplan/society-library';
 import { cookies } from 'next/headers';
 import { randomBytes } from 'node:crypto';
@@ -138,6 +139,7 @@ export async function saveBrief(brief: Brief): Promise<SaveResult> {
           select: { id: true },
         });
     await shareIntoLibrary(row.id, brief);
+    await recordReferral(row.id, user?.id ?? null);
     return { ok: true, persisted: true };
   } catch {
     return { ok: true, persisted: false };
@@ -166,6 +168,50 @@ async function shareIntoLibrary(briefId: string, brief: Brief): Promise<void> {
     await prisma.societyPlan.upsert({ where: { briefId }, create: { briefId, ...row }, update: row });
   } catch {
     /* The library is a convenience for the next family; never this one's save. */
+  }
+}
+
+/**
+ * The referral code this browser arrived through, onto the brief — once, and
+ * never the customer's own. Never fails the save.
+ */
+async function recordReferral(briefId: string, customerId: string | null): Promise<void> {
+  try {
+    const code = cleanCode((await cookies()).get(REFERRAL_COOKIE)?.value);
+    if (!code) return;
+    const owner = await prisma.user.findUnique({ where: { referralCode: code }, select: { id: true } });
+    if (!counts(owner?.id ?? null, customerId)) return;
+    await prisma.brief.updateMany({ where: { id: briefId, referredByCode: null }, data: { referredByCode: code } });
+  } catch {
+    /* A lost referral is ops' problem to chase; a failed brief save is the customer's. */
+  }
+}
+
+/** This customer's referral code, made the first time it is needed. */
+export async function referralCodeFor(userId: string, name: string | null): Promise<string | null> {
+  if (!hasDatabase()) return null;
+  try {
+    const existing = await prisma.user.findUnique({ where: { id: userId }, select: { referralCode: true } });
+    if (existing?.referralCode) return existing.referralCode;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const code = makeCode(name, randomBytes(4));
+      const done = await prisma.user
+        .update({ where: { id: userId }, data: { referralCode: code }, select: { referralCode: true } })
+        .catch(() => null);
+      if (done?.referralCode) return done.referralCode;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** How many briefs came through this code. */
+export async function referralCount(code: string): Promise<number> {
+  try {
+    return await prisma.brief.count({ where: { referredByCode: code } });
+  } catch {
+    return 0;
   }
 }
 

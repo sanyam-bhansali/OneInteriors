@@ -120,3 +120,8 @@ export function stageOf(facts: {
   if (facts.briefDone) return 'BRIEF_DONE';
   return 'START';
 }
+
+/** Is OneReferrals on? Only once its terms are written (referral.ts). */
+export function referralsLive(benefits: Benefit[] = BENEFITS): boolean {
+  return Boolean(benefits.find((b) => b.id === 'referral')?.terms);
+}

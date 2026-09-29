@@ -76,6 +76,10 @@ model User {
   @@index([role])
   @@map("users")
 
+  /// OneReferrals: this customer's personal code (modules/portal/referral.ts).
+  /// Made the first time "Your home" is opened.
+  referralCode String?       @unique
+
   expertHours  ExpertHours[] @relation("ExpertHours")
   expertBlocks ExpertBlock[] @relation("ExpertBlocks")
 }
@@ -377,6 +381,10 @@ model Brief {
   @@map("briefs")
 
   societyPlan SocietyPlan?
+
+  /// The referral code this customer arrived through, if any — set once,
+  /// never by its own owner.
+  referredByCode String?
 }
 
 // ─────────────────────────────────────────────────────────────
