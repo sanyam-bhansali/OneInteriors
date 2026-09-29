@@ -7,6 +7,8 @@ import { Container } from '@/components/ui';
 import { Wordmark } from '@/components/brand';
 import { getCurrentUser } from '@/modules/auth/session';
 import { safeNext } from '@/lib/site';
+import { googleOAuth } from '@/lib/env';
+import { GoogleButton } from '@/components/GoogleButton';
 import { signOutAction } from './actions';
 import { SignInForm } from './SignInForm';
 import { PasswordForm } from './PasswordForm';
@@ -22,9 +24,19 @@ export const dynamic = 'force-dynamic';
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; reason?: string }>;
+  searchParams: Promise<{ next?: string; reason?: string; error?: string }>;
 }) {
-  const { next, reason } = await searchParams;
+  const { next, reason, error } = await searchParams;
+  const google = googleOAuth() !== null;
+  /* What went wrong with Google, in their terms — each one says what to do. */
+  const googleError =
+    error === 'google-staff'
+      ? 'That Google account’s email belongs to a studio or team account, which signs in by email below — not with Google.'
+      : error === 'google-unavailable'
+        ? 'Signing in with Google is not available right now. Use your number instead.'
+        : error === 'google'
+          ? 'Google sign-in did not complete. Try again, or use your number instead.'
+          : null;
   const destination = safeNext(next ?? null);
 
   const user = await getCurrentUser();
@@ -217,10 +229,32 @@ export default async function SignInPage({
                 Your answers are saved. Your name and number, a code on WhatsApp, and the quotes
                 are on the next screen — so they stay yours and you can come back to them.
               </>
+            ) : google ? (
+              <>With Google, or your number and a code on WhatsApp. No password to remember or lose.</>
             ) : (
               <>Your number and a code on WhatsApp. No password to remember or lose.</>
             )}
           </p>
+
+          {googleError ? (
+            <p
+              role="alert"
+              className="m-0 mb-6 border-l-2 border-[var(--color-terracotta)] pl-3 text-[14.5px] leading-relaxed text-[var(--color-ink)]"
+            >
+              {googleError}
+            </p>
+          ) : null}
+
+          {/* One tap, no code to wait for — the owner's direction. Shown only
+              when it is set up end to end. */}
+          {google ? (
+            <div className="mb-8">
+              <GoogleButton next={destination} className="w-full" />
+              <p className="m-0 mt-6 text-center text-[13px] uppercase tracking-[0.14em] text-[var(--color-ink-3)]">
+                or with your number
+              </p>
+            </div>
+          ) : null}
 
           {/* Customers sign in by phone. The emailed link is still here, below
               the fold, because ops and studio accounts use it — but it is not

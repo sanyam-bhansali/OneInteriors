@@ -93,6 +93,12 @@ export async function featureReadiness(): Promise<FeatureReadiness[]> {
       needs: [present('RESEND_API_KEY'), present('EMAIL_FROM')],
     },
     {
+      feature: 'Sign in with Google (customers)',
+      ready: Boolean(process.env.GOOGLE_CLIENT_ID?.trim()) && Boolean(process.env.GOOGLE_CLIENT_SECRET?.trim()),
+      fallback: 'No Google button anywhere; customers sign in with their number.',
+      needs: [present('GOOGLE_CLIENT_ID'), present('GOOGLE_CLIENT_SECRET')],
+    },
+    {
       feature: 'Customer marketplace open',
       ready: process.env.CUSTOMER_LIVE?.trim() === '1',
       fallback: 'The quiz, matches and compare redirect to the landing page.',

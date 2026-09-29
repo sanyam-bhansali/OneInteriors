@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { cachedRoster } from '@/modules/studio/roster-cache';
-import { showUnverifiedStudios } from '@/lib/env';
+import { googleOAuth, showUnverifiedStudios } from '@/lib/env';
+import { getCurrentUser } from '@/modules/auth/session';
 import { QuizClient } from './QuizClient';
 
 export const metadata: Metadata = {
@@ -17,8 +18,17 @@ export const dynamic = 'force-dynamic';
  * directly, and Postgres is a swap behind this line rather than a rewrite.
  */
 export default async function QuizPage() {
-  const studios = await cachedRoster();
+  const [studios, user] = await Promise.all([cachedRoster(), getCurrentUser()]);
   // The live "N studios match so far" counter ranks in the browser, so the gate
   // is read here and handed down. See MatchClient for the full reasoning.
-  return <QuizClient studios={studios} allowUnverified={showUnverifiedStudios()} />;
+  return (
+    <QuizClient
+      studios={studios}
+      allowUnverified={showUnverifiedStudios()}
+      // Who they are, if signed in — the contact screen fills in from it.
+      account={user ? { name: user.name, email: user.email } : null}
+      // Offered only when it is set up end to end; see googleOAuth().
+      googleSignIn={googleOAuth() !== null}
+    />
+  );
 }

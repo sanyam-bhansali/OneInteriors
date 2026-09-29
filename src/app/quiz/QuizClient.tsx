@@ -71,6 +71,7 @@ import {
   type ContactInput,
 } from '@/modules/brief/contact';
 import { PURPOSE_NOTICE } from '@/modules/consent/policy';
+import { GoogleButton } from '@/components/GoogleButton';
 
 type ContactErrors = Partial<Record<ContactField | 'form', string>>;
 import {
@@ -160,9 +161,15 @@ export function QuizClient({
   studios,
   /** Server-decided; see MatchClient. Defaults to the strict answer. */
   allowUnverified = false,
+  account = null,
+  googleSignIn = false,
 }: {
   studios: Studio[];
   allowUnverified?: boolean;
+  /** The signed-in account, if any. The contact screen fills in from it. */
+  account?: { name: string | null; email: string | null } | null;
+  /** Whether "Continue with Google" can be offered. */
+  googleSignIn?: boolean;
 }) {
   const router = useRouter();
   const [brief, setBrief] = useState<Brief>(EMPTY_BRIEF);
@@ -325,6 +332,8 @@ export function QuizClient({
   const stepId = stepAt(step);
   const canAdvance = isStepAnswered(brief, stepId);
   const contactCtx: ContactContext = {
+    account,
+    googleSignIn,
     contact,
     setContact: (next) => {
       setContact(next);
@@ -511,6 +520,8 @@ type StepParts = { ask: React.ReactNode; options: React.ReactNode };
 
 /** What the contact screen needs beyond the brief. */
 interface ContactContext {
+  account: { name: string | null; email: string | null } | null;
+  googleSignIn: boolean;
   contact: ContactInput;
   setContact: (next: ContactInput) => void;
   errors: ContactErrors;
@@ -552,6 +563,8 @@ function stepContent(
         options: (
           <ContactStep
             brief={brief}
+            account={ctx.account}
+            googleSignIn={ctx.googleSignIn}
             contact={ctx.contact}
             setContact={ctx.setContact}
             errors={ctx.errors}
@@ -659,16 +672,28 @@ function stepContent(
  */
 function ContactStep({
   brief,
+  account,
+  googleSignIn,
   contact,
   setContact,
   errors,
 }: {
   brief: Brief;
+  account: { name: string | null; email: string | null } | null;
+  googleSignIn: boolean;
   contact: ContactInput;
   setContact: (next: ContactInput) => void;
   errors: ContactErrors;
 }) {
   const set = (patch: Partial<ContactInput>) => setContact({ ...contact, ...patch });
+
+  /* Signed in — with Google or otherwise — fills the email and, if they
+     skipped nothing, keeps the name they gave on screen one. Filled once, so
+     it never overwrites something they have since typed. */
+  useEffect(() => {
+    if (account?.email && !contact.email) setContact({ ...contact, email: account.email });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
+  }, [account?.email]);
   const field =
     'w-full rounded-full border bg-[var(--card)] px-5 py-3 text-[16px] text-[var(--ink)] placeholder:text-[var(--ink2)]';
   const border = (bad: boolean) => (bad ? 'border-[var(--acc)]' : 'border-[var(--line)]');
@@ -678,6 +703,22 @@ function ContactStep({
 
   return (
     <div className="flex max-w-lg flex-col gap-5">
+      {/* One tap instead of typing, and the brief is kept on their account. No
+          provider gives a phone number, so the mobile is still asked below. */}
+      {account ? (
+        <p className="m-0 text-[14px] text-[var(--ink2)]">
+          Signed in{account.email ? ` as ${account.email}` : ''}. Your brief is saved to your account.
+        </p>
+      ) : googleSignIn ? (
+        <div className="flex flex-col gap-2 border-b border-[var(--line)] pb-5">
+          <GoogleButton next="/quiz" className="self-start" />
+          <p className="m-0 text-[13px] leading-snug text-[var(--ink2)]">
+            Fills in your name and email and keeps your brief on your account. We still need your
+            mobile below.
+          </p>
+        </div>
+      ) : null}
+
       <label className="block">
         <FieldLabel>Your name</FieldLabel>
         <input

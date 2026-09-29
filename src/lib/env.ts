@@ -251,3 +251,17 @@ export function waitlistIngestToken(): string | null {
   const t = process.env.WAITLIST_INGEST_TOKEN?.trim();
   return t ? t : null;
 }
+
+/**
+ * Google sign-in credentials, or null when it is not set up.
+ *
+ * Both halves, trimmed, or nothing: a client id without its secret starts a
+ * flow that can never finish, and a customer who picks "Continue with Google"
+ * and lands on an error is worse off than one who never saw the button. When
+ * this is null the button is not shown at all.
+ */
+export function googleOAuth(): { clientId: string; clientSecret: string } | null {
+  const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+  return clientId && clientSecret ? { clientId, clientSecret } : null;
+}

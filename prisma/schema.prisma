@@ -64,6 +64,7 @@ model User {
   brief         Brief?
   studioMember  StudioMember?
   sessions      Session[]
+  identities    AuthIdentity[]
   consents      Consent[]
   auditEntries  AuditLog[]        @relation("AuditActor")
   notifications Notification[]
@@ -74,6 +75,38 @@ model User {
 
   @@index([role])
   @@map("users")
+}
+
+/// Who a social sign-in provider says this user is. Google since 29 Sep
+/// 2026; Apple and Facebook will use the same table.
+enum AuthProvider {
+  GOOGLE
+  APPLE
+  FACEBOOK
+}
+
+/// A provider identity linked to a user — "Google account 1098765 is this
+/// customer". Found by (provider, subject), never by email: emails change and
+/// get recycled, the provider's subject does not. Social sign-in only ever
+/// creates or reaches CUSTOMER accounts (see modules/auth/oauth-google.ts).
+model AuthIdentity {
+  id       String       @id @default(cuid())
+  provider AuthProvider
+  /// The provider's stable id for the person (OpenID `sub`).
+  subject  String
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// The verified email the provider gave at the last sign-in, for support.
+  email String?
+
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+
+  @@unique([provider, subject])
+  @@index([userId])
+  @@map("auth_identities")
 }
 
 model Session {
