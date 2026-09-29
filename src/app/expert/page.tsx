@@ -7,8 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { loadBrief, readAnonKey } from '@/modules/brief/repository';
 import { getCurrentUser } from '@/modules/auth/session';
 import { studioRepository } from '@/modules/studio/repository';
-import { rankStudios } from '@/modules/matching/score';
-import { showUnverifiedStudios } from '@/lib/env';
+import { rankOnServer } from '@/modules/matching/rank-server';
 import { quoteBrief } from '@/modules/quotation/generate';
 import { MIN_STUDIOS, MAX_STUDIOS } from '@/modules/consultation/request';
 import { ARCHITECT, ARCHITECT_IS_REAL, architectFacts } from '@/modules/consultation/architect';
@@ -45,9 +44,7 @@ export default async function ExpertPage() {
   }
 
   const studios = await studioRepository.list({ activeOnly: true });
-  const ranked = rankStudios(brief, studios, 9, {
-    allowUnverified: showUnverifiedStudios(),
-  }).slice(0, MAX_STUDIOS);
+  const ranked = (await rankOnServer(brief, studios, 9)).slice(0, MAX_STUDIOS);
   const result = await quoteBrief(brief, ranked.map((r) => r.studioId));
   if (!result.ok) redirect('/match');
 
