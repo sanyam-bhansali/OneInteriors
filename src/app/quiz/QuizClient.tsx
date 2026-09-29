@@ -79,6 +79,7 @@ import {
 import { PURPOSE_NOTICE } from '@/modules/consent/policy';
 import { SocialButtons, anyProvider, type Providers } from '@/components/SocialButtons';
 import { InspirationReader } from './InspirationReader';
+import { STYLE_PHOTOS, stylePhotoUrl } from '@/data/style-photos';
 
 const NO_PROVIDERS: Providers = { google: false, apple: false, facebook: false };
 
@@ -1715,7 +1716,21 @@ function StylePicker({
                 isSelected ? ring : ''
               }`}
             >
-              <StyleScene tag={tag} className="block aspect-[4/3] w-full" />
+              {STYLE_PHOTOS[tag] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={stylePhotoUrl(STYLE_PHOTOS[tag])}
+                  srcSet={`${stylePhotoUrl(STYLE_PHOTOS[tag], 400)} 400w, ${stylePhotoUrl(STYLE_PHOTOS[tag], 800)} 800w`}
+                  sizes="(min-width: 640px) 33vw, 50vw"
+                  /* Named only after it is picked — the alt describes the room,
+                     never the style, so a screen reader is not told the answer. */
+                  alt={STYLE_PHOTOS[tag].alt}
+                  loading={i < 6 ? 'eager' : 'lazy'}
+                  className="block aspect-[4/3] w-full object-cover"
+                />
+              ) : (
+                <StyleScene tag={tag} className="block aspect-[4/3] w-full" />
+              )}
               <span
                 className={`block bg-[var(--card)] px-3 py-2 text-[12.5px] ${
                   isSelected ? 'font-bold text-[var(--ink)]' : 'text-[var(--ink2)]'
@@ -1742,6 +1757,13 @@ function StylePicker({
         <p className="m-0 oi-num text-[11px] uppercase tracking-[0.1em] text-[var(--ink2)]">
           {selected.length} of {max} selected
         </p>
+        <details className="text-[11.5px] text-[var(--ink2)]">
+          <summary className="cursor-pointer">Photo credits</summary>
+          <p className="m-0 mt-1 max-w-[60ch] leading-relaxed">
+            Photographs from Unsplash by{' '}
+            {[...new Set(Object.values(STYLE_PHOTOS).map((p) => p.photographer))].join(', ')}.
+          </p>
+        </details>
         {selected.length > 0 && tone === 'include' ? (
           <MaterialSwatches tag={selected[selected.length - 1]} />
         ) : null}
