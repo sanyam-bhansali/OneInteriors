@@ -64,8 +64,8 @@ civil block**
 |---|---|
 | Fit block above price | ✅ ranked exactly as the match page |
 | Per-room and per-material prices, material ids not sentences | ✅ |
-| AI comparison summary with a figure checker, in English / हिन्दी / मराठी, with "listen" | ✅ English, checker, rules fallback · 🔨 Hindi/Marathi, "listen" |
-| Comparison brief (one page, shareable) | 🔨 |
+| AI comparison summary with a figure checker, in English / हिन्दी / मराठी, with "listen" | ✅ all three languages, the checker reads Devanagari figures, Listen on summaries and match reads |
+| Comparison brief (one page, shareable) | ✅ `/compare/brief`, prints / saves as PDF |
 
 ### Phase 6 — expert and after
 
@@ -82,11 +82,11 @@ civil block**
 
 | Feature | State |
 |---|---|
-| Apple / Facebook sign-in | ⏳ accounts |
-| Inspiration upload → style | 🔨 |
-| Society floor-plan library | 🔨 (after the reader) |
-| Customer-side project tracker (milestones, site photos) | 🔨 — must exist before "Project tracker" is promised |
-| Referrals (code, tracking) | 🔨 · ⏳ terms |
+| Apple / Facebook sign-in | ✅ built, shown when keys are set · ⏳ your Apple and Meta developer accounts |
+| Inspiration upload → style | ✅ on the likes step; the customer confirms |
+| Society floor-plan library | ✅ offered once two homes in a building share |
+| Customer-side project tracker (milestones, site photos) | ✅ stages, dates, updates; ops runs it · 🔨 site photos, studio posting |
+| Referrals (code, tracking) | ✅ codes, links, tracking · ⏳ terms (hidden until written) |
 
 ---
 

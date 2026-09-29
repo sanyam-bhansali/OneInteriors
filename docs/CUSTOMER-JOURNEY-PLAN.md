@@ -478,10 +478,10 @@ fixtures while real studios fill in their profiles.
   the timing line, "like your home", widenings, "why not the others", one
   server ranker and stored matches. Waiting: the photo style picker and
   Style DNA (licensed images), and "one band up" (your yes).
-- **Phase 5 — mostly done.** Compare leads with fit, then price by room
-  and per material, and "Explain the differences" with a figure checker
-  and a rules fallback. Still to do: Hindi/Marathi, "listen", the
-  one-page comparison brief.
+- **Phase 5 — done.** Compare leads with fit, then price by room and per
+  material; "Explain the differences" in English, हिन्दी or मराठी with a
+  figure checker that reads Devanagari; Listen; the one-page brief at
+  `/compare/brief`.
 - **Phase 6 — done, waiting on inputs.** Slot booking with no double
   booking, `/ops/experts`, confirmation with a calendar invite; the
   expert's pack; the expert page on the customer's own quotes; "Your home"
@@ -490,6 +490,10 @@ fixtures while real studios fill in their profiles.
   after-meeting check-in feeding the communication rating. Waiting: the
   expert and their hours, benefit terms, the 3D tool, the WhatsApp
   template.
+- **Phase 7 — done, waiting on inputs.** Apple and Facebook sign-in
+  (shown when keys are set); inspiration photo → styles; the society
+  floor-plan library; the customer project tracker; referral codes and
+  tracking (hidden until terms exist).
 - **Migrations to deploy:** `20260929100000_waitlist_signups_lockdown`,
   `20260929110000_brief_possession_status`,
   `20260929120000_brief_contact_and_home`, `20260929130000_auth_identities`,
@@ -498,7 +502,9 @@ fixtures while real studios fill in their profiles.
   `20260929160000_studio_payment_phases`,
   `20260929170000_studio_matching_profile`,
   `20260929180000_portfolio_matching_fields`, `20260929190000_studio_band`,
-  `20260929200000_expert_booking`, `20260929210000_meeting_check_ins`.
+  `20260929200000_expert_booking`, `20260929210000_meeting_check_ins`,
+  `20260929220000_society_plans`, `20260929230000_home_projects`,
+  `20260929240000_referrals`.
 
 ---
 
