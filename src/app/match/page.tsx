@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { publicStudios } from '@/modules/studio/public';
 import { cachedRoster } from '@/modules/studio/roster-cache';
 import { showUnverifiedStudios } from '@/lib/env';
 import { resolveRatesForMany } from '@/modules/quotation/resolve-rates';
@@ -74,7 +75,7 @@ export default async function MatchPage() {
 
   return (
     <MatchClient
-      studios={studios}
+      studios={publicStudios(studios)}
       allowUnverified={allowUnverified}
       /* The brief as we hold it, for a tab that has none — a new tab, another
          device after signing in. sessionStorage is per tab, so without this

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { publicStudios } from '@/modules/studio/public';
 import { cachedRoster } from '@/modules/studio/roster-cache';
 import { appleOAuth, facebookOAuth, googleOAuth, showUnverifiedStudios } from '@/lib/env';
 import { getCurrentUser } from '@/modules/auth/session';
@@ -23,7 +24,7 @@ export default async function QuizPage() {
   // is read here and handed down. See MatchClient for the full reasoning.
   return (
     <QuizClient
-      studios={studios}
+      studios={publicStudios(studios)}
       allowUnverified={showUnverifiedStudios()}
       // Who they are, if signed in — the contact screen fills in from it.
       account={user ? { name: user.name, email: user.email } : null}

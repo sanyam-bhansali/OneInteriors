@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { publicStudios } from '@/modules/studio/public';
 import { cachedRoster } from '@/modules/studio/roster-cache';
 import { resolveRatesForMany } from '@/modules/quotation/resolve-rates';
 import { showUnverifiedStudios } from '@/lib/env';
@@ -22,7 +23,7 @@ export default async function ComparisonBriefPage() {
       <AppHeader />
       <Wrap className="py-10">
         <BriefClient
-          studios={studios}
+          studios={publicStudios(studios)}
           allowUnverified={showUnverifiedStudios()}
           filedRates={Object.fromEntries(Object.entries(rates).map(([slug, r]) => [slug, r.rates]))}
         />
