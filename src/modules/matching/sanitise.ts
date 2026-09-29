@@ -24,10 +24,14 @@ import 'server-only';
 
 import {
   EMPTY_BRIEF,
+  HOME_NEEDS,
   PUNE_LOCALITIES,
   STYLE_TAGS,
   type Brief,
+  type HomeNeed,
+  type Household,
   type Involvement,
+  type PossessionStatus,
   type PriorityFactor,
   type PropertyType,
   type ScopeType,
@@ -38,6 +42,28 @@ const PROPERTY_TYPES: PropertyType[] = ['BHK_1', 'BHK_2', 'BHK_3', 'BHK_4_PLUS',
 const SCOPES: ScopeType[] = ['FULL_HOME', 'KITCHEN_WARDROBE', 'SINGLE_ROOM', 'RENOVATION'];
 const INVOLVEMENTS: Involvement[] = ['DECIDE_FOR_ME', 'COLLABORATE', 'APPROVE_EVERYTHING'];
 const PRIORITIES = new Set<string>(['BUDGET', 'SPEED', 'DESIGN_AMBITION', 'MATERIAL_QUALITY']);
+const POSSESSION: PossessionStatus[] = ['HAVE_KEYS', 'EXPECTED', 'NOT_SURE'];
+const NEEDS = new Set<string>(HOME_NEEDS);
+
+/** A small count, or null. A household of 400 is a probe, not a family. */
+function count(value: unknown, max = 12): number | null {
+  if (typeof value !== 'number' || !Number.isInteger(value)) return null;
+  return value >= 0 && value <= max ? value : null;
+}
+
+function household(value: unknown): Household | null {
+  if (!value || typeof value !== 'object') return null;
+  const h = value as Partial<Household>;
+  const adults = count(h.adults);
+  if (adults === null || adults < 1) return null;
+  return {
+    adults,
+    children: count(h.children) ?? 0,
+    elderly: count(h.elderly) ?? 0,
+    pets: h.pets === true,
+    worksFromHome: h.worksFromHome === true,
+  };
+}
 
 type Locality = (typeof PUNE_LOCALITIES)[number]['slug'];
 const LOCALITY_SLUGS = new Set<string>(PUNE_LOCALITIES.map((l) => l.slug));
@@ -122,5 +148,18 @@ export function sanitiseBrief(input: unknown): Brief {
     styleLikes: tags(raw.styleLikes),
     styleDislikes: tags(raw.styleDislikes),
     priorityRanking: priorities(raw.priorityRanking),
+    // The rest of the brief, for the written read (29 Sep): the engine does not
+    // score these yet, but the read speaks to them. Rebuilt like everything
+    // else here — the name and the number are deliberately NOT carried: the
+    // privacy notice promises the model never receives them.
+    household: household(raw.household),
+    needs: Array.isArray(raw.needs)
+      ? [...new Set(raw.needs.filter((n): n is HomeNeed => typeof n === 'string' && NEEDS.has(n)))]
+      : [],
+    possessionStatus: oneOf(raw.possessionStatus, POSSESSION),
+    possessionOn:
+      typeof raw.possessionOn === 'string' && /^\d{4}-\d{2}(-\d{2})?$/.test(raw.possessionOn)
+        ? raw.possessionOn.slice(0, 10)
+        : null,
   };
 }

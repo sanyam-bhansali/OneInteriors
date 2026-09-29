@@ -26,7 +26,9 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { loadBrief } from '@/modules/brief/store';
+import { loadBrief, saveBrief } from '@/modules/brief/store';
+import { cleanName } from '@/modules/brief/steps';
+import { TIER } from '@/modules/quotation/tiers';
 import { rankStudios, type MatchResult } from '@/modules/matching/score';
 import {
   loadProject,
@@ -46,7 +48,22 @@ import { CompareBar } from './CompareBar';
 import { useScrollFocus } from '@/components/oi/useScrollFocus';
 import { saveQuoteAction, saveDecisionAction } from './journey-actions';
 import type { Studio } from '@/modules/studio/types';
-import type { Brief } from '@/modules/brief/types';
+import { localityLabel, propertyLabel, type Brief } from '@/modules/brief/types';
+
+/**
+ * "your 3 BHK in Kharadi · Premium" — what the ranking is for, in their terms.
+ * Built from what they told us; a part they skipped is simply left out.
+ */
+function forWhat(brief: Brief | null): string | null {
+  if (!brief) return null;
+  const home = propertyLabel(brief.propertyType);
+  const where = localityLabel(brief.locality);
+  const level = brief.tier ? TIER[brief.tier].label : null;
+  const place = [home ? `your ${home}` : 'your home', where ? `in ${where}` : null]
+    .filter(Boolean)
+    .join(' ');
+  return level ? `${place} · ${level}` : place;
+}
 
 /** Bedrooms by configuration, for the quote request. */
 const BEDROOMS: Record<string, number> = {
@@ -61,9 +78,12 @@ export function MatchClient({
   studios,
   allowUnverified,
   filedRates,
+  savedBrief = null,
 }: {
   studios: Studio[];
   allowUnverified: boolean;
+  /** The server's copy, used when this tab holds no brief. See page.tsx. */
+  savedBrief?: Brief | null;
   /**
    * Resolved rates per studio slug, from the server.
    *
@@ -79,8 +99,16 @@ export function MatchClient({
   const [quoting, setQuoting] = useState<QuoteRequest | null>(null);
 
   useEffect(() => {
-    setBrief(loadBrief());
+    const local = loadBrief();
+    if (local.propertyType === null && savedBrief) {
+      // A new tab or another device: take the brief we hold, and keep it here.
+      setBrief(savedBrief);
+      saveBrief(savedBrief);
+    } else {
+      setBrief(local);
+    }
     setProject(loadProject());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
   }, []);
 
   /**
@@ -223,7 +251,11 @@ export function MatchClient({
 
       <Wrap className="py-12">
         {briefed && matches.length > 0 ? (
-          <MatchHero fit={matches.length} />
+          <MatchHero
+            fit={matches.length}
+            name={cleanName(brief?.contactName)}
+            forWhat={forWhat(brief)}
+          />
         ) : (
           <Chapter
             eyebrow="Who fits"

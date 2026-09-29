@@ -22,16 +22,24 @@ import { CountUp } from '@/components/oi/CountUp';
 
 export function MatchHero({
   fit,
+  name,
+  forWhat,
 }: {
   /** How many studios cleared the brief. This is the "top N". */
   fit: number;
+  /** The name they gave on the brief's first screen, if any. */
+  name?: string | null;
+  /** "your 3 BHK in Kharadi · Premium" — what these are the best fits for. */
+  forWhat?: string | null;
 }) {
   const reduced = useReducedMotion();
 
   return (
     <header className="mx-auto max-w-[46rem] pb-2 text-center">
+      {/* Their name, when they gave it — the first thing the brief asked, and
+          the first thing this page says back. */}
       <motion.p {...rise(reduced, 0)} className="oi-eyebrow q-eyebrow-lg m-0 mb-7">
-        Who fits you
+        {name ? `Welcome, ${name}` : 'Who fits you'}
       </motion.p>
 
       <motion.p {...rise(reduced, 0.06)} className="m-0 flex items-baseline justify-center gap-3">
@@ -54,6 +62,12 @@ export function MatchHero({
       >
         Best fits for your brief.
       </motion.h1>
+
+      {forWhat ? (
+        <motion.p {...rise(reduced, 0.18)} className="q-body m-0 mt-3 text-[var(--ink)]">
+          For {forWhat}.
+        </motion.p>
+      ) : null}
 
       {/* Directly below the number, as the footnote to it.
 
