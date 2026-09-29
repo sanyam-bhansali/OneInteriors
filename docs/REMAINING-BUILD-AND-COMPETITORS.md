@@ -73,10 +73,10 @@ civil block**
 |---|---|
 | Book a 30-minute slot; availability in the ops console | ✅ `/ops/experts`; no double booking · ⏳ the expert and their hours |
 | Confirmation email + calendar invite; WhatsApp | ✅ email with .ics · ⏳ WhatsApp template |
-| Expert's pack (everything the customer did) | 🔨 |
-| Customer portal ("Your home"): brief, matches, quotes, booking, introduction, mood board (from `/prepare`), 3D slot | 🔨 · ⏳ your 3D tool |
-| Benefits pass (states: available / unlocks when / claimed) | 🔨 structure · ⏳ benefit terms |
-| Post-meeting check-in feeding the engine | 🔨 |
+| Expert's pack (everything the customer did) | ✅ every answer, stored match reasoning, quotes as seen, stars |
+| Customer portal ("Your home"): brief, matches, quotes, booking, introduction, mood board (from `/prepare`), 3D slot | ✅ `/account`, with family share and one-press consent withdrawal · ⏳ your 3D tool (link appears when `DESIGN_TOOL_URL` is set) |
+| Benefits pass (states: available / unlocks when / claimed) | ✅ five benefits live · ⏳ terms for cashback, referrals, cab, tracker, shoot, hamper (`modules/portal/benefits.ts`) |
+| Post-meeting check-in feeding the engine | ✅ three or more become the studio's communication rating |
 
 ### Phase 7 — the rest
 

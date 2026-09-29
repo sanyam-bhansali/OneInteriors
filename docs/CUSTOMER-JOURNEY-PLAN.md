@@ -482,10 +482,14 @@ fixtures while real studios fill in their profiles.
   and per material, and "Explain the differences" with a figure checker
   and a rules fallback. Still to do: Hindi/Marathi, "listen", the
   one-page comparison brief.
-- **Phase 6 — started.** Real 30-minute slots, booked in one tap, no
-  double booking, confirmation email with a calendar invite, hours in
-  `/ops/experts`. Still to do: the expert's pack, the customer portal,
-  the benefits pass, the post-meeting check-in.
+- **Phase 6 — done, waiting on inputs.** Slot booking with no double
+  booking, `/ops/experts`, confirmation with a calendar invite; the
+  expert's pack; the expert page on the customer's own quotes; "Your home"
+  (`/account`) with matches, the call, the studio and meetings, rooms,
+  the benefits pass, family sharing and consent withdrawal; the
+  after-meeting check-in feeding the communication rating. Waiting: the
+  expert and their hours, benefit terms, the 3D tool, the WhatsApp
+  template.
 - **Migrations to deploy:** `20260929100000_waitlist_signups_lockdown`,
   `20260929110000_brief_possession_status`,
   `20260929120000_brief_contact_and_home`, `20260929130000_auth_identities`,
@@ -494,7 +498,7 @@ fixtures while real studios fill in their profiles.
   `20260929160000_studio_payment_phases`,
   `20260929170000_studio_matching_profile`,
   `20260929180000_portfolio_matching_fields`, `20260929190000_studio_band`,
-  `20260929200000_expert_booking`.
+  `20260929200000_expert_booking`, `20260929210000_meeting_check_ins`.
 
 ---
 
