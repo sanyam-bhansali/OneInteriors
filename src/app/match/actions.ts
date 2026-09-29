@@ -27,6 +27,8 @@
 import { headers } from 'next/headers';
 import { cachedRoster } from '@/modules/studio/roster-cache';
 import { rankStudios } from '@/modules/matching/score';
+import { resolveRatesForMany } from '@/modules/quotation/resolve-rates';
+import { filedRatesFor } from '@/data/filed-rates';
 import { explainMatch, type Explanation } from '@/modules/matching/explain';
 import { sanitiseBrief } from '@/modules/matching/sanitise';
 import { showUnverifiedStudios } from '@/lib/env';
@@ -99,9 +101,12 @@ export async function explainAction(brief: Brief, studioId: string): Promise<Exp
   const studio = studios.find((s) => s.id === studioId);
   if (!studio) return { text: '', source: 'rules' };
 
-  // Recomputed here rather than trusting a score posted from the browser.
+  // Recomputed here rather than trusting a score posted from the browser —
+  // on the same rates the card was scored on, or the two would disagree.
+  const resolved = await resolveRatesForMany(studios.map((s) => s.slug));
   const match = rankStudios(safe, studios, 99, {
     allowUnverified: showUnverifiedStudios(),
+    ratesFor: (slug) => resolved[slug]?.rates ?? filedRatesFor(slug),
   }).find((m) => m.studioId === studioId);
 
   if (!match) return { text: '', source: 'rules' };

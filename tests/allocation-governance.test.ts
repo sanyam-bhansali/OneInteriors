@@ -108,6 +108,12 @@ describe('the matching engine cannot see money', () => {
     join(process.cwd(), 'src/modules/matching/score.ts'),
     'utf8',
   );
+  /* The factor signals live beside the engine since match@2.0.0; the money
+     rule covers them too. */
+  const signalsSource = readFileSync(
+    join(process.cwd(), 'src/modules/matching/signals.ts'),
+    'utf8',
+  );
 
   /**
    * Named identifiers, not loose words.
@@ -136,6 +142,9 @@ describe('the matching engine cannot see money', () => {
       expect(source.toLowerCase(), `score.ts references "${name}"`).not.toContain(
         name.toLowerCase(),
       );
+      expect(signalsSource.toLowerCase(), `signals.ts references "${name}"`).not.toContain(
+        name.toLowerCase(),
+      );
     }
   });
 
@@ -153,15 +162,16 @@ describe('the matching engine cannot see money', () => {
 
     // Everything else about allocation is invisible to ranking. `pauseCause`
     // included: why a studio is out makes no difference to who fits a brief.
-    for (const field of ['capacityPerMonth', 'pauseCause', 'pausedReason']) {
-      expect(source, `score.ts reads ${field}`).not.toContain(field);
+    for (const field of ['capacityPerMonth', 'pauseCause', 'pausedReason', 'pausedAt']) {
+      if (field !== 'pausedAt') expect(source, `score.ts reads ${field}`).not.toContain(field);
+      expect(signalsSource, `signals.ts reads ${field}`).not.toContain(field);
     }
 
     // And the one field it does read may only ever remove a studio. If
     // `pausedAt` ever appears outside the hard filters, this stops being true.
     const filterBody = source.slice(
-      source.indexOf('export function passesHardFilters'),
-      source.indexOf('// ── Factors'),
+      source.indexOf('export function failedFilter'),
+      source.indexOf('// ── Composition'),
     );
     expect(filterBody).toContain('studio.pausedAt');
     expect(source.split('studio.pausedAt').length - 1, 'pausedAt read more than once').toBe(1);

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { EMPTY_BRIEF, type Brief } from '@/modules/brief/types';
 import { rankStudios, scoreMatch, passesHardFilters, WEIGHTS } from '@/modules/matching/score';
+import { deliveredBudgetFit } from '@/modules/matching/signals';
 import { STUDIOS, getStudioById } from '@/data/studios';
 import { lakhsToPaise } from '@/lib/money';
 import type { Studio } from '@/modules/studio/types';
@@ -105,7 +106,8 @@ describe('cold start — the honesty rule', () => {
     const permissive: Brief = { ...baseBrief, locality: 'kothrud', styleDislikes: [] };
     const result = scoreMatch(permissive, noRecord);
     expect(result).not.toBeNull();
-    expect(result!.breakdown.deliveryReliability).toBeNull();
+    // No possession date in this brief, so timing cannot be measured.
+    expect(result!.breakdown.timeline).toBeNull();
     expect(result!.factorsScored).toBeLessThan(result!.factorsTotal);
   });
 
@@ -202,21 +204,18 @@ describe('an open-ended budget (the top band)', () => {
   });
 
   it('is still measured', () => {
-    const result = scoreMatch(floorOnly, withWork([28, 35, 40, 45]));
-    expect(result?.breakdown.budgetFit).not.toBeNull();
+    expect(deliveredBudgetFit(floorOnly, withWork([28, 35, 40, 45]))).not.toBeNull();
   });
 
   it('scores work entirely above the floor as a full fit', () => {
-    expect(scoreMatch(floorOnly, withWork([32, 36, 40, 44]))?.breakdown.budgetFit).toBe(100);
+    expect(deliveredBudgetFit(floorOnly, withWork([32, 36, 40, 44]))?.value).toBe(100);
   });
 
   it('scores work entirely below the floor as no fit', () => {
-    expect(scoreMatch(floorOnly, withWork([8, 10, 12, 14]))?.breakdown.budgetFit).toBe(0);
+    expect(deliveredBudgetFit(floorOnly, withWork([8, 10, 12, 14]))?.value).toBe(0);
   });
 
-  it('leaves a brief with both ends scoring exactly as before', () => {
-    const both = scoreMatch(baseBrief, proven);
-    expect(both?.breakdown.budgetFit).not.toBeNull();
-    expect(both?.engineVersion).toBe('match@1.0.1');
+  it('stamps the v2 engine', () => {
+    expect(scoreMatch(baseBrief, proven)?.engineVersion).toBe('match@2.0.0');
   });
 });

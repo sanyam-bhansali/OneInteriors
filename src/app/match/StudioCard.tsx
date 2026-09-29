@@ -44,7 +44,7 @@ import { Glass, revealProps } from '@/components/oi/Surfaces';
 import { ProjectWings } from './ProjectWings';
 import type { Focus } from '@/components/oi/useScrollFocus';
 import type { Studio } from '@/modules/studio/types';
-import type { MatchResult } from '@/modules/matching/score';
+import { ENGINE_VERSION, FACTOR_LABELS, type FactorKey, type MatchResult } from '@/modules/matching/score';
 import { localityLabel, type Brief } from '@/modules/brief/types';
 
 /** Two letters from the trade name. "Chitra & Co." → CC, "Teakline" → TE. */
@@ -107,7 +107,9 @@ export function StudioCard({
   const reduced = useReducedMotion();
   const [open, setOpen] = useState(false);
 
-  const key = briefKey(brief);
+  // The engine version is part of the key: a read written under an older
+  // engine explains a score that no longer exists.
+  const key = `${briefKey(brief)}|${ENGINE_VERSION}`;
   const fresh = cachedRead?.briefKey === key ? cachedRead : undefined;
   const [read, setRead] = useState<Explanation | null>(
     fresh ? { text: fresh.text, source: fresh.source } : null,
@@ -216,6 +218,20 @@ export function StudioCard({
         />
       </div>
 
+      {/* When they can start, against when you can — either way, on every card. */}
+      {match.timeline ? (
+        <p
+          className={`q-small m-0 mt-4 ${match.timeline.late ? 'text-[var(--acc-ink)]' : 'text-[var(--ink2)]'}`}
+        >
+          {match.timeline.line}
+        </p>
+      ) : null}
+      {match.widened ? (
+        <p className="oi-label m-0 mt-2">
+          {match.widened === 'ANY_ZONE' ? 'Works in another part of Pune' : 'One level above the one you chose'}
+        </p>
+      ) : null}
+
       {/* ── The read ── */}
       <div className="mt-5 border-t border-[var(--line)] pt-4">
         <p className="oi-eyebrow m-0 mb-2">Why this one fits you</p>
@@ -290,6 +306,23 @@ export function StudioCard({
         >
           <div className="mt-5 border-t border-[var(--line)] pt-4">
             <p className="oi-eyebrow m-0 mb-3">What the score is made of</p>
+            {match.evidence ? (
+              <dl className="m-0 mb-4 grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-[10rem_1fr]">
+                {(Object.keys(FACTOR_LABELS) as FactorKey[]).map((key) => (
+                  <div key={key} className="contents">
+                    <dt className="oi-label m-0">
+                      {FACTOR_LABELS[key]}
+                      {match.breakdown[key] === null ? '' : ` · ${match.breakdown[key]}`}
+                    </dt>
+                    <dd className="q-small m-0 text-[var(--ink2)]">
+                      {match.breakdown[key] === null
+                        ? 'Not known yet — not counted either way'
+                        : (match.evidence?.[key] ?? 'Measured')}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
             <ul className="m-0 flex list-none flex-col gap-2 p-0">
               {match.reasoning.map((line) => (
                 <li key={line} className="q-small text-[var(--ink2)]">

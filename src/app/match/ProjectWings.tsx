@@ -171,7 +171,7 @@ export function ProjectWings({
               "eight checks exist"; this is the only thing on screen that stops
               it doing so. */}
           {proof.more > 0 ? (
-            <PillNote i={proof.right.length}>+{proof.more} more on their profile</PillNote>
+            <PillNote i={proof.right.length}>+{proof.more} more {proof.more === 1 ? 'check' : 'checks'} on their profile</PillNote>
           ) : null}
         </Drawer>
       ) : null}

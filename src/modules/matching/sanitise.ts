@@ -22,9 +22,14 @@ import 'server-only';
  * a case the prompt already handles ("locality not given").
  */
 
+import { cleanSociety } from '@/modules/brief/mapping';
+import { ITEM, ROOMS, type Room } from '@/modules/quotation/catalogue';
+import { TIERS } from '@/modules/quotation/tiers';
 import {
   EMPTY_BRIEF,
   HOME_NEEDS,
+  LANGUAGES,
+  type PlanUse,
   PUNE_LOCALITIES,
   STYLE_TAGS,
   type Brief,
@@ -44,6 +49,7 @@ const INVOLVEMENTS: Involvement[] = ['DECIDE_FOR_ME', 'COLLABORATE', 'APPROVE_EV
 const PRIORITIES = new Set<string>(['BUDGET', 'SPEED', 'DESIGN_AMBITION', 'MATERIAL_QUALITY']);
 const POSSESSION: PossessionStatus[] = ['HAVE_KEYS', 'EXPECTED', 'NOT_SURE'];
 const NEEDS = new Set<string>(HOME_NEEDS);
+const ROOM_SET = new Set<string>(ROOMS);
 
 /** A small count, or null. A household of 400 is a probe, not a family. */
 function count(value: unknown, max = 12): number | null {
@@ -73,8 +79,8 @@ const TAGS = new Set<string>(STYLE_TAGS);
 const MIN_PAISE = 100;
 const MAX_PAISE = 10_00_00_000_00;
 
-function oneOf<T extends string>(value: unknown, allowed: T[]): T | null {
-  return typeof value === 'string' && (allowed as string[]).includes(value) ? (value as T) : null;
+function oneOf<T extends string>(value: unknown, allowed: readonly T[]): T | null {
+  return typeof value === 'string' && (allowed as readonly string[]).includes(value) ? (value as T) : null;
 }
 
 function money(value: unknown): number | null {
@@ -161,5 +167,38 @@ export function sanitiseBrief(input: unknown): Brief {
       typeof raw.possessionOn === 'string' && /^\d{4}-\d{2}(-\d{2})?$/.test(raw.possessionOn)
         ? raw.possessionOn.slice(0, 10)
         : null,
+    // What match@2.0.0 filters and scores on (29 Sep): the band, the scope's
+    // rooms and unticked items, the society (for "a home in your building" —
+    // scored here, never put in the prompt), the plan's bathrooms and kitchen,
+    // and the language tie-breaker.
+    tier: oneOf(raw.tier, TIERS),
+    society: cleanSociety(typeof raw.society === 'string' ? raw.society : null),
+    scopeRooms: Array.isArray(raw.scopeRooms)
+      ? [...new Set(raw.scopeRooms.filter((r): r is Room => typeof r === 'string' && ROOM_SET.has(r)))]
+      : [],
+    excludedItems: Array.isArray(raw.excludedItems)
+      ? [...new Set(raw.excludedItems.filter((c): c is string => typeof c === 'string' && c in ITEM))]
+      : [],
+    planReading: planUse(raw.planReading),
+    language: oneOf(raw.language, LANGUAGES),
+  };
+}
+
+/** A confirmed plan reading, rebuilt field by field, or null. */
+function planUse(value: unknown): PlanUse | null {
+  if (!value || typeof value !== 'object') return null;
+  const v = value as Partial<PlanUse>;
+  const bathrooms = count(v.bathrooms, 8);
+  if (bathrooms === null || bathrooms < 1) return null;
+  const run =
+    typeof v.kitchenRunMm === 'number' && v.kitchenRunMm >= 1500 && v.kitchenRunMm <= 9000
+      ? Math.round(v.kitchenRunMm)
+      : null;
+  const sources = ['printed', 'computed', 'customer'] as const;
+  return {
+    kitchenRunMm: run,
+    bathrooms,
+    hasStudy: v.hasStudy === true,
+    areaSource: oneOf(v.areaSource, sources),
   };
 }

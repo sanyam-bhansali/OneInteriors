@@ -30,7 +30,26 @@ import { loadBrief, saveBrief } from '@/modules/brief/store';
 import { cleanName } from '@/modules/brief/steps';
 import { TIER } from '@/modules/quotation/tiers';
 import { formatINRCompact } from '@/lib/money';
-import { rankStudios, type MatchResult } from '@/modules/matching/score';
+import {
+  FILTER_REASON_LABELS,
+  rankStudios,
+  whyNotTheOthers,
+  wideningsFor,
+  type MatchResult,
+  type Widening,
+} from '@/modules/matching/score';
+
+/**
+ * Offer "show the band above too" when fewer than three fit? Waits on the
+ * owner's yes (docs/REMAINING-BUILD-AND-COMPETITORS.md, "What I need from
+ * you"). The engine and the offer are built; this is the switch.
+ */
+const BAND_UP_APPROVED = false;
+
+const WIDENING_COPY: Record<Widening, string> = {
+  ANY_ZONE: 'Include studios from other parts of Pune',
+  BAND_UP: 'Show the level above yours too, clearly marked',
+};
 import {
   loadProject,
   saveProject,
@@ -167,9 +186,34 @@ export function MatchClient({
    */
   const briefed = brief !== null && brief.propertyType !== null;
 
+  /* One-tap widenings the customer has chosen — offered by name, with the
+     count each adds, when fewer than three studios fit (plan §4.4). */
+  const [widen, setWiden] = useState<Widening[]>([]);
+  const rankOptions = useMemo(
+    () => ({
+      allowUnverified,
+      // Each studio's rates, so the budget priority reads its quote for THIS home.
+      ratesFor: (slug: string) => filedRates?.[slug] ?? filedRatesFor(slug),
+    }),
+    [allowUnverified, filedRates],
+  );
+
   const matches = useMemo(
-    () => (briefed && brief ? rankStudios(brief, studios, 6, { allowUnverified }) : []),
-    [briefed, brief, studios, allowUnverified],
+    () => (briefed && brief ? rankStudios(brief, studios, 6, { ...rankOptions, widen }) : []),
+    [briefed, brief, studios, rankOptions, widen],
+  );
+
+  const offers = useMemo(
+    () =>
+      briefed && brief && matches.length < 3
+        ? wideningsFor(brief, studios, rankOptions, BAND_UP_APPROVED).filter((o) => !widen.includes(o.kind))
+        : [],
+    [briefed, brief, studios, rankOptions, matches.length, widen],
+  );
+
+  const others = useMemo(
+    () => (briefed && brief ? whyNotTheOthers(brief, studios, { ...rankOptions, widen }) : []),
+    [briefed, brief, studios, rankOptions, widen],
   );
 
   const byId = useMemo(() => new Map(studios.map((s) => [s.id, s])), [studios]);
@@ -411,15 +455,15 @@ export function MatchClient({
             </p>
             <Quiet href="/quiz">Start the brief</Quiet>
           </Sheet>
-        ) : matches.length === 0 ? (
+        ) : matches.length === 0 && offers.length === 0 ? (
           <Sheet className="p-8">
             <p className="m-0 mb-4 max-w-[54ch] text-[15px] leading-[1.6]">
-              Nothing on the roster matches this brief — usually the locality or the budget band.
-              Widening either is the quickest fix.
+              Nothing on the roster matches this brief — usually the level or the kind of work.
+              Changing either is the quickest fix.
             </p>
             <Quiet href="/quiz">Change your answers</Quiet>
           </Sheet>
-        ) : (
+        ) : matches.length === 0 ? null : (
           <ul className="mx-auto m-0 mt-12 flex max-w-[40rem] list-none flex-col gap-6 p-0">
             {matches.map((match: MatchResult, i) => {
               const studio = byId.get(match.studioId);
@@ -459,6 +503,48 @@ export function MatchClient({
             })}
           </ul>
         )}
+
+        {/* Fewer than three: said plainly, with named one-tap widenings and
+            what each adds — never a silent loosening of what they asked for. */}
+        {briefed && offers.length > 0 ? (
+          <Sheet className="mx-auto mt-10 max-w-[40rem] p-6">
+            <p className="m-0 mb-4 text-[15px] leading-[1.6]">
+              {matches.length === 0
+                ? 'No studio fits everything you asked for yet.'
+                : `Only ${matches.length === 1 ? 'one studio fits' : `${matches.length} studios fit`} everything you asked for.`}{' '}
+              We would rather tell you than pad the list.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {offers.map((o) => (
+                <button
+                  key={o.kind}
+                  type="button"
+                  onClick={() => setWiden((w) => [...w, o.kind])}
+                  className="min-h-11 cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-5 py-2.5 text-[14px] font-semibold text-[var(--ink)] hover:border-[var(--ink2)]"
+                >
+                  {WIDENING_COPY[o.kind]} (+{o.adds})
+                </button>
+              ))}
+            </div>
+          </Sheet>
+        ) : null}
+
+        {/* Why not the others — the roster is small enough to say, and a
+            customer who knows a studio by name should not wonder. */}
+        {briefed && others.length > 0 ? (
+          <details className="mx-auto mt-10 max-w-[40rem]">
+            <summary className="cursor-pointer text-[14px] font-semibold text-[var(--ink2)]">
+              Why not the others ({others.length})
+            </summary>
+            <ul className="m-0 mt-3 flex list-none flex-col gap-1.5 p-0">
+              {others.map((o) => (
+                <li key={o.studioId} className="text-[13.5px] text-[var(--ink2)]">
+                  <span className="text-[var(--ink)]">{o.name}</span> — {FILTER_REASON_LABELS[o.reason]}
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </Wrap>
 
       <CompareBar selected={comparing.length} minimum={MIN_TO_COMPARE} priced={quoted.length} />

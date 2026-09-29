@@ -1,47 +1,79 @@
 /**
- * Matching engine v1 — deterministic, rules-based, explainable.
+ * Matching engine — deterministic, rules-based, explainable. `match@2.0.0`,
+ * built to docs/CUSTOMER-JOURNEY-PLAN.md §5.
  *
  * Design constraints, in priority order:
  *  1. Every score must be explainable to the customer in plain sentences that
- *     quote their own inputs back. A score they cannot check is marketing, and
- *     they detect it within two sessions.
+ *     quote their own inputs back. A score they cannot check is marketing.
  *  2. Unmeasurable factors return null. We NEVER redistribute their weight to
- *     manufacture a flattering number — the UI says "matched on 4 of 6 factors".
+ *     manufacture a flattering number — the card says what was measured.
  *  3. The engine is versioned. A stored match keeps the version that produced
  *     it, so an old score is never silently reinterpreted under new weights.
  *  4. No ML until >500 completed projects. Transparency beats accuracy here.
+ *
+ * ## What changed from 1.x
+ *
+ * - **Filters stack band × scope × zone.** A customer who chose Premium sees
+ *   Premium studios. A studio that takes homes anywhere in Pune passes the
+ *   zone filter and is ranked on place instead (§4.4).
+ * - **Every priority has its own signal** (signals.ts) instead of re-reading
+ *   another factor: budget reads this studio's quote for this home, speed
+ *   reads when they can start against possession, design reads services and
+ *   depth, material reads carcass, warranty and factory. The customer's
+ *   ranking splits 30 points 12 / 9 / 6 / 3.
+ * - **Style earns partial credit** between neighbouring styles (style-affinity.ts).
+ * - **Similar work** is scope, size and place — "a home in your society".
+ * - **Household and needs** meet the studio's specialisms and tagged projects.
+ * - **The order is confidence-adjusted**, so a studio measured on half the
+ *   factors cannot outrank one measured on all of them on thin evidence. The
+ *   displayed number is still normalised over what was measured.
  */
 
-import type { Brief, PriorityFactor } from '@/modules/brief/types';
-import { STYLE_LABELS, localityLabel, zoneOf } from '@/modules/brief/types';
+import type { Brief } from '@/modules/brief/types';
+import { STYLE_LABELS, zoneOf } from '@/modules/brief/types';
 import type { Studio } from '@/modules/studio/types';
-import { MIN_PROJECTS_FOR_RELIABILITY } from '@/modules/studio/types';
+import type { StudioRates } from '@/modules/quotation/catalogue';
+import { TIERS, type Tier } from '@/modules/quotation/tiers';
+import { scopeShare } from '@/modules/quotation/scope-band';
+import { selectionOf } from '@/modules/quotation/scope';
+import { homeShapeFor } from '@/modules/quotation/first-quote';
+import { zonesServed } from '@/modules/studio/coverage';
+import {
+  dislikedShare,
+  householdFit,
+  priorities,
+  similarWork,
+  styleFit,
+  timelineFit,
+  workingStyle,
+  type Signal,
+  type SignalContext,
+} from './signals';
 
 /**
- * 1.0.1 (29 Sep 2026): budget fit scores an open-ended budget — the Luxury
- * band has a floor and no ceiling — instead of returning null for it. Every
- * brief that has both ends scores exactly as it did under 1.0.0.
+ * 2.0.0 (29 Sep 2026): the §5 engine — band, scope and zone filters; six
+ * factors with their own signals; confidence-adjusted order.
  */
-export const ENGINE_VERSION = 'match@1.0.1';
+export const ENGINE_VERSION = 'match@2.0.0';
 
 export const WEIGHTS = {
-  styleOverlap: 25,
-  budgetFit: 20,
-  workingStyle: 20,
-  deliveryReliability: 15,
-  scopeExperience: 10,
-  priorityAlignment: 10,
+  style: 30,
+  priorities: 30,
+  similarWork: 15,
+  workingStyle: 10,
+  household: 10,
+  timeline: 5,
 } as const;
 
 export type FactorKey = keyof typeof WEIGHTS;
 
 export const FACTOR_LABELS: Record<FactorKey, string> = {
-  styleOverlap: 'Style overlap',
-  budgetFit: 'Budget fit',
+  style: 'Style',
+  priorities: 'Your priorities',
+  similarWork: 'Work like yours',
   workingStyle: 'Working style',
-  deliveryReliability: 'Delivery reliability',
-  scopeExperience: 'Scope experience',
-  priorityAlignment: 'Your top priority',
+  household: 'Your household',
+  timeline: 'Timing',
 };
 
 /** null = not measurable yet. Never coerce to 0 or to the mean. */
@@ -49,12 +81,27 @@ export type FactorScores = Record<FactorKey, number | null>;
 
 export interface MatchResult {
   studioId: string;
+  /** The displayed score: normalised over what was measured. */
   score: number;
   factorsScored: number;
   factorsTotal: number;
   breakdown: FactorScores;
   reasoning: string[];
   engineVersion: string;
+  /** How much of the 100 points could be measured. */
+  measuredWeight?: number;
+  /** The confidence-adjusted score the order uses. Never displayed. */
+  orderScore?: number;
+  /** One line of evidence per measured factor, for the card. */
+  evidence?: Partial<Record<FactorKey, string>>;
+  /** "Can start in January, when you get the keys" — and whether it is late. */
+  timeline?: { line: string; late: boolean } | null;
+  /** Their projects most like this home, best first. */
+  similarProjects?: string[];
+  /** Homes they have done in the customer's society and area — checkable facts. */
+  local?: { society: number; area: number };
+  /** Set when a widening let this studio in — the card says so. */
+  widened?: Widening;
 }
 
 const FACTOR_COUNT = Object.keys(WEIGHTS).length;
@@ -62,276 +109,176 @@ const FACTOR_COUNT = Object.keys(WEIGHTS).length;
 /** Above this share of a studio's work in a rejected style, it is not shown. */
 export const MAX_DISLIKED_SHARE = 0.4;
 
-/**
- * Share of a studio's tagged work sitting in a style the customer ruled out.
- * null when there is nothing to measure. Used both to exclude and to phrase the
- * reasoning honestly — the same number, so the two can never disagree.
- */
-function dislikedShare(brief: Brief, studio: Studio): number | null {
-  if (brief.styleDislikes.length === 0) return null;
-  const tags = studio.portfolio.flatMap((p) => p.styleTags);
-  if (tags.length === 0) return null;
-  const disliked = new Set<string>(brief.styleDislikes);
-  return tags.filter((t) => disliked.has(t)).length / tags.length;
+// ── Options ────────────────────────────────────────────────────
+
+export type Widening = 'ANY_ZONE' | 'BAND_UP';
+
+export interface RankOptions {
+  /**
+   * Let studios through that are not yet ACTIVE and verified, or whose band
+   * ops has not confirmed — so the funnel can be walked end to end before the
+   * roster is set up. Decided on the server (`showUnverifiedStudios()`, which
+   * refuses once the roster is declared real). A caller that passes nothing
+   * gets the strict behaviour.
+   */
+  allowUnverified?: boolean;
+  /** The studio's rates, to price this home for the budget priority. */
+  ratesFor?: (slug: string) => StudioRates | undefined;
+  /** Injected for deterministic tests. */
+  today?: Date;
+  /** One-tap widenings, offered by name when fewer than three fit. */
+  widen?: Widening[];
 }
 
 // ── Hard filters ───────────────────────────────────────────────
 // These run before scoring. A studio failing one is not ranked low — it is not
 // shown at all. A bad match displayed at 41% still costs trust.
 
-/**
- * Options that only a server may decide.
- *
- * `score.ts` is pure and is imported by `MatchClient`, which ranks studios **in
- * the browser** — so it cannot read an environment variable, and the one that
- * matters here (`DEV_SHOW_UNVERIFIED_STUDIOS`) is deliberately not
- * `NEXT_PUBLIC_`. The decision is therefore made on the server and passed in.
- */
-export interface RankOptions {
-  /**
-   * Let studios through that are not yet ACTIVE and not yet verified.
-   *
-   * ## Why this exists
-   *
-   * The roster query in `prisma-repository.ts` already honours
-   * `showUnverifiedStudios()` and drops its `status = 'ACTIVE'` filter — but
-   * these two lines re-applied the same gate afterwards, so the flag worked on
-   * `/studios` and silently did nothing on `/match`, `/quotes`, `/compare` and
-   * `/expert`. Those are precisely the four pages `env.ts` names as the reason
-   * the flag exists: without them the funnel cannot be walked end to end before
-   * a studio has been verified.
-   *
-   * Two gates for one decision, drifted apart. This is the same gate, made
-   * explicit, with the safe answer as the default: a caller that passes nothing
-   * gets the strict behaviour.
-   *
-   * `showUnverifiedStudios()` itself refuses to return true once the roster is
-   * declared real, so this cannot survive launch however it is passed.
-   */
-  allowUnverified?: boolean;
+export type FilterReason =
+  | 'NOT_VERIFIED'
+  | 'PAUSED'
+  | 'DISLIKED_STYLE'
+  | 'OTHER_BAND'
+  | 'SCOPE'
+  | 'NO_CIVIL'
+  | 'ZONE'
+  | 'MINIMUM';
+
+/** "Why not the others" — one plain line per reason. */
+export const FILTER_REASON_LABELS: Record<FilterReason, string> = {
+  NOT_VERIFIED: 'Not yet verified',
+  PAUSED: 'Not taking new projects right now',
+  DISLIKED_STYLE: 'Much of their work is in a style you ruled out',
+  OTHER_BAND: 'Works at a different level from the one you chose',
+  SCOPE: 'Does not take this kind of work',
+  NO_CIVIL: 'Does not do the civil work a renovation needs',
+  ZONE: 'Does not work in your part of Pune',
+  MINIMUM: 'Their minimum for this work is above your range',
+};
+
+function nextBand(t: Tier): Tier | null {
+  return TIERS[TIERS.indexOf(t) + 1] ?? null;
 }
 
-export function passesHardFilters(
-  brief: Brief,
-  studio: Studio,
-  options: RankOptions = {},
-): boolean {
+/** The first filter a studio fails for this brief, or null when it passes. */
+export function failedFilter(brief: Brief, studio: Studio, options: RankOptions = {}): FilterReason | null {
   if (!options.allowUnverified) {
-    if (studio.status !== 'ACTIVE') return false;
-    if (studio.tier === 'UNVERIFIED') return false;
+    if (studio.status !== 'ACTIVE') return 'NOT_VERIFIED';
+    if (studio.tier === 'UNVERIFIED') return 'NOT_VERIFIED';
   }
 
-  /**
-   * Paused studios are excluded outright, not ranked low.
-   *
-   * A studio pauses when it is at capacity, away, or under investigation. In
-   * every one of those cases showing it to a customer spends the single
-   * introduction we get on a studio that cannot take the work — worse than
-   * showing one fewer option. This is also the only allocation field the
-   * matching engine is allowed to read, and it can only ever remove a studio,
-   * never move one up.
-   */
-  // Truthiness, not `!== null`, deliberately. A fixture or a mapper that
-  // forgets this field leaves it `undefined`, and `undefined !== null` is true —
-  // which silently pauses the entire roster and empties every customer's
-  // results. That exact bug cost an afternoon; a missing field should fail open
-  // here, not closed.
-  if (studio.pausedAt) return false;
+  // Truthiness, not `!== null`: a mapper that forgets this field leaves it
+  // undefined, and a missing field must fail open, not pause the roster.
+  if (studio.pausedAt) return 'PAUSED';
 
   // Q5 anti-style is an exclusion, not a weight.
   const share = dislikedShare(brief, studio);
-  if (share !== null && share > MAX_DISLIKED_SHARE) return false;
+  if (share !== null && share > MAX_DISLIKED_SHARE) return 'DISLIKED_STYLE';
 
-  // Budget: exclude only on a hard miss, so we don't over-filter thin supply.
-  if (brief.budgetMaxPaise !== null && studio.minProjectPaise !== null) {
-    if (studio.minProjectPaise > brief.budgetMaxPaise * 2) return false;
+  /* The band. A customer who chose Premium sees Premium studios — the owner's
+     rule (29 Sep). A studio ops has not placed in a band is in none of them;
+     only the pre-launch gate lets it through. */
+  if (brief.tier) {
+    const allowed = new Set<Tier>([brief.tier]);
+    const up = nextBand(brief.tier);
+    if (up && options.widen?.includes('BAND_UP')) allowed.add(up);
+    if (studio.band) {
+      if (!allowed.has(studio.band)) return 'OTHER_BAND';
+    } else if (!options.allowUnverified) {
+      return 'OTHER_BAND';
+    }
   }
 
-  /**
-   * Locality, by ZONE rather than by exact match.
-   *
-   * This used to require the studio to have ticked the customer's exact
-   * locality, which was reasonable while the list had twelve entries: a studio
-   * ticking six covered half of Pune, so overlap was the normal case.
-   *
-   * The list is now sixty-four, because studios and customers both wanted
-   * their actual neighbourhood rather than the nearest famous one. At that
-   * size an exact-match filter is a trap — ticking six covers a tenth of the
-   * city, and a customer in Pashan would be told nobody matches while three
-   * studios who work in Baner, ten minutes away, sat excluded.
-   *
-   * So the hard filter asks the honest question — does this studio work in
-   * this part of Pune — and the exact locality stays where it belongs, as a
-   * scoring bonus further down: "they have finished four homes in Kharadi" is
-   * worth saying, and is not worth excluding everyone else over.
-   *
-   * A studio whose ticked localities are all unknown to us (an older row, a
-   * slug since retired) yields no zones, and we fail OPEN rather than hiding
-   * them — the same reasoning as the `pausedAt` note above.
-   */
-  if (brief.locality && studio.localities.length > 0) {
+  // Scope. A studio that has not said which work it takes fails open here —
+  // its portfolio then decides how well it fits, in similar work.
+  const profile = studio.matchingProfile;
+  if (brief.scope && profile && profile.scopes.length > 0 && !profile.scopes.includes(brief.scope)) return 'SCOPE';
+  if (brief.scope === 'RENOVATION' && profile?.civil === 'NONE') return 'NO_CIVIL';
+
+  // Zone — city-wide studios pass and are ranked on place instead (§4.4).
+  if (brief.locality && !options.widen?.includes('ANY_ZONE') && !profile?.cityWide) {
     const wanted = zoneOf(brief.locality);
-    const served = new Set(studio.localities.map(zoneOf).filter(Boolean));
-    if (wanted && served.size > 0 && !served.has(wanted)) return false;
+    const served = zonesServed(studio);
+    // A studio whose areas are all unknown to us yields no zones: fail open.
+    if (wanted && served.length > 0 && !served.includes(wanted)) return 'ZONE';
   }
 
-  return true;
-}
-
-// ── Factors ────────────────────────────────────────────────────
-
-function scoreStyleOverlap(brief: Brief, studio: Studio): number | null {
-  if (brief.styleLikes.length === 0) return null;
-  const tags = studio.portfolio.flatMap((p) => p.styleTags);
-  if (tags.length === 0) return null;
-
-  const liked = new Set<string>(brief.styleLikes);
-  const hits = tags.filter((t) => liked.has(t)).length;
-
-  // Share of the studio's body of work sitting in the customer's direction.
-  // Divided by 0.6 so a studio need not be 100% one style to score full marks.
-  return clamp((hits / tags.length / 0.6) * 100);
-}
-
-function scoreBudgetFit(brief: Brief, studio: Studio): number | null {
-  if (brief.budgetMinPaise === null) return null;
-
-  // Prefer the studio's ACTUAL delivered values over their claimed range.
-  // Claimed ranges are aspirational; delivered values are not.
-  const delivered = studio.portfolio
-    .map((p) => p.valuePaise)
-    .filter((v): v is number => v !== null)
-    .sort((a, b) => a - b);
-
-  let lo: number;
-  let hi: number;
-
-  if (delivered.length >= 3) {
-    lo = delivered[Math.floor(delivered.length * 0.1)];
-    hi = delivered[Math.min(delivered.length - 1, Math.floor(delivered.length * 0.9))];
-  } else if (studio.minProjectPaise !== null && studio.maxProjectPaise !== null) {
-    lo = studio.minProjectPaise;
-    hi = studio.maxProjectPaise;
-  } else {
-    return null;
+  // Minimums. The studio's declared minimum for this kind of work, against
+  // the top of the customer's range for it — with 25% grace, so thin supply
+  // is not filtered on a rounding difference.
+  const scope = brief.scope ?? 'FULL_HOME';
+  const min = profile?.minimumLakhs[scope];
+  if (brief.budgetMaxPaise !== null && min !== undefined) {
+    const shape = homeShapeFor(brief);
+    const part = scopeShare(shape, selectionOf(brief)) ?? 1;
+    if (min * 100_000 * 100 > brief.budgetMaxPaise * part * 1.25) return 'MINIMUM';
+  } else if (brief.budgetMaxPaise !== null && studio.minProjectPaise !== null && scope === 'FULL_HOME') {
+    // v1's rule, kept for studios without a per-scope minimum.
+    if (studio.minProjectPaise > brief.budgetMaxPaise * 2) return 'MINIMUM';
   }
 
-  /**
-   * The top band is a floor, not a range.
-   *
-   * Luxury has no ceiling (₹2,500/sq ft and up), so choosing it sets a
-   * minimum and no maximum. Scoring that as "unmeasured" would drop the
-   * budget factor for every Luxury customer — the one group for whom a studio
-   * that only does ₹8 lakh flats is most plainly wrong. So the question
-   * becomes: how much of what this studio delivers sits at or above the floor?
-   */
-  if (brief.budgetMaxPaise === null) {
-    if (hi <= lo) return hi >= brief.budgetMinPaise ? 100 : 0;
-    const above = Math.max(0, hi - Math.max(lo, brief.budgetMinPaise));
-    return clamp((above / (hi - lo)) * 100);
-  }
-
-  const overlap = rangeOverlap(brief.budgetMinPaise, brief.budgetMaxPaise, lo, hi);
-  const width = brief.budgetMaxPaise - brief.budgetMinPaise;
-  if (width <= 0) return overlap > 0 ? 100 : 0;
-
-  return clamp((overlap / width) * 100);
+  return null;
 }
 
-function scoreWorkingStyle(brief: Brief, studio: Studio): number | null {
-  if (!brief.involvement) return null;
-  if (studio.autonomyProfile === null || studio.communicationRating === null) return null;
-
-  const want =
-    brief.involvement === 'DECIDE_FOR_ME' ? 0 : brief.involvement === 'COLLABORATE' ? 0.5 : 1;
-
-  const fit = 1 - Math.abs(want - studio.autonomyProfile);
-  const comms = (studio.communicationRating - 1) / 4;
-
-  return clamp((fit * 0.6 + comms * 0.4) * 100);
-}
-
-function scoreDeliveryReliability(studio: Studio): number | null {
-  // The cold-start factor. Null until the studio has run projects through OUR
-  // monitored milestone plan — exactly the data that makes Tier 3 uncopiable,
-  // data we will not have on day one. Say so rather than invent it.
-  if (studio.completedProjects < MIN_PROJECTS_FOR_RELIABILITY) return null;
-  if (studio.avgVarianceDays === null) return null;
-
-  // On time = 100. 30+ days late = 0. Early delivery earns no extra credit.
-  const variance = Math.max(0, studio.avgVarianceDays);
-  const base = clamp(100 - (variance / 30) * 100);
-
-  return clamp(base - studio.upheldDisputes * 15);
-}
-
-function scoreScopeExperience(brief: Brief, studio: Studio): number | null {
-  if (!brief.scope && !brief.propertyType) return null;
-  if (studio.portfolio.length === 0) return null;
-
-  const comparable = studio.portfolio.filter((p) => {
-    const scopeMatch = !brief.scope || p.scope === brief.scope;
-    const typeMatch = !brief.propertyType || p.propertyType === brief.propertyType;
-    return scopeMatch && typeMatch;
-  });
-
-  // Five comparable projects is treated as full experience.
-  return clamp((comparable.length / 5) * 100);
-}
-
-function scorePriorityAlignment(brief: Brief, studio: Studio): number | null {
-  const top = brief.priorityRanking[0] as PriorityFactor | undefined;
-  if (!top) return null;
-
-  switch (top) {
-    case 'SPEED':
-      return scoreDeliveryReliability(studio);
-    case 'BUDGET':
-      return scoreBudgetFit(brief, studio);
-    case 'MATERIAL_QUALITY':
-      return studio.specComplianceRate === null ? null : clamp(studio.specComplianceRate * 100);
-    case 'DESIGN_AMBITION':
-      return scoreStyleOverlap(brief, studio);
-    default:
-      return null;
-  }
+export function passesHardFilters(brief: Brief, studio: Studio, options: RankOptions = {}): boolean {
+  return failedFilter(brief, studio, options) === null;
 }
 
 // ── Composition ────────────────────────────────────────────────
 
-export function scoreMatch(
-  brief: Brief,
-  studio: Studio,
-  options: RankOptions = {},
-): MatchResult | null {
-  if (!passesHardFilters(brief, studio, options)) return null;
+/** How strongly an unmeasured factor pulls the ORDER toward the middle. */
+const SHRINK = 0.5;
+const PRIOR = 50;
 
-  const breakdown: FactorScores = {
-    styleOverlap: scoreStyleOverlap(brief, studio),
-    budgetFit: scoreBudgetFit(brief, studio),
-    workingStyle: scoreWorkingStyle(brief, studio),
-    deliveryReliability: scoreDeliveryReliability(studio),
-    scopeExperience: scoreScopeExperience(brief, studio),
-    priorityAlignment: scorePriorityAlignment(brief, studio),
+function contextOf(options: RankOptions): SignalContext {
+  return { today: options.today ?? new Date(), ratesFor: options.ratesFor };
+}
+
+export function scoreMatch(brief: Brief, studio: Studio, options: RankOptions = {}): MatchResult | null {
+  if (!passesHardFilters(brief, studio, options)) return null;
+  const ctx = contextOf(options);
+
+  const timeline = timelineFit(brief, studio, ctx);
+  const similar = similarWork(brief, studio);
+  const signals: Record<FactorKey, Signal | null> = {
+    style: styleFit(brief, studio, ctx),
+    priorities: priorities(brief, studio, ctx),
+    similarWork: similar,
+    workingStyle: workingStyle(brief, studio),
+    household: householdFit(brief, studio),
+    timeline,
   };
 
-  // Normalise over MEASURED weight only. This is the honest cold-start move:
-  // the score means "88 on what we could actually check", and factorsScored
-  // lets the UI say "matched on 4 of 6 factors — reliability builds after
-  // their first project with us."
+  const breakdown = Object.fromEntries(
+    (Object.keys(WEIGHTS) as FactorKey[]).map((k) => [k, signals[k] ? Math.round(signals[k]!.value) : null]),
+  ) as FactorScores;
+
   let weighted = 0;
   let measuredWeight = 0;
   let factorsScored = 0;
-
+  const evidence: Partial<Record<FactorKey, string>> = {};
   for (const key of Object.keys(WEIGHTS) as FactorKey[]) {
-    const value = breakdown[key];
-    if (value === null) continue;
-    weighted += value * WEIGHTS[key];
+    const s = signals[key];
+    if (!s) continue;
+    weighted += s.value * WEIGHTS[key];
     measuredWeight += WEIGHTS[key];
     factorsScored += 1;
+    if (s.evidence) evidence[key] = s.evidence;
   }
-
   if (measuredWeight === 0) return null;
+
+  // The order shrinks toward the middle by how much could NOT be measured,
+  // so a studio scored on half the factors does not outrank one scored on
+  // all of them on thin evidence. The displayed score is not shrunk.
+  const unmeasured = 100 - measuredWeight;
+  const orderScore = (weighted + PRIOR * unmeasured * SHRINK) / (measuredWeight + unmeasured * SHRINK);
+
+  const widened: Widening | undefined =
+    options.widen && failedFilter(brief, studio, { ...options, widen: [] }) !== null
+      ? failedFilter(brief, studio, { ...options, widen: ['ANY_ZONE'] }) === null
+        ? 'ANY_ZONE'
+        : 'BAND_UP'
+      : undefined;
 
   return {
     studioId: studio.id,
@@ -339,10 +286,20 @@ export function scoreMatch(
     factorsScored,
     factorsTotal: FACTOR_COUNT,
     breakdown,
-    reasoning: buildReasoning(brief, studio, breakdown),
+    reasoning: buildReasoning(brief, studio, evidence, timeline),
     engineVersion: ENGINE_VERSION,
+    measuredWeight,
+    // Late starters sort down, never out.
+    orderScore: timeline?.late ? orderScore - 5 : orderScore,
+    evidence,
+    timeline: timeline ? { line: timeline.line, late: timeline.late } : null,
+    similarProjects: similar?.projects ?? [],
+    local: { society: similar?.sameSociety ?? 0, area: similar?.sameArea ?? 0 },
+    ...(widened ? { widened } : {}),
   };
 }
+
+const passed = (s: Studio) => s.checks.filter((c) => c.result === 'PASS').length;
 
 export function rankStudios(
   brief: Brief,
@@ -350,12 +307,77 @@ export function rankStudios(
   limit = 9,
   options: RankOptions = {},
 ): MatchResult[] {
+  const byId = new Map(studios.map((s) => [s.id, s]));
   return studios
     .map((s) => scoreMatch(brief, s, options))
     .filter((m): m is MatchResult => m !== null)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit); // never show more than ~12; scarcity of options IS the value
+    .sort((a, b) => {
+      const d = (b.orderScore ?? b.score) - (a.orderScore ?? a.score);
+      if (Math.abs(d) > 1e-9) return d;
+      // Explicit tie-breaks: measured weight, then checks cleared, then
+      // delivery record, then language, then a stable name order.
+      const sa = byId.get(a.studioId)!;
+      const sb = byId.get(b.studioId)!;
+      return (
+        (b.measuredWeight ?? 0) - (a.measuredWeight ?? 0) ||
+        passed(sb) - passed(sa) ||
+        sb.completedProjects - sa.completedProjects ||
+        speaks(brief, sb) - speaks(brief, sa) ||
+        sa.tradeName.localeCompare(sb.tradeName)
+      );
+    })
+    .slice(0, limit); // never show more than ~6; scarcity of options IS the value
 }
+
+function speaks(brief: Brief, s: Studio): number {
+  return brief.language && s.matchingProfile?.languages.includes(brief.language) ? 1 : 0;
+}
+
+// ── Fewer than three: widenings, and why not the others ────────
+
+export interface WideningOffer {
+  kind: Widening;
+  /** How many more studios it would add. */
+  adds: number;
+}
+
+/**
+ * The named, one-tap widenings for a thin result (§4.4), with the count each
+ * adds. "One band up" is offered only when the caller says the owner has
+ * approved it (`allowBandUp`).
+ */
+export function wideningsFor(
+  brief: Brief,
+  studios: Studio[],
+  options: RankOptions = {},
+  allowBandUp = false,
+): WideningOffer[] {
+  const base = new Set(rankStudios(brief, studios, 99, { ...options, widen: [] }).map((r) => r.studioId));
+  const offers: WideningOffer[] = [];
+  const kinds: Widening[] = allowBandUp && brief.tier && nextBand(brief.tier) ? ['ANY_ZONE', 'BAND_UP'] : ['ANY_ZONE'];
+  for (const kind of kinds) {
+    const more = rankStudios(brief, studios, 99, { ...options, widen: [kind] }).filter((r) => !base.has(r.studioId));
+    if (more.length > 0) offers.push({ kind, adds: more.length });
+  }
+  return offers;
+}
+
+/** Every studio left out, and the first reason — for "why not the others". */
+export function whyNotTheOthers(
+  brief: Brief,
+  studios: Studio[],
+  options: RankOptions = {},
+): { studioId: string; name: string; reason: FilterReason }[] {
+  const out: { studioId: string; name: string; reason: FilterReason }[] = [];
+  for (const s of studios) {
+    const reason = failedFilter(brief, s, options);
+    // Unverified and paused studios are not the customer's business.
+    if (reason && reason !== 'NOT_VERIFIED' && reason !== 'PAUSED') out.push({ studioId: s.id, name: s.tradeName, reason });
+  }
+  return out;
+}
+
+// ── Words ──────────────────────────────────────────────────────
 
 /**
  * Customer-facing explanation. Rules:
@@ -363,25 +385,25 @@ export function rankStudios(
  *   - include the unflattering number where we have one
  *   - never claim a factor we scored null
  */
-function buildReasoning(brief: Brief, studio: Studio, breakdown: FactorScores): string[] {
+function buildReasoning(
+  brief: Brief,
+  studio: Studio,
+  evidence: Partial<Record<FactorKey, string>>,
+  timeline: { line: string; late: boolean } | null,
+): string[] {
   const lines: string[] = [];
   const name = studio.tradeName;
 
-  if (breakdown.styleOverlap !== null && breakdown.styleOverlap >= 55) {
-    lines.push(
-      `You leaned toward ${formatStyles(brief.styleLikes)} — most of ${name}'s recent work sits in that direction.`,
-    );
+  if (evidence.style && brief.styleLikes.length > 0) {
+    lines.push(`You leaned toward ${formatStyles(brief.styleLikes)}. ${evidence.style}.`);
   }
 
-  // Say the true thing, not the flattering one. The hard filter only excludes a
-  // studio when MORE than 40% of its work sits in a rejected style — so
-  // "none of their portfolio goes there" was false for anything up to 40%.
+  // Say the true thing, not the flattering one: the filter excludes only
+  // above 40%, so "none of their work goes there" is false below that.
   if (brief.styleDislikes.length > 0) {
     const share = dislikedShare(brief, studio);
     if (share === 0) {
-      lines.push(
-        `You ruled out ${formatStyles(brief.styleDislikes)}. None of their portfolio goes there.`,
-      );
+      lines.push(`You ruled out ${formatStyles(brief.styleDislikes)}. None of their portfolio goes there.`);
     } else if (share !== null) {
       lines.push(
         `You ruled out ${formatStyles(brief.styleDislikes)}. About ${Math.round(share * 100)}% of their work leans that way.`,
@@ -389,43 +411,24 @@ function buildReasoning(brief: Brief, studio: Studio, breakdown: FactorScores): 
     }
   }
 
-  if (breakdown.deliveryReliability !== null && studio.avgVarianceDays !== null) {
+  if (evidence.similarWork) lines.push(`${evidence.similarWork}.`);
+  if (evidence.household) lines.push(`${evidence.household}.`);
+  if (evidence.priorities) lines.push(`${evidence.priorities}.`);
+  if (evidence.workingStyle) lines.push(`${evidence.workingStyle}.`);
+  if (timeline) lines.push(`${timeline.line}.`);
+
+  if (studio.completedProjects === 0) {
+    lines.push(`${name} has not completed a project with us yet, so we have no delivery record for them.`);
+  } else if (studio.avgVarianceDays !== null && studio.completedProjects >= 3) {
     const d = Math.round(studio.avgVarianceDays);
     lines.push(
       d <= 0
         ? `Their last ${studio.completedProjects} projects finished on or ahead of the committed date.`
         : `Their last ${studio.completedProjects} projects averaged ${d} day${d === 1 ? '' : 's'} past the committed date.`,
     );
-  } else if (studio.completedProjects === 0) {
-    lines.push(
-      `${name} has not completed a project with us yet, so we have no delivery record for them.`,
-    );
   } else {
-    // 1 or 2 completed projects: they HAVE delivered, just not enough to state
-    // a reliable average. Saying "has not completed a project" here was false.
     const n = studio.completedProjects;
-    lines.push(
-      `${name} has completed ${n} project${n === 1 ? '' : 's'} with us — not yet enough to state a reliable delivery average.`,
-    );
-  }
-
-  if (brief.priorityRanking[0] === 'MATERIAL_QUALITY' && studio.specComplianceRate !== null) {
-    lines.push(
-      `You put material quality first. On ${studio.completedProjects} projects, ${Math.round(studio.specComplianceRate * 100)}% used exactly the materials quoted.`,
-    );
-  }
-
-  // Derived from locality, not from scope. scoreScopeExperience never looks at
-  // p.locality, so gating this on that score claimed local experience a studio
-  // might not have — and the locality hard filter is skipped entirely when a
-  // studio has declared no service areas.
-  if (brief.locality) {
-    const local = studio.portfolio.filter((p) => p.locality === brief.locality).length;
-    if (local > 0) {
-      lines.push(
-        `They have completed ${local} ${local === 1 ? 'home' : 'homes'} in ${localityLabel(brief.locality)}.`,
-      );
-    }
+    lines.push(`${name} has completed ${n} project${n === 1 ? '' : 's'} with us — not yet enough to state a reliable delivery average.`);
   }
 
   if (studio.upheldDisputes > 0) {
@@ -437,104 +440,44 @@ function buildReasoning(brief: Brief, studio: Studio, breakdown: FactorScores): 
 }
 
 /**
- * The one-sentence version, for the hero card.
+ * The one-sentence version, for the card.
  *
- * ## Why this exists alongside `reasoning`
- *
- * `reasoning` is a list of complete sentences — right for a detail panel, wrong
- * for the top of the page, where a customer is deciding in about two seconds
- * whether the ranking is worth trusting. A score with no sentence next to it is
- * a number they cannot check, and an unverifiable number reads as marketing.
- *
- * So this composes short clauses into one line: *"because you leaned toward
- * Warm Minimalist and most of their work sits there; their delivered projects
- * land in your range; they work in Baner."*
- *
- * ## The rules it inherits
- *
- * Every clause must quote something the customer actually told us, and no
- * clause may describe a factor that scored `null`. A studio with nothing
- * measurable gets no sentence rather than a vague one — `null` is a real
- * return value here and the caller must handle it.
- *
- * Capped at three clauses. A fourth is read as boilerplate, and the honest
- * detail lives in `reasoning` directly below it on the page.
- *
- * ## No number in the sentence
- *
- * It used to open with "82% match — because…". The card already prints the
- * score in large type directly above, so the sentence carried a second copy
- * of it — and the moment the two were computed from different inputs, the
- * customer saw two different percentages for one studio. The number lives in
- * one place on the card; the sentence says why.
+ * Composed from the evidence of the factors that scored well — every clause
+ * quotes something measured about this studio against this brief, and no
+ * clause describes a factor that scored null. Three clauses at most. No
+ * number in the sentence: the score lives in one place on the card.
  */
-export function matchSummary(
-  brief: Brief,
-  studio: Studio,
-  result: MatchResult,
-): string | null {
-  const clauses: string[] = [];
+export function matchSummary(brief: Brief, studio: Studio, result: MatchResult): string | null {
   const b = result.breakdown;
-
-  if (b.styleOverlap !== null && b.styleOverlap >= 55 && brief.styleLikes.length > 0) {
-    clauses.push(
-      `you leaned toward ${formatStyles(brief.styleLikes)} and most of their work sits there`,
-    );
+  const e = result.evidence ?? {};
+  const clauses: string[] = [];
+  const add = (key: FactorKey, min: number) => {
+    const text = e[key];
+    if (b[key] !== null && (b[key] as number) >= min && text) clauses.push(lowerFirst(text));
+  };
+  // Checkable facts about the customer's own street and household first. A
+  // home in their society or area is said whatever the factor scored — it is
+  // a fact about this studio, not a judgement.
+  const local = (result.local?.society ?? 0) + (result.local?.area ?? 0) > 0;
+  add('similarWork', local ? 0 : 40);
+  add('household', 50);
+  if (b.style !== null && b.style >= 55 && brief.styleLikes.length > 0) {
+    clauses.push(`you leaned toward ${formatStyles(brief.styleLikes)} and most of their work sits there`);
   }
-
-  // Phrased from delivered values where we used them, because "fits your
-  // budget" from a studio's own claimed range is a claim, not a measurement.
-  if (b.budgetFit !== null && b.budgetFit >= 50) {
-    const delivered = studio.portfolio.filter((p) => p.valuePaise !== null).length;
-    clauses.push(
-      delivered >= 3
-        ? 'the projects they have actually delivered land in your range'
-        : 'their stated project range covers your budget',
-    );
+  add('priorities', 60);
+  add('workingStyle', 60);
+  if (result.timeline && !result.timeline.late && b.timeline !== null) {
+    clauses.push(lowerFirst(result.timeline.line));
   }
-
-  // Locality before working style, because only three clauses survive the slice
-  // and "they have finished two homes in Baner" is a checkable fact about the
-  // customer's own street. "They work the way you said" is an inference from a
-  // questionnaire — true, but weaker evidence, and it should lose the seat.
-  if (brief.locality) {
-    const local = studio.portfolio.filter((p) => p.locality === brief.locality).length;
-    if (local > 0) {
-      clauses.push(
-        `they have finished ${local} ${local === 1 ? 'home' : 'homes'} in ${localityLabel(brief.locality)}`,
-      );
-    }
-  }
-
-  if (b.workingStyle !== null && b.workingStyle >= 60 && brief.involvement) {
-    clauses.push(
-      brief.involvement === 'DECIDE_FOR_ME'
-        ? 'they are used to running a project without needing you at every step'
-        : brief.involvement === 'APPROVE_EVERYTHING'
-          ? 'they work with clients who want to sign off on every detail'
-          : 'they work the way you said you want to — decisions made together',
-    );
-  }
-
-  if (b.deliveryReliability !== null && b.deliveryReliability >= 70) {
-    clauses.push('their delivery record holds up');
-  }
-
   if (clauses.length === 0) return null;
-
   return `Because ${clauses.slice(0, 3).join('; ')}.`;
 }
 
 // ── Helpers ────────────────────────────────────────────────────
 
-function clamp(n: number): number {
-  return Math.max(0, Math.min(100, n));
-}
-
-function rangeOverlap(aLo: number, aHi: number, bLo: number, bHi: number): number {
-  const lo = Math.max(aLo, bLo);
-  const hi = Math.min(aHi, bHi);
-  return hi > lo ? hi - lo : 0;
+/** Lower-case the first letter to join a clause — but never an acronym ("BWP ply"). */
+function lowerFirst(text: string): string {
+  return /^[A-Z]{2}/.test(text) ? text : text.charAt(0).toLowerCase() + text.slice(1);
 }
 
 function formatStyles(tags: string[]): string {
