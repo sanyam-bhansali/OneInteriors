@@ -25,7 +25,7 @@
  */
 
 import type { Paise } from '@/lib/money';
-import { FULL_HOME, scopeItems, scopePhrase, type ScopeSelection } from './scope';
+import { FULL_HOME, needAddsOf, needLines, scopeItems, scopePhrase, type ScopeSelection } from './scope';
 import {
   CATALOGUE,
   ITEM,
@@ -145,6 +145,8 @@ export interface QuoteLine {
   spec: string;
   /** False only for the kitchen items when a real run was supplied. */
   standard: boolean;
+  /** "Added because you work from home" — a line their household added (scope.ts `needLines`). */
+  addedFor?: string;
 }
 
 export interface FirstQuote {
@@ -187,7 +189,7 @@ export interface FirstQuote {
  */
 export function homeShapeFor(
   brief: Pick<Brief, 'propertyType' | 'carpetAreaSqft'> &
-    Partial<Pick<Brief, 'scope' | 'scopeRooms' | 'excludedItems' | 'planReading' | 'floorPlanName'>>,
+    Partial<Pick<Brief, 'scope' | 'scopeRooms' | 'excludedItems' | 'planReading' | 'floorPlanName' | 'needs' | 'household'>>,
 ): {
   bhk: number;
   carpetAreaSqft: number;
@@ -215,6 +217,7 @@ export function homeShapeFor(
       scope: brief.scope ?? 'FULL_HOME',
       scopeRooms: brief.scopeRooms ?? [],
       excludedItems: brief.excludedItems ?? [],
+      adds: needAddsOf(brief),
     },
     plan:
       brief.planReading?.kitchenRunMm
@@ -275,8 +278,11 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
 
   const selection = input.scope ?? FULL_HOME;
 
+  const reasons = new Map(needLines(input.bhk, selection).map((n) => [n.item.code, n.reason]));
+
   for (const item of scopeItems(input.bhk, selection)) {
-    const filed = rates[item.code];
+    const own = rates[item.code];
+    const filed = own ?? (item.rateFrom ? rates[item.rateFrom] : undefined);
     if (!filed) {
       notPriced.push(item.code);
       continue;
@@ -327,8 +333,11 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
       // The studio's own description when they filed one, our canonical spec
       // when they did not. Two studios differing here is the whole point of
       // the comparison screen.
-      spec: filed.spec ?? item.spec,
+      // A rate borrowed from the standard line (`rateFrom`) keeps this line's
+      // own spec — a study unit is not described as a workstation.
+      spec: (own ? filed.spec : undefined) ?? item.spec,
       standard,
+      ...(reasons.has(item.code) ? { addedFor: reasons.get(item.code)! } : {}),
     });
   }
 

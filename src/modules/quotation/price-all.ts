@@ -53,6 +53,7 @@ export function quoteKey(shape: HomeShape, plan: FloorPlan): string {
     shape.scope.scope,
     [...shape.scope.scopeRooms].sort(),
     [...shape.scope.excludedItems].sort(),
+    [...(shape.scope.adds ?? [])].sort(),
     plan.kitchenRunMm,
     runSourceOf(plan),
   ]);

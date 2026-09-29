@@ -26,7 +26,7 @@
  */
 
 import type { ScopeType } from '@/modules/brief/types';
-import { CATALOGUE, ROOM_LABELS, type CatalogueItem, type Room } from './catalogue';
+import { CATALOGUE, NEED_ITEMS, ROOM_LABELS, type CatalogueItem, type Room } from './catalogue';
 
 /** The rooms a customer can pick for a single-room job or a renovation. */
 export const PICKABLE_ROOMS: Room[] = [
@@ -51,6 +51,51 @@ export interface ScopeSelection {
   scopeRooms: string[];
   /** Catalogue codes they unticked on the checklist. */
   excludedItems: string[];
+  /** What their household asks for that adds a line — `needAddsOf`. */
+  adds?: NeedAdd[];
+}
+
+/**
+ * The answers that add a line to the quote (build queue item 5): working from
+ * home adds a study unit, a pooja room a mandir, "a lot of storage" extra
+ * lofts. Vastu, smart home, low maintenance and entertaining change who fits,
+ * not what is quoted, so they are not here.
+ */
+export const NEED_ADDS = ['WORKS_FROM_HOME', 'POOJA_ROOM', 'EXTRA_STORAGE'] as const;
+export type NeedAdd = (typeof NEED_ADDS)[number];
+
+/** Why the line is on their quote, in their terms. */
+export const NEED_ADD_REASONS: Record<NeedAdd, string> = {
+  WORKS_FROM_HOME: 'Added because you work from home',
+  POOJA_ROOM: 'Added for your pooja room',
+  EXTRA_STORAGE: 'Added because you need a lot of storage',
+};
+
+/** The adds a brief's household and needs imply. */
+export function needAddsOf(brief: {
+  needs?: readonly string[] | null;
+  household?: { worksFromHome?: boolean } | null;
+}): NeedAdd[] {
+  const needs = new Set(brief.needs ?? []);
+  const out: NeedAdd[] = [];
+  if (brief.household?.worksFromHome) out.push('WORKS_FROM_HOME');
+  if (needs.has('POOJA_ROOM')) out.push('POOJA_ROOM');
+  if (needs.has('EXTRA_STORAGE')) out.push('EXTRA_STORAGE');
+  return out;
+}
+
+/** The line each add brings, for this configuration. */
+function itemForAdd(add: NeedAdd, bhk: number): CatalogueItem | undefined {
+  const find = (code: string) => [...CATALOGUE, ...NEED_ITEMS].find((i) => i.code === code);
+  switch (add) {
+    case 'WORKS_FROM_HOME':
+      // The second bedroom's workstation where there is one; a study unit in the living room otherwise.
+      return bhk >= 2 ? find('second_workstation') : find('study_unit');
+    case 'POOJA_ROOM':
+      return find('mandir');
+    case 'EXTRA_STORAGE':
+      return find('extra_loft');
+  }
 }
 
 export const FULL_HOME: ScopeSelection = { scope: 'FULL_HOME', scopeRooms: [], excludedItems: [] };
@@ -60,11 +105,14 @@ export function selectionOf(brief: {
   scope: ScopeType | null;
   scopeRooms: string[];
   excludedItems: string[];
+  needs?: readonly string[] | null;
+  household?: { worksFromHome?: boolean } | null;
 }): ScopeSelection {
   return {
     scope: brief.scope,
     scopeRooms: brief.scopeRooms ?? [],
     excludedItems: brief.excludedItems ?? [],
+    adds: needAddsOf(brief),
   };
 }
 
@@ -90,9 +138,35 @@ function inScope(item: CatalogueItem, selection: ScopeSelection): boolean {
   }
 }
 
+/**
+ * The lines the household adds on top of the scope, each with its reason.
+ *
+ * A whole-home or kitchen-and-wardrobes job gets them all. A job the customer
+ * narrowed to named rooms (a single room, a renovation) gets only those in
+ * the rooms they named — they drew that line themselves. A line the scope
+ * already covers is not added twice.
+ */
+export function needLines(
+  bhk: number,
+  selection: ScopeSelection,
+): { item: CatalogueItem; add: NeedAdd; reason: string }[] {
+  const base = new Set(CATALOGUE.filter((i) => (i.minBhk ?? 0) <= bhk && inScope(i, selection)).map((i) => i.code));
+  const narrow = selection.scope === 'SINGLE_ROOM' || selection.scope === 'RENOVATION';
+  const rooms = new Set(selection.scopeRooms);
+  const out: { item: CatalogueItem; add: NeedAdd; reason: string }[] = [];
+  for (const add of selection.adds ?? []) {
+    const item = itemForAdd(add, bhk);
+    if (!item || base.has(item.code) || out.some((o) => o.item.code === item.code)) continue;
+    if (narrow && !rooms.has(item.room)) continue;
+    out.push({ item, add, reason: NEED_ADD_REASONS[add] });
+  }
+  return out;
+}
+
 /** Everything the scope covers for this configuration — the checklist. */
 export function scopeCandidates(bhk: number, selection: ScopeSelection): CatalogueItem[] {
-  return CATALOGUE.filter((i) => (i.minBhk ?? 0) <= bhk && inScope(i, selection));
+  const base = CATALOGUE.filter((i) => (i.minBhk ?? 0) <= bhk && inScope(i, selection));
+  return [...base, ...needLines(bhk, selection).map((n) => n.item)];
 }
 
 /** What is actually quoted: the candidates, minus what they unticked. */

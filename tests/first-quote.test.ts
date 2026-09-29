@@ -339,7 +339,7 @@ describe('the home the quote is built for', () => {
       carpetAreaSqft: 1650,
       carpetAreaAssumed: true,
       bathrooms: 4,
-      scope: { scope: 'FULL_HOME', scopeRooms: [], excludedItems: [] },
+      scope: { scope: 'FULL_HOME', scopeRooms: [], excludedItems: [], adds: [] },
       plan: null,
     });
   });

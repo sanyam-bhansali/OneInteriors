@@ -256,7 +256,16 @@ export function QuoteDocument({
               label={line.label}
               quantity={`${line.size}  ·  ${line.quantity.toLocaleString('en-IN')} ${line.unit} at ${money(line.ratePaise)} per ${line.unit}`}
               value={money(line.amountPaise)}
-              note={<Spec text={line.spec} onPick={setTerm} />}
+              note={
+                line.addedFor ? (
+                  <>
+                    <Spec text={line.spec} onPick={setTerm} />
+                    <span className="mt-0.5 block text-[12.5px] text-[var(--acc-ink)]">{line.addedFor}</span>
+                  </>
+                ) : (
+                  <Spec text={line.spec} onPick={setTerm} />
+                )
+              }
             />
           ))}
         </section>

@@ -139,6 +139,12 @@ export interface CatalogueItem {
    * rather than guessed.
    */
   civil?: boolean;
+  /**
+   * Priced at this item's rate when the studio has none of its own — for the
+   * lines a household's needs add (`NEED_ITEMS`), which are the same product
+   * as one already in every archive: an extra loft is a loft.
+   */
+  rateFrom?: string;
 }
 
 /**
@@ -414,6 +420,39 @@ export const CATALOGUE: CatalogueItem[] = [
     sizing: 'PER_SQFT_CARPET',
     civil: true,
     spec: 'New conduit and copper wiring · DB replaced · modular switches',
+  },
+];
+
+/**
+ * Lines a household's answers add (build queue item 5; plan §2 screen 10).
+ *
+ * Not in `CATALOGUE`: they are not standard scope — a study unit or extra
+ * lofts in every quote would make the quote high for most people, which is
+ * why the archive keeps them out (see the note above). They are in the quote
+ * of the customer whose household asks for them, and nobody else's. Each is
+ * the same product as a standard line, so it is priced at that line's rate
+ * when the studio has not filed its own.
+ */
+export const NEED_ITEMS: CatalogueItem[] = [
+  {
+    code: 'study_unit',
+    room: 'LIVING_DINING',
+    label: 'Study unit',
+    work: 'MO',
+    sizing: 'UNIT',
+    rateFrom: 'second_workstation',
+    spec: '18mm BWP · laminate top · overhead shelf · cable cut-out',
+  },
+  {
+    code: 'extra_loft',
+    room: 'WHOLE_HOME',
+    label: 'Extra lofts — passage and over doors',
+    work: 'MO',
+    sizing: 'AREA',
+    widthMm: 3000,
+    heightMm: 600,
+    rateFrom: 'master_loft',
+    spec: '18mm BWP carcass · laminate shutter',
   },
 ];
 
