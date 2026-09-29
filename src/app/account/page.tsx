@@ -14,6 +14,12 @@ import { consentHistory } from '@/modules/consent/record';
 import { PURPOSE_NOTICE, type ConsentPurpose } from '@/modules/consent/policy';
 import { signedUrlFor } from '@/modules/storage/floor-plan';
 import { propertyLabel, scopeLabel, PUNE_LOCALITIES } from '@/modules/brief/types';
+import { yourHome } from '@/modules/portal/home';
+import { benefitsPass, STAGES, type Stage } from '@/modules/portal/benefits';
+import { prepForBrief } from '@/modules/prepare/prep';
+import { slotLabel } from '@/modules/consultation/slots';
+import { CheckInForm, ShareButton } from './HomeParts';
+import { withdrawConsentAction } from './actions';
 
 export const metadata: Metadata = {
   title: 'Your project',
@@ -46,6 +52,13 @@ export default async function AccountPage() {
   const calls = row ? await myConsultations(row.id) : [];
   const consents = await consentHistory();
   const planUrl = row ? await signedUrlFor(row.id) : null;
+  const briefDone = found && Boolean(brief.completedAt);
+  const home = await yourHome(row?.id ?? null, briefDone);
+  const rooms = row ? await prepForBrief(row.id) : [];
+  const pass = benefitsPass(home.stage);
+  // The owner's 3D design tool (plan §10), linked once it exists. Never a
+  // placeholder: nothing is shown until there is somewhere to go.
+  const designTool = process.env.DESIGN_TOOL_URL?.trim() || null;
 
   return (
     <>
@@ -58,9 +71,25 @@ export default async function AccountPage() {
             {user.name ? `Hello, ${user.name.split(' ')[0]}.` : 'Your project'}
           </h1>
           <p className="lede mb-6 max-w-[58ch]">
-            Everything you have with us, in one place. It stays here — when your project starts,
-            the tracker and your payment schedule appear on this page too.
+            Your home, with us — your brief, the studios that fit, your quotes, your expert call and
+            everything after it, in one place.
           </p>
+
+          {/* Where they are, as a path — each step a fact we hold. */}
+          <ol className="m-0 mb-8 flex list-none flex-wrap gap-x-5 gap-y-2 p-0">
+            {PATH.map((step) => {
+              const done = STAGES.indexOf(step.stage) <= STAGES.indexOf(home.stage);
+              return (
+                <li
+                  key={step.stage}
+                  className={`font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] ${done ? 'text-[var(--color-ontrack)]' : 'text-[var(--color-ink-3)]'}`}
+                >
+                  {done ? '✓ ' : ''}
+                  {step.label}
+                </li>
+              );
+            })}
+          </ol>
 
           {/* The only sign-out on the customer surface. There was none at all:
               a signed-in customer could neither find this page nor leave it. */}
@@ -121,6 +150,43 @@ export default async function AccountPage() {
                   href={planUrl ?? undefined}
                 />
               </dl>
+            )}
+          </Section>
+
+          {/* ── Matches ──────────────────────────────────── */}
+          <Section title="Studios that fit" action={home.matches.length > 0 ? { href: '/match', label: 'See them' } : undefined}>
+            {home.matches.length === 0 ? (
+              <Empty>
+                {briefDone ? (
+                  <>
+                    Your matches appear here once you have opened them.{' '}
+                    <Link href="/match" className="text-[var(--color-petrol)]">
+                      See who fits
+                    </Link>
+                    .
+                  </>
+                ) : (
+                  'They appear once your brief is finished.'
+                )}
+              </Empty>
+            ) : (
+              <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                {home.matches.map((m) => (
+                  <li key={m.studioSlug} className="border-b border-[var(--color-rule-soft)] py-3">
+                    <span className="flex flex-wrap items-baseline justify-between gap-3">
+                      <Link href={`/studios/${m.studioSlug}`} className="text-[15.5px] text-[var(--color-ink)] no-underline hover:text-[var(--color-petrol)]">
+                        {m.studioName}
+                      </Link>
+                      <span className="font-[family-name:var(--font-mono)] text-[12.5px] text-[var(--color-ink-2)]">
+                        {m.score}% · {m.measured} measured
+                      </span>
+                    </span>
+                    {m.firstReason ? (
+                      <span className="mt-1 block text-[13.5px] text-[var(--color-ink-3)]">{m.firstReason}</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
             )}
           </Section>
 
@@ -187,21 +253,108 @@ export default async function AccountPage() {
                     className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-5 py-4"
                   >
                     <span className="text-[14.5px] text-[var(--color-ink-2)]">
-                      Requested{' '}
-                      {call.createdAt.toLocaleDateString('en-IN', {
-                        day: 'numeric',
-                        month: 'short',
-                      })}
-                      {call.preferredTimes ? ` · you said ${call.preferredTimes}` : ''}
+                      {call.scheduledFor && call.status === 'scheduled' ? (
+                        <>
+                          <span className="text-[var(--color-ink)]">
+                            {slotLabel(call.scheduledFor.toISOString()).day}, {slotLabel(call.scheduledFor.toISOString()).time}
+                          </span>{' '}
+                          · thirty minutes, we ring you
+                        </>
+                      ) : (
+                        <>
+                          Requested{' '}
+                          {call.createdAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                          {call.preferredTimes ? ` · you said ${call.preferredTimes}` : ''}
+                        </>
+                      )}
                     </span>
                     <Pill tone={call.status === 'completed' ? 'ontrack' : 'petrol'}>
-                      {call.status}
+                      {CALL_STATUS[call.status] ?? call.status}
                     </Pill>
                   </li>
                 ))}
               </ul>
             )}
           </Section>
+
+          {/* ── Your studio ──────────────────────────────── */}
+          {home.introductions.length > 0 ? (
+            <Section title="Your studio">
+              <ul className="m-0 flex list-none flex-col gap-4 p-0">
+                {home.introductions.map((intro) => {
+                  const next = intro.meetings.find((m) => m.status !== 'CANCELLED' && m.startsAt.getTime() > Date.now());
+                  return (
+                    <li key={intro.id} className="rounded-[10px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-5 py-4">
+                      <p className="m-0 text-[15px] text-[var(--color-ink)]">
+                        Introduced to{' '}
+                        <Link href={`/studios/${intro.studioSlug}`} className="text-[var(--color-petrol)]">
+                          {intro.studioName}
+                        </Link>{' '}
+                        on {intro.introducedAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}
+                      </p>
+                      {next ? (
+                        <p className="m-0 mt-1 text-[14px] text-[var(--color-ink-2)]">
+                          {MEETING_KIND[next.kind] ?? 'Meeting'} {slotLabel(next.startsAt.toISOString()).day} at{' '}
+                          {slotLabel(next.startsAt.toISOString()).time}
+                          {next.location ? ` · ${next.location}` : ''}
+                          {next.status === 'PROPOSED' ? ' (proposed)' : ''}
+                        </p>
+                      ) : null}
+                      {intro.checkInDue ? (
+                        <CheckInForm introductionId={intro.id} studioName={intro.studioName} />
+                      ) : intro.checkedIn ? (
+                        <p className="m-0 mt-2 text-[13px] text-[var(--color-ink-3)]">You told us how the first meeting went — thank you.</p>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </Section>
+          ) : null}
+
+          {/* ── Your rooms ───────────────────────────────── */}
+          <Section title="Your rooms" action={{ href: '/prepare', label: rooms.length > 0 ? 'Open your boards' : 'Start a board' }}>
+            <Empty>
+              {rooms.length > 0
+                ? `${rooms.length} room${rooms.length === 1 ? '' : 's'} on your mood board. The expert and your studio see them before they talk to you.`
+                : 'A mood board for each room — styles, finishes and what matters there. The expert and your studio see it before they talk to you.'}
+            </Empty>
+            {designTool ? (
+              <p className="m-0 mt-3">
+                <a href={designTool} className="text-[14.5px] text-[var(--color-petrol)]">
+                  Design your home in 3D →
+                </a>
+              </p>
+            ) : null}
+          </Section>
+
+          {/* ── Benefits ─────────────────────────────────── */}
+          <Section title="Your benefits">
+            <ul className="m-0 flex list-none flex-col gap-3 p-0">
+              {pass.map((b) => (
+                <li key={b.id} className="flex flex-wrap items-baseline justify-between gap-3 border-b border-[var(--color-rule-soft)] pb-3">
+                  <span className="max-w-[52ch]">
+                    <span className="block text-[15px] text-[var(--color-ink)]">{b.title}</span>
+                    <span className="block text-[13.5px] leading-relaxed text-[var(--color-ink-3)]">{b.terms}</span>
+                  </span>
+                  <Pill tone={b.state === 'available' ? 'ontrack' : 'neutral'}>
+                    {b.state === 'available' ? 'Yours now' : `Unlocks ${b.when}`}
+                  </Pill>
+                </li>
+              ))}
+            </ul>
+          </Section>
+
+          {/* ── Share ────────────────────────────────────── */}
+          {briefDone ? (
+            <Section title="Deciding with someone?">
+              <p className="m-0 mb-4 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--color-ink-2)]">
+                A read-only link to your brief, your quotes and the comparison — for whoever else is
+                deciding. It does not show your phone number, and you can switch it off.
+              </p>
+              <ShareButton />
+            </Section>
+          ) : null}
 
           {/* ── Project ──────────────────────────────────── */}
           <Section title="Your project">
@@ -226,16 +379,26 @@ export default async function AccountPage() {
                     <span className="max-w-[46ch] text-[14.5px] text-[var(--color-ink-2)]">
                       {PURPOSE_NOTICE[consent.purpose].label}
                     </span>
-                    <Pill tone={consent.granted && !consent.withdrawnAt ? 'ontrack' : 'neutral'}>
-                      {consent.withdrawnAt ? 'Withdrawn' : consent.granted ? 'Yes' : 'No'}
-                    </Pill>
+                    <span className="flex items-center gap-3">
+                      <Pill tone={consent.granted && !consent.withdrawnAt ? 'ontrack' : 'neutral'}>
+                        {consent.withdrawnAt ? 'Withdrawn' : consent.granted ? 'Yes' : 'No'}
+                      </Pill>
+                      {consent.granted && !consent.withdrawnAt ? (
+                        <form action={withdrawConsentAction}>
+                          <input type="hidden" name="purpose" value={consent.purpose} />
+                          <button type="submit" className="text-[13px] text-[var(--color-ink-3)] underline hover:text-[var(--color-ink)]">
+                            Withdraw
+                          </button>
+                        </form>
+                      ) : null}
+                    </span>
                   </li>
                 ))}
               </ul>
             )}
             <p className="m-0 mt-4 max-w-[62ch] text-[13.5px] leading-relaxed text-[var(--color-ink-3)]">
-              You can change any of these at any time, and withdrawing is as easy as agreeing was.
-              Ask us and it is done the same day — we are building the one-click version now.
+              You can change any of these at any time, and withdrawing is as easy as agreeing was —
+              one press, here.
             </p>
           </Section>
         </Container>
@@ -245,6 +408,28 @@ export default async function AccountPage() {
     </>
   );
 }
+
+const PATH: { stage: Stage; label: string }[] = [
+  { stage: 'BRIEF_DONE', label: 'Brief' },
+  { stage: 'CALL_BOOKED', label: 'Expert call' },
+  { stage: 'INTRODUCED', label: 'Introduced' },
+  { stage: 'SIGNED', label: 'Signed' },
+  { stage: 'HANDOVER', label: 'Handover' },
+];
+
+const CALL_STATUS: Record<string, string> = {
+  requested: 'Requested',
+  scheduled: 'Booked',
+  completed: 'Done',
+  no_show: 'Missed',
+  cancelled: 'Cancelled',
+};
+
+const MEETING_KIND: Record<string, string> = {
+  FIRST_MEETING: 'First meeting',
+  SITE_VISIT: 'Site visit',
+  FOLLOW_UP: 'Follow-up',
+};
 
 function latestByPurpose(records: { purpose: ConsentPurpose; granted: boolean; withdrawnAt?: Date | string | null }[]) {
   const byPurpose = new Map<ConsentPurpose, (typeof records)[number]>();

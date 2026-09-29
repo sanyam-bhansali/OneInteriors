@@ -1282,6 +1282,25 @@ model Consultation {
   @@map("consultations")
 }
 
+/// Two questions to the customer after their first meeting with a studio
+/// (plan §10): did the studio match what we told them, and how was the
+/// communication. Enough of these (three or more) become the studio's
+/// communication rating, which the matching engine reads (§5.5).
+model MeetingCheckIn {
+  id             String       @id @default(cuid())
+  introductionId String       @unique
+  introduction   Introduction @relation(fields: [introductionId], references: [id], onDelete: Cascade)
+  /// YES | PARTLY | NO — did the studio match what we told you?
+  matched        String
+  /// 1–5.
+  communication  Int
+  note           String?      @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@map("meeting_check_ins")
+}
+
 /// An expert's weekly hours for booked calls, in IST (modules/consultation/slots.ts).
 /// Set by ops. Several rows per expert and weekday are allowed (a morning and
 /// an evening block).
@@ -1379,6 +1398,7 @@ model Introduction {
   updatedAt DateTime @updatedAt
 
   appointments Appointment[]
+  checkIn      MeetingCheckIn?
 
   /// One introduction per studio per brief. A second one is the same
   /// introduction, not a new one.
@@ -2646,6 +2666,9 @@ model FirstQuote {
   nonModularPaise      BigInt
   modularDiscountPaise BigInt
   professionalFeePaise BigInt
+  /// The One Interiors curated discount on this quote, as the customer saw
+  /// it. Zero when the studio has none (or the quote predates it).
+  curatedDiscountPaise BigInt @default(0)
   gstPaise             BigInt
   totalPaise           BigInt
   lowPaise             BigInt
