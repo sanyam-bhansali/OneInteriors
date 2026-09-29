@@ -27,6 +27,7 @@ import { Prisma } from '@prisma/client';
 import { getCurrentUser, hasRole, type AuthUser } from '@/modules/auth/session';
 import { validateGstin } from '@/modules/verification/gstin';
 import { missingCoreRates } from '@/modules/quotation/categories';
+import { quotationsSent } from './approval';
 import { lakhsToPaise } from '@/lib/money';
 import {
   isOurImageUrl,
@@ -104,6 +105,8 @@ export interface StudioContext {
     status: string;
     portfolioCount: number;
     missingRates: string[];
+    /** Quotations sent in archives not rejected. See approval.ts. */
+    quotationsSent: number;
     /** Required matching-profile sections still short. See matching-profile.ts. */
     practiceMissing: string[];
     /** Validated; EMPTY_PROFILE when not started. */
@@ -186,6 +189,11 @@ async function loadStudio(user: AuthUser): Promise<StudioContext | null> {
     where: { studioId: s.id },
     select: { category: true, ratePaise: true },
   });
+  const archives = await prisma.quotationArchive.findMany({
+    where: { studioId: s.id, state: { not: 'REJECTED' } },
+    select: { quotationCount: true, _count: { select: { files: true } } },
+  });
+
   const rates: Partial<Record<string, number>> = {};
   for (const item of rateItems) rates[item.category] = Number(item.ratePaise);
 
@@ -208,6 +216,9 @@ async function loadStudio(user: AuthUser): Promise<StudioContext | null> {
       status: s.status,
       portfolioCount: s._count.portfolio,
       missingRates: missingCoreRates(rates as never),
+      quotationsSent: quotationsSent(
+        archives.map((a) => ({ quotationCount: a.quotationCount, fileCount: a._count.files })),
+      ),
       practiceMissing: profileSections(profile, s.localities, today())
         .filter((x) => x.required)
         .flatMap((x) => x.missing),

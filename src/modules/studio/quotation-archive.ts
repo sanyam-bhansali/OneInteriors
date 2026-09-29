@@ -74,7 +74,7 @@ export function confidenceFor(
 export function studioMessage(summary: ArchiveSummary, minForRates: number): string {
   switch (summary.state) {
     case 'RECEIVED':
-      return `${summary.fileCount} file${summary.fileCount === 1 ? '' : 's'} received. Somebody here opens these by hand — you will hear back within a few days, and you do not need to wait for us. Fill the rates in below if you would rather not.`;
+      return `${summary.fileCount} file${summary.fileCount === 1 ? '' : 's'} received. Somebody here opens these by hand — you will hear back within a few days.`;
 
     case 'READING':
       return 'We are reading through them now. If anything is unreadable or there are fewer quotations than we need, we will tell you exactly what is missing rather than going quiet.';
@@ -85,13 +85,13 @@ export function studioMessage(summary: ArchiveSummary, minForRates: number): str
       const confidence = confidenceFor(n, minForRates);
       return confidence === 'filed'
         ? `Built from ${n} of your own quotations. Check them anyway — a rate you disagree with is a rate you should change, and nothing here is locked.`
-        : `Built from ${n} of your own quotations. That is enough for a good starting point but not enough for us to stand behind it on its own, so please read every line before you send this for review.`;
+        : `Built from ${n} of your own quotations. That is a starting point, but we list a studio only once at least ${minForRates} of its quotations have been read — send the rest and we will rebuild these from all of them.`;
     }
 
     case 'REJECTED':
       return summary.note?.trim()
         ? summary.note.trim()
-        : 'We could not use what you sent. Fill the rates in below and we will take it from there.';
+        : `We could not use what you sent. Send your quotations again — at least ${minForRates} of them — and we will take it from there.`;
   }
 }
 

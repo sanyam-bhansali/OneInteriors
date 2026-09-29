@@ -19,6 +19,7 @@ Legend: ✅ done · 🔨 next · ⏳ waits on the owner (named)
 | 2 | **Reschedule and cancel links** for a booked expert call | A booked call with no way to move it becomes a no-show | ✅ |
 | 3 | **"Rates not filed yet"** at launch — a studio without its own live rates is shown without a borrowed price once the roster is real | No placeholder price under a real studio's name (§7.3) | ✅ |
 | 4 | **Send the browser only what the page shows** — the match page stops receiving full studio records | Privacy and page weight (§5.8) | ✅ ops-only fields stripped; ranking stays in the browser for instant widenings |
+| 4a | **No studio is approved without its quotations** — at least 50 of its own read into approved rates and a product master; the onboarding rates step needs 50 sent, and `setStudioStatus` refuses Active until then | The owner's rule, 30 Sep: every customer price is the studio's real number | ✅ blockers shown beside the status control |
 
 ## P2 — Answers that change the result
 

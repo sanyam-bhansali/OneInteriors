@@ -7,6 +7,7 @@
  * about what we are waiting for. Deriving it means the checklist and the
  * profile cannot disagree.
  */
+import { MIN_QUOTATIONS_FOR_RATES } from '@/modules/quotation/catalogue';
 
 export const ONBOARDING_STEPS = ['profile', 'registration', 'portfolio', 'practice', 'rates', 'review'] as const;
 
@@ -26,7 +27,7 @@ export const STEP_BLURBS: Record<OnboardingStep, string> = {
   registration: 'The numbers we check against the public registries.',
   portfolio: 'Three completed projects. This is what customers actually read.',
   practice: 'What you take on, when you can start, how you run a project. This is what we match on.',
-  rates: 'What you charge. Private, and never shown to anyone but you.',
+  rates: 'Your past quotations — at least 50 — and the rates we read from them. Private to you.',
   review: 'We take it from here.',
 };
 
@@ -67,6 +68,11 @@ export interface OnboardingSnapshot {
   portfolioShortfallNote: string | null;
   /// Core rate categories still without a rate. Empty = quotable.
   missingRates: string[];
+  /**
+   * Quotations sent in archives not rejected — `quotationsSent` in
+   * approval.ts. The rates step needs `MIN_QUOTATIONS_FOR_RATES`.
+   */
+  quotationsSent: number;
   /**
    * What the required sections of the matching profile still lack, from
    * `profileSections` (matching-profile.ts). Empty = matchable.
@@ -187,13 +193,18 @@ export function assessSteps(studio: OnboardingSnapshot): StepStatus[] {
     missing: portfolioMissing,
   };
 
-  // Without a complete rate card the studio produces no quote, and a studio
-  // nobody can get a quote from cannot be shown to a customer — the quote is
-  // the only route from a match to a conversation.
+  // Rates come from the studio's own quotations (the owner's rule of 30 Sep
+  // 2026): a studio is listed only once at least MIN_QUOTATIONS_FOR_RATES of
+  // them have been read, so a hand-typed rate card never completes this step
+  // on its own. The approval itself checks the rates that came out of them —
+  // see approval.ts.
   const ratesMissing: string[] = [];
-  if (studio.missingRates.length > 0) {
-    const n = studio.missingRates.length;
-    ratesMissing.push(`${n} rate${n === 1 ? '' : 's'} still to enter`);
+  if (studio.quotationsSent < MIN_QUOTATIONS_FOR_RATES) {
+    ratesMissing.push(
+      studio.quotationsSent === 0
+        ? `Send at least ${MIN_QUOTATIONS_FOR_RATES} of your past quotations`
+        : `${studio.quotationsSent} quotations sent — at least ${MIN_QUOTATIONS_FOR_RATES} are needed`,
+    );
   }
   const rates: StepStatus = {
     step: 'rates',

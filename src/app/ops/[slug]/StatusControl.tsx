@@ -26,10 +26,13 @@ export function StatusControl({
   studioId,
   slug,
   status,
+  blockers = [],
 }: {
   studioId: string;
   slug: string;
   status: StudioStatus;
+  /** Why this studio cannot be made Active yet — `approvalBlockers`. */
+  blockers?: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState<RecordResult | null, FormData>(
@@ -55,6 +58,16 @@ export function StatusControl({
         </button>
       </div>
       <p className="m-0 mt-1 text-[14px] text-[var(--color-ink)]">{status}</p>
+      {status !== 'ACTIVE' && blockers.length > 0 ? (
+        <div className="mt-2 rounded-md border border-[var(--color-rule)] p-3">
+          <p className="label m-0">Cannot be approved yet</p>
+          <ul className="m-0 mt-1 list-disc pl-4 text-[12px] leading-snug text-[var(--color-ink-2)]">
+            {blockers.map((b) => (
+              <li key={b}>{b}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {open ? (
         <form action={action} className="mt-3 flex flex-col gap-3">

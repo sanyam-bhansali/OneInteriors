@@ -1,3 +1,4 @@
+import { MIN_QUOTATIONS_FOR_RATES } from '@/modules/quotation/catalogue';
 import { describe, it, expect } from 'vitest';
 import {
   assessSteps,
@@ -23,6 +24,7 @@ const COMPLETE: OnboardingSnapshot = {
   portfolioCount: MIN_PORTFOLIO_PROJECTS,
   portfolioShortfallNote: null,
   missingRates: [],
+  quotationsSent: 60,
   practiceMissing: [],
   submittedForReview: false,
 };
@@ -128,27 +130,27 @@ describe('assessSteps — registration', () => {
 });
 
 describe('assessSteps — rates', () => {
-  it('is done when every core rate is entered', () => {
+  it(`is done once ${MIN_QUOTATIONS_FOR_RATES} quotations are in`, () => {
     expect(step(COMPLETE, 'rates').done).toBe(true);
+    expect(step(snapshot({ quotationsSent: MIN_QUOTATIONS_FOR_RATES }), 'rates').done).toBe(true);
   });
 
-  // A studio with no rate card produces no quote, and the quote is the only
-  // route from a match to a conversation — so an incomplete card is not a
-  // cosmetic gap, it makes the studio unshowable.
-  it('is not done while core rates are missing', () => {
-    const s = snapshot({ missingRates: ['painting', 'electrical'] });
+  // The owner's rule: rates come from the studio's own quotations, so a
+  // hand-typed card never completes the step on its own.
+  it('is not done on a full hand-typed card with no quotations', () => {
+    const s = snapshot({ missingRates: [], quotationsSent: 0 });
     expect(step(s, 'rates').done).toBe(false);
-    expect(step(s, 'rates').missing[0]).toBe('2 rates still to enter');
+    expect(step(s, 'rates').missing[0]).toBe(`Send at least ${MIN_QUOTATIONS_FOR_RATES} of your past quotations`);
   });
 
-  it('gets the singular right at one missing', () => {
-    expect(step(snapshot({ missingRates: ['painting'] }), 'rates').missing[0]).toBe(
-      '1 rate still to enter',
+  it('says how many are still needed', () => {
+    expect(step(snapshot({ quotationsSent: 20 }), 'rates').missing[0]).toBe(
+      `20 quotations sent — at least ${MIN_QUOTATIONS_FOR_RATES} are needed`,
     );
   });
 
-  it('blocks review until rates are in', () => {
-    expect(readyForReview(snapshot({ missingRates: ['painting'] }))).toBe(false);
+  it('blocks review until the quotations are in', () => {
+    expect(readyForReview(snapshot({ quotationsSent: MIN_QUOTATIONS_FOR_RATES - 1 }))).toBe(false);
   });
 });
 

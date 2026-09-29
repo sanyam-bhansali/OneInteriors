@@ -24,6 +24,8 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
+import { approvalBlockers } from '@/modules/studio/approval';
+import { approvalFactsFor } from '@/modules/studio/approval-store';
 import { requireRole, getCurrentUser, hasRole, type AuthUser } from '@/modules/auth/session';
 import { hasDatabase } from '@/lib/env';
 import { assessTier } from './tiers';
@@ -187,6 +189,16 @@ export async function setStudioStatus(
         select: { status: true, tier: true, tradeName: true },
       });
 
+      /* The owner's rule (30 Sep 2026): nobody is listed until at least
+         fifty of their own quotations have been read into approved rates and
+         a product master. Checked here, inside the transaction, so it is the
+         same data the approval commits. Only on the way IN — re-saving an
+         active studio is not a new approval. */
+      if (status === 'ACTIVE' && before.status !== 'ACTIVE') {
+        const blockers = approvalBlockers(await approvalFactsFor(studioId, tx));
+        if (blockers.length > 0) throw new ApprovalBlocked(blockers);
+      }
+
       await tx.studio.update({ where: { id: studioId }, data: { status } });
       const tier = await refreshTier(tx, studioId);
 
@@ -237,7 +249,16 @@ export async function setStudioStatus(
 
     return { ok: true };
   } catch (err) {
+    if (err instanceof ApprovalBlocked) {
+      return { ok: false, error: `Not yet — ${err.blockers.join(' ')}` };
+    }
     return { ok: false, error: err instanceof Error ? err.message : 'Could not change the status.' };
+  }
+}
+
+class ApprovalBlocked extends Error {
+  constructor(readonly blockers: string[]) {
+    super(blockers.join(' '));
   }
 }
 
