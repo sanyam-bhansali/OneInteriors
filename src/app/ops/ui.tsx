@@ -28,6 +28,7 @@ export function OpsHeader() {
             <OpsLink href="/ops/applications">Applications</OpsLink>
             <OpsLink href="/ops/verification">Verification</OpsLink>
             <OpsLink href="/ops/allocation">Allocation</OpsLink>
+            <OpsLink href="/ops/coverage">Coverage</OpsLink>
             <OpsLink href="/ops/consultations">Calls</OpsLink>
             {/* After the call. Everything from the handoff to whether the
                 meeting happened — the half of the funnel we charge for and,
