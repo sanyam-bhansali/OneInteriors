@@ -30,7 +30,7 @@ Legend: ✅ done · 🔨 next · ⏳ waits on the owner (named)
 | 6 | **The customer's top priority leads each card's evidence** | "You put finishing on time first → they can start in January…" (§6) | ✅ `topPriority` on every match, said whatever it scored (match@2.0.1) |
 | 7 | **Society typeahead** — picking "Gera World of Joy" fills Kharadi, and society names stay consistent for matching and the plan library | §2 screen 2; makes "a home in your building" match reliably | ✅ 23 hand-checked societies in `src/data/pune-societies.ts` (ops extends it); one spelling per building for matching and the plan library |
 | 8 | **Skip screens the floor plan already answered** | Fewer questions for the customers who did the most work (§2 rules) | ✅ the carpet area moved to the plan screen, asked only without a plan; a confirmed plan sets BHK and area |
-| 9 | **Expert questions from household and possession**, not only the price gap | The call starts with their real worries (§9) | |
+| 9 | **Expert questions from household and possession**, not only the price gap | The call starts with their real worries (§9) | ✅ "From your brief" on the booking form, and "worth raising" in the expert's pack |
 
 ## P3 — The style signal
 

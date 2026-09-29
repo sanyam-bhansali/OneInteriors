@@ -216,6 +216,16 @@ async function PrepCard({
           {pack.starred.join(', ')}
         </p>
       ) : null}
+      {pack && pack.worthRaising.length > 0 ? (
+        <div className="mb-5">
+          <p className="label m-0 mb-1.5">Worth raising — from their brief</p>
+          <ul className="m-0 list-disc pl-5 text-[13.5px] leading-relaxed text-[var(--color-ink-2)]">
+            {pack.worthRaising.map((q) => (
+              <li key={q}>{q}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {/* The prep pack.
           This is the half of the card that did not come out of a dropdown —

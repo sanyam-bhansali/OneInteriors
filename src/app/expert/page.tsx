@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { briefQuestions } from '@/modules/consultation/brief-questions';
 import { CallOffer } from '@/components/oi/CallOffer';
 import { BenefitChips } from '@/components/oi/ExpertPitch';
 import { currentOffer } from '@/modules/consultation/offer-store';
@@ -233,6 +234,7 @@ export default async function ExpertPage() {
           defaultName={user.name}
           defaultEmail={user.email}
           slots={slots.map((s) => s.startsAt)}
+          fromBrief={briefQuestions(brief)}
           studios={offer.quotes.map((q) => ({
             id: q.studioId,
             name: q.studioName,

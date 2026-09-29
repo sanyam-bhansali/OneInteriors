@@ -18,6 +18,7 @@ import { ITEM } from '@/modules/quotation/catalogue';
 import { rowToBrief } from '@/modules/brief/mapping';
 import { splitReasoning } from '@/modules/matching/store';
 import { briefAnswers, type Answer } from './answers';
+import { briefQuestions } from './brief-questions';
 
 export interface PackStudio {
   id: string;
@@ -32,6 +33,8 @@ export interface ExpertPack {
   answers: Answer[];
   studios: PackStudio[];
   starred: string[];
+  /** Worth raising on the call, from their possession, household and needs — ticked or not. */
+  worthRaising: string[];
 }
 
 export interface SeenQuote {
@@ -103,8 +106,10 @@ export async function expertPack(briefId: string, studioIds: string[]): Promise<
     ]);
     if (!row) return null;
     const compared = new Set(decision?.comparedSlugs ?? []);
+    const brief = rowToBrief(row);
     return {
-      answers: briefAnswers(rowToBrief(row)),
+      answers: briefAnswers(brief),
+      worthRaising: briefQuestions(brief),
       studios: studioIds
         .map((id) => studios.find((s) => s.id === id))
         .filter((s): s is NonNullable<typeof s> => Boolean(s))

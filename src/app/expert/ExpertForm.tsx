@@ -69,6 +69,7 @@ export function ExpertForm({
   maxStudios,
   slots = [],
   preselected = [],
+  fromBrief = [],
 }: {
   briefId: string;
   studios: StudioOption[];
@@ -80,6 +81,8 @@ export function ExpertForm({
   slots?: string[];
   /** The studios they compared — ticked for them. */
   preselected?: string[];
+  /** Questions from their possession, household and needs (consultation/brief-questions.ts). */
+  fromBrief?: string[];
 }) {
   const [state, action, pending] = useActionState(requestExpertAction, INITIAL);
   const [slot, setSlot] = useState<string | null>(null);
@@ -239,8 +242,8 @@ export function ExpertForm({
       <fieldset className="m-0 border-0 p-0">
         <legend className="oi-display mb-2 p-0 text-[21px]">What do you want answered?</legend>
         <p className="m-0 mb-5 max-w-[56ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-          Tick anything you want looked into before the call. The first two are written from your
-          own comparison. Nobody is going to open with &ldquo;so, tell me about your
+          Tick anything you want looked into before the call. The first ones are written from your
+          own quotes and your brief. Nobody is going to open with &ldquo;so, tell me about your
           requirement&rdquo;.
         </p>
 
@@ -268,7 +271,22 @@ export function ExpertForm({
           </div>
         ) : null}
 
-        {generated.length > 0 ? (
+        {/* From their life rather than their quotes — the timeline, the family,
+            what the home needs (build queue item 9). */}
+        {fromBrief.length > 0 ? (
+          <div className="mb-5">
+            <p className="oi-eyebrow m-0 mb-3">From your brief</p>
+            <ul className="m-0 flex list-none flex-col gap-2 p-0">
+              {fromBrief.map((q) => (
+                <li key={q}>
+                  <Ask q={q} on={asks.includes(q)} onToggle={() => toggleAsk(q)} derived />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {generated.length > 0 || fromBrief.length > 0 ? (
           <p className="oi-eyebrow m-0 mb-3">Things most people ask</p>
         ) : null}
 
