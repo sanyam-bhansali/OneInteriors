@@ -13,7 +13,7 @@
  */
 
 import type { Brief, PriorityFactor } from '@/modules/brief/types';
-import { STYLE_LABELS, zoneOf } from '@/modules/brief/types';
+import { STYLE_LABELS, localityLabel, zoneOf } from '@/modules/brief/types';
 import type { Studio } from '@/modules/studio/types';
 import { MIN_PROJECTS_FOR_RELIABILITY } from '@/modules/studio/types';
 
@@ -423,7 +423,7 @@ function buildReasoning(brief: Brief, studio: Studio, breakdown: FactorScores): 
     const local = studio.portfolio.filter((p) => p.locality === brief.locality).length;
     if (local > 0) {
       lines.push(
-        `They have completed ${local} ${local === 1 ? 'home' : 'homes'} in ${titleCase(brief.locality)}.`,
+        `They have completed ${local} ${local === 1 ? 'home' : 'homes'} in ${localityLabel(brief.locality)}.`,
       );
     }
   }
@@ -501,7 +501,7 @@ export function matchSummary(
     const local = studio.portfolio.filter((p) => p.locality === brief.locality).length;
     if (local > 0) {
       clauses.push(
-        `they have finished ${local} ${local === 1 ? 'home' : 'homes'} in ${titleCase(brief.locality)}`,
+        `they have finished ${local} ${local === 1 ? 'home' : 'homes'} in ${localityLabel(brief.locality)}`,
       );
     }
   }

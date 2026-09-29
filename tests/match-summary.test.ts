@@ -217,3 +217,15 @@ describe('sanitiseBrief keeps everything the engine reads', () => {
     expect(cleaned.priorityRanking).toEqual(['SPEED', 'BUDGET']);
   });
 });
+
+// "They have finished 2 homes in Nibm" — the slug title-cased — was what a
+// customer in NIBM Road read. Places are named by their label.
+describe('place names', () => {
+  it('uses the locality label, not the slug', () => {
+    const b = brief({ locality: 'nibm' });
+    const s = studio({ localities: ['nibm'], portfolio: [project({ locality: 'nibm' })] });
+    const result = scoreMatch(b, s);
+    expect(result?.reasoning.join(' ')).toContain('NIBM Road');
+    expect(matchSummary(b, s, result!) ?? '').not.toContain('Nibm');
+  });
+});
