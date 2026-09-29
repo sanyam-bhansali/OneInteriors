@@ -451,6 +451,11 @@ export function CompareClient({
         ) : null}
 
         <ExplainDifferences slugs={entries.map((e) => e.slug)} brief={brief} plan={project.plan} />
+        <p className="m-0 -mt-6 mb-10">
+          <Link href="/compare/brief" className="text-[14px] font-semibold text-[var(--ink)] underline">
+            The one-page brief — to print, save or send to family →
+          </Link>
+        </p>
         <RoomPrices entries={entries} />
         <MaterialPrices entries={entries} />
 

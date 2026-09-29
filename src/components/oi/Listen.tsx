@@ -49,7 +49,7 @@ export function Listen({ text, language = 'EN' }: { text: string; language?: Lan
         setSpeaking(true);
       }}
       aria-pressed={speaking}
-      className="min-h-11 cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-4 py-2 text-[13.5px] font-semibold text-[var(--ink)] hover:border-[var(--ink2)]"
+      className="min-h-11 cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-4 py-2 text-[13.5px] font-semibold text-[var(--ink)] hover:border-[var(--ink2)] print:hidden"
     >
       {speaking ? '■ Stop' : '▶ Listen'}
     </button>

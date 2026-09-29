@@ -173,7 +173,7 @@ export function ExplainDifferences({
         <p className="oi-eyebrow m-0">In plain words</p>
         {/* In the language from their brief, and switchable — the person
             reading it may not be the person who filled it in. */}
-        <div className="flex gap-1" role="group" aria-label="Language">
+        <div className="flex gap-1 print:hidden" role="group" aria-label="Language">
           {LANGUAGES.map((l) => (
             <button
               key={l}
@@ -212,7 +212,7 @@ export function ExplainDifferences({
                 else setFailed(true);
               })
             }
-            className="min-h-11 cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-5 py-2.5 text-[14px] font-semibold text-[var(--ink)] hover:border-[var(--ink2)] disabled:opacity-50"
+            className="min-h-11 cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-5 py-2.5 text-[14px] font-semibold text-[var(--ink)] hover:border-[var(--ink2)] disabled:opacity-50 print:hidden"
           >
             {pending ? 'Reading the numbers…' : 'Explain the differences'}
           </button>
