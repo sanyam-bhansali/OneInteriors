@@ -33,7 +33,7 @@ describe('compare insights', () => {
     const rows = materialRows(entries);
     expect(rows.map((r) => r.code)).toContain('kitchen_base');
     const base = rows.find((r) => r.code === 'kitchen_base')!;
-    expect(base.cells.every((c) => c.ratePaise !== null && c.materials.length > 0)).toBe(true);
+    expect(base.cells.every((c) => c.amountPaise !== null && c.materials.length > 0)).toBe(true);
     // Grouped by what the material is, not how the sentence is written.
     const groups = sameSpecGroups(base);
     expect(groups.reduce((n, g) => n + g.studios.length, 0)).toBe(3);

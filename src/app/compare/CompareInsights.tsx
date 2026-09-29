@@ -110,15 +110,15 @@ export function RoomPrices({ entries }: { entries: Entry[] }) {
   );
 }
 
-/** Each studio's rate and material on the same item — and who quotes the same material for what. */
+/** Each studio's price and material for the same item at the same size — never a per-sq-ft rate. */
 export function MaterialPrices({ entries }: { entries: Entry[] }) {
   const rows = materialRows(entries);
   if (rows.length === 0) return null;
   return (
     <Sheet className="mb-10 p-6">
-      <p className="oi-eyebrow m-0 mb-1">Price per material</p>
+      <p className="oi-eyebrow m-0 mb-1">By material</p>
       <p className="m-0 mb-4 text-[13px] text-[var(--ink2)]">
-        The same item, the same size — each studio&rsquo;s rate and what it is made of.
+        The same item at the same size — what each studio charges for it, and what it is made of.
       </p>
       <ul className="m-0 flex list-none flex-col gap-4 p-0">
         {rows.map((row) => {
@@ -126,20 +126,20 @@ export function MaterialPrices({ entries }: { entries: Entry[] }) {
           return (
             <li key={row.code} className="border-b border-[var(--line)] pb-4 last:border-b-0 last:pb-0">
               <p className="m-0 mb-1.5 text-[14.5px] font-medium">
-                {row.label} <span className="oi-label">per {row.unit}</span>
+                {row.label}
               </p>
               <ul className="m-0 flex list-none flex-col gap-1 p-0">
                 {row.cells.map((c) => (
                   <li key={c.slug} className="text-[13px] leading-snug text-[var(--ink2)]">
                     <span className="text-[var(--ink)]">{c.name}</span>{' '}
-                    {c.ratePaise === null ? 'not quoted' : <span className="oi-num">{money(c.ratePaise)}</span>}
+                    {c.amountPaise === null ? 'not quoted' : <span className="oi-num">{money(c.amountPaise)}</span>}
                     {c.spec ? ` — ${c.spec}` : ''}
                   </li>
                 ))}
               </ul>
               {shared.map((g) => (
                 <p key={g.spec} className="m-0 mt-2 text-[13px] leading-snug text-[var(--ink)]">
-                  Same material at {g.studios.length} studios: {g.studios.map((s) => `${money(s.ratePaise)} at ${s.name}`).join(', ')}.
+                  Same material at {g.studios.length} studios: {g.studios.map((s) => `${money(s.amountPaise)} at ${s.name}`).join(', ')}.
                 </p>
               ))}
             </li>

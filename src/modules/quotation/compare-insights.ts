@@ -60,7 +60,13 @@ export function roomSpreads(entries: Entry[]): RoomSpread[] {
 
 // ── By material ────────────────────────────────────────────────
 
-/** The items whose rate says most about a studio's materials: the big carpentry faces. */
+/**
+ * The items whose price says most about a studio's materials: the big
+ * carpentry faces. Compared as the price of the same item at the same size,
+ * never as a per-square-foot rate — a studio's rate card is its own business,
+ * and a customer screen that printed it would be the easiest place for a
+ * competitor to read it (the owner, 30 Sep 2026).
+ */
 const MATERIAL_ITEMS = ['kitchen_base', 'kitchen_wall', 'master_wardrobe'];
 
 export interface MaterialRow {
@@ -70,7 +76,8 @@ export interface MaterialRow {
   cells: {
     slug: string;
     name: string;
-    ratePaise: number | null;
+    /** The line's price at the standard size — the same size for every studio. */
+    amountPaise: number | null;
     spec: string | null;
     /** Glossary ids in the spec — how two studios' words are matched to one material. */
     materials: string[];
@@ -92,7 +99,7 @@ export function materialRows(entries: Entry[]): MaterialRow[] {
         return {
           slug: e.slug,
           name: e.name,
-          ratePaise: l?.ratePaise ?? null,
+          amountPaise: l?.amountPaise ?? null,
           spec: l?.spec ?? null,
           materials: l?.spec ? [...new Set(findTerms(l.spec).map((t) => t.material.id))].sort() : [],
         };
@@ -107,13 +114,13 @@ export function materialRows(entries: Entry[]): MaterialRow[] {
  * like-for-like the plan asks for ("18mm BWP ply, veneer: ₹2,130 at Akara,
  * ₹1,950 at Sixth Wall"). Grouped on glossary ids, never on the sentence.
  */
-export function sameSpecGroups(row: MaterialRow): { spec: string; studios: { name: string; ratePaise: number }[] }[] {
-  const groups = new Map<string, { spec: string; studios: { name: string; ratePaise: number }[] }>();
+export function sameSpecGroups(row: MaterialRow): { spec: string; studios: { name: string; amountPaise: number }[] }[] {
+  const groups = new Map<string, { spec: string; studios: { name: string; amountPaise: number }[] }>();
   for (const c of row.cells) {
-    if (c.ratePaise === null || !c.spec) continue;
+    if (c.amountPaise === null || !c.spec) continue;
     const key = c.materials.length > 0 ? c.materials.join('+') : c.spec.toLowerCase();
     const g = groups.get(key) ?? { spec: c.spec, studios: [] };
-    g.studios.push({ name: c.name, ratePaise: c.ratePaise });
+    g.studios.push({ name: c.name, amountPaise: c.amountPaise });
     groups.set(key, g);
   }
   return [...groups.values()];
@@ -174,9 +181,9 @@ export function compareFacts(entries: Entry[]): string {
   for (const r of roomSpreads(entries)) {
     lines.push(`- ${r.label}: ${r.cells.map((c) => `${c.name} ${c.subtotalPaise === null ? 'not priced' : money(c.subtotalPaise)}`).join(', ')}.`);
   }
-  lines.push('', 'Materials and rates on the main carpentry items:');
+  lines.push('', 'Materials and prices on the main carpentry items, each at the same size (never state a rate per square foot):');
   for (const row of materialRows(entries)) {
-    lines.push(`- ${row.label}, per ${row.unit}: ${row.cells.map((c) => (c.ratePaise === null ? `${c.name} not priced` : `${c.name} ${money(c.ratePaise)} (${c.spec ?? 'no spec given'})`)).join('; ')}.`);
+    lines.push(`- ${row.label}: ${row.cells.map((c) => (c.amountPaise === null ? `${c.name} not priced` : `${c.name} ${money(c.amountPaise)} (${c.spec ?? 'no spec given'})`)).join('; ')}.`);
   }
   return lines.join('\n');
 }
@@ -222,20 +229,20 @@ export function percentFigures(text: string): number[] {
   return [...asciiDigits(text).matchAll(/(\d+(?:\.\d+)?)\s?(%|per ?cent|प्रतिशत|टक्के|टक्का)/g)].map((m) => Number(m[1]));
 }
 
-/** Every figure the summary is allowed to state: totals, subtotals, rates, and the differences between them. */
+/** Every figure the summary is allowed to state: totals, subtotals, item prices, and the differences between them. */
 export function allowedFigures(entries: Entry[]): { paise: number[]; percents: number[] } {
   const base: number[] = [];
   for (const e of entries) {
     base.push(e.quote.totalPaise);
     for (const r of e.quote.rooms) base.push(r.subtotalPaise);
   }
-  for (const row of materialRows(entries)) for (const c of row.cells) if (c.ratePaise !== null) base.push(c.ratePaise);
+  for (const row of materialRows(entries)) for (const c of row.cells) if (c.amountPaise !== null) base.push(c.amountPaise);
   const diffs: number[] = [];
   const percents: number[] = [];
   const groups = [
     entries.map((e) => e.quote.totalPaise),
     ...roomSpreads(entries).map((r) => r.cells.map((c) => c.subtotalPaise).filter((v): v is number => v !== null)),
-    ...materialRows(entries).map((row) => row.cells.map((c) => c.ratePaise).filter((v): v is number => v !== null)),
+    ...materialRows(entries).map((row) => row.cells.map((c) => c.amountPaise).filter((v): v is number => v !== null)),
   ];
   for (const g of groups) {
     for (const a of g) for (const b of g) {

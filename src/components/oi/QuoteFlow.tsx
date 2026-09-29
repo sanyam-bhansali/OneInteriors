@@ -254,7 +254,9 @@ export function QuoteDocument({
             <DocRow
               key={line.code}
               label={line.label}
-              quantity={`${line.size}  ·  ${line.quantity.toLocaleString('en-IN')} ${line.unit} at ${money(line.ratePaise)} per ${line.unit}`}
+              // Size and quantity, never the rate: a studio's per-unit rate is not
+              // shown on any customer screen (the owner, 30 Sep 2026).
+              quantity={line.unit === 'unit' ? line.size : `${line.size}  ·  ${line.quantity.toLocaleString('en-IN')} ${line.unit}`}
               value={money(line.amountPaise)}
               note={
                 line.addedFor ? (
