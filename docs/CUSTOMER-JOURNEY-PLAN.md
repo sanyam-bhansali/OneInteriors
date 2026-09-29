@@ -462,9 +462,19 @@ fixtures while real studios fill in their profiles.
   written read given the whole brief; `/tier` retired. **The scope item
   checklist moves to Phase 2**, because what it lists is the catalogue's
   scope membership, which Phase 2 builds.
+- **Phase 2 — done.** Scope checklist, scope-scaled bands and the civil
+  block; the floor-plan reader with its confirm step; every match priced
+  at once on the platform format ("Prepared for", payment phases in
+  rupees, "Powered by One Interiors", print/save as PDF on A4); where the
+  total lands against the chosen band; archive threshold 50 with a
+  per-item floor of 8; Excel quotations read. The per-studio modular
+  discount moves to Phase 3 with the curated discount.
 - **Migrations to deploy:** `20260929100000_waitlist_signups_lockdown`,
   `20260929110000_brief_possession_status`,
-  `20260929120000_brief_contact_and_home`, `20260929130000_auth_identities`.
+  `20260929120000_brief_contact_and_home`, `20260929130000_auth_identities`,
+  `20260929140000_brief_scope_selection`,
+  `20260929150000_brief_floor_plan_reading`,
+  `20260929160000_studio_payment_phases`.
 
 ---
 

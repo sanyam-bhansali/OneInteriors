@@ -27,14 +27,14 @@ civil block**
 
 | Feature | State |
 |---|---|
-| Floor-plan reader (Claude reads the plan; customer confirms) in the brief, with the Hauspire app's eight faults fixed | 🔨 |
-| Every matched studio priced at once, build animation once | 🔨 |
-| Payment phases on the quote, from each studio (studio profile / archive) | 🔨 structure · ⏳ studios' figures |
-| Platform quotation format: studio logo + "Powered by One Interiors", "Prepared for Sanyam" | 🔨 |
-| Quote PDF | 🔨 (print stylesheet first; true PDF later) |
-| Each studio's own modular discount, falling back to 10% | 🔨 structure · ⏳ archives |
-| Where the total lands against the chosen band | 🔨 |
-| Lower the archive threshold 100 → 50 with a per-item minimum; read Excel quotations | 🔨 |
+| Floor-plan reader (Claude reads the plan; customer confirms) in the brief, with the Hauspire app's eight faults fixed | ✅ |
+| Every matched studio priced at once, build animation once | ✅ |
+| Payment phases on the quote, from each studio (studio profile / archive) | ✅ structure (rates step, in rupees on the quote, high-advance note) · ⏳ studios' figures |
+| Platform quotation format: studio logo + "Powered by One Interiors", "Prepared for Sanyam" | ✅ (monogram until the logo field lands in Phase 3) |
+| Quote PDF | ✅ print / save as PDF on A4 · true server PDF later |
+| Each studio's own modular discount, falling back to 10% | moved to Phase 3, with the curated discount — both are studio-profile fields |
+| Where the total lands against the chosen band | ✅ — and it shows the archive rates sit **below** the Essential floor (≈₹1,000–1,170/sq ft for a standard full home, before GST). See the last section. |
+| Lower the archive threshold 100 → 50 with a per-item minimum; read Excel quotations | ✅ 50, per-item floor 8 enforced at approval; .xlsx/.xlsm/.csv read |
 
 ### Phase 3 — the studio profile
 
@@ -199,3 +199,11 @@ opposite of "no studio pays for position".
 - Your 3D design tool, when ready
 - WhatsApp template approval (Meta)
 - A lawyer's read of `/privacy` and the studio agreement
+- **The bands against the archive.** Priced on the archive medians, a
+  standard full home comes to about ₹1,000–1,170 per sq ft before GST
+  (2 BHK/850 sq ft: ₹9.5 L; 3 BHK/1,250 sq ft: ₹12.6 L). That is under the
+  Essential floor of ₹1,200, so most quotes now say "below your range".
+  Either the bands are meant with GST and extras (then the line should
+  compare after GST), or the standard scope is thinner than the homes the
+  bands were set from, or the bands need to come down. Your call; the
+  line is a one-word change either way.
