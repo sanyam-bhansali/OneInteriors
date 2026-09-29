@@ -95,6 +95,25 @@ export function ratesAreReal(): boolean {
 export const RATES_VERSION = 'archive-median@1';
 
 /**
+ * How far above the archive a fixture studio prices.
+ *
+ * The archive is one market's medians and places every studio in Essential,
+ * so the Premium and Luxury fixtures (added 29 Sep for the band filter) are
+ * the same medians scaled — about 2× and 2.75× — which is roughly where
+ * veneer, lacquer and stone quotes sit against a laminate one. Only invented
+ * studios appear here; a real studio's rates come from its own quotations.
+ */
+const FIXTURE_LEVEL: Record<string, number> = {
+  'vaastu-atelier': 2,
+  'grain-and-grey': 2,
+  'kosha-interiors': 2,
+  'southlight-design': 2,
+  'marigold-house': 2.75,
+  'stone-and-sill': 2.75,
+  'ashrama-studio': 2.75,
+};
+
+/**
  * A stable number in roughly [-1, 1] from a slug.
  *
  * Deterministic on purpose: the same studio must show the same rates on every
@@ -172,7 +191,7 @@ export function referenceRates(filedOn = '2026-09-18'): StudioRates {
 }
 
 export function filedRatesFor(slug: string, filedOn = '2026-09-18'): StudioRates {
-  const factor = 1 + spread(slug) * 0.09;
+  const factor = (FIXTURE_LEVEL[slug] ?? 1) * (1 + spread(slug) * 0.09);
   // Cheaper studios tend to the cheaper board, which is the whole reason a
   // total can be lower without the studio being better value.
   const profile =

@@ -45,7 +45,7 @@ import { ProjectWings } from './ProjectWings';
 import type { Focus } from '@/components/oi/useScrollFocus';
 import type { Studio } from '@/modules/studio/types';
 import type { MatchResult } from '@/modules/matching/score';
-import type { Brief } from '@/modules/brief/types';
+import { localityLabel, type Brief } from '@/modules/brief/types';
 
 /** Two letters from the trade name. "Chitra & Co." → CC, "Teakline" → TE. */
 function monogram(name: string): string {
@@ -141,7 +141,7 @@ export function StudioCard({
 
   const tags = useMemo(() => {
     const out: string[] = [];
-    if (studio.localities.length > 0) out.push(studio.localities.slice(0, 2).join(' · '));
+    if (studio.localities.length > 0) out.push(studio.localities.slice(0, 2).map((l) => localityLabel(l) ?? l).join(' · '));
     if (studio.yearsActive) out.push(`${studio.yearsActive} yrs`);
     if (studio.teamSize) out.push(`Team of ${studio.teamSize}`);
     return out;

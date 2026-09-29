@@ -18,7 +18,7 @@ import {
   TIER_LABELS,
   describeDelivery,
 } from '@/modules/studio/types';
-import { PROPERTY_LABELS, SCOPE_LABELS, STYLE_LABELS } from '@/modules/brief/types';
+import { PROPERTY_LABELS, SCOPE_LABELS, STYLE_LABELS, localityLabel } from '@/modules/brief/types';
 
 /**
  * A studio's profile, in the language `/match` established.
@@ -148,7 +148,7 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
   /* Where they work. The roster card has said this from the beginning and the
      profile never did — so the one page devoted to a studio was the one place
      that did not say whether they come to your part of the city. */
-  const where = [...studio.localities.slice(0, 4)];
+  const where = studio.localities.slice(0, 4).map((l) => localityLabel(l) ?? l);
   const band =
     studio.minProjectPaise && studio.maxProjectPaise
       ? `${formatINRCompact(studio.minProjectPaise)}–${formatINRCompact(studio.maxProjectPaise)}`
@@ -352,7 +352,7 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
 
                         <p className="oi-label m-0">
                           {[
-                            p.locality,
+                            localityLabel(p.locality),
                             p.propertyType ? PROPERTY_LABELS[p.propertyType] : null,
                             p.scope ? SCOPE_LABELS[p.scope] : null,
                           ]

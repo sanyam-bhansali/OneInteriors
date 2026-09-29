@@ -31,6 +31,7 @@ import { getCurrentUser, hasRole } from '@/modules/auth/session';
 import { contactState, type ContactState } from './introduction-access';
 import type { AppointmentKindName, AppointmentStatusName } from './appointment-rules';
 import { whatItNeeds, type IntroductionNeed } from './introduction-needs';
+import { localityLabel } from '@/modules/brief/types';
 
 // The pure half lives next door so Vitest can reach it — CONTRIBUTING §9.5.
 export { whatItNeeds, NEED_LABEL } from './introduction-needs';
@@ -183,7 +184,7 @@ export async function listIntroductions(limit = 100): Promise<OpsIntroduction[]>
         // the other side of the same rule, not an exception to it.
         customerName: consultation?.contactName ?? null,
         customerPhone: consultation?.contactPhone ?? null,
-        locality: row.brief.locality,
+        locality: localityLabel(row.brief.locality),
         propertyType: row.brief.propertyType,
         appointments,
         wonHere: row.brief.quoteDecision?.wonByStudioId === row.studio.id,
