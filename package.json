@@ -21,6 +21,7 @@
     "roster:check": "tsx prisma/roster-check.ts",
     "db:studio": "prisma studio",
     "db:ops": "tsx prisma/seed-ops.ts",
+    "db:expert": "tsx prisma/seed-expert.ts",
     "db:studio-login": "tsx prisma/seed-studio.ts",
     "db:rates": "tsx prisma/seed-rate-cards.ts",
     "guard:destructive": "tsx prisma/guard-destructive.ts",

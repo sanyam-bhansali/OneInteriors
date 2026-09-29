@@ -131,7 +131,7 @@ export default async function ExpertPage() {
                 {ARCHITECT.name}
               </h2>
               <p className="m-0 mt-1.5 text-[14px] text-[var(--ink2)]">
-                {ARCHITECT.role} · {ARCHITECT.credential}
+                {ARCHITECT.role}
               </p>
             </div>
           </div>
@@ -253,8 +253,10 @@ function Read({ label }: { label: string }) {
   );
 }
 
+/** "Ar. Swarupa Tondare" → "Swarupa": the title is not a name. */
 function firstName(full: string): string {
-  return full.split(' ')[0] ?? full;
+  const words = full.split(' ').filter((w) => !/^(ar|dr|mr|ms|mrs)\.?$/i.test(w));
+  return words[0] ?? full;
 }
 
 function localityLabel(slug: string | null): string | null {

@@ -5,11 +5,10 @@
  *
  * ## A benefit without terms is not shown
  *
- * Plan §17.3, and the reason several benefits below have `terms: null`: copy
- * that promises money needs a rule behind it — how much, for what, when it is
- * paid, what cancels it. Until the owner writes those terms here, the benefit
- * does not appear on any screen. Adding the sentence is the whole of turning
- * one on.
+ * Plan §17.3: copy that promises money needs a rule behind it — how much,
+ * for what, when it is paid, what cancels it. A benefit with `terms: null`
+ * appears on no screen; adding the sentence is the whole of turning one on.
+ * Every benefit below has the owner's terms as of 30 Sep 2026.
  *
  * Pure, and tested.
  */
@@ -24,7 +23,7 @@ const STAGE_WORDS: Record<Stage, string> = {
   CALL_BOOKED: 'once your expert call is booked',
   INTRODUCED: 'once we introduce you to a studio',
   SIGNED: 'when you sign with a studio through us',
-  HANDOVER: 'at handover',
+  HANDOVER: 'when your home is handed over',
 };
 
 export interface Benefit {
@@ -66,18 +65,46 @@ export const BENEFITS: Benefit[] = [
     terms: 'Studios that offer one show it as its own line on your quote — the same for every customer, never a struck-through price.',
     unlocksAt: 'SIGNED',
   },
-  // Terms to be written by the owner (§17.3) before these appear anywhere.
-  { id: 'cashback', title: 'Cashback', terms: null, unlocksAt: 'SIGNED' },
-  { id: 'referral', title: 'OneReferrals', terms: null, unlocksAt: 'START' },
-  { id: 'free-cab', title: 'Free cab to a studio', terms: null, unlocksAt: 'CALL_BOOKED' },
+  // Terms written by the owner, 30 Sep 2026 (§17.3).
+  {
+    id: 'cashback',
+    title: 'Cashback',
+    terms:
+      'Up to ₹50,000 back once you have signed with a studio through us and paid its first payment phase. If the project is cancelled before 20% of its value has been paid to the studio, the cashback is cancelled.',
+    unlocksAt: 'SIGNED',
+  },
+  {
+    id: 'referral',
+    title: 'OneReferrals',
+    terms:
+      'Refer a friend. When their project with a studio chosen through us has its 20% advance paid, you get ₹10,000 — for every project that closes.',
+    unlocksAt: 'START',
+  },
+  {
+    id: 'free-cab',
+    title: 'Free cab to a studio',
+    terms: 'After your expert call, when a studio meeting is scheduled, we book your cab to the studio — the first trip, from anywhere in Pune.',
+    unlocksAt: 'INTRODUCED',
+  },
   {
     id: 'tracker',
     title: 'Project tracker',
     terms: 'Every stage of your home here, with its planned date, what is done and what has happened on site.',
     unlocksAt: 'SIGNED',
   },
-  { id: 'cinematic-shoot', title: 'Cinematic video of your home', terms: null, unlocksAt: 'HANDOVER' },
-  { id: 'onehamper', title: 'OneHamper', terms: null, unlocksAt: 'HANDOVER' },
+  {
+    id: 'cinematic-shoot',
+    title: 'Cinematic video of your home',
+    terms:
+      'When a studio chosen through us completes your home, we film it — a cinematic video, with a testimonial from you if you would like to give one, both yours to keep.',
+    unlocksAt: 'HANDOVER',
+  },
+  {
+    id: 'onehamper',
+    title: 'OneHamper',
+    terms: 'At handover, every home built through us gets OneHamper — a gift from us.',
+    unlocksAt: 'HANDOVER',
+  },
 ];
 
 export interface BenefitState {
@@ -113,7 +140,10 @@ export function stageOf(facts: {
   callBooked: boolean;
   introduced: boolean;
   signed: boolean;
+  /** The tracker's HANDOVER stage is marked done. */
+  handedOver?: boolean;
 }): Stage {
+  if (facts.handedOver) return 'HANDOVER';
   if (facts.signed) return 'SIGNED';
   if (facts.introduced) return 'INTRODUCED';
   if (facts.callBooked) return 'CALL_BOOKED';

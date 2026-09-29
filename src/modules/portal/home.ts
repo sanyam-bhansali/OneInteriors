@@ -43,7 +43,7 @@ export async function yourHome(briefId: string | null, briefDone: boolean, now =
   const empty: YourHome = { matches: [], introductions: [], stage: stageOf({ briefDone, callBooked: false, introduced: false, signed: false }) };
   if (!briefId) return empty;
   try {
-    const [matches, intros, calls, decision] = await Promise.all([
+    const [matches, intros, calls, decision, handedOver] = await Promise.all([
       prisma.match.findMany({
         where: { briefId },
         orderBy: { score: 'desc' },
@@ -61,6 +61,7 @@ export async function yourHome(briefId: string | null, briefDone: boolean, now =
       }),
       prisma.consultation.count({ where: { briefId, status: { in: ['scheduled', 'completed'] } } }),
       prisma.quoteDecision.findUnique({ where: { briefId }, select: { wonByStudioId: true } }),
+      prisma.homeProject.count({ where: { introduction: { briefId }, doneStages: { has: 'HANDOVER' } } }),
     ]);
     return {
       matches: matches.map((m) => ({
@@ -84,6 +85,7 @@ export async function yourHome(briefId: string | null, briefDone: boolean, now =
         callBooked: calls > 0,
         introduced: intros.length > 0,
         signed: Boolean(decision?.wonByStudioId),
+        handedOver: handedOver > 0,
       }),
     };
   } catch (error) {

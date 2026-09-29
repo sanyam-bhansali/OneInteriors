@@ -40,11 +40,11 @@ import {
 } from '@/modules/matching/score';
 
 /**
- * Offer "show the band above too" when fewer than three fit? Waits on the
- * owner's yes (docs/REMAINING-BUILD-AND-COMPETITORS.md, "What I need from
- * you"). The engine and the offer are built; this is the switch.
+ * Offer "show the band above too" when fewer than three fit — the owner's
+ * yes, 30 Sep 2026. Always the customer's tap, and every studio it adds is
+ * marked as the band above.
  */
-const BAND_UP_APPROVED = false;
+const BAND_UP_APPROVED = true;
 
 const WIDENING_COPY: Record<Widening, string> = {
   ANY_ZONE: 'Include studios from other parts of Pune',

@@ -62,10 +62,17 @@ Legend: ✅ done · 🔨 next · ⏳ waits on the owner (named)
 | 24 | **Ask your quote** — "Why is Akara's kitchen ₹60,000 more?", answered only from their numbers and checked | |
 | 25 | **Walk the quote on your floor plan** — tap a room to see its lines | |
 | 26 | **Your home, assembling** — the brief's side panel becomes a picture of their home | |
+| 27 | **The owner's 3D design tool** in the customer portal — developed together once this queue is done (owner, 30 Sep) | |
 
 ## Waiting on the owner (not in the queue)
 
-Google / Apple / Meta credentials · WhatsApp template · the named expert and
-hours · benefit terms (cashback, referrals, cab, shoot, hamper) · the 3D tool
-· "one band up" yes/no · bands with or without GST · a lawyer's read of
-`/privacy` · running `npm run db:deploy` · the Pinterest board (item 10).
+Answered 30 Sep: bands are **before GST** (unchanged) · **one band up: yes**
+(switched on) · the 3D tool comes after this queue (item 27) · benefit terms
+written for cashback, OneReferrals, the cab, the shoot and OneHamper · the
+named expert is **Ar. Swarupa Tondare**, Tue–Sun 11:00–19:00 IST, with three
+colleagues covering (`npm run db:expert -- <email> "<name>"` for each).
+
+Still open: Google / Apple / Meta credentials · WhatsApp verification and the
+OTP template · Swarupa's years in practice and COA number (shown once given) ·
+a lawyer's read of `/privacy` · running `npm run db:deploy` then
+`npm run db:expert` · the Pinterest board (item 10).

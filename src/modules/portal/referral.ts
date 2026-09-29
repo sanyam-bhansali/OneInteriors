@@ -8,10 +8,11 @@
  *
  * ## Not shown until the terms exist
  *
- * The owner's benefit is "refer a friend, get ₹10,000", and plan §17.3 asks
- * first: paid to whom, and when. Until the referral benefit carries terms in
- * benefits.ts, the code and the link appear on no screen. The tracking runs
- * regardless, so no referral made in the meantime is lost.
+ * ₹10,000 to the referrer for every referred project whose 20% advance is
+ * paid to the studio (the owner's terms, 30 Sep 2026, in benefits.ts). The
+ * code and link appear only while the referral benefit carries terms; the
+ * tracking runs regardless, so no referral is lost. Paying out is ops's job,
+ * read from `Brief.referredByCode`.
  *
  * Pure, and tested.
  */

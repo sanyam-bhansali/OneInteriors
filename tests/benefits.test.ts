@@ -16,7 +16,8 @@ describe('the benefits pass', () => {
   });
 
   it('opens up as the customer moves along', () => {
-    expect(benefitsPass('SIGNED').every((b) => b.state === 'available')).toBe(true);
+    expect(benefitsPass('SIGNED').filter((b) => b.state === 'unlocks').map((b) => b.id)).toEqual(['cinematic-shoot', 'onehamper']);
+    expect(benefitsPass('HANDOVER').every((b) => b.state === 'available')).toBe(true);
   });
 
   it('turns on a benefit the moment its terms are written', () => {
@@ -27,5 +28,23 @@ describe('the benefits pass', () => {
   it('reads the stage from facts we hold', () => {
     expect(stageOf({ briefDone: true, callBooked: false, introduced: false, signed: false })).toBe('BRIEF_DONE');
     expect(stageOf({ briefDone: true, callBooked: true, introduced: true, signed: false })).toBe('INTRODUCED');
+  });
+});
+
+describe('the owner’s terms, 30 Sep 2026', () => {
+  it('shows every benefit, each with its terms', () => {
+    expect(BENEFITS.every((b) => b.terms)).toBe(true);
+    expect(benefitsPass('HANDOVER')).toHaveLength(BENEFITS.length);
+  });
+
+  it('offers the cab once a studio meeting is set up, not before', () => {
+    const cab = (stage: Parameters<typeof benefitsPass>[0]) => benefitsPass(stage).find((b) => b.id === 'free-cab')!;
+    expect(cab('CALL_BOOKED').state).toBe('unlocks');
+    expect(cab('INTRODUCED').state).toBe('available');
+  });
+
+  it('reaches handover only when the tracker says so', () => {
+    expect(stageOf({ briefDone: true, callBooked: true, introduced: true, signed: true })).toBe('SIGNED');
+    expect(stageOf({ briefDone: true, callBooked: true, introduced: true, signed: true, handedOver: true })).toBe('HANDOVER');
   });
 });
