@@ -14,7 +14,7 @@
  *    with nobody in it.
  */
 
-import { EMPTY_BRIEF, type Brief } from './types';
+import { EMPTY_BRIEF, HOME_NEEDS, LANGUAGES, type Brief, type HomeNeed, type Language } from './types';
 import type {
   PropertyType,
   PossessionStatus,
@@ -26,9 +26,17 @@ import type {
 
 /** The subset of the Prisma row this module reads. */
 export interface BriefRow {
+  /**
+   * READ ONLY through this mapper, for the same reason as `floorPlanName`:
+   * the contact step writes it, after consent, and a quiz sync that
+   * round-tripped it would either erase it or write a name the customer has
+   * not yet agreed to give us.
+   */
+  contactName?: string | null;
   propertyType: string | null;
   carpetAreaSqft: number | null;
   locality: string | null;
+  society?: string | null;
   possessionStatus: string | null;
   possessionOn: Date | null;
   scope: string | null;
@@ -42,8 +50,10 @@ export interface BriefRow {
   elderly: number | null;
   pets: boolean;
   worksFromHome: boolean;
+  needs?: string[];
   priorityRanking: string[];
   involvement: string | null;
+  language?: string | null;
   moveInBy: Date | null;
   lastStep: number;
   completedAt: Date | null;
@@ -58,6 +68,19 @@ export interface BriefRow {
    * has no business crossing to a client component.
    */
   floorPlanName?: string | null;
+}
+
+/**
+ * A society name, as typed, made safe to keep.
+ *
+ * Free text from a public form: trimmed, internal whitespace collapsed,
+ * control characters dropped, capped at 80. Empty becomes null — "no answer"
+ * and "answered with spaces" are the same thing.
+ */
+export function cleanSociety(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const cleaned = value.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  return cleaned || null;
 }
 
 function isoDate(value: Date | null): string | null {
@@ -86,9 +109,11 @@ export function rowToBrief(row: BriefRow): Brief {
 
   return {
     ...EMPTY_BRIEF,
+    contactName: row.contactName ?? null,
     propertyType: (row.propertyType as PropertyType) ?? null,
     carpetAreaSqft: row.carpetAreaSqft,
     locality: row.locality,
+    society: row.society ?? null,
     possessionStatus: (row.possessionStatus as PossessionStatus) ?? null,
     possessionOn: isoDate(row.possessionOn),
     scope: (row.scope as ScopeType) ?? null,
@@ -98,8 +123,14 @@ export function rowToBrief(row: BriefRow): Brief {
     styleLikes: row.styleLikes as StyleTag[],
     styleDislikes: row.styleDislikes as StyleTag[],
     household,
+    // Filtered, not cast: a need retired from the list must not render as
+    // `undefined` on somebody's brief.
+    needs: (row.needs ?? []).filter((n): n is HomeNeed => (HOME_NEEDS as readonly string[]).includes(n)),
     priorityRanking: row.priorityRanking as PriorityFactor[],
     involvement: (row.involvement as Involvement) ?? null,
+    language: (LANGUAGES as readonly string[]).includes(row.language ?? '')
+      ? (row.language as Language)
+      : null,
     moveInBy: isoDate(row.moveInBy),
     lastStep: row.lastStep,
     completedAt: row.completedAt ? row.completedAt.toISOString() : null,
@@ -118,6 +149,7 @@ export function briefToRow(brief: Brief) {
     propertyType: brief.propertyType,
     carpetAreaSqft: brief.carpetAreaSqft,
     locality: brief.locality,
+    society: cleanSociety(brief.society),
     possessionStatus: brief.possessionStatus,
     possessionOn: toDate(brief.possessionOn),
     scope: brief.scope,
@@ -131,8 +163,10 @@ export function briefToRow(brief: Brief) {
     elderly: brief.household?.elderly ?? null,
     pets: brief.household?.pets ?? false,
     worksFromHome: brief.household?.worksFromHome ?? false,
+    needs: brief.needs.filter((n) => (HOME_NEEDS as readonly string[]).includes(n)),
     priorityRanking: brief.priorityRanking,
     involvement: brief.involvement,
+    language: brief.language,
     moveInBy: toDate(brief.moveInBy),
     lastStep: brief.lastStep,
     completedAt: toDate(brief.completedAt),

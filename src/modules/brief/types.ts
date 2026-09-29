@@ -28,6 +28,54 @@ export type PriorityFactor = 'BUDGET' | 'SPEED' | 'DESIGN_AMBITION' | 'MATERIAL_
  */
 export type PossessionStatus = 'HAVE_KEYS' | 'EXPECTED' | 'NOT_SURE';
 
+/**
+ * What the home needs beyond the rooms themselves.
+ *
+ * Asked beside the household (29 Sep 2026), because these are the practical
+ * facts a studio designs around and a customer rarely thinks to say until the
+ * first meeting. Each one is something a studio can have done before — and
+ * the matching engine will ask exactly that once studios declare it
+ * (docs/STUDIO-PROFILE-REQUIREMENTS.md §7). A pooja room also adds its line to
+ * the quote.
+ *
+ * Add freely, never rename: these are stored as strings on briefs.
+ */
+export const HOME_NEEDS = [
+  'VASTU',
+  'POOJA_ROOM',
+  'EXTRA_STORAGE',
+  'SMART_HOME',
+  'LOW_MAINTENANCE',
+  'ENTERTAINING',
+] as const;
+
+export type HomeNeed = (typeof HOME_NEEDS)[number];
+
+export const HOME_NEED_LABELS: Record<HomeNeed, string> = {
+  VASTU: 'Vastu-compliant layout',
+  POOJA_ROOM: 'A pooja room or mandir',
+  EXTRA_STORAGE: 'A lot of storage',
+  SMART_HOME: 'Smart home / automation',
+  LOW_MAINTENANCE: 'Easy to keep clean',
+  ENTERTAINING: 'Room to host people',
+};
+
+/**
+ * The language they would like their studio to speak.
+ *
+ * A studio's team declares the languages it can hold a client meeting in; the
+ * match uses this as a tie-breaker, never a filter. Pune is Marathi, Hindi and
+ * English in roughly equal measure depending on the building.
+ */
+export const LANGUAGES = ['EN', 'HI', 'MR'] as const;
+export type Language = (typeof LANGUAGES)[number];
+
+export const LANGUAGE_LABELS: Record<Language, string> = {
+  EN: 'English',
+  HI: 'हिन्दी',
+  MR: 'मराठी',
+};
+
 export const POSSESSION_LABELS: Record<PossessionStatus, string> = {
   HAVE_KEYS: 'I have the keys',
   EXPECTED: 'Expecting possession',
@@ -83,10 +131,26 @@ export interface Household {
 }
 
 export interface Brief {
+  /**
+   * What they asked us to call them — the first question since 29 Sep.
+   *
+   * Read-only through the database mapper, like the floor plan: it is kept in
+   * the customer's own tab while they answer, and written to our database
+   * only by the contact step, with the number, once they have agreed to the
+   * notice. A name typed on screen one has not yet been given to anyone.
+   */
+  contactName: string | null;
+
   // Q1 — property
   propertyType: PropertyType | null;
   carpetAreaSqft: number | null;
   locality: string | null;
+  /**
+   * The society or building, as they typed it. Free text: there is no
+   * reliable list of Pune societies to pick from, and a studio that has
+   * worked in "Gera World of Joy" will recognise it however it is spelt.
+   */
+  society: string | null;
   /** Q9 — have they got the keys, are they expecting them, or not sure. */
   possessionStatus: PossessionStatus | null;
   /** ISO date, first of the month. Set only when the status is EXPECTED. */
@@ -112,12 +176,16 @@ export interface Brief {
 
   // Q6 — household
   household: Household | null;
+  /** Beside the household — see `HOME_NEEDS`. */
+  needs: HomeNeed[];
 
   // Q7 — ranked, index 0 is most important. Does most of the matching work.
   priorityRanking: PriorityFactor[];
 
   // Q8 — working style. The #1 cause of client/studio breakdown.
   involvement: Involvement | null;
+  /** The language they want their studio to speak — see `LANGUAGES`. */
+  language: Language | null;
 
   /**
    * No longer asked (29 Sep 2026) — Q9 is possession now. Kept so briefs
@@ -140,9 +208,11 @@ export interface Brief {
 }
 
 export const EMPTY_BRIEF: Brief = {
+  contactName: null,
   propertyType: null,
   carpetAreaSqft: null,
   locality: null,
+  society: null,
   possessionStatus: null,
   possessionOn: null,
   scope: null,
@@ -152,8 +222,10 @@ export const EMPTY_BRIEF: Brief = {
   styleLikes: [],
   styleDislikes: [],
   household: null,
+  needs: [],
   priorityRanking: [],
   involvement: null,
+  language: null,
   moveInBy: null,
   floorPlanName: null,
   lastStep: 0,

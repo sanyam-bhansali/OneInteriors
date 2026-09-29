@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rowToBrief, briefToRow, type BriefRow } from '@/modules/brief/mapping';
+import { rowToBrief, briefToRow, cleanSociety, type BriefRow } from '@/modules/brief/mapping';
 import { EMPTY_BRIEF, type Brief } from '@/modules/brief/types';
 import {
   checkProps,
@@ -197,5 +197,52 @@ describe('stepFunnel', () => {
 
   it('returns null when nothing has enough traffic to judge', () => {
     expect(worstStep(stepFunnel({ 1: 2 }, { 1: 0 }, 1))).toBeNull();
+  });
+});
+
+/**
+ * The fields added for Phase 1 of the journey plan (29 Sep 2026).
+ */
+describe('name, society, needs and language', () => {
+  const withHome: Brief = {
+    ...FULL,
+    contactName: 'Sanyam',
+    society: '  Gera   World of Joy ',
+    needs: ['VASTU', 'POOJA_ROOM'],
+    language: 'MR',
+  };
+
+  // The name is kept in the customer's tab until the contact step, where it
+  // is written with the number once they have agreed to the notice. A quiz
+  // sync must never write it early — or erase it afterwards.
+  it('never writes the name from the per-step sync', () => {
+    expect('contactName' in briefToRow(withHome)).toBe(false);
+    expect('contactPhone' in briefToRow(withHome)).toBe(false);
+  });
+
+  it('reads the name back once the contact step has written it', () => {
+    const row = { ...rowFrom(withHome), contactName: 'Sanyam' } as BriefRow;
+    expect(rowToBrief(row).contactName).toBe('Sanyam');
+  });
+
+  it('keeps needs and language, and cleans the society as typed', () => {
+    const back = rowToBrief(rowFrom(withHome));
+    expect(back.needs).toEqual(['VASTU', 'POOJA_ROOM']);
+    expect(back.language).toBe('MR');
+    expect(back.society).toBe('Gera World of Joy');
+  });
+
+  it('drops a need or language this build does not know, rather than rendering undefined', () => {
+    const row = { ...rowFrom(withHome), needs: ['VASTU', 'RETIRED_NEED'], language: 'FR' } as BriefRow;
+    const back = rowToBrief(row);
+    expect(back.needs).toEqual(['VASTU']);
+    expect(back.language).toBeNull();
+  });
+
+  it('treats an empty or whitespace society as no answer, and caps a long one', () => {
+    expect(cleanSociety('   ')).toBeNull();
+    expect(cleanSociety(null)).toBeNull();
+    expect(cleanSociety('a'.repeat(200))).toHaveLength(80);
+    expect(cleanSociety('Tower\u0000 B')).toBe('Tower B');
   });
 });

@@ -224,10 +224,19 @@ model Brief {
   /// never reachable by both a stale cookie and an account.
   anonKey String? @unique
 
+  /// Written only by the contact step, after the customer has agreed to the
+  /// notice — never by the per-step quiz sync. The number is unverified: it is
+  /// a way to reach them about this brief, not an identity (User.phone is).
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
+
   // Q1
   propertyType     PropertyType?
   carpetAreaSqft   Int?
   locality         String? // Pune locality slug: "kharadi", "baner", "wakad"
+  /// The society or building, as typed. Free text; no list exists to pick from.
+  society          String?
   /// Q9 since 29 Sep 2026: have the keys / expecting them / not sure.
   possessionStatus PossessionStatus?
   possessionOn     DateTime?
@@ -261,11 +270,18 @@ model Brief {
   pets          Boolean @default(false)
   worksFromHome Boolean @default(false)
 
+  /// HomeNeed values (VASTU, POOJA_ROOM, …) — strings, like styleTags, so a
+  /// new need is a code change and not a migration.
+  needs String[] @default([])
+
   // Q7 — ranked, index 0 = most important
   priorityRanking PriorityFactor[] @default([])
 
   // Q8
   involvement Involvement?
+
+  /// EN | HI | MR — the language they want their studio to speak.
+  language String?
 
   // Q9
   moveInBy DateTime?
