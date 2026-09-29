@@ -285,6 +285,11 @@ nobody can, the page says so once at the top.
 
 ### 7.1 The floor plan — the Hauspire quotation software
 
+**Detailed in `docs/QUOTATION-ENGINE-INTEGRATION.md`** (29 Sep), written
+after reading the software's source: what it does, what One Interiors
+already has, the eight things to fix on the way in, how it plugs into the
+brief, and the 50–60-quotations-per-studio data feed.
+
 The Hauspire quotation software you will share reads a floor plan with Claude
 and produces a basic quotation. It plugs in behind two interfaces, so the
 rest of the journey does not care how the reading is done:
