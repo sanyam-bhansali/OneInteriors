@@ -26,6 +26,7 @@ import { scopeReady, selectionOf } from '@/modules/quotation/scope';
 export const STEP_IDS = [
   'name',
   'home',
+  'plan',
   'possession',
   'scope',
   'level',
@@ -48,6 +49,7 @@ export const TOTAL_STEPS = STEP_IDS.length;
 export const CHAPTER: Record<StepId, string> = {
   name: 'You',
   home: 'Your home',
+  plan: 'Your home',
   possession: 'Your home',
   scope: 'The work',
   level: 'The work',
@@ -110,6 +112,9 @@ export function isStepAnswered(brief: Brief, id: StepId): boolean {
       return cleanName(brief.contactName) !== null;
     case 'home':
       return brief.propertyType !== null && brief.locality !== null;
+    case 'plan':
+      // Optional: without a plan the kitchen is priced on the standard run.
+      return true;
     case 'possession':
       return possessionAnswered(brief);
     case 'scope':

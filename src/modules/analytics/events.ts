@@ -21,6 +21,8 @@ export const EVENTS = [
   'quiz.complete',
   /** The contact step's details were accepted — name, number, the notice. */
   'quiz.contact.saved',
+  /** A floor plan was read (the customer has not confirmed it yet). */
+  'quiz.plan.read',
   'reveal.view',
   'tier.select',
   'match.view',

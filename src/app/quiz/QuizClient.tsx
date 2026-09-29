@@ -69,6 +69,7 @@ import {
   type StepId,
 } from '@/modules/brief/steps';
 import { LocalityPicker } from './LocalityPicker';
+import { PlanReader } from './PlanReader';
 import {
   EMPTY_CONTACT,
   checkContact,
@@ -581,6 +582,16 @@ function stepContent(
       return nameStep(brief, update);
     case 'home':
       return homeStep(brief, update);
+    case 'plan':
+      return {
+        ask: (
+          <Ask
+            title="Have your floor plan?"
+            hint="The builder's plan, or a photo of it. We read the sizes off it so every studio's quote is priced on your actual kitchen and rooms — not a standard one. Skip it if you don't have it to hand."
+          />
+        ),
+        options: <PlanReader brief={brief} update={update} />,
+      };
     case 'possession':
       return possessionStep(brief, update);
     case 'scope':

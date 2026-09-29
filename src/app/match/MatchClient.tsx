@@ -172,7 +172,8 @@ export function MatchClient({
           <QuoteFlow
             filedRates={filedRates?.[quoting.studioSlug]}
             request={quoting}
-            plan={project.plan}
+            // A plan confirmed on the brief wins over an earlier gate answer.
+            plan={quoting.plan ?? project.plan}
             seenQuestions={project.askedQuestions}
             onAsked={(id) =>
               update({

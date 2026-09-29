@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rowToBrief, briefToRow, cleanSociety, type BriefRow } from '@/modules/brief/mapping';
+import { rowToBrief, briefToRow, cleanSociety, planUseFrom, type BriefRow } from '@/modules/brief/mapping';
 import { EMPTY_BRIEF, type Brief } from '@/modules/brief/types';
 import {
   checkProps,
@@ -244,5 +244,22 @@ describe('name, society, needs and language', () => {
     expect(cleanSociety(null)).toBeNull();
     expect(cleanSociety('a'.repeat(200))).toHaveLength(80);
     expect(cleanSociety('Tower\u0000 B')).toBe('Tower B');
+  });
+});
+
+describe('the confirmed floor-plan reading', () => {
+  it('round-trips what the customer confirmed', () => {
+    const planned: Brief = {
+      ...FULL,
+      planReading: { kitchenRunMm: 4200, bathrooms: 2, hasStudy: true, areaSource: 'computed' },
+    };
+    const row = { ...rowFrom(planned) } as BriefRow & { floorPlanReading?: unknown };
+    expect(rowToBrief(row).planReading).toEqual(planned.planReading);
+  });
+
+  it('refuses a stored reading that is not the shape we wrote', () => {
+    expect(planUseFrom({ kitchenRunMm: 99999, bathrooms: 2 })?.kitchenRunMm).toBeNull();
+    expect(planUseFrom({ bathrooms: 40 })).toBeNull();
+    expect(planUseFrom('nonsense')).toBeNull();
   });
 });

@@ -173,7 +173,7 @@ export interface FirstQuote {
  */
 export function homeShapeFor(
   brief: Pick<Brief, 'propertyType' | 'carpetAreaSqft'> &
-    Partial<Pick<Brief, 'scope' | 'scopeRooms' | 'excludedItems'>>,
+    Partial<Pick<Brief, 'scope' | 'scopeRooms' | 'excludedItems' | 'planReading' | 'floorPlanName'>>,
 ): {
   bhk: number;
   carpetAreaSqft: number;
@@ -181,6 +181,12 @@ export function homeShapeFor(
   bathrooms: number;
   /** What the quote covers — every studio priced on the same lines. */
   scope: ScopeSelection;
+  /**
+   * The kitchen from their confirmed floor plan, when there is one — so the
+   * quote skips the "measure your kitchen" gate and the ±10% it prints is
+   * earned. Null without a confirmed plan or a readable kitchen.
+   */
+  plan: { fileName: string | null; kitchenRunMm: number; source: 'floor_plan' } | null;
 } {
   const bhk = BEDROOMS[brief.propertyType ?? 'BHK_2'];
   const { sqft, assumed } = carpetAreaFor(brief);
@@ -188,14 +194,22 @@ export function homeShapeFor(
     bhk,
     carpetAreaSqft: sqft,
     carpetAreaAssumed: assumed,
-    // One bathroom per bedroom is what the archive's flats overwhelmingly
-    // have, and the vanity is the only line it drives.
-    bathrooms: Math.max(1, bhk),
+    // From their plan when they confirmed one; otherwise one bathroom per
+    // bedroom, which is what the archive's flats overwhelmingly have.
+    bathrooms: brief.planReading?.bathrooms || Math.max(1, bhk),
     scope: {
       scope: brief.scope ?? 'FULL_HOME',
       scopeRooms: brief.scopeRooms ?? [],
       excludedItems: brief.excludedItems ?? [],
     },
+    plan:
+      brief.planReading?.kitchenRunMm
+        ? {
+            fileName: brief.floorPlanName ?? null,
+            kitchenRunMm: brief.planReading.kitchenRunMm,
+            source: 'floor_plan',
+          }
+        : null,
   };
 }
 

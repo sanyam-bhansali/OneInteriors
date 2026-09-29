@@ -33,6 +33,7 @@ import { getCurrentUser } from '@/modules/auth/session';
 import { EMPTY_BRIEF, type Brief } from './types';
 import { rowToBrief, briefToRow } from './mapping';
 import type { CleanContact } from './contact';
+import { deleteFloorPlan } from '@/modules/storage/floor-plan';
 
 const COOKIE = 'oi.brief';
 /**
@@ -137,6 +138,36 @@ export async function saveBrief(brief: Brief): Promise<SaveResult> {
     return { ok: true, persisted: true };
   } catch {
     return { ok: true, persisted: false };
+  }
+}
+
+/**
+ * Point this browser's brief at an uploaded floor plan.
+ *
+ * Only the path and the display name — the reading is confirmed by the
+ * customer first and arrives with the next quiz sync. A plan replacing an
+ * earlier one deletes the old file after the row points at the new one,
+ * never before, so a failed write never leaves them with neither.
+ */
+export async function attachFloorPlan(upload: { path: string; name: string }): Promise<boolean> {
+  if (!hasDatabase()) return false;
+  try {
+    const user = await getCurrentUser();
+    const where = user ? { userId: user.id } : { anonKey: await ensureAnonKey() };
+    const previous = await prisma.brief.findUnique({ where, select: { floorPlanPath: true } });
+    const data = { floorPlanPath: upload.path, floorPlanName: upload.name };
+    await prisma.brief.upsert({
+      where,
+      create: { ...data, ...(user ? { userId: user.id } : { anonKey: (where as { anonKey: string }).anonKey }) },
+      update: data,
+    });
+    if (previous?.floorPlanPath && previous.floorPlanPath !== upload.path) {
+      await deleteFloorPlan(previous.floorPlanPath);
+    }
+    return true;
+  } catch (error) {
+    console.error('[brief] attach floor plan failed', error instanceof Error ? error.name : 'unknown');
+    return false;
   }
 }
 

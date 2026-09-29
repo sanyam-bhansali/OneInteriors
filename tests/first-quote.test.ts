@@ -340,7 +340,28 @@ describe('the home the quote is built for', () => {
       carpetAreaAssumed: true,
       bathrooms: 4,
       scope: { scope: 'FULL_HOME', scopeRooms: [], excludedItems: [] },
+      plan: null,
     });
+  });
+
+  // A confirmed floor plan sizes the kitchen and the bathrooms, and skips the
+  // "measure your kitchen" gate with a reading the ±10% is entitled to.
+  it('uses a confirmed floor plan for the kitchen and the bathrooms', () => {
+    const shape = homeShapeFor({
+      propertyType: 'BHK_3',
+      carpetAreaSqft: 1180,
+      floorPlanName: 'tower-b.pdf',
+      planReading: { kitchenRunMm: 4200, bathrooms: 2, hasStudy: true, areaSource: 'printed' },
+    });
+    expect(shape.bathrooms).toBe(2);
+    expect(shape.plan).toEqual({ fileName: 'tower-b.pdf', kitchenRunMm: 4200, source: 'floor_plan' });
+    expect(
+      homeShapeFor({
+        propertyType: 'BHK_3',
+        carpetAreaSqft: 1180,
+        planReading: { kitchenRunMm: null, bathrooms: 2, hasStudy: false, areaSource: null },
+      }).plan,
+    ).toBeNull();
   });
 
   it('uses their own area when they gave one', () => {

@@ -50,6 +50,8 @@ export interface QuoteRequest {
   bathrooms: number;
   /** What the quote covers. See modules/quotation/scope.ts. */
   scope?: ScopeSelection;
+  /** The kitchen from their confirmed floor plan, which skips the gate. */
+  plan?: FloorPlan | null;
 }
 
 // ── The gate ────────────────────────────────────────────────────

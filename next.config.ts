@@ -13,6 +13,19 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
 
+  experimental: {
+    serverActions: {
+      /**
+       * Floor plans are uploaded through server actions (the brief's reader
+       * and /prepare), and the default limit is 1 MB — a phone photo of a
+       * plan is usually more, and it failed with no useful message. 4 MB is
+       * the most that fits under Vercel's ~4.5 MB request limit; the screens
+       * say so before the upload rather than after.
+       */
+      bodySizeLimit: '4mb',
+    },
+  },
+
   typescript: {
     // Never turn this on. Type errors are correctness, not style, and a build
     // that skips them ships broken code.

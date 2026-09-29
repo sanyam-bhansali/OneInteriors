@@ -18,6 +18,10 @@ import {
 import { checkContact, type ContactField, type ContactInput } from '@/modules/brief/contact';
 import { consume, addressOf, bucketFor, waitPhrase } from '@/modules/rate-limit/store';
 import { hashIp } from '@/modules/auth/session';
+import { attachFloorPlan } from '@/modules/brief/repository';
+import { canReadPlans, readFloorPlan, readablePlanType } from '@/modules/floorplan/read';
+import type { FloorPlanReading } from '@/modules/floorplan/reading';
+import { floorPlanUploadEnabled, uploadFloorPlan } from '@/modules/storage/floor-plan';
 import { record } from '@/modules/analytics/record';
 import { recordConsent, type ConsentDecision } from '@/modules/consent/record';
 import { QUIZ_PURPOSES, isBlocking, type ConsentPurpose } from '@/modules/consent/policy';
@@ -136,4 +140,73 @@ export async function submitContactAction(
   const saved = await saveContact(brief, check.value);
   await record('quiz.contact.saved');
   return { ok: true, persisted: saved.persisted };
+}
+
+export type PlanReadResult =
+  | { ok: true; reading: FloorPlanReading; fileName: string }
+  | { ok: false; error: string };
+
+/** The most a plan can be: what fits in one request on Vercel. See next.config.ts. */
+const PLAN_MAX_BYTES = 4 * 1024 * 1024;
+
+/** Each read costs money. Eight an hour from one connection covers a family trying twice. */
+const PLAN_LIMIT = { max: 8, windowMs: 60 * 60 * 1000 };
+
+/**
+ * Upload a floor plan, keep it privately, and read it.
+ *
+ * The reading comes back to the screen, not to the brief: the customer
+ * confirms it ("We read: 3 BHK, 1,180 sq ft — right?") and only what they
+ * confirm is saved. Storage failing does not stop the read; the read failing
+ * says what to do instead. Every refusal is in their terms.
+ */
+export async function readFloorPlanAction(formData: FormData): Promise<PlanReadResult> {
+  const file = formData.get('plan');
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: 'Choose your floor plan first — a PDF or a photo.' };
+  }
+  if (!readablePlanType(file.type)) {
+    return { ok: false, error: 'That file type cannot be read. A PDF, JPG, PNG or WebP works.' };
+  }
+  if (file.size > PLAN_MAX_BYTES) {
+    return {
+      ok: false,
+      error: 'That file is over 4 MB. A screenshot or a photo of the plan works just as well.',
+    };
+  }
+  if (!canReadPlans()) {
+    return {
+      ok: false,
+      error: 'Reading plans is not switched on here yet. Type your carpet area on the previous screen instead.',
+    };
+  }
+
+  const h = await headers();
+  const verdict = await consume(
+    bucketFor('plan', hashIp(addressOf(h.get('x-forwarded-for'))) ?? 'unknown'),
+    PLAN_LIMIT,
+  );
+  if (!verdict.allowed) {
+    return { ok: false, error: `That is a lot of plans from one connection. Try again ${waitPhrase(verdict.retryInSeconds)}.` };
+  }
+
+  // Kept privately, where the expert and — only once chosen — the studio can see it.
+  if (floorPlanUploadEnabled()) {
+    const upload = await uploadFloorPlan(file);
+    if (upload.ok) await attachFloorPlan(upload);
+  }
+
+  const base64 = Buffer.from(await file.arrayBuffer()).toString('base64');
+  const result = await readFloorPlan(base64, file.type);
+  if (!result.ok) {
+    return {
+      ok: false,
+      error:
+        result.reason === 'no-rooms'
+          ? 'We could not find rooms on that — is it the floor plan? Try a clearer photo, or skip this.'
+          : 'We could not read that plan just now. Try a clearer photo, or skip this and we will price a standard kitchen.',
+    };
+  }
+  await record('quiz.plan.read');
+  return { ok: true, reading: result.reading, fileName: file.name.slice(0, 120) };
 }

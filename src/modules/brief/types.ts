@@ -130,6 +130,22 @@ export interface Household {
   worksFromHome: boolean;
 }
 
+/**
+ * What a floor plan told us, once the customer confirmed it.
+ *
+ * Only the facts the quote uses; the file itself stays in private storage.
+ * Written on the brief after the "We read: … — right?" step, never straight
+ * from the model (modules/floorplan/reading.ts).
+ */
+export interface PlanUse {
+  /** The platform run, mm, as confirmed. Null if the kitchen was unreadable. */
+  kitchenRunMm: number | null;
+  bathrooms: number;
+  hasStudy: boolean;
+  /** Where the carpet area on the brief came from. */
+  areaSource: 'printed' | 'computed' | 'customer' | null;
+}
+
 export interface Brief {
   /**
    * What they asked us to call them — the first question since 29 Sep.
@@ -211,6 +227,8 @@ export interface Brief {
    * the file itself is reachable only through a short signed URL.
    */
   floorPlanName: string | null;
+  /** The confirmed reading of that plan — see `PlanUse`. */
+  planReading: PlanUse | null;
 
   // Progress
   lastStep: number;
@@ -240,6 +258,7 @@ export const EMPTY_BRIEF: Brief = {
   language: null,
   moveInBy: null,
   floorPlanName: null,
+  planReading: null,
   lastStep: 0,
   completedAt: null,
 };

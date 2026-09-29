@@ -21,7 +21,8 @@ describe('the order', () => {
   it('opens with their name, then their home', () => {
     expect(STEP_IDS[0]).toBe('name');
     expect(STEP_IDS[1]).toBe('home');
-    expect(STEP_IDS[2]).toBe('possession');
+    expect(STEP_IDS[2]).toBe('plan');
+    expect(STEP_IDS[3]).toBe('possession');
   });
 
   // The number is asked last, after four minutes that show what it is for.

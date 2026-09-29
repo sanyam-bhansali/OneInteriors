@@ -289,8 +289,11 @@ model Brief {
   /// Object path in the private floor-plan bucket. Never a public URL: the
   /// file is somebody's home layout, and it is served only through a short
   /// signed URL to a person who owns the brief.
-  floorPlanPath String?
-  floorPlanName String?
+  floorPlanPath    String?
+  floorPlanName    String?
+  /// The confirmed reading of the plan: kitchen run, bathrooms, study, where
+  /// the area came from (PlanUse). Written after the customer confirms it.
+  floorPlanReading Json?
 
   // Q3 — paise
   budgetMinPaise BigInt?

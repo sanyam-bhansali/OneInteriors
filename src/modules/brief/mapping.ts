@@ -14,7 +14,15 @@
  *    with nobody in it.
  */
 
-import { EMPTY_BRIEF, HOME_NEEDS, LANGUAGES, type Brief, type HomeNeed, type Language } from './types';
+import {
+  EMPTY_BRIEF,
+  HOME_NEEDS,
+  LANGUAGES,
+  type Brief,
+  type HomeNeed,
+  type Language,
+  type PlanUse,
+} from './types';
 import type {
   PropertyType,
   PossessionStatus,
@@ -70,6 +78,36 @@ export interface BriefRow {
    * has no business crossing to a client component.
    */
   floorPlanName?: string | null;
+  floorPlanReading?: unknown;
+}
+
+/** A reading as a plain JSON object, checked on the way in as on the way out. */
+function planJson(value: PlanUse): Record<string, string | number | boolean | null> | undefined {
+  const p = planUseFrom(value);
+  return p
+    ? { kitchenRunMm: p.kitchenRunMm, bathrooms: p.bathrooms, hasStudy: p.hasStudy, areaSource: p.areaSource }
+    : undefined;
+}
+
+/** A stored reading, if it has the shape we wrote; anything else is none. */
+export function planUseFrom(value: unknown): PlanUse | null {
+  if (!value || typeof value !== 'object') return null;
+  const v = value as Record<string, unknown>;
+  const run = typeof v.kitchenRunMm === 'number' && v.kitchenRunMm >= 1500 && v.kitchenRunMm <= 9000
+    ? Math.round(v.kitchenRunMm)
+    : null;
+  const baths = typeof v.bathrooms === 'number' && Number.isInteger(v.bathrooms) && v.bathrooms >= 0 && v.bathrooms <= 6
+    ? v.bathrooms
+    : null;
+  if (baths === null) return null;
+  const source = v.areaSource;
+  return {
+    kitchenRunMm: run,
+    bathrooms: baths,
+    hasStudy: v.hasStudy === true,
+    areaSource:
+      source === 'printed' || source === 'computed' || source === 'customer' ? source : null,
+  };
 }
 
 /**
@@ -139,6 +177,7 @@ export function rowToBrief(row: BriefRow): Brief {
     lastStep: row.lastStep,
     completedAt: row.completedAt ? row.completedAt.toISOString() : null,
     floorPlanName: row.floorPlanName ?? null,
+    planReading: planUseFrom(row.floorPlanReading),
   };
 }
 
@@ -177,6 +216,9 @@ export function briefToRow(brief: Brief) {
     involvement: brief.involvement,
     language: brief.language,
     moveInBy: toDate(brief.moveInBy),
+    // Json column: Prisma wants DbNull, not null, to clear it — omitted when
+    // there is none so a sync never wipes a reading another tab confirmed.
+    ...(brief.planReading ? { floorPlanReading: planJson(brief.planReading) } : {}),
     lastStep: brief.lastStep,
     completedAt: toDate(brief.completedAt),
   };

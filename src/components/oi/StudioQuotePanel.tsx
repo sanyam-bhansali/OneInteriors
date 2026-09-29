@@ -140,7 +140,7 @@ export function StudioQuotePanel({
       ) : (
         <QuoteFlow
           request={request}
-          plan={project.plan}
+          plan={request.plan ?? project.plan}
           onBuilt={(quote, plan) =>
             update({
               ...project,

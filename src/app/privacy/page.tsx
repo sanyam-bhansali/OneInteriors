@@ -96,7 +96,8 @@ export default function PrivacyPage() {
               compare and the lines you star.
             </li>
             <li>
-              <strong>A floor plan</strong>, only if you upload one.
+              <strong>A floor plan</strong>, only if you upload one — kept privately, and read
+              for its sizes (below).
             </li>
             <li>
               <strong>Technical details</strong> — a cookie that keeps you signed in, a cookie that
@@ -135,8 +136,9 @@ export default function PrivacyPage() {
             <li>Resend — to deliver the emails we send you.</li>
             <li>Meta — WhatsApp messages, if you sign in or get updates that way.</li>
             <li>
-              Anthropic — writes the short explanation beside each match. It receives your brief&rsquo;s
-              answers and the studio&rsquo;s record, never your name or number.
+              Anthropic — writes the short explanation beside each match, and reads the sizes off a
+              floor plan if you upload one. It receives your brief&rsquo;s answers, the
+              studio&rsquo;s record and the plan, never your name or number.
             </li>
             <li>Google — only if you choose to sign in with Google.</li>
           </ul>
