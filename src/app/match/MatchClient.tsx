@@ -25,6 +25,7 @@
  * shortcut to it, not a second home for it.
  */
 
+import { StyleDnaCard } from '@/components/oi/StyleDnaCard';
 import { SEEN_KEY, readSeen, welcomeBack } from '@/modules/matching/welcome-back';
 import { ExpertPitch } from '@/components/oi/ExpertPitch';
 import type { OfferState } from '@/modules/consultation/offer';
@@ -542,6 +543,10 @@ export function MatchClient({
 
         {briefed && matches.length > 0 ? (
           <ExpertPitch offer={offer} className="mx-auto mt-10 max-w-[40rem]" />
+        ) : null}
+
+        {briefed && brief && brief.styleLikes.length > 0 ? (
+          <StyleDnaCard likes={brief.styleLikes} className="mx-auto mt-10 max-w-[40rem]" />
         ) : null}
 
         {/* Fewer than three: said plainly, with named one-tap widenings and
