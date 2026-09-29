@@ -42,6 +42,7 @@ import type { Explanation } from '@/modules/matching/explain';
 import { DUR, EASE_OUT, riseCard } from '@/components/oi/motion';
 import { Glass, revealProps } from '@/components/oi/Surfaces';
 import { ProjectWings } from './ProjectWings';
+import { Listen } from '@/components/oi/Listen';
 import type { Focus } from '@/components/oi/useScrollFocus';
 import type { Studio } from '@/modules/studio/types';
 import { ENGINE_VERSION, FACTOR_LABELS, type FactorKey, type MatchResult } from '@/modules/matching/score';
@@ -237,7 +238,12 @@ export function StudioCard({
       <div className="mt-5 border-t border-[var(--line)] pt-4">
         <p className="oi-eyebrow m-0 mb-2">Why this one fits you</p>
         {read ? (
-          <p className="q-small m-0 max-w-[62ch] text-[var(--ink)]">{read.text}</p>
+          <>
+            <p className="q-small m-0 max-w-[62ch] text-[var(--ink)]">{read.text}</p>
+            <div className="mt-2">
+              <Listen text={read.text} />
+            </div>
+          </>
         ) : (
           <p className="q-small m-0 text-[var(--ink2)]">Reading your brief against their work…</p>
         )}

@@ -14,6 +14,7 @@ import 'server-only';
  */
 
 import { anthropicModel, hasAnthropic } from '@/lib/env';
+import type { Language } from '@/modules/brief/types';
 import type { Comparison } from './first-quote';
 import {
   allowedFigures,
@@ -27,18 +28,29 @@ import {
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
 const TIMEOUT_MS = 20_000;
-const MAX_TOKENS = 600;
+const MAX_TOKENS = 1200; // Devanagari takes several tokens a word
 
 export interface ComparisonExplanation {
   /** The written paragraph, or the rules summary as one paragraph. */
   text: string;
   source: 'model' | 'rules';
+  /** The language `text` is in. The rules summary is always English. */
+  language: Language;
   /** The rule-based summary, always — the page shows its questions either way. */
   rules: CompareSummary;
 }
 
-function systemPrompt(): string {
+const WRITE_IN: Record<Language, string> = {
+  EN: 'Write in plain English.',
+  HI: 'Write in simple, everyday Hindi (Devanagari script), as a family in Pune speaks it — not formal or bookish Hindi. Keep studio names in English.',
+  MR: 'Write in simple, everyday Marathi (Devanagari script), as a family in Pune speaks it. Keep studio names in English.',
+};
+
+function systemPrompt(language: Language): string {
   return [
+    WRITE_IN[language],
+    'Every rupee figure must be copied exactly as given, with the ₹ sign and the same digits and unit (for example ₹6.16 L). Do not convert figures into words or into Devanagari digits.',
+    '',
     'You explain, to a homeowner in Pune, how interior-design quotes from different studios differ. All the quotes are priced on the same line items and sizes, so every difference is either the studio\'s rate or the material it specified.',
     '',
     'RULES:',
@@ -53,17 +65,22 @@ function systemPrompt(): string {
 const BANNED = /\b(premium|bespoke|exceptional|perfect|trusted|world[- ]class|stunning|dream|hassle|best value|recommend)\b/i;
 
 function usable(text: string): boolean {
-  if (text.length < 120 || text.length > 1400) return false;
+  if (text.length < 120 || text.length > 1800) return false;
   if (BANNED.test(text)) return false;
   if (/[*#_`]/.test(text)) return false;
   return true;
 }
 
-export async function explainComparison(entries: Entry[], comparison: Comparison): Promise<ComparisonExplanation> {
+export async function explainComparison(
+  entries: Entry[],
+  comparison: Comparison,
+  language: Language = 'EN',
+): Promise<ComparisonExplanation> {
   const rules = deterministicSummary(entries, comparison);
   const fallback: ComparisonExplanation = {
     text: [rules.headline, ...rules.points].join(' '),
     source: 'rules',
+    language: 'EN',
     rules,
   };
   if (!hasAnthropic() || entries.length < 2) return fallback;
@@ -82,7 +99,7 @@ export async function explainComparison(entries: Entry[], comparison: Comparison
       body: JSON.stringify({
         model: anthropicModel(),
         max_tokens: MAX_TOKENS,
-        system: systemPrompt(),
+        system: systemPrompt(language),
         messages: [{ role: 'user', content: compareFacts(entries) }],
       }),
     });
@@ -100,7 +117,7 @@ export async function explainComparison(entries: Entry[], comparison: Comparison
       console.error('[compare] summary named figures not in the data', check.stray.length);
       return fallback;
     }
-    return { text, source: 'model', rules };
+    return { text, source: 'model', language, rules };
   } catch {
     return fallback;
   } finally {

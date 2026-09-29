@@ -20,6 +20,8 @@ import { explainComparisonAction } from './actions';
 import type { ComparisonExplanation } from '@/modules/quotation/compare-summary';
 import type { Brief } from '@/modules/brief/types';
 import type { FloorPlan } from '@/modules/quotation/project-store';
+import { LANGUAGES, LANGUAGE_LABELS, type Language } from '@/modules/brief/types';
+import { Listen } from '@/components/oi/Listen';
 
 const money = (p: number) => formatINRCompact(p);
 
@@ -161,6 +163,7 @@ export function ExplainDifferences({
   // A standard kitchen is not a measurement; the server prices its own standard one.
   const measured = plan && plan.source !== 'standard' && plan.kitchenRunMm ? plan : null;
   const [result, setResult] = useState<ComparisonExplanation | null>(null);
+  const [language, setLanguage] = useState<Language>(brief?.language ?? 'EN');
   const [failed, setFailed] = useState(false);
   const [pending, start] = useTransition();
 
@@ -168,6 +171,30 @@ export function ExplainDifferences({
     <Sheet className="mb-10 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="oi-eyebrow m-0">In plain words</p>
+        {/* In the language from their brief, and switchable — the person
+            reading it may not be the person who filled it in. */}
+        <div className="flex gap-1" role="group" aria-label="Language">
+          {LANGUAGES.map((l) => (
+            <button
+              key={l}
+              type="button"
+              aria-pressed={language === l}
+              onClick={() => {
+                setLanguage(l);
+                setResult(null);
+                setFailed(false);
+              }}
+              className="min-h-9 cursor-pointer rounded-full border px-3 text-[13px]"
+              style={{
+                borderColor: language === l ? 'var(--acc)' : 'var(--line)',
+                background: language === l ? 'var(--acc-wash)' : 'transparent',
+                color: language === l ? 'var(--acc-ink)' : 'var(--ink2)',
+              }}
+            >
+              {LANGUAGE_LABELS[l]}
+            </button>
+          ))}
+        </div>
         {!result ? (
           <button
             type="button"
@@ -179,6 +206,7 @@ export function ExplainDifferences({
                   brief,
                   kitchenRunMm: measured?.kitchenRunMm ?? null,
                   measured: measured?.source ?? null,
+                  language,
                 }).catch(() => null);
                 if (r) setResult(r);
                 else setFailed(true);
@@ -192,12 +220,19 @@ export function ExplainDifferences({
       </div>
       {result ? (
         <>
-          <p className="m-0 mt-4 max-w-[68ch] text-[14.5px] leading-[1.65]">{result.text}</p>
-          <p className="oi-label m-0 mt-3">
-            {result.source === 'model'
-              ? 'Written by AI from these quotes — every figure in it was checked against them'
-              : 'From the numbers above, by our rules'}
+          <p className="m-0 mt-4 max-w-[68ch] text-[14.5px] leading-[1.65]" lang={result.language.toLowerCase()}>
+            {result.text}
           </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <p className="oi-label m-0">
+              {result.source === 'model'
+                ? 'Written by AI from these quotes — every figure in it was checked against them'
+                : language === 'EN'
+                  ? 'From the numbers above, by our rules'
+                  : 'From the numbers above, by our rules — in English, because a written version was not available just now'}
+            </p>
+            <Listen text={result.text} language={result.language} />
+          </div>
           {result.rules.questions.length > 0 ? (
             <>
               <p className="oi-eyebrow m-0 mb-2 mt-5">Worth asking every studio</p>

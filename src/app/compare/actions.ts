@@ -77,6 +77,7 @@ export async function explainComparisonAction(input: {
   brief: unknown;
   kitchenRunMm: unknown;
   measured: unknown;
+  language?: unknown;
 }): Promise<ComparisonExplanation | null> {
   const slugs = Array.isArray(input.slugs)
     ? [...new Set(input.slugs.filter((s): s is string => typeof s === 'string' && s.length <= 80))].slice(0, 6)
@@ -112,5 +113,7 @@ export async function explainComparisonAction(input: {
       ),
     }));
   if (entries.length < 2) return null;
-  return explainComparison(entries, compareMany(entries));
+  // The language from their brief, or the one they switched to on the page.
+  const language = input.language === 'HI' || input.language === 'MR' ? input.language : brief.language === 'HI' || brief.language === 'MR' ? brief.language : 'EN';
+  return explainComparison(entries, compareMany(entries), language);
 }

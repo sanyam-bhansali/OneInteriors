@@ -183,22 +183,43 @@ export function compareFacts(entries: Entry[]): string {
 
 // ── The checker ────────────────────────────────────────────────
 
-/** Every rupee figure in a text, in paise: "₹6.16 L", "₹2.13 K", "₹61,633", "Rs 1.2 Cr". */
+/** Devanagari digits (०–९) as ASCII, so a Hindi or Marathi figure is checked like any other. */
+export function asciiDigits(text: string): string {
+  return text.replace(/[०-९]/g, (d) => String(d.charCodeAt(0) - 0x0966));
+}
+
+/* Longest first, so "lakhs" is not read as "L". The Latin letters must not run
+   on into a word ("3 Living rooms" is not ₹3 L). */
+const MONEY =
+  /(₹|Rs\.?|रु\.?|रुपये)?\s?(\d[\d,]*(?:\.\d+)?)\s*(crores|crore|Cr|lakhs|lakh|L|thousand|K|k|करोड़|करोड|कोटी|लाख|हज़ार|हजार)?(?![A-Za-z])/g;
+
+/**
+ * Every rupee figure in a text, in paise: "₹6.16 L", "₹2.13 K", "Rs 61,633",
+ * "₹1.2 Cr", "६.१६ लाख", "4.53 lakh". A number counts as money when it has a
+ * rupee sign or a money unit — so a translated figure without the sign is
+ * still checked, and "4,400 mm" is not.
+ */
 export function rupeeFigures(text: string): number[] {
   const out: number[] = [];
-  const re = /(?:₹|Rs\.?\s?)\s?([\d,]+(?:\.\d+)?)\s*(Cr|crore|L|lakh|lakhs|K|k|thousand)?\b/g;
-  for (const m of text.matchAll(re)) {
-    const n = Number(m[1]!.replace(/,/g, ''));
+  for (const m of asciiDigits(text).matchAll(MONEY)) {
+    if (!m[1] && !m[3]) continue;
+    const n = Number(m[2]!.replace(/,/g, ''));
     if (!Number.isFinite(n)) continue;
-    const unit = (m[2] ?? '').toLowerCase();
-    const mult = unit.startsWith('cr') ? 1e7 : unit.startsWith('l') ? 1e5 : unit === 'k' || unit === 'thousand' ? 1e3 : 1;
+    const unit = (m[3] ?? '').toLowerCase();
+    const mult = /^(cr|करोड|कोटी)/.test(unit)
+      ? 1e7
+      : /^(l|लाख)/.test(unit)
+        ? 1e5
+        : /^(k|thousand|हज़ार|हजार)/.test(unit)
+          ? 1e3
+          : 1;
     out.push(Math.round(n * mult * 100));
   }
   return out;
 }
 
 export function percentFigures(text: string): number[] {
-  return [...text.matchAll(/(\d+(?:\.\d+)?)\s?%/g)].map((m) => Number(m[1]));
+  return [...asciiDigits(text).matchAll(/(\d+(?:\.\d+)?)\s?(%|per ?cent|प्रतिशत|टक्के|टक्का)/g)].map((m) => Number(m[1]));
 }
 
 /** Every figure the summary is allowed to state: totals, subtotals, rates, and the differences between them. */

@@ -54,6 +54,13 @@ describe('the figures checker', () => {
     expect(percentFigures('about 12% more, 3.5 %')).toEqual([12, 3.5]);
   });
 
+  it('reads Hindi and Marathi figures, and money written without the sign', () => {
+    expect(rupeeFigures('कुल ₹६.१६ लाख है')).toEqual([61_600_000]);
+    expect(rupeeFigures('एकूण 4.53 lakh आणि 1.2 कोटी')).toEqual([45_300_000, 1_200_000_000]);
+    expect(rupeeFigures('4,400 mm and 3 Living rooms')).toEqual([]);
+    expect(percentFigures('७ प्रतिशत अधिक, 12 टक्के')).toEqual([7, 12]);
+  });
+
   it('passes our own rule-based summary', () => {
     const s = deterministicSummary(entries, comparison);
     const text = [s.headline, ...s.points].join(' ');
