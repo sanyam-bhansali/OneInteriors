@@ -478,6 +478,14 @@ fixtures while real studios fill in their profiles.
   the timing line, "like your home", widenings, "why not the others", one
   server ranker and stored matches. Waiting: the photo style picker and
   Style DNA (licensed images), and "one band up" (your yes).
+- **Phase 5 — mostly done.** Compare leads with fit, then price by room
+  and per material, and "Explain the differences" with a figure checker
+  and a rules fallback. Still to do: Hindi/Marathi, "listen", the
+  one-page comparison brief.
+- **Phase 6 — started.** Real 30-minute slots, booked in one tap, no
+  double booking, confirmation email with a calendar invite, hours in
+  `/ops/experts`. Still to do: the expert's pack, the customer portal,
+  the benefits pass, the post-meeting check-in.
 - **Migrations to deploy:** `20260929100000_waitlist_signups_lockdown`,
   `20260929110000_brief_possession_status`,
   `20260929120000_brief_contact_and_home`, `20260929130000_auth_identities`,
@@ -485,7 +493,8 @@ fixtures while real studios fill in their profiles.
   `20260929150000_brief_floor_plan_reading`,
   `20260929160000_studio_payment_phases`,
   `20260929170000_studio_matching_profile`,
-  `20260929180000_portfolio_matching_fields`, `20260929190000_studio_band`.
+  `20260929180000_portfolio_matching_fields`, `20260929190000_studio_band`,
+  `20260929200000_expert_booking`.
 
 ---
 

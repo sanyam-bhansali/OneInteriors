@@ -62,17 +62,17 @@ civil block**
 
 | Feature | State |
 |---|---|
-| Fit block above price | 🔨 |
-| Per-room and per-material prices, material ids not sentences | 🔨 |
-| AI comparison summary with a figure checker, in English / हिन्दी / मराठी, with "listen" | 🔨 |
+| Fit block above price | ✅ ranked exactly as the match page |
+| Per-room and per-material prices, material ids not sentences | ✅ |
+| AI comparison summary with a figure checker, in English / हिन्दी / मराठी, with "listen" | ✅ English, checker, rules fallback · 🔨 Hindi/Marathi, "listen" |
 | Comparison brief (one page, shareable) | 🔨 |
 
 ### Phase 6 — expert and after
 
 | Feature | State |
 |---|---|
-| Book a 30-minute slot; availability in the ops console | 🔨 · ⏳ the expert and their hours |
-| Confirmation email + calendar invite; WhatsApp | 🔨 email · ⏳ WhatsApp template |
+| Book a 30-minute slot; availability in the ops console | ✅ `/ops/experts`; no double booking · ⏳ the expert and their hours |
+| Confirmation email + calendar invite; WhatsApp | ✅ email with .ics · ⏳ WhatsApp template |
 | Expert's pack (everything the customer did) | 🔨 |
 | Customer portal ("Your home"): brief, matches, quotes, booking, introduction, mood board (from `/prepare`), 3D slot | 🔨 · ⏳ your 3D tool |
 | Benefits pass (states: available / unlocks when / claimed) | 🔨 structure · ⏳ benefit terms |
