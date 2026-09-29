@@ -52,6 +52,7 @@ import { prisma } from '@/lib/prisma';
 import { hasAnthropic, anthropicModel, supabaseConfig } from '@/lib/env';
 import { checkExtraction, type ExtractCheck } from './extract-schema';
 import { ROOMS } from './catalogue';
+import { MAX_WORKBOOK_CHARS, readWorkbook, spreadsheetKind, workbookText } from './workbook';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
@@ -91,9 +92,9 @@ const BUCKET = 'quotation-archives';
 /**
  * What we can send as a document.
  *
- * PDFs and images only. A workbook is not something the API reads, and the
- * Python adapter remains the better tool for those — this is the path for
- * everything that adapter cannot open, not a replacement for it.
+ * PDFs and images as themselves. Workbooks (.xlsx, .xlsm) and CSVs are not
+ * something the API reads, so they go as their rows in text — see
+ * `workbook.ts` and `canRead` below. Old binary .xls still goes to ops.
  */
 const SENDABLE = new Map<string, 'pdf' | 'image'>([
   ['application/pdf', 'pdf'],
@@ -129,7 +130,8 @@ function systemPrompt(): string {
     '3. Copy the product text EXACTLY as printed, including the studio\'s own spelling and punctuation. Do not normalise "Storage- Shoe Rack" into "Shoe rack". The exact wording is used to recognise the item.',
     '4. Amounts are the LINE amount in rupees, not per-unit rates and not including tax. If a row shows a rate and a quantity and an amount, report the amount.',
     '5. Dimensions in millimetres. If the document gives feet or inches, convert; if it gives no dimensions, use null. Never invent a size.',
-    '6. If a document is not a quotation — a floor plan, an invoice, a contract, a brochure — return it with an empty lines array. Do not extract from it.',
+    '6. Some documents are spreadsheets sent as text rows, cells separated by " | ". Read the header row to find which column is the amount, which the rate, which the quantity; the same rules apply.',
+    '7. If a document is not a quotation — a floor plan, an invoice, a contract, a brochure — return it with an empty lines array. Do not extract from it.',
     '',
     `Rooms must be one of: ${ROOMS.join(', ')}, or null when the document does not group by room. The room a line sits under changes what the item means, so preserve the grouping exactly; do not assign a room from the product name.`,
     '',
@@ -166,13 +168,15 @@ export async function extractArchive(archiveId: string): Promise<ExtractResult> 
   });
   if (files.length === 0) return { ok: false, error: 'This archive has no files.' };
 
-  const sendable = files.filter((f) => SENDABLE.has(f.contentType));
+  const canRead = (f: { contentType: string; filename: string }) =>
+    SENDABLE.has(f.contentType) || spreadsheetKind(f.contentType, f.filename) !== null;
+  const sendable = files.filter(canRead);
   const skipped = files
-    .filter((f) => !SENDABLE.has(f.contentType))
-    .map((f) => `${f.filename} — not a PDF or an image, so it goes to ops by hand.`);
+    .filter((f) => !canRead(f))
+    .map((f) => `${f.filename} — not a PDF, an image or an .xlsx/.csv, so it goes to ops by hand.`);
 
   if (sendable.length === 0) {
-    return { ok: false, error: 'Nothing here is a PDF or an image. Ops reads these by hand.' };
+    return { ok: false, error: 'Nothing here is a PDF, an image or a workbook we can read. Ops reads these by hand.' };
   }
 
   const all: unknown[] = [];
@@ -213,11 +217,31 @@ export async function extractArchive(archiveId: string): Promise<ExtractResult> 
          is deliberately not advanced. */
       if (inBatch.length > 0 && batchBytes + bytes.length > MAX_BATCH_BASE64) break;
 
-      const kind = SENDABLE.get(file.contentType)!;
-      blocks.push({
-        type: kind === 'pdf' ? 'document' : 'image',
-        source: { type: 'base64', media_type: file.contentType, data: bytes },
-      });
+      const sheet = SENDABLE.has(file.contentType) ? null : spreadsheetKind(file.contentType, file.filename);
+      if (sheet) {
+        /* A workbook goes as its rows. Unreadable (a corrupt file, a zip
+           bomb past the cap, an .xlsx that is really something else) is
+           said to the studio, not guessed at. */
+        const raw = Buffer.from(bytes, 'base64');
+        const rows = sheet === 'csv' ? raw.toString('utf8').slice(0, MAX_WORKBOOK_CHARS) : null;
+        const sheets = sheet === 'xlsx' ? readWorkbook(raw) : null;
+        const text = rows ?? (sheets && sheets.length > 0 ? workbookText(sheets) : null);
+        if (!text) {
+          skipped.push(`${file.filename} — we could not open this workbook. Ops will read it by hand.`);
+          index += 1;
+          continue;
+        }
+        blocks.push({
+          type: 'text',
+          text: `A spreadsheet quotation follows, one row per line, cells separated by " | ".\n\n${text}`,
+        });
+      } else {
+        const kind = SENDABLE.get(file.contentType)!;
+        blocks.push({
+          type: kind === 'pdf' ? 'document' : 'image',
+          source: { type: 'base64', media_type: file.contentType, data: bytes },
+        });
+      }
       /* The filename travels as the reference, so every extracted quotation
          can be pointed back at the document it came from. Ops approving a
          rate needs to be able to open the thing it was read out of. */
