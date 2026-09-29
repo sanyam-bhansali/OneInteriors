@@ -8,11 +8,8 @@ import { prisma } from '@/lib/prisma';
 import { formatINRCompact } from '@/lib/money';
 import { signedUrlFor } from '@/modules/storage/floor-plan';
 import { prepForBrief } from '@/modules/prepare/prep';
+import { expertPack } from '@/modules/consultation/pack';
 import { CallOutcome } from './CallOutcome';
-import { propertyLabel, scopeLabel, PUNE_LOCALITIES, STYLE_LABELS } from '@/modules/brief/types';
-import { fromDb } from '@/lib/money';
-import { possessionPhrase } from '@/modules/brief/possession';
-import type { StyleTag } from '@/modules/brief/types';
 
 export const metadata: Metadata = { title: 'Expert calls', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -113,29 +110,12 @@ async function PrepCard({
 }) {
   const brief = await prisma.brief.findUnique({
     where: { id: request.briefId },
-    select: {
-      propertyType: true,
-      carpetAreaSqft: true,
-      locality: true,
-      scope: true,
-      budgetMinPaise: true,
-      budgetMaxPaise: true,
-      styleLikes: true,
-      styleDislikes: true,
-      involvement: true,
-      moveInBy: true,
-      possessionStatus: true,
-      possessionOn: true,
-      floorPlanName: true,
-      adults: true,
-      children: true,
-      elderly: true,
-      pets: true,
-    },
+    select: { floorPlanName: true },
   });
 
   const planUrl = await signedUrlFor(request.briefId);
   const prep = await prepForBrief(request.briefId);
+  const pack = await expertPack(request.briefId, request.studioIds);
 
   return (
     <li key={request.id} className="rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-6">
@@ -178,58 +158,64 @@ async function PrepCard({
         </p>
       ) : null}
 
-      <dl className="mb-5 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
-        <Fact label="Home" value={propertyLabel(brief?.propertyType)} />
-        <Fact label="Area" value={brief?.carpetAreaSqft ? `${brief.carpetAreaSqft} sqft` : null} />
-        <Fact
-          label="Where"
-          value={PUNE_LOCALITIES.find((l) => l.slug === brief?.locality)?.label ?? brief?.locality ?? null}
-        />
-        <Fact label="Scope" value={scopeLabel(brief?.scope)} />
-        <Fact
-          label="Budget"
-          value={
-            brief?.budgetMinPaise && brief?.budgetMaxPaise
-              ? `${formatINRCompact(fromDb(brief.budgetMinPaise))}–${formatINRCompact(fromDb(brief.budgetMaxPaise))}`
-              : brief?.budgetMinPaise
-                ? `From ${formatINRCompact(fromDb(brief.budgetMinPaise))}`
-                : null
-          }
-        />
-        <Fact
-          label="Household"
-          value={
-            brief
-              ? `${brief.adults ?? 0} adults, ${brief.children ?? 0} children${brief.pets ? ', pets' : ''}`
-              : null
-          }
-        />
-        <Fact label="Working style" value={brief?.involvement ?? null} />
-        <Fact
-          label="When"
-          value={
-            brief
-              ? possessionPhrase({
-                  possessionStatus: brief.possessionStatus,
-                  possessionOn: brief.possessionOn ? brief.possessionOn.toISOString() : null,
-                  moveInBy: brief.moveInBy ? brief.moveInBy.toISOString() : null,
-                })
-              : null
-          }
-        />
-      </dl>
+      {/* Every answer, in words and in the order the brief asked them — the
+          customer should never have to repeat themselves on the call. */}
+      {pack && pack.answers.length > 0 ? (
+        <dl className="mb-5 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-[9rem_1fr]">
+          {pack.answers.map((a) => (
+            <div key={a.label} className="contents">
+              <dt className="label m-0 pt-0.5">{a.label}</dt>
+              <dd
+                className={`m-0 text-[14px] leading-snug ${a.label === 'Rules out' ? 'text-[var(--color-atrisk)]' : 'text-[var(--color-ink)]'}`}
+              >
+                {a.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
 
-      <div className="mb-5 flex flex-wrap gap-x-8 gap-y-2">
-        <span className="text-[13.5px] text-[var(--color-ink-2)]">
-          <span className="label mr-2">Likes</span>
-          {(brief?.styleLikes ?? []).map((t) => STYLE_LABELS[t as StyleTag] ?? t).join(', ') || '—'}
-        </span>
-        {/* The hard filter. Worth seeing before recommending anyone. */}
-        <span className="text-[13.5px] text-[var(--color-atrisk)]">
-          <span className="label mr-2">Rules out</span>
-          {(brief?.styleDislikes ?? []).map((t) => STYLE_LABELS[t as StyleTag] ?? t).join(', ') || '—'}
-        </span>
-      </div>
+      {/* The studios as the customer saw them: the stored match and its
+          reasons, the quote exactly as shown, whether they compared it — the
+          same for every studio, whatever it scored. */}
+      {pack && pack.studios.length > 0 ? (
+        <div className="mb-5 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(16rem,1fr))' }}>
+          {pack.studios.map((st) => (
+            <div key={st.id} className="rounded-[10px] border border-[var(--color-rule-soft)] bg-[var(--color-paper)] p-4">
+              <p className="m-0 mb-1 text-[15px] font-semibold text-[var(--color-ink)]">
+                {st.name}
+                {st.compared ? <span className="label ml-2">compared</span> : null}
+              </p>
+              <p className="m-0 mb-2 font-[family-name:var(--font-mono)] text-[12.5px] text-[var(--color-ink-2)]">
+                {st.match ? `${st.match.score}% · ${st.match.measured} measured` : 'No stored match'}
+                {st.quote
+                  ? ` · ${formatINRCompact(st.quote.totalPaise)} (${formatINRCompact(st.quote.lowPaise)}–${formatINRCompact(st.quote.highPaise)}, ${st.quote.kitchen})`
+                  : ' · not quoted'}
+              </p>
+              {st.quote && st.quote.notPriced > 0 ? (
+                <p className="m-0 mb-2 text-[12.5px] text-[var(--color-brass)]">
+                  {st.quote.notPriced} item{st.quote.notPriced === 1 ? '' : 's'} not priced in their total
+                </p>
+              ) : null}
+              {st.match ? (
+                <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                  {st.match.reasoning.map((line) => (
+                    <li key={line} className="text-[12.5px] leading-snug text-[var(--color-ink-2)]">
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {pack && pack.starred.length > 0 ? (
+        <p className="m-0 mb-5 text-[13.5px] text-[var(--color-ink-2)]">
+          <span className="label mr-2">Starred on compare</span>
+          {pack.starred.join(', ')}
+        </p>
+      ) : null}
 
       {/* The prep pack.
           This is the half of the card that did not come out of a dropdown —
@@ -337,15 +323,4 @@ function waitingFor(since: Date): string {
   if (hours < 24) return `${hours}h waiting`;
   const days = Math.floor(hours / 24);
   return `${days}d waiting`;
-}
-
-function Fact({ label, value }: { label: string; value: string | null }) {
-  return (
-    <div className="min-w-0">
-      <dt className="label m-0">{label}</dt>
-      <dd className="m-0 truncate text-[13.5px] text-[var(--color-ink)]">
-        {value ?? <span className="text-[var(--color-ink-3)]">—</span>}
-      </dd>
-    </div>
-  );
 }
