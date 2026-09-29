@@ -15,6 +15,7 @@ import { PURPOSE_NOTICE, type ConsentPurpose } from '@/modules/consent/policy';
 import { signedUrlFor } from '@/modules/storage/floor-plan';
 import { propertyLabel, scopeLabel, PUNE_LOCALITIES } from '@/modules/brief/types';
 import { yourHome } from '@/modules/portal/home';
+import { trackersForBrief } from '@/modules/portal/tracker-store';
 import { benefitsPass, STAGES, type Stage } from '@/modules/portal/benefits';
 import { prepForBrief } from '@/modules/prepare/prep';
 import { slotLabel } from '@/modules/consultation/slots';
@@ -55,6 +56,7 @@ export default async function AccountPage() {
   const briefDone = found && Boolean(brief.completedAt);
   const home = await yourHome(row?.id ?? null, briefDone);
   const rooms = row ? await prepForBrief(row.id) : [];
+  const trackers = row ? await trackersForBrief(row.id) : [];
   const pass = benefitsPass(home.stage);
   // The owner's 3D design tool (plan §10), linked once it exists. Never a
   // placeholder: nothing is shown until there is somewhere to go.
@@ -358,11 +360,50 @@ export default async function AccountPage() {
 
           {/* ── Project ──────────────────────────────────── */}
           <Section title="Your project">
-            <Empty>
-              Nothing here yet. Once you sign with a studio, this is where the milestone plan,
-              site photographs and payment schedule live. We do not hold your money — you pay the
-              studio directly against milestones we set and check.
-            </Empty>
+            {trackers.length === 0 ? (
+              <Empty>
+                Nothing here yet. Once you sign with a studio, every stage of your home appears here,
+                with its date and what has happened. We do not hold your money — you pay the studio
+                directly, on their schedule.
+              </Empty>
+            ) : (
+              trackers.map((t) => (
+                <div key={t.studioName} className="mb-6">
+                  <p className="m-0 mb-3 text-[15px] text-[var(--color-ink)]">With {t.studioName}</p>
+                  <ol className="m-0 mb-4 flex list-none flex-col gap-2 p-0">
+                    {t.stages.map((st) => (
+                      <li key={st.key} className="flex flex-wrap items-baseline gap-x-3 text-[14.5px]">
+                        <span
+                          className={`w-5 ${st.state === 'done' ? 'text-[var(--color-ontrack)]' : st.state === 'now' ? 'text-[var(--color-petrol)]' : 'text-[var(--color-ink-3)]'}`}
+                        >
+                          {st.state === 'done' ? '✓' : st.state === 'now' ? '●' : '○'}
+                        </span>
+                        <span className={st.state === 'later' ? 'text-[var(--color-ink-3)]' : 'text-[var(--color-ink)]'}>
+                          {st.label}
+                        </span>
+                        <span className="font-[family-name:var(--font-mono)] text-[11.5px] text-[var(--color-ink-3)]">
+                          {st.state === 'done' ? 'done' : `planned by ${st.targetOn.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`}
+                          {st.late ? ' · running late' : ''}
+                          {st.state === 'next' ? ' · next' : ''}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                  {t.updates.length > 0 ? (
+                    <ul className="m-0 flex list-none flex-col gap-2 border-t border-[var(--color-rule-soft)] p-0 pt-3">
+                      {t.updates.map((u, i) => (
+                        <li key={i} className="text-[14px] leading-relaxed text-[var(--color-ink-2)]">
+                          <span className="mr-2 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-3)]">
+                            {u.at.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                          </span>
+                          {u.note}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ))
+            )}
           </Section>
 
           {/* ── Permissions ──────────────────────────────── */}

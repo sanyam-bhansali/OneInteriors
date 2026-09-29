@@ -70,7 +70,12 @@ export const BENEFITS: Benefit[] = [
   { id: 'cashback', title: 'Cashback', terms: null, unlocksAt: 'SIGNED' },
   { id: 'referral', title: 'OneReferrals', terms: null, unlocksAt: 'START' },
   { id: 'free-cab', title: 'Free cab to a studio', terms: null, unlocksAt: 'CALL_BOOKED' },
-  { id: 'tracker', title: 'Project tracker', terms: null, unlocksAt: 'SIGNED' },
+  {
+    id: 'tracker',
+    title: 'Project tracker',
+    terms: 'Every stage of your home here, with its planned date, what is done and what has happened on site.',
+    unlocksAt: 'SIGNED',
+  },
   { id: 'cinematic-shoot', title: 'Cinematic video of your home', terms: null, unlocksAt: 'HANDOVER' },
   { id: 'onehamper', title: 'OneHamper', terms: null, unlocksAt: 'HANDOVER' },
 ];

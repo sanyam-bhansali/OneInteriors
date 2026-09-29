@@ -11,6 +11,7 @@ import {
   type Result,
 } from './actions';
 import type { OpsIntroduction } from '@/modules/studio/introduction-ops';
+import { TrackerControl } from './TrackerControl';
 /**
  * The kinds come from the state machine, not from this file.
  *
@@ -348,6 +349,8 @@ export function IntroductionCard({
           {error}
         </p>
       ) : null}
+
+      <TrackerControl intro={intro} />
     </li>
   );
 }

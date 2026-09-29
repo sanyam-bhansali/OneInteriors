@@ -31,7 +31,6 @@ describe('a quote on sizes the building shared', () => {
       ...EMPTY_BRIEF,
       propertyType: 'BHK_3',
       carpetAreaSqft: 1250,
-      society: 'Sapphire Heights',
       floorPlanName: 'mine.pdf',
       planReading: { kitchenRunMm: 4150, bathrooms: 3, hasStudy: false, areaSource: 'society' },
     });

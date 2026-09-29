@@ -1284,6 +1284,45 @@ model Consultation {
   @@map("consultations")
 }
 
+/// The customer's project tracker (Phase 7): one per introduction that became
+/// a signed project. Stages and target dates come from modules/portal/tracker.ts;
+/// a stage is done only when somebody marks it done. Started and updated by
+/// ops (and by the studio, once its own tool is switched on); read by the
+/// customer in "Your home". Not the escrow-era `Project` — this holds no money.
+model HomeProject {
+  id             String       @id @default(cuid())
+  introductionId String       @unique
+  introduction   Introduction @relation(fields: [introductionId], references: [id], onDelete: Cascade)
+  startOn        DateTime
+  /// Sign-off to handover, in days — the studio's own for this work where known.
+  totalDays      Int
+  /// Stage keys marked done (TRACKER_STAGES).
+  doneStages     String[]     @default([])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  updates HomeProjectUpdate[]
+
+  @@map("home_projects")
+}
+
+/// A dated note on the project — "Kitchen carcasses delivered to site".
+model HomeProjectUpdate {
+  id          String      @id @default(cuid())
+  projectId   String
+  project     HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// The stage it belongs to, if any.
+  stage       String?
+  note        String      @db.Text
+  postedById  String
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@map("home_project_updates")
+}
+
 /// The society floor-plan library (Phase 7): the sizes a customer confirmed
 /// from their own floor plan, kept against their society and home type so the
 /// next family in the same building can use them without uploading anything.
@@ -1427,6 +1466,7 @@ model Introduction {
 
   appointments Appointment[]
   checkIn      MeetingCheckIn?
+  homeProject  HomeProject?
 
   /// One introduction per studio per brief. A second one is the same
   /// introduction, not a new one.

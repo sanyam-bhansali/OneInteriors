@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/modules/auth/session';
 import { recordOutcome } from '@/modules/quotation/journey-repository';
+import { postUpdate, setStageDone, startTracker } from '@/modules/portal/tracker-store';
 import {
   releaseContactDetails,
   withdrawIntroduction,
@@ -154,4 +155,24 @@ export async function recordWonAction(introductionId: string): Promise<Result> {
   });
 
   return done();
+}
+
+// ── The customer's project tracker ─────────────────────────────
+
+export async function startTrackerAction(introductionId: string, startOn: string): Promise<Result> {
+  const r = await startTracker(introductionId, startOn);
+  revalidatePath('/ops/introductions');
+  return r.ok ? { ok: true } : { ok: false, error: r.error };
+}
+
+export async function stageDoneAction(projectId: string, stage: string, done: boolean): Promise<Result> {
+  const r = await setStageDone(projectId, stage, done);
+  revalidatePath('/ops/introductions');
+  return r.ok ? { ok: true } : { ok: false, error: r.error };
+}
+
+export async function postUpdateAction(projectId: string, note: string, stage: string | null): Promise<Result> {
+  const r = await postUpdate(projectId, note, stage);
+  revalidatePath('/ops/introductions');
+  return r.ok ? { ok: true } : { ok: false, error: r.error };
 }

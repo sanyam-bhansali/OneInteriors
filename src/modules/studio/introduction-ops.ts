@@ -77,6 +77,9 @@ export interface OpsIntroduction {
   wonHere: boolean;
   wonByOther: boolean;
 
+  /** The customer's project tracker, once started (modules/portal/tracker.ts). */
+  project: { id: string; startOn: Date; totalDays: number; doneStages: string[] } | null;
+
   /**
    * What, if anything, this row is waiting on us for. Null when nothing is.
    *
@@ -122,6 +125,7 @@ export async function listIntroductions(limit = 100): Promise<OpsIntroduction[]>
             quoteDecision: { select: { wonByStudioId: true } },
           },
         },
+        homeProject: { select: { id: true, startOn: true, totalDays: true, doneStages: true } },
         appointments: {
           orderBy: { startsAt: 'asc' },
           select: {
@@ -192,6 +196,7 @@ export async function listIntroductions(limit = 100): Promise<OpsIntroduction[]>
           row.brief.quoteDecision?.wonByStudioId != null &&
           row.brief.quoteDecision.wonByStudioId !== row.studio.id,
         needs: whatItNeeds(row.withdrawnAt, appointments),
+        project: row.homeProject ?? null,
       };
     });
   } catch (error) {
