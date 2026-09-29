@@ -1,0 +1,226 @@
+'use client';
+
+/**
+ * The compare sections plan §8 adds: fit first, then price by room, price per
+ * material, and a written summary whose every figure is checked.
+ */
+
+import { useState, useTransition } from 'react';
+import { formatINRCompact } from '@/lib/money';
+import { Sheet } from '@/components/oi';
+import { FACTOR_LABELS, type MatchResult } from '@/modules/matching/score';
+import type { Studio } from '@/modules/studio/types';
+import {
+  materialRows,
+  roomSpreads,
+  sameSpecGroups,
+  type Entry,
+} from '@/modules/quotation/compare-insights';
+import { explainComparisonAction } from './actions';
+import type { ComparisonExplanation } from '@/modules/quotation/compare-summary';
+import type { Brief } from '@/modules/brief/types';
+import type { FloorPlan } from '@/modules/quotation/project-store';
+
+const money = (p: number) => formatINRCompact(p);
+
+/** Fit, first: the decision is a designer, not a price list. */
+export function FitBlock({
+  entries,
+  studios,
+  matches,
+}: {
+  entries: Entry[];
+  studios: Studio[];
+  matches: Map<string, MatchResult>;
+}) {
+  const rows: { label: string; cell: (s: Studio, m: MatchResult | undefined) => string }[] = [
+    { label: 'Fit', cell: (_, m) => (m ? `${m.score}% · ${m.factorsScored} of ${m.factorsTotal} measured` : 'Not in your matches now') },
+    { label: FACTOR_LABELS.similarWork, cell: (_, m) => m?.evidence?.similarWork ?? '—' },
+    { label: FACTOR_LABELS.timeline, cell: (_, m) => m?.timeline?.line ?? 'Not known yet' },
+    { label: FACTOR_LABELS.workingStyle, cell: (_, m) => m?.evidence?.workingStyle ?? 'Not known yet' },
+    { label: FACTOR_LABELS.household, cell: (_, m) => m?.evidence?.household ?? '—' },
+    { label: 'Checks cleared', cell: (s) => `${s.checks.filter((c) => c.result === 'PASS').length} of ${s.checks.length}` },
+    {
+      label: 'Delivered with us',
+      cell: (s) =>
+        s.completedProjects === 0
+          ? 'No projects with us yet'
+          : `${s.completedProjects} projects${s.avgVarianceDays !== null ? `, ${s.avgVarianceDays <= 0 ? 'on time' : `+${s.avgVarianceDays} days`} on average` : ''}`,
+    },
+  ];
+  const cols = entries.map((e) => ({ entry: e, studio: studios.find((s) => s.slug === e.slug) }));
+  if (cols.some((c) => !c.studio)) return null;
+
+  return (
+    <Sheet className="mb-10 overflow-x-auto p-6">
+      <p className="oi-eyebrow m-0 mb-4">Who fits, side by side</p>
+      <table className="w-full min-w-[36rem] border-collapse text-[13.5px]">
+        <thead>
+          <tr>
+            <th className="w-[9rem]" />
+            {cols.map((c) => (
+              <th key={c.entry.slug} className="pb-3 text-left font-semibold text-[var(--ink)]">
+                {c.entry.name}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.label} className="border-t border-[var(--line)] align-top">
+              <th className="oi-label py-2.5 pr-3 text-left font-normal">{r.label}</th>
+              {cols.map((c) => (
+                <td key={c.entry.slug} className="py-2.5 pr-4 leading-snug text-[var(--ink2)]">
+                  {r.cell(c.studio!, matches.get(c.studio!.id))}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Sheet>
+  );
+}
+
+/** "Kitchen: ₹2.1 L – ₹2.9 L across your four studios." */
+export function RoomPrices({ entries }: { entries: Entry[] }) {
+  const rooms = roomSpreads(entries);
+  if (rooms.length === 0) return null;
+  return (
+    <Sheet className="mb-10 p-6">
+      <p className="oi-eyebrow m-0 mb-4">Price by room</p>
+      <ul className="m-0 flex list-none flex-col gap-3 p-0">
+        {rooms.map((r) => (
+          <li key={r.room} className="border-b border-[var(--line)] pb-3 last:border-b-0 last:pb-0">
+            <p className="m-0 flex flex-wrap items-baseline justify-between gap-3">
+              <span className="text-[14.5px] font-medium">{r.label}</span>
+              <span className="oi-num text-[13.5px]">
+                {r.spreadPaise === 0 ? money(r.lowPaise) : `${money(r.lowPaise)} – ${money(r.highPaise)}`}
+              </span>
+            </p>
+            <p className="m-0 mt-1 text-[13px] text-[var(--ink2)]">
+              {r.cells.map((c) => `${c.name} ${c.subtotalPaise === null ? 'not priced' : money(c.subtotalPaise)}`).join(' · ')}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </Sheet>
+  );
+}
+
+/** Each studio's rate and material on the same item — and who quotes the same material for what. */
+export function MaterialPrices({ entries }: { entries: Entry[] }) {
+  const rows = materialRows(entries);
+  if (rows.length === 0) return null;
+  return (
+    <Sheet className="mb-10 p-6">
+      <p className="oi-eyebrow m-0 mb-1">Price per material</p>
+      <p className="m-0 mb-4 text-[13px] text-[var(--ink2)]">
+        The same item, the same size — each studio&rsquo;s rate and what it is made of.
+      </p>
+      <ul className="m-0 flex list-none flex-col gap-4 p-0">
+        {rows.map((row) => {
+          const shared = sameSpecGroups(row).filter((g) => g.studios.length > 1);
+          return (
+            <li key={row.code} className="border-b border-[var(--line)] pb-4 last:border-b-0 last:pb-0">
+              <p className="m-0 mb-1.5 text-[14.5px] font-medium">
+                {row.label} <span className="oi-label">per {row.unit}</span>
+              </p>
+              <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                {row.cells.map((c) => (
+                  <li key={c.slug} className="text-[13px] leading-snug text-[var(--ink2)]">
+                    <span className="text-[var(--ink)]">{c.name}</span>{' '}
+                    {c.ratePaise === null ? 'not quoted' : <span className="oi-num">{money(c.ratePaise)}</span>}
+                    {c.spec ? ` — ${c.spec}` : ''}
+                  </li>
+                ))}
+              </ul>
+              {shared.map((g) => (
+                <p key={g.spec} className="m-0 mt-2 text-[13px] leading-snug text-[var(--ink)]">
+                  Same material at {g.studios.length} studios: {g.studios.map((s) => `${money(s.ratePaise)} at ${s.name}`).join(', ')}.
+                </p>
+              ))}
+            </li>
+          );
+        })}
+      </ul>
+    </Sheet>
+  );
+}
+
+/** "Explain the differences" — on demand, written by AI or by the rules, and labelled which. */
+export function ExplainDifferences({
+  slugs,
+  brief,
+  plan,
+}: {
+  slugs: string[];
+  brief: Brief | null;
+  plan: FloorPlan | null;
+}) {
+  // A standard kitchen is not a measurement; the server prices its own standard one.
+  const measured = plan && plan.source !== 'standard' && plan.kitchenRunMm ? plan : null;
+  const [result, setResult] = useState<ComparisonExplanation | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [pending, start] = useTransition();
+
+  return (
+    <Sheet className="mb-10 p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="oi-eyebrow m-0">In plain words</p>
+        {!result ? (
+          <button
+            type="button"
+            disabled={pending || !brief}
+            onClick={() =>
+              start(async () => {
+                const r = await explainComparisonAction({
+                  slugs,
+                  brief,
+                  kitchenRunMm: measured?.kitchenRunMm ?? null,
+                  measured: measured?.source ?? null,
+                }).catch(() => null);
+                if (r) setResult(r);
+                else setFailed(true);
+              })
+            }
+            className="min-h-11 cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-5 py-2.5 text-[14px] font-semibold text-[var(--ink)] hover:border-[var(--ink2)] disabled:opacity-50"
+          >
+            {pending ? 'Reading the numbers…' : 'Explain the differences'}
+          </button>
+        ) : null}
+      </div>
+      {result ? (
+        <>
+          <p className="m-0 mt-4 max-w-[68ch] text-[14.5px] leading-[1.65]">{result.text}</p>
+          <p className="oi-label m-0 mt-3">
+            {result.source === 'model'
+              ? 'Written by AI from these quotes — every figure in it was checked against them'
+              : 'From the numbers above, by our rules'}
+          </p>
+          {result.rules.questions.length > 0 ? (
+            <>
+              <p className="oi-eyebrow m-0 mb-2 mt-5">Worth asking every studio</p>
+              <ul className="m-0 flex list-disc flex-col gap-1 pl-5">
+                {result.rules.questions.map((q) => (
+                  <li key={q} className="text-[13.5px] text-[var(--ink2)]">
+                    {q}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+        </>
+      ) : failed ? (
+        <p className="m-0 mt-3 text-[13.5px] text-[var(--ink2)]">
+          Could not write it just now — everything it would say is in the sections below.
+        </p>
+      ) : (
+        <p className="m-0 mt-3 text-[13.5px] text-[var(--ink2)]">
+          Where the cost changes, how the materials differ, and what each studio charges for the same
+          material — in a few sentences.
+        </p>
+      )}
+    </Sheet>
+  );
+}

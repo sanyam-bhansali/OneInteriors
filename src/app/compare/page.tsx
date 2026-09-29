@@ -1,5 +1,8 @@
 import type { Metadata } from 'next';
 import { CompareClient } from './CompareClient';
+import { cachedRoster } from '@/modules/studio/roster-cache';
+import { resolveRatesForMany } from '@/modules/quotation/resolve-rates';
+import { showUnverifiedStudios } from '@/lib/env';
 
 export const metadata: Metadata = {
   title: 'Side by side',
@@ -21,6 +24,17 @@ export const metadata: Metadata = {
  * top few on the fly, so the customer's own choices had no bearing on what
  * they saw. See CompareClient.
  */
-export default function ComparePage() {
-  return <CompareClient />;
+export default async function ComparePage() {
+  /* The quotes still come from the browser — the ones the customer saw. The
+     roster and rates come from here, for the fit block, which ranks exactly
+     as the match page does (same gate, same rates). */
+  const studios = await cachedRoster();
+  const rates = await resolveRatesForMany(studios.map((s) => s.slug));
+  return (
+    <CompareClient
+      studios={studios}
+      allowUnverified={showUnverifiedStudios()}
+      filedRates={Object.fromEntries(Object.entries(rates).map(([slug, r]) => [slug, r.rates]))}
+    />
+  );
 }
