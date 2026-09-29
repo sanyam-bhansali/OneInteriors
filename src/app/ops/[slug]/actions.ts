@@ -7,6 +7,7 @@ import {
   setStudioStatus,
   setHiddenAsTest,
   setCuratedDiscount,
+  confirmBand,
   type RecordResult,
 } from '@/modules/verification/record';
 import type { CheckResult, CheckType, StudioStatus } from '@/modules/studio/types';
@@ -72,6 +73,21 @@ export async function setStatusAction(
     revalidatePath(`/studios/${slug}`);
     revalidatePath('/studios');
     revalidatePath('/');
+  }
+  return result;
+}
+
+/** Confirm the band. It decides which customers this studio is shown to. */
+export async function confirmBandAction(
+  _prev: RecordResult | null,
+  formData: FormData,
+): Promise<RecordResult> {
+  const slug = String(formData.get('slug') ?? '');
+  const result = await confirmBand(String(formData.get('studioId') ?? ''), String(formData.get('band') ?? ''));
+  if (result.ok && slug) {
+    revalidatePath(`/ops/${slug}`);
+    revalidatePath('/ops');
+    revalidatePath('/match');
   }
   return result;
 }

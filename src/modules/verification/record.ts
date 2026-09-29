@@ -31,6 +31,7 @@ import { validateGstin } from './gstin';
 import type { CheckResult, CheckType, StudioStatus } from '@/modules/studio/types';
 import { Prisma } from '@prisma/client';
 import { LIMITS, profileJson, readProfile } from '@/modules/studio/matching-profile';
+import { TIERS } from '@/modules/quotation/tiers';
 
 export type RecordResult = { ok: true } | { ok: false; error: string };
 
@@ -411,6 +412,35 @@ export async function setCuratedDiscount(studioId: string, raw: string): Promise
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Could not save the discount.' };
+  }
+}
+
+/**
+ * Confirm a studio's band — or clear it with ''.
+ *
+ * Ops only, audited. The proposal (modules/studio/band.ts) is shown beside the
+ * control; what is stored is the person's decision, because a band sorts
+ * which customers a studio ever meets.
+ */
+export async function confirmBand(studioId: string, raw: string): Promise<RecordResult> {
+  const actor = await requireRole('OPS');
+  const band = raw === '' ? null : (TIERS as readonly string[]).includes(raw) ? raw : undefined;
+  if (band === undefined) return { ok: false, error: 'Pick Essential, Premium or Luxury.' };
+  try {
+    await prisma.$transaction(async (tx) => {
+      const before = await tx.studio.findUniqueOrThrow({
+        where: { id: studioId },
+        select: { band: true },
+      });
+      await tx.studio.update({
+        where: { id: studioId },
+        data: { band, bandConfirmedAt: band ? new Date() : null },
+      });
+      await writeAudit(tx, actor, 'studio.band.confirm', 'Studio', studioId, before, { band });
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Could not save the band.' };
   }
 }
 

@@ -611,6 +611,14 @@ model Studio {
   /// does not recognise. Null = not started.
   matchingProfile Json?
 
+  /// The studio's band — ESSENTIAL | PREMIUM | LUXURY — as confirmed by ops
+  /// from the proposal in `modules/studio/band.ts` (its rates on a reference
+  /// home, checked against its finished homes). Never set by the studio.
+  /// Null until confirmed; a customer who picks a band sees only studios
+  /// confirmed in it.
+  band            String?
+  bandConfirmedAt DateTime?
+
   // ── Allocation ──
   //
   // What a subscription actually buys is VOLUME — how many briefs a studio is

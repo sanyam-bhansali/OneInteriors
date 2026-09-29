@@ -17,6 +17,7 @@
 
 import { readPhases } from './payment-phases';
 import { readProfile } from './matching-profile';
+import { TIERS, type Tier } from '@/modules/quotation/tiers';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { fromDb } from '@/lib/money';
@@ -115,6 +116,7 @@ function toStudio(row: StudioRow): Studio {
     maxProjectPaise: row.maxProjectPaise === null ? null : fromDb(row.maxProjectPaise),
     paymentPhases: readPhases(row.paymentPhases),
     matchingProfile: readProfile(row.matchingProfile),
+    band: (TIERS as readonly string[]).includes(row.band ?? '') ? (row.band as Tier) : null,
     completedProjects: row.completedProjects,
     avgVarianceDays: row.avgVarianceDays,
     upheldDisputes: row.upheldDisputes,

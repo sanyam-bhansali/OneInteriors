@@ -12,6 +12,9 @@ import { CheckRow } from './CheckRow';
 import { StatusControl } from './StatusControl';
 import { GstinControl } from './GstinControl';
 import { DiscountControl } from './DiscountControl';
+import { BandControl } from './BandControl';
+import { proposeBand } from '@/modules/studio/band';
+import { liveRatesFor } from '@/modules/quotation/filed-rate-store';
 import { HideControl } from './HideControl';
 import { ArchiveReview } from './ArchiveReview';
 import { archivesForStudio } from '@/modules/studio/quotation-archive-store';
@@ -41,6 +44,7 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
   const assessment = assessTier(studio);
   const gstin = studio.gstin ? validateGstin(studio.gstin) : null;
   const now = new Date();
+  const band = proposeBand(await liveRatesFor(studio.id), studio.portfolio);
   const trail = await studioAuditTrail(studio.id, 20);
 
   return (
@@ -128,6 +132,14 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
                   current={studio.gstin}
                   notApplicable={studio.gstinNotApplicable ?? false}
                   note={studio.gstinNote ?? null}
+                />
+                <BandControl
+                  studioId={studio.id}
+                  slug={studio.slug}
+                  current={studio.band ?? null}
+                  proposed={band.proposed}
+                  note={band.note}
+                  disagree={band.disagree}
                 />
                 <DiscountControl
                   studioId={studio.id}

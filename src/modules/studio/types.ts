@@ -8,6 +8,7 @@
 
 import type { PaymentPhase } from './payment-phases';
 import type { MatchingProfile } from './matching-profile';
+import type { Tier } from '@/modules/quotation/tiers';
 import type { Paise } from '@/lib/money';
 import type { PropertyType, ScopeType, StyleTag } from '@/modules/brief/types';
 
@@ -161,6 +162,12 @@ export interface Studio {
    * which matching scores as "not known yet". See matching-profile.ts.
    */
   matchingProfile?: MatchingProfile;
+
+  /**
+   * The band ops confirmed from the proposal in band.ts. Null until then.
+   * Optional for the fixture reason above.
+   */
+  band?: Tier | null;
 
   // ── Derived performance ──
   // Recomputed by a job from real projects. NULL means "we don't know yet"
