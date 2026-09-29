@@ -16,7 +16,7 @@ import { STYLE_LABELS, STYLE_TAGS, type StyleTag } from '@/modules/brief/types';
 import { extractJson } from '@/modules/floorplan/reading';
 
 /** The definitions studios tag with (docs/STUDIO-PROFILE-REQUIREMENTS.md), so both sides use one vocabulary. */
-const DEFINITIONS: Record<StyleTag, string> = {
+export const STYLE_DEFINITIONS: Record<StyleTag, string> = {
   'contemporary-minimal': 'clean lines, flat surfaces, a neutral palette, almost no ornament',
   'warm-modern': 'modern forms softened with wood, warm neutrals and layered light',
   'indian-contemporary': 'modern layouts with Indian materials — cane, brass, jaali, handloom, stone',
@@ -33,7 +33,7 @@ const DEFINITIONS: Record<StyleTag, string> = {
 
 export const INSPIRATION_PROMPT = [
   'This is a photo of a room a homeowner in Pune likes. Say which interior styles it shows, choosing ONLY from this list:',
-  ...STYLE_TAGS.map((t) => `- ${t}: ${DEFINITIONS[t]}`),
+  ...STYLE_TAGS.map((t) => `- ${t}: ${STYLE_DEFINITIONS[t]}`),
   '',
   'Pick one to three, strongest first. For each, one short reason that points at something visible in the photo (a material, a colour, a shape). If the photo is not of an interior, return an empty list.',
   'Reply with JSON only: {"styles": [{"style": "<one of the ids above>", "why": "<under 90 characters>"}]}',
