@@ -21,6 +21,7 @@
  * down the road who would have guessed a number over the phone.
  */
 
+import { QuotePlan, roomAnchor } from './QuotePlan';
 import { showcase } from '@/modules/portal/benefits';
 import { useCallback, useState } from 'react';
 import { formatINRCompact } from '@/lib/money';
@@ -240,8 +241,10 @@ export function QuoteDocument({
 
       {bandLine ? <p className="m-0 mb-6 text-[13.5px] leading-[1.6] text-[var(--ink2)]">{bandLine}</p> : null}
 
+      <QuotePlan quote={quote} />
+
       {quote.rooms.map((room) => (
-        <section key={room.room} className="mb-7">
+        <section key={room.room} id={roomAnchor(room.room)} className="mb-7 scroll-mt-24">
           {/* The room heading was a 10.5px mono label, the same size as the
               smallest thing on the page. It is a heading; it now reads like
               one. */}
