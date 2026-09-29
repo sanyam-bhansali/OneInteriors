@@ -136,11 +136,13 @@ export default function PrivacyPage() {
             <li>Resend — to deliver the emails we send you.</li>
             <li>Meta — WhatsApp messages, if you sign in or get updates that way.</li>
             <li>
-              Anthropic — writes the short explanation beside each match, and reads the sizes off a
-              floor plan if you upload one. It receives your brief&rsquo;s answers, the
-              studio&rsquo;s record and the plan, never your name or number.
+              Anthropic — writes the short explanation beside each match and the plain-words
+              comparison of your quotes, reads the sizes off a floor plan if you upload one, and
+              tells you the styles in a room photo if you share one (the photo is read once and
+              not kept). It receives your brief&rsquo;s answers, the quotes, the studio&rsquo;s
+              record, the plan or the photo — never your name or number.
             </li>
-            <li>Google — only if you choose to sign in with Google.</li>
+            <li>Google, Apple or Facebook — only if you choose to sign in with one of them.</li>
           </ul>
         </Section>
 

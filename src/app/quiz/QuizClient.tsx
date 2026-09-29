@@ -78,6 +78,7 @@ import {
 } from '@/modules/brief/contact';
 import { PURPOSE_NOTICE } from '@/modules/consent/policy';
 import { SocialButtons, anyProvider, type Providers } from '@/components/SocialButtons';
+import { InspirationReader } from './InspirationReader';
 
 const NO_PROVIDERS: Providers = { google: false, apple: false, facebook: false };
 
@@ -628,6 +629,11 @@ function stepContent(
                 . That&rsquo;s the direction we&rsquo;ll match on.
               </p>
             ) : null}
+            <InspirationReader
+              likes={brief.styleLikes}
+              dislikes={brief.styleDislikes}
+              onUse={(styleLikes) => update({ styleLikes })}
+            />
           </div>
         ),
       };

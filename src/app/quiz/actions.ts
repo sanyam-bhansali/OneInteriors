@@ -9,6 +9,8 @@
  * write costs a brief while a blocked click costs the customer.
  */
 
+import { canReadInspiration, readableInspirationType, readInspirationPhoto } from '@/modules/inspiration/read';
+import type { StylePick } from '@/modules/inspiration/reading';
 import { headers } from 'next/headers';
 import {
   saveBrief as persistBrief,
@@ -209,4 +211,46 @@ export async function readFloorPlanAction(formData: FormData): Promise<PlanReadR
   }
   await record('quiz.plan.read');
   return { ok: true, reading: result.reading, fileName: file.name.slice(0, 120) };
+}
+
+// ── "A room you love" ───────────────────────────────────────────
+
+export type InspirationReadResult =
+  | { ok: true; picks: StylePick[] }
+  | { ok: false; error: string };
+
+const INSPIRATION_LIMIT = { max: 12, windowMs: 60 * 60 * 1000 };
+
+/**
+ * Which of our styles a photo shows (modules/inspiration). The photo goes to
+ * the model for this one reading and is not stored. Rate-limited per
+ * connection, like the plan reader, because each call is paid.
+ */
+export async function readInspirationAction(formData: FormData): Promise<InspirationReadResult> {
+  const file = formData.get('photo');
+  if (!(file instanceof File) || file.size === 0) return { ok: false, error: 'Choose a photo first.' };
+  if (!readableInspirationType(file.type)) return { ok: false, error: 'A JPG, PNG or WebP photo works.' };
+  if (file.size > PLAN_MAX_BYTES) return { ok: false, error: 'That photo is over 4 MB. A screenshot works just as well.' };
+  if (!canReadInspiration()) return { ok: false, error: 'Reading photos is not switched on here yet — pick from the styles above.' };
+
+  const h = await headers();
+  const verdict = await consume(
+    bucketFor('inspiration', hashIp(addressOf(h.get('x-forwarded-for'))) ?? 'unknown'),
+    INSPIRATION_LIMIT,
+  );
+  if (!verdict.allowed) {
+    return { ok: false, error: `That is a lot of photos from one connection. Try again ${waitPhrase(verdict.retryInSeconds)}.` };
+  }
+
+  const result = await readInspirationPhoto(Buffer.from(await file.arrayBuffer()).toString('base64'), file.type);
+  if (!result.ok) {
+    return {
+      ok: false,
+      error:
+        result.reason === 'not-interior'
+          ? 'We could not see a room in that one. Try a photo of an interior.'
+          : 'We could not read that photo just now. Pick from the styles above instead.',
+    };
+  }
+  return { ok: true, picks: result.picks };
 }
