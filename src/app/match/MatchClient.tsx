@@ -37,6 +37,7 @@ import {
 } from '@/modules/quotation/project-store';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
 import { QuoteFlow, type QuoteRequest } from '@/components/oi/QuoteFlow';
+import { homeShapeFor } from '@/modules/quotation/first-quote';
 import type { StudioRates } from '@/modules/quotation/catalogue';
 import { Wrap, Chapter, Sheet, Quiet } from '@/components/oi';
 import { StudioCard } from './StudioCard';
@@ -122,11 +123,7 @@ export function MatchClient({
   const requestFor = (studio: Studio): QuoteRequest => ({
     studioSlug: studio.slug,
     studioName: studio.tradeName,
-    bhk: BEDROOMS[brief?.propertyType ?? 'BHK_2'] ?? 2,
-    carpetAreaSqft: brief?.carpetAreaSqft ?? 850,
-    // One bathroom per bedroom is what the archive's flats overwhelmingly
-    // have, and the vanity is the only line it drives.
-    bathrooms: Math.max(1, BEDROOMS[brief?.propertyType ?? 'BHK_2'] ?? 2),
+    ...homeShapeFor(brief ?? { propertyType: null, carpetAreaSqft: null }),
   });
 
   // ── The quote, over everything ──
@@ -240,7 +237,7 @@ export function MatchClient({
           <Sheet className="p-8">
             <p className="m-0 mb-4 max-w-[54ch] text-[15px] leading-[1.6]">
               Scoring studios against an empty brief would give you the roster in an arbitrary
-              order with numbers on it. Nine questions, about two minutes, and these become real.
+              order with numbers on it. About four minutes of your brief, and these become real.
             </p>
             <Quiet href="/quiz">Start the brief</Quiet>
           </Sheet>

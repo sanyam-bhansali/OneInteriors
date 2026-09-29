@@ -38,6 +38,10 @@ import {
   type WorkCode,
 } from './catalogue';
 
+import type { Brief } from '@/modules/brief/types';
+import { carpetAreaFor } from '@/modules/brief/steps';
+import { BEDROOMS } from './estimate';
+
 const MM_PER_FOOT = 304.8;
 
 /** Face area in square feet, from millimetre dimensions. */
@@ -98,6 +102,12 @@ export interface QuoteInput {
   /** 1–5. Decides which bedrooms are in scope. */
   bhk: number;
   carpetAreaSqft: number;
+  /**
+   * True when the area is the typical one for their configuration rather than
+   * a figure they gave. It prices the ceiling, painting and electrical lines,
+   * so the document says it was assumed.
+   */
+  carpetAreaAssumed?: boolean;
   bathrooms: number;
   /** From the floor plan, or from the customer, or absent. */
   kitchenRunMm: number | null;
@@ -141,6 +151,35 @@ export interface FirstQuote {
   notPriced: string[];
   /** Every assumption, in reading order, for the foot of the document. */
   assumptions: string[];
+}
+
+/**
+ * The shape of their home, as the quote needs it.
+ *
+ * One function, because it was written twice — in the match page and in the
+ * studio profile's quote panel — and both invented the same thing: 850 sq ft
+ * and a 2 BHK when the brief did not say, with nothing on the document
+ * admitting it (FINDINGS 2.8). The area is now the typical one for their
+ * configuration and is flagged as assumed; a missing configuration is still
+ * treated as a 2 BHK, the commonest in the archive, which the document shows
+ * as its size.
+ */
+export function homeShapeFor(brief: Pick<Brief, 'propertyType' | 'carpetAreaSqft'>): {
+  bhk: number;
+  carpetAreaSqft: number;
+  carpetAreaAssumed: boolean;
+  bathrooms: number;
+} {
+  const bhk = BEDROOMS[brief.propertyType ?? 'BHK_2'];
+  const { sqft, assumed } = carpetAreaFor(brief);
+  return {
+    bhk,
+    carpetAreaSqft: sqft,
+    carpetAreaAssumed: assumed,
+    // One bathroom per bedroom is what the archive's flats overwhelmingly
+    // have, and the vanity is the only line it drives.
+    bathrooms: Math.max(1, bhk),
+  };
 }
 
 /** Which catalogue items a flat of this size includes. */
@@ -287,6 +326,12 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
   } else {
     assumptions.push(
       `No floor plan yet, so the kitchen is priced on a standard ${runMm}mm platform run — what a ${input.bhk} BHK usually has. This is the number most likely to move.`,
+    );
+  }
+
+  if (input.carpetAreaAssumed) {
+    assumptions.push(
+      `Carpet area taken as ${input.carpetAreaSqft.toLocaleString('en-IN')} sq ft, typical for a ${input.bhk} BHK — tell us yours and the ceiling, painting and electrical lines follow it.`,
     );
   }
 

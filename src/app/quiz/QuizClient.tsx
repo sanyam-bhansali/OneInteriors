@@ -29,14 +29,17 @@ import {
   INVOLVEMENT_LABELS,
   PRIORITY_LABELS,
   PROPERTY_LABELS,
-  LOCALITIES_BY_ZONE,
   localityLabel,
   POSSESSION_LABELS,
   SCOPE_LABELS,
   STYLE_LABELS,
   STYLE_TAGS,
-  TOTAL_STEPS,
+  HOME_NEEDS,
+  HOME_NEED_LABELS,
+  LANGUAGES,
+  LANGUAGE_LABELS,
   type Brief,
+  type HomeNeed,
   type Involvement,
   type PossessionStatus,
   type PriorityFactor,
@@ -46,8 +49,19 @@ import {
 } from '@/modules/brief/types';
 import { loadBrief, saveBrief } from '@/modules/brief/store';
 import {
+  CHAPTER,
+  NAME_MAX,
+  TOTAL_STEPS,
+  carpetAreaFor,
+  cleanName,
+  isStepAnswered,
+  stepAt,
+  typicalCarpetSqft,
+  type StepId,
+} from '@/modules/brief/steps';
+import { LocalityPicker } from './LocalityPicker';
+import {
   FULL_HOME_DAYS,
-  possessionAnswered,
   possessionPhrase,
   readyWindow,
 } from '@/modules/brief/possession';
@@ -125,7 +139,7 @@ function minutesLeft(step: number): string {
   if (remaining <= 1) return 'nearly done';
   const seconds = remaining * 20;
   if (seconds <= 60) return 'under a minute left';
-  return `about ${Math.ceil(seconds / 60)} minutes left`;
+  return `about ${Math.ceil(seconds / 60)} min left`;
 }
 
 export function QuizClient({
@@ -158,8 +172,10 @@ export function QuizClient({
       // Only adopt the server copy if it is further along. Otherwise someone
       // who reloads mid-question gets thrown backwards to their last sync.
       if ((remote.lastStep ?? 0) >= (local.lastStep ?? 0)) {
-        setBrief(remote);
-        saveBrief(remote);
+        // The server has no name until the contact step; keep the one typed here.
+        const adopted = { ...remote, contactName: remote.contactName ?? local.contactName };
+        setBrief(adopted);
+        saveBrief(adopted);
         setStep(Math.min(Math.max(remote.lastStep || 1, 1), TOTAL_STEPS));
       }
     });
@@ -209,7 +225,10 @@ export function QuizClient({
    * nothing else.
    */
   function sync(next: Brief) {
-    void saveBriefAction(next).catch(() => {});
+    // The name stays in this tab until the contact step sends it with the
+    // number, after consent. The mapper would drop it anyway; not sending it
+    // at all is the stronger guarantee.
+    void saveBriefAction({ ...next, contactName: null }).catch(() => {});
   }
 
   function next() {
@@ -235,7 +254,7 @@ export function QuizClient({
        */
       setFinishing(true);
       void Promise.race([
-        saveBriefAction(done).catch(() => {}),
+        saveBriefAction({ ...done, contactName: null }).catch(() => {}),
         new Promise((resolve) => setTimeout(resolve, 1000)),
       ]).then(() =>
         // Straight to the matches. The band was chosen on question 3, with real
@@ -261,7 +280,8 @@ export function QuizClient({
     setStep(step - 1);
   }
 
-  const canAdvance = isStepAnswered(brief, step);
+  const stepId = stepAt(step);
+  const canAdvance = isStepAnswered(brief, stepId);
 
   const matchCount = useMemo(() => {
     if (!hydrated) return studios.length;
@@ -289,7 +309,9 @@ export function QuizClient({
               aria-label="One Interiors, home"
             >
               <Mark className="h-[18px] w-[18px] text-[var(--ink)]" />
-              <span className="oi-display text-[17px] leading-none text-[var(--ink)]">
+              {/* The mark alone on a phone: the wordmark wrapped to two lines
+                  there and pushed the chapter and time off the right edge. */}
+              <span className="oi-display hidden text-[17px] leading-none text-[var(--ink)] sm:inline">
                 One Interiors
               </span>
             </Link>
@@ -300,8 +322,17 @@ export function QuizClient({
                 motivating than an index. Calibrated at roughly twenty seconds
                 a question, which is what the nine-questions promise on the
                 landing page implies, so the two cannot contradict. */}
-            <span className="oi-num text-[10.5px] uppercase tracking-[0.16em] text-[var(--ink2)]">
-              {step} of {TOTAL_STEPS} · {minutesLeft(step)}
+            {/* The chapter, then how long is left. The count is dropped on a
+                phone, where the three together ran off the edge of the screen;
+                the chapter and the time are the two parts that answer "how
+                much more of this is there". */}
+            <span className="oi-num min-w-0 truncate text-right text-[10.5px] uppercase tracking-[0.16em] text-[var(--ink2)]">
+              {CHAPTER[stepId]}
+              <span className="hidden sm:inline">
+                {' '}
+                · {step} of {TOTAL_STEPS}
+              </span>{' '}
+              · {minutesLeft(step)}
             </span>
           </div>
         </Wrap>
@@ -340,12 +371,12 @@ export function QuizClient({
         <Wrap>
           <div className="grid grid-cols-1 gap-9 py-8 sm:py-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-14">
             <div key={`q-${step}`} className="oi-swap flex flex-col gap-7">
-              <QuestionStep step={step} brief={brief} update={update} slot="ask" />
+              <QuestionStep id={stepId} brief={brief} update={update} slot="ask" />
               <LiveProfile brief={brief} matchCount={matchCount} className="hidden lg:block" />
             </div>
 
             <div key={`o-${step}`} className="oi-swap min-w-0">
-              <QuestionStep step={step} brief={brief} update={update} slot="options" />
+              <QuestionStep id={stepId} brief={brief} update={update} slot="options" />
 
               {/* On a phone the brief is COLLAPSED by default.
                   It is reassurance, not information the customer needs to
@@ -357,7 +388,11 @@ export function QuizClient({
                   costs no vertical space at all. */}
               <details className="group mt-7 border border-[var(--line)] bg-[var(--card)] lg:hidden">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
-                  <span className="oi-label m-0">Your brief so far</span>
+                  <span className="oi-label m-0">
+                    {cleanName(brief.contactName)
+                      ? `${cleanName(brief.contactName)}'s brief so far`
+                      : 'Your brief so far'}
+                  </span>
                   <span className="oi-num text-[10.5px] uppercase tracking-[0.14em] text-[var(--acc-ink)] group-open:hidden">
                     Show
                   </span>
@@ -424,92 +459,33 @@ export function QuizClient({
 type StepParts = { ask: React.ReactNode; options: React.ReactNode };
 
 function QuestionStep({
-  step,
+  id,
   brief,
   update,
   slot,
 }: {
-  step: number;
+  id: StepId;
   brief: Brief;
   update: (patch: Partial<Brief>) => void;
   slot: 'ask' | 'options';
 }) {
-  const parts = stepContent(step, brief, update);
-  if (!parts) return null;
+  const parts = stepContent(id, brief, update);
   return <>{slot === 'ask' ? parts.ask : parts.options}</>;
 }
 
 function stepContent(
-  step: number,
+  id: StepId,
   brief: Brief,
   update: (patch: Partial<Brief>) => void,
-): StepParts | null {
-  switch (step) {
-    case 1:
-      return {
-        ask: (
-          <Ask
-            title="First — what kind of home are we working with?"
-            hint="And where in Pune it is, so we only show you studios who actually work there."
-          />
-        ),
-        options: (
-          /* Tighter than the other steps on purpose.
-             This is the only question carrying three fields, and Continue does
-             not unlock until locality is answered — so if locality sits below
-             the fold, the very first screen of the funnel looks like a dead
-             button. It was doing exactly that on anything shorter than a
-             full-height laptop window. The gaps here are the difference
-             between all three fields fitting and not. */
-          <div className="flex flex-col gap-5 sm:gap-6">
-            <TileRow>
-              {(Object.keys(PROPERTY_LABELS) as PropertyType[]).map((k) => (
-                <CircleTile
-                  key={k}
-                  label={PROPERTY_LABELS[k]}
-                  Icon={PROPERTY_ICONS[k]}
-                  selected={brief.propertyType === k}
-                  onClick={() => update({ propertyType: k })}
-                />
-              ))}
-            </TileRow>
-
-            <div>
-              <FieldLabel>Locality</FieldLabel>
-              <div className="flex flex-wrap gap-2">
-                {LOCALITIES_BY_ZONE.flatMap((g) => g.localities).map((l) => (
-                  <Chip
-                    key={l.slug}
-                    selected={brief.locality === l.slug}
-                    onClick={() => update({ locality: l.slug })}
-                  >
-                    {l.label}
-                  </Chip>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <FieldLabel>Carpet area, if you know it</FieldLabel>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  placeholder="980"
-                  value={brief.carpetAreaSqft ?? ''}
-                  onChange={(e) =>
-                    update({ carpetAreaSqft: e.target.value ? Number(e.target.value) : null })
-                  }
-                  className="oi-num w-32 rounded-full border border-[var(--line)] bg-[var(--card)] px-4 py-2.5 text-[15px] text-[var(--ink)] placeholder:text-[var(--ink2)]"
-                />
-                <span className="text-[14px] text-[var(--ink2)]">sq ft</span>
-              </div>
-            </div>
-          </div>
-        ),
-      };
-
-    case 2:
+): StepParts {
+  switch (id) {
+    case 'name':
+      return nameStep(brief, update);
+    case 'home':
+      return homeStep(brief, update);
+    case 'possession':
+      return possessionStep(brief, update);
+    case 'scope':
       return {
         ask: (
           <Ask
@@ -531,11 +507,9 @@ function stepContent(
           </TileRow>
         ),
       };
-
-    case 3:
+    case 'level':
       return budgetStep(brief, update);
-
-    case 4:
+    case 'likes':
       return {
         ask: (
           <Ask
@@ -566,8 +540,7 @@ function stepContent(
           </div>
         ),
       };
-
-    case 5:
+    case 'dislikes':
       return {
         ask: (
           <Ask
@@ -585,52 +558,196 @@ function stepContent(
           />
         ),
       };
-
-    case 6:
-      return householdStep(brief, update);
-
-    case 7:
+    case 'living':
+      return livingStep(brief, update);
+    case 'working':
+      return workingStep(brief, update);
+    case 'priorities':
       return priorityStep(brief, update);
-
-    case 8:
-      return {
-        ask: (
-          <Ask
-            title="How involved do you want to be?"
-            hint="The most common reason a project goes wrong is a mismatch here — not a mismatch in taste."
-          />
-        ),
-        options: (
-          <TileRow>
-            {(Object.keys(INVOLVEMENT_LABELS) as Involvement[]).map((k) => (
-              <CircleTile
-                key={k}
-                label={INVOLVEMENT_LABELS[k]}
-                Icon={INVOLVEMENT_ICONS[k]}
-                selected={brief.involvement === k}
-                onClick={() => update({ involvement: k })}
-              />
-            ))}
-          </TileRow>
-        ),
-      };
-
-    case 9:
-      return possessionStep(brief, update);
-
-    default:
-      return null;
   }
 }
 
 /**
- * The area assumed when the customer skipped the carpet-area field.
+ * Screen one: their name.
  *
- * Typical for a 2 BHK in Pune. It is stated as an assumption wherever it is
- * used rather than presented as their figure — a number we made up, shown back
- * as theirs, is exactly the move this product exists not to make.
+ * First because it costs nothing and everything after it can speak to them —
+ * the home question, the matches page ("Welcome, Sanyam"), the quotation
+ * ("Prepared for Sanyam"). It stays in their tab until the contact step, where
+ * it is sent with the number once they have agreed to the notice, and the hint
+ * says exactly that.
  */
-const TYPICAL_SQFT = 850;
+function nameStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
+  return {
+    ask: (
+      <Ask
+        title="First — what should we call you?"
+        hint="Just a first name is fine. It stays on this device until you send us your brief at the end."
+      />
+    ),
+    options: (
+      <div className="max-w-md">
+        <input
+          type="text"
+          value={brief.contactName ?? ''}
+          onChange={(e) => update({ contactName: e.target.value.slice(0, NAME_MAX) })}
+          placeholder="Your first name"
+          aria-label="Your first name"
+          autoComplete="given-name"
+          autoCapitalize="words"
+          maxLength={NAME_MAX}
+          className="w-full rounded-full border border-[var(--line)] bg-[var(--card)] px-5 py-3.5 text-[17px] text-[var(--ink)] placeholder:text-[var(--ink2)]"
+        />
+      </div>
+    ),
+  };
+}
+
+/**
+ * Screen two: the home, and where it is.
+ *
+ * The locality is a search now, not 64 chips — see `LocalityPicker`. The
+ * society is optional free text: studios that have worked in the same
+ * building know its layouts, and "they have done three flats in your
+ * society" is the most checkable thing we will ever be able to say.
+ *
+ * The carpet area is optional, and its placeholder is the typical area for
+ * the configuration they just picked rather than one number for every home.
+ */
+function homeStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
+  const name = cleanName(brief.contactName);
+  const typical = typicalCarpetSqft(brief.propertyType);
+
+  return {
+    ask: (
+      <Ask
+        title={name ? `${name}, what kind of home are we working with?` : 'What kind of home are we working with?'}
+        hint="And where in Pune it is, so we only show you studios who actually work there."
+      />
+    ),
+    options: (
+      <div className="flex flex-col gap-6">
+        <TileRow>
+          {(Object.keys(PROPERTY_LABELS) as PropertyType[]).map((k) => (
+            <CircleTile
+              key={k}
+              label={PROPERTY_LABELS[k]}
+              Icon={PROPERTY_ICONS[k]}
+              selected={brief.propertyType === k}
+              onClick={() => update({ propertyType: k })}
+            />
+          ))}
+        </TileRow>
+
+        <div>
+          <FieldLabel>Where is it?</FieldLabel>
+          <LocalityPicker value={brief.locality} onChange={(locality) => update({ locality })} />
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <label className="block">
+            <FieldLabel>Society or building, if you like</FieldLabel>
+            <input
+              type="text"
+              value={brief.society ?? ''}
+              onChange={(e) => update({ society: e.target.value.slice(0, 80) })}
+              placeholder="e.g. Gera World of Joy"
+              autoComplete="off"
+              className="w-full rounded-full border border-[var(--line)] bg-[var(--card)] px-4 py-2.5 text-[15px] text-[var(--ink)] placeholder:text-[var(--ink2)]"
+            />
+          </label>
+          <label className="block">
+            <FieldLabel>Carpet area, if you know it</FieldLabel>
+            <span className="flex items-center gap-2">
+              <input
+                type="number"
+                inputMode="numeric"
+                placeholder={String(typical)}
+                value={brief.carpetAreaSqft ?? ''}
+                onChange={(e) =>
+                  update({ carpetAreaSqft: e.target.value ? Number(e.target.value) : null })
+                }
+                className="oi-num w-32 rounded-full border border-[var(--line)] bg-[var(--card)] px-4 py-2.5 text-[15px] text-[var(--ink)] placeholder:text-[var(--ink2)]"
+              />
+              <span className="text-[14px] text-[var(--ink2)]">sq ft</span>
+            </span>
+          </label>
+        </div>
+      </div>
+    ),
+  };
+}
+
+/** Who lives there, and what the home needs. */
+function livingStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
+  const household = householdStep(brief, update);
+  const toggle = (need: HomeNeed) =>
+    update({
+      needs: brief.needs.includes(need)
+        ? brief.needs.filter((n) => n !== need)
+        : [...brief.needs, need],
+    });
+
+  return {
+    ask: household.ask,
+    options: (
+      <div className="flex flex-col gap-7">
+        {household.options}
+        <div>
+          <FieldLabel>Anything the home needs? Pick any that apply</FieldLabel>
+          <div className="flex flex-wrap gap-2">
+            {HOME_NEEDS.map((need) => (
+              <Chip key={need} selected={brief.needs.includes(need)} onClick={() => toggle(need)}>
+                {HOME_NEED_LABELS[need]}
+              </Chip>
+            ))}
+          </div>
+        </div>
+      </div>
+    ),
+  };
+}
+
+/** How involved they want to be, and the language they want to work in. */
+function workingStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
+  return {
+    ask: (
+      <Ask
+        title="How involved do you want to be?"
+        hint="The most common reason a project goes wrong is a mismatch here — not a mismatch in taste."
+      />
+    ),
+    options: (
+      <div className="flex flex-col gap-7">
+        <TileRow>
+          {(Object.keys(INVOLVEMENT_LABELS) as Involvement[]).map((k) => (
+            <CircleTile
+              key={k}
+              label={INVOLVEMENT_LABELS[k]}
+              Icon={INVOLVEMENT_ICONS[k]}
+              selected={brief.involvement === k}
+              onClick={() => update({ involvement: k })}
+            />
+          ))}
+        </TileRow>
+        <div>
+          <FieldLabel>The language you&rsquo;d like your studio to speak</FieldLabel>
+          <div className="flex flex-wrap gap-2">
+            {LANGUAGES.map((lang) => (
+              <Chip
+                key={lang}
+                selected={brief.language === lang}
+                onClick={() => update({ language: brief.language === lang ? null : lang })}
+              >
+                {LANGUAGE_LABELS[lang]}
+              </Chip>
+            ))}
+          </div>
+        </div>
+      </div>
+    ),
+  };
+}
+
 
 /**
  * Budget and finish level, as one question.
@@ -656,8 +773,7 @@ const TYPICAL_SQFT = 850;
  * everyone than killing it at the quotation.
  */
 function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
-  const areaAssumed = !brief.carpetAreaSqft || brief.carpetAreaSqft <= 0;
-  const area = areaAssumed ? TYPICAL_SQFT : (brief.carpetAreaSqft as number);
+  const { sqft: area, assumed: areaAssumed } = carpetAreaFor(brief);
 
   return {
     ask: (
@@ -718,7 +834,9 @@ function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPart
 
         <p className="m-0 mt-1 text-[13px] leading-[1.55] text-[var(--ink2)]">
           {areaAssumed
-            ? `Excluding GST, for a typical ${TYPICAL_SQFT} sqft home — tell us your carpet area on the first question and these tighten.`
+            ? `Excluding GST, for a typical ${area.toLocaleString('en-IN')} sq ft ${
+                brief.propertyType ? PROPERTY_LABELS[brief.propertyType] : 'home'
+              } — tell us your carpet area and these tighten.`
             : // Derived, not written as a constant (FINDINGS 1.1): until studios'
               // own filed rates are live, "their own rates" would be false.
               `Excluding GST, for your ${area} sqft. ${
@@ -970,6 +1088,8 @@ function LiveProfile({
   if (brief.propertyType) {
     const loc = localityLabel(brief.locality);
     rows.push(['Home', `${PROPERTY_LABELS[brief.propertyType]}${loc ? ` · ${loc}` : ''}`]);
+    const society = brief.society?.trim();
+    if (society) rows.push(['Society', society]);
   }
   if (brief.scope) rows.push(['Scope', SCOPE_LABELS[brief.scope]]);
   if (brief.budgetMinPaise) {
@@ -999,6 +1119,7 @@ function LiveProfile({
   if (brief.priorityRanking.length) {
     rows.push(['Priority', PRIORITY_LABELS[brief.priorityRanking[0]]]);
   }
+  if (brief.needs.length) rows.push(['Needs', brief.needs.map((n) => HOME_NEED_LABELS[n]).join(', ')]);
   if (brief.involvement) rows.push(['Working style', INVOLVEMENT_LABELS[brief.involvement]]);
   {
     const possession = possessionPhrase(brief);
@@ -1010,7 +1131,9 @@ function LiveProfile({
       as="section"
       className={bare ? `border-0 bg-transparent ${className}` : `p-5 ${className}`}
     >
-      <p className="oi-label m-0 mb-4">Your brief so far</p>
+      <p className="oi-label m-0 mb-4">
+        {cleanName(brief.contactName) ? `${cleanName(brief.contactName)}'s brief so far` : 'Your brief so far'}
+      </p>
 
       {rows.length === 0 ? (
         <p className="m-0 text-[14px] text-[var(--ink2)]">
@@ -1084,17 +1207,22 @@ function CircleTile({
          136 plus gaps need ~744px, so on any window between roughly 640 and
          1024 the fifth tile wrapped onto a second row and pushed the locality
          chips — the field that actually unlocks Continue — below the fold.
-         Twelve pixels of tile is not worth a hidden required field. */
-      className={`relative flex h-[122px] w-[122px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-full px-3 text-center transition-all ${
+         Twelve pixels of tile is not worth a hidden required field.
+
+         100px on a phone for the same reason: at 122 a 375px screen fits two
+         a row, so the five home types took three rows and pushed "Where is
+         it?" — the field that unlocks Continue — off the first screen. At 100
+         they fit three a row. */
+      className={`relative flex h-[100px] w-[100px] shrink-0 flex-col items-center justify-center gap-1 rounded-full px-2.5 text-center transition-all sm:h-[122px] sm:w-[122px] sm:gap-1.5 sm:px-3 ${
         selected
           ? 'bg-[var(--acc-wash)] ring-2 ring-[var(--acc)]'
           : 'bg-[var(--card)] hover:bg-[var(--line)]'
       }`}
     >
       <Icon
-        className={`h-10 w-10 ${selected ? 'text-[var(--acc-ink)]' : 'text-[var(--ink2)]'}`}
+        className={`h-8 w-8 sm:h-10 sm:w-10 ${selected ? 'text-[var(--acc-ink)]' : 'text-[var(--ink2)]'}`}
       />
-      <span className="text-[12.5px] leading-tight text-[var(--ink2)]">{label}</span>
+      <span className="text-[12px] leading-tight text-[var(--ink2)] sm:text-[12.5px]">{label}</span>
       {selected ? (
         <span
           className="absolute right-3 top-4 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--acc-ink)] text-[11px] leading-none text-white"
@@ -1269,43 +1397,3 @@ function StylePicker({
 
 // ── Validation ─────────────────────────────────────────────────
 
-function isStepAnswered(brief: Brief, step: number): boolean {
-  switch (step) {
-    case 1:
-      return brief.propertyType !== null && brief.locality !== null;
-    case 2:
-      return brief.scope !== null;
-    case 3:
-      return brief.budgetMaxPaise !== null;
-    case 4:
-      // Two, not one. The question asks for three and the reveal on /match
-      // reads "leaning X, with a bit of Y" — a single pick makes that sentence
-      // impossible and gives the matcher nothing to weigh against.
-      return brief.styleLikes.length >= 2;
-    case 5:
-      return true; // optional, but high-signal when given
-    case 6:
-      /**
-       * Answered by default, because the screen already shows a real answer.
-       *
-       * The step renders two adults, no children, no elderly — the modal Pune
-       * household — and used to leave Continue disabled behind "Pick an answer
-       * to continue" until you nudged a stepper. So the product displayed an
-       * answer and then denied it had one, and the only way forward was to
-       * change something you agreed with and change it back.
-       *
-       * Nothing is hidden by accepting it: the defaults are on screen, they
-       * are what we would have assumed anyway, and anyone whose household
-       * differs can see at a glance that it needs changing.
-       */
-      return true;
-    case 7:
-      return brief.priorityRanking.length === 4;
-    case 8:
-      return brief.involvement !== null;
-    case 9:
-      return possessionAnswered(brief);
-    default:
-      return false;
-  }
-}

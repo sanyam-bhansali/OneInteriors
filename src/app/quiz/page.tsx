@@ -5,7 +5,7 @@ import { QuizClient } from './QuizClient';
 
 export const metadata: Metadata = {
   title: 'Tell us about your home',
-  description: 'Nine questions, about three minutes. No signup until you have seen your matches.',
+  description: 'About four minutes about your home, and your matches at the end.',
 };
 
 /** Per request: the roster must not be frozen into a build. See /match. */

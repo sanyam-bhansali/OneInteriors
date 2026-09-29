@@ -34,7 +34,7 @@ import { Wrap, Eyebrow, Heading } from './parts';
 import { SNAPSHOTS } from './snapshots';
 
 const STEPS = [
-  { name: 'OneQuiz', note: 'nine questions, no phone number' },
+  { name: 'OneBrief', note: 'about four minutes' },
   { name: 'OneMatch', note: 'scored against your answers' },
   { name: 'OneQuote', note: 'priced off their rate card in seconds' },
   { name: 'OneCompare', note: 'quotes and materials side by side' },

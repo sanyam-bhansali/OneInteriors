@@ -82,7 +82,7 @@ export default async function AccountPage() {
           <Section title="Your brief" action={{ href: '/quiz', label: 'Edit' }}>
             {!found || !brief.completedAt ? (
               <Empty>
-                You have not finished the nine questions yet.{' '}
+                You have not finished your brief yet.{' '}
                 <Link href="/quiz" className="text-[var(--color-petrol)]">
                   Pick up where you left off
                 </Link>

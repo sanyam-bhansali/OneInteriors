@@ -241,7 +241,7 @@ export default async function SharedPage({
               Get quotes for your own home
             </Button>
             <span className="max-w-[46ch] text-[14.5px] leading-relaxed text-[var(--color-ink-3)]">
-              Nine questions, three minutes. Whoever sent you this will not be told that you
+              About four minutes. Whoever sent you this will not be told that you
               opened it.
             </span>
           </div>

@@ -105,7 +105,7 @@ export function ReviewPanel({
         <h2 className="h3 m-0 mb-3">What being listed gets you</h2>
         <ul className="m-0 grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-3">
           <Benefit title="Briefs, not enquiries">
-            A homeowner who has answered nine questions and seen your quote before you hear from
+            A homeowner who has filled in a four-minute brief and seen your quote before you hear from
             them.
           </Benefit>
           <Benefit title="Inside your range">

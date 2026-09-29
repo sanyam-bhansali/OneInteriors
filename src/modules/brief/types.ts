@@ -234,9 +234,6 @@ export const EMPTY_BRIEF: Brief = {
 
 export type BudgetTier = 'ESSENTIAL' | 'PREMIUM' | 'LUXURY';
 
-export const TOTAL_STEPS = 9;
-
-/** Pune localities we currently have verified supply in. */
 /**
  * Where we work, grouped the way Pune actually thinks about itself.
  *

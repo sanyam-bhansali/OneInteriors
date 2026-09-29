@@ -15,7 +15,7 @@ import { HeroShowreel } from '@/components/landing/HeroShowreel';
 export const metadata: Metadata = {
   title: 'One Interiors — verified interior studios in Pune',
   description:
-    'Nine questions about your flat. Three studios matched to the answers. A first quote priced in three seconds, and an architect of your own while you compare.',
+    'A four-minute brief about your flat. Three studios matched to the answers. A first quote priced in three seconds, and an architect of your own while you compare.',
 };
 
 /**
@@ -181,7 +181,7 @@ export default function HomePage() {
               </h1>
 
               <p className="m-0 mb-8 max-w-[52ch] text-[16px] leading-[1.6] text-white/85">
-                Answer nine questions about your flat. We match you with studios that actually fit
+                Tell us about your flat in four minutes. We match you with studios that actually fit
                 it, price the first quote off their own rate card, and give you a personal architect
                 to check every step.
               </p>
@@ -367,10 +367,10 @@ export default function HomePage() {
           <div className="flex flex-wrap items-center justify-between gap-x-12 gap-y-7">
             <div>
               <h2 className="oi-display m-0 mb-3 max-w-[24ch] text-[clamp(1.6rem,1.15rem+1.8vw,2.4rem)] text-white">
-                Nine questions. Then a quote you can actually read.
+                Four minutes. Then a quote you can actually read.
               </h2>
               <p className="m-0 max-w-[56ch] text-[15.5px] leading-[1.6] text-white/85">
-                Two minutes, no phone call, and nothing payable by you at any point.
+                Four minutes, no phone call, and nothing payable by you at any point.
               </p>
             </div>
 

@@ -4,6 +4,7 @@ import {
   compareQuotes,
   itemsFor,
   runSourceOf,
+  homeShapeFor,
   STANDARD_KITCHEN_RUN_MM,
   standardKitchenRunMm,
   type QuoteInput,
@@ -323,5 +324,34 @@ describe('an unread floor plan', () => {
     expect(runSourceOf({ kitchenRunMm: 3410, source: 'floor_plan' })).toBe('floor_plan');
     expect(runSourceOf({ kitchenRunMm: null, source: 'floor_plan' })).toBe('standard');
     expect(runSourceOf({ kitchenRunMm: null, source: 'customer' })).toBe('standard');
+  });
+});
+
+/**
+ * FINDINGS 2.8: a brief without an area was quoted as 850 sq ft, and a brief
+ * without a configuration as a 2 BHK, with nothing on the document admitting
+ * either. The area now follows the configuration and is printed as assumed.
+ */
+describe('the home the quote is built for', () => {
+  it('uses the typical area for their configuration, and flags it', () => {
+    expect(homeShapeFor({ propertyType: 'BHK_4_PLUS', carpetAreaSqft: null })).toEqual({
+      bhk: 4,
+      carpetAreaSqft: 1650,
+      carpetAreaAssumed: true,
+      bathrooms: 4,
+    });
+  });
+
+  it('uses their own area when they gave one', () => {
+    const shape = homeShapeFor({ propertyType: 'BHK_3', carpetAreaSqft: 1180 });
+    expect(shape.carpetAreaSqft).toBe(1180);
+    expect(shape.carpetAreaAssumed).toBe(false);
+  });
+
+  it('says on the document when the area was assumed', () => {
+    const assumed = buildFirstQuote({ ...BASE, carpetAreaAssumed: true }, ratesFor(100_00));
+    const given = buildFirstQuote({ ...BASE, carpetAreaAssumed: false }, ratesFor(100_00));
+    expect(assumed.assumptions.join(' ')).toMatch(/Carpet area taken as 850 sq ft, typical for a 2 BHK/);
+    expect(given.assumptions.join(' ')).not.toMatch(/Carpet area taken as/);
   });
 });

@@ -64,7 +64,7 @@ const STEPS: Step[] = [
   {
     n: '01',
     name: 'OneQuiz',
-    body: 'Nine questions fill in your flat — area, rooms, budget band.',
+    body: 'A four-minute brief fills in your flat — area, rooms, budget band.',
     Snap: QuizSnap,
   },
   {
@@ -216,7 +216,7 @@ export function HowItWorks() {
           </ol>
 
           <div className="mt-10">
-            <Cta href="/quiz">Start with nine questions</Cta>
+            <Cta href="/quiz">Start your brief</Cta>
           </div>
         </Wrap>
       </div>
@@ -411,7 +411,7 @@ export function HowItWorks() {
             </div>
 
             <div className="mt-7">
-              <Cta href="/quiz">Start with nine questions</Cta>
+              <Cta href="/quiz">Start your brief</Cta>
             </div>
           </Wrap>
         </div>

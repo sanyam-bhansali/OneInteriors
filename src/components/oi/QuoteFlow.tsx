@@ -44,6 +44,8 @@ export interface QuoteRequest {
   studioName: string;
   bhk: number;
   carpetAreaSqft: number;
+  /** The typical area for their configuration, not a figure they gave. */
+  carpetAreaAssumed?: boolean;
   bathrooms: number;
 }
 
@@ -306,6 +308,7 @@ export function QuoteFlow({
       {
         bhk: request.bhk,
         carpetAreaSqft: request.carpetAreaSqft,
+        carpetAreaAssumed: request.carpetAreaAssumed,
         bathrooms: request.bathrooms,
         kitchenRunMm: usedPlan.kitchenRunMm,
         runSource: runSourceOf(usedPlan),
