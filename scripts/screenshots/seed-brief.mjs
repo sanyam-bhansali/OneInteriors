@@ -65,7 +65,7 @@ export const DEMO_BRIEF = {
  * /quiz is excluded on purpose — it should be photographed mid-question, not
  * already answered.
  */
-export const NEEDS_BRIEF = new Set(['/tier', '/match', '/quotes', '/compare', '/expert']);
+export const NEEDS_BRIEF = new Set(['/match', '/quotes', '/compare', '/expert']);
 
 /**
  * Install the brief so it is present before any page script runs.

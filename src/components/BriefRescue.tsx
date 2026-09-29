@@ -14,7 +14,7 @@
  *    fire-and-forget, because a slow database must never make Continue feel
  *    broken. `saveBrief` swallows its own failures for the same reason.
  *
- * `/quiz`, `/tier` and `/match` render on the client and reconcile the two, so
+ * `/quiz` and `/match` render on the client and reconcile the two, so
  * they work whichever copy exists. `/quotes`, `/compare` and `/expert` render
  * on the server and can only see Postgres. So any time the server copy is
  * missing — a dropped write, a claim that did not attach, a sign-in that

@@ -35,6 +35,18 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  /**
+   * Retired pages, sent somewhere that still answers.
+   *
+   * `/tier` asked for the finish level after the brief; since the level moved
+   * into the brief itself it was the same question twice, then an orphan
+   * nothing linked to (FINDINGS 3.9). An old link lands on the matches, which
+   * say "start your brief" to anyone who has not.
+   */
+  async redirects() {
+    return [{ source: '/tier', destination: '/match', permanent: true }];
+  },
+
   async headers() {
     /**
      * Content-Security-Policy.
