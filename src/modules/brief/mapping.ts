@@ -15,13 +15,21 @@
  */
 
 import { EMPTY_BRIEF, type Brief } from './types';
-import type { PropertyType, ScopeType, Involvement, PriorityFactor, StyleTag } from './types';
+import type {
+  PropertyType,
+  PossessionStatus,
+  ScopeType,
+  Involvement,
+  PriorityFactor,
+  StyleTag,
+} from './types';
 
 /** The subset of the Prisma row this module reads. */
 export interface BriefRow {
   propertyType: string | null;
   carpetAreaSqft: number | null;
   locality: string | null;
+  possessionStatus: string | null;
   possessionOn: Date | null;
   scope: string | null;
   tier: string | null;
@@ -81,6 +89,7 @@ export function rowToBrief(row: BriefRow): Brief {
     propertyType: (row.propertyType as PropertyType) ?? null,
     carpetAreaSqft: row.carpetAreaSqft,
     locality: row.locality,
+    possessionStatus: (row.possessionStatus as PossessionStatus) ?? null,
     possessionOn: isoDate(row.possessionOn),
     scope: (row.scope as ScopeType) ?? null,
     tier: (row.tier as Brief['tier']) ?? null,
@@ -109,6 +118,7 @@ export function briefToRow(brief: Brief) {
     propertyType: brief.propertyType,
     carpetAreaSqft: brief.carpetAreaSqft,
     locality: brief.locality,
+    possessionStatus: brief.possessionStatus,
     possessionOn: toDate(brief.possessionOn),
     scope: brief.scope,
     tier: brief.tier,

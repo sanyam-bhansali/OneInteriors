@@ -11,6 +11,7 @@ import { prepForBrief } from '@/modules/prepare/prep';
 import { CallOutcome } from './CallOutcome';
 import { propertyLabel, scopeLabel, PUNE_LOCALITIES, STYLE_LABELS } from '@/modules/brief/types';
 import { fromDb } from '@/lib/money';
+import { possessionPhrase } from '@/modules/brief/possession';
 import type { StyleTag } from '@/modules/brief/types';
 
 export const metadata: Metadata = { title: 'Expert calls', robots: { index: false, follow: false } };
@@ -123,6 +124,8 @@ async function PrepCard({
       styleDislikes: true,
       involvement: true,
       moveInBy: true,
+      possessionStatus: true,
+      possessionOn: true,
       floorPlanName: true,
       adults: true,
       children: true,
@@ -202,7 +205,18 @@ async function PrepCard({
           }
         />
         <Fact label="Working style" value={brief?.involvement ?? null} />
-        <Fact label="When" value={brief?.moveInBy ? brief.moveInBy.toLocaleDateString('en-IN') : null} />
+        <Fact
+          label="When"
+          value={
+            brief
+              ? possessionPhrase({
+                  possessionStatus: brief.possessionStatus,
+                  possessionOn: brief.possessionOn ? brief.possessionOn.toISOString() : null,
+                  moveInBy: brief.moveInBy ? brief.moveInBy.toISOString() : null,
+                })
+              : null
+          }
+        />
       </dl>
 
       <div className="mb-5 flex flex-wrap gap-x-8 gap-y-2">

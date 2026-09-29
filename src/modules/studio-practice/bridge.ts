@@ -120,6 +120,7 @@ export async function bridgeIntroduction(db: Db, introductionId: string): Promis
             budgetMinPaise: true,
             budgetMaxPaise: true,
             moveInBy: true,
+            possessionStatus: true,
             possessionOn: true,
             user: { select: { name: true, phone: true, email: true } },
           },
@@ -183,6 +184,7 @@ export async function bridgeIntroduction(db: Db, introductionId: string): Promis
       budgetMinLakhs: lakhs(intro.brief?.budgetMinPaise),
       budgetMaxLakhs: lakhs(intro.brief?.budgetMaxPaise),
       moveInBy: intro.brief?.moveInBy ?? null,
+      possessionStatus: intro.brief?.possessionStatus ?? null,
       possessionOn: intro.brief?.possessionOn ?? null,
     };
     const card = cardFacts(facts);

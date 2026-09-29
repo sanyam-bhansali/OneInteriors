@@ -31,18 +31,26 @@ import {
   PROPERTY_LABELS,
   LOCALITIES_BY_ZONE,
   localityLabel,
+  POSSESSION_LABELS,
   SCOPE_LABELS,
   STYLE_LABELS,
   STYLE_TAGS,
   TOTAL_STEPS,
   type Brief,
   type Involvement,
+  type PossessionStatus,
   type PriorityFactor,
   type PropertyType,
   type ScopeType,
   type StyleTag,
 } from '@/modules/brief/types';
 import { loadBrief, saveBrief } from '@/modules/brief/store';
+import {
+  FULL_HOME_DAYS,
+  possessionAnswered,
+  possessionPhrase,
+  readyWindow,
+} from '@/modules/brief/possession';
 import {
   saveBriefAction,
   loadBriefAction,
@@ -608,29 +616,7 @@ function stepContent(
       };
 
     case 9:
-      return {
-        ask: (
-          <Ask
-            title="Last one — when do you want to move in?"
-            hint="An honest date helps far more than an optimistic one."
-          />
-        ),
-        options: (
-          <div>
-            <input
-              type="date"
-              value={brief.moveInBy?.slice(0, 10) ?? ''}
-              onChange={(e) => update({ moveInBy: e.target.value || null })}
-              className="oi-num rounded-full border border-[var(--line)] bg-[var(--card)] px-5 py-3 text-[15px] text-[var(--ink)]"
-            />
-            <p className="mt-5 max-w-[48ch] text-[14.5px] leading-relaxed text-[var(--ink2)]">
-              A full-home project in Pune usually runs 70 to 130 days from sign-off. If your date is
-              tighter than that, we&rsquo;ll say so — rather than quietly match you to someone who
-              will miss it.
-            </p>
-          </div>
-        ),
-      };
+      return possessionStep(brief, update);
 
     default:
       return null;
@@ -741,6 +727,93 @@ function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPart
                   : 'Your quotes follow, line by line.'
               }`}
         </p>
+      </div>
+    ),
+  };
+}
+
+/**
+ * Q9 — possession, not move-in.
+ *
+ * Three answers, because those are the three situations people are actually
+ * in. "Expecting it" opens a month field: a studio can plan design around a
+ * month, and nobody knows their handover to the day.
+ *
+ * The line under the choice is the timeline this answer buys them — for a
+ * full home only, because 70–130 days is the one duration we have evidence
+ * for (see `modules/brief/possession.ts`). The old Q9 promised "we'll say so"
+ * about a tight date and never did; this says only what it can back.
+ */
+function possessionStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
+  const status = brief.possessionStatus;
+  const window = readyWindow(status, brief.possessionOn, brief.scope);
+  const monthValue = brief.possessionOn ? brief.possessionOn.slice(0, 7) : '';
+  const short = (d: Date) =>
+    d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+
+  const option = (value: PossessionStatus, body: string) => {
+    const selected = status === value;
+    return (
+      <button
+        key={value}
+        type="button"
+        aria-pressed={selected}
+        onClick={() =>
+          update({
+            possessionStatus: value,
+            // A month only means something when they are expecting the keys.
+            possessionOn: value === 'EXPECTED' ? brief.possessionOn : null,
+          })
+        }
+        className={`rounded-[14px] border-2 p-5 text-left transition-colors ${
+          selected
+            ? 'border-[var(--acc)] bg-[var(--acc-wash)]'
+            : 'border-[var(--line)] bg-[var(--card)] hover:border-[var(--ink2)]'
+        }`}
+      >
+        <span className="oi-display block text-[21px] leading-none text-[var(--ink)]">
+          {POSSESSION_LABELS[value]}
+        </span>
+        <span className="mt-1.5 block text-[14.5px] leading-[1.5] text-[var(--ink2)]">{body}</span>
+      </button>
+    );
+  };
+
+  return {
+    ask: (
+      <Ask
+        title="Last one — do you have possession yet?"
+        hint="Work starts from the day you get the keys, so everything we plan counts from there."
+      />
+    ),
+    options: (
+      <div className="flex flex-col gap-3">
+        {option('HAVE_KEYS', 'Work can start as soon as the design is signed off.')}
+        {option('EXPECTED', 'Tell us the month. Design can start before handover.')}
+        {status === 'EXPECTED' ? (
+          <label className="-mt-1 ml-1 flex flex-wrap items-center gap-3">
+            <span className="text-[14px] text-[var(--ink2)]">Possession expected in</span>
+            <input
+              type="month"
+              value={monthValue}
+              onChange={(e) =>
+                update({ possessionOn: e.target.value ? `${e.target.value}-01` : null })
+              }
+              className="oi-num rounded-full border border-[var(--line)] bg-[var(--card)] px-4 py-2.5 text-[15px] text-[var(--ink)]"
+            />
+          </label>
+        ) : null}
+        {option('NOT_SURE', 'That is fine — we will plan from when you know.')}
+
+        {window ? (
+          <p className="m-0 mt-2 max-w-[52ch] text-[14.5px] leading-relaxed text-[var(--ink2)]">
+            A full home in Pune usually takes {FULL_HOME_DAYS.min} to {FULL_HOME_DAYS.max} days from
+            design sign-off. With the design signed off by{' '}
+            {status === 'HAVE_KEYS' ? 'now' : 'the time you get the keys'}, yours could be ready
+            between <strong className="text-[var(--ink)]">{short(window.from)}</strong> and{' '}
+            <strong className="text-[var(--ink)]">{short(window.to)}</strong>.
+          </p>
+        ) : null}
       </div>
     ),
   };
@@ -927,6 +1000,10 @@ function LiveProfile({
     rows.push(['Priority', PRIORITY_LABELS[brief.priorityRanking[0]]]);
   }
   if (brief.involvement) rows.push(['Working style', INVOLVEMENT_LABELS[brief.involvement]]);
+  {
+    const possession = possessionPhrase(brief);
+    if (possession) rows.push(['Possession', possession]);
+  }
 
   return (
     <Sheet
@@ -1227,7 +1304,7 @@ function isStepAnswered(brief: Brief, step: number): boolean {
     case 8:
       return brief.involvement !== null;
     case 9:
-      return true;
+      return possessionAnswered(brief);
     default:
       return false;
   }

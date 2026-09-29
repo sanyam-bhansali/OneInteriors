@@ -41,7 +41,8 @@
    `undefined` into the card, silently, on exactly the rows unusual enough to
    matter. That warning is written on those helpers; this file is a caller
    that could easily have ignored it. */
-import { localityLabel, propertyLabel, scopeLabel } from '@/modules/brief/types';
+import { localityLabel, propertyLabel, scopeLabel, type PossessionStatus } from '@/modules/brief/types';
+import { possessionPhrase } from '@/modules/brief/possession';
 
 /**
  * What the bridge reads off a brief. Deliberately the whole input.
@@ -60,6 +61,7 @@ export interface BriefFacts {
   budgetMinLakhs: number | null;
   budgetMaxLakhs: number | null;
   moveInBy: Date | null;
+  possessionStatus: string | null;
   possessionOn: Date | null;
 }
 
@@ -140,13 +142,17 @@ export function briefSummary(facts: BriefFacts): string {
   const two = [scope, tier, money].filter(Boolean).join(' · ');
   if (two) bits.push(`${two}.`);
 
-  /* Sentence three: time. Possession only when it is the more useful of the
-     two — somebody waiting on handover has a date they cannot move, and a
-     move-in target they can. */
-  const moveIn = monthYear(facts.moveInBy);
-  const possession = monthYear(facts.possessionOn);
-  if (moveIn) bits.push(`Wants to move in by ${moveIn}.`);
-  else if (possession) bits.push(`Possession ${possession}.`);
+  /* Sentence three: time. Since 29 Sep the brief asks about possession —
+     keys in hand, expected in a month, or not sure — and the phrase comes
+     from the same function the customer's own panel uses, so the studio
+     reads what the customer said, in the same words. Older briefs fall back
+     to the move-in date they gave. */
+  const timing = possessionPhrase({
+    possessionStatus: (facts.possessionStatus as PossessionStatus | null) ?? null,
+    possessionOn: facts.possessionOn ? facts.possessionOn.toISOString() : null,
+    moveInBy: facts.moveInBy ? facts.moveInBy.toISOString() : null,
+  });
+  if (timing) bits.push(`${timing}.`);
 
   return bits.length > 0
     ? `From their One Interiors brief — ${bits.join(' ')}`

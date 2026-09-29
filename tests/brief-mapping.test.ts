@@ -14,6 +14,7 @@ const FULL: Brief = {
   propertyType: 'BHK_3',
   carpetAreaSqft: 1150,
   locality: 'kharadi',
+  possessionStatus: 'EXPECTED',
   possessionOn: '2026-12-01',
   scope: 'FULL_HOME',
   budgetMinPaise: 60_000_000,
@@ -50,6 +51,15 @@ describe('brief round trip', () => {
     expect(back.priorityRanking).toEqual(FULL.priorityRanking);
     expect(back.involvement).toBe(FULL.involvement);
     expect(back.lastStep).toBe(9);
+  });
+
+  // Q9 since 29 Sep: the status and the month travel together, and an
+  // unanswered status stays unanswered rather than becoming a default.
+  it('keeps the possession answer', () => {
+    const back = rowToBrief(rowFrom(FULL));
+    expect(back.possessionStatus).toBe('EXPECTED');
+    expect(back.possessionOn).toBe('2026-12-01');
+    expect(rowToBrief(rowFrom(EMPTY_BRIEF)).possessionStatus).toBeNull();
   });
 
   /**

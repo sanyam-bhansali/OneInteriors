@@ -201,6 +201,14 @@ enum PriorityFactor {
   MATERIAL_QUALITY
 }
 
+/// Where the customer is with the flat. Work starts from possession, so the
+/// timeline is built around it rather than around a move-in wish.
+enum PossessionStatus {
+  HAVE_KEYS
+  EXPECTED
+  NOT_SURE
+}
+
 model Brief {
   id String @id @default(cuid())
 
@@ -217,10 +225,12 @@ model Brief {
   anonKey String? @unique
 
   // Q1
-  propertyType   PropertyType?
-  carpetAreaSqft Int?
-  locality       String? // Pune locality slug: "kharadi", "baner", "wakad"
-  possessionOn   DateTime?
+  propertyType     PropertyType?
+  carpetAreaSqft   Int?
+  locality         String? // Pune locality slug: "kharadi", "baner", "wakad"
+  /// Q9 since 29 Sep 2026: have the keys / expecting them / not sure.
+  possessionStatus PossessionStatus?
+  possessionOn     DateTime?
 
   // Q2
   scope ScopeType?
@@ -419,8 +429,8 @@ model Studio {
   tier   VerificationTier @default(UNVERIFIED)
 
   // Registry identifiers — verified, not self-declared
-  gstin       String? @unique
-  panLast4    String?
+  gstin    String? @unique
+  panLast4 String?
 
   /// The studio has told us it has no GST registration.
   ///
@@ -559,14 +569,14 @@ model Studio {
   // inputs come out of the score; see docs/DATA-ARCHITECTURE.md §6.
   // `performanceComputedAt` was dropped in 20260923070000: a timestamp for a
   // computation that never runs is worse than no timestamp.
-  completedProjects     Int       @default(0)
-  avgVarianceDays       Float?
-  upheldDisputes        Int       @default(0)
-  specComplianceRate    Float?
+  completedProjects   Int    @default(0)
+  avgVarianceDays     Float?
+  upheldDisputes      Int    @default(0)
+  specComplianceRate  Float?
   /// Mean past-client rating for communication, 1–5. Null until ~3 ratings.
-  communicationRating   Float?
+  communicationRating Float?
   /// 0 = hands-off, 1 = highly collaborative. Drives the working-style match.
-  autonomyProfile       Float?
+  autonomyProfile     Float?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

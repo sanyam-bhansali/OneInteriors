@@ -18,6 +18,23 @@ export type Involvement = 'DECIDE_FOR_ME' | 'COLLABORATE' | 'APPROVE_EVERYTHING'
 export type PriorityFactor = 'BUDGET' | 'SPEED' | 'DESIGN_AMBITION' | 'MATERIAL_QUALITY';
 
 /**
+ * Where they are with the flat itself.
+ *
+ * Asked instead of a move-in date since 29 Sep 2026. Work starts from
+ * possession, not from the day somebody would like to move in: a buyer
+ * waiting on handover has a date they cannot move and a studio cannot start
+ * before it, which is the fact the timeline — and the match — has to be
+ * built around.
+ */
+export type PossessionStatus = 'HAVE_KEYS' | 'EXPECTED' | 'NOT_SURE';
+
+export const POSSESSION_LABELS: Record<PossessionStatus, string> = {
+  HAVE_KEYS: 'I have the keys',
+  EXPECTED: 'Expecting possession',
+  NOT_SURE: 'Not sure yet',
+};
+
+/**
  * Style vocabulary. This list is shared by the quiz picker and portfolio
  * tagging — if the two ever diverge, matching silently degrades and nobody
  * notices, because a zero overlap looks like a legitimate low score.
@@ -70,7 +87,10 @@ export interface Brief {
   propertyType: PropertyType | null;
   carpetAreaSqft: number | null;
   locality: string | null;
-  possessionOn: string | null; // ISO date
+  /** Q9 — have they got the keys, are they expecting them, or not sure. */
+  possessionStatus: PossessionStatus | null;
+  /** ISO date, first of the month. Set only when the status is EXPECTED. */
+  possessionOn: string | null;
 
   // Q2 — scope
   scope: ScopeType | null;
@@ -99,7 +119,10 @@ export interface Brief {
   // Q8 — working style. The #1 cause of client/studio breakdown.
   involvement: Involvement | null;
 
-  // Q9 — timeline
+  /**
+   * No longer asked (29 Sep 2026) — Q9 is possession now. Kept so briefs
+   * written before the change still read, and still reach the studio.
+   */
   moveInBy: string | null; // ISO date
 
   /**
@@ -120,6 +143,7 @@ export const EMPTY_BRIEF: Brief = {
   propertyType: null,
   carpetAreaSqft: null,
   locality: null,
+  possessionStatus: null,
   possessionOn: null,
   scope: null,
   tier: null,
