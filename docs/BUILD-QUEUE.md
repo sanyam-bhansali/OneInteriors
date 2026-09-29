@@ -38,31 +38,31 @@ Legend: ✅ done · 🔨 next · ⏳ waits on the owner (named)
 |---|---|---|---|
 | 10 | **Style photos from the owner's Pinterest board**, assigned to style and room; **scope-aware** (kitchens for kitchen customers) | The stock photos are stand-ins | ✅ 32 free Unsplash photos chosen against the owner's three boards (12 living, 11 bedroom, 9 kitchen); kitchen and bedrooms-only jobs see their room |
 | 11 | **Studio portfolio photos in the picker** (with picker consent), and a match boost when a customer picks a studio's own photo | §5.2 direct affinity | ✅ a consented, non-render photo takes the stock photo's place for its style, unnamed; picking it lifts that studio's style score to at least 90 (match@2.1.0) |
-| 12 | **This or that** — four pairs from the styles closest to their picks | Sharpens style fit (§2 screen 8) | |
-| 13 | **Style DNA card** — their styles as shares, a palette, three materials; shareable to WhatsApp | Delight and reach (§18.4) | |
-| 14 | **Swipe your style** on phones | More signal in less time (§18.3) | |
+| 12 | **This or that** — four pairs from the styles closest to their picks | Sharpens style fit (§2 screen 8) | ✅ optional, after two picks; likes are ordered and weighted (affinity@2, match@2.2.0) |
+| 13 | **Style DNA card** — their styles as shares, a palette, three materials; shareable to WhatsApp | Delight and reach (§18.4) | ✅ on the match page; WhatsApp share carries styles and a link only |
+| 14 | **Swipe your style** on phones | More signal in less time (§18.3) | ✅ default on touch screens; buttons for anyone who cannot drag |
 
 ## P4 — Delight and return visits
 
 | # | Item | State |
 |---|---|---|
-| 15 | **The reveal counted down** — "Verified studios: 18 → at Premium: 7 → … → for you" | |
-| 16 | **Welcome back** — "one new studio fits your brief since Tuesday" | |
-| 17 | **Possession countdown** in "Your home" — "Keys in 84 days", with the plan laid against it | |
-| 18 | **Studio intro video** on the match card | |
-| 19 | **"Their work like yours" on the card itself**, not only beside it | |
-| 20 | **"Built in 9.6 seconds"** — a live stopwatch on the quote build | |
-| 21 | **Fold `/prepare` into "Your home"** — drop its duplicate floor-plan upload | |
-| 22 | **Tracker site photos, and studios posting updates themselves** | |
+| 15 | **The reveal counted down** — "Verified studios: 18 → at Premium: 7 → … → for you" | ⏸ held — it shows studio counts, which the owner is not showing until the roster is fifty |
+| 16 | **Welcome back** — "one new studio fits your brief since Tuesday" | ✅ this device only (localStorage) |
+| 17 | **Possession countdown** in "Your home" — "Keys in 84 days", with the plan laid against it | ✅ on "Your home" |
+| 18 | **Studio intro video** on the match card | ✅ link on the card when the studio has one |
+| 19 | **"Their work like yours" on the card itself**, not only beside it | ✅ up to two projects on every card |
+| 20 | **"Built in 9.6 seconds"** — a live stopwatch on the quote build | ✅ |
+| 21 | **Fold `/prepare` into "Your home"** — drop its duplicate floor-plan upload | ✅ boards on /account; /prepare redirects; the duplicate upload is gone |
+| 22 | **Tracker site photos, and studios posting updates themselves** | ✅ private site-photos bucket, signed links; studios post at /studio/updates |
 
 ## P5 — The bigger immersive pieces
 
 | # | Item | State |
 |---|---|---|
-| 23 | **Material close-ups** — every spec opens a photo, the cheaper alternative, and the price difference per sq ft | |
-| 24 | **Ask your quote** — "Why is Akara's kitchen ₹60,000 more?", answered only from their numbers and checked | |
-| 25 | **Walk the quote on your floor plan** — tap a room to see its lines | |
-| 26 | **Your home, assembling** — the brief's side panel becomes a picture of their home | |
+| 23 | **Material close-ups** — every spec opens a photo, the cheaper alternative, and the price difference per sq ft | ✅ 11 of 15 materials have a close-up; 4 keep their drawing |
+| 24 | **Ask your quote** — "Why is Akara's kitchen ₹60,000 more?", answered only from their numbers and checked | ✅ on the comparison; figures checked, no rates |
+| 25 | **Walk the quote on your floor plan** — tap a room to see its lines | ✅ a schematic of a typical layout, labelled as one |
+| 26 | **Your home, assembling** — the brief's side panel becomes a picture of their home | ✅ the brief's side panel; replaced the studio counter |
 | 27 | **The owner's 3D design tool** in the customer portal — developed together once this queue is done (owner, 30 Sep) | |
 
 ## Waiting on the owner (not in the queue)
@@ -72,6 +72,11 @@ Answered 30 Sep: bands are **before GST** (unchanged) · **one band up: yes**
 written for cashback, OneReferrals, the cab, the shoot and OneHamper · the
 named expert is **Ar. Swarupa Tondare**, Tue–Sun 11:00–19:00 IST, with three
 colleagues covering (`npm run db:expert -- <email> "<name>"` for each).
+
+Before deploying: `npm run db:deploy` (migrations up to 20260930140000),
+then `npm run db:expert` for Swarupa and the three colleagues, and create a
+**private** Supabase storage bucket named `site-photos` for tracker photos
+(docs/DATA-ARCHITECTURE.md).
 
 Still open: Google / Apple / Meta credentials · WhatsApp verification and the
 OTP template · Swarupa's years in practice and COA number (shown once given) ·
