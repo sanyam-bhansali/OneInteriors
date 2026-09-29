@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { loadPrepPack } from '@/modules/prepare/prep';
+import { PrepClient } from '@/app/prepare/PrepClient';
 import { countdownFor } from '@/modules/portal/countdown';
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
@@ -68,6 +70,7 @@ export default async function AccountPage() {
   // The owner's 3D design tool (plan §10), linked once it exists. Never a
   // placeholder: nothing is shown until there is somewhere to go.
   const designTool = process.env.DESIGN_TOOL_URL?.trim() || null;
+  const prep = briefDone ? await loadPrepPack() : null;
 
   return (
     <>
@@ -361,12 +364,41 @@ export default async function AccountPage() {
           ) : null}
 
           {/* ── Your rooms ───────────────────────────────── */}
-          <Section title="Your rooms" action={{ href: '/prepare', label: rooms.length > 0 ? 'Open your boards' : 'Start a board' }}>
+          {/* The room boards live here now (queue item 21): /prepare was a
+              second place to be, with a second floor-plan upload the brief
+              already asks for. */}
+          <div id="rooms" />
+          <Section title="Your rooms">
             <Empty>
               {rooms.length > 0
                 ? `${rooms.length} room${rooms.length === 1 ? '' : 's'} on your mood board. The expert and your studio see them before they talk to you.`
-                : 'A mood board for each room — styles, finishes and what matters there. The expert and your studio see it before they talk to you.'}
+                : 'A mood board for each room — styles, finishes and what matters there. None of it is required; the expert and your studio see it before they talk to you.'}
             </Empty>
+            {prep && prep.brief.completedAt ? (
+              <div className="mt-5">
+                <PrepClient
+                  rooms={prep.plan.rooms.map((room) => ({
+                    key: room.key,
+                    label: room.label,
+                    indicativePaise: room.indicativePaise,
+                  }))}
+                  likes={prep.brief.styleLikes}
+                  dislikes={prep.brief.styleDislikes}
+                  tier={prep.brief.tier}
+                  initial={Object.fromEntries(
+                    prep.boards.map((board) => [
+                      board.proposal.room,
+                      {
+                        shuffle: board.state.shuffle,
+                        chosenOption: board.state.chosenOption,
+                        note: board.state.note,
+                        items: board.state.items,
+                      },
+                    ]),
+                  )}
+                />
+              </div>
+            ) : null}
             {designTool ? (
               <p className="m-0 mt-3">
                 <a href={designTool} className="text-[14.5px] text-[var(--color-petrol)]">

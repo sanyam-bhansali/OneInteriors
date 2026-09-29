@@ -159,7 +159,7 @@ export function ExpertForm({
             already know which three things you are choosing between.
           </p>
           <a
-            href="/prepare"
+            href="/account#rooms"
             className="oi-cta inline-flex min-h-11 items-center px-6 py-3 text-[14.5px] no-underline"
           >
             Prepare for the call
