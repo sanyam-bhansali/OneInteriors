@@ -20,6 +20,7 @@
  *     show what it is for, and only with the notice agreed.
  */
 
+import { SwipeOrGrid, SwipePicker } from './SwipePicker';
 import { ThisOrThat } from './ThisOrThat';
 import { studioPickerPhotos, type PickerPhoto } from '@/modules/brief/picker-photos';
 import { SocietyInput } from './SocietyInput';
@@ -622,24 +623,37 @@ function stepContent(
         ),
         options: (
           <div>
+            <SwipeOrGrid
+              grid={
             <StylePicker
-              selected={brief.styleLikes}
-              max={3}
-              exclude={brief.styleDislikes}
-              photos={ctx.pickerPhotos}
-              room={pickerRoomFor(brief.scope, brief.scopeRooms)}
-              onChange={(styleLikes) =>
-                update({
-                  styleLikes,
-                  // Whose work they chose, for the tiles that were a studio's own photo.
-                  styleStudioPicks: [
-                    ...new Set(
-                      styleLikes
-                        .map((t) => ctx.pickerPhotos[t]?.studioId)
-                        .filter((id): id is string => Boolean(id)),
-                    ),
-                  ],
-                })
+                  selected={brief.styleLikes}
+                  max={3}
+                  exclude={brief.styleDislikes}
+                  photos={ctx.pickerPhotos}
+                  room={pickerRoomFor(brief.scope, brief.scopeRooms)}
+                  onChange={(styleLikes) =>
+                    update({
+                      styleLikes,
+                      // Whose work they chose, for the tiles that were a studio's own photo.
+                      styleStudioPicks: [
+                        ...new Set(
+                          styleLikes
+                            .map((t) => ctx.pickerPhotos[t]?.studioId)
+                            .filter((id): id is string => Boolean(id)),
+                        ),
+                      ],
+                    })
+                  }
+                />
+              }
+              swipe={
+                <SwipePicker
+                  selected={brief.styleLikes}
+                  exclude={brief.styleDislikes}
+                  max={3}
+                  room={pickerRoomFor(brief.scope, brief.scopeRooms)}
+                  onChange={(styleLikes) => update({ styleLikes })}
+                />
               }
             />
             {brief.styleLikes.length === 3 ? (
