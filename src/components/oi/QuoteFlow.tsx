@@ -37,6 +37,7 @@ import type { FloorPlan } from '@/modules/quotation/project-store';
 import { Building, stagesFor } from './Building';
 import { Spec, MaterialPanel } from './Material';
 import { Sheet, DocRow, Flag } from './index';
+import { Mark } from '@/components/brand';
 
 type Phase = 'gate' | 'building' | 'done';
 
@@ -158,10 +159,19 @@ export function QuoteDocument({
   quote,
   studioName,
   plan,
+  preparedFor = null,
+  onMeasured,
 }: {
   quote: FirstQuote;
   studioName: string;
   plan: FloorPlan;
+  /** "Sanyam · 3 BHK · Kharadi · Full home" — printed under the studio's name. */
+  preparedFor?: string | null;
+  /**
+   * Offered when the kitchen is the standard one: measure it here and every
+   * studio is re-priced on it at once (±16% → ±12%).
+   */
+  onMeasured?: (runMm: number) => void;
 }) {
   const money = (p: number) => formatINRCompact(p);
 
@@ -178,9 +188,29 @@ export function QuoteDocument({
   return (
     <Sheet className="p-[clamp(20px,3vw,34px)]">
       <div className="mb-7 flex flex-wrap items-end justify-between gap-x-8 gap-y-3 border-b border-[var(--ink)] pb-5">
-        <div>
-          <p className="oi-eyebrow m-0 mb-2">First quote · generated</p>
-          <h2 className="oi-display m-0 text-[clamp(1.4rem,1.15rem+1vw,1.9rem)]">{studioName}</h2>
+        {/* The studio's own name and mark on top — the quote is theirs, priced
+            on their rates. Our mark is at the foot, as the platform that
+            built it (the owner's format, 29 Sep; studio logos arrive with the
+            studio profile, until then their initials). */}
+        <div className="flex items-start gap-4">
+          <span
+            aria-hidden="true"
+            className="oi-num flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] bg-[var(--acc-wash)] text-[15px] text-[var(--acc-ink)]"
+          >
+            {studioName
+              .split(/\s+/)
+              .map((w) => w[0])
+              .join('')
+              .slice(0, 2)
+              .toUpperCase()}
+          </span>
+          <div>
+            <p className="oi-eyebrow m-0 mb-2">First quote · generated</p>
+            <h2 className="oi-display m-0 text-[clamp(1.4rem,1.15rem+1vw,1.9rem)]">{studioName}</h2>
+            {preparedFor ? (
+              <p className="m-0 mt-1.5 text-[13.5px] text-[var(--ink2)]">Prepared for {preparedFor}</p>
+            ) : null}
+          </div>
         </div>
         <div className="text-left sm:text-right">
           <p className="oi-num m-0 text-[26px] leading-none">{money(quote.totalPaise)}</p>
@@ -262,12 +292,83 @@ export function QuoteDocument({
         </ul>
       </div>
 
-      <p className="oi-label m-0 mt-6 border-t border-[var(--line)] pt-4">
+      {/* When money moves. Each studio's own phases, from its quotations or
+          its profile — never a schedule we invented for it. */}
+      <div className="mt-7 border-t border-[var(--line)] pt-5">
+        <p className="oi-label m-0 mb-2">Payment phases</p>
+        <p className="m-0 text-[13.5px] leading-[1.6] text-[var(--ink2)]">
+          {studioName} has not filed its payment schedule with us yet. Our expert confirms it with
+          them before you meet — and how much is paid before anything is installed is worth asking.
+        </p>
+      </div>
+
+      {onMeasured && runSourceOf(plan) === 'standard' ? (
+        <MeasureKitchen onMeasured={onMeasured} />
+      ) : null}
+
+      <p className="oi-label m-0 mt-6 border-t border-[var(--line)] pt-4 print:hidden">
         Underlined materials open an explanation — what it is, and what the cheaper version costs
       </p>
 
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--ink)] pt-4">
+        <p className="m-0 flex items-center gap-2 text-[12.5px] text-[var(--ink2)]">
+          <Mark className="h-[14px] w-[14px] text-[var(--ink)]" />
+          Powered by One Interiors
+        </p>
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="cursor-pointer border border-[var(--line)] bg-transparent px-4 py-2 text-[13px] text-[var(--ink)] print:hidden"
+        >
+          Print or save as PDF
+        </button>
+      </div>
+
       <MaterialPanel material={term} onClose={() => setTerm(null)} />
     </Sheet>
+  );
+}
+
+/**
+ * Measure the kitchen, and every studio is re-priced on it.
+ *
+ * Offered on a quote priced on the standard kitchen: the platform run is the
+ * number that moves a quote most, and a measured one takes the band from ±16%
+ * to ±12% for every studio at once.
+ */
+function MeasureKitchen({ onMeasured }: { onMeasured: (runMm: number) => void }) {
+  const [value, setValue] = useState('');
+  const n = Number(value);
+  const ok = Number.isFinite(n) && n >= 1500 && n <= 9000;
+  return (
+    <div className="mt-7 border-t border-[var(--line)] pt-5 print:hidden">
+      <p className="oi-label m-0 mb-2">Tighten this quote</p>
+      <p className="m-0 mb-3 text-[13.5px] leading-[1.6] text-[var(--ink2)]">
+        Measure your kitchen platform and every studio is re-priced on it — the range narrows from
+        ±16% to ±12%.
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          inputMode="numeric"
+          value={value}
+          onChange={(e) => setValue(e.target.value.replace(/\D/g, ''))}
+          placeholder="Platform length, mm"
+          className={`${input} oi-num w-48`}
+        />
+        {ok ? (
+          <button
+            type="button"
+            onClick={() => onMeasured(Math.round(n))}
+            className="cursor-pointer px-4 py-2.5 text-[14px] font-medium text-white"
+            style={{ background: 'var(--acc-btn)' }}
+          >
+            Re-price every studio
+          </button>
+        ) : value ? (
+          <span className="text-[13px] text-[var(--ink2)]">Between 1,500 and 9,000 mm.</span>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

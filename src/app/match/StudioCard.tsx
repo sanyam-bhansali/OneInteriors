@@ -237,6 +237,16 @@ export function StudioCard({
             Get a quote
           </button>
         ) : (
+          <>
+          {/* Every match is priced when the page opens, so the quote is the
+              first thing to offer — it used to sit behind "More". */}
+          <button
+            type="button"
+            onClick={onQuote}
+            className="oi-cta min-h-11 cursor-pointer border-0 px-5 py-2.5 text-[14px]"
+          >
+            See the quote
+          </button>
           <button
             type="button"
             onClick={onToggleCompare}
@@ -250,6 +260,7 @@ export function StudioCard({
           >
             {inCompare ? 'In compare' : 'Add to compare'}
           </button>
+          </>
         )}
 
         <Link

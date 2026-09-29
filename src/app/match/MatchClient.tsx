@@ -38,7 +38,12 @@ import {
   type Project,
 } from '@/modules/quotation/project-store';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
-import { QuoteFlow, type QuoteRequest } from '@/components/oi/QuoteFlow';
+import { QuoteFlow, QuoteDocument, type QuoteRequest } from '@/components/oi/QuoteFlow';
+import { Building, stagesFor } from '@/components/oi/Building';
+import { kitchenFor, priceMatches, quoteKey } from '@/modules/quotation/price-all';
+import { runSourceOf } from '@/modules/quotation/first-quote';
+import { filedRatesFor, ratesAreReal } from '@/data/filed-rates';
+import { scopePhrase, selectionOf } from '@/modules/quotation/scope';
 import { homeShapeFor } from '@/modules/quotation/first-quote';
 import type { StudioRates } from '@/modules/quotation/catalogue';
 import { Wrap, Chapter, Sheet, Quiet } from '@/components/oi';
@@ -63,6 +68,18 @@ function forWhat(brief: Brief | null): string | null {
     .filter(Boolean)
     .join(' ');
   return level ? `${place} · ${level}` : place;
+}
+
+/** "Sanyam · 3 BHK · Kharadi · Kitchen & wardrobes" — who and what a quote is for. */
+function preparedFor(brief: Brief | null): string | null {
+  if (!brief) return null;
+  const parts = [
+    cleanName(brief.contactName),
+    propertyLabel(brief.propertyType),
+    localityLabel(brief.locality),
+    scopePhrase(selectionOf(brief)),
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : null;
 }
 
 /** Bedrooms by configuration, for the quote request. */
@@ -154,9 +171,95 @@ export function MatchClient({
     ...homeShapeFor(brief ?? { propertyType: null, carpetAreaSqft: null }),
   });
 
+  /* ── Every match priced at once ──
+     The same lines, the same kitchen, each studio's own rates — the moment
+     the page opens, and again whenever the brief changes something a quote
+     depends on. See modules/quotation/price-all.ts. */
+  const shape = useMemo(
+    () => homeShapeFor(brief ?? { propertyType: null, carpetAreaSqft: null }),
+    [brief],
+  );
+  const kitchen = kitchenFor(shape, shape.plan, project.plan);
+  const pricedFor = quoteKey(shape, kitchen);
+
+  useEffect(() => {
+    if (!briefed || matches.length === 0) return;
+    const fresh = priceMatches({
+      shape,
+      plan: kitchen,
+      studios: matches
+        .map((m) => byId.get(m.studioId))
+        .filter((s): s is Studio => Boolean(s))
+        .map((s) => ({ slug: s.slug, name: s.tradeName })),
+      existing: project.quotes,
+      ratesFor: (slug) => filedRates?.[slug] ?? filedRatesFor(slug),
+    });
+    if (fresh.length === 0) return;
+    // The durable copies, behind the screen — see onBuilt below for why
+    // these are not awaited.
+    for (const q of fresh) void saveQuoteAction({ studioSlug: q.studioSlug, quote: q.quote, plan: kitchen });
+    update({
+      ...project,
+      plan: kitchen,
+      quotes: { ...project.quotes, ...Object.fromEntries(fresh.map((q) => [q.studioSlug, q])) },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on what a quote depends on
+  }, [briefed, matches, pricedFor, project.quotes]);
+
   // ── The quote, over everything ──
   if (quoting) {
     const built = project.quotes[quoting.studioSlug];
+    const current = built?.key === pricedFor;
+    /* Already priced (every match is): straight to the document. The build
+       plays once a visit, the first time — "a quote in ten seconds" watched
+       once, not sat through six times. */
+    if (built && current) {
+      return (
+        <div className="oi-app min-h-dvh bg-[var(--bg)]">
+          <AppHeader />
+          <Wrap className="py-10">
+            <button
+              type="button"
+              onClick={() => setQuoting(null)}
+              className="oi-num mb-8 cursor-pointer border-0 bg-transparent p-0 text-[11px] uppercase tracking-[0.16em] text-[var(--ink2)] hover:text-[var(--ink)]"
+            >
+              ← Back to your matches
+            </button>
+            {project.seenBuild ? (
+              <QuoteDocument
+                quote={built.quote}
+                studioName={quoting.studioName}
+                plan={kitchen}
+                preparedFor={preparedFor(brief)}
+                onMeasured={(runMm) =>
+                  update({ ...project, plan: { fileName: null, kitchenRunMm: runMm, source: 'customer' } })
+                }
+              />
+            ) : (
+              <Building
+                studioName={quoting.studioName}
+                stages={stagesFor({
+                  bhk: shape.bhk,
+                  measured: runSourceOf(kitchen) !== 'standard',
+                  ratesAreReal: ratesAreReal(),
+                })}
+                onDone={() => update({ ...project, seenBuild: true })}
+                seenQuestions={project.askedQuestions}
+                onAsked={(id) =>
+                  update({
+                    ...project,
+                    askedQuestions: project.askedQuestions.includes(id)
+                      ? project.askedQuestions
+                      : [...project.askedQuestions, id],
+                  })
+                }
+              />
+            )}
+          </Wrap>
+          <AppFooter />
+        </div>
+      );
+    }
     return (
       <div className="oi-app min-h-dvh bg-[var(--bg)]">
         <AppHeader />

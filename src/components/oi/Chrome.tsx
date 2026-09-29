@@ -56,7 +56,7 @@ export type ChapterId = (typeof CHAPTERS)[number]['id'];
  */
 export function AppHeader() {
   return (
-    <header className="border-b border-[var(--line)] bg-[var(--card)]">
+    <header className="border-b border-[var(--line)] bg-[var(--card)] print:hidden">
       <Wrap>
         <div className="flex items-center justify-between gap-6 py-3.5">
           <Link
@@ -198,7 +198,7 @@ export function AppFooter() {
   return (
     <footer
       data-on-dark
-      className="mt-20 border-t border-[var(--line)] py-12"
+      className="mt-20 border-t border-[var(--line)] py-12 print:hidden"
       style={{ background: 'var(--ink)', colorScheme: 'light' }}
     >
       <Wrap>
