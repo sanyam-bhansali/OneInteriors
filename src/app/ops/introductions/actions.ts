@@ -171,8 +171,13 @@ export async function stageDoneAction(projectId: string, stage: string, done: bo
   return r.ok ? { ok: true } : { ok: false, error: r.error };
 }
 
-export async function postUpdateAction(projectId: string, note: string, stage: string | null): Promise<Result> {
-  const r = await postUpdate(projectId, note, stage);
+export async function postUpdateAction(formData: FormData): Promise<Result> {
+  const r = await postUpdate(
+    String(formData.get('projectId') ?? ''),
+    String(formData.get('note') ?? ''),
+    String(formData.get('stage') ?? '') || null,
+    formData.getAll('photos').filter((f): f is File => f instanceof File),
+  );
   revalidatePath('/ops/introductions');
   return r.ok ? { ok: true } : { ok: false, error: r.error };
 }

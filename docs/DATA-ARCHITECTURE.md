@@ -205,6 +205,7 @@ they already are:
 | `studio-logos` | `studio_<id>/<uuid>.<ext>` | no | signed, 5 min | 2 MB | ⚠ none — see below |
 | `portfolio-images` | `studio_<id>/<uuid>.<ext>` | **yes** | permanent public URL, immutable cache | 8 MB, 20/project | none, by design |
 | `business-proof` | `studio_<id>/<uuid>.<ext>` | no | signed, 5 min | 10 MB | `requireRole('OPS')` |
+| `site-photos` | `project_<id>/<uuid>.<ext>` | no | signed, 10 min | 8 MB (shrunk in the browser first), 6/update | the customer's own page, the studio's own project, ops |
 | `quotation-archives` | `studio_<id>/<uuid>.<ext>` | no | signed, 5 min | 25 MB, 40/batch | `requireRole('OPS')` |
 | `floor-plans` | `u_<userId>/…` or `a_<anonKey>/…` | no | signed, 5 min | 15 MB | owner-or-OPS |
 

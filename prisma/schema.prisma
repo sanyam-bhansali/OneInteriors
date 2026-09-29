@@ -1343,6 +1343,11 @@ model HomeProjectUpdate {
   stage       String?
   note        String      @db.Text
   postedById  String
+  /// Posted by the studio doing the work, not by us (queue item 22).
+  byStudio    Boolean     @default(false)
+  /// Site photographs: paths in the private `site-photos` bucket, served
+  /// only through short-lived signed links (storage/site-photos.ts).
+  photoPaths  String[]    @default([])
 
   createdAt DateTime @default(now())
 

@@ -331,6 +331,8 @@ function navFor(context: ShellContext | null): NavGroup[] {
           count: context?.toConfirm,
         },
         { icon: 'listing', href: '/studio/listing', label: 'Your listing', ready: isLive('listing') },
+        // Updates for homes introduced through us — the customer sees them (queue item 22).
+        { icon: 'projects', href: '/studio/updates', label: 'Client updates', ready: true },
       ],
     });
   }

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { startTrackerAction, stageDoneAction, postUpdateAction } from './actions';
+import { withShrunkPhotos } from '@/lib/shrink-image';
 import { plannedStages, TRACKER_STAGES } from '@/modules/portal/tracker';
 import type { OpsIntroduction } from '@/modules/studio/introduction-ops';
 
@@ -79,7 +80,15 @@ export function TrackerControl({ intro }: { intro: OpsIntroduction }) {
         className="flex flex-wrap items-end gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          run(() => postUpdateAction(intro.project!.id, note, stage || null), () => setNote(''));
+          const form = e.currentTarget;
+          const data = new FormData(form);
+          data.set('projectId', intro.project!.id);
+          data.set('note', note);
+          data.set('stage', stage);
+          run(async () => postUpdateAction(await withShrunkPhotos(data)), () => {
+            setNote('');
+            form.reset();
+          });
         }}
       >
         <input
@@ -96,6 +105,7 @@ export function TrackerControl({ intro }: { intro: OpsIntroduction }) {
             </option>
           ))}
         </select>
+        <input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple className="text-[12.5px]" aria-label="Site photos" />
         <button type="submit" disabled={pending || note.trim().length < 3} className={ghost}>
           Post update
         </button>

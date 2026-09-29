@@ -496,6 +496,21 @@ export default async function AccountPage() {
                             {u.at.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                           </span>
                           {u.note}
+                          {u.byStudio ? (
+                            <span className="ml-2 font-[family-name:var(--font-mono)] text-[10.5px] uppercase tracking-[0.08em] text-[var(--color-ink-3)]">
+                              from {t.studioName}
+                            </span>
+                          ) : null}
+                          {u.photos.length > 0 ? (
+                            <span className="mt-2 flex flex-wrap gap-2">
+                              {u.photos.map((src) => (
+                                <a key={src} href={src} target="_blank" rel="noopener noreferrer">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={src} alt="A photo from site" className="h-20 w-28 rounded-[6px] object-cover" />
+                                </a>
+                              ))}
+                            </span>
+                          ) : null}
                         </li>
                       ))}
                     </ul>
