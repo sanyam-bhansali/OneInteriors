@@ -58,8 +58,10 @@ import {
  * each card's evidence. Scores unchanged; bumped so cached reads refresh.
  * 2.1.0 (30 Sep 2026): direct affinity — a studio whose own photo the
  * customer picked in the style picker scores at least 90 on style.
+ * 2.2.0 (30 Sep 2026): likes are ordered (affinity@2) — "this or that" puts
+ * the style they chose most first, and it counts more than the others.
  */
-export const ENGINE_VERSION = 'match@2.1.0';
+export const ENGINE_VERSION = 'match@2.2.0';
 
 export const WEIGHTS = {
   style: 30,

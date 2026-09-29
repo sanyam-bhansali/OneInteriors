@@ -20,7 +20,7 @@ import { buildFirstQuote, homeShapeFor } from '@/modules/quotation/first-quote';
 import { scopeBandRange } from '@/modules/quotation/scope-band';
 import { selectionOf } from '@/modules/quotation/scope';
 import type { StudioRates } from '@/modules/quotation/catalogue';
-import { bestAffinity } from './style-affinity';
+import { affinity, weightedAffinity } from './style-affinity';
 
 export interface Signal {
   value: number;
@@ -57,9 +57,8 @@ export function styleFit(brief: Brief, studio: Studio, ctx: SignalContext): Sign
     const w = recency(p, ctx.today);
     for (const t of p.styleTags) {
       total += w;
-      const a = bestAffinity(t, brief.styleLikes);
-      credit += a * w;
-      if (a === 1) exact += 1;
+      credit += weightedAffinity(t, brief.styleLikes) * w;
+      if (brief.styleLikes.some((l) => affinity(t, l) === 1)) exact += 1;
     }
   }
   if (total === 0) return null;

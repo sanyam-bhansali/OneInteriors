@@ -20,6 +20,7 @@
  *     show what it is for, and only with the notice agreed.
  */
 
+import { ThisOrThat } from './ThisOrThat';
 import { studioPickerPhotos, type PickerPhoto } from '@/modules/brief/picker-photos';
 import { SocietyInput } from './SocietyInput';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -649,6 +650,15 @@ function stepContent(
                 </strong>
                 . That&rsquo;s the direction we&rsquo;ll match on.
               </p>
+            ) : null}
+            {brief.styleLikes.length >= 2 ? (
+              <ThisOrThat
+                key={brief.styleLikes.slice().sort().join(',')}
+                likes={brief.styleLikes}
+                dislikes={brief.styleDislikes}
+                room={pickerRoomFor(brief.scope, brief.scopeRooms)}
+                onDone={(styleLikes) => update({ styleLikes })}
+              />
             ) : null}
             <InspirationReader
               likes={brief.styleLikes}
