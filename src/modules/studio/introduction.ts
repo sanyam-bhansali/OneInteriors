@@ -16,6 +16,8 @@ import 'server-only';
  * the gate is the entire quality mechanic and the reason the fee exists.
  */
 
+import { mayShareBriefWithStudios } from '@/modules/consent/record';
+import { HELD_FOR_CONSENT } from '@/modules/consent/share';
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { requireRole, getCurrentUser } from '@/modules/auth/session';
@@ -33,7 +35,7 @@ import {
    of that file for why it is the one thing there that takes a studio id. */
 import { bridgeIntroduction, redactWithdrawn } from '@/modules/studio-practice/bridge';
 
-export type IntroResult = { ok: true; id: string } | { ok: false; error: string };
+export type IntroResult = { ok: true; id: string; held?: string } | { ok: false; error: string };
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
 export {
@@ -96,7 +98,12 @@ export async function createIntroduction(input: {
     return { ok: false, error: `${studio.tradeName} is not active. Approve or resume them first.` };
   }
 
-  const releaseContact = input.releaseContact !== false;
+  /* Contact goes to the studio only with the customer's agreement to share
+     it (modules/consent/share.ts). Without it the introduction is still made,
+     with the contact held back, and ops is told why. */
+  const wanted = input.releaseContact !== false;
+  const consented = wanted ? await mayShareBriefWithStudios(briefId) : false;
+  const releaseContact = wanted && consented;
 
   try {
     const row = await prisma.$transaction(async (tx) => {
@@ -154,7 +161,7 @@ export async function createIntroduction(input: {
       return created;
     });
 
-    return { ok: true, id: row.id };
+    return { ok: true, id: row.id, ...(wanted && !consented ? { held: HELD_FOR_CONSENT } : {}) };
   } catch (error) {
     console.error('[introduction] create failed', error);
     return { ok: false, error: 'That did not save.' };
@@ -164,6 +171,10 @@ export async function createIntroduction(input: {
 /** Release contact details on an introduction made without them. */
 export async function releaseContactDetails(introductionId: string): Promise<ActionResult> {
   const actor = await requireRole('OPS');
+
+  const intro = await prisma.introduction.findUnique({ where: { id: introductionId }, select: { briefId: true } });
+  if (!intro) return { ok: false, error: 'That introduction is gone.' };
+  if (!(await mayShareBriefWithStudios(intro.briefId))) return { ok: false, error: HELD_FOR_CONSENT };
 
   try {
     await prisma.$transaction(async (tx) => {

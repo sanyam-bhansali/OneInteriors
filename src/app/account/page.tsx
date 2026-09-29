@@ -21,7 +21,8 @@ import { referralCodeFor, referralCount } from '@/modules/brief/repository';
 import { prepForBrief } from '@/modules/prepare/prep';
 import { slotLabel } from '@/modules/consultation/slots';
 import { CheckInForm, ShareButton } from './HomeParts';
-import { withdrawConsentAction } from './actions';
+import { shareWithStudiosAction, withdrawConsentAction } from './actions';
+import { mayShareBriefWithStudios } from '@/modules/consent/record';
 
 export const metadata: Metadata = {
   title: 'Your project',
@@ -58,6 +59,7 @@ export default async function AccountPage() {
   const home = await yourHome(row?.id ?? null, briefDone);
   const rooms = row ? await prepForBrief(row.id) : [];
   const trackers = row ? await trackersForBrief(row.id) : [];
+  const sharingAgreed = row ? await mayShareBriefWithStudios(row.id) : false;
   const referralCode = referralsLive() ? await referralCodeFor(user.id, user.name) : null;
   const referral = referralCode ? { code: referralCode, count: await referralCount(referralCode) } : null;
   const pass = benefitsPass(home.stage);
@@ -281,6 +283,22 @@ export default async function AccountPage() {
               </ul>
             )}
           </Section>
+
+          {/* Agreeing later: a call booked before the question existed, or
+              somebody who withdrew and changed their mind. */}
+          {calls.length > 0 && !sharingAgreed ? (
+            <div className="-mt-6 mb-12 rounded-[10px] border border-[var(--color-brass)]/40 bg-[var(--color-brass-soft)] px-5 py-4">
+              <p className="m-0 mb-3 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--color-ink)]">
+                We can introduce you to a studio only if they may see your name and number. Only the
+                studios you picked, only once we introduce you.
+              </p>
+              <form action={shareWithStudiosAction}>
+                <button type="submit" className="rounded-full bg-[var(--color-petrol)] px-4 py-2 text-[13.5px] text-[var(--color-paper)]">
+                  Share with the studios I picked
+                </button>
+              </form>
+            </div>
+          ) : null}
 
           {/* ── Your studio ──────────────────────────────── */}
           {home.introductions.length > 0 ? (

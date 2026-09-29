@@ -9,7 +9,7 @@ import {
   type AppointmentKindName,
 } from '@/modules/studio/introduction';
 
-export type OutcomeResult = { ok: true } | { ok: false; error: string };
+export type OutcomeResult = { ok: true; note?: string } | { ok: false; error: string };
 
 /**
  * The end of an expert call, in one action.
@@ -88,6 +88,7 @@ export async function completeCallAction(input: {
   // a second transaction and a duplicate audit row for the same fact.
   if (!outcome.ok) return { ok: false, error: 'Could not record the outcome.' };
 
+  let held: string | null = null;
   if (input.introduce) {
     const introduction = await createIntroduction({
       briefId: input.briefId,
@@ -96,6 +97,7 @@ export async function completeCallAction(input: {
       releaseContact: input.releaseContact,
     });
 
+    if (introduction.ok && introduction.held) held = introduction.held;
     if (!introduction.ok) {
       // The call is recorded; only the handoff failed. Say precisely that,
       // because the expert needs to know which half to redo.
@@ -121,7 +123,7 @@ export async function completeCallAction(input: {
 
   revalidatePath('/ops/consultations');
   revalidatePath('/ops');
-  return { ok: true };
+  return { ok: true, ...(held ? { note: held } : {}) };
 }
 
 export async function scheduleCallAction(

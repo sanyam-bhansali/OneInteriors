@@ -28,6 +28,7 @@ import { after } from 'next/server';
 import { availableSlots } from './availability';
 import { icsFor, slotLabel, SLOT_MINS } from './slots';
 import { sendCallBooked } from '@/modules/auth/email';
+import { recordConsent } from '@/modules/consent/record';
 
 export interface RequestInput {
   briefId: string;
@@ -44,6 +45,8 @@ export interface RequestInput {
    * a moment earlier.
    */
   startsAt?: string;
+  /** "Share my brief, name and number with the studios I pick" — required. */
+  shareConsent?: boolean;
 }
 
 export type RequestResult =
@@ -129,6 +132,10 @@ export async function requestConsultation(input: RequestInput): Promise<RequestR
     errors.studioIds = `Pick up to ${MAX_STUDIOS}. Past that the call stops being a decision and becomes a tour.`;
   }
 
+  if (!input.shareConsent) {
+    errors.shareConsent = 'We can only introduce you to a studio if they may see your name and number.';
+  }
+
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
   /* OWNERSHIP, not existence.
@@ -198,6 +205,8 @@ export async function requestConsultation(input: RequestInput): Promise<RequestR
   }
 
   await record(booking ? 'enquiry.booked' : 'enquiry.sent', { studios: input.studioIds.length }, brief.id);
+  // The moment they picked studios is the moment they agreed to share with them (§3.3).
+  await recordConsent([{ purpose: 'SHARE_WITH_STUDIO', granted: true }], 'expert_booking');
 
   if (booking && contactEmail) {
     const studios = await prisma.studio.findMany({

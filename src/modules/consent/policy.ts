@@ -37,6 +37,7 @@ export const CONSENT_PURPOSES = [
   'MARKETING_WHATSAPP',
   'MARKETING_SMS',
   'IMPORTED_LEAD',
+  'SHARE_WITH_STUDIO',
 ] as const;
 
 export type ConsentPurpose = (typeof CONSENT_PURPOSES)[number];
@@ -64,6 +65,11 @@ export const PURPOSE_NOTICE: Record<ConsentPurpose, { label: string; detail: str
   MARKETING_SMS: {
     label: 'Send me SMS updates',
     detail: 'Only where WhatsApp does not reach you.',
+  },
+  SHARE_WITH_STUDIO: {
+    label: 'Share my brief, name and number with the studios I pick',
+    detail:
+      'Only the studios you tick, only once we introduce you, and only so they can arrange a meeting with you. You can withdraw this from "Your home"; studios already introduced keep what they were given.',
   },
   IMPORTED_LEAD: {
     label: 'Contact recorded from an earlier enquiry',
@@ -94,6 +100,7 @@ export const DEFAULT_GRANTED: Record<ConsentPurpose, boolean> = {
   MARKETING_WHATSAPP: false,
   MARKETING_SMS: false,
   IMPORTED_LEAD: false,
+  SHARE_WITH_STUDIO: false,
 };
 
 /**

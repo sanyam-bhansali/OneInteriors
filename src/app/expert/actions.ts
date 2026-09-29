@@ -32,6 +32,7 @@ export async function requestExpertAction(
     askedAbout: String(formData.get('askedAbout') ?? '').slice(0, MAX_ASKED),
     preferredTimes: String(formData.get('preferredTimes') ?? '').slice(0, MAX_TIMES),
     startsAt: String(formData.get('startsAt') ?? '').slice(0, 40) || undefined,
+    shareConsent: formData.get('shareConsent') === 'on',
   });
 
   if (!result.ok) return { status: 'error', errors: result.errors };

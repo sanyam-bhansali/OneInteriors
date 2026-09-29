@@ -171,6 +171,9 @@ enum ConsentPurpose {
   MARKETING_SMS
   DATA_PROCESSING
   IMPORTED_LEAD // pre-existing record; source must be recorded
+  /// Agreed, when picking studios at the expert step, that the studios they
+  /// pick may see their name and number (modules/consent/share.ts).
+  SHARE_WITH_STUDIO
 }
 
 model Consent {

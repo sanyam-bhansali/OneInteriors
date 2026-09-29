@@ -351,6 +351,25 @@ export function ExpertForm({
         </fieldset>
       ) : null}
 
+      {/* Asked here, where they pick the studios, because this is what they
+          are agreeing to (plan §3.3). Required: an introduction without it
+          could never tell the studio who to meet. */}
+      <label className="flex cursor-pointer items-start gap-3">
+        <input type="checkbox" name="shareConsent" required className="mt-1 h-4 w-4 flex-none accent-[var(--acc)]" />
+        <span className="text-[14.5px] leading-snug text-[var(--ink)]">
+          Share my brief, name and number with the studios I have ticked — only once you introduce
+          me, and only so they can arrange to meet.
+          <span className="mt-1 block text-[13px] text-[var(--ink2)]">
+            You can withdraw this from &ldquo;Your home&rdquo; at any time.
+          </span>
+        </span>
+      </label>
+      {err.shareConsent ? (
+        <p role="alert" className="m-0 -mt-3 text-[13.5px]" style={{ color: 'var(--acc-ink)' }}>
+          {err.shareConsent}
+        </p>
+      ) : null}
+
       <div className="border-t border-[var(--line)] pt-7">
         {err.form ? (
           <p
