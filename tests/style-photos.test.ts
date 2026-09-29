@@ -19,3 +19,26 @@ describe('style picker photos', () => {
     expect(stylePhotoUrl(STYLE_PHOTOS.japandi, 400)).toMatch(/fit=crop&w=400&h=300/);
   });
 });
+
+describe('the picker shows the room they are doing', () => {
+  it('kitchens for a kitchen job, bedrooms for bedrooms only, living rooms otherwise', async () => {
+    const { pickerRoomFor } = await import('@/data/style-photos');
+    expect(pickerRoomFor('KITCHEN_WARDROBE')).toBe('KITCHEN');
+    expect(pickerRoomFor('SINGLE_ROOM', ['KITCHEN'])).toBe('KITCHEN');
+    expect(pickerRoomFor('SINGLE_ROOM', ['MASTER_BEDROOM', 'SECOND_BEDROOM'])).toBe('BEDROOM');
+    expect(pickerRoomFor('SINGLE_ROOM', ['KITCHEN', 'LIVING_DINING'])).toBe('LIVING');
+    expect(pickerRoomFor('FULL_HOME')).toBe('LIVING');
+  });
+
+  it('every room photo is a free Unsplash photo, and a missing room falls back to the living room', async () => {
+    const { ROOM_STYLE_PHOTOS, stylePhotoFor } = await import('@/data/style-photos');
+    for (const rooms of Object.values(ROOM_STYLE_PHOTOS)) {
+      for (const p of Object.values(rooms ?? {})) {
+        expect(p!.src).toMatch(/^https:\/\/images\.unsplash\.com\/photo-[\w-]+$/);
+        expect(p!.photographer.length).toBeGreaterThan(1);
+      }
+    }
+    expect(stylePhotoFor('indian-contemporary', 'KITCHEN')).toBe(STYLE_PHOTOS['indian-contemporary']);
+    expect(stylePhotoFor('warm-modern', 'KITCHEN')).not.toBe(STYLE_PHOTOS['warm-modern']);
+  });
+});

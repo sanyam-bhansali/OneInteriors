@@ -80,7 +80,7 @@ import {
 import { PURPOSE_NOTICE } from '@/modules/consent/policy';
 import { SocialButtons, anyProvider, type Providers } from '@/components/SocialButtons';
 import { InspirationReader } from './InspirationReader';
-import { STYLE_PHOTOS, stylePhotoUrl } from '@/data/style-photos';
+import { STYLE_PHOTOS, pickerRoomFor, stylePhotoFor, stylePhotoUrl, type PickerRoom } from '@/data/style-photos';
 
 const NO_PROVIDERS: Providers = { google: false, apple: false, facebook: false };
 
@@ -626,6 +626,7 @@ function stepContent(
               max={3}
               exclude={brief.styleDislikes}
               photos={ctx.pickerPhotos}
+              room={pickerRoomFor(brief.scope, brief.scopeRooms)}
               onChange={(styleLikes) =>
                 update({
                   styleLikes,
@@ -672,6 +673,7 @@ function stepContent(
             exclude={brief.styleLikes}
             tone="exclude"
             photos={ctx.pickerPhotos}
+            room={pickerRoomFor(brief.scope, brief.scopeRooms)}
             onChange={(styleDislikes) => update({ styleDislikes })}
           />
         ),
@@ -1684,7 +1686,8 @@ function StylePicker({
   exclude,
   onChange,
   tone = 'include',
-  photos = {},
+  photos: studioPhotos = {},
+  room = 'LIVING',
 }: {
   selected: StyleTag[];
   max: number;
@@ -1693,7 +1696,11 @@ function StylePicker({
   tone?: 'include' | 'exclude';
   /** A studio's own photo for a style, used in place of the stock one. */
   photos?: Partial<Record<StyleTag, PickerPhoto>>;
+  /** Scope-aware: kitchens for a kitchen job, bedrooms for a bedrooms-only job. */
+  room?: PickerRoom;
 }) {
+  // Studio photos lead with living rooms, so they stand in only where living rooms are shown.
+  const photos = room === 'LIVING' ? studioPhotos : {};
   function toggle(tag: StyleTag) {
     if (selected.includes(tag)) {
       onChange(selected.filter((t) => t !== tag));
@@ -1734,12 +1741,12 @@ function StylePicker({
               ) : STYLE_PHOTOS[tag] ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={stylePhotoUrl(STYLE_PHOTOS[tag])}
-                  srcSet={`${stylePhotoUrl(STYLE_PHOTOS[tag], 400)} 400w, ${stylePhotoUrl(STYLE_PHOTOS[tag], 800)} 800w`}
+                  src={stylePhotoUrl(stylePhotoFor(tag, room))}
+                  srcSet={`${stylePhotoUrl(stylePhotoFor(tag, room), 400)} 400w, ${stylePhotoUrl(stylePhotoFor(tag, room), 800)} 800w`}
                   sizes="(min-width: 640px) 33vw, 50vw"
                   /* Named only after it is picked — the alt describes the room,
                      never the style, so a screen reader is not told the answer. */
-                  alt={STYLE_PHOTOS[tag].alt}
+                  alt={stylePhotoFor(tag, room).alt}
                   loading={i < 6 ? 'eager' : 'lazy'}
                   className="block aspect-[4/3] w-full object-cover"
                 />
@@ -1781,7 +1788,7 @@ function StylePicker({
             Photographs from Unsplash by{' '}
             {[
               ...new Set(
-                STYLE_TAGS.filter((t) => !photos[t]).map((t) => STYLE_PHOTOS[t]?.photographer).filter(Boolean),
+                STYLE_TAGS.filter((t) => !photos[t]).map((t) => stylePhotoFor(t, room).photographer).filter(Boolean),
               ),
             ].join(', ')}
             .
