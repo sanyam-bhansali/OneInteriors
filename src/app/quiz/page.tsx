@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { cachedRoster } from '@/modules/studio/roster-cache';
-import { googleOAuth, showUnverifiedStudios } from '@/lib/env';
+import { appleOAuth, facebookOAuth, googleOAuth, showUnverifiedStudios } from '@/lib/env';
 import { getCurrentUser } from '@/modules/auth/session';
 import { QuizClient } from './QuizClient';
 
@@ -28,7 +28,11 @@ export default async function QuizPage() {
       // Who they are, if signed in — the contact screen fills in from it.
       account={user ? { name: user.name, email: user.email } : null}
       // Offered only when it is set up end to end; see googleOAuth().
-      googleSignIn={googleOAuth() !== null}
+      socialSignIn={{
+        google: googleOAuth() !== null,
+        apple: appleOAuth() !== null,
+        facebook: facebookOAuth() !== null,
+      }}
     />
   );
 }

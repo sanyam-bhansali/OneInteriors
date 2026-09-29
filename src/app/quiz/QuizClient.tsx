@@ -77,7 +77,9 @@ import {
   type ContactInput,
 } from '@/modules/brief/contact';
 import { PURPOSE_NOTICE } from '@/modules/consent/policy';
-import { GoogleButton } from '@/components/GoogleButton';
+import { SocialButtons, anyProvider, type Providers } from '@/components/SocialButtons';
+
+const NO_PROVIDERS: Providers = { google: false, apple: false, facebook: false };
 
 type ContactErrors = Partial<Record<ContactField | 'form', string>>;
 import {
@@ -168,14 +170,14 @@ export function QuizClient({
   /** Server-decided; see MatchClient. Defaults to the strict answer. */
   allowUnverified = false,
   account = null,
-  googleSignIn = false,
+  socialSignIn = NO_PROVIDERS,
 }: {
   studios: Studio[];
   allowUnverified?: boolean;
   /** The signed-in account, if any. The contact screen fills in from it. */
   account?: { name: string | null; email: string | null } | null;
   /** Whether "Continue with Google" can be offered. */
-  googleSignIn?: boolean;
+  socialSignIn?: Providers;
 }) {
   const router = useRouter();
   const [brief, setBrief] = useState<Brief>(EMPTY_BRIEF);
@@ -339,7 +341,7 @@ export function QuizClient({
   const canAdvance = isStepAnswered(brief, stepId);
   const contactCtx: ContactContext = {
     account,
-    googleSignIn,
+    socialSignIn,
     contact,
     setContact: (next) => {
       setContact(next);
@@ -527,7 +529,7 @@ type StepParts = { ask: React.ReactNode; options: React.ReactNode };
 /** What the contact screen needs beyond the brief. */
 interface ContactContext {
   account: { name: string | null; email: string | null } | null;
-  googleSignIn: boolean;
+  socialSignIn: Providers;
   contact: ContactInput;
   setContact: (next: ContactInput) => void;
   errors: ContactErrors;
@@ -570,7 +572,7 @@ function stepContent(
           <ContactStep
             brief={brief}
             account={ctx.account}
-            googleSignIn={ctx.googleSignIn}
+            socialSignIn={ctx.socialSignIn}
             contact={ctx.contact}
             setContact={ctx.setContact}
             errors={ctx.errors}
@@ -669,14 +671,14 @@ function stepContent(
 function ContactStep({
   brief,
   account,
-  googleSignIn,
+  socialSignIn,
   contact,
   setContact,
   errors,
 }: {
   brief: Brief;
   account: { name: string | null; email: string | null } | null;
-  googleSignIn: boolean;
+  socialSignIn: Providers;
   contact: ContactInput;
   setContact: (next: ContactInput) => void;
   errors: ContactErrors;
@@ -705,9 +707,9 @@ function ContactStep({
         <p className="m-0 text-[14px] text-[var(--ink2)]">
           Signed in{account.email ? ` as ${account.email}` : ''}. Your brief is saved to your account.
         </p>
-      ) : googleSignIn ? (
+      ) : anyProvider(socialSignIn) ? (
         <div className="flex flex-col gap-2 border-b border-[var(--line)] pb-5">
-          <GoogleButton next="/quiz" className="self-start" />
+          <SocialButtons providers={socialSignIn} next="/quiz" className="max-w-xs" />
           <p className="m-0 text-[13px] leading-snug text-[var(--ink2)]">
             Fills in your name and email and keeps your brief on your account. We still need your
             mobile below.

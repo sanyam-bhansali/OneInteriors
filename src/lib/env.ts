@@ -265,3 +265,26 @@ export function googleOAuth(): { clientId: string; clientSecret: string } | null
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
   return clientId && clientSecret ? { clientId, clientSecret } : null;
 }
+
+/**
+ * Facebook sign-in, or null when it is not set up — the same all-or-nothing
+ * rule as `googleOAuth()`: no button unless the flow can finish.
+ */
+export function facebookOAuth(): { appId: string; appSecret: string } | null {
+  const appId = process.env.FACEBOOK_APP_ID?.trim();
+  const appSecret = process.env.FACEBOOK_APP_SECRET?.trim();
+  return appId && appSecret ? { appId, appSecret } : null;
+}
+
+/**
+ * Sign in with Apple, or null when it is not set up. The private key is the
+ * .p8 from the Apple developer account; pasted into one env line its newlines
+ * arrive as "\n", which are restored here.
+ */
+export function appleOAuth(): { clientId: string; teamId: string; keyId: string; privateKey: string } | null {
+  const clientId = process.env.APPLE_CLIENT_ID?.trim();
+  const teamId = process.env.APPLE_TEAM_ID?.trim();
+  const keyId = process.env.APPLE_KEY_ID?.trim();
+  const privateKey = process.env.APPLE_PRIVATE_KEY?.trim().replace(/\n/g, '\n');
+  return clientId && teamId && keyId && privateKey ? { clientId, teamId, keyId, privateKey } : null;
+}

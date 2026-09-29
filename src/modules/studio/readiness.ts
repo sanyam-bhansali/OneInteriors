@@ -99,6 +99,18 @@ export async function featureReadiness(): Promise<FeatureReadiness[]> {
       needs: [present('GOOGLE_CLIENT_ID'), present('GOOGLE_CLIENT_SECRET')],
     },
     {
+      feature: 'Sign in with Apple (customers)',
+      ready: ['APPLE_CLIENT_ID', 'APPLE_TEAM_ID', 'APPLE_KEY_ID', 'APPLE_PRIVATE_KEY'].every((k) => Boolean(process.env[k]?.trim())),
+      fallback: 'No Apple button anywhere.',
+      needs: [present('APPLE_CLIENT_ID'), present('APPLE_TEAM_ID'), present('APPLE_KEY_ID'), present('APPLE_PRIVATE_KEY')],
+    },
+    {
+      feature: 'Sign in with Facebook (customers)',
+      ready: Boolean(process.env.FACEBOOK_APP_ID?.trim()) && Boolean(process.env.FACEBOOK_APP_SECRET?.trim()),
+      fallback: 'No Facebook button anywhere.',
+      needs: [present('FACEBOOK_APP_ID'), present('FACEBOOK_APP_SECRET')],
+    },
+    {
       feature: 'Customer marketplace open',
       ready: process.env.CUSTOMER_LIVE?.trim() === '1',
       fallback: 'The quiz, matches and compare redirect to the landing page.',

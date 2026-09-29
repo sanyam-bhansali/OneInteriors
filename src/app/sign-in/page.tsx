@@ -7,8 +7,27 @@ import { Container } from '@/components/ui';
 import { Wordmark } from '@/components/brand';
 import { getCurrentUser } from '@/modules/auth/session';
 import { safeNext } from '@/lib/site';
-import { googleOAuth } from '@/lib/env';
-import { GoogleButton } from '@/components/GoogleButton';
+import { appleOAuth, facebookOAuth, googleOAuth } from '@/lib/env';
+
+const PROVIDER_NAME: Record<string, string> = { google: 'Google', apple: 'Apple', facebook: 'Facebook' };
+
+/** What went wrong with a social sign-in, in their terms — each one says what to do. */
+function socialError(error: string | undefined): string | null {
+  const m = /^(google|apple|facebook)(?:-(staff|unavailable|no-email))?$/.exec(error ?? '');
+  if (!m) return null;
+  const name = PROVIDER_NAME[m[1]!]!;
+  switch (m[2]) {
+    case 'staff':
+      return `That ${name} account’s email belongs to a studio or team account, which signs in by email below — not with ${name}.`;
+    case 'unavailable':
+      return `Signing in with ${name} is not available right now. Use your number instead.`;
+    case 'no-email':
+      return `Your ${name} account has no email we can use. Use your number instead.`;
+    default:
+      return `${name} sign-in did not complete. Try again, or use your number instead.`;
+  }
+}
+import { SocialButtons, anyProvider, type Providers } from '@/components/SocialButtons';
 import { signOutAction } from './actions';
 import { SignInForm } from './SignInForm';
 import { PasswordForm } from './PasswordForm';
@@ -27,16 +46,13 @@ export default async function SignInPage({
   searchParams: Promise<{ next?: string; reason?: string; error?: string }>;
 }) {
   const { next, reason, error } = await searchParams;
-  const google = googleOAuth() !== null;
-  /* What went wrong with Google, in their terms — each one says what to do. */
-  const googleError =
-    error === 'google-staff'
-      ? 'That Google account’s email belongs to a studio or team account, which signs in by email below — not with Google.'
-      : error === 'google-unavailable'
-        ? 'Signing in with Google is not available right now. Use your number instead.'
-        : error === 'google'
-          ? 'Google sign-in did not complete. Try again, or use your number instead.'
-          : null;
+  const providers: Providers = {
+    google: googleOAuth() !== null,
+    apple: appleOAuth() !== null,
+    facebook: facebookOAuth() !== null,
+  };
+  const google = anyProvider(providers);
+  const googleError = socialError(error);
   const destination = safeNext(next ?? null);
 
   const user = await getCurrentUser();
@@ -230,7 +246,13 @@ export default async function SignInPage({
                 are on the next screen — so they stay yours and you can come back to them.
               </>
             ) : google ? (
-              <>With Google, or your number and a code on WhatsApp. No password to remember or lose.</>
+              <>
+                With {[providers.google && 'Google', providers.apple && 'Apple', providers.facebook && 'Facebook']
+                  .filter(Boolean)
+                  .join(', ')
+                  .replace(/, ([^,]*)$/, ' or $1')}
+                , or your number and a code on WhatsApp. No password to remember or lose.
+              </>
             ) : (
               <>Your number and a code on WhatsApp. No password to remember or lose.</>
             )}
@@ -249,7 +271,7 @@ export default async function SignInPage({
               when it is set up end to end. */}
           {google ? (
             <div className="mb-8">
-              <GoogleButton next={destination} className="w-full" />
+              <SocialButtons providers={providers} next={destination} />
               <p className="m-0 mt-6 text-center text-[13px] uppercase tracking-[0.14em] text-[var(--color-ink-3)]">
                 or with your number
               </p>
