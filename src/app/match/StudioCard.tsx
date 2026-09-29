@@ -43,6 +43,7 @@ import { DUR, EASE_OUT, riseCard } from '@/components/oi/motion';
 import { Glass, revealProps } from '@/components/oi/Surfaces';
 import { ProjectWings } from './ProjectWings';
 import { Listen } from '@/components/oi/Listen';
+import { NO_RATES_LABEL } from '@/modules/quotation/rate-policy';
 import type { Focus } from '@/components/oi/useScrollFocus';
 import type { Studio } from '@/modules/studio/types';
 import { ENGINE_VERSION, FACTOR_LABELS, type FactorKey, type MatchResult } from '@/modules/matching/score';
@@ -76,6 +77,7 @@ export function StudioCard({
   focus,
   wingsOpen,
   quotedTotalPaise,
+  ratesFiled = true,
   inCompare,
   cachedRead,
   onQuote,
@@ -98,6 +100,8 @@ export function StudioCard({
    */
   wingsOpen: boolean;
   quotedTotalPaise: number | null;
+  /** False once the roster is real and this studio has no approved rates (rate-policy.ts). */
+  ratesFiled?: boolean;
   inCompare: boolean;
   cachedRead: StoredRead | undefined;
   onQuote: () => void;
@@ -207,7 +211,7 @@ export function StudioCard({
       {/* ── The facts that decide a shortlist ── */}
       <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-4 border-t border-[var(--line)] pt-5 sm:grid-cols-3">
         <Fact
-          label={quotedTotalPaise !== null ? 'Your quote' : 'Not priced yet'}
+          label={quotedTotalPaise !== null ? 'Your quote' : ratesFiled ? 'Not priced yet' : NO_RATES_LABEL}
           value={quotedTotalPaise !== null ? formatINRCompact(quotedTotalPaise) : '—'}
         />
         <Fact
@@ -251,7 +255,7 @@ export function StudioCard({
 
       {/* ── Actions ── */}
       <div className="mt-5 flex flex-wrap items-center gap-2.5">
-        {quotedTotalPaise === null ? (
+        {quotedTotalPaise === null && !ratesFiled ? null : quotedTotalPaise === null ? (
           <button
             type="button"
             onClick={onQuote}

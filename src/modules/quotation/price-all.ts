@@ -13,6 +13,7 @@
 
 import { buildFirstQuote, runSourceOf, standardKitchenRunMm, type FirstQuote } from './first-quote';
 import type { StudioRates } from './catalogue';
+import { hasRates } from './rate-policy';
 import type { FloorPlan, StoredQuote } from './project-store';
 import type { ScopeSelection } from './scope';
 
@@ -80,6 +81,9 @@ export function priceMatches({
   const key = quoteKey(shape, plan);
   const fresh: StoredQuote[] = [];
   for (const studio of studios) {
+    const rates = ratesFor(studio.slug);
+    // No rates of their own: "Rates not filed yet", never a figure (rate-policy.ts).
+    if (!hasRates(rates)) continue;
     const had = existing[studio.slug];
     const discount = studio.curatedDiscountPct ?? null;
     if (had?.key === key && (had.quote.curatedDiscountPct ?? null) === discount) continue;
@@ -95,7 +99,7 @@ export function priceMatches({
         scope: shape.scope,
         curatedDiscountPct: discount,
       },
-      ratesFor(studio.slug),
+      rates,
     );
     fresh.push({ studioSlug: studio.slug, studioName: studio.name, builtAt: now.toISOString(), quote, key });
   }

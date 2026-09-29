@@ -29,6 +29,7 @@
  * Pure, and with NO `server-only` — the quote renders in the browser.
  */
 
+import { rosterIsReal } from '@/lib/env';
 import type { StudioRates } from '@/modules/quotation/catalogue';
 
 /**
@@ -78,7 +79,9 @@ const ARCHIVE_MEDIAN: Record<string, number> = {
  * a placeholder is good enough.
  */
 export function ratesAreReal(): boolean {
-  return false;
+  // Once the roster is real, no studio is priced on these samples
+  // (modules/quotation/rate-policy.ts), so the pre-launch label goes.
+  return rosterIsReal();
 }
 
 /**

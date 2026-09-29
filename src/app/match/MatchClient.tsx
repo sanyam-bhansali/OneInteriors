@@ -64,6 +64,7 @@ import { kitchenFor, priceMatches, quoteKey } from '@/modules/quotation/price-al
 import { runSourceOf } from '@/modules/quotation/first-quote';
 import { filedRatesFor, ratesAreReal } from '@/data/filed-rates';
 import { scopePhrase, selectionOf } from '@/modules/quotation/scope';
+import { hasRates } from '@/modules/quotation/rate-policy';
 import { placementIn, scopeBandRange } from '@/modules/quotation/scope-band';
 import type { FirstQuote } from '@/modules/quotation/first-quote';
 import { homeShapeFor } from '@/modules/quotation/first-quote';
@@ -482,6 +483,7 @@ export function MatchClient({
                   brief={brief}
                   rank={i}
                   quotedTotalPaise={stored?.quote.totalPaise ?? null}
+                  ratesFiled={hasRates(rankOptions.ratesFor(studio.slug))}
                   inCompare={comparing.includes(studio.slug)}
                   cachedRead={project.reads?.[studio.id]}
                   onRead={(id, read) =>
