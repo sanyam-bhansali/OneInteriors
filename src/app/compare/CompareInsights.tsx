@@ -16,8 +16,8 @@ import {
   sameSpecGroups,
   type Entry,
 } from '@/modules/quotation/compare-insights';
-import { explainComparisonAction } from './actions';
-import type { ComparisonExplanation } from '@/modules/quotation/compare-summary';
+import { askQuoteAction, explainComparisonAction } from './actions';
+import type { ComparisonExplanation, QuoteAnswer } from '@/modules/quotation/compare-summary';
 import type { Brief } from '@/modules/brief/types';
 import type { FloorPlan } from '@/modules/quotation/project-store';
 import { LANGUAGES, LANGUAGE_LABELS, type Language } from '@/modules/brief/types';
@@ -256,6 +256,87 @@ export function ExplainDifferences({
           material — in a few sentences.
         </p>
       )}
+    </Sheet>
+  );
+}
+
+/**
+ * Ask your quote (queue item 24): a question in their words, answered only
+ * from these quotes — every figure in the answer is checked against them on
+ * the server, and when it cannot be answered from them, it says so.
+ */
+export function AskYourQuote({ slugs, brief, plan }: { slugs: string[]; brief: Brief | null; plan: FloorPlan | null }) {
+  const measured = plan && plan.source !== 'standard' && plan.kitchenRunMm ? plan : null;
+  const [question, setQuestion] = useState('');
+  const [answer, setAnswer] = useState<QuoteAnswer | null>(null);
+  const [pending, start] = useTransition();
+  const examples = ['Why is the kitchen so different between them?', 'Where does most of the money go?'];
+  const ask = (q: string) =>
+    start(async () => {
+      setAnswer(null);
+      const r = await askQuoteAction({
+        slugs,
+        brief,
+        kitchenRunMm: measured?.kitchenRunMm ?? null,
+        measured: measured?.source ?? null,
+        question: q,
+      }).catch(() => null);
+      setAnswer(r ?? { text: 'Could not answer just now. Try again in a minute.', source: 'none' });
+    });
+  return (
+    <Sheet className="mb-10 p-6 print:hidden">
+      <p className="oi-eyebrow m-0 mb-2">Ask your quote</p>
+      <p className="m-0 mb-4 text-[13.5px] text-[var(--ink2)]">
+        Answered only from the figures on these quotes — nothing made up, and every number checked.
+      </p>
+      <form
+        className="flex flex-wrap gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (question.trim().length >= 5) ask(question);
+        }}
+      >
+        <input
+          value={question}
+          onChange={(e) => setQuestion(e.target.value.slice(0, 300))}
+          placeholder="Why is one studio’s kitchen more?"
+          className="min-h-11 min-w-[16rem] flex-1 rounded-full border border-[var(--line)] bg-[var(--card)] px-4 text-[15px]"
+          aria-label="Your question about these quotes"
+        />
+        <button
+          type="submit"
+          disabled={pending || !brief || question.trim().length < 5}
+          className="oi-cta min-h-11 cursor-pointer border-0 px-5 text-[14px] disabled:opacity-50"
+        >
+          {pending ? 'Reading your quotes…' : 'Ask'}
+        </button>
+      </form>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {examples.map((q) => (
+          <button
+            key={q}
+            type="button"
+            disabled={pending || !brief}
+            onClick={() => {
+              setQuestion(q);
+              ask(q);
+            }}
+            className="cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-3 py-1.5 text-[12.5px] text-[var(--ink2)]"
+          >
+            {q}
+          </button>
+        ))}
+      </div>
+      {answer ? (
+        <div className="mt-4 border-t border-[var(--line)] pt-4">
+          <p className="m-0 max-w-[62ch] text-[15px] leading-relaxed text-[var(--ink)]">{answer.text}</p>
+          {answer.source === 'model' ? (
+            <div className="mt-2">
+              <Listen text={answer.text} />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </Sheet>
   );
 }

@@ -16,7 +16,9 @@ import { sanitiseBrief } from '@/modules/matching/sanitise';
 import { buildFirstQuote, compareMany, homeShapeFor } from '@/modules/quotation/first-quote';
 import { resolveRatesForMany } from '@/modules/quotation/resolve-rates';
 import { filedRatesFor } from '@/data/filed-rates';
-import { explainComparison, type ComparisonExplanation } from '@/modules/quotation/compare-summary';
+import { answerQuestion, explainComparison, type ComparisonExplanation, type QuoteAnswer } from '@/modules/quotation/compare-summary';
+import { cleanQuestion } from '@/modules/quotation/quote-questions';
+import type { Language } from '@/modules/brief/types';
 
 export type ShareLinkResult =
   | { ok: true; url: string }
@@ -72,17 +74,24 @@ function withinLimit(key: string): boolean {
  * and the studios' names come from the roster, so nothing the browser wrote
  * reaches the prompt and the figures are the ones this server stands behind.
  */
-export async function explainComparisonAction(input: {
+interface CompareInput {
   slugs: unknown;
   brief: unknown;
   kitchenRunMm: unknown;
   measured: unknown;
   language?: unknown;
-}): Promise<ComparisonExplanation | null> {
+}
+
+/**
+ * The quotes, priced again on the server from the slugs and the sanitised
+ * brief — never taken from the browser — so an answer can only speak to real
+ * numbers. Rate-limited per address.
+ */
+async function entriesFor(input: CompareInput, min: number) {
   const slugs = Array.isArray(input.slugs)
     ? [...new Set(input.slugs.filter((s): s is string => typeof s === 'string' && s.length <= 80))].slice(0, 6)
     : [];
-  if (slugs.length < 2) return null;
+  if (slugs.length < min) return null;
 
   const h = await headers();
   const key = h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || 'unknown';
@@ -112,8 +121,28 @@ export async function explainComparisonAction(input: {
         rates[s.slug]?.rates ?? filedRatesFor(s.slug),
       ),
     }));
-  if (entries.length < 2) return null;
+  if (entries.length < min) return null;
   // The language from their brief, or the one they switched to on the page.
-  const language = input.language === 'HI' || input.language === 'MR' ? input.language : brief.language === 'HI' || brief.language === 'MR' ? brief.language : 'EN';
-  return explainComparison(entries, compareMany(entries), language);
+  const language: Language =
+    input.language === 'HI' || input.language === 'MR'
+      ? input.language
+      : brief.language === 'HI' || brief.language === 'MR'
+        ? brief.language
+        : 'EN';
+  return { entries, language };
+}
+
+export async function explainComparisonAction(input: CompareInput): Promise<ComparisonExplanation | null> {
+  const got = await entriesFor(input, 2);
+  if (!got) return null;
+  return explainComparison(got.entries, compareMany(got.entries), got.language);
+}
+
+/** "Ask your quote" (queue item 24): one question, answered from these quotes only. */
+export async function askQuoteAction(input: CompareInput & { question: unknown }): Promise<QuoteAnswer | null> {
+  const question = cleanQuestion(input.question);
+  if (!question) return null;
+  const got = await entriesFor(input, 1);
+  if (!got) return null;
+  return answerQuestion(got.entries, question, got.language);
 }

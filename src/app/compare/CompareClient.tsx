@@ -42,7 +42,7 @@ import { saveDecisionAction } from '@/app/match/journey-actions';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
 import { Spec, MaterialChip, MaterialPanel } from '@/components/oi/Material';
 import { Wrap, Chapter, Sheet, Quiet, Flag } from '@/components/oi';
-import { ExplainDifferences, FitBlock, MaterialPrices, RoomPrices } from './CompareInsights';
+import { ExplainDifferences, AskYourQuote, FitBlock, MaterialPrices, RoomPrices } from './CompareInsights';
 import { rankStudios, type MatchResult } from '@/modules/matching/score';
 import { loadBrief } from '@/modules/brief/store';
 import { filedRatesFor } from '@/data/filed-rates';
@@ -461,6 +461,7 @@ export function CompareClient({
             The one-page brief — to print, save or send to family →
           </Link>
         </p>
+        <AskYourQuote slugs={entries.map((e) => e.slug)} brief={brief} plan={project.plan} />
         <RoomPrices entries={entries} />
         <MaterialPrices entries={entries} />
 
