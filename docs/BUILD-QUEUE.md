@@ -27,7 +27,7 @@ Legend: ✅ done · 🔨 next · ⏳ waits on the owner (named)
 | # | Item | Why | State |
 |---|---|---|---|
 | 5 | **Household and needs add quote lines** — study unit for work from home, mandir for a pooja room, extra lofts for storage | "Every answer affects the result" — these two answers do not touch the quote yet (§7.2) | ✅ each added line says why; priced at the standard line's rate; untickable; narrowed jobs keep to their rooms |
-| 6 | **The customer's top priority leads each card's evidence** | "You put finishing on time first → they can start in January…" (§6) | |
+| 6 | **The customer's top priority leads each card's evidence** | "You put finishing on time first → they can start in January…" (§6) | ✅ `topPriority` on every match, said whatever it scored (match@2.0.1) |
 | 7 | **Society typeahead** — picking "Gera World of Joy" fills Kharadi, and society names stay consistent for matching and the plan library | §2 screen 2; makes "a home in your building" match reliably | |
 | 8 | **Skip screens the floor plan already answered** | Fewer questions for the customers who did the most work (§2 rules) | |
 | 9 | **Expert questions from household and possession**, not only the price gap | The call starts with their real worries (§9) | |

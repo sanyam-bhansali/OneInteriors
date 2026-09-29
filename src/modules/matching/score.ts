@@ -30,7 +30,7 @@
  */
 
 import type { Brief } from '@/modules/brief/types';
-import { STYLE_LABELS, zoneOf } from '@/modules/brief/types';
+import { PRIORITY_LABELS, STYLE_LABELS, zoneOf } from '@/modules/brief/types';
 import type { Studio } from '@/modules/studio/types';
 import type { StudioRates } from '@/modules/quotation/catalogue';
 import { TIERS, type Tier } from '@/modules/quotation/tiers';
@@ -42,6 +42,7 @@ import {
   dislikedShare,
   householdFit,
   priorities,
+  prioritySignal,
   similarWork,
   styleFit,
   timelineFit,
@@ -53,8 +54,10 @@ import {
 /**
  * 2.0.0 (29 Sep 2026): the §5 engine — band, scope and zone filters; six
  * factors with their own signals; confidence-adjusted order.
+ * 2.0.1 (30 Sep 2026): `topPriority` — the customer's first priority leads
+ * each card's evidence. Scores unchanged; bumped so cached reads refresh.
  */
-export const ENGINE_VERSION = 'match@2.0.0';
+export const ENGINE_VERSION = 'match@2.0.1';
 
 export const WEIGHTS = {
   style: 30,
@@ -94,6 +97,12 @@ export interface MatchResult {
   orderScore?: number;
   /** One line of evidence per measured factor, for the card. */
   evidence?: Partial<Record<FactorKey, string>>;
+  /**
+   * "You put finishing on time first: they can start in January, when you
+   * get the keys." What this studio offers on the customer's #1 priority,
+   * flattering or not — it leads the card (build queue item 6, plan §6).
+   */
+  topPriority?: string;
   /** "Can start in January, when you get the keys" — and whether it is late. */
   timeline?: { line: string; late: boolean } | null;
   /** Their projects most like this home, best first. */
@@ -280,13 +289,16 @@ export function scoreMatch(brief: Brief, studio: Studio, options: RankOptions = 
         : 'BAND_UP'
       : undefined;
 
+  const lead = topPriorityLine(brief, studio, ctx);
+
   return {
     studioId: studio.id,
     score: Math.round(weighted / measuredWeight),
     factorsScored,
     factorsTotal: FACTOR_COUNT,
     breakdown,
-    reasoning: buildReasoning(brief, studio, evidence, timeline),
+    reasoning: [...(lead ? [lead] : []), ...buildReasoning(brief, studio, evidence, timeline)],
+    ...(lead ? { topPriority: lead } : {}),
     engineVersion: ENGINE_VERSION,
     measuredWeight,
     // Late starters sort down, never out.
@@ -471,6 +483,36 @@ export function matchSummary(brief: Brief, studio: Studio, result: MatchResult):
   }
   if (clauses.length === 0) return null;
   return `Because ${clauses.slice(0, 3).join('; ')}.`;
+}
+
+/**
+ * The customer's first priority, answered for this studio in one sentence.
+ *
+ * Said whatever it scored: someone who put finishing on time first should
+ * read "they cannot start until March" on the card, not have it hidden
+ * because it lost points. When we know nothing on it, that is said too.
+ */
+export function topPriorityLine(brief: Brief, studio: Studio, ctx: SignalContext = contextOf({})): string | null {
+  const first = brief.priorityRanking[0];
+  if (!first) return null;
+  const label = PRIORITY_LABELS[first].toLowerCase();
+  const s = prioritySignal(first, brief, studio, ctx);
+  if (!s) return `You put ${label} first. We have nothing on that for ${studio.tradeName} yet.`;
+  let text = s.evidence;
+  if (!text || /^From /.test(text)) {
+    // The delivered-budget fallback says where its number came from, not what it is.
+    text =
+      first === 'BUDGET'
+        ? s.value >= 60
+          ? 'Their past projects sit within your budget'
+          : 'Most of their past projects sit outside your budget'
+        : s.value >= 60
+          ? 'They measure well on it'
+          : 'They measure weakly on it';
+  }
+  // The timeline's lines have no subject ("Can start in January"); give them one.
+  const subject = /^(can|cannot)\b/i.test(text) ? 'they ' : /^booked\b/i.test(text) ? 'they are ' : '';
+  return `You put ${label} first: ${subject}${lowerFirst(text)}.`;
 }
 
 // ── Helpers ────────────────────────────────────────────────────

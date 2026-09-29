@@ -242,6 +242,10 @@ export function StudioCard({
       {/* ── The read ── */}
       <div className="mt-5 border-t border-[var(--line)] pt-4">
         <p className="oi-eyebrow m-0 mb-2">Why this one fits you</p>
+        {/* Their first priority, answered first — flattering or not. */}
+        {match.topPriority ? (
+          <p className="q-small m-0 mb-2 max-w-[62ch] font-semibold text-[var(--ink)]">{match.topPriority}</p>
+        ) : null}
         {read ? (
           <>
             <p className="q-small m-0 max-w-[62ch] text-[var(--ink)]">{read.text}</p>

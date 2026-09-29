@@ -216,6 +216,6 @@ describe('an open-ended budget (the top band)', () => {
   });
 
   it('stamps the v2 engine', () => {
-    expect(scoreMatch(baseBrief, proven)?.engineVersion).toBe('match@2.0.0');
+    expect(scoreMatch(baseBrief, proven)?.engineVersion).toBe('match@2.0.1');
   });
 });
