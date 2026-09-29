@@ -249,7 +249,7 @@ export function MatchClient({
             <button
               type="button"
               onClick={() => setQuoting(null)}
-              className="oi-num mb-8 cursor-pointer border-0 bg-transparent p-0 text-[11px] uppercase tracking-[0.16em] text-[var(--ink2)] hover:text-[var(--ink)]"
+              className="oi-num mb-8 cursor-pointer border-0 bg-transparent p-0 text-[11px] uppercase tracking-[0.16em] text-[var(--ink2)] hover:text-[var(--ink)] print:hidden"
             >
               ← Back to your matches
             </button>
@@ -297,7 +297,7 @@ export function MatchClient({
           <button
             type="button"
             onClick={() => setQuoting(null)}
-            className="oi-num mb-8 cursor-pointer border-0 bg-transparent p-0 text-[11px] uppercase tracking-[0.16em] text-[var(--ink2)] hover:text-[var(--ink)]"
+            className="oi-num mb-8 cursor-pointer border-0 bg-transparent p-0 text-[11px] uppercase tracking-[0.16em] text-[var(--ink2)] hover:text-[var(--ink)] print:hidden"
           >
             ← Back to your matches
           </button>

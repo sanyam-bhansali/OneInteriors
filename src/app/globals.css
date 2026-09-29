@@ -2055,6 +2055,14 @@ p {
    the URL that is already in quotations people have sent. This does the
    same job and breaks nothing.
    ───────────────────────────────────────────────────────────────────── */
+/* A quotation on A4, with a margin a printer will not clip. The browser's
+   own header and footer (URL, date) are a print-dialog setting we cannot
+   switch off from here. */
+@page {
+  size: A4;
+  margin: 14mm 12mm;
+}
+
 @media print {
   /* The shell, in every form it takes. */
   .studio-app aside,
