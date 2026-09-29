@@ -30,6 +30,7 @@ export function OpsHeader() {
             <OpsLink href="/ops/allocation">Allocation</OpsLink>
             <OpsLink href="/ops/coverage">Coverage</OpsLink>
             <OpsLink href="/ops/consultations">Calls</OpsLink>
+            <OpsLink href="/ops/experts">Expert hours</OpsLink>
             {/* After the call. Everything from the handoff to whether the
                 meeting happened — the half of the funnel we charge for and,
                 until now, the only half nothing on this surface could see. */}

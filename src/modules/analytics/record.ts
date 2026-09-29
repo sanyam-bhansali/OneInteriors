@@ -112,6 +112,7 @@ export async function funnelSummary(sinceDays = 30, quizSteps = 9): Promise<Funn
         quizCompletions += 1;
         break;
       case 'enquiry.sent':
+      case 'enquiry.booked':
         enquiries += 1;
         break;
       case 'quiz.step.view':

@@ -257,6 +257,47 @@ export async function sendApplicationReceived(
 }
 
 /**
+ * The customer's expert call, booked — with the invite attached.
+ *
+ * Said the way the page said it: the day, the time, who we will talk about,
+ * and that we ring them. The .ics puts it in their calendar in one tap.
+ */
+export async function sendCallBooked(
+  to: string,
+  call: { name: string; when: { day: string; time: string }; studios: string[]; ics: string },
+): Promise<SendResult> {
+  const cfg = config();
+  const text = [
+    `Hello ${call.name},`,
+    '',
+    `Your expert call is booked for ${call.when.day} at ${call.when.time} — thirty minutes.`,
+    '',
+    call.studios.length > 0 ? `We will go through ${call.studios.join(', ')} with you.` : '',
+    'We ring you; there is nothing to install and nothing to prepare. The',
+    'expert has your brief and your quotes, exactly as you saw them.',
+    '',
+    'To move or cancel it, reply to this email.',
+    '',
+    'One Interiors',
+  ]
+    .filter((l, i, all) => !(l === '' && all[i - 1] === ''))
+    .join('\n');
+
+  if (isFault(cfg)) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error(`[expert] ${cfg.message} — booking confirmation NOT sent to`, maskEmail(to));
+      return { delivered: false, reason: cfg.reason };
+    }
+    console.log(`\n[expert] Booking confirmation for ${to}\n${text}\n`);
+    return { delivered: false, reason: 'dev_console' };
+  }
+
+  return send(cfg, to, `Booked: your expert call, ${call.when.day} at ${call.when.time}`, text, '[expert]', [
+    { filename: 'one-interiors-call.ics', content: call.ics },
+  ]);
+}
+
+/**
  * The email a studio gets when we say no.
  *
  * ## Why this is not optional
@@ -327,6 +368,7 @@ async function send(
   subject: string,
   text: string,
   tag: string,
+  attachments?: { filename: string; content: string }[],
 ): Promise<SendResult> {
   try {
     const res = await fetch(RESEND_ENDPOINT, {
@@ -335,7 +377,15 @@ async function send(
         Authorization: `Bearer ${cfg.apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ from: cfg.from, to, subject, text }),
+      body: JSON.stringify({
+        from: cfg.from,
+        to,
+        subject,
+        text,
+        ...(attachments?.length
+          ? { attachments: attachments.map((a) => ({ filename: a.filename, content: Buffer.from(a.content).toString('base64') })) }
+          : {}),
+      }),
     });
 
     if (!res.ok) {

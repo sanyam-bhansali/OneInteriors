@@ -23,6 +23,11 @@ import { normalisePhone } from '@/modules/studio/phone';
 import { isValidEmail, normaliseEmail } from '@/modules/auth/magic-link';
 import { record } from '@/modules/analytics/record';
 import { missingCoreRates } from '@/modules/quotation/categories';
+import { Prisma } from '@prisma/client';
+import { after } from 'next/server';
+import { availableSlots } from './availability';
+import { icsFor, slotLabel, SLOT_MINS } from './slots';
+import { sendCallBooked } from '@/modules/auth/email';
 
 export interface RequestInput {
   briefId: string;
@@ -32,10 +37,17 @@ export interface RequestInput {
   contactEmail?: string;
   askedAbout?: string;
   preferredTimes?: string;
+  /**
+   * A slot picked from the calendar (ISO). When present the call is booked,
+   * not requested: checked against what is open right now, given to the
+   * first expert free then, and refused by the database if somebody took it
+   * a moment earlier.
+   */
+  startsAt?: string;
 }
 
 export type RequestResult =
-  | { ok: true; id: string }
+  | { ok: true; id: string; scheduledFor?: string }
   | { ok: false; errors: Record<string, string> };
 
 /** Two is the minimum for a comparison to be worth a call. */
@@ -148,22 +160,73 @@ export async function requestConsultation(input: RequestInput): Promise<RequestR
      in itself. */
   if (!brief) return { ok: false, errors: { form: 'We could not find that brief.' } };
 
-  const consultation = await prisma.consultation.create({
-    data: {
-      briefId: brief.id,
-      studioIds: input.studioIds,
-      contactName,
-      contactPhone,
-      contactEmail,
-      askedAbout: input.askedAbout?.trim() || null,
-      preferredTimes: input.preferredTimes?.trim() || null,
-      status: 'requested',
-    },
-  });
+  /* A picked slot: still open, and whose. */
+  let booking: { scheduledFor: Date; expertUserId: string } | null = null;
+  if (input.startsAt) {
+    const slot = (await availableSlots()).find((s) => s.startsAt === input.startsAt);
+    if (!slot || slot.experts.length === 0) {
+      return { ok: false, errors: { startsAt: 'That time has just gone. Pick another — the list is up to date now.' } };
+    }
+    booking = { scheduledFor: new Date(slot.startsAt), expertUserId: slot.experts[0]! };
+  }
 
-  await record('enquiry.sent', { studios: input.studioIds.length }, brief.id);
+  let consultation: { id: string };
+  try {
+    consultation = await prisma.consultation.create({
+      data: {
+        briefId: brief.id,
+        studioIds: input.studioIds,
+        contactName,
+        contactPhone,
+        contactEmail,
+        askedAbout: input.askedAbout?.trim() || null,
+        preferredTimes: booking ? null : input.preferredTimes?.trim() || null,
+        status: booking ? 'scheduled' : 'requested',
+        ...(booking
+          ? { scheduledFor: booking.scheduledFor, expertUserId: booking.expertUserId, bookedAt: new Date(), durationMins: SLOT_MINS }
+          : {}),
+      },
+      select: { id: true },
+    });
+  } catch (error) {
+    // The partial unique index: somebody booked this expert at this time a
+    // moment ago. Say so plainly; the page reloads the slots.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return { ok: false, errors: { startsAt: 'Somebody booked that time a moment ago. Pick another.' } };
+    }
+    throw error;
+  }
 
-  return { ok: true, id: consultation.id };
+  await record(booking ? 'enquiry.booked' : 'enquiry.sent', { studios: input.studioIds.length }, brief.id);
+
+  if (booking && contactEmail) {
+    const studios = await prisma.studio.findMany({
+      where: { id: { in: input.studioIds } },
+      select: { id: true, tradeName: true },
+    });
+    const names = input.studioIds.map((id) => studios.find((s) => s.id === id)?.tradeName).filter(Boolean) as string[];
+    const iso = booking.scheduledFor.toISOString();
+    // After the response: a slow mail provider must not hold the booking screen.
+    after(() =>
+      sendCallBooked(contactEmail, {
+        name: contactName,
+        when: slotLabel(iso),
+        studios: names,
+        ics: icsFor({
+          uid: consultation.id,
+          startsAt: iso,
+          title: 'One Interiors — your expert call',
+          description: `A 30-minute call about ${names.join(', ')}. We will ring ${contactPhone}.`,
+        }),
+      }).then(() => undefined),
+    );
+  }
+
+  return {
+    ok: true,
+    id: consultation.id,
+    ...(booking ? { scheduledFor: booking.scheduledFor.toISOString() } : {}),
+  };
 }
 
 export interface ConsultationRow {

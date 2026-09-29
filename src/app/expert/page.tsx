@@ -8,6 +8,7 @@ import { loadBrief, readAnonKey } from '@/modules/brief/repository';
 import { getCurrentUser } from '@/modules/auth/session';
 import { studioRepository } from '@/modules/studio/repository';
 import { rankOnServer } from '@/modules/matching/rank-server';
+import { availableSlots } from '@/modules/consultation/availability';
 import { quoteBrief } from '@/modules/quotation/generate';
 import { MIN_STUDIOS, MAX_STUDIOS } from '@/modules/consultation/request';
 import { ARCHITECT, ARCHITECT_IS_REAL, architectFacts } from '@/modules/consultation/architect';
@@ -45,7 +46,10 @@ export default async function ExpertPage() {
 
   const studios = await studioRepository.list({ activeOnly: true });
   const ranked = (await rankOnServer(brief, studios, 9)).slice(0, MAX_STUDIOS);
-  const result = await quoteBrief(brief, ranked.map((r) => r.studioId));
+  const [result, slots] = await Promise.all([
+    quoteBrief(brief, ranked.map((r) => r.studioId)),
+    availableSlots(),
+  ]);
   if (!result.ok) redirect('/match');
 
   /**
@@ -201,6 +205,7 @@ export default async function ExpertPage() {
           maxStudios={MAX_STUDIOS}
           defaultName={user.name}
           defaultEmail={user.email}
+          slots={slots.map((s) => s.startsAt)}
           studios={result.quotes.map((q) => ({
             id: q.studioId,
             name: q.studioName,

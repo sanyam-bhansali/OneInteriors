@@ -30,6 +30,7 @@
  */
 
 import { useActionState, useMemo, useState } from 'react';
+import { slotLabel } from '@/modules/consultation/slots';
 import { formatINRCompact } from '@/lib/money';
 import { Sheet, Tick } from '@/components/oi';
 import { requestExpertAction, type ExpertState } from './actions';
@@ -65,6 +66,7 @@ export function ExpertForm({
   defaultEmail,
   minStudios,
   maxStudios,
+  slots = [],
 }: {
   briefId: string;
   studios: StudioOption[];
@@ -72,8 +74,12 @@ export function ExpertForm({
   defaultEmail: string | null;
   minStudios: number;
   maxStudios: number;
+  /** Open 30-minute slots (ISO). Empty when no expert has hours set — then we ask when suits them. */
+  slots?: string[];
 }) {
   const [state, action, pending] = useActionState(requestExpertAction, INITIAL);
+  const [slot, setSlot] = useState<string | null>(null);
+  const booking = slots.length > 0;
   const [picked, setPicked] = useState<string[]>(studios.slice(0, 2).map((s) => s.id));
   const [asks, setAsks] = useState<string[]>([]);
   const [own, setOwn] = useState('');
@@ -110,16 +116,17 @@ export function ExpertForm({
     .slice(0, 2000);
 
   if (state.status === 'sent') {
+    const when = state.scheduledFor ? slotLabel(state.scheduledFor) : null;
     return (
       <Sheet className="p-[clamp(22px,3vw,34px)]">
-        <p className="oi-eyebrow m-0 mb-4">Requested</p>
+        <p className="oi-eyebrow m-0 mb-4">{when ? 'Booked' : 'Requested'}</p>
         <h2 className="oi-display m-0 mb-4 text-[clamp(1.5rem,1.2rem+1.2vw,2rem)]">
-          We&rsquo;ll call you.
+          {when ? `${when.day}, ${when.time}.` : 'We\u2019ll call you.'}
         </h2>
         <p className="m-0 mb-3 max-w-[58ch] text-[15px] leading-[1.65] text-[var(--ink2)]">
-          Someone will be in touch within one working day to fix a time. Before the call they will
-          read your brief, your floor plan and every quote on your comparison — you will not have
-          to explain any of it again.
+          {when
+            ? 'Thirty minutes, and we ring you. The invite is in your email if you gave us one. Before the call the expert reads your brief, your floor plan and every quote on your comparison — you will not have to explain any of it again.'
+            : 'Someone will be in touch within one working day to fix a time. Before the call they will read your brief, your floor plan and every quote on your comparison — you will not have to explain any of it again.'}
         </p>
         {asks.length > 0 ? (
           <p className="m-0 mb-6 max-w-[58ch] text-[15px] leading-[1.65] text-[var(--ink2)]">
@@ -313,13 +320,31 @@ export function ExpertForm({
             defaultValue={defaultEmail}
             error={err.contactEmail}
           />
-          <Field
-            label="When suits you?"
-            name="preferredTimes"
-            placeholder="Weekday evenings, or Saturday morning"
-          />
+          {booking ? null : (
+            <Field
+              label="When suits you?"
+              name="preferredTimes"
+              placeholder="Weekday evenings, or Saturday morning"
+            />
+          )}
         </div>
       </fieldset>
+
+      {booking ? (
+        <fieldset className="m-0 border-0 p-0">
+          <legend className="oi-eyebrow m-0 mb-1 p-0">Pick a time — thirty minutes, we ring you</legend>
+          <p className="m-0 mb-4 text-[13.5px] text-[var(--ink2)]">
+            These are real times. Pick one and it is booked — nobody calls you back to arrange it.
+          </p>
+          <SlotPicker slots={slots} value={slot} onPick={setSlot} />
+          <input type="hidden" name="startsAt" value={slot ?? ''} />
+          {err.startsAt ? (
+            <p role="alert" className="m-0 mt-3 text-[14px]" style={{ color: 'var(--acc-ink)' }}>
+              {err.startsAt}
+            </p>
+          ) : null}
+        </fieldset>
+      ) : null}
 
       <div className="border-t border-[var(--line)] pt-7">
         {err.form ? (
@@ -333,10 +358,18 @@ export function ExpertForm({
         ) : null}
         <button
           type="submit"
-          disabled={pending || picked.length < minStudios}
+          disabled={pending || picked.length < minStudios || (booking && !slot)}
           className="oi-cta min-h-11 cursor-pointer border-0 px-7 py-3.5 text-[15px] disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {pending ? 'Sending…' : 'Request the call'}
+          {pending
+            ? booking
+              ? 'Booking…'
+              : 'Sending…'
+            : booking
+              ? slot
+                ? `Book ${slotLabel(slot).day.split(' ')[0]} ${slotLabel(slot).time}`
+                : 'Pick a time above'
+              : 'Request the call'}
         </button>
         <p className="m-0 mt-5 max-w-[58ch] text-[13.5px] leading-[1.6] text-[var(--ink2)]">
           Free, and there is nothing to buy on the call. We are paid by the studio if you go ahead
@@ -439,6 +472,53 @@ function Field({
           {error}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/** The next ten days, one row per day, each open half-hour a button. */
+function SlotPicker({
+  slots,
+  value,
+  onPick,
+}: {
+  slots: string[];
+  value: string | null;
+  onPick: (iso: string) => void;
+}) {
+  const days = new Map<string, string[]>();
+  for (const iso of slots) {
+    const { day } = slotLabel(iso);
+    days.set(day, [...(days.get(day) ?? []), iso]);
+  }
+  return (
+    <div className="flex flex-col gap-4">
+      {[...days.entries()].map(([day, times]) => (
+        <div key={day}>
+          <p className="oi-label m-0 mb-2">{day}</p>
+          <div className="flex flex-wrap gap-2">
+            {times.map((iso) => {
+              const on = value === iso;
+              return (
+                <button
+                  key={iso}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => onPick(iso)}
+                  className="oi-num min-h-11 cursor-pointer rounded-full border px-4 py-2 text-[13.5px] transition-colors"
+                  style={{
+                    borderColor: on ? 'var(--acc)' : 'var(--line)',
+                    background: on ? 'var(--acc-wash)' : 'transparent',
+                    color: on ? 'var(--acc-ink)' : 'var(--ink)',
+                  }}
+                >
+                  {slotLabel(iso).time}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -44,6 +44,8 @@ export const EVENTS = [
    */
   'studio.compared',
   'enquiry.sent',
+  // A call booked straight into a slot, rather than requested — plan §9.
+  'enquiry.booked',
   'signin.requested',
   'signin.completed',
   'brief.claimed',

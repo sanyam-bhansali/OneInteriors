@@ -75,6 +75,9 @@ model User {
 
   @@index([role])
   @@map("users")
+
+  expertHours  ExpertHours[] @relation("ExpertHours")
+  expertBlocks ExpertBlock[] @relation("ExpertBlocks")
 }
 
 /// Who a social sign-in provider says this user is. Google since 29 Sep
@@ -1259,6 +1262,13 @@ model Consultation {
   scheduledFor DateTime?
   expertUserId String?
   status       String    @default("requested") // requested | scheduled | completed | no_show | cancelled
+  /// Booked from a real slot (plan §9) rather than requested with free text.
+  /// No double booking: a partial unique index on (expertUserId,
+  /// scheduledFor) WHERE status = 'scheduled', in raw SQL in the migration
+  /// (Prisma cannot express a partial index), so a cancelled call frees its
+  /// slot.
+  durationMins Int       @default(30)
+  bookedAt     DateTime?
 
   // The expert's read is the training signal for the matching engine.
   outcomeNotes        String?  @db.Text
@@ -1270,6 +1280,40 @@ model Consultation {
 
   @@index([briefId])
   @@map("consultations")
+}
+
+/// An expert's weekly hours for booked calls, in IST (modules/consultation/slots.ts).
+/// Set by ops. Several rows per expert and weekday are allowed (a morning and
+/// an evening block).
+model ExpertHours {
+  id           String @id @default(cuid())
+  expertUserId String
+  expert       User   @relation("ExpertHours", fields: [expertUserId], references: [id], onDelete: Cascade)
+  /// 0 = Sunday … 6 = Saturday.
+  weekday      Int
+  /// Minutes after IST midnight, on the half-hour.
+  startMin     Int
+  endMin       Int
+
+  createdAt DateTime @default(now())
+
+  @@index([expertUserId])
+  @@map("expert_hours")
+}
+
+/// A day an expert is away. No slots are offered on it.
+model ExpertBlock {
+  id           String @id @default(cuid())
+  expertUserId String
+  expert       User   @relation("ExpertBlocks", fields: [expertUserId], references: [id], onDelete: Cascade)
+  /// IST date, YYYY-MM-DD.
+  day          String
+  reason       String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([expertUserId, day])
+  @@map("expert_blocks")
 }
 
 // ─────────────────────────────────────────────────────────────
