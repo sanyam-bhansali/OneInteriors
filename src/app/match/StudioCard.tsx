@@ -258,6 +258,23 @@ export function StudioCard({
         )}
       </div>
 
+      {/* ── Their work like yours, on the card itself (queue item 19) ──
+          The wings beside the card only fit on wide screens; this is the same
+          evidence where everyone can see it. */}
+      <LikeYours studio={studio} ids={match.similarProjects ?? []} />
+
+      {/* ── Meet the studio (queue item 18) ── their own short intro. */}
+      {studio.matchingProfile?.introVideoUrl ? (
+        <a
+          href={studio.matchingProfile.introVideoUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="q-small mt-4 inline-flex items-center gap-2 font-semibold text-[var(--acc-ink)] underline underline-offset-4"
+        >
+          <span aria-hidden>▶</span> Meet {studio.tradeName} — their intro video
+        </a>
+      ) : null}
+
       {/* What booking this studio through us brings, on the card itself —
           the moment a customer sees a name is the moment they could ring it. */}
       <BenefitChips limit={4} className="mt-5 border-t border-[var(--line)] pt-4" />
@@ -364,5 +381,39 @@ export function StudioCard({
       ) : null}
       </Glass>
     </motion.li>
+  );
+}
+
+/** Up to two of the studio's projects most like this brief, with a cover when there is one. */
+function LikeYours({ studio, ids }: { studio: Studio; ids: string[] }) {
+  const projects = ids
+    .map((id) => studio.portfolio.find((p) => p.id === id))
+    .filter((p): p is Studio['portfolio'][number] => Boolean(p))
+    .slice(0, 2);
+  if (projects.length === 0) return null;
+  return (
+    <div className="mt-5 border-t border-[var(--line)] pt-4">
+      <p className="oi-eyebrow m-0 mb-2">Their work like yours</p>
+      <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2">
+        {projects.map((p) => (
+          <li key={p.id} className="flex items-center gap-3">
+            {p.images[0] ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={p.images[0]} alt="" className="h-12 w-16 flex-none rounded-[6px] object-cover" />
+            ) : (
+              <span className="h-12 w-16 flex-none rounded-[6px] bg-[var(--line)]" aria-hidden />
+            )}
+            <span className="min-w-0">
+              <span className="block truncate text-[13.5px] font-semibold text-[var(--ink)]">{p.title}</span>
+              <span className="block text-[12.5px] text-[var(--ink2)]">
+                {[localityLabel(p.locality), p.valuePaise ? formatINRCompact(p.valuePaise) : null, p.durationDays ? `${p.durationDays} days` : null]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

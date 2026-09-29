@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { countdownFor } from '@/modules/portal/countdown';
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { Container, Eyebrow, Pill } from '@/components/ui';
@@ -56,6 +57,7 @@ export default async function AccountPage() {
   const consents = await consentHistory();
   const planUrl = row ? await signedUrlFor(row.id) : null;
   const briefDone = found && Boolean(brief.completedAt);
+  const countdown = found ? countdownFor(brief) : null;
   const home = await yourHome(row?.id ?? null, briefDone);
   const rooms = row ? await prepForBrief(row.id) : [];
   const trackers = row ? await trackersForBrief(row.id) : [];
@@ -81,6 +83,22 @@ export default async function AccountPage() {
             Your home, with us — your brief, the studios that fit, your quotes, your expert call and
             everything after it, in one place.
           </p>
+
+          {/* The keys, counted down, with the plan against them (queue item 17). */}
+          {countdown ? (
+            <div className="mb-8 rounded-[12px] border border-[var(--color-rule)] p-5">
+              <p className="m-0 font-[family-name:var(--font-display)] text-[clamp(1.6rem,3vw,2.2rem)] leading-none">
+                {countdown.headline}
+              </p>
+              <ul className="m-0 mt-3 flex list-none flex-col gap-1.5 p-0">
+                {countdown.plan.map((line) => (
+                  <li key={line} className="text-[14px] text-[var(--color-ink-2)]">
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {/* Where they are, as a path — each step a fact we hold. */}
           <ol className="m-0 mb-8 flex list-none flex-wrap gap-x-5 gap-y-2 p-0">
