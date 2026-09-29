@@ -312,6 +312,9 @@ model Brief {
   // Q4 / Q5 — style image picks resolve to tag slugs
   styleLikes    String[] @default([])
   styleDislikes String[] @default([]) // HARD FILTER, not a weight
+  /// Studios whose own portfolio photo they picked in the style picker —
+  /// shown unnamed, with the studio's consent (brief/picker-photos.ts).
+  styleStudioPicks String[] @default([])
 
   // Q6
   adults        Int?

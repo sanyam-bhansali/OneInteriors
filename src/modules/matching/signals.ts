@@ -65,11 +65,21 @@ export function styleFit(brief: Brief, studio: Studio, ctx: SignalContext): Sign
   if (total === 0) return null;
   // A studio need not be 100% one style to score full marks — 60% of its
   // recent work in the customer's direction is a studio that does it.
+  const value = clamp((credit / total / 0.6) * 100);
+  // Direct affinity (plan §5.2): they picked this studio's own photograph in
+  // the style picker before they knew whose it was. The strongest style
+  // evidence there is — lifted to at least PICKED_THEIR_PHOTO.
+  if (brief.styleStudioPicks?.includes(studio.id)) {
+    return { value: Math.max(value, PICKED_THEIR_PHOTO), evidence: 'You picked a photograph of their work in the style picker' };
+  }
   return {
-    value: clamp((credit / total / 0.6) * 100),
+    value,
     evidence: exact > 0 ? `${exact} of their project tags are styles you picked` : 'Their work sits next to your styles rather than in them',
   };
 }
+
+/** The style score a studio gets, at least, when the customer picked its own photo. */
+export const PICKED_THEIR_PHOTO = 90;
 
 /** Share of the studio's work in a style the customer ruled out, or null. */
 export function dislikedShare(brief: Brief, studio: Studio): number | null {

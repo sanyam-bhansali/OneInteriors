@@ -56,6 +56,7 @@ export interface BriefRow {
   budgetMaxPaise: bigint | null;
   styleLikes: string[];
   styleDislikes: string[];
+  styleStudioPicks?: string[];
   adults: number | null;
   children: number | null;
   elderly: number | null;
@@ -166,6 +167,7 @@ export function rowToBrief(row: BriefRow): Brief {
     budgetMaxPaise: row.budgetMaxPaise === null ? null : Number(row.budgetMaxPaise),
     styleLikes: row.styleLikes as StyleTag[],
     styleDislikes: row.styleDislikes as StyleTag[],
+    styleStudioPicks: row.styleStudioPicks ?? [],
     household,
     // Filtered, not cast: a need retired from the list must not render as
     // `undefined` on somebody's brief.
@@ -208,6 +210,7 @@ export function briefToRow(brief: Brief) {
     budgetMaxPaise: brief.budgetMaxPaise === null ? null : BigInt(brief.budgetMaxPaise),
     styleLikes: brief.styleLikes,
     styleDislikes: brief.styleDislikes,
+    styleStudioPicks: (brief.styleStudioPicks ?? []).filter((id) => typeof id === 'string' && id.length <= 40).slice(0, 3),
     adults: brief.household?.adults ?? null,
     children: brief.household?.children ?? null,
     elderly: brief.household?.elderly ?? null,

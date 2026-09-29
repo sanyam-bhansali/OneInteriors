@@ -56,8 +56,10 @@ import {
  * factors with their own signals; confidence-adjusted order.
  * 2.0.1 (30 Sep 2026): `topPriority` — the customer's first priority leads
  * each card's evidence. Scores unchanged; bumped so cached reads refresh.
+ * 2.1.0 (30 Sep 2026): direct affinity — a studio whose own photo the
+ * customer picked in the style picker scores at least 90 on style.
  */
-export const ENGINE_VERSION = 'match@2.0.1';
+export const ENGINE_VERSION = 'match@2.1.0';
 
 export const WEIGHTS = {
   style: 30,

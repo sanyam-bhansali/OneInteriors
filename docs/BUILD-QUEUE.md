@@ -37,7 +37,7 @@ Legend: ✅ done · 🔨 next · ⏳ waits on the owner (named)
 | # | Item | Why | State |
 |---|---|---|---|
 | 10 | **Style photos from the owner's Pinterest board**, assigned to style and room; **scope-aware** (kitchens for kitchen customers) | The stock photos are stand-ins | ⏳ the Pinterest board |
-| 11 | **Studio portfolio photos in the picker** (with picker consent), and a match boost when a customer picks a studio's own photo | §5.2 direct affinity | |
+| 11 | **Studio portfolio photos in the picker** (with picker consent), and a match boost when a customer picks a studio's own photo | §5.2 direct affinity | ✅ a consented, non-render photo takes the stock photo's place for its style, unnamed; picking it lifts that studio's style score to at least 90 (match@2.1.0) |
 | 12 | **This or that** — four pairs from the styles closest to their picks | Sharpens style fit (§2 screen 8) | |
 | 13 | **Style DNA card** — their styles as shares, a palette, three materials; shareable to WhatsApp | Delight and reach (§18.4) | |
 | 14 | **Swipe your style** on phones | More signal in less time (§18.3) | |

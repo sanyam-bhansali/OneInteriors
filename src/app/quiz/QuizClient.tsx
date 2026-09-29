@@ -20,6 +20,7 @@
  *     show what it is for, and only with the notice agreed.
  */
 
+import { studioPickerPhotos, type PickerPhoto } from '@/modules/brief/picker-photos';
 import { SocietyInput } from './SocietyInput';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -341,6 +342,8 @@ export function QuizClient({
 
   const stepId = stepAt(step);
   const canAdvance = isStepAnswered(brief, stepId);
+  const pickerPhotos = useMemo(() => studioPickerPhotos(studios), [studios]);
+
   const contactCtx: ContactContext = {
     account,
     socialSignIn,
@@ -351,6 +354,7 @@ export function QuizClient({
       if (Object.keys(contactErrors).length > 0) setContactErrors({});
     },
     errors: contactErrors,
+    pickerPhotos,
   };
 
   const matchCount = useMemo(() => {
@@ -535,6 +539,8 @@ interface ContactContext {
   contact: ContactInput;
   setContact: (next: ContactInput) => void;
   errors: ContactErrors;
+  /** Studios' own photos for the style picker, unnamed (brief/picker-photos.ts). */
+  pickerPhotos: Partial<Record<StyleTag, PickerPhoto>>;
 }
 
 function QuestionStep({
@@ -619,7 +625,20 @@ function stepContent(
               selected={brief.styleLikes}
               max={3}
               exclude={brief.styleDislikes}
-              onChange={(styleLikes) => update({ styleLikes })}
+              photos={ctx.pickerPhotos}
+              onChange={(styleLikes) =>
+                update({
+                  styleLikes,
+                  // Whose work they chose, for the tiles that were a studio's own photo.
+                  styleStudioPicks: [
+                    ...new Set(
+                      styleLikes
+                        .map((t) => ctx.pickerPhotos[t]?.studioId)
+                        .filter((id): id is string => Boolean(id)),
+                    ),
+                  ],
+                })
+              }
             />
             {brief.styleLikes.length === 3 ? (
               <p className="mt-5 rounded-[10px] bg-[var(--acc-wash)] px-4 py-3 text-[15px] leading-relaxed text-[var(--ink2)]">
@@ -652,6 +671,7 @@ function stepContent(
             max={2}
             exclude={brief.styleLikes}
             tone="exclude"
+            photos={ctx.pickerPhotos}
             onChange={(styleDislikes) => update({ styleDislikes })}
           />
         ),
@@ -1664,12 +1684,15 @@ function StylePicker({
   exclude,
   onChange,
   tone = 'include',
+  photos = {},
 }: {
   selected: StyleTag[];
   max: number;
   exclude: StyleTag[];
   onChange: (tags: StyleTag[]) => void;
   tone?: 'include' | 'exclude';
+  /** A studio's own photo for a style, used in place of the stock one. */
+  photos?: Partial<Record<StyleTag, PickerPhoto>>;
 }) {
   function toggle(tag: StyleTag) {
     if (selected.includes(tag)) {
@@ -1700,7 +1723,15 @@ function StylePicker({
                 isSelected ? ring : ''
               }`}
             >
-              {STYLE_PHOTOS[tag] ? (
+              {photos[tag] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={photos[tag]!.src}
+                  alt={photos[tag]!.alt}
+                  loading={i < 6 ? 'eager' : 'lazy'}
+                  className="block aspect-[4/3] w-full object-cover"
+                />
+              ) : STYLE_PHOTOS[tag] ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={stylePhotoUrl(STYLE_PHOTOS[tag])}
@@ -1744,8 +1775,16 @@ function StylePicker({
         <details className="text-[11.5px] text-[var(--ink2)]">
           <summary className="cursor-pointer">Photo credits</summary>
           <p className="m-0 mt-1 max-w-[60ch] leading-relaxed">
+            {Object.keys(photos).length > 0
+              ? 'Some are finished homes by studios on One Interiors, shown with their permission and without their names. '
+              : ''}
             Photographs from Unsplash by{' '}
-            {[...new Set(Object.values(STYLE_PHOTOS).map((p) => p.photographer))].join(', ')}.
+            {[
+              ...new Set(
+                STYLE_TAGS.filter((t) => !photos[t]).map((t) => STYLE_PHOTOS[t]?.photographer).filter(Boolean),
+              ),
+            ].join(', ')}
+            .
           </p>
         </details>
         {selected.length > 0 && tone === 'include' ? (

@@ -200,6 +200,11 @@ export interface Brief {
   // Q4 / Q5 — likes are a weight, dislikes are a HARD FILTER
   styleLikes: StyleTag[];
   styleDislikes: StyleTag[];
+  /**
+   * Studios whose own photo they picked in the style picker, unnamed
+   * (brief/picker-photos.ts). Read by the style factor as direct evidence.
+   */
+  styleStudioPicks?: string[];
 
   // Q6 — household
   household: Household | null;
@@ -252,6 +257,7 @@ export const EMPTY_BRIEF: Brief = {
   budgetMaxPaise: null,
   styleLikes: [],
   styleDislikes: [],
+  styleStudioPicks: [],
   household: null,
   needs: [],
   priorityRanking: [],

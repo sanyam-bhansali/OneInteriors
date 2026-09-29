@@ -153,6 +153,10 @@ export function sanitiseBrief(input: unknown): Brief {
     budgetMaxPaise: money(raw.budgetMaxPaise),
     styleLikes: tags(raw.styleLikes),
     styleDislikes: tags(raw.styleDislikes),
+    // Studio ids, not names: at most the three likes, each id-shaped.
+    styleStudioPicks: Array.isArray(raw.styleStudioPicks)
+      ? [...new Set(raw.styleStudioPicks.filter((x): x is string => typeof x === 'string' && /^[a-z0-9_-]{1,40}$/i.test(x)))].slice(0, 3)
+      : [],
     priorityRanking: priorities(raw.priorityRanking),
     // The rest of the brief, for the written read (29 Sep): the engine does not
     // score these yet, but the read speaks to them. Rebuilt like everything
