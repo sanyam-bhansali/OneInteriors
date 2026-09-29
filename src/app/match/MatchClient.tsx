@@ -25,6 +25,7 @@
  * shortcut to it, not a second home for it.
  */
 
+import { SEEN_KEY, readSeen, welcomeBack } from '@/modules/matching/welcome-back';
 import { ExpertPitch } from '@/components/oi/ExpertPitch';
 import type { OfferState } from '@/modules/consultation/offer';
 import { useEffect, useMemo, useState } from 'react';
@@ -288,6 +289,22 @@ export function MatchClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on what a quote depends on
   }, [briefed, matches, pricedFor, project.quotes]);
 
+  /* ── Welcome back (queue item 16) ──
+     Which studios this device last showed, and when; anything new since
+     earns a line at the top. Stored in this browser only. */
+  const [welcome, setWelcome] = useState<string | null>(null);
+  const matchIds = matches.map((m) => m.studioId).join(',');
+  useEffect(() => {
+    if (!briefed || !matchIds) return;
+    try {
+      const ids = matchIds.split(',');
+      setWelcome(welcomeBack(readSeen(localStorage.getItem(SEEN_KEY)), ids));
+      localStorage.setItem(SEEN_KEY, JSON.stringify({ ids, at: new Date().toISOString() }));
+    } catch {
+      // Storage blocked: no welcome line, nothing else changes.
+    }
+  }, [briefed, matchIds]);
+
   // ── The quote, over everything ──
   if (quoting) {
     const built = project.quotes[quoting.studioSlug];
@@ -445,6 +462,11 @@ export function MatchClient({
       />
 
       <Wrap className="py-12">
+        {welcome ? (
+          <p className="mx-auto mb-6 max-w-[40rem] rounded-full border border-[var(--acc)] px-5 py-2.5 text-center text-[14px] text-[var(--ink)]">
+            {welcome}
+          </p>
+        ) : null}
         {briefed && matches.length > 0 ? (
           <MatchHero
             fit={matches.length}
