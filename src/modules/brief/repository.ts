@@ -32,6 +32,7 @@ import { hasDatabase } from '@/lib/env';
 import { getCurrentUser } from '@/modules/auth/session';
 import { EMPTY_BRIEF, type Brief } from './types';
 import { rowToBrief, briefToRow } from './mapping';
+import type { CleanContact } from './contact';
 
 const COOKIE = 'oi.brief';
 /**
@@ -135,6 +136,59 @@ export async function saveBrief(brief: Brief): Promise<SaveResult> {
     });
     return { ok: true, persisted: true };
   } catch {
+    return { ok: true, persisted: false };
+  }
+}
+
+/**
+ * Write the brief with the contact details from its last screen.
+ *
+ * The only writer of `contactName` / `contactPhone` / `contactEmail`. The
+ * caller has already recorded the customer's agreement to the notice — this
+ * runs after consent, never before, which is the reason the per-step sync
+ * cannot write these fields (see `briefToRow`).
+ *
+ * If they are signed in and the account has no name yet, it gets this one.
+ * The number is never written to `User.phone`: it is unverified, and that
+ * column is unique and is an identity. See `modules/brief/contact.ts`.
+ */
+export async function saveContact(
+  brief: Brief,
+  contact: CleanContact,
+): Promise<SaveResult> {
+  if (!hasDatabase()) return { ok: true, persisted: false };
+
+  try {
+    const data = {
+      ...briefToRow(brief),
+      contactName: contact.name,
+      contactPhone: contact.phone,
+      contactEmail: contact.email,
+    };
+    const user = await getCurrentUser();
+
+    if (user) {
+      await prisma.brief.upsert({
+        where: { userId: user.id },
+        create: { ...data, userId: user.id },
+        update: data,
+      });
+      await prisma.user.updateMany({
+        where: { id: user.id, name: null },
+        data: { name: contact.name },
+      });
+      return { ok: true, persisted: true };
+    }
+
+    const anonKey = await ensureAnonKey();
+    await prisma.brief.upsert({
+      where: { anonKey },
+      create: { ...data, anonKey },
+      update: data,
+    });
+    return { ok: true, persisted: true };
+  } catch (error) {
+    console.error('[brief] contact save failed', error instanceof Error ? error.message : error);
     return { ok: true, persisted: false };
   }
 }

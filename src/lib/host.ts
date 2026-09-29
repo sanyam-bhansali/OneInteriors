@@ -168,6 +168,11 @@ const ALWAYS = [
    * it while signed in.
    */
   '/f',
+  /**
+   * The privacy notice. Every consent row points at it, and studios give us
+   * personal data too — on the studio host as much as the public one.
+   */
+  '/privacy',
   '/_next',
   '/favicon',
   '/robots.txt',

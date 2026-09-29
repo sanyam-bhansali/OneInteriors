@@ -19,6 +19,8 @@ export const EVENTS = [
   'quiz.step.complete',
   'quiz.abandon',
   'quiz.complete',
+  /** The contact step's details were accepted — name, number, the notice. */
+  'quiz.contact.saved',
   'reveal.view',
   'tier.select',
   'match.view',

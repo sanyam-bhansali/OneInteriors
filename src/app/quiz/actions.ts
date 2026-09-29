@@ -9,7 +9,15 @@
  * write costs a brief while a blocked click costs the customer.
  */
 
-import { saveBrief as persistBrief, loadBrief as readBrief } from '@/modules/brief/repository';
+import { headers } from 'next/headers';
+import {
+  saveBrief as persistBrief,
+  loadBrief as readBrief,
+  saveContact,
+} from '@/modules/brief/repository';
+import { checkContact, type ContactField, type ContactInput } from '@/modules/brief/contact';
+import { consume, addressOf, bucketFor, waitPhrase } from '@/modules/rate-limit/store';
+import { hashIp } from '@/modules/auth/session';
 import { record } from '@/modules/analytics/record';
 import { recordConsent, type ConsentDecision } from '@/modules/consent/record';
 import { QUIZ_PURPOSES, isBlocking, type ConsentPurpose } from '@/modules/consent/policy';
@@ -68,4 +76,64 @@ export async function recordQuizConsentAction(
 
   await recordConsent(decisions, 'quiz_consent_step');
   return { ok: true };
+}
+
+export type ContactResult =
+  | { ok: true; persisted: boolean }
+  | { ok: false; errors: Partial<Record<ContactField | 'form', string>> };
+
+/**
+ * Twenty an hour from one address.
+ *
+ * A household on one Wi-Fi re-submitting after a typo is a handful; a script
+ * filling our database with other people's numbers is thousands. Keyed on a
+ * hash of the address, never the address itself (CONTRIBUTING §7).
+ */
+const CONTACT_LIMIT = { max: 20, windowMs: 60 * 60 * 1000 };
+
+/**
+ * The last screen of the brief: their name, their number, and the notice.
+ *
+ * Order matters and is the point of this function: the same checks the
+ * screen ran, then the consent rows, and only then the details written — so
+ * there is never a number in our database without a recorded agreement
+ * beside it. `checkContact` is pure and shared with the screen.
+ */
+export async function submitContactAction(
+  brief: Brief,
+  input: ContactInput,
+): Promise<ContactResult> {
+  const check = checkContact({
+    name: String(input?.name ?? ''),
+    phone: String(input?.phone ?? ''),
+    email: String(input?.email ?? ''),
+    agreed: input?.agreed === true,
+    whatsappUpdates: input?.whatsappUpdates === true,
+  });
+  if (!check.ok) return { ok: false, errors: check.errors };
+
+  const h = await headers();
+  const verdict = await consume(
+    bucketFor('contact', hashIp(addressOf(h.get('x-forwarded-for'))) ?? 'unknown'),
+    CONTACT_LIMIT,
+  );
+  if (!verdict.allowed) {
+    return {
+      ok: false,
+      errors: { form: `That is a lot of tries from one connection. Try again ${waitPhrase(verdict.retryInSeconds)}.` },
+    };
+  }
+
+  await recordConsent(
+    [
+      { purpose: 'DATA_PROCESSING', granted: true },
+      // Recorded either way: "they said no" and "we never asked" are different.
+      { purpose: 'MARKETING_WHATSAPP', granted: check.value.whatsappUpdates },
+    ],
+    'quiz_contact_step',
+  );
+
+  const saved = await saveContact(brief, check.value);
+  await record('quiz.contact.saved');
+  return { ok: true, persisted: saved.persisted };
 }

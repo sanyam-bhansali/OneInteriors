@@ -24,6 +24,12 @@ describe('the order', () => {
     expect(STEP_IDS[2]).toBe('possession');
   });
 
+  // The number is asked last, after four minutes that show what it is for.
+  it('ends with where to send their matches', () => {
+    expect(STEP_IDS[TOTAL_STEPS - 1]).toBe('contact');
+    expect(CHAPTER.contact).toBe('Your matches');
+  });
+
   it('puts every screen in a chapter', () => {
     for (const id of STEP_IDS) expect(CHAPTER[id]).toBeTruthy();
   });

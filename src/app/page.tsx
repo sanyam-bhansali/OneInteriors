@@ -469,14 +469,14 @@ export default function HomePage() {
             <p className="oi-num m-0 text-[10px] uppercase tracking-[0.16em] text-white/40">
               © 2026 One Interiors · Pune, Maharashtra
             </p>
-            {/* These three routes do not exist yet. Linked because the page is
-                the spec for them and a footer without them reads as a company
-                that has not thought about consent — but `/privacy` in
-                particular is overdue: `consent/policy.ts` already stamps every
-                consent row with POLICY_VERSION '2026-09-01', and that version
-                currently points at no page at all. */}
+            {/* Privacy is a real page since 29 Sep — every consent row points
+                at its version. Terms and "how we use your brief" do not exist
+                yet; they stay as plain text rather than links to nothing. */}
             <div className="flex gap-6">
-              {['Privacy', 'Terms', 'How we use your brief'].map((label) => (
+              <Link href="/privacy" className="text-[13px] text-white/70 hover:text-white">
+                Privacy
+              </Link>
+              {['Terms', 'How we use your brief'].map((label) => (
                 <span key={label} className="text-[13px] text-white/40">
                   {label}
                 </span>

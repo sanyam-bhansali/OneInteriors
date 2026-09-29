@@ -11,8 +11,8 @@
  * screen is found by its id.
  *
  * The order follows docs/CUSTOMER-JOURNEY-PLAN.md §2: who you are, your
- * home, the work, your taste, how you live, how you work, and — added with
- * the contact step — where to send your matches.
+ * home, the work, your taste, how you live, how you work, and where to send
+ * your matches.
  *
  * Pure — no `server-only` — so the quiz and the tests read the same rules
  * (CONTRIBUTING §9.5).
@@ -33,6 +33,7 @@ export const STEP_IDS = [
   'living',
   'working',
   'priorities',
+  'contact',
 ] as const;
 
 export type StepId = (typeof STEP_IDS)[number];
@@ -54,6 +55,7 @@ export const CHAPTER: Record<StepId, string> = {
   living: 'How you live',
   working: 'How you work',
   priorities: 'How you work',
+  contact: 'Your matches',
 };
 
 /** The screen at a 1-based position, clamped into range. */
@@ -130,5 +132,9 @@ export function isStepAnswered(brief: Brief, id: StepId): boolean {
       return brief.involvement !== null;
     case 'priorities':
       return brief.priorityRanking.length === 4;
+    case 'contact':
+      // The details live in the screen, not the brief; the screen checks them
+      // with `checkContact` when they press on, and says what is missing.
+      return true;
   }
 }

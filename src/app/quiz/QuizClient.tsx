@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The 9-question brief.
+ * The brief — eleven short screens in seven chapters (modules/brief/steps.ts).
  *
  * Layout: question on the left in large display serif, options on the right as
  * soft circular tiles. That split does two things at once — it gives the
@@ -12,8 +12,12 @@
  *  1. One question per screen. Progress always visible.
  *  2. The live profile panel updates on every answer — the user watches the
  *     machine work. That, not gamification, is what holds them through Q7.
- *  3. No phone number until after the reveal. Progressive commitment: never ask
- *     for more than the customer has earned reason to give.
+ *  3. The number comes last. Progressive commitment: never ask for more than
+ *     the customer has earned reason to give. Since 29 Sep the brief does take
+ *     a name and number (the owner's direction — the matches greet them and
+ *     the expert call books without a form), so the name is the first screen,
+ *     costing nothing, and the number is the last, after four minutes that
+ *     show what it is for, and only with the notice agreed.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -61,6 +65,15 @@ import {
 } from '@/modules/brief/steps';
 import { LocalityPicker } from './LocalityPicker';
 import {
+  EMPTY_CONTACT,
+  checkContact,
+  type ContactField,
+  type ContactInput,
+} from '@/modules/brief/contact';
+import { PURPOSE_NOTICE } from '@/modules/consent/policy';
+
+type ContactErrors = Partial<Record<ContactField | 'form', string>>;
+import {
   FULL_HOME_DAYS,
   possessionPhrase,
   readyWindow,
@@ -69,6 +82,7 @@ import {
   saveBriefAction,
   loadBriefAction,
   trackAction,
+  submitContactAction,
 } from './actions';
 import { rankStudios } from '@/modules/matching/score';
 import type { Studio } from '@/modules/studio/types';
@@ -156,6 +170,9 @@ export function QuizClient({
   const [hydrated, setHydrated] = useState(false);
   /** True between the last answer and the tier page. Keeps the button honest. */
   const [finishing, setFinishing] = useState(false);
+  /** The contact screen's fields. Held here, not in the brief — see contact.ts. */
+  const [contact, setContact] = useState<ContactInput>(EMPTY_CONTACT);
+  const [contactErrors, setContactErrors] = useState<ContactErrors>({});
 
   useEffect(() => {
     // sessionStorage first so the quiz paints immediately, then reconcile with
@@ -231,38 +248,63 @@ export function QuizClient({
     void saveBriefAction({ ...next, contactName: null }).catch(() => {});
   }
 
+  /**
+   * Leave the brief for the matches.
+   *
+   * The one sync that is waited on. Every other write is fire-and-forget so
+   * Continue never feels slow. This one carries `completedAt`, and every
+   * server-rendered step after this point refuses to work without it. Waited
+   * on, but never blocking: a second, then we move regardless. BriefRescue
+   * picks up whatever did not land.
+   */
+  function finish(from: Brief) {
+    const done = { ...from, completedAt: new Date().toISOString(), lastStep: TOTAL_STEPS };
+    setBrief(done);
+    saveBrief(done);
+    void trackAction('quiz.complete');
+
+    setFinishing(true);
+    void Promise.race([
+      saveBriefAction({ ...done, contactName: null }).catch(() => {}),
+      new Promise((resolve) => setTimeout(resolve, 1000)),
+    ]).then(() => router.push('/match'));
+  }
+
+  /**
+   * The last screen: check, then send the contact details, then finish.
+   *
+   * Checked here first with the same rules the server applies, so a missing
+   * number is said against its field without a round trip. The server then
+   * records the agreement before it writes a single detail.
+   */
+  async function submitContact() {
+    const input = { ...contact, name: contact.name || brief.contactName || '' };
+    const check = checkContact(input);
+    if (!check.ok) {
+      setContactErrors(check.errors);
+      return;
+    }
+    setContactErrors({});
+    setFinishing(true);
+
+    const result = await submitContactAction(brief, input).catch(() => null);
+    if (result && !result.ok) {
+      setContactErrors(result.errors);
+      setFinishing(false);
+      return;
+    }
+    finish({ ...brief, contactName: check.value.name });
+  }
+
   function next() {
     void trackAction('quiz.step.complete', { step });
 
+    if (stepId === 'contact') {
+      void submitContact();
+      return;
+    }
     if (step >= TOTAL_STEPS) {
-      const done = { ...brief, completedAt: new Date().toISOString(), lastStep: TOTAL_STEPS };
-      saveBrief(done);
-      void trackAction('quiz.complete');
-
-      /**
-       * The one sync that is waited on.
-       *
-       * Every other write is fire-and-forget so Continue never feels slow. This
-       * one is different: it carries `completedAt`, and every server-rendered
-       * step after this point refuses to work without it. Racing the navigation
-       * against it means the customer can reach the quote step before the row
-       * says their brief is finished.
-       *
-       * Waited on, but never blocking: a second, then we move regardless.
-       * BriefRescue picks up whatever did not land, so the worst case is a
-       * short "picking up your brief" rather than a stall here.
-       */
-      setFinishing(true);
-      void Promise.race([
-        saveBriefAction({ ...done, contactName: null }).catch(() => {}),
-        new Promise((resolve) => setTimeout(resolve, 1000)),
-      ]).then(() =>
-        // Straight to the matches. The band was chosen on question 3, with real
-        // numbers for their own home, so the separate /tier screen it used to
-        // land on was asking the same question a second time. That page still
-        // exists for anyone who wants to change their level later.
-        router.push('/match'),
-      );
+      finish(brief);
       return;
     }
     const n = step + 1;
@@ -282,6 +324,15 @@ export function QuizClient({
 
   const stepId = stepAt(step);
   const canAdvance = isStepAnswered(brief, stepId);
+  const contactCtx: ContactContext = {
+    contact,
+    setContact: (next) => {
+      setContact(next);
+      // An error disappears as soon as they start fixing it.
+      if (Object.keys(contactErrors).length > 0) setContactErrors({});
+    },
+    errors: contactErrors,
+  };
 
   const matchCount = useMemo(() => {
     if (!hydrated) return studios.length;
@@ -371,12 +422,12 @@ export function QuizClient({
         <Wrap>
           <div className="grid grid-cols-1 gap-9 py-8 sm:py-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-14">
             <div key={`q-${step}`} className="oi-swap flex flex-col gap-7">
-              <QuestionStep id={stepId} brief={brief} update={update} slot="ask" />
+              <QuestionStep id={stepId} brief={brief} update={update} slot="ask" ctx={contactCtx} />
               <LiveProfile brief={brief} matchCount={matchCount} className="hidden lg:block" />
             </div>
 
             <div key={`o-${step}`} className="oi-swap min-w-0">
-              <QuestionStep id={stepId} brief={brief} update={update} slot="options" />
+              <QuestionStep id={stepId} brief={brief} update={update} slot="options" ctx={contactCtx} />
 
               {/* On a phone the brief is COLLAPSED by default.
                   It is reassurance, not information the customer needs to
@@ -458,18 +509,27 @@ export function QuizClient({
  */
 type StepParts = { ask: React.ReactNode; options: React.ReactNode };
 
+/** What the contact screen needs beyond the brief. */
+interface ContactContext {
+  contact: ContactInput;
+  setContact: (next: ContactInput) => void;
+  errors: ContactErrors;
+}
+
 function QuestionStep({
   id,
   brief,
   update,
   slot,
+  ctx,
 }: {
   id: StepId;
   brief: Brief;
   update: (patch: Partial<Brief>) => void;
   slot: 'ask' | 'options';
+  ctx: ContactContext;
 }) {
-  const parts = stepContent(id, brief, update);
+  const parts = stepContent(id, brief, update, ctx);
   return <>{slot === 'ask' ? parts.ask : parts.options}</>;
 }
 
@@ -477,8 +537,28 @@ function stepContent(
   id: StepId,
   brief: Brief,
   update: (patch: Partial<Brief>) => void,
+  ctx: ContactContext,
 ): StepParts {
   switch (id) {
+    case 'contact': {
+      const name = cleanName(brief.contactName);
+      return {
+        ask: (
+          <Ask
+            title={name ? `${name}, where should we send your matches?` : 'Where should we send your matches?'}
+            hint="Your number is how our expert reaches you to book your call. No studio sees it until you choose one."
+          />
+        ),
+        options: (
+          <ContactStep
+            brief={brief}
+            contact={ctx.contact}
+            setContact={ctx.setContact}
+            errors={ctx.errors}
+          />
+        ),
+      };
+    }
     case 'name':
       return nameStep(brief, update);
     case 'home':
@@ -565,6 +645,115 @@ function stepContent(
     case 'priorities':
       return priorityStep(brief, update);
   }
+}
+
+/**
+ * The last screen: where to send their matches.
+ *
+ * Name (from the first screen), mobile, an optional email, and the notice.
+ * The notice's words come from `PURPOSE_NOTICE`, the same object the consent
+ * row records, so what they read and what we store cannot drift apart. The
+ * WhatsApp line is separate, optional and unticked (DPDP: specific consent,
+ * an affirmative act). Errors appear against the field they belong to;
+ * Continue is never greyed out without saying why.
+ */
+function ContactStep({
+  brief,
+  contact,
+  setContact,
+  errors,
+}: {
+  brief: Brief;
+  contact: ContactInput;
+  setContact: (next: ContactInput) => void;
+  errors: ContactErrors;
+}) {
+  const set = (patch: Partial<ContactInput>) => setContact({ ...contact, ...patch });
+  const field =
+    'w-full rounded-full border bg-[var(--card)] px-5 py-3 text-[16px] text-[var(--ink)] placeholder:text-[var(--ink2)]';
+  const border = (bad: boolean) => (bad ? 'border-[var(--acc)]' : 'border-[var(--line)]');
+  const Err = ({ text }: { text?: string }) =>
+    text ? <p className="m-0 mt-2 text-[13.5px] leading-snug text-[var(--acc-ink)]">{text}</p> : null;
+  const name = contact.name || brief.contactName || '';
+
+  return (
+    <div className="flex max-w-lg flex-col gap-5">
+      <label className="block">
+        <FieldLabel>Your name</FieldLabel>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => set({ name: e.target.value.slice(0, NAME_MAX) })}
+          autoComplete="name"
+          maxLength={NAME_MAX}
+          className={`${field} ${border(!!errors.name)}`}
+        />
+        <Err text={errors.name} />
+      </label>
+
+      <label className="block">
+        <FieldLabel>Mobile</FieldLabel>
+        <input
+          type="tel"
+          inputMode="tel"
+          value={contact.phone}
+          onChange={(e) => set({ phone: e.target.value.slice(0, 20) })}
+          placeholder="98765 43210"
+          autoComplete="tel-national"
+          className={`oi-num ${field} ${border(!!errors.phone)}`}
+        />
+        <Err text={errors.phone} />
+      </label>
+
+      <label className="block">
+        <FieldLabel>Email, if you like</FieldLabel>
+        <input
+          type="email"
+          inputMode="email"
+          value={contact.email}
+          onChange={(e) => set({ email: e.target.value.slice(0, 254) })}
+          placeholder="you@example.com"
+          autoComplete="email"
+          className={`${field} ${border(!!errors.email)}`}
+        />
+        <Err text={errors.email} />
+      </label>
+
+      <div className="flex flex-col gap-3 border-t border-[var(--line)] pt-5">
+        <label className="flex cursor-pointer items-start gap-3 text-[14.5px] leading-relaxed text-[var(--ink)]">
+          <input
+            type="checkbox"
+            checked={contact.agreed}
+            onChange={(e) => set({ agreed: e.target.checked })}
+            className="mt-1 h-4 w-4 shrink-0 accent-[var(--acc)]"
+          />
+          <span>
+            {PURPOSE_NOTICE.DATA_PROCESSING.label}.{' '}
+            <span className="text-[var(--ink2)]">{PURPOSE_NOTICE.DATA_PROCESSING.detail}</span>{' '}
+            <Link href="/privacy" target="_blank" className="text-[var(--ink2)] underline">
+              How we use it
+            </Link>
+          </span>
+        </label>
+        <Err text={errors.agreed} />
+
+        <label className="flex cursor-pointer items-start gap-3 text-[14.5px] leading-relaxed text-[var(--ink2)]">
+          <input
+            type="checkbox"
+            checked={contact.whatsappUpdates}
+            onChange={(e) => set({ whatsappUpdates: e.target.checked })}
+            className="mt-1 h-4 w-4 shrink-0 accent-[var(--acc)]"
+          />
+          <span>
+            {PURPOSE_NOTICE.MARKETING_WHATSAPP.label} — optional.{' '}
+            {PURPOSE_NOTICE.MARKETING_WHATSAPP.detail}
+          </span>
+        </label>
+      </div>
+
+      <Err text={errors.form} />
+    </div>
+  );
 }
 
 /**

@@ -24,7 +24,12 @@
  * which is only knowable if the version was recorded at the time.
  */
 
-export const POLICY_VERSION = '2026-09-01';
+/**
+ * 2026-09-29: the notice now covers the number taken on the brief's last
+ * screen and the expert call, and the policy it refers to exists at
+ * /privacy. Consent given against 2026-09-01 does not cover that.
+ */
+export const POLICY_VERSION = '2026-09-29';
 
 export const CONSENT_PURPOSES = [
   'DATA_PROCESSING',
@@ -44,9 +49,9 @@ export type ConsentPurpose = (typeof CONSENT_PURPOSES)[number];
  */
 export const PURPOSE_NOTICE: Record<ConsentPurpose, { label: string; detail: string }> = {
   DATA_PROCESSING: {
-    label: 'Use my brief to find and contact matching studios',
+    label: 'Use my brief and number to find my matches and arrange my expert call',
     detail:
-      'We share your brief — area, budget range, scope and style — with the studios you choose to enquire with. Without this we cannot introduce you to anyone.',
+      'We use your answers to match and price studios, and your name and number to reach you about your matches and your call. A studio sees them only when you choose that studio. Without this we cannot introduce you to anyone.',
   },
   MARKETING_EMAIL: {
     label: 'Email me about my project and new studios',

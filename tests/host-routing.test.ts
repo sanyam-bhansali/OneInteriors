@@ -411,4 +411,11 @@ describe('the whole sign-in round trip is reachable on every host', () => {
     /* And it must not open anything adjacent. */
     expect(isAlwaysAllowed('/faq')).toBe(false);
   });
+
+  // Every consent row points at the privacy notice, and studios give us
+  // personal data too, so it answers on the studio host as well as ours.
+  it('answers the privacy notice on every host', () => {
+    expect(isAlwaysAllowed('/privacy')).toBe(true);
+    expect(isAlwaysAllowed('/privacy-policy')).toBe(false);
+  });
 });
