@@ -154,6 +154,23 @@ const CARCASS = [
 /** Which items the carcass convention actually describes. */
 const CARPENTRY = /wardrobe|loft|kitchen_base|kitchen_wall|tv_unit|console_shoe|mandir|vanity|dressing|workstation/;
 
+/**
+ * The archive medians as a rate card, with no per-studio variation.
+ *
+ * Not any studio's rates and never shown as one. It is the yardstick for how
+ * large a part of a full home a given scope is — kitchen and wardrobes are
+ * roughly a third — so a band's price per square foot can be turned into a
+ * range for a partial scope (`quotation/scope.ts`).
+ */
+export function referenceRates(filedOn = '2026-09-18'): StudioRates {
+  return Object.fromEntries(
+    Object.entries(ARCHIVE_MEDIAN).map(([code, ratePaise]) => [
+      code,
+      { code, ratePaise, fromQuotations: 0, filedOn },
+    ]),
+  );
+}
+
 export function filedRatesFor(slug: string, filedOn = '2026-09-18'): StudioRates {
   const factor = 1 + spread(slug) * 0.09;
   // Cheaper studios tend to the cheaper board, which is the whole reason a

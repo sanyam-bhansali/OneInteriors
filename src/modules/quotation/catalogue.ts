@@ -66,6 +66,7 @@ export const ROOMS = [
   'LIVING_DINING',
   'BATHROOMS',
   'WHOLE_HOME',
+  'CIVIL',
 ] as const;
 
 export type Room = (typeof ROOMS)[number];
@@ -78,6 +79,7 @@ export const ROOM_LABELS: Record<Room, string> = {
   LIVING_DINING: 'Living & dining',
   BATHROOMS: 'Bathrooms',
   WHOLE_HOME: 'Whole home',
+  CIVIL: 'Civil & renovation',
 };
 
 /**
@@ -128,6 +130,15 @@ export interface CatalogueItem {
   spec: string;
   /** Which configurations include it. Empty means every one. */
   minBhk?: number;
+  /**
+   * Civil work — only ever quoted for a renovation (see `scope.ts`).
+   *
+   * Kept out of every other scope so that a full-home quote is exactly what
+   * it was before renovation existed. No archive median exists for these
+   * lines yet, so until a studio files them they are named as "not priced"
+   * rather than guessed.
+   */
+  civil?: boolean;
 }
 
 /**
@@ -363,6 +374,46 @@ export const CATALOGUE: CatalogueItem[] = [
     work: 'MO',
     sizing: 'PER_BATHROOM',
     spec: 'Marine-ply carcass · laminate · mirror unit',
+  },
+
+  // ── Civil — renovation only (29 Sep 2026) ──
+  // The lines a renovation is quoted on in Pune. Their rates come from each
+  // studio's own quotations; none is in the archive medians yet.
+  {
+    code: 'civil_flooring',
+    room: 'CIVIL',
+    label: 'Flooring — remove and relay',
+    work: 'NM',
+    sizing: 'PER_SQFT_CARPET',
+    civil: true,
+    spec: 'Remove existing · level screed · vitrified tile, laid and grouted',
+  },
+  {
+    code: 'civil_bathroom',
+    room: 'CIVIL',
+    label: 'Bathroom renovation',
+    work: 'NM',
+    sizing: 'PER_BATHROOM',
+    civil: true,
+    spec: 'Waterproofing · wall and floor tile · CP fittings replaced · plumbing re-run',
+  },
+  {
+    code: 'civil_kitchen',
+    room: 'CIVIL',
+    label: 'Kitchen civil work',
+    work: 'NM',
+    sizing: 'UNIT',
+    civil: true,
+    spec: 'Platform rebuilt · dado tiling · sink and plumbing points',
+  },
+  {
+    code: 'civil_rewiring',
+    room: 'CIVIL',
+    label: 'Electrical rewiring',
+    work: 'NM',
+    sizing: 'PER_SQFT_CARPET',
+    civil: true,
+    spec: 'New conduit and copper wiring · DB replaced · modular switches',
   },
 ];
 

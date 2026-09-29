@@ -158,6 +158,16 @@ export interface Brief {
 
   // Q2 — scope
   scope: ScopeType | null;
+  /**
+   * For a single-room job or a renovation: which rooms (quotation `Room`
+   * codes — KITCHEN, MASTER_BEDROOM…). Empty for the other scopes.
+   */
+  scopeRooms: string[];
+  /**
+   * Catalogue codes unticked on the scope checklist. The checklist is the
+   * quote: an item left out here leaves every studio's quote at once.
+   */
+  excludedItems: string[];
 
   /**
    * Essential / Premium / Luxury. Chosen after the nine questions rather than
@@ -216,6 +226,8 @@ export const EMPTY_BRIEF: Brief = {
   possessionStatus: null,
   possessionOn: null,
   scope: null,
+  scopeRooms: [],
+  excludedItems: [],
   tier: null,
   budgetMinPaise: null,
   budgetMaxPaise: null,

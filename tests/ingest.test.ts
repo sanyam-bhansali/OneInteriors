@@ -243,6 +243,12 @@ describe('every catalogue item can actually be reached', () => {
       ['Safety Door', 'LIVING_DINING'],
       ['False Ceiling -(Master Bedroom)', 'WHOLE_HOME'],
       ['Paint- 3bhk', 'WHOLE_HOME'],
+      // Civil work, for renovations — so a studio's own renovation quotes can
+      // file these rates (29 Sep 2026).
+      ['Flooring - vitrified tile', 'WHOLE_HOME'],
+      ['Bathroom renovation', 'WHOLE_HOME'],
+      ['Kitchen platform', 'KITCHEN'],
+      ['Complete rewiring with new DB', 'WHOLE_HOME'],
       ['Electrcials', 'WHOLE_HOME'],
       ['Vanity Unit-02', 'BATHROOMS'],
     ];

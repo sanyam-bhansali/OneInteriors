@@ -26,7 +26,12 @@ import Link from 'next/link';
 import { Mark } from '@/components/brand';
 import { Wrap, Sheet, DocRow } from '@/components/oi';
 import { formatINRCompact } from '@/lib/money';
-import { TIER, TIERS, tierRangeFor } from '@/modules/quotation/tiers';
+import { TIER, TIERS, perSqftLabel, tierRangeFor } from '@/modules/quotation/tiers';
+import { checklistFor, roomsFor, scopePhrase, selectionOf } from '@/modules/quotation/scope';
+import { scopeBandRange, scopeShare } from '@/modules/quotation/scope-band';
+import { homeShapeFor } from '@/modules/quotation/first-quote';
+import { BEDROOMS } from '@/modules/quotation/estimate';
+import { ROOM_LABELS } from '@/modules/quotation/catalogue';
 import { ratesAreReal } from '@/data/filed-rates';
 import {
   EMPTY_BRIEF,
@@ -579,27 +584,7 @@ function stepContent(
     case 'possession':
       return possessionStep(brief, update);
     case 'scope':
-      return {
-        ask: (
-          <Ask
-            title="How much of it are we doing?"
-            hint="You can widen this later with your studio — nothing here is fixed."
-          />
-        ),
-        options: (
-          <TileRow>
-            {(Object.keys(SCOPE_LABELS) as ScopeType[]).map((k) => (
-              <CircleTile
-                key={k}
-                label={SCOPE_LABELS[k]}
-                Icon={SCOPE_ICONS[k]}
-                selected={brief.scope === k}
-                onClick={() => update({ scope: k })}
-              />
-            ))}
-          </TileRow>
-        ),
-      };
+      return scopeStep(brief, update);
     case 'level':
       return budgetStep(brief, update);
     case 'likes':
@@ -795,6 +780,107 @@ function ContactStep({
       <Err text={errors.form} />
     </div>
   );
+}
+
+/**
+ * The work: the scope, then exactly what it covers.
+ *
+ * The checklist is the quote. Every item listed is on every studio's first
+ * quote; untick one and it leaves all of them, so the comparison stays like
+ * for like. A single-room job and a renovation first ask which rooms.
+ * Changing the scope clears the rooms and the unticked items — they belong to
+ * the old scope's list.
+ */
+function scopeStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
+  const bhk = BEDROOMS[brief.propertyType ?? 'BHK_2'];
+  const selection = selectionOf(brief);
+  const needsRooms = brief.scope === 'SINGLE_ROOM' || brief.scope === 'RENOVATION';
+  const groups = brief.scope ? checklistFor(bhk, selection) : [];
+  const off = new Set(brief.excludedItems);
+
+  const toggleRoom = (room: string) =>
+    update({
+      scopeRooms: brief.scopeRooms.includes(room)
+        ? brief.scopeRooms.filter((r) => r !== room)
+        : [...brief.scopeRooms, room],
+      excludedItems: [],
+    });
+  const toggleItem = (code: string) =>
+    update({
+      excludedItems: off.has(code)
+        ? brief.excludedItems.filter((c) => c !== code)
+        : [...brief.excludedItems, code],
+    });
+
+  return {
+    ask: (
+      <Ask
+        title="How much of it are we doing?"
+        hint="Then untick anything you don't want. Every studio is priced on exactly what is ticked."
+      />
+    ),
+    options: (
+      <div className="flex flex-col gap-7">
+        <TileRow>
+          {(Object.keys(SCOPE_LABELS) as ScopeType[]).map((k) => (
+            <CircleTile
+              key={k}
+              label={SCOPE_LABELS[k]}
+              Icon={SCOPE_ICONS[k]}
+              selected={brief.scope === k}
+              onClick={() => update({ scope: k, scopeRooms: [], excludedItems: [] })}
+            />
+          ))}
+        </TileRow>
+
+        {needsRooms ? (
+          <div>
+            <FieldLabel>
+              {brief.scope === 'RENOVATION'
+                ? 'Any rooms to redo as well as the civil work?'
+                : 'Which rooms?'}
+            </FieldLabel>
+            <div className="flex flex-wrap gap-2">
+              {roomsFor(bhk).map((room) => (
+                <Chip key={room} selected={brief.scopeRooms.includes(room)} onClick={() => toggleRoom(room)}>
+                  {ROOM_LABELS[room]}
+                </Chip>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {groups.length > 0 ? (
+          <div>
+            <FieldLabel>What we will price — untick anything you don&rsquo;t want</FieldLabel>
+            <div className="overflow-hidden rounded-[14px] border border-[var(--line)] bg-[var(--card)]">
+              {groups.map((g) => (
+                <div key={g.room} className="border-b border-[var(--line)] px-4 py-3 last:border-b-0">
+                  <p className="m-0 mb-2 text-[13px] font-medium text-[var(--ink)]">{g.label}</p>
+                  <div className="flex flex-col gap-1.5">
+                    {g.items.map((item) => (
+                      <label
+                        key={item.code}
+                        className="flex cursor-pointer items-center gap-3 text-[14.5px] text-[var(--ink2)]"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!off.has(item.code)}
+                          onChange={() => toggleItem(item.code)}
+                          className="h-4 w-4 accent-[var(--acc)]"
+                        />
+                        {item.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    ),
+  };
 }
 
 /**
@@ -1004,6 +1090,9 @@ function workingStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPar
  */
 function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
   const { sqft: area, assumed: areaAssumed } = carpetAreaFor(brief);
+  const shape = homeShapeFor(brief);
+  const selection = selectionOf(brief);
+  const partial = brief.scope !== null && (brief.scope !== 'FULL_HOME' || brief.excludedItems.length > 0);
 
   return {
     ask: (
@@ -1016,7 +1105,11 @@ function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPart
       <div className="flex flex-col gap-3">
         {TIERS.map((tier) => {
           const definition = TIER[tier];
+          // The budget kept on the brief is the band for the WHOLE home — it is
+          // the studio's price level, and matching compares like with like.
+          // What is shown is that band for their scope (see scope-band.ts).
           const { lowPaise, highPaise } = tierRangeFor(tier, area);
+          const shown = partial ? scopeBandRange(tier, shape, selection) : { lowPaise, highPaise };
           const selected = brief.tier === tier;
 
           return (
@@ -1045,9 +1138,11 @@ function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPart
                   {definition.label}
                 </span>
                 <span className="oi-num oi-display text-[19px] leading-none text-[var(--acc-ink)]">
-                  {highPaise === null
-                    ? `From ${formatINRCompact(lowPaise)}`
-                    : `${formatINRCompact(lowPaise)} – ${formatINRCompact(highPaise)}`}
+                  {shown === null
+                    ? perSqftLabel(tier) + ' / sq ft'
+                    : shown.highPaise === null
+                      ? `From ${formatINRCompact(shown.lowPaise)}`
+                      : `${formatINRCompact(shown.lowPaise)} – ${formatINRCompact(shown.highPaise)}`}
                 </span>
               </div>
               <p className="m-0 text-[14.5px] leading-[1.5] text-[var(--ink2)]">
@@ -1062,6 +1157,13 @@ function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPart
           );
         })}
 
+        {partial ? (
+          <p className="m-0 mt-1 text-[13px] leading-[1.55] text-[var(--ink2)]">
+            {scopeShare(shape, selection) === null
+              ? 'We cannot put a range on civil work yet — each studio prices it on its own rates, and your quotes show it line by line. The level is what they charge per square foot of a home.'
+              : `For ${scopePhrase(selection)?.toLowerCase() ?? 'your scope'} — the level's price for your home, scaled to the part you are doing.`}
+          </p>
+        ) : null}
         <p className="m-0 mt-1 text-[13px] leading-[1.55] text-[var(--ink2)]">
           {areaAssumed
             ? `Excluding GST, for a typical ${area.toLocaleString('en-IN')} sq ft ${
@@ -1321,7 +1423,11 @@ function LiveProfile({
     const society = brief.society?.trim();
     if (society) rows.push(['Society', society]);
   }
-  if (brief.scope) rows.push(['Scope', SCOPE_LABELS[brief.scope]]);
+  if (brief.scope) {
+    const phrase = scopePhrase(selectionOf(brief)) ?? SCOPE_LABELS[brief.scope];
+    const off = brief.excludedItems.length;
+    rows.push(['Scope', off ? `${phrase} · ${off} left out` : phrase]);
+  }
   if (brief.budgetMinPaise) {
     rows.push([
       'Budget',

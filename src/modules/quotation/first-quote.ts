@@ -25,8 +25,10 @@
  */
 
 import type { Paise } from '@/lib/money';
+import { FULL_HOME, scopeItems, scopePhrase, type ScopeSelection } from './scope';
 import {
   CATALOGUE,
+  ITEM,
   GST_BPS,
   MODULAR_DISCOUNT_BPS,
   PROFESSIONAL_FEE_BPS,
@@ -113,6 +115,11 @@ export interface QuoteInput {
   kitchenRunMm: number | null;
   /** How we came by the kitchen run. Drives the variance and the wording. */
   runSource: 'floor_plan' | 'customer' | 'standard';
+  /**
+   * What the quote covers. Absent means the full home — exactly the quote
+   * this function produced before scope existed. See `scope.ts`.
+   */
+  scope?: ScopeSelection;
 }
 
 export interface QuoteLine {
@@ -164,11 +171,16 @@ export interface FirstQuote {
  * treated as a 2 BHK, the commonest in the archive, which the document shows
  * as its size.
  */
-export function homeShapeFor(brief: Pick<Brief, 'propertyType' | 'carpetAreaSqft'>): {
+export function homeShapeFor(
+  brief: Pick<Brief, 'propertyType' | 'carpetAreaSqft'> &
+    Partial<Pick<Brief, 'scope' | 'scopeRooms' | 'excludedItems'>>,
+): {
   bhk: number;
   carpetAreaSqft: number;
   carpetAreaAssumed: boolean;
   bathrooms: number;
+  /** What the quote covers — every studio priced on the same lines. */
+  scope: ScopeSelection;
 } {
   const bhk = BEDROOMS[brief.propertyType ?? 'BHK_2'];
   const { sqft, assumed } = carpetAreaFor(brief);
@@ -179,12 +191,17 @@ export function homeShapeFor(brief: Pick<Brief, 'propertyType' | 'carpetAreaSqft
     // One bathroom per bedroom is what the archive's flats overwhelmingly
     // have, and the vanity is the only line it drives.
     bathrooms: Math.max(1, bhk),
+    scope: {
+      scope: brief.scope ?? 'FULL_HOME',
+      scopeRooms: brief.scopeRooms ?? [],
+      excludedItems: brief.excludedItems ?? [],
+    },
   };
 }
 
 /** Which catalogue items a flat of this size includes. */
 export function itemsFor(bhk: number): CatalogueItem[] {
-  return CATALOGUE.filter((i) => (i.minBhk ?? 0) <= bhk);
+  return CATALOGUE.filter((i) => !i.civil && (i.minBhk ?? 0) <= bhk);
 }
 
 /**
@@ -227,7 +244,9 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
   const lines: QuoteLine[] = [];
   const notPriced: string[] = [];
 
-  for (const item of itemsFor(input.bhk)) {
+  const selection = input.scope ?? FULL_HOME;
+
+  for (const item of scopeItems(input.bhk, selection)) {
     const filed = rates[item.code];
     if (!filed) {
       notPriced.push(item.code);
@@ -316,6 +335,20 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
   }).filter((r) => r.lines.length > 0);
 
   const assumptions: string[] = [];
+
+  // What the quote covers comes first: it changes how every line below is read.
+  if (selection.scope && selection.scope !== 'FULL_HOME') {
+    assumptions.push(
+      `Scope: ${scopePhrase(selection)} — only these lines are priced, and every studio is priced on the same ones.`,
+    );
+  }
+  const left = selection.excludedItems
+    .map((code) => ITEM[code]?.label)
+    .filter((label): label is string => Boolean(label));
+  if (left.length > 0) {
+    assumptions.push(`Left out at your request: ${left.join(', ')}.`);
+  }
+
 
   if (source === 'floor_plan') {
     assumptions.push(

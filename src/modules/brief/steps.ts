@@ -20,7 +20,8 @@
 
 import { possessionAnswered } from './possession';
 import type { Brief, PropertyType } from './types';
-import { TYPICAL_CARPET_SQFT } from '@/modules/quotation/estimate';
+import { BEDROOMS, TYPICAL_CARPET_SQFT } from '@/modules/quotation/estimate';
+import { scopeReady, selectionOf } from '@/modules/quotation/scope';
 
 export const STEP_IDS = [
   'name',
@@ -112,7 +113,8 @@ export function isStepAnswered(brief: Brief, id: StepId): boolean {
     case 'possession':
       return possessionAnswered(brief);
     case 'scope':
-      return brief.scope !== null;
+      // A scope, the rooms a single-room job needs, and at least one line left.
+      return scopeReady(BEDROOMS[brief.propertyType ?? 'BHK_2'], selectionOf(brief));
     case 'level':
       // The band's floor is the budget; the top band has no ceiling.
       return brief.budgetMinPaise !== null;

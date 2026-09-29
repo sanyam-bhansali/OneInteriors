@@ -275,7 +275,11 @@ model Brief {
   possessionOn     DateTime?
 
   // Q2
-  scope ScopeType?
+  scope         ScopeType?
+  /// Rooms chosen for a single-room job or a renovation (quotation Room codes).
+  scopeRooms    String[]   @default([])
+  /// Catalogue codes unticked on the scope checklist — left out of every quote.
+  excludedItems String[]   @default([])
 
   /// Essential / Premium / Luxury. The band the customer chose — a statement
   /// about materials and finish, never a ranking of studios and never

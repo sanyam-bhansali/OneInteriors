@@ -31,6 +31,7 @@ import {
 } from '@/modules/quotation/first-quote';
 import { filedRatesFor, ratesAreReal } from '@/data/filed-rates';
 import type { StudioRates } from '@/modules/quotation/catalogue';
+import type { ScopeSelection } from '@/modules/quotation/scope';
 import type { Material } from '@/modules/materials/glossary';
 import type { FloorPlan } from '@/modules/quotation/project-store';
 import { Building, stagesFor } from './Building';
@@ -47,6 +48,8 @@ export interface QuoteRequest {
   /** The typical area for their configuration, not a figure they gave. */
   carpetAreaAssumed?: boolean;
   bathrooms: number;
+  /** What the quote covers. See modules/quotation/scope.ts. */
+  scope?: ScopeSelection;
 }
 
 // ── The gate ────────────────────────────────────────────────────
@@ -310,6 +313,7 @@ export function QuoteFlow({
         carpetAreaSqft: request.carpetAreaSqft,
         carpetAreaAssumed: request.carpetAreaAssumed,
         bathrooms: request.bathrooms,
+        scope: request.scope,
         kitchenRunMm: usedPlan.kitchenRunMm,
         runSource: runSourceOf(usedPlan),
       },

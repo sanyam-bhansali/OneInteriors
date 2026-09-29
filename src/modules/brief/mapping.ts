@@ -40,6 +40,8 @@ export interface BriefRow {
   possessionStatus: string | null;
   possessionOn: Date | null;
   scope: string | null;
+  scopeRooms?: string[];
+  excludedItems?: string[];
   tier: string | null;
   budgetMinPaise: bigint | null;
   budgetMaxPaise: bigint | null;
@@ -117,6 +119,8 @@ export function rowToBrief(row: BriefRow): Brief {
     possessionStatus: (row.possessionStatus as PossessionStatus) ?? null,
     possessionOn: isoDate(row.possessionOn),
     scope: (row.scope as ScopeType) ?? null,
+    scopeRooms: row.scopeRooms ?? [],
+    excludedItems: row.excludedItems ?? [],
     tier: (row.tier as Brief['tier']) ?? null,
     budgetMinPaise: row.budgetMinPaise === null ? null : Number(row.budgetMinPaise),
     budgetMaxPaise: row.budgetMaxPaise === null ? null : Number(row.budgetMaxPaise),
@@ -153,6 +157,11 @@ export function briefToRow(brief: Brief) {
     possessionStatus: brief.possessionStatus,
     possessionOn: toDate(brief.possessionOn),
     scope: brief.scope,
+    // Short codes only; anything longer is not one of ours.
+    scopeRooms: brief.scopeRooms.filter((r) => typeof r === 'string' && r.length <= 32).slice(0, 8),
+    excludedItems: brief.excludedItems
+      .filter((c) => typeof c === 'string' && c.length <= 40)
+      .slice(0, 60),
     tier: brief.tier,
     budgetMinPaise: brief.budgetMinPaise === null ? null : BigInt(brief.budgetMinPaise),
     budgetMaxPaise: brief.budgetMaxPaise === null ? null : BigInt(brief.budgetMaxPaise),

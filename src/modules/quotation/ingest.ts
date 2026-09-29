@@ -164,6 +164,14 @@ const ALIASES: Alias[] = [
   // 27 lines of a rate.
   { pattern: /shoe rack|con?sole/, code: 'console_shoe' },
 
+  // ── Civil work, for renovations (29 Sep 2026). Before the electrical
+  //    line on purpose: "rewiring" is a new installation, priced per sq ft of
+  //    the flat, not additional points — the same word in a different job. ──
+  { pattern: /rewir|new wiring|distribution board|\bdb\b/, code: 'civil_rewiring' },
+  { pattern: /flooring|floor til|vitrified|relay/, code: 'civil_flooring' },
+  { pattern: /bathroom (renov|civil)|toilet (renov|civil)|waterproof/, code: 'civil_bathroom' },
+  { pattern: /platform|kitchen civil|dado/, code: 'civil_kitchen' },
+
   // ── Not furniture. `electr` rather than `electric`: the archive contains
   //    "Electrcials" 91 times, and a typo in their sheet is not a reason to
   //    lose the rate. ──
