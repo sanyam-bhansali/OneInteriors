@@ -29,6 +29,8 @@ import { availableSlots } from './availability';
 import { icsFor, slotLabel, SLOT_MINS } from './slots';
 import { sendCallBooked } from '@/modules/auth/email';
 import { recordConsent } from '@/modules/consent/record';
+import { newManageToken } from './manage';
+import { manageUrl } from './manage-store';
 
 export interface RequestInput {
   briefId: string;
@@ -177,6 +179,7 @@ export async function requestConsultation(input: RequestInput): Promise<RequestR
     booking = { scheduledFor: new Date(slot.startsAt), expertUserId: slot.experts[0]! };
   }
 
+  const manageToken = booking ? newManageToken() : null;
   let consultation: { id: string };
   try {
     consultation = await prisma.consultation.create({
@@ -190,7 +193,7 @@ export async function requestConsultation(input: RequestInput): Promise<RequestR
         preferredTimes: booking ? null : input.preferredTimes?.trim() || null,
         status: booking ? 'scheduled' : 'requested',
         ...(booking
-          ? { scheduledFor: booking.scheduledFor, expertUserId: booking.expertUserId, bookedAt: new Date(), durationMins: SLOT_MINS }
+          ? { scheduledFor: booking.scheduledFor, expertUserId: booking.expertUserId, bookedAt: new Date(), durationMins: SLOT_MINS, manageToken }
           : {}),
       },
       select: { id: true },
@@ -218,6 +221,7 @@ export async function requestConsultation(input: RequestInput): Promise<RequestR
     // After the response: a slow mail provider must not hold the booking screen.
     after(() =>
       sendCallBooked(contactEmail, {
+        manageUrl: manageToken ? manageUrl(manageToken) : undefined,
         name: contactName,
         when: slotLabel(iso),
         studios: names,
@@ -260,6 +264,8 @@ export interface ConsultationRow {
   /** When the call is booked for, once somebody has set a time. */
   scheduledFor: Date | null;
   createdAt: Date;
+  /** The customer's own link to move or cancel a booked call. Only their rows carry it. */
+  manageToken?: string | null;
 }
 
 /**
@@ -308,6 +314,7 @@ export async function listConsultations(status?: string): Promise<ConsultationRo
     status: r.status,
     scheduledFor: r.scheduledFor,
     createdAt: r.createdAt,
+    manageToken: r.manageToken,
   }));
 }
 

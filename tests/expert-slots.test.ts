@@ -69,4 +69,14 @@ describe('icsFor', () => {
     expect(ics).toContain('DESCRIPTION:Akara\\, Sixth Wall\\; your 3 BHK');
     expect(ics.split('\r\n')[0]).toBe('BEGIN:VCALENDAR');
   });
+
+  it('updates or cancels the same calendar entry', () => {
+    const base = { uid: 'c1', startsAt: '2026-10-01T05:30:00.000Z', title: 't', description: 'd', now: NOW };
+    const moved = icsFor({ ...base, sequence: 2 });
+    expect(moved).toContain('SEQUENCE:2');
+    expect(moved).toContain('METHOD:REQUEST');
+    const gone = icsFor({ ...base, sequence: 3, cancelled: true });
+    expect(gone).toContain('METHOD:CANCEL');
+    expect(gone).toContain('STATUS:CANCELLED');
+  });
 });

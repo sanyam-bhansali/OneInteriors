@@ -264,37 +264,64 @@ export async function sendApplicationReceived(
  */
 export async function sendCallBooked(
   to: string,
-  call: { name: string; when: { day: string; time: string }; studios: string[]; ics: string },
+  call: {
+    name: string;
+    when: { day: string; time: string };
+    studios: string[];
+    ics: string;
+    /** booked (default), moved to a new time, or cancelled. */
+    kind?: 'booked' | 'moved' | 'cancelled';
+    /** The private link to move or cancel it. */
+    manageUrl?: string;
+  },
 ): Promise<SendResult> {
   const cfg = config();
-  const text = [
-    `Hello ${call.name},`,
-    '',
-    `Your expert call is booked for ${call.when.day} at ${call.when.time} — thirty minutes.`,
-    '',
-    call.studios.length > 0 ? `We will go through ${call.studios.join(', ')} with you.` : '',
-    'We ring you; there is nothing to install and nothing to prepare. The',
-    'expert has your brief and your quotes, exactly as you saw them.',
-    '',
-    'To move or cancel it, reply to this email.',
-    '',
-    'One Interiors',
-  ]
+  const kind = call.kind ?? 'booked';
+  const hello = call.name ? `Hello ${call.name},` : 'Hello,';
+  const lines =
+    kind === 'cancelled'
+      ? [
+          hello,
+          '',
+          `Your expert call on ${call.when.day} at ${call.when.time} is cancelled.`,
+          'Nothing else changes — your brief and quotes are still in "Your home",',
+          'and you can book another time whenever you like.',
+        ]
+      : [
+          hello,
+          '',
+          kind === 'moved'
+            ? `Your expert call has moved to ${call.when.day} at ${call.when.time} — thirty minutes.`
+            : `Your expert call is booked for ${call.when.day} at ${call.when.time} — thirty minutes.`,
+          '',
+          call.studios.length > 0 ? `We will go through ${call.studios.join(', ')} with you.` : '',
+          'We ring you; there is nothing to install and nothing to prepare. The',
+          'expert has your brief and your quotes, exactly as you saw them.',
+          '',
+          call.manageUrl
+            ? `To move or cancel it (up to an hour before): ${call.manageUrl}`
+            : 'To move or cancel it, reply to this email.',
+        ];
+  const text = [...lines, '', 'One Interiors']
     .filter((l, i, all) => !(l === '' && all[i - 1] === ''))
     .join('\n');
 
   if (isFault(cfg)) {
     if (process.env.NODE_ENV === 'production') {
-      console.error(`[expert] ${cfg.message} — booking confirmation NOT sent to`, maskEmail(to));
+      console.error(`[expert] ${cfg.message} — call email NOT sent to`, maskEmail(to));
       return { delivered: false, reason: cfg.reason };
     }
-    console.log(`\n[expert] Booking confirmation for ${to}\n${text}\n`);
+    console.log(`\n[expert] Call email for ${to}\n${text}\n`);
     return { delivered: false, reason: 'dev_console' };
   }
 
-  return send(cfg, to, `Booked: your expert call, ${call.when.day} at ${call.when.time}`, text, '[expert]', [
-    { filename: 'one-interiors-call.ics', content: call.ics },
-  ]);
+  const subject =
+    kind === 'cancelled'
+      ? `Cancelled: your expert call, ${call.when.day}`
+      : kind === 'moved'
+        ? `Moved: your expert call, ${call.when.day} at ${call.when.time}`
+        : `Booked: your expert call, ${call.when.day} at ${call.when.time}`;
+  return send(cfg, to, subject, text, '[expert]', [{ filename: 'one-interiors-call.ics', content: call.ics }]);
 }
 
 /**

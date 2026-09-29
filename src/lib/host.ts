@@ -157,6 +157,8 @@ const ALWAYS = [
   '/auth',
   // Referral links (modules/portal/referral.ts) — valid on any host.
   '/r',
+  // A booked call's private link (modules/consultation/manage.ts).
+  '/call',
   '/sign-in',
   '/set-password',
   /**

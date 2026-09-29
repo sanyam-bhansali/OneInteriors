@@ -127,12 +127,21 @@ export function icsFor({
   title,
   description,
   now = new Date(),
+  sequence = 0,
+  cancelled = false,
 }: {
   uid: string;
   startsAt: string;
   durationMins?: number;
   title: string;
   description: string;
+  /**
+   * Bumped on every change, so a calendar that already holds this call
+   * updates the entry (same UID) instead of adding a second one.
+   */
+  sequence?: number;
+  /** A cancellation removes the entry from their calendar. */
+  cancelled?: boolean;
   now?: Date;
 }): string {
   const start = new Date(startsAt);
@@ -141,10 +150,12 @@ export function icsFor({
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//One Interiors//Expert call//EN',
-    'METHOD:REQUEST',
+    `METHOD:${cancelled ? 'CANCEL' : 'REQUEST'}`,
     'BEGIN:VEVENT',
     `UID:${uid}@oneinteriors.in`,
     `DTSTAMP:${icsDate(now)}`,
+    `SEQUENCE:${sequence}`,
+    ...(cancelled ? ['STATUS:CANCELLED'] : []),
     `DTSTART:${icsDate(start)}`,
     `DTEND:${icsDate(end)}`,
     `SUMMARY:${icsText(title)}`,

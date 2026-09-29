@@ -1282,6 +1282,9 @@ model Consultation {
   /// slot.
   durationMins Int       @default(30)
   bookedAt     DateTime?
+  /// The private link to move or cancel a booked call (/call/<token>),
+  /// usable without signing in — it is sent in the confirmation email.
+  manageToken  String?   @unique
 
   // The expert's read is the training signal for the matching engine.
   outcomeNotes        String?  @db.Text

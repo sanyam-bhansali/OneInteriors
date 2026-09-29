@@ -275,9 +275,16 @@ export default async function AccountPage() {
                         </>
                       )}
                     </span>
-                    <Pill tone={call.status === 'completed' ? 'ontrack' : 'petrol'}>
-                      {CALL_STATUS[call.status] ?? call.status}
-                    </Pill>
+                    <span className="flex items-center gap-3">
+                      {call.status === 'scheduled' && call.manageToken ? (
+                        <Link href={`/call/${call.manageToken}`} className="text-[13.5px] text-[var(--color-petrol)]">
+                          Move or cancel
+                        </Link>
+                      ) : null}
+                      <Pill tone={call.status === 'completed' ? 'ontrack' : 'petrol'}>
+                        {CALL_STATUS[call.status] ?? call.status}
+                      </Pill>
+                    </span>
                   </li>
                 ))}
               </ul>
