@@ -79,6 +79,11 @@ function toPortfolio(row: StudioRow['portfolio'][number]): PortfolioProject {
     completedOn: toIso(row.completedOn),
     images: row.images,
     isRender: row.isRender,
+    carpetAreaSqft: row.carpetAreaSqft ?? null,
+    society: row.society ?? null,
+    tags: row.tags,
+    imageRooms: row.imageRooms,
+    pickerConsent: row.pickerConsent,
   };
 }
 

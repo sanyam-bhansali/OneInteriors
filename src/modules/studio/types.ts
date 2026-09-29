@@ -65,6 +65,16 @@ export interface PortfolioProject {
   images: string[];
   /** A render labelled as a render is fine. Passing one off as a photo is not. */
   isRender: boolean;
+  // Matching fields — optional because the fixtures predate them. See
+  // modules/studio/portfolio-fields.ts.
+  carpetAreaSqft?: number | null;
+  society?: string | null;
+  /** Specialism tags: CHILDREN, ELDERLY, PETS, VASTU… */
+  tags?: string[];
+  /** One room per image, aligned by index; '' = not said. */
+  imageRooms?: string[];
+  /** May these appear, unnamed, in the homeowner's style picker? */
+  pickerConsent?: boolean;
 }
 
 export interface Studio {

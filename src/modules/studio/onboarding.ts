@@ -36,6 +36,13 @@ import {
 import { isOffering, isPriceLevel } from './positioning';
 import { checkPhases, parsePhasesText, type PaymentPhase } from './payment-phases';
 import {
+  CARPET_AREA_RANGE,
+  carpetAreaFrom,
+  cleanImageRooms,
+  cleanSocietyName,
+  cleanTags,
+} from './portfolio-fields';
+import {
   profileFromForm,
   profileJson,
   profileSections,
@@ -659,6 +666,12 @@ export interface ProjectInput {
    * is why reordering is a rewrite of it rather than a column on a row.
    */
   images?: string[];
+  /** One room per image, aligned by index. See portfolio-fields.ts. */
+  imageRooms?: string[];
+  carpetArea?: string;
+  society?: string;
+  tags?: string[];
+  pickerConsent?: boolean;
 }
 
 // Derived from the label maps rather than retyped, so these can never drift
@@ -706,7 +719,19 @@ export async function addProject(input: ProjectInput): Promise<SaveResult> {
    * rather than rejected: a URL that fails this test is one we did not write,
    * so dropping it loses nothing the studio put there.
    */
-  const images = (input.images ?? []).filter(isOurImageUrl).slice(0, MAX_IMAGES_PER_PROJECT);
+  /* The rooms travel beside the images by index, so they are aligned to the
+     same filter: a URL dropped above takes its room with it. */
+  const kept = (input.images ?? [])
+    .map((url, i) => ({ url, room: input.imageRooms?.[i] ?? '' }))
+    .filter((x) => isOurImageUrl(x.url))
+    .slice(0, MAX_IMAGES_PER_PROJECT);
+  const images = kept.map((x) => x.url);
+  const imageRooms = cleanImageRooms(images, kept.map((x) => x.room));
+
+  const carpetAreaSqft = carpetAreaFrom(input.carpetArea ?? '');
+  if (carpetAreaSqft === undefined) {
+    errors.carpetArea = `Carpet area between ${CARPET_AREA_RANGE[0]} and ${CARPET_AREA_RANGE[1].toLocaleString('en-IN')} sq ft.`;
+  }
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
@@ -726,6 +751,13 @@ export async function addProject(input: ProjectInput): Promise<SaveResult> {
       isRender: input.isRender,
       clientConsented: input.clientConsented,
       images,
+      imageRooms,
+      carpetAreaSqft: carpetAreaSqft ?? null,
+      society: cleanSocietyName(input.society ?? ''),
+      tags: cleanTags(input.tags ?? []),
+      // Only a photographed, client-approved project can go into a stranger's
+      // style picker; a render never stands in for a finished room there.
+      pickerConsent: Boolean(input.pickerConsent) && input.clientConsented && !input.isRender,
     },
   });
 

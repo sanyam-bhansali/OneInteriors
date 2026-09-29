@@ -351,6 +351,11 @@ export async function addProjectAction(
        arranged them. addProject re-checks that we issued them, because this
        array ends up in an img src on a public page. */
     images: formData.getAll('images').map(String),
+    imageRooms: formData.getAll('imageRooms').map(String),
+    carpetArea: String(formData.get('carpetArea') ?? ''),
+    society: String(formData.get('society') ?? ''),
+    tags: formData.getAll('tags').map(String),
+    pickerConsent: formData.get('pickerConsent') === 'on',
   });
 
   if (!result.ok) return { status: 'error', errors: result.errors };

@@ -812,6 +812,20 @@ model PortfolioProject {
   isRender        Boolean  @default(false) // a render labelled as a render is fine; passing one off is not
   clientConsented Boolean  @default(false)
 
+  /// Matching fields (modules/studio/portfolio-fields.ts). Carpet area turns
+  /// the value into ₹/sq ft, which checks the studio's band against delivered
+  /// work; society is "they have done a flat in your building"; tags are the
+  /// evidence behind a specialism (two projects make it count).
+  carpetAreaSqft Int?
+  society        String?
+  tags           String[] @default([])
+  /// One room per image, aligned with `images` by index; '' = not said.
+  imageRooms     String[] @default([])
+  /// May these photos appear, without the studio's name, in a homeowner's
+  /// style picker? Separate from clientConsented, which covers the studio's
+  /// own page.
+  pickerConsent  Boolean  @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
