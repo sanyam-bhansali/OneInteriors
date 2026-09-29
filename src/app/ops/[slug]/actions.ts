@@ -6,6 +6,7 @@ import {
   setGstin,
   setStudioStatus,
   setHiddenAsTest,
+  setCuratedDiscount,
   type RecordResult,
 } from '@/modules/verification/record';
 import type { CheckResult, CheckType, StudioStatus } from '@/modules/studio/types';
@@ -71,6 +72,24 @@ export async function setStatusAction(
     revalidatePath(`/studios/${slug}`);
     revalidatePath('/studios');
     revalidatePath('/');
+  }
+  return result;
+}
+
+/** The curated discount from the studio agreement. It moves every quote for this studio. */
+export async function setCuratedDiscountAction(
+  _prev: RecordResult | null,
+  formData: FormData,
+): Promise<RecordResult> {
+  const slug = String(formData.get('slug') ?? '');
+  const result = await setCuratedDiscount(
+    String(formData.get('studioId') ?? ''),
+    String(formData.get('curatedDiscountPct') ?? ''),
+  );
+  if (result.ok && slug) {
+    revalidatePath(`/ops/${slug}`);
+    revalidatePath(`/studios/${slug}`);
+    revalidatePath('/match');
   }
   return result;
 }

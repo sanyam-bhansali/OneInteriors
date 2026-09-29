@@ -598,6 +598,19 @@ model Studio {
   /// stored value that fails the checks is read as none.
   paymentPhases Json?
 
+  /// The matching profile: work mix (modular / carpentry / both), scopes and
+  /// minimums, civil capability, home types, city-wide and societies,
+  /// capacity, earliest start, durations, how they work, materials,
+  /// specialisms, languages, intro video, and the curated discount ops
+  /// records from the studio agreement.
+  ///
+  /// One JSON column rather than thirty, because studios differ in shape —
+  /// a carpenter-led studio has no factory and no hardware brands — and
+  /// every field is optional until the studio says. Read and written only
+  /// through `modules/studio/matching-profile.ts`, which drops anything it
+  /// does not recognise. Null = not started.
+  matchingProfile Json?
+
   // ── Allocation ──
   //
   // What a subscription actually buys is VOLUME — how many briefs a studio is

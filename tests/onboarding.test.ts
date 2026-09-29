@@ -23,6 +23,7 @@ const COMPLETE: OnboardingSnapshot = {
   portfolioCount: MIN_PORTFOLIO_PROJECTS,
   portfolioShortfallNote: null,
   missingRates: [],
+  practiceMissing: [],
   submittedForReview: false,
 };
 
@@ -239,7 +240,7 @@ describe('onboardingProgress', () => {
   it('counts done steps out of the full list', () => {
     const p = onboardingProgress(snapshot({ portfolioCount: 0, gstin: null }));
     expect(p.total).toBe(ONBOARDING_STEPS.length);
-    expect(p.done).toBe(2); // profile and rates
+    expect(p.done).toBe(3); // profile, practice and rates
   });
 
   /**

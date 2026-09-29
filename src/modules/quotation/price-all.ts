@@ -71,7 +71,8 @@ export function priceMatches({
 }: {
   shape: HomeShape;
   plan: FloorPlan;
-  studios: { slug: string; name: string }[];
+  /** `curatedDiscountPct` from the studio's profile; a change re-prices that studio. */
+  studios: { slug: string; name: string; curatedDiscountPct?: number | null }[];
   existing: Record<string, StoredQuote>;
   ratesFor: (slug: string) => StudioRates;
   now?: Date;
@@ -79,7 +80,9 @@ export function priceMatches({
   const key = quoteKey(shape, plan);
   const fresh: StoredQuote[] = [];
   for (const studio of studios) {
-    if (existing[studio.slug]?.key === key) continue;
+    const had = existing[studio.slug];
+    const discount = studio.curatedDiscountPct ?? null;
+    if (had?.key === key && (had.quote.curatedDiscountPct ?? null) === discount) continue;
     const quote: FirstQuote = buildFirstQuote(
       {
         bhk: shape.bhk,
@@ -89,6 +92,7 @@ export function priceMatches({
         kitchenRunMm: plan.kitchenRunMm,
         runSource: runSourceOf(plan),
         scope: shape.scope,
+        curatedDiscountPct: discount,
       },
       ratesFor(studio.slug),
     );

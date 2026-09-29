@@ -24,7 +24,8 @@ const steps = (...done: boolean[]): StepStatus[] =>
     missing: done[i] ? [] : ['something'],
   }));
 
-const [PROFILE, REGISTRATION, PORTFOLIO, RATES, REVIEW] = ONBOARDING_STEPS as readonly [
+const [PROFILE, REGISTRATION, PORTFOLIO, , RATES, REVIEW] = ONBOARDING_STEPS as readonly [
+  OnboardingStep,
   OnboardingStep,
   OnboardingStep,
   OnboardingStep,
@@ -34,7 +35,7 @@ const [PROFILE, REGISTRATION, PORTFOLIO, RATES, REVIEW] = ONBOARDING_STEPS as re
 
 describe('gateFor', () => {
   it('opens only the first unfinished step on a fresh studio', () => {
-    const s = steps(false, false, false, false, false);
+    const s = steps(false, false, false, false, false, false);
     expect(gateFor(s, PROFILE)).toBe('current');
     expect(gateFor(s, REGISTRATION)).toBe('locked');
     expect(gateFor(s, REVIEW)).toBe('locked');
@@ -43,7 +44,7 @@ describe('gateFor', () => {
   it('keeps finished steps reachable', () => {
     /* Going back to edit is the whole reason the flow is not a wizard with
        one road out. */
-    const s = steps(true, true, false, false, false);
+    const s = steps(true, true, false, false, false, false);
     expect(gateFor(s, PROFILE)).toBe('done');
     expect(gateFor(s, REGISTRATION)).toBe('done');
     expect(gateFor(s, PORTFOLIO)).toBe('current');
@@ -56,7 +57,7 @@ describe('gateFor', () => {
      * studio finished everything and then deleted a project, so Portfolio
      * fails again — and Rates, which was done, is shut behind it.
      */
-    const s = steps(true, true, false, true, false);
+    const s = steps(true, true, false, false, true, false);
     expect(gateFor(s, PORTFOLIO)).toBe('current');
     /* Still `done`, because it is: the data is there. But the rail will not
        link past a `current` step, and `firstIncomplete` sends them back. */
@@ -68,14 +69,14 @@ describe('gateFor', () => {
     /* Happens when an earlier step was completed out of order — Rates filled
        from the application before Portfolio was touched. Reachable, but not
        the thing being pointed at. */
-    const s = steps(true, true, true, false, false);
+    const s = steps(true, true, true, true, false, false);
     expect(gateFor(s, RATES)).toBe('current');
     expect(gateFor(s, REVIEW)).toBe('locked');
   });
 
   it('locks an unknown step rather than opening it', () => {
     /* Fails closed. A typo'd URL must not be a way past the gate. */
-    expect(gateFor(steps(true, true, true, true, true), 'nonsense' as OnboardingStep)).toBe(
+    expect(gateFor(steps(true, true, true, true, true, true), 'nonsense' as OnboardingStep)).toBe(
       'locked',
     );
   });
@@ -83,20 +84,20 @@ describe('gateFor', () => {
 
 describe('firstIncomplete', () => {
   it('names the step to work on', () => {
-    expect(firstIncomplete(steps(true, false, false, false, false))).toBe(REGISTRATION);
+    expect(firstIncomplete(steps(true, false, false, false, false, false))).toBe(REGISTRATION);
   });
 
   it('falls back to the last step when everything is done', () => {
     /* Not `undefined`, because the caller redirects to it. */
-    expect(firstIncomplete(steps(true, true, true, true, true))).toBe(REVIEW);
+    expect(firstIncomplete(steps(true, true, true, true, true, true))).toBe(REVIEW);
   });
 });
 
 describe('percentComplete', () => {
   it('counts steps, not fields', () => {
-    expect(percentComplete(steps(false, false, false, false, false))).toBe(0);
-    expect(percentComplete(steps(true, false, false, false, false))).toBe(20);
-    expect(percentComplete(steps(true, true, true, false, false))).toBe(60);
+    expect(percentComplete(steps(false, false, false, false, false, false))).toBe(0);
+    expect(percentComplete(steps(true, false, false, false, false, false))).toBe(17);
+    expect(percentComplete(steps(true, true, true, true, false, false))).toBe(67);
   });
 
   it('never shows 100 beside an unfinished step', () => {
@@ -106,8 +107,8 @@ describe('percentComplete', () => {
      * locked Review is the bar telling somebody the work is done when the
      * submit button will refuse them.
      */
-    expect(percentComplete(steps(true, true, true, true, false))).toBe(80);
-    expect(percentComplete(steps(true, true, true, true, true))).toBe(100);
+    expect(percentComplete(steps(true, true, true, true, true, false))).toBe(83);
+    expect(percentComplete(steps(true, true, true, true, true, true))).toBe(100);
 
     const many: StepStatus[] = Array.from({ length: 200 }, (_, i) => ({
       step: PROFILE,

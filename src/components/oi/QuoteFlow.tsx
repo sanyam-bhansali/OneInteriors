@@ -271,6 +271,13 @@ export function QuoteDocument({
           value={`−${money(quote.modularDiscountPaise)}`}
           better
         />
+        {quote.curatedDiscountPaise ? (
+          <DocRow
+            label={`One Interiors discount · ${quote.curatedDiscountPct}%`}
+            value={`−${money(quote.curatedDiscountPaise)}`}
+            better
+          />
+        ) : null}
         <DocRow label="GST · 18%" value={money(quote.gstPaise)} />
         <DocRow label="Total" value={money(quote.totalPaise)} emphasis />
       </div>

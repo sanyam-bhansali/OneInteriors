@@ -120,6 +120,12 @@ export interface QuoteInput {
    * this function produced before scope existed. See `scope.ts`.
    */
   scope?: ScopeSelection;
+  /**
+   * The studio's One Interiors discount, % — agreed in its studio agreement
+   * and recorded by ops. Its own line, after the modular discount and before
+   * GST; never folded into the rates, never a struck-through price.
+   */
+  curatedDiscountPct?: number | null;
 }
 
 export interface QuoteLine {
@@ -148,6 +154,12 @@ export interface FirstQuote {
   /** 15% off the modular half. Shown as a line, never as a promotion. */
   modularDiscountPaise: Paise;
   professionalFeePaise: Paise;
+  /**
+   * The One Interiors discount and its percentage. Optional because quotes
+   * saved before it existed have neither; read absent as none.
+   */
+  curatedDiscountPaise?: Paise;
+  curatedDiscountPct?: number | null;
   gstPaise: Paise;
   totalPaise: Paise;
   /** The honest band. The midpoint never appears on its own. */
@@ -331,8 +343,14 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
   );
   const modularDiscountPaise = Math.round((modularPaise * MODULAR_DISCOUNT_BPS) / 10_000);
 
-  const beforeTax =
+  const afterStudioTerms =
     modularPaise + nonModularPaise + professionalFeePaise - modularDiscountPaise;
+  const curatedDiscountPct =
+    input.curatedDiscountPct && input.curatedDiscountPct > 0 ? input.curatedDiscountPct : null;
+  const curatedDiscountPaise = curatedDiscountPct
+    ? Math.round((afterStudioTerms * curatedDiscountPct) / 100)
+    : 0;
+  const beforeTax = afterStudioTerms - curatedDiscountPaise;
   const gstPaise = Math.round((beforeTax * GST_BPS) / 10_000);
   const totalPaise = beforeTax + gstPaise;
 
@@ -400,6 +418,8 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
     nonModularPaise,
     modularDiscountPaise,
     professionalFeePaise,
+    curatedDiscountPaise,
+    curatedDiscountPct,
     gstPaise,
     totalPaise,
     lowPaise: Math.round(totalPaise * (1 - variancePct)),

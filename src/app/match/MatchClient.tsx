@@ -218,7 +218,11 @@ export function MatchClient({
       studios: matches
         .map((m) => byId.get(m.studioId))
         .filter((s): s is Studio => Boolean(s))
-        .map((s) => ({ slug: s.slug, name: s.tradeName })),
+        .map((s) => ({
+          slug: s.slug,
+          name: s.tradeName,
+          curatedDiscountPct: s.matchingProfile?.curatedDiscountPct ?? null,
+        })),
       existing: project.quotes,
       ratesFor: (slug) => filedRates?.[slug] ?? filedRatesFor(slug),
     });

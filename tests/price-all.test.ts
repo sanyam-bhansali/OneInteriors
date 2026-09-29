@@ -46,6 +46,27 @@ describe('priceMatches', () => {
   });
 });
 
+describe('the curated discount', () => {
+  it('is its own line before GST, and re-prices the studio when it changes', () => {
+    const [plain] = priceMatches({ shape: SHAPE, plan: standard, studios: STUDIOS.slice(0, 1), existing: {}, ratesFor: filedRatesFor });
+    const withDiscount = [{ ...STUDIOS[0]!, curatedDiscountPct: 5 }];
+    const [discounted] = priceMatches({
+      shape: SHAPE,
+      plan: standard,
+      studios: withDiscount,
+      existing: { [plain!.studioSlug]: plain! },
+      ratesFor: filedRatesFor,
+    });
+    expect(discounted).toBeDefined();
+    const q = discounted!.quote;
+    const beforeDiscount = q.modularPaise + q.nonModularPaise + q.professionalFeePaise - q.modularDiscountPaise;
+    expect(q.curatedDiscountPaise).toBe(Math.round(beforeDiscount * 0.05));
+    expect(q.totalPaise).toBeLessThan(plain!.quote.totalPaise);
+    expect(q.gstPaise).toBe(Math.round(((beforeDiscount - q.curatedDiscountPaise!) * 1800) / 10_000));
+    expect(plain!.quote.curatedDiscountPaise).toBe(0);
+  });
+});
+
 describe('kitchenFor', () => {
   it('prefers the confirmed plan, then a measured run, then the standard one', () => {
     const plan = { fileName: 'b.pdf', kitchenRunMm: 4200, source: 'floor_plan' as const };

@@ -11,6 +11,7 @@ import { OpsHeader, TierProgress } from '../ui';
 import { CheckRow } from './CheckRow';
 import { StatusControl } from './StatusControl';
 import { GstinControl } from './GstinControl';
+import { DiscountControl } from './DiscountControl';
 import { HideControl } from './HideControl';
 import { ArchiveReview } from './ArchiveReview';
 import { archivesForStudio } from '@/modules/studio/quotation-archive-store';
@@ -127,6 +128,11 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
                   current={studio.gstin}
                   notApplicable={studio.gstinNotApplicable ?? false}
                   note={studio.gstinNote ?? null}
+                />
+                <DiscountControl
+                  studioId={studio.id}
+                  slug={studio.slug}
+                  current={studio.matchingProfile?.curatedDiscountPct ?? null}
                 />
               </section>
 

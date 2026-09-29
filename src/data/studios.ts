@@ -17,6 +17,7 @@
 import { lakhsToPaise } from '@/lib/money';
 import type { Studio, VerificationCheck, PortfolioProject } from '@/modules/studio/types';
 import type { StyleTag, PropertyType, ScopeType } from '@/modules/brief/types';
+import { EMPTY_PROFILE } from '@/modules/studio/matching-profile';
 
 type PortfolioSeed = [
   title: string,
@@ -136,6 +137,7 @@ const RAW_STUDIOS: RawStudio[] = [
       { label: 'Material delivery', pct: 40 },
       { label: 'Handover', pct: 10 },
     ],
+    matchingProfile: { ...EMPTY_PROFILE, curatedDiscountPct: 5 },
     completedProjects: 14,
     avgVarianceDays: 6,
     upheldDisputes: 0,

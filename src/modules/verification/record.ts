@@ -30,6 +30,7 @@ import { assessTier } from './tiers';
 import { validateGstin } from './gstin';
 import type { CheckResult, CheckType, StudioStatus } from '@/modules/studio/types';
 import { Prisma } from '@prisma/client';
+import { LIMITS, profileJson, readProfile } from '@/modules/studio/matching-profile';
 
 export type RecordResult = { ok: true } | { ok: false; error: string };
 
@@ -373,6 +374,43 @@ export async function setGstin(studioId: string, raw: string): Promise<RecordRes
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Could not save the GSTIN.' };
+  }
+}
+
+/**
+ * The studio's One Interiors discount, as agreed in its studio agreement.
+ *
+ * Ops only: it is a commercial term, and a studio editing its own would make
+ * the line on a customer's quote something the studio can move after signing.
+ * Blank clears it. Audited like every other change ops makes to a studio.
+ */
+export async function setCuratedDiscount(studioId: string, raw: string): Promise<RecordResult> {
+  const actor = await requireRole('OPS');
+  const trimmed = raw.trim();
+  const pct = trimmed === '' ? null : Number(trimmed);
+  const [lo, hi] = LIMITS.curatedDiscountPct;
+  if (pct !== null && (!Number.isFinite(pct) || pct < lo || pct > hi)) {
+    return { ok: false, error: `A percentage between ${lo} and ${hi}, or blank to clear it.` };
+  }
+  try {
+    await prisma.$transaction(async (tx) => {
+      const before = await tx.studio.findUniqueOrThrow({
+        where: { id: studioId },
+        select: { matchingProfile: true },
+      });
+      const profile = readProfile(before.matchingProfile);
+      const next = { ...profile, curatedDiscountPct: pct === null ? null : Math.round(pct * 100) / 100 };
+      await tx.studio.update({
+        where: { id: studioId },
+        data: { matchingProfile: profileJson(next) as Prisma.InputJsonValue },
+      });
+      await writeAudit(tx, actor, 'studio.curated_discount.set', 'Studio', studioId, {
+        curatedDiscountPct: profile.curatedDiscountPct,
+      }, { curatedDiscountPct: next.curatedDiscountPct });
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Could not save the discount.' };
   }
 }
 

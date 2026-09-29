@@ -23,6 +23,8 @@ import { PortfolioForm } from '../PortfolioForm';
 import { ReviewPanel } from '../ReviewPanel';
 import { RateCardForm } from '../RateCardForm';
 import { PaymentPhasesForm } from '../PaymentPhasesForm';
+import { PracticeForm } from '../PracticeForm';
+import { profileScore, profileSections } from '@/modules/studio/matching-profile';
 import { phasesText, readPhases } from '@/modules/studio/payment-phases';
 import { PositioningForm } from '../PositioningForm';
 import { ArchivePanel, type ArchiveView } from '../ArchivePanel';
@@ -108,6 +110,11 @@ export default async function OnboardingStepPage({
      reads of the same row. Null everywhere else, so no other step pays for
      it. */
   const archive = step === 'rates' ? await archiveView() : null;
+  const practiceSections = profileSections(
+    studio.matchingProfile,
+    studio.localities,
+    new Date(Date.now() + 5.5 * 3_600_000).toISOString().slice(0, 10),
+  );
 
   const doneParam = (await searchParams).done;
   const claimed = typeof doneParam === 'string' && isStep(doneParam) ? doneParam : null;
@@ -235,6 +242,14 @@ export default async function OnboardingStepPage({
               isRender: p.isRender,
               images: p.images,
             }))}
+          />
+        ) : null}
+
+        {step === 'practice' ? (
+          <PracticeForm
+            profile={studio.matchingProfile}
+            sections={practiceSections}
+            score={profileScore(practiceSections)}
           />
         ) : null}
 

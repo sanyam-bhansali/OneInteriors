@@ -16,6 +16,7 @@ import {
   uploadProjectImages,
   savePositioning,
   savePaymentPhases,
+  saveMatchingProfile,
   submitForReview,
   currentStudio,
   onboardingProgress,
@@ -401,6 +402,17 @@ export async function savePositioningAction(
   });
   if (!result.ok) return { status: 'error', errors: result.errors };
   refresh();
+  return { status: 'saved' };
+}
+
+export async function saveMatchingProfileAction(
+  _prev: StepState,
+  formData: FormData,
+): Promise<StepState> {
+  const result = await saveMatchingProfile(formData);
+  refresh();
+  if (!result.ok) return { status: 'error', errors: result.errors };
+  await continueFrom('practice');
   return { status: 'saved' };
 }
 

@@ -36,6 +36,19 @@ import {
 import { isOffering, isPriceLevel } from './positioning';
 import { checkPhases, parsePhasesText, type PaymentPhase } from './payment-phases';
 import {
+  profileFromForm,
+  profileJson,
+  profileSections,
+  readProfile,
+  type FormLike,
+  type MatchingProfile,
+} from './matching-profile';
+
+/** Today in India, as YYYY-MM-DD — the calendar the studio is on. */
+function today(): string {
+  return new Date(Date.now() + 5.5 * 3_600_000).toISOString().slice(0, 10);
+}
+import {
   onboardingProgress,
   MIN_ABOUT_LENGTH,
   MAX_ABOUT_LENGTH,
@@ -84,6 +97,10 @@ export interface StudioContext {
     status: string;
     portfolioCount: number;
     missingRates: string[];
+    /** Required matching-profile sections still short. See matching-profile.ts. */
+    practiceMissing: string[];
+    /** Validated; EMPTY_PROFILE when not started. */
+    matchingProfile: MatchingProfile;
     submittedForReview: boolean;
     gstinNotApplicable: boolean;
     gstinNote: string | null;
@@ -156,6 +173,7 @@ async function loadStudio(user: AuthUser): Promise<StudioContext | null> {
 
   const s = member.studio;
   const steps = readSteps(s.onboardingSteps);
+  const profile = readProfile(s.matchingProfile);
 
   const rateItems = await prisma.rateCardItem.findMany({
     where: { studioId: s.id },
@@ -183,6 +201,10 @@ async function loadStudio(user: AuthUser): Promise<StudioContext | null> {
       status: s.status,
       portfolioCount: s._count.portfolio,
       missingRates: missingCoreRates(rates as never),
+      practiceMissing: profileSections(profile, s.localities, today())
+        .filter((x) => x.required)
+        .flatMap((x) => x.missing),
+      matchingProfile: profile,
       submittedForReview: steps.submittedForReview === true,
       gstinNotApplicable: s.gstinNotApplicable,
       gstinNote: s.gstinNote,
@@ -832,6 +854,25 @@ export async function savePaymentPhases(text: string): Promise<SaveResult> {
     data: { paymentPhases: phases ? phases.map((p) => ({ label: p.label, pct: p.pct })) : Prisma.DbNull },
   });
   return { ok: true };
+}
+
+/**
+ * The matching profile, from the "How you work" step.
+ *
+ * Saved even with errors on individual fields left out — a studio that got
+ * one number wrong should not lose the twenty it got right. The errors come
+ * back beside the fields.
+ */
+export async function saveMatchingProfile(form: FormLike): Promise<SaveResult> {
+  const context = await currentStudio();
+  if (!context) return { ok: false, errors: { form: 'No studio is linked to this account.' } };
+
+  const { profile, errors } = profileFromForm(form, today(), context.studio.matchingProfile);
+  await prisma.studio.update({
+    where: { id: context.studio.id },
+    data: { matchingProfile: profileJson(profile) as Prisma.InputJsonValue },
+  });
+  return Object.keys(errors).length > 0 ? { ok: false, errors } : { ok: true };
 }
 
 export async function listProjects() {
