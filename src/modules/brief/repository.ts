@@ -80,6 +80,8 @@ export interface LoadedBrief {
   brief: Brief;
   /** False when there is nothing stored yet — the caller may prefer its local copy. */
   found: boolean;
+  /** The stored row's id, when found — what matches are stored against. */
+  id?: string;
 }
 
 /**
@@ -92,13 +94,13 @@ export async function loadBrief(): Promise<LoadedBrief> {
   const user = await getCurrentUser();
   if (user) {
     const row = await prisma.brief.findUnique({ where: { userId: user.id } });
-    if (row) return { brief: rowToBrief(row), found: true };
+    if (row) return { brief: rowToBrief(row), found: true, id: row.id };
   }
 
   const anonKey = await readAnonKey();
   if (anonKey) {
     const row = await prisma.brief.findUnique({ where: { anonKey } });
-    if (row) return { brief: rowToBrief(row), found: true };
+    if (row) return { brief: rowToBrief(row), found: true, id: row.id };
   }
 
   return { brief: EMPTY_BRIEF, found: false };
