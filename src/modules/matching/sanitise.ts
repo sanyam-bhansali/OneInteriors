@@ -194,7 +194,7 @@ function planUse(value: unknown): PlanUse | null {
     typeof v.kitchenRunMm === 'number' && v.kitchenRunMm >= 1500 && v.kitchenRunMm <= 9000
       ? Math.round(v.kitchenRunMm)
       : null;
-  const sources = ['printed', 'computed', 'customer'] as const;
+  const sources = ['printed', 'computed', 'customer', 'society'] as const;
   return {
     kitchenRunMm: run,
     bathrooms,

@@ -20,7 +20,8 @@ import {
 import { checkContact, type ContactField, type ContactInput } from '@/modules/brief/contact';
 import { consume, addressOf, bucketFor, waitPhrase } from '@/modules/rate-limit/store';
 import { hashIp } from '@/modules/auth/session';
-import { attachFloorPlan } from '@/modules/brief/repository';
+import { attachFloorPlan, societyPlanFor } from '@/modules/brief/repository';
+import type { LibraryReading } from '@/modules/floorplan/society-library';
 import { canReadPlans, readFloorPlan, readablePlanType } from '@/modules/floorplan/read';
 import type { FloorPlanReading } from '@/modules/floorplan/reading';
 import { floorPlanUploadEnabled, uploadFloorPlan } from '@/modules/storage/floor-plan';
@@ -253,4 +254,10 @@ export async function readInspirationAction(formData: FormData): Promise<Inspira
     };
   }
   return { ok: true, picks: result.picks };
+}
+
+/** "Homes in your building have shared their plan" — the library's offer, when there is one. */
+export async function societyPlanAction(society: unknown, propertyType: unknown): Promise<LibraryReading | null> {
+  if (typeof society !== 'string' || typeof propertyType !== 'string' || society.length > 80) return null;
+  return societyPlanFor(society, propertyType);
 }

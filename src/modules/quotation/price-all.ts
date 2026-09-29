@@ -91,6 +91,7 @@ export function priceMatches({
         bathrooms: shape.bathrooms,
         kitchenRunMm: plan.kitchenRunMm,
         runSource: runSourceOf(plan),
+        runShared: plan.shared === true,
         scope: shape.scope,
         curatedDiscountPct: discount,
       },

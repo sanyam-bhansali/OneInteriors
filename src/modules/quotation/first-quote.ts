@@ -115,6 +115,8 @@ export interface QuoteInput {
   kitchenRunMm: number | null;
   /** How we came by the kitchen run. Drives the variance and the wording. */
   runSource: 'floor_plan' | 'customer' | 'standard';
+  /** The run came from plans other homes in their building shared, not their own. */
+  runShared?: boolean;
   /**
    * What the quote covers. Absent means the full home — exactly the quote
    * this function produced before scope existed. See `scope.ts`.
@@ -198,7 +200,7 @@ export function homeShapeFor(
    * quote skips the "measure your kitchen" gate and the ±10% it prints is
    * earned. Null without a confirmed plan or a readable kitchen.
    */
-  plan: { fileName: string | null; kitchenRunMm: number; source: 'floor_plan' } | null;
+  plan: { fileName: string | null; kitchenRunMm: number; source: 'floor_plan'; shared?: boolean } | null;
 } {
   const bhk = BEDROOMS[brief.propertyType ?? 'BHK_2'];
   const { sqft, assumed } = carpetAreaFor(brief);
@@ -217,9 +219,10 @@ export function homeShapeFor(
     plan:
       brief.planReading?.kitchenRunMm
         ? {
-            fileName: brief.floorPlanName ?? null,
+            fileName: brief.planReading.areaSource === 'society' ? null : (brief.floorPlanName ?? null),
             kitchenRunMm: brief.planReading.kitchenRunMm,
             source: 'floor_plan',
+            ...(brief.planReading.areaSource === 'society' ? { shared: true } : {}),
           }
         : null,
   };
@@ -384,7 +387,9 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
 
   if (source === 'floor_plan') {
     assumptions.push(
-      `Kitchen priced on a ${Math.round(runMm)}mm platform run read from your floor plan.`,
+      input.runShared
+        ? `Kitchen priced on a ${Math.round(runMm)}mm platform run, read from floor plans other homes in your building shared. Your own plan would confirm it.`
+        : `Kitchen priced on a ${Math.round(runMm)}mm platform run read from your floor plan.`,
     );
   } else if (source === 'customer') {
     assumptions.push(`Kitchen priced on the ${Math.round(runMm)}mm platform run you gave us.`);

@@ -143,7 +143,8 @@ export interface PlanUse {
   bathrooms: number;
   hasStudy: boolean;
   /** Where the carpet area on the brief came from. */
-  areaSource: 'printed' | 'computed' | 'customer' | null;
+  /** 'society': taken from plans other homes in the building shared (society-library.ts). */
+  areaSource: 'printed' | 'computed' | 'customer' | 'society' | null;
 }
 
 export interface Brief {

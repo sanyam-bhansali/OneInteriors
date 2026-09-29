@@ -10,10 +10,11 @@
  * one narrows the range to ±10%.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FloorPlanReading } from '@/modules/floorplan/reading';
 import type { Brief, PropertyType } from '@/modules/brief/types';
-import { readFloorPlanAction } from './actions';
+import { readFloorPlanAction, societyPlanAction } from './actions';
+import type { LibraryReading } from '@/modules/floorplan/society-library';
 
 const BHK_FOR: Record<number, PropertyType> = { 1: 'BHK_1', 2: 'BHK_2', 3: 'BHK_3' };
 const typeFor = (bedrooms: number): PropertyType =>
@@ -36,6 +37,19 @@ export function PlanReader({
   const [area, setArea] = useState('');
   const [runMm, setRunMm] = useState('');
   const [baths, setBaths] = useState('');
+  /* Homes in their building that have shared a plan (society-library.ts) —
+     offered before the upload, because using it is one tap. */
+  const [shared, setShared] = useState<LibraryReading | null>(null);
+  useEffect(() => {
+    if (!brief.society || !brief.propertyType || brief.planReading) return;
+    let live = true;
+    societyPlanAction(brief.society, brief.propertyType)
+      .then((r) => live && setShared(r))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [brief.society, brief.propertyType, brief.planReading]);
 
   async function read(form: FormData) {
     setState({ kind: 'reading' });
@@ -60,7 +74,9 @@ export function PlanReader({
     return (
       <div className="rounded-[14px] border border-[var(--line)] bg-[var(--card)] p-5">
         <p className="m-0 text-[15px] leading-relaxed text-[var(--ink)]">
-          Using your plan{brief.floorPlanName ? ` (${brief.floorPlanName})` : ''}:{' '}
+          {p.areaSource === 'society'
+            ? `Using the plan other homes in ${brief.society ?? 'your building'} shared: `
+            : `Using your plan${brief.floorPlanName ? ` (${brief.floorPlanName})` : ''}: `}
           {brief.carpetAreaSqft ? `${brief.carpetAreaSqft.toLocaleString('en-IN')} sq ft, ` : ''}
           {p.bathrooms} bathroom{p.bathrooms === 1 ? '' : 's'}
           {p.kitchenRunMm ? `, kitchen platform ${p.kitchenRunMm.toLocaleString('en-IN')} mm` : ''}.
@@ -159,12 +175,51 @@ export function PlanReader({
             Try another file
           </button>
         </div>
+        {brief.society ? (
+          <p className="m-0 mt-4 text-[12.5px] leading-snug text-[var(--ink2)]">
+            Its sizes — never the file, never your name — help the next family in {brief.society}.
+          </p>
+        ) : null}
       </div>
     );
   }
 
   return (
     <form action={read} className="flex flex-col gap-3">
+      {shared ? (
+        <div className="mb-2 rounded-[14px] border border-[var(--acc)] bg-[var(--card)] p-5">
+          <p className="m-0 text-[15px] leading-relaxed text-[var(--ink)]">
+            {shared.homes} homes in {brief.society} have shared their plan for this layout:{' '}
+            {[
+              shared.carpetAreaSqft ? `${shared.carpetAreaSqft.toLocaleString('en-IN')} sq ft` : null,
+              `${shared.bathrooms} bathroom${shared.bathrooms === 1 ? '' : 's'}`,
+              shared.kitchenRunMm ? `kitchen platform ${shared.kitchenRunMm.toLocaleString('en-IN')} mm` : null,
+            ]
+              .filter(Boolean)
+              .join(', ')}
+            .
+          </p>
+          <button
+            type="button"
+            onClick={() =>
+              update({
+                ...(shared.carpetAreaSqft ? { carpetAreaSqft: shared.carpetAreaSqft } : {}),
+                planReading: {
+                  kitchenRunMm: shared.kitchenRunMm,
+                  bathrooms: shared.bathrooms,
+                  hasStudy: false,
+                  areaSource: 'society',
+                },
+              })
+            }
+            className="mt-3 cursor-pointer px-5 py-2.5 text-[14.5px] font-medium text-white"
+            style={{ background: 'var(--acc-btn)' }}
+          >
+            Use these sizes
+          </button>
+          <p className="m-0 mt-2 text-[12.5px] text-[var(--ink2)]">Or upload your own below — yours is the one to trust.</p>
+        </div>
+      ) : null}
       <input
         type="file"
         name="plan"

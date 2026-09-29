@@ -97,7 +97,9 @@ export default function PrivacyPage() {
             </li>
             <li>
               <strong>A floor plan</strong>, only if you upload one — kept privately, and read
-              for its sizes (below).
+              for its sizes (below). If you confirm those sizes and told us your society, the
+              sizes alone — never the file or your name — are kept for your building, and offered
+              to the next family there once two or more homes have shared theirs.
             </li>
             <li>
               <strong>Technical details</strong> — a cookie that keeps you signed in, a cookie that

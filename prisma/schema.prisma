@@ -375,6 +375,8 @@ model Brief {
   @@index([locality, completedAt])
   @@index([anonKey])
   @@map("briefs")
+
+  societyPlan SocietyPlan?
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1280,6 +1282,32 @@ model Consultation {
 
   @@index([briefId])
   @@map("consultations")
+}
+
+/// The society floor-plan library (Phase 7): the sizes a customer confirmed
+/// from their own floor plan, kept against their society and home type so the
+/// next family in the same building can use them without uploading anything.
+/// Sizes only — never the file, the name or the brief's other answers — and
+/// offered only once two or more homes agree (modules/floorplan/society-library.ts).
+/// One row per brief: a customer who corrects their plan corrects their row.
+model SocietyPlan {
+  id             String   @id @default(cuid())
+  briefId        String   @unique
+  /// Deleted with the brief — an erasure request takes these sizes too.
+  brief          Brief    @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  /// Lower-case letters and digits of the society name, so "Sapphire Heights"
+  /// and "sapphire heights " are one building.
+  societyKey     String
+  bhk            Int
+  carpetAreaSqft Int?
+  bathrooms      Int
+  kitchenRunMm   Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([societyKey, bhk])
+  @@map("society_plans")
 }
 
 /// Two questions to the customer after their first meeting with a studio

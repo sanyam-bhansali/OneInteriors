@@ -106,7 +106,7 @@ export function planUseFrom(value: unknown): PlanUse | null {
     bathrooms: baths,
     hasStudy: v.hasStudy === true,
     areaSource:
-      source === 'printed' || source === 'computed' || source === 'customer' ? source : null,
+      source === 'printed' || source === 'computed' || source === 'customer' || source === 'society' ? source : null,
   };
 }
 

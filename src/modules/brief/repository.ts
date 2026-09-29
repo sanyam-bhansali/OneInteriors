@@ -25,6 +25,7 @@ import 'server-only';
  * sessionStorage exactly as before.
  */
 
+import { libraryReading, shareable, societyKey, type LibraryReading } from '@/modules/floorplan/society-library';
 import { cookies } from 'next/headers';
 import { randomBytes } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
@@ -122,24 +123,69 @@ export async function saveBrief(brief: Brief): Promise<SaveResult> {
     const data = briefToRow(brief);
     const user = await getCurrentUser();
 
-    if (user) {
-      await prisma.brief.upsert({
-        where: { userId: user.id },
-        create: { ...data, userId: user.id },
-        update: data,
-      });
-      return { ok: true, persisted: true };
-    }
-
-    const anonKey = await ensureAnonKey();
-    await prisma.brief.upsert({
-      where: { anonKey },
-      create: { ...data, anonKey },
-      update: data,
-    });
+    const anonKey = user ? null : await ensureAnonKey();
+    const row = user
+      ? await prisma.brief.upsert({
+          where: { userId: user.id },
+          create: { ...data, userId: user.id },
+          update: data,
+          select: { id: true },
+        })
+      : await prisma.brief.upsert({
+          where: { anonKey: anonKey! },
+          create: { ...data, anonKey: anonKey! },
+          update: data,
+          select: { id: true },
+        });
+    await shareIntoLibrary(row.id, brief);
     return { ok: true, persisted: true };
   } catch {
     return { ok: true, persisted: false };
+  }
+}
+
+/**
+ * Keep the confirmed plan's sizes in the society library — or take them out
+ * when the plan or the society is gone. Sizes only. Never fails the save.
+ */
+async function shareIntoLibrary(briefId: string, brief: Brief): Promise<void> {
+  try {
+    const key = societyKey(brief.society);
+    const bhk = brief.propertyType ? BHK_OF[brief.propertyType] : undefined;
+    if (!shareable(brief.planReading, brief.society) || !key || !bhk || !brief.planReading) {
+      await prisma.societyPlan.deleteMany({ where: { briefId } });
+      return;
+    }
+    const row = {
+      societyKey: key,
+      bhk,
+      carpetAreaSqft: brief.carpetAreaSqft,
+      bathrooms: brief.planReading.bathrooms,
+      kitchenRunMm: brief.planReading.kitchenRunMm,
+    };
+    await prisma.societyPlan.upsert({ where: { briefId }, create: { briefId, ...row }, update: row });
+  } catch {
+    /* The library is a convenience for the next family; never this one's save. */
+  }
+}
+
+const BHK_OF: Record<string, number | undefined> = { BHK_1: 1, BHK_2: 2, BHK_3: 3, BHK_4_PLUS: 4 };
+
+/** The building's plan for this home type, when two or more homes have shared theirs. */
+export async function societyPlanFor(society: string, propertyType: string): Promise<LibraryReading | null> {
+  if (!hasDatabase()) return null;
+  const key = societyKey(society);
+  const bhk = BHK_OF[propertyType];
+  if (!key || !bhk) return null;
+  try {
+    const rows = await prisma.societyPlan.findMany({
+      where: { societyKey: key, bhk },
+      select: { carpetAreaSqft: true, bathrooms: true, kitchenRunMm: true },
+      take: 50,
+    });
+    return libraryReading(rows);
+  } catch {
+    return null;
   }
 }
 

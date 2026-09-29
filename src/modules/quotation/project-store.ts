@@ -36,6 +36,8 @@ export interface FloorPlan {
   /** The one number the plan is read for. */
   kitchenRunMm: number | null;
   source: 'floor_plan' | 'customer' | 'standard';
+  /** From plans other homes in their building shared (society-library.ts). */
+  shared?: boolean;
 }
 
 export interface StoredQuote {
