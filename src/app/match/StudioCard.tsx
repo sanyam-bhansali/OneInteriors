@@ -167,6 +167,7 @@ export function StudioCard({
         projects={studio.portfolio}
         checks={studio.checks}
         studioName={studio.tradeName}
+        likeYours={match.similarProjects}
       />
 
       <Glass focus={focus}>

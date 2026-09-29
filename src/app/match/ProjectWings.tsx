@@ -92,14 +92,24 @@ function Check({ chip, i }: { chip: ProofChip; i: number }) {
   );
 }
 
-function Plate({ project }: { project: PortfolioProject }) {
+function Plate({ project, likeYours }: { project: PortfolioProject; likeYours: boolean }) {
+  const cover = project.images[0];
   return (
     <article className="q-plate">
-      {/* The photograph goes here. Empty on every studio today, and labelled
-          rather than dressed up as a picture. */}
-      <div className="q-plate-photo" aria-hidden>
-        <span className="oi-label">Photo to come</span>
+      {/* The cover photograph when there is one; labelled as missing, never
+          dressed up, when there is not. A render says so. */}
+      <div className="q-plate-photo relative overflow-hidden" aria-hidden>
+        {cover ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={cover} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        ) : (
+          <span className="oi-label">Photo to come</span>
+        )}
+        {cover && project.isRender ? (
+          <span className="oi-label absolute bottom-1.5 left-1.5 rounded-full bg-[var(--card)] px-2 py-0.5">Render</span>
+        ) : null}
       </div>
+      {likeYours ? <p className="oi-label m-0 mt-2 text-[var(--acc-ink)]">Like your home</p> : null}
       <p className="oi-num m-0 mt-2.5 text-[13px] font-semibold leading-tight text-[var(--ink)]">
         {project.title}
       </p>
@@ -116,14 +126,22 @@ function Plate({ project }: { project: PortfolioProject }) {
 }
 
 export function ProjectWings({
-  projects,
+  projects: all,
   checks,
   studioName,
+  likeYours = [],
 }: {
   projects: PortfolioProject[];
   checks: VerificationCheck[];
   studioName: string;
+  /** Project ids most like this home, best first — shown first (match@2 similar work). */
+  likeYours?: string[];
 }) {
+  const similar = new Set(likeYours);
+  const projects = [
+    ...likeYours.map((id) => all.find((p) => p.id === id)).filter((p): p is PortfolioProject => Boolean(p)),
+    ...all.filter((p) => !similar.has(p.id)),
+  ];
   const proof = studioProof(checks, 4);
 
   // Nothing to fan out on either count means no wings at all, rather than
@@ -139,7 +157,7 @@ export function ProjectWings({
       {left.length > 0 ? (
         <Drawer side="left" label={`Work by ${studioName}`}>
           {left.map((p) => (
-            <Plate key={p.id} project={p} />
+            <Plate key={p.id} project={p} likeYours={similar.has(p.id)} />
           ))}
         </Drawer>
       ) : null}
@@ -147,7 +165,7 @@ export function ProjectWings({
       {right.length > 0 ? (
         <Drawer side="right" label={`More work by ${studioName}`}>
           {right.map((p) => (
-            <Plate key={p.id} project={p} />
+            <Plate key={p.id} project={p} likeYours={similar.has(p.id)} />
           ))}
         </Drawer>
       ) : null}
