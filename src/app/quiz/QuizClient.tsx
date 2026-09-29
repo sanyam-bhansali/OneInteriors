@@ -66,7 +66,6 @@ import {
   cleanName,
   isStepAnswered,
   stepAt,
-  typicalCarpetSqft,
   type StepId,
 } from '@/modules/brief/steps';
 import { LocalityPicker } from './LocalityPicker';
@@ -947,12 +946,12 @@ function nameStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts 
  * building know its layouts, and "they have done three flats in your
  * society" is the most checkable thing we will ever be able to say.
  *
- * The carpet area is optional, and its placeholder is the typical area for
- * the configuration they just picked rather than one number for every home.
+ * The carpet area is not asked here since 30 Sep (build queue item 8): the
+ * floor plan on the next screen gives it, and only a customer without one is
+ * asked for it there (PlanReader).
  */
 function homeStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
   const name = cleanName(brief.contactName);
-  const typical = typicalCarpetSqft(brief.propertyType);
 
   return {
     ask: (
@@ -985,32 +984,14 @@ function homeStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts 
           />
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2">
-          <label className="block">
-            <FieldLabel>Society or building, if you like</FieldLabel>
-            <SocietyInput
-              value={brief.society}
-              onChange={(society) => update({ society })}
-              onPick={(s) => update({ society: s.name, locality: s.locality })}
-            />
-          </label>
-          <label className="block">
-            <FieldLabel>Carpet area, if you know it</FieldLabel>
-            <span className="flex items-center gap-2">
-              <input
-                type="number"
-                inputMode="numeric"
-                placeholder={String(typical)}
-                value={brief.carpetAreaSqft ?? ''}
-                onChange={(e) =>
-                  update({ carpetAreaSqft: e.target.value ? Number(e.target.value) : null })
-                }
-                className="oi-num w-32 rounded-full border border-[var(--line)] bg-[var(--card)] px-4 py-2.5 text-[15px] text-[var(--ink)] placeholder:text-[var(--ink2)]"
-              />
-              <span className="text-[14px] text-[var(--ink2)]">sq ft</span>
-            </span>
-          </label>
-        </div>
+        <label className="block sm:max-w-[26rem]">
+          <FieldLabel>Society or building, if you like</FieldLabel>
+          <SocietyInput
+            value={brief.society}
+            onChange={(society) => update({ society })}
+            onPick={(s) => update({ society: s.name, locality: s.locality })}
+          />
+        </label>
       </div>
     ),
   };

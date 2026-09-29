@@ -15,6 +15,7 @@ import type { FloorPlanReading } from '@/modules/floorplan/reading';
 import type { Brief, PropertyType } from '@/modules/brief/types';
 import { readFloorPlanAction, societyPlanAction } from './actions';
 import type { LibraryReading } from '@/modules/floorplan/society-library';
+import { typicalCarpetSqft } from '@/modules/brief/steps';
 
 const BHK_FOR: Record<number, PropertyType> = { 1: 'BHK_1', 2: 'BHK_2', 3: 'BHK_3' };
 const typeFor = (bedrooms: number): PropertyType =>
@@ -246,6 +247,28 @@ export function PlanReader({
         We read it with an AI service to size your quote, and keep it privately. A studio sees it
         only when you choose that studio.
       </p>
+
+      {/* Asked only here, and only without a plan: a plan gives the area, so
+          nobody who uploads one is asked for it (build queue item 8). */}
+      <label className="mt-4 block border-t border-[var(--line)] pt-4">
+        <span className="mb-2 block text-[14px] text-[var(--ink)]">
+          No plan to hand? Your carpet area, if you know it
+        </span>
+        <span className="flex items-center gap-2">
+          <input
+            type="number"
+            inputMode="numeric"
+            placeholder={String(typicalCarpetSqft(brief.propertyType))}
+            value={brief.carpetAreaSqft ?? ''}
+            onChange={(e) => update({ carpetAreaSqft: e.target.value ? Number(e.target.value) : null })}
+            className="oi-num w-32 rounded-full border border-[var(--line)] bg-[var(--card)] px-4 py-2.5 text-[15px] text-[var(--ink)] placeholder:text-[var(--ink2)]"
+          />
+          <span className="text-[14px] text-[var(--ink2)]">sq ft</span>
+        </span>
+        <span className="mt-1.5 block text-[12.5px] text-[var(--ink2)]">
+          Left blank, we use the typical area for your home and say so on every quote.
+        </span>
+      </label>
     </form>
   );
 }
