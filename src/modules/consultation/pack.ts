@@ -34,6 +34,58 @@ export interface ExpertPack {
   starred: string[];
 }
 
+export interface SeenQuote {
+  studioId: string;
+  studioName: string;
+  lowPaise: number;
+  highPaise: number;
+  compared: boolean;
+}
+
+/**
+ * The quotes this customer was shown, for the expert page (plan §9): the
+ * studios they compared first, then the rest in their ranked order. Empty
+ * when nothing is stored — a brief finished on another device — and the page
+ * falls back to pricing afresh.
+ */
+export async function quotesAsSeen(briefId: string, rankedIds: string[]): Promise<SeenQuote[]> {
+  try {
+    const [quotes, decision] = await Promise.all([
+      prisma.firstQuote.findMany({
+        where: { briefId },
+        include: { studio: { select: { tradeName: true, slug: true, status: true, pausedAt: true } } },
+      }),
+      prisma.quoteDecision.findUnique({ where: { briefId }, select: { comparedSlugs: true } }),
+    ]);
+    const compared = decision?.comparedSlugs ?? [];
+    const rank = (id: string) => {
+      const i = rankedIds.indexOf(id);
+      return i === -1 ? 999 : i;
+    };
+    return quotes
+      // A studio paused or gone since cannot take the call's outcome.
+      .filter((q) => q.studio.status === 'ACTIVE' && !q.studio.pausedAt)
+      .map((q) => ({
+        studioId: q.studioId,
+        studioName: q.studio.tradeName,
+        lowPaise: fromDb(q.lowPaise),
+        highPaise: fromDb(q.highPaise),
+        compared: compared.includes(q.studio.slug),
+        slugOrder: compared.indexOf(q.studio.slug),
+      }))
+      .sort((a, b) =>
+        a.compared !== b.compared
+          ? a.compared ? -1 : 1
+          : a.compared
+            ? a.slugOrder - b.slugOrder
+            : rank(a.studioId) - rank(b.studioId),
+      )
+      .map(({ slugOrder: _slugOrder, ...q }) => q);
+  } catch {
+    return [];
+  }
+}
+
 const KITCHEN: Record<string, string> = {
   STANDARD: 'standard kitchen',
   CUSTOMER: 'kitchen they measured',

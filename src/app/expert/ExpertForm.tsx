@@ -67,6 +67,7 @@ export function ExpertForm({
   minStudios,
   maxStudios,
   slots = [],
+  preselected = [],
 }: {
   briefId: string;
   studios: StudioOption[];
@@ -76,11 +77,15 @@ export function ExpertForm({
   maxStudios: number;
   /** Open 30-minute slots (ISO). Empty when no expert has hours set — then we ask when suits them. */
   slots?: string[];
+  /** The studios they compared — ticked for them. */
+  preselected?: string[];
 }) {
   const [state, action, pending] = useActionState(requestExpertAction, INITIAL);
   const [slot, setSlot] = useState<string | null>(null);
   const booking = slots.length > 0;
-  const [picked, setPicked] = useState<string[]>(studios.slice(0, 2).map((s) => s.id));
+  const [picked, setPicked] = useState<string[]>(
+    preselected.length > 0 ? preselected.slice(0, maxStudios) : studios.slice(0, 2).map((s) => s.id),
+  );
   const [asks, setAsks] = useState<string[]>([]);
   const [own, setOwn] = useState('');
   const err = state.errors ?? {};
