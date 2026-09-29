@@ -65,3 +65,28 @@ export function scopeBandRange(
     share,
   };
 }
+
+/**
+ * Where a quote lands against the band they chose — one line on the quote.
+ *
+ * "Inside your Premium range for kitchen & wardrobes (₹8.3 L–₹11.5 L)", or
+ * how far above or below it. Compared before GST, because the bands are
+ * quoted before GST. A quote above the band is not wrong — it is this
+ * studio's price for this home — but the customer chose a level and should
+ * not have to work out for themselves that this is outside it.
+ */
+export type Placement =
+  | { kind: 'inside' }
+  | { kind: 'above'; byPaise: number }
+  | { kind: 'below'; byPaise: number };
+
+export function placementIn(
+  workPaise: number,
+  band: { lowPaise: number; highPaise: number | null },
+): Placement {
+  if (workPaise < band.lowPaise) return { kind: 'below', byPaise: band.lowPaise - workPaise };
+  if (band.highPaise !== null && workPaise > band.highPaise) {
+    return { kind: 'above', byPaise: workPaise - band.highPaise };
+  }
+  return { kind: 'inside' };
+}

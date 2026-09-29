@@ -5,7 +5,7 @@
  * ## Two thresholds, not one
  *
  * `MIN_QUOTATIONS_TO_SEND` (20) is how many make it worth sending at all.
- * `MIN_QUOTATIONS_FOR_RATES` (100, in the catalogue) is how many make a
+ * `MIN_QUOTATIONS_FOR_RATES` (50, in the catalogue) is how many make a
  * derived rate trustworthy on its own.
  *
  * They are different numbers because they answer different questions, and

@@ -22,6 +22,8 @@ import { RegistrationForm } from '../RegistrationForm';
 import { PortfolioForm } from '../PortfolioForm';
 import { ReviewPanel } from '../ReviewPanel';
 import { RateCardForm } from '../RateCardForm';
+import { PaymentPhasesForm } from '../PaymentPhasesForm';
+import { phasesText, readPhases } from '@/modules/studio/payment-phases';
 import { PositioningForm } from '../PositioningForm';
 import { ArchivePanel, type ArchiveView } from '../ArchivePanel';
 import { myArchive } from '@/modules/studio/quotation-archive-store';
@@ -268,6 +270,7 @@ export default async function OnboardingStepPage({
               maxLakhs={studio.maxProjectPaise ? paiseToLakhs(fromDb(studio.maxProjectPaise)) : null}
             />
             <RateCardForm values={await rateCardValues()} />
+            <PaymentPhasesForm initial={phasesText(readPhases(studio.paymentPhases))} />
           </div>
         ) : null}
 

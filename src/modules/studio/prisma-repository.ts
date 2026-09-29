@@ -15,6 +15,7 @@
  *     the conversion and throws rather than silently losing precision.
  */
 
+import { readPhases } from './payment-phases';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { fromDb } from '@/lib/money';
@@ -106,6 +107,7 @@ function toStudio(row: StudioRow): Studio {
     teamSize: row.teamSize ?? null,
     minProjectPaise: row.minProjectPaise === null ? null : fromDb(row.minProjectPaise),
     maxProjectPaise: row.maxProjectPaise === null ? null : fromDb(row.maxProjectPaise),
+    paymentPhases: readPhases(row.paymentPhases),
     completedProjects: row.completedProjects,
     avgVarianceDays: row.avgVarianceDays,
     upheldDisputes: row.upheldDisputes,

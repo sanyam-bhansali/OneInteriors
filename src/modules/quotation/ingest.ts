@@ -47,6 +47,8 @@ import type { Paise } from '@/lib/money';
 import {
   ITEM,
   MIN_QUOTATIONS_FOR_RATES,
+  MIN_QUOTATIONS_PER_ITEM,
+  rateCanGoLive,
   type FiledRate,
   type Room,
   type StudioRates,
@@ -408,9 +410,9 @@ export function ingestQuotations(
     );
   }
   for (const item of evidence) {
-    if (item.fromQuotations < 5) {
+    if (!rateCanGoLive(item.fromQuotations)) {
       problems.push(
-        `"${ITEM[item.code]?.label ?? item.code}" appears in only ${item.fromQuotations} quotations. Treat that rate as provisional.`,
+        `"${ITEM[item.code]?.label ?? item.code}" appears in only ${item.fromQuotations} quotations — provisional, and it will not go live below ${MIN_QUOTATIONS_PER_ITEM}.`,
       );
     }
   }

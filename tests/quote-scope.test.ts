@@ -9,7 +9,7 @@ import {
   scopeReady,
   type ScopeSelection,
 } from '@/modules/quotation/scope';
-import { scopeBandRange, scopeShare } from '@/modules/quotation/scope-band';
+import { placementIn, scopeBandRange, scopeShare } from '@/modules/quotation/scope-band';
 import { referenceRates } from '@/data/filed-rates';
 import { tierRangeFor } from '@/modules/quotation/tiers';
 
@@ -123,5 +123,17 @@ describe('band prices for a scope', () => {
   // nothing to measure. No range is better than an invented one.
   it('shows no range for work nothing prices yet', () => {
     expect(scopeBandRange('PREMIUM', HOME, sel({ scope: 'RENOVATION' }))).toBeNull();
+  });
+});
+
+describe('placementIn', () => {
+  const band = { lowPaise: 800_000_00, highPaise: 1_100_000_00 };
+  it('says inside, above or below, and by how much', () => {
+    expect(placementIn(900_000_00, band)).toEqual({ kind: 'inside' });
+    expect(placementIn(1_200_000_00, band)).toEqual({ kind: 'above', byPaise: 100_000_00 });
+    expect(placementIn(700_000_00, band)).toEqual({ kind: 'below', byPaise: 100_000_00 });
+  });
+  it('has no ceiling on an open-ended band', () => {
+    expect(placementIn(9_000_000_00, { lowPaise: 800_000_00, highPaise: null })).toEqual({ kind: 'inside' });
   });
 });

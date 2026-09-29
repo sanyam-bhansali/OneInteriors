@@ -34,6 +34,7 @@ import {
   storePortfolioImage,
 } from '@/modules/storage/portfolio-images';
 import { isOffering, isPriceLevel } from './positioning';
+import { checkPhases, parsePhasesText, type PaymentPhase } from './payment-phases';
 import {
   onboardingProgress,
   MIN_ABOUT_LENGTH,
@@ -91,6 +92,8 @@ export interface StudioContext {
     /** Positioning. Self-declared, shown, never scored. */
     offering: string | null;
     priceLevel: string | null;
+    /** Raw JSON; read it through readPhases(). */
+    paymentPhases: unknown;
     portfolioShortfallNote: string | null;
   };
 }
@@ -187,6 +190,7 @@ async function loadStudio(user: AuthUser): Promise<StudioContext | null> {
       pincode: s.pincode,
       offering: s.offering,
       priceLevel: s.priceLevel,
+      paymentPhases: s.paymentPhases,
       portfolioShortfallNote: s.portfolioShortfallNote,
     },
   };
@@ -796,6 +800,37 @@ export async function savePositioning(input: {
     },
   });
 
+  return { ok: true };
+}
+
+/**
+ * The studio's payment schedule, as they write it at the foot of a quotation.
+ *
+ * Optional, and blocks nothing: until it is filed, the quote tells the
+ * customer the schedule is still to come. Cleared by saving it empty.
+ */
+export async function savePaymentPhases(text: string): Promise<SaveResult> {
+  const context = await currentStudio();
+  if (!context) return { ok: false, errors: { form: 'No studio is linked to this account.' } };
+
+  const trimmed = text.trim();
+  let phases: PaymentPhase[] | null = null;
+  if (trimmed) {
+    phases = parsePhasesText(trimmed);
+    if (!phases) {
+      return {
+        ok: false,
+        errors: { paymentPhases: 'Give every phase a percentage — for example "10% booking, 40% design sign-off, 40% delivery, 10% handover".' },
+      };
+    }
+    const problem = checkPhases(phases);
+    if (problem) return { ok: false, errors: { paymentPhases: problem } };
+  }
+
+  await prisma.studio.update({
+    where: { id: context.studio.id },
+    data: { paymentPhases: phases ? phases.map((p) => ({ label: p.label, pct: p.pct })) : Prisma.DbNull },
+  });
   return { ok: true };
 }
 

@@ -588,6 +588,16 @@ model Studio {
   /// everything else on this side of the model.
   priceLevel String?
 
+  /// When the studio is paid: [{ label, pct }], summing to 100.
+  ///
+  /// Printed on every quote this studio gets through us, in rupees on that
+  /// quote's total — how much leaves a customer's account before anything is
+  /// installed is the difference between two quotes at the same figure. From
+  /// the studio (the rates step) or read from their own quotations; never a
+  /// schedule we invent. Checked by `modules/studio/payment-phases.ts`, and a
+  /// stored value that fails the checks is read as none.
+  paymentPhases Json?
+
   // ── Allocation ──
   //
   // What a subscription actually buys is VOLUME — how many briefs a studio is

@@ -6,6 +6,7 @@
  * "not enough data yet" — never as a favourable default. That is the brand.
  */
 
+import type { PaymentPhase } from './payment-phases';
 import type { Paise } from '@/lib/money';
 import type { PropertyType, ScopeType, StyleTag } from '@/modules/brief/types';
 
@@ -134,6 +135,13 @@ export interface Studio {
 
   minProjectPaise: Paise | null;
   maxProjectPaise: Paise | null;
+
+  /**
+   * When the studio is paid, from the studio. Null until filed — and the
+   * quote then says so rather than printing a schedule we made up. Optional
+   * for the fixture reason above. See modules/studio/payment-phases.ts.
+   */
+  paymentPhases?: PaymentPhase[] | null;
 
   // ── Derived performance ──
   // Recomputed by a job from real projects. NULL means "we don't know yet"

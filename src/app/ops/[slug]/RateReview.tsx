@@ -9,7 +9,7 @@ import {
   MIN_QUOTATIONS_TO_START,
   type FiledRateView,
 } from '@/modules/quotation/analysis-states';
-import { ITEM } from '@/modules/quotation/catalogue';
+import { ITEM, MIN_QUOTATIONS_PER_ITEM, rateCanGoLive } from '@/modules/quotation/catalogue';
 import { formatINR } from '@/lib/money';
 
 /**
@@ -63,6 +63,7 @@ export function RateReview({
   );
   const thin = rates.filter((r) => r.confidence === 'thin').length;
   const shortArchive = quotationsRead !== null && quotationsRead < MIN_QUOTATIONS_TO_START;
+  const held = rates.filter((r) => !rateCanGoLive(r.fromQuotations)).length;
 
   return (
     <div className="rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper)] p-5">
@@ -82,6 +83,15 @@ export function RateReview({
           {thin === 1 ? 'One rate rests' : `${thin} rates rest`} on fewer than five quotations, and{' '}
           {thin === 1 ? 'is' : 'are'} listed first. A median from that few is one designer&rsquo;s
           mood rather than how the studio prices.
+        </p>
+      ) : null}
+
+      {held > 0 ? (
+        <p className="m-0 mb-3 text-[13px] leading-relaxed text-[var(--color-ink-2)]">
+          Approving puts the rest live and holds back{' '}
+          {held === 1 ? 'one rate' : `${held} rates`} priced in fewer than {MIN_QUOTATIONS_PER_ITEM}{' '}
+          quotations. Those items stay &ldquo;not filed&rdquo; on this studio&rsquo;s quotes until
+          more of their quotations include them.
         </p>
       ) : null}
 

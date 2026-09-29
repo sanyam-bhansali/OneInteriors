@@ -473,12 +473,30 @@ export const MODULAR_DISCOUNT_BPS = 1000; // 10% off MO — median of 934 quotat
 /**
  * How many of a studio's own quotations we read before we will price for them.
  *
- * A rate taken from a handful of quotes is one designer's mood. A hundred is
- * enough for a median to mean something and for an outlier to stand out — and
- * it is also a real commitment from the studio, which is part of why the
- * roster is fourteen and not six thousand.
+ * A rate taken from a handful of quotes is one designer's mood. Fifty is what
+ * every studio is asked for (50–60, up to 100), and it is enough for a median
+ * to mean something — provided the count is also checked per item, which
+ * `MIN_QUOTATIONS_PER_ITEM` does. It was a hundred; almost no Pune studio has
+ * a hundred findable quotations, and the per-item floor is what makes fifty
+ * safe, not the archive total.
  */
-export const MIN_QUOTATIONS_FOR_RATES = 100;
+export const MIN_QUOTATIONS_FOR_RATES = 50;
+
+/**
+ * How many quotations must price an item before that rate can go live.
+ *
+ * Fifty-five quotations of which three contain a mandir give a solid kitchen
+ * rate and a mandir "rate" that is three designers' moods. Below this the item
+ * is not priced — the quote names it as not filed — rather than priced off a
+ * median of three. Approval enforces it (`approveRates`), so it cannot be
+ * waved through on a busy afternoon.
+ */
+export const MIN_QUOTATIONS_PER_ITEM = 8;
+
+/** Can a rate built from this many quotations price a customer's home? */
+export function rateCanGoLive(fromQuotations: number): boolean {
+  return fromQuotations >= MIN_QUOTATIONS_PER_ITEM;
+}
 
 // ── A studio's rates ────────────────────────────────────────────
 

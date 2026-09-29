@@ -78,7 +78,7 @@ export function isRateState(v: string): v is RateState {
 /**
  * How much weight one derived rate can carry.
  *
- * `MIN_QUOTATIONS_FOR_RATES` is 100 and the reasoning beside it stands: a
+ * `MIN_QUOTATIONS_FOR_RATES` is 50 and the reasoning beside it stands: a
  * rate from a handful is one designer's mood. But the bar to *start* is now
  * twenty, so the honest arrangement is not to lower the threshold and say
  * nothing — it is to derive the rate anyway and mark how thin the evidence

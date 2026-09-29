@@ -29,6 +29,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { loadBrief, saveBrief } from '@/modules/brief/store';
 import { cleanName } from '@/modules/brief/steps';
 import { TIER } from '@/modules/quotation/tiers';
+import { formatINRCompact } from '@/lib/money';
 import { rankStudios, type MatchResult } from '@/modules/matching/score';
 import {
   loadProject,
@@ -44,6 +45,8 @@ import { kitchenFor, priceMatches, quoteKey } from '@/modules/quotation/price-al
 import { runSourceOf } from '@/modules/quotation/first-quote';
 import { filedRatesFor, ratesAreReal } from '@/data/filed-rates';
 import { scopePhrase, selectionOf } from '@/modules/quotation/scope';
+import { placementIn, scopeBandRange } from '@/modules/quotation/scope-band';
+import type { FirstQuote } from '@/modules/quotation/first-quote';
 import { homeShapeFor } from '@/modules/quotation/first-quote';
 import type { StudioRates } from '@/modules/quotation/catalogue';
 import { Wrap, Chapter, Sheet, Quiet } from '@/components/oi';
@@ -68,6 +71,31 @@ function forWhat(brief: Brief | null): string | null {
     .filter(Boolean)
     .join(' ');
   return level ? `${place} · ${level}` : place;
+}
+
+/**
+ * "Inside your Premium range for kitchen & wardrobes (₹8.3 L–₹11.5 L)." — or
+ * how far outside it. Before GST, as the bands are. Null when they chose no
+ * band or the scope has no range (civil-only).
+ */
+function bandLine(
+  brief: Brief | null,
+  shape: { bhk: number; carpetAreaSqft: number; bathrooms: number },
+  quote: FirstQuote,
+): string | null {
+  if (!brief?.tier) return null;
+  const selection = selectionOf(brief);
+  const band = scopeBandRange(brief.tier, shape, selection);
+  if (!band) return null;
+  const level = TIER[brief.tier].label;
+  const what = selection.scope && selection.scope !== 'FULL_HOME' ? ` for ${(scopePhrase(selection) ?? '').toLowerCase()}` : '';
+  const range =
+    band.highPaise === null
+      ? `from ${formatINRCompact(band.lowPaise)}`
+      : `${formatINRCompact(band.lowPaise)}–${formatINRCompact(band.highPaise)}`;
+  const place = placementIn(quote.totalPaise - quote.gstPaise, band);
+  if (place.kind === 'inside') return `Before GST, this sits inside your ${level} range${what} (${range}).`;
+  return `Before GST, this is ${formatINRCompact(place.byPaise)} ${place.kind} your ${level} range${what} (${range}).`;
 }
 
 /** "Sanyam · 3 BHK · Kharadi · Kitchen & wardrobes" — who and what a quote is for. */
@@ -231,6 +259,8 @@ export function MatchClient({
                 studioName={quoting.studioName}
                 plan={kitchen}
                 preparedFor={preparedFor(brief)}
+                paymentPhases={studios.find((s) => s.slug === quoting.studioSlug)?.paymentPhases ?? null}
+                bandLine={bandLine(brief, shape, built.quote)}
                 onMeasured={(runMm) =>
                   update({ ...project, plan: { fileName: null, kitchenRunMm: runMm, source: 'customer' } })
                 }

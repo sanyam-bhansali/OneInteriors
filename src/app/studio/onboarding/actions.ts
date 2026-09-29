@@ -15,6 +15,7 @@ import {
   removeProject,
   uploadProjectImages,
   savePositioning,
+  savePaymentPhases,
   submitForReview,
   currentStudio,
   onboardingProgress,
@@ -398,6 +399,16 @@ export async function savePositioningAction(
     offering: String(formData.get('offering') ?? ''),
     priceLevel: String(formData.get('priceLevel') ?? ''),
   });
+  if (!result.ok) return { status: 'error', errors: result.errors };
+  refresh();
+  return { status: 'saved' };
+}
+
+export async function savePaymentPhasesAction(
+  _prev: StepState,
+  formData: FormData,
+): Promise<StepState> {
+  const result = await savePaymentPhases(String(formData.get('paymentPhases') ?? ''));
   if (!result.ok) return { status: 'error', errors: result.errors };
   refresh();
   return { status: 'saved' };

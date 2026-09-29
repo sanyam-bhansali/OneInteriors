@@ -38,6 +38,7 @@ import { Building, stagesFor } from './Building';
 import { Spec, MaterialPanel } from './Material';
 import { Sheet, DocRow, Flag } from './index';
 import { Mark } from '@/components/brand';
+import { advanceIsHigh, phaseAmounts, type PaymentPhase } from '@/modules/studio/payment-phases';
 
 type Phase = 'gate' | 'building' | 'done';
 
@@ -161,12 +162,18 @@ export function QuoteDocument({
   plan,
   preparedFor = null,
   onMeasured,
+  paymentPhases = null,
+  bandLine = null,
 }: {
   quote: FirstQuote;
   studioName: string;
   plan: FloorPlan;
   /** "Sanyam · 3 BHK · Kharadi · Full home" — printed under the studio's name. */
   preparedFor?: string | null;
+  /** The studio's own schedule; null until they file one. */
+  paymentPhases?: PaymentPhase[] | null;
+  /** "Inside your Premium range…" — where this total lands against the band they chose. */
+  bandLine?: string | null;
   /**
    * Offered when the kitchen is the standard one: measure it here and every
    * studio is re-priced on it at once (±16% → ±12%).
@@ -229,6 +236,8 @@ export function QuoteDocument({
           </Flag>
         </p>
       ) : null}
+
+      {bandLine ? <p className="m-0 mb-6 text-[13.5px] leading-[1.6] text-[var(--ink2)]">{bandLine}</p> : null}
 
       {quote.rooms.map((room) => (
         <section key={room.room} className="mb-7">
@@ -296,10 +305,24 @@ export function QuoteDocument({
           its profile — never a schedule we invented for it. */}
       <div className="mt-7 border-t border-[var(--line)] pt-5">
         <p className="oi-label m-0 mb-2">Payment phases</p>
-        <p className="m-0 text-[13.5px] leading-[1.6] text-[var(--ink2)]">
-          {studioName} has not filed its payment schedule with us yet. Our expert confirms it with
-          them before you meet — and how much is paid before anything is installed is worth asking.
-        </p>
+        {paymentPhases ? (
+          <>
+            {phaseAmounts(paymentPhases, quote.totalPaise).map((p, i) => (
+              <DocRow key={`${p.label}-${i}`} label={`${p.label} · ${p.pct}%`} value={money(p.amountPaise)} />
+            ))}
+            {advanceIsHigh(paymentPhases) ? (
+              <p className="m-0 mt-3 text-[13px] leading-[1.6] text-[var(--ink2)]">
+                {studioName} asks {paymentPhases[0]!.pct}% at booking — more than most Pune studios.
+                Worth asking what it covers before you pay it.
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <p className="m-0 text-[13.5px] leading-[1.6] text-[var(--ink2)]">
+            {studioName} has not filed its payment schedule with us yet. Our expert confirms it with
+            them before you meet — and how much is paid before anything is installed is worth asking.
+          </p>
+        )}
       </div>
 
       {onMeasured && runSourceOf(plan) === 'standard' ? (
