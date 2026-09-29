@@ -1,4 +1,5 @@
-import { showcase } from '@/modules/portal/benefits';
+import { showcase, showcaseWorthPaise } from '@/modules/portal/benefits';
+import { formatINR } from '@/lib/money';
 import type { OfferState } from '@/modules/consultation/offer';
 import { ExpertPitch } from './ExpertPitch';
 
@@ -17,7 +18,12 @@ export function DirectVsUs({ studioName, offer }: { studioName: string; offer: O
   return (
     <div className="grid gap-8 lg:grid-cols-[1.3fr_1fr]">
       <table className="w-full border-collapse text-[14px]">
-        <caption className="oi-eyebrow mb-3 text-left">Directly, or through us</caption>
+        <caption className="mb-3 text-left">
+          <span className="oi-eyebrow block">Directly, or through us</span>
+          <span className="mt-1 block text-[14px] text-[var(--ink2)]">
+            Worth up to {formatINR(showcaseWorthPaise())} through us, and nothing directly.
+          </span>
+        </caption>
         <thead>
           <tr className="border-b border-[var(--ink)] text-left">
             <th scope="col" className="py-2 pr-3 font-normal text-[var(--ink2)]" />

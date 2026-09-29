@@ -1,6 +1,7 @@
 import { Wrap, Section, Eyebrow, Heading, Cta } from './parts';
 import { CallOffer } from '@/components/oi/CallOffer';
-import { showcase } from '@/modules/portal/benefits';
+import { showcase, showcaseWorthPaise } from '@/modules/portal/benefits';
+import { formatINR } from '@/lib/money';
 import { ARCHITECT } from '@/modules/consultation/architect';
 import type { OfferState } from '@/modules/consultation/offer';
 
@@ -19,7 +20,8 @@ export function WhyThroughUs({ offer }: { offer: OfferState }) {
         <Eyebrow>Why book through us</Eyebrow>
         <Heading className="max-w-[26ch]">The same studios, with more for you when you book through us.</Heading>
         <p className="m-0 mt-4 max-w-[60ch] text-[15.5px] leading-[1.6] text-[var(--ink2)]">
-          Ring a studio directly and none of this comes with it.
+          Worth up to {formatINR(showcaseWorthPaise())} to you — and none of it comes with ringing a
+          studio directly.
         </p>
 
         <ul className="m-0 mt-10 grid list-none gap-x-8 gap-y-7 p-0 sm:grid-cols-2 lg:grid-cols-4">

@@ -88,3 +88,14 @@ describe('the journey funnel', () => {
     expect(stages[1]!.fromPrevious).toBe(0.6);
   });
 });
+
+describe('what the benefits are worth', () => {
+  it('adds up to ₹76,000 for the customer — cashback, cab, shoot and hamper; a referral pays someone else', async () => {
+    const { showcaseWorthPaise, unlockedWorthPaise } = await import('@/modules/portal/benefits');
+    expect(showcaseWorthPaise()).toBe(7_600_000);
+    expect(unlockedWorthPaise('START')).toBe(0);
+    expect(unlockedWorthPaise('INTRODUCED')).toBe(100_000);
+    expect(unlockedWorthPaise('SIGNED')).toBe(5_100_000);
+    expect(unlockedWorthPaise('HANDOVER')).toBe(7_600_000);
+  });
+});

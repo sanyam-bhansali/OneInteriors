@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { Container, Eyebrow, Pill } from '@/components/ui';
 import { SiteHeader, SiteFooter } from '@/components/chrome';
 import { prisma } from '@/lib/prisma';
-import { formatINRCompact } from '@/lib/money';
+import { formatINR, formatINRCompact } from '@/lib/money';
 import { getCurrentUser } from '@/modules/auth/session';
 import { signOutAction } from '@/app/sign-in/actions';
 import { loadBrief } from '@/modules/brief/repository';
@@ -16,7 +16,7 @@ import { signedUrlFor } from '@/modules/storage/floor-plan';
 import { propertyLabel, scopeLabel, PUNE_LOCALITIES } from '@/modules/brief/types';
 import { yourHome } from '@/modules/portal/home';
 import { trackersForBrief } from '@/modules/portal/tracker-store';
-import { BENEFITS, benefitsPass, referralsLive, STAGES, type Stage } from '@/modules/portal/benefits';
+import { BENEFITS, benefitsPass, referralsLive, showcaseWorthPaise, unlockedWorthPaise, STAGES, type Stage } from '@/modules/portal/benefits';
 import { referralCodeFor, referralCount } from '@/modules/brief/repository';
 import { prepForBrief } from '@/modules/prepare/prep';
 import { slotLabel } from '@/modules/consultation/slots';
@@ -360,6 +360,11 @@ export default async function AccountPage() {
 
           {/* ── Benefits ─────────────────────────────────── */}
           <Section title="Your benefits">
+            <p className="m-0 mb-4 text-[14px] text-[var(--color-ink-2)]">
+              Worth up to {formatINR(showcaseWorthPaise())} through us —{' '}
+              <strong className="text-[var(--color-ink)]">{formatINR(unlockedWorthPaise(home.stage))}</strong> of it
+              unlocked so far.
+            </p>
             <ul className="m-0 flex list-none flex-col gap-3 p-0">
               {pass.map((b) => (
                 <li key={b.id} className="flex flex-wrap items-baseline justify-between gap-3 border-b border-[var(--color-rule-soft)] pb-3">

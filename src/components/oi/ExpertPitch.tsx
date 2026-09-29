@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { CallOffer } from './CallOffer';
-import { showcase } from '@/modules/portal/benefits';
+import { showcase, showcaseWorthPaise } from '@/modules/portal/benefits';
+import { formatINR } from '@/lib/money';
 import { ARCHITECT } from '@/modules/consultation/architect';
 import type { OfferState } from '@/modules/consultation/offer';
 
@@ -35,7 +36,7 @@ export function ExpertPitch({
         sets up the meeting with the one you choose. No studio pays her.
       </p>
       <CallOffer offer={offer} className="mb-4" />
-      <BenefitChips />
+      <BenefitChips worth />
       <Link
         href="/expert"
         className="oi-cta mt-5 inline-flex min-h-11 items-center px-5 py-3 text-[14px] no-underline"
@@ -47,11 +48,22 @@ export function ExpertPitch({
 }
 
 /** "Through One Interiors: Up to ₹50,000 cashback · Free cab to the studio · …" */
-export function BenefitChips({ limit, className = '' }: { limit?: number; className?: string }) {
+export function BenefitChips({
+  limit,
+  worth = false,
+  className = '',
+}: {
+  limit?: number;
+  /** Add "worth up to ₹76,000" to the label. */
+  worth?: boolean;
+  className?: string;
+}) {
   const items = showcase().slice(0, limit);
   return (
     <div className={className}>
-      <p className="oi-label m-0 mb-2">Only when you book through us</p>
+      <p className="oi-label m-0 mb-2">
+        Only when you book through us{worth ? ` · worth up to ${formatINR(showcaseWorthPaise())}` : ''}
+      </p>
       <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
         {items.map((b) => (
           <li

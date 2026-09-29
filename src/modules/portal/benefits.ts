@@ -37,6 +37,12 @@ export interface Benefit {
    * where there are rupees: that is what makes going direct feel like a loss.
    */
   short?: string;
+  /**
+   * What it is worth to the customer, in paise — the owner's figures of
+   * 30 Sep 2026. Only for benefits the customer receives themselves; a
+   * referral pays someone else and is not counted.
+   */
+  valuePaise?: number;
 }
 
 export const BENEFITS: Benefit[] = [
@@ -81,6 +87,7 @@ export const BENEFITS: Benefit[] = [
       'Up to ₹50,000 back once you have signed with a studio through us and paid its first payment phase. If the project is cancelled before 20% of its value has been paid to the studio, the cashback is cancelled.',
     unlocksAt: 'SIGNED',
     short: 'Up to ₹50,000 cashback',
+    valuePaise: 5_000_000,
   },
   {
     id: 'referral',
@@ -96,6 +103,7 @@ export const BENEFITS: Benefit[] = [
     terms: 'After your expert call, when a studio meeting is scheduled, we book your cab to the studio — the first trip, from anywhere in Pune.',
     unlocksAt: 'INTRODUCED',
     short: 'Free cab to the studio',
+    valuePaise: 100_000,
   },
   {
     id: 'tracker',
@@ -111,6 +119,7 @@ export const BENEFITS: Benefit[] = [
       'When a studio chosen through us completes your home, we film it — a cinematic video, with a testimonial from you if you would like to give one, both yours to keep.',
     unlocksAt: 'HANDOVER',
     short: 'A cinematic film of your finished home',
+    valuePaise: 2_000_000,
   },
   {
     id: 'onehamper',
@@ -118,6 +127,7 @@ export const BENEFITS: Benefit[] = [
     terms: 'At handover, every home built through us gets OneHamper — a gift from us.',
     unlocksAt: 'HANDOVER',
     short: 'OneHamper at handover',
+    valuePaise: 500_000,
   },
 ];
 
@@ -136,6 +146,19 @@ export const SHOWCASE_ORDER = [
   'onehamper',
   'referral',
 ] as const;
+
+/** "Worth up to ₹76,000": the benefits a customer receives, added up. */
+export function showcaseWorthPaise(benefits: Benefit[] = BENEFITS): number {
+  return benefits.filter((b) => b.terms).reduce((n, b) => n + (b.valuePaise ?? 0), 0);
+}
+
+/** The worth of what is available to a customer at this stage. */
+export function unlockedWorthPaise(stage: Stage, benefits: Benefit[] = BENEFITS): number {
+  const at = STAGES.indexOf(stage);
+  return benefits
+    .filter((b) => b.terms && STAGES.indexOf(b.unlocksAt) <= at)
+    .reduce((n, b) => n + (b.valuePaise ?? 0), 0);
+}
 
 export interface ShowcaseItem {
   id: string;

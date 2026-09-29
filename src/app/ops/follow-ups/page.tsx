@@ -38,7 +38,7 @@ export default async function FollowUpsPage() {
             {rows.length === 0 ? 'Nobody to call right now.' : `${rows.length} to call${overdue ? ` · ${overdue} past ${TARGET_HOURS} hours` : ''}`}
           </h1>
           <p className="m-0 mb-8 max-w-[70ch] text-[15px] leading-relaxed text-[var(--color-ink-2)]">
-            Everyone who finished their brief in the last {WINDOW_DAYS} days, left a number and has
+            For the sales team. Everyone who finished their brief in the last {WINDOW_DAYS} days, left a number and has
             not booked the expert call. Call within {TARGET_HOURS} hours: &ldquo;I have read your
             quotes — would thirty minutes with our architect help?&rdquo; The call is free for them
             and books from /expert. A &ldquo;call back&rdquo; or &ldquo;no answer&rdquo; comes back

@@ -145,7 +145,7 @@ export default async function ExpertPage() {
           </p>
 
           <CallOffer offer={callOffer} className="mb-5" />
-          <BenefitChips className="mb-6" />
+          <BenefitChips worth className="mb-6" />
 
           <div className="flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-[var(--line)] pt-5">
             {architectFacts().map((f) => (
