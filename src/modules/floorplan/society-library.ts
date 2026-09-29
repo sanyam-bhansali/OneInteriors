@@ -20,12 +20,17 @@
  * Pure, and tested.
  */
 
+import { societyMatchKey } from '@/modules/brief/society';
+
 export const MIN_HOMES = 2;
 
-/** "Sapphire Heights", "sapphire  heights " and "Sapphire-Heights" are one building. */
+/**
+ * "Sapphire Heights", "sapphire  heights " and "Sapphire-Heights" are one
+ * building — and so are a known society's aliases ("Gera WOJ" is Gera World
+ * of Joy; brief/society.ts).
+ */
 export function societyKey(name: string | null | undefined): string | null {
-  const key = (name ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  return key.length >= 3 ? key : null;
+  return societyMatchKey(name);
 }
 
 export interface SharedPlan {

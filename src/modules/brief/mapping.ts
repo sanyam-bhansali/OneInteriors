@@ -14,6 +14,7 @@
  *    with nobody in it.
  */
 
+import { canonicalSociety } from './society';
 import {
   EMPTY_BRIEF,
   HOME_NEEDS,
@@ -120,7 +121,8 @@ export function planUseFrom(value: unknown): PlanUse | null {
 export function cleanSociety(value: string | null | undefined): string | null {
   if (!value) return null;
   const cleaned = value.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 80);
-  return cleaned || null;
+  // A known building is stored under its one spelling (brief/society.ts).
+  return cleaned ? canonicalSociety(cleaned) : null;
 }
 
 function isoDate(value: Date | null): string | null {

@@ -16,6 +16,7 @@
  * Pure, and tested.
  */
 
+import { canonicalSociety } from '@/modules/brief/society';
 import { SPECIALISMS, type Specialism } from './matching-profile';
 
 export const IMAGE_ROOMS = [
@@ -75,7 +76,8 @@ export function cleanTags(raw: string[]): Specialism[] {
 
 export function cleanSocietyName(raw: string): string | null {
   const s = raw.replace(/\s+/g, ' ').trim().slice(0, SOCIETY_MAX);
-  return s.length >= 2 ? s : null;
+  // A known building is stored under its one spelling, as on the brief (brief/society.ts).
+  return s.length >= 2 ? canonicalSociety(s) : null;
 }
 
 /** A carpet area, or null for blank; `undefined` means present but out of range. */

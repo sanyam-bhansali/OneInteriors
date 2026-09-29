@@ -20,6 +20,7 @@
  *     show what it is for, and only with the notice agreed.
  */
 
+import { SocietyInput } from './SocietyInput';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -976,19 +977,21 @@ function homeStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts 
 
         <div>
           <FieldLabel>Where is it?</FieldLabel>
-          <LocalityPicker value={brief.locality} onChange={(locality) => update({ locality })} />
+          {/* Keyed on the value so a locality filled from the society collapses the picker. */}
+          <LocalityPicker
+            key={brief.locality ?? 'none'}
+            value={brief.locality}
+            onChange={(locality) => update({ locality })}
+          />
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
           <label className="block">
             <FieldLabel>Society or building, if you like</FieldLabel>
-            <input
-              type="text"
-              value={brief.society ?? ''}
-              onChange={(e) => update({ society: e.target.value.slice(0, 80) })}
-              placeholder="e.g. Gera World of Joy"
-              autoComplete="off"
-              className="w-full rounded-full border border-[var(--line)] bg-[var(--card)] px-4 py-2.5 text-[15px] text-[var(--ink)] placeholder:text-[var(--ink2)]"
+            <SocietyInput
+              value={brief.society}
+              onChange={(society) => update({ society })}
+              onPick={(s) => update({ society: s.name, locality: s.locality })}
             />
           </label>
           <label className="block">

@@ -8,6 +8,7 @@
  * normalised over what was measured.
  */
 
+import { sameSociety as isSameSociety } from '@/modules/brief/society';
 import type { Brief, HomeNeed, PriorityFactor } from '@/modules/brief/types';
 import { localityLabel, zoneOf } from '@/modules/brief/types';
 import { monthOf, FULL_HOME_DAYS } from '@/modules/brief/possession';
@@ -290,8 +291,6 @@ export function priorities(brief: Brief, studio: Studio, ctx: SignalContext): Si
 
 // ── Similar work (weight 15) ───────────────────────────────────
 
-const norm = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
-
 export interface SimilarWork extends Signal {
   /** Projects that count, best first, for "their work like yours". */
   projects: string[];
@@ -314,7 +313,7 @@ export function similarWork(brief: Brief, studio: Studio): SimilarWork | null {
     const sizeFit = p.carpetAreaSqft
       ? Math.abs(p.carpetAreaSqft - area) <= area * 0.25 ? 1 : 0.3
       : p.propertyType && p.propertyType === brief.propertyType ? 0.8 : 0.3;
-    const society = brief.society && norm(p.society) === norm(brief.society);
+    const society = isSameSociety(p.society, brief.society);
     const sameArea = Boolean(brief.locality && p.locality === brief.locality);
     const placeFit = society ? 1 : sameArea ? 0.8 : zone && zoneOf(p.locality) === zone ? 0.6 : 0.3;
     return { p, s: scopeFit * (0.4 + 0.3 * sizeFit + 0.3 * placeFit), society: Boolean(society), sameArea };
