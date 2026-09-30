@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import localFont from 'next/font/local';
 import { HomeV3 } from '@/components/landing-v3/HomeV3';
 import { currentOffer } from '@/modules/consultation/offer-store';
 import '@/components/landing-v3/landing-v3.css';
@@ -19,8 +19,20 @@ export const metadata: Metadata = {
  * studio is asked for it.
  */
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-geist', display: 'swap' });
-const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono', weight: ['400', '500'], display: 'swap' });
+/* Geist is bundled like the site fonts (see layout.tsx): the Latin variable
+   files from Google Fonts, SIL Open Font License. */
+const geist = localFont({
+  src: './fonts/geist-latin.woff2',
+  weight: '100 900',
+  variable: '--font-geist',
+  display: 'swap',
+});
+const geistMono = localFont({
+  src: './fonts/geist-mono-latin.woff2',
+  weight: '400 500',
+  variable: '--font-geist-mono',
+  display: 'swap',
+});
 
 /** Hourly, so the expert-call offer's count stays true without making the page dynamic. */
 export const revalidate = 3600;
