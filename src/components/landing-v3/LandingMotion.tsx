@@ -191,7 +191,17 @@ export function LandingMotion() {
     const logoEl = root.querySelector<HTMLElement>('.logo');
     const startSec = root.querySelector<HTMLElement>('#start');
     let compact = false;
+    let backed = false;
+    const lv3: HTMLElement = root; // narrowed, for the function below
     function updateLogo() {
+      // Past the hero the nav gets a frosted bar; without it its links sit
+      // straight on top of the headings they scroll over.
+      const b = window.scrollY > vh() * 0.6;
+      if (b !== backed) {
+        backed = b;
+        if (b) lv3.dataset.scrolled = '1';
+        else delete lv3.dataset.scrolled;
+      }
       if (!how || !startSec || !logoEl) return;
       const c = how.getBoundingClientRect().top <= 90 && startSec.getBoundingClientRect().top > vh() * 0.55;
       if (c !== compact) {

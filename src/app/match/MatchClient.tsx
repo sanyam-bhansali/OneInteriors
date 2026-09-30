@@ -118,9 +118,13 @@ function bandLine(
     band.highPaise === null
       ? `from ${formatINRCompact(band.lowPaise)}`
       : `${formatINRCompact(band.lowPaise)}–${formatINRCompact(band.highPaise)}`;
-  const place = placementIn(quote.totalPaise - quote.gstPaise, band);
-  if (place.kind === 'inside') return `Before GST, this sits inside your ${level} range${what} (${range}).`;
-  return `Before GST, this is ${formatINRCompact(place.byPaise)} ${place.kind} your ${level} range${what} (${range}).`;
+  // The headline total includes GST and the bands do not, so name the
+  // pre-GST figure — "₹29 L … inside ₹20.7 L–₹28.75 L" reads as a mistake.
+  const beforeGst = quote.totalPaise - quote.gstPaise;
+  const place = placementIn(beforeGst, band);
+  const lead = `Before GST it is ${formatINRCompact(beforeGst)}`;
+  if (place.kind === 'inside') return `${lead}, inside your ${level} range${what} (${range}).`;
+  return `${lead}, ${formatINRCompact(place.byPaise)} ${place.kind} your ${level} range${what} (${range}).`;
 }
 
 /** "Sanyam · 3 BHK · Kharadi · Kitchen & wardrobes" — who and what a quote is for. */
