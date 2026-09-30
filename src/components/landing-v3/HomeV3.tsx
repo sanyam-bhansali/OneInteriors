@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LivePrice } from './LivePrice';
 import { VERIFIED_STUDIOS } from '@/lib/claims';
 import { Mark } from '@/components/brand';
 import { LandingMotion } from './LandingMotion';
@@ -293,6 +294,21 @@ export function HomeV3({ offer }: { offer: OfferState }) {
                 <span className="line" />
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* ── What would my home cost? — a live price, before the brief ── */}
+        <section className="section" id="price" data-tone="light" aria-labelledby="price-h">
+          <div className="wrap">
+            <p className="eyebrow mono" data-reveal="">
+              What would my home cost?
+            </p>
+            <Split className="h-l" id="price-h" text="Your home, priced in a second." />
+            <p className="lede" data-reveal="">
+              Pick your home and a finish level. This is the range for a full home at that level;
+              your brief turns it into real quotes from {VERIFIED_STUDIOS} verified studios.
+            </p>
+            <LivePrice />
           </div>
         </section>
 
