@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { VERIFIED_STUDIOS } from '@/lib/claims';
 import { Mark } from '@/components/brand';
 import { LandingMotion } from './LandingMotion';
 import { CHECK_LABELS } from '@/modules/studio/types';
@@ -94,8 +95,8 @@ const STEPS = [
     tag: 'Match',
     state: 'Walls and floor',
     title: 'Meet the studios that fit',
-    body: 'Verified studios, scored against your answers, each with the reason in your own words. Nobody can pay to rank higher.',
-    chip: '3–6 matches · every score explained',
+    body: `${VERIFIED_STUDIOS} verified studios, scored against your answers, each with the reason in your own words. Nobody can pay to rank higher.`,
+    chip: `${VERIFIED_STUDIOS} verified studios → 3–6 matches`,
   },
   {
     n: '03',
@@ -265,7 +266,7 @@ export function HomeV3({ offer }: { offer: OfferState }) {
               <div>
                 <p className="hero-meta mono intro">
                   <i aria-hidden="true" />
-                  Pune · Verified studios · Quotes you can read
+                  Pune · {VERIFIED_STUDIOS} verified studios · Quotes you can read
                 </p>
                 <Split as="h1" className="h-xl" text="Find the right interior designer for your home." auto />
                 <p className="hero-sub" data-reveal="" data-auto="" style={{ ['--d' as string]: '500ms' }}>
@@ -439,8 +440,8 @@ export function HomeV3({ offer }: { offer: OfferState }) {
             </h2>
             <div className="trust-copy">
               <p data-reveal="">
-                From GST filings to finished sites we have stood in. Each has a named source, and every
-                studio card shows which it has cleared.
+                {VERIFIED_STUDIOS} studios verified so far, from GST filings to finished sites we have
+                stood in. Each check has a named source, and every studio card shows which it has cleared.
               </p>
               <p className="muted" data-reveal="" style={{ ['--d' as string]: '120ms' }}>
                 A studio is listed only once at least fifty of its own quotations have been read, so every
@@ -612,7 +613,7 @@ export function HomeV3({ offer }: { offer: OfferState }) {
             </p>
             <ul className="ben-core">
               {[
-                ['Verified studios', benefit('verified').terms],
+                [`${VERIFIED_STUDIOS} verified studios`, benefit('verified').terms],
                 ['A quote in seconds', benefit('instant-quote').terms],
                 ['Quotes compared in plain language', benefit('plain-compare').terms],
                 [

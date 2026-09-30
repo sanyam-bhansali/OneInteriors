@@ -24,6 +24,7 @@ export function MatchHero({
   fit,
   name,
   forWhat,
+  reveal = [],
 }: {
   /** How many studios cleared the brief. This is the "top N". */
   fit: number;
@@ -31,6 +32,8 @@ export function MatchHero({
   name?: string | null;
   /** "your 3 BHK in Kharadi · Premium" — what these are the best fits for. */
   forWhat?: string | null;
+  /** "10 verified studios → 6 at Premium → 3 for you" (queue item 15). */
+  reveal?: { count: number; label: string }[];
 }) {
   const reduced = useReducedMotion();
 
@@ -62,6 +65,20 @@ export function MatchHero({
       >
         Best fits for your brief.
       </motion.h1>
+
+      {reveal.length > 1 ? (
+        <motion.p
+          {...rise(reduced, 0.16)}
+          className="oi-num m-0 mt-4 flex flex-wrap items-baseline justify-center gap-x-2 text-[13px] uppercase tracking-[0.1em] text-[var(--ink2)]"
+        >
+          {reveal.map((st, i) => (
+            <span key={st.label}>
+              {i > 0 ? <span aria-hidden className="mr-2 text-[var(--acc)]">→</span> : null}
+              <strong className="text-[var(--ink)]">{st.count}</strong> {st.label}
+            </span>
+          ))}
+        </motion.p>
+      ) : null}
 
       {forWhat ? (
         <motion.p {...rise(reduced, 0.18)} className="q-body m-0 mt-3 text-[var(--ink)]">

@@ -25,6 +25,7 @@
  * shortcut to it, not a second home for it.
  */
 
+import { revealSteps } from '@/modules/matching/reveal';
 import { StyleDnaCard } from '@/components/oi/StyleDnaCard';
 import { SEEN_KEY, readSeen, welcomeBack } from '@/modules/matching/welcome-back';
 import { ExpertPitch } from '@/components/oi/ExpertPitch';
@@ -471,6 +472,7 @@ export function MatchClient({
         {briefed && matches.length > 0 ? (
           <MatchHero
             fit={matches.length}
+            reveal={brief ? revealSteps(brief, studios, matches.length, rankOptions) : []}
             name={cleanName(brief?.contactName)}
             forWhat={forWhat(brief)}
           />

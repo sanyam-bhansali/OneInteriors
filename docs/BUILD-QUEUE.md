@@ -46,7 +46,7 @@ Legend: ✅ done · 🔨 next · ⏳ waits on the owner (named)
 
 | # | Item | State |
 |---|---|---|
-| 15 | **The reveal counted down** — "Verified studios: 18 → at Premium: 7 → … → for you" | ⏸ held — it shows studio counts, which the owner is not showing until the roster is fifty |
+| 15 | **The reveal counted down** — "Verified studios: 18 → at Premium: 7 → … → for you" | ✅ "10 verified studios → 4 at Premium → 2 for you" on the match page; the stated number is lib/claims.ts (owner: 10) |
 | 16 | **Welcome back** — "one new studio fits your brief since Tuesday" | ✅ this device only (localStorage) |
 | 17 | **Possession countdown** in "Your home" — "Keys in 84 days", with the plan laid against it | ✅ on "Your home" |
 | 18 | **Studio intro video** on the match card | ✅ link on the card when the studio has one |

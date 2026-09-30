@@ -20,6 +20,8 @@
  *     show what it is for, and only with the notice agreed.
  */
 
+import { rankStudios } from '@/modules/matching/score';
+import { VERIFIED_STUDIOS, shownStudioCount } from '@/lib/claims';
 import { HomeSketch } from '@/components/oi/HomeSketch';
 import { SwipeOrGrid, SwipePicker } from './SwipePicker';
 import { ThisOrThat } from './ThisOrThat';
@@ -173,7 +175,7 @@ function minutesLeft(step: number): string {
 export function QuizClient({
   studios,
   /** Server-decided; see MatchClient. Defaults to the strict answer. */
-  allowUnverified: _allowUnverified = false,
+  allowUnverified = false,
   account = null,
   socialSignIn = NO_PROVIDERS,
 }: {
@@ -359,6 +361,12 @@ export function QuizClient({
     pickerPhotos,
   };
 
+  // Capped at the number the site states (lib/claims.ts), and it only narrows.
+  const matchCount = useMemo(() => {
+    if (!hydrated) return VERIFIED_STUDIOS;
+    return shownStudioCount(rankStudios(brief, studios, 99, { allowUnverified }).length);
+  }, [brief, hydrated, studios, allowUnverified]);
+
   if (!hydrated) {
     return (
       <div className="oi-app min-h-dvh bg-[var(--bg)] py-16">
@@ -443,7 +451,7 @@ export function QuizClient({
           <div className="grid grid-cols-1 gap-9 py-8 sm:py-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-14">
             <div key={`q-${step}`} className="oi-swap flex flex-col gap-7">
               <QuestionStep id={stepId} brief={brief} update={update} slot="ask" ctx={contactCtx} />
-              <LiveProfile brief={brief} className="hidden lg:block" />
+              <LiveProfile brief={brief} matchCount={matchCount} className="hidden lg:block" />
             </div>
 
             <div key={`o-${step}`} className="oi-swap min-w-0">
@@ -472,7 +480,7 @@ export function QuizClient({
                   </span>
                 </summary>
                 <div className="border-t border-[var(--line)] p-4">
-                  <LiveProfile brief={brief} bare />
+                  <LiveProfile brief={brief} matchCount={matchCount} bare />
                 </div>
               </details>
             </div>
@@ -1450,10 +1458,13 @@ function priorityStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPa
  */
 function LiveProfile({
   brief,
+  matchCount,
   className = '',
   bare = false,
 }: {
   brief: Brief;
+  /** Studios that still fit, capped at the stated number. */
+  matchCount: number;
   className?: string;
   /** Inside the phone disclosure, which already draws the border. */
   bare?: boolean;
@@ -1526,12 +1537,20 @@ function LiveProfile({
         </div>
       )}
 
-      {/* Their home, assembling as they answer (queue item 26). It took the
-          place of the "N studios still match" counter: before the answers
-          narrow anything, that number is the size of the roster, which the
-          owner is not showing until it is fifty. */}
+      {/* Their home, assembling as they answer (queue item 26). */}
       <div className="mt-5 border-t border-[var(--ink)] pt-4">
         <HomeSketch brief={brief} />
+      </div>
+
+      {/* The counter: answering a question visibly narrows the field. Capped
+          at the number the site states (lib/claims.ts). */}
+      <div className="mt-5 flex items-baseline gap-2.5 border-t border-[var(--ink)] pt-4">
+        <span className="oi-num text-[30px] leading-none" style={{ color: 'var(--sec-ink)' }}>
+          {matchCount}
+        </span>
+        <span className="text-[13.5px] text-[var(--ink2)]">
+          of {VERIFIED_STUDIOS} verified studios still match
+        </span>
       </div>
     </Sheet>
   );
