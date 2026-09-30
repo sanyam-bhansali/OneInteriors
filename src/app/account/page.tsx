@@ -1,4 +1,9 @@
 import Link from 'next/link';
+import { HomeIn3D } from './HomeIn3D';
+import { BEDROOMS } from '@/modules/quotation/estimate';
+import { carpetAreaFor } from '@/modules/brief/steps';
+import { selectionOf } from '@/modules/quotation/scope';
+import { layoutRoomsInScope } from '@/modules/brief/flat-layout';
 import { loadPrepPack } from '@/modules/prepare/prep';
 import { PrepClient } from '@/app/prepare/PrepClient';
 import { countdownFor } from '@/modules/portal/countdown';
@@ -364,6 +369,23 @@ export default async function AccountPage() {
           ) : null}
 
           {/* ── Your rooms ───────────────────────────────── */}
+          {/* ── Your home in 3D (option 2) ─────────────────── */}
+          {found && brief.propertyType ? (
+            <Section title="Your home in 3D">
+              <HomeIn3D
+                bedrooms={BEDROOMS[brief.propertyType]}
+                carpetAreaSqft={carpetAreaFor(brief).sqft}
+                style={brief.styleLikes[0] ?? null}
+                inScope={brief.scope ? layoutRoomsInScope(BEDROOMS[brief.propertyType], selectionOf(brief)) : null}
+                label="A 3D sketch of your flat in the style you lean to"
+              />
+              <p className="m-0 mt-2 text-[12.5px] text-[var(--color-ink-3)]">
+                A sketch of a typical layout for your home, in your style — not your floor plan. Drag to
+                turn it. The rooms in your work are in colour.
+              </p>
+            </Section>
+          ) : null}
+
           {/* The room boards live here now (queue item 21): /prepare was a
               second place to be, with a second floor-plan upload the brief
               already asks for. */}

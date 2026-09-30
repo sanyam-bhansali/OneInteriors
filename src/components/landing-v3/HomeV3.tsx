@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { FlatStage } from './FlatStage';
 import { LivePrice } from './LivePrice';
 import { VERIFIED_STUDIOS } from '@/lib/claims';
 import { Mark } from '@/components/brand';
@@ -349,6 +350,11 @@ export function HomeV3({ offer }: { offer: OfferState }) {
               </ol>
             </div>
           </div>
+        </section>
+
+        {/* ── Their home in 3D, built by the scroll ── */}
+        <section id="home3d" data-tone="dark" aria-label="Your home in 3D">
+          <FlatStage />
         </section>
 
         {/* ── Matching and the quote ── */}

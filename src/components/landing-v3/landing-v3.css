@@ -1838,3 +1838,80 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* The 3D flat, built by the scroll */
+.lv3 .flat-stage {
+  height: 240vh;
+  position: relative;
+}
+.lv3 .flat-sticky {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr);
+  gap: clamp(24px, 4vw, 64px);
+  align-items: center;
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 84px var(--gutter) 24px;
+}
+.lv3 .flat-copy p.muted {
+  margin: 20px 0 0;
+  max-width: 40ch;
+}
+.lv3 .flat-styles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 28px;
+}
+.lv3 .flat-styles button {
+  font: 500 14px/1 var(--body);
+  color: var(--fg);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 11px 16px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  cursor: pointer;
+}
+.lv3 .flat-styles button[aria-pressed='true'] {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: none;
+}
+.lv3 .flat-note {
+  margin-top: 24px !important;
+  font-size: 11px;
+}
+.lv3 .flat-canvas {
+  height: min(72vh, 680px);
+  border-radius: 20px;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 40%, rgba(241, 240, 236, 0.1), transparent 70%);
+}
+.lv3 .flat-3d {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+.lv3 .stage-loading {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+@media (max-width: 960px) {
+  .lv3 .flat-stage {
+    height: 200vh;
+  }
+  .lv3 .flat-sticky {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    padding-top: 80px;
+  }
+  .lv3 .flat-canvas {
+    height: 46vh;
+  }
+}
