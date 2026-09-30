@@ -32,6 +32,8 @@ function whenIST(d: Date): string {
  * answers "which societies actually worked", which is not knowable any other
  * way and decides where the next week of asking goes.
  */
+const POSSESSION_WORDS: Record<string, string> = { HAVE_KEYS: 'Has keys', WITHIN_3_MONTHS: 'Keys < 3 months', LATER: 'Keys later' };
+
 export default async function WaitlistPage() {
   const user = await getCurrentUser();
   if (!hasRole(user, 'OPS')) {
@@ -132,6 +134,9 @@ export default async function WaitlistPage() {
                   <th className="py-2 font-normal">Contact</th>
                   <th className="py-2 font-normal">Style</th>
                   <th className="py-2 font-normal">Via</th>
+                  <th className="py-2 font-normal">Keys · BHK · society</th>
+                  <th className="py-2 font-normal">Code · referred by</th>
+                  <th className="py-2 font-normal">Welcomed</th>
                 </tr>
               </thead>
               <tbody>
@@ -152,6 +157,16 @@ export default async function WaitlistPage() {
                         <span className="text-[var(--color-ink-3)]">—</span>
                       )}
                     </td>
+                    <td className="py-2.5 text-[13px] text-[var(--color-ink-2)]">
+                      {[r.possession ? POSSESSION_WORDS[r.possession] ?? r.possession : null, r.bhk ? `${r.bhk} BHK` : null, r.society]
+                        .filter(Boolean)
+                        .join(' · ') || '—'}
+                    </td>
+                    <td className="py-2.5 font-[family-name:var(--font-mono)] text-[12.5px]">
+                      {r.referralCode ?? '—'}
+                      {r.referredByCode ? <span className="text-[var(--color-ink-3)]"> ← {r.referredByCode}</span> : null}
+                    </td>
+                    <td className="py-2.5 text-[12.5px] text-[var(--color-ink-3)]">{r.welcomeChannel ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>

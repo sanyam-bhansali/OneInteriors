@@ -12,8 +12,22 @@
  * be able to do anything worse than add rows to this one table.
  */
 
+import { randomBytes } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
 import { normalisePhone } from '@/modules/studio/phone';
+import { societyMatchKey, canonicalSociety } from '@/modules/brief/society';
+import {
+  cleanCode,
+  cleanExtras,
+  makeCode,
+  positionOf,
+  publicStats,
+  unlocksFor,
+  type PublicStats,
+  type QueueRow,
+  type Unlocks,
+} from './queue';
+import { sendWaitlistWelcome } from './welcome';
 
 /** Mirrors the four cards on the waitlist page. Anything else is dropped. */
 const STYLES = ['Warm Minimalist', 'Modern Classic', 'Industrial Loft', 'Traditional Indian'];
@@ -27,10 +41,14 @@ export interface WaitlistInput {
   city?: unknown;
   via?: unknown;
   policyVersion?: unknown;
+  /** The referral code of the link that brought them (?r=CODE). */
+  ref?: unknown;
+  /** The consent tick on the form. Required — no tick, no row. */
+  consent?: unknown;
 }
 
 export type IngestResult =
-  | { ok: true; created: boolean }
+  | { ok: true; created: boolean; code: string }
   | { ok: false; fields: string[] };
 
 function str(v: unknown, max: number): string {
@@ -69,6 +87,8 @@ export async function ingestWaitlistSignup(
   const style = STYLES.includes(styleRaw) ? styleRaw : null;
   if (styleRaw && !style) fields.push('style');
 
+  if (input.consent !== true) fields.push('consent');
+
   if (fields.length) return { ok: false, fields };
 
   const data = {
@@ -87,15 +107,138 @@ export async function ingestWaitlistSignup(
    * while name, style and via take the newest values.
    */
   const where = phone ? { phone } : { email: email! };
-  const before = await prisma.waitlistSignup.findUnique({ where, select: { id: true } });
-
-  await prisma.waitlistSignup.upsert({
+  const before = await prisma.waitlistSignup.findUnique({
     where,
-    create: { ...data, phone, email },
-    update: data,
+    select: { id: true, referralCode: true, referredByCode: true },
   });
 
-  return { ok: true, created: !before };
+  // A referral counts once, from someone else's real code, and only on the
+  // way in — coming back through a second link does not move the credit.
+  const ref = cleanCode(input.ref);
+  const referrer =
+    ref && ref !== before?.referralCode && !before?.referredByCode
+      ? await prisma.waitlistSignup.findUnique({ where: { referralCode: ref }, select: { id: true } })
+      : null;
+
+  const code = before?.referralCode ?? (await freshCode());
+  const row = await prisma.waitlistSignup.upsert({
+    where,
+    create: { ...data, phone, email, referralCode: code, referredByCode: referrer ? ref : null },
+    update: { ...data, referralCode: code, ...(referrer ? { referredByCode: ref } : {}) },
+    select: { id: true, name: true, phone: true, email: true, referralCode: true, welcomedAt: true },
+  });
+
+  // The welcome goes once, to the channel they gave. Never fails the signup.
+  if (!row.welcomedAt) {
+    const status = await waitlistStatus(code).catch(() => null);
+    const sent = await sendWaitlistWelcome({
+      name: row.name,
+      phone: row.phone,
+      email: row.email,
+      code,
+      position: status?.position ?? null,
+    }).catch(() => null);
+    if (sent?.delivered) {
+      await prisma.waitlistSignup.update({
+        where: { id: row.id },
+        data: { welcomedAt: new Date(), welcomeChannel: sent.channel },
+      });
+    }
+  }
+
+  return { ok: true, created: !before, code };
+}
+
+/** A code nobody has yet. Seven characters from 32 is 34 billion; a clash is a retry. */
+async function freshCode(): Promise<string> {
+  for (let i = 0; i < 5; i++) {
+    const code = makeCode(randomBytes(7));
+    const taken = await prisma.waitlistSignup.findUnique({ where: { referralCode: code }, select: { id: true } });
+    if (!taken) return code;
+  }
+  throw new Error('Could not find a free referral code');
+}
+
+// ── The queue, as each person sees it ────────────────────────
+
+export interface WaitlistStatus {
+  code: string;
+  firstName: string;
+  position: number;
+  joined: number;
+  referrals: number;
+  answered: boolean;
+  society: string | null;
+  societyCount: number;
+  unlocks: Unlocks;
+  stats: PublicStats;
+}
+
+/**
+ * Everyone's place, computed on read. At the gate's size (two thousand) one
+ * query of four columns is cheaper than keeping positions in step on write.
+ */
+export async function waitlistStatus(code: string): Promise<WaitlistStatus | null> {
+  const clean = cleanCode(code);
+  if (!clean) return null;
+  const rows = await prisma.waitlistSignup.findMany({
+    orderBy: { createdAt: 'asc' },
+    select: { name: true, referralCode: true, referredByCode: true, extrasAt: true, society: true },
+  });
+  const referrals = new Map<string, number>();
+  for (const r of rows) if (r.referredByCode) referrals.set(r.referredByCode, (referrals.get(r.referredByCode) ?? 0) + 1);
+  const queue: QueueRow[] = rows
+    .map((r, i) => ({ r, i }))
+    .filter(({ r }) => r.referralCode)
+    .map(({ r, i }) => ({ code: r.referralCode!, joined: i + 1, referrals: referrals.get(r.referralCode!) ?? 0, answered: Boolean(r.extrasAt) }));
+  const meIndex = rows.findIndex((r) => r.referralCode === clean);
+  if (meIndex < 0) return null;
+  const me = rows[meIndex]!;
+  const key = societyMatchKey(me.society);
+  const societyCount = key ? rows.filter((r) => societyMatchKey(r.society) === key).length : 0;
+  const mine = queue.find((q) => q.code === clean)!;
+  return {
+    code: clean,
+    firstName: me.name.split(/\s+/)[0] ?? me.name,
+    position: positionOf(clean, queue)!,
+    joined: mine.joined,
+    referrals: mine.referrals,
+    answered: mine.answered,
+    society: me.society,
+    societyCount,
+    unlocks: unlocksFor(mine.joined, mine.referrals, societyCount),
+    stats: publicStats(rows.length),
+  };
+}
+
+/** The optional answers — "skip 20 places". The places are given once. */
+export async function saveWaitlistExtras(
+  code: string,
+  input: { possession?: unknown; bhk?: unknown; society?: unknown; style?: unknown },
+): Promise<WaitlistStatus | null> {
+  const clean = cleanCode(code);
+  if (!clean) return null;
+  const row = await prisma.waitlistSignup.findUnique({ where: { referralCode: clean }, select: { id: true, extrasAt: true } });
+  if (!row) return null;
+  const extras = cleanExtras(input);
+  const styleRaw = str(input.style, 40);
+  const answeredSomething = Boolean(extras.possession || extras.bhk || extras.society);
+  await prisma.waitlistSignup.update({
+    where: { id: row.id },
+    data: {
+      ...(extras.possession ? { possession: extras.possession } : {}),
+      ...(extras.bhk ? { bhk: extras.bhk } : {}),
+      ...(extras.society ? { society: canonicalSociety(extras.society) } : {}),
+      ...(STYLES.includes(styleRaw) ? { style: styleRaw } : {}),
+      ...(answeredSomething && !row.extrasAt ? { extrasAt: new Date() } : {}),
+    },
+  });
+  return waitlistStatus(clean);
+}
+
+/** For the page: the count (from a hundred) and the free calls left. */
+export async function waitlistPublicStats(): Promise<PublicStats> {
+  return publicStats(await prisma.waitlistSignup.count());
 }
 
 export interface WaitlistSummary {

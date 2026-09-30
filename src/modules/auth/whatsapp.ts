@@ -124,3 +124,43 @@ export async function sendOtp(to: string, code: string): Promise<SendResult> {
     return { delivered: false, reason: 'network' };
   }
 }
+
+/**
+ * A pre-approved template with body parameters in order — the waitlist
+ * welcome, and anything else that is not the OTP. Meta rejects a template
+ * that was not approved, and says so; the reason is logged, never the
+ * parameters (they carry a name).
+ */
+export async function sendTemplate(
+  to: string,
+  template: string,
+  params: string[],
+  locale = process.env.WHATSAPP_TEMPLATE_LOCALE?.trim() || 'en',
+): Promise<SendResult> {
+  const cfg = config();
+  if (!cfg) return { delivered: false, reason: 'no_provider' };
+  try {
+    const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${cfg.phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${cfg.accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: to.replace(/^\+/, ''),
+        type: 'template',
+        template: {
+          name: template,
+          language: { code: locale },
+          components: [{ type: 'body', parameters: params.map((text) => ({ type: 'text', text })) }],
+        },
+      }),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      console.error('[whatsapp] template send failed', template, res.status, detail.slice(0, 300));
+      return { delivered: false, reason: `provider_${res.status}` };
+    }
+    return { delivered: true };
+  } catch {
+    return { delivered: false, reason: 'network' };
+  }
+}

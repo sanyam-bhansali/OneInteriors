@@ -3163,10 +3163,28 @@ model WaitlistSignup {
   notifyConsent Boolean @default(true)
   policyVersion String
 
+  /// Their personal link's code (oneinteriors.in/?r=CODE). Everyone who
+  /// joins through it moves them up the queue (modules/waitlist/queue.ts).
+  referralCode   String?   @unique
+  /// Whose link brought them — another row's referralCode.
+  referredByCode String?
+
+  /// The optional "skip 20 places" answers, given after joining.
+  possession     String?   // HAVE_KEYS | WITHIN_3_MONTHS | LATER
+  bhk            String?   // 1 | 2 | 3 | 4+
+  society        String?
+  extrasAt       DateTime?
+
+  /// When the welcome message went out, and on which channel.
+  welcomedAt     DateTime?
+  welcomeChannel String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([createdAt])
   @@index([via])
+  @@index([referredByCode])
+  @@index([society])
   @@map("waitlist_signups")
 }

@@ -426,3 +426,30 @@ async function send(
     return { delivered: false, reason: 'network' };
   }
 }
+
+/** The waitlist welcome by email, for someone who joined with an address. */
+export async function sendWaitlistWelcomeEmail(
+  to: string,
+  firstName: string,
+  position: number | null,
+  link: string,
+): Promise<SendResult> {
+  const cfg = config();
+  if (isFault(cfg)) return { delivered: false, reason: cfg.reason };
+  const text = [
+    `Hi ${firstName},`,
+    '',
+    position ? `You are #${position} on the One Interiors founding list for Pune.` : 'You are on the One Interiors founding list for Pune.',
+    'Pune opens when 2,000 people have joined, and invites go out in queue order.',
+    '',
+    'Move up the queue: every friend who joins through your link moves you up 25 places.',
+    `Your link: ${link}`,
+    '',
+    'Three friends make your ₹5,000 call with our architect free, wherever you are in the queue (it is free anyway for the first 1,000 to join). Five friends get you a free cab to the studio.',
+    '',
+    'We will only write about your place on the list and the launch. To stop, reply to this email.',
+    '',
+    'One Interiors',
+  ].join('\n');
+  return send(cfg, to, `You're #${position ?? '—'} on the One Interiors list`, text, '[waitlist]');
+}
