@@ -451,5 +451,6 @@ export async function sendWaitlistWelcomeEmail(
     '',
     'One Interiors',
   ].join('\n');
-  return send(cfg, to, `You're #${position ?? '—'} on the One Interiors list`, text, '[waitlist]');
+  const subject = position ? `You're #${position} on the One Interiors list` : "You're on the One Interiors list";
+  return send(cfg, to, subject, text, '[waitlist]');
 }
