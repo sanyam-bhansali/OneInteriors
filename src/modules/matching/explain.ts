@@ -31,7 +31,13 @@ import 'server-only';
 import { hasAnthropic, anthropicModel } from '@/lib/env';
 import { matchSummary, type MatchResult } from './score';
 import { paiseToLakhs } from '@/lib/money';
-import type { Brief } from '@/modules/brief/types';
+import {
+  HOME_NEED_LABELS,
+  INVOLVEMENT_LABELS,
+  PRIORITY_LABELS,
+  type Brief,
+} from '@/modules/brief/types';
+import { possessionPhrase } from '@/modules/brief/possession';
 import type { Studio } from '@/modules/studio/types';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
@@ -65,11 +71,21 @@ function systemPrompt(): string {
     '- Do not repeat the score as a number. The customer can already see it.',
     '- Never use the studio name more than once.',
     '- If a figure is missing, say it is not known rather than guessing or omitting the subject.',
+    "- Lead with the customer's first priority when a studio figure speaks to it.",
+    '- Mention the household, the home needs or the possession date only where a figure given bears on them. Never claim a studio has experience of something no figure shows.',
   ].join('\n');
 }
 
-/** Only facts we hold. Nothing here is inferred. */
-function factsAsPrompt(brief: Brief, studio: Studio, match: MatchResult): string {
+/**
+ * Only facts we hold. Nothing here is inferred.
+ *
+ * Since 29 Sep this carries the whole brief — household, needs, priorities in
+ * order, working style, possession — so the read can speak to the person who
+ * answered, not just to their flat. It never carries their name or number:
+ * the privacy notice says the model does not receive them, and nothing it
+ * writes needs them.
+ */
+export function factsAsPrompt(brief: Brief, studio: Studio, match: MatchResult): string {
   const localMatches = brief.locality
     ? studio.portfolio.filter((p) => p.locality === brief.locality).length
     : 0;
@@ -85,13 +101,25 @@ function factsAsPrompt(brief: Brief, studio: Studio, match: MatchResult): string
     `Customer brief: ${brief.propertyType ?? 'unknown property type'}, ${
       brief.carpetAreaSqft ? `${brief.carpetAreaSqft} sq ft carpet` : 'area not given'
     }, locality ${brief.locality ?? 'not given'}, scope ${brief.scope ?? 'not given'}.`,
+    // The top band has a floor and no ceiling; "not given" would be false.
     brief.budgetMaxPaise
       ? `Budget up to about ₹${paiseToLakhs(brief.budgetMaxPaise).toFixed(1)} lakh.`
-      : 'Budget not given.',
+      : brief.budgetMinPaise
+        ? `Budget from about ₹${paiseToLakhs(brief.budgetMinPaise).toFixed(1)} lakh, with no upper limit (the Luxury band).`
+        : 'Budget not given.',
     brief.styleLikes.length > 0
       ? `Leaning towards: ${brief.styleLikes.join(', ')}.`
       : 'No style leaning given.',
     brief.styleDislikes.length > 0 ? `Ruled out: ${brief.styleDislikes.join(', ')}.` : '',
+    brief.priorityRanking.length > 0
+      ? `Priorities, most important first: ${brief.priorityRanking.map((p) => PRIORITY_LABELS[p]).join(', ')}.`
+      : '',
+    brief.involvement ? `How involved they want to be: ${INVOLVEMENT_LABELS[brief.involvement]}.` : '',
+    householdLine(brief),
+    brief.needs.length > 0
+      ? `The home needs: ${brief.needs.map((n) => HOME_NEED_LABELS[n]).join(', ')}.`
+      : '',
+    timingLine(brief),
     '',
     `Studio: ${studio.tradeName}, ${studio.yearsActive ?? 'unknown'} years active, team of ${studio.teamSize ?? 'unknown'}.`,
     `Works in: ${studio.localities.join(', ')}.`,
@@ -112,6 +140,24 @@ function factsAsPrompt(brief: Brief, studio: Studio, match: MatchResult): string
   ];
 
   return lines.filter(Boolean).join('\n');
+}
+
+/** "Household: 2 adults, 1 child, someone works from home." Or nothing. */
+function householdLine(brief: Brief): string {
+  const h = brief.household;
+  if (!h) return '';
+  const parts = [`${h.adults} adult${h.adults === 1 ? '' : 's'}`];
+  if (h.children) parts.push(`${h.children} child${h.children === 1 ? '' : 'ren'}`);
+  if (h.elderly) parts.push(`${h.elderly} elderly parent${h.elderly === 1 ? '' : 's'}`);
+  if (h.pets) parts.push('pets');
+  if (h.worksFromHome) parts.push('someone works from home');
+  return `Household: ${parts.join(', ')}.`;
+}
+
+/** "Timing: Possession expected January 2027." Or nothing. */
+function timingLine(brief: Brief): string {
+  const possession = possessionPhrase(brief);
+  return possession ? `Timing: ${possession}.` : '';
 }
 
 /**

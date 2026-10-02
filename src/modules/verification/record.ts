@@ -24,12 +24,16 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
+import { approvalBlockers } from '@/modules/studio/approval';
+import { approvalFactsFor } from '@/modules/studio/approval-store';
 import { requireRole, getCurrentUser, hasRole, type AuthUser } from '@/modules/auth/session';
 import { hasDatabase } from '@/lib/env';
 import { assessTier } from './tiers';
 import { validateGstin } from './gstin';
 import type { CheckResult, CheckType, StudioStatus } from '@/modules/studio/types';
 import { Prisma } from '@prisma/client';
+import { LIMITS, profileJson, readProfile } from '@/modules/studio/matching-profile';
+import { TIERS } from '@/modules/quotation/tiers';
 
 export type RecordResult = { ok: true } | { ok: false; error: string };
 
@@ -185,6 +189,16 @@ export async function setStudioStatus(
         select: { status: true, tier: true, tradeName: true },
       });
 
+      /* The owner's rule (30 Sep 2026): nobody is listed until at least
+         fifty of their own quotations have been read into approved rates and
+         a product master. Checked here, inside the transaction, so it is the
+         same data the approval commits. Only on the way IN — re-saving an
+         active studio is not a new approval. */
+      if (status === 'ACTIVE' && before.status !== 'ACTIVE') {
+        const blockers = approvalBlockers(await approvalFactsFor(studioId, tx));
+        if (blockers.length > 0) throw new ApprovalBlocked(blockers);
+      }
+
       await tx.studio.update({ where: { id: studioId }, data: { status } });
       const tier = await refreshTier(tx, studioId);
 
@@ -235,7 +249,16 @@ export async function setStudioStatus(
 
     return { ok: true };
   } catch (err) {
+    if (err instanceof ApprovalBlocked) {
+      return { ok: false, error: `Not yet — ${err.blockers.join(' ')}` };
+    }
     return { ok: false, error: err instanceof Error ? err.message : 'Could not change the status.' };
+  }
+}
+
+class ApprovalBlocked extends Error {
+  constructor(readonly blockers: string[]) {
+    super(blockers.join(' '));
   }
 }
 
@@ -373,6 +396,72 @@ export async function setGstin(studioId: string, raw: string): Promise<RecordRes
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Could not save the GSTIN.' };
+  }
+}
+
+/**
+ * The studio's One Interiors discount, as agreed in its studio agreement.
+ *
+ * Ops only: it is a commercial term, and a studio editing its own would make
+ * the line on a customer's quote something the studio can move after signing.
+ * Blank clears it. Audited like every other change ops makes to a studio.
+ */
+export async function setCuratedDiscount(studioId: string, raw: string): Promise<RecordResult> {
+  const actor = await requireRole('OPS');
+  const trimmed = raw.trim();
+  const pct = trimmed === '' ? null : Number(trimmed);
+  const [lo, hi] = LIMITS.curatedDiscountPct;
+  if (pct !== null && (!Number.isFinite(pct) || pct < lo || pct > hi)) {
+    return { ok: false, error: `A percentage between ${lo} and ${hi}, or blank to clear it.` };
+  }
+  try {
+    await prisma.$transaction(async (tx) => {
+      const before = await tx.studio.findUniqueOrThrow({
+        where: { id: studioId },
+        select: { matchingProfile: true },
+      });
+      const profile = readProfile(before.matchingProfile);
+      const next = { ...profile, curatedDiscountPct: pct === null ? null : Math.round(pct * 100) / 100 };
+      await tx.studio.update({
+        where: { id: studioId },
+        data: { matchingProfile: profileJson(next) as Prisma.InputJsonValue },
+      });
+      await writeAudit(tx, actor, 'studio.curated_discount.set', 'Studio', studioId, {
+        curatedDiscountPct: profile.curatedDiscountPct,
+      }, { curatedDiscountPct: next.curatedDiscountPct });
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Could not save the discount.' };
+  }
+}
+
+/**
+ * Confirm a studio's band — or clear it with ''.
+ *
+ * Ops only, audited. The proposal (modules/studio/band.ts) is shown beside the
+ * control; what is stored is the person's decision, because a band sorts
+ * which customers a studio ever meets.
+ */
+export async function confirmBand(studioId: string, raw: string): Promise<RecordResult> {
+  const actor = await requireRole('OPS');
+  const band = raw === '' ? null : (TIERS as readonly string[]).includes(raw) ? raw : undefined;
+  if (band === undefined) return { ok: false, error: 'Pick Essential, Premium or Luxury.' };
+  try {
+    await prisma.$transaction(async (tx) => {
+      const before = await tx.studio.findUniqueOrThrow({
+        where: { id: studioId },
+        select: { band: true },
+      });
+      await tx.studio.update({
+        where: { id: studioId },
+        data: { band, bandConfirmedAt: band ? new Date() : null },
+      });
+      await writeAudit(tx, actor, 'studio.band.confirm', 'Studio', studioId, before, { band });
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Could not save the band.' };
   }
 }
 

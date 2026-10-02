@@ -64,6 +64,7 @@ model User {
   brief         Brief?
   studioMember  StudioMember?
   sessions      Session[]
+  identities    AuthIdentity[]
   consents      Consent[]
   auditEntries  AuditLog[]        @relation("AuditActor")
   notifications Notification[]
@@ -74,6 +75,45 @@ model User {
 
   @@index([role])
   @@map("users")
+
+  /// OneReferrals: this customer's personal code (modules/portal/referral.ts).
+  /// Made the first time "Your home" is opened.
+  referralCode String?       @unique
+
+  expertHours  ExpertHours[] @relation("ExpertHours")
+  expertBlocks ExpertBlock[] @relation("ExpertBlocks")
+}
+
+/// Who a social sign-in provider says this user is. Google since 29 Sep
+/// 2026; Apple and Facebook will use the same table.
+enum AuthProvider {
+  GOOGLE
+  APPLE
+  FACEBOOK
+}
+
+/// A provider identity linked to a user — "Google account 1098765 is this
+/// customer". Found by (provider, subject), never by email: emails change and
+/// get recycled, the provider's subject does not. Social sign-in only ever
+/// creates or reaches CUSTOMER accounts (see modules/auth/oauth-google.ts).
+model AuthIdentity {
+  id       String       @id @default(cuid())
+  provider AuthProvider
+  /// The provider's stable id for the person (OpenID `sub`).
+  subject  String
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// The verified email the provider gave at the last sign-in, for support.
+  email String?
+
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+
+  @@unique([provider, subject])
+  @@index([userId])
+  @@map("auth_identities")
 }
 
 model Session {
@@ -131,6 +171,9 @@ enum ConsentPurpose {
   MARKETING_SMS
   DATA_PROCESSING
   IMPORTED_LEAD // pre-existing record; source must be recorded
+  /// Agreed, when picking studios at the expert step, that the studios they
+  /// pick may see their name and number (modules/consent/share.ts).
+  SHARE_WITH_STUDIO
 }
 
 model Consent {
@@ -201,6 +244,14 @@ enum PriorityFactor {
   MATERIAL_QUALITY
 }
 
+/// Where the customer is with the flat. Work starts from possession, so the
+/// timeline is built around it rather than around a move-in wish.
+enum PossessionStatus {
+  HAVE_KEYS
+  EXPECTED
+  NOT_SURE
+}
+
 model Brief {
   id String @id @default(cuid())
 
@@ -216,14 +267,29 @@ model Brief {
   /// never reachable by both a stale cookie and an account.
   anonKey String? @unique
 
+  /// Written only by the contact step, after the customer has agreed to the
+  /// notice — never by the per-step quiz sync. The number is unverified: it is
+  /// a way to reach them about this brief, not an identity (User.phone is).
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
+
   // Q1
-  propertyType   PropertyType?
-  carpetAreaSqft Int?
-  locality       String? // Pune locality slug: "kharadi", "baner", "wakad"
-  possessionOn   DateTime?
+  propertyType     PropertyType?
+  carpetAreaSqft   Int?
+  locality         String? // Pune locality slug: "kharadi", "baner", "wakad"
+  /// The society or building, as typed. Free text; no list exists to pick from.
+  society          String?
+  /// Q9 since 29 Sep 2026: have the keys / expecting them / not sure.
+  possessionStatus PossessionStatus?
+  possessionOn     DateTime?
 
   // Q2
-  scope ScopeType?
+  scope         ScopeType?
+  /// Rooms chosen for a single-room job or a renovation (quotation Room codes).
+  scopeRooms    String[]   @default([])
+  /// Catalogue codes unticked on the scope checklist — left out of every quote.
+  excludedItems String[]   @default([])
 
   /// Essential / Premium / Luxury. The band the customer chose — a statement
   /// about materials and finish, never a ranking of studios and never
@@ -233,8 +299,11 @@ model Brief {
   /// Object path in the private floor-plan bucket. Never a public URL: the
   /// file is somebody's home layout, and it is served only through a short
   /// signed URL to a person who owns the brief.
-  floorPlanPath String?
-  floorPlanName String?
+  floorPlanPath    String?
+  floorPlanName    String?
+  /// The confirmed reading of the plan: kitchen run, bathrooms, study, where
+  /// the area came from (PlanUse). Written after the customer confirms it.
+  floorPlanReading Json?
 
   // Q3 — paise
   budgetMinPaise BigInt?
@@ -243,6 +312,9 @@ model Brief {
   // Q4 / Q5 — style image picks resolve to tag slugs
   styleLikes    String[] @default([])
   styleDislikes String[] @default([]) // HARD FILTER, not a weight
+  /// Studios whose own portfolio photo they picked in the style picker —
+  /// shown unnamed, with the studio's consent (brief/picker-photos.ts).
+  styleStudioPicks String[] @default([])
 
   // Q6
   adults        Int?
@@ -251,11 +323,18 @@ model Brief {
   pets          Boolean @default(false)
   worksFromHome Boolean @default(false)
 
+  /// HomeNeed values (VASTU, POOJA_ROOM, …) — strings, like styleTags, so a
+  /// new need is a code change and not a migration.
+  needs String[] @default([])
+
   // Q7 — ranked, index 0 = most important
   priorityRanking PriorityFactor[] @default([])
 
   // Q8
   involvement Involvement?
+
+  /// EN | HI | MR — the language they want their studio to speak.
+  language String?
 
   // Q9
   moveInBy DateTime?
@@ -306,6 +385,22 @@ model Brief {
   @@index([locality, completedAt])
   @@index([anonKey])
   @@map("briefs")
+
+  societyPlan SocietyPlan?
+
+  /// The referral code this customer arrived through, if any — set once,
+  /// never by its own owner.
+  referredByCode String?
+
+  /// The follow-up call to a customer who finished the brief and did not
+  /// book the expert call (ops/follow-ups). Covered by DATA_PROCESSING, which
+  /// already tells them we use their number to reach them about their matches
+  /// and their call. Outcome: BOOKED | CALL_BACK | NO_ANSWER | NOT_INTERESTED.
+  followUpOutcome String?
+  followUpNote    String?   @db.Text
+  followedUpAt    DateTime?
+  /// Calls made without reaching them (NO_ANSWER / CALL_BACK). Stops at three.
+  followUpTries   Int       @default(0)
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -419,8 +514,8 @@ model Studio {
   tier   VerificationTier @default(UNVERIFIED)
 
   // Registry identifiers — verified, not self-declared
-  gstin       String? @unique
-  panLast4    String?
+  gstin    String? @unique
+  panLast4 String?
 
   /// The studio has told us it has no GST registration.
   ///
@@ -522,6 +617,37 @@ model Studio {
   /// everything else on this side of the model.
   priceLevel String?
 
+  /// When the studio is paid: [{ label, pct }], summing to 100.
+  ///
+  /// Printed on every quote this studio gets through us, in rupees on that
+  /// quote's total — how much leaves a customer's account before anything is
+  /// installed is the difference between two quotes at the same figure. From
+  /// the studio (the rates step) or read from their own quotations; never a
+  /// schedule we invent. Checked by `modules/studio/payment-phases.ts`, and a
+  /// stored value that fails the checks is read as none.
+  paymentPhases Json?
+
+  /// The matching profile: work mix (modular / carpentry / both), scopes and
+  /// minimums, civil capability, home types, city-wide and societies,
+  /// capacity, earliest start, durations, how they work, materials,
+  /// specialisms, languages, intro video, and the curated discount ops
+  /// records from the studio agreement.
+  ///
+  /// One JSON column rather than thirty, because studios differ in shape —
+  /// a carpenter-led studio has no factory and no hardware brands — and
+  /// every field is optional until the studio says. Read and written only
+  /// through `modules/studio/matching-profile.ts`, which drops anything it
+  /// does not recognise. Null = not started.
+  matchingProfile Json?
+
+  /// The studio's band — ESSENTIAL | PREMIUM | LUXURY — as confirmed by ops
+  /// from the proposal in `modules/studio/band.ts` (its rates on a reference
+  /// home, checked against its finished homes). Never set by the studio.
+  /// Null until confirmed; a customer who picks a band sees only studios
+  /// confirmed in it.
+  band            String?
+  bandConfirmedAt DateTime?
+
   // ── Allocation ──
   //
   // What a subscription actually buys is VOLUME — how many briefs a studio is
@@ -559,14 +685,14 @@ model Studio {
   // inputs come out of the score; see docs/DATA-ARCHITECTURE.md §6.
   // `performanceComputedAt` was dropped in 20260923070000: a timestamp for a
   // computation that never runs is worse than no timestamp.
-  completedProjects     Int       @default(0)
-  avgVarianceDays       Float?
-  upheldDisputes        Int       @default(0)
-  specComplianceRate    Float?
+  completedProjects   Int    @default(0)
+  avgVarianceDays     Float?
+  upheldDisputes      Int    @default(0)
+  specComplianceRate  Float?
   /// Mean past-client rating for communication, 1–5. Null until ~3 ratings.
-  communicationRating   Float?
+  communicationRating Float?
   /// 0 = hands-off, 1 = highly collaborative. Drives the working-style match.
-  autonomyProfile       Float?
+  autonomyProfile     Float?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -722,6 +848,20 @@ model PortfolioProject {
   images          String[] @default([])
   isRender        Boolean  @default(false) // a render labelled as a render is fine; passing one off is not
   clientConsented Boolean  @default(false)
+
+  /// Matching fields (modules/studio/portfolio-fields.ts). Carpet area turns
+  /// the value into ₹/sq ft, which checks the studio's band against delivered
+  /// work; society is "they have done a flat in your building"; tags are the
+  /// evidence behind a specialism (two projects make it count).
+  carpetAreaSqft Int?
+  society        String?
+  tags           String[] @default([])
+  /// One room per image, aligned with `images` by index; '' = not said.
+  imageRooms     String[] @default([])
+  /// May these photos appear, without the studio's name, in a homeowner's
+  /// style picker? Separate from clientConsented, which covers the studio's
+  /// own page.
+  pickerConsent  Boolean  @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1148,6 +1288,16 @@ model Consultation {
   scheduledFor DateTime?
   expertUserId String?
   status       String    @default("requested") // requested | scheduled | completed | no_show | cancelled
+  /// Booked from a real slot (plan §9) rather than requested with free text.
+  /// No double booking: a partial unique index on (expertUserId,
+  /// scheduledFor) WHERE status = 'scheduled', in raw SQL in the migration
+  /// (Prisma cannot express a partial index), so a cancelled call frees its
+  /// slot.
+  durationMins Int       @default(30)
+  bookedAt     DateTime?
+  /// The private link to move or cancel a booked call (/call/<token>),
+  /// usable without signing in — it is sent in the confirmation email.
+  manageToken  String?   @unique
 
   // The expert's read is the training signal for the matching engine.
   outcomeNotes        String?  @db.Text
@@ -1159,6 +1309,129 @@ model Consultation {
 
   @@index([briefId])
   @@map("consultations")
+}
+
+/// The customer's project tracker (Phase 7): one per introduction that became
+/// a signed project. Stages and target dates come from modules/portal/tracker.ts;
+/// a stage is done only when somebody marks it done. Started and updated by
+/// ops (and by the studio, once its own tool is switched on); read by the
+/// customer in "Your home". Not the escrow-era `Project` — this holds no money.
+model HomeProject {
+  id             String       @id @default(cuid())
+  introductionId String       @unique
+  introduction   Introduction @relation(fields: [introductionId], references: [id], onDelete: Cascade)
+  startOn        DateTime
+  /// Sign-off to handover, in days — the studio's own for this work where known.
+  totalDays      Int
+  /// Stage keys marked done (TRACKER_STAGES).
+  doneStages     String[]     @default([])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  updates HomeProjectUpdate[]
+
+  @@map("home_projects")
+}
+
+/// A dated note on the project — "Kitchen carcasses delivered to site".
+model HomeProjectUpdate {
+  id          String      @id @default(cuid())
+  projectId   String
+  project     HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// The stage it belongs to, if any.
+  stage       String?
+  note        String      @db.Text
+  postedById  String
+  /// Posted by the studio doing the work, not by us (queue item 22).
+  byStudio    Boolean     @default(false)
+  /// Site photographs: paths in the private `site-photos` bucket, served
+  /// only through short-lived signed links (storage/site-photos.ts).
+  photoPaths  String[]    @default([])
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@map("home_project_updates")
+}
+
+/// The society floor-plan library (Phase 7): the sizes a customer confirmed
+/// from their own floor plan, kept against their society and home type so the
+/// next family in the same building can use them without uploading anything.
+/// Sizes only — never the file, the name or the brief's other answers — and
+/// offered only once two or more homes agree (modules/floorplan/society-library.ts).
+/// One row per brief: a customer who corrects their plan corrects their row.
+model SocietyPlan {
+  id             String   @id @default(cuid())
+  briefId        String   @unique
+  /// Deleted with the brief — an erasure request takes these sizes too.
+  brief          Brief    @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  /// Lower-case letters and digits of the society name, so "Sapphire Heights"
+  /// and "sapphire heights " are one building.
+  societyKey     String
+  bhk            Int
+  carpetAreaSqft Int?
+  bathrooms      Int
+  kitchenRunMm   Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([societyKey, bhk])
+  @@map("society_plans")
+}
+
+/// Two questions to the customer after their first meeting with a studio
+/// (plan §10): did the studio match what we told them, and how was the
+/// communication. Enough of these (three or more) become the studio's
+/// communication rating, which the matching engine reads (§5.5).
+model MeetingCheckIn {
+  id             String       @id @default(cuid())
+  introductionId String       @unique
+  introduction   Introduction @relation(fields: [introductionId], references: [id], onDelete: Cascade)
+  /// YES | PARTLY | NO — did the studio match what we told you?
+  matched        String
+  /// 1–5.
+  communication  Int
+  note           String?      @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@map("meeting_check_ins")
+}
+
+/// An expert's weekly hours for booked calls, in IST (modules/consultation/slots.ts).
+/// Set by ops. Several rows per expert and weekday are allowed (a morning and
+/// an evening block).
+model ExpertHours {
+  id           String @id @default(cuid())
+  expertUserId String
+  expert       User   @relation("ExpertHours", fields: [expertUserId], references: [id], onDelete: Cascade)
+  /// 0 = Sunday … 6 = Saturday.
+  weekday      Int
+  /// Minutes after IST midnight, on the half-hour.
+  startMin     Int
+  endMin       Int
+
+  createdAt DateTime @default(now())
+
+  @@index([expertUserId])
+  @@map("expert_hours")
+}
+
+/// A day an expert is away. No slots are offered on it.
+model ExpertBlock {
+  id           String @id @default(cuid())
+  expertUserId String
+  expert       User   @relation("ExpertBlocks", fields: [expertUserId], references: [id], onDelete: Cascade)
+  /// IST date, YYYY-MM-DD.
+  day          String
+  reason       String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([expertUserId, day])
+  @@map("expert_blocks")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1224,6 +1497,8 @@ model Introduction {
   updatedAt DateTime @updatedAt
 
   appointments Appointment[]
+  checkIn      MeetingCheckIn?
+  homeProject  HomeProject?
 
   /// One introduction per studio per brief. A second one is the same
   /// introduction, not a new one.
@@ -2491,6 +2766,9 @@ model FirstQuote {
   nonModularPaise      BigInt
   modularDiscountPaise BigInt
   professionalFeePaise BigInt
+  /// The One Interiors curated discount on this quote, as the customer saw
+  /// it. Zero when the studio has none (or the quote predates it).
+  curatedDiscountPaise BigInt @default(0)
   gstPaise             BigInt
   totalPaise           BigInt
   lowPaise             BigInt
@@ -2885,10 +3163,28 @@ model WaitlistSignup {
   notifyConsent Boolean @default(true)
   policyVersion String
 
+  /// Their personal link's code (oneinteriors.in/?r=CODE). Everyone who
+  /// joins through it moves them up the queue (modules/waitlist/queue.ts).
+  referralCode   String?   @unique
+  /// Whose link brought them — another row's referralCode.
+  referredByCode String?
+
+  /// The optional "skip 20 places" answers, given after joining.
+  possession     String?   // HAVE_KEYS | WITHIN_3_MONTHS | LATER
+  bhk            String?   // 1 | 2 | 3 | 4+
+  society        String?
+  extrasAt       DateTime?
+
+  /// When the welcome message went out, and on which channel.
+  welcomedAt     DateTime?
+  welcomeChannel String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([createdAt])
   @@index([via])
+  @@index([referredByCode])
+  @@index([society])
   @@map("waitlist_signups")
 }

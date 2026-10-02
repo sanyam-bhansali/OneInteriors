@@ -353,16 +353,16 @@ export async function factorAverages(
  * fewer. Telling them to do it would be advice that costs them work.
  */
 export const FACTOR_ADVICE: Record<FactorKey, string> = {
-  styleOverlap:
+  style:
     'Tag your projects with the styles they honestly are. Three accurate tags beat eight hopeful ones — a style you are tagged for and did not really do is a style that can rule you out.',
-  budgetFit:
-    'Enter the real value of completed projects. Once three exist we use those instead of the range you declared, and delivered numbers are far more convincing than claimed ones.',
+  priorities:
+    'Customers rank budget, speed, design and materials, and each reads something you can fill in: your filed rates, your earliest start date and durations, your 3D views and revisions, your carcass, warranty and factory. Complete "How you work" and keep your start date current.',
+  similarWork:
+    'Add completed projects with their carpet area and society. A buyer is told when you have done a flat in their building, and a studio with no kitchen-only projects keeps losing kitchen-only briefs.',
   workingStyle:
-    'This comes from past-client ratings on communication, so it fills in as projects complete. Nothing to do yet.',
-  deliveryReliability:
-    'This is days past your own committed date, across completed projects. The only way to move it is to finish on time — and the only way to have it at all is to finish something through us.',
-  scopeExperience:
-    'Add completed projects in the scopes you want more of. A studio with no kitchen-only projects will keep losing kitchen-only briefs.',
-  priorityAlignment:
-    'This follows from the factors above rather than standing alone — it reads whichever one the customer said mattered most.',
+    'Say which of the three is closest to how you run a project, on "How you work". Later, past-client ratings on communication join it.',
+  household:
+    "Tag the projects that show children's rooms, elderly parents, pets, vastu or a pooja room. Two tagged projects make it one of your specialisms.",
+  timeline:
+    'Keep your earliest start date current — it is matched against when the buyer gets the keys, and after 60 days unconfirmed we treat it as unknown.',
 };

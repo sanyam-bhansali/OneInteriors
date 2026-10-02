@@ -257,6 +257,74 @@ export async function sendApplicationReceived(
 }
 
 /**
+ * The customer's expert call, booked — with the invite attached.
+ *
+ * Said the way the page said it: the day, the time, who we will talk about,
+ * and that we ring them. The .ics puts it in their calendar in one tap.
+ */
+export async function sendCallBooked(
+  to: string,
+  call: {
+    name: string;
+    when: { day: string; time: string };
+    studios: string[];
+    ics: string;
+    /** booked (default), moved to a new time, or cancelled. */
+    kind?: 'booked' | 'moved' | 'cancelled';
+    /** The private link to move or cancel it. */
+    manageUrl?: string;
+  },
+): Promise<SendResult> {
+  const cfg = config();
+  const kind = call.kind ?? 'booked';
+  const hello = call.name ? `Hello ${call.name},` : 'Hello,';
+  const lines =
+    kind === 'cancelled'
+      ? [
+          hello,
+          '',
+          `Your expert call on ${call.when.day} at ${call.when.time} is cancelled.`,
+          'Nothing else changes — your brief and quotes are still in "Your home",',
+          'and you can book another time whenever you like.',
+        ]
+      : [
+          hello,
+          '',
+          kind === 'moved'
+            ? `Your expert call has moved to ${call.when.day} at ${call.when.time} — thirty minutes.`
+            : `Your expert call is booked for ${call.when.day} at ${call.when.time} — thirty minutes.`,
+          '',
+          call.studios.length > 0 ? `We will go through ${call.studios.join(', ')} with you.` : '',
+          'We ring you; there is nothing to install and nothing to prepare. The',
+          'expert has your brief and your quotes, exactly as you saw them.',
+          '',
+          call.manageUrl
+            ? `To move or cancel it (up to an hour before): ${call.manageUrl}`
+            : 'To move or cancel it, reply to this email.',
+        ];
+  const text = [...lines, '', 'One Interiors']
+    .filter((l, i, all) => !(l === '' && all[i - 1] === ''))
+    .join('\n');
+
+  if (isFault(cfg)) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error(`[expert] ${cfg.message} — call email NOT sent to`, maskEmail(to));
+      return { delivered: false, reason: cfg.reason };
+    }
+    console.log(`\n[expert] Call email for ${to}\n${text}\n`);
+    return { delivered: false, reason: 'dev_console' };
+  }
+
+  const subject =
+    kind === 'cancelled'
+      ? `Cancelled: your expert call, ${call.when.day}`
+      : kind === 'moved'
+        ? `Moved: your expert call, ${call.when.day} at ${call.when.time}`
+        : `Booked: your expert call, ${call.when.day} at ${call.when.time}`;
+  return send(cfg, to, subject, text, '[expert]', [{ filename: 'one-interiors-call.ics', content: call.ics }]);
+}
+
+/**
  * The email a studio gets when we say no.
  *
  * ## Why this is not optional
@@ -327,6 +395,7 @@ async function send(
   subject: string,
   text: string,
   tag: string,
+  attachments?: { filename: string; content: string }[],
 ): Promise<SendResult> {
   try {
     const res = await fetch(RESEND_ENDPOINT, {
@@ -335,7 +404,15 @@ async function send(
         Authorization: `Bearer ${cfg.apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ from: cfg.from, to, subject, text }),
+      body: JSON.stringify({
+        from: cfg.from,
+        to,
+        subject,
+        text,
+        ...(attachments?.length
+          ? { attachments: attachments.map((a) => ({ filename: a.filename, content: Buffer.from(a.content).toString('base64') })) }
+          : {}),
+      }),
     });
 
     if (!res.ok) {
@@ -348,4 +425,32 @@ async function send(
     console.error(`${tag} send failed:`, err instanceof Error ? err.message : err);
     return { delivered: false, reason: 'network' };
   }
+}
+
+/** The waitlist welcome by email, for someone who joined with an address. */
+export async function sendWaitlistWelcomeEmail(
+  to: string,
+  firstName: string,
+  position: number | null,
+  link: string,
+): Promise<SendResult> {
+  const cfg = config();
+  if (isFault(cfg)) return { delivered: false, reason: cfg.reason };
+  const text = [
+    `Hi ${firstName},`,
+    '',
+    position ? `You are #${position} on the One Interiors founding list for Pune.` : 'You are on the One Interiors founding list for Pune.',
+    'Pune opens when 2,000 people have joined, and invites go out in queue order.',
+    '',
+    'Move up the queue: every friend who joins through your link moves you up 25 places.',
+    `Your link: ${link}`,
+    '',
+    'Three friends make your ₹5,000 call with our architect free, wherever you are in the queue (it is free anyway for the first 1,000 to join). Five friends get you a free cab to the studio.',
+    '',
+    'We will only write about your place on the list and the launch. To stop, reply to this email.',
+    '',
+    'One Interiors',
+  ].join('\n');
+  const subject = position ? `You're #${position} on the One Interiors list` : "You're on the One Interiors list";
+  return send(cfg, to, subject, text, '[waitlist]');
 }

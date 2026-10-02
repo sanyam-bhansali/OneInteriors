@@ -32,6 +32,7 @@
  * figure this whole product exists to argue against.
  */
 
+import { BenefitChips } from '@/components/oi/ExpertPitch';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -42,10 +43,12 @@ import type { Explanation } from '@/modules/matching/explain';
 import { DUR, EASE_OUT, riseCard } from '@/components/oi/motion';
 import { Glass, revealProps } from '@/components/oi/Surfaces';
 import { ProjectWings } from './ProjectWings';
+import { Listen } from '@/components/oi/Listen';
+import { NO_RATES_LABEL } from '@/modules/quotation/rate-policy';
 import type { Focus } from '@/components/oi/useScrollFocus';
 import type { Studio } from '@/modules/studio/types';
-import type { MatchResult } from '@/modules/matching/score';
-import type { Brief } from '@/modules/brief/types';
+import { ENGINE_VERSION, FACTOR_LABELS, type FactorKey, type MatchResult } from '@/modules/matching/score';
+import { localityLabel, type Brief } from '@/modules/brief/types';
 
 /** Two letters from the trade name. "Chitra & Co." → CC, "Teakline" → TE. */
 function monogram(name: string): string {
@@ -75,6 +78,7 @@ export function StudioCard({
   focus,
   wingsOpen,
   quotedTotalPaise,
+  ratesFiled = true,
   inCompare,
   cachedRead,
   onQuote,
@@ -97,6 +101,8 @@ export function StudioCard({
    */
   wingsOpen: boolean;
   quotedTotalPaise: number | null;
+  /** False once the roster is real and this studio has no approved rates (rate-policy.ts). */
+  ratesFiled?: boolean;
   inCompare: boolean;
   cachedRead: StoredRead | undefined;
   onQuote: () => void;
@@ -107,7 +113,9 @@ export function StudioCard({
   const reduced = useReducedMotion();
   const [open, setOpen] = useState(false);
 
-  const key = briefKey(brief);
+  // The engine version is part of the key: a read written under an older
+  // engine explains a score that no longer exists.
+  const key = `${briefKey(brief)}|${ENGINE_VERSION}`;
   const fresh = cachedRead?.briefKey === key ? cachedRead : undefined;
   const [read, setRead] = useState<Explanation | null>(
     fresh ? { text: fresh.text, source: fresh.source } : null,
@@ -141,7 +149,7 @@ export function StudioCard({
 
   const tags = useMemo(() => {
     const out: string[] = [];
-    if (studio.localities.length > 0) out.push(studio.localities.slice(0, 2).join(' · '));
+    if (studio.localities.length > 0) out.push(studio.localities.slice(0, 2).map((l) => localityLabel(l) ?? l).join(' · '));
     if (studio.yearsActive) out.push(`${studio.yearsActive} yrs`);
     if (studio.teamSize) out.push(`Team of ${studio.teamSize}`);
     return out;
@@ -165,6 +173,7 @@ export function StudioCard({
         projects={studio.portfolio}
         checks={studio.checks}
         studioName={studio.tradeName}
+        likeYours={match.similarProjects}
       />
 
       <Glass focus={focus}>
@@ -203,7 +212,7 @@ export function StudioCard({
       {/* ── The facts that decide a shortlist ── */}
       <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-4 border-t border-[var(--line)] pt-5 sm:grid-cols-3">
         <Fact
-          label={quotedTotalPaise !== null ? 'Your quote' : 'Not priced yet'}
+          label={quotedTotalPaise !== null ? 'Your quote' : ratesFiled ? 'Not priced yet' : NO_RATES_LABEL}
           value={quotedTotalPaise !== null ? formatINRCompact(quotedTotalPaise) : '—'}
         />
         <Fact
@@ -216,19 +225,63 @@ export function StudioCard({
         />
       </div>
 
+      {/* When they can start, against when you can — either way, on every card. */}
+      {match.timeline ? (
+        <p
+          className={`q-small m-0 mt-4 ${match.timeline.late ? 'text-[var(--acc-ink)]' : 'text-[var(--ink2)]'}`}
+        >
+          {match.timeline.line}
+        </p>
+      ) : null}
+      {match.widened ? (
+        <p className="oi-label m-0 mt-2">
+          {match.widened === 'ANY_ZONE' ? 'Works in another part of Pune' : 'One level above the one you chose'}
+        </p>
+      ) : null}
+
       {/* ── The read ── */}
       <div className="mt-5 border-t border-[var(--line)] pt-4">
         <p className="oi-eyebrow m-0 mb-2">Why this one fits you</p>
+        {/* Their first priority, answered first — flattering or not. */}
+        {match.topPriority ? (
+          <p className="q-small m-0 mb-2 max-w-[62ch] font-semibold text-[var(--ink)]">{match.topPriority}</p>
+        ) : null}
         {read ? (
-          <p className="q-small m-0 max-w-[62ch] text-[var(--ink)]">{read.text}</p>
+          <>
+            <p className="q-small m-0 max-w-[62ch] text-[var(--ink)]">{read.text}</p>
+            <div className="mt-2">
+              <Listen text={read.text} />
+            </div>
+          </>
         ) : (
           <p className="q-small m-0 text-[var(--ink2)]">Reading your brief against their work…</p>
         )}
       </div>
 
+      {/* ── Their work like yours, on the card itself (queue item 19) ──
+          The wings beside the card only fit on wide screens; this is the same
+          evidence where everyone can see it. */}
+      <LikeYours studio={studio} ids={match.similarProjects ?? []} />
+
+      {/* ── Meet the studio (queue item 18) ── their own short intro. */}
+      {studio.matchingProfile?.introVideoUrl ? (
+        <a
+          href={studio.matchingProfile.introVideoUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="q-small mt-4 inline-flex items-center gap-2 font-semibold text-[var(--acc-ink)] underline underline-offset-4"
+        >
+          <span aria-hidden>▶</span> Meet {studio.tradeName} — their intro video
+        </a>
+      ) : null}
+
+      {/* What booking this studio through us brings, on the card itself —
+          the moment a customer sees a name is the moment they could ring it. */}
+      <BenefitChips limit={4} className="mt-5 border-t border-[var(--line)] pt-4" />
+
       {/* ── Actions ── */}
       <div className="mt-5 flex flex-wrap items-center gap-2.5">
-        {quotedTotalPaise === null ? (
+        {quotedTotalPaise === null && !ratesFiled ? null : quotedTotalPaise === null ? (
           <button
             type="button"
             onClick={onQuote}
@@ -237,6 +290,16 @@ export function StudioCard({
             Get a quote
           </button>
         ) : (
+          <>
+          {/* Every match is priced when the page opens, so the quote is the
+              first thing to offer — it used to sit behind "More". */}
+          <button
+            type="button"
+            onClick={onQuote}
+            className="oi-cta min-h-11 cursor-pointer border-0 px-5 py-2.5 text-[14px]"
+          >
+            See the quote
+          </button>
           <button
             type="button"
             onClick={onToggleCompare}
@@ -250,6 +313,7 @@ export function StudioCard({
           >
             {inCompare ? 'In compare' : 'Add to compare'}
           </button>
+          </>
         )}
 
         <Link
@@ -279,6 +343,23 @@ export function StudioCard({
         >
           <div className="mt-5 border-t border-[var(--line)] pt-4">
             <p className="oi-eyebrow m-0 mb-3">What the score is made of</p>
+            {match.evidence ? (
+              <dl className="m-0 mb-4 grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-[10rem_1fr]">
+                {(Object.keys(FACTOR_LABELS) as FactorKey[]).map((key) => (
+                  <div key={key} className="contents">
+                    <dt className="oi-label m-0">
+                      {FACTOR_LABELS[key]}
+                      {match.breakdown[key] === null ? '' : ` · ${match.breakdown[key]}`}
+                    </dt>
+                    <dd className="q-small m-0 text-[var(--ink2)]">
+                      {match.breakdown[key] === null
+                        ? 'Not known yet — not counted either way'
+                        : (match.evidence?.[key] ?? 'Measured')}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
             <ul className="m-0 flex list-none flex-col gap-2 p-0">
               {match.reasoning.map((line) => (
                 <li key={line} className="q-small text-[var(--ink2)]">
@@ -300,5 +381,39 @@ export function StudioCard({
       ) : null}
       </Glass>
     </motion.li>
+  );
+}
+
+/** Up to two of the studio's projects most like this brief, with a cover when there is one. */
+function LikeYours({ studio, ids }: { studio: Studio; ids: string[] }) {
+  const projects = ids
+    .map((id) => studio.portfolio.find((p) => p.id === id))
+    .filter((p): p is Studio['portfolio'][number] => Boolean(p))
+    .slice(0, 2);
+  if (projects.length === 0) return null;
+  return (
+    <div className="mt-5 border-t border-[var(--line)] pt-4">
+      <p className="oi-eyebrow m-0 mb-2">Their work like yours</p>
+      <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2">
+        {projects.map((p) => (
+          <li key={p.id} className="flex items-center gap-3">
+            {p.images[0] ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={p.images[0]} alt="" className="h-12 w-16 flex-none rounded-[6px] object-cover" />
+            ) : (
+              <span className="h-12 w-16 flex-none rounded-[6px] bg-[var(--line)]" aria-hidden />
+            )}
+            <span className="min-w-0">
+              <span className="block truncate text-[13.5px] font-semibold text-[var(--ink)]">{p.title}</span>
+              <span className="block text-[12.5px] text-[var(--ink2)]">
+                {[localityLabel(p.locality), p.valuePaise ? formatINRCompact(p.valuePaise) : null, p.durationDays ? `${p.durationDays} days` : null]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

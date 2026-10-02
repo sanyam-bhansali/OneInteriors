@@ -6,6 +6,9 @@
  * "not enough data yet" — never as a favourable default. That is the brand.
  */
 
+import type { PaymentPhase } from './payment-phases';
+import type { MatchingProfile } from './matching-profile';
+import type { Tier } from '@/modules/quotation/tiers';
 import type { Paise } from '@/lib/money';
 import type { PropertyType, ScopeType, StyleTag } from '@/modules/brief/types';
 
@@ -63,6 +66,16 @@ export interface PortfolioProject {
   images: string[];
   /** A render labelled as a render is fine. Passing one off as a photo is not. */
   isRender: boolean;
+  // Matching fields — optional because the fixtures predate them. See
+  // modules/studio/portfolio-fields.ts.
+  carpetAreaSqft?: number | null;
+  society?: string | null;
+  /** Specialism tags: CHILDREN, ELDERLY, PETS, VASTU… */
+  tags?: string[];
+  /** One room per image, aligned by index; '' = not said. */
+  imageRooms?: string[];
+  /** May these appear, unnamed, in the homeowner's style picker? */
+  pickerConsent?: boolean;
 }
 
 export interface Studio {
@@ -134,6 +147,27 @@ export interface Studio {
 
   minProjectPaise: Paise | null;
   maxProjectPaise: Paise | null;
+
+  /**
+   * When the studio is paid, from the studio. Null until filed — and the
+   * quote then says so rather than printing a schedule we made up. Optional
+   * for the fixture reason above. See modules/studio/payment-phases.ts.
+   */
+  paymentPhases?: PaymentPhase[] | null;
+
+  /**
+   * What the studio told us to match it on — work mix, scopes, timing, how
+   * it works, materials, specialisms, languages, the curated discount.
+   * Optional for the fixture reason above; absent reads as EMPTY_PROFILE,
+   * which matching scores as "not known yet". See matching-profile.ts.
+   */
+  matchingProfile?: MatchingProfile;
+
+  /**
+   * The band ops confirmed from the proposal in band.ts. Null until then.
+   * Optional for the fixture reason above.
+   */
+  band?: Tier | null;
 
   // ── Derived performance ──
   // Recomputed by a job from real projects. NULL means "we don't know yet"

@@ -18,6 +18,71 @@ export type Involvement = 'DECIDE_FOR_ME' | 'COLLABORATE' | 'APPROVE_EVERYTHING'
 export type PriorityFactor = 'BUDGET' | 'SPEED' | 'DESIGN_AMBITION' | 'MATERIAL_QUALITY';
 
 /**
+ * Where they are with the flat itself.
+ *
+ * Asked instead of a move-in date since 29 Sep 2026. Work starts from
+ * possession, not from the day somebody would like to move in: a buyer
+ * waiting on handover has a date they cannot move and a studio cannot start
+ * before it, which is the fact the timeline — and the match — has to be
+ * built around.
+ */
+export type PossessionStatus = 'HAVE_KEYS' | 'EXPECTED' | 'NOT_SURE';
+
+/**
+ * What the home needs beyond the rooms themselves.
+ *
+ * Asked beside the household (29 Sep 2026), because these are the practical
+ * facts a studio designs around and a customer rarely thinks to say until the
+ * first meeting. Each one is something a studio can have done before — and
+ * the matching engine will ask exactly that once studios declare it
+ * (docs/STUDIO-PROFILE-REQUIREMENTS.md §7). A pooja room also adds its line to
+ * the quote.
+ *
+ * Add freely, never rename: these are stored as strings on briefs.
+ */
+export const HOME_NEEDS = [
+  'VASTU',
+  'POOJA_ROOM',
+  'EXTRA_STORAGE',
+  'SMART_HOME',
+  'LOW_MAINTENANCE',
+  'ENTERTAINING',
+] as const;
+
+export type HomeNeed = (typeof HOME_NEEDS)[number];
+
+export const HOME_NEED_LABELS: Record<HomeNeed, string> = {
+  VASTU: 'Vastu-compliant layout',
+  POOJA_ROOM: 'A pooja room or mandir',
+  EXTRA_STORAGE: 'A lot of storage',
+  SMART_HOME: 'Smart home / automation',
+  LOW_MAINTENANCE: 'Easy to keep clean',
+  ENTERTAINING: 'Room to host people',
+};
+
+/**
+ * The language they would like their studio to speak.
+ *
+ * A studio's team declares the languages it can hold a client meeting in; the
+ * match uses this as a tie-breaker, never a filter. Pune is Marathi, Hindi and
+ * English in roughly equal measure depending on the building.
+ */
+export const LANGUAGES = ['EN', 'HI', 'MR'] as const;
+export type Language = (typeof LANGUAGES)[number];
+
+export const LANGUAGE_LABELS: Record<Language, string> = {
+  EN: 'English',
+  HI: 'हिन्दी',
+  MR: 'मराठी',
+};
+
+export const POSSESSION_LABELS: Record<PossessionStatus, string> = {
+  HAVE_KEYS: 'I have the keys',
+  EXPECTED: 'Expecting possession',
+  NOT_SURE: 'Not sure yet',
+};
+
+/**
  * Style vocabulary. This list is shared by the quiz picker and portfolio
  * tagging — if the two ever diverge, matching silently degrades and nobody
  * notices, because a zero overlap looks like a legitimate low score.
@@ -65,15 +130,61 @@ export interface Household {
   worksFromHome: boolean;
 }
 
+/**
+ * What a floor plan told us, once the customer confirmed it.
+ *
+ * Only the facts the quote uses; the file itself stays in private storage.
+ * Written on the brief after the "We read: … — right?" step, never straight
+ * from the model (modules/floorplan/reading.ts).
+ */
+export interface PlanUse {
+  /** The platform run, mm, as confirmed. Null if the kitchen was unreadable. */
+  kitchenRunMm: number | null;
+  bathrooms: number;
+  hasStudy: boolean;
+  /** Where the carpet area on the brief came from. */
+  /** 'society': taken from plans other homes in the building shared (society-library.ts). */
+  areaSource: 'printed' | 'computed' | 'customer' | 'society' | null;
+}
+
 export interface Brief {
+  /**
+   * What they asked us to call them — the first question since 29 Sep.
+   *
+   * Read-only through the database mapper, like the floor plan: it is kept in
+   * the customer's own tab while they answer, and written to our database
+   * only by the contact step, with the number, once they have agreed to the
+   * notice. A name typed on screen one has not yet been given to anyone.
+   */
+  contactName: string | null;
+
   // Q1 — property
   propertyType: PropertyType | null;
   carpetAreaSqft: number | null;
   locality: string | null;
-  possessionOn: string | null; // ISO date
+  /**
+   * The society or building, as they typed it. Free text: there is no
+   * reliable list of Pune societies to pick from, and a studio that has
+   * worked in "Gera World of Joy" will recognise it however it is spelt.
+   */
+  society: string | null;
+  /** Q9 — have they got the keys, are they expecting them, or not sure. */
+  possessionStatus: PossessionStatus | null;
+  /** ISO date, first of the month. Set only when the status is EXPECTED. */
+  possessionOn: string | null;
 
   // Q2 — scope
   scope: ScopeType | null;
+  /**
+   * For a single-room job or a renovation: which rooms (quotation `Room`
+   * codes — KITCHEN, MASTER_BEDROOM…). Empty for the other scopes.
+   */
+  scopeRooms: string[];
+  /**
+   * Catalogue codes unticked on the scope checklist. The checklist is the
+   * quote: an item left out here leaves every studio's quote at once.
+   */
+  excludedItems: string[];
 
   /**
    * Essential / Premium / Luxury. Chosen after the nine questions rather than
@@ -89,17 +200,29 @@ export interface Brief {
   // Q4 / Q5 — likes are a weight, dislikes are a HARD FILTER
   styleLikes: StyleTag[];
   styleDislikes: StyleTag[];
+  /**
+   * Studios whose own photo they picked in the style picker, unnamed
+   * (brief/picker-photos.ts). Read by the style factor as direct evidence.
+   */
+  styleStudioPicks?: string[];
 
   // Q6 — household
   household: Household | null;
+  /** Beside the household — see `HOME_NEEDS`. */
+  needs: HomeNeed[];
 
   // Q7 — ranked, index 0 is most important. Does most of the matching work.
   priorityRanking: PriorityFactor[];
 
   // Q8 — working style. The #1 cause of client/studio breakdown.
   involvement: Involvement | null;
+  /** The language they want their studio to speak — see `LANGUAGES`. */
+  language: Language | null;
 
-  // Q9 — timeline
+  /**
+   * No longer asked (29 Sep 2026) — Q9 is possession now. Kept so briefs
+   * written before the change still read, and still reach the studio.
+   */
   moveInBy: string | null; // ISO date
 
   /**
@@ -110,6 +233,8 @@ export interface Brief {
    * the file itself is reachable only through a short signed URL.
    */
   floorPlanName: string | null;
+  /** The confirmed reading of that plan — see `PlanUse`. */
+  planReading: PlanUse | null;
 
   // Progress
   lastStep: number;
@@ -117,30 +242,36 @@ export interface Brief {
 }
 
 export const EMPTY_BRIEF: Brief = {
+  contactName: null,
   propertyType: null,
   carpetAreaSqft: null,
   locality: null,
+  society: null,
+  possessionStatus: null,
   possessionOn: null,
   scope: null,
+  scopeRooms: [],
+  excludedItems: [],
   tier: null,
   budgetMinPaise: null,
   budgetMaxPaise: null,
   styleLikes: [],
   styleDislikes: [],
+  styleStudioPicks: [],
   household: null,
+  needs: [],
   priorityRanking: [],
   involvement: null,
+  language: null,
   moveInBy: null,
   floorPlanName: null,
+  planReading: null,
   lastStep: 0,
   completedAt: null,
 };
 
 export type BudgetTier = 'ESSENTIAL' | 'PREMIUM' | 'LUXURY';
 
-export const TOTAL_STEPS = 9;
-
-/** Pune localities we currently have verified supply in. */
 /**
  * Where we work, grouped the way Pune actually thinks about itself.
  *

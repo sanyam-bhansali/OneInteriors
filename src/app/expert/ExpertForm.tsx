@@ -30,6 +30,8 @@
  */
 
 import { useActionState, useMemo, useState } from 'react';
+import { slotLabel } from '@/modules/consultation/slots';
+import { SlotPicker } from '@/components/SlotPicker';
 import { formatINRCompact } from '@/lib/money';
 import { Sheet, Tick } from '@/components/oi';
 import { requestExpertAction, type ExpertState } from './actions';
@@ -65,6 +67,9 @@ export function ExpertForm({
   defaultEmail,
   minStudios,
   maxStudios,
+  slots = [],
+  preselected = [],
+  fromBrief = [],
 }: {
   briefId: string;
   studios: StudioOption[];
@@ -72,9 +77,19 @@ export function ExpertForm({
   defaultEmail: string | null;
   minStudios: number;
   maxStudios: number;
+  /** Open 30-minute slots (ISO). Empty when no expert has hours set — then we ask when suits them. */
+  slots?: string[];
+  /** The studios they compared — ticked for them. */
+  preselected?: string[];
+  /** Questions from their possession, household and needs (consultation/brief-questions.ts). */
+  fromBrief?: string[];
 }) {
   const [state, action, pending] = useActionState(requestExpertAction, INITIAL);
-  const [picked, setPicked] = useState<string[]>(studios.slice(0, 2).map((s) => s.id));
+  const [slot, setSlot] = useState<string | null>(null);
+  const booking = slots.length > 0;
+  const [picked, setPicked] = useState<string[]>(
+    preselected.length > 0 ? preselected.slice(0, maxStudios) : studios.slice(0, 2).map((s) => s.id),
+  );
   const [asks, setAsks] = useState<string[]>([]);
   const [own, setOwn] = useState('');
   const err = state.errors ?? {};
@@ -110,16 +125,17 @@ export function ExpertForm({
     .slice(0, 2000);
 
   if (state.status === 'sent') {
+    const when = state.scheduledFor ? slotLabel(state.scheduledFor) : null;
     return (
       <Sheet className="p-[clamp(22px,3vw,34px)]">
-        <p className="oi-eyebrow m-0 mb-4">Requested</p>
+        <p className="oi-eyebrow m-0 mb-4">{when ? 'Booked' : 'Requested'}</p>
         <h2 className="oi-display m-0 mb-4 text-[clamp(1.5rem,1.2rem+1.2vw,2rem)]">
-          We&rsquo;ll call you.
+          {when ? `${when.day}, ${when.time}.` : 'We\u2019ll call you.'}
         </h2>
         <p className="m-0 mb-3 max-w-[58ch] text-[15px] leading-[1.65] text-[var(--ink2)]">
-          Someone will be in touch within one working day to fix a time. Before the call they will
-          read your brief, your floor plan and every quote on your comparison — you will not have
-          to explain any of it again.
+          {when
+            ? 'Thirty minutes, and we ring you. The invite is in your email if you gave us one. Before the call the expert reads your brief, your floor plan and every quote on your comparison — you will not have to explain any of it again.'
+            : 'Someone will be in touch within one working day to fix a time. Before the call they will read your brief, your floor plan and every quote on your comparison — you will not have to explain any of it again.'}
         </p>
         {asks.length > 0 ? (
           <p className="m-0 mb-6 max-w-[58ch] text-[15px] leading-[1.65] text-[var(--ink2)]">
@@ -143,7 +159,7 @@ export function ExpertForm({
             already know which three things you are choosing between.
           </p>
           <a
-            href="/prepare"
+            href="/account#rooms"
             className="oi-cta inline-flex min-h-11 items-center px-6 py-3 text-[14.5px] no-underline"
           >
             Prepare for the call
@@ -226,8 +242,8 @@ export function ExpertForm({
       <fieldset className="m-0 border-0 p-0">
         <legend className="oi-display mb-2 p-0 text-[21px]">What do you want answered?</legend>
         <p className="m-0 mb-5 max-w-[56ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-          Tick anything you want looked into before the call. The first two are written from your
-          own comparison. Nobody is going to open with &ldquo;so, tell me about your
+          Tick anything you want looked into before the call. The first ones are written from your
+          own quotes and your brief. Nobody is going to open with &ldquo;so, tell me about your
           requirement&rdquo;.
         </p>
 
@@ -255,7 +271,22 @@ export function ExpertForm({
           </div>
         ) : null}
 
-        {generated.length > 0 ? (
+        {/* From their life rather than their quotes — the timeline, the family,
+            what the home needs (build queue item 9). */}
+        {fromBrief.length > 0 ? (
+          <div className="mb-5">
+            <p className="oi-eyebrow m-0 mb-3">From your brief</p>
+            <ul className="m-0 flex list-none flex-col gap-2 p-0">
+              {fromBrief.map((q) => (
+                <li key={q}>
+                  <Ask q={q} on={asks.includes(q)} onToggle={() => toggleAsk(q)} derived />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {generated.length > 0 || fromBrief.length > 0 ? (
           <p className="oi-eyebrow m-0 mb-3">Things most people ask</p>
         ) : null}
 
@@ -313,13 +344,50 @@ export function ExpertForm({
             defaultValue={defaultEmail}
             error={err.contactEmail}
           />
-          <Field
-            label="When suits you?"
-            name="preferredTimes"
-            placeholder="Weekday evenings, or Saturday morning"
-          />
+          {booking ? null : (
+            <Field
+              label="When suits you?"
+              name="preferredTimes"
+              placeholder="Weekday evenings, or Saturday morning"
+            />
+          )}
         </div>
       </fieldset>
+
+      {booking ? (
+        <fieldset className="m-0 border-0 p-0">
+          <legend className="oi-eyebrow m-0 mb-1 p-0">Pick a time — thirty minutes, we ring you</legend>
+          <p className="m-0 mb-4 text-[13.5px] text-[var(--ink2)]">
+            These are real times. Pick one and it is booked — nobody calls you back to arrange it.
+          </p>
+          <SlotPicker slots={slots} value={slot} onPick={setSlot} />
+          <input type="hidden" name="startsAt" value={slot ?? ''} />
+          {err.startsAt ? (
+            <p role="alert" className="m-0 mt-3 text-[14px]" style={{ color: 'var(--acc-ink)' }}>
+              {err.startsAt}
+            </p>
+          ) : null}
+        </fieldset>
+      ) : null}
+
+      {/* Asked here, where they pick the studios, because this is what they
+          are agreeing to (plan §3.3). Required: an introduction without it
+          could never tell the studio who to meet. */}
+      <label className="flex cursor-pointer items-start gap-3">
+        <input type="checkbox" name="shareConsent" required className="mt-1 h-4 w-4 flex-none accent-[var(--acc)]" />
+        <span className="text-[14.5px] leading-snug text-[var(--ink)]">
+          Share my brief, name and number with the studios I have ticked — only once you introduce
+          me, and only so they can arrange to meet.
+          <span className="mt-1 block text-[13px] text-[var(--ink2)]">
+            You can withdraw this from &ldquo;Your home&rdquo; at any time.
+          </span>
+        </span>
+      </label>
+      {err.shareConsent ? (
+        <p role="alert" className="m-0 -mt-3 text-[13.5px]" style={{ color: 'var(--acc-ink)' }}>
+          {err.shareConsent}
+        </p>
+      ) : null}
 
       <div className="border-t border-[var(--line)] pt-7">
         {err.form ? (
@@ -333,10 +401,18 @@ export function ExpertForm({
         ) : null}
         <button
           type="submit"
-          disabled={pending || picked.length < minStudios}
+          disabled={pending || picked.length < minStudios || (booking && !slot)}
           className="oi-cta min-h-11 cursor-pointer border-0 px-7 py-3.5 text-[15px] disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {pending ? 'Sending…' : 'Request the call'}
+          {pending
+            ? booking
+              ? 'Booking…'
+              : 'Sending…'
+            : booking
+              ? slot
+                ? `Book ${slotLabel(slot).day.split(' ')[0]} ${slotLabel(slot).time}`
+                : 'Pick a time above'
+              : 'Request the call'}
         </button>
         <p className="m-0 mt-5 max-w-[58ch] text-[13.5px] leading-[1.6] text-[var(--ink2)]">
           Free, and there is nothing to buy on the call. We are paid by the studio if you go ahead

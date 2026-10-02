@@ -5,6 +5,8 @@ import { requestConsultation } from '@/modules/consultation/request';
 export interface ExpertState {
   status: 'idle' | 'sent' | 'error';
   errors?: Record<string, string>;
+  /** Set when the call was booked into a slot rather than requested. */
+  scheduledFor?: string;
 }
 
 /**
@@ -29,8 +31,10 @@ export async function requestExpertAction(
     contactEmail: String(formData.get('contactEmail') ?? ''),
     askedAbout: String(formData.get('askedAbout') ?? '').slice(0, MAX_ASKED),
     preferredTimes: String(formData.get('preferredTimes') ?? '').slice(0, MAX_TIMES),
+    startsAt: String(formData.get('startsAt') ?? '').slice(0, 40) || undefined,
+    shareConsent: formData.get('shareConsent') === 'on',
   });
 
   if (!result.ok) return { status: 'error', errors: result.errors };
-  return { status: 'sent' };
+  return { status: 'sent', scheduledFor: result.scheduledFor };
 }

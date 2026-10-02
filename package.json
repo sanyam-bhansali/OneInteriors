@@ -21,6 +21,7 @@
     "roster:check": "tsx prisma/roster-check.ts",
     "db:studio": "prisma studio",
     "db:ops": "tsx prisma/seed-ops.ts",
+    "db:expert": "tsx prisma/seed-expert.ts",
     "db:studio-login": "tsx prisma/seed-studio.ts",
     "db:rates": "tsx prisma/seed-rate-cards.ts",
     "guard:destructive": "tsx prisma/guard-destructive.ts",
@@ -34,11 +35,13 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@prisma/client": "^6.19.3",
     "framer-motion": "^13.4.0",
+    "lenis": "^1.1.13",
     "lucide-react": "^1.48.0",
     "next": "15.5.25",
     "react": "19.1.1",
     "react-dom": "19.1.1",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "three": "^0.170.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
@@ -46,6 +49,7 @@
     "@types/node": "^22.18.1",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
+    "@types/three": "^0.170.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "15.5.25",
     "playwright": "^1.63.0",

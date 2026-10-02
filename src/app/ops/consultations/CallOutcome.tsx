@@ -48,10 +48,12 @@ export function CallOutcome({
   const [when, setWhen] = useState('');
   const [location, setLocation] = useState('');
 
+  const [held, setHeld] = useState<string | null>(null);
   if (done) {
     return (
       <p className="m-0 mt-4 rounded-[10px] bg-[var(--color-ontrack-soft)] px-4 py-3 text-[14px] text-[var(--color-ink)]">
         Recorded. {introduce ? 'Introduction made.' : 'No introduction made.'}
+        {held ? <span className="mt-1 block text-[var(--color-brass)]">{held}</span> : null}
       </p>
     );
   }
@@ -134,8 +136,10 @@ export function CallOutcome({
         appointmentLocation: location || undefined,
       });
 
-      if (result.ok) setDone(true);
-      else setError(result.error);
+      if (result.ok) {
+        setHeld(result.note ?? null);
+        setDone(true);
+      } else setError(result.error);
     });
   }
 

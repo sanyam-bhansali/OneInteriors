@@ -1,4 +1,6 @@
 import { notFound } from 'next/navigation';
+import { DirectVsUs } from '@/components/oi/DirectVsUs';
+import { currentOffer } from '@/modules/consultation/offer-store';
 import { showUnverifiedStudios } from '@/lib/env';
 import type { Metadata } from 'next';
 import { StartCta } from '@/components/StartCta';
@@ -18,7 +20,7 @@ import {
   TIER_LABELS,
   describeDelivery,
 } from '@/modules/studio/types';
-import { PROPERTY_LABELS, SCOPE_LABELS, STYLE_LABELS } from '@/modules/brief/types';
+import { PROPERTY_LABELS, SCOPE_LABELS, STYLE_LABELS, localityLabel } from '@/modules/brief/types';
 
 /**
  * A studio's profile, in the language `/match` established.
@@ -104,6 +106,7 @@ export async function generateMetadata({
 }
 
 export default async function StudioProfile({ params }: { params: Promise<{ slug: string }> }) {
+  const offer = await currentOffer();
   const { slug } = await params;
   const studio = await studioRepository.bySlug(slug);
   if (!studio) notFound();
@@ -148,7 +151,7 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
   /* Where they work. The roster card has said this from the beginning and the
      profile never did — so the one page devoted to a studio was the one place
      that did not say whether they come to your part of the city. */
-  const where = [...studio.localities.slice(0, 4)];
+  const where = studio.localities.slice(0, 4).map((l) => localityLabel(l) ?? l);
   const band =
     studio.minProjectPaise && studio.maxProjectPaise
       ? `${formatINRCompact(studio.minProjectPaise)}–${formatINRCompact(studio.maxProjectPaise)}`
@@ -223,6 +226,14 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
         <section className="border-y border-[var(--line)] py-12">
           <Wrap>
             <StudioQuotePanel studioSlug={studio.slug} studioName={studio.tradeName} />
+          </Wrap>
+        </section>
+
+        {/* ── Directly, or through us ── right after the quote, where the
+            decision to ring them is made. */}
+        <section className="py-12">
+          <Wrap>
+            <DirectVsUs studioName={studio.tradeName} offer={offer} />
           </Wrap>
         </section>
 
@@ -352,7 +363,7 @@ export default async function StudioProfile({ params }: { params: Promise<{ slug
 
                         <p className="oi-label m-0">
                           {[
-                            p.locality,
+                            localityLabel(p.locality),
                             p.propertyType ? PROPERTY_LABELS[p.propertyType] : null,
                             p.scope ? SCOPE_LABELS[p.scope] : null,
                           ]

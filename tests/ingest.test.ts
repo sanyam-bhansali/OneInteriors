@@ -6,7 +6,7 @@ import {
   type IngestedLine,
   type IngestedQuotation,
 } from '@/modules/quotation/ingest';
-import { ITEM, type Room } from '@/modules/quotation/catalogue';
+import { ITEM, MIN_QUOTATIONS_PER_ITEM, rateCanGoLive, type Room } from '@/modules/quotation/catalogue';
 
 /**
  * These tests are the ingestion.
@@ -176,7 +176,17 @@ describe('the report', () => {
 
   it('refuses to price a studio that has filed too few quotations', () => {
     const { report } = ingestQuotations([quotation([line()])], '2026-09-18');
-    expect(report.problems.join(' ')).toMatch(/at least 100/i);
+    expect(report.problems.join(' ')).toMatch(/at least 50/i);
+  });
+
+  it('will not put an item live on fewer than the per-item minimum', () => {
+    expect(rateCanGoLive(MIN_QUOTATIONS_PER_ITEM - 1)).toBe(false);
+    expect(rateCanGoLive(MIN_QUOTATIONS_PER_ITEM)).toBe(true);
+    const quotes = Array.from({ length: MIN_QUOTATIONS_PER_ITEM - 1 }, (_, i) =>
+      quotation([line({ quotationId: `q${i}` })]),
+    );
+    const { report } = ingestQuotations(quotes, '2026-09-18');
+    expect(report.problems.join(' ')).toMatch(/will not go live below 8/);
   });
 
   it('flags a rate built on almost nothing as provisional', () => {
@@ -243,6 +253,12 @@ describe('every catalogue item can actually be reached', () => {
       ['Safety Door', 'LIVING_DINING'],
       ['False Ceiling -(Master Bedroom)', 'WHOLE_HOME'],
       ['Paint- 3bhk', 'WHOLE_HOME'],
+      // Civil work, for renovations — so a studio's own renovation quotes can
+      // file these rates (29 Sep 2026).
+      ['Flooring - vitrified tile', 'WHOLE_HOME'],
+      ['Bathroom renovation', 'WHOLE_HOME'],
+      ['Kitchen platform', 'KITCHEN'],
+      ['Complete rewiring with new DB', 'WHOLE_HOME'],
       ['Electrcials', 'WHOLE_HOME'],
       ['Vanity Unit-02', 'BATHROOMS'],
     ];

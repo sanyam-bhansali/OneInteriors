@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { EMPTY_BRIEF, type Brief } from '@/modules/brief/types';
 import { rankStudios, scoreMatch, passesHardFilters, WEIGHTS } from '@/modules/matching/score';
+import { deliveredBudgetFit } from '@/modules/matching/signals';
 import { STUDIOS, getStudioById } from '@/data/studios';
 import { lakhsToPaise } from '@/lib/money';
 import type { Studio } from '@/modules/studio/types';
@@ -105,7 +106,8 @@ describe('cold start — the honesty rule', () => {
     const permissive: Brief = { ...baseBrief, locality: 'kothrud', styleDislikes: [] };
     const result = scoreMatch(permissive, noRecord);
     expect(result).not.toBeNull();
-    expect(result!.breakdown.deliveryReliability).toBeNull();
+    // No possession date in this brief, so timing cannot be measured.
+    expect(result!.breakdown.timeline).toBeNull();
     expect(result!.factorsScored).toBeLessThan(result!.factorsTotal);
   });
 
@@ -180,5 +182,40 @@ describe('ranking', () => {
   it('stamps the engine version so old scores are never reinterpreted', () => {
     const results = rankStudios(baseBrief, STUDIOS, 99);
     expect(results[0].engineVersion).toMatch(/^match@\d+\.\d+\.\d+$/);
+  });
+});
+
+/**
+ * The Luxury band has a floor and no ceiling (₹2,500/sq ft and up), so a
+ * Luxury brief carries `budgetMinPaise` and `budgetMaxPaise: null`. Under
+ * 1.0.0 that returned null for budget fit — the factor quietly dropped out for
+ * exactly the customers for whom an ₹8 lakh studio is most plainly wrong.
+ */
+describe('an open-ended budget (the top band)', () => {
+  const floorOnly: Brief = { ...baseBrief, budgetMinPaise: lakhsToPaise(30), budgetMaxPaise: null };
+
+  const withWork = (values: number[]): Studio => ({
+    ...proven,
+    portfolio: values.map((v, i) => ({
+      ...proven.portfolio[0]!,
+      id: `v${i}`,
+      valuePaise: lakhsToPaise(v),
+    })),
+  });
+
+  it('is still measured', () => {
+    expect(deliveredBudgetFit(floorOnly, withWork([28, 35, 40, 45]))).not.toBeNull();
+  });
+
+  it('scores work entirely above the floor as a full fit', () => {
+    expect(deliveredBudgetFit(floorOnly, withWork([32, 36, 40, 44]))?.value).toBe(100);
+  });
+
+  it('scores work entirely below the floor as no fit', () => {
+    expect(deliveredBudgetFit(floorOnly, withWork([8, 10, 12, 14]))?.value).toBe(0);
+  });
+
+  it('stamps the v2 engine', () => {
+    expect(scoreMatch(baseBrief, proven)?.engineVersion).toBe('match@2.2.0');
   });
 });

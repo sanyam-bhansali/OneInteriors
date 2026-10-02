@@ -29,7 +29,7 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
-import { hasDatabase } from '@/lib/env';
+import { hasDatabase, rosterIsReal } from '@/lib/env';
 import { filedRatesFor } from '@/data/filed-rates';
 import { liveRatesFor } from './filed-rate-store';
 import type { StudioRates } from './catalogue';
@@ -75,6 +75,8 @@ export async function resolveRatesFor(slug: string): Promise<ResolvedRates> {
 
   const live = await liveRatesFor(studio.id);
   const realCodes = Object.keys(live);
+  // A real roster is priced on its own rates only (rate-policy.ts).
+  if (rosterIsReal()) return { rates: live, realCodes };
   if (realCodes.length === 0) return { rates: placeholder, realCodes: [] };
 
   /* Live over placeholder, item by item. Spread order is the whole policy

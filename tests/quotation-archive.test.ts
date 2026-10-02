@@ -78,7 +78,7 @@ describe('what the studio is told', () => {
     // reviewArchive refuses this, but the database can hold an older row and a
     // studio must never be shown an empty box where a reason should be.
     const message = studioMessage(summary({ state: 'REJECTED' }), MIN_QUOTATIONS_FOR_RATES);
-    expect(message).toContain('Fill the rates in');
+    expect(message).toContain(`at least ${MIN_QUOTATIONS_FOR_RATES}`);
   });
 });
 

@@ -15,6 +15,9 @@
  *     the conversion and throws rather than silently losing precision.
  */
 
+import { readPhases } from './payment-phases';
+import { readProfile } from './matching-profile';
+import { TIERS, type Tier } from '@/modules/quotation/tiers';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { fromDb } from '@/lib/money';
@@ -77,6 +80,11 @@ function toPortfolio(row: StudioRow['portfolio'][number]): PortfolioProject {
     completedOn: toIso(row.completedOn),
     images: row.images,
     isRender: row.isRender,
+    carpetAreaSqft: row.carpetAreaSqft ?? null,
+    society: row.society ?? null,
+    tags: row.tags,
+    imageRooms: row.imageRooms,
+    pickerConsent: row.pickerConsent,
   };
 }
 
@@ -106,6 +114,9 @@ function toStudio(row: StudioRow): Studio {
     teamSize: row.teamSize ?? null,
     minProjectPaise: row.minProjectPaise === null ? null : fromDb(row.minProjectPaise),
     maxProjectPaise: row.maxProjectPaise === null ? null : fromDb(row.maxProjectPaise),
+    paymentPhases: readPhases(row.paymentPhases),
+    matchingProfile: readProfile(row.matchingProfile),
+    band: (TIERS as readonly string[]).includes(row.band ?? '') ? (row.band as Tier) : null,
     completedProjects: row.completedProjects,
     avgVarianceDays: row.avgVarianceDays,
     upheldDisputes: row.upheldDisputes,

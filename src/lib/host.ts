@@ -155,6 +155,10 @@ const PUBLIC_PAGES = ['/studios', '/verification'];
 const ALWAYS = [
   '/api',
   '/auth',
+  // Referral links (modules/portal/referral.ts) — valid on any host.
+  '/r',
+  // A booked call's private link (modules/consultation/manage.ts).
+  '/call',
   '/sign-in',
   '/set-password',
   /**
@@ -168,6 +172,11 @@ const ALWAYS = [
    * it while signed in.
    */
   '/f',
+  /**
+   * The privacy notice. Every consent row points at it, and studios give us
+   * personal data too — on the studio host as much as the public one.
+   */
+  '/privacy',
   '/_next',
   '/favicon',
   '/robots.txt',

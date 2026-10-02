@@ -46,6 +46,7 @@ import {
   type StyleTag,
 } from '@/modules/brief/types';
 import { budgetPhrase, monthYear } from './bridge-facts';
+import { possessionPhrase } from '@/modules/brief/possession';
 import { paiseToLakhs, fromDb } from '@/lib/money';
 
 export interface MarketplaceContext {
@@ -62,6 +63,12 @@ export interface MarketplaceContext {
   budget: string | null;
   moveInBy: string | null;
   possessionOn: string | null;
+  /**
+   * The possession answer in the words the customer saw — "Has the keys",
+   * "Possession expected January 2027" — falling back to a move-in date on
+   * briefs written before 29 Sep. What the panel shows under Timing.
+   */
+  timing: string | null;
 
   /** Styles they picked, in the order the quiz stores them. */
   likes: string[];
@@ -120,6 +127,7 @@ export async function marketplaceContextFor(
             budgetMinPaise: true,
             budgetMaxPaise: true,
             moveInBy: true,
+            possessionStatus: true,
             possessionOn: true,
             styleLikes: true,
             styleDislikes: true,
@@ -154,6 +162,7 @@ export async function marketplaceContextFor(
         budget: null,
         moveInBy: null,
         possessionOn: null,
+        timing: null,
         likes: [],
         dislikes: [],
         household: null,
@@ -179,6 +188,11 @@ export async function marketplaceContextFor(
       budget: budgetPhrase(lakhs(b?.budgetMinPaise), lakhs(b?.budgetMaxPaise)),
       moveInBy: monthYear(b?.moveInBy ?? null),
       possessionOn: monthYear(b?.possessionOn ?? null),
+      timing: possessionPhrase({
+        possessionStatus: b?.possessionStatus ?? null,
+        possessionOn: b?.possessionOn ? b.possessionOn.toISOString() : null,
+        moveInBy: b?.moveInBy ? b.moveInBy.toISOString() : null,
+      }),
 
       /* Indexed through the label maps with a fallback, not directly. The
          style list is data the quiz writes and a tag retired later would

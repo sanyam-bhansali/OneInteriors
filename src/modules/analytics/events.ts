@@ -19,6 +19,10 @@ export const EVENTS = [
   'quiz.step.complete',
   'quiz.abandon',
   'quiz.complete',
+  /** The contact step's details were accepted — name, number, the notice. */
+  'quiz.contact.saved',
+  /** A floor plan was read (the customer has not confirmed it yet). */
+  'quiz.plan.read',
   'reveal.view',
   'tier.select',
   'match.view',
@@ -40,6 +44,8 @@ export const EVENTS = [
    */
   'studio.compared',
   'enquiry.sent',
+  // A call booked straight into a slot, rather than requested — plan §9.
+  'enquiry.booked',
   'signin.requested',
   'signin.completed',
   'brief.claimed',

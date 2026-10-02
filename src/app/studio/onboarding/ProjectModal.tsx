@@ -9,6 +9,8 @@ import {
 } from './actions';
 import { PROPERTY_LABELS, SCOPE_LABELS, STYLE_LABELS } from '@/modules/brief/types';
 import { X } from 'lucide-react';
+import { IMAGE_ROOMS, IMAGE_ROOM_LABELS } from '@/modules/studio/portfolio-fields';
+import { SPECIALISMS, SPECIALISM_LABELS } from '@/modules/studio/matching-profile';
 import { INLINE_ICON } from './icon-sizes';
 
 const INITIAL: StepState = { status: 'idle' };
@@ -27,7 +29,7 @@ const IMAGES_INITIAL: ImagesState = { status: 'idle' };
  * fires whenever neither box is ticked.
  */
 const STAGES = [
-  { label: 'Basic info', hint: 'Project details', owns: ['title'] },
+  { label: 'Basic info', hint: 'Project details', owns: ['title', 'carpetArea'] },
   { label: 'Photographs', hint: 'Show the work', owns: [] },
   { label: 'The numbers', hint: 'Budget, timing', owns: ['completedOn'] },
   { label: 'Style', hint: 'How it reads', owns: ['styleTags', 'clientConsented'] },
@@ -45,6 +47,7 @@ const FIELD_LABELS: Record<string, string> = {
   styleTags: 'Style',
   clientConsented: 'Permission',
   completedOn: 'Finished on',
+  carpetArea: 'Carpet area',
 };
 
 /**
@@ -97,6 +100,10 @@ export function ProjectModal({
   const [state, action, pending] = useActionState(addProjectAction, INITIAL);
   const [stage, setStage] = useState(0);
   const [images, setImages] = useState<string[]>([]);
+  /* Keyed by URL, not index, so a room stays with its photograph when the
+     photographs are reordered. Serialised in image order on submit. */
+  const [rooms, setRooms] = useState<Record<string, string>>({});
+  const [pickerConsent, setPickerConsent] = useState(false);
 
   /**
    * The three things `addProject` refuses on, held here so the button can
@@ -153,6 +160,8 @@ export function ProjectModal({
     if (state.status !== 'saved') return;
     setStage(0);
     setImages([]);
+    setRooms({});
+    setPickerConsent(false);
     setTitle('');
     setLocality('');
     setStyles([]);
@@ -288,6 +297,23 @@ export function ProjectModal({
                 <Select label="Property type" name="propertyType" options={PROPERTY_LABELS} />
               </div>
               <Select label="What you did" name="scope" options={SCOPE_LABELS} />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Text
+                  label="Society"
+                  name="society"
+                  placeholder="Gera World of Joy"
+                  hint="Optional. Lets us tell a buyer in the same building that you have done a flat there."
+                />
+                <Text
+                  label="Carpet area"
+                  name="carpetArea"
+                  type="number"
+                  placeholder="1150"
+                  suffix="sq ft"
+                  error={err.carpetArea}
+                  hint="With the value, it checks your price level against work you have delivered."
+                />
+              </div>
             </div>
 
             {/* ── 2. Photographs ── */}
@@ -295,6 +321,8 @@ export function ProjectModal({
               <ImageStage
                 images={images}
                 onChange={setImages}
+                rooms={rooms}
+                onRoom={(url, room) => setRooms((r) => ({ ...r, [url]: room }))}
                 enabled={uploadEnabled}
                 active={stage === 1}
               />
@@ -371,6 +399,25 @@ export function ProjectModal({
                 ) : null}
               </fieldset>
 
+              <fieldset className="m-0 border-0 p-0">
+                <legend className="label m-0 mb-1 p-0">Who lived there, and what it needed — optional</legend>
+                <p className="m-0 mb-3 max-w-[54ch] text-[13.5px] leading-relaxed text-[var(--color-ink-2)]">
+                  Two projects tagged the same way make it one of your specialisms — families
+                  with children, elderly parents or pets are matched to studios who have done it.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {SPECIALISMS.map((value) => (
+                    <label
+                      key={value}
+                      className="oi-chip inline-flex cursor-pointer items-center rounded-full border border-[var(--color-rule)] px-4 py-2 text-[14px] text-[var(--color-ink-2)] has-[:checked]:border-transparent has-[:checked]:bg-[var(--color-petrol)] has-[:checked]:text-white"
+                    >
+                      <input type="checkbox" name="tags" value={value} className="sr-only" />
+                      {SPECIALISM_LABELS[value]}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
               <div className="flex flex-col gap-3 rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-4">
                 {/* Said before the boxes, not discovered by pressing the
                     button. One of the two is required and neither is ticked
@@ -403,6 +450,18 @@ export function ProjectModal({
                   </p>
                 ) : null}
               </div>
+
+              {/* Only a real, client-approved project can stand in a stranger's
+                  style picker, so the box appears only once that is true. */}
+              {consented && !isRender ? (
+                <Check
+                  name="pickerConsent"
+                  checked={pickerConsent}
+                  onChange={setPickerConsent}
+                  label="These photos may appear, without our name, in homeowners' style picker"
+                  hint="Homeowners who pick your work there are matched more strongly to you. Your name is shown only after they have chosen."
+                />
+              ) : null}
             </div>
 
             {/* What the card will look like on the grid behind this modal.
@@ -422,6 +481,9 @@ export function ProjectModal({
                 and the first really is the cover. */}
             {images.map((url) => (
               <input key={url} type="hidden" name="images" value={url} />
+            ))}
+            {images.map((url) => (
+              <input key={`room-${url}`} type="hidden" name="imageRooms" value={rooms[url] ?? ''} />
             ))}
 
             {err.form ? (
@@ -591,11 +653,15 @@ function StageRail({ stage, onPick }: { stage: number; onPick: (n: number) => vo
 function ImageStage({
   images,
   onChange,
+  rooms,
+  onRoom,
   enabled,
   active,
 }: {
   images: string[];
   onChange: (next: string[]) => void;
+  rooms: Record<string, string>;
+  onRoom: (url: string, room: string) => void;
   enabled: boolean;
   active: boolean;
 }) {
@@ -692,7 +758,8 @@ function ImageStage({
       {images.length > 0 ? (
         <>
           <p className="label m-0 mb-2 mt-5">
-            {images.length} {images.length === 1 ? 'photograph' : 'photographs'} — drag to reorder
+            {images.length} {images.length === 1 ? 'photograph' : 'photographs'} — drag to reorder,
+            and say which room each one is
           </p>
           <ul className="m-0 grid list-none grid-cols-3 gap-2.5 p-0 sm:grid-cols-4">
             {images.map((url, i) => (
@@ -707,8 +774,9 @@ function ImageStage({
                   if (dragFrom.current !== null) move(dragFrom.current, i);
                   dragFrom.current = null;
                 }}
-                className="oi-tile group relative aspect-[4/3] overflow-hidden rounded-[10px] border border-[var(--color-rule)]"
+                className="flex flex-col gap-1.5"
               >
+                <div className="oi-tile group relative aspect-[4/3] overflow-hidden rounded-[10px] border border-[var(--color-rule)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt="" className="h-full w-full object-cover" />
 
@@ -738,6 +806,20 @@ function ImageStage({
                     ×
                   </Tile>
                 </span>
+                </div>
+                <select
+                  aria-label={`Room in photograph ${i + 1}`}
+                  value={rooms[url] ?? ''}
+                  onChange={(e) => onRoom(url, e.target.value)}
+                  className="oi-input w-full rounded-[8px] border border-[var(--color-rule)] px-2 py-1 text-[12.5px]"
+                >
+                  <option value="">Which room?</option>
+                  {IMAGE_ROOMS.map((r) => (
+                    <option key={r} value={r}>
+                      {IMAGE_ROOM_LABELS[r]}
+                    </option>
+                  ))}
+                </select>
               </li>
             ))}
           </ul>

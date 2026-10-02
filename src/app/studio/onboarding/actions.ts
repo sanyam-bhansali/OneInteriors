@@ -15,6 +15,8 @@ import {
   removeProject,
   uploadProjectImages,
   savePositioning,
+  savePaymentPhases,
+  saveMatchingProfile,
   submitForReview,
   currentStudio,
   onboardingProgress,
@@ -349,6 +351,11 @@ export async function addProjectAction(
        arranged them. addProject re-checks that we issued them, because this
        array ends up in an img src on a public page. */
     images: formData.getAll('images').map(String),
+    imageRooms: formData.getAll('imageRooms').map(String),
+    carpetArea: String(formData.get('carpetArea') ?? ''),
+    society: String(formData.get('society') ?? ''),
+    tags: formData.getAll('tags').map(String),
+    pickerConsent: formData.get('pickerConsent') === 'on',
   });
 
   if (!result.ok) return { status: 'error', errors: result.errors };
@@ -398,6 +405,27 @@ export async function savePositioningAction(
     offering: String(formData.get('offering') ?? ''),
     priceLevel: String(formData.get('priceLevel') ?? ''),
   });
+  if (!result.ok) return { status: 'error', errors: result.errors };
+  refresh();
+  return { status: 'saved' };
+}
+
+export async function saveMatchingProfileAction(
+  _prev: StepState,
+  formData: FormData,
+): Promise<StepState> {
+  const result = await saveMatchingProfile(formData);
+  refresh();
+  if (!result.ok) return { status: 'error', errors: result.errors };
+  await continueFrom('practice');
+  return { status: 'saved' };
+}
+
+export async function savePaymentPhasesAction(
+  _prev: StepState,
+  formData: FormData,
+): Promise<StepState> {
+  const result = await savePaymentPhases(String(formData.get('paymentPhases') ?? ''));
   if (!result.ok) return { status: 'error', errors: result.errors };
   refresh();
   return { status: 'saved' };

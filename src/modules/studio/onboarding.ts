@@ -27,6 +27,7 @@ import { Prisma } from '@prisma/client';
 import { getCurrentUser, hasRole, type AuthUser } from '@/modules/auth/session';
 import { validateGstin } from '@/modules/verification/gstin';
 import { missingCoreRates } from '@/modules/quotation/categories';
+import { quotationsSent } from './approval';
 import { lakhsToPaise } from '@/lib/money';
 import {
   isOurImageUrl,
@@ -34,6 +35,27 @@ import {
   storePortfolioImage,
 } from '@/modules/storage/portfolio-images';
 import { isOffering, isPriceLevel } from './positioning';
+import { checkPhases, parsePhasesText, type PaymentPhase } from './payment-phases';
+import {
+  CARPET_AREA_RANGE,
+  carpetAreaFrom,
+  cleanImageRooms,
+  cleanSocietyName,
+  cleanTags,
+} from './portfolio-fields';
+import {
+  profileFromForm,
+  profileJson,
+  profileSections,
+  readProfile,
+  type FormLike,
+  type MatchingProfile,
+} from './matching-profile';
+
+/** Today in India, as YYYY-MM-DD — the calendar the studio is on. */
+function today(): string {
+  return new Date(Date.now() + 5.5 * 3_600_000).toISOString().slice(0, 10);
+}
 import {
   onboardingProgress,
   MIN_ABOUT_LENGTH,
@@ -83,6 +105,12 @@ export interface StudioContext {
     status: string;
     portfolioCount: number;
     missingRates: string[];
+    /** Quotations sent in archives not rejected. See approval.ts. */
+    quotationsSent: number;
+    /** Required matching-profile sections still short. See matching-profile.ts. */
+    practiceMissing: string[];
+    /** Validated; EMPTY_PROFILE when not started. */
+    matchingProfile: MatchingProfile;
     submittedForReview: boolean;
     gstinNotApplicable: boolean;
     gstinNote: string | null;
@@ -91,6 +119,8 @@ export interface StudioContext {
     /** Positioning. Self-declared, shown, never scored. */
     offering: string | null;
     priceLevel: string | null;
+    /** Raw JSON; read it through readPhases(). */
+    paymentPhases: unknown;
     portfolioShortfallNote: string | null;
   };
 }
@@ -153,11 +183,17 @@ async function loadStudio(user: AuthUser): Promise<StudioContext | null> {
 
   const s = member.studio;
   const steps = readSteps(s.onboardingSteps);
+  const profile = readProfile(s.matchingProfile);
 
   const rateItems = await prisma.rateCardItem.findMany({
     where: { studioId: s.id },
     select: { category: true, ratePaise: true },
   });
+  const archives = await prisma.quotationArchive.findMany({
+    where: { studioId: s.id, state: { not: 'REJECTED' } },
+    select: { quotationCount: true, _count: { select: { files: true } } },
+  });
+
   const rates: Partial<Record<string, number>> = {};
   for (const item of rateItems) rates[item.category] = Number(item.ratePaise);
 
@@ -180,6 +216,13 @@ async function loadStudio(user: AuthUser): Promise<StudioContext | null> {
       status: s.status,
       portfolioCount: s._count.portfolio,
       missingRates: missingCoreRates(rates as never),
+      quotationsSent: quotationsSent(
+        archives.map((a) => ({ quotationCount: a.quotationCount, fileCount: a._count.files })),
+      ),
+      practiceMissing: profileSections(profile, s.localities, today())
+        .filter((x) => x.required)
+        .flatMap((x) => x.missing),
+      matchingProfile: profile,
       submittedForReview: steps.submittedForReview === true,
       gstinNotApplicable: s.gstinNotApplicable,
       gstinNote: s.gstinNote,
@@ -187,6 +230,7 @@ async function loadStudio(user: AuthUser): Promise<StudioContext | null> {
       pincode: s.pincode,
       offering: s.offering,
       priceLevel: s.priceLevel,
+      paymentPhases: s.paymentPhases,
       portfolioShortfallNote: s.portfolioShortfallNote,
     },
   };
@@ -633,6 +677,12 @@ export interface ProjectInput {
    * is why reordering is a rewrite of it rather than a column on a row.
    */
   images?: string[];
+  /** One room per image, aligned by index. See portfolio-fields.ts. */
+  imageRooms?: string[];
+  carpetArea?: string;
+  society?: string;
+  tags?: string[];
+  pickerConsent?: boolean;
 }
 
 // Derived from the label maps rather than retyped, so these can never drift
@@ -680,7 +730,19 @@ export async function addProject(input: ProjectInput): Promise<SaveResult> {
    * rather than rejected: a URL that fails this test is one we did not write,
    * so dropping it loses nothing the studio put there.
    */
-  const images = (input.images ?? []).filter(isOurImageUrl).slice(0, MAX_IMAGES_PER_PROJECT);
+  /* The rooms travel beside the images by index, so they are aligned to the
+     same filter: a URL dropped above takes its room with it. */
+  const kept = (input.images ?? [])
+    .map((url, i) => ({ url, room: input.imageRooms?.[i] ?? '' }))
+    .filter((x) => isOurImageUrl(x.url))
+    .slice(0, MAX_IMAGES_PER_PROJECT);
+  const images = kept.map((x) => x.url);
+  const imageRooms = cleanImageRooms(images, kept.map((x) => x.room));
+
+  const carpetAreaSqft = carpetAreaFrom(input.carpetArea ?? '');
+  if (carpetAreaSqft === undefined) {
+    errors.carpetArea = `Carpet area between ${CARPET_AREA_RANGE[0]} and ${CARPET_AREA_RANGE[1].toLocaleString('en-IN')} sq ft.`;
+  }
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
@@ -700,6 +762,13 @@ export async function addProject(input: ProjectInput): Promise<SaveResult> {
       isRender: input.isRender,
       clientConsented: input.clientConsented,
       images,
+      imageRooms,
+      carpetAreaSqft: carpetAreaSqft ?? null,
+      society: cleanSocietyName(input.society ?? ''),
+      tags: cleanTags(input.tags ?? []),
+      // Only a photographed, client-approved project can go into a stranger's
+      // style picker; a render never stands in for a finished room there.
+      pickerConsent: Boolean(input.pickerConsent) && input.clientConsented && !input.isRender,
     },
   });
 
@@ -797,6 +866,56 @@ export async function savePositioning(input: {
   });
 
   return { ok: true };
+}
+
+/**
+ * The studio's payment schedule, as they write it at the foot of a quotation.
+ *
+ * Optional, and blocks nothing: until it is filed, the quote tells the
+ * customer the schedule is still to come. Cleared by saving it empty.
+ */
+export async function savePaymentPhases(text: string): Promise<SaveResult> {
+  const context = await currentStudio();
+  if (!context) return { ok: false, errors: { form: 'No studio is linked to this account.' } };
+
+  const trimmed = text.trim();
+  let phases: PaymentPhase[] | null = null;
+  if (trimmed) {
+    phases = parsePhasesText(trimmed);
+    if (!phases) {
+      return {
+        ok: false,
+        errors: { paymentPhases: 'Give every phase a percentage — for example "10% booking, 40% design sign-off, 40% delivery, 10% handover".' },
+      };
+    }
+    const problem = checkPhases(phases);
+    if (problem) return { ok: false, errors: { paymentPhases: problem } };
+  }
+
+  await prisma.studio.update({
+    where: { id: context.studio.id },
+    data: { paymentPhases: phases ? phases.map((p) => ({ label: p.label, pct: p.pct })) : Prisma.DbNull },
+  });
+  return { ok: true };
+}
+
+/**
+ * The matching profile, from the "How you work" step.
+ *
+ * Saved even with errors on individual fields left out — a studio that got
+ * one number wrong should not lose the twenty it got right. The errors come
+ * back beside the fields.
+ */
+export async function saveMatchingProfile(form: FormLike): Promise<SaveResult> {
+  const context = await currentStudio();
+  if (!context) return { ok: false, errors: { form: 'No studio is linked to this account.' } };
+
+  const { profile, errors } = profileFromForm(form, today(), context.studio.matchingProfile);
+  await prisma.studio.update({
+    where: { id: context.studio.id },
+    data: { matchingProfile: profileJson(profile) as Prisma.InputJsonValue },
+  });
+  return Object.keys(errors).length > 0 ? { ok: false, errors } : { ok: true };
 }
 
 export async function listProjects() {

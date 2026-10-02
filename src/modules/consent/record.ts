@@ -11,6 +11,7 @@ import 'server-only';
  * gets asked about.
  */
 
+import { mayShareWithStudios } from './share';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import { hasDatabase } from '@/lib/env';
@@ -58,6 +59,30 @@ export async function recordConsent(
     return { ok: true };
   } catch {
     return { ok: false };
+  }
+}
+
+/**
+ * May the studios this customer picks see their name and number? Read for the
+ * brief's owner — signed-in user or anonymous browser — never the caller.
+ */
+export async function mayShareBriefWithStudios(briefId: string): Promise<boolean> {
+  if (!hasDatabase()) return false;
+  try {
+    const brief = await prisma.brief.findUnique({ where: { id: briefId }, select: { userId: true, anonKey: true } });
+    if (!brief) return false;
+    const owners = [
+      ...(brief.userId ? [{ userId: brief.userId }] : []),
+      ...(brief.anonKey ? [{ anonKey: brief.anonKey }] : []),
+    ];
+    if (owners.length === 0) return false;
+    const rows = await prisma.consent.findMany({
+      where: { OR: owners, purpose: 'SHARE_WITH_STUDIO' as Prisma.ConsentWhereInput['purpose'] },
+      select: { purpose: true, granted: true, grantedAt: true, withdrawnAt: true },
+    });
+    return mayShareWithStudios(rows);
+  } catch {
+    return false;
   }
 }
 

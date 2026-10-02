@@ -130,19 +130,11 @@ export const ROUTES = [
   // ── 01 · The customer journey ─────────────────────────────────
   {
     flow: '01-customer', n: 1, path: '/quiz', name: 'quiz',
-    title: 'Nine questions',
+    title: 'The brief',
     does: 'The brief being written, a question at a time. Shows the answers accumulating and a live count of how many studios still match — so the customer sees their choices narrowing the field rather than filling a form.',
     who: 'A homeowner starting out.',
-    before: 'The landing page.', after: 'The tier estimate.',
+    before: 'The landing page.', after: 'Their matches.',
     needs: 'Nothing. Progress is kept per browser until they sign in.',
-  },
-  {
-    flow: '01-customer', n: 2, path: '/tier', name: 'tier',
-    title: 'What this is likely to cost',
-    does: 'An honest range from the brief, with what moves it up and down. Before any studio is involved, so the number is not anchored by whoever quoted first.',
-    who: 'A customer who has finished the quiz.',
-    before: 'The quiz.', after: 'Their matches.',
-    needs: 'A completed brief in the session.',
   },
   {
     flow: '01-customer', n: 3, path: '/match', name: 'match',

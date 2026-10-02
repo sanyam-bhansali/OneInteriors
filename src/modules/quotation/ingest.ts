@@ -47,6 +47,8 @@ import type { Paise } from '@/lib/money';
 import {
   ITEM,
   MIN_QUOTATIONS_FOR_RATES,
+  MIN_QUOTATIONS_PER_ITEM,
+  rateCanGoLive,
   type FiledRate,
   type Room,
   type StudioRates,
@@ -163,6 +165,14 @@ const ALIASES: Alias[] = [
   // as well as the correct spelling. A studio's typo is not a reason to lose
   // 27 lines of a rate.
   { pattern: /shoe rack|con?sole/, code: 'console_shoe' },
+
+  // ── Civil work, for renovations (29 Sep 2026). Before the electrical
+  //    line on purpose: "rewiring" is a new installation, priced per sq ft of
+  //    the flat, not additional points — the same word in a different job. ──
+  { pattern: /rewir|new wiring|distribution board|\bdb\b/, code: 'civil_rewiring' },
+  { pattern: /flooring|floor til|vitrified|relay/, code: 'civil_flooring' },
+  { pattern: /bathroom (renov|civil)|toilet (renov|civil)|waterproof/, code: 'civil_bathroom' },
+  { pattern: /platform|kitchen civil|dado/, code: 'civil_kitchen' },
 
   // ── Not furniture. `electr` rather than `electric`: the archive contains
   //    "Electrcials" 91 times, and a typo in their sheet is not a reason to
@@ -400,9 +410,9 @@ export function ingestQuotations(
     );
   }
   for (const item of evidence) {
-    if (item.fromQuotations < 5) {
+    if (!rateCanGoLive(item.fromQuotations)) {
       problems.push(
-        `"${ITEM[item.code]?.label ?? item.code}" appears in only ${item.fromQuotations} quotations. Treat that rate as provisional.`,
+        `"${ITEM[item.code]?.label ?? item.code}" appears in only ${item.fromQuotations} quotations — provisional, and it will not go live below ${MIN_QUOTATIONS_PER_ITEM}.`,
       );
     }
   }

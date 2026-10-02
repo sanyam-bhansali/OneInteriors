@@ -38,14 +38,7 @@ export function BriefPanel({ ctx }: { ctx: MarketplaceContext }) {
     { label: 'Home', value: joinFacts(ctx.property, ctx.where, sqft(ctx.carpetSqft)) },
     { label: 'Wants', value: joinDots(ctx.scope, ctx.tier ? `${ctx.tier} finish` : null) },
     { label: 'Budget', value: ctx.budget },
-    {
-      label: 'Timing',
-      value: ctx.moveInBy
-        ? `Move in by ${ctx.moveInBy}`
-        : ctx.possessionOn
-          ? `Possession ${ctx.possessionOn}`
-          : null,
-    },
+    { label: 'Timing', value: ctx.timing },
     { label: 'Household', value: householdLine(ctx) },
     { label: 'Involvement', value: ctx.involvement },
   ];

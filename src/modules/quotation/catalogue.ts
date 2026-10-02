@@ -66,6 +66,7 @@ export const ROOMS = [
   'LIVING_DINING',
   'BATHROOMS',
   'WHOLE_HOME',
+  'CIVIL',
 ] as const;
 
 export type Room = (typeof ROOMS)[number];
@@ -78,6 +79,7 @@ export const ROOM_LABELS: Record<Room, string> = {
   LIVING_DINING: 'Living & dining',
   BATHROOMS: 'Bathrooms',
   WHOLE_HOME: 'Whole home',
+  CIVIL: 'Civil & renovation',
 };
 
 /**
@@ -128,6 +130,21 @@ export interface CatalogueItem {
   spec: string;
   /** Which configurations include it. Empty means every one. */
   minBhk?: number;
+  /**
+   * Civil work — only ever quoted for a renovation (see `scope.ts`).
+   *
+   * Kept out of every other scope so that a full-home quote is exactly what
+   * it was before renovation existed. No archive median exists for these
+   * lines yet, so until a studio files them they are named as "not priced"
+   * rather than guessed.
+   */
+  civil?: boolean;
+  /**
+   * Priced at this item's rate when the studio has none of its own — for the
+   * lines a household's needs add (`NEED_ITEMS`), which are the same product
+   * as one already in every archive: an extra loft is a loft.
+   */
+  rateFrom?: string;
 }
 
 /**
@@ -364,6 +381,79 @@ export const CATALOGUE: CatalogueItem[] = [
     sizing: 'PER_BATHROOM',
     spec: 'Marine-ply carcass · laminate · mirror unit',
   },
+
+  // ── Civil — renovation only (29 Sep 2026) ──
+  // The lines a renovation is quoted on in Pune. Their rates come from each
+  // studio's own quotations; none is in the archive medians yet.
+  {
+    code: 'civil_flooring',
+    room: 'CIVIL',
+    label: 'Flooring — remove and relay',
+    work: 'NM',
+    sizing: 'PER_SQFT_CARPET',
+    civil: true,
+    spec: 'Remove existing · level screed · vitrified tile, laid and grouted',
+  },
+  {
+    code: 'civil_bathroom',
+    room: 'CIVIL',
+    label: 'Bathroom renovation',
+    work: 'NM',
+    sizing: 'PER_BATHROOM',
+    civil: true,
+    spec: 'Waterproofing · wall and floor tile · CP fittings replaced · plumbing re-run',
+  },
+  {
+    code: 'civil_kitchen',
+    room: 'CIVIL',
+    label: 'Kitchen civil work',
+    work: 'NM',
+    sizing: 'UNIT',
+    civil: true,
+    spec: 'Platform rebuilt · dado tiling · sink and plumbing points',
+  },
+  {
+    code: 'civil_rewiring',
+    room: 'CIVIL',
+    label: 'Electrical rewiring',
+    work: 'NM',
+    sizing: 'PER_SQFT_CARPET',
+    civil: true,
+    spec: 'New conduit and copper wiring · DB replaced · modular switches',
+  },
+];
+
+/**
+ * Lines a household's answers add (build queue item 5; plan §2 screen 10).
+ *
+ * Not in `CATALOGUE`: they are not standard scope — a study unit or extra
+ * lofts in every quote would make the quote high for most people, which is
+ * why the archive keeps them out (see the note above). They are in the quote
+ * of the customer whose household asks for them, and nobody else's. Each is
+ * the same product as a standard line, so it is priced at that line's rate
+ * when the studio has not filed its own.
+ */
+export const NEED_ITEMS: CatalogueItem[] = [
+  {
+    code: 'study_unit',
+    room: 'LIVING_DINING',
+    label: 'Study unit',
+    work: 'MO',
+    sizing: 'UNIT',
+    rateFrom: 'second_workstation',
+    spec: '18mm BWP · laminate top · overhead shelf · cable cut-out',
+  },
+  {
+    code: 'extra_loft',
+    room: 'WHOLE_HOME',
+    label: 'Extra lofts — passage and over doors',
+    work: 'MO',
+    sizing: 'AREA',
+    widthMm: 3000,
+    heightMm: 600,
+    rateFrom: 'master_loft',
+    spec: '18mm BWP carcass · laminate shutter',
+  },
 ];
 
 /** Look an item up by the code its rate is filed against. */
@@ -422,12 +512,30 @@ export const MODULAR_DISCOUNT_BPS = 1000; // 10% off MO — median of 934 quotat
 /**
  * How many of a studio's own quotations we read before we will price for them.
  *
- * A rate taken from a handful of quotes is one designer's mood. A hundred is
- * enough for a median to mean something and for an outlier to stand out — and
- * it is also a real commitment from the studio, which is part of why the
- * roster is fourteen and not six thousand.
+ * A rate taken from a handful of quotes is one designer's mood. Fifty is what
+ * every studio is asked for (50–60, up to 100), and it is enough for a median
+ * to mean something — provided the count is also checked per item, which
+ * `MIN_QUOTATIONS_PER_ITEM` does. It was a hundred; almost no Pune studio has
+ * a hundred findable quotations, and the per-item floor is what makes fifty
+ * safe, not the archive total.
  */
-export const MIN_QUOTATIONS_FOR_RATES = 100;
+export const MIN_QUOTATIONS_FOR_RATES = 50;
+
+/**
+ * How many quotations must price an item before that rate can go live.
+ *
+ * Fifty-five quotations of which three contain a mandir give a solid kitchen
+ * rate and a mandir "rate" that is three designers' moods. Below this the item
+ * is not priced — the quote names it as not filed — rather than priced off a
+ * median of three. Approval enforces it (`approveRates`), so it cannot be
+ * waved through on a busy afternoon.
+ */
+export const MIN_QUOTATIONS_PER_ITEM = 8;
+
+/** Can a rate built from this many quotations price a customer's home? */
+export function rateCanGoLive(fromQuotations: number): boolean {
+  return fromQuotations >= MIN_QUOTATIONS_PER_ITEM;
+}
 
 // ── A studio's rates ────────────────────────────────────────────
 

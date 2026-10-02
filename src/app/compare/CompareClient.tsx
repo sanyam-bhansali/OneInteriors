@@ -28,6 +28,8 @@
  * as ₹0, which reads as free — makes it a decision.
  */
 
+import { ExpertPitch } from '@/components/oi/ExpertPitch';
+import type { OfferState } from '@/modules/consultation/offer';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { formatINRCompact } from '@/lib/money';
@@ -40,6 +42,13 @@ import { saveDecisionAction } from '@/app/match/journey-actions';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
 import { Spec, MaterialChip, MaterialPanel } from '@/components/oi/Material';
 import { Wrap, Chapter, Sheet, Quiet, Flag } from '@/components/oi';
+import { ExplainDifferences, AskYourQuote, FitBlock, MaterialPrices, RoomPrices } from './CompareInsights';
+import { rankStudios, type MatchResult } from '@/modules/matching/score';
+import { loadBrief } from '@/modules/brief/store';
+import { filedRatesFor } from '@/data/filed-rates';
+import type { Brief } from '@/modules/brief/types';
+import type { Studio } from '@/modules/studio/types';
+import type { StudioRates } from '@/modules/quotation/catalogue';
 
 const money = (p: number | null) => (p === null ? null : formatINRCompact(p));
 
@@ -116,11 +125,38 @@ function Star({
   );
 }
 
-export function CompareClient() {
+export function CompareClient({
+  studios: roster = [],
+  allowUnverified = false,
+  filedRates,
+  offer,
+}: {
+  studios?: Studio[];
+  allowUnverified?: boolean;
+  filedRates?: Record<string, StudioRates>;
+  /** The expert call's launch offer, from the server. */
+  offer?: OfferState;
+} = {}) {
   const [project, setProject] = useState<Project | null>(null);
+  const [brief, setBrief] = useState<Brief | null>(null);
   const [term, setTerm] = useState<Material | null>(null);
 
-  useEffect(() => setProject(loadProject()), []);
+  useEffect(() => {
+    setProject(loadProject());
+    const b = loadBrief();
+    setBrief(b.propertyType ? b : null);
+  }, []);
+
+  /* Ranked exactly as the match page ranks — same gate, same rates — so the
+     fit shown here is the fit shown there. */
+  const fit = useMemo(() => {
+    if (!brief) return new Map<string, MatchResult>();
+    const ranked = rankStudios(brief, roster, 99, {
+      allowUnverified,
+      ratesFor: (slug) => filedRates?.[slug] ?? filedRatesFor(slug),
+    });
+    return new Map(ranked.map((r) => [r.studioId, r]));
+  }, [brief, roster, allowUnverified, filedRates]);
 
   const entries = useMemo(() => {
     if (!project) return [];
@@ -219,6 +255,9 @@ export function CompareClient() {
             <Flag>Pre-launch — priced on archive rates, not each studio&rsquo;s own filed card</Flag>
           </p>
         ) : null}
+
+        {/* ── Fit, first ── */}
+        {roster.length > 0 ? <FitBlock entries={entries} studios={roster} matches={fit} /> : null}
 
         {/* ── The totals ── */}
         <div className="mb-10 grid gap-4" style={{ gridTemplateColumns: `repeat(auto-fit,minmax(15rem,1fr))` }}>
@@ -415,6 +454,16 @@ export function CompareClient() {
             </ul>
           </Sheet>
         ) : null}
+
+        <ExplainDifferences slugs={entries.map((e) => e.slug)} brief={brief} plan={project.plan} />
+        <p className="m-0 -mt-6 mb-10">
+          <Link href="/compare/brief" className="text-[14px] font-semibold text-[var(--ink)] underline">
+            The one-page brief — to print, save or send to family →
+          </Link>
+        </p>
+        <AskYourQuote slugs={entries.map((e) => e.slug)} brief={brief} plan={project.plan} />
+        <RoomPrices entries={entries} />
+        <MaterialPrices entries={entries} />
 
         {/* ── Every line, on a phone ──
             The table below is unusable under about 700px: the pinned item
@@ -648,17 +697,17 @@ export function CompareClient() {
           </table>
         </div>
 
+        {offer ? (
+          <ExpertPitch
+            offer={offer}
+            lead="Every studio here comes with the same benefits through us"
+            className="mt-10 max-w-[44rem]"
+          />
+        ) : null}
+
         <div className="mt-8 flex flex-wrap items-center gap-4">
           <Quiet href="/match">Price another studio</Quiet>
-          {/* Hand-rolled with an inline background before, which meant no
-              hover, no focus ring and no minimum height. One terracotta action
-              per screen — this is it, so it uses the component that owns it. */}
-          <Link
-            href="/expert"
-            className="oi-cta inline-flex min-h-11 items-center px-5 py-3 text-[14px] no-underline"
-          >
-            Have an architect read these with you
-          </Link>
+          {/* The one terracotta action on this screen is the expert pitch above. */}
         </div>
 
         <p className="m-0 mt-6 max-w-[58ch] text-[13px] leading-[1.6] text-[var(--ink2)]">

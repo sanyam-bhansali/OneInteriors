@@ -25,8 +25,10 @@
  */
 
 import type { Paise } from '@/lib/money';
+import { FULL_HOME, needAddsOf, needLines, scopeItems, scopePhrase, type ScopeSelection } from './scope';
 import {
   CATALOGUE,
+  ITEM,
   GST_BPS,
   MODULAR_DISCOUNT_BPS,
   PROFESSIONAL_FEE_BPS,
@@ -37,6 +39,10 @@ import {
   type StudioRates,
   type WorkCode,
 } from './catalogue';
+
+import type { Brief } from '@/modules/brief/types';
+import { carpetAreaFor } from '@/modules/brief/steps';
+import { BEDROOMS } from './estimate';
 
 const MM_PER_FOOT = 304.8;
 
@@ -98,11 +104,30 @@ export interface QuoteInput {
   /** 1–5. Decides which bedrooms are in scope. */
   bhk: number;
   carpetAreaSqft: number;
+  /**
+   * True when the area is the typical one for their configuration rather than
+   * a figure they gave. It prices the ceiling, painting and electrical lines,
+   * so the document says it was assumed.
+   */
+  carpetAreaAssumed?: boolean;
   bathrooms: number;
   /** From the floor plan, or from the customer, or absent. */
   kitchenRunMm: number | null;
   /** How we came by the kitchen run. Drives the variance and the wording. */
   runSource: 'floor_plan' | 'customer' | 'standard';
+  /** The run came from plans other homes in their building shared, not their own. */
+  runShared?: boolean;
+  /**
+   * What the quote covers. Absent means the full home — exactly the quote
+   * this function produced before scope existed. See `scope.ts`.
+   */
+  scope?: ScopeSelection;
+  /**
+   * The studio's One Interiors discount, % — agreed in its studio agreement
+   * and recorded by ops. Its own line, after the modular discount and before
+   * GST; never folded into the rates, never a struck-through price.
+   */
+  curatedDiscountPct?: number | null;
 }
 
 export interface QuoteLine {
@@ -120,6 +145,8 @@ export interface QuoteLine {
   spec: string;
   /** False only for the kitchen items when a real run was supplied. */
   standard: boolean;
+  /** "Added because you work from home" — a line their household added (scope.ts `needLines`). */
+  addedFor?: string;
 }
 
 export interface FirstQuote {
@@ -131,6 +158,12 @@ export interface FirstQuote {
   /** 15% off the modular half. Shown as a line, never as a promotion. */
   modularDiscountPaise: Paise;
   professionalFeePaise: Paise;
+  /**
+   * The One Interiors discount and its percentage. Optional because quotes
+   * saved before it existed have neither; read absent as none.
+   */
+  curatedDiscountPaise?: Paise;
+  curatedDiscountPct?: number | null;
   gstPaise: Paise;
   totalPaise: Paise;
   /** The honest band. The midpoint never appears on its own. */
@@ -143,9 +176,81 @@ export interface FirstQuote {
   assumptions: string[];
 }
 
+/**
+ * The shape of their home, as the quote needs it.
+ *
+ * One function, because it was written twice — in the match page and in the
+ * studio profile's quote panel — and both invented the same thing: 850 sq ft
+ * and a 2 BHK when the brief did not say, with nothing on the document
+ * admitting it (FINDINGS 2.8). The area is now the typical one for their
+ * configuration and is flagged as assumed; a missing configuration is still
+ * treated as a 2 BHK, the commonest in the archive, which the document shows
+ * as its size.
+ */
+export function homeShapeFor(
+  brief: Pick<Brief, 'propertyType' | 'carpetAreaSqft'> &
+    Partial<Pick<Brief, 'scope' | 'scopeRooms' | 'excludedItems' | 'planReading' | 'floorPlanName' | 'needs' | 'household'>>,
+): {
+  bhk: number;
+  carpetAreaSqft: number;
+  carpetAreaAssumed: boolean;
+  bathrooms: number;
+  /** What the quote covers — every studio priced on the same lines. */
+  scope: ScopeSelection;
+  /**
+   * The kitchen from their confirmed floor plan, when there is one — so the
+   * quote skips the "measure your kitchen" gate and the ±10% it prints is
+   * earned. Null without a confirmed plan or a readable kitchen.
+   */
+  plan: { fileName: string | null; kitchenRunMm: number; source: 'floor_plan'; shared?: boolean } | null;
+} {
+  const bhk = BEDROOMS[brief.propertyType ?? 'BHK_2'];
+  const { sqft, assumed } = carpetAreaFor(brief);
+  return {
+    bhk,
+    carpetAreaSqft: sqft,
+    carpetAreaAssumed: assumed,
+    // From their plan when they confirmed one; otherwise one bathroom per
+    // bedroom, which is what the archive's flats overwhelmingly have.
+    bathrooms: brief.planReading?.bathrooms || Math.max(1, bhk),
+    scope: {
+      scope: brief.scope ?? 'FULL_HOME',
+      scopeRooms: brief.scopeRooms ?? [],
+      excludedItems: brief.excludedItems ?? [],
+      adds: needAddsOf(brief),
+    },
+    plan:
+      brief.planReading?.kitchenRunMm
+        ? {
+            fileName: brief.planReading.areaSource === 'society' ? null : (brief.floorPlanName ?? null),
+            kitchenRunMm: brief.planReading.kitchenRunMm,
+            source: 'floor_plan',
+            ...(brief.planReading.areaSource === 'society' ? { shared: true } : {}),
+          }
+        : null,
+  };
+}
+
 /** Which catalogue items a flat of this size includes. */
 export function itemsFor(bhk: number): CatalogueItem[] {
-  return CATALOGUE.filter((i) => (i.minBhk ?? 0) <= bhk);
+  return CATALOGUE.filter((i) => !i.civil && (i.minBhk ?? 0) <= bhk);
+}
+
+/**
+ * Where the kitchen run really came from.
+ *
+ * A source only counts if it came with a number. The quote gate once offered
+ * a floor-plan upload that nothing read: it recorded `source: 'floor_plan'`
+ * with `kitchenRunMm: null`, and the quote then priced the standard run while
+ * printing the ±10% band and "read from your floor plan". A plan that was not
+ * read is not a measurement — and journeys restored from a customer's browser
+ * can still carry that old shape, so the rule lives here, not in the gate.
+ */
+export function runSourceOf(plan: {
+  kitchenRunMm: number | null;
+  source: QuoteInput['runSource'];
+}): QuoteInput['runSource'] {
+  return plan.kitchenRunMm === null ? 'standard' : plan.source;
 }
 
 /**
@@ -157,21 +262,27 @@ export function itemsFor(bhk: number): CatalogueItem[] {
  * it is worth four points — and no amount of paperwork gets below the floor,
  * because the remaining doubt is design decisions nobody has made yet.
  */
-function variance(input: QuoteInput): number {
-  if (input.runSource === 'floor_plan') return 0.1;
-  if (input.runSource === 'customer') return 0.12;
+function variance(source: QuoteInput['runSource']): number {
+  if (source === 'floor_plan') return 0.1;
+  if (source === 'customer') return 0.12;
   return 0.16;
 }
 
 export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuote {
+  const source = runSourceOf({ kitchenRunMm: input.kitchenRunMm, source: input.runSource });
   const runMm = input.kitchenRunMm ?? standardKitchenRunMm(input.bhk);
-  const measured = input.runSource !== 'standard';
+  const measured = source !== 'standard';
 
   const lines: QuoteLine[] = [];
   const notPriced: string[] = [];
 
-  for (const item of itemsFor(input.bhk)) {
-    const filed = rates[item.code];
+  const selection = input.scope ?? FULL_HOME;
+
+  const reasons = new Map(needLines(input.bhk, selection).map((n) => [n.item.code, n.reason]));
+
+  for (const item of scopeItems(input.bhk, selection)) {
+    const own = rates[item.code];
+    const filed = own ?? (item.rateFrom ? rates[item.rateFrom] : undefined);
     if (!filed) {
       notPriced.push(item.code);
       continue;
@@ -222,8 +333,11 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
       // The studio's own description when they filed one, our canonical spec
       // when they did not. Two studios differing here is the whole point of
       // the comparison screen.
-      spec: filed.spec ?? item.spec,
+      // A rate borrowed from the standard line (`rateFrom`) keeps this line's
+      // own spec — a study unit is not described as a workstation.
+      spec: (own ? filed.spec : undefined) ?? item.spec,
       standard,
+      ...(reasons.has(item.code) ? { addedFor: reasons.get(item.code)! } : {}),
     });
   }
 
@@ -241,12 +355,18 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
   );
   const modularDiscountPaise = Math.round((modularPaise * MODULAR_DISCOUNT_BPS) / 10_000);
 
-  const beforeTax =
+  const afterStudioTerms =
     modularPaise + nonModularPaise + professionalFeePaise - modularDiscountPaise;
+  const curatedDiscountPct =
+    input.curatedDiscountPct && input.curatedDiscountPct > 0 ? input.curatedDiscountPct : null;
+  const curatedDiscountPaise = curatedDiscountPct
+    ? Math.round((afterStudioTerms * curatedDiscountPct) / 100)
+    : 0;
+  const beforeTax = afterStudioTerms - curatedDiscountPaise;
   const gstPaise = Math.round((beforeTax * GST_BPS) / 10_000);
   const totalPaise = beforeTax + gstPaise;
 
-  const variancePct = variance(input);
+  const variancePct = variance(source);
 
   const rooms = ROOMS.map((room) => {
     const roomLines = lines.filter((l) => l.room === room);
@@ -260,15 +380,37 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
 
   const assumptions: string[] = [];
 
-  if (input.runSource === 'floor_plan') {
+  // What the quote covers comes first: it changes how every line below is read.
+  if (selection.scope && selection.scope !== 'FULL_HOME') {
     assumptions.push(
-      `Kitchen priced on a ${Math.round(runMm)}mm platform run read from your floor plan.`,
+      `Scope: ${scopePhrase(selection)} — only these lines are priced, and every studio is priced on the same ones.`,
     );
-  } else if (input.runSource === 'customer') {
+  }
+  const left = selection.excludedItems
+    .map((code) => ITEM[code]?.label)
+    .filter((label): label is string => Boolean(label));
+  if (left.length > 0) {
+    assumptions.push(`Left out at your request: ${left.join(', ')}.`);
+  }
+
+
+  if (source === 'floor_plan') {
+    assumptions.push(
+      input.runShared
+        ? `Kitchen priced on a ${Math.round(runMm)}mm platform run, read from floor plans other homes in your building shared. Your own plan would confirm it.`
+        : `Kitchen priced on a ${Math.round(runMm)}mm platform run read from your floor plan.`,
+    );
+  } else if (source === 'customer') {
     assumptions.push(`Kitchen priced on the ${Math.round(runMm)}mm platform run you gave us.`);
   } else {
     assumptions.push(
       `No floor plan yet, so the kitchen is priced on a standard ${runMm}mm platform run — what a ${input.bhk} BHK usually has. This is the number most likely to move.`,
+    );
+  }
+
+  if (input.carpetAreaAssumed) {
+    assumptions.push(
+      `Carpet area taken as ${input.carpetAreaSqft.toLocaleString('en-IN')} sq ft, typical for a ${input.bhk} BHK — tell us yours and the ceiling, painting and electrical lines follow it.`,
     );
   }
 
@@ -290,6 +432,8 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
     nonModularPaise,
     modularDiscountPaise,
     professionalFeePaise,
+    curatedDiscountPaise,
+    curatedDiscountPct,
     gstPaise,
     totalPaise,
     lowPaise: Math.round(totalPaise * (1 - variancePct)),

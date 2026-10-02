@@ -30,15 +30,8 @@ import {
 } from '@/modules/quotation/project-store';
 import { loadBrief } from '@/modules/brief/store';
 import { QuoteFlow, QuoteDocument, type QuoteRequest } from './QuoteFlow';
+import { homeShapeFor } from '@/modules/quotation/first-quote';
 import { Sheet, Quiet } from './index';
-
-const BEDROOMS: Record<string, number> = {
-  BHK_1: 1,
-  BHK_2: 2,
-  BHK_3: 3,
-  BHK_4_PLUS: 4,
-  VILLA: 4,
-};
 
 export function StudioQuotePanel({
   studioSlug,
@@ -58,9 +51,7 @@ export function StudioQuotePanel({
     setRequest({
       studioSlug,
       studioName,
-      bhk: BEDROOMS[brief.propertyType ?? 'BHK_2'] ?? 2,
-      carpetAreaSqft: brief.carpetAreaSqft ?? 850,
-      bathrooms: Math.max(1, BEDROOMS[brief.propertyType ?? 'BHK_2'] ?? 2),
+      ...homeShapeFor(brief),
     });
   }, [studioSlug, studioName]);
 
@@ -82,7 +73,7 @@ export function StudioQuotePanel({
       <Sheet className="p-6">
         <p className="oi-eyebrow m-0 mb-3">Your quote</p>
         <p className="m-0 mb-5 max-w-[52ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-          Nine questions about your flat and we will price this studio on their own filed rates —
+          About four minutes on your flat and we will price this studio line by line —
           in about ten seconds, with every line carrying a quantity.
         </p>
         <Quiet href="/quiz">Start the brief</Quiet>
@@ -149,7 +140,7 @@ export function StudioQuotePanel({
       ) : (
         <QuoteFlow
           request={request}
-          plan={project.plan}
+          plan={request.plan ?? project.plan}
           onBuilt={(quote, plan) =>
             update({
               ...project,

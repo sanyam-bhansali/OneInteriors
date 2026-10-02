@@ -1,6 +1,5 @@
-import { timingSafeEqual } from 'node:crypto';
-import { ingestWaitlistSignup } from '@/modules/waitlist/ingest';
-import { waitlistIngestToken } from '@/lib/env';
+import { ingestWaitlistSignup, waitlistStatus } from '@/modules/waitlist/ingest';
+import { authorised, notConfigured } from '@/modules/waitlist/auth';
 import { POLICY_VERSION } from '@/modules/consent/policy';
 
 /**
@@ -19,51 +18,10 @@ import { POLICY_VERSION } from '@/modules/consent/policy';
 export const runtime = 'nodejs';       // timingSafeEqual, and Prisma
 export const dynamic = 'force-dynamic';
 
-type AuthResult = 'ok' | 'refused' | 'not-configured';
-
-function authorised(req: Request): AuthResult {
-  const expected = waitlistIngestToken();
-  // No token configured means the route is closed, not open. A missing
-  // environment variable must never be the thing that makes an endpoint
-  // public.
-  //
-  // It is reported separately from a refusal, though, because the two have
-  // completely different fixes and were indistinguishable from the caller's
-  // side: "I set the variable" and "I set it and redeployed" both produced
-  // the same 401, and the only way to tell them apart was to open the
-  // function log. Saying "this route has no token" reveals nothing useful to
-  // anyone — it is shut either way — and saves the person who just set it up
-  // from hunting the wrong problem.
-  if (!expected) return 'not-configured';
-
-  const header = req.headers.get('authorization') ?? '';
-  // Trimmed on both sides. The value gets pasted into two different Vercel
-  // dashboards by hand, and a trailing newline off a terminal is invisible in
-  // both of them — it would fail here on length and report as "Not for you.",
-  // which reads as a wrong secret rather than a stray character.
-  const supplied = (header.startsWith('Bearer ') ? header.slice(7) : '').trim();
-  if (!supplied) return 'refused';
-
-  // Compare in constant time. A plain !== leaks the correct prefix through
-  // response timing, which is enough to recover a token given patience.
-  const a = Buffer.from(supplied);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return 'refused';   // length is not secret
-  return timingSafeEqual(a, b) ? 'ok' : 'refused';
-}
-
 export async function POST(req: Request) {
   const auth = authorised(req);
-  if (auth === 'not-configured') {
-    return Response.json(
-      { error: 'Waitlist ingest is not configured on this deployment.',
-        fix: 'Set WAITLIST_INGEST_TOKEN in this Vercel project and REDEPLOY — env vars are read at boot.' },
-      { status: 503 },
-    );
-  }
-  if (auth !== 'ok') {
-    return Response.json({ error: 'Not for you.' }, { status: 401 });
-  }
+  if (auth === 'not-configured') return notConfigured();
+  if (auth !== 'ok') return Response.json({ error: 'Not for you.' }, { status: 401 });
 
   let body: unknown;
   try {
@@ -80,7 +38,9 @@ export async function POST(req: Request) {
     if (!result.ok) {
       return Response.json({ error: 'Invalid submission', fields: result.fields }, { status: 400 });
     }
-    return Response.json({ ok: true, created: result.created });
+    // Their place, their link and what it unlocks, for the confirmation screen.
+    const status = await waitlistStatus(result.code).catch(() => null);
+    return Response.json({ ok: true, created: result.created, code: result.code, status });
   } catch (err) {
     /**
      * The visitor on the other side has already watched their room furnish

@@ -11,12 +11,18 @@ import { OpsHeader, TierProgress } from '../ui';
 import { CheckRow } from './CheckRow';
 import { StatusControl } from './StatusControl';
 import { GstinControl } from './GstinControl';
+import { DiscountControl } from './DiscountControl';
+import { BandControl } from './BandControl';
+import { proposeBand } from '@/modules/studio/band';
+import { liveRatesFor } from '@/modules/quotation/filed-rate-store';
 import { HideControl } from './HideControl';
 import { ArchiveReview } from './ArchiveReview';
 import { archivesForStudio } from '@/modules/studio/quotation-archive-store';
 import { ratesForReview } from '@/modules/quotation/filed-rate-store';
 import type { ArchiveRow } from './ArchiveReview';
 import { studioAuditTrail } from '@/modules/verification/record';
+import { approvalBlockers } from '@/modules/studio/approval';
+import { approvalFactsFor } from '@/modules/studio/approval-store';
 
 export const metadata: Metadata = {
   title: 'Studio verification',
@@ -40,7 +46,9 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
   const assessment = assessTier(studio);
   const gstin = studio.gstin ? validateGstin(studio.gstin) : null;
   const now = new Date();
+  const band = proposeBand(await liveRatesFor(studio.id), studio.portfolio);
   const trail = await studioAuditTrail(studio.id, 20);
+  const blockers = approvalBlockers(await approvalFactsFor(studio.id));
 
   return (
     <>
@@ -127,6 +135,19 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
                   current={studio.gstin}
                   notApplicable={studio.gstinNotApplicable ?? false}
                   note={studio.gstinNote ?? null}
+                />
+                <BandControl
+                  studioId={studio.id}
+                  slug={studio.slug}
+                  current={studio.band ?? null}
+                  proposed={band.proposed}
+                  note={band.note}
+                  disagree={band.disagree}
+                />
+                <DiscountControl
+                  studioId={studio.id}
+                  slug={studio.slug}
+                  current={studio.matchingProfile?.curatedDiscountPct ?? null}
                 />
               </section>
 
@@ -229,7 +250,12 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
                 </p>
 
                 <Divider className="my-4" />
-                <StatusControl studioId={studio.id} slug={studio.slug} status={studio.status} />
+                <StatusControl
+                  studioId={studio.id}
+                  slug={studio.slug}
+                  status={studio.status}
+                  blockers={blockers}
+                />
 
                 {/* A separate axis from status, and separated on screen to
                     match. Status says something about a studio; this says

@@ -22,18 +22,27 @@ import { CountUp } from '@/components/oi/CountUp';
 
 export function MatchHero({
   fit,
-  checkCount,
+  name,
+  forWhat,
+  reveal = [],
 }: {
   /** How many studios cleared the brief. This is the "top N". */
   fit: number;
-  checkCount: number;
+  /** The name they gave on the brief's first screen, if any. */
+  name?: string | null;
+  /** "your 3 BHK in Kharadi · Premium" — what these are the best fits for. */
+  forWhat?: string | null;
+  /** "10 verified studios → 6 at Premium → 3 for you" (queue item 15). */
+  reveal?: { count: number; label: string }[];
 }) {
   const reduced = useReducedMotion();
 
   return (
     <header className="mx-auto max-w-[46rem] pb-2 text-center">
+      {/* Their name, when they gave it — the first thing the brief asked, and
+          the first thing this page says back. */}
       <motion.p {...rise(reduced, 0)} className="oi-eyebrow q-eyebrow-lg m-0 mb-7">
-        Who fits you
+        {name ? `Welcome, ${name}` : 'Who fits you'}
       </motion.p>
 
       <motion.p {...rise(reduced, 0.06)} className="m-0 flex items-baseline justify-center gap-3">
@@ -57,13 +66,41 @@ export function MatchHero({
         Best fits for your brief.
       </motion.h1>
 
-      {/* Directly below the number, as the footnote to it. */}
+      {reveal.length > 1 ? (
+        <motion.p
+          {...rise(reduced, 0.16)}
+          className="oi-num m-0 mt-4 flex flex-wrap items-baseline justify-center gap-x-2 text-[13px] uppercase tracking-[0.1em] text-[var(--ink2)]"
+        >
+          {reveal.map((st, i) => (
+            <span key={st.label}>
+              {i > 0 ? <span aria-hidden className="mr-2 text-[var(--acc)]">→</span> : null}
+              <strong className="text-[var(--ink)]">{st.count}</strong> {st.label}
+            </span>
+          ))}
+        </motion.p>
+      ) : null}
+
+      {forWhat ? (
+        <motion.p {...rise(reduced, 0.18)} className="q-body m-0 mt-3 text-[var(--ink)]">
+          For {forWhat}.
+        </motion.p>
+      ) : null}
+
+      {/* Directly below the number, as the footnote to it.
+
+          It must name only what the engine reads. It used to say "household"
+          and "how many of the checks they have cleared" — neither is scored:
+          the household is passed to the studio, and verification is a filter
+          (only verified studios appear), not a factor. Nor is it "all fifteen":
+          a LISTED studio has cleared five. Each card lists its own checks, so
+          the footnote points there rather than quoting a number that is true
+          of some cards and not others. */}
       <motion.p
         {...rise(reduced, 0.22)}
         className="q-body mx-auto m-0 mt-6 max-w-[46ch] text-[var(--ink2)]"
       >
-        Scored on your answers — locality, scope, budget band, style, household — and on how many
-        of the {checkCount} checks they have cleared.
+        Ranked on your answers — your area, budget band, scope and the styles you chose. Every
+        studio here has cleared our checks; each card shows which.
       </motion.p>
     </header>
   );

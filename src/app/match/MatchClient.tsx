@@ -25,9 +25,36 @@
  * shortcut to it, not a second home for it.
  */
 
+import { revealSteps } from '@/modules/matching/reveal';
+import { StyleDnaCard } from '@/components/oi/StyleDnaCard';
+import { SEEN_KEY, readSeen, welcomeBack } from '@/modules/matching/welcome-back';
+import { ExpertPitch } from '@/components/oi/ExpertPitch';
+import type { OfferState } from '@/modules/consultation/offer';
 import { useEffect, useMemo, useState } from 'react';
-import { loadBrief } from '@/modules/brief/store';
-import { rankStudios, type MatchResult } from '@/modules/matching/score';
+import { loadBrief, saveBrief } from '@/modules/brief/store';
+import { cleanName } from '@/modules/brief/steps';
+import { TIER } from '@/modules/quotation/tiers';
+import { formatINRCompact } from '@/lib/money';
+import {
+  FILTER_REASON_LABELS,
+  rankStudios,
+  whyNotTheOthers,
+  wideningsFor,
+  type MatchResult,
+  type Widening,
+} from '@/modules/matching/score';
+
+/**
+ * Offer "show the band above too" when fewer than three fit — the owner's
+ * yes, 30 Sep 2026. Always the customer's tap, and every studio it adds is
+ * marked as the band above.
+ */
+const BAND_UP_APPROVED = true;
+
+const WIDENING_COPY: Record<Widening, string> = {
+  ANY_ZONE: 'Include studios from other parts of Pune',
+  BAND_UP: 'Show the level above yours too, clearly marked',
+};
 import {
   loadProject,
   saveProject,
@@ -35,9 +62,17 @@ import {
   MIN_TO_COMPARE,
   type Project,
 } from '@/modules/quotation/project-store';
-import { CHECK_COUNT } from '@/components/landing/checks';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
-import { QuoteFlow, type QuoteRequest } from '@/components/oi/QuoteFlow';
+import { QuoteFlow, QuoteDocument, type QuoteRequest } from '@/components/oi/QuoteFlow';
+import { Building, stagesFor } from '@/components/oi/Building';
+import { kitchenFor, priceMatches, quoteKey } from '@/modules/quotation/price-all';
+import { runSourceOf } from '@/modules/quotation/first-quote';
+import { filedRatesFor, ratesAreReal } from '@/data/filed-rates';
+import { scopePhrase, selectionOf } from '@/modules/quotation/scope';
+import { hasRates } from '@/modules/quotation/rate-policy';
+import { placementIn, scopeBandRange } from '@/modules/quotation/scope-band';
+import type { FirstQuote } from '@/modules/quotation/first-quote';
+import { homeShapeFor } from '@/modules/quotation/first-quote';
 import type { StudioRates } from '@/modules/quotation/catalogue';
 import { Wrap, Chapter, Sheet, Quiet } from '@/components/oi';
 import { StudioCard } from './StudioCard';
@@ -46,7 +81,63 @@ import { CompareBar } from './CompareBar';
 import { useScrollFocus } from '@/components/oi/useScrollFocus';
 import { saveQuoteAction, saveDecisionAction } from './journey-actions';
 import type { Studio } from '@/modules/studio/types';
-import type { Brief } from '@/modules/brief/types';
+import { localityLabel, propertyLabel, type Brief } from '@/modules/brief/types';
+
+/**
+ * "your 3 BHK in Kharadi · Premium" — what the ranking is for, in their terms.
+ * Built from what they told us; a part they skipped is simply left out.
+ */
+function forWhat(brief: Brief | null): string | null {
+  if (!brief) return null;
+  const home = propertyLabel(brief.propertyType);
+  const where = localityLabel(brief.locality);
+  const level = brief.tier ? TIER[brief.tier].label : null;
+  const place = [home ? `your ${home}` : 'your home', where ? `in ${where}` : null]
+    .filter(Boolean)
+    .join(' ');
+  return level ? `${place} · ${level}` : place;
+}
+
+/**
+ * "Inside your Premium range for kitchen & wardrobes (₹8.3 L–₹11.5 L)." — or
+ * how far outside it. Before GST, as the bands are. Null when they chose no
+ * band or the scope has no range (civil-only).
+ */
+function bandLine(
+  brief: Brief | null,
+  shape: { bhk: number; carpetAreaSqft: number; bathrooms: number },
+  quote: FirstQuote,
+): string | null {
+  if (!brief?.tier) return null;
+  const selection = selectionOf(brief);
+  const band = scopeBandRange(brief.tier, shape, selection);
+  if (!band) return null;
+  const level = TIER[brief.tier].label;
+  const what = selection.scope && selection.scope !== 'FULL_HOME' ? ` for ${(scopePhrase(selection) ?? '').toLowerCase()}` : '';
+  const range =
+    band.highPaise === null
+      ? `from ${formatINRCompact(band.lowPaise)}`
+      : `${formatINRCompact(band.lowPaise)}–${formatINRCompact(band.highPaise)}`;
+  // The headline total includes GST and the bands do not, so name the
+  // pre-GST figure — "₹29 L … inside ₹20.7 L–₹28.75 L" reads as a mistake.
+  const beforeGst = quote.totalPaise - quote.gstPaise;
+  const place = placementIn(beforeGst, band);
+  const lead = `Before GST it is ${formatINRCompact(beforeGst)}`;
+  if (place.kind === 'inside') return `${lead}, inside your ${level} range${what} (${range}).`;
+  return `${lead}, ${formatINRCompact(place.byPaise)} ${place.kind} your ${level} range${what} (${range}).`;
+}
+
+/** "Sanyam · 3 BHK · Kharadi · Kitchen & wardrobes" — who and what a quote is for. */
+function preparedFor(brief: Brief | null): string | null {
+  if (!brief) return null;
+  const parts = [
+    cleanName(brief.contactName),
+    propertyLabel(brief.propertyType),
+    localityLabel(brief.locality),
+    scopePhrase(selectionOf(brief)),
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
 
 /** Bedrooms by configuration, for the quote request. */
 const BEDROOMS: Record<string, number> = {
@@ -61,9 +152,15 @@ export function MatchClient({
   studios,
   allowUnverified,
   filedRates,
+  savedBrief = null,
+  offer,
 }: {
   studios: Studio[];
+  /** The expert call's launch offer, counted on the server (offer-store.ts). */
+  offer: OfferState;
   allowUnverified: boolean;
+  /** The server's copy, used when this tab holds no brief. See page.tsx. */
+  savedBrief?: Brief | null;
   /**
    * Resolved rates per studio slug, from the server.
    *
@@ -79,8 +176,16 @@ export function MatchClient({
   const [quoting, setQuoting] = useState<QuoteRequest | null>(null);
 
   useEffect(() => {
-    setBrief(loadBrief());
+    const local = loadBrief();
+    if (local.propertyType === null && savedBrief) {
+      // A new tab or another device: take the brief we hold, and keep it here.
+      setBrief(savedBrief);
+      saveBrief(savedBrief);
+    } else {
+      setBrief(local);
+    }
     setProject(loadProject());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
   }, []);
 
   /**
@@ -94,9 +199,34 @@ export function MatchClient({
    */
   const briefed = brief !== null && brief.propertyType !== null;
 
+  /* One-tap widenings the customer has chosen — offered by name, with the
+     count each adds, when fewer than three studios fit (plan §4.4). */
+  const [widen, setWiden] = useState<Widening[]>([]);
+  const rankOptions = useMemo(
+    () => ({
+      allowUnverified,
+      // Each studio's rates, so the budget priority reads its quote for THIS home.
+      ratesFor: (slug: string) => filedRates?.[slug] ?? filedRatesFor(slug),
+    }),
+    [allowUnverified, filedRates],
+  );
+
   const matches = useMemo(
-    () => (briefed && brief ? rankStudios(brief, studios, 6, { allowUnverified }) : []),
-    [briefed, brief, studios, allowUnverified],
+    () => (briefed && brief ? rankStudios(brief, studios, 6, { ...rankOptions, widen }) : []),
+    [briefed, brief, studios, rankOptions, widen],
+  );
+
+  const offers = useMemo(
+    () =>
+      briefed && brief && matches.length < 3
+        ? wideningsFor(brief, studios, rankOptions, BAND_UP_APPROVED).filter((o) => !widen.includes(o.kind))
+        : [],
+    [briefed, brief, studios, rankOptions, matches.length, widen],
+  );
+
+  const others = useMemo(
+    () => (briefed && brief ? whyNotTheOthers(brief, studios, { ...rankOptions, widen }) : []),
+    [briefed, brief, studios, rankOptions, widen],
   );
 
   const byId = useMemo(() => new Map(studios.map((s) => [s.id, s])), [studios]);
@@ -107,6 +237,14 @@ export function MatchClient({
      is the classic order-of-hooks crash. */
   const { register, focus, open } = useScrollFocus<HTMLLIElement>(matches.length);
 
+  /* The quote replaces the whole page, but the scroll offset survived the
+     swap: pressing "Get a quote" on the third card opened the gate already
+     scrolled past its heading, on the one screen whose first line explains
+     what it is asking for. Both ways — opening a quote and coming back. */
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [quoting]);
+
   const update = (next: Project) => {
     setProject(next);
     saveProject(next);
@@ -115,16 +253,120 @@ export function MatchClient({
   const requestFor = (studio: Studio): QuoteRequest => ({
     studioSlug: studio.slug,
     studioName: studio.tradeName,
-    bhk: BEDROOMS[brief?.propertyType ?? 'BHK_2'] ?? 2,
-    carpetAreaSqft: brief?.carpetAreaSqft ?? 850,
-    // One bathroom per bedroom is what the archive's flats overwhelmingly
-    // have, and the vanity is the only line it drives.
-    bathrooms: Math.max(1, BEDROOMS[brief?.propertyType ?? 'BHK_2'] ?? 2),
+    ...homeShapeFor(brief ?? { propertyType: null, carpetAreaSqft: null }),
   });
+
+  /* ── Every match priced at once ──
+     The same lines, the same kitchen, each studio's own rates — the moment
+     the page opens, and again whenever the brief changes something a quote
+     depends on. See modules/quotation/price-all.ts. */
+  const shape = useMemo(
+    () => homeShapeFor(brief ?? { propertyType: null, carpetAreaSqft: null }),
+    [brief],
+  );
+  const kitchen = kitchenFor(shape, shape.plan, project.plan);
+  const pricedFor = quoteKey(shape, kitchen);
+
+  useEffect(() => {
+    if (!briefed || matches.length === 0) return;
+    const fresh = priceMatches({
+      shape,
+      plan: kitchen,
+      studios: matches
+        .map((m) => byId.get(m.studioId))
+        .filter((s): s is Studio => Boolean(s))
+        .map((s) => ({
+          slug: s.slug,
+          name: s.tradeName,
+          curatedDiscountPct: s.matchingProfile?.curatedDiscountPct ?? null,
+        })),
+      existing: project.quotes,
+      ratesFor: (slug) => filedRates?.[slug] ?? filedRatesFor(slug),
+    });
+    if (fresh.length === 0) return;
+    // The durable copies, behind the screen — see onBuilt below for why
+    // these are not awaited.
+    for (const q of fresh) void saveQuoteAction({ studioSlug: q.studioSlug, quote: q.quote, plan: kitchen });
+    update({
+      ...project,
+      plan: kitchen,
+      quotes: { ...project.quotes, ...Object.fromEntries(fresh.map((q) => [q.studioSlug, q])) },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on what a quote depends on
+  }, [briefed, matches, pricedFor, project.quotes]);
+
+  /* ── Welcome back (queue item 16) ──
+     Which studios this device last showed, and when; anything new since
+     earns a line at the top. Stored in this browser only. */
+  const [welcome, setWelcome] = useState<string | null>(null);
+  const matchIds = matches.map((m) => m.studioId).join(',');
+  useEffect(() => {
+    if (!briefed || !matchIds) return;
+    try {
+      const ids = matchIds.split(',');
+      setWelcome(welcomeBack(readSeen(localStorage.getItem(SEEN_KEY)), ids));
+      localStorage.setItem(SEEN_KEY, JSON.stringify({ ids, at: new Date().toISOString() }));
+    } catch {
+      // Storage blocked: no welcome line, nothing else changes.
+    }
+  }, [briefed, matchIds]);
 
   // ── The quote, over everything ──
   if (quoting) {
     const built = project.quotes[quoting.studioSlug];
+    const current = built?.key === pricedFor;
+    /* Already priced (every match is): straight to the document. The build
+       plays once a visit, the first time — "a quote in ten seconds" watched
+       once, not sat through six times. */
+    if (built && current) {
+      return (
+        <div className="oi-app min-h-dvh bg-[var(--bg)]">
+          <AppHeader />
+          <Wrap className="py-10">
+            <button
+              type="button"
+              onClick={() => setQuoting(null)}
+              className="oi-num mb-8 cursor-pointer border-0 bg-transparent p-0 text-[11px] uppercase tracking-[0.16em] text-[var(--ink2)] hover:text-[var(--ink)] print:hidden"
+            >
+              ← Back to your matches
+            </button>
+            {project.seenBuild ? (
+              <QuoteDocument
+                quote={built.quote}
+                studioName={quoting.studioName}
+                plan={kitchen}
+                preparedFor={preparedFor(brief)}
+                paymentPhases={studios.find((s) => s.slug === quoting.studioSlug)?.paymentPhases ?? null}
+                bandLine={bandLine(brief, shape, built.quote)}
+                onMeasured={(runMm) =>
+                  update({ ...project, plan: { fileName: null, kitchenRunMm: runMm, source: 'customer' } })
+                }
+              />
+            ) : (
+              <Building
+                studioName={quoting.studioName}
+                stages={stagesFor({
+                  bhk: shape.bhk,
+                  measured: runSourceOf(kitchen) !== 'standard',
+                  ratesAreReal: ratesAreReal(),
+                })}
+                onDone={() => update({ ...project, seenBuild: true })}
+                seenQuestions={project.askedQuestions}
+                onAsked={(id) =>
+                  update({
+                    ...project,
+                    askedQuestions: project.askedQuestions.includes(id)
+                      ? project.askedQuestions
+                      : [...project.askedQuestions, id],
+                  })
+                }
+              />
+            )}
+          </Wrap>
+          <AppFooter />
+        </div>
+      );
+    }
     return (
       <div className="oi-app min-h-dvh bg-[var(--bg)]">
         <AppHeader />
@@ -132,7 +374,7 @@ export function MatchClient({
           <button
             type="button"
             onClick={() => setQuoting(null)}
-            className="oi-num mb-8 cursor-pointer border-0 bg-transparent p-0 text-[11px] uppercase tracking-[0.16em] text-[var(--ink2)] hover:text-[var(--ink)]"
+            className="oi-num mb-8 cursor-pointer border-0 bg-transparent p-0 text-[11px] uppercase tracking-[0.16em] text-[var(--ink2)] hover:text-[var(--ink)] print:hidden"
           >
             ← Back to your matches
           </button>
@@ -140,7 +382,8 @@ export function MatchClient({
           <QuoteFlow
             filedRates={filedRates?.[quoting.studioSlug]}
             request={quoting}
-            plan={project.plan}
+            // A plan confirmed on the brief wins over an earlier gate answer.
+            plan={quoting.plan ?? project.plan}
             seenQuestions={project.askedQuestions}
             onAsked={(id) =>
               update({
@@ -175,6 +418,13 @@ export function MatchClient({
             }}
           />
 
+          {built ? (
+            <ExpertPitch
+              offer={offer}
+              lead={`Before you ring ${quoting.studioName}`}
+              className="mt-10 max-w-[40rem]"
+            />
+          ) : null}
           {built ? (
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <Quiet href={`/studios/${quoting.studioSlug}`}>
@@ -218,8 +468,18 @@ export function MatchClient({
       />
 
       <Wrap className="py-12">
+        {welcome ? (
+          <p className="mx-auto mb-6 max-w-[40rem] rounded-full border border-[var(--acc)] px-5 py-2.5 text-center text-[14px] text-[var(--ink)]">
+            {welcome}
+          </p>
+        ) : null}
         {briefed && matches.length > 0 ? (
-          <MatchHero fit={matches.length} checkCount={CHECK_COUNT} />
+          <MatchHero
+            fit={matches.length}
+            reveal={brief ? revealSteps(brief, studios, matches.length, rankOptions) : []}
+            name={cleanName(brief?.contactName)}
+            forWhat={forWhat(brief)}
+          />
         ) : (
           <Chapter
             eyebrow="Who fits"
@@ -233,19 +493,19 @@ export function MatchClient({
           <Sheet className="p-8">
             <p className="m-0 mb-4 max-w-[54ch] text-[15px] leading-[1.6]">
               Scoring studios against an empty brief would give you the roster in an arbitrary
-              order with numbers on it. Nine questions, about two minutes, and these become real.
+              order with numbers on it. About four minutes of your brief, and these become real.
             </p>
             <Quiet href="/quiz">Start the brief</Quiet>
           </Sheet>
-        ) : matches.length === 0 ? (
+        ) : matches.length === 0 && offers.length === 0 ? (
           <Sheet className="p-8">
             <p className="m-0 mb-4 max-w-[54ch] text-[15px] leading-[1.6]">
-              Nothing on the roster matches this brief — usually the locality or the budget band.
-              Widening either is the quickest fix.
+              Nothing on the roster matches this brief — usually the level or the kind of work.
+              Changing either is the quickest fix.
             </p>
             <Quiet href="/quiz">Change your answers</Quiet>
           </Sheet>
-        ) : (
+        ) : matches.length === 0 ? null : (
           <ul className="mx-auto m-0 mt-12 flex max-w-[40rem] list-none flex-col gap-6 p-0">
             {matches.map((match: MatchResult, i) => {
               const studio = byId.get(match.studioId);
@@ -264,6 +524,7 @@ export function MatchClient({
                   brief={brief}
                   rank={i}
                   quotedTotalPaise={stored?.quote.totalPaise ?? null}
+                  ratesFiled={hasRates(rankOptions.ratesFor(studio.slug))}
                   inCompare={comparing.includes(studio.slug)}
                   cachedRead={project.reads?.[studio.id]}
                   onRead={(id, read) =>
@@ -285,6 +546,56 @@ export function MatchClient({
             })}
           </ul>
         )}
+
+        {briefed && matches.length > 0 ? (
+          <ExpertPitch offer={offer} className="mx-auto mt-10 max-w-[40rem]" />
+        ) : null}
+
+        {briefed && brief && brief.styleLikes.length > 0 ? (
+          <StyleDnaCard likes={brief.styleLikes} className="mx-auto mt-10 max-w-[40rem]" />
+        ) : null}
+
+        {/* Fewer than three: said plainly, with named one-tap widenings and
+            what each adds — never a silent loosening of what they asked for. */}
+        {briefed && offers.length > 0 ? (
+          <Sheet className="mx-auto mt-10 max-w-[40rem] p-6">
+            <p className="m-0 mb-4 text-[15px] leading-[1.6]">
+              {matches.length === 0
+                ? 'No studio fits everything you asked for yet.'
+                : `Only ${matches.length === 1 ? 'one studio fits' : `${matches.length} studios fit`} everything you asked for.`}{' '}
+              We would rather tell you than pad the list.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {offers.map((o) => (
+                <button
+                  key={o.kind}
+                  type="button"
+                  onClick={() => setWiden((w) => [...w, o.kind])}
+                  className="min-h-11 cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-5 py-2.5 text-[14px] font-semibold text-[var(--ink)] hover:border-[var(--ink2)]"
+                >
+                  {WIDENING_COPY[o.kind]} (+{o.adds})
+                </button>
+              ))}
+            </div>
+          </Sheet>
+        ) : null}
+
+        {/* Why not the others — the roster is small enough to say, and a
+            customer who knows a studio by name should not wonder. */}
+        {briefed && others.length > 0 ? (
+          <details className="mx-auto mt-10 max-w-[40rem]">
+            <summary className="cursor-pointer text-[14px] font-semibold text-[var(--ink2)]">
+              Why not the others ({others.length})
+            </summary>
+            <ul className="m-0 mt-3 flex list-none flex-col gap-1.5 p-0">
+              {others.map((o) => (
+                <li key={o.studioId} className="text-[13.5px] text-[var(--ink2)]">
+                  <span className="text-[var(--ink)]">{o.name}</span> — {FILTER_REASON_LABELS[o.reason]}
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </Wrap>
 
       <CompareBar selected={comparing.length} minimum={MIN_TO_COMPARE} priced={quoted.length} />

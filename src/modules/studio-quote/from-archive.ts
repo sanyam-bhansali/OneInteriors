@@ -49,6 +49,9 @@ const ROOM_CATEGORY: Record<Room, RoomCategory> = {
   LIVING_DINING: 'Living',
   BATHROOMS: 'Bathroom',
   WHOLE_HOME: 'Whole home',
+  // Civil work sits with the whole-home lines in a studio's own catalogue:
+  // it is priced on the flat, not on a room's furniture.
+  CIVIL: 'Whole home',
 };
 
 /**

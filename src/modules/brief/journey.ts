@@ -35,9 +35,9 @@ export const JOURNEY: JourneyStep[] = [
    */
   {
     name: `${PREFIX}Brief`,
-    title: 'Nine questions about your home',
+    title: 'A few minutes about your home',
     body: 'Your flat, the styles you like, and the ones you cannot live with — plus what each level of finish costs for a home your size, so you can pick the one you actually want to spend in. Nothing is shared with anyone yet.',
-    duration: 'Three minutes',
+    duration: 'About four minutes',
   },
   {
     name: `${PREFIX}Match`,

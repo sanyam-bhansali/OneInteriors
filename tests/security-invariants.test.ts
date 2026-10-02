@@ -116,6 +116,31 @@ describe('every migration that creates a table locks it down', () => {
    */
   const INITIAL_MIGRATION = '20260907170456_init';
 
+  /**
+   * Migrations that shipped without the block, each paired with the follow-up
+   * that locks its table down.
+   *
+   * A migration that has run anywhere is never edited, so the fix for a
+   * missed block is a new migration — and the test has to accept the old one
+   * only when the follow-up really exists and really covers that table. An
+   * entry here is an admission, not an exemption: it is checked below.
+   */
+  const LOCKED_DOWN_LATER: Record<string, { by: string; table: string }> = {
+    '20260926000000_waitlist_signups': {
+      by: '20260929100000_waitlist_signups_lockdown',
+      table: 'waitlist_signups',
+    },
+  };
+
+  it('locks down every late table in its named follow-up', () => {
+    for (const { by, table } of Object.values(LOCKED_DOWN_LATER)) {
+      const sql = read(`prisma/migrations/${by}/migration.sql`);
+      expect(sql).toContain(`ALTER TABLE "${table}" ENABLE ROW LEVEL SECURITY`);
+      expect(sql).toContain(`ALTER TABLE "${table}" FORCE ROW LEVEL SECURITY`);
+      expect(sql).toContain(`REVOKE ALL ON "${table}" FROM anon, authenticated`);
+    }
+  });
+
   it('has a lockdown migration that sweeps every table', () => {
     // The exception below is only safe because this exists.
     const lockdown = read('prisma/migrations/20260907180000_enable_rls_lockdown/migration.sql');
@@ -144,6 +169,7 @@ describe('every migration that creates a table locks it down', () => {
          That arrangement is stronger than per-table statements, not weaker —
          it cannot miss one. Every migration since carries its own block. */
       if (name === INITIAL_MIGRATION) continue;
+      if (name in LOCKED_DOWN_LATER) continue;
 
       const hasRls = /ROW LEVEL SECURITY/i.test(sql);
       const hasRevoke = /REVOKE ALL[\s\S]*?(anon|authenticated)/i.test(sql);

@@ -14,7 +14,7 @@
  *    fire-and-forget, because a slow database must never make Continue feel
  *    broken. `saveBrief` swallows its own failures for the same reason.
  *
- * `/quiz`, `/tier` and `/match` render on the client and reconcile the two, so
+ * `/quiz` and `/match` render on the client and reconcile the two, so
  * they work whichever copy exists. `/quotes`, `/compare` and `/expert` render
  * on the server and can only see Postgres. So any time the server copy is
  * missing — a dropped write, a claim that did not attach, a sign-in that
@@ -201,7 +201,7 @@ export function BriefRescue({
         <h1 className="h1 mb-4">We do not have your brief yet.</h1>
         <p className="m-0 mb-8 max-w-[54ch] text-[17px] leading-relaxed text-[var(--color-ink-2)]">
           Either it was not finished, or it was answered in a different browser — briefs are held
-          per browser until you sign in. Nine questions, three minutes, and {destination} follow
+          per browser until you sign in. About four minutes, and {destination} follow
           immediately.
         </p>
         <Button href="/quiz" size="lg">

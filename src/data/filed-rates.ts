@@ -29,6 +29,7 @@
  * Pure, and with NO `server-only` — the quote renders in the browser.
  */
 
+import { rosterIsReal } from '@/lib/env';
 import type { StudioRates } from '@/modules/quotation/catalogue';
 
 /**
@@ -78,7 +79,9 @@ const ARCHIVE_MEDIAN: Record<string, number> = {
  * a placeholder is good enough.
  */
 export function ratesAreReal(): boolean {
-  return false;
+  // Once the roster is real, no studio is priced on these samples
+  // (modules/quotation/rate-policy.ts), so the pre-launch label goes.
+  return rosterIsReal();
 }
 
 /**
@@ -93,6 +96,25 @@ export function ratesAreReal(): boolean {
  * of averaging them together.
  */
 export const RATES_VERSION = 'archive-median@1';
+
+/**
+ * How far above the archive a fixture studio prices.
+ *
+ * The archive is one market's medians and places every studio in Essential,
+ * so the Premium and Luxury fixtures (added 29 Sep for the band filter) are
+ * the same medians scaled — about 2× and 2.75× — which is roughly where
+ * veneer, lacquer and stone quotes sit against a laminate one. Only invented
+ * studios appear here; a real studio's rates come from its own quotations.
+ */
+const FIXTURE_LEVEL: Record<string, number> = {
+  'vaastu-atelier': 2,
+  'grain-and-grey': 2,
+  'kosha-interiors': 2,
+  'southlight-design': 2,
+  'marigold-house': 2.75,
+  'stone-and-sill': 2.75,
+  'ashrama-studio': 2.75,
+};
 
 /**
  * A stable number in roughly [-1, 1] from a slug.
@@ -154,8 +176,25 @@ const CARCASS = [
 /** Which items the carcass convention actually describes. */
 const CARPENTRY = /wardrobe|loft|kitchen_base|kitchen_wall|tv_unit|console_shoe|mandir|vanity|dressing|workstation/;
 
+/**
+ * The archive medians as a rate card, with no per-studio variation.
+ *
+ * Not any studio's rates and never shown as one. It is the yardstick for how
+ * large a part of a full home a given scope is — kitchen and wardrobes are
+ * roughly a third — so a band's price per square foot can be turned into a
+ * range for a partial scope (`quotation/scope.ts`).
+ */
+export function referenceRates(filedOn = '2026-09-18'): StudioRates {
+  return Object.fromEntries(
+    Object.entries(ARCHIVE_MEDIAN).map(([code, ratePaise]) => [
+      code,
+      { code, ratePaise, fromQuotations: 0, filedOn },
+    ]),
+  );
+}
+
 export function filedRatesFor(slug: string, filedOn = '2026-09-18'): StudioRates {
-  const factor = 1 + spread(slug) * 0.09;
+  const factor = (FIXTURE_LEVEL[slug] ?? 1) * (1 + spread(slug) * 0.09);
   // Cheaper studios tend to the cheaper board, which is the whole reason a
   // total can be lower without the studio being better value.
   const profile =

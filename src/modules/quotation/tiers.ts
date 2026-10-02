@@ -42,7 +42,12 @@ export interface TierDefinition {
    * customer what a band means before they have a quote.
    */
   perSqftFrom: number;
-  perSqftTo: number;
+  /**
+   * `null` for the top band, which has no ceiling. A made-up upper number
+   * would be printed on the budget screen as though it were a limit, and
+   * would quietly cap the budget matching runs on.
+   */
+  perSqftTo: number | null;
   /** What actually differs. Materials, not adjectives. */
   materials: string[];
   /** Said plainly, because a tier that suits everyone tells you nothing. */
@@ -52,18 +57,24 @@ export interface TierDefinition {
 /**
  * Bands in rupees per sqft of carpet area, all-in before GST.
  *
- * Derived from what the Pune market actually advertises — the entry points
- * published by studios in this segment sit around ₹3.5–5 lakh for a 1 BHK and
- * ₹6–9 lakh for a 2 BHK, which lands roughly where these bands are drawn. They
- * are ours, not any one studio's, and no studio's catalogue was used to set
- * them.
+ * Set by One Interiors on 29 Sep 2026: Essential ₹1,200–1,800, Premium
+ * ₹1,800–2,500, Luxury ₹2,500 and up. These are the SAME boundaries as the
+ * studio subscription bands in `modules/studio/subscription.ts` — a studio's
+ * band and the band a homeowner picks are one thing, so a customer who
+ * chooses Premium is shown Premium studios and nobody has to reconcile two
+ * meanings of the word. They replaced ₹700–1,100 / 1,100–1,800 / 1,800–3,200,
+ * which were drawn from what the market advertises rather than what the
+ * roster charges.
+ *
+ * They are ours, not any one studio's, and no studio's catalogue was used to
+ * set them.
  */
 export const TIER: Record<Tier, TierDefinition> = {
   ESSENTIAL: {
     label: 'Essential',
     promise: 'Everything you need, made well, with nothing spent on show.',
-    perSqftFrom: 700,
-    perSqftTo: 1100,
+    perSqftFrom: 1200,
+    perSqftTo: 1800,
     materials: [
       'Branded laminate finishes',
       'Standard soft-close hardware',
@@ -76,8 +87,8 @@ export const TIER: Record<Tier, TierDefinition> = {
   PREMIUM: {
     label: 'Premium',
     promise: 'Better materials where they are touched, and more design time.',
-    perSqftFrom: 1100,
-    perSqftTo: 1800,
+    perSqftFrom: 1800,
+    perSqftTo: 2500,
     materials: [
       'Veneer and acrylic on the pieces you see and touch',
       'Hettich or Hafele hardware throughout',
@@ -91,8 +102,8 @@ export const TIER: Record<Tier, TierDefinition> = {
   LUXURY: {
     label: 'Luxury',
     promise: 'Made to your drawings, in the materials you chose.',
-    perSqftFrom: 1800,
-    perSqftTo: 3200,
+    perSqftFrom: 2500,
+    perSqftTo: null,
     materials: [
       'Imported veneer, stone and specialist finishes',
       'Furniture designed for the room rather than selected',
@@ -129,12 +140,25 @@ export function tierForPerSqft(perSqft: number): Tier {
 export function tierRangeFor(
   tier: Tier,
   carpetAreaSqft: number,
-): { lowPaise: Paise; highPaise: Paise } {
+): { lowPaise: Paise; highPaise: Paise | null } {
   const definition = TIER[tier];
   return {
     lowPaise: Math.round(definition.perSqftFrom * carpetAreaSqft * 100),
-    highPaise: Math.round(definition.perSqftTo * carpetAreaSqft * 100),
+    highPaise:
+      definition.perSqftTo === null ? null : Math.round(definition.perSqftTo * carpetAreaSqft * 100),
   };
+}
+
+/**
+ * A band's price as words: "₹1,800–2,500" or "₹2,500 and up".
+ *
+ * One place, so the open top band is never printed as "₹2,500–" or as a
+ * ceiling someone invented.
+ */
+export function perSqftLabel(tier: Tier): string {
+  const { perSqftFrom, perSqftTo } = TIER[tier];
+  const from = `₹${perSqftFrom.toLocaleString('en-IN')}`;
+  return perSqftTo === null ? `${from} and up` : `${from}–${perSqftTo.toLocaleString('en-IN')}`;
 }
 
 /**
@@ -195,7 +219,8 @@ export function tiersForBudget(
     }
 
     // Their budget clears the whole band — they can afford everything in it.
-    if (budgetMaxPaise > highPaise) {
+    // The top band has no ceiling, so nothing clears it.
+    if (highPaise !== null && budgetMaxPaise > highPaise) {
       return { tier, withinBudget: true, fit: 'under' as const };
     }
 

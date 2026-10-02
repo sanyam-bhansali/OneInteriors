@@ -36,6 +36,8 @@ export interface FloorPlan {
   /** The one number the plan is read for. */
   kitchenRunMm: number | null;
   source: 'floor_plan' | 'customer' | 'standard';
+  /** From plans other homes in their building shared (society-library.ts). */
+  shared?: boolean;
 }
 
 export interface StoredQuote {
@@ -44,6 +46,12 @@ export interface StoredQuote {
   /** ISO timestamp. A quote without one cannot be told stale. */
   builtAt: string;
   quote: FirstQuote;
+  /**
+   * What it was priced for — home, scope, kitchen (`quoteKey`). When the brief
+   * changes any of them the quote is rebuilt rather than shown for a flat the
+   * customer no longer has.
+   */
+  key?: string;
 }
 
 /**
@@ -86,6 +94,13 @@ export interface Project {
    * lines. Codes, not indexes, so it survives a studio being added or dropped.
    */
   starred: string[];
+  /**
+   * Whether the build has been shown this visit. Every match is priced the
+   * moment the page opens; the build plays once, the first time a quote is
+   * opened, so "a quote in ten seconds" is something they watch happen once
+   * rather than sit through six times.
+   */
+  seenBuild?: boolean;
 }
 
 export const EMPTY_PROJECT: Project = {

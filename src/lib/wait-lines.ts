@@ -96,7 +96,7 @@ export const WAIT_LINES: Record<WaitMoment, readonly string[]> = {
     'Nobody is going to say they need to check with their manager.',
     'No one will ring back this evening to ask whether you have thought about it.',
     'We have already read your brief. You will not be explaining your flat again.',
-    'This is not a discovery call. We did the discovering in the nine questions.',
+    'This is not a discovery call. We did the discovering in your brief.',
     'Half an hour, and then we get out of the way.',
   ],
 };

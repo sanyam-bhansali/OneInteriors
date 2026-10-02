@@ -31,6 +31,7 @@ import { getCurrentUser, hasRole } from '@/modules/auth/session';
 import { contactState, type ContactState } from './introduction-access';
 import type { AppointmentKindName, AppointmentStatusName } from './appointment-rules';
 import { whatItNeeds, type IntroductionNeed } from './introduction-needs';
+import { localityLabel } from '@/modules/brief/types';
 
 // The pure half lives next door so Vitest can reach it — CONTRIBUTING §9.5.
 export { whatItNeeds, NEED_LABEL } from './introduction-needs';
@@ -75,6 +76,9 @@ export interface OpsIntroduction {
    */
   wonHere: boolean;
   wonByOther: boolean;
+
+  /** The customer's project tracker, once started (modules/portal/tracker.ts). */
+  project: { id: string; startOn: Date; totalDays: number; doneStages: string[] } | null;
 
   /**
    * What, if anything, this row is waiting on us for. Null when nothing is.
@@ -121,6 +125,7 @@ export async function listIntroductions(limit = 100): Promise<OpsIntroduction[]>
             quoteDecision: { select: { wonByStudioId: true } },
           },
         },
+        homeProject: { select: { id: true, startOn: true, totalDays: true, doneStages: true } },
         appointments: {
           orderBy: { startsAt: 'asc' },
           select: {
@@ -183,7 +188,7 @@ export async function listIntroductions(limit = 100): Promise<OpsIntroduction[]>
         // the other side of the same rule, not an exception to it.
         customerName: consultation?.contactName ?? null,
         customerPhone: consultation?.contactPhone ?? null,
-        locality: row.brief.locality,
+        locality: localityLabel(row.brief.locality),
         propertyType: row.brief.propertyType,
         appointments,
         wonHere: row.brief.quoteDecision?.wonByStudioId === row.studio.id,
@@ -191,6 +196,7 @@ export async function listIntroductions(limit = 100): Promise<OpsIntroduction[]>
           row.brief.quoteDecision?.wonByStudioId != null &&
           row.brief.quoteDecision.wonByStudioId !== row.studio.id,
         needs: whatItNeeds(row.withdrawnAt, appointments),
+        project: row.homeProject ?? null,
       };
     });
   } catch (error) {

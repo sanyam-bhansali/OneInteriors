@@ -25,6 +25,8 @@ import 'server-only';
  * sessionStorage exactly as before.
  */
 
+import { cleanCode, counts, makeCode, REFERRAL_COOKIE } from '@/modules/portal/referral';
+import { libraryReading, shareable, societyKey, type LibraryReading } from '@/modules/floorplan/society-library';
 import { cookies } from 'next/headers';
 import { randomBytes } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
@@ -32,6 +34,8 @@ import { hasDatabase } from '@/lib/env';
 import { getCurrentUser } from '@/modules/auth/session';
 import { EMPTY_BRIEF, type Brief } from './types';
 import { rowToBrief, briefToRow } from './mapping';
+import type { CleanContact } from './contact';
+import { deleteFloorPlan } from '@/modules/storage/floor-plan';
 
 const COOKIE = 'oi.brief';
 /**
@@ -78,6 +82,8 @@ export interface LoadedBrief {
   brief: Brief;
   /** False when there is nothing stored yet — the caller may prefer its local copy. */
   found: boolean;
+  /** The stored row's id, when found — what matches are stored against. */
+  id?: string;
 }
 
 /**
@@ -90,13 +96,13 @@ export async function loadBrief(): Promise<LoadedBrief> {
   const user = await getCurrentUser();
   if (user) {
     const row = await prisma.brief.findUnique({ where: { userId: user.id } });
-    if (row) return { brief: rowToBrief(row), found: true };
+    if (row) return { brief: rowToBrief(row), found: true, id: row.id };
   }
 
   const anonKey = await readAnonKey();
   if (anonKey) {
     const row = await prisma.brief.findUnique({ where: { anonKey } });
-    if (row) return { brief: rowToBrief(row), found: true };
+    if (row) return { brief: rowToBrief(row), found: true, id: row.id };
   }
 
   return { brief: EMPTY_BRIEF, found: false };
@@ -118,11 +124,183 @@ export async function saveBrief(brief: Brief): Promise<SaveResult> {
     const data = briefToRow(brief);
     const user = await getCurrentUser();
 
+    const anonKey = user ? null : await ensureAnonKey();
+    const row = user
+      ? await prisma.brief.upsert({
+          where: { userId: user.id },
+          create: { ...data, userId: user.id },
+          update: data,
+          select: { id: true },
+        })
+      : await prisma.brief.upsert({
+          where: { anonKey: anonKey! },
+          create: { ...data, anonKey: anonKey! },
+          update: data,
+          select: { id: true },
+        });
+    await shareIntoLibrary(row.id, brief);
+    await recordReferral(row.id, user?.id ?? null);
+    return { ok: true, persisted: true };
+  } catch {
+    return { ok: true, persisted: false };
+  }
+}
+
+/**
+ * Keep the confirmed plan's sizes in the society library — or take them out
+ * when the plan or the society is gone. Sizes only. Never fails the save.
+ */
+async function shareIntoLibrary(briefId: string, brief: Brief): Promise<void> {
+  try {
+    const key = societyKey(brief.society);
+    const bhk = brief.propertyType ? BHK_OF[brief.propertyType] : undefined;
+    if (!shareable(brief.planReading, brief.society) || !key || !bhk || !brief.planReading) {
+      await prisma.societyPlan.deleteMany({ where: { briefId } });
+      return;
+    }
+    const row = {
+      societyKey: key,
+      bhk,
+      carpetAreaSqft: brief.carpetAreaSqft,
+      bathrooms: brief.planReading.bathrooms,
+      kitchenRunMm: brief.planReading.kitchenRunMm,
+    };
+    await prisma.societyPlan.upsert({ where: { briefId }, create: { briefId, ...row }, update: row });
+  } catch {
+    /* The library is a convenience for the next family; never this one's save. */
+  }
+}
+
+/**
+ * The referral code this browser arrived through, onto the brief — once, and
+ * never the customer's own. Never fails the save.
+ */
+async function recordReferral(briefId: string, customerId: string | null): Promise<void> {
+  try {
+    const code = cleanCode((await cookies()).get(REFERRAL_COOKIE)?.value);
+    if (!code) return;
+    const owner = await prisma.user.findUnique({ where: { referralCode: code }, select: { id: true } });
+    if (!counts(owner?.id ?? null, customerId)) return;
+    await prisma.brief.updateMany({ where: { id: briefId, referredByCode: null }, data: { referredByCode: code } });
+  } catch {
+    /* A lost referral is ops' problem to chase; a failed brief save is the customer's. */
+  }
+}
+
+/** This customer's referral code, made the first time it is needed. */
+export async function referralCodeFor(userId: string, name: string | null): Promise<string | null> {
+  if (!hasDatabase()) return null;
+  try {
+    const existing = await prisma.user.findUnique({ where: { id: userId }, select: { referralCode: true } });
+    if (existing?.referralCode) return existing.referralCode;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const code = makeCode(name, randomBytes(4));
+      const done = await prisma.user
+        .update({ where: { id: userId }, data: { referralCode: code }, select: { referralCode: true } })
+        .catch(() => null);
+      if (done?.referralCode) return done.referralCode;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** How many briefs came through this code. */
+export async function referralCount(code: string): Promise<number> {
+  try {
+    return await prisma.brief.count({ where: { referredByCode: code } });
+  } catch {
+    return 0;
+  }
+}
+
+const BHK_OF: Record<string, number | undefined> = { BHK_1: 1, BHK_2: 2, BHK_3: 3, BHK_4_PLUS: 4 };
+
+/** The building's plan for this home type, when two or more homes have shared theirs. */
+export async function societyPlanFor(society: string, propertyType: string): Promise<LibraryReading | null> {
+  if (!hasDatabase()) return null;
+  const key = societyKey(society);
+  const bhk = BHK_OF[propertyType];
+  if (!key || !bhk) return null;
+  try {
+    const rows = await prisma.societyPlan.findMany({
+      where: { societyKey: key, bhk },
+      select: { carpetAreaSqft: true, bathrooms: true, kitchenRunMm: true },
+      take: 50,
+    });
+    return libraryReading(rows);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Point this browser's brief at an uploaded floor plan.
+ *
+ * Only the path and the display name — the reading is confirmed by the
+ * customer first and arrives with the next quiz sync. A plan replacing an
+ * earlier one deletes the old file after the row points at the new one,
+ * never before, so a failed write never leaves them with neither.
+ */
+export async function attachFloorPlan(upload: { path: string; name: string }): Promise<boolean> {
+  if (!hasDatabase()) return false;
+  try {
+    const user = await getCurrentUser();
+    const where = user ? { userId: user.id } : { anonKey: await ensureAnonKey() };
+    const previous = await prisma.brief.findUnique({ where, select: { floorPlanPath: true } });
+    const data = { floorPlanPath: upload.path, floorPlanName: upload.name };
+    await prisma.brief.upsert({
+      where,
+      create: { ...data, ...(user ? { userId: user.id } : { anonKey: (where as { anonKey: string }).anonKey }) },
+      update: data,
+    });
+    if (previous?.floorPlanPath && previous.floorPlanPath !== upload.path) {
+      await deleteFloorPlan(previous.floorPlanPath);
+    }
+    return true;
+  } catch (error) {
+    console.error('[brief] attach floor plan failed', error instanceof Error ? error.name : 'unknown');
+    return false;
+  }
+}
+
+/**
+ * Write the brief with the contact details from its last screen.
+ *
+ * The only writer of `contactName` / `contactPhone` / `contactEmail`. The
+ * caller has already recorded the customer's agreement to the notice — this
+ * runs after consent, never before, which is the reason the per-step sync
+ * cannot write these fields (see `briefToRow`).
+ *
+ * If they are signed in and the account has no name yet, it gets this one.
+ * The number is never written to `User.phone`: it is unverified, and that
+ * column is unique and is an identity. See `modules/brief/contact.ts`.
+ */
+export async function saveContact(
+  brief: Brief,
+  contact: CleanContact,
+): Promise<SaveResult> {
+  if (!hasDatabase()) return { ok: true, persisted: false };
+
+  try {
+    const data = {
+      ...briefToRow(brief),
+      contactName: contact.name,
+      contactPhone: contact.phone,
+      contactEmail: contact.email,
+    };
+    const user = await getCurrentUser();
+
     if (user) {
       await prisma.brief.upsert({
         where: { userId: user.id },
         create: { ...data, userId: user.id },
         update: data,
+      });
+      await prisma.user.updateMany({
+        where: { id: user.id, name: null },
+        data: { name: contact.name },
       });
       return { ok: true, persisted: true };
     }
@@ -134,7 +312,8 @@ export async function saveBrief(brief: Brief): Promise<SaveResult> {
       update: data,
     });
     return { ok: true, persisted: true };
-  } catch {
+  } catch (error) {
+    console.error('[brief] contact save failed', error instanceof Error ? error.message : error);
     return { ok: true, persisted: false };
   }
 }

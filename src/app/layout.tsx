@@ -1,12 +1,20 @@
 import type { Metadata, Viewport } from 'next';
-import { Instrument_Serif, Instrument_Sans, IBM_Plex_Mono, Quicksand } from 'next/font/google';
+import localFont from 'next/font/local';
 import { siteUrl } from '@/lib/site';
 import { RosterGateBanner } from '@/components/RosterGateBanner';
 import './globals.css';
 
-const display = Instrument_Serif({
+/*
+ * Every face is bundled (src/app/fonts: the Latin files Google Fonts serves,
+ * all under the SIL Open Font License) instead of fetched through
+ * next/font/google at build time. CI's build failed inside the Google loader
+ * — twice on the same commit that built fine locally and on Vercel — and a
+ * build that depends on a third party answering the same way every time is
+ * not a build we control. Same faces, same weights, same CSS variables.
+ */
+const display = localFont({
+  src: './fonts/instrument-serif-400.woff2',
   weight: '400',
-  subsets: ['latin'],
   variable: '--font-display-loaded',
   display: 'swap',
 });
@@ -20,8 +28,9 @@ const display = Instrument_Serif({
  * merely coexisting. Swapped globally rather than only on the landing page,
  * because two sans faces on one site is the kind of drift nobody ever unwinds.
  */
-const sans = Instrument_Sans({
-  subsets: ['latin'],
+const sans = localFont({
+  src: './fonts/instrument-sans-latin.woff2',
+  weight: '400 700',
   variable: '--font-sans-loaded',
   display: 'swap',
 });
@@ -37,16 +46,19 @@ const sans = Instrument_Sans({
  * approved for the rest of the product, move the class up to <body> and every
  * screen follows in one line.
  */
-const rounded = Quicksand({
-  weight: ['400', '500', '600', '700'],
-  subsets: ['latin'],
+const rounded = localFont({
+  src: './fonts/quicksand-latin.woff2',
+  weight: '400 700',
   variable: '--font-rounded-loaded',
   display: 'swap',
 });
 
-const mono = IBM_Plex_Mono({
-  weight: ['400', '500', '600'],
-  subsets: ['latin'],
+const mono = localFont({
+  src: [
+    { path: './fonts/ibm-plex-mono-400.woff2', weight: '400' },
+    { path: './fonts/ibm-plex-mono-500.woff2', weight: '500' },
+    { path: './fonts/ibm-plex-mono-600.woff2', weight: '600' },
+  ],
   variable: '--font-mono-loaded',
   display: 'swap',
 });

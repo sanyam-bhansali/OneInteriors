@@ -1,4 +1,8 @@
 import { redirect } from 'next/navigation';
+import { briefQuestions } from '@/modules/consultation/brief-questions';
+import { CallOffer } from '@/components/oi/CallOffer';
+import { BenefitChips } from '@/components/oi/ExpertPitch';
+import { currentOffer } from '@/modules/consultation/offer-store';
 import type { Metadata } from 'next';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
 import { Wrap, Chapter, Sheet, Established, Flag, Tick } from '@/components/oi';
@@ -7,9 +11,10 @@ import { prisma } from '@/lib/prisma';
 import { loadBrief, readAnonKey } from '@/modules/brief/repository';
 import { getCurrentUser } from '@/modules/auth/session';
 import { studioRepository } from '@/modules/studio/repository';
-import { rankStudios } from '@/modules/matching/score';
-import { showUnverifiedStudios } from '@/lib/env';
+import { rankOnServer } from '@/modules/matching/rank-server';
+import { availableSlots } from '@/modules/consultation/availability';
 import { quoteBrief } from '@/modules/quotation/generate';
+import { quotesAsSeen } from '@/modules/consultation/pack';
 import { MIN_STUDIOS, MAX_STUDIOS } from '@/modules/consultation/request';
 import { ARCHITECT, ARCHITECT_IS_REAL, architectFacts } from '@/modules/consultation/architect';
 import { TIER } from '@/modules/quotation/tiers';
@@ -45,11 +50,32 @@ export default async function ExpertPage() {
   }
 
   const studios = await studioRepository.list({ activeOnly: true });
-  const ranked = rankStudios(brief, studios, 9, {
-    allowUnverified: showUnverifiedStudios(),
-  }).slice(0, MAX_STUDIOS);
-  const result = await quoteBrief(brief, ranked.map((r) => r.studioId));
-  if (!result.ok) redirect('/match');
+  const ranked = (await rankOnServer(brief, studios, 9)).slice(0, MAX_STUDIOS);
+  const [result, slots, callOffer] = await Promise.all([
+    quoteBrief(brief, ranked.map((r) => r.studioId)),
+    availableSlots(),
+    currentOffer(),
+  ]);
+  /* The quotes the customer actually saw, compared studios first and
+     pre-ticked (plan §9). Priced afresh only when none are stored — a brief
+     finished on another device. */
+  const seen = await quotesAsSeen(id, ranked.map((r) => r.studioId));
+  if (seen.length === 0 && !result.ok) redirect('/match');
+  const offer =
+    seen.length > 0
+      ? { quotes: seen, skipped: [] as { name: string }[] }
+      : {
+          quotes: result.ok
+            ? result.quotes.map((q) => ({
+                studioId: q.studioId,
+                studioName: q.studioName,
+                lowPaise: q.quote.lowPaise,
+                highPaise: q.quote.highPaise,
+                compared: false,
+              }))
+            : [],
+          skipped: result.ok ? result.skipped : [],
+        };
 
   /**
    * The minimum is what the roster can actually offer.
@@ -60,14 +86,14 @@ export default async function ExpertPage() {
    * computes the same figure independently in `requestConsultation` — this one
    * is only so the button is not lying about what it will accept.
    */
-  const minStudios = Math.max(1, Math.min(MIN_STUDIOS, result.quotes.length));
+  const minStudios = Math.max(1, Math.min(MIN_STUDIOS, offer.quotes.length));
 
   const facts = [
     brief.propertyType ? { label: 'Home', value: propertyLabel(brief.propertyType) ?? '—' } : null,
     brief.carpetAreaSqft ? { label: 'Carpet', value: `${brief.carpetAreaSqft} sqft` } : null,
     localityLabel(brief.locality) ? { label: 'Where', value: localityLabel(brief.locality)! } : null,
     brief.tier ? { label: 'Level', value: TIER[brief.tier].label } : null,
-    { label: 'Quotes', value: String(result.quotes.length) },
+    { label: 'Quotes', value: String(offer.quotes.length) },
   ].filter((f): f is { label: string; value: string } => f !== null);
 
   return (
@@ -76,7 +102,7 @@ export default async function ExpertPage() {
       <Spine
         at="expert"
         facts={[
-          { id: 'quote', fact: `${result.quotes.length} priced` },
+          { id: 'quote', fact: `${offer.quotes.length} priced` },
           { id: 'expert', fact: 'Reading it with you' },
         ]}
       />
@@ -110,7 +136,7 @@ export default async function ExpertPage() {
                 {ARCHITECT.name}
               </h2>
               <p className="m-0 mt-1.5 text-[14px] text-[var(--ink2)]">
-                {ARCHITECT.role} · {ARCHITECT.credential}
+                {ARCHITECT.role}
               </p>
             </div>
           </div>
@@ -118,6 +144,9 @@ export default async function ExpertPage() {
           <p className="m-0 mb-6 max-w-[60ch] text-[15px] leading-[1.65] text-[var(--ink)]">
             &ldquo;{ARCHITECT.says}&rdquo;
           </p>
+
+          <CallOffer offer={callOffer} className="mb-5" />
+          <BenefitChips worth className="mb-6" />
 
           <div className="flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-[var(--line)] pt-5">
             {architectFacts().map((f) => (
@@ -165,7 +194,7 @@ export default async function ExpertPage() {
                   : 'Your style answers'
               }
             />
-            <Read label={`All ${result.quotes.length} quotes, line by line, with the materials`} />
+            <Read label={`All ${offer.quotes.length} quotes, line by line, with the materials`} />
             <Read label="Every studio's verification standing and delivery record" />
           </ul>
           <p className="m-0 mt-4 max-w-[58ch] text-[13.5px] leading-[1.6] text-[var(--ink2)]">
@@ -178,17 +207,17 @@ export default async function ExpertPage() {
             they expected four should be told it is about rates and not about
             fit, and a studio absent for a reason we could state and did not is
             the sort of silence people notice later. */}
-        {result.skipped.length > 0 ? (
+        {offer.skipped.length > 0 ? (
           <Sheet className="mb-8 px-5 py-4">
             <p className="m-0 max-w-[58ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-              {result.skipped.length === 1
-                ? `${result.skipped[0]!.name} suits this brief but has not published rates for all of this work yet, so we cannot put a number against their name — and a studio on this call without a quote would be one you could not compare.`
-                : `${result.skipped.length} studios that suit this brief have not published rates for all of this work yet. We have left them out rather than show you a name with no number against it.`}
+              {offer.skipped.length === 1
+                ? `${offer.skipped[0]!.name} suits this brief but has not published rates for all of this work yet, so we cannot put a number against their name — and a studio on this call without a quote would be one you could not compare.`
+                : `${offer.skipped.length} studios that suit this brief have not published rates for all of this work yet. We have left them out rather than show you a name with no number against it.`}
             </p>
           </Sheet>
         ) : null}
 
-        {result.quotes.length === 1 ? (
+        {offer.quotes.length === 1 ? (
           <Sheet className="mb-8 px-5 py-4">
             <p className="m-0 max-w-[58ch] text-[14.5px] leading-[1.6]">
               There is one studio we can quote for this brief today, so this call is about whether
@@ -204,12 +233,15 @@ export default async function ExpertPage() {
           maxStudios={MAX_STUDIOS}
           defaultName={user.name}
           defaultEmail={user.email}
-          studios={result.quotes.map((q) => ({
+          slots={slots.map((s) => s.startsAt)}
+          fromBrief={briefQuestions(brief)}
+          studios={offer.quotes.map((q) => ({
             id: q.studioId,
             name: q.studioName,
-            lowPaise: q.quote.lowPaise,
-            highPaise: q.quote.highPaise,
+            lowPaise: q.lowPaise,
+            highPaise: q.highPaise,
           }))}
+          preselected={offer.quotes.filter((q) => q.compared).map((q) => q.studioId)}
         />
       </Wrap>
 
@@ -230,8 +262,10 @@ function Read({ label }: { label: string }) {
   );
 }
 
+/** "Ar. Swarupa Tondare" → "Swarupa": the title is not a name. */
 function firstName(full: string): string {
-  return full.split(' ')[0] ?? full;
+  const words = full.split(' ').filter((w) => !/^(ar|dr|mr|ms|mrs)\.?$/i.test(w));
+  return words[0] ?? full;
 }
 
 function localityLabel(slug: string | null): string | null {

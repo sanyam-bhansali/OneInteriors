@@ -33,10 +33,10 @@ export interface Architect {
   name: string;
   /** Their standing, in their own terms. */
   role: string;
-  /** Years practising. A number, because this is the evidence. */
-  years: number;
-  /** Briefs read on this platform. Matches the figure used on the landing page. */
-  briefsRead: number;
+  /** Years practising. A number, because this is the evidence. Null: not given yet, not shown. */
+  years: number | null;
+  /** Briefs read on this platform. Null until there is a real count, and not shown. */
+  briefsRead: number | null;
   /** Where they trained or registered. */
   credential: string;
   /** Two sentences, first person, no adjectives about themselves. */
@@ -44,23 +44,29 @@ export interface Architect {
 }
 
 /** Flip to true only when a real person's details are in the object below. */
-export const ARCHITECT_IS_REAL = false;
+export const ARCHITECT_IS_REAL = true;
 
+/**
+ * The owner's named expert, 30 Sep 2026. Three colleagues cover her hours
+ * when she is away; the booking takes whoever holds the slot. Years
+ * practising and the COA number are still to come from the owner — shown
+ * only once they are real.
+ */
 export const ARCHITECT: Architect = {
-  name: 'Ira Deshmukh',
-  role: 'Principal architect, One Interiors',
-  years: 12,
-  briefsRead: 68,
-  credential: 'B.Arch, COA registered',
+  name: 'Ar. Swarupa Tondare',
+  role: 'Architect, One Interiors',
+  years: null,
+  briefsRead: null,
+  credential: 'Architect',
   says:
-    'I read the brief, the floor plan and every quote before I ring, so the call starts at the disagreements rather than at your requirements. If none of the studios suits the flat, I will tell you that — no studio pays me, and there is nothing on this call to buy.',
+    'I read your brief, your floor plan and every quote before we speak, so the call starts where the studios differ rather than at your requirements. No studio pays me — if none of them suits your home, I will tell you so, and there is nothing on this call to buy.',
 };
 
 /** The three facts that carry the argument, for the mono strip under the name. */
 export function architectFacts(a: Architect = ARCHITECT): { label: string; value: string }[] {
   return [
-    { label: 'Practising', value: `${a.years} years` },
-    { label: 'Briefs read here', value: String(a.briefsRead) },
+    ...(a.years !== null ? [{ label: 'Practising', value: `${a.years} years` }] : []),
+    ...(a.briefsRead !== null ? [{ label: 'Briefs read here', value: String(a.briefsRead) }] : []),
     { label: 'Paid by a studio', value: 'Never' },
   ];
 }

@@ -31,6 +31,7 @@
  * focus away from the table.
  */
 
+import { MATERIAL_PHOTOS } from '@/data/material-photos';
 import { useEffect, useState } from 'react';
 import { splitSpec, type Material } from '@/modules/materials/glossary';
 import { MaterialArt } from './MaterialArt';
@@ -204,6 +205,21 @@ export function MaterialPanel({
       <div className="mx-auto w-full max-w-[72rem] px-[clamp(16px,4vw,40px)] py-6">
         <div className="flex items-start justify-between gap-5">
           <div className="min-w-0 flex-1">
+            {/* A real close-up where we have one (queue item 23). */}
+            {MATERIAL_PHOTOS[m.id] ? (
+              <figure className="m-0 mb-4 max-w-[28rem]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`${MATERIAL_PHOTOS[m.id]!.src}?auto=format&fit=crop&w=720&h=360&q=70`}
+                  alt={MATERIAL_PHOTOS[m.id]!.alt}
+                  className="block aspect-[2/1] w-full rounded-[8px] object-cover"
+                  loading="lazy"
+                />
+                <figcaption className="mt-1 text-[11px] text-[var(--ink2)]">
+                  Photo: {MATERIAL_PHOTOS[m.id]!.photographer} / Unsplash
+                </figcaption>
+              </figure>
+            ) : null}
             <MaterialCard material={m} />
           </div>
 

@@ -26,6 +26,7 @@ const FULL: BriefFacts = {
   budgetMinLakhs: 12,
   budgetMaxLakhs: 18,
   moveInBy: new Date('2027-03-01T00:00:00Z'),
+  possessionStatus: null,
   possessionOn: new Date('2026-12-01T00:00:00Z'),
 };
 
@@ -38,6 +39,7 @@ const EMPTY: BriefFacts = {
   budgetMinLakhs: null,
   budgetMaxLakhs: null,
   moveInBy: null,
+  possessionStatus: null,
   possessionOn: null,
 };
 
@@ -77,9 +79,22 @@ describe('briefSummary', () => {
     expect(s).toContain('March 2027');
   });
 
-  it('prefers move-in over possession — one is a target, the other is fixed', () => {
+  it('reads an older brief by its move-in date, then its possession month', () => {
     expect(briefSummary(FULL)).not.toContain('December 2026');
     expect(briefSummary({ ...FULL, moveInBy: null })).toContain('Possession December 2026');
+  });
+
+  // Q9 asks about possession since 29 Sep. The answer is what the studio
+  // plans around, so it wins over a move-in date left from an older brief.
+  it('says the possession answer in the words the customer saw', () => {
+    expect(briefSummary({ ...FULL, possessionStatus: 'EXPECTED' })).toContain(
+      'Possession expected December 2026.',
+    );
+    expect(briefSummary({ ...FULL, possessionStatus: 'HAVE_KEYS' })).toContain('Has the keys.');
+    expect(briefSummary({ ...FULL, possessionStatus: 'NOT_SURE' })).toContain(
+      'Possession date not known yet.',
+    );
+    expect(briefSummary({ ...FULL, possessionStatus: 'HAVE_KEYS' })).not.toContain('March 2027');
   });
 
   it('never prints "undefined" for an enum wider than the TS union', () => {

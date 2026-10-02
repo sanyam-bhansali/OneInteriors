@@ -6,17 +6,19 @@
  * ## Why this is not just a link to /quiz
  *
  * Every entry point on the site pointed at `/quiz`, which is right exactly
- * once — the first time. Come back after finishing the nine questions and the
- * button labelled "Get my quotes" walks you into question one, which reads as
- * the product having forgotten you rather than as a fresh start.
+ * once — the first time. Come back after finishing the brief and the button
+ * labelled "Get my quotes" walks you into question one, which reads as the
+ * product having forgotten you rather than as a fresh start.
  *
  * So the button resumes. Where it goes is decided by how far the brief in this
  * browser actually got:
  *
- *  - nothing answered      → `/quiz`
+ *  - nothing answered       → `/quiz`
  *  - answered, not finished → `/quiz` ("Finish your brief")
- *  - finished, no band      → `/tier`
- *  - band chosen           → `/quotes`
+ *  - finished               → `/match`, where the quotes are
+ *
+ * There used to be a "finished, no band" branch to `/tier`. The band is chosen
+ * inside the brief now, so a finished brief always has one.
  *
  * ## Why the browser's copy and not the server's
  *
@@ -53,17 +55,10 @@ function resumeFrom(): Resume {
   const brief = loadBrief();
 
   if (isBriefComplete(brief) && brief.completedAt) {
-    if (brief.tier) {
-      return {
-        href: '/quotes',
-        label: 'See my quotes',
-        note: 'You finished your brief — picking up where you left off.',
-      };
-    }
     return {
-      href: '/tier',
-      label: 'See what it costs',
-      note: 'Your brief is done. One question left before your quotes.',
+      href: '/match',
+      label: 'See my matches',
+      note: 'You finished your brief — picking up where you left off.',
     };
   }
 
@@ -71,7 +66,7 @@ function resumeFrom(): Resume {
     return {
       href: '/quiz',
       label: 'Finish my brief',
-      note: `You were on question ${brief.lastStep}. Nothing was lost.`,
+      note: 'You were part-way through. Nothing was lost.',
     };
   }
 

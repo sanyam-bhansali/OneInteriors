@@ -3,6 +3,8 @@ import {
   buildFirstQuote,
   compareQuotes,
   itemsFor,
+  runSourceOf,
+  homeShapeFor,
   STANDARD_KITCHEN_RUN_MM,
   standardKitchenRunMm,
   type QuoteInput,
@@ -289,5 +291,89 @@ describe('standardKitchenRunMm', () => {
       expect(standardKitchenRunMm(bhk)).toBeGreaterThanOrEqual(3410 - 200);
       expect(standardKitchenRunMm(bhk)).toBeLessThanOrEqual(5240);
     }
+  });
+});
+
+/**
+ * A plan that was never read is not a measurement.
+ *
+ * The quote gate offered a floor-plan upload that nothing read. It recorded
+ * `source: 'floor_plan'` with no kitchen run, and the quote then priced the
+ * standard run while claiming ±10% and "read from your floor plan". Journeys
+ * restored from a customer's browser can still carry that shape.
+ */
+describe('an unread floor plan', () => {
+  const unread: QuoteInput = { ...BASE, kitchenRunMm: null, runSource: 'floor_plan' };
+
+  it('is priced exactly like the standard kitchen', () => {
+    const standard = buildFirstQuote({ ...unread, runSource: 'standard' }, ratesFor(100_00));
+    const q = buildFirstQuote(unread, ratesFor(100_00));
+
+    expect(q.totalPaise).toBe(standard.totalPaise);
+    expect(q.variancePct).toBe(0.16);
+  });
+
+  it('never claims the plan was read', () => {
+    const q = buildFirstQuote(unread, ratesFor(100_00));
+    expect(q.assumptions.join(' ')).not.toMatch(/floor plan\./);
+    expect(q.assumptions[0]).toMatch(/^No floor plan yet/);
+    expect(q.lines.filter((l) => l.room === 'KITCHEN').every((l) => l.standard)).toBe(true);
+  });
+
+  it('keeps a real reading as a reading', () => {
+    expect(runSourceOf({ kitchenRunMm: 3410, source: 'floor_plan' })).toBe('floor_plan');
+    expect(runSourceOf({ kitchenRunMm: null, source: 'floor_plan' })).toBe('standard');
+    expect(runSourceOf({ kitchenRunMm: null, source: 'customer' })).toBe('standard');
+  });
+});
+
+/**
+ * FINDINGS 2.8: a brief without an area was quoted as 850 sq ft, and a brief
+ * without a configuration as a 2 BHK, with nothing on the document admitting
+ * either. The area now follows the configuration and is printed as assumed.
+ */
+describe('the home the quote is built for', () => {
+  it('uses the typical area for their configuration, and flags it', () => {
+    expect(homeShapeFor({ propertyType: 'BHK_4_PLUS', carpetAreaSqft: null })).toEqual({
+      bhk: 4,
+      carpetAreaSqft: 1650,
+      carpetAreaAssumed: true,
+      bathrooms: 4,
+      scope: { scope: 'FULL_HOME', scopeRooms: [], excludedItems: [], adds: [] },
+      plan: null,
+    });
+  });
+
+  // A confirmed floor plan sizes the kitchen and the bathrooms, and skips the
+  // "measure your kitchen" gate with a reading the ±10% is entitled to.
+  it('uses a confirmed floor plan for the kitchen and the bathrooms', () => {
+    const shape = homeShapeFor({
+      propertyType: 'BHK_3',
+      carpetAreaSqft: 1180,
+      floorPlanName: 'tower-b.pdf',
+      planReading: { kitchenRunMm: 4200, bathrooms: 2, hasStudy: true, areaSource: 'printed' },
+    });
+    expect(shape.bathrooms).toBe(2);
+    expect(shape.plan).toEqual({ fileName: 'tower-b.pdf', kitchenRunMm: 4200, source: 'floor_plan' });
+    expect(
+      homeShapeFor({
+        propertyType: 'BHK_3',
+        carpetAreaSqft: 1180,
+        planReading: { kitchenRunMm: null, bathrooms: 2, hasStudy: false, areaSource: null },
+      }).plan,
+    ).toBeNull();
+  });
+
+  it('uses their own area when they gave one', () => {
+    const shape = homeShapeFor({ propertyType: 'BHK_3', carpetAreaSqft: 1180 });
+    expect(shape.carpetAreaSqft).toBe(1180);
+    expect(shape.carpetAreaAssumed).toBe(false);
+  });
+
+  it('says on the document when the area was assumed', () => {
+    const assumed = buildFirstQuote({ ...BASE, carpetAreaAssumed: true }, ratesFor(100_00));
+    const given = buildFirstQuote({ ...BASE, carpetAreaAssumed: false }, ratesFor(100_00));
+    expect(assumed.assumptions.join(' ')).toMatch(/Carpet area taken as 850 sq ft, typical for a 2 BHK/);
+    expect(given.assumptions.join(' ')).not.toMatch(/Carpet area taken as/);
   });
 });

@@ -22,7 +22,7 @@ import { requireRole, getCurrentUser, hasRole } from '@/modules/auth/session';
 import { myStudioId } from '@/modules/studio/tenancy';
 import { ingestQuotations } from './ingest';
 import { extractArchive } from './extract-agent';
-import type { StudioRates } from './catalogue';
+import { MIN_QUOTATIONS_PER_ITEM, rateCanGoLive, type StudioRates } from './catalogue';
 import { confidenceOf } from './analysis-states';
 import type { FiledRateView } from './analysis-states';
 import { productsFromArchive, bridgeSummary } from '@/modules/studio-quote/from-archive';
@@ -362,7 +362,13 @@ export async function approveRates(archiveId: string): Promise<ReviewResult> {
   if (pending.length === 0) return { ok: false, error: 'Nothing pending on this archive.' };
 
   const studioId = pending[0]!.studioId;
-  const codes = pending.map((p) => p.code);
+  /* The per-item floor. A rate from fewer than MIN_QUOTATIONS_PER_ITEM
+     quotations is set aside with a note rather than put in force — the quote
+     then names that item as not filed, which is true, instead of pricing it
+     off a median of three. */
+  const going = pending.filter((p) => rateCanGoLive(p.fromQuotations));
+  const held = pending.filter((p) => !rateCanGoLive(p.fromQuotations));
+  const codes = going.map((p) => p.code);
 
   await prisma.$transaction(async (tx) => {
     /* The rate these replace. Superseded rather than deleted: an existing
@@ -374,9 +380,21 @@ export async function approveRates(archiveId: string): Promise<ReviewResult> {
     });
 
     await tx.studioFiledRate.updateMany({
-      where: { id: { in: pending.map((p) => p.id) } },
+      where: { id: { in: going.map((p) => p.id) } },
       data: { state: 'LIVE', reviewedAt: new Date(), reviewedById: user?.id ?? null },
     });
+
+    if (held.length > 0) {
+      await tx.studioFiledRate.updateMany({
+        where: { id: { in: held.map((p) => p.id) } },
+        data: {
+          state: 'REJECTED',
+          note: `Fewer than ${MIN_QUOTATIONS_PER_ITEM} of your quotations price this — send more that include it and it will be priced.`,
+          reviewedAt: new Date(),
+          reviewedById: user?.id ?? null,
+        },
+      });
+    }
 
     await tx.quotationArchive.update({
       where: { id: archiveId },
@@ -399,7 +417,7 @@ export async function approveRates(archiveId: string): Promise<ReviewResult> {
    */
   const catalogue = await fillProductMaster(studioId, pending);
 
-  return { ok: true, live: pending.length, catalogue };
+  return { ok: true, live: going.length, catalogue };
 }
 
 /**

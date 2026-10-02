@@ -26,10 +26,9 @@
 
 import { headers } from 'next/headers';
 import { cachedRoster } from '@/modules/studio/roster-cache';
-import { rankStudios } from '@/modules/matching/score';
+import { rankOnServer } from '@/modules/matching/rank-server';
 import { explainMatch, type Explanation } from '@/modules/matching/explain';
 import { sanitiseBrief } from '@/modules/matching/sanitise';
-import { showUnverifiedStudios } from '@/lib/env';
 import type { Brief } from '@/modules/brief/types';
 
 /**
@@ -99,10 +98,9 @@ export async function explainAction(brief: Brief, studioId: string): Promise<Exp
   const studio = studios.find((s) => s.id === studioId);
   if (!studio) return { text: '', source: 'rules' };
 
-  // Recomputed here rather than trusting a score posted from the browser.
-  const match = rankStudios(safe, studios, 99, {
-    allowUnverified: showUnverifiedStudios(),
-  }).find((m) => m.studioId === studioId);
+  // Recomputed here rather than trusting a score posted from the browser —
+  // on the same rates the card was scored on, or the two would disagree.
+  const match = (await rankOnServer(safe, studios, 99)).find((m) => m.studioId === studioId);
 
   if (!match) return { text: '', source: 'rules' };
 

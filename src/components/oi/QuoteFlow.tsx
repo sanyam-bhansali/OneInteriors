@@ -21,16 +21,26 @@
  * down the road who would have guessed a number over the phone.
  */
 
+import { QuotePlan, roomAnchor } from './QuotePlan';
+import { showcase } from '@/modules/portal/benefits';
 import { useCallback, useState } from 'react';
 import { formatINRCompact } from '@/lib/money';
-import { buildFirstQuote, standardKitchenRunMm, type FirstQuote } from '@/modules/quotation/first-quote';
+import {
+  buildFirstQuote,
+  runSourceOf,
+  standardKitchenRunMm,
+  type FirstQuote,
+} from '@/modules/quotation/first-quote';
 import { filedRatesFor, ratesAreReal } from '@/data/filed-rates';
 import type { StudioRates } from '@/modules/quotation/catalogue';
+import type { ScopeSelection } from '@/modules/quotation/scope';
 import type { Material } from '@/modules/materials/glossary';
 import type { FloorPlan } from '@/modules/quotation/project-store';
-import { Building } from './Building';
+import { Building, stagesFor } from './Building';
 import { Spec, MaterialPanel } from './Material';
-import { Sheet, DocRow, Tick, Flag } from './index';
+import { Sheet, DocRow, Flag } from './index';
+import { Mark } from '@/components/brand';
+import { advanceIsHigh, phaseAmounts, type PaymentPhase } from '@/modules/studio/payment-phases';
 
 type Phase = 'gate' | 'building' | 'done';
 
@@ -39,7 +49,13 @@ export interface QuoteRequest {
   studioName: string;
   bhk: number;
   carpetAreaSqft: number;
+  /** The typical area for their configuration, not a figure they gave. */
+  carpetAreaAssumed?: boolean;
   bathrooms: number;
+  /** What the quote covers. See modules/quotation/scope.ts. */
+  scope?: ScopeSelection;
+  /** The kitchen from their confirmed floor plan, which skips the gate. */
+  plan?: FloorPlan | null;
 }
 
 // ── The gate ────────────────────────────────────────────────────
@@ -50,20 +66,19 @@ const input =
 /**
  * The gate.
  *
- * ## Why the way through is on the first screen now
+ * ## Why there is no floor-plan upload here, for now
  *
- * It used to read "Send us the floor plan", with the standard-kitchen path
- * two presses further on, behind "I haven't got the plan to hand". That is
- * the right emphasis and the wrong gate: most people arriving here do not
- * have a PDF of their flat on the device they are browsing on, and a screen
- * that asks for one before showing anything is a screen a good share of them
- * leave at.
+ * There was one: "Send us the floor plan", a file input, and a "Build my
+ * quote" button that promised ±10%. Nothing read the file. Its name was
+ * recorded, the kitchen was priced on the standard run anyway, and the
+ * document then said "Kitchen priced on a platform run read from your floor
+ * plan" — a measurement nobody took, printed on the one page whose whole
+ * claim is that it says what it assumed.
  *
- * So all three ways are visible at once, in the order of how much they
- * improve the answer, and each says what it costs: a plan gives ±10%, a
- * measured run ±12%, the standard kitchen ±16%. Nobody has to guess which
- * button is the one that lets them through, and nobody is misled about what
- * the quick one is worth.
+ * Reading a plan properly — Claude reads it, the customer confirms what was
+ * read — is Phase 2 of `docs/CUSTOMER-JOURNEY-PLAN.md`, and it moves into the
+ * brief so it sizes every studio's quote at once. Until then the gate offers
+ * only what is true: a kitchen they measured (±12%) or a standard one (±16%).
  *
  * The standard run is sized to their configuration — see
  * `standardKitchenRunMm`. A 1 BHK and a 4 BHK do not have the same kitchen,
@@ -71,9 +86,7 @@ const input =
  * whole build.
  */
 function Gate({ onReady, bhk }: { onReady: (plan: FloorPlan) => void; bhk: number }) {
-  const [fileName, setFileName] = useState<string | null>(null);
   const [runMm, setRunMm] = useState('');
-  const [noPlan, setNoPlan] = useState(false);
 
   const typed = Number(runMm);
   const runIsSane = Number.isFinite(typed) && typed >= 1500 && typed <= 9000;
@@ -83,125 +96,62 @@ function Gate({ onReady, bhk }: { onReady: (plan: FloorPlan) => void; bhk: numbe
     <Sheet className="mx-auto max-w-[36rem] p-[clamp(22px,3vw,32px)]">
       <p className="oi-eyebrow m-0 mb-4">Before we price it</p>
       <h2 className="oi-display m-0 mb-3 text-[clamp(1.5rem,1.2rem+1.2vw,2rem)]">
-        Send us the floor plan.
+        One number decides most of the quote.
       </h2>
       <p className="m-0 mb-6 text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-        One number on it decides most of the quote — the length of your kitchen platform. With the
-        plan we price your kitchen; without it we price a typical one and say so.
+        The length of your kitchen platform. Measure it and we price your kitchen; skip it and we
+        price a typical one for a {bhk} BHK, and say so on the quote.
       </p>
 
-      {!noPlan ? (
-        <>
-          <label className="mb-5 block">
-            <span className="oi-label mb-2 block">Floor plan · PDF or photo</span>
-            <input
-              type="file"
-              accept=".pdf,image/*"
-              onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
-              className={input}
-            />
-          </label>
+      {/* One press, first. Most people are not standing in their kitchen with
+          a tape measure, and the alternative to this button is not a better
+          quote — it is no quote and a closed tab. */}
+      <button
+        type="button"
+        onClick={() => onReady({ fileName: null, kitchenRunMm: standardRun, source: 'standard' })}
+        className="cursor-pointer px-6 py-3 text-[14.5px] font-medium text-white transition-colors"
+        style={{ background: 'var(--acc-btn)' }}
+      >
+        Price it now on a standard {bhk} BHK kitchen
+      </button>
+      <p className="m-0 mt-2.5 text-[12.5px] leading-snug text-[var(--ink2)]">
+        A {standardRun.toLocaleString('en-IN')}mm platform, which is what a {bhk} BHK usually has.
+        Every other size in the quote is standard anyway. The range is ±16%, and the document says
+        so.
+      </p>
 
-          {fileName ? (
-            <p className="m-0 mb-5 flex items-center gap-2.5 text-[13.5px]">
-              <Tick style={{ color: 'var(--sec)' }} />
-              <span>{fileName}</span>
-            </p>
-          ) : null}
+      <div className="mt-7 border-t border-[var(--line)] pt-5">
+        <label className="mb-2 block">
+          <span className="oi-label mb-2 block">Or tell us your kitchen platform, in mm</span>
+          <input
+            inputMode="numeric"
+            value={runMm}
+            onChange={(e) => setRunMm(e.target.value.replace(/\D/g, ''))}
+            placeholder="e.g. 3600"
+            className={`${input} oi-num`}
+          />
+        </label>
+        <p className="m-0 mb-4 text-[13px] leading-snug text-[var(--ink2)]">
+          Measure the run your counter sits on. Most Pune flats are between 3,000 and 5,500mm. A
+          rough number is worth more than none, and it narrows the range to ±12%.
+        </p>
 
-          <div className="flex flex-wrap items-center gap-4">
-            <button
-              type="button"
-              disabled={!fileName}
-              onClick={() =>
-                onReady({ fileName, kitchenRunMm: null, source: 'floor_plan' })
-              }
-              className="cursor-pointer px-6 py-3 text-[14.5px] font-medium text-white transition-colors disabled:opacity-40"
-              style={{ background: 'var(--acc-btn)' }}
-            >
-              Build my quote
-            </button>
-            {/* The way through. Quiet, but never hidden — a gate with no
-                visible exit is a gate people leave the site at. */}
-            <button
-              type="button"
-              onClick={() => setNoPlan(true)}
-              className="cursor-pointer border-0 bg-transparent p-0 text-[13.5px] text-[var(--ink2)] underline hover:text-[var(--ink)]"
-            >
-              I know my kitchen measurement
-            </button>
-          </div>
-
-          {/* One press, from the first screen. Most people do not have a
-              floor plan on the phone they are reading this on, and the
-              alternative to this button is not a better quote — it is no
-              quote and a closed tab. */}
-          <div className="mt-6 border-t border-[var(--line)] pt-5">
-            <button
-              type="button"
-              onClick={() =>
-                onReady({ fileName: null, kitchenRunMm: standardRun, source: 'standard' })
-              }
-              className="cursor-pointer border border-[var(--line)] bg-transparent px-5 py-2.5 text-[14px] font-medium text-[var(--ink)] transition-colors hover:border-[var(--ink)]"
-            >
-              Price it now on a standard {bhk} BHK kitchen
-            </button>
-            <p className="m-0 mt-2.5 text-[12.5px] leading-snug text-[var(--ink2)]">
-              A {standardRun.toLocaleString('en-IN')}mm platform, which is what a {bhk} BHK usually
-              has. Every other size in the quote is standard anyway — this is the one the plan
-              would change. It widens the band from ±10% to ±16%, and the document says so.
-            </p>
-          </div>
-        </>
-      ) : (
-        <>
-          <label className="mb-2 block">
-            <span className="oi-label mb-2 block">
-              How long is your kitchen platform, in mm?
-            </span>
-            <input
-              inputMode="numeric"
-              value={runMm}
-              onChange={(e) => setRunMm(e.target.value.replace(/\D/g, ''))}
-              placeholder="e.g. 3600"
-              className={`${input} oi-num`}
-            />
-          </label>
-          <p className="m-0 mb-6 text-[13px] leading-snug text-[var(--ink2)]">
-            Measure the run your counter sits on. Most Pune flats are between 3,000 and 5,500mm. A
-            rough number is worth more than none.
+        {/* Says what is missing rather than sitting greyed out — a disabled
+            button is a puzzle that says no without saying why. */}
+        {runIsSane ? (
+          <button
+            type="button"
+            onClick={() => onReady({ fileName: null, kitchenRunMm: typed, source: 'customer' })}
+            className="cursor-pointer border border-[var(--ink)] bg-transparent px-5 py-2.5 text-[14px] font-medium text-[var(--ink)]"
+          >
+            Build it on {typed.toLocaleString('en-IN')}mm
+          </button>
+        ) : runMm ? (
+          <p className="m-0 text-[13px] text-[var(--ink2)]">
+            That is outside 1,500–9,000mm — check the number, or use the standard kitchen above.
           </p>
-
-          <div className="flex flex-wrap items-center gap-4">
-            <button
-              type="button"
-              disabled={!runIsSane}
-              onClick={() => onReady({ fileName: null, kitchenRunMm: typed, source: 'customer' })}
-              className="cursor-pointer px-6 py-3 text-[14.5px] font-medium text-white transition-colors disabled:opacity-40"
-              style={{ background: 'var(--acc-btn)' }}
-            >
-              Build my quote
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                onReady({
-                  fileName: null,
-                  kitchenRunMm: standardRun,
-                  source: 'standard',
-                })
-              }
-              className="cursor-pointer border-0 bg-transparent p-0 text-[13.5px] text-[var(--ink2)] underline hover:text-[var(--ink)]"
-            >
-              Use a standard {bhk} BHK kitchen instead
-            </button>
-          </div>
-
-          <p className="m-0 mt-5 border-t border-[var(--line)] pt-4">
-            <Flag>A standard kitchen widens the quote from ±10% to ±16%</Flag>
-          </p>
-        </>
-      )}
+        ) : null}
+      </div>
     </Sheet>
   );
 }
@@ -212,10 +162,25 @@ export function QuoteDocument({
   quote,
   studioName,
   plan,
+  preparedFor = null,
+  onMeasured,
+  paymentPhases = null,
+  bandLine = null,
 }: {
   quote: FirstQuote;
   studioName: string;
   plan: FloorPlan;
+  /** "Sanyam · 3 BHK · Kharadi · Full home" — printed under the studio's name. */
+  preparedFor?: string | null;
+  /** The studio's own schedule; null until they file one. */
+  paymentPhases?: PaymentPhase[] | null;
+  /** "Inside your Premium range…" — where this total lands against the band they chose. */
+  bandLine?: string | null;
+  /**
+   * Offered when the kitchen is the standard one: measure it here and every
+   * studio is re-priced on it at once (±16% → ±12%).
+   */
+  onMeasured?: (runMm: number) => void;
 }) {
   const money = (p: number) => formatINRCompact(p);
 
@@ -232,9 +197,29 @@ export function QuoteDocument({
   return (
     <Sheet className="p-[clamp(20px,3vw,34px)]">
       <div className="mb-7 flex flex-wrap items-end justify-between gap-x-8 gap-y-3 border-b border-[var(--ink)] pb-5">
-        <div>
-          <p className="oi-eyebrow m-0 mb-2">First quote · generated</p>
-          <h2 className="oi-display m-0 text-[clamp(1.4rem,1.15rem+1vw,1.9rem)]">{studioName}</h2>
+        {/* The studio's own name and mark on top — the quote is theirs, priced
+            on their rates. Our mark is at the foot, as the platform that
+            built it (the owner's format, 29 Sep; studio logos arrive with the
+            studio profile, until then their initials). */}
+        <div className="flex items-start gap-4">
+          <span
+            aria-hidden="true"
+            className="oi-num flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] bg-[var(--acc-wash)] text-[15px] text-[var(--acc-ink)]"
+          >
+            {studioName
+              .split(/\s+/)
+              .map((w) => w[0])
+              .join('')
+              .slice(0, 2)
+              .toUpperCase()}
+          </span>
+          <div>
+            <p className="oi-eyebrow m-0 mb-2">First quote · generated</p>
+            <h2 className="oi-display m-0 text-[clamp(1.4rem,1.15rem+1vw,1.9rem)]">{studioName}</h2>
+            {preparedFor ? (
+              <p className="m-0 mt-1.5 text-[13.5px] text-[var(--ink2)]">Prepared for {preparedFor}</p>
+            ) : null}
+          </div>
         </div>
         <div className="text-left sm:text-right">
           <p className="oi-num m-0 text-[26px] leading-none">{money(quote.totalPaise)}</p>
@@ -254,8 +239,12 @@ export function QuoteDocument({
         </p>
       ) : null}
 
+      {bandLine ? <p className="m-0 mb-6 text-[13.5px] leading-[1.6] text-[var(--ink2)]">{bandLine}</p> : null}
+
+      <QuotePlan quote={quote} />
+
       {quote.rooms.map((room) => (
-        <section key={room.room} className="mb-7">
+        <section key={room.room} id={roomAnchor(room.room)} className="mb-7 scroll-mt-24">
           {/* The room heading was a 10.5px mono label, the same size as the
               smallest thing on the page. It is a heading; it now reads like
               one. */}
@@ -268,9 +257,20 @@ export function QuoteDocument({
             <DocRow
               key={line.code}
               label={line.label}
-              quantity={`${line.size}  ·  ${line.quantity.toLocaleString('en-IN')} ${line.unit} at ${money(line.ratePaise)} per ${line.unit}`}
+              // Size and quantity, never the rate: a studio's per-unit rate is not
+              // shown on any customer screen (the owner, 30 Sep 2026).
+              quantity={line.unit === 'unit' ? line.size : `${line.size}  ·  ${line.quantity.toLocaleString('en-IN')} ${line.unit}`}
               value={money(line.amountPaise)}
-              note={<Spec text={line.spec} onPick={setTerm} />}
+              note={
+                line.addedFor ? (
+                  <>
+                    <Spec text={line.spec} onPick={setTerm} />
+                    <span className="mt-0.5 block text-[12.5px] text-[var(--acc-ink)]">{line.addedFor}</span>
+                  </>
+                ) : (
+                  <Spec text={line.spec} onPick={setTerm} />
+                )
+              }
             />
           ))}
         </section>
@@ -286,6 +286,13 @@ export function QuoteDocument({
           value={`−${money(quote.modularDiscountPaise)}`}
           better
         />
+        {quote.curatedDiscountPaise ? (
+          <DocRow
+            label={`One Interiors discount · ${quote.curatedDiscountPct}%`}
+            value={`−${money(quote.curatedDiscountPaise)}`}
+            better
+          />
+        ) : null}
         <DocRow label="GST · 18%" value={money(quote.gstPaise)} />
         <DocRow label="Total" value={money(quote.totalPaise)} emphasis />
       </div>
@@ -309,21 +316,116 @@ export function QuoteDocument({
             </li>
           ))}
           <li className="text-[13px] leading-[1.55] text-[var(--ink2)]">
-            {plan.source === 'floor_plan'
-              ? `Read from ${plan.fileName ?? 'your floor plan'}.`
-              : plan.source === 'customer'
-                ? 'Kitchen run as you measured it.'
-                : 'No plan and no measurement — a standard kitchen was used.'}
+            {runSourceOf(plan) === 'customer'
+              ? 'Kitchen run as you measured it.'
+              : 'No measurement — a standard kitchen was used.'}
           </li>
         </ul>
       </div>
 
-      <p className="oi-label m-0 mt-6 border-t border-[var(--line)] pt-4">
+      {/* When money moves. Each studio's own phases, from its quotations or
+          its profile — never a schedule we invented for it. */}
+      <div className="mt-7 border-t border-[var(--line)] pt-5">
+        <p className="oi-label m-0 mb-2">Payment phases</p>
+        {paymentPhases ? (
+          <>
+            {phaseAmounts(paymentPhases, quote.totalPaise).map((p, i) => (
+              <DocRow key={`${p.label}-${i}`} label={`${p.label} · ${p.pct}%`} value={money(p.amountPaise)} />
+            ))}
+            {advanceIsHigh(paymentPhases) ? (
+              <p className="m-0 mt-3 text-[13px] leading-[1.6] text-[var(--ink2)]">
+                {studioName} asks {paymentPhases[0]!.pct}% at booking — more than most Pune studios.
+                Worth asking what it covers before you pay it.
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <p className="m-0 text-[13.5px] leading-[1.6] text-[var(--ink2)]">
+            {studioName} has not filed its payment schedule with us yet. Our expert confirms it with
+            them before you meet — and how much is paid before anything is installed is worth asking.
+          </p>
+        )}
+      </div>
+
+      {onMeasured && runSourceOf(plan) === 'standard' ? (
+        <MeasureKitchen onMeasured={onMeasured} />
+      ) : null}
+
+      <p className="oi-label m-0 mt-6 border-t border-[var(--line)] pt-4 print:hidden">
         Underlined materials open an explanation — what it is, and what the cheaper version costs
       </p>
 
+      {/* Printed too: quotes get forwarded and carried into studio meetings,
+          and the PDF is where a customer is most likely to go direct. */}
+      <div className="mt-6 border-t border-[var(--line)] pt-4">
+        <p className="m-0 mb-1.5 text-[13.5px] font-semibold text-[var(--ink)]">
+          Book this quote through One Interiors to keep:
+        </p>
+        <p className="m-0 text-[13px] leading-[1.6] text-[var(--ink2)]">
+          {showcase().map((b) => b.short).join(' · ')}. Start with your expert call at
+          oneinteriors.in/expert — {studioName} is introduced to you through us.
+        </p>
+      </div>
+
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--ink)] pt-4">
+        <p className="m-0 flex items-center gap-2 text-[12.5px] text-[var(--ink2)]">
+          <Mark className="h-[14px] w-[14px] text-[var(--ink)]" />
+          Powered by One Interiors
+        </p>
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="cursor-pointer border border-[var(--line)] bg-transparent px-4 py-2 text-[13px] text-[var(--ink)] print:hidden"
+        >
+          Print or save as PDF
+        </button>
+      </div>
+
       <MaterialPanel material={term} onClose={() => setTerm(null)} />
     </Sheet>
+  );
+}
+
+/**
+ * Measure the kitchen, and every studio is re-priced on it.
+ *
+ * Offered on a quote priced on the standard kitchen: the platform run is the
+ * number that moves a quote most, and a measured one takes the band from ±16%
+ * to ±12% for every studio at once.
+ */
+function MeasureKitchen({ onMeasured }: { onMeasured: (runMm: number) => void }) {
+  const [value, setValue] = useState('');
+  const n = Number(value);
+  const ok = Number.isFinite(n) && n >= 1500 && n <= 9000;
+  return (
+    <div className="mt-7 border-t border-[var(--line)] pt-5 print:hidden">
+      <p className="oi-label m-0 mb-2">Tighten this quote</p>
+      <p className="m-0 mb-3 text-[13.5px] leading-[1.6] text-[var(--ink2)]">
+        Measure your kitchen platform and every studio is re-priced on it — the range narrows from
+        ±16% to ±12%.
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          inputMode="numeric"
+          value={value}
+          onChange={(e) => setValue(e.target.value.replace(/\D/g, ''))}
+          placeholder="Platform length, mm"
+          className={`${input} oi-num w-48`}
+        />
+        {ok ? (
+          <button
+            type="button"
+            onClick={() => onMeasured(Math.round(n))}
+            className="cursor-pointer px-4 py-2.5 text-[14px] font-medium text-white"
+            style={{ background: 'var(--acc-btn)' }}
+          >
+            Re-price every studio
+          </button>
+        ) : value ? (
+          <span className="text-[13px] text-[var(--ink2)]">Between 1,500 and 9,000 mm.</span>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -369,9 +471,11 @@ export function QuoteFlow({
       {
         bhk: request.bhk,
         carpetAreaSqft: request.carpetAreaSqft,
+        carpetAreaAssumed: request.carpetAreaAssumed,
         bathrooms: request.bathrooms,
+        scope: request.scope,
         kitchenRunMm: usedPlan.kitchenRunMm,
-        runSource: usedPlan.source,
+        runSource: runSourceOf(usedPlan),
       },
       /* The studio's own filed rates when the server resolved them, and the
          placeholder table otherwise. The fallback is not defensive tidiness:
@@ -390,6 +494,11 @@ export function QuoteFlow({
     return (
       <Building
         studioName={request.studioName}
+        stages={stagesFor({
+          bhk: request.bhk,
+          measured: usedPlan !== null && runSourceOf(usedPlan) === 'customer',
+          ratesAreReal: ratesAreReal(),
+        })}
         onDone={finish}
         seenQuestions={seenQuestions}
         onAsked={onAsked}

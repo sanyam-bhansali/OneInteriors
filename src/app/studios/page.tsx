@@ -69,7 +69,7 @@ export default async function StudiosPage() {
                 Not sure which one?
               </h2>
               <p className="m-0 mb-6 max-w-[52ch] text-[var(--color-ink-2)]">
-                Nine questions and we will rank them for your home, with the reasoning shown.
+                Four minutes about your home and we will rank them for it, with the reasoning shown.
               </p>
               <Button href="/quiz" size="lg">
                 Start

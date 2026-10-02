@@ -3,10 +3,10 @@
 import { useActionState, useRef, useState } from 'react';
 import { uploadQuotationsAction, type UploadState } from './actions';
 import {
-  MIN_QUOTATIONS_TO_SEND,
   studioMessage,
   type ArchiveState,
 } from '@/modules/studio/quotation-archive';
+import { MIN_QUOTATIONS_FOR_RATES } from '@/modules/quotation/catalogue';
 import { UploadCloud } from 'lucide-react';
 
 const INITIAL: UploadState = { status: 'idle' };
@@ -78,10 +78,10 @@ export function ArchivePanel({
     return (
       <div className="rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-6">
         <UploadCloud {...PANEL_ICON} className="mb-3 text-[var(--color-ink-3)]" />
-        <p className="label m-0 mb-2 text-[var(--color-petrol)]">Instead of typing all of this</p>
+        <p className="label m-0 mb-2 text-[var(--color-petrol)]">Required to be listed</p>
         <p className="h3 m-0 mb-3">Send us your past quotations.</p>
         <p className="m-0 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--color-ink-2)]">
-          {MIN_QUOTATIONS_TO_SEND} or more and we read them and fill this page in from what you
+          At least {MIN_QUOTATIONS_FOR_RATES}, and we read them and fill this page in from what you
           actually charged. Sending them from here is not switched on yet — email them to{' '}
           <a
             href="mailto:studios@oneinteriors.in?subject=Our%20past%20quotations"
@@ -89,8 +89,8 @@ export function ArchivePanel({
           >
             studios@oneinteriors.in
           </a>{' '}
-          and we will do the same thing by hand. Any format. It does not hold this step up — the
-          rates below still work.
+          and we will do the same thing by hand. Any format. We list a studio only once they are
+          in.
         </p>
       </div>
     );
@@ -102,11 +102,11 @@ export function ArchivePanel({
           eye lands on first when a studio is scanning for the shortcut, and
           the words underneath are what tell them it is one. */}
       <UploadCloud {...PANEL_ICON} className="mb-3 text-[var(--color-petrol)]" />
-      <p className="label m-0 mb-2 text-[var(--color-petrol)]">Instead of typing all of this</p>
+      <p className="label m-0 mb-2 text-[var(--color-petrol)]">Required to be listed</p>
       <p className="h3 m-0 mb-3">Send us your past quotations.</p>
 
       <p className="m-0 mb-4 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--color-ink-2)]">
-        {MIN_QUOTATIONS_TO_SEND} or more and we will read them and fill this page in from your own
+        At least {MIN_QUOTATIONS_FOR_RATES}, and we will read them and fill this page in from your own
         numbers — what you actually charged, not what you can remember charging at nine in the
         evening. Any format: Excel, PDF, Word, photographs of printed ones. A person opens them,
         so anything you can open, we can.
@@ -226,9 +226,10 @@ export function ArchivePanel({
       ) : null}
 
       <p className="m-0 mt-5 border-t border-[var(--color-rule)] pt-4 max-w-[62ch] text-[13.5px] leading-relaxed text-[var(--color-ink-2)]">
-        Fewer than {MIN_QUOTATIONS_TO_SEND}, or would rather not send them? Fill the rates in
-        yourself below. It is the same rate card either way, and you can change any number on it
-        whenever you like.
+        Your quotations are required: we list a studio only once at least{' '}
+        {MIN_QUOTATIONS_FOR_RATES} of its own have been read, because every price a customer sees is
+        built from them. The rate card below can be filled in by hand meanwhile, and you can
+        change any number on it whenever you like.
       </p>
     </div>
   );
