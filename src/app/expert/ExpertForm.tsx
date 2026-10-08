@@ -71,6 +71,7 @@ export function ExpertForm({
   slots = [],
   preselected = [],
   fromBrief = [],
+  initialSlot = null,
 }: {
   briefId: string;
   studios: StudioOption[];
@@ -84,9 +85,11 @@ export function ExpertForm({
   preselected?: string[];
   /** Questions from their possession, household and needs (consultation/brief-questions.ts). */
   fromBrief?: string[];
+  /** A slot already picked in the app (/app/expert), kept only if it is still open. */
+  initialSlot?: string | null;
 }) {
   const [state, action, pending] = useActionState(requestExpertAction, INITIAL);
-  const [slot, setSlot] = useState<string | null>(null);
+  const [slot, setSlot] = useState<string | null>(initialSlot && slots.includes(initialSlot) ? initialSlot : null);
   const booking = slots.length > 0;
   const [picked, setPicked] = useState<string[]>(
     preselected.length > 0 ? preselected.slice(0, maxStudios) : studios.slice(0, 2).map((s) => s.id),

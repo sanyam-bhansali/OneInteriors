@@ -115,6 +115,8 @@ export function audienceFor(
  * is still a page that answered, and it would hand a visitor `/match`.
  */
 const CUSTOMER_APP = [
+  // The installable app (the owner's v1 screens, 8 Oct 2026).
+  '/app',
   '/quiz',
   '/tier',
   '/match',

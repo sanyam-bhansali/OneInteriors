@@ -5,15 +5,15 @@ import type { MetadataRoute } from 'next';
  * opens full-screen, like an app (docs/CUSTOMER-APP-PLAN.md, route B — the
  * installable web app, until the store app covers every screen).
  *
- * Opens on the brief: someone who installed us has already read the home
- * page, and the brief is where the product starts.
+ * Opens on the app (/app): the owner's v1 screens, from the opening film to
+ * the project.
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'One Interiors',
     short_name: 'One Interiors',
     description: 'Verified interior studios in Pune, matched to your home and quoted line by line.',
-    start_url: '/quiz?source=app',
+    start_url: '/app?source=app',
     scope: '/',
     display: 'standalone',
     orientation: 'portrait',

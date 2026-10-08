@@ -28,7 +28,8 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic';
 
-export default async function ExpertPage() {
+export default async function ExpertPage({ searchParams }: { searchParams: Promise<{ slot?: string }> }) {
+  const { slot } = await searchParams;
   const user = await getCurrentUser();
   if (!user) redirect('/sign-in?next=/expert&reason=expert');
 
@@ -234,6 +235,7 @@ export default async function ExpertPage() {
           defaultName={user.name}
           defaultEmail={user.email}
           slots={slots.map((s) => s.startsAt)}
+          initialSlot={typeof slot === 'string' ? slot : null}
           fromBrief={briefQuestions(brief)}
           studios={offer.quotes.map((q) => ({
             id: q.studioId,
