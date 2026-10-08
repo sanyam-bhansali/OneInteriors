@@ -163,7 +163,9 @@ export async function askGeio({
       }),
     });
     if (!response.ok) {
-      console.error('[geio] model call failed', response.status);
+      // Anthropic's own error type and message — never the request, which carries the key.
+      const body = (await response.json().catch(() => null)) as { error?: { type?: string; message?: string } } | null;
+      console.error('[geio] model call failed', response.status, body?.error?.type ?? '', (body?.error?.message ?? '').slice(0, 300));
       return null;
     }
     const json = (await response.json()) as {
