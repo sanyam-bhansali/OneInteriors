@@ -30,7 +30,8 @@
  */
 
 import { useActionState, useMemo, useState } from 'react';
-import { slotLabel } from '@/modules/consultation/slots';
+import { googleCalendarUrl, slotLabel } from '@/modules/consultation/slots';
+import { ARCHITECT } from '@/modules/consultation/architect';
 import { SlotPicker } from '@/components/SlotPicker';
 import { formatINRCompact } from '@/lib/money';
 import { Sheet, Tick } from '@/components/oi';
@@ -137,11 +138,46 @@ export function ExpertForm({
             ? 'Thirty minutes, and we ring you. The invite is in your email if you gave us one. Before the call the expert reads your brief, your floor plan and every quote on your comparison — you will not have to explain any of it again.'
             : 'Someone will be in touch within one working day to fix a time. Before the call they will read your brief, your floor plan and every quote on your comparison — you will not have to explain any of it again.'}
         </p>
-        {asks.length > 0 ? (
-          <p className="m-0 mb-6 max-w-[58ch] text-[15px] leading-[1.65] text-[var(--ink2)]">
-            They will come to the call with your {asks.length} question
-            {asks.length === 1 ? '' : 's'} already looked into, so the call starts at the answer
-            rather than at the question.
+        {/* Who, and the agenda — their own questions, in their order — so the
+            call reads as a working session they set, not a sales call
+            (principle 9, docs/UX-PRINCIPLES-PLAN.md; Superhuman, Calendly). */}
+        <p className="m-0 mb-5 text-[15px] text-[var(--ink)]">
+          With <strong className="font-semibold">{ARCHITECT.name}</strong> · {ARCHITECT.role}
+        </p>
+        {asks.length > 0 || own.trim() ? (
+          <div className="mb-6 rounded-[18px] bg-[var(--card)] p-5">
+            <p className="oi-label m-0 mb-3">Your agenda</p>
+            <ol className="m-0 flex list-decimal flex-col gap-2 pl-5 text-[15px] leading-[1.5] text-[var(--ink)]">
+              {asks.map((q) => (
+                <li key={q}>{q}</li>
+              ))}
+              {own.trim() ? <li>{own.trim()}</li> : null}
+            </ol>
+            <p className="m-0 mt-3 text-[13.5px] text-[var(--ink2)]">
+              Looked into before the call, so it starts at the answers.
+            </p>
+          </div>
+        ) : null}
+        {state.scheduledFor ? (
+          <p className="m-0 mb-6">
+            <a
+              href={googleCalendarUrl({
+                startsAt: state.scheduledFor,
+                title: `One Interiors · call with ${ARCHITECT.name}`,
+                details: [
+                  'Thirty minutes about your home and your quotes. We ring you.',
+                  ...asks.map((q) => `• ${q}`),
+                  own.trim() ? `• ${own.trim()}` : '',
+                ]
+                  .filter(Boolean)
+                  .join('\n'),
+              })}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-11 items-center rounded-full border border-[var(--line)] px-5 text-[14px] font-medium text-[var(--ink)] no-underline hover:border-[var(--ink)]"
+            >
+              Add to Google Calendar
+            </a>
           </p>
         ) : null}
 

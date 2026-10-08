@@ -113,8 +113,13 @@ export function budgetPosition(brief: Brief, studio: Studio, ctx: SignalContext)
       const missing = quote.notPriced.length * 8;
       return {
         value: clamp(100 - position * 70 - missing),
+        /* Below the floor is said as below. "At the bottom of your range"
+           for a quote ₹1.4 L under it contradicted the quote page itself
+           (review, 8 Oct). */
         evidence:
-          position <= 0
+          work < band.lowPaise * 0.98
+            ? 'Their quote for your home comes in below your range'
+            : position <= 0.05
             ? 'Their quote for your home comes in at the bottom of your range'
             : position >= 1
               ? 'Their quote for your home comes in above your range'
@@ -293,7 +298,11 @@ export function priorities(brief: Brief, studio: Studio, ctx: SignalContext): Si
     if (!s) return;
     weighted += s.value * PRIORITY_SPLIT[i]!;
     weight += PRIORITY_SPLIT[i]!;
-    evidence ??= s.evidence;
+    /* The first priority is answered on its own, in bold, by
+       `topPriorityLine` (score.ts). Quoting it again here put the same
+       sentence on the card two or three times (review, 8 Oct), so the
+       evidence comes from the next priority that has something to say. */
+    if (i > 0) evidence ??= s.evidence;
   });
   return weight === 0 ? null : { value: weighted / weight, evidence };
 }

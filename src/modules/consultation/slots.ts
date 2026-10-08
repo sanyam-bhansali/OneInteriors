@@ -119,6 +119,34 @@ export function slotLabel(iso: string): { day: string; time: string } {
 const icsDate = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
 const icsText = (s: string) => s.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/([,;])/g, '\\$1');
 
+/**
+ * "Add to Google Calendar" for one call, straight from the confirmation
+ * screen (principle 9, docs/UX-PRINCIPLES-PLAN.md; Calendly). A link, not a
+ * file: it works on every phone without a download, and the email still
+ * carries the .ics for everything else.
+ */
+export function googleCalendarUrl({
+  startsAt,
+  durationMins = SLOT_MINS,
+  title,
+  details,
+}: {
+  startsAt: string;
+  durationMins?: number;
+  title: string;
+  details: string;
+}): string {
+  const start = new Date(startsAt);
+  const end = new Date(start.getTime() + durationMins * MIN);
+  const q = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: title,
+    dates: `${icsDate(start)}/${icsDate(end)}`,
+    details,
+  });
+  return `https://calendar.google.com/calendar/render?${q.toString()}`;
+}
+
 /** An RFC 5545 invite for one call — what the confirmation email carries. */
 export function icsFor({
   uid,

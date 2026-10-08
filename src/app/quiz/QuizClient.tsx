@@ -1462,6 +1462,25 @@ function priorityStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPa
  * anti-dropout device in the flow, which is why it sits beside the question
  * rather than below the fold.
  */
+/**
+ * "₹11.5 L – ₹24 L+ before GST": the range across the three finish levels for
+ * this home and scope, the same figures the level step shows. Null until the
+ * home and the scope are known.
+ */
+function likelyCost(brief: Brief): string | null {
+  if (!brief.propertyType || !brief.scope) return null;
+  const { sqft } = carpetAreaFor(brief);
+  const shape = homeShapeFor(brief);
+  const selection = selectionOf(brief);
+  const partial = brief.scope !== 'FULL_HOME' || brief.excludedItems.length > 0;
+  const band = (tier: (typeof TIERS)[number]) =>
+    partial ? scopeBandRange(tier, shape, selection) : tierRangeFor(tier, sqft);
+  const low = band(TIERS[0]);
+  const top = band(TIERS[TIERS.length - 1]);
+  if (!low || !top) return null;
+  return `${formatINRCompact(low.lowPaise)} – ${formatINRCompact(top.lowPaise)}+ before GST`;
+}
+
 function LiveProfile({
   brief,
   matchCount,
@@ -1488,6 +1507,12 @@ function LiveProfile({
     const off = brief.excludedItems.length;
     rows.push(['Scope', off ? `${phrase} · ${off} left out` : phrase]);
   }
+  // A running figure from the moment home and scope are known, so the early
+  // answers visibly move something (principle 3, docs/UX-PRINCIPLES-PLAN.md;
+  // Lemonade's live price). Until a level is picked it spans all three; once
+  // one is, the budget row below takes over.
+  const likely = likelyCost(brief);
+  if (likely && !brief.tier) rows.push(['Likely cost', likely]);
   if (brief.budgetMinPaise) {
     rows.push([
       'Budget',

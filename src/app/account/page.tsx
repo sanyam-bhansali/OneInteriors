@@ -510,6 +510,30 @@ export default async function AccountPage() {
                       </li>
                     ))}
                   </ol>
+                  {/* What is due when — the studio's own schedule, as a bar of
+                      phases (principle 6; Klarna's four-part ring). */}
+                  {t.phases ? (
+                    <div className="mb-4">
+                      <p className="label m-0 mb-2">Payment schedule · paid to {t.studioName} directly</p>
+                      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-[var(--color-paper-3)]" aria-hidden>
+                        {t.phases.map((ph, i) => (
+                          <span
+                            key={ph.label}
+                            style={{ width: `${ph.pct}%`, opacity: 1 - i * (0.6 / t.phases!.length) }}
+                            className="h-full border-r-2 border-[var(--color-paper)] bg-[var(--color-ink)] last:border-r-0"
+                          />
+                        ))}
+                      </div>
+                      <ol className="m-0 mt-2 flex list-none flex-col gap-1 p-0">
+                        {t.phases.map((ph) => (
+                          <li key={ph.label} className="flex justify-between gap-3 text-[14px] text-[var(--color-ink)]">
+                            <span>{ph.label}</span>
+                            <span className="tabular-nums text-[var(--color-ink-2)]">{ph.pct}%</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  ) : null}
                   {t.updates.length > 0 ? (
                     <ul className="m-0 flex list-none flex-col gap-2 border-t border-[var(--color-rule-soft)] p-0 pt-3">
                       {t.updates.map((u, i) => (

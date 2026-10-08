@@ -46,7 +46,7 @@ import { ProjectWings } from './ProjectWings';
 import { Listen } from '@/components/oi/Listen';
 import { NO_RATES_LABEL } from '@/modules/quotation/rate-policy';
 import type { Focus } from '@/components/oi/useScrollFocus';
-import type { Studio } from '@/modules/studio/types';
+import { CHECK_LABELS, type Studio } from '@/modules/studio/types';
 import { ENGINE_VERSION, FACTOR_LABELS, type FactorKey, type MatchResult } from '@/modules/matching/score';
 import { localityLabel, type Brief } from '@/modules/brief/types';
 
@@ -252,6 +252,14 @@ export function StudioCard({
         </p>
       ) : null}
 
+      {/* ── The checks, on every screen size ──
+          The wings beside the card only fit on a wide screen, so on a phone
+          the checks were invisible. A badge is believed when its rules are
+          public (principle 7, docs/UX-PRINCIPLES-PLAN.md; Airbnb's Guest
+          favourite, Thumbtack's Top Pro): each check with who verified it
+          and when. */}
+      <CheckList checks={studio.checks} />
+
       {/* ── The read ── */}
       <div className="mt-5 border-t border-[var(--line)] pt-4">
         <p className="oi-eyebrow m-0 mb-2">Why this one fits you</p>
@@ -428,5 +436,43 @@ function LikeYours({ studio, ids }: { studio: Studio; ids: string[] }) {
         ))}
       </ul>
     </div>
+  );
+}
+
+/** "15 of 15 checks cleared", opening to each check, its source and its date. */
+function CheckList({ checks }: { checks: Studio['checks'] }) {
+  const counted = checks.filter((c) => c.result !== 'NOT_APPLICABLE');
+  const passed = counted.filter((c) => c.result === 'PASS');
+  if (counted.length === 0) return null;
+  return (
+    <details className="group mt-4 rounded-[16px] border border-[var(--line)] px-4 py-3">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-[14px] font-medium text-[var(--ink)]">
+        <span>
+          {passed.length} of {counted.length} checks cleared
+        </span>
+        <span aria-hidden className="text-[var(--ink2)] group-open:hidden">
+          See them +
+        </span>
+        <span aria-hidden className="hidden text-[var(--ink2)] group-open:inline">
+          Hide −
+        </span>
+      </summary>
+      <ul className="m-0 mt-3 flex list-none flex-col gap-2 p-0">
+        {counted.map((c) => (
+          <li key={c.type} className="flex items-baseline justify-between gap-3 text-[13.5px]">
+            <span className={c.result === 'PASS' ? 'text-[var(--ink)]' : 'text-[var(--ink2)]'}>
+              <span aria-hidden className="mr-1.5">{c.result === 'PASS' ? '✓' : '○'}</span>
+              {CHECK_LABELS[c.type]}
+              <span className="sr-only">{c.result === 'PASS' ? ', cleared' : ', not yet cleared'}</span>
+            </span>
+            <span className="shrink-0 text-right text-[12px] text-[var(--ink2)]">
+              {[c.source, c.checkedAt ? new Date(c.checkedAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : null]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }

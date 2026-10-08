@@ -40,6 +40,7 @@ import { splitSpec, type Material } from '@/modules/materials/glossary';
 import { ratesAreReal } from '@/data/filed-rates';
 import { saveDecisionAction } from '@/app/match/journey-actions';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
+import { NextStepBar } from '@/components/oi/NextStepBar';
 import { Spec, MaterialChip, MaterialPanel } from '@/components/oi/Material';
 import { Wrap, Chapter, Sheet, Quiet, Flag } from '@/components/oi';
 import { ExplainDifferences, AskYourQuote, FitBlock, MaterialPrices, RoomPrices } from './CompareInsights';
@@ -721,6 +722,7 @@ export function CompareClient({
           the table behind it. Escape closes it. */}
       <MaterialPanel material={term} onClose={() => setTerm(null)} />
 
+      <NextStepBar label={`${entries.length} quotes side by side`} offer={offer} />
       <AppFooter />
     </div>
   );

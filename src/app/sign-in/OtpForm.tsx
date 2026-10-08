@@ -34,12 +34,22 @@ import { requestOtpAction, verifyOtpAction } from './actions';
 
 const RESEND_SECONDS = 30;
 
-export function OtpForm({ next }: { next: string | null }) {
+export function OtpForm({
+  next,
+  initialName = '',
+  initialPhone = '',
+}: {
+  next: string | null;
+  /** From the brief's contact step, so the customer is not asked twice. */
+  initialName?: string;
+  /** Ten digits, without +91 — the field shows the prefix itself. */
+  initialPhone?: string;
+}) {
   const router = useRouter();
 
   const [stage, setStage] = useState<'details' | 'code'>('details');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [name, setName] = useState(initialName);
+  const [phone, setPhone] = useState(initialPhone);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -30,6 +30,10 @@ import { StyleDnaCard } from '@/components/oi/StyleDnaCard';
 import { SEEN_KEY, readSeen, welcomeBack } from '@/modules/matching/welcome-back';
 import { ExpertPitch } from '@/components/oi/ExpertPitch';
 import type { OfferState } from '@/modules/consultation/offer';
+import { NextStepBar } from '@/components/oi/NextStepBar';
+import { QuoteCanvas } from '@/components/oi/QuoteCanvas';
+import { draftChanged, draftFrom, priceDraft, type CanvasDraft } from '@/modules/quotation/canvas';
+import { saveBriefAction } from '@/app/quiz/actions';
 import { useEffect, useMemo, useState } from 'react';
 import { loadBrief, saveBrief } from '@/modules/brief/store';
 import { cleanName } from '@/modules/brief/steps';
@@ -60,6 +64,7 @@ import {
   saveProject,
   EMPTY_PROJECT,
   MIN_TO_COMPARE,
+  type FloorPlan,
   type Project,
 } from '@/modules/quotation/project-store';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
@@ -295,6 +300,60 @@ export function MatchClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on what a quote depends on
   }, [briefed, matches, pricedFor, project.quotes]);
 
+  /* ── The Home Canvas, v0 (docs/HOME-CANVAS.md) ──
+     The quote made editable. The draft is what the customer has changed on
+     the quote screen and not yet saved; every matched studio is re-priced on
+     it on every render — pure arithmetic, a few milliseconds for the lot. */
+  const [draft, setDraft] = useState<CanvasDraft | null>(null);
+  const liveDraft = draft ?? draftFrom(shape);
+  const drafted = draftChanged(shape, liveDraft);
+  const canvasStudios = useMemo(
+    () =>
+      matches
+        .map((m) => byId.get(m.studioId))
+        .filter((s): s is Studio => Boolean(s))
+        .map((s) => ({ slug: s.slug, name: s.tradeName, curatedDiscountPct: s.matchingProfile?.curatedDiscountPct ?? null })),
+    [matches, byId],
+  );
+  const priced = priceDraft({
+    shape,
+    plan: kitchen,
+    draft: liveDraft,
+    studios: canvasStudios,
+    ratesFor: (slug) => filedRates?.[slug] ?? filedRatesFor(slug),
+  });
+
+  /** Write the draft to the brief, and re-price every match on it straight away. */
+  const saveDraft = () => {
+    if (!brief) return;
+    const next: Brief = { ...brief, excludedItems: liveDraft.excludedItems };
+    setBrief(next);
+    saveBrief(next);
+    void saveBriefAction({ ...next, contactName: null }).catch(() => {});
+    const nextShape = homeShapeFor(next);
+    const nextPlan: FloorPlan =
+      liveDraft.kitchenRunMm !== null
+        ? { fileName: null, kitchenRunMm: liveDraft.kitchenRunMm, source: 'customer' }
+        : kitchenFor(nextShape, nextShape.plan, project.plan);
+    // Priced here rather than left to the effect above, so the open quote
+    // never sees a moment where its stored copy is stale and the build
+    // screen takes over.
+    const fresh = priceMatches({
+      shape: nextShape,
+      plan: nextPlan,
+      studios: canvasStudios,
+      existing: {},
+      ratesFor: (slug) => filedRates?.[slug] ?? filedRatesFor(slug),
+    });
+    for (const q of fresh) void saveQuoteAction({ studioSlug: q.studioSlug, quote: q.quote, plan: nextPlan });
+    update({
+      ...project,
+      plan: nextPlan,
+      quotes: { ...project.quotes, ...Object.fromEntries(fresh.map((q) => [q.studioSlug, q])) },
+    });
+    setDraft(null);
+  };
+
   /* ── Welcome back (queue item 16) ──
      Which studios this device last showed, and when; anything new since
      earns a line at the top. Stored in this browser only. */
@@ -315,6 +374,10 @@ export function MatchClient({
   if (quoting) {
     const built = project.quotes[quoting.studioSlug];
     const current = built?.key === pricedFor;
+    // While the canvas holds unsaved changes, the document below it is the
+    // draft's, so the whole page answers the change at once.
+    const shownQuote =
+      (drafted ? priced.find((p) => p.slug === quoting.studioSlug)?.quote : undefined) ?? built?.quote;
     /* Already priced (every match is): straight to the document. The build
        plays once a visit, the first time — "a quote in ten seconds" watched
        once, not sat through six times. */
@@ -331,8 +394,23 @@ export function MatchClient({
               ← Back to your matches
             </button>
             {project.seenBuild ? (
+              <>
+              <QuoteCanvas
+                shape={shape}
+                plan={kitchen}
+                draft={liveDraft}
+                onDraft={setDraft}
+                priced={priced}
+                currentSlug={quoting.studioSlug}
+                savedTotalPaise={built.quote.totalPaise}
+                onPick={(slug) => {
+                  const s = studios.find((x) => x.slug === slug);
+                  if (s) setQuoting(requestFor(s));
+                }}
+                onSave={saveDraft}
+              />
               <QuoteDocument
-                quote={built.quote}
+                quote={shownQuote}
                 studioName={quoting.studioName}
                 plan={kitchen}
                 preparedFor={preparedFor(brief)}
@@ -342,6 +420,7 @@ export function MatchClient({
                   update({ ...project, plan: { fileName: null, kitchenRunMm: runMm, source: 'customer' } })
                 }
               />
+              </>
             ) : (
               <Building
                 studioName={quoting.studioName}
@@ -363,6 +442,18 @@ export function MatchClient({
               />
             )}
           </Wrap>
+          {project.seenBuild ? (
+            <NextStepBar
+              label={`${quoting.studioName} · your quote`}
+              totalPaise={shownQuote!.totalPaise}
+              offer={offer}
+              change={
+                drafted && shownQuote!.totalPaise !== built.quote.totalPaise
+                  ? `${shownQuote!.totalPaise < built.quote.totalPaise ? '−' : '+'}${formatINRCompact(Math.abs(shownQuote!.totalPaise - built.quote.totalPaise))}, not saved`
+                  : undefined
+              }
+            />
+          ) : null}
           <AppFooter />
         </div>
       );

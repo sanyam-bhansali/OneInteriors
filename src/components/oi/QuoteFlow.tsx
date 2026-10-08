@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 /**
  * Getting a quote: the gate, the ten seconds, and the document.
  *
@@ -276,25 +278,33 @@ export function QuoteDocument({
         </section>
       ))}
 
-      {/* The commercial terms, identical for every studio on the roster. */}
-      <div className="mt-8 border-t border-[var(--ink)] pt-2">
-        <DocRow label="Modular (factory)" value={money(quote.modularPaise)} />
-        <DocRow label="Non-modular (on site)" value={money(quote.nonModularPaise)} />
-        <DocRow label="Professional fee · 7%" value={money(quote.professionalFeePaise)} />
+      {/* The commercial terms, identical for every studio on the roster —
+          written as a sum, each step signed, so the total can be checked
+          by eye (principle 5, docs/UX-PRINCIPLES-PLAN.md; Wise). "Before
+          GST" is the total less GST, not a re-addition, so the two can
+          never disagree by a rounding paisa. */}
+      <div className="mt-8 border-t border-[var(--ink)] pt-4">
+        <p className="oi-label m-0 mb-1">How the total is made</p>
+        <DocRow label={`Work · all ${quote.lines.length} lines`} value={money(quote.modularPaise + quote.nonModularPaise)} />
+        <p className="m-0 -mt-1 mb-1 text-[12.5px] text-[var(--ink2)]">
+          {money(quote.modularPaise)} made in the factory · {money(quote.nonModularPaise)} built on site
+        </p>
+        <DocRow label="+ Professional fee · 7%" value={money(quote.professionalFeePaise)} />
         <DocRow
-          label="Less discount on modular · 10%"
+          label="− Factory discount · 10%"
           value={`−${money(quote.modularDiscountPaise)}`}
           better
         />
         {quote.curatedDiscountPaise ? (
           <DocRow
-            label={`One Interiors discount · ${quote.curatedDiscountPct}%`}
+            label={`− One Interiors discount · ${quote.curatedDiscountPct}%`}
             value={`−${money(quote.curatedDiscountPaise)}`}
             better
           />
         ) : null}
-        <DocRow label="GST · 18%" value={money(quote.gstPaise)} />
-        <DocRow label="Total" value={money(quote.totalPaise)} emphasis />
+        <DocRow label="= Before GST" value={money(quote.totalPaise - quote.gstPaise)} />
+        <DocRow label="+ GST · 18%" value={money(quote.gstPaise)} />
+        <DocRow label="= Total" value={money(quote.totalPaise)} emphasis />
       </div>
 
       {quote.notPriced.length > 0 ? (
@@ -362,9 +372,18 @@ export function QuoteDocument({
           Book this quote through One Interiors to keep:
         </p>
         <p className="m-0 text-[13px] leading-[1.6] text-[var(--ink2)]">
-          {showcase().map((b) => b.short).join(' · ')}. Start with your expert call at
-          oneinteriors.in/expert — {studioName} is introduced to you through us.
+          {showcase().map((b) => b.short).join(' · ')}.{' '}
+          <span className="hidden print:inline">
+            Start with your expert call at oneinteriors.in/expert — {studioName} is introduced to you through us.
+          </span>
         </p>
+        {/* On screen it is a link, not an address to type (review, 8 Oct). */}
+        <Link
+          href="/expert"
+          className="mt-3 inline-block text-[14px] font-semibold text-[var(--ink)] underline underline-offset-4 print:hidden"
+        >
+          Start with your expert call — {studioName} is introduced to you through us →
+        </Link>
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--ink)] pt-4">

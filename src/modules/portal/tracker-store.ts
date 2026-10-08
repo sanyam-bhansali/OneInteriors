@@ -1,4 +1,5 @@
 import 'server-only';
+import { readPhases, type PaymentPhase } from '@/modules/studio/payment-phases';
 
 /**
  * The project tracker in the database — started, advanced and annotated by
@@ -151,6 +152,13 @@ export async function projectsForStudio(now = new Date()): Promise<StudioProject
 
 export interface TrackerForCustomer {
   studioName: string;
+  /**
+   * The studio's filed payment schedule, or null when it has not filed one.
+   * Shown so the customer always knows what is due at which stage
+   * (principle 6, docs/UX-PRINCIPLES-PLAN.md; Klarna). We do not hold or
+   * record payments, so there is no "paid" state here — only the plan.
+   */
+  phases: PaymentPhase[] | null;
   stages: StageView[];
   updates: { note: string; stage: string | null; at: Date; byStudio: boolean; photos: string[] }[];
 }
@@ -161,7 +169,7 @@ export async function trackersForBrief(briefId: string, now = new Date()): Promi
     const projects = await prisma.homeProject.findMany({
       where: { introduction: { briefId } },
       include: {
-        introduction: { select: { studio: { select: { tradeName: true } } } },
+        introduction: { select: { studio: { select: { tradeName: true, paymentPhases: true } } } },
         updates: { orderBy: { createdAt: 'desc' }, take: 20 },
       },
     });
@@ -171,6 +179,7 @@ export async function trackersForBrief(briefId: string, now = new Date()): Promi
     );
     return projects.map((p, i) => ({
       studioName: p.introduction.studio.tradeName,
+      phases: readPhases(p.introduction.studio.paymentPhases),
       stages: trackerView(plannedStages(p.startOn, p.totalDays), p.doneStages, now),
       updates: p.updates.map((u, j) => ({
         note: u.note,

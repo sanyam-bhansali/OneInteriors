@@ -32,6 +32,7 @@ import { signOutAction } from './actions';
 import { SignInForm } from './SignInForm';
 import { PasswordForm } from './PasswordForm';
 import { OtpForm } from './OtpForm';
+import { loadBriefContact } from '@/modules/brief/repository';
 
 export const metadata: Metadata = {
   title: 'Sign in',
@@ -127,6 +128,9 @@ export default async function SignInPage({
   // Arriving from the quotes gate is a different moment from arriving at a
   // sign-in page cold: they are mid-task and did not come here to sign in.
   const fromQuotes = reason === 'quotes' || reason === 'expert';
+  // Coming from the brief, they have already given a name and number; ask
+  // once (review, 8 Oct), and let the WhatsApp code confirm it.
+  const known = fromQuotes ? await loadBriefContact() : null;
 
   /**
    * Is this person heading for a staff surface?
@@ -292,7 +296,11 @@ export default async function SignInPage({
           {/* Customers sign in by phone. The emailed link is still here, below
               the fold, because ops and studio accounts use it — but it is not
               what a customer should be reading first. */}
-          <OtpForm next={destination} />
+          <OtpForm
+            next={destination}
+            initialName={known?.name ?? ''}
+            initialPhone={known?.phone?.replace(/^\+91/, '') ?? ''}
+          />
 
           <p className="m-0 mt-10 border-t border-[var(--color-rule)] pt-5 text-[13.5px] leading-relaxed text-[var(--color-ink-3)]">
             Nothing is shared with any studio until you ask us to introduce you, and we do not

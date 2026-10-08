@@ -232,21 +232,11 @@ export function Building({
     [picked],
   );
 
-  /* A live stopwatch, frozen when the quote is ready — "Built in 9.6
-     seconds" (queue item 20). Real time, measured here, not the budget. */
-  const startedAt = useRef<number | null>(null);
-  const [clock, clock_] = useState(0);
-  useEffect(() => {
-    startedAt.current ??= performance.now();
-    if (stagesDone) {
-      clock_(performance.now() - startedAt.current);
-      return;
-    }
-    const t = setInterval(() => clock_(performance.now() - (startedAt.current ?? performance.now())), 100);
-    return () => clearInterval(t);
-  }, [stagesDone]);
-  const seconds = (clock / 1000).toFixed(1);
-
+  /* No stopwatch. It said "Built in 12.1 seconds", but the quote is
+     calculated instantly and the seconds were this walkthrough's own pacing —
+     a measured-looking number for work that was not happening (review,
+     8 Oct). The steps are a short explanation of how the quote is made, and
+     anyone can skip them. */
   /** How far through, by time budgeted rather than stages counted. */
   const total = stages.reduce((sum, s) => sum + s.ms, 0);
   const elapsed = stages.slice(0, at).reduce((sum, s) => sum + s.ms, 0);
@@ -266,9 +256,15 @@ export function Building({
           <p className="m-0 text-[13.5px] text-[var(--ink2)]" aria-live="polite">
             {stagesDone ? 'Quotation ready' : current.label}
           </p>
-          <span className="oi-num text-[11px] tracking-[0.1em] text-[var(--ink2)]" aria-live="off">
-            {stagesDone ? `Built in ${seconds} seconds` : `${pct}% · ${seconds}s`}
-          </span>
+          {stagesDone ? null : (
+            <button
+              type="button"
+              onClick={() => onDone?.()}
+              className="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-[13px] font-medium text-[var(--ink)] underline underline-offset-4"
+            >
+              Skip to the quote
+            </button>
+          )}
         </div>
         <div className="h-[3px] w-full bg-[var(--line)]">
           <div
