@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import { siteUrl } from '@/lib/site';
 import { RosterGateBanner } from '@/components/RosterGateBanner';
+import { RegisterServiceWorker } from '@/components/RegisterServiceWorker';
 import './globals.css';
 
 /*
@@ -98,6 +99,9 @@ export const metadata: Metadata = {
     locale: 'en_IN',
     siteName: 'One Interiors',
   },
+  // Installs to the home screen as an app (src/app/manifest.ts).
+  appleWebApp: { capable: true, title: 'One Interiors', statusBarStyle: 'default' },
+  icons: { apple: '/icons/apple-touch-icon.png', icon: '/icons/icon-192.png' },
   robots: {
     // Flip to true once the brand name and pricing are settled.
     index: false,
@@ -110,7 +114,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: 'cover', // safe-area insets for the wrapped app
   // Single value: the product is light-only by design (see globals.css).
-  themeColor: '#fdf9f2',
+  // White, the customer side's ground since the 8 Oct redesign.
+  themeColor: '#ffffff',
   colorScheme: 'light',
 };
 
@@ -143,6 +148,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             pages is worse than no banner: it teaches you to trust its
             absence. */}
         <RosterGateBanner />
+        <RegisterServiceWorker />
         {children}
       </body>
     </html>

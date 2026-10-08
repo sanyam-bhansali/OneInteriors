@@ -116,6 +116,12 @@ const nextConfig: NextConfig = {
      * 'unsafe-eval' in it, so this cannot quietly leak out later.
      */
     const dev = process.env.NODE_ENV === 'development';
+    /* A production build served over plain http on the local network, so a
+       phone on the same Wi-Fi can test it (8 Oct 2026). Without this the
+       policy below upgrades every stylesheet and script to https, which a
+       LAN address cannot answer, and the phone gets an unstyled page. Only
+       when asked for by name, and never on Vercel, whatever is set there. */
+    const plainHttp = process.env.LOCAL_HTTP_TEST === '1' && !process.env.VERCEL;
 
     const csp = [
       "default-src 'self'",
@@ -133,7 +139,7 @@ const nextConfig: NextConfig = {
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
-      'upgrade-insecure-requests',
+      ...(plainHttp ? [] : ['upgrade-insecure-requests']),
     ].join('; ');
 
     return [
@@ -149,10 +155,14 @@ const nextConfig: NextConfig = {
              redirect cannot. `preload` is deliberately absent — it is
              effectively irreversible and belongs to a decision about the
              domain, not a header file. */
-          {
-            key: 'Strict-Transport-Security',
-            value: 'max-age=63072000; includeSubDomains',
-          },
+          ...(plainHttp
+            ? []
+            : [
+                {
+                  key: 'Strict-Transport-Security',
+                  value: 'max-age=63072000; includeSubDomains',
+                },
+              ]),
           /* Nothing in this app uses a camera, a microphone or location.
              They were allowed on `self` for no reason; a permission granted
              to a feature that does not exist is only useful to an attacker
