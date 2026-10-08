@@ -45,31 +45,20 @@ export function MatchHero({
         {name ? `Welcome, ${name}` : 'Who fits you'}
       </motion.p>
 
-      <motion.p {...rise(reduced, 0.06)} className="m-0 flex items-baseline justify-center gap-3">
-        <span className="oi-display q-h1 uppercase text-[var(--ink2)]" aria-hidden>
-          Top
-        </span>
-        <CountUp
-          to={fit}
-          className="oi-num q-hero text-[var(--ink)]"
-          label={`top ${fit} best fits for your brief`}
-        />
-      </motion.p>
-
-      {/* Uppercase, with the tracking opened up — caps set at display tracking
-          close into a solid block and stop reading as words. */}
+      {/* One sentence, set large: "Your top 5 matches." The count is the
+          only figure in it, so it is the one that counts up. */}
       <motion.h1
-        {...rise(reduced, 0.14)}
-        className="oi-display q-h1 m-0 mt-4 uppercase text-[var(--ink)]"
-        style={{ letterSpacing: '0.02em' }}
+        {...rise(reduced, 0.06)}
+        className="oi-display m-0 text-[clamp(2.6rem,1.4rem+5vw,5.4rem)] leading-[0.98] text-[var(--ink)]"
       >
-        Best fits for your brief.
+        Your top <CountUp to={fit} className="tabular-nums text-[var(--acc)]" label={fit === 1 ? 'match' : 'matches'} />
+        <span aria-hidden> {fit === 1 ? 'match' : 'matches'}.</span>
       </motion.h1>
 
       {reveal.length > 1 ? (
         <motion.p
           {...rise(reduced, 0.16)}
-          className="oi-num m-0 mt-4 flex flex-wrap items-baseline justify-center gap-x-2 text-[13px] uppercase tracking-[0.1em] text-[var(--ink2)]"
+          className="oi-mono m-0 mt-6 flex flex-wrap items-baseline justify-center gap-x-2 text-[13px] uppercase tracking-[0.1em] text-[var(--ink2)]"
         >
           {reveal.map((st, i) => (
             <span key={st.label}>

@@ -124,7 +124,7 @@ export function OtpForm({ next }: { next: string | null }) {
             autoComplete="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Sanyam Bhansali"
+            placeholder="Your name"
             className="w-full rounded-full border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-5 py-3.5 text-[16px] text-[var(--color-ink)] placeholder:text-[var(--color-ink-3)]"
           />
         </div>

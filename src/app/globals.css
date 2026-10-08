@@ -2564,3 +2564,252 @@ p {
     opacity: 0;
   }
 }
+
+/* ═════════════════════════════════════════════════════════════════════
+   THE CUSTOMER SKIN — 8 Oct 2026
+   ═════════════════════════════════════════════════════════════════════
+
+   The owner asked for every customer screen in the manner of cuberto.com,
+   the home page first (components/home). This block carries that language
+   into the software behind it — the brief, the matches, the quote, the
+   comparison, the architect, sign-in and "Your home" — by re-pointing the
+   tokens those screens already read, rather than rewriting each screen:
+
+   - a white canvas and black ink; soft grey cards with big radii;
+   - one sans face (Geist), set tight and medium for headings; Geist Mono for
+     evidence (money, quantities, labels), never for sentences;
+   - black pill buttons whose hover fills terracotta — terracotta stays the
+     one accent, for intent and gap flags;
+   - selected chips go black, not petrol.
+
+   Two token families are remapped because two generations of screen exist:
+   the `--bg/--card/--ink/--acc` set (quiz, match, compare, expert) and the
+   older `--color-*` set (sign-in, "Your home"). Scoped to `.oi-app`, so the
+   studio and ops software are untouched. Placed last in the file so it wins
+   over the rules above it at equal specificity. */
+
+.oi-app {
+  --bg: #ffffff;
+  --card: #f4f4f2;
+  --ink: #0b0b0b;
+  --ink2: #5f5f5f;
+  --acc: #c0613c;
+  --line: #e6e6e3;
+  --acc-ink: #a14f2f;
+  --acc-btn: #0b0b0b;
+  --acc-wash: rgba(11, 11, 11, 0.05);
+  --glass: rgba(244, 244, 242, 0.9);
+  --sunken: #f4f4f2;
+
+  --color-paper: #ffffff;
+  --color-paper-2: #f4f4f2;
+  --color-paper-3: #ebebe8;
+  --color-ink: #0b0b0b;
+  --color-ink-2: #5f5f5f;
+  --color-ink-3: #8a8a8a;
+  --color-rule: #e6e6e3;
+  --color-rule-soft: #efefec;
+  --color-petrol: #0b0b0b;
+  --color-petrol-deep: #2b2b2a;
+  --color-petrol-soft: #f0f0ee;
+
+  --font-display: var(--font-geist), 'Helvetica Neue', Arial, sans-serif;
+  --font-sans: var(--font-geist), 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, 'SF Mono', Menlo, monospace;
+
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+/* The match screen's rounded face gives way to the same sans as everywhere. */
+.oi-app.oi-quick,
+.oi-app .oi-quick {
+  --font-display: var(--font-geist), 'Helvetica Neue', Arial, sans-serif;
+  --font-sans: var(--font-geist), 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+/* Headings: medium weight, tight, large — the reference's one voice. */
+.oi-app .oi-display,
+.oi-app .display,
+.oi-app .h1,
+.oi-app .h2 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.04;
+}
+.oi-app .h3 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.oi-app .oi-eyebrow {
+  letter-spacing: 0.1em;
+  color: var(--ink2);
+}
+.oi-app .label {
+  color: var(--color-ink-3);
+  letter-spacing: 0.1em;
+}
+
+/* Mono for evidence, without the never-wrap. `.oi-num` keeps nowrap for
+   money; a sentence-length label set in mono uses this and wraps, so it can
+   never widen a phone screen (review, 8 Oct: the pre-launch flag made the
+   quote 570px and compare 525px wide on a 375px phone). */
+.oi-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* The one action: a black pill, terracotta rising into it on hover. */
+.oi-app .oi-cta {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--ink);
+  color: #fff;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  box-shadow: none;
+  transition:
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.3s ease;
+}
+.oi-app .oi-cta::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--acc);
+  transform: translateY(101%);
+  border-top-left-radius: 50% 40%;
+  border-top-right-radius: 50% 40%;
+  transition:
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.oi-app .oi-cta:hover {
+  filter: none;
+  box-shadow: none;
+}
+.oi-app .oi-cta:hover::before {
+  transform: none;
+  border-radius: 999px;
+}
+.oi-app .oi-cta:active {
+  box-shadow: none;
+  transform: scale(0.98);
+}
+
+/* Cards: soft grey, big radius, no glass and no shadow — the reference's
+   surfaces are flat tints on white. */
+.oi-app .oi-pane {
+  border-radius: 28px;
+  background: var(--card);
+  border-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+.oi-app .oi-pane:hover,
+.oi-app .oi-pane:focus-within {
+  border-color: rgba(11, 11, 11, 0.12);
+  box-shadow: 0 24px 50px -32px rgba(11, 11, 11, 0.28);
+}
+.oi-app .oi-glass {
+  border-radius: 28px;
+  background: var(--card);
+  border-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.oi-app .oi-sec {
+  border-radius: 24px;
+  box-shadow: none;
+}
+
+/* Chips: outlined pills; selected is black. */
+.oi-app .oi-chip {
+  background: transparent;
+  border-radius: 999px;
+}
+.oi-app .oi-chip:hover {
+  background: var(--card);
+  border-color: var(--ink);
+}
+.oi-app .oi-chip-on,
+.oi-app .oi-chip:has(:checked) {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+.oi-app .oi-chip-on:hover {
+  background: #2b2b2a;
+  border-color: #2b2b2a;
+}
+
+/* Fields: grey wells that go white with a black ring when typed in. */
+.oi-app .oi-input {
+  background: var(--card);
+  border-radius: 16px;
+}
+.oi-app .oi-input:focus {
+  background: #fff;
+  outline-color: var(--ink);
+  box-shadow: 0 0 0 5px rgba(11, 11, 11, 0.06);
+}
+.oi-app :focus-visible {
+  outline-color: var(--ink);
+}
+.oi-app ::selection {
+  background: var(--ink);
+  color: #fff;
+}
+
+/* Rounded surfaces. The screens were built square ("squared corners
+   everywhere except glass"); the reference is rounded throughout. Any card
+   painted with the card tint and not already given a radius gets one, so a
+   screen does not need editing to follow. Controls keep their own shapes. */
+.oi-app
+  :where([class*='bg-[var(--card)]'], [class*='bg-[var(--color-paper-2)]']):not(
+    button,
+    input,
+    textarea,
+    select,
+    td,
+    th,
+    tr,
+    footer,
+    header,
+    [class*='rounded']
+  ) {
+  border-radius: 22px;
+}
+
+/* Buttons built square: solid ones become pills, outlined option rows get a
+   soft radius. Anything that already chose a radius keeps it. */
+.oi-app :where(button, a)[class*='bg-[var(--ink)]']:not([class*='rounded']),
+.oi-app :where(button, a)[class*='bg-[var(--acc']:not([class*='rounded']),
+.oi-app :where(button, a)[class*='bg-[var(--color-petrol)]']:not([class*='rounded']) {
+  border-radius: 999px;
+}
+.oi-app button[class*='border']:not([class*='rounded']),
+.oi-app label[class*='border']:not([class*='rounded']) {
+  border-radius: 16px;
+}
+
+/* Labels in the sans, not the typewriter (owner, 8 Oct). Small capitals
+   stay — the reference uses them for section labels — but set in Geist with
+   ordinary tracking, the way the home page sets "What we do". Mono is kept
+   for what it is for: prices, quantities, sizes and scores, which are not
+   uppercase, so this leaves them alone. */
+.oi-app :is(.oi-eyebrow, .oi-label, .label, .oi-pill-note, .q-eyebrow-lg),
+.oi-app .uppercase:is(.oi-num, .oi-mono, [class*='font-mono'], [class*='--font-mono']) {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}

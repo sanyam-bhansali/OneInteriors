@@ -53,6 +53,26 @@ const rounded = localFont({
   display: 'swap',
 });
 
+/**
+ * Geist and Geist Mono — the customer side's faces since 8 Oct 2026, when the
+ * owner asked for it in the manner of cuberto.com: one neutral sans, set large
+ * and tight, everywhere a homeowner looks. Bound to the font tokens inside
+ * `.oi-app` (globals.css) and used directly by the home page (`.cb`). The
+ * studio and ops software keep their own faces.
+ */
+const geist = localFont({
+  src: './fonts/geist-latin.woff2',
+  weight: '100 900',
+  variable: '--font-geist',
+  display: 'swap',
+});
+const geistMono = localFont({
+  src: './fonts/geist-mono-latin.woff2',
+  weight: '400 500',
+  variable: '--font-geist-mono',
+  display: 'swap',
+});
+
 const mono = localFont({
   src: [
     { path: './fonts/ibm-plex-mono-400.woff2', weight: '400' },
@@ -106,7 +126,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // var(--font-display) silently inherits the body sans instead.
     //
     // The symptom is that the serif simply never appears and nothing errors.
-    <html lang="en-IN" className={`${display.variable} ${sans.variable} ${mono.variable} ${rounded.variable}`}>
+    <html lang="en-IN" className={`${display.variable} ${sans.variable} ${mono.variable} ${rounded.variable} ${geist.variable} ${geistMono.variable}`}>
       <body>
         {/* The verification-gate warning lives HERE, not in SiteHeader.
             It was in SiteHeader, and it silently vanished on /match — the one

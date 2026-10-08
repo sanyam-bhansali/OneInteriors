@@ -219,9 +219,22 @@ export function StudioCard({
           label="Projects delivered"
           value={studio.completedProjects > 0 ? String(studio.completedProjects) : '—'}
         />
+        {/* Early is said as early: "+-2 days over" read as a typo (review, 8 Oct). */}
         <Fact
-          label={studio.avgVarianceDays === null ? 'Days over — unmeasured' : 'Days over promise'}
-          value={studio.avgVarianceDays === null ? '—' : `+${studio.avgVarianceDays}`}
+          label={
+            studio.avgVarianceDays === null
+              ? 'Days over — unmeasured'
+              : studio.avgVarianceDays < 0
+                ? 'Days early, on average'
+                : 'Days over promise'
+          }
+          value={
+            studio.avgVarianceDays === null
+              ? '—'
+              : studio.avgVarianceDays < 0
+                ? String(Math.abs(studio.avgVarianceDays))
+                : `+${studio.avgVarianceDays}`
+          }
         />
       </div>
 

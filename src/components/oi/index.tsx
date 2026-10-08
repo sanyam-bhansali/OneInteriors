@@ -194,7 +194,9 @@ export function DocRow({
         </span>
         {value ? (
           <span
-            className={`oi-num ${emphasis ? 'text-[19px]' : 'text-[14.5px]'}`}
+            /* Money never wraps; a long spec ("Contemporary Minimal, Warm
+               Modern, …") must, or it runs out of its card. */
+            className={`${value.length > 22 ? 'oi-mono min-w-0 text-right' : 'oi-num'} ${emphasis ? 'text-[19px]' : 'text-[14.5px]'}`}
             style={better ? { color: 'var(--sec-ink)' } : undefined}
           >
             {value}
@@ -209,7 +211,7 @@ export function DocRow({
           because these are figures; everything that made it hard to read has
           gone. */}
       {quantity ? (
-        <p className="oi-num m-0 mt-1.5 text-[12.5px] leading-snug text-[var(--ink2)]">
+        <p className="oi-mono m-0 mt-1.5 text-[12.5px] leading-snug text-[var(--ink2)]">
           {quantity}
         </p>
       ) : null}

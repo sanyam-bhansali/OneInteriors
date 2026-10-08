@@ -237,10 +237,21 @@ export default async function SignInPage({
           </div>
 
           <h1 className="h1 mb-3">
-            {fromQuotes ? 'Last step before your quotes.' : 'Sign in'}
+            {reason === 'expert'
+              ? 'One step before your call.'
+              : fromQuotes
+                ? 'Last step before your quotes.'
+                : 'Sign in'}
           </h1>
           <p className="m-0 mb-8 text-[16px] leading-relaxed text-[var(--color-ink-2)]">
-            {fromQuotes ? (
+            {reason === 'expert' ? (
+              /* They have already seen their quotes by now; this screen used
+                 to say the quotes were next (review, 8 Oct). */
+              <>
+                Your brief and quotes are saved. Your name and number, a code on WhatsApp, and then
+                you pick a time — so our architect can reach you and your booking stays yours.
+              </>
+            ) : fromQuotes ? (
               <>
                 Your answers are saved. Your name and number, a code on WhatsApp, and the quotes
                 are on the next screen — so they stay yours and you can come back to them.

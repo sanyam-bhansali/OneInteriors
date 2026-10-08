@@ -488,30 +488,36 @@ export function QuizClient({
         </Wrap>
       </main>
 
-      <footer className="sticky bottom-0 z-10 border-t border-[var(--line)] bg-[var(--card)]/95 backdrop-blur">
+      <footer className="sticky bottom-0 z-10 border-t border-[var(--line)] bg-[var(--bg)]/90 backdrop-blur">
         <Wrap>
           <div className="flex items-center justify-between gap-4 py-4">
             <button
               type="button"
               onClick={back}
-              className="cursor-pointer border border-[var(--line)] bg-[var(--card)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--ink)] transition-colors hover:border-[var(--ink2)]"
+              className="min-h-11 cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-5 py-2.5 text-[14px] font-medium text-[var(--ink)] transition-colors hover:border-[var(--ink)]"
             >
               Back
             </button>
 
             <div className="flex items-center gap-4">
+              {/* Says what is missing, on phones too: the priorities screen
+                  wants all four ranked, and a dead button with no reason was
+                  where people stopped (review, 8 Oct). */}
               {!canAdvance ? (
-                <span className="hidden text-[13.5px] text-[var(--ink2)] sm:inline">
-                  Pick an answer to continue
+                <span className="text-right text-[13px] leading-snug text-[var(--ink2)]">
+                  {stepId === 'priorities'
+                    ? `Rank all four to continue (${brief.priorityRanking.length} of 4)`
+                    : stepId === 'likes'
+                      ? 'Pick at least two to continue'
+                      : 'Pick an answer to continue'}
                 </span>
               ) : null}
-              {/* The one terracotta thing on the screen. */}
+              {/* The one action on the screen: a black pill, terracotta on hover. */}
               <button
                 type="button"
                 onClick={next}
                 disabled={!canAdvance || finishing}
-                className="cursor-pointer px-6 py-3 text-[14.5px] font-medium text-white transition-colors disabled:opacity-40"
-                style={{ background: 'var(--acc-btn)' }}
+                className="oi-cta min-h-11 shrink-0 cursor-pointer rounded-full px-6 py-3 text-[14.5px] font-medium text-white disabled:cursor-default disabled:opacity-30"
               >
                 {finishing
                   ? 'Writing your brief…'
@@ -1654,7 +1660,7 @@ function Chip({
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="m-0 mb-3 oi-num text-[10px] uppercase tracking-[0.13em] text-[var(--ink2)]">
+    <p className="m-0 mb-3 oi-mono text-[10px] uppercase tracking-[0.13em] text-[var(--ink2)]">
       {children}
     </p>
   );
