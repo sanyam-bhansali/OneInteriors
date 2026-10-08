@@ -12,6 +12,7 @@ import { useJourney } from '@/components/app/useJourney';
 import { formatINRCompact } from '@/lib/money';
 import { lateness, plainWords, type AppQuote } from '@/modules/app/journey';
 import type { Studio } from '@/modules/studio/types';
+import { useAppData } from '@/components/app/useAppData';
 import type { AppData } from '../data';
 
 /** The first part of a " · " spec, e.g. "18mm BWP carcass". */
@@ -72,9 +73,20 @@ export function CompareScreen({ data }: { data: AppData }) {
   const cols = `repeat(${quotes.length}, minmax(0, 1fr))`;
   const rows: { label: string; values: string[]; mark?: boolean }[] = [
     { label: 'Wardrobe board', values: quotes.map(wardrobeBoard), mark: true },
-    { label: 'Kitchen shutter', values: quotes.map((q) => kitchenPart(q, /shutter/i)), mark: true },
-    { label: 'Kitchen counter', values: quotes.map((q) => kitchenPart(q, /quartz|granite|counter/i)), mark: true },
-    { label: 'Time to handover', values: quotes.map((q) => handoverWeeks(studio(q.slug))) },
+    {
+      label: 'Kitchen shutter',
+      values: quotes.map((q) => kitchenPart(q, /shutter/i)),
+      mark: true,
+    },
+    {
+      label: 'Kitchen counter',
+      values: quotes.map((q) => kitchenPart(q, /quartz|granite|counter/i)),
+      mark: true,
+    },
+    {
+      label: 'Time to handover',
+      values: quotes.map((q) => handoverWeeks(studio(q.slug))),
+    },
     {
       label: 'Usually late by',
       values: quotes.map((q) => {
@@ -95,7 +107,15 @@ export function CompareScreen({ data }: { data: AppData }) {
             In plain words
           </h1>
           {plainWords(quotes).map((p) => (
-            <p key={p} style={{ margin: '14px 0 0', fontSize: 16, lineHeight: 1.55, color: 'rgba(255,255,255,.85)' }}>
+            <p
+              key={p}
+              style={{
+                margin: '14px 0 0',
+                fontSize: 16,
+                lineHeight: 1.55,
+                color: 'rgba(255,255,255,.85)',
+              }}
+            >
               {p}
             </p>
           ))}
@@ -138,4 +158,10 @@ export function CompareScreen({ data }: { data: AppData }) {
       </Foot>
     </Frame>
   );
+}
+
+/** The screen once the studio data is here — usually already, since the quiz fetches it early. */
+export function Compare() {
+  const data = useAppData();
+  return data ? <CompareScreen data={data} /> : <Frame>{null}</Frame>;
 }

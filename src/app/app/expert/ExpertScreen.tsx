@@ -15,6 +15,32 @@ const TZ = 'Asia/Kolkata';
 const DAYS_SHOWN = 4;
 const TIMES_SHOWN = 6;
 
+/** The confetti: where each piece lands and its colour, from the design file. */
+const BURST: [number, number, string][] = [
+  [70, 0, '#ba5329'],
+  [81, 34, '#e07a4e'],
+  [75, 75, '#f2c98a'],
+  [27, 65, '#f1f0ec'],
+  [0, 88, '#ba5329'],
+  [-41, 98, '#e07a4e'],
+  [-49, 49, '#f2c98a'],
+  [-81, 34, '#f1f0ec'],
+  [-106, 0, '#ba5329'],
+  [-65, -27, '#e07a4e'],
+  [-62, -62, '#f2c98a'],
+  [-41, -98, '#f1f0ec'],
+  [0, -70, '#ba5329'],
+  [34, -81, '#e07a4e'],
+  [75, -75, '#f2c98a'],
+  [65, -27, '#f1f0ec'],
+];
+
+const NEXT = [
+  'Talk through the quotes with {expert}',
+  'Meet the studios you like, at their office or your flat',
+  'Sign with one, and watch your home come together here',
+];
+
 const dayKey = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: TZ });
 const fmt = (iso: string, o: Intl.DateTimeFormatOptions) => new Date(iso).toLocaleString('en-IN', { timeZone: TZ, ...o });
 const timeOf = (iso: string) => fmt(iso, { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
@@ -45,17 +71,75 @@ export function ExpertScreen({ slots, sample, expert }: { slots: string[]; sampl
     router.push(`/expert?slot=${encodeURIComponent(slot)}`);
   };
 
-  if (booked && label) {
+  if (booked && slot) {
+    const when = `${fmt(slot, { weekday: 'long', day: 'numeric', month: 'long' })}, ${timeOf(slot)}`;
     return (
-      <Frame>
-        <Head back={() => setBooked(false)} meta="Booked" />
-        <Body>
-          <h1 className="oa-title">{label}. {first} will call you.</h1>
-          <p className="oa-sub">She reads your answers and all three quotes before the call, so it starts where the studios differ.</p>
-          <p className="oa-sample">Test build · nothing was booked</p>
-        </Body>
+      <Frame dark>
+        <main
+          className="oa-body"
+          style={{
+            paddingTop: 'calc(env(safe-area-inset-top, 0px) + 64px)',
+            gap: 28,
+          }}
+        >
+          <div className="oa-burst" aria-hidden>
+            <span className="ring" />
+            {BURST.map(([dx, dy, c], i) => (
+              <span
+                key={i}
+                className="bit"
+                style={{
+                  background: c,
+                  ['--dx' as string]: `${dx}px`,
+                  ['--dy' as string]: `${dy}px`,
+                  animationDelay: `${0.12 + i * 0.0147}s`,
+                }}
+              />
+            ))}
+            <span className="tick">
+              <svg
+                width="26"
+                height="26"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            </span>
+          </div>
+          <div role="status" className="flex flex-col gap-3">
+            <h1 className="oa-title" style={{ color: '#f1f0ec', fontSize: 40 }}>
+              See you {when}.
+            </h1>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 15,
+                lineHeight: 1.5,
+                color: '#b5b3ad',
+              }}
+            >
+              {first} reads your answers and all three quotes first, then calls you.
+            </p>
+            {sample ? <p className="oa-sample">Test build · nothing was booked</p> : null}
+          </div>
+          <ol className="oa-next-steps">
+            {NEXT.map((step, i) => (
+              <li key={step}>
+                <span>{String(i + 1).padStart(2, '0')}</span>
+                <span>{step.replace('{expert}', first)}</span>
+              </li>
+            ))}
+          </ol>
+        </main>
         <Foot>
-          <Cta href="/app/home">See what happens after you sign</Cta>
+          <Cta href="/app/home" tone="ghost">
+            See how your project will look
+          </Cta>
         </Foot>
       </Frame>
     );
@@ -73,7 +157,14 @@ export function ExpertScreen({ slots, sample, expert }: { slots: string[]; sampl
             <span className="oa-avatar" aria-hidden>
               {first.charAt(0)}
             </span>
-            <p style={{ margin: 0, fontSize: 15, lineHeight: 1.45, color: 'rgba(255,255,255,.85)' }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 15,
+                lineHeight: 1.45,
+                color: 'rgba(255,255,255,.85)',
+              }}
+            >
               {expert} reads your answers and all 3 quotes first. She earns the same whichever studio you pick.
             </p>
           </div>

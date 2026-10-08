@@ -1,10 +1,9 @@
 import type { Metadata } from 'next';
-import { appData } from '../data';
-import { VerifyScreen } from './VerifyScreen';
+import { Verify } from './VerifyScreen';
 
 export const metadata: Metadata = { title: 'Your quotes are ready' };
-export const dynamic = 'force-dynamic';
 
-export default async function AppVerifyPage() {
-  return <VerifyScreen data={await appData()} />;
+/** Static, so it is prefetched; the data comes from the app's kept copy (`useAppData`). */
+export default function AppVerifyPage() {
+  return <Verify />;
 }

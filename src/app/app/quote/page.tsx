@@ -1,10 +1,9 @@
 import type { Metadata } from 'next';
-import { appData } from '../data';
-import { QuoteScreen } from './QuoteScreen';
+import { Quote } from './QuoteScreen';
 
 export const metadata: Metadata = { title: 'Your quotes' };
-export const dynamic = 'force-dynamic';
 
-export default async function AppQuotePage() {
-  return <QuoteScreen data={await appData()} />;
+/** Static, so it is prefetched; the data comes from the app's kept copy (`useAppData`). */
+export default function AppQuotePage() {
+  return <Quote />;
 }

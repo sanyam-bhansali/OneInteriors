@@ -1,10 +1,9 @@
 import type { Metadata } from 'next';
-import { appData } from '../data';
-import { CompareScreen } from './CompareScreen';
+import { Compare } from './CompareScreen';
 
 export const metadata: Metadata = { title: 'Side by side' };
-export const dynamic = 'force-dynamic';
 
-export default async function AppComparePage() {
-  return <CompareScreen data={await appData()} />;
+/** Static, so it is prefetched; the data comes from the app's kept copy (`useAppData`). */
+export default function AppComparePage() {
+  return <Compare />;
 }

@@ -1,10 +1,9 @@
 import type { Metadata } from 'next';
-import { appData } from '../data';
-import { MatchesScreen } from './MatchesScreen';
+import { Matches } from './MatchesScreen';
 
 export const metadata: Metadata = { title: 'Your matches' };
-export const dynamic = 'force-dynamic';
 
-export default async function AppMatchesPage() {
-  return <MatchesScreen data={await appData()} />;
+/** Static, so it is prefetched; the data comes from the app's kept copy (`useAppData`). */
+export default function AppMatchesPage() {
+  return <Matches />;
 }

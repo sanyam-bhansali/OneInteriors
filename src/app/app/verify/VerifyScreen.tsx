@@ -17,6 +17,7 @@ import { Body, Cta, Foot, Frame, Head } from '@/components/app/ui';
 import { useJourney } from '@/components/app/useJourney';
 import { normalisePhone } from '@/modules/studio/phone';
 import { submitContactAction } from '@/app/quiz/actions';
+import { useAppData } from '@/components/app/useAppData';
 import type { AppData } from '../data';
 
 const COUNT = ['No', 'One', 'Two', 'Three'];
@@ -43,7 +44,13 @@ export function VerifyScreen({ data }: { data: AppData }) {
       return;
     }
     setBusy(true);
-    const contact = await submitContactAction(brief, { name, phone, email: '', agreed, whatsappUpdates: whatsapp });
+    const contact = await submitContactAction(brief, {
+      name,
+      phone,
+      email: '',
+      agreed,
+      whatsappUpdates: whatsapp,
+    });
     setBusy(false);
     if (!contact.ok) {
       return setError(Object.values(contact.errors)[0] ?? 'Check your details and try again.');
@@ -58,7 +65,9 @@ export function VerifyScreen({ data }: { data: AppData }) {
       <Head back="/app/matches" meta="Quotes ready" />
       <Body>
         <h1 className="oa-title">{n === 1 ? 'Your quote is' : `Your ${n || ''} quotes are`} ready. Where should we send them?</h1>
-        <p className="oa-sub">Your expert uses this number to reach you about these quotes. Nothing goes to a studio without your say.</p>
+        <p className="oa-sub">
+          Your expert uses this number to reach you about these quotes. Nothing goes to a studio without your say.
+        </p>
 
         <label className="oa-label" htmlFor="oa-phone">
           Mobile number
@@ -83,9 +92,15 @@ export function VerifyScreen({ data }: { data: AppData }) {
 
         <div className="oa-list mt-2">
           <label className="oa-row" style={{ alignItems: 'flex-start', justifyContent: 'flex-start' }}>
-            <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-1 h-5 w-5 accent-[var(--accent)]" />
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="mt-1 h-5 w-5 accent-[var(--accent)]"
+            />
             <span className="text-[15px] leading-[1.45]">
-              Share my home details and answers with {n === 1 ? 'this studio' : `these ${COUNT[n]?.toLowerCase() ?? n} studios`} so they can quote. I agree to the{' '}
+              Share my home details and answers with {n === 1 ? 'this studio' : `these ${COUNT[n]?.toLowerCase() ?? n} studios`}{' '}
+              so they can quote. I agree to the{' '}
               <a href="/privacy" className="underline" style={{ color: 'var(--accent-ink)' }}>
                 privacy policy
               </a>
@@ -93,8 +108,15 @@ export function VerifyScreen({ data }: { data: AppData }) {
             </span>
           </label>
           <label className="oa-row" style={{ alignItems: 'flex-start', justifyContent: 'flex-start' }}>
-            <input type="checkbox" checked={whatsapp} onChange={(e) => setWhatsapp(e.target.checked)} className="mt-1 h-5 w-5 accent-[var(--accent)]" />
-            <span className="text-[15px] leading-[1.45] text-[var(--ink-2)]">Send me tips and offers on WhatsApp too (optional)</span>
+            <input
+              type="checkbox"
+              checked={whatsapp}
+              onChange={(e) => setWhatsapp(e.target.checked)}
+              className="mt-1 h-5 w-5 accent-[var(--accent)]"
+            />
+            <span className="text-[15px] leading-[1.45] text-[var(--ink-2)]">
+              Send me tips and offers on WhatsApp too (optional)
+            </span>
           </label>
         </div>
 
@@ -111,4 +133,10 @@ export function VerifyScreen({ data }: { data: AppData }) {
       </Foot>
     </Frame>
   );
+}
+
+/** The screen once the studio data is here — usually already, since the quiz fetches it early. */
+export function Verify() {
+  const data = useAppData();
+  return data ? <VerifyScreen data={data} /> : <Frame>{null}</Frame>;
 }

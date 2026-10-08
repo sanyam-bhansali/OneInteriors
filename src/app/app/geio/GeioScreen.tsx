@@ -13,7 +13,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CameraIcon, Chevron, Frame, MicIcon, SendIcon, useBrief } from '@/components/app/ui';
 import { photo } from '@/modules/app/example-project';
 import { GREETING, SUGGESTIONS, answerFor, partOfDay, topicOf } from '@/modules/app/geio-script';
@@ -57,21 +57,68 @@ function preview(question: string, name: string, expert: string, pic: boolean): 
   // A written answer cannot be about a photo it has not seen, so a photo goes to a person.
   if (pic) {
     return {
-      paragraphs: [`I can’t look at photos in this build, so I’ve passed yours to ${expert}. She will tell you whether it needs the studio’s attention.`],
+      paragraphs: [
+        `I can’t look at photos in this build, so I’ve passed yours to ${expert}. She will tell you whether it needs the studio’s attention.`,
+      ],
       see: [],
       handover: `${name} sent a photo and asked: “${question.slice(0, 200)}”`,
       follow: [],
     };
   }
   const a = answerFor(topicOf(question), name, expert, question);
-  return { paragraphs: a.paragraphs, see: (a.see ?? []).map((s) => ({ ...s, watch: Boolean(s.watch) })), handover: a.handover ?? null, follow: a.follow ?? [] };
+  return {
+    paragraphs: a.paragraphs,
+    see: (a.see ?? []).map((s) => ({ ...s, watch: Boolean(s.watch) })),
+    handover: a.handover ?? null,
+    follow: a.follow ?? [],
+  };
 }
 
-type Recognition = { lang: string; interimResults: boolean; start: () => void; stop: () => void; onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null };
+type Recognition = {
+  lang: string;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onend: (() => void) | null;
+};
+
+/**
+ * An answer arriving the way the design shows it: one paragraph at a time
+ * with a cursor, then the cards under it. Older answers are already whole.
+ */
+function Reveal({ paragraphs, children }: { paragraphs: string[]; children: ReactNode }) {
+  const [shown, setShown] = useState(1);
+  useEffect(() => {
+    if (shown >= paragraphs.length) return;
+    const t = setTimeout(() => setShown((n) => n + 1), 700);
+    return () => clearTimeout(t);
+  }, [shown, paragraphs.length]);
+  const done = shown >= paragraphs.length;
+  return (
+    <>
+      {paragraphs.slice(0, shown).map((p) => (
+        <p key={p} className="oa-para">
+          {p}
+        </p>
+      ))}
+      {done ? <div className="oa-later">{children}</div> : <span className="oa-caret" aria-hidden />}
+    </>
+  );
+}
 
 function Headset() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      aria-hidden
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+    >
       <path d="M4 14v-2a8 8 0 0 1 16 0v2" />
       <rect x="3.5" y="13" width="4" height="6" rx="1.5" />
       <rect x="16.5" y="13" width="4" height="6" rx="1.5" />
@@ -100,7 +147,10 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
 
   useEffect(() => {
     setPart(partOfDay(new Date().getHours()));
-    const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
+    const w = window as unknown as {
+      SpeechRecognition?: unknown;
+      webkitSpeechRecognition?: unknown;
+    };
     setCanSpeak(Boolean(w.SpeechRecognition ?? w.webkitSpeechRecognition));
   }, []);
   useEffect(() => {
@@ -118,13 +168,25 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
         { role: 'user', text: t.ask },
         { role: 'assistant', text: t.reply!.paragraphs.join('\n\n') },
       ]);
-    const turn: Turn = { ask: question, pic, reply: null, live: false, site: !pic && topicOf(question) === 'site' };
+    const turn: Turn = {
+      ask: question,
+      pic,
+      reply: null,
+      live: false,
+      site: !pic && topicOf(question) === 'site',
+    };
     setTurns((all) => [...all, turn]);
 
     let reply: GeioReply;
     let wasLive = false;
     try {
-      const res = await askGeioAction({ question, history, image: pic?.startsWith('data:') ? pic : undefined, lang, name });
+      const res = await askGeioAction({
+        question,
+        history,
+        image: pic?.startsWith('data:') ? pic : undefined,
+        lang,
+        name,
+      });
       if (res.ok) {
         reply = res.reply;
         wasLive = true;
@@ -160,7 +222,10 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
       recognition.current?.stop();
       return;
     }
-    const w = window as unknown as { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
+    const w = window as unknown as {
+      SpeechRecognition?: new () => Recognition;
+      webkitSpeechRecognition?: new () => Recognition;
+    };
     const R = w.SpeechRecognition ?? w.webkitSpeechRecognition;
     if (!R) return;
     const r = new R();
@@ -177,12 +242,15 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
 
   return (
     <Frame>
+      <div className="oa-aura-box" aria-hidden>
+        <div className={`oa-aura${listening ? ' hot' : turns.length ? ' quiet' : ''}`} />
+      </div>
       <header className="oa-geio-head">
         <button type="button" className="oa-back" aria-label="Back" onClick={() => router.push(back)} style={{ marginLeft: 0 }}>
           <Chevron />
         </button>
         <span className="who">
-          <span className="oa-orb" aria-hidden />
+          <span className={`oa-orb small${busy ? ' busy' : ''}`} aria-hidden />
           <span>
             GEIO
             <small>{turns.length === 0 ? 'Interior expert' : live ? 'Interior expert' : 'Preview'}</small>
@@ -191,7 +259,11 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
         <button
           type="button"
           className="oa-pill"
-          style={{ background: 'var(--ink)', color: '#fff', borderColor: 'var(--ink)' }}
+          style={{
+            background: 'var(--ink)',
+            color: '#fff',
+            borderColor: 'var(--ink)',
+          }}
           onClick={() => void ask(`Can I talk to ${expert}?`)}
         >
           <Headset />
@@ -204,7 +276,7 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
           <>
             <span className="oa-orb big" aria-hidden />
             <h1 className="oa-title">
-              <span style={{ color: 'var(--accent)' }}>{g.hello(part, name)}</span>
+              <span className="oa-grad">{g.hello(part, name)}</span>
               <br />
               {g.ask}
             </h1>
@@ -220,17 +292,37 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
             </div>
             <div className="oa-chips">
               {['2 BHK, Baner', 'Example project'].map((c) => (
-                <span key={c} className="oa-chip small" style={{ display: 'inline-flex', alignItems: 'center', cursor: 'default' }}>
+                <span
+                  key={c}
+                  className="oa-chip small"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    cursor: 'default',
+                  }}
+                >
                   {c}
                 </span>
               ))}
-              <span className="oa-chip small" style={{ display: 'inline-flex', alignItems: 'center', cursor: 'default', color: 'var(--accent-ink)' }}>
+              <span
+                className="oa-chip small"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  cursor: 'default',
+                  color: 'var(--accent-ink)',
+                }}
+              >
                 Carpentry, day 18
               </span>
             </div>
             <div className="oa-suggest">
               {SUGGESTIONS.map((s) => (
-                <button key={s.topic} type="button" onClick={() => (s.topic === 'photo' ? file.current?.click() : void ask(s.ask))}>
+                <button
+                  key={s.topic}
+                  type="button"
+                  onClick={() => (s.topic === 'photo' ? file.current?.click() : void ask(s.ask))}
+                >
                   <small>{s.label}</small>
                   {s.topic === 'photo' ? 'Is this crack normal? Send a photo' : s.ask}
                 </button>
@@ -253,26 +345,40 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
                   {t.ask}
                 </div>
                 <div className="oa-msg-ai">
-                  <span className="oa-orb" aria-hidden />
+                  <span className={`oa-orb${t.reply === null ? ' busy' : ''}`} aria-hidden />
                   <div className="text">
                     {t.reply === null ? (
-                      <p className="oa-note" aria-live="polite">
+                      <p className="oa-think" aria-live="polite">
                         {t.pic ? 'Looking at your photo…' : 'Checking your project…'}
                       </p>
                     ) : (
-                      <>
-                        {t.reply.paragraphs.map((p) => (
-                          <p key={p}>{p}</p>
-                        ))}
+                      <Reveal paragraphs={t.reply.paragraphs}>
                         {t.site ? (
-                          <Link href="/app/site" className="oa-card" style={{ display: 'block', padding: 0, overflow: 'hidden', textDecoration: 'none' }}>
+                          <Link
+                            href="/app/site"
+                            className="oa-card"
+                            style={{
+                              display: 'block',
+                              padding: 0,
+                              overflow: 'hidden',
+                              textDecoration: 'none',
+                            }}
+                          >
                             <span className="oa-thumbs" style={{ gap: 2 }}>
                               {[28, 31, 25].map((f) => (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img key={f} src={photo(f)} alt="" style={{ borderRadius: 0 }} />
                               ))}
                             </span>
-                            <b style={{ display: 'block', padding: '12px 14px', fontSize: 14.5 }}>Today&rsquo;s site update, 9:40 am →</b>
+                            <b
+                              style={{
+                                display: 'block',
+                                padding: '12px 14px',
+                                fontSize: 14.5,
+                              }}
+                            >
+                              Today&rsquo;s site update, 9:40 am →
+                            </b>
                           </Link>
                         ) : null}
                         {t.reply.see.length ? (
@@ -291,7 +397,14 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
                         {t.reply.handover ? (
                           <div className="oa-card">
                             <div className="flex items-center gap-3">
-                              <span className="oa-avatar" style={{ background: 'var(--ok)', color: '#fff' }} aria-hidden>
+                              <span
+                                className="oa-avatar"
+                                style={{
+                                  background: 'var(--ok)',
+                                  color: '#fff',
+                                }}
+                                aria-hidden
+                              >
                                 {expert.charAt(0)}
                               </span>
                               <span>
@@ -301,13 +414,27 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
                             </div>
                             <div className="mt-3 rounded-[14px] p-3" style={{ background: 'var(--bg)' }}>
                               <span className="oa-meta">GEIO passed this to {expert}</span>
-                              <p style={{ margin: '6px 0 0', fontSize: 14.5, lineHeight: 1.45 }}>{t.reply.handover}</p>
+                              <p
+                                style={{
+                                  margin: '6px 0 0',
+                                  fontSize: 14.5,
+                                  lineHeight: 1.45,
+                                }}
+                              >
+                                {t.reply.handover}
+                              </p>
                             </div>
                             <div className="mt-3 grid grid-cols-2 gap-2">
                               <Link href="/app/expert" className="oa-cta black" style={{ minHeight: 46, padding: '0 14px' }}>
                                 Call
                               </Link>
-                              <button type="button" className="oa-cta" style={{ minHeight: 46, padding: '0 14px' }} disabled title="Not built yet: nothing is sent">
+                              <button
+                                type="button"
+                                className="oa-cta"
+                                style={{ minHeight: 46, padding: '0 14px' }}
+                                disabled
+                                title="Not built yet: nothing is sent"
+                              >
                                 Chat here
                               </button>
                             </div>
@@ -323,7 +450,7 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
                             ))}
                           </div>
                         ) : null}
-                      </>
+                      </Reveal>
                     )}
                   </div>
                 </div>
@@ -358,7 +485,13 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
           }}
         />
         <div className="box">
-          <button type="button" className="oa-icon-btn" aria-label="Send a photo" onClick={() => file.current?.click()} disabled={busy}>
+          <button
+            type="button"
+            className="oa-icon-btn"
+            aria-label="Send a photo"
+            onClick={() => file.current?.click()}
+            disabled={busy}
+          >
             <CameraIcon />
           </button>
           <input
@@ -368,14 +501,20 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
             maxLength={600}
             onChange={(e) => setText(e.target.value)}
           />
+          {listening ? (
+            <span className="oa-wave" aria-hidden>
+              {[18, 26, 30, 22, 28, 16, 24].map((h, i) => (
+                <span key={i} style={{ height: h, animationDelay: `${i * 0.12}s` }} />
+              ))}
+            </span>
+          ) : null}
           {canSpeak ? (
             <button
               type="button"
-              className="oa-icon-btn"
+              className={`oa-icon-btn${listening ? ' listening' : ''}`}
               aria-label={listening ? 'Stop listening' : 'Speak'}
               aria-pressed={listening}
               onClick={speak}
-              style={listening ? { color: 'var(--accent)' } : undefined}
             >
               <MicIcon />
             </button>

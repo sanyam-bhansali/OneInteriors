@@ -8,6 +8,7 @@ import { Body, Cta, Foot, Frame, Head, useBrief } from '@/components/app/ui';
 import { VERIFIED_STUDIOS } from '@/lib/claims';
 import { filedRatesFor } from '@/data/filed-rates';
 import { lateness, topMatches } from '@/modules/app/journey';
+import { useAppData } from '@/components/app/useAppData';
 import type { AppData } from '../data';
 
 const WORDS = ['No studios', 'One studio', 'Two studios', 'Three studios'];
@@ -70,14 +71,35 @@ export function MatchesScreen({ data }: { data: AppData }) {
                   </div>
                 </div>
                 <div className="oa-chips mt-3.5">
-                  <span className="oa-chip small" style={{ cursor: 'default', display: 'inline-flex', alignItems: 'center' }}>
+                  <span
+                    className="oa-chip small"
+                    style={{
+                      cursor: 'default',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                    }}
+                  >
                     {passed}/{counted.length} checks
                   </span>
-                  <span className="oa-chip small" style={{ cursor: 'default', display: 'inline-flex', alignItems: 'center' }}>
+                  <span
+                    className="oa-chip small"
+                    style={{
+                      cursor: 'default',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                    }}
+                  >
                     Scored on {match.factorsScored} of {match.factorsTotal}
                   </span>
                   {late ? (
-                    <span className="oa-chip small" style={{ cursor: 'default', display: 'inline-flex', alignItems: 'center' }}>
+                    <span
+                      className="oa-chip small"
+                      style={{
+                        cursor: 'default',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                      }}
+                    >
                       {late}
                     </span>
                   ) : null}
@@ -104,4 +126,10 @@ export function MatchesScreen({ data }: { data: AppData }) {
       </Foot>
     </Frame>
   );
+}
+
+/** The screen once the studio data is here — usually already, since the quiz fetches it early. */
+export function Matches() {
+  const data = useAppData();
+  return data ? <MatchesScreen data={data} /> : <Frame>{null}</Frame>;
 }

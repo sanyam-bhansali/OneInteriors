@@ -7,6 +7,8 @@
  */
 
 import { useParams, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { warmAppData } from '@/components/app/useAppData';
 import { Body, Cta, Foot, Frame, Head, Progress, useBrief } from '@/components/app/ui';
 import {
   PUNE_LOCALITIES,
@@ -38,16 +40,49 @@ const HOMES: { value: PropertyType; label: string }[] = [
 ];
 
 /** The areas people pick most; the rest are a tap away. */
-const POPULAR = ['kharadi', 'baner', 'wakad', 'hinjewadi', 'kothrud', 'viman-nagar', 'aundh', 'hadapsar', 'balewadi', 'undri', 'ravet', 'magarpatta'];
-
-const SCOPES: { value: ScopeType; title: string; sub: string }[] = [
-  { value: 'FULL_HOME', title: 'Full home', sub: 'Every room, from bare walls to handover' },
-  { value: 'KITCHEN_WARDROBE', title: 'Kitchen & wardrobes', sub: 'The two jobs that need a carpenter most' },
-  { value: 'SINGLE_ROOM', title: 'One room', sub: 'A bedroom, the living room, a study' },
-  { value: 'RENOVATION', title: 'Renovation', sub: 'Change what is already there' },
+const POPULAR = [
+  'kharadi',
+  'baner',
+  'wakad',
+  'hinjewadi',
+  'kothrud',
+  'viman-nagar',
+  'aundh',
+  'hadapsar',
+  'balewadi',
+  'undri',
+  'ravet',
+  'magarpatta',
 ];
 
-const TIER_TAG: Record<Tier, string> = { ESSENTIAL: 'Good value', PREMIUM: 'Most chosen', LUXURY: 'Made to order' };
+const SCOPES: { value: ScopeType; title: string; sub: string }[] = [
+  {
+    value: 'FULL_HOME',
+    title: 'Full home',
+    sub: 'Every room, from bare walls to handover',
+  },
+  {
+    value: 'KITCHEN_WARDROBE',
+    title: 'Kitchen & wardrobes',
+    sub: 'The two jobs that need a carpenter most',
+  },
+  {
+    value: 'SINGLE_ROOM',
+    title: 'One room',
+    sub: 'A bedroom, the living room, a study',
+  },
+  {
+    value: 'RENOVATION',
+    title: 'Renovation',
+    sub: 'Change what is already there',
+  },
+];
+
+const TIER_TAG: Record<Tier, string> = {
+  ESSENTIAL: 'Good value',
+  PREMIUM: 'Most chosen',
+  LUXURY: 'Made to order',
+};
 const TIER_LINE: Record<Tier, string> = {
   ESSENTIAL: 'Everything you need, made well',
   PREMIUM: 'Better materials where they are touched',
@@ -55,16 +90,44 @@ const TIER_LINE: Record<Tier, string> = {
 };
 
 const PRIORITIES: { value: PriorityFactor; title: string; sub: string }[] = [
-  { value: 'SPEED', title: 'Finishing on time', sub: 'Weighs each studio’s delivery record' },
-  { value: 'DESIGN_AMBITION', title: 'Design ambition', sub: 'Bolder, more personal past work' },
-  { value: 'BUDGET', title: 'Staying in budget', sub: 'Final bills that match the quote' },
-  { value: 'MATERIAL_QUALITY', title: 'Material quality', sub: 'Better boards, hardware and finishes' },
+  {
+    value: 'SPEED',
+    title: 'Finishing on time',
+    sub: 'Weighs each studio’s delivery record',
+  },
+  {
+    value: 'DESIGN_AMBITION',
+    title: 'Design ambition',
+    sub: 'Bolder, more personal past work',
+  },
+  {
+    value: 'BUDGET',
+    title: 'Staying in budget',
+    sub: 'Final bills that match the quote',
+  },
+  {
+    value: 'MATERIAL_QUALITY',
+    title: 'Material quality',
+    sub: 'Better boards, hardware and finishes',
+  },
 ];
 
 const INVOLVEMENT: { value: Involvement; title: string; sub: string }[] = [
-  { value: 'DECIDE_FOR_ME', title: 'Decide most things for me', sub: 'Studios that lead with a clear design of their own' },
-  { value: 'COLLABORATE', title: 'Work through it together', sub: 'Regular reviews; you sign off the key choices' },
-  { value: 'APPROVE_EVERYTHING', title: 'I want to approve every detail', sub: 'Every finish and fitting comes to you first' },
+  {
+    value: 'DECIDE_FOR_ME',
+    title: 'Decide most things for me',
+    sub: 'Studios that lead with a clear design of their own',
+  },
+  {
+    value: 'COLLABORATE',
+    title: 'Work through it together',
+    sub: 'Regular reviews; you sign off the key choices',
+  },
+  {
+    value: 'APPROVE_EVERYTHING',
+    title: 'I want to approve every detail',
+    sub: 'Every finish and fitting comes to you first',
+  },
 ];
 
 function answered(brief: Brief, n: number): boolean {
@@ -92,6 +155,10 @@ export default function AppQuestion() {
   const router = useRouter();
   const n = Math.min(TOTAL, Math.max(1, Number(useParams<{ n: string }>().n) || 1));
   const [brief, update] = useBrief();
+  // Fetch the studios now, so the matches screen has them the moment the last answer is in.
+  useEffect(() => {
+    void warmAppData();
+  }, []);
   if (!brief) return <Frame>{null}</Frame>;
 
   const next = () => {
@@ -102,10 +169,16 @@ export default function AppQuestion() {
     }
     // The last answer: the brief is complete, kept on the server too when
     // there is one, then the matches.
-    const done = { ...brief, completedAt: new Date().toISOString(), lastStep: 12 };
+    const done = {
+      ...brief,
+      completedAt: new Date().toISOString(),
+      lastStep: 12,
+    };
     update(done);
-    void saveBriefAction({ ...done, contactName: null }).catch(() => {});
+    // Navigate first: the router waits for a pending server action before it moves,
+    // so saving first held the matches screen back by the length of the save.
     router.push('/app/matches');
+    setTimeout(() => void saveBriefAction({ ...done, contactName: null }).catch(() => {}), 0);
   };
 
   const back = n === 1 ? '/app/name' : `/app/q/${n - 1}`;
@@ -255,9 +328,7 @@ function ScopeStep({ brief, update }: StepProps) {
                 aria-pressed={brief.scopeRooms.includes(r)}
                 onClick={() =>
                   update({
-                    scopeRooms: brief.scopeRooms.includes(r)
-                      ? brief.scopeRooms.filter((x) => x !== r)
-                      : [...brief.scopeRooms, r],
+                    scopeRooms: brief.scopeRooms.includes(r) ? brief.scopeRooms.filter((x) => x !== r) : [...brief.scopeRooms, r],
                     excludedItems: [],
                   })
                 }
@@ -287,7 +358,13 @@ function TierStep({ brief, update }: StepProps) {
               role="radio"
               aria-checked={brief.tier === t}
               className="oa-tier"
-              onClick={() => update({ tier: t, budgetMinPaise: lowPaise, budgetMaxPaise: highPaise })}
+              onClick={() =>
+                update({
+                  tier: t,
+                  budgetMinPaise: lowPaise,
+                  budgetMaxPaise: highPaise,
+                })
+              }
             >
               <span className="oa-tier-top">
                 <span className="oa-tier-name">{TIER[t].label}</span>
@@ -352,7 +429,13 @@ function StyleStep({ brief, update }: StepProps) {
 }
 
 function HouseholdStep({ brief, update }: StepProps) {
-  const h = brief.household ?? { adults: 2, children: 0, elderly: 0, pets: false, worksFromHome: false };
+  const h = brief.household ?? {
+    adults: 2,
+    children: 0,
+    elderly: 0,
+    pets: false,
+    worksFromHome: false,
+  };
   const set = (patch: Partial<typeof h>) => update({ household: { ...h, ...patch } });
   const counter = (key: 'adults' | 'children' | 'elderly', title: string, sub: string, min: number) => (
     <div className="oa-row" style={{ cursor: 'default' }}>
@@ -361,11 +444,20 @@ function HouseholdStep({ brief, update }: StepProps) {
         <span className="oa-row-sub">{sub}</span>
       </span>
       <span className="oa-step">
-        <button type="button" aria-label={`Fewer ${title.toLowerCase()}`} onClick={() => set({ [key]: Math.max(min, h[key] - 1) })}>
+        <button
+          type="button"
+          aria-label={`Fewer ${title.toLowerCase()}`}
+          onClick={() => set({ [key]: Math.max(min, h[key] - 1) })}
+        >
           −
         </button>
         <output aria-live="polite">{h[key]}</output>
-        <button type="button" className="plus" aria-label={`More ${title.toLowerCase()}`} onClick={() => set({ [key]: Math.min(9, h[key] + 1) })}>
+        <button
+          type="button"
+          className="plus"
+          aria-label={`More ${title.toLowerCase()}`}
+          onClick={() => set({ [key]: Math.min(9, h[key] + 1) })}
+        >
           +
         </button>
       </span>
@@ -377,7 +469,14 @@ function HouseholdStep({ brief, update }: StepProps) {
         <span className="oa-row-title">{title}</span>
         <span className="oa-row-sub">{sub}</span>
       </span>
-      <button type="button" role="switch" aria-checked={h[key]} aria-label={title} className="oa-toggle" onClick={() => set({ [key]: !h[key] })} />
+      <button
+        type="button"
+        role="switch"
+        aria-checked={h[key]}
+        aria-label={title}
+        className="oa-toggle"
+        onClick={() => set({ [key]: !h[key] })}
+      />
     </div>
   );
   return (
@@ -397,7 +496,9 @@ function HouseholdStep({ brief, update }: StepProps) {
 function PriorityStep({ brief, update }: StepProps) {
   const ranking = brief.priorityRanking;
   const tap = (p: PriorityFactor) =>
-    update({ priorityRanking: ranking.includes(p) ? ranking.filter((x) => x !== p) : [...ranking, p] });
+    update({
+      priorityRanking: ranking.includes(p) ? ranking.filter((x) => x !== p) : [...ranking, p],
+    });
   const first = PRIORITIES.find((p) => p.value === ranking[0]);
   return (
     <>
@@ -407,7 +508,14 @@ function PriorityStep({ brief, update }: StepProps) {
         {PRIORITIES.map((p) => {
           const at = ranking.indexOf(p.value);
           return (
-            <button key={p.value} type="button" className="oa-row" aria-pressed={at >= 0} onClick={() => tap(p.value)} style={{ justifyContent: 'flex-start' }}>
+            <button
+              key={p.value}
+              type="button"
+              className="oa-row"
+              aria-pressed={at >= 0}
+              onClick={() => tap(p.value)}
+              style={{ justifyContent: 'flex-start' }}
+            >
               <span className={`oa-rank${at >= 0 ? ' on' : ''}`}>{at >= 0 ? at + 1 : ''}</span>
               <span>
                 <span className="oa-row-title" style={at >= 0 ? { color: 'var(--accent-ink)' } : undefined}>
@@ -424,7 +532,12 @@ function PriorityStep({ brief, update }: StepProps) {
           <span className="oa-label accent" style={{ margin: 0 }}>
             {first ? `${first.title} first` : ''}
           </span>
-          <button type="button" className="oa-link" style={{ textDecoration: 'underline', fontSize: 14 }} onClick={() => update({ priorityRanking: [] })}>
+          <button
+            type="button"
+            className="oa-link"
+            style={{ textDecoration: 'underline', fontSize: 14 }}
+            onClick={() => update({ priorityRanking: [] })}
+          >
             Start over
           </button>
         </div>

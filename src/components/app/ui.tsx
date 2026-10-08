@@ -8,9 +8,9 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useSyncExternalStore, type ReactNode } from 'react';
 import { loadBrief, saveBrief } from '@/modules/brief/store';
-import { EMPTY_BRIEF, type Brief } from '@/modules/brief/types';
+import type { Brief } from '@/modules/brief/types';
 
 export function Frame({ children, dark = false }: { children: ReactNode; dark?: boolean }) {
   return <div className={`oa-frame${dark ? ' dark' : ''}`}>{children}</div>;
@@ -66,7 +66,7 @@ export function Cta({
   onClick?: () => void;
   href?: string;
   disabled?: boolean;
-  tone?: 'black' | 'light';
+  tone?: 'black' | 'light' | 'ghost';
 }) {
   const cls = `oa-cta${tone ? ` ${tone}` : ''}`;
   const inner = (
@@ -89,18 +89,30 @@ export function Cta({
   );
 }
 
-/** The brief, shared with the website's sessionStorage copy (`modules/brief/store`). */
+/*
+ * The brief, shared with the website's sessionStorage copy (`modules/brief/store`).
+ *
+ * Kept in memory once read, so a screen opened from another screen has it on
+ * its very first paint — no blank frame while it is fetched from storage.
+ * Only a full page load starts empty, for one render, because the server
+ * cannot see sessionStorage.
+ */
+let current: Brief | undefined;
+const listeners = new Set<() => void>();
+const readBrief = (): Brief => (current ??= loadBrief());
+const onBrief = (fn: () => void) => {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+};
+
 export function useBrief(): [Brief | null, (patch: Partial<Brief>) => void] {
-  const [brief, setBrief] = useState<Brief | null>(null);
-  useEffect(() => {
-    setBrief(loadBrief());
-  }, []);
+  const brief = useSyncExternalStore(onBrief, readBrief, () => null);
   const update = useCallback((patch: Partial<Brief>) => {
-    setBrief((prev) => {
-      const next = { ...(prev ?? EMPTY_BRIEF), ...patch };
-      saveBrief(next);
-      return next;
-    });
+    current = { ...readBrief(), ...patch };
+    saveBrief(current);
+    listeners.forEach((fn) => fn());
   }, []);
   return [brief, update];
 }
@@ -132,7 +144,13 @@ export function Tabs() {
 
 // ── Icons, drawn here so the app needs no icon library ─────────
 
-const S = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;
+const S = {
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.7,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+} as const;
 
 export function Chevron() {
   return (

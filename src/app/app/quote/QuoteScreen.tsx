@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { Body, Cta, Foot, Frame, Head } from '@/components/app/ui';
 import { useJourney } from '@/components/app/useJourney';
 import { formatINR, formatINRCompact } from '@/lib/money';
+import { useAppData } from '@/components/app/useAppData';
 import type { AppData } from '../data';
 
 const SHOWN = 4;
@@ -47,19 +48,11 @@ export function QuoteScreen({ data }: { data: AppData }) {
       <Head back="/app/matches" meta={`Same lines for all ${quotes.length}`} />
       <Body>
         <h1 className="oa-title">A quote you can actually read.</h1>
-        {!data.ratesReal ? (
-          <p className="oa-sample">Pre-launch rates · not yet the studio&rsquo;s own</p>
-        ) : null}
+        {!data.ratesReal ? <p className="oa-sample">Pre-launch rates · not yet the studio&rsquo;s own</p> : null}
 
         <div className="oa-chips" role="group" aria-label="Studio">
           {quotes.map((s, i) => (
-            <button
-              key={s.slug}
-              type="button"
-              className="oa-chip"
-              aria-pressed={i === pick}
-              onClick={() => setPick(i)}
-            >
+            <button key={s.slug} type="button" className="oa-chip" aria-pressed={i === pick} onClick={() => setPick(i)}>
               {s.name}
             </button>
           ))}
@@ -90,7 +83,8 @@ export function QuoteScreen({ data }: { data: AppData }) {
         <div className="oa-total">
           <div className="sum">{formatINRCompact(q.quote.totalPaise)}</div>
           <p>
-            Total for all {q.quote.lines.length} lines, with GST. Measured on site it can move ±{Math.round(q.quote.variancePct * 100)}%.
+            Total for all {q.quote.lines.length} lines, with GST. Measured on site it can move ±
+            {Math.round(q.quote.variancePct * 100)}%.
           </p>
         </div>
       </Body>
@@ -101,4 +95,10 @@ export function QuoteScreen({ data }: { data: AppData }) {
       </Foot>
     </Frame>
   );
+}
+
+/** The screen once the studio data is here — usually already, since the quiz fetches it early. */
+export function Quote() {
+  const data = useAppData();
+  return data ? <QuoteScreen data={data} /> : <Frame>{null}</Frame>;
 }
