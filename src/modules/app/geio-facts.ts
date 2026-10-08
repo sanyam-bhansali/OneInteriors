@@ -32,7 +32,11 @@ export interface GeioFacts {
 const lakh = (l: number) => Math.round(l * 100_000 * 100);
 const rs = (rupees: number) => rupees * 100;
 
-export function geioFacts(name: string, expert: string): GeioFacts {
+/**
+ * The same text for every homeowner on the same project, so the model's
+ * prompt cache can reuse it; their name travels with the question instead.
+ */
+export function geioFacts(expert: string): GeioFacts {
   const paise: number[] = [lakh(EXAMPLE.totalLakh), lakh(EXAMPLE.paidLakh), lakh(EXAMPLE.totalLakh - EXAMPLE.paidLakh)];
   for (const q of QUOTE_LINES) paise.push(rs(q.rupees));
   for (const p of PAYMENTS) paise.push(rs(p.rupees));
@@ -42,7 +46,7 @@ export function geioFacts(name: string, expert: string): GeioFacts {
   }
 
   const lines = [
-    `HOMEOWNER: ${name}. EXPERT: ${expert}, an architect employed by One Interiors; no studio pays her.`,
+    `EXPERT: ${expert}, an architect employed by One Interiors; no studio pays her.`,
     `HOME: ${EXAMPLE.flat}, 2 BHK. Studio: ${EXAMPLE.studio}, working since ${EXAMPLE.since}.`,
     `STAGE: ${EXAMPLE.stage.name}, day ${EXAMPLE.stage.day} of ${EXAMPLE.stage.of}. Stages: ${EXAMPLE.stages.join(' → ')}. Running ${EXAMPLE.runningLateDays} days late overall. Handover planned ${EXAMPLE.handover}. Today is ${EXAMPLE.today}.`,
     `MONEY: quote total ${formatINRCompact(lakh(EXAMPLE.totalLakh))} (${formatINR(lakh(EXAMPLE.totalLakh))}), paid ${formatINRCompact(lakh(EXAMPLE.paidLakh))} so far.`,

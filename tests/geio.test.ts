@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { checked } from '@/modules/app/geio';
 import { geioFacts } from '@/modules/app/geio-facts';
 
-const facts = geioFacts('Priya', 'Swarupa');
+const facts = geioFacts('Swarupa');
 
 describe('GEIO facts', () => {
   it('carries the project and its figures', () => {
@@ -65,5 +65,20 @@ describe('GEIO answer checks', () => {
 
   it('hands over when the model says nothing', () => {
     expect(checked({ hand_to_expert: false }, facts.allowed, 'P', 'q').handover).not.toBeNull();
+  });
+});
+
+describe('GEIO cost', () => {
+  it('prices Haiku 4.5 in paise, rounded up', async () => {
+    const { costPaise, GEIO_DEFAULT_MODEL } = await import('@/modules/app/geio-cost');
+    // 2,500 in + 300 out = $0.004 = ₹0.36 at ₹90
+    expect(costPaise(GEIO_DEFAULT_MODEL, { input_tokens: 2500, output_tokens: 300 })).toBe(36);
+    // the same prefix read from the cache: 2,400 × $0.10/M + 100 in + 300 out
+    expect(costPaise(GEIO_DEFAULT_MODEL, { input_tokens: 100, cache_read_input_tokens: 2400, output_tokens: 300 })).toBe(17);
+  });
+
+  it('prices an unknown model at the dearest rate', async () => {
+    const { costPaise } = await import('@/modules/app/geio-cost');
+    expect(costPaise('some-other-model', { input_tokens: 2500, output_tokens: 300 })).toBe(180);
   });
 });

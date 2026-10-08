@@ -2,24 +2,22 @@
 
 /**
  * Phone and consent (the owner's v1 screens). The number is asked for here,
- * once, when the quotes are ready — verified by a WhatsApp code, which also
- * signs them in so everything is saved. Contact and consent are written by
- * the same server action the website's brief uses, consent first.
+ * once, when the quotes are ready. Contact and consent are written by the
+ * same server action the website's brief uses, consent first.
  *
- * A build with no database (local, or SAMPLE_DATA_ONLY) sends no code and
+ * No WhatsApp code for now (owner, 8 Oct 2026): the number is saved on the
+ * brief, unverified, and nobody is signed in by it — signing in still needs
+ * a code on /sign-in. A build with no database (local, or SAMPLE_DATA_ONLY)
  * saves nothing, and says so.
  */
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Body, Cta, Foot, Frame, Head } from '@/components/app/ui';
 import { useJourney } from '@/components/app/useJourney';
 import { normalisePhone } from '@/modules/studio/phone';
-import { requestOtpAction, verifyOtpAction } from '@/app/sign-in/actions';
 import { submitContactAction } from '@/app/quiz/actions';
 import type { AppData } from '../data';
-
-const RESEND = 30;
 
 const COUNT = ['No', 'One', 'Two', 'Three'];
 
@@ -29,34 +27,13 @@ export function VerifyScreen({ data }: { data: AppData }) {
   const { brief, matches } = useJourney(data);
   const n = matches.length;
   const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
-  const [sent, setSent] = useState(false);
-  const [devCode, setDevCode] = useState<string | null>(null);
   const [agreed, setAgreed] = useState(false);
   const [whatsapp, setWhatsapp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [wait, setWait] = useState(0);
-
-  useEffect(() => {
-    if (wait <= 0) return;
-    const t = setTimeout(() => setWait((w) => w - 1), 1000);
-    return () => clearTimeout(t);
-  }, [wait]);
 
   const valid = normalisePhone(phone) !== null;
   const name = brief?.contactName?.trim() || 'there';
-
-  const sendCode = async () => {
-    setError(null);
-    setBusy(true);
-    const res = await requestOtpAction(phone, name);
-    setBusy(false);
-    if (!res.ok) return setError(res.error);
-    setSent(true);
-    setDevCode(res.devCode ?? null);
-    setWait(RESEND);
-  };
 
   const verify = async () => {
     if (!brief) return;
@@ -67,24 +44,21 @@ export function VerifyScreen({ data }: { data: AppData }) {
     }
     setBusy(true);
     const contact = await submitContactAction(brief, { name, phone, email: '', agreed, whatsappUpdates: whatsapp });
+    setBusy(false);
     if (!contact.ok) {
-      setBusy(false);
       return setError(Object.values(contact.errors)[0] ?? 'Check your details and try again.');
     }
-    const res = await verifyOtpAction(phone, code, name);
-    setBusy(false);
-    if (!res.ok) return setError(res.error);
     router.push('/app/quote');
   };
 
-  const ready = valid && agreed && (sample || code.replace(/\D/g, '').length >= 4);
+  const ready = valid && agreed;
 
   return (
     <Frame>
       <Head back="/app/matches" meta="Quotes ready" />
       <Body>
         <h1 className="oa-title">{n === 1 ? 'Your quote is' : `Your ${n || ''} quotes are`} ready. Where should we send them?</h1>
-        <p className="oa-sub">Your number also saves everything, so you can come back any time.</p>
+        <p className="oa-sub">Your expert uses this number to reach you about these quotes. Nothing goes to a studio without your say.</p>
 
         <label className="oa-label" htmlFor="oa-phone">
           Mobile number
@@ -105,39 +79,7 @@ export function VerifyScreen({ data }: { data: AppData }) {
           />
         </div>
 
-        {sample ? (
-          <p className="oa-sample">Test build · no code is sent and nothing is saved</p>
-        ) : sent ? (
-          <>
-            <label className="oa-label" htmlFor="oa-code">
-              Code sent on WhatsApp
-            </label>
-            <input
-              id="oa-code"
-              className="oa-input mono"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={8}
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              style={{ letterSpacing: '0.4em', fontSize: 28 }}
-            />
-            {devCode ? <p className="oa-note">Test build: your code is {devCode}.</p> : null}
-            <button
-              type="button"
-              className="oa-link"
-              style={{ textAlign: 'left', padding: 0, fontSize: 14, color: 'var(--ink-2)', fontWeight: 400 }}
-              disabled={wait > 0 || busy}
-              onClick={sendCode}
-            >
-              {wait > 0 ? `Didn’t get it? Ask for a new code in 0:${String(wait).padStart(2, '0')}` : 'Send a new code'}
-            </button>
-          </>
-        ) : (
-          <button type="button" className="oa-cta black" disabled={!valid || busy} onClick={sendCode}>
-            Send code on WhatsApp
-          </button>
-        )}
+        {sample ? <p className="oa-sample">Test build · nothing is saved</p> : null}
 
         <div className="oa-list mt-2">
           <label className="oa-row" style={{ alignItems: 'flex-start', justifyContent: 'flex-start' }}>
@@ -164,7 +106,7 @@ export function VerifyScreen({ data }: { data: AppData }) {
       </Body>
       <Foot>
         <Cta onClick={verify} disabled={!ready || busy}>
-          {sample ? 'See my quotes' : 'Verify and see my quotes'}
+          See my quotes
         </Cta>
       </Foot>
     </Frame>

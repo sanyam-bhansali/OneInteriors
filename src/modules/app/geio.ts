@@ -13,11 +13,20 @@ import 'server-only';
  * expert with a note, which is the design's GEIO 4. With no key, or on any
  * failure, the reply is `null` and the screen falls back to its written
  * preview answers.
+ *
+ * Cost: Claude Haiku 4.5 by default (`GEIO_MODEL` overrides it), the rules
+ * and the home's facts marked for the prompt cache, and a monthly cap
+ * (`geio-budget.ts`) checked before each call and charged after it from the
+ * token counts the API returns.
  */
 
-import { anthropicModel, hasAnthropic } from '@/lib/env';
+import { hasAnthropic } from '@/lib/env';
 import { figuresCheck } from '@/modules/quotation/compare-insights';
 import { geioFacts } from './geio-facts';
+import { recordSpend, withinBudget } from './geio-budget';
+import { GEIO_DEFAULT_MODEL, costPaise, type Usage } from './geio-cost';
+
+const model = () => process.env.GEIO_MODEL?.trim() || GEIO_DEFAULT_MODEL;
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
@@ -55,7 +64,7 @@ function system(lang: GeioLang, expert: string): string {
     'You are GEIO, the interior design expert inside the One Interiors app. You talk to one homeowner in Pune about their own flat while a studio does the interiors.',
     WRITE_IN[lang],
     '',
-    'WHAT YOU KNOW is in the HOME FACTS block. That is everything; you have no other record of this project.',
+    "WHAT YOU KNOW is in the home_facts block. That is everything; you have no other record of this project. The homeowner's first name comes with each question.",
     '',
     'RULES:',
     '1. Answer from the HOME FACTS, from what is visible in a photo they send, and from general, well-established interior practice (materials, finishes, what is normal at each stage of work). Say plainly when something is general practice rather than a fact about their flat.',
@@ -115,8 +124,8 @@ export async function askGeio({
   name: string;
   expert: string;
 }): Promise<GeioReply | null> {
-  if (!hasAnthropic()) return null;
-  const facts = geioFacts(name, expert);
+  if (!hasAnthropic() || !(await withinBudget())) return null;
+  const facts = geioFacts(expert);
 
   const messages = [
     ...history.map((t) => ({ role: t.role, content: t.text })),
@@ -124,7 +133,7 @@ export async function askGeio({
       role: 'user' as const,
       content: [
         ...(image ? [{ type: 'image', source: { type: 'base64', media_type: image.mediaType, data: image.data } }] : []),
-        { type: 'text', text: `<home_facts>\n${facts.text}\n</home_facts>\n\n<question>${question}</question>` },
+        { type: 'text', text: `<homeowner>${name}</homeowner>\n<question>${question}</question>` },
       ],
     },
   ];
@@ -141,9 +150,13 @@ export async function askGeio({
         'anthropic-version': API_VERSION,
       },
       body: JSON.stringify({
-        model: anthropicModel(),
+        model: model(),
         max_tokens: MAX_TOKENS,
-        system: system(lang, expert),
+        // Rules, then the home's facts. The cache mark covers the tool and both blocks — nothing per-person.
+        system: [
+          { type: 'text', text: system(lang, expert) },
+          { type: 'text', text: `<home_facts>\n${facts.text}\n</home_facts>`, cache_control: { type: 'ephemeral' } },
+        ],
         tools: [TOOL],
         tool_choice: { type: 'tool', name: 'reply' },
         messages,
@@ -153,7 +166,12 @@ export async function askGeio({
       console.error('[geio] model call failed', response.status);
       return null;
     }
-    const json = (await response.json()) as { content?: { type: string; name?: string; input?: Record<string, unknown> }[] };
+    const json = (await response.json()) as {
+      content?: { type: string; name?: string; input?: Record<string, unknown> }[];
+      usage?: Usage;
+    };
+    // Charged from what the API says it used; with no usage, as a long answer.
+    await recordSpend(costPaise(model(), json.usage ?? { input_tokens: 8_000, output_tokens: MAX_TOKENS }));
     const input = json.content?.find((b) => b.type === 'tool_use' && b.name === 'reply')?.input;
     if (!input) return null;
     return checked(input, facts.allowed, name, question);
