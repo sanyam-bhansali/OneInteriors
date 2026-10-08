@@ -61,7 +61,7 @@ export function geioFacts(expert: string): GeioFacts {
     `DECISION DUE ${DECISION.due}: ${DECISION.title}. ${DECISION.why} Options: ${DECISION.options.map((o) => `${o.name} (${o.note}; ${o.price})`).join('; ')}.`,
     `SNAGS OPEN: ${SNAGS.open.map((s) => `${s.title} — ${s.where}; ${s.status}`).join('; ')}. FIXED: ${SNAGS.fixed.map((s) => `${s.title} — ${s.status}`).join('; ')}. The last payment is due only once snags close.`,
     `MATERIALS: ${MATERIALS.map((m) => `${m.part}: ${m.name} (${m.note})`).join('; ')}.`,
-    `ROOMS: ${ROOMS_3D.map((r) => `${r.label} — ${r.state}: ${r.note}`).join(' ')}`,
+    `ROOMS: ${ROOMS_3D.map((r) => `${r.name} — ${r.status}: ${r.note}`).join(' ')}`,
     `DOCUMENTS IN THE LOCKER: ${DOCUMENTS.map((d) => `${d.name} (${d.meta})`).join('; ')}.`,
   ];
 

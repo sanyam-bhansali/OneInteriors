@@ -15,7 +15,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CameraIcon, Chevron, Frame, MicIcon, SendIcon, useBrief } from '@/components/app/ui';
-import { photo } from '@/modules/app/example-project';
+import { TODAY } from '@/modules/app/example-project';
+import { STYLE_LABELS } from '@/modules/brief/types';
+import { TIER } from '@/modules/quotation/tiers';
 import { GREETING, SUGGESTIONS, answerFor, partOfDay, topicOf } from '@/modules/app/geio-script';
 import type { GeioReply } from '@/modules/app/geio';
 import { askGeioAction } from './actions';
@@ -107,6 +109,25 @@ function Reveal({ paragraphs, children }: { paragraphs: string[]; children: Reac
   );
 }
 
+const SUGGEST_ICON: Record<string, ReactNode> = {
+  site: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
+    </svg>
+  ),
+  photo: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </svg>
+  ),
+  price: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 4h12M6 9h12M13 21 6 13h3a4 4 0 0 0 0-9" />
+    </svg>
+  ),
+};
+
 function Headset() {
   return (
     <svg
@@ -143,7 +164,6 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
   const started = useRef(false);
 
   const busy = turns.some((t) => t.reply === null);
-  const live = turns.some((t) => t.live);
 
   useEffect(() => {
     setPart(partOfDay(new Date().getHours()));
@@ -239,6 +259,11 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
   };
 
   const g = GREETING[lang];
+  const context = [
+    '2 BHK, Baner',
+    brief?.tier ? TIER[brief.tier].label : 'Premium',
+    brief?.styleLikes?.[0] ? STYLE_LABELS[brief.styleLikes[0]] : 'Warm modern',
+  ];
 
   return (
     <Frame>
@@ -246,15 +271,12 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
         <div className={`oa-aura${listening ? ' hot' : turns.length ? ' quiet' : ''}`} />
       </div>
       <header className="oa-geio-head">
-        <button type="button" className="oa-back" aria-label="Back" onClick={() => router.push(back)} style={{ marginLeft: 0 }}>
+        <button type="button" className="oa-geio-back" aria-label="Back" onClick={() => router.push(back)}>
           <Chevron />
         </button>
         <span className="who">
           <span className={`oa-orb small${busy ? ' busy' : ''}`} aria-hidden />
-          <span>
-            GEIO
-            <small>{turns.length === 0 ? 'Interior expert' : live ? 'Interior expert' : 'Preview'}</small>
-          </span>
+          GEIO
         </span>
         <button
           type="button"
@@ -283,53 +305,37 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
             <p className="oa-sub" style={{ margin: 0 }}>
               I&rsquo;m GEIO, your interior design expert. Ask me anything about your home.
             </p>
-            <div className="oa-chips">
+            <div className="oa-geio-langs" role="group" aria-label="Language">
               {LANGS.map((l) => (
-                <button key={l.id} type="button" className="oa-chip" aria-pressed={lang === l.id} onClick={() => setLang(l.id)}>
+                <button key={l.id} type="button" aria-pressed={lang === l.id} onClick={() => setLang(l.id)}>
                   {l.label}
                 </button>
               ))}
             </div>
-            <div className="oa-chips">
-              {['2 BHK, Baner', 'Example project'].map((c) => (
-                <span
-                  key={c}
-                  className="oa-chip small"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    cursor: 'default',
-                  }}
-                >
-                  {c}
-                </span>
+            <div className="oa-geio-context" aria-label="What GEIO knows about your home">
+              {context.map((c) => (
+                <span key={c}>{c}</span>
               ))}
-              <span
-                className="oa-chip small"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  cursor: 'default',
-                  color: 'var(--accent-ink)',
-                }}
-              >
-                Carpentry, day 18
-              </span>
+              <span className="now">Carpentry, day 18</span>
             </div>
             <div className="oa-suggest">
-              {SUGGESTIONS.map((s) => (
+              {SUGGESTIONS.map((sg) => (
                 <button
-                  key={s.topic}
+                  key={sg.topic}
                   type="button"
-                  onClick={() => (s.topic === 'photo' ? file.current?.click() : void ask(s.ask))}
+                  onClick={() => (sg.topic === 'photo' ? file.current?.click() : void ask(sg.ask))}
                 >
-                  <small>{s.label}</small>
-                  {s.topic === 'photo' ? 'Is this crack normal? Send a photo' : s.ask}
+                  {sg.topic === 'photo' ? 'Is this crack normal? Send a photo' : sg.ask}
+                  <span className="icon" aria-hidden>
+                    {SUGGEST_ICON[sg.topic]}
+                  </span>
                 </button>
               ))}
               <button type="button" onClick={() => void ask(`Can I talk to ${expert}?`)}>
-                <small>A person</small>
                 Talk to {expert}, your expert
+                <span className="icon" aria-hidden>
+                  <Headset />
+                </span>
               </button>
             </div>
           </>
@@ -337,13 +343,11 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
           <div className="oa-chat">
             {turns.map((t, i) => (
               <div key={i} className="oa-chat">
-                <div className="oa-msg-me">
-                  {t.pic ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={t.pic} alt="Your photo" />
-                  ) : null}
-                  {t.ask}
-                </div>
+                {t.pic ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className="oa-msg-photo" src={t.pic} alt="Your photo" />
+                ) : null}
+                <div className="oa-msg-me">{t.ask}</div>
                 <div className="oa-msg-ai">
                   <span className={`oa-orb${t.reply === null ? ' busy' : ''}`} aria-hidden />
                   <div className="text">
@@ -365,10 +369,10 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
                             }}
                           >
                             <span className="oa-thumbs" style={{ gap: 2 }}>
-                              {[28, 31, 25].map((f) => (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img key={f} src={photo(f)} alt="" style={{ borderRadius: 0 }} />
-                              ))}
+                              {TODAY.map((ph) => (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img key={ph.src} src={ph.src} alt={ph.alt} style={{ borderRadius: 0 }} />
+                                ))}
                             </span>
                             <b
                               style={{

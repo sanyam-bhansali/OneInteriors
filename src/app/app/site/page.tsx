@@ -3,9 +3,11 @@
 /** On site (the owner's v1 screens): every working day, photographed, and a day nobody came, said plainly. */
 
 import { AskGeio, ExampleTag, Frame, Tabs } from '@/components/app/ui';
-import { EXAMPLE, WEEK, photo } from '@/modules/app/example-project';
+import { useMyProject, type MyProject } from '@/components/app/useMyProject';
+import { EXAMPLE, PHOTOS, WEEK } from '@/modules/app/example-project';
+import { STAGE_SHORT, dayLabel, timeLabel } from '@/modules/app/project-view';
 
-export default function AppSite() {
+function ExampleSite() {
   const worked = WEEK.filter((d) => d.state === 'worked' || d.state === 'today').length;
   const sofar = WEEK.filter((d) => d.state !== 'ahead').length;
   return (
@@ -44,12 +46,12 @@ export default function AppSite() {
           <span style={{ font: '500 12px var(--mono)', color: 'var(--ink-2)' }}>5:12 pm</span>
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="oa-photo-main" src={photo(32)} alt="The living room at the end of the day" />
+        <img className="oa-photo-main" src={PHOTOS.living} alt="Living room after today's work" />
         <div className="oa-photo-pair">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photo(29)} alt="" />
+          <img src={PHOTOS.bedroom1} alt="Bedroom 1" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photo(26)} alt="" />
+          <img src={PHOTOS.kitchenCarcass} alt="Kitchen" />
         </div>
         <p style={{ margin: 0, fontSize: 16, lineHeight: 1.5 }}>
           Wardrobe frames fitted in both bedrooms. Kitchen carcass levelled and fixed to the wall.
@@ -72,4 +74,56 @@ export default function AppSite() {
       <Tabs />
     </Frame>
   );
+}
+
+/** The real project's site updates, newest first: photos, what was done, and who posted it. */
+function RealSite({ project }: { project: MyProject }) {
+  return (
+    <Frame>
+      <header className="oa-page-head">
+        <span className="oa-meta">Every update from site</span>
+        <h1>On site</h1>
+      </header>
+      <main className="oa-body">
+        {project.updates.length === 0 ? (
+          <p className="oa-sub" style={{ margin: 0 }}>
+            Nothing yet. The first update from {project.studio} appears here, and on your phone, as soon as it is posted.
+          </p>
+        ) : null}
+        {project.updates.map((u) => (
+          <section key={u.id} className="flex flex-col gap-3" style={{ borderTop: '1px solid var(--line)', paddingTop: 14 }}>
+            <div className="oa-section-head">
+              <h2>{dayLabel(u.at)}</h2>
+              <span style={{ font: '500 12px var(--mono)', color: 'var(--ink-2)' }}>{timeLabel(u.at)}</span>
+            </div>
+            {u.photos[0] ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="oa-photo-main" src={u.photos[0]} alt="Site photo" />
+            ) : null}
+            {u.photos.length > 1 ? (
+              <div className="oa-photo-pair">
+                {u.photos.slice(1, 5).map((src) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={src} src={src} alt="Site photo" />
+                ))}
+              </div>
+            ) : null}
+            <p style={{ margin: 0, fontSize: 16, lineHeight: 1.5 }}>{u.note}</p>
+            <div className="flex flex-wrap gap-2">
+              <span className="oa-who">{u.byStudio ? `Posted by ${project.studio}` : 'Posted by One Interiors'}</span>
+              {u.stage ? <span className="oa-who">{STAGE_SHORT[u.stage] ?? u.stage}</span> : null}
+            </div>
+          </section>
+        ))}
+      </main>
+      <AskGeio from="site" />
+      <Tabs />
+    </Frame>
+  );
+}
+
+export default function AppSite() {
+  const mine = useMyProject();
+  if (mine.state === 'loading') return <Frame>{null}</Frame>;
+  return mine.state === 'real' ? <RealSite project={mine.project} /> : <ExampleSite />;
 }

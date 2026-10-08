@@ -3,11 +3,10 @@
  * screens, 8 Oct 2026) until a customer has a signed project of their own.
  *
  * Every screen that reads this says "Example project" on it. The studio, the
- * people and the flat are invented; the photos are the home page's own
+ * people and the flat are invented; the photos are the owner's, taken from
+ * the design file (public/app/photos), not anyone's site
  * empty-room film, not anyone's site.
  */
-
-import type { LayoutRoomKey } from '@/modules/brief/flat-layout';
 
 export const EXAMPLE = {
   flat: 'Flat 1204, Baner',
@@ -23,8 +22,24 @@ export const EXAMPLE = {
   today: 'Thu 8 Oct',
 };
 
-/** A frame of the home page's empty-room film: 0 is dark, 32 fully lit. */
-export const photo = (i: number) => `/landing/seq/f${String(i).padStart(2, '0')}.webp`;
+/** The design file's own photos, one per place the screens show a photo. */
+export const PHOTOS = {
+  welcome: '/app/photos/welcome-hero.webp',
+  homeHero: '/app/photos/home-hero.webp',
+  living: '/app/photos/living.webp',
+  bedroom1: '/app/photos/bedroom-1.webp',
+  kitchenCarcass: '/app/photos/kitchen-carcass.webp',
+  kitchen: '/app/photos/kitchen.webp',
+  wardrobeTop: '/app/photos/wardrobe-top.webp',
+  switchboard: '/app/photos/switchboard.webp',
+} as const;
+
+/** Today's three site photos, as Home, On site and GEIO show them. */
+export const TODAY = [
+  { src: PHOTOS.bedroom1, alt: 'Bedroom 1 on site' },
+  { src: PHOTOS.living, alt: 'Bedroom 2 on site' },
+  { src: PHOTOS.kitchenCarcass, alt: 'Kitchen on site' },
+];
 
 export interface Milestone {
   title: string;
@@ -76,10 +91,10 @@ export const DECISION = {
 
 export const SNAGS = {
   open: [
-    { title: 'Gap between wardrobe and ceiling', where: 'Bedroom 1, raised Wed 7 Oct', status: 'Fix by Sat 10 Oct', img: 30, late: false },
-    { title: 'Scratch on kitchen side panel', where: 'Kitchen, raised Mon 5 Oct', status: 'Studio: replacing panel Mon 12 Oct', img: 26, late: false },
+    { title: 'Gap between wardrobe and ceiling', where: 'Bedroom 1, raised Wed 7 Oct', status: 'Fix by Sat 10 Oct', img: PHOTOS.wardrobeTop, late: false },
+    { title: 'Scratch on kitchen side panel', where: 'Kitchen, raised Mon 5 Oct', status: 'Studio: replacing panel Mon 12 Oct', img: PHOTOS.kitchen, late: false },
   ],
-  fixed: [{ title: 'Switchboard not level', where: 'Living room, raised 24 Sep', status: 'Fixed 26 Sep, photo from site', img: 24, late: false }],
+  fixed: [{ title: 'Switchboard not level', where: 'Living room, raised 24 Sep', status: 'Fixed 26 Sep, photo from site', img: PHOTOS.switchboard, late: false }],
 };
 
 export const MATERIALS = [
@@ -97,12 +112,63 @@ export const DOCUMENTS = [
   { name: 'Warranties and manuals', meta: 'Added at handover, 14 Dec' },
 ];
 
-export const ROOMS_3D: { key: LayoutRoomKey; label: string; state: 'done' | 'now' | 'next'; note: string }[] = [
-  { key: 'LIVING_DINING', label: 'Living & dining', state: 'next', note: 'TV unit and false ceiling start 19 Oct.' },
-  { key: 'MASTER_BEDROOM', label: 'Bedroom 1', state: 'now', note: 'Wardrobe frames fitted today. Shutters follow the kitchen.' },
-  { key: 'KITCHEN', label: 'Kitchen', state: 'now', note: 'Carcass fixed to the wall today. Shutters wait on your finish choice, due Fri 16 Oct.' },
-  { key: 'BATHROOMS', label: 'Bath & utility', state: 'done', note: 'Vanity and utility storage fitted 2 Oct.' },
-  { key: 'SECOND_BEDROOM', label: 'Bedroom 2', state: 'now', note: 'Wardrobe frames fitted. Study table next week.' },
+export type RoomId = 'living' | 'bed1' | 'kitchen' | 'bath' | 'bed2';
+
+/** The five rooms of the 3D home (the design's own notes), and where each one links. */
+export const ROOMS_3D: {
+  id: RoomId;
+  name: string;
+  status: 'Done' | 'In progress' | 'Next up';
+  note: string;
+  designNote: string;
+  photo: string | null;
+  link: { href: string; label: string } | null;
+}[] = [
+  {
+    id: 'living',
+    name: 'Living & dining',
+    status: 'Next up',
+    note: 'Walls, floor and wiring done. The TV unit and false ceiling start next week.',
+    designNote: 'Linen sofa, oak coffee table and a walnut TV wall, as in your design.',
+    photo: null,
+    link: { href: '/app/project', label: 'See the timeline' },
+  },
+  {
+    id: 'bed1',
+    name: 'Bedroom 1',
+    status: 'In progress',
+    note: 'Wardrobe frames fitted today. Ramesh, carpenter, on site from 9:40 am.',
+    designNote: 'Queen bed with a wood headboard and a full-height wardrobe.',
+    photo: PHOTOS.bedroom1,
+    link: { href: '/app/site', label: 'See today on site' },
+  },
+  {
+    id: 'kitchen',
+    name: 'Kitchen',
+    status: 'In progress',
+    note: 'Carcass fixed to the wall today. Shutters wait on your finish choice, due Fri 16 Oct.',
+    designNote: 'L-shaped kitchen with sage matte shutters and a quartz counter.',
+    photo: PHOTOS.kitchenCarcass,
+    link: { href: '/app/decision', label: 'Choose the shutter finish' },
+  },
+  {
+    id: 'bath',
+    name: 'Bath & utility',
+    status: 'Done',
+    note: 'Tiling and fittings finished. Checked by your expert on 21 Sep.',
+    designNote: 'Grey-blue tiles, a walk-in shower and a wall-hung vanity.',
+    photo: null,
+    link: null,
+  },
+  {
+    id: 'bed2',
+    name: 'Bedroom 2',
+    status: 'In progress',
+    note: 'Wardrobe frames fitted today by Ramesh’s helper.',
+    designNote: 'Second bedroom with a study corner and a full-height wardrobe.',
+    photo: PHOTOS.living,
+    link: { href: '/app/site', label: 'See today on site' },
+  },
 ];
 
 /** A few lines of the example's signed quote, so GEIO can answer "what did I pay for…". */

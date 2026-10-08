@@ -7,7 +7,7 @@
  */
 
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { warmAppData } from '@/components/app/useAppData';
 import { Body, Cta, Foot, Frame, Head, Progress, useBrief } from '@/components/app/ui';
 import {
@@ -26,7 +26,6 @@ import { roomsFor } from '@/modules/quotation/scope';
 import { ROOM_LABELS } from '@/modules/quotation/catalogue';
 import { BEDROOMS } from '@/modules/quotation/estimate';
 import { STYLE_PHOTOS } from '@/data/style-photos';
-import { formatINRCompact } from '@/lib/money';
 import { saveBriefAction } from '@/app/quiz/actions';
 
 const TOTAL = 7;
@@ -226,9 +225,13 @@ function Step({ n, brief, update }: { n: number; brief: Brief; update: (p: Parti
 type StepProps = { brief: Brief; update: (p: Partial<Brief>) => void };
 
 function HomeStep({ brief, update }: StepProps) {
-  const popular = PUNE_LOCALITIES.filter((l) => POPULAR.includes(l.slug));
+  // In the design's order, not the alphabet's.
+  const popular = POPULAR.map((slug) => PUNE_LOCALITIES.find((l) => l.slug === slug)).filter(
+    (l): l is (typeof PUNE_LOCALITIES)[number] => Boolean(l),
+  );
   const others = PUNE_LOCALITIES.filter((l) => !POPULAR.includes(l.slug));
   const otherPicked = brief.locality !== null && !POPULAR.includes(brief.locality);
+  const [showOther, setShowOther] = useState(otherPicked);
   return (
     <>
       <h1 className="oa-title">First, what kind of home are we working with?</h1>
@@ -261,19 +264,6 @@ function HomeStep({ brief, update }: StepProps) {
           </button>
         ))}
       </div>
-      <select
-        aria-label="Another area"
-        className="oa-search"
-        value={otherPicked ? (brief.locality ?? '') : ''}
-        onChange={(e) => e.target.value && update({ locality: e.target.value })}
-      >
-        <option value="">Somewhere else in Pune…</option>
-        {others.map((l) => (
-          <option key={l.slug} value={l.slug}>
-            {l.label}
-          </option>
-        ))}
-      </select>
       <label className="oa-label" htmlFor="oa-area">
         Carpet area, sq ft (optional)
       </label>
@@ -289,6 +279,25 @@ function HomeStep({ brief, update }: StepProps) {
         }}
       />
       <p className="oa-note">Not sure? Skip it. Studios measure on their first visit.</p>
+      {showOther ? (
+      <select
+          aria-label="Another area"
+          className="oa-search"
+          value={otherPicked ? (brief.locality ?? '') : ''}
+          onChange={(e) => e.target.value && update({ locality: e.target.value })}
+        >
+          <option value="">Somewhere else in Pune…</option>
+          {others.map((l) => (
+            <option key={l.slug} value={l.slug}>
+              {l.label}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <button type="button" className="oa-link" style={{ alignSelf: 'flex-start', padding: 0, textDecoration: 'underline' }} onClick={() => setShowOther(true)}>
+          My area isn&rsquo;t listed
+        </button>
+      )}
     </>
   );
 }
@@ -371,12 +380,6 @@ function TierStep({ brief, update }: StepProps) {
                 <span className="oa-tier-tag">{TIER_TAG[t]}</span>
               </span>
               <p>{TIER_LINE[t]}</p>
-              <span className="range block">
-                {highPaise === null
-                  ? `From ${formatINRCompact(lowPaise)}`
-                  : `${formatINRCompact(lowPaise)} – ${formatINRCompact(highPaise)}`}{' '}
-                for {sqft.toLocaleString('en-IN')} sq ft, before GST
-              </span>
             </button>
           );
         })}
@@ -418,7 +421,13 @@ function StyleStep({ brief, update }: StepProps) {
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={`${STYLE_PHOTOS[tag].src}?auto=format&fit=crop&w=300&h=400&q=60`} alt="" loading="lazy" />
-              {on ? <i className="tick">✓</i> : null}
+              {on ? (
+                <i className="tick">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                </i>
+              ) : null}
               <span>{STYLE_LABELS[tag]}</span>
             </button>
           );

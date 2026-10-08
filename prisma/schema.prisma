@@ -73,15 +73,18 @@ model User {
   reviewedDocs  StudioDocument[]  @relation("StudioDocumentReviewer")
   reviewedRates StudioFiledRate[] @relation("FiledRateReviewer")
 
-  @@index([role])
-  @@map("users")
-
   /// OneReferrals: this customer's personal code (modules/portal/referral.ts).
   /// Made the first time "Your home" is opened.
-  referralCode String?       @unique
+  referralCode String? @unique
 
   expertHours  ExpertHours[] @relation("ExpertHours")
   expertBlocks ExpertBlock[] @relation("ExpertBlocks")
+
+  /// Phones signed in to the app, for push (docs/CUSTOMER-PLATFORM-PLAN.md).
+  pushDevices PushDevice[]
+
+  @@index([role])
+  @@map("users")
 }
 
 /// Who a social sign-in provider says this user is. Google since 29 Sep
@@ -310,8 +313,8 @@ model Brief {
   budgetMaxPaise BigInt?
 
   // Q4 / Q5 — style image picks resolve to tag slugs
-  styleLikes    String[] @default([])
-  styleDislikes String[] @default([]) // HARD FILTER, not a weight
+  styleLikes       String[] @default([])
+  styleDislikes    String[] @default([]) // HARD FILTER, not a weight
   /// Studios whose own portfolio photo they picked in the style picker —
   /// shown unnamed, with the studio's consent (brief/picker-photos.ts).
   styleStudioPicks String[] @default([])
@@ -382,10 +385,6 @@ model Brief {
   shareToken String?   @unique
   sharedAt   DateTime?
 
-  @@index([locality, completedAt])
-  @@index([anonKey])
-  @@map("briefs")
-
   societyPlan SocietyPlan?
 
   /// The referral code this customer arrived through, if any — set once,
@@ -401,6 +400,10 @@ model Brief {
   followedUpAt    DateTime?
   /// Calls made without reaching them (NO_ANSWER / CALL_BACK). Stops at three.
   followUpTries   Int       @default(0)
+
+  @@index([locality, completedAt])
+  @@index([anonKey])
+  @@map("briefs")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1329,25 +1332,107 @@ model HomeProject {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  updates HomeProjectUpdate[]
+  updates   HomeProjectUpdate[]
+  decisions HomeDecision[]
+  snags     HomeSnag[]
 
   @@map("home_projects")
 }
 
+/// A choice the customer has to make by a date (the app's "Decision with a
+/// deadline"): posted by the studio or ops, made by the customer.
+model HomeDecision {
+  id        String      @id @default(cuid())
+  projectId String
+  project   HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  title String
+  /// What waiting costs, in the studio's words: "Shutters are cut next week…".
+  why   String   @db.Text
+  dueOn DateTime
+
+  /// [{ name, note, extraPaise (0 = in the quote), swatch? }]. Validated by
+  /// modules/portal/decisions.ts on the way in; never trusted on the way out.
+  options Json
+
+  /// Index into `options`, once chosen.
+  chosenIndex Int?
+  chosenAt    DateTime?
+  chosenById  String?
+
+  postedById String
+  byStudio   Boolean   @default(false)
+  /// Set when the 2-days-left reminder went out, so it goes out once.
+  remindedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId, dueOn])
+  @@map("home_decisions")
+}
+
+/// Something wrong on site, to be fixed by a date (the app's "Snags").
+/// Raised by the customer or at the handover walk-through; closed by the studio.
+model HomeSnag {
+  id        String      @id @default(cuid())
+  projectId String
+  project   HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  title      String
+  room       String?
+  note       String?  @db.Text
+  /// Paths in the private `site-photos` bucket, served only as signed links.
+  photoPaths String[] @default([])
+
+  raisedById      String
+  raisedByStudio  Boolean   @default(false)
+  fixBy           DateTime?
+  /// "OPEN" | "FIXED"
+  status          String    @default("OPEN")
+  fixedAt         DateTime?
+  fixedNote       String?   @db.Text
+  fixedPhotoPaths String[]  @default([])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId, status])
+  @@map("home_snags")
+}
+
+/// A phone signed in to the app. The Expo push token is what a push is sent
+/// to; a token the push service reports as gone is deleted.
+model PushDevice {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  token    String @unique
+  /// "ios" | "android"
+  platform String
+
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@map("push_devices")
+}
+
 /// A dated note on the project — "Kitchen carcasses delivered to site".
 model HomeProjectUpdate {
-  id          String      @id @default(cuid())
-  projectId   String
-  project     HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id         String      @id @default(cuid())
+  projectId  String
+  project    HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
   /// The stage it belongs to, if any.
-  stage       String?
-  note        String      @db.Text
-  postedById  String
+  stage      String?
+  note       String      @db.Text
+  postedById String
   /// Posted by the studio doing the work, not by us (queue item 22).
-  byStudio    Boolean     @default(false)
+  byStudio   Boolean     @default(false)
   /// Site photographs: paths in the private `site-photos` bucket, served
   /// only through short-lived signed links (storage/site-photos.ts).
-  photoPaths  String[]    @default([])
+  photoPaths String[]    @default([])
 
   createdAt DateTime @default(now())
 
@@ -1362,10 +1447,10 @@ model HomeProjectUpdate {
 /// offered only once two or more homes agree (modules/floorplan/society-library.ts).
 /// One row per brief: a customer who corrects their plan corrects their row.
 model SocietyPlan {
-  id             String   @id @default(cuid())
-  briefId        String   @unique
+  id             String @id @default(cuid())
+  briefId        String @unique
   /// Deleted with the brief — an erasure request takes these sizes too.
-  brief          Brief    @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  brief          Brief  @relation(fields: [briefId], references: [id], onDelete: Cascade)
   /// Lower-case letters and digits of the society name, so "Sapphire Heights"
   /// and "sapphire heights " are one building.
   societyKey     String
@@ -1421,9 +1506,9 @@ model ExpertHours {
 
 /// A day an expert is away. No slots are offered on it.
 model ExpertBlock {
-  id           String @id @default(cuid())
+  id           String  @id @default(cuid())
   expertUserId String
-  expert       User   @relation("ExpertBlocks", fields: [expertUserId], references: [id], onDelete: Cascade)
+  expert       User    @relation("ExpertBlocks", fields: [expertUserId], references: [id], onDelete: Cascade)
   /// IST date, YYYY-MM-DD.
   day          String
   reason       String?
@@ -3165,15 +3250,15 @@ model WaitlistSignup {
 
   /// Their personal link's code (oneinteriors.in/?r=CODE). Everyone who
   /// joins through it moves them up the queue (modules/waitlist/queue.ts).
-  referralCode   String?   @unique
+  referralCode   String? @unique
   /// Whose link brought them — another row's referralCode.
   referredByCode String?
 
   /// The optional "skip 20 places" answers, given after joining.
-  possession     String?   // HAVE_KEYS | WITHIN_3_MONTHS | LATER
-  bhk            String?   // 1 | 2 | 3 | 4+
-  society        String?
-  extrasAt       DateTime?
+  possession String? // HAVE_KEYS | WITHIN_3_MONTHS | LATER
+  bhk        String? // 1 | 2 | 3 | 4+
+  society    String?
+  extrasAt   DateTime?
 
   /// When the welcome message went out, and on which channel.
   welcomedAt     DateTime?

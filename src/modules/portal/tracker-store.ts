@@ -7,6 +7,7 @@ import { readPhases, type PaymentPhase } from '@/modules/studio/payment-phases';
  */
 
 import { prisma } from '@/lib/prisma';
+import { notify } from '@/modules/notify/service';
 import { requireRole } from '@/modules/auth/session';
 import { readProfile } from '@/modules/studio/matching-profile';
 import { currentStudio } from '@/modules/studio/onboarding';
@@ -79,7 +80,7 @@ async function createUpdate(
     if (!stored.ok) return { ok: false, error: stored.error };
     photoPaths.push(stored.path);
   }
-  await prisma.homeProjectUpdate.create({
+  const created = await prisma.homeProjectUpdate.create({
     data: {
       projectId,
       note: text,
@@ -88,7 +89,13 @@ async function createUpdate(
       byStudio,
       photoPaths,
     },
+    select: { project: { select: { introduction: { select: { studio: { select: { tradeName: true } }, brief: { select: { userId: true } } } } } } },
   });
+  // The customer hears about it on their phone (docs/CUSTOMER-PLATFORM-PLAN.md).
+  const intro = created.project.introduction;
+  if (intro.brief.userId) {
+    void notify(intro.brief.userId, { kind: 'update', studio: intro.studio.tradeName, note: text, photos: photoPaths.length });
+  }
   return { ok: true };
 }
 

@@ -76,7 +76,7 @@ export default function AppStart() {
       {phase === 'done' ? (
         <section className="oa-welcome" aria-label="Welcome">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/landing/hero.webp" alt="" />
+          <img src="/app/photos/welcome-hero.webp" alt="A warmly lit living room with a linen sofa, round oak table and a tall window" />
           <Logotype className="logo" />
           <div className="copy">
             <p className="oa-meta" style={{ color: 'rgba(255,255,255,.85)', margin: 0 }}>
