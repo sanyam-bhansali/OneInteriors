@@ -15,6 +15,7 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
+import { formatINR } from '@/lib/money';
 import { getCurrentUser, hasRole } from '@/modules/auth/session';
 import { currentStudio } from '@/modules/studio/onboarding';
 import { readPhases, type PaymentPhase } from '@/modules/studio/payment-phases';
@@ -23,6 +24,8 @@ import { notify, notifyStudio } from '@/modules/notify/service';
 import { plannedStages, trackerView, type StageView } from './tracker';
 import { canChoose, checkDecision, daysLeft, decisionState, parseOptions, type DecisionInput, type DecisionOption, type DecisionState } from './decisions';
 import { checkSnag, SNAG_LIMITS, snagLine } from './snags';
+import { checkDoc, DOC_KINDS, docMeta, type DocKind } from './documents';
+import { signedDocUrls, storeProjectDoc } from '@/modules/storage/project-docs';
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -62,6 +65,16 @@ export interface CustomerProject {
   updates: { id: string; note: string; stage: string | null; at: string; byStudio: boolean; photos: string[] }[];
   decisions: CustomerDecision[];
   snags: CustomerSnag[];
+  documents: CustomerDocument[];
+}
+
+export interface CustomerDocument {
+  id: string;
+  kind: DocKind;
+  title: string;
+  meta: string;
+  /** A signed link that lasts minutes; "" when it could not be made. */
+  url: string;
 }
 
 const UPDATES_SHOWN = 30;
@@ -76,14 +89,16 @@ export async function customerProjects(userId: string, now = new Date()): Promis
       updates: { orderBy: { createdAt: 'desc' }, take: UPDATES_SHOWN },
       decisions: { orderBy: { dueOn: 'asc' } },
       snags: { orderBy: { createdAt: 'desc' } },
+      documents: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },
     },
   });
   return Promise.all(
     projects.map(async (p) => {
-      const [updatePhotos, snagPhotos, fixedPhotos] = await Promise.all([
+      const [updatePhotos, snagPhotos, fixedPhotos, docUrls] = await Promise.all([
         Promise.all(p.updates.map((u) => signedSitePhotoUrls(u.photoPaths))),
         Promise.all(p.snags.map((s) => signedSitePhotoUrls(s.photoPaths))),
         Promise.all(p.snags.map((s) => signedSitePhotoUrls(s.fixedPhotoPaths))),
+        signedDocUrls(p.documents.map((d) => d.storageKey)),
       ]);
       return {
         id: p.id,
@@ -123,6 +138,13 @@ export async function customerProjects(userId: string, now = new Date()): Promis
           photos: snagPhotos[i] ?? [],
           fixedNote: s.fixedNote,
           fixedPhotos: fixedPhotos[i] ?? [],
+        })),
+        documents: p.documents.map((d, i) => ({
+          id: d.id,
+          kind: (d.kind in DOC_KINDS ? d.kind : 'OTHER') as DocKind,
+          title: d.title,
+          meta: docMeta(d),
+          url: docUrls[i] ?? '',
         })),
       } satisfies CustomerProject;
     }),
@@ -258,4 +280,134 @@ async function storePhotos(projectId: string, photos: File[]): Promise<{ ok: tru
     paths.push(stored.path);
   }
   return { ok: true, paths };
+}
+
+// ── What the studio and ops see ────────────────────────────────
+
+export interface StaffWork {
+  documents: { id: string; kind: DocKind; title: string; meta: string; url: string; byStudio: boolean }[];
+  decisions: {
+    id: string;
+    title: string;
+    due: string;
+    state: DecisionState;
+    options: number;
+    /** The customer's choice and what it adds, once made. */
+    chosen: string | null;
+  }[];
+  snags: {
+    id: string;
+    title: string;
+    room: string | null;
+    note: string | null;
+    status: 'OPEN' | 'FIXED';
+    line: string | null;
+    /** "YYYY-MM-DD" for the date field, or "". */
+    fixBy: string;
+    raisedAt: string;
+    raisedByStudio: boolean;
+    photos: string[];
+  }[];
+}
+
+/** A project's decisions and snags for the studio doing it, or ops. Null when the signed-in person may not see it. */
+export async function projectWork(projectId: string, now = new Date()): Promise<StaffWork | null> {
+  const staff = await staffFor(projectId);
+  if (!staff.ok) return null;
+  const [decisions, snags, documents] = await Promise.all([
+    prisma.homeDecision.findMany({ where: { projectId }, orderBy: { dueOn: 'desc' }, take: 50 }),
+    prisma.homeSnag.findMany({ where: { projectId }, orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], take: 100 }),
+    prisma.homeDocument.findMany({ where: { projectId, deletedAt: null }, orderBy: { createdAt: 'desc' }, take: 100 }),
+  ]);
+  const [photos, docUrls] = await Promise.all([
+    Promise.all(snags.map((s) => signedSitePhotoUrls(s.photoPaths))),
+    signedDocUrls(documents.map((d) => d.storageKey)),
+  ]);
+  return {
+    documents: documents.map((d, i) => ({
+      id: d.id,
+      kind: (d.kind in DOC_KINDS ? d.kind : 'OTHER') as DocKind,
+      title: d.title,
+      meta: docMeta(d),
+      url: docUrls[i] ?? '',
+      byStudio: d.byStudio,
+    })),
+    decisions: decisions.map((d) => {
+      const options = parseOptions(d.options) ?? [];
+      const pick = d.chosenIndex === null ? null : options[d.chosenIndex];
+      return {
+        id: d.id,
+        title: d.title,
+        due: d.dueOn.toISOString(),
+        state: decisionState(d, now),
+        options: options.length,
+        chosen: pick ? `${pick.name}${pick.extraPaise > 0 ? ` (+${formatINR(pick.extraPaise)})` : ''}` : null,
+      };
+    }),
+    snags: snags.map((s, i) => ({
+      id: s.id,
+      title: s.title,
+      room: s.room,
+      note: s.note,
+      status: s.status === 'FIXED' ? 'FIXED' : 'OPEN',
+      line: snagLine(s),
+      fixBy: s.fixBy ? s.fixBy.toISOString().slice(0, 10) : '',
+      raisedAt: s.createdAt.toISOString(),
+      raisedByStudio: s.raisedByStudio,
+      photos: photos[i] ?? [],
+    })),
+  };
+}
+
+/** A snag found by the studio or at the handover walk-through, raised from the staff side. The customer is told it was logged. */
+export async function raiseSnagAsStaff(
+  projectId: string,
+  input: { title: unknown; room?: unknown; note?: unknown },
+  photos: File[] = [],
+): Promise<ActionResult> {
+  const staff = await staffFor(projectId);
+  if (!staff.ok) return staff;
+  const check = checkSnag(input);
+  if (!check.ok) return check;
+  const stored = await storePhotos(projectId, photos);
+  if (!stored.ok) return stored;
+  const snag = await prisma.homeSnag.create({
+    data: { projectId, ...check.value, photoPaths: stored.paths, raisedById: staff.userId, raisedByStudio: staff.byStudio },
+  });
+  return { ok: true, id: snag.id };
+}
+
+/** Upload a document to a project. The customer is told it is in their Locker. */
+export async function addDocument(projectId: string, input: { kind: unknown; title: unknown }, file: File | null): Promise<ActionResult> {
+  const staff = await staffFor(projectId);
+  if (!staff.ok) return staff;
+  const check = checkDoc(input);
+  if (!check.ok) return check;
+  if (!file || file.size === 0) return { ok: false, error: 'Choose the file.' };
+  const stored = await storeProjectDoc(projectId, file);
+  if (!stored.ok) return stored;
+  const doc = await prisma.homeDocument.create({
+    data: {
+      projectId,
+      ...check.value,
+      storageKey: stored.path,
+      originalName: file.name.slice(0, 200),
+      contentType: file.type,
+      bytes: file.size,
+      uploadedById: staff.userId,
+      byStudio: staff.byStudio,
+    },
+  });
+  if (staff.customerId) void notify(staff.customerId, { kind: 'document', studio: staff.studioName, title: check.value.title });
+  return { ok: true, id: doc.id };
+}
+
+/** Take a document off the project. Kept for the record; the customer stops seeing it. */
+export async function removeDocument(documentId: string): Promise<ActionResult> {
+  const doc = await prisma.homeDocument.findUnique({ where: { id: documentId }, select: { projectId: true } });
+  if (!doc) return { ok: false, error: 'That document is gone.' };
+  const staff = await staffFor(doc.projectId);
+  if (!staff.ok) return staff;
+  await prisma.homeDocument.update({ where: { id: documentId }, data: { deletedAt: new Date() } });
+  return { ok: true, id: documentId };
 }

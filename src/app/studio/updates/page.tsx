@@ -1,23 +1,27 @@
 import type { Metadata } from 'next';
 import { PageHead, PageBody } from '../StudioShell';
 import { projectsForStudio } from '@/modules/portal/tracker-store';
+import { projectWork } from '@/modules/portal/project-store';
+import { ProjectWork } from '@/components/project-work/ProjectWork';
 import { UpdateForm } from './UpdateForm';
 
-export const metadata: Metadata = { title: 'Client updates', robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: 'Client projects', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
 
 /**
- * Updates for the homes introduced through One Interiors (build queue item
- * 22). What a studio posts here — a line and site photos — appears in the
- * customer's "Your home" the moment it is posted, marked as from the studio.
+ * The homes introduced through One Interiors (build queue item 22, and
+ * docs/CUSTOMER-PLATFORM-PLAN.md step 2). What a studio posts here — a site
+ * update with photos, a decision for the client, a snag's date and its fix —
+ * reaches the client's app and phone the moment it is saved.
  */
 export default async function StudioUpdatesPage() {
   const projects = await projectsForStudio();
+  const work = await Promise.all(projects.map((p) => projectWork(p.id)));
   return (
     <>
       <PageHead
-        title="Client updates"
-        sub="Homes introduced through One Interiors that have started. What you post here, your client sees in their project tracker."
+        title="Client projects"
+        sub="Homes introduced through One Interiors that have started. Post what happened on site, ask your client for decisions, and keep the snag list moving. Your client sees it in their app, and on their phone."
       />
       <PageBody>
         {projects.length === 0 ? (
@@ -27,7 +31,7 @@ export default async function StudioUpdatesPage() {
           </p>
         ) : (
           <ul className="m-0 flex list-none flex-col gap-5 p-0">
-            {projects.map((p) => (
+            {projects.map((p, i) => (
               <li key={p.id} className="rounded-[12px] border border-[var(--color-rule)] p-5">
                 <p className="m-0 text-[16px] font-semibold">{p.label || 'A home'}</p>
                 <p className="m-0 mt-1 text-[13px] text-[var(--color-ink-3)]">
@@ -35,6 +39,7 @@ export default async function StudioUpdatesPage() {
                   {p.stages.filter((s) => s.state === 'done').length} of {p.stages.length} stages done
                 </p>
                 <UpdateForm projectId={p.id} />
+                {work[i] ? <ProjectWork projectId={p.id} work={work[i]!} /> : null}
                 {p.updates.length > 0 ? (
                   <ul className="m-0 mt-4 flex list-none flex-col gap-1.5 border-t border-[var(--color-rule)] p-0 pt-3">
                     {p.updates.map((u, i) => (

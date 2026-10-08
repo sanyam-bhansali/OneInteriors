@@ -4,9 +4,11 @@
 
 import { useState } from 'react';
 import { Arrow, AskGeio, ExampleTag, Frame, SearchIcon, Tabs } from '@/components/app/ui';
+import { useMyProject, type MyProject } from '@/components/app/useMyProject';
 import { DOCUMENTS, EXAMPLE, MATERIALS } from '@/modules/app/example-project';
+import { DOC_KINDS } from '@/modules/portal/documents';
 
-export default function AppLocker() {
+function ExampleLocker() {
   const [q, setQ] = useState('');
   const term = q.trim().toLowerCase();
   const hit = (s: string) => !term || s.toLowerCase().includes(term);
@@ -73,4 +75,58 @@ export default function AppLocker() {
       <Tabs />
     </Frame>
   );
+}
+
+/** The real project's documents, filed by the studio or ops, opened through links that last minutes. */
+function RealLocker({ project }: { project: MyProject }) {
+  const [q, setQ] = useState('');
+  const term = q.trim().toLowerCase();
+  const docs = project.documents.filter((d) => !term || `${d.title} ${DOC_KINDS[d.kind]} ${d.meta}`.toLowerCase().includes(term));
+  return (
+    <Frame>
+      <header className="oa-page-head">
+        <span className="oa-meta">Your home, for as long as you live there</span>
+        <h1>Home locker</h1>
+      </header>
+      <main className="oa-body">
+        <label className="oa-search">
+          <SearchIcon />
+          <input placeholder="Search, for example warranty" value={q} onChange={(e) => setQ(e.target.value)} />
+        </label>
+        <div className="oa-section-head">
+          <h2>Documents</h2>
+        </div>
+        {project.documents.length === 0 ? (
+          <p className="oa-sub" style={{ margin: 0 }}>
+            Nothing filed yet. The agreement, drawings, receipts and warranties appear here as {project.studio} adds them.
+          </p>
+        ) : (
+          <div style={{ borderTop: '1px solid var(--line)' }}>
+            {docs.map((d) => (
+              <a key={d.id} className="oa-doc" href={d.url || undefined} target="_blank" rel="noreferrer" aria-disabled={!d.url}>
+                <div>
+                  <b>{d.title}</b>
+                  <span>
+                    {DOC_KINDS[d.kind]} · {d.meta}
+                  </span>
+                </div>
+                <span style={{ color: 'var(--ink-2)' }}>
+                  <Arrow />
+                </span>
+              </a>
+            ))}
+            {docs.length === 0 ? <p className="oa-note">Nothing matches &ldquo;{q}&rdquo;.</p> : null}
+          </div>
+        )}
+      </main>
+      <AskGeio from="locker" />
+      <Tabs />
+    </Frame>
+  );
+}
+
+export default function AppLocker() {
+  const mine = useMyProject();
+  if (mine.state === 'loading') return <Frame>{null}</Frame>;
+  return mine.state === 'real' ? <RealLocker project={mine.project} /> : <ExampleLocker />;
 }

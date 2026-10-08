@@ -1335,6 +1335,7 @@ model HomeProject {
   updates   HomeProjectUpdate[]
   decisions HomeDecision[]
   snags     HomeSnag[]
+  documents HomeDocument[]
 
   @@map("home_projects")
 }
@@ -1399,6 +1400,33 @@ model HomeSnag {
 
   @@index([projectId, status])
   @@map("home_snags")
+}
+
+/// A document on a customer's project — the agreement, the signed quote,
+/// drawings, receipts, warranties — uploaded by the studio or ops, read by the
+/// customer in the app's Locker. Stored in the private `project-docs` bucket.
+model HomeDocument {
+  id        String      @id @default(cuid())
+  projectId String
+  project   HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// AGREEMENT | QUOTATION | DRAWINGS | RECEIPT | WARRANTY | OTHER
+  kind         String
+  title        String
+  storageKey   String
+  originalName String
+  contentType  String
+  bytes        Int
+
+  uploadedById String
+  byStudio     Boolean @default(false)
+
+  createdAt DateTime  @default(now())
+  /// Soft delete: a removed document stops showing and stays for the record.
+  deletedAt DateTime?
+
+  @@index([projectId, createdAt])
+  @@map("home_documents")
 }
 
 /// A phone signed in to the app. The Expo push token is what a push is sent

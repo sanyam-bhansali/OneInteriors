@@ -4,6 +4,7 @@ import { Container } from '@/components/ui';
 import { OpsHeader } from '../ui';
 import { listIntroductions, NEED_LABEL } from '@/modules/studio/introduction-ops';
 import { IntroductionCard } from './IntroductionCard';
+import { projectWork } from '@/modules/portal/project-store';
 
 export const metadata: Metadata = {
   title: 'Introductions · Ops',
@@ -33,6 +34,10 @@ export const dynamic = 'force-dynamic';
  */
 export default async function IntroductionsPage() {
   const all = await listIntroductions();
+  // Decisions and snags for every started project, for the panel under its tracker.
+  const work = new Map(
+    await Promise.all(all.filter((i) => i.project).map(async (i) => [i.id, await projectWork(i.project!.id)] as const)),
+  );
 
   const needsUs = all.filter((i) => i.needs !== null);
   const running = all.filter((i) => i.needs === null && !i.withdrawnAt);
@@ -85,6 +90,7 @@ export default async function IntroductionsPage() {
                     key={intro.id}
                     intro={intro}
                     need={intro.needs ? NEED_LABEL[intro.needs] : null}
+                    work={work.get(intro.id) ?? null}
                   />
                 ))}
               </ul>
@@ -103,7 +109,7 @@ export default async function IntroductionsPage() {
               </h2>
               <ul className="m-0 grid list-none grid-cols-1 gap-4 p-0 xl:grid-cols-2">
                 {running.map((intro) => (
-                  <IntroductionCard key={intro.id} intro={intro} />
+                  <IntroductionCard key={intro.id} intro={intro} work={work.get(intro.id) ?? null} />
                 ))}
               </ul>
             </section>
@@ -116,7 +122,7 @@ export default async function IntroductionsPage() {
               </summary>
               <ul className="m-0 grid list-none grid-cols-1 gap-4 p-0 xl:grid-cols-2">
                 {closed.map((intro) => (
-                  <IntroductionCard key={intro.id} intro={intro} />
+                  <IntroductionCard key={intro.id} intro={intro} work={work.get(intro.id) ?? null} />
                 ))}
               </ul>
             </details>

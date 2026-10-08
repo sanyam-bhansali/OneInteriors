@@ -41,7 +41,7 @@ Supersedes the slice order in `MOBILE-APP-PLAN.md`; the store-app decision of
 
 ## What is missing, and the order it gets built
 
-### Step 1 — Backend (1–2 weeks) ← starting now
+### Step 1 — Backend (1–2 weeks) — built 9 Oct, untested on a database
 
 1. **Decisions with a deadline.** `HomeDecision`: title, why it matters, due
    date, options (name, note, price against the quote, swatch), the choice and
@@ -62,7 +62,13 @@ Supersedes the slice order in `MOBILE-APP-PLAN.md`; the store-app decision of
 6. **Example data off.** The `/app` after-signing screens read the real project
    when the signed-in customer has one, and the example only in the test build.
 
-### Step 2 — Studio side (about 1 week)
+### Step 2 — Studio side (about 1 week) — built 9 Oct, untested on a database
+
+Built as one panel (`components/project-work/ProjectWork.tsx`) under each project on
+`/studio/updates` (renamed "Client projects") and on `/ops/introductions`; documents
+added as `HomeDocument` in a private `project-docs` bucket (migration
+20261009130000), shown in the app's Locker.
+
 
 Posting a daily update from a phone (photos first), raising a decision with
 options and a deadline, closing snags with a photo, uploading documents

@@ -14,7 +14,8 @@ export type ProjectEvent =
   | { kind: 'decision-due'; decisionId: string; title: string; daysLeft: number }
   | { kind: 'decision-made'; decisionId: string; title: string; choice: string; extraPaise: number }
   | { kind: 'snag-raised'; snagId: string; title: string; room: string | null }
-  | { kind: 'snag-fixed'; snagId: string; title: string };
+  | { kind: 'snag-fixed'; snagId: string; title: string }
+  | { kind: 'document'; studio: string; title: string };
 
 export interface Message {
   title: string;
@@ -55,14 +56,14 @@ export function messageFor(e: ProjectEvent): Message {
         template: 'decision.made',
         title: 'The customer has chosen',
         body: clip(`${e.title}: ${e.choice}${e.extraPaise > 0 ? ` (+${formatINR(e.extraPaise)})` : ''}.`, 160),
-        url: `/studio/projects`,
+        url: '/studio/updates',
       };
     case 'snag-raised':
       return {
         template: 'snag.raised',
         title: 'New snag raised',
         body: clip(e.room ? `${e.title} · ${e.room}` : e.title, 160),
-        url: `/studio/projects`,
+        url: '/studio/updates',
       };
     case 'snag-fixed':
       return {
@@ -70,6 +71,13 @@ export function messageFor(e: ProjectEvent): Message {
         title: 'Snag fixed',
         body: clip(e.title, 160),
         url: `/app/snags`,
+      };
+    case 'document':
+      return {
+        template: 'project.document',
+        title: `New document · ${e.studio}`,
+        body: clip(e.title, 160),
+        url: '/app/locker',
       };
   }
 }

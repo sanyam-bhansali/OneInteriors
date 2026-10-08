@@ -170,3 +170,25 @@ describe('the screens, from a real project', async () => {
     expect(pickDecision([], null)).toBeNull();
   });
 });
+
+describe('project documents', async () => {
+  const { checkDoc, docMeta, isDocKind } = await import('@/modules/portal/documents');
+
+  it('need a known kind; the title defaults to the kind', () => {
+    expect(isDocKind('AGREEMENT')).toBe(true);
+    expect(isDocKind('SECRET')).toBe(false);
+    expect(checkDoc({ kind: 'nope', title: 'x' }).ok).toBe(false);
+    expect(checkDoc({ kind: 'DRAWINGS', title: '  ' })).toEqual({ ok: true, value: { kind: 'DRAWINGS', title: 'Design drawings' } });
+    expect(checkDoc({ kind: 'RECEIPT', title: ' Receipt   2 ' })).toEqual({ ok: true, value: { kind: 'RECEIPT', title: 'Receipt 2' } });
+  });
+
+  it('read as type, size and date', () => {
+    expect(docMeta({ contentType: 'application/pdf', bytes: 1_258_291, createdAt: new Date('2026-08-03T06:30:00Z') })).toBe('PDF · 1.2 MB · 3 Aug');
+    expect(docMeta({ contentType: 'image/jpeg', bytes: 300, createdAt: new Date('2026-08-03T06:30:00Z') })).toBe('Photo · 1 KB · 3 Aug');
+  });
+
+  it('a new one tells the customer it is in their Locker', () => {
+    const m = messageFor({ kind: 'document', studio: 'Teakline Studio', title: 'Agreement' });
+    expect(m).toMatchObject({ title: 'New document · Teakline Studio', body: 'Agreement', url: '/app/locker' });
+  });
+});

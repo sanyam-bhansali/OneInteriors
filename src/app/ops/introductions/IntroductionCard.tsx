@@ -12,6 +12,8 @@ import {
 } from './actions';
 import type { OpsIntroduction } from '@/modules/studio/introduction-ops';
 import { TrackerControl } from './TrackerControl';
+import { ProjectWork } from '@/components/project-work/ProjectWork';
+import type { StaffWork } from '@/modules/portal/project-store';
 /**
  * The kinds come from the state machine, not from this file.
  *
@@ -46,10 +48,13 @@ const input =
 export function IntroductionCard({
   intro,
   need = null,
+  work = null,
 }: {
   intro: OpsIntroduction;
   /** What this row is waiting on us for, when it is in that queue. */
   need?: string | null;
+  /** The started project's decisions and snags (docs/CUSTOMER-PLATFORM-PLAN.md, step 2). */
+  work?: StaffWork | null;
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -351,6 +356,7 @@ export function IntroductionCard({
       ) : null}
 
       <TrackerControl intro={intro} />
+      {intro.project && work ? <ProjectWork projectId={intro.project.id} work={work} /> : null}
     </li>
   );
 }

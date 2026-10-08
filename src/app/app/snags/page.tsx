@@ -9,7 +9,7 @@
 import { useRef, useState } from 'react';
 import { AskGeio, CameraIcon, ExampleTag, Frame, Tabs } from '@/components/app/ui';
 import { raiseSnagOnline, useMyProject } from '@/components/app/useMyProject';
-import { shrinkToFile } from '@/components/app/photos';
+import { shrinkImage } from '@/lib/shrink-image';
 import { EXAMPLE, SNAGS } from '@/modules/app/example-project';
 import { dayLabel } from '@/modules/app/project-view';
 
@@ -67,7 +67,7 @@ export default function AppSnags() {
   const onPhoto = async (f: File | undefined) => {
     if (!f) return;
     try {
-      const photo = await shrinkToFile(f);
+      const photo = await shrinkImage(f);
       setDraft({ photo, preview: URL.createObjectURL(photo) });
       setNote(null);
     } catch {
