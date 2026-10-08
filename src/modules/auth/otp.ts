@@ -38,7 +38,7 @@ import { randomBytes } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
 import { AuthChannel } from '@prisma/client';
 import { showOtpOnScreen } from '@/lib/env';
-import { createSession, hashIp, hashToken } from './session';
+import { createSession, hashIp, hashToken, type SessionMeta } from './session';
 import { normalisePhone } from '@/modules/studio/phone';
 import { sendOtp } from './whatsapp';
 import { codeFromBytes, cleanCode, cleanName, isOtpShape, isValidName } from './otp-code';
@@ -172,7 +172,12 @@ export async function requestOtp(
 }
 
 export type VerifyOtpResult =
-  | { ok: true; userId: string }
+  | {
+      ok: true;
+      userId: string;
+      /** Set only when `meta.bearer` asked for the token rather than a cookie. */
+      token?: string;
+    }
   | { ok: false; reason: 'invalid_phone' | 'invalid_code' | 'expired' | 'too_many' };
 
 /**
@@ -185,7 +190,7 @@ export async function verifyOtp(
   rawPhone: string,
   rawCode: string,
   rawName: string | null,
-  meta: { userAgent?: string | null; ip?: string | null } = {},
+  meta: SessionMeta = {},
 ): Promise<VerifyOtpResult> {
   const phone = normalisePhone(rawPhone);
   if (!phone) return { ok: false, reason: 'invalid_phone' };
@@ -290,6 +295,6 @@ export async function verifyOtp(
 
   if (!outcome.ok) return outcome;
 
-  await createSession(outcome.userId, meta);
-  return { ok: true, userId: outcome.userId };
+  const token = await createSession(outcome.userId, meta);
+  return meta.bearer ? { ok: true, userId: outcome.userId, token } : { ok: true, userId: outcome.userId };
 }

@@ -21,9 +21,10 @@ import 'server-only';
  *     signed claims, precisely so we can kill one.
  */
 
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
+import { bearerFrom } from './bearer';
 import type { UserRole } from '@prisma/client';
 
 const COOKIE = 'oi_session';
@@ -61,10 +62,22 @@ export function hashIp(ip: string | null | undefined): string | null {
   return createHash('sha256').update(ip).digest('hex').slice(0, 32);
 }
 
-export async function createSession(
+export interface SessionMeta {
+  userAgent?: string | null;
+  ip?: string | null;
+  /**
+   * Hand the token back instead of setting the cookie — the phone app, which
+   * keeps it in the device keychain and sends it as `Authorization: Bearer`.
+   * Same row, same token strength, same revocation; only the transport differs.
+   */
+  bearer?: boolean;
+}
+
+/** Write the session row and return its token, without touching any cookie. */
+export async function issueSession(
   userId: string,
-  meta: { userAgent?: string | null; ip?: string | null } = {},
-): Promise<string> {
+  meta: SessionMeta = {},
+): Promise<{ token: string; expiresAt: Date }> {
   const token = newToken();
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
 
@@ -77,6 +90,13 @@ export async function createSession(
       expiresAt,
     },
   });
+
+  return { token, expiresAt };
+}
+
+export async function createSession(userId: string, meta: SessionMeta = {}): Promise<string> {
+  const { token, expiresAt } = await issueSession(userId, meta);
+  if (meta.bearer) return token;
 
   const jar = await cookies();
   jar.set(COOKIE, token, {
@@ -91,11 +111,31 @@ export async function createSession(
 }
 
 /**
+ * The session token for this request: the website's cookie, or the phone
+ * app's bearer header.
+ *
+ * The cookie wins when both are present. A browser never sends our bearer
+ * header, and the app never holds the cookie, so in practice there is only
+ * ever one — but if something did send both, the cookie is the one the
+ * same-site rules have already vetted.
+ *
+ * A bearer header cannot be forged cross-site the way a cookie can be
+ * ridden, so accepting it adds no CSRF surface: a page on another origin
+ * cannot read the token from the keychain to put it in a header.
+ */
+async function requestToken(): Promise<string | null> {
+  const jar = await cookies();
+  const fromCookie = jar.get(COOKIE)?.value;
+  if (fromCookie) return fromCookie;
+  const h = await headers();
+  return bearerFrom(h.get('authorization'));
+}
+
+/**
  * The current user, or null. Reads the role fresh from the database — see (3).
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  const jar = await cookies();
-  const token = jar.get(COOKIE)?.value;
+  const token = await requestToken();
   if (!token) return null;
 
   const session = await prisma.session.findUnique({
@@ -124,7 +164,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
 export async function signOut(): Promise<void> {
   const jar = await cookies();
-  const token = jar.get(COOKIE)?.value;
+  const token = await requestToken();
   if (token) {
     await prisma.session
       .updateMany({ where: { tokenHash: hashToken(token) }, data: { revokedAt: new Date() } })
