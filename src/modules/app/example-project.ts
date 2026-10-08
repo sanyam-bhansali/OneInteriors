@@ -104,3 +104,21 @@ export const ROOMS_3D: { key: LayoutRoomKey; label: string; state: 'done' | 'now
   { key: 'BATHROOMS', label: 'Bath & utility', state: 'done', note: 'Vanity and utility storage fitted 2 Oct.' },
   { key: 'SECOND_BEDROOM', label: 'Bedroom 2', state: 'now', note: 'Wardrobe frames fitted. Study table next week.' },
 ];
+
+/** A few lines of the example's signed quote, so GEIO can answer "what did I pay for…". */
+export const QUOTE_LINES = [
+  { line: 3, item: 'Kitchen, L-shape 11 ft', spec: '18mm BWP ply carcass, laminate shutter, quartz counter', rupees: 385_000 },
+  { line: 7, item: 'Wardrobe, bedroom 1', spec: '18mm BWP ply, matt laminate, soft-close hinges', rupees: 210_000 },
+  { line: 9, item: 'Wardrobe, bedroom 2', spec: '18mm BWP ply, matt laminate, soft-close hinges', rupees: 210_000 },
+  { line: 14, item: 'TV unit', spec: 'Veneer finish, 9 ft wide, concealed wiring', rupees: 86_000 },
+  { line: 18, item: 'False ceiling, living', spec: 'Gypsum, cove lighting, 420 sq ft', rupees: 1_26_000 },
+];
+
+/** The payment plan: what is paid, and what falls due when. */
+export const PAYMENTS = [
+  { stage: 'Booking and design', rupees: 1_84_000, state: 'Paid 3 Aug' },
+  { stage: 'Civil and electrical start', rupees: 5_52_000, state: 'Paid 25 Aug' },
+  { stage: 'Carpentry midway', rupees: 5_52_000, state: 'Due once the midway photos are checked by your expert (this week)' },
+  { stage: 'Painting and finishing start', rupees: 3_68_000, state: 'Due 1 Nov' },
+  { stage: 'Handover, after snags close', rupees: 1_84_000, state: 'Due after the snag list is closed' },
+];
