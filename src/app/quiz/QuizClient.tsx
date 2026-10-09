@@ -350,7 +350,7 @@ export function QuizClient({
    */
   async function submitContact() {
     const input = { ...contact, name: contact.name || brief.contactName || '' };
-    const check = checkContact(input);
+    const check = checkContact(input, { requireEmail: true });
     if (!check.ok) {
       setContactErrors(check.errors);
       return;
@@ -358,7 +358,7 @@ export function QuizClient({
     setContactErrors({});
     setFinishing(true);
 
-    const result = await submitContactAction(brief, input).catch(() => null);
+    const result = await submitContactAction(brief, input, { requireEmail: true }).catch(() => null);
     if (result && !result.ok) {
       setContactErrors(result.errors);
       setFinishing(false);

@@ -447,6 +447,7 @@ export const EXPERT_DICT = {
   'flow.done': { en: 'Done', hi: 'ठीक है', mr: 'ठीक आहे' },
   'flow.name': { en: 'Your name', hi: 'आपका नाम', mr: 'तुमचे नाव' },
   'flow.mobile': { en: 'Mobile', hi: 'मोबाइल', mr: 'मोबाइल' },
+  'flow.email': { en: 'Email', hi: 'ईमेल', mr: 'ईमेल' },
   'flow.step4': { en: 'Confirm with a code', hi: 'कोड से पक्का करें', mr: 'कोडने पक्के करा' },
   'flow.sendCode': { en: 'Send code on WhatsApp', hi: 'WhatsApp पर कोड भेजें', mr: 'WhatsApp वर कोड पाठवा' },
   'flow.sending': { en: 'Sending…', hi: 'भेज रहे हैं…', mr: 'पाठवतोय…' },

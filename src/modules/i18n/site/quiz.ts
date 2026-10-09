@@ -368,7 +368,7 @@ export const QUIZ_DICT = {
   },
   'contact.name': { en: 'Your name', hi: 'आपका नाम', mr: 'तुमचे नाव' },
   'contact.mobile': { en: 'Mobile', hi: 'मोबाइल', mr: 'मोबाइल' },
-  'contact.email': { en: 'Email, if you like', hi: 'ईमेल, अगर देना चाहें', mr: 'ईमेल, द्यायचा असल्यास' },
+  'contact.email': { en: 'Email', hi: 'ईमेल', mr: 'ईमेल' },
   'contact.howWeUse': { en: 'How we use it', hi: 'हम इसका इस्तेमाल कैसे करते हैं', mr: 'आम्ही याचा वापर कसा करतो' },
   'contact.optional': { en: 'optional', hi: 'वैकल्पिक', mr: 'ऐच्छिक' },
 
@@ -456,6 +456,16 @@ export const QUIZ_SERVER_TX: Record<string, Tx> = {
     en: 'That does not look like an Indian mobile — check the number.',
     hi: 'यह भारतीय मोबाइल नंबर नहीं लगता — नंबर जाँच लें।',
     mr: 'हा भारतीय मोबाइल नंबर वाटत नाही — नंबर तपासा.',
+  },
+  'We need your email to send your matches and the call details.': {
+    en: 'We need your email to send your matches and the call details.',
+    hi: 'आपके मैच और कॉल की जानकारी भेजने के लिए हमें आपका ईमेल चाहिए।',
+    mr: 'तुमचे मॅच आणि कॉलची माहिती पाठवण्यासाठी आम्हाला तुमचा ईमेल हवा आहे.',
+  },
+  'Check the email address.': {
+    en: 'Check the email address.',
+    hi: 'ईमेल पता जाँच लें।',
+    mr: 'ईमेल पत्ता तपासा.',
   },
   'Check the email address, or leave it empty.': {
     en: 'Check the email address, or leave it empty.',

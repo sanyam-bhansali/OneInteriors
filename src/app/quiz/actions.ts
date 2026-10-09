@@ -112,6 +112,8 @@ const CONTACT_LIMIT = { max: 20, windowMs: 60 * 60 * 1000 };
 export async function submitContactAction(
   brief: Brief,
   input: ContactInput,
+  /** The website asks for an email and requires it; the phone app does not ask. */
+  opts: { requireEmail?: boolean } = {},
 ): Promise<ContactResult> {
   const check = checkContact({
     name: String(input?.name ?? ''),
@@ -119,7 +121,7 @@ export async function submitContactAction(
     email: String(input?.email ?? ''),
     agreed: input?.agreed === true,
     whatsappUpdates: input?.whatsappUpdates === true,
-  });
+  }, { requireEmail: opts.requireEmail === true });
   if (!check.ok) return { ok: false, errors: check.errors };
 
   const h = await headers();

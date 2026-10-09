@@ -50,6 +50,14 @@ describe('checkContact', () => {
     expect(EMPTY_CONTACT.agreed).toBe(false);
   });
 
+  it('requires an email on the website, and still not in the phone app', () => {
+    const missing = checkContact({ ...good, email: '' }, { requireEmail: true });
+    expect(missing.ok).toBe(false);
+    expect(!missing.ok && missing.errors.email).toBeTruthy();
+    expect(checkContact({ ...good, email: 'a@b.in' }, { requireEmail: true }).ok).toBe(true);
+    expect(checkContact({ ...good, email: '' }).ok).toBe(true);
+  });
+
   it('keeps an optional email, and refuses a malformed one', () => {
     const withEmail = checkContact({ ...good, email: ' Sanyam@Example.com ' });
     expect(withEmail.ok && withEmail.value.email).toBe('sanyam@example.com');

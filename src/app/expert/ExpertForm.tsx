@@ -23,7 +23,7 @@
  */
 
 import { startTransition, useActionState, useEffect, useState } from 'react';
-import { readContact, rememberContact, type RememberedContact } from '@/lib/remembered-contact';
+import { readContact, rememberContact } from '@/lib/remembered-contact';
 import { googleCalendarUrl, slotLabel } from '@/modules/consultation/slots';
 import { ARCHITECT } from '@/modules/consultation/architect';
 import { formatINRCompact } from '@/lib/money';
@@ -121,21 +121,21 @@ export function ExpertForm({
   );
 
   /* Name and number from the start of the brief (this device, or the server). */
-  const [remembered, setRemembered] = useState<RememberedContact | null>(null);
   const [name, setName] = useState(defaultName ?? '');
   const [phone, setPhone] = useState(defaultPhone ?? '');
+  const [email, setEmail] = useState(defaultEmail ?? '');
   const [editing, setEditing] = useState(false);
   useEffect(() => {
     const r = readContact();
-    setRemembered(r);
     if (r) {
       setName((n) => n || r.name);
       setPhone((p) => p || r.phone);
+      setEmail((m) => m || r.email);
     }
   }, []);
   useEffect(() => {
-    if (name || phone) rememberContact({ name, phone });
-  }, [name, phone]);
+    if (name || phone || email) rememberContact({ name, phone, email });
+  }, [name, phone, email]);
 
   /* The code. */
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -273,7 +273,7 @@ export function ExpertForm({
     picked.forEach((id) => data.append('studioIds', id));
     data.set('contactName', name.trim());
     data.set('contactPhone', phone);
-    data.set('contactEmail', remembered?.email ?? defaultEmail ?? '');
+    data.set('contactEmail', email.trim());
     data.set('startsAt', slot ?? '');
     // The sentence above the button says what confirming agrees to; pressing it is the act.
     data.set('shareConsent', 'on');
@@ -423,6 +423,19 @@ export function ExpertForm({
                 style={field}
               />
             </label>
+            <label className="block sm:col-span-2">
+              <span className="mb-2 block px-1 text-[13px] font-medium text-[var(--ink-2)]">{t('flow.email')}</span>
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value.slice(0, 120))}
+                inputMode="email"
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                className="flow-input"
+                style={field}
+              />
+            </label>
             {editing && name.trim() && phoneOk ? (
               <div className="sm:col-span-2">
                 <PillButton tone="line" size="sm" onClick={() => setEditing(false)}>
@@ -436,6 +449,9 @@ export function ExpertForm({
             <p className="m-0 text-[17px] text-[var(--ink)]">
               <span className="block font-medium">{name}</span>
               <span className="mt-1 block text-[15px] font-normal tabular-nums text-[var(--ink-2)]">+91 {phone}</span>
+              {email.trim() ? (
+                <span className="mt-0.5 block break-all text-[15px] font-normal text-[var(--ink-2)]">{email.trim()}</span>
+              ) : null}
             </p>
             <PillButton tone="line" size="sm" onClick={() => setEditing(true)}>
               {t('flow.change')}
@@ -444,6 +460,7 @@ export function ExpertForm({
         )}
         {err.contactName ? <Alert>{err.contactName}</Alert> : null}
         {err.contactPhone ? <Alert>{err.contactPhone}</Alert> : null}
+        {err.contactEmail ? <Alert>{err.contactEmail}</Alert> : null}
       </section>
 
       {/* 4 · The code, then the booking */}
