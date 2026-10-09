@@ -409,8 +409,8 @@ export function ExpertForm({
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="m-0 text-[16px] text-[var(--ink)]">
-              <span className="font-medium">{name}</span>
-              <span className="ml-3 text-[15px] font-normal tabular-nums text-[var(--ink2)]">+91 {phone}</span>
+              <span className="block font-medium">{name}</span>
+              <span className="mt-1 block text-[15px] font-normal tabular-nums text-[var(--ink2)]">+91 {phone}</span>
             </p>
             <button
               type="button"
