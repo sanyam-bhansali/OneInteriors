@@ -115,5 +115,5 @@ export default function SignIn() {
 }
 
 const styles = StyleSheet.create({
-  link: { fontFamily: font.sansMedium, fontSize: 15, color: color.petrol, textDecorationLine: 'underline' },
+  link: { fontFamily: font.sansMedium, fontSize: 15, color: color.accentInk, textDecorationLine: 'underline' },
 });

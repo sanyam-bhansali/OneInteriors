@@ -75,7 +75,7 @@ options and a deadline, closing snags with a photo, uploading documents
 (agreement, drawings, receipts, warranties). Inside the existing `/studio`
 CRM so studios learn one tool.
 
-### Step 3 — Phone app (2–3 weeks)
+### Step 3 — Phone app (2–3 weeks) — first pass built 9 Oct, not yet on a phone
 
 The Expo app in `mobile/`, built to the v1 design.
 

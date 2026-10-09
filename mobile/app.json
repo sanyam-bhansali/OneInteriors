@@ -8,7 +8,13 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "in.oneinteriors.app"
+      "bundleIdentifier": "in.oneinteriors.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "To photograph a snag or ask GEIO about something on site.",
+        "NSPhotoLibraryUsageDescription": "To send a photo of your home to your studio or to GEIO.",
+        "NSFaceIDUsageDescription": "To lock the app, which holds photos of the inside of your home.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +24,13 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "in.oneinteriors.app"
+      "package": "in.oneinteriors.app",
+      "permissions": [
+        "CAMERA",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "POST_NOTIFICATIONS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -27,11 +39,49 @@
       "expo-router",
       "expo-secure-store",
       "expo-font",
-      "expo-image"
+      "expo-image",
+      "expo-web-browser",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0e0e0d",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 140
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#ba5329"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "To photograph a snag or ask GEIO about something on site.",
+          "photosPermission": "To send a photo of your home to your studio or to GEIO."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "To lock the app, which holds photos of the inside of your home."
+        }
+      ]
     ],
     "scheme": "oneinteriors",
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "backgroundColor": "#0e0e0d",
+    "extra": {
+      "eas": {
+        "projectId": "5a00fc08-0979-4e11-ac96-ccaa88d69092"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "owner": "one-interiors"
   }
 }

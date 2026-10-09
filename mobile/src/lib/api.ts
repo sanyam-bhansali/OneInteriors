@@ -1,5 +1,6 @@
 import { apiBase } from './config';
 import { readToken } from './token';
+import type { Notice, Project } from './types';
 
 /**
  * The only place the app talks to the backend (src/app/api/app/v1 on the
@@ -13,16 +14,17 @@ const OFFLINE = 'We could not reach One Interiors. Check your connection and try
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<Result<T>> {
   const token = await readToken();
+  const form = typeof FormData !== 'undefined' && body instanceof FormData;
   let res: Response;
   try {
     res = await fetch(`${apiBase()}/api/app/v1${path}`, {
       method,
       headers: {
         accept: 'application/json',
-        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        ...(body === undefined || form ? {} : { 'content-type': 'application/json' }),
         ...(token ? { authorization: `Bearer ${token}` } : {}),
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : form ? (body as FormData) : JSON.stringify(body),
     });
   } catch {
     return { ok: false, status: 0, error: OFFLINE };
@@ -48,4 +50,12 @@ export const api = {
     call<{ token: string }>('POST', '/auth/otp/verify', { phone, code, name }),
   signOut: () => call<object>('POST', '/auth/sign-out'),
   me: () => call<{ user: Me }>('GET', '/me'),
+  projects: () => call<{ projects: Project[] }>('GET', '/project'),
+  choose: (decisionId: string, index: number) => call<object>('POST', `/decisions/${encodeURIComponent(decisionId)}`, { index }),
+  /** Multipart: projectId, title, room?, photos. */
+  raiseSnag: (form: FormData) => call<{ id: string }>('POST', '/snags', form),
+  registerDevice: (token: string, platform: 'ios' | 'android') => call<object>('POST', '/devices', { token, platform }),
+  removeDevice: (token: string) => call<object>('DELETE', '/devices', { token }),
+  notifications: () => call<{ unread: number; notifications: Notice[] }>('GET', '/notifications'),
+  markRead: (ids: string[] | 'all') => call<object>('POST', '/notifications', ids === 'all' ? { all: true } : { ids }),
 };

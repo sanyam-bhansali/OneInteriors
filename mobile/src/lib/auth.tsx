@@ -1,11 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, type Me } from './api';
 import { clearToken, readToken, writeToken } from './token';
+import { forgetProject } from './project';
+import { unregisterPush } from './push';
 
 type State =
   | { status: 'loading' }
   | { status: 'signed-out' }
-  /** A token we could not check — no signal. Kept, and retried. */
+  /** A token we could not check â€” no signal. Kept, and retried. */
   | { status: 'offline'; error: string }
   | { status: 'signed-in'; user: Me };
 
@@ -56,6 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await load();
       },
       signOut: async () => {
+        await unregisterPush();
+        await forgetProject();
         await api.signOut();
         await clearToken();
         setState({ status: 'signed-out' });

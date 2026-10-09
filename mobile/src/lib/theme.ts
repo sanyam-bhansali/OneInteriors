@@ -1,32 +1,42 @@
 /**
- * The brand, as the website defines it (src/app/globals.css). Copied rather
- * than imported because CSS variables mean nothing to React Native; change
- * one, change the other.
+ * The owner's v1 screens (the design file, 8 Oct 2026), as the web app's
+ * `.oa` tokens set them (src/components/app/app.css). Copied rather than
+ * imported because CSS variables mean nothing to React Native; change one,
+ * change the other.
  */
 export const color = {
-  paper: '#fdf9f2',
-  paper2: '#f8f0e3',
-  paper3: '#f1e5d2',
-  ink: '#262019',
-  ink2: '#574d42',
-  ink3: '#8a7d6e',
-  rule: '#e5d9c6',
-  petrolDeep: '#0f3538',
-  petrol: '#1a6068',
-  petrolSoft: '#dceceb',
-  terracotta: '#b85f3c',
-  terracottaSoft: '#f8e3d8',
-  brass: '#8d6412',
-  atrisk: '#98371f',
-  atriskSoft: '#f9e0d6',
+  bg: '#f1f0ec',
+  surface: '#fbfaf8',
+  white: '#ffffff',
+  ink: '#0e0e0d',
+  ink2: '#5a5853',
+  ink3: '#8c8a84',
+  line: '#d4d3ce',
+  accent: '#ba5329',
+  accentInk: '#a6461f',
+  accentWarm: '#e07a4e',
+  accentWash: '#f6e3d9',
+  gold: '#f2c98a',
+  dark: '#0e0e0d',
+  onDark: '#f1f0ec',
+  onDark2: '#b5b3ad',
+  ok: '#2f6b45',
 } as const;
 
 export const font = {
-  display: 'InstrumentSerif_400Regular',
-  sans: 'InstrumentSans_400Regular',
-  sansMedium: 'InstrumentSans_500Medium',
-  sansBold: 'InstrumentSans_600SemiBold',
+  sans: 'Geist_400Regular',
+  sansMedium: 'Geist_500Medium',
+  sansSemi: 'Geist_600SemiBold',
+  sansBold: 'Geist_700Bold',
+  mono: 'GeistMono_400Regular',
+  monoMedium: 'GeistMono_500Medium',
 } as const;
 
-export const space = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 } as const;
-export const radius = { sm: 8, md: 14, pill: 999 } as const;
+export const space = { xs: 4, sm: 8, md: 16, lg: 22, xl: 32, xxl: 48 } as const;
+export const radius = { sm: 12, md: 18, lg: 22, pill: 999 } as const;
+
+/** The design's two curves: a glide that settles, and a small spring. */
+export const motion = {
+  glide: { duration: 800 },
+  stagger: 60,
+} as const;
