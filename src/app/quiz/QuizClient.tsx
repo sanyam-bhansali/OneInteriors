@@ -1,6 +1,7 @@
 'use client';
 
 import { SiteLangPicker, useLang, useSiteT } from '@/components/app/i18n';
+import { readContact, rememberContact } from '@/lib/remembered-contact';
 import { tx, type Lang } from '@/modules/i18n/site';
 import {
   FINISH_TX,
@@ -230,8 +231,20 @@ export function QuizClient({
     // sessionStorage first so the quiz paints immediately, then reconcile with
     // the server. A stored brief always wins over an empty local one; a local
     // brief wins when the server has never heard of this browser.
-    const local = loadBrief();
+    const remembered = readContact();
+    const stored = loadBrief();
+    // A name typed on an earlier visit fills the first screen again.
+    const local = !stored.contactName && remembered?.name ? { ...stored, contactName: remembered.name } : stored;
     setBrief(local);
+    if (local.contactName) rememberContact({ name: local.contactName });
+    if (remembered) {
+      setContact((c) => ({
+        ...c,
+        name: c.name || remembered.name,
+        phone: c.phone || remembered.phone,
+        email: c.email || remembered.email,
+      }));
+    }
     setStep(Math.min(Math.max(local.lastStep || 1, 1), TOTAL_STEPS));
     setHydrated(true);
 
@@ -384,6 +397,7 @@ export function QuizClient({
     contact,
     setContact: (next) => {
       setContact(next);
+      rememberContact({ name: next.name, phone: next.phone, email: next.email });
       // An error disappears as soon as they start fixing it.
       if (Object.keys(contactErrors).length > 0) setContactErrors({});
     },
@@ -1022,7 +1036,10 @@ function nameStep(brief: Brief, update: (p: Partial<Brief>) => void, t: QT): Ste
         <input
           type="text"
           value={brief.contactName ?? ''}
-          onChange={(e) => update({ contactName: e.target.value.slice(0, NAME_MAX) })}
+          onChange={(e) => {
+            update({ contactName: e.target.value.slice(0, NAME_MAX) });
+            rememberContact({ name: e.target.value.slice(0, NAME_MAX) });
+          }}
           placeholder={t('name.placeholder')}
           aria-label={t('name.placeholder')}
           autoComplete="given-name"

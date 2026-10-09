@@ -29,7 +29,8 @@
  * its own name off the wire so nothing is sent twice.
  */
 
-import { useActionState, useMemo, useState } from 'react';
+import { useActionState, useEffect, useMemo, useState } from 'react';
+import { readContact, rememberContact, type RememberedContact } from '@/lib/remembered-contact';
 import { googleCalendarUrl, slotLabel } from '@/modules/consultation/slots';
 import { ARCHITECT } from '@/modules/consultation/architect';
 import { SlotPicker } from '@/components/SlotPicker';
@@ -108,6 +109,12 @@ export function ExpertForm({
   );
   const [asks, setAsks] = useState<string[]>([]);
   const [own, setOwn] = useState('');
+  /* Name, mobile and email typed earlier on this device (the quiz's last
+     screen, or a previous booking) fill the boxes, and what is typed here is
+     remembered for next time. */
+  const [remembered, setRemembered] = useState<RememberedContact | null>(null);
+  useEffect(() => setRemembered(readContact()), []);
+  const filled = remembered ? 'remembered' : 'blank';
   const err = state.errors ?? {};
 
   /**
@@ -242,7 +249,18 @@ export function ExpertForm({
     setAsks((prev) => (prev.includes(q) ? prev.filter((a) => a !== q) : [...prev, q]));
 
   return (
-    <form action={action} className="flex flex-col gap-10">
+    <form
+      action={action}
+      onChange={(e) => {
+        const data = new FormData(e.currentTarget);
+        rememberContact({
+          name: String(data.get('contactName') ?? ''),
+          phone: String(data.get('contactPhone') ?? ''),
+          email: String(data.get('contactEmail') ?? ''),
+        });
+      }}
+      className="flex flex-col gap-10"
+    >
       <input type="hidden" name="briefId" value={briefId} />
       <input type="hidden" name="askedAbout" value={composed} />
 
@@ -377,26 +395,30 @@ export function ExpertForm({
         <div className="flex flex-col gap-5">
           <Field
             label={t('field.name')}
+            key={`name-${filled}`}
             name="contactName"
             required
-            defaultValue={defaultName}
+            defaultValue={defaultName || remembered?.name || null}
             error={err.contactName}
             optionalText={t('field.optional')}
           />
           <Field
             label={t('field.mobile')}
+            key={`phone-${filled}`}
             name="contactPhone"
             type="tel"
             required
+            defaultValue={remembered?.phone || null}
             error={err.contactPhone}
             optionalText={t('field.optional')}
             placeholder="98765 43210"
           />
           <Field
             label={t('field.email')}
+            key={`email-${filled}`}
             name="contactEmail"
             type="email"
-            defaultValue={defaultEmail}
+            defaultValue={defaultEmail || remembered?.email || null}
             error={err.contactEmail}
             optionalText={t('field.optional')}
           />
