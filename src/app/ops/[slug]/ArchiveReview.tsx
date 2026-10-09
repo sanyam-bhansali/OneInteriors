@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { reviewArchiveAction, openArchiveFileAction } from './actions';
 import type { RecordResult } from '@/modules/verification/record';
 // Values AND types from the pure module, never from the `server-only` store —
@@ -12,7 +13,7 @@ import {
   type FiledRateView,
 } from '@/modules/quotation/analysis-states';
 import { RateReview } from './RateReview';
-import { reanalyseArchiveAction, type RateDecision } from './actions';
+import { readArchiveBatchAction } from './actions';
 
 export interface ArchiveRow {
   id: string;
@@ -24,6 +25,8 @@ export interface ArchiveRow {
   /** What the automatic reader did, separate from what ops has done. */
   analysisState: string;
   analysisError: string | null;
+  /** Files read so far by an unfinished read. */
+  readSoFar: number;
   /** Derived and awaiting a person. Empty when nothing has been read. */
   pendingRates: FiledRateView[];
 }
@@ -95,7 +98,8 @@ function ArchiveCard({ archive }: { archive: ArchiveRow }) {
         archiveId={archive.id}
         state={archive.analysisState}
         error={archive.analysisError}
-        hasFiles={archive.files.length > 0}
+        total={archive.files.length}
+        readSoFar={archive.readSoFar}
       />
 
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
@@ -264,25 +268,65 @@ function AnalysisLine({
   archiveId,
   state,
   error,
-  hasFiles,
+  total,
+  readSoFar,
 }: {
   archiveId: string;
   state: string;
   error: string | null;
-  hasFiles: boolean;
+  total: number;
+  readSoFar: number;
 }) {
-  const [result, action, pending] = useActionState<RateDecision | null, FormData>(
-    reanalyseArchiveAction,
-    null,
-  );
+  const router = useRouter();
+  const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(readSoFar);
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const stop = useRef(false);
 
   /* NOT_STARTED is shown here, unlike on the studio's side, because it is
-     the state ops most needs to act on: files sitting unread because the
-     background run never happened. */
+     the state ops most needs to act on: files waiting for somebody to press
+     Read. Nothing reads them on upload any more. */
   const known = isAnalysisState(state) ? state : 'NOT_STARTED';
   const copy = ANALYSIS_COPY[known];
+  const partway = readSoFar > 0 && readSoFar < total && known !== 'READ';
 
-  if (!hasFiles) return null;
+  if (total === 0) return null;
+
+  /**
+   * One batch per call, until done or stopped.
+   *
+   * The loop lives in the browser on purpose: every batch is paid for, and
+   * the person paying can see the count move and press Stop. Closing the tab
+   * stops it too, and the next Read carries on from the saved position.
+   */
+  async function run(fresh: boolean) {
+    stop.current = false;
+    setRunning(true);
+    setNote(null);
+    let first = true;
+    for (;;) {
+      const r = await readArchiveBatchAction(archiveId, fresh && first);
+      first = false;
+      if (!r.ok) {
+        setNote({ ok: false, text: r.error });
+        break;
+      }
+      setDone(r.read);
+      if (r.done) {
+        setNote({
+          ok: true,
+          text: `All ${r.total} files read${r.skipped ? `, ${r.skipped} skipped` : ''} — ${r.filed ?? 0} rates filed for review below.`,
+        });
+        break;
+      }
+      if (stop.current) {
+        setNote({ ok: true, text: `Stopped at ${r.read} of ${r.total}. Read carries on from here.` });
+        break;
+      }
+    }
+    setRunning(false);
+    router.refresh();
+  }
 
   return (
     <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -295,38 +339,57 @@ function AnalysisLine({
               : 'bg-[var(--color-paper-3)] text-[var(--color-ink-2)]'
         }`}
       >
-        {copy.label}
+        {running ? `Reading ${done} of ${total}` : partway ? `Read ${readSoFar} of ${total}` : copy.label}
       </span>
-      {error ? (
+      {error && !running ? (
         <span className="font-[family-name:var(--font-mono)] text-[11.5px] text-[var(--color-ink-3)]">
           {error}
         </span>
       ) : null}
 
-      {/* Always offered, not only after a failure. A successful read can
-          still be a bad one — a template nobody has seen, half the lines
-          missed — and the person best placed to notice is the one looking
-          at the documents. Re-reading supersedes the pending rates rather
-          than adding to them. */}
-      <form action={action} className="ml-auto">
-        <input type="hidden" name="archiveId" value={archiveId} />
-        <button
-          type="submit"
-          disabled={pending || known === 'READING'}
-          className="text-[12px] text-[var(--color-ink-3)] underline underline-offset-2 hover:text-[var(--color-petrol)] disabled:no-underline disabled:opacity-50"
-        >
-          {pending ? 'Starting…' : known === 'READING' ? 'Reading…' : 'Read them again'}
-        </button>
-      </form>
+      <span className="ml-auto flex gap-3">
+        {running ? (
+          <button
+            type="button"
+            onClick={() => {
+              stop.current = true;
+            }}
+            className="text-[12px] text-[var(--color-atrisk)] underline underline-offset-2"
+          >
+            Stop after this batch
+          </button>
+        ) : (
+          <>
+            {/* Costs money per document, so it is a deliberate press with the
+                count on it — never something that starts by itself. */}
+            {known !== 'READ' ? (
+              <button
+                type="button"
+                onClick={() => run(false)}
+                className="text-[12px] text-[var(--color-petrol)] underline underline-offset-2"
+              >
+                {partway ? `Carry on reading (${total - readSoFar} left)` : `Read ${total} files`}
+              </button>
+            ) : null}
+            {known === 'READ' || partway || known === 'FAILED' ? (
+              <button
+                type="button"
+                onClick={() => run(true)}
+                className="text-[12px] text-[var(--color-ink-3)] underline underline-offset-2 hover:text-[var(--color-petrol)]"
+              >
+                Read again from the start
+              </button>
+            ) : null}
+          </>
+        )}
+      </span>
 
-      {result ? (
+      {note ? (
         <span
           role="status"
-          className={`w-full text-[12.5px] ${
-            result.ok ? 'text-[var(--color-ontrack)]' : 'text-[var(--color-atrisk)]'
-          }`}
+          className={`w-full text-[12.5px] ${note.ok ? 'text-[var(--color-ontrack)]' : 'text-[var(--color-atrisk)]'}`}
         >
-          {result.ok ? result.message : result.error}
+          {note.text}
         </span>
       ) : null}
     </div>

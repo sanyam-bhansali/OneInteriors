@@ -6,6 +6,8 @@ import { formatINR, formatINRCompact } from '@/lib/money';
 import { redirect } from 'next/navigation';
 import { crmIsOpen, standingOf, STANDING_COPY } from '@/modules/studio/standing';
 import { myAnnouncements } from '@/modules/studio/announcements';
+import { myRatesGate, RATES_GATE_COPY } from '@/modules/studio-quote/rates-gate';
+import { RatesGateCard } from './RatesGateCard';
 import { StandingBanner } from './StandingBanner';
 import { currentStudio, onboardingProgress, firstIncomplete } from '@/modules/studio/onboarding';
 import { visibility } from '@/modules/studio/dashboard';
@@ -129,7 +131,7 @@ export default async function StudioHome() {
     status: studio.status,
     submittedForReview: studio.submittedForReview,
   });
-  const announcements = await myAnnouncements();
+  const [announcements, ratesGate] = await Promise.all([myAnnouncements(), myRatesGate()]);
   const approval = announcements.find((a) => a.template === 'studio.approved') ?? null;
 
   return (
@@ -151,6 +153,12 @@ export default async function StudioHome() {
       />
 
       <PageBody>
+        {/* Their rates, and whether the builder is open. Only once they have
+            checked them is it out of the way — see rates-gate.ts. */}
+        {ratesGate !== 'OPEN' ? (
+          <RatesGateCard gate={ratesGate} {...RATES_GATE_COPY[ratesGate]} where="elsewhere" />
+        ) : null}
+
         <div className="flex flex-col gap-6">
           {/* ── Four figures, and each one is a link to the thing it counts ── */}
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

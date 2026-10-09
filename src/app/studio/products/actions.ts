@@ -10,6 +10,7 @@ import {
   type SaveResult,
 } from '@/modules/studio-quote/store';
 import type { QuoteUnitName, WorkCodeName } from '@/modules/studio-quote/pricing';
+import { confirmMyRates } from '@/modules/studio-quote/rates-gate';
 
 /**
  * The product master's writes.
@@ -85,4 +86,19 @@ export async function addProductAction(_prev: State, form: FormData): Promise<St
  */
 export async function toggleStandardAction(id: string, standard: boolean): Promise<State> {
   return done(await setProductStandard(id, standard));
+}
+
+/**
+ * The studio says the rates we filled from its quotations are right.
+ *
+ * Opens the quotation builder — see `rates-gate.ts`. Every figure on the
+ * page stays editable afterwards; confirming is "these are mine now", not a
+ * lock.
+ */
+export async function confirmRatesAction(_prev: State | null): Promise<State> {
+  const result = await confirmMyRates();
+  if (result.ok) {
+    revalidatePath('/studio', 'layout');
+  }
+  return result;
 }

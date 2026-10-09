@@ -7,6 +7,8 @@ import { formatINR } from '@/lib/money';
 import { myQuotes, STATUS_LABELS, type QuoteStatusName } from '@/modules/studio-quote/quotes';
 import { myProducts } from '@/modules/studio-quote/store';
 import { StartQuote } from './NewQuote';
+import { RatesGateCard } from '../RatesGateCard';
+import { myRatesGate, RATES_GATE_COPY } from '@/modules/studio-quote/rates-gate';
 
 export const metadata: Metadata = {
   title: 'Quotations',
@@ -30,7 +32,21 @@ const TONE: Record<QuoteStatusName, string> = {
  * and this is a work surface.
  */
 export default async function QuotationsPage() {
-  const [quotes, products] = await Promise.all([myQuotes(), myProducts()]);
+  const [quotes, products, gate] = await Promise.all([myQuotes(), myProducts(), myRatesGate()]);
+
+  /* Shut until the studio has confirmed the rates filled from its own
+     quotations — rates-gate.ts. createQuote refuses as well; this is the
+     page saying why, instead of a builder that fails on submit. */
+  if (gate !== 'OPEN') {
+    return (
+      <>
+        <PageHead title="Quotations" sub="Opens once your rates are confirmed." />
+        <PageBody>
+          <RatesGateCard gate={gate} {...RATES_GATE_COPY[gate]} where="elsewhere" />
+        </PageBody>
+      </>
+    );
+  }
 
   const priced = products.filter((p) => p.ratePaise > 0).length;
   const standard = products.filter((p) => p.inStandardBuild).length;
