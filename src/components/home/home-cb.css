@@ -1933,3 +1933,69 @@ a.foot-pill:hover {
   background: var(--ink);
   mix-blend-mode: normal;
 }
+
+/* The FAQ into the closing section (owner, 10 Oct 2026: "make it more soft
+   or smooth"). Both are black, so the rounded overlap only drew a seam, and
+   the glow was cut off in a hard line where the section begins. Now the two
+   run together, and the glow rises out of the dark with no edge, breathing
+   slowly. */
+.cb .panel-dark + .outro {
+  /* -2px, not 0: at fractional scroll positions the two black sections left
+     a hairline of the white page between them. */
+  margin-top: -2px;
+  border-radius: 0;
+}
+.cb .outro .glow {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 45%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 45%);
+  filter: blur(60px);
+  animation: cb-glow-breathe 9s ease-in-out infinite alternate;
+}
+@keyframes cb-glow-breathe {
+  from {
+    opacity: 0.75;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cb .outro .glow {
+    animation: none;
+  }
+}
+
+/* The hero prints (owner, 10 Oct 2026): each one lifts toward you on hover,
+   and the whole table drifts slowly right to left and back — slow enough to
+   read as calm, not as a carousel. */
+.cb .collage {
+  animation: cb-collage-drift 38s ease-in-out infinite alternate;
+}
+@keyframes cb-collage-drift {
+  from {
+    translate: 3vw 0;
+  }
+  to {
+    translate: -3vw 0;
+  }
+}
+.cb .collage .tile {
+  transition:
+    translate 700ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.cb .collage .tile:hover {
+  translate: 0 -14px;
+  box-shadow: 0 46px 80px -34px rgba(11, 11, 11, 0.45);
+  z-index: 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cb .collage {
+    animation: none;
+  }
+  .cb .collage .tile {
+    transition: none;
+  }
+}

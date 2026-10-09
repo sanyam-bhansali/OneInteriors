@@ -9,6 +9,11 @@ import { Wrap, Chapter, Sheet, Established, Flag, Tick } from '@/components/oi';
 import { BriefRescue } from '@/components/BriefRescue';
 import { prisma } from '@/lib/prisma';
 import { loadBrief, readAnonKey } from '@/modules/brief/repository';
+import { decodePreviewBrief } from '@/modules/brief/preview-param';
+import { buildFirstQuote, homeShapeFor, standardKitchenRunMm } from '@/modules/quotation/first-quote';
+import { resolveRatesFor } from '@/modules/quotation/resolve-rates';
+import type { Brief } from '@/modules/brief/types';
+import { hasDatabase } from '@/lib/env';
 import { getCurrentUser } from '@/modules/auth/session';
 import { studioRepository } from '@/modules/studio/repository';
 import { rankOnServer } from '@/modules/matching/rank-server';
@@ -35,8 +40,12 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const dynamic = 'force-dynamic';
 
-export default async function ExpertPage({ searchParams }: { searchParams: Promise<{ slot?: string }> }) {
-  const { slot } = await searchParams;
+export default async function ExpertPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ slot?: string; preview?: string }>;
+}) {
+  const { slot, preview } = await searchParams;
   const user = await getCurrentUser();
   const lang = await getLang();
   const t = translator(lang, EXPERT_DICT);
@@ -48,15 +57,20 @@ export default async function ExpertPage({ searchParams }: { searchParams: Promi
   // Both of these mean the same thing — the server has no brief for this
   // person — and neither is grounds for restarting them. The browser may still
   // hold it; let the client try to hand it over. See BriefRescue.
-  const { brief, found } = await loadBrief();
-  const id = found && brief.completedAt ? await briefId() : null;
+  const loaded = await loadBrief();
+  /* A build with no database renders from the brief BriefRescue put in the
+     address; booking then says it cannot be taken here. */
+  const previewBrief = !hasDatabase() ? decodePreviewBrief(preview) : null;
+  const brief = previewBrief ?? loaded.brief;
+  const found = previewBrief ? true : loaded.found;
+  const id = previewBrief?.completedAt ? 'preview' : found && brief.completedAt ? await briefId() : null;
 
   if (!id) {
     return (
       <div className="oi-app oi-quick min-h-dvh bg-[var(--bg)]">
         <AppHeader />
         <Spine at="expert" />
-        <BriefRescue destination={t('rescue.destination')} />
+        <BriefRescue destination={t('rescue.destination')} previewable />
         <AppFooter />
       </div>
     );
@@ -72,7 +86,9 @@ export default async function ExpertPage({ searchParams }: { searchParams: Promi
   /* The quotes the customer actually saw, compared studios first and
      pre-ticked (plan §9). Priced afresh only when none are stored — a brief
      finished on another device. */
-  const seen = await quotesAsSeen(id, ranked.map((r) => r.studioId));
+  const seen = previewBrief
+    ? await previewQuotes(previewBrief, ranked.map((r) => r.studioId), studios)
+    : await quotesAsSeen(id, ranked.map((r) => r.studioId));
   if (seen.length === 0 && !result.ok) redirect('/match');
   const offer =
     seen.length > 0
@@ -313,4 +329,40 @@ async function briefId(): Promise<string | null> {
   if (!anonKey) return null;
   const row = await prisma.brief.findUnique({ where: { anonKey }, select: { id: true } });
   return row?.id ?? null;
+}
+
+/**
+ * A build with no database has no rate cards, so `quoteBrief` prices nothing.
+ * Price the way /match does there — each studio's sample rates through the
+ * same engine — so the walkthrough reaches the call form.
+ */
+async function previewQuotes(
+  brief: Brief,
+  rankedIds: string[],
+  studios: { id: string; slug: string; tradeName: string }[],
+) {
+  const shape = homeShapeFor(brief);
+  const out = [];
+  for (const id of rankedIds) {
+    const studio = studios.find((s) => s.id === id);
+    if (!studio) continue;
+    const { rates } = await resolveRatesFor(studio.slug);
+    const quote = buildFirstQuote(
+      {
+        ...shape,
+        kitchenRunMm: shape.plan?.kitchenRunMm ?? standardKitchenRunMm(shape.bhk),
+        runSource: shape.plan ? 'floor_plan' : 'standard',
+      },
+      rates,
+    );
+    if (quote.totalPaise <= 0) continue;
+    out.push({
+      studioId: studio.id,
+      studioName: studio.tradeName,
+      lowPaise: quote.lowPaise,
+      highPaise: quote.highPaise,
+      compared: false,
+    });
+  }
+  return out;
 }

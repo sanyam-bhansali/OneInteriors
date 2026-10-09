@@ -35,10 +35,12 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Container, Button } from '@/components/ui';
+import Link from 'next/link';
+import { Sheet, Wrap } from '@/components/oi';
 import { loadBrief } from '@/modules/brief/store';
 import { isBriefComplete } from '@/modules/brief/types';
 import { saveBriefAction } from '@/app/quiz/actions';
+import { PREVIEW_PARAM, encodePreviewBrief } from '@/modules/brief/preview-param';
 import { useSiteT } from '@/components/app/i18n';
 import { EXPERT_DICT } from '@/modules/i18n/site/expert';
 
@@ -100,8 +102,11 @@ export function RescueSettled() {
 export function BriefRescue({
   /** What the customer was trying to reach. Shown so the wait has a reason. */
   destination,
+  previewable = false,
 }: {
   destination?: string;
+  /** The page can render from `?preview=` when the build has no database. */
+  previewable?: boolean;
 }) {
   const t = useSiteT(EXPERT_DICT);
   const dest = destination ?? t('rescue.defaultDest');
@@ -140,6 +145,17 @@ export function BriefRescue({
       .then((result) => {
         if (cancelled) return;
         if (!result.persisted) {
+          /* A build with no database cannot store it — hand the page the
+             brief in the address instead (modules/brief/preview-param). */
+          if (result.noDatabase && previewable) {
+            clearRescueAttempts();
+            const url = new URL(window.location.href);
+            url.searchParams.set(PREVIEW_PARAM, encodePreviewBrief(brief));
+            // A full load: the client router's soft replace was cut short by
+            // the page's own streaming boundary and landed back on the bare URL.
+            window.location.replace(`${url.pathname}${url.search}`);
+            return;
+          }
           setPhase('failed');
           return;
         }
@@ -153,61 +169,79 @@ export function BriefRescue({
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, previewable]);
+
+  /* The customer side's look (owner, 10 Oct 2026: "make it more like our
+     theme"): a soft card, a display heading, black pill actions. */
+  const primary =
+    'oi-cta inline-flex min-h-12 cursor-pointer items-center justify-center rounded-full px-7 py-3 text-[15px] font-medium text-white no-underline';
+  const secondary =
+    'inline-flex min-h-12 cursor-pointer items-center justify-center rounded-full border border-[var(--line)] bg-transparent px-7 py-3 text-[15px] font-medium text-[var(--ink)] no-underline transition-colors hover:border-[var(--ink)]';
+
+  const frame = (children: React.ReactNode) => (
+    <main className="py-14 sm:py-20">
+      <Wrap>
+        <Sheet className="mx-auto max-w-[720px] rounded-[28px] px-6 py-10 sm:px-12 sm:py-14">{children}</Sheet>
+      </Wrap>
+    </main>
+  );
 
   if (phase === 'checking' || phase === 'restoring') {
-    return (
-      <main className="py-24">
-        <Container size="narrow">
-          <p className="m-0 font-[family-name:var(--font-mono)] text-[12px] uppercase tracking-[0.12em] text-[var(--color-ink-3)]">
-            {t('rescue.picking')}
-          </p>
-          <p className="m-0 mt-4 max-w-[46ch] text-[16px] leading-relaxed text-[var(--color-ink-2)]">
+    return frame(
+      <div className="flex items-start gap-5">
+        <span
+          aria-hidden
+          className="mt-1 h-6 w-6 shrink-0 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--acc)] motion-reduce:animate-none"
+        />
+        <div>
+          <p className="oi-eyebrow m-0">{t('rescue.picking')}</p>
+          <p className="m-0 mt-3 max-w-[46ch] text-[16px] leading-relaxed text-[var(--ink2)]">
             {t('rescue.pickingBody', { dest })}
           </p>
-        </Container>
-      </main>
+        </div>
+      </div>,
     );
   }
 
   if (phase === 'failed') {
-    return (
-      <main className="py-20">
-        <Container size="narrow">
-          <h1 className="h1 mb-4">{t('rescue.failedH1')}</h1>
-          <p className="m-0 mb-8 max-w-[54ch] text-[17px] leading-relaxed text-[var(--color-ink-2)]">
-            {t('rescue.failedBody')}
-          </p>
-          <div className="flex flex-wrap gap-4">
-            <Button
-              onClick={() => {
-                clearRescueAttempts();
-                router.refresh();
-              }}
-              size="lg"
-            >
-              {t('rescue.retry')}
-            </Button>
-            <Button href="/match" variant="secondary" size="lg">
-              {t('rescue.back')}
-            </Button>
-          </div>
-        </Container>
-      </main>
+    return frame(
+      <>
+        <h1 className="oi-display m-0 mb-4 max-w-[20ch] text-[clamp(1.9rem,1.2rem+2.4vw,2.9rem)] leading-[1.08]">
+          {t('rescue.failedH1')}
+        </h1>
+        <p className="m-0 mb-8 max-w-[54ch] text-[16.5px] leading-relaxed text-[var(--ink2)]">
+          {t('rescue.failedBody')}
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            className={primary}
+            onClick={() => {
+              clearRescueAttempts();
+              router.refresh();
+            }}
+          >
+            {t('rescue.retry')}
+          </button>
+          <Link href="/match" className={secondary}>
+            {t('rescue.back')}
+          </Link>
+        </div>
+      </>,
     );
   }
 
-  return (
-    <main className="py-20">
-      <Container size="narrow">
-        <h1 className="h1 mb-4">{t('rescue.emptyH1')}</h1>
-        <p className="m-0 mb-8 max-w-[54ch] text-[17px] leading-relaxed text-[var(--color-ink-2)]">
-          {t('rescue.emptyBody', { dest })}
-        </p>
-        <Button href="/quiz" size="lg">
-          {t('rescue.answer')}
-        </Button>
-      </Container>
-    </main>
+  return frame(
+    <>
+      <h1 className="oi-display m-0 mb-4 max-w-[20ch] text-[clamp(1.9rem,1.2rem+2.4vw,2.9rem)] leading-[1.08]">
+        {t('rescue.emptyH1')}
+      </h1>
+      <p className="m-0 mb-8 max-w-[54ch] text-[16.5px] leading-relaxed text-[var(--ink2)]">
+        {t('rescue.emptyBody', { dest })}
+      </p>
+      <Link href="/quiz" className={primary}>
+        {t('rescue.answer')}
+      </Link>
+    </>,
   );
 }
