@@ -26,12 +26,13 @@ import {
   type ScopeType,
 } from '@/modules/brief/types';
 import { carpetAreaFor } from '@/modules/brief/steps';
-import { TIER, TIERS, tierRangeFor, type Tier } from '@/modules/quotation/tiers';
+import { TIER, TIERS, tierRangeFor } from '@/modules/quotation/tiers';
 import { roomsFor } from '@/modules/quotation/scope';
 import { ROOM_LABELS } from '@/modules/quotation/catalogue';
 import { BEDROOMS } from '@/modules/quotation/estimate';
 import { STYLE_PHOTOS } from '@/data/style-photos';
 import { saveBriefAction } from '@/app/quiz/actions';
+import { useT } from '@/components/app/i18n';
 
 const TOTAL = 7;
 
@@ -82,16 +83,6 @@ const SCOPES: { value: ScopeType; title: string; sub: string }[] = [
   },
 ];
 
-const TIER_TAG: Record<Tier, string> = {
-  ESSENTIAL: 'Good value',
-  PREMIUM: 'Most chosen',
-  LUXURY: 'Made to order',
-};
-const TIER_LINE: Record<Tier, string> = {
-  ESSENTIAL: 'Everything you need, made well',
-  PREMIUM: 'Better materials where they are touched',
-  LUXURY: 'Made to your drawings, in the materials you chose',
-};
 
 const PRIORITIES: { value: PriorityFactor; title: string; sub: string }[] = [
   {
@@ -159,6 +150,7 @@ export default function AppQuestion() {
   const router = useRouter();
   const n = Math.min(TOTAL, Math.max(1, Number(useParams<{ n: string }>().n) || 1));
   const [brief, update] = useBrief();
+  const tr = useT();
   // Fetch the studios now, so the matches screen has them the moment the last answer is in.
   useEffect(() => {
     void warmAppData();
@@ -186,7 +178,7 @@ export default function AppQuestion() {
   };
 
   const back = n === 1 ? '/app/name' : `/app/q/${n - 1}`;
-  const meta = n === TOTAL ? 'Last question' : `Question ${n} of ${TOTAL}`;
+  const meta = n === TOTAL ? tr('q.last') : tr('q.meta', { n, of: TOTAL });
   const ok = answered(brief, n);
 
   return (
@@ -199,10 +191,10 @@ export default function AppQuestion() {
       </Body>
       <Foot>
         {n === 6 && !ok && brief.priorityRanking.length > 0 ? (
-          <p className="oa-foot-note">Rank all four to continue ({brief.priorityRanking.length} of 4)</p>
+          <p className="oa-foot-note">{tr('q6.rank', { n: brief.priorityRanking.length })}</p>
         ) : null}
         <Cta onClick={next} disabled={!ok}>
-          {n === TOTAL ? 'See my 3 matches' : 'Next'}
+          {n === TOTAL ? tr('q.seeMatches') : tr('common.next')}
         </Cta>
       </Foot>
     </Frame>
@@ -231,6 +223,7 @@ function Step({ n, brief, update }: { n: number; brief: Brief; update: (p: Parti
 type StepProps = { brief: Brief; update: (p: Partial<Brief>) => void };
 
 function HomeStep({ brief, update }: StepProps) {
+  const tr = useT();
   // In the design's order, not the alphabet's.
   const popular = POPULAR.map((slug) => PUNE_LOCALITIES.find((l) => l.slug === slug)).filter(
     (l): l is (typeof PUNE_LOCALITIES)[number] => Boolean(l),
@@ -240,9 +233,9 @@ function HomeStep({ brief, update }: StepProps) {
   const [showOther, setShowOther] = useState(otherPicked);
   return (
     <>
-      <h1 className="oa-title">First, what kind of home are we working with?</h1>
-      <p className="oa-sub">And where in Pune is it?</p>
-      <p className="oa-label">Property type</p>
+      <h1 className="oa-title">{tr('q1.h1')}</h1>
+      <p className="oa-sub">{tr('q1.sub')}</p>
+      <p className="oa-label">{tr('q1.type')}</p>
       <div className="oa-chips" role="group" aria-label="Property type">
         {HOMES.map((h) => (
           <button
@@ -256,7 +249,7 @@ function HomeStep({ brief, update }: StepProps) {
           </button>
         ))}
       </div>
-      <p className="oa-label">Locality</p>
+      <p className="oa-label">{tr('q1.locality')}</p>
       <div className="oa-chips" role="group" aria-label="Locality">
         {popular.map((l) => (
           <button
@@ -271,7 +264,7 @@ function HomeStep({ brief, update }: StepProps) {
         ))}
       </div>
       <label className="oa-label" htmlFor="oa-area">
-        Carpet area, sq ft (optional)
+        {tr('q1.area')}
       </label>
       <input
         id="oa-area"
@@ -284,7 +277,7 @@ function HomeStep({ brief, update }: StepProps) {
           update({ carpetAreaSqft: v > 0 ? Math.min(v, 20000) : null });
         }}
       />
-      <p className="oa-note">Not sure? Skip it. Studios measure on their first visit.</p>
+      <p className="oa-note">{tr('q1.areaNote')}</p>
       {showOther ? (
       <select
           aria-label="Another area"
@@ -292,7 +285,7 @@ function HomeStep({ brief, update }: StepProps) {
           value={otherPicked ? (brief.locality ?? '') : ''}
           onChange={(e) => e.target.value && update({ locality: e.target.value })}
         >
-          <option value="">Somewhere else in Pune…</option>
+          <option value="">{tr('q1.otherPick')}</option>
           {others.map((l) => (
             <option key={l.slug} value={l.slug}>
               {l.label}
@@ -301,7 +294,7 @@ function HomeStep({ brief, update }: StepProps) {
         </select>
       ) : (
         <button type="button" className="oa-link" style={{ alignSelf: 'flex-start', padding: 0, textDecoration: 'underline' }} onClick={() => setShowOther(true)}>
-          My area isn&rsquo;t listed
+          {tr('q1.other')}
         </button>
       )}
     </>
@@ -309,11 +302,12 @@ function HomeStep({ brief, update }: StepProps) {
 }
 
 function ScopeStep({ brief, update }: StepProps) {
+  const tr = useT();
   const rooms = roomsFor(BEDROOMS[brief.propertyType ?? 'BHK_2']);
   const about = useOptionEstimates(brief, SCOPES.map((o) => ({ scope: o.value, scopeRooms: [], excludedItems: [] })));
   return (
     <>
-      <h1 className="oa-title">How much of it are we doing?</h1>
+      <h1 className="oa-title">{tr('q2.h1')}</h1>
       <div className="oa-list" role="radiogroup" aria-label="Scope">
         {SCOPES.map((s, i) => (
           <button
@@ -325,12 +319,12 @@ function ScopeStep({ brief, update }: StepProps) {
             onClick={() => update({ scope: s.value, scopeRooms: [], excludedItems: [] })}
           >
             <span>
-              <span className="oa-row-title">{s.title}</span>
-              <span className="oa-row-sub">{s.sub}</span>
+              <span className="oa-row-title">{tr(`scope.${s.value}`)}</span>
+              <span className="oa-row-sub">{tr(`scope.${s.value}.sub`)}</span>
             </span>
             <span className="oa-row-end">
               {about[i] && s.value !== 'SINGLE_ROOM' && s.value !== 'RENOVATION' ? (
-                <span className="oa-row-price">about {formatINRCompact(about[i]!.midPaise)}</span>
+                <span className="oa-row-price">{tr('est.about', { x: formatINRCompact(about[i]!.midPaise) })}</span>
               ) : null}
               <span className="oa-radio" />
             </span>
@@ -339,7 +333,7 @@ function ScopeStep({ brief, update }: StepProps) {
       </div>
       {brief.scope === 'SINGLE_ROOM' || brief.scope === 'RENOVATION' ? (
         <>
-          <p className="oa-label">Which rooms?</p>
+          <p className="oa-label">{tr('q2.rooms')}</p>
           <div className="oa-chips" role="group" aria-label="Rooms">
             {rooms.map((r) => (
               <button
@@ -365,11 +359,12 @@ function ScopeStep({ brief, update }: StepProps) {
 }
 
 function TierStep({ brief, update }: StepProps) {
+  const tr = useT();
   const { sqft } = carpetAreaFor(brief);
   const per = useOptionEstimates(brief, TIERS.map((t) => ({ tier: t })));
   return (
     <>
-      <h1 className="oa-title">What are you planning to spend?</h1>
+      <h1 className="oa-title">{tr('q3.h1')}</h1>
       <div className="flex flex-col gap-2.5" role="radiogroup" aria-label="Finish level">
         {TIERS.map((t, i) => {
           const { lowPaise, highPaise } = tierRangeFor(t, sqft);
@@ -391,34 +386,35 @@ function TierStep({ brief, update }: StepProps) {
             >
               <span className="oa-tier-top">
                 <span className="oa-tier-name">{TIER[t].label}</span>
-                <span className="oa-tier-tag">{TIER_TAG[t]}</span>
+                <span className="oa-tier-tag">{tr(`tier.${t}.tag`)}</span>
               </span>
-              <p>{TIER_LINE[t]}</p>
+              <p>{tr(`tier.${t}.line`)}</p>
               {est ? (
                 <p className="oa-tier-price">
-                  Most studios: {formatINRCompact(est.lowPaise)}–{formatINRCompact(est.highPaise)} for your flat, with GST
+                  {tr('est.most', { range: `${formatINRCompact(est.lowPaise)}–${formatINRCompact(est.highPaise)}` })}
                 </p>
               ) : null}
             </button>
           );
         })}
       </div>
-      <p className="oa-note">This sets the materials, not a fixed price. Your quotes show the exact figure for your flat.</p>
+      <p className="oa-note">{tr('q3.note')}</p>
     </>
   );
 }
 
 function StyleStep({ brief, update }: StepProps) {
+  const tr = useT();
   const picked = brief.styleLikes;
   return (
     <>
-      <h1 className="oa-title">Which of these feel like your home?</h1>
+      <h1 className="oa-title">{tr('q4.h1')}</h1>
       <div className="flex items-baseline justify-between gap-3">
         <p className="oa-sub" style={{ margin: 0 }}>
-          Pick two or three, on instinct.
+          {tr('q4.sub')}
         </p>
         <span className="oa-meta" style={{ color: 'var(--accent-ink)' }}>
-          {picked.length} of 3
+          {tr('q4.count', { n: picked.length })}
         </span>
       </div>
       <div className="oa-grid3">
@@ -457,6 +453,7 @@ function StyleStep({ brief, update }: StepProps) {
 }
 
 function HouseholdStep({ brief, update }: StepProps) {
+  const tr = useT();
   const h = brief.household ?? {
     adults: 2,
     children: 0,
@@ -509,19 +506,20 @@ function HouseholdStep({ brief, update }: StepProps) {
   );
   return (
     <>
-      <h1 className="oa-title">Who’s going to live there?</h1>
+      <h1 className="oa-title">{tr('q5.h1')}</h1>
       <div className="oa-list">
-        {counter('adults', 'Adults', '18 and over', 1)}
-        {counter('children', 'Children', 'Under 18', 0)}
-        {counter('elderly', 'Parents or elderly', 'We plan for grab rails and easy reach', 0)}
-        {toggle('pets', 'Pets', 'Scratch-proof fabrics and finishes')}
-        {toggle('worksFromHome', 'Someone works from home', 'A quiet corner with a proper desk')}
+        {counter('adults', tr('q5.adults'), tr('q5.adults.sub'), 1)}
+        {counter('children', tr('q5.children'), tr('q5.children.sub'), 0)}
+        {counter('elderly', tr('q5.elderly'), tr('q5.elderly.sub'), 0)}
+        {toggle('pets', tr('q5.pets'), tr('q5.pets.sub'))}
+        {toggle('worksFromHome', tr('q5.wfh'), tr('q5.wfh.sub'))}
       </div>
     </>
   );
 }
 
 function PriorityStep({ brief, update }: StepProps) {
+  const tr = useT();
   const ranking = brief.priorityRanking;
   const tap = (p: PriorityFactor) =>
     update({
@@ -530,8 +528,8 @@ function PriorityStep({ brief, update }: StepProps) {
   const first = PRIORITIES.find((p) => p.value === ranking[0]);
   return (
     <>
-      <h1 className="oa-title">What matters most to you here?</h1>
-      <p className="oa-sub">Tap them in order, most important first.</p>
+      <h1 className="oa-title">{tr('q6.h1')}</h1>
+      <p className="oa-sub">{tr('q6.sub')}</p>
       <div className="oa-list">
         {PRIORITIES.map((p) => {
           const at = ranking.indexOf(p.value);
@@ -547,9 +545,9 @@ function PriorityStep({ brief, update }: StepProps) {
               <span className={`oa-rank${at >= 0 ? ' on' : ''}`}>{at >= 0 ? at + 1 : ''}</span>
               <span>
                 <span className="oa-row-title" style={at >= 0 ? { color: 'var(--accent-ink)' } : undefined}>
-                  {p.title}
+                  {tr(`prio.${p.value}`)}
                 </span>
-                <span className="oa-row-sub">{p.sub}</span>
+                <span className="oa-row-sub">{tr(`prio.${p.value}.sub`)}</span>
               </span>
             </button>
           );
@@ -558,7 +556,7 @@ function PriorityStep({ brief, update }: StepProps) {
       {ranking.length > 0 ? (
         <div className="flex items-center justify-between">
           <span className="oa-label accent" style={{ margin: 0 }}>
-            {first ? `${first.title} first` : ''}
+            {first ? tr('q6.first', { x: tr(`prio.${first.value}`) }) : ''}
           </span>
           <button
             type="button"
@@ -566,7 +564,7 @@ function PriorityStep({ brief, update }: StepProps) {
             style={{ textDecoration: 'underline', fontSize: 14 }}
             onClick={() => update({ priorityRanking: [] })}
           >
-            Start over
+            {tr('q6.startOver')}
           </button>
         </div>
       ) : null}
@@ -575,9 +573,10 @@ function PriorityStep({ brief, update }: StepProps) {
 }
 
 function InvolvementStep({ brief, update }: StepProps) {
+  const tr = useT();
   return (
     <>
-      <h1 className="oa-title">How involved do you want to be?</h1>
+      <h1 className="oa-title">{tr('q7.h1')}</h1>
       <div className="oa-list" role="radiogroup" aria-label="Involvement">
         {INVOLVEMENT.map((o) => (
           <button
@@ -589,8 +588,8 @@ function InvolvementStep({ brief, update }: StepProps) {
             onClick={() => update({ involvement: o.value })}
           >
             <span>
-              <span className="oa-row-title">{o.title}</span>
-              <span className="oa-row-sub">{o.sub}</span>
+              <span className="oa-row-title">{tr(`inv.${o.value}`)}</span>
+              <span className="oa-row-sub">{tr(`inv.${o.value}.sub`)}</span>
             </span>
             <span className="oa-radio" />
           </button>
@@ -627,16 +626,17 @@ function useOptionEstimates(brief: Brief, patches: Partial<Brief>[]): (EstimateR
 }
 
 function RunningEstimate({ brief }: { brief: Brief }) {
+  const tr = useT();
   const data = useAppData();
   const est = useEstimate(brief, data);
   if (!est) return null;
   return (
     <div className="oa-estimate" aria-live="polite">
-      <span>Your home, so far</span>
+      <span>{tr('est.label')}</span>
       <b>
         {formatINRCompact(est.lowPaise)}–{formatINRCompact(est.highPaise)}
       </b>
-      <small>What most of {est.studios} studios would quote, with GST. It firms up with every answer.</small>
+      <small>{tr('est.note', { n: est.studios })}</small>
     </div>
   );
 }

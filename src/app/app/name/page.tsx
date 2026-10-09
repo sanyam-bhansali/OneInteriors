@@ -4,19 +4,21 @@
 
 import { useRouter } from 'next/navigation';
 import { Body, Cta, Foot, Frame, Head, useBrief } from '@/components/app/ui';
+import { useT } from '@/components/app/i18n';
 
 export default function AppName() {
   const router = useRouter();
+  const t = useT();
   const [brief, update] = useBrief();
   const name = brief?.contactName ?? '';
 
   return (
     <Frame>
-      <Head back="/app" meta="Before we start" />
+      <Head back="/app" meta={t('name.meta')} />
       <Body>
-        <h1 className="oa-title">First, what should we call you?</h1>
+        <h1 className="oa-title">{t('name.h1')}</h1>
         <label className="oa-label" htmlFor="oa-name">
-          Your first name
+          {t('name.label')}
         </label>
         <input
           id="oa-name"
@@ -31,11 +33,11 @@ export default function AppName() {
             if (e.key === 'Enter' && name.trim()) router.push('/app/q/1');
           }}
         />
-        <p className="oa-note">No phone number or email yet. We only ask for those when your quotes are ready.</p>
+        <p className="oa-note">{t('name.note')}</p>
       </Body>
       <Foot>
         <Cta href="/app/q/1" disabled={!name.trim()}>
-          Continue
+          {t('common.continue')}
         </Cta>
       </Foot>
     </Frame>

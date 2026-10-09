@@ -11,6 +11,7 @@ import { useState } from 'react';
 import { Body, Cta, Foot, Frame, Head, useBrief } from '@/components/app/ui';
 import { styleDna, whatsappShare } from '@/modules/brief/style-dna';
 import { localityLabel, type Brief } from '@/modules/brief/types';
+import { useLang, useT } from '@/components/app/i18n';
 
 const HOMES: Record<string, string> = {
   BHK_1: '1 BHK',
@@ -37,6 +38,8 @@ function livedIn(brief: Brief): string | null {
 export default function StyleDnaScreen() {
   const [brief] = useBrief();
   const [shared, setShared] = useState(false);
+  const t = useT();
+  const lang = useLang();
   if (!brief) return <Frame>{null}</Frame>;
 
   const dna = styleDna(brief.styleLikes);
@@ -58,9 +61,9 @@ export default function StyleDnaScreen() {
 
   const [lead, second] = dna.shares;
   const leaning =
-    `Your home leans ${lead!.label}` +
-    (second ? `, with ${second.label} touches.` : '.') +
-    ` Think ${dna.materials.map((m) => m.toLowerCase()).join(', ')}.`;
+    (second ? t('style.leans', { lead: lead!.label, second: second.label }) : t('style.leansOne', { lead: lead!.label })) +
+    ' ' +
+    t('style.think', { materials: dna.materials.map((m) => m.toLowerCase()).join(', ') });
   const where = [localityLabel(brief.locality), brief.propertyType ? HOMES[brief.propertyType] : null].filter(Boolean).join(' · ');
 
   const share = async () => {
@@ -80,9 +83,9 @@ export default function StyleDnaScreen() {
 
   return (
     <Frame>
-      <Head back="/app/q/7" meta="Your answers, in one picture" />
+      <Head back="/app/q/7" meta={t('style.meta')} />
       <Body>
-        <h1 className="oa-title">This is your style DNA{name ? `, ${name}` : ''}.</h1>
+        <h1 className="oa-title">{t('style.h1', { name: name ? `, ${name}` : '' })}</h1>
 
         <section className="oa-dna" aria-label="Your style DNA">
           <div className="bar" aria-hidden>
@@ -110,15 +113,15 @@ export default function StyleDnaScreen() {
             ))}
           </div>
           <p className="words">
-            {leaning} {livedIn(brief) ?? ''}
+            {leaning} {lang === 'en' ? (livedIn(brief) ?? '') : ''}
           </p>
           {where ? <p className="where">{where}</p> : null}
         </section>
 
         <button type="button" className="oa-share-row" onClick={share}>
           <span>
-            <b>{shared ? 'Shared' : 'Share your style with family'}</b>
-            <small>Only the styles and colours. No name, flat or number.</small>
+            <b>{shared ? t('style.shared') : t('style.share')}</b>
+            <small>{t('style.share.sub')}</small>
           </span>
           <span className="go" aria-hidden>
             ↗
@@ -126,7 +129,7 @@ export default function StyleDnaScreen() {
         </button>
       </Body>
       <Foot>
-        <Cta href="/app/matches">See studios that match my style</Cta>
+        <Cta href="/app/matches">{t('style.cta')}</Cta>
       </Foot>
     </Frame>
   );

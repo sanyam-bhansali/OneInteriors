@@ -21,8 +21,8 @@ import { submitContactAction } from '@/app/quiz/actions';
 import { requestOtpAction, verifyOtpAction } from '@/app/sign-in/actions';
 import { useAppData } from '@/components/app/useAppData';
 import type { AppData } from '../data';
+import { useT } from '@/components/app/i18n';
 
-const COUNT = ['No', 'One', 'Two', 'Three'];
 const RESEND_S = 30;
 
 export function VerifyScreen({ data }: { data: AppData }) {
@@ -31,6 +31,7 @@ export function VerifyScreen({ data }: { data: AppData }) {
   const { brief, matches } = useJourney(data);
   const n = matches.length;
   const [phone, setPhone] = useState('');
+  const t = useT();
   const [code, setCode] = useState('');
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [wait, setWait] = useState(0);
@@ -91,13 +92,13 @@ export function VerifyScreen({ data }: { data: AppData }) {
 
   return (
     <Frame>
-      <Head back="/app/matches" meta="Quotes ready" />
+      <Head back="/app/matches" meta={t('verify.meta')} />
       <Body>
-        <h1 className="oa-title">{n === 1 ? 'Your quote is' : `Your ${n || ''} quotes are`} ready. Where should we send them?</h1>
-        <p className="oa-sub">Your number also saves everything, so you can come back any time.</p>
+        <h1 className="oa-title">{t('verify.h1', { n: n || '' })}</h1>
+        <p className="oa-sub">{t('verify.sub')}</p>
 
         <label className="oa-label" htmlFor="oa-phone">
-          Mobile number
+          {t('verify.mobile')}
         </label>
         <div className="flex items-end gap-3">
           <span className="oa-input mono" style={{ width: 'auto', color: 'var(--ink-2)' }} aria-hidden>
@@ -118,7 +119,7 @@ export function VerifyScreen({ data }: { data: AppData }) {
         {sentTo && !changed ? (
           <>
             <label className="oa-label" htmlFor="oa-code">
-              6-digit code sent on WhatsApp
+              {t('verify.code')}
             </label>
             <input
               id="oa-code"
@@ -132,10 +133,10 @@ export function VerifyScreen({ data }: { data: AppData }) {
             />
             <p className="oa-note">
               {wait > 0 ? (
-                `Didn’t get it? Ask for a new code in 0:${String(wait).padStart(2, '0')}`
+                t('verify.wait', { s: String(wait).padStart(2, '0') })
               ) : (
                 <button type="button" className="oa-inline-link" onClick={send} disabled={busy}>
-                  Send a new code
+                  {t('verify.resend')}
                 </button>
               )}
             </p>
@@ -143,7 +144,7 @@ export function VerifyScreen({ data }: { data: AppData }) {
           </>
         ) : (
           <button type="button" className="oa-cta outline" onClick={send} disabled={!normal || busy}>
-            {changed ? 'Send a code to this number' : 'Send me a code on WhatsApp'}
+            {changed ? t('verify.sendThis') : t('verify.send')}
           </button>
         )}
 
@@ -158,10 +159,9 @@ export function VerifyScreen({ data }: { data: AppData }) {
               className="mt-1 h-5 w-5 accent-[var(--accent)]"
             />
             <span className="text-[15px] leading-[1.45]">
-              Share my home details and answers with {n === 1 ? 'this studio' : `these ${COUNT[n]?.toLowerCase() ?? n} studios`}{' '}
-              so they can quote. I agree to the{' '}
+              {t('verify.consent')}{' '}
               <a href="/privacy" className="underline" style={{ color: 'var(--accent-ink)' }}>
-                privacy policy
+                {t('verify.privacy')}
               </a>
               .
             </span>
@@ -173,7 +173,7 @@ export function VerifyScreen({ data }: { data: AppData }) {
               onChange={(e) => setWhatsapp(e.target.checked)}
               className="mt-1 h-5 w-5 accent-[var(--accent)]"
             />
-            <span className="text-[15px] leading-[1.45] text-[var(--ink-2)]">Send me tips and offers on WhatsApp too (optional)</span>
+            <span className="text-[15px] leading-[1.45] text-[var(--ink-2)]">{t('verify.tips')}</span>
           </label>
         </div>
 
@@ -184,9 +184,9 @@ export function VerifyScreen({ data }: { data: AppData }) {
         ) : null}
       </Body>
       <Foot>
-        {sentTo && !agreed ? <p className="oa-foot-note">Tick the first box to continue</p> : null}
+        {sentTo && !agreed ? <p className="oa-foot-note">{t('verify.tick')}</p> : null}
         <Cta onClick={verify} disabled={!ready}>
-          Verify and see my quotes
+          {t('verify.cta')}
         </Cta>
       </Foot>
     </Frame>

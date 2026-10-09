@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useSyncExternalStore, type ReactNode } from 'react';
 import { loadBrief, saveBrief } from '@/modules/brief/store';
+import { useT } from './i18n';
 import type { Brief } from '@/modules/brief/types';
 
 export function Frame({ children, dark = false }: { children: ReactNode; dark?: boolean }) {
@@ -124,23 +125,24 @@ export function useBrief(): [Brief | null, (patch: Partial<Brief>) => void] {
 // middle, so there is no floating button over the screens.
 
 const TABS = [
-  { href: '/app/home', label: 'Home', icon: <HomeIcon />, also: [] as string[] },
-  { href: '/app/project', label: 'Project', icon: <ListIcon />, also: ['/app/snags', '/app/decision'] },
-  { href: '/app/geio', label: 'GEIO', icon: null, also: [] },
-  { href: '/app/site', label: 'Site', icon: <CameraIcon />, also: ['/app/3d'] },
-  { href: '/app/me', label: 'Me', icon: <PersonIcon />, also: ['/app/locker', '/app/notifications'] },
-];
+  { href: '/app/home', label: 'tab.home', icon: <HomeIcon />, also: [] as string[] },
+  { href: '/app/project', label: 'tab.project', icon: <ListIcon />, also: ['/app/snags', '/app/decision'] },
+  { href: '/app/geio', label: 'tab.geio', icon: null, also: [] },
+  { href: '/app/site', label: 'tab.site', icon: <CameraIcon />, also: ['/app/3d', '/app/story'] },
+  { href: '/app/me', label: 'tab.me', icon: <PersonIcon />, also: ['/app/locker', '/app/notifications', '/app/coins', '/app/family', '/app/dream', '/app/refer'] },
+] as const;
 
 export function Tabs() {
   const path = usePathname();
+  const t = useT();
   return (
     <nav className="oa-tabs" aria-label="Your project">
-      {TABS.map((t) => {
-        const here = path === t.href || t.also.some((a) => path?.startsWith(a));
+      {TABS.map((tab) => {
+        const here = path === tab.href || tab.also.some((a) => path?.startsWith(a));
         return (
-          <Link key={t.href} href={t.href} className={`oa-tab${t.icon ? '' : ' geio'}`} aria-current={here ? 'page' : undefined}>
-            {t.icon ?? <span className="oa-orb" aria-hidden />}
-            {t.label}
+          <Link key={tab.href} href={tab.href} className={`oa-tab${tab.icon ? '' : ' geio'}`} aria-current={here ? 'page' : undefined}>
+            {tab.icon ?? <span className="oa-orb" aria-hidden />}
+            {t(tab.label)}
           </Link>
         );
       })}

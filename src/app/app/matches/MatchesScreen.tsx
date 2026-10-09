@@ -21,13 +21,14 @@ import { TIER, TIERS, tierRangeFor, type Tier } from '@/modules/quotation/tiers'
 import { formatINRCompact } from '@/lib/money';
 import { useAppData } from '@/components/app/useAppData';
 import type { AppData } from '../data';
+import { useT } from '@/components/app/i18n';
 
-const WORDS = ['No studios', 'One studio', 'Two studios', 'Three studios'];
 
 export function MatchesScreen({ data }: { data: AppData }) {
   const router = useRouter();
   const [brief, update] = useBrief();
   const [tier, setTier] = useState<Tier | null>(null);
+  const t = useT();
   const shown: Tier = tier ?? brief?.tier ?? 'PREMIUM';
 
   const { matches, quotes } = useMemo(() => {
@@ -82,22 +83,23 @@ export function MatchesScreen({ data }: { data: AppData }) {
         back="/app/style"
         meta={
           <Link href="/app/q/1" className="oa-head-link">
-            Edit my answers
+            {t('matches.edit')}
           </Link>
         }
       />
       <Body>
         <p className="oa-note">
-          {listed} verified studios in Pune · {matches.length} matched for you
+          {t('matches.count', { n: listed, m: matches.length })}
         </p>
         <h1 className="oa-title">
-          {WORDS[matches.length] ?? `${matches.length} studios`}, scored on your brief. Never on who paid.
+          {t('matches.h1', { count: t('matches.studios', { n: matches.length }) })}
         </h1>
 
         <TierSwitch value={shown} onChange={setTier} />
         <p className="oa-note">
-          {chose && shown !== brief.tier ? `You chose ${chose}. These are the best matches if you go ${TIER[shown].label}` : `Best matches for ${TIER[shown].label}`}
-          , at about {rangeWords} for your flat before GST.
+          {chose && shown !== brief.tier
+            ? t('matches.if', { chose, tier: TIER[shown].label, range: rangeWords })
+            : t('matches.best', { tier: TIER[shown].label, range: rangeWords })}
         </p>
 
         <div className="oa-list">
@@ -120,20 +122,20 @@ export function MatchesScreen({ data }: { data: AppData }) {
                     <p className="oa-match-why">{studio.about.split(/(?<=[.;])\s/)[0]}</p>
                     {q ? (
                       <p className="oa-match-range">
-                        {formatINRCompact(q.lowPaise)}–{formatINRCompact(q.highPaise)} for your brief
+                        {t('matches.range', { range: `${formatINRCompact(q.lowPaise)}–${formatINRCompact(q.highPaise)}` })}
                       </p>
                     ) : null}
                   </div>
                 </div>
                 <div className="oa-chips mt-3">
                   <span className="oa-chip small static">
-                    {passed}/{counted.length} checks
+                    {t('matches.checks', { a: passed, b: counted.length })}
                   </span>
                   {late ? <span className="oa-chip small static">{late}</span> : null}
                 </div>
                 {reasons.length > 0 ? (
                   <>
-                    {i === 0 ? <p className="oa-label">Why they suit you</p> : null}
+                    {i === 0 ? <p className="oa-label">{t('matches.why')}</p> : null}
                     <ul className="oa-bullets">
                       {reasons.map((r) => (
                         <li key={r}>{r}</li>
@@ -141,15 +143,15 @@ export function MatchesScreen({ data }: { data: AppData }) {
                     </ul>
                   </>
                 ) : null}
-                <span className="oa-match-more">See their homes, checks and record</span>
+                <span className="oa-match-more">{t('matches.more')}</span>
               </Link>
             );
           })}
         </div>
         <Link href="/app/studios" className="oa-share-row" style={{ textDecoration: 'none' }}>
           <span>
-            <b>See all {listed} verified studios</b>
-            <small>Filter by area, style and budget</small>
+            <b>{t('matches.all', { n: listed })}</b>
+            <small>{t('matches.all.sub')}</small>
           </span>
           <span className="go" aria-hidden>
             →
@@ -157,7 +159,7 @@ export function MatchesScreen({ data }: { data: AppData }) {
         </Link>
       </Body>
       <Foot>
-        <Cta onClick={go}>Get quotes from {matches.length === 1 ? 'this studio' : `these ${matches.length}`}</Cta>
+        <Cta onClick={go}>{matches.length === 1 ? t('matches.ctaOne') : t('matches.cta', { n: matches.length })}</Cta>
       </Foot>
     </Frame>
   );

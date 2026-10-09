@@ -14,6 +14,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useLang } from '@/components/app/i18n';
 import { CameraIcon, Chevron, Frame, MicIcon, SendIcon, useBrief } from '@/components/app/ui';
 import { TODAY } from '@/modules/app/example-project';
 import { STYLE_LABELS } from '@/modules/brief/types';
@@ -153,7 +154,10 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
   const router = useRouter();
   const [brief] = useBrief();
   const name = brief?.contactName?.trim() || 'Priya';
-  const [lang, setLang] = useState<Lang>('en');
+  // GEIO starts in the app's language (picked on Welcome or in Me); its own switch still changes it.
+  const appLang = useLang();
+  const [lang, setLang] = useState<Lang>(appLang);
+  useEffect(() => setLang(appLang), [appLang]);
   const [text, setText] = useState('');
   const [turns, setTurns] = useState<Turn[]>([]);
   const [part, setPart] = useState('evening');

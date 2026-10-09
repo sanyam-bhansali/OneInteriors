@@ -20,6 +20,7 @@ import { ARCHITECT } from '@/modules/consultation/architect';
 import { localityLabel } from '@/modules/brief/types';
 import { TIER } from '@/modules/quotation/tiers';
 import { walletAction } from '../engage/actions';
+import { LangPicker, useT } from '@/components/app/i18n';
 
 const HOMES: Record<string, string> = { BHK_1: '1 BHK', BHK_2: '2 BHK', BHK_3: '3 BHK', BHK_4_PLUS: '4+ BHK', VILLA: 'Villa' };
 const expert = ARCHITECT.name.split(' ')[0];
@@ -32,6 +33,7 @@ export default function AppMe() {
   const mine = useMyProject();
   const [me, setMe] = useState<Me | undefined>(undefined);
   const [unread, setUnread] = useState(0);
+  const t = useT();
   const [coins, setCoins] = useState<{ balance: number; streak: number } | null>(null);
 
   useEffect(() => {
@@ -68,7 +70,7 @@ export default function AppMe() {
   return (
     <Frame>
       <header className="oa-page-head">
-        <h1>Me</h1>
+        <h1>{t('me.h1')}</h1>
       </header>
       <main className="oa-body">
         <section className="oa-me">
@@ -76,7 +78,7 @@ export default function AppMe() {
             {(name ?? '?').charAt(0).toUpperCase()}
           </span>
           <div>
-            <b>{name ?? (me === null ? 'Not signed in' : ' ')}</b>
+            <b>{name ?? (me === null ? t('me.notSignedIn') : ' ')}</b>
             {me?.phone ? <span className="mono">{me.phone}</span> : null}
           </div>
         </section>
@@ -89,33 +91,43 @@ export default function AppMe() {
         ) : null}
 
         <nav className="oa-list" aria-label="Your account">
-          <Row href="/app/locker" title="Home locker" sub="Agreement, drawings, receipts, warranties" />
+          <Row href="/app/locker" title={t('me.locker')} sub={t('me.locker.sub')} />
           <Row
             href="/app/notifications"
-            title="Notifications"
-            sub={unread ? `${unread} unread` : 'Site updates, decisions and payments'}
+            title={t('me.notifications')}
+            sub={unread ? t('me.unread', { n: unread }) : t('me.notifications.sub')}
             icon={<BellIcon />}
           />
           <Row
             href="/app/coins"
-            title="Home Coins"
-            sub={coins ? `${coins.balance.toLocaleString('en-IN')} coins${coins.streak ? ` · ${coins.streak}-day streak` : ''}` : 'Earn as your home comes together'}
+            title={t('me.coins')}
+            sub={
+              coins
+                ? `${t('me.coins.balance', { n: coins.balance.toLocaleString('en-IN') })}${coins.streak ? ` · ${t('me.streak', { n: coins.streak })}` : ''}`
+                : t('me.coins.sub')
+            }
           />
-          <Row href="/app/family" title="Family" sub="They see every update and vote on decisions" />
-          <Row href="/app/dream" title="Dream board" sub="Photos you love, shared with your studio" />
-          <Row href="/app/refer" title="Refer and earn" sub="Give 5,000, get 5,000" />
-          <Row href="/app/geio?ask=expert" title={`Ask ${expert}`} sub="Your One Interiors expert. She earns nothing from any studio." />
-          <Row href="/app/geio" title="Ask GEIO" sub="Anything about your home, in plain words" />
-          <Row href="/privacy" title="Privacy and your data" sub="What we keep, and how to have it removed" />
+          <Row href="/app/family" title={t('me.family')} sub={t('me.family.sub')} />
+          <Row href="/app/dream" title={t('me.dream')} sub={t('me.dream.sub')} />
+          <Row href="/app/refer" title={t('me.refer')} sub={t('me.refer.sub')} />
+          <Row href="/app/geio?ask=expert" title={t('me.expert', { expert })} sub={t('me.expert.sub')} />
+          <Row href="/app/geio" title={t('me.geio')} sub={t('me.geio.sub')} />
+          <Row href="/privacy" title={t('me.privacy')} sub={t('me.privacy.sub')} />
         </nav>
+
+        <section>
+          <p className="oa-label">{t('lang.label')}</p>
+          <LangPicker />
+          {t('me.draft') ? <p className="oa-note" style={{ marginTop: 8 }}>{t('me.draft')}</p> : null}
+        </section>
 
         {me ? (
           <button type="button" className="oa-cta outline" onClick={() => void signOut()}>
-            Log out
+            {t('me.logout')}
           </button>
         ) : me === null ? (
           <Link href="/sign-in?next=/app/me" className="oa-cta">
-            Sign in
+            {t('me.signIn')}
           </Link>
         ) : null}
         <p className="oa-note" style={{ textAlign: 'center' }}>

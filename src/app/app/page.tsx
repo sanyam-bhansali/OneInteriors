@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Logotype } from '@/components/brand';
 import { Frame, Foot, Cta } from '@/components/app/ui';
 import { VERIFIED_STUDIOS } from '@/lib/claims';
+import { LangPicker, useT } from '@/components/app/i18n';
 
 const SEEN = 'oa.opened';
 const DARK_MS = 1000;
@@ -23,6 +24,7 @@ const CLIP_MAX_MS = 4200;
 type Phase = 'dark' | 'clip' | 'logo' | 'done';
 
 export default function AppStart() {
+  const t = useT();
   const [phase, setPhase] = useState<Phase>('dark');
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -81,15 +83,16 @@ export default function AppStart() {
           <div className="copy">
             <p className="oa-meta" style={{ color: 'rgba(255,255,255,.85)', margin: 0 }}>
               <span className="oa-dot" />
-              Pune, {VERIFIED_STUDIOS} verified studios
+              {t('welcome.kicker', { n: VERIFIED_STUDIOS })}
             </p>
-            <h1>Find the right interior designer for your home.</h1>
-            <p>Seven questions, three studios matched to your flat, and a quote you can read line by line.</p>
+            <h1>{t('welcome.h1')}</h1>
+            <p>{t('welcome.sub')}</p>
+            <LangPicker dark />
           </div>
           <Foot>
-            <Cta href="/app/name">Find your designer</Cta>
+            <Cta href="/app/name">{t('welcome.cta')}</Cta>
             <Link href="/sign-in?next=/app/home" className="oa-link" style={{ color: '#fff' }}>
-              I already have an account
+              {t('welcome.have')}
             </Link>
           </Foot>
         </section>
