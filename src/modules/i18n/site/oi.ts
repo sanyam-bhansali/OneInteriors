@@ -56,6 +56,13 @@ export const OI_DICT = {
   'sketch.bed3': { en: 'Bed 3', hi: 'बेड 3', mr: 'बेड 3' },
   'sketch.living': { en: 'Living & dining', hi: 'लिविंग और डाइनिंग', mr: 'लिव्हिंग आणि डायनिंग' },
   'sketch.bath': { en: 'Bath', hi: 'बाथ', mr: 'बाथ' },
+  'sketch.bed4': { en: 'Bed 4', hi: 'बेड 4', mr: 'बेड 4' },
+  'sketch.balcony': { en: 'Balcony', hi: 'बालकनी', mr: 'बाल्कनी' },
+  'sketch.note': {
+    en: 'A typical {bhk} BHK, furnished in your style. Not your floor plan — the studio measures that.',
+    hi: 'एक आम {bhk} BHK, आपकी स्टाइल में सजा हुआ। यह आपका फ़्लोर प्लान नहीं है — वह स्टूडियो नापकर बनाएगा।',
+    mr: 'एक साधारण {bhk} BHK, तुमच्या स्टाइलमध्ये सजवलेले. हा तुमचा फ्लोअर प्लॅन नाही — तो स्टुडिओ मोजून बनवेल.',
+  },
   'sketch.kitchen': { en: 'Kitchen', hi: 'किचन', mr: 'किचन' },
   'sketch.adult': { en: '{n} adult', hi: '{n} बड़ा', mr: '{n} मोठी व्यक्ती' },
   'sketch.adults': { en: '{n} adults', hi: '{n} बड़े', mr: '{n} मोठी माणसं' },
