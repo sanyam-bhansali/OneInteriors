@@ -48,9 +48,9 @@ unaffected version.
 ### `sharp` → `^0.35.5`
 
 Next depends on `sharp@0.34.5`, which inherits four libvips CVEs
-(**GHSA-f88m-g3jw-g9cj**: CVE-2026-33327, -33328, -35590, -35591), and `<0.35.5` carries a librsvg CVE (**GHSA-wq5f-xc86-pv6w**,
-CVE-2026-96889). `0.35.5` is
-patched and API-compatible for Next's image optimisation use.
+(**GHSA-f88m-g3jw-g9cj**: CVE-2026-33327, -33328, -35590, -35591), and
+`<0.35.5` carries a librsvg CVE (**GHSA-wq5f-xc86-pv6w**, CVE-2026-96889).
+`0.35.5` is patched and API-compatible for Next's image optimisation use.
 
 Relevant to us because milestone site photos and studio portfolios are
 user-uploaded images that will pass through image processing. This is not a
