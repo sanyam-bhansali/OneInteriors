@@ -2853,3 +2853,9 @@ html:is([lang='hi'], [lang='mr']) :is(h1, h2, h3, .oi-display) {
 html:is([lang='hi'], [lang='mr']) .split .w {
   padding-block: 0.08em;
 }
+
+/* The focus ring follows a pill's shape instead of squaring it off. */
+.oi-landing .rounded-full:focus-visible,
+.oi-app .rounded-full:focus-visible {
+  border-radius: 9999px;
+}

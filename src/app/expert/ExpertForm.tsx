@@ -391,7 +391,7 @@ export function ExpertForm({
                 inputMode="tel"
                 autoComplete="tel-national"
                 placeholder="98765 43210"
-                className="oi-num w-full rounded-full border border-[var(--line)] bg-[var(--bg)] px-5 py-3 text-[15px] text-[var(--ink)]"
+                className="w-full rounded-full border border-[var(--line)] bg-[var(--bg)] px-5 py-3 text-[15px] font-normal tabular-nums text-[var(--ink)]"
               />
             </label>
             {editing && name.trim() && phoneOk ? (
@@ -410,7 +410,7 @@ export function ExpertForm({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="m-0 text-[16px] text-[var(--ink)]">
               <span className="font-medium">{name}</span>
-              <span className="oi-num ml-3 text-[15px] text-[var(--ink2)]">+91 {phone}</span>
+              <span className="ml-3 text-[15px] font-normal tabular-nums text-[var(--ink2)]">+91 {phone}</span>
             </p>
             <button
               type="button"
@@ -440,7 +440,7 @@ export function ExpertForm({
                 autoComplete="one-time-code"
                 maxLength={6}
                 placeholder="······"
-                className="oi-num w-full rounded-full border border-[var(--line)] bg-[var(--bg)] px-5 py-3 text-center text-[20px] tracking-[0.4em] text-[var(--ink)]"
+                className="w-full rounded-full border border-[var(--line)] bg-[var(--bg)] px-5 py-3 text-center font-normal tabular-nums text-[20px] tracking-[0.4em] text-[var(--ink)]"
               />
             </label>
             <p className="m-0 mt-3 text-[13px] text-[var(--ink2)]">
