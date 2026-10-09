@@ -137,7 +137,7 @@ export const QUIZ_DICT = {
   },
 
   // ── Possession ─────────────────────────────────────────────
-  'poss.title': { en: 'Last one — do you have possession yet?', hi: 'आखिरी सवाल — क्या पज़ेशन मिल गया है?', mr: 'शेवटचा प्रश्न — पझेशन मिळाले आहे का?' },
+  'poss.title': { en: 'Do you have possession yet?', hi: 'क्या पज़ेशन मिल गया है?', mr: 'पझेशन मिळाले आहे का?' },
   'poss.hint': {
     en: 'Work starts from the day you get the keys, so everything we plan counts from there.',
     hi: 'काम चाबी मिलने के दिन से शुरू होता है, इसलिए हमारी पूरी प्लानिंग वहीं से गिनी जाती है।',

@@ -2195,3 +2195,9 @@ a.foot-pill:hover {
 .cb .pill.pill-wrap .roll > span::after {
   width: 100%;
 }
+/* Room for descenders: a word's mask was cutting the tails off p, g and y
+   ("re-prices" on the quote). The negative margin keeps the line spacing. */
+.cb .split .w {
+  padding-bottom: 0.2em;
+  margin-bottom: -0.2em;
+}

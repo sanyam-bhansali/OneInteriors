@@ -293,7 +293,12 @@ export function Building({
               ) : null}
             </div>
 
-            <h2 className="m-0 mb-5 text-[clamp(1.25rem,1.05rem+0.8vw,1.6rem)] font-medium leading-[1.2] tracking-[-0.025em]">
+            {/* Margin inline: a site-wide heading rule was winning over the utility
+                and the question sat on top of its first answer. */}
+            <h2
+              className="text-[clamp(1.25rem,1.05rem+0.8vw,1.6rem)] font-medium leading-[1.25] tracking-[-0.025em]"
+              style={{ margin: '0 0 20px' }}
+            >
               {question.ask}
             </h2>
 
