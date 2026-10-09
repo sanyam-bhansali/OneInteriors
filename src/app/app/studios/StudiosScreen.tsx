@@ -14,9 +14,8 @@ import { filedRatesFor } from '@/data/filed-rates';
 import { scoreMatch } from '@/modules/matching/score';
 import { localityLabel } from '@/modules/brief/types';
 import { TIER, TIERS, type Tier } from '@/modules/quotation/tiers';
-import { lateness } from '@/modules/app/journey';
+import { lateness, listedStudios } from '@/modules/app/journey';
 import { useAppData } from '@/components/app/useAppData';
-import { listedStudios } from '../matches/MatchesScreen';
 import type { AppData } from '../data';
 
 type Filter = 'ALL' | 'NEAR' | Tier;

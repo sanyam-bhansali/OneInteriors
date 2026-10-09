@@ -12,6 +12,7 @@ import { Timeline } from './Timeline';
 import { BriefPanel } from './BriefPanel';
 import { Duplicates } from './Duplicates';
 import { LogContact } from './LogContact';
+import { FinalQuote } from './FinalQuote';
 
 export const metadata: Metadata = {
   title: 'Lead',
@@ -106,6 +107,12 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             {brief ? (
               <div className="mb-5">
                 <BriefPanel ctx={brief} />
+              </div>
+            ) : null}
+
+            {client.fromMarketplace ? (
+              <div className="mb-5">
+                <FinalQuote clientId={client.id} />
               </div>
             ) : null}
 

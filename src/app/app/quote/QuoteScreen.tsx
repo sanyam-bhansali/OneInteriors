@@ -18,11 +18,10 @@ import { useJourney } from '@/components/app/useJourney';
 import { formatINR, formatINRCompact } from '@/lib/money';
 import { useAppData } from '@/components/app/useAppData';
 import { filedRatesFor } from '@/data/filed-rates';
-import { quotesForStudios } from '@/modules/app/journey';
+import { listedStudios, quotesForStudios } from '@/modules/app/journey';
 import { puneRanges, type LineRange } from '@/modules/app/pune-range';
 import { CATALOGUE, GST_BPS, MODULAR_DISCOUNT_BPS, PROFESSIONAL_FEE_BPS, ROOM_LABELS } from '@/modules/quotation/catalogue';
 import type { FirstQuote, QuoteLine } from '@/modules/quotation/first-quote';
-import { listedStudios } from '../matches/MatchesScreen';
 import type { AppData } from '../data';
 
 const VALID_DAYS = 30;

@@ -12,6 +12,7 @@ import {
   type SaveLineInput,
 } from '@/modules/studio-quote/quotes';
 import { isConfigName, type HomeConfig } from '@/modules/studio-quote/configure';
+import { finalQuoteForClient } from '@/modules/studio-quote/final';
 
 // `State` and `IDLE` live in studio/form-state.ts. A 'use server'
 // file may only export async functions — and Turbopack rejects even a
@@ -141,4 +142,16 @@ export async function clearLinesAction(quoteId: string): Promise<State> {
   if (!result.ok) return result;
   refresh(quoteId);
   return { ok: true };
+}
+
+/**
+ * The final quote for a client One Interiors introduced: opens the one that
+ * exists, or starts it from the standard build, linked so the customer can
+ * read and sign it in the app once it is issued.
+ */
+export async function finalQuoteAction(clientId: string): Promise<State> {
+  const result = await finalQuoteForClient(clientId);
+  if (!result.ok) return result;
+  refresh(result.id);
+  redirect(`/studio/quotations/${result.id}`);
 }

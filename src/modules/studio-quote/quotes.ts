@@ -252,6 +252,12 @@ export interface NewQuoteInput {
   society?: string;
   config?: string;
   carpetSqft?: number;
+  /**
+   * A client One Interiors introduced: the quotation is their final quote,
+   * which the customer reads and signs in the app (v79 "Choose & sign").
+   * Callers must have checked the client is this studio's.
+   */
+  link?: { clientId: string; introductionId: string; briefId: string | null };
 }
 
 export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
@@ -294,6 +300,9 @@ export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
         society: input.society?.trim() || null,
         config: input.config?.trim() || null,
         carpetSqft: input.carpetSqft ?? null,
+        ...(input.link
+          ? { clientId: input.link.clientId, introductionId: input.link.introductionId, briefId: input.link.briefId }
+          : {}),
         // Snapshotted at creation. Changing the defaults in Settings later must
         // never rewrite a quotation already sent to a client.
         feeBps: branding.feeBps,

@@ -16,7 +16,7 @@ import { useMemo, useState } from 'react';
 import { Body, Cta, Foot, Frame, Head, useBrief } from '@/components/app/ui';
 import { filedRatesFor } from '@/data/filed-rates';
 import { carpetAreaFor } from '@/modules/brief/steps';
-import { lateness, quotesFor, topMatches } from '@/modules/app/journey';
+import { lateness, listedStudios, quotesFor, topMatches } from '@/modules/app/journey';
 import { TIER, TIERS, tierRangeFor, type Tier } from '@/modules/quotation/tiers';
 import { formatINRCompact } from '@/lib/money';
 import { useAppData } from '@/components/app/useAppData';
@@ -163,11 +163,7 @@ export function MatchesScreen({ data }: { data: AppData }) {
   );
 }
 
-/** The studios a customer can be matched with: matching's own first filter (score.ts `failedFilter`). */
-export function listedStudios(data: AppData): AppData['studios'] {
-  return data.studios.filter((s) => !s.pausedAt && (data.allowUnverified || (s.status === 'ACTIVE' && s.tier !== 'UNVERIFIED')));
-}
-export function verifiedCount(data: AppData): number {
+function verifiedCount(data: AppData): number {
   return listedStudios(data).length;
 }
 

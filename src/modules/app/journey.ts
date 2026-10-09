@@ -34,6 +34,11 @@ function ratesOf(rates: Record<string, StudioRates>, fallback: (slug: string) =>
   return (slug: string) => rates[slug] ?? fallback(slug);
 }
 
+/** The studios a customer can be matched with: matching's own first filter (score.ts `failedFilter`). */
+export function listedStudios(data: { studios: Studio[]; allowUnverified: boolean }): Studio[] {
+  return data.studios.filter((s) => !s.pausedAt && (data.allowUnverified || (s.status === 'ACTIVE' && s.tier !== 'UNVERIFIED')));
+}
+
 /** The top studios for this brief, best first — the same ranking as /match. */
 export function topMatches(
   brief: Brief,

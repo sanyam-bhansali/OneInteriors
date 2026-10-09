@@ -7,8 +7,13 @@
  */
 
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { warmAppData } from '@/components/app/useAppData';
+import { useEffect, useMemo, useState } from 'react';
+import { useAppData, warmAppData } from '@/components/app/useAppData';
+import { filedRatesFor } from '@/data/filed-rates';
+import { estimateFor, studiosForTier, type EstimateRange } from '@/modules/app/estimate-range';
+import { formatINRCompact } from '@/lib/money';
+import { listedStudios } from '@/modules/app/journey';
+import type { AppData } from '../../data';
 import { Body, Cta, Foot, Frame, Head, Progress, useBrief } from '@/components/app/ui';
 import {
   PUNE_LOCALITIES,
@@ -189,6 +194,7 @@ export default function AppQuestion() {
       <Head back={back} meta={meta} />
       <Progress step={n} of={TOTAL} />
       <Body>
+        {n >= 2 ? <RunningEstimate brief={brief} /> : null}
         <Step n={n} brief={brief} update={update} />
       </Body>
       <Foot>
@@ -304,11 +310,12 @@ function HomeStep({ brief, update }: StepProps) {
 
 function ScopeStep({ brief, update }: StepProps) {
   const rooms = roomsFor(BEDROOMS[brief.propertyType ?? 'BHK_2']);
+  const about = useOptionEstimates(brief, SCOPES.map((o) => ({ scope: o.value, scopeRooms: [], excludedItems: [] })));
   return (
     <>
       <h1 className="oa-title">How much of it are we doing?</h1>
       <div className="oa-list" role="radiogroup" aria-label="Scope">
-        {SCOPES.map((s) => (
+        {SCOPES.map((s, i) => (
           <button
             key={s.value}
             type="button"
@@ -321,7 +328,12 @@ function ScopeStep({ brief, update }: StepProps) {
               <span className="oa-row-title">{s.title}</span>
               <span className="oa-row-sub">{s.sub}</span>
             </span>
-            <span className="oa-radio" />
+            <span className="oa-row-end">
+              {about[i] && s.value !== 'SINGLE_ROOM' && s.value !== 'RENOVATION' ? (
+                <span className="oa-row-price">about {formatINRCompact(about[i]!.midPaise)}</span>
+              ) : null}
+              <span className="oa-radio" />
+            </span>
           </button>
         ))}
       </div>
@@ -354,12 +366,14 @@ function ScopeStep({ brief, update }: StepProps) {
 
 function TierStep({ brief, update }: StepProps) {
   const { sqft } = carpetAreaFor(brief);
+  const per = useOptionEstimates(brief, TIERS.map((t) => ({ tier: t })));
   return (
     <>
       <h1 className="oa-title">What are you planning to spend?</h1>
       <div className="flex flex-col gap-2.5" role="radiogroup" aria-label="Finish level">
-        {TIERS.map((t) => {
+        {TIERS.map((t, i) => {
           const { lowPaise, highPaise } = tierRangeFor(t, sqft);
+          const est = per[i];
           return (
             <button
               key={t}
@@ -380,6 +394,11 @@ function TierStep({ brief, update }: StepProps) {
                 <span className="oa-tier-tag">{TIER_TAG[t]}</span>
               </span>
               <p>{TIER_LINE[t]}</p>
+              {est ? (
+                <p className="oa-tier-price">
+                  Most studios: {formatINRCompact(est.lowPaise)}–{formatINRCompact(est.highPaise)} for your flat, with GST
+                </p>
+              ) : null}
             </button>
           );
         })}
@@ -578,5 +597,46 @@ function InvolvementStep({ brief, update }: StepProps) {
         ))}
       </div>
     </>
+  );
+}
+
+// ── The running estimate (trust fix 3) ─────────────────────────
+
+/** Every listed studio, priced on the brief as answered so far. Null until the studios are here. */
+function useEstimate(brief: Brief, data: AppData | null): EstimateRange | null {
+  return useMemo(
+    () => (data ? estimateFor(brief, studiosForTier(listedStudios(data), brief.tier), data.rates, filedRatesFor) : null),
+    [brief, data],
+  );
+}
+
+/** The same estimate for each option on a step, as if it were chosen. */
+function useOptionEstimates(brief: Brief, patches: Partial<Brief>[]): (EstimateRange | null)[] {
+  const data = useAppData();
+  const key = JSON.stringify(patches);
+  return useMemo(() => {
+    if (!data) return patches.map(() => null);
+    const all = listedStudios(data);
+    return patches.map((p) => {
+      const b = { ...brief, ...p };
+      return estimateFor(b, studiosForTier(all, b.tier), data.rates, filedRatesFor);
+    });
+    // `key` stands for `patches`, which callers build fresh on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brief, data, key]);
+}
+
+function RunningEstimate({ brief }: { brief: Brief }) {
+  const data = useAppData();
+  const est = useEstimate(brief, data);
+  if (!est) return null;
+  return (
+    <div className="oa-estimate" aria-live="polite">
+      <span>Your home, so far</span>
+      <b>
+        {formatINRCompact(est.lowPaise)}–{formatINRCompact(est.highPaise)}
+      </b>
+      <small>What most of {est.studios} studios would quote, with GST. It firms up with every answer.</small>
+    </div>
   );
 }

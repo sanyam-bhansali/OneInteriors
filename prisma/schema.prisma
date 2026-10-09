@@ -1329,6 +1329,21 @@ model HomeProject {
   /// Stage keys marked done (TRACKER_STAGES).
   doneStages     String[]     @default([])
 
+  /// Set when the customer signed the studio's final quote in the app (v79
+  /// "Choose & sign"). Null on trackers ops started by hand before that.
+  signedAt      DateTime?
+  /// The StudioQuote they signed. Its issued lines are the locked price.
+  signedQuoteId String?   @unique
+  /// The locked total, GST included. The money the customer pays the studio
+  /// directly; One Interiors only keeps track of it.
+  contractPaise BigInt?
+  /// The payment stages as signed, [{ label, pct, amountPaise }] — copied, so
+  /// a later change to the studio's schedule never rewrites a signed one.
+  paymentPhases Json?
+  /// When each stage was paid, by index into paymentPhases: [{ index, paidOn }].
+  /// Marked by the studio or ops; read by the customer's payment view.
+  paidPhases    Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
