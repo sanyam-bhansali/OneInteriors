@@ -1,40 +1,34 @@
 'use client';
 
 /**
- * Asking for the call.
+ * Booking the expert call — as little friction as the call allows (owner,
+ * 10 Oct 2026: "I don't want this many questions to be asked").
  *
- * ## Why there is a question builder
+ * Four short steps on one screen, each a card:
  *
- * The form used to end with an empty textarea and the encouraging note that
- * "the thing you are actually worried about is the most useful sentence you
- * can write here". That is true, and almost nobody writes it — not because
- * they have no worry, but because a blank box at the end of a form is a
- * homework question, and the honest answer ("I don't know what I don't know")
- * does not fit in it.
+ *   1. Which studios to talk about — the ones they compared are ticked.
+ *   2. A date, then a time.
+ *   3. Who it is for — the name and number were taken at the start, so this
+ *      is a confirmation with a Change link, not a form.
+ *   4. A 6-digit WhatsApp code, then Confirm booking.
  *
- * So the worries are offered as a list, and several of them are generated from
- * this customer's own comparison: if two studios are ₹1.2 L apart, "why is
- * Teakline ₹1.2 L more than Chitra & Co.?" is on the list with the real names
- * and the real figure in it. Ticking is one press; writing that sentence is
- * not.
+ * The question builder and the free-text agenda are gone: the architect has
+ * already read the brief and every quote, and the call is where the questions
+ * get asked. Consent to share with the chosen studios is the sentence right
+ * above the button; pressing Confirm is the act it describes.
  *
- * ## Why it composes into `askedAbout` rather than a new column
- *
- * What the architect needs is a paragraph they can read before ringing. The
- * ticked questions and the typed sentence are the same thing — the customer's
- * agenda for the call — and splitting them across two fields would mean two
- * places for ops to look and one of them eventually not being looked at.
- *
- * The composed text is put in a hidden input on submit, and the textarea keeps
- * its own name off the wire so nothing is sent twice.
+ * The code is verified before the booking is sent, and the server refuses a
+ * booking whose number is not the signed-in, verified one (actions.ts). In a
+ * build with no database (`preview`) any six digits pass and nothing is booked.
  */
 
-import { useActionState, useEffect, useMemo, useState } from 'react';
+import { startTransition, useActionState, useEffect, useState } from 'react';
 import { readContact, rememberContact, type RememberedContact } from '@/lib/remembered-contact';
 import { googleCalendarUrl, slotLabel } from '@/modules/consultation/slots';
 import { ARCHITECT } from '@/modules/consultation/architect';
-import { SlotPicker } from '@/components/SlotPicker';
 import { formatINRCompact } from '@/lib/money';
+import { normalisePhone } from '@/modules/studio/phone';
+import { requestOtpAction, verifyOtpAction } from '@/app/sign-in/actions';
 import { Sheet, Tick } from '@/components/oi';
 import { requestExpertAction, type ExpertState } from './actions';
 import { useLang, useSiteT } from '@/components/app/i18n';
@@ -42,6 +36,7 @@ import { EXPERT_DICT, known } from '@/modules/i18n/site/expert';
 import type { Lang } from '@/modules/i18n/site';
 
 const INITIAL: ExpertState = { status: 'idle' };
+const RESEND_S = 30;
 
 export interface StudioOption {
   id: string;
@@ -49,14 +44,6 @@ export interface StudioOption {
   lowPaise: number;
   highPaise: number;
 }
-
-/**
- * The questions that apply to everybody, in the order they tend to matter.
- *
- * Every one is a real thing people ring us about and a real thing an architect
- * can answer. None of them is a lead-qualification question in disguise.
- */
-const STANDARD = ['std.0', 'std.1', 'std.2', 'std.3', 'std.4', 'std.5'] as const;
 
 /**
  * A slot as the customer reads it. English is `slotLabel` exactly; Hindi and
@@ -72,135 +59,124 @@ function slotText(iso: string, lang: Lang): { day: string; time: string } {
   };
 }
 
+/** "Fri" and "9" for the day tiles, Pune time. */
+function weekdayOf(iso: string, lang: Lang): string {
+  const locale = lang === 'en' ? 'en-IN' : `${lang}-IN`;
+  return new Date(iso).toLocaleDateString(locale, { weekday: 'short', timeZone: 'Asia/Kolkata' });
+}
+function dateOf(iso: string, lang: Lang): string {
+  const locale = lang === 'en' ? 'en-IN' : `${lang}-IN`;
+  return new Date(iso).toLocaleDateString(locale, { day: 'numeric', timeZone: 'Asia/Kolkata', numberingSystem: 'latn' });
+}
+
+/** "Sat 11 Oct" in the visitor's language, Pune time. */
+function dayChip(iso: string, lang: Lang): string {
+  const locale = lang === 'en' ? 'en-IN' : `${lang}-IN`;
+  return new Date(iso).toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
+}
+
+function dayKey(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+}
+
 export function ExpertForm({
   briefId,
   studios,
   defaultName,
+  defaultPhone = null,
   defaultEmail,
   minStudios,
   maxStudios,
   slots = [],
   preselected = [],
-  fromBrief = [],
   initialSlot = null,
+  preview = false,
 }: {
   briefId: string;
   studios: StudioOption[];
   defaultName: string | null;
+  /** The number they gave at the start, when the server knows it. */
+  defaultPhone?: string | null;
   defaultEmail: string | null;
   minStudios: number;
   maxStudios: number;
-  /** Open 30-minute slots (ISO). Empty when no expert has hours set — then we ask when suits them. */
+  /** Open 30-minute slots (ISO). Empty when no expert has hours set — then we call to fix a time. */
   slots?: string[];
   /** The studios they compared — ticked for them. */
   preselected?: string[];
-  /** Questions from their possession, household and needs (consultation/brief-questions.ts). */
-  fromBrief?: string[];
   /** A slot already picked in the app (/app/expert), kept only if it is still open. */
   initialSlot?: string | null;
+  /** A build with no database: walk the flow, book nothing. */
+  preview?: boolean;
 }) {
   const t = useSiteT(EXPERT_DICT);
   const lang = useLang();
   const [state, action, pending] = useActionState(requestExpertAction, INITIAL);
-  const [slot, setSlot] = useState<string | null>(initialSlot && slots.includes(initialSlot) ? initialSlot : null);
   const booking = slots.length > 0;
+  const startSlot = initialSlot && slots.includes(initialSlot) ? initialSlot : null;
+  const [slot, setSlot] = useState<string | null>(startSlot);
+  const [day, setDay] = useState<string | null>(startSlot ? dayKey(startSlot) : slots[0] ? dayKey(slots[0]) : null);
   const [picked, setPicked] = useState<string[]>(
     preselected.length > 0 ? preselected.slice(0, maxStudios) : studios.slice(0, 2).map((s) => s.id),
   );
-  const [asks, setAsks] = useState<string[]>([]);
-  const [own, setOwn] = useState('');
-  /* Name, mobile and email typed earlier on this device (the quiz's last
-     screen, or a previous booking) fill the boxes, and what is typed here is
-     remembered for next time. */
+
+  /* Name and number from the start of the brief (this device, or the server). */
   const [remembered, setRemembered] = useState<RememberedContact | null>(null);
-  useEffect(() => setRemembered(readContact()), []);
-  const filled = remembered ? 'remembered' : 'blank';
+  const [name, setName] = useState(defaultName ?? '');
+  const [phone, setPhone] = useState(defaultPhone ?? '');
+  const [editing, setEditing] = useState(false);
+  useEffect(() => {
+    const r = readContact();
+    setRemembered(r);
+    if (r) {
+      setName((n) => n || r.name);
+      setPhone((p) => p || r.phone);
+    }
+  }, []);
+  useEffect(() => {
+    if (name || phone) rememberContact({ name, phone });
+  }, [name, phone]);
+
+  /* The code. */
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [wait, setWait] = useState(0);
+  const [devCode, setDevCode] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [codeError, setCodeError] = useState<string | null>(null);
+  const [previewDone, setPreviewDone] = useState(false);
+  useEffect(() => {
+    if (wait <= 0) return;
+    const id = setTimeout(() => setWait((w) => w - 1), 1000);
+    return () => clearTimeout(id);
+  }, [wait]);
+
   const err = state.errors ?? {};
 
-  /**
-   * Questions written out of this customer's own numbers.
-   *
-   * Generated rather than canned, so the list opens with the thing they were
-   * already wondering — with both studios named and the gap in rupees.
-   */
-  const generated = useMemo((): { id: string; q: string }[] => {
-    if (studios.length < 2) return [];
-    const byMid = [...studios].sort(
-      (a, b) => (a.lowPaise + a.highPaise) / 2 - (b.lowPaise + b.highPaise) / 2,
-    );
-    const low = byMid[0]!;
-    const high = byMid[byMid.length - 1]!;
-    const gap = (high.lowPaise + high.highPaise) / 2 - (low.lowPaise + low.highPaise) / 2;
-    if (gap <= 0) return [];
-    return [
-      { id: 'gen.why', q: t('gen.why', { high: high.name, gap: formatINRCompact(Math.round(gap)), low: low.name }) },
-      { id: 'gen.leaving', q: t('gen.leaving', { low: low.name }) },
-    ];
-  }, [studios, t]);
-
-  /** Every question on offer, by id: the ticked ones are kept as ids so a language change keeps them. */
-  const questionText = new Map<string, string>([
-    ...generated.map((g) => [g.id, g.q] as [string, string]),
-    ...fromBrief.map((q) => [`brief:${q}`, q] as [string, string]),
-    ...STANDARD.map((k) => [k, t(k)] as [string, string]),
-  ]);
-  const askedTexts = asks.map((id) => questionText.get(id) ?? id);
-
-  /** Ticked questions first, then whatever they wrote. One paragraph for ops. */
-  const composed = [
-    ...askedTexts.map((q) => `• ${q}`),
-    own.trim() ? `\n${own.trim()}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n')
-    .slice(0, 2000);
-
-  if (state.status === 'sent') {
-    const when = state.scheduledFor ? slotText(state.scheduledFor, lang) : null;
+  if (state.status === 'sent' || previewDone) {
+    const scheduledFor = state.status === 'sent' ? state.scheduledFor : slot ?? undefined;
+    const when = scheduledFor ? slotText(scheduledFor, lang) : null;
     return (
-      <Sheet className="p-[clamp(22px,3vw,34px)]">
+      <Sheet className="rounded-[22px] p-[clamp(22px,3vw,34px)]">
         <p className="oi-eyebrow m-0 mb-4">{when ? t('sent.booked') : t('sent.requested')}</p>
         <h2 className="oi-display m-0 mb-4 text-[clamp(1.5rem,1.2rem+1.2vw,2rem)]">
           {when ? t('sent.when', { day: when.day, time: when.time }) : t('sent.weCall')}
         </h2>
         <p className="m-0 mb-3 max-w-[58ch] text-[15px] leading-[1.65] text-[var(--ink2)]">
-          {when
-            ? t('sent.bookedBody')
-            : t('sent.requestedBody')}
+          {when ? t('sent.bookedBody') : t('sent.requestedBody')}
         </p>
-        {/* Who, and the agenda — their own questions, in their order — so the
-            call reads as a working session they set, not a sales call
-            (principle 9, docs/UX-PRINCIPLES-PLAN.md; Superhuman, Calendly). */}
         <p className="m-0 mb-5 text-[15px] text-[var(--ink)]">
           {t('sent.with')} <strong className="font-semibold">{ARCHITECT.name}</strong> · {known(lang, 'architect.role', ARCHITECT.role)}
         </p>
-        {asks.length > 0 || own.trim() ? (
-          <div className="mb-6 rounded-[18px] bg-[var(--card)] p-5">
-            <p className="oi-label m-0 mb-3">{t('sent.agenda')}</p>
-            <ol className="m-0 flex list-decimal flex-col gap-2 pl-5 text-[15px] leading-[1.5] text-[var(--ink)]">
-              {askedTexts.map((q) => (
-                <li key={q}>{q}</li>
-              ))}
-              {own.trim() ? <li>{own.trim()}</li> : null}
-            </ol>
-            <p className="m-0 mt-3 text-[13.5px] text-[var(--ink2)]">
-              {t('sent.agendaNote')}
-            </p>
-          </div>
-        ) : null}
-        {state.scheduledFor ? (
+        {previewDone ? <p className="m-0 mb-5 text-[13px] text-[var(--acc-ink)]">{t('flow.testBuild')}</p> : null}
+        {scheduledFor ? (
           <p className="m-0 mb-6">
             <a
               href={googleCalendarUrl({
-                startsAt: state.scheduledFor,
+                startsAt: scheduledFor,
                 title: t('cal.title', { name: ARCHITECT.name }),
-                details: [
-                  t('cal.details'),
-                  ...askedTexts.map((q) => `• ${q}`),
-                  own.trim() ? `• ${own.trim()}` : '',
-                ]
-                  .filter(Boolean)
-                  .join('\n'),
+                details: t('cal.details'),
               })}
               target="_blank"
               rel="noreferrer"
@@ -211,26 +187,13 @@ export function ExpertForm({
           </p>
         ) : null}
 
-        {/* The reason this screen is not the end of the page.
-            A confirmation with nothing after it is a dead end at the highest-
-            intent moment we ever get — they have just handed over a phone
-            number, and the next thing they do is go and fill in somebody
-            else's form, because waiting is not an activity. The prep pack is
-            the activity, and it makes their own call better, which is the only
-            honest reason to offer it. */}
+        {/* The next thing to do, so the confirmation is not a dead end. */}
         <div className="border-t border-[var(--line)] pt-6">
-          <p className="m-0 mb-5 max-w-[58ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-            {t('prep.body')}
-          </p>
-          <a
-            href="/account#rooms"
-            className="oi-cta inline-flex min-h-11 items-center px-6 py-3 text-[14.5px] no-underline"
-          >
+          <p className="m-0 mb-5 max-w-[58ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">{t('prep.body')}</p>
+          <a href="/account#rooms" className="oi-cta inline-flex min-h-11 items-center rounded-full px-6 py-3 text-[14.5px] text-white no-underline">
             {t('prep.cta')}
           </a>
-          <p className="m-0 mt-4 text-[13px] text-[var(--ink2)]">
-            {t('prep.note')}
-          </p>
+          <p className="m-0 mt-4 text-[13px] text-[var(--ink2)]">{t('prep.note')}</p>
         </div>
       </Sheet>
     );
@@ -238,362 +201,309 @@ export function ExpertForm({
 
   const toggleStudio = (id: string) =>
     setPicked((prev) =>
-      prev.includes(id)
-        ? prev.filter((p) => p !== id)
-        : prev.length < maxStudios
-          ? [...prev, id]
-          : prev,
+      prev.includes(id) ? prev.filter((p) => p !== id) : prev.length < maxStudios ? [...prev, id] : prev,
     );
 
-  const toggleAsk = (q: string) =>
-    setAsks((prev) => (prev.includes(q) ? prev.filter((a) => a !== q) : [...prev, q]));
+  /* The slots, grouped by day: a date first, then the times on it. */
+  const days: { key: string; label: string; times: string[] }[] = [];
+  for (const iso of slots) {
+    const key = dayKey(iso);
+    let d = days.find((x) => x.key === key);
+    if (!d) {
+      d = { key, label: dayChip(iso, lang), times: [] };
+      days.push(d);
+    }
+    d.times.push(iso);
+  }
+  const activeDay = days.find((d) => d.key === day) ?? null;
+
+  const phoneOk = Boolean(normalisePhone(phone));
+  const blocker =
+    picked.length < minStudios
+      ? t('flow.needStudios', { n: minStudios })
+      : booking && !slot
+        ? t('flow.needSlot')
+        : !phoneOk || !name.trim()
+          ? t('flow.needPhone')
+          : null;
+  const codeOpen = sentTo !== null && sentTo === phone;
+
+  const sendCode = async () => {
+    if (blocker) return;
+    setCodeError(null);
+    setCode('');
+    if (preview) {
+      setSentTo(phone);
+      setWait(RESEND_S);
+      return;
+    }
+    setSending(true);
+    const r = await requestOtpAction(phone, name);
+    setSending(false);
+    if (!r.ok) return setCodeError(r.error);
+    setSentTo(phone);
+    setDevCode(r.devCode ?? null);
+    setWait(RESEND_S);
+  };
+
+  const confirm = async () => {
+    if (blocker || code.length !== 6) return;
+    setCodeError(null);
+    if (preview) {
+      setPreviewDone(true);
+      return;
+    }
+    setConfirming(true);
+    const v = await verifyOtpAction(phone, code, name);
+    setConfirming(false);
+    if (!v.ok) return setCodeError(v.error);
+    const data = new FormData();
+    data.set('briefId', briefId);
+    picked.forEach((id) => data.append('studioIds', id));
+    data.set('contactName', name.trim());
+    data.set('contactPhone', phone);
+    data.set('contactEmail', remembered?.email ?? defaultEmail ?? '');
+    data.set('startsAt', slot ?? '');
+    // The sentence above the button says what confirming agrees to; pressing it is the act.
+    data.set('shareConsent', 'on');
+    startTransition(() => action(data));
+  };
+
+  const card = 'rounded-[22px] border border-[var(--line)] bg-[var(--card)] p-[clamp(18px,2.6vw,28px)]';
+  const pill = 'oi-cta min-h-12 cursor-pointer rounded-full border-0 px-8 py-3.5 text-[15px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
-    <form
-      action={action}
-      onChange={(e) => {
-        const data = new FormData(e.currentTarget);
-        rememberContact({
-          name: String(data.get('contactName') ?? ''),
-          phone: String(data.get('contactPhone') ?? ''),
-          email: String(data.get('contactEmail') ?? ''),
-        });
-      }}
-      className="flex flex-col gap-10"
-    >
-      <input type="hidden" name="briefId" value={briefId} />
-      <input type="hidden" name="askedAbout" value={composed} />
-
-      {/* ── Which studios ── */}
-      <fieldset className="m-0 border-0 p-0">
-        <legend className="oi-display mb-2 p-0 text-[21px]">
-          {t('studios.legend')}
-        </legend>
-        <p className="m-0 mb-5 max-w-[56ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-          {t('studios.help', { min: minStudios, max: maxStudios })}
-        </p>
-
-        {err.studioIds ? (
-          <p role="alert" className="m-0 mb-3 text-[14px]" style={{ color: 'var(--acc-ink)' }}>
-            {err.studioIds}
-          </p>
-        ) : null}
-
-        <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
+    <div className="flex flex-col gap-5">
+      {/* 1 · Studios */}
+      <section className={card}>
+        <Step n={1} title={t('flow.step1')} help={t('flow.step1Help', { min: minStudios, max: maxStudios })} />
+        <ul className="m-0 grid list-none gap-2.5 p-0 sm:grid-cols-2">
           {studios.map((studio) => {
             const checked = picked.includes(studio.id);
             return (
               <li key={studio.id}>
-                <label
-                  className="flex min-h-11 cursor-pointer items-center justify-between gap-4 border px-5 py-3.5"
-                  style={{
-                    borderColor: checked ? 'var(--ink2)' : 'var(--line)',
-                    background: checked ? 'var(--acc-wash)' : 'var(--card)',
-                  }}
+                <button
+                  type="button"
+                  aria-pressed={checked}
+                  onClick={() => toggleStudio(studio.id)}
+                  className={`flex min-h-14 w-full cursor-pointer items-center justify-between gap-3 rounded-[16px] border px-4 py-3 text-left transition-colors ${
+                    checked ? 'border-[var(--ink)] bg-[var(--acc-wash)]' : 'border-[var(--line)] bg-[var(--bg)] hover:border-[var(--ink2)]'
+                  }`}
                 >
                   <span className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      name="studioIds"
-                      value={studio.id}
-                      checked={checked}
-                      onChange={() => toggleStudio(studio.id)}
-                      className="h-4 w-4 accent-[var(--acc)]"
-                    />
-                    <span className="text-[15px]">{studio.name}</span>
+                    <span
+                      aria-hidden
+                      className={`flex h-5 w-5 flex-none items-center justify-center rounded-full border ${
+                        checked ? 'border-[var(--ink)] bg-[var(--ink)] text-white' : 'border-[var(--line)]'
+                      }`}
+                    >
+                      {checked ? <Tick style={{ width: 11, height: 11 }} /> : null}
+                    </span>
+                    <span className="text-[15px] font-medium text-[var(--ink)]">{studio.name}</span>
                   </span>
                   <span className="oi-num text-[12.5px] text-[var(--ink2)]">
                     {formatINRCompact(studio.lowPaise)}–{formatINRCompact(studio.highPaise)}
                   </span>
-                </label>
+                </button>
               </li>
             );
           })}
         </ul>
-      </fieldset>
+        {err.studioIds ? <Alert>{err.studioIds}</Alert> : null}
+      </section>
 
-      {/* ── What you want answered ── */}
-      <fieldset className="m-0 border-0 p-0">
-        <legend className="oi-display mb-2 p-0 text-[21px]">{t('asks.legend')}</legend>
-        <p className="m-0 mb-5 max-w-[56ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-          {t('asks.help')}
-        </p>
-
-        {/* ── The two that came from their own numbers ──
-            Separated from the canned list, and labelled, because they are not
-            the same kind of thing. "Why is Teakline about ₹1.2 L more than
-            Chitra & Co.?" is the question the customer has already been
-            asking themselves since the compare screen, with both studios named
-            and the gap in rupees — computed from their quotes, not written by
-            us and hoping to land.
-
-            They were mixed into the standard list wearing a 10px grey caption.
-            A question we derived from this person's own spread is the single
-            most persuasive thing on the page, and it read as a footnote. */}
-        {generated.length > 0 ? (
-          <div className="mb-5">
-            <p className="oi-eyebrow m-0 mb-3">{t('asks.fromQuotes')}</p>
-            <ul className="m-0 flex list-none flex-col gap-2 p-0">
-              {generated.map((g) => (
-                <li key={g.id}>
-                  <Ask q={g.q} on={asks.includes(g.id)} onToggle={() => toggleAsk(g.id)} derived />
-                </li>
+      {/* 2 · Date, then time */}
+      <section className={card}>
+        <Step n={2} title={t('flow.step2')} />
+        {booking ? (
+          <>
+            <p className="oi-label m-0 mb-3">{t('flow.pickDay')}</p>
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+              {days.slice(0, 7).map((d) => (
+                <button
+                  key={d.key}
+                  type="button"
+                  aria-pressed={day === d.key}
+                  onClick={() => {
+                    setDay(d.key);
+                    if (slot && !d.times.includes(slot)) setSlot(null);
+                  }}
+                  className={`cursor-pointer rounded-[16px] border py-3 text-center transition-colors ${
+                    day === d.key
+                      ? 'border-[var(--ink)] bg-[var(--ink)] text-white'
+                      : 'border-[var(--line)] bg-transparent text-[var(--ink)] hover:border-[var(--ink2)]'
+                  }`}
+                >
+                  <small className="oi-num block text-[13px]">{weekdayOf(d.times[0]!, lang)}</small>
+                  <b className="mt-1 block text-[24px] font-semibold leading-none">{dateOf(d.times[0]!, lang)}</b>
+                </button>
               ))}
-            </ul>
-          </div>
-        ) : null}
-
-        {/* From their life rather than their quotes — the timeline, the family,
-            what the home needs (build queue item 9). */}
-        {fromBrief.length > 0 ? (
-          <div className="mb-5">
-            <p className="oi-eyebrow m-0 mb-3">{t('asks.fromBrief')}</p>
-            <ul className="m-0 flex list-none flex-col gap-2 p-0">
-              {fromBrief.map((q) => (
-                <li key={q}>
-                  <Ask q={q} on={asks.includes(`brief:${q}`)} onToggle={() => toggleAsk(`brief:${q}`)} derived />
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        {generated.length > 0 || fromBrief.length > 0 ? (
-          <p className="oi-eyebrow m-0 mb-3">{t('asks.common')}</p>
-        ) : null}
-
-        <ul className="m-0 flex list-none flex-col gap-2 p-0">
-          {STANDARD.map((k) => (
-            <li key={k}>
-              <Ask q={t(k)} on={asks.includes(k)} onToggle={() => toggleAsk(k)} />
-            </li>
-          ))}
-        </ul>
-
-        <div className="mt-5">
-          <label htmlFor="ownQuestion" className="oi-label mb-2 block">
-            {t('asks.own')}
-          </label>
-          <textarea
-            id="ownQuestion"
-            rows={3}
-            value={own}
-            onChange={(e) => setOwn(e.target.value)}
-            placeholder={t('asks.ownPlaceholder')}
-            className="w-full border border-[var(--line)] bg-[var(--card)] px-4 py-3 text-[14.5px] leading-[1.6] text-[var(--ink)] placeholder:text-[var(--ink2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--acc)]"
-          />
-        </div>
-      </fieldset>
-
-      {/* ── How we reach you ── */}
-      <fieldset className="m-0 border-0 p-0">
-        <legend className="oi-display mb-2 p-0 text-[21px]">{t('reach.legend')}</legend>
-        <p className="m-0 mb-5 max-w-[56ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-          {t('reach.help')}
-        </p>
-
-        <div className="flex flex-col gap-5">
-          <Field
-            label={t('field.name')}
-            key={`name-${filled}`}
-            name="contactName"
-            required
-            defaultValue={defaultName || remembered?.name || null}
-            error={err.contactName}
-            optionalText={t('field.optional')}
-          />
-          <Field
-            label={t('field.mobile')}
-            key={`phone-${filled}`}
-            name="contactPhone"
-            type="tel"
-            required
-            defaultValue={remembered?.phone || null}
-            error={err.contactPhone}
-            optionalText={t('field.optional')}
-            placeholder="98765 43210"
-          />
-          <Field
-            label={t('field.email')}
-            key={`email-${filled}`}
-            name="contactEmail"
-            type="email"
-            defaultValue={defaultEmail || remembered?.email || null}
-            error={err.contactEmail}
-            optionalText={t('field.optional')}
-          />
-          {booking ? null : (
-            <Field
-              label={t('field.when')}
-              name="preferredTimes"
-              placeholder={t('field.whenPlaceholder')}
-              optionalText={t('field.optional')}
-            />
-          )}
-        </div>
-      </fieldset>
-
-      {booking ? (
-        <fieldset className="m-0 border-0 p-0">
-          <legend className="oi-eyebrow m-0 mb-1 p-0">{t('slot.legend')}</legend>
-          <p className="m-0 mb-4 text-[13.5px] text-[var(--ink2)]">
-            {t('slot.help')}
-          </p>
-          <SlotPicker slots={slots} value={slot} onPick={setSlot} />
-          <input type="hidden" name="startsAt" value={slot ?? ''} />
-          {err.startsAt ? (
-            <p role="alert" className="m-0 mt-3 text-[14px]" style={{ color: 'var(--acc-ink)' }}>
-              {err.startsAt}
-            </p>
-          ) : null}
-        </fieldset>
-      ) : null}
-
-      {/* Asked here, where they pick the studios, because this is what they
-          are agreeing to (plan §3.3). Required: an introduction without it
-          could never tell the studio who to meet. */}
-      <label className="flex cursor-pointer items-start gap-3">
-        <input type="checkbox" name="shareConsent" required className="mt-1 h-4 w-4 flex-none accent-[var(--acc)]" />
-        <span className="text-[14.5px] leading-snug text-[var(--ink)]">
-          {t('consent.label')}
-          <span className="mt-1 block text-[13px] text-[var(--ink2)]">
-            {t('consent.withdraw')}
-          </span>
-        </span>
-      </label>
-      {err.shareConsent ? (
-        <p role="alert" className="m-0 -mt-3 text-[13.5px]" style={{ color: 'var(--acc-ink)' }}>
-          {err.shareConsent}
-        </p>
-      ) : null}
-
-      <div className="border-t border-[var(--line)] pt-7">
-        {err.form ? (
-          <p
-            role="alert"
-            className="m-0 mb-4 border-l-2 px-4 py-2.5 text-[14.5px]"
-            style={{ borderColor: 'var(--acc)', color: 'var(--acc-ink)' }}
-          >
-            {err.form}
-          </p>
-        ) : null}
-        <button
-          type="submit"
-          disabled={pending || picked.length < minStudios || (booking && !slot)}
-          className="oi-cta min-h-11 cursor-pointer border-0 px-7 py-3.5 text-[15px] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {pending
-            ? booking
-              ? t('submit.booking')
-              : t('submit.sending')
-            : booking
-              ? slot
-                ? t('submit.book', { day: slotText(slot, lang).day.split(' ')[0]!, time: slotText(slot, lang).time })
-                : t('submit.pick')
-              : t('submit.request')}
-        </button>
-        <p className="m-0 mt-5 max-w-[58ch] text-[13.5px] leading-[1.6] text-[var(--ink2)]">
-          {t('submit.note')}
-        </p>
-      </div>
-    </form>
-  );
-}
-
-/**
- * One question the customer can hand to the architect.
- *
- * `derived` marks the ones computed from this customer's own quote spread
- * rather than written by us. It gets a sage rule down its left edge and the
- * label sits above the group rather than inside each row: a badge on every
- * item in a group of two says the same thing twice and competes with the
- * question itself, which is the part worth reading.
- *
- * Both states are a shape as well as a colour — a tick or an empty ring — per
- * docs/DESIGN-LANGUAGE.md §4.4. Sage is verification and better-spec here,
- * never an action, so the button that submits is terracotta and these are not.
- */
-function Ask({
-  q,
-  on,
-  onToggle,
-  derived = false,
-}: {
-  q: string;
-  on: boolean;
-  onToggle: () => void;
-  derived?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-pressed={on}
-      className="flex min-h-11 w-full cursor-pointer items-start gap-3 border px-4 py-3 text-left text-[14px] leading-snug transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--acc)]"
-      style={{
-        borderColor: on ? 'var(--sec)' : 'var(--line)',
-        background: on ? 'rgba(131,144,115,.09)' : 'var(--card)',
-        borderLeftWidth: derived ? 3 : 1,
-        borderLeftColor: derived ? 'var(--sec)' : on ? 'var(--sec)' : 'var(--line)',
-      }}
-    >
-      <span className="flex h-[19px] flex-none items-center">
-        {on ? (
-          <Tick style={{ color: 'var(--sec)' }} />
+            </div>
+            {activeDay ? (
+              <>
+                <p className="oi-label m-0 mb-3 mt-6">{t('flow.step2Time')}</p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {activeDay.times.map((iso) => (
+                    <button
+                      key={iso}
+                      type="button"
+                      aria-pressed={slot === iso}
+                      onClick={() => setSlot(iso)}
+                      className={`oi-num min-h-[50px] cursor-pointer rounded-full border text-[15px] transition-colors ${
+                        slot === iso
+                          ? 'border-[var(--ink)] bg-[var(--ink)] text-white'
+                          : 'border-[var(--line)] bg-transparent text-[var(--ink)] hover:border-[var(--ink2)]'
+                      }`}
+                    >
+                      {slotText(iso, lang).time}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : null}
+            {preview ? <p className="m-0 mt-4 text-[13px] text-[var(--acc-ink)]">{t('flow.sampleHours')}</p> : null}
+            {err.startsAt ? <Alert>{err.startsAt}</Alert> : null}
+          </>
         ) : (
-          <span
-            aria-hidden
-            className="h-[13px] w-[13px] rounded-full border"
-            style={{ borderColor: 'var(--line)' }}
-          />
+          <p className="m-0 text-[14.5px] leading-[1.6] text-[var(--ink2)]">{t('flow.step2None')}</p>
         )}
-      </span>
-      <span className="min-w-0">{q}</span>
-    </button>
+      </section>
+
+      {/* 3 · Who it is for — already known, so a confirmation, not a form */}
+      <section className={card}>
+        <Step n={3} title={t('flow.step3')} />
+        {editing || !name.trim() || !phoneOk ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="oi-label mb-2 block">{t('flow.name')}</span>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value.slice(0, 80))}
+                autoComplete="name"
+                className="w-full rounded-full border border-[var(--line)] bg-[var(--bg)] px-5 py-3 text-[15px] text-[var(--ink)]"
+              />
+            </label>
+            <label className="block">
+              <span className="oi-label mb-2 block">{t('flow.mobile')}</span>
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.slice(0, 16))}
+                inputMode="tel"
+                autoComplete="tel-national"
+                placeholder="98765 43210"
+                className="oi-num w-full rounded-full border border-[var(--line)] bg-[var(--bg)] px-5 py-3 text-[15px] text-[var(--ink)]"
+              />
+            </label>
+            {editing && name.trim() && phoneOk ? (
+              <div className="sm:col-span-2">
+                <button
+                  type="button"
+                  onClick={() => setEditing(false)}
+                  className="cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-4 py-2 text-[13.5px] font-medium text-[var(--ink)] hover:border-[var(--ink)]"
+                >
+                  {t('flow.done')}
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="m-0 text-[16px] text-[var(--ink)]">
+              <span className="font-medium">{name}</span>
+              <span className="oi-num ml-3 text-[15px] text-[var(--ink2)]">+91 {phone}</span>
+            </p>
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-4 py-1.5 text-[13px] font-medium text-[var(--ink2)] hover:border-[var(--ink)] hover:text-[var(--ink)]"
+            >
+              {t('flow.change')}
+            </button>
+          </div>
+        )}
+        {err.contactName ? <Alert>{err.contactName}</Alert> : null}
+        {err.contactPhone ? <Alert>{err.contactPhone}</Alert> : null}
+      </section>
+
+      {/* 4 · The code, then the booking */}
+      <section className={card}>
+        <Step n={4} title={t('flow.step4')} />
+        {codeOpen ? (
+          <>
+            <p className="m-0 mb-4 text-[14.5px] text-[var(--ink2)]">{t('flow.codeSent', { phone })}</p>
+            <label className="block max-w-[260px]">
+              <span className="oi-label mb-2 block">{t('flow.code')}</span>
+              <input
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                placeholder="······"
+                className="oi-num w-full rounded-full border border-[var(--line)] bg-[var(--bg)] px-5 py-3 text-center text-[20px] tracking-[0.4em] text-[var(--ink)]"
+              />
+            </label>
+            <p className="m-0 mt-3 text-[13px] text-[var(--ink2)]">
+              {wait > 0 ? (
+                t('flow.resendIn', { s: wait })
+              ) : (
+                <button type="button" onClick={sendCode} className="cursor-pointer border-0 bg-transparent p-0 text-[13px] text-[var(--ink)] underline">
+                  {t('flow.resend')}
+                </button>
+              )}
+            </p>
+            {devCode ? <p className="m-0 mt-2 text-[13px] text-[var(--acc-ink)]">Test build · your code is {devCode}</p> : null}
+            {preview ? <p className="m-0 mt-2 text-[13px] text-[var(--acc-ink)]">{t('flow.testBuild')}</p> : null}
+          </>
+        ) : null}
+
+        {codeError ? <Alert>{codeError}</Alert> : null}
+        {err.form ? <Alert>{err.form}</Alert> : null}
+        {err.shareConsent ? <Alert>{err.shareConsent}</Alert> : null}
+
+        <p className="m-0 mb-5 mt-5 max-w-[60ch] text-[13px] leading-[1.6] text-[var(--ink2)]">{t('flow.consent')}</p>
+        {codeOpen ? (
+          <button
+            type="button"
+            onClick={confirm}
+            disabled={Boolean(blocker) || code.length !== 6 || confirming || pending}
+            className={pill}
+          >
+            {confirming || pending
+              ? t('flow.confirming')
+              : slot
+                ? `${t('flow.confirm')} · ${dayChip(slot, lang)}, ${slotText(slot, lang).time}`
+                : t('flow.confirm')}
+          </button>
+        ) : (
+          <button type="button" onClick={sendCode} disabled={Boolean(blocker) || sending} className={pill}>
+            {sending ? t('flow.sending') : t('flow.sendCode')}
+          </button>
+        )}
+        {blocker ? <p className="m-0 mt-3 text-[13px] text-[var(--ink2)]">{blocker}</p> : null}
+      </section>
+    </div>
   );
 }
 
-function Field({
-  label,
-  name,
-  type = 'text',
-  required = false,
-  defaultValue,
-  error,
-  placeholder,
-  optionalText = ' — optional',
-}: {
-  label: string;
-  name: string;
-  type?: string;
-  required?: boolean;
-  defaultValue?: string | null;
-  error?: string;
-  placeholder?: string;
-  /** " — optional", in the visitor's language. */
-  optionalText?: string;
-}) {
+function Step({ n, title, help }: { n: number; title: string; help?: string }) {
   return (
-    <div>
-      <label htmlFor={name} className="oi-label mb-2 block">
-        {label}
-        {required ? '' : optionalText}
-      </label>
-      <input
-        id={name}
-        name={name}
-        type={type}
-        required={required}
-        defaultValue={defaultValue ?? undefined}
-        placeholder={placeholder}
-        aria-invalid={Boolean(error)}
-        className="w-full border border-[var(--line)] bg-[var(--card)] px-4 py-3 text-[15px] text-[var(--ink)] placeholder:text-[var(--ink2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--acc)]"
-      />
-      {error ? (
-        <p role="alert" className="m-0 mt-1.5 text-[13.5px]" style={{ color: 'var(--acc-ink)' }}>
-          {error}
-        </p>
-      ) : null}
+    <div className="mb-5 flex items-start gap-3">
+      <span className="oi-num flex h-7 w-7 flex-none items-center justify-center rounded-full bg-[var(--ink)] text-[12px] text-white">
+        {n}
+      </span>
+      <div>
+        <h2 className="oi-display m-0 text-[clamp(1.2rem,1.05rem+0.6vw,1.5rem)] leading-tight">{title}</h2>
+        {help ? <p className="m-0 mt-1 text-[13.5px] text-[var(--ink2)]">{help}</p> : null}
+      </div>
     </div>
+  );
+}
+
+function Alert({ children }: { children: React.ReactNode }) {
+  return (
+    <p role="alert" className="m-0 mt-3 text-[14px]" style={{ color: 'var(--acc-ink)' }}>
+      {children}
+    </p>
   );
 }

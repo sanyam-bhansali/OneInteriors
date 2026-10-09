@@ -1,15 +1,14 @@
 import { redirect } from 'next/navigation';
-import { briefQuestions } from '@/modules/consultation/brief-questions';
 import { CallOffer } from '@/components/oi/CallOffer';
-import { BenefitChips } from '@/components/oi/ExpertPitch';
 import { currentOffer } from '@/modules/consultation/offer-store';
 import type { Metadata } from 'next';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
-import { Wrap, Chapter, Sheet, Established, Flag, Tick } from '@/components/oi';
+import { Wrap, Sheet, Established, Flag } from '@/components/oi';
 import { BriefRescue } from '@/components/BriefRescue';
 import { prisma } from '@/lib/prisma';
-import { loadBrief, readAnonKey } from '@/modules/brief/repository';
+import { loadBrief, loadBriefContact, readAnonKey } from '@/modules/brief/repository';
 import { decodePreviewBrief } from '@/modules/brief/preview-param';
+import { openSlots } from '@/modules/consultation/slots';
 import { buildFirstQuote, homeShapeFor, standardKitchenRunMm } from '@/modules/quotation/first-quote';
 import { resolveRatesFor } from '@/modules/quotation/resolve-rates';
 import type { Brief } from '@/modules/brief/types';
@@ -21,13 +20,13 @@ import { availableSlots } from '@/modules/consultation/availability';
 import { quoteBrief } from '@/modules/quotation/generate';
 import { quotesAsSeen } from '@/modules/consultation/pack';
 import { MIN_STUDIOS, MAX_STUDIOS } from '@/modules/consultation/request';
-import { ARCHITECT, ARCHITECT_IS_REAL, architectFacts } from '@/modules/consultation/architect';
+import { ARCHITECT, ARCHITECT_IS_REAL } from '@/modules/consultation/architect';
 import { TIER } from '@/modules/quotation/tiers';
 import { PROPERTY_LABELS, PUNE_LOCALITIES, STYLE_LABELS } from '@/modules/brief/types';
 import { ExpertForm } from './ExpertForm';
 import { getLang } from '@/modules/i18n/server';
 import { translator, tx, type Lang } from '@/modules/i18n/site';
-import { EXPERT_DICT, known } from '@/modules/i18n/site/expert';
+import { EXPERT_DICT } from '@/modules/i18n/site/expert';
 import { PROPERTY_TX } from '@/modules/i18n/site/labels';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -77,6 +76,8 @@ export default async function ExpertPage({
   }
 
   const studios = await studioRepository.list({ activeOnly: true });
+  // The number they gave at the end of the brief, so the booking only confirms it.
+  const contact = previewBrief ? null : await loadBriefContact();
   const ranked = (await rankOnServer(brief, studios, 9, { lang })).slice(0, MAX_STUDIOS);
   const [result, slots, callOffer] = await Promise.all([
     quoteBrief(brief, ranked.map((r) => r.studioId)),
@@ -137,95 +138,64 @@ export default async function ExpertPage({
       />
 
       <Wrap className="py-12">
-        <Chapter
-          eyebrow={t('ch.eyebrow')}
-          title={t('ch.title')}
-          aside={
-            <p className="oi-num m-0 whitespace-nowrap text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink2)]">
-              {t('ch.aside')}
-            </p>
-          }
-        >
-          {t('ch.body')}
-        </Chapter>
-
-        {/* ── Who is actually going to ring ──
-            Everything else in this product is specific — a quantity on every
-            line, a named studio behind every quote. Asking for a phone number
-            on behalf of "an expert" was the one place we sounded like a sales
-            queue. */}
-        <div className="oi-pane mb-10 p-[clamp(22px,3vw,32px)]">
-          <div className="mb-5 flex flex-wrap items-baseline justify-between gap-x-8 gap-y-2">
-            <div>
-              <p className="oi-eyebrow m-0 mb-2">{t('who.eyebrow')}</p>
-              <h2 className="oi-display m-0 text-[clamp(1.4rem,1.15rem+1vw,1.85rem)]">
-                {ARCHITECT.name}
-              </h2>
-              <p className="m-0 mt-1.5 text-[14px] text-[var(--ink2)]">
-                {known(lang, 'architect.role', ARCHITECT.role)}
-              </p>
+        {/* The phone app's header, on the web (owner, 10 Oct 2026: "make
+            something like that"): who rings, why they can be trusted, the
+            price — one dark card. */}
+        <section className="mb-5 overflow-hidden rounded-[28px] bg-[#0b0b0b] px-[clamp(22px,3.4vw,40px)] py-[clamp(24px,3.6vw,40px)] text-white">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <p className="oi-eyebrow m-0 text-white/60">{t('ch.eyebrow')}</p>
+            <div className="flex items-center gap-3">
+              <span className="text-[13px] text-white/60">{t('hero.meta')}</span>
+              {!ARCHITECT_IS_REAL ? <Flag>{t('flag.placeholder')}</Flag> : null}
             </div>
           </div>
-
-          <p className="m-0 mb-6 max-w-[60ch] text-[15px] leading-[1.65] text-[var(--ink)]">
-            &ldquo;{known(lang, 'architect.says', ARCHITECT.says)}&rdquo;
-          </p>
-
-          <CallOffer offer={callOffer} className="mb-5" />
-          <BenefitChips worth className="mb-6" />
-
-          <div className="flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-[var(--line)] pt-5">
-            {architectFacts().map((f) => (
-              <p key={f.label} className="m-0 flex items-baseline gap-2">
-                <span className="oi-label m-0">{architectFactText(lang, f.label)}</span>
-                <span className="oi-num text-[13px]">{architectFactText(lang, f.value)}</span>
-              </p>
-            ))}
+          <h1 className="oi-display m-0 max-w-[20ch] text-[clamp(1.9rem,1.2rem+2.6vw,3rem)] leading-[1.05] text-white">
+            {t('hero.title')}
+          </h1>
+          <div className="mt-6 flex items-center gap-4">
+            <span
+              aria-hidden
+              className="flex h-12 w-12 flex-none items-center justify-center rounded-full text-[19px] font-semibold text-white"
+              style={{ background: 'var(--acc)' }}
+            >
+              {ARCHITECT.name.replace(/^(Ar|Dr)\.?\s+/i, '').charAt(0)}
+            </span>
+            <p className="m-0 max-w-[56ch] text-[15px] leading-[1.5] text-white/85">
+              {t('hero.body', { name: ARCHITECT.name, n: offer.quotes.length })}
+            </p>
           </div>
+          <div className="mt-6 border-t border-white/10 pt-5 [&_*]:!text-white/80">
+            <CallOffer offer={callOffer} />
+          </div>
+        </section>
 
-          {/* Honest failure mode for unfinished content is a visible label, not
-              a plausible-looking fiction — the same rule the stock photography
-              and the placeholder films follow. */}
-          {!ARCHITECT_IS_REAL ? (
-            <p className="m-0 mt-5">
-              <Flag>
-                {t('flag.placeholder')}
-              </Flag>
+        {/* Their brief, read back — what the architect will have read. */}
+        <section className="mb-5 rounded-[22px] border border-[var(--line)] bg-[var(--card)] p-[clamp(18px,2.6vw,28px)]">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="oi-display m-0 text-[clamp(1.2rem,1.05rem+0.6vw,1.5rem)]">{t('flow.brief')}</h2>
+            <a
+              href="/quiz"
+              className="rounded-full border border-[var(--line)] px-4 py-1.5 text-[13px] font-medium text-[var(--ink2)] no-underline hover:border-[var(--ink)] hover:text-[var(--ink)]"
+            >
+              {t('flow.editBrief')}
+            </a>
+          </div>
+          <Established facts={facts} />
+          {brief.styleLikes.length || brief.styleDislikes.length ? (
+            <p className="m-0 mt-4 text-[14px] leading-[1.6] text-[var(--ink2)]">
+              {[
+                brief.styleLikes.length
+                  ? t('reads.leaning', { styles: brief.styleLikes.map((s) => STYLE_LABELS[s]).join(', ') })
+                  : null,
+                brief.styleDislikes.length
+                  ? t('reads.ruledOut', { styles: brief.styleDislikes.map((s) => STYLE_LABELS[s]).join(', ') })
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </p>
           ) : null}
-        </div>
-
-        {/* What they will already have read. "Briefed, not a cold intro" is a
-            claim; this is the evidence, and everything in it is drawn from the
-            brief — nothing here is aspirational. */}
-        <div className="mb-10">
-          <p className="oi-label m-0 mb-3">{t('reads.label', { name: firstName(ARCHITECT.name) })}</p>
-          <Established facts={facts} />
-          <ul className="m-0 mt-4 flex list-none flex-col gap-2 p-0">
-            <Read label={t('reads.brief')} />
-            <Read
-              label={
-                brief.styleLikes.length || brief.styleDislikes.length
-                  ? [
-                      brief.styleLikes.length
-                        ? t('reads.leaning', { styles: brief.styleLikes.map((s) => STYLE_LABELS[s]).join(', ') })
-                        : null,
-                      brief.styleDislikes.length
-                        ? t('reads.ruledOut', { styles: brief.styleDislikes.map((s) => STYLE_LABELS[s]).join(', ') })
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')
-                  : t('reads.styleAnswers')
-              }
-            />
-            <Read label={t('reads.allQuotes', { n: offer.quotes.length })} />
-            <Read label={t('reads.verification')} />
-          </ul>
-          <p className="m-0 mt-4 max-w-[58ch] text-[13.5px] leading-[1.6] text-[var(--ink2)]">
-            {t('reads.noExplain')}
-          </p>
-        </div>
+        </section>
 
         {/* Studios that were ranked for this brief and could not be priced.
             Named rather than dropped: a customer who sees two studios where
@@ -254,11 +224,12 @@ export default async function ExpertPage({
           briefId={id}
           minStudios={minStudios}
           maxStudios={MAX_STUDIOS}
-          defaultName={user?.name ?? null}
+          defaultName={user?.name ?? contact?.name ?? brief.contactName ?? null}
+          defaultPhone={user?.phone ?? contact?.phone ?? null}
           defaultEmail={user?.email ?? null}
-          slots={slots.map((s) => s.startsAt)}
+          preview={Boolean(previewBrief)}
+          slots={(previewBrief && slots.length === 0 ? usualHours() : slots).map((s) => s.startsAt)}
           initialSlot={typeof slot === 'string' ? slot : null}
-          fromBrief={briefQuestions(brief)}
           studios={offer.quotes.map((q) => ({
             id: q.studioId,
             name: q.studioName,
@@ -272,24 +243,6 @@ export default async function ExpertPage({
       <AppFooter />
     </div>
   );
-}
-
-/** One thing already read. Sage tick — this is verification, not an action. */
-function Read({ label }: { label: string }) {
-  return (
-    <li className="flex items-start gap-2.5 text-[14px] leading-snug">
-      <span className="flex h-[21px] flex-none items-center">
-        <Tick style={{ color: 'var(--sec)' }} />
-      </span>
-      <span>{label}</span>
-    </li>
-  );
-}
-
-/** "Ar. Firstname Surname" → "Firstname": a title is not a name. */
-function firstName(full: string): string {
-  const words = full.split(' ').filter((w) => !/^(ar|dr|mr|ms|mrs)\.?$/i.test(w));
-  return words[0] ?? full;
 }
 
 function localityLabel(slug: string | null): string | null {
@@ -306,17 +259,6 @@ function propertyLabel(type: keyof typeof PROPERTY_LABELS, lang: Lang): string |
   if (!PROPERTY_LABELS[type]) return null;
   const entry = PROPERTY_TX[type];
   return entry ? tx(lang, entry) : PROPERTY_LABELS[type];
-}
-
-/** The architect's facts (consultation/architect.ts), translated while the English still matches. */
-function architectFactText(lang: Lang, english: string): string {
-  const years = /^(\d+) years$/.exec(english);
-  if (years) return known(lang, 'architect.years', english, { n: years[1]! });
-  if (english === 'Practising') return known(lang, 'architect.practising', english);
-  if (english === 'Briefs read here') return known(lang, 'architect.briefsRead', english);
-  if (english === 'Paid by a studio') return known(lang, 'architect.paidBy', english);
-  if (english === 'Never') return known(lang, 'architect.never', english);
-  return english;
 }
 
 async function briefId(): Promise<string | null> {
@@ -365,4 +307,13 @@ async function previewQuotes(
     });
   }
   return out;
+}
+
+/**
+ * A build with no database has no calendar: show the architect's usual hours
+ * (Tue–Sun, 11 am – 7 pm), as the phone app does, and book nothing.
+ */
+function usualHours() {
+  const hours = [2, 3, 4, 5, 6, 0].map((weekday) => ({ expertUserId: 'sample', weekday, startMin: 660, endMin: 1140 }));
+  return openSlots({ hours, blocked: new Map(), booked: new Map(), now: new Date() });
 }

@@ -2,7 +2,11 @@
 
 import { requestConsultation } from '@/modules/consultation/request';
 import { getLang } from '@/modules/i18n/server';
-import { localiseExpertError } from '@/modules/i18n/site/expert';
+import { EXPERT_DICT, localiseExpertError } from '@/modules/i18n/site/expert';
+import { tx } from '@/modules/i18n/site';
+import { hasDatabase } from '@/lib/env';
+import { getCurrentUser } from '@/modules/auth/session';
+import { normalisePhone } from '@/modules/studio/phone';
 
 export interface ExpertState {
   status: 'idle' | 'sent' | 'error';
@@ -25,6 +29,19 @@ export async function requestExpertAction(
   _prev: ExpertState,
   formData: FormData,
 ): Promise<ExpertState> {
+  /* The booking is confirmed with a WhatsApp code (owner, 10 Oct 2026): the
+     form verifies it first, which signs them in on that number. Refuse a
+     booking whose number is not that verified one, so the code cannot be
+     skipped by posting here directly. */
+  if (hasDatabase()) {
+    const user = await getCurrentUser();
+    const asked = normalisePhone(String(formData.get('contactPhone') ?? ''));
+    if (!user || !user.phone || !asked || normalisePhone(user.phone) !== asked) {
+      const lang = await getLang();
+      return { status: 'error', errors: { form: tx(lang, EXPERT_DICT['flow.verifyFirst']) } };
+    }
+  }
+
   const result = await requestConsultation({
     briefId: String(formData.get('briefId') ?? ''),
     studioIds: formData.getAll('studioIds').map(String),
