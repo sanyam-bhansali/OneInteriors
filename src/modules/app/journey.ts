@@ -56,20 +56,35 @@ export function quotesFor(
   rates: Record<string, StudioRates>,
   fallback: (slug: string) => StudioRates,
 ): AppQuote[] {
+  return quotesForStudios(
+    brief,
+    matched.map((m) => m.studio),
+    rates,
+    fallback,
+  );
+}
+
+/** Any studios' quotes for this brief, in the order given — the matches, or every listed studio for a market range. */
+export function quotesForStudios(
+  brief: Brief,
+  studios: Studio[],
+  rates: Record<string, StudioRates>,
+  fallback: (slug: string) => StudioRates,
+): AppQuote[] {
   const shape = homeShapeFor(brief);
   const priced = priceDraft({
     shape,
     plan: kitchenFor(shape, shape.plan, null),
     draft: draftFrom(shape),
-    studios: matched.map((m) => ({
-      slug: m.studio.slug,
-      name: m.studio.tradeName,
-      curatedDiscountPct: m.studio.matchingProfile?.curatedDiscountPct ?? null,
+    studios: studios.map((s) => ({
+      slug: s.slug,
+      name: s.tradeName,
+      curatedDiscountPct: s.matchingProfile?.curatedDiscountPct ?? null,
     })),
     ratesFor: ratesOf(rates, fallback),
   });
   const bySlug = new Map(priced.map((p) => [p.slug, p]));
-  return matched.map((m) => bySlug.get(m.studio.slug)).filter((q): q is AppQuote => Boolean(q));
+  return studios.map((s) => bySlug.get(s.slug)).filter((q): q is AppQuote => Boolean(q));
 }
 
 /**

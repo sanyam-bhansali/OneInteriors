@@ -167,7 +167,7 @@ export default function AppQuestion() {
       return;
     }
     // The last answer: the brief is complete, kept on the server too when
-    // there is one, then the matches.
+    // there is one, then their style DNA (v79), then the matches.
     const done = {
       ...brief,
       completedAt: new Date().toISOString(),
@@ -176,7 +176,7 @@ export default function AppQuestion() {
     update(done);
     // Navigate first: the router waits for a pending server action before it moves,
     // so saving first held the matches screen back by the length of the save.
-    router.push('/app/matches');
+    router.push('/app/style');
     setTimeout(() => void saveBriefAction({ ...done, contactName: null }).catch(() => {}), 0);
   };
 

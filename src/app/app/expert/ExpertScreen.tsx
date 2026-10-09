@@ -1,15 +1,20 @@
 'use client';
 
 /**
- * Expert call (the owner's v1 screens): who the expert is and who pays her,
- * then a day and a time. Booking goes through the website's expert form with
- * the slot already picked, so there is one booking path, not two. A test
- * build books nothing and says so.
+ * Expert call (v79 design): who the expert is and who pays her, then a day
+ * and a time, booked in one tap with the number they verified at "quotes
+ * ready" (trust fix 1). The booking goes through the same service as the
+ * website's /expert form, so there is one booking path. A test build books
+ * nothing and says so.
  */
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Body, Cta, Foot, Frame, Head } from '@/components/app/ui';
+import { useAppData } from '@/components/app/useAppData';
+import { useJourney } from '@/components/app/useJourney';
+import type { AppData } from '../data';
+import { bookExpertCallAction } from './actions';
 
 const TZ = 'Asia/Kolkata';
 const DAYS_SHOWN = 4;
@@ -36,9 +41,9 @@ const BURST: [number, number, string][] = [
 ];
 
 const NEXT = [
-  'Talk through the quotes with {expert}',
+  'Talk through the {n} quotes with {expert}',
   'Meet the studios you like, at their office or your flat',
-  'Sign with one, and watch your home come together here',
+  'See the final quote, sign, and watch your home come together here',
 ];
 
 const dayKey = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: TZ });
@@ -53,6 +58,11 @@ function spread<T>(list: T[], n: number): T[] {
 
 export function ExpertScreen({ slots, sample, expert }: { slots: string[]; sample: boolean; expert: string }) {
   const router = useRouter();
+  const data = useAppData();
+  const studioIds = useStudioIds(data);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [phone, setPhone] = useState<string | null>(null);
   const days = useMemo(() => {
     const by = new Map<string, string[]>();
     for (const s of slots) by.set(dayKey(s), [...(by.get(dayKey(s)) ?? []), s]);
@@ -65,10 +75,19 @@ export function ExpertScreen({ slots, sample, expert }: { slots: string[]; sampl
 
   const label = slot ? `${fmt(slot, { weekday: 'short', day: 'numeric', month: 'short' })}, ${timeOf(slot)}` : null;
 
-  const book = () => {
+  const book = async () => {
     if (!slot) return;
     if (sample) return setBooked(true);
-    router.push(`/expert?slot=${encodeURIComponent(slot)}`);
+    setError(null);
+    setBusy(true);
+    const r = await bookExpertCallAction({ startsAt: slot, studioIds });
+    setBusy(false);
+    if (!r.ok) {
+      if (r.signIn) return router.push('/app/verify');
+      return setError(r.error);
+    }
+    setPhone(r.phone);
+    setBooked(true);
   };
 
   if (booked && slot) {
@@ -123,7 +142,7 @@ export function ExpertScreen({ slots, sample, expert }: { slots: string[]; sampl
                 color: '#b5b3ad',
               }}
             >
-              {first} reads your answers and all three quotes first, then calls you.
+              {first} reads your answers and all your quotes first, then calls you{phone ? ` on ${prettyPhone(phone)}` : ''}.
             </p>
             {sample ? <p className="oa-sample">Test build · nothing was booked</p> : null}
           </div>
@@ -131,14 +150,14 @@ export function ExpertScreen({ slots, sample, expert }: { slots: string[]; sampl
             {NEXT.map((step, i) => (
               <li key={step}>
                 <span>{String(i + 1).padStart(2, '0')}</span>
-                <span>{step.replace('{expert}', first)}</span>
+                <span>{step.replace('{expert}', first).replace('{n} ', studioIds.length > 1 ? `${studioIds.length} ` : '')}</span>
               </li>
             ))}
           </ol>
         </main>
         <Foot>
-          <Cta href="/app/home" tone="ghost">
-            See how your project will look
+          <Cta href="/app/choose" tone="ghost">
+            Next: meet your studios
           </Cta>
         </Foot>
       </Frame>
@@ -165,7 +184,7 @@ export function ExpertScreen({ slots, sample, expert }: { slots: string[]; sampl
                 color: 'rgba(255,255,255,.85)',
               }}
             >
-              {expert} reads your answers and all 3 quotes first. She earns the same whichever studio you pick.
+              {first} reads your answers and all {studioIds.length || 'your'} quotes first. She earns the same whichever studio you pick.
             </p>
           </div>
         </div>
@@ -205,6 +224,11 @@ export function ExpertScreen({ slots, sample, expert }: { slots: string[]; sampl
               ))}
             </div>
             {sample ? <p className="oa-sample">Test build · usual hours shown, nothing is booked</p> : null}
+            {error ? (
+              <p className="oa-note" role="alert" style={{ color: 'var(--accent-ink)' }}>
+                {error}
+              </p>
+            ) : null}
           </>
         )}
       </Body>
@@ -212,11 +236,23 @@ export function ExpertScreen({ slots, sample, expert }: { slots: string[]; sampl
         {days.length === 0 ? (
           <Cta href="/expert">Ask for a call</Cta>
         ) : (
-          <Cta onClick={book} disabled={!slot}>
-            {label ? `Book ${label}` : 'Pick a time'}
+          <Cta onClick={() => void book()} disabled={!slot || busy}>
+            {busy ? 'Booking…' : label ? `Book ${label}` : 'Pick a time'}
           </Cta>
         )}
       </Foot>
     </Frame>
   );
+}
+
+/** The matched studios' ids, for the consultation record — the same three the quotes came from. */
+function useStudioIds(data: AppData | null): string[] {
+  const empty = useMemo(() => ({ studios: [], rates: {}, allowUnverified: false, sample: true, ratesReal: false }) as AppData, []);
+  const { matches } = useJourney(data ?? empty);
+  return matches.map((m) => m.studio.id);
+}
+
+function prettyPhone(p: string): string {
+  const d = p.replace(/\D/g, '').slice(-10);
+  return d.length === 10 ? `+91 ${d.slice(0, 5)} ${d.slice(5)}` : p;
 }

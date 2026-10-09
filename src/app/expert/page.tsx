@@ -264,7 +264,7 @@ function Read({ label }: { label: string }) {
   );
 }
 
-/** "Ar. Swarupa Tondare" → "Swarupa": the title is not a name. */
+/** "Ar. Firstname Surname" → "Firstname": a title is not a name. */
 function firstName(full: string): string {
   const words = full.split(' ').filter((w) => !/^(ar|dr|mr|ms|mrs)\.?$/i.test(w));
   return words[0] ?? full;
