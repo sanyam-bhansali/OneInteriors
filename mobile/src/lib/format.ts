@@ -20,3 +20,10 @@ export function inr(paise: number): string {
 }
 
 export const optionPrice = (extraPaise: number) => (extraPaise > 0 ? `+${inr(extraPaise)}` : 'In quote');
+
+/** Lakhs for the big figures: 1840000_00 paise → "₹18.4 L"; under a lakh, rupees in full. */
+export function lakh(paise: number): string {
+  const rupees = paise / 100;
+  if (rupees < 100_000) return inr(paise);
+  return `₹${(rupees / 100_000).toFixed(2).replace(/\.?0+$/, '')} L`;
+}

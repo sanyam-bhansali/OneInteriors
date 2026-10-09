@@ -54,9 +54,9 @@ const styles = StyleSheet.create({
   update: { gap: 12, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.line },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   h2: { fontFamily: font.sansSemi, fontSize: 22, letterSpacing: -0.7, color: color.ink },
-  mono: { fontFamily: font.monoMedium, fontSize: 12, color: color.ink2 },
+  mono: { fontFamily: font.monoMedium, fontSize: 13, color: color.ink2 },
   main: { width: '100%', aspectRatio: 4 / 3, borderRadius: 16 },
   pair: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   small: { flexBasis: '48%', flexGrow: 1, aspectRatio: 4 / 3, borderRadius: 12 },
-  who: { fontFamily: font.monoMedium, fontSize: 12, color: color.ink, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: color.line },
+  who: { fontFamily: font.monoMedium, fontSize: 13, color: color.ink, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: color.line },
 });

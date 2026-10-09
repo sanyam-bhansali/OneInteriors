@@ -15,6 +15,11 @@ import { color, font } from '../lib/theme';
  */
 export default function Web() {
   const { path = '/app', title = '' } = useLocalSearchParams<{ path?: string; title?: string }>();
+  return <AppWebView path={path} title={title} closable />;
+}
+
+/** A website `/app` page inside the app. The GEIO tab uses it without the close button. */
+export function AppWebView({ path, title, closable = false }: { path: string; title: string; closable?: boolean }) {
   const [loading, setLoading] = useState(true);
   const base = apiBase();
   const safePath = path.startsWith('/app') ? path : '/app';
@@ -22,9 +27,13 @@ export default function Web() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: color.bg }} edges={['top']}>
       <View style={styles.bar}>
-        <Press onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} style={styles.close} accessibilityLabel="Close">
-          <Text style={{ fontSize: 22, color: color.ink }}>×</Text>
-        </Press>
+        {closable ? (
+          <Press onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} style={styles.close} accessibilityLabel="Close">
+            <Text style={{ fontSize: 22, color: color.ink }}>×</Text>
+          </Press>
+        ) : (
+          <View style={{ width: 44 }} />
+        )}
         <Text style={styles.title}>{title}</Text>
         <View style={{ width: 44 }} />
       </View>
@@ -57,6 +66,6 @@ export default function Web() {
 const styles = StyleSheet.create({
   bar: { height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12 },
   close: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  title: { fontFamily: font.mono, fontSize: 12, letterSpacing: 0.7, textTransform: 'uppercase', color: color.ink2 },
+  title: { fontFamily: font.sansMedium, fontSize: 14, color: color.ink2 },
   loading: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 52, alignItems: 'center', justifyContent: 'center' },
 });

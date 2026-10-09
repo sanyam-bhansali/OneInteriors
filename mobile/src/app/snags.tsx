@@ -3,12 +3,12 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { CameraIcon } from '../../components/icons';
-import { Body, Button, Chip, DarkCard, ErrorText, Field, Loading, Meta, Press, Rise, Screen, Title } from '../../components/ui';
-import { api } from '../../lib/api';
-import { dayLabel } from '../../lib/format';
-import { useProject } from '../../lib/project';
-import { color, font } from '../../lib/theme';
+import { CameraIcon } from '../components/icons';
+import { Body, Button, Chip, DarkCard, ErrorText, Field, Loading, Meta, Press, Rise, Screen, Title } from '../components/ui';
+import { api } from '../lib/api';
+import { dayLabel } from '../lib/format';
+import { useProject } from '../lib/project';
+import { color, font } from '../lib/theme';
 
 /**
  * Snags (the v1 design): fixed by a date, or we chase it. "Photograph a
@@ -27,7 +27,7 @@ export default function Snags() {
   if (state.status === 'loading') return <Loading />;
   if (state.status === 'none') {
     return (
-      <Screen>
+      <Screen back>
         <Meta>Fixed by a date, or we chase it</Meta>
         <Title>Snags</Title>
         <Body muted>Once your project starts, photograph anything wrong and it goes straight to the studio.</Body>
@@ -67,7 +67,7 @@ export default function Snags() {
   };
 
   return (
-    <Screen onRefresh={() => void refresh()} refreshing={refreshing}>
+    <Screen back onRefresh={() => void refresh()} refreshing={refreshing}>
       <Meta>Fixed by a date, or we chase it</Meta>
       <Title size={40}>Snags</Title>
 
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   snag: { flexDirection: 'row', gap: 14, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: color.line },
   thumb: { width: 84, height: 84, borderRadius: 12 },
   snagTitle: { fontFamily: font.sansSemi, fontSize: 17, lineHeight: 21, color: color.ink },
-  mono: { fontFamily: font.mono, fontSize: 12.5, color: color.ink2 },
-  cardMeta: { fontFamily: font.mono, fontSize: 11.5, letterSpacing: 0.7, textTransform: 'uppercase', color: '#f08a5d' },
+  mono: { fontFamily: font.mono, fontSize: 13, color: color.ink2 },
+  cardMeta: { fontFamily: font.sansMedium, fontSize: 13, color: '#f08a5d' },
   cardBody: { fontFamily: font.sans, fontSize: 15.5, lineHeight: 23, color: 'rgba(255,255,255,.85)' },
 });

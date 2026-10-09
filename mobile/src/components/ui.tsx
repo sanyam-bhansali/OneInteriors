@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -18,6 +19,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { color, font, radius, space } from '../lib/theme';
+import { BackIcon } from './icons';
 
 /**
  * The app's parts, to the owner's v1 screens: a warm grey ground, headlines
@@ -86,6 +88,7 @@ export function Screen({
   refreshing = false,
   dark = false,
   header,
+  back = false,
 }: {
   children: ReactNode;
   footer?: ReactNode;
@@ -93,10 +96,19 @@ export function Screen({
   refreshing?: boolean;
   dark?: boolean;
   header?: ReactNode;
+  /** A back arrow above the screen, for screens opened from a tab rather than in the tab bar. */
+  back?: boolean;
 }) {
   const bg = dark ? color.dark : color.bg;
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={['top', 'left', 'right']}>
+      {back ? (
+        <View style={{ paddingHorizontal: 12, paddingTop: 4 }}>
+          <Press onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))} style={styles.back} accessibilityLabel="Back">
+            <BackIcon color={dark ? color.white : color.ink} />
+          </Press>
+        </View>
+      ) : null}
       {header}
       <ScrollView
         contentContainerStyle={styles.body}
@@ -202,9 +214,10 @@ export function Loading() {
 }
 
 export const styles = StyleSheet.create({
+  back: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   body: { padding: space.lg, paddingTop: 18, paddingBottom: space.xl, gap: 18 },
   footer: { paddingHorizontal: space.lg, paddingTop: 12, paddingBottom: 28, gap: 8 },
-  meta: { fontFamily: font.mono, fontSize: 12, letterSpacing: 0.7, textTransform: 'uppercase', color: color.ink2 },
+  meta: { fontFamily: font.sansMedium, fontSize: 13, color: color.ink2 },
   title: { fontFamily: font.sansSemi, color: color.ink, letterSpacing: -1.6 },
   body15: { fontFamily: font.sans, fontSize: 15.5, lineHeight: 23, color: color.ink },
   button: { minHeight: 56, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },

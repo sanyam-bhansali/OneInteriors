@@ -106,7 +106,7 @@ export default function DecisionScreen() {
 const styles = StyleSheet.create({
   hero: { height: 240, backgroundColor: color.dark, overflow: 'hidden' },
   back: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,.25)', alignItems: 'center', justifyContent: 'center' },
-  heroMeta: { fontFamily: font.mono, fontSize: 12, letterSpacing: 0.7, textTransform: 'uppercase', color: color.white },
+  heroMeta: { fontFamily: font.sansMedium, fontSize: 13, color: color.white },
   h1: { fontFamily: font.sansSemi, fontSize: 36, lineHeight: 35, letterSpacing: -1.6, color: color.ink },
   option: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: color.line },
   swatch: { width: 60, height: 60, borderRadius: 14, borderWidth: 1, borderColor: color.line },

@@ -62,12 +62,34 @@ export interface Doc {
   url: string;
 }
 
+export interface PayStage {
+  index: number;
+  label: string;
+  pct: number | null;
+  amountPaise: number;
+  dueOn: string | null;
+  paidOn: string | null;
+  state: 'paid' | 'next' | 'later';
+}
+
+export interface Money {
+  contractPaise: number;
+  paidPaise: number;
+  next: PayStage | null;
+  laterPaise: number;
+  stages: PayStage[];
+}
+
 export interface Project {
   id: string;
   studio: string;
   startOn: string;
   stages: Stage[];
   phases: { label: string; pct: number }[] | null;
+  /** The signed total and its stages in rupees; null on a project started before signing in the app. */
+  money: Money | null;
+  /** Every option chosen on a decision, and what they add. Optional: older servers do not send it. */
+  changes?: { totalPaise: number; items: { decisionId: string; title: string; option: string; extraPaise: number; chosenAt: string | null }[] };
   updates: Update[];
   decisions: Decision[];
   snags: Snag[];

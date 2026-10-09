@@ -75,5 +75,5 @@ const styles = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: color.accentWarm, marginTop: 7 },
   title: { fontFamily: font.sansSemi, fontSize: 16, color: color.ink },
   body: { fontFamily: font.sans, fontSize: 14.5, lineHeight: 21, color: color.ink2 },
-  when: { fontFamily: font.mono, fontSize: 11.5, color: color.ink3 },
+  when: { fontFamily: font.mono, fontSize: 13, color: color.ink3 },
 });

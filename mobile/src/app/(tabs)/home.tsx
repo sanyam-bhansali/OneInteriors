@@ -8,8 +8,8 @@ import { ArrowIcon, BellIcon } from '../../components/icons';
 import { Body, Button, DarkCard, Loading, Meta, Press, Rise, Title } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
-import { dayLabel, timeLabel } from '../../lib/format';
-import { dayOf } from '../../lib/progress';
+import { dayLabel, inr, shortDate, timeLabel } from '../../lib/format';
+import { dayOf, daysLate } from '../../lib/progress';
 import { useProject } from '../../lib/project';
 import { color, font } from '../../lib/theme';
 import { STAGE_SHORT } from '../../lib/types';
@@ -53,6 +53,11 @@ export default function Home() {
   const stage = nowIndex >= 0 ? p.stages[nowIndex] : null;
   const { day, of } = dayOf(p.startOn, p.stages, now);
   const decision = p.decisions.find((d) => d.state === 'due-soon' || d.state === 'open') ?? null;
+  // The design's one delay message: the stage and the whole project, kept apart.
+  const late = daysLate(p.stages, now);
+  const stageStatus = stage ? `${STAGE_SHORT[stage.key] ?? stage.label} · ${stage.late ? 'running late' : 'on track'}` : 'Handed over';
+  const overall = `Overall · ${late ? `${late} day${late === 1 ? '' : 's'} late` : 'on time'}`;
+  const nextPay = p.money?.next ?? null;
 
   return (
     <View style={{ flex: 1, backgroundColor: color.bg }}>
@@ -76,7 +81,12 @@ export default function Home() {
               </Rise>
             ) : null}
             <View style={{ flex: 1 }} />
-            <Meta style={{ color: 'rgba(255,255,255,.8)' }}>{stage ? `${STAGE_SHORT[stage.key] ?? stage.label}, day ${day} of ${of}` : 'Handed over'}</Meta>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+              <Text style={styles.status} accessibilityLabel={`${stageStatus}, day ${day} of ${of}`}>
+                {stageStatus}
+              </Text>
+              <Text style={[styles.status, late ? { color: color.gold } : null]}>{overall}</Text>
+            </View>
             <Rise>
               <Text style={styles.h1}>Your home is coming together{name ? `, ${name}` : ''}.</Text>
             </Rise>
@@ -109,6 +119,16 @@ export default function Home() {
             </Rise>
           ) : null}
 
+          {nextPay ? (
+            <Press onPress={() => router.push('/project')} haptic={false} style={styles.payCard}>
+              <Meta>Next payment{nextPay.dueOn ? `, due ${shortDate(nextPay.dueOn)}` : ''}</Meta>
+              <Text style={styles.payAmt}>{inr(nextPay.amountPaise)}</Text>
+              <Body muted style={{ fontSize: 14 }}>
+                To {p.studio} for {nextPay.label.toLowerCase()}. You pay the studio directly; we keep track of it here.
+              </Body>
+            </Press>
+          ) : null}
+
           <View style={styles.sectionHead}>
             <Text style={styles.h2}>Latest from site</Text>
             {latest ? <Meta>{dayLabel(latest.at)}</Meta> : null}
@@ -136,7 +156,7 @@ function Header({ unread, light = false, label }: { unread: number; light?: bool
   const c = light ? color.white : color.ink;
   return (
     <View style={styles.header}>
-      <Press onPress={() => router.push('/settings')} haptic={false}>
+      <Press onPress={() => router.push('/me')} haptic={false}>
         <Text style={[styles.headerLabel, { color: light ? 'rgba(255,255,255,.9)' : color.ink2 }]}>{label ?? 'One Interiors'}</Text>
       </Press>
       <Press onPress={() => router.push('/notifications')} style={[styles.bell, { backgroundColor: light ? 'rgba(255,255,255,.16)' : 'rgba(14,14,13,.06)' }]} accessibilityLabel="Notifications">
@@ -148,21 +168,24 @@ function Header({ unread, light = false, label }: { unread: number; light?: bool
 }
 
 const styles = StyleSheet.create({
+  status: { fontFamily: font.mono, fontSize: 13.5, color: 'rgba(255,255,255,.85)' },
+  payCard: { padding: 16, borderRadius: 18, backgroundColor: color.surface, gap: 4 },
+  payAmt: { fontFamily: font.sansSemi, fontSize: 26, letterSpacing: -1, color: color.ink },
   hero: { height: 420, backgroundColor: color.dark, overflow: 'hidden' },
   heroInner: { flex: 1, paddingHorizontal: 20, paddingBottom: 22 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8 },
-  headerLabel: { fontFamily: font.mono, fontSize: 12, letterSpacing: 0.7, textTransform: 'uppercase' },
+  headerLabel: { fontFamily: font.sansMedium, fontSize: 13 },
   bell: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   badge: { position: 'absolute', top: 10, right: 11, width: 7, height: 7, borderRadius: 4, backgroundColor: color.accentWarm },
   pill: { alignSelf: 'center', marginTop: 14, paddingHorizontal: 13, paddingVertical: 7, borderRadius: 999, backgroundColor: 'rgba(14,14,13,.72)' },
-  pillText: { fontFamily: font.mono, fontSize: 11, color: color.onDark, letterSpacing: 0.4 },
+  pillText: { fontFamily: font.mono, fontSize: 13, color: color.onDark, letterSpacing: 0.4 },
   h1: { fontFamily: font.sansSemi, fontSize: 40, lineHeight: 39, letterSpacing: -1.8, color: color.white, marginTop: 8 },
   stages: { flexDirection: 'row', marginTop: 16 },
   dot: { width: 18, height: 18, borderRadius: 9, backgroundColor: color.dark, borderWidth: 1.5, borderColor: 'rgba(255,255,255,.4)' },
   dotDone: { backgroundColor: color.accentWarm, borderColor: color.accentWarm },
   dotNow: { borderWidth: 2, borderColor: color.accentWarm },
-  stageText: { fontFamily: font.mono, fontSize: 9.5, letterSpacing: 0.6, textTransform: 'uppercase', color: 'rgba(255,255,255,.7)' },
-  cardMeta: { fontFamily: font.mono, fontSize: 11.5, letterSpacing: 0.7, textTransform: 'uppercase', color: '#f08a5d' },
+  stageText: { fontFamily: font.sansMedium, fontSize: 13, color: 'rgba(255,255,255,.7)' },
+  cardMeta: { fontFamily: font.sansMedium, fontSize: 13, color: '#f08a5d' },
   cardTitle: { fontFamily: font.sansBold, fontSize: 25, lineHeight: 27, letterSpacing: -0.8, color: color.white },
   cardBody: { fontFamily: font.sans, fontSize: 15, lineHeight: 22, color: 'rgba(255,255,255,.75)' },
   cardCta: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: color.accent, borderRadius: 999, paddingHorizontal: 22, minHeight: 48, marginTop: 6 },

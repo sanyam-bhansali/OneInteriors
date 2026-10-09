@@ -1,11 +1,11 @@
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
-import { ArrowIcon } from '../../components/icons';
-import { Body, Loading, Meta, Press, Rise, Screen, Title } from '../../components/ui';
-import { useProject } from '../../lib/project';
-import { color, font } from '../../lib/theme';
-import { DOC_KINDS } from '../../lib/types';
+import { ArrowIcon } from '../components/icons';
+import { Body, Loading, Meta, Press, Rise, Screen, Title } from '../components/ui';
+import { useProject } from '../lib/project';
+import { color, font } from '../lib/theme';
+import { DOC_KINDS } from '../lib/types';
 
 /** Home locker (the v1 design): every document about the home, searchable, opened in the phone's browser. */
 export default function Locker() {
@@ -14,7 +14,7 @@ export default function Locker() {
   if (state.status === 'loading') return <Loading />;
   if (state.status === 'none') {
     return (
-      <Screen>
+      <Screen back>
         <Meta>For as long as you live there</Meta>
         <Title>Home locker</Title>
         <Body muted>Your agreement, drawings, receipts and warranties are kept here once your project starts.</Body>
@@ -26,7 +26,7 @@ export default function Locker() {
   const docs = p.documents.filter((d) => !term || `${d.title} ${DOC_KINDS[d.kind]} ${d.meta}`.toLowerCase().includes(term));
 
   return (
-    <Screen onRefresh={() => void refresh()} refreshing={refreshing}>
+    <Screen back onRefresh={() => void refresh()} refreshing={refreshing}>
       <Meta>Your home, for as long as you live there</Meta>
       <Title size={40}>Home locker</Title>
       <TextInput value={q} onChangeText={setQ} placeholder="Search, for example warranty" placeholderTextColor={color.ink3} style={styles.search} />
@@ -64,5 +64,5 @@ const styles = StyleSheet.create({
   h2: { fontFamily: font.sansSemi, fontSize: 22, letterSpacing: -0.7, color: color.ink },
   doc: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: color.line },
   docTitle: { fontFamily: font.sansSemi, fontSize: 17, color: color.ink },
-  docMeta: { fontFamily: font.mono, fontSize: 12.5, color: color.ink2, marginTop: 3 },
+  docMeta: { fontFamily: font.mono, fontSize: 13, color: color.ink2, marginTop: 3 },
 });

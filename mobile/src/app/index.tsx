@@ -54,7 +54,7 @@ export default function Welcome() {
 const styles = StyleSheet.create({
   wrap: { flex: 1, paddingHorizontal: 22, paddingBottom: 16 },
   logo: { width: 92, height: 48, marginTop: 8 },
-  meta: { fontFamily: font.mono, fontSize: 12, letterSpacing: 0.7, textTransform: 'uppercase', color: 'rgba(255,255,255,.85)' },
+  meta: { fontFamily: font.sansMedium, fontSize: 13, color: 'rgba(255,255,255,.85)' },
   h1: { fontFamily: font.sansSemi, fontSize: 46, lineHeight: 44, letterSpacing: -2.2, color: color.white, marginTop: 12 },
   p: { fontFamily: font.sans, fontSize: 17, lineHeight: 25, color: 'rgba(255,255,255,.86)', marginTop: 16 },
 });
