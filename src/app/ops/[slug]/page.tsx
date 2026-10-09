@@ -38,6 +38,16 @@ export const metadata: Metadata = {
  */
 export const dynamic = 'force-dynamic';
 
+/**
+ * Room for one batch of quotation reading per server action.
+ *
+ * A batch is a single request to the reader, which can take up to three
+ * minutes on a long scanned PDF. Server actions run with the time limit of
+ * the page they are posted from, so the limit is raised here rather than on
+ * the action.
+ */
+export const maxDuration = 300;
+
 export default async function OpsStudio({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const studio = await studioRepository.bySlug(slug);
@@ -379,6 +389,7 @@ async function archivesWithRates(studioId: string): Promise<ArchiveRow[]> {
       files: a.files,
       analysisState: a.analysisState,
       analysisError: a.analysisError,
+      readSoFar: a.readSoFar,
       pendingRates: await ratesForReview(a.id),
     })),
   );

@@ -591,6 +591,11 @@ model Studio {
   /// with itself, and knowing WHEN something was hidden is free.
   hiddenAsTestAt DateTime?
 
+  /// When the studio checked the rates we filled from their quotations and
+  /// said they were right. Until then the quotation builder stays shut — see
+  /// `modules/studio-quote/rates-gate.ts`. Null for a studio that has not.
+  ratesConfirmedAt DateTime?
+
   // Commercial
   minProjectPaise BigInt?
   maxProjectPaise BigInt?

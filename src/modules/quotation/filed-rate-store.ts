@@ -21,36 +21,49 @@ import { toDb, fromDb, type Paise } from '@/lib/money';
 import { requireRole, getCurrentUser, hasRole } from '@/modules/auth/session';
 import { myStudioId } from '@/modules/studio/tenancy';
 import { ingestQuotations } from './ingest';
-import { extractArchive } from './extract-agent';
+import { readNextBatch, EMPTY_PROGRESS, type ReadProgress } from './extract-agent';
 import { MIN_QUOTATIONS_PER_ITEM, rateCanGoLive, type StudioRates } from './catalogue';
 import { confidenceOf } from './analysis-states';
 import type { FiledRateView } from './analysis-states';
 import { productsFromArchive, bridgeSummary } from '@/modules/studio-quote/from-archive';
 
 /**
- * Read an archive and file what it yields, as PENDING.
+ * Read the next batch of an archive, and file the rates once the last batch is in.
  *
- * ## Never throws
+ * ## Ops presses it; nothing reads on upload any more
  *
- * It runs in the background after an upload, where a throw is an unhandled
- * rejection in a serverless function and the studio is told nothing. Every
- * failure lands in `analysisState` and `analysisError`, which is where ops
- * looks and where the studio's own status line is read from.
+ * Reading costs money per document, so it starts only when a person asks:
+ * ops opens the archive, presses Read, and the screen calls this once per
+ * batch until it reports done — or until ops presses Stop. Upload only
+ * stores the files.
+ *
+ * ## One batch per call
+ *
+ * See `readNextBatch`. What was read so far lives in `report.progress` on the
+ * archive, so a stopped or interrupted read carries on from where it was,
+ * and a read never runs longer than one request to the reader.
  *
  * ## Idempotent by supersession, not by skipping
  *
- * Running it twice on the same archive does not double the rates: the
- * existing PENDING rows for that archive are superseded first. Running it
- * after ops has already approved rates supersedes those too, which is
- * correct — a re-read means we now believe something different, and the old
- * figure stays in the table so a quote already shown can still be explained.
+ * When the last batch is in, the archive's PENDING rates are replaced, not
+ * added to. `fresh: true` starts again from the first file — the "read them
+ * again" case — and discards the stored progress.
  */
-export async function analyseArchive(archiveId: string): Promise<void> {
+export type BatchOutcome =
+  | { ok: true; done: boolean; read: number; total: number; filed: number | null; skipped: number }
+  | { ok: false; error: string };
+
+export async function readArchiveBatch(archiveId: string, fresh = false): Promise<BatchOutcome> {
+  await requireRole('OPS');
+
   const archive = await prisma.quotationArchive.findUnique({
     where: { id: archiveId },
-    select: { id: true, studioId: true },
+    select: { id: true, studioId: true, report: true },
   });
-  if (!archive) return;
+  if (!archive) return { ok: false, error: 'That archive is not there any more.' };
+
+  const stored = (archive.report as { progress?: ReadProgress } | null)?.progress;
+  const before: ReadProgress = !fresh && stored && typeof stored.cursor === 'number' ? stored : EMPTY_PROGRESS;
 
   try {
     await prisma.quotationArchive.update({
@@ -58,22 +71,48 @@ export async function analyseArchive(archiveId: string): Promise<void> {
       data: { analysisState: 'READING', analysisError: null },
     });
 
-    const result = await extractArchive(archiveId);
+    const result = await readNextBatch(archiveId, before);
 
     if (!result.ok) {
       await prisma.quotationArchive.update({
         where: { id: archiveId },
         data: {
-          /* UNAVAILABLE and FAILED are different facts and the studio is told
-             different things: one is our deployment, the other is their
-             documents. Collapsing them would have a studio re-scanning files
-             that were never the problem. */
           analysisState: result.error.includes('No API key') ? 'UNAVAILABLE' : 'FAILED',
           analysisError: result.error,
           analysedAt: new Date(),
         },
       });
-      return;
+      return { ok: false, error: result.error };
+    }
+
+    if (!result.done) {
+      /* Partway. The progress is saved so the next press — or the next
+         visit, if ops stops here — continues rather than starting over. */
+      await prisma.quotationArchive.update({
+        where: { id: archiveId },
+        data: { report: { progress: result.progress } as never },
+      });
+      return {
+        ok: true,
+        done: false,
+        read: result.progress.cursor,
+        total: result.total,
+        filed: null,
+        skipped: result.progress.skipped.length,
+      };
+    }
+
+    if (result.check.quotations.length === 0) {
+      await prisma.quotationArchive.update({
+        where: { id: archiveId },
+        data: {
+          analysisState: 'FAILED',
+          analysisError: 'Nothing readable came back. Ops reads these by hand.',
+          analysedAt: new Date(),
+          report: { progress: result.progress } as never,
+        },
+      });
+      return { ok: false, error: 'Nothing readable came back from these files.' };
     }
 
     const { rates, report } = ingestQuotations(
@@ -94,15 +133,25 @@ export async function analyseArchive(archiveId: string): Promise<void> {
            read. Stored rather than recomputed because it is evidence: which
            rate came from how many quotations, and which product strings we
            could not place. When a studio disputes a number a year from now,
-           this is the answer. */
+           this is the answer. The raw progress is dropped — it has served
+           its purpose and it is the largest thing on the row. */
         report: {
           ...report,
-          filesRead: result.filesRead,
-          filesSkipped: result.filesSkipped,
+          filesRead: result.progress.filesRead,
+          filesSkipped: result.progress.skipped,
           extractionIssues: result.check.issues,
         } as never,
       },
     });
+
+    return {
+      ok: true,
+      done: true,
+      read: result.total,
+      total: result.total,
+      filed: Object.keys(rates).length,
+      skipped: result.progress.skipped.length,
+    };
   } catch (error) {
     await prisma.quotationArchive
       .update({
@@ -116,6 +165,7 @@ export async function analyseArchive(archiveId: string): Promise<void> {
       .catch(() => {
         /* The database is the thing that failed. Nothing further to try. */
       });
+    return { ok: false, error: 'The read stopped on our side. Press Read to carry on from where it was.' };
   }
 }
 
@@ -286,52 +336,6 @@ function view(row: {
   };
 }
 
-/**
- * Ops asks for an archive to be read again.
- *
- * ## Why a retry is needed at all
- *
- * Extraction fails on things nobody can predict: a scan at an angle, a
- * password-protected export, a batch that hit the API while it was having a
- * bad minute. Without this the only way back was asking the studio to upload
- * the same twenty documents a second time, which is both insulting and the
- * thing most likely to lose them.
- *
- * ## The role check is here, not at the caller
- *
- * `analyseArchive` takes an archive id and no session — it is called from the
- * studio upload path where `currentStudio()` has already established whose
- * archive it is. Reached by id from an ops screen, nothing else would scope
- * it, so the guard belongs next to the write rather than in the action. An
- * action is a route by another name.
- *
- * ## Marking it READING before the work starts
- *
- * So the screen changes the moment the button is pressed. `analyseArchive`
- * sets the same state again when it begins, which is harmless and means a
- * press whose background work never ran leaves the archive in a state that
- * can simply be pressed again.
- */
-export async function requestReanalysis(archiveId: string): Promise<ReviewResult> {
-  await requireRole('OPS');
-
-  const archive = await prisma.quotationArchive.findUnique({
-    where: { id: archiveId },
-    select: { id: true, _count: { select: { files: true } } },
-  });
-  if (!archive) return { ok: false, error: 'That archive is not there any more.' };
-  if (archive._count.files === 0) {
-    return { ok: false, error: 'There are no files on this archive to read.' };
-  }
-
-  await prisma.quotationArchive.update({
-    where: { id: archiveId },
-    data: { analysisState: 'READING', analysisError: null },
-  });
-
-  return { ok: true, live: 0, catalogue: null };
-}
-
 // ── Ops decisions ──────────────────────────────────────────────
 
 export type ReviewResult =
@@ -416,6 +420,28 @@ export async function approveRates(archiveId: string): Promise<ReviewResult> {
    * were before this existed.
    */
   const catalogue = await fillProductMaster(studioId, pending);
+
+  /* Tell the studio their rates are in and need checking. In-app, read on the
+     dashboard and Product master; cleared when they confirm. Outside the
+     transaction for the same reason the product master is: a notice failing
+     to write must not undo an approval. */
+  if (going.length > 0) {
+    await prisma.studioMember
+      .findMany({ where: { studioId }, select: { userId: true } })
+      .then((members) =>
+        members.length === 0
+          ? null
+          : prisma.notification.createMany({
+              data: members.map((m) => ({
+                userId: m.userId,
+                channel: 'push',
+                template: 'rates.filled',
+                payload: { archiveId, live: going.length },
+              })),
+            }),
+      )
+      .catch((error) => console.error('[filed-rates] rates.filled notice failed', error));
+  }
 
   return { ok: true, live: going.length, catalogue };
 }

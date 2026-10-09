@@ -48,6 +48,7 @@ import 'server-only';
  * shape, one less package to keep patched. Same as `portfolio-agent.ts`.
  */
 
+import { createHash } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
 import { hasAnthropic, anthropicModel, supabaseConfig } from '@/lib/env';
 import { checkExtraction, type ExtractCheck } from './extract-schema';
@@ -103,10 +104,6 @@ const SENDABLE = new Map<string, 'pdf' | 'image'>([
   ['image/webp', 'image'],
 ]);
 
-export type ExtractResult =
-  | { ok: true; check: ExtractCheck; filesRead: number; filesSkipped: string[] }
-  | { ok: false; error: string };
-
 /**
  * The system prompt.
  *
@@ -143,15 +140,55 @@ function systemPrompt(): string {
 }
 
 /**
- * Read one archive's files.
+ * Where a read has got to, kept on the archive between presses.
  *
- * Batched, and the batches are independent: a request that fails loses four
- * documents rather than twenty, and what the others produced is kept. An
- * archive half-read is still worth approving — `fromQuotations` on every rate
- * says how much it rests on, which is exactly the judgement ops is there to
- * make.
+ * ## Why a read is now many small requests instead of one long one
+ *
+ * The whole archive used to be read inside one `after()` on the upload
+ * request. Eighty files is twenty sequential calls of up to three minutes
+ * each, and a serverless function is stopped long before that — so the
+ * archive sat at READING for ever, nothing was filed, and every byte sent up
+ * to that point was paid for and thrown away.
+ *
+ * Now each call reads ONE batch (at most `FILES_PER_REQUEST` files, one API
+ * request) and stores what came back here. Ops drives it from the archive
+ * screen, batch after batch, and can stop at any point without losing what
+ * was read. A function that dies mid-batch loses one batch, not the archive.
+ *
+ * `docs` holds the raw per-document replies; `checkExtraction` runs once over
+ * all of them at the end, exactly as it did over a single read before.
  */
-export async function extractArchive(archiveId: string): Promise<ExtractResult> {
+export interface ReadProgress {
+  /** Index into the archive's files, in upload order. */
+  cursor: number;
+  docs: unknown[];
+  skipped: string[];
+  /** SHA-256 of every file already read, so a re-sent copy is not paid for twice. */
+  hashes: string[];
+  filesRead: number;
+}
+
+export const EMPTY_PROGRESS: ReadProgress = { cursor: 0, docs: [], skipped: [], hashes: [], filesRead: 0 };
+
+export type ChunkResult =
+  | { ok: true; done: false; progress: ReadProgress; total: number }
+  | {
+      ok: true;
+      done: true;
+      progress: ReadProgress;
+      total: number;
+      check: ExtractCheck;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Read the next batch of an archive.
+ *
+ * Takes the progress so far and returns the progress after one more batch.
+ * It never reads more than one batch per call — that is the entire point —
+ * and it never writes anything itself; the store decides what to keep.
+ */
+export async function readNextBatch(archiveId: string, before: ReadProgress): Promise<ChunkResult> {
   if (!hasAnthropic()) {
     return { ok: false, error: 'No API key on this deployment. The archive goes to ops by hand.' };
   }
@@ -163,116 +200,103 @@ export async function extractArchive(archiveId: string): Promise<ExtractResult> 
 
   const files = await prisma.quotationFile.findMany({
     where: { archiveId },
-    orderBy: { uploadedAt: 'asc' },
+    orderBy: [{ uploadedAt: 'asc' }, { id: 'asc' }],
     take: MAX_FILES_PER_ARCHIVE,
   });
   if (files.length === 0) return { ok: false, error: 'This archive has no files.' };
 
+  const progress: ReadProgress = {
+    cursor: before.cursor,
+    docs: [...before.docs],
+    skipped: [...before.skipped],
+    hashes: [...before.hashes],
+    filesRead: before.filesRead,
+  };
+  const seen = new Set(progress.hashes);
+
   const canRead = (f: { contentType: string; filename: string }) =>
     SENDABLE.has(f.contentType) || spreadsheetKind(f.contentType, f.filename) !== null;
-  const sendable = files.filter(canRead);
-  const skipped = files
-    .filter((f) => !canRead(f))
-    .map((f) => `${f.filename} — not a PDF, an image or an .xlsx/.csv, so it goes to ops by hand.`);
 
-  if (sendable.length === 0) {
-    return { ok: false, error: 'Nothing here is a PDF, an image or a workbook we can read. Ops reads these by hand.' };
-  }
+  const blocks: unknown[] = [];
+  const inBatch: string[] = [];
+  let batchBytes = 0;
 
-  const all: unknown[] = [];
-  let filesRead = 0;
+  while (progress.cursor < files.length && inBatch.length < FILES_PER_REQUEST) {
+    const file = files[progress.cursor]!;
 
-  /**
-   * Batched by BYTES as well as by count, and each batch released before the
-   * next is fetched.
-   *
-   * The count alone said nothing about memory — four 25 MB PDFs is 133 MB of
-   * base64 in one invocation. So a batch closes when it reaches either four
-   * documents or `MAX_BATCH_BASE64`, and `blocks` goes out of scope at the
-   * end of each iteration so the collector can take it before the next
-   * download starts.
-   *
-   * A single file bigger than the budget still goes on its own rather than
-   * being skipped: one oversized document is exactly the case where a studio
-   * would otherwise never find out why their archive read short.
-   */
-  let index = 0;
-  while (index < sendable.length) {
-    const blocks: unknown[] = [];
-    const inBatch: string[] = [];
-    let batchBytes = 0;
-
-    while (index < sendable.length && inBatch.length < FILES_PER_REQUEST) {
-      const file = sendable[index]!;
-
-      const bytes = await download(config.url, key, file.path);
-      if (!bytes) {
-        skipped.push(`${file.filename} — we could not fetch it back from storage.`);
-        index += 1;
-        continue;
-      }
-
-      /* Over budget and this batch already has something in it: leave the
-         file for the next round rather than pushing the batch over. `index`
-         is deliberately not advanced. */
-      if (inBatch.length > 0 && batchBytes + bytes.length > MAX_BATCH_BASE64) break;
-
-      const sheet = SENDABLE.has(file.contentType) ? null : spreadsheetKind(file.contentType, file.filename);
-      if (sheet) {
-        /* A workbook goes as its rows. Unreadable (a corrupt file, a zip
-           bomb past the cap, an .xlsx that is really something else) is
-           said to the studio, not guessed at. */
-        const raw = Buffer.from(bytes, 'base64');
-        const rows = sheet === 'csv' ? raw.toString('utf8').slice(0, MAX_WORKBOOK_CHARS) : null;
-        const sheets = sheet === 'xlsx' ? readWorkbook(raw) : null;
-        const text = rows ?? (sheets && sheets.length > 0 ? workbookText(sheets) : null);
-        if (!text) {
-          skipped.push(`${file.filename} — we could not open this workbook. Ops will read it by hand.`);
-          index += 1;
-          continue;
-        }
-        blocks.push({
-          type: 'text',
-          text: `A spreadsheet quotation follows, one row per line, cells separated by " | ".\n\n${text}`,
-        });
-      } else {
-        const kind = SENDABLE.get(file.contentType)!;
-        blocks.push({
-          type: kind === 'pdf' ? 'document' : 'image',
-          source: { type: 'base64', media_type: file.contentType, data: bytes },
-        });
-      }
-      /* The filename travels as the reference, so every extracted quotation
-         can be pointed back at the document it came from. Ops approving a
-         rate needs to be able to open the thing it was read out of. */
-      blocks.push({ type: 'text', text: `Document reference: ${file.filename}` });
-
-      batchBytes += bytes.length;
-      inBatch.push(file.filename);
-      index += 1;
-    }
-
-    if (blocks.length === 0) continue;
-
-    const batchResult = await callOnce(blocks);
-    /* Emptied before the next batch is fetched. Without this the previous
-       batch's bytes are still reachable while the next one downloads, which
-       doubles the peak for no reason. */
-    blocks.length = 0;
-
-    if (!batchResult.ok) {
-      skipped.push(`${inBatch.length} document(s) could not be read: ${batchResult.error}`);
+    if (!canRead(file)) {
+      progress.skipped.push(`${file.filename} — not a PDF, an image or an .xlsx/.csv, so it goes to ops by hand.`);
+      progress.cursor += 1;
       continue;
     }
-    if (Array.isArray(batchResult.parsed)) all.push(...batchResult.parsed);
-    filesRead += inBatch.length;
+
+    const bytes = await download(config.url, key, file.path);
+    if (!bytes) {
+      progress.skipped.push(`${file.filename} — we could not fetch it back from storage.`);
+      progress.cursor += 1;
+      continue;
+    }
+
+    /* The same document sent twice is read once. Studios re-upload — a
+       batch that looked like it failed, a folder picked twice — and every
+       copy used to go to the reader and into the medians. */
+    const hash = createHash('sha256').update(bytes).digest('hex');
+    if (seen.has(hash)) {
+      progress.skipped.push(`${file.filename} — the same file was already read, so it was not read again.`);
+      progress.cursor += 1;
+      continue;
+    }
+
+    /* Not the first file and it would push this batch over: leave it for
+       the next press. The cursor is deliberately not advanced. */
+    if (inBatch.length > 0 && batchBytes + bytes.length > MAX_BATCH_BASE64) break;
+
+    const sheet = SENDABLE.has(file.contentType) ? null : spreadsheetKind(file.contentType, file.filename);
+    if (sheet) {
+      const raw = Buffer.from(bytes, 'base64');
+      const rows = sheet === 'csv' ? raw.toString('utf8').slice(0, MAX_WORKBOOK_CHARS) : null;
+      const sheets = sheet === 'xlsx' ? readWorkbook(raw) : null;
+      const text = rows ?? (sheets && sheets.length > 0 ? workbookText(sheets) : null);
+      if (!text) {
+        progress.skipped.push(`${file.filename} — we could not open this workbook. Ops will read it by hand.`);
+        progress.cursor += 1;
+        continue;
+      }
+      blocks.push({
+        type: 'text',
+        text: `A spreadsheet quotation follows, one row per line, cells separated by " | ".\n\n${text}`,
+      });
+    } else {
+      const kind = SENDABLE.get(file.contentType)!;
+      blocks.push({
+        type: kind === 'pdf' ? 'document' : 'image',
+        source: { type: 'base64', media_type: file.contentType, data: bytes },
+      });
+    }
+    /* Named, so a line can be traced back to the document it came from. */
+    blocks.push({ type: 'text', text: `Document reference: ${file.filename}` });
+
+    seen.add(hash);
+    progress.hashes.push(hash);
+    batchBytes += bytes.length;
+    inBatch.push(file.filename);
+    progress.cursor += 1;
   }
 
-  if (all.length === 0) {
-    return { ok: false, error: 'Nothing readable came back. Ops reads these by hand.' };
+  if (blocks.length > 0) {
+    const batchResult = await callOnce(blocks);
+    if (!batchResult.ok) {
+      progress.skipped.push(`${inBatch.length} document(s) could not be read: ${batchResult.error}`);
+    } else {
+      if (Array.isArray(batchResult.parsed)) progress.docs.push(...batchResult.parsed);
+      progress.filesRead += inBatch.length;
+    }
   }
 
-  return { ok: true, check: checkExtraction(all), filesRead, filesSkipped: skipped };
+  const total = files.length;
+  if (progress.cursor < total) return { ok: true, done: false, progress, total };
+
+  return { ok: true, done: true, progress, total, check: checkExtraction(progress.docs) };
 }
 
 async function callOnce(

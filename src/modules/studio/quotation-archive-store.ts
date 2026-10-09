@@ -8,8 +8,6 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
-import { after } from 'next/server';
-import { analyseArchive } from '@/modules/quotation/filed-rate-store';
 import { requireRole } from '@/modules/auth/session';
 import { currentStudio } from './onboarding';
 import {
@@ -38,6 +36,8 @@ export interface ArchiveDetail extends ArchiveSummary {
   id: string;
   uploadedAt: string;
   files: { id: string; filename: string; bytes: number; path: string }[];
+  /** Files already read by a stopped or unfinished read — see `readArchiveBatch`. */
+  readSoFar: number;
 }
 
 function toDetail(row: {
@@ -50,7 +50,9 @@ function toDetail(row: {
   note: string | null;
   uploadedAt: Date;
   files: { id: string; filename: string; bytes: number; path: string }[];
+  report?: unknown;
 }): ArchiveDetail {
+  const progress = (row.report as { progress?: { cursor?: unknown } } | null | undefined)?.progress;
   return {
     id: row.id,
     state: row.state as ArchiveState,
@@ -61,6 +63,7 @@ function toDetail(row: {
     fileCount: row.files.length,
     uploadedAt: row.uploadedAt.toISOString(),
     files: row.files,
+    readSoFar: typeof progress?.cursor === 'number' ? progress.cursor : 0,
   };
 }
 
@@ -154,7 +157,14 @@ export async function uploadQuotations(files: File[]): Promise<UploadOutcome> {
   const stored: { path: string; filename: string; contentType: string; bytes: number }[] = [];
   const skipped: string[] = [];
 
+  const sent = await alreadySent(context.studio.id);
   for (const file of real) {
+    const key = sentKey(file.name, file.size);
+    if (sent.has(key)) {
+      skipped.push(`${file.name} — already sent, so it was not sent again.`);
+      continue;
+    }
+    sent.add(key);
     const result = await storeQuotationFile(context.studio.id, file);
     if (result.ok) stored.push(result.file);
     else skipped.push(result.error);
@@ -189,6 +199,28 @@ export async function recordUploadedQuotations(
   return recordStored(context.studio.id, stored, []);
 }
 
+/**
+ * What this studio has already sent, as name + size.
+ *
+ * Name and size rather than a content hash because the browser uploads
+ * straight to storage and we never see the bytes at this point. It catches
+ * the case that actually happens — the same folder chosen twice — and the
+ * reader hashes content as well, so a renamed copy is still read only once.
+ * Rejected archives do not count: a studio re-sending after a rejection is
+ * meant to.
+ */
+async function alreadySent(studioId: string): Promise<Set<string>> {
+  const rows = await prisma.quotationFile.findMany({
+    where: { archive: { studioId, state: { not: 'REJECTED' } } },
+    select: { filename: true, bytes: true },
+  });
+  return new Set(rows.map((r) => sentKey(r.filename, r.bytes)));
+}
+
+function sentKey(name: string, bytes: number): string {
+  return `${name.slice(0, 120).toLowerCase()}|${bytes}`;
+}
+
 /** Signed links for each file the studio chose, after the same checks a direct upload makes. */
 export async function planQuotationUploads(
   files: { name: string; type: string; size: number }[],
@@ -207,7 +239,17 @@ export async function planQuotationUploads(
   }
   const uploads: (PlannedUpload & { index: number })[] = [];
   const skipped: string[] = [];
+  const sent = await alreadySent(context.studio.id);
   for (const [index, f] of files.entries()) {
+    /* The same file twice — a folder picked again, a batch that looked like
+       it failed — used to be stored, counted toward the fifty and paid for
+       when read. Skipped and named instead. */
+    const key = sentKey(String(f.name), Number(f.size));
+    if (sent.has(key)) {
+      skipped.push(`${String(f.name)} — already sent, so it was not sent again.`);
+      continue;
+    }
+    sent.add(key);
     const r = await planQuotationUpload(context.studio.id, { name: String(f.name), type: String(f.type), size: Number(f.size) });
     if (r.ok) uploads.push({ ...r.upload, index });
     else skipped.push(r.error);
@@ -232,39 +274,20 @@ async function recordStored(
       select: { id: true },
     });
 
-    let archiveId: string;
     if (open) {
       await prisma.quotationFile.createMany({
         data: stored.map((f) => ({ archiveId: open.id, ...f })),
       });
-      archiveId = open.id;
     } else {
-      const created = await prisma.quotationArchive.create({
+      await prisma.quotationArchive.create({
         data: { studioId: context.studio.id, files: { create: stored } },
         select: { id: true },
       });
-      archiveId = created.id;
     }
 
-    /**
-     * Start reading them, without making the studio wait.
-     *
-     * Twenty documents through the extractor is minutes, not seconds, so it
-     * cannot happen inside this request — the upload would time out and the
-     * studio would be told their files failed when they are sitting safely
-     * in the bucket.
-     *
-     * `after()` runs once the response is sent. It is best-effort by nature:
-     * a cold start killed mid-flight leaves the archive at NOT_STARTED,
-     * which is a state ops can see and re-run from, and is exactly where
-     * every archive sat before this existed. Nothing is lost by it not
-     * running — only time.
-     *
-     * `analyseArchive` never throws; its failures land in `analysisState`.
-     * The `catch` is belt and braces for an unhandled rejection reaching a
-     * serverless function, where it would take the instance down.
-     */
-    after(() => analyseArchive(archiveId).catch(() => {}));
+    /* Not read here. Reading is paid for per document, so it starts when
+       ops presses Read on the archive — see `readArchiveBatch`. The archive
+       waits at NOT_STARTED, which is what ops looks for. */
   } catch {
     // The objects are in the bucket but unreferenced. Remove them rather than
     // leaving files nobody can find and nobody can delete.
