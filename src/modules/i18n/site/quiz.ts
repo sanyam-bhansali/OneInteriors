@@ -369,6 +369,11 @@ export const QUIZ_DICT = {
   'contact.name': { en: 'Your name', hi: 'आपका नाम', mr: 'तुमचे नाव' },
   'contact.mobile': { en: 'Mobile', hi: 'मोबाइल', mr: 'मोबाइल' },
   'contact.email': { en: 'Email', hi: 'ईमेल', mr: 'ईमेल' },
+  'contact.byContinuing': {
+    en: 'By pressing See who fits, you agree:',
+    hi: '"देखें कौन सही है" दबाकर आप सहमति देते हैं:',
+    mr: '"कोण योग्य आहे ते पाहा" दाबून तुम्ही संमती देता:',
+  },
   'contact.howWeUse': { en: 'How we use it', hi: 'हम इसका इस्तेमाल कैसे करते हैं', mr: 'आम्ही याचा वापर कसा करतो' },
   'contact.optional': { en: 'optional', hi: 'वैकल्पिक', mr: 'ऐच्छिक' },
 

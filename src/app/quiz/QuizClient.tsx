@@ -349,7 +349,11 @@ export function QuizClient({
    * records the agreement before it writes a single detail.
    */
   async function submitContact() {
-    const input = { ...contact, name: contact.name || brief.contactName || '' };
+    /* Consent by the button (owner, 10 Oct 2026): the notice sits right above
+       "See who fits", and pressing it is the affirmative act DPDP asks for —
+       no pre-ticked box, and no box to tick. WhatsApp stays a separate,
+       unticked opt-in. */
+    const input = { ...contact, agreed: true, name: contact.name || brief.contactName || '' };
     const check = checkContact(input, { requireEmail: true });
     if (!check.ok) {
       setContactErrors(check.errors);
@@ -900,21 +904,13 @@ function ContactStep({
       {/* The notice, on the landing's soft card: calm type, nothing in a box
           of rules. The words are unchanged (PURPOSE_NOTICE). */}
       <div className="flow-card mt-1 flex flex-col gap-4 !p-5 sm:!p-6">
-        <label className="flex cursor-pointer items-start gap-3.5 text-[15px] leading-relaxed text-[var(--ink)]">
-          <input
-            type="checkbox"
-            checked={contact.agreed}
-            onChange={(e) => set({ agreed: e.target.checked })}
-            className="mt-[5px] h-[18px] w-[18px] shrink-0 accent-[var(--ink)]"
-          />
-          <span>
-            {PURPOSE_NOTICE.DATA_PROCESSING.label}.{' '}
-            <span className="text-[var(--ink-2)]">{PURPOSE_NOTICE.DATA_PROCESSING.detail}</span>{' '}
-            <Link href="/privacy" target="_blank" className="text-[var(--ink)] underline underline-offset-2">
-              {t('contact.howWeUse')}
-            </Link>
-          </span>
-        </label>
+        <p className="m-0 text-[15px] leading-relaxed text-[var(--ink)]">
+          {t('contact.byContinuing')} {PURPOSE_NOTICE.DATA_PROCESSING.label.charAt(0).toLowerCase() + PURPOSE_NOTICE.DATA_PROCESSING.label.slice(1)}.{' '}
+          <span className="text-[var(--ink-2)]">{PURPOSE_NOTICE.DATA_PROCESSING.detail}</span>{' '}
+          <Link href="/privacy" target="_blank" className="text-[var(--ink)] underline underline-offset-2">
+            {t('contact.howWeUse')}
+          </Link>
+        </p>
         <Err text={quizServerText(lang, errors.agreed)} />
 
         <label className="flex cursor-pointer items-start gap-3.5 text-[15px] leading-relaxed text-[var(--ink-2)]">
