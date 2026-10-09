@@ -1695,7 +1695,7 @@ function LiveProfile({
               <DocRow
                 key={k}
                 label={k}
-                value={v.toUpperCase()}
+                value={v}
                 action={
                   <button
                     type="button"
@@ -1708,7 +1708,7 @@ function LiveProfile({
                 }
               />
             ) : (
-              <DocRow key={k} label={k} value={v.toUpperCase()} />
+              <DocRow key={k} label={k} value={v} />
             ),
           )}
         </div>

@@ -2859,3 +2859,49 @@ html:is([lang='hi'], [lang='mr']) .split .w {
 .oi-app .rounded-full:focus-visible {
   border-radius: 9999px;
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+   One voice from the quiz to the expert call (owner, 10 Oct 2026: "make
+   this entire page from the quiz to the expert page in our theme").
+
+   The home page sets everything in one sans — figures included — at a
+   normal weight. The customer screens still set numbers, prices, times
+   and labels in a typewriter mono at 600, which read as a different site.
+   Here the mono slot takes the same sans with tabular figures (so money
+   and times still line up in columns), and the weights come down to the
+   home page's. Scoped to `.oi-app`; studio and ops keep their mono.
+   ───────────────────────────────────────────────────────────────────── */
+.oi-app,
+.oi-app.oi-quick,
+.oi-app .oi-quick {
+  --font-mono: var(--font-geist), 'Helvetica Neue', Arial, sans-serif;
+}
+.oi-app.oi-quick,
+.oi-app .oi-quick {
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.oi-app .oi-num,
+.oi-app.oi-quick .oi-num,
+.oi-app .oi-quick .oi-num,
+.oi-app .oi-mono {
+  font-family: var(--font-geist), 'Helvetica Neue', Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.oi-app .oi-eyebrow,
+.oi-app .oi-label,
+.oi-app.oi-quick .oi-eyebrow,
+.oi-app.oi-quick .oi-label,
+.oi-app .oi-quick .oi-eyebrow,
+.oi-app .oi-quick .oi-label {
+  font-family: var(--font-geist), 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+}
+.oi-app.oi-quick .oi-display,
+.oi-app .oi-quick .oi-display {
+  font-weight: 500;
+  letter-spacing: -0.035em;
+}
