@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useActionState, useState } from 'react';
 import { savePositioningAction, type StepState } from './actions';
 import { Section } from './Section';
-import { SaveBar } from './fields';
+import { SaveBar, keepValues } from './fields';
 import {
   OFFERINGS,
   OFFERING_COPY,
@@ -61,7 +61,7 @@ export function PositioningForm({
   const suggestion = suggestedLevel(minLakhs, maxLakhs);
 
   return (
-    <form action={action} className="flex flex-col gap-4">
+    <form onSubmit={keepValues(action)} className="flex flex-col gap-4">
       <Section
         n={1}
         title="What do you offer?"

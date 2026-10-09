@@ -127,6 +127,10 @@ export function AreaPicker({
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          /* Enter here is a search, not "save the whole profile". */
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.preventDefault();
+          }}
           placeholder="Search areas — Baner, Wakad, Kharadi…"
           aria-label="Search areas"
           className="oi-input w-full rounded-[11px] border border-[var(--color-rule)] py-2.5 pl-10 pr-4 text-[14.5px]"

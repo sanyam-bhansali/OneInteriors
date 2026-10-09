@@ -284,7 +284,10 @@ export default async function OnboardingStepPage({
               minLakhs={studio.minProjectPaise ? paiseToLakhs(fromDb(studio.minProjectPaise)) : null}
               maxLakhs={studio.maxProjectPaise ? paiseToLakhs(fromDb(studio.maxProjectPaise)) : null}
             />
-            <RateCardForm values={await rateCardValues()} />
+            <RateCardForm
+              values={await rateCardValues()}
+              stillNeeded={steps.find((s) => s.step === 'rates')?.missing[0] ?? null}
+            />
             <PaymentPhasesForm initial={phasesText(readPhases(studio.paymentPhases))} />
           </div>
         ) : null}

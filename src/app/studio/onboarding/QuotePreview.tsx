@@ -39,7 +39,9 @@ export function QuotePreview({ rupees }: { rupees: Record<string, string> }) {
   const rates: RateCard = {};
   for (const [category, raw] of Object.entries(rupees)) {
     const n = Number(raw);
-    if (Number.isFinite(n) && n > 0) {
+    // Capped: a huge number (an extra few zeros) used to throw in the
+    // paise conversion and take the page down.
+    if (Number.isFinite(n) && n > 0 && n < 1e8) {
       rates[category as RateCategory] = rupeesToPaise(n) as Paise;
     }
   }

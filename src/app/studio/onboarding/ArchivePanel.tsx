@@ -1,7 +1,8 @@
 'use client';
 
-import { useActionState, useRef, useState } from 'react';
-import { uploadQuotationsAction, type UploadState } from './actions';
+
+import { useRef, useState } from 'react';
+import { planQuotationUploadsAction, recordQuotationUploadsAction, type UploadState } from './actions';
 import {
   studioMessage,
   type ArchiveState,
@@ -57,9 +58,66 @@ export function ArchivePanel({
   /** False when storage is not configured on this deployment. */
   enabled: boolean;
 }) {
-  const [state, action, pending] = useActionState(uploadQuotationsAction, INITIAL);
+  const [state, setState] = useState<UploadState>(INITIAL);
+  const [pending, setPending] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; of: number } | null>(null);
   const [chosen, setChosen] = useState(0);
   const input = useRef<HTMLInputElement>(null);
+
+  /**
+   * Straight to storage, one file at a time, then recorded.
+   *
+   * Quotations can be 25 MB. Posting them through the server action — what
+   * this did — broke its 4 MB limit with a few files and crashed the page
+   * ("Application error"). Now each file goes to storage on a signed link
+   * the server issues for that file alone, and the action only records what
+   * arrived. A file that fails is named; the others still count.
+   */
+  async function send() {
+    const files = Array.from(input.current?.files ?? []).filter((f) => f.size > 0);
+    if (files.length === 0 || pending) return;
+    setPending(true);
+    setState(INITIAL);
+    try {
+      const plan = await planQuotationUploadsAction(files.map((f) => ({ name: f.name, type: f.type, size: f.size })));
+      if (!plan.ok) {
+        setState({ status: 'error', message: plan.error });
+        return;
+      }
+      const skipped = [...plan.skipped];
+      const arrived: { path: string; filename: string; contentType: string; bytes: number }[] = [];
+      for (let i = 0; i < plan.uploads.length; i++) {
+        const u = plan.uploads[i]!;
+        setProgress({ done: i, of: plan.uploads.length });
+        const file = files[u.index];
+        if (!file) continue;
+        try {
+          const r = await fetch(u.uploadUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': u.contentType, 'x-upsert': 'false' },
+            body: file,
+          });
+          if (r.ok) arrived.push({ path: u.path, filename: u.filename, contentType: u.contentType, bytes: u.bytes });
+          else skipped.push(`${u.filename} did not go through. Try that one again.`);
+        } catch {
+          skipped.push(`${u.filename} did not go through. Check the connection and try that one again.`);
+        }
+      }
+      setProgress(null);
+      if (arrived.length === 0) {
+        setState({ status: 'error', message: 'None of the files went through.', skipped });
+        return;
+      }
+      setState(await recordQuotationUploadsAction(arrived, skipped));
+      if (input.current) input.current.value = '';
+      setChosen(0);
+    } catch {
+      setState({ status: 'error', message: 'That did not go through. Check the connection and try again.' });
+    } finally {
+      setProgress(null);
+      setPending(false);
+    }
+  }
 
   /**
    * Off, and saying so.
@@ -156,7 +214,13 @@ export function ArchivePanel({
       ) : null}
 
       {enabled ? (
-        <form action={action} className="flex flex-col gap-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void send();
+          }}
+          className="flex flex-col gap-4"
+        >
           <div>
             <label
               htmlFor="quotations"
@@ -187,7 +251,9 @@ export function ArchivePanel({
                 disabled={pending}
                 className="rounded-full bg-[var(--color-petrol)] px-5 py-2.5 text-[14.5px] font-medium text-[var(--color-paper)] disabled:opacity-40"
               >
-                {pending ? 'Sending…' : `Send ${chosen} file${chosen === 1 ? '' : 's'}`}
+                {pending
+                  ? `Sending${progress ? ` ${progress.done + 1} of ${progress.of}` : ''}…`
+                  : `Send ${chosen} file${chosen === 1 ? '' : 's'}`}
               </button>
               {/* Large files over a slow connection. Saying so beats a button
                   that looks stuck. */}

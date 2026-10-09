@@ -244,3 +244,67 @@ function safeDisplayName(original: string): string {
     .slice(0, 120);
   return cleaned || 'quotation';
 }
+
+// ── Direct uploads (9 Oct 2026) ───────────────────────────────
+//
+// A quotation can be 25 MB; a server action carries at most 4 MB and Vercel
+// about 4.5 MB. Sending files through the action meant a few of them broke
+// the request and crashed the studio's page. So the browser now puts each
+// file straight into storage with a short-lived signed link, and the action
+// only records what arrived.
+
+export interface PlannedUpload {
+  path: string;
+  filename: string;
+  contentType: string;
+  bytes: number;
+  /** Absolute URL to PUT the file to; good for two hours, for this path only. */
+  uploadUrl: string;
+}
+
+export type PlanResult = { ok: true; upload: PlannedUpload } | { ok: false; error: string };
+
+/** A signed link to put one file at a path we choose, after the same checks a direct store makes. */
+export async function planQuotationUpload(
+  studioId: string,
+  file: { name: string; type: string; size: number },
+): Promise<PlanResult> {
+  const config = supabaseConfig();
+  const key = secretKey();
+  if (!config || !key) return { ok: false, error: 'Sending files is not switched on for this deployment.' };
+
+  const name = safeDisplayName(file.name);
+  const extension = ALLOWED.get(file.type) ?? extensionOf(file.name);
+  if (!extension) return { ok: false, error: `${name} — we cannot take that kind of file.` };
+  if (file.size <= 0) return { ok: false, error: `${name} is empty.` };
+  if (file.size > MAX_BYTES) return { ok: false, error: `${name} is over 25 MB.` };
+
+  const path = `studio_${studioId}/${crypto.randomUUID()}.${extension}`;
+  try {
+    const response = await fetch(`${config.url}/storage/v1/object/upload/sign/${BUCKET}/${encodeURI(path)}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (!response.ok) return { ok: false, error: `We could not prepare ${name}. Try again in a minute.` };
+    const json = (await response.json()) as { url?: string };
+    if (!json.url) return { ok: false, error: `We could not prepare ${name}. Try again in a minute.` };
+    return {
+      ok: true,
+      upload: {
+        path,
+        filename: name,
+        contentType: file.type || 'application/octet-stream',
+        bytes: file.size,
+        uploadUrl: `${config.url}/storage/v1${json.url}`,
+      },
+    };
+  } catch {
+    return { ok: false, error: 'We could not reach storage. Try again in a minute.' };
+  }
+}
+
+/** A path this studio may record: one we generated for it, nothing else. */
+export function isStudioUploadPath(studioId: string, path: string): boolean {
+  return new RegExp(`^studio_${studioId}/[0-9a-f-]{36}\.[a-z0-9]{1,5}$`).test(path);
+}

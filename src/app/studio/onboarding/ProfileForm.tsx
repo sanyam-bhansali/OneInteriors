@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { MIN_ABOUT_LENGTH, MAX_ABOUT_LENGTH } from '@/modules/studio/onboarding-steps';
 import { saveProfileAction, saveProfileDraftAction, type StepState } from './actions';
-import { SaveBar } from './fields';
+import { SaveBar, keepValues } from './fields';
 import { Section, Counter } from './Section';
 import { AreaPicker } from './AreaPicker';
 import { SiteLookup } from './SiteLookup';
@@ -166,7 +166,7 @@ export function ProfileForm({
      * is not a preview of anything.
      */
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_19rem] xl:gap-8">
-      <form ref={form} action={action} className="flex flex-col gap-4">
+      <form ref={form} onSubmit={keepValues(action)} className="flex flex-col gap-4">
       <Section
         n={1}
         title="Studio description"
@@ -521,7 +521,7 @@ function Money({
           /* `step="0.5"` so the browser accepts 7.5. A number input defaults
              to step=1, which makes an ordinary project floor unenterable and
              gives no reason why. */
-          step="0.5"
+          step="any"
           min="0"
           value={value}
           onChange={(e) => onChange(e.target.value)}

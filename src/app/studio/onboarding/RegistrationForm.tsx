@@ -2,7 +2,7 @@
 
 import { useActionState, useRef, useState } from 'react';
 import { saveRegistrationAction, type StepState } from './actions';
-import { SaveBar } from './fields';
+import { SaveBar, keepValues } from './fields';
 import { Section } from './Section';
 import { ProofUpload } from './ProofUpload';
 import type { StudioDocumentView } from '@/modules/studio/documents';
@@ -107,7 +107,7 @@ export function RegistrationForm({
     <div className="flex flex-col gap-4">
       <Reassurance />
 
-      <form id={FORM_ID} ref={form} action={action} className="flex flex-col gap-4">
+      <form id={FORM_ID} ref={form} onSubmit={keepValues(action)} className="flex flex-col gap-4">
         <Section
           n={1}
           title="Business identity"
@@ -173,10 +173,9 @@ export function RegistrationForm({
                 label="Pincode"
                 name="pincode"
                 value={pincode}
-                onChange={setPincode}
+                onChange={(v) => setPincode(digitsOnly(v).slice(0, 6))}
                 placeholder="411045"
                 inputMode="numeric"
-                maxLength={6}
                 mono
                 error={err.pincode}
               />
@@ -223,9 +222,8 @@ export function RegistrationForm({
                   label="GSTIN"
                   name="gstin"
                   value={gstin}
-                  onChange={(v) => setGstin(v.toUpperCase())}
+                  onChange={(v) => setGstin(v.replace(/[\s-]+/g, '').toUpperCase().slice(0, 15))}
                   placeholder="27AAPFU0939F1ZV"
-                  maxLength={15}
                   mono
                   error={err.gstin}
                   hint="Fifteen characters, as on the certificate. We check the format immediately so a typo does not cost you a week."
@@ -450,4 +448,13 @@ function TickCircle() {
 
 function titleCase(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
+ * A pincode as it is pasted or typed: spaces dropped, Devanagari digits read
+ * as digits. With `maxLength={6}` a pasted "411 045" was cut to "411 04" and
+ * the Save button stayed grey with nothing saying why.
+ */
+function digitsOnly(v: string): string {
+  return v.replace(/[०-९]/g, (d) => String(d.charCodeAt(0) - 0x0966)).replace(/\D/g, '');
 }

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useActionState, useState } from 'react';
 import { formatINRCompact } from '@/lib/money';
 import { removeProjectAction, declarePortfolioShortfallAction, type StepState } from './actions';
-import { SaveBar } from './fields';
+import { SaveBar, keepValues } from './fields';
 import { ProjectModal } from './ProjectModal';
 import { Image as ImageIcon } from 'lucide-react';
 import { PANEL_ICON } from './icon-sizes';
@@ -326,7 +326,7 @@ function ProjectCard({ project }: { project: ProjectRow }) {
           </span>
         </span>
 
-        <form action={action}>
+        <form onSubmit={keepValues(action)}>
           <input type="hidden" name="id" value={project.id} />
           <button
             type="submit"
@@ -364,7 +364,7 @@ function ShortfallForm({ note }: { note: string | null }) {
 
   return (
     <form
-      action={action}
+      onSubmit={keepValues(action)}
       className="flex flex-col gap-5 rounded-[14px] border border-dashed border-[var(--color-rule)] bg-[var(--color-paper-2)] p-6"
     >
       <div>

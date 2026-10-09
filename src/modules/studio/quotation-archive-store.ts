@@ -13,6 +13,9 @@ import { analyseArchive } from '@/modules/quotation/filed-rate-store';
 import { requireRole } from '@/modules/auth/session';
 import { currentStudio } from './onboarding';
 import {
+  planQuotationUpload,
+  isStudioUploadPath,
+  type PlannedUpload,
   storeQuotationFile,
   deleteQuotationFiles,
   signedUrlForFile,
@@ -161,6 +164,63 @@ export async function uploadQuotations(files: File[]): Promise<UploadOutcome> {
     return { ok: false, error: skipped[0] ?? 'Nothing could be stored.' };
   }
 
+  return recordStored(context.studio.id, stored, skipped);
+}
+
+/**
+ * Record files the browser has already put in storage through a signed link
+ * (`planQuotationUploads`). Only paths we generated for this studio count.
+ */
+export async function recordUploadedQuotations(
+  files: { path: string; filename: string; contentType: string; bytes: number }[],
+): Promise<UploadOutcome> {
+  const context = await currentStudio();
+  if (!context) return { ok: false, error: 'No studio is linked to this account.' };
+  const stored = files
+    .filter((f) => isStudioUploadPath(context.studio.id, f.path))
+    .slice(0, MAX_FILES_PER_UPLOAD)
+    .map((f) => ({
+      path: f.path,
+      filename: String(f.filename).slice(0, 120) || 'quotation',
+      contentType: String(f.contentType).slice(0, 120) || 'application/octet-stream',
+      bytes: Math.max(0, Math.min(Number(f.bytes) || 0, 25 * 1024 * 1024)),
+    }));
+  if (stored.length === 0) return { ok: false, error: 'No files arrived. Try sending them again.' };
+  return recordStored(context.studio.id, stored, []);
+}
+
+/** Signed links for each file the studio chose, after the same checks a direct upload makes. */
+export async function planQuotationUploads(
+  files: { name: string; type: string; size: number }[],
+): Promise<{ ok: true; uploads: (PlannedUpload & { index: number })[]; skipped: string[] } | { ok: false; error: string }> {
+  const context = await currentStudio();
+  if (!context) return { ok: false, error: 'No studio is linked to this account.' };
+  if (!quotationUploadEnabled()) {
+    return { ok: false, error: 'Sending files is not switched on yet. Fill the rates in below and we will sort this out with you directly.' };
+  }
+  if (files.length === 0) return { ok: false, error: 'No files were selected.' };
+  if (files.length > MAX_FILES_PER_UPLOAD) {
+    return {
+      ok: false,
+      error: `That is more than ${MAX_FILES_PER_UPLOAD} files at once. Send them in two goes — a second batch adds to the first, it does not replace it.`,
+    };
+  }
+  const uploads: (PlannedUpload & { index: number })[] = [];
+  const skipped: string[] = [];
+  for (const [index, f] of files.entries()) {
+    const r = await planQuotationUpload(context.studio.id, { name: String(f.name), type: String(f.type), size: Number(f.size) });
+    if (r.ok) uploads.push({ ...r.upload, index });
+    else skipped.push(r.error);
+  }
+  return { ok: true, uploads, skipped };
+}
+
+async function recordStored(
+  studioId: string,
+  stored: { path: string; filename: string; contentType: string; bytes: number }[],
+  skipped: string[],
+): Promise<UploadOutcome> {
+  const context = { studio: { id: studioId } };
   try {
     /* Added to the open archive rather than starting a new one, so a studio
        who sends twelve files today and fifteen tomorrow is one batch of

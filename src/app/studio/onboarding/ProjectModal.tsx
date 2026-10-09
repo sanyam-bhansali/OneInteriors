@@ -1,12 +1,8 @@
 'use client';
 
 import { startTransition, useActionState, useEffect, useRef, useState } from 'react';
-import {
-  addProjectAction,
-  uploadProjectImagesAction,
-  type ImagesState,
-  type StepState,
-} from './actions';
+import { addProjectAction, uploadProjectImagesAction, type ImagesState, type StepState } from './actions';
+import { shrinkImage } from '@/lib/shrink-image';
 import { PROPERTY_LABELS, SCOPE_LABELS, STYLE_LABELS } from '@/modules/brief/types';
 import { X } from 'lucide-react';
 import { IMAGE_ROOMS, IMAGE_ROOM_LABELS } from '@/modules/studio/portfolio-fields';
@@ -155,9 +151,14 @@ export function ProjectModal({
 
   /* A successful add closes the modal and resets it, so the next "Add
      project" opens on an empty stage one rather than on the last one filled
-     in. Keyed on the state object, which is new per submission. */
+     in. Acts once per submission: `onClose` is a new function every time the
+     page behind re-renders, so without this the effect re-ran on the next
+     render — and "Add another" opened the modal only for this to shut it
+     again at once, which a studio reported as a button that does nothing. */
+  const handledSave = useRef<StepState | null>(null);
   useEffect(() => {
-    if (state.status !== 'saved') return;
+    if (state.status !== 'saved' || handledSave.current === state) return;
+    handledSave.current = state;
     setStage(0);
     setImages([]);
     setRooms({});
@@ -192,13 +193,15 @@ export function ProjectModal({
     if (target !== undefined) setStage(target);
   }, [state]);
 
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
     firstField.current?.focus();
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') closeRef.current();
     };
     document.addEventListener('keydown', onKey);
     /* The page behind must not scroll while this is open, or a phone shows
@@ -211,7 +214,7 @@ export function ProjectModal({
       document.body.style.overflow = overflow;
       previous?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -260,15 +263,17 @@ export function ProjectModal({
         <form
           noValidate
           onSubmit={(e) => {
+            /* Always by hand: posting through `action={action}` let React 19
+               reset every uncontrolled field (society, area, numbers, tags)
+               whenever the add was refused, so fixing one thing lost the rest. */
+            e.preventDefault();
             /* Nothing asked to add. A stray default action from the stage
                that just advanced is not a person finishing a project. */
-            if (!askedToAdd.current) {
-              e.preventDefault();
-              return;
-            }
+            if (!askedToAdd.current) return;
             askedToAdd.current = false;
+            const data = new FormData(e.currentTarget);
+            startTransition(() => action(data));
           }}
-          action={action}
           className="grid grid-cols-1 gap-0 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]"
         >
           <StageRail stage={stage} onPick={setStage} />
@@ -665,24 +670,48 @@ function ImageStage({
   enabled: boolean;
   active: boolean;
 }) {
-  const [state, action, pending] = useActionState(uploadProjectImagesAction, IMAGES_INITIAL);
+  const [pending, setPending] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; of: number } | null>(null);
+  const [skipped, setSkipped] = useState<string[]>([]);
   const [over, setOver] = useState(false);
   const dragFrom = useRef<number | null>(null);
+  /* The latest list, for appending as each photo comes back. */
+  const current = useRef(images);
+  current.current = images;
 
-  /* New URLs are appended as they come back. Keyed on the state object so a
-     second upload of the same picture still lands — `urls` alone would be
-     deep-equal and the effect would not run. */
-  useEffect(() => {
-    if (state.status !== 'saved' || !state.urls) return;
-    onChange([...images, ...state.urls]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
-
-  function send(files: FileList | null) {
-    if (!files || files.length === 0 || !enabled) return;
-    const data = new FormData();
-    for (const file of Array.from(files)) data.append('images', file);
-    startTransition(() => action(data));
+  /**
+   * One photo per request, each shrunk first.
+   *
+   * The server-action body limit is 4 MB (next.config.ts) and Vercel's own is
+   * 4.5 MB. Sending every chosen photo in one request — what this did — meant
+   * two phone photos broke the limit, the request was refused before our code
+   * ran, and the unhandled rejection took the whole page down with
+   * "Application error: a client-side exception". Shrunk to 1,600 px a photo
+   * is a few hundred KB, and one at a time a big batch still cannot add up.
+   */
+  async function send(files: FileList | null) {
+    if (!files || files.length === 0 || !enabled || pending) return;
+    const list = Array.from(files);
+    setPending(true);
+    setSkipped([]);
+    const notes: string[] = [];
+    for (let i = 0; i < list.length; i++) {
+      setProgress({ done: i, of: list.length });
+      const original = list[i]!;
+      try {
+        const file = await shrinkImage(original);
+        const data = new FormData();
+        data.append('images', file);
+        const r: ImagesState = await uploadProjectImagesAction(IMAGES_INITIAL, data);
+        if (r.urls?.length) onChange([...current.current, ...r.urls]);
+        if (r.skipped?.length) notes.push(...r.skipped);
+      } catch {
+        notes.push(`${original.name} could not be uploaded. Check the connection and try that one again.`);
+      }
+    }
+    setSkipped(notes);
+    setProgress(null);
+    setPending(false);
   }
 
   function move(from: number, to: number) {
@@ -735,7 +764,7 @@ function ImageStage({
           disabled={pending || !active}
         />
         <span className="text-[15px] font-medium text-[var(--color-ink)]">
-          {pending ? 'Uploading…' : 'Drag photographs here'}
+          {pending ? `Uploading${progress ? ` ${progress.done + 1} of ${progress.of}` : ''}…` : 'Drag photographs here'}
         </span>
         <span className="mt-0.5 text-[13.5px] text-[var(--color-ink-2)]">
           {pending ? 'One moment.' : 'or click to choose them'}
@@ -745,9 +774,9 @@ function ImageStage({
         </span>
       </label>
 
-      {state.skipped && state.skipped.length > 0 ? (
+      {skipped.length > 0 ? (
         <ul className="m-0 mt-3 flex list-none flex-col gap-1 rounded-[10px] border border-[var(--color-brass)]/35 bg-[var(--color-brass-soft)] px-4 py-2.5 p-0">
-          {state.skipped.map((message) => (
+          {skipped.map((message) => (
             <li key={message} className="text-[13px] leading-relaxed text-[var(--color-ink)]">
               {message}
             </li>

@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import { savePaymentPhasesAction, type StepState } from './actions';
-import { Field, SaveBar } from './fields';
+import { Field, SaveBar, keepValues } from './fields';
 import { advanceIsHigh, checkPhases, parsePhasesText } from '@/modules/studio/payment-phases';
 
 const INITIAL: StepState = { status: 'idle' };
@@ -27,7 +27,7 @@ export function PaymentPhasesForm({ initial }: { initial: string }) {
 
   return (
     <form
-      action={action}
+      onSubmit={keepValues(action)}
       className="oi-sec rounded-[16px] border border-[var(--color-rule)] bg-[var(--color-paper)] px-6 py-5"
     >
       <p className="m-0 text-[15.5px] font-semibold text-[var(--color-ink)]">When you are paid</p>
@@ -75,6 +75,7 @@ export function PaymentPhasesForm({ initial }: { initial: string }) {
         saved={state.status === 'saved'}
         formError={state.errors?.form}
         label="Save payment phases"
+        missing={problem ? [problem] : undefined}
       />
     </form>
   );
