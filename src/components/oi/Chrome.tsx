@@ -25,10 +25,10 @@
  * and nothing is hidden to manufacture curiosity.
  */
 
-import { SiteLangPicker, useSiteT } from '@/components/app/i18n';
+import { useSiteT } from '@/components/app/i18n';
 import { CHROME_DICT } from '@/modules/i18n/site/chrome';
 import Link from 'next/link';
-import { Mark } from '@/components/brand';
+import { Wordmark } from '@/components/brand';
 import { rosterIsReal } from '@/lib/env';
 import { Wrap } from '@/components/landing/parts';
 
@@ -69,14 +69,12 @@ export function AppHeader() {
             className="flex items-center gap-2.5 no-underline"
             aria-label={t('header.homeAria')}
           >
-            <Mark className="h-[18px] w-[18px] text-[var(--ink)]" />
-            <span className="oi-display text-[17px] leading-none text-[var(--ink)]">
-              One Interiors
+            <span className="text-[var(--ink)]">
+              <Wordmark inherit showCity={false} />
             </span>
           </Link>
 
           <nav className="flex items-center gap-5">
-            <SiteLangPicker />
             <Link
               href="/studios"
               className="hidden text-[13.5px] text-[var(--ink2)] no-underline hover:text-[var(--ink)] sm:inline"
@@ -213,8 +211,9 @@ export function AppFooter() {
         <div className="flex flex-col gap-9 sm:flex-row sm:justify-between sm:gap-12">
           <div className="max-w-[40ch]">
             <span className="mb-3 flex items-center gap-2.5">
-              <Mark className="h-5 w-5 text-white/80" />
-              <span className="oi-display text-[18px] text-[#f4efe8]">One Interiors</span>
+              <span className="text-[#f4efe8]">
+                <Wordmark inherit showCity={false} />
+              </span>
             </span>
             <p className="m-0 text-[13.5px] leading-[1.6] text-white/60">
               {t('footer.tagline')}

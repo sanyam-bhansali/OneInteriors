@@ -6,11 +6,14 @@ import { showUnverifiedStudios } from '@/lib/env';
 import { AppFooter, AppHeader } from '@/components/oi/Chrome';
 import { Wrap } from '@/components/oi';
 import { BriefClient } from './BriefClient';
+import { getLang } from '@/modules/i18n/server';
+import { translator } from '@/modules/i18n/site';
+import { COMPARE_DICT } from '@/modules/i18n/site/compare';
 
-export const metadata: Metadata = {
-  title: 'Comparison brief',
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = translator(await getLang(), COMPARE_DICT);
+  return { title: t('meta.briefTitle'), robots: { index: false, follow: false } };
+}
 
 export const dynamic = 'force-dynamic';
 

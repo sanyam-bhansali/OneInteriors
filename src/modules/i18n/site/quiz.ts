@@ -374,6 +374,9 @@ export const QUIZ_DICT = {
 
   // ── The running brief ("brief so far") ─────────────────────
   'profile.titleNamed': { en: "{name}'s brief so far", hi: '{name} का ब्रीफ़ अब तक', mr: '{name} यांचे आतापर्यंतचे ब्रीफ' },
+  'profile.edit': { en: 'Edit', hi: 'बदलें', mr: 'बदला' },
+  'profile.editAria': { en: 'Change {what}', hi: '{what} बदलें', mr: '{what} बदला' },
+  'cta.backToDetails': { en: 'Back to your details', hi: 'अपनी जानकारी पर वापस', mr: 'तुमच्या माहितीकडे परत' },
   'profile.title': { en: 'Your brief so far', hi: 'आपका ब्रीफ़ अब तक', mr: 'तुमचे आतापर्यंतचे ब्रीफ' },
   'profile.empty': {
     en: 'This fills in as you answer. Nothing is sent anywhere while you do.',

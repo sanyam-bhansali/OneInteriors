@@ -30,7 +30,7 @@
 
 import { ExpertPitch } from '@/components/oi/ExpertPitch';
 import type { OfferState } from '@/modules/consultation/offer';
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { formatINRCompact } from '@/lib/money';
 import { compareMany, type ComparedLine } from '@/modules/quotation/first-quote';
@@ -50,8 +50,25 @@ import { filedRatesFor } from '@/data/filed-rates';
 import type { Brief } from '@/modules/brief/types';
 import type { Studio } from '@/modules/studio/types';
 import type { StudioRates } from '@/modules/quotation/catalogue';
+import { useLang, useSiteT } from '@/components/app/i18n';
+import { COMPARE_DICT } from '@/modules/i18n/site/compare';
+import { ROOM_TX, itemLabel, lbl } from '@/modules/i18n/site/labels';
+import type { Lang } from '@/modules/i18n/site';
 
 const money = (p: number | null) => (p === null ? null : formatINRCompact(p));
+
+/** A room's name in this language; the English label for a room the labels do not know. */
+export function roomName(lang: Lang, room: string, english: string): string {
+  return room in ROOM_TX ? lbl(lang, ROOM_TX, room) : english;
+}
+
+/** A translated sentence with `{key}` placeholders filled by elements rather than strings. */
+function withNodes(text: string, nodes: Record<string, ReactNode>): ReactNode[] {
+  return text.split(/(\{\w+\})/).map((part, i) => {
+    const m = /^\{(\w+)\}$/.exec(part);
+    return m && m[1] in nodes ? <Fragment key={i}>{nodes[m[1]]}</Fragment> : part;
+  });
+}
 
 /** One studio's column width. Wide enough for a material, narrow enough for four. */
 const COL = 'min-w-[13.5rem]';
@@ -110,13 +127,14 @@ function Star({
   label: string;
   onToggle: () => void;
 }) {
+  const t = useSiteT(COMPARE_DICT);
   return (
     <button
       type="button"
       onClick={onToggle}
       aria-pressed={on}
       aria-label={
-        on ? `${label} — starred. Remove from your verdict` : `Star ${label} to count it in your verdict`
+        on ? t('star.on', { label }) : t('star.off', { label })
       }
       className="-ml-1.5 flex h-11 w-9 flex-none cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-[15px] leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--acc)]"
       style={{ color: on ? 'var(--acc-ink)' : 'var(--ink2)' }}
@@ -141,6 +159,8 @@ export function CompareClient({
   const [project, setProject] = useState<Project | null>(null);
   const [brief, setBrief] = useState<Brief | null>(null);
   const [term, setTerm] = useState<Material | null>(null);
+  const t = useSiteT(COMPARE_DICT);
+  const lang = useLang();
 
   useEffect(() => {
     setProject(loadProject());
@@ -155,9 +175,10 @@ export function CompareClient({
     const ranked = rankStudios(brief, roster, 99, {
       allowUnverified,
       ratesFor: (slug) => filedRates?.[slug] ?? filedRatesFor(slug),
+      lang,
     });
     return new Map(ranked.map((r) => [r.studioId, r]));
-  }, [brief, roster, allowUnverified, filedRates]);
+  }, [brief, roster, allowUnverified, filedRates, lang]);
 
   const entries = useMemo(() => {
     if (!project) return [];
@@ -206,12 +227,11 @@ export function CompareClient({
         <AppHeader />
         <Spine at="compare" />
         <Wrap className="py-12">
-          <Chapter eyebrow="Side by side" title="Two quotes, and this page starts working.">
-            One quote compared with nothing is a quote. Price a second studio and every line lands
-            beside its opposite number — same item, same size, their materials and their price.
+          <Chapter eyebrow={t('eyebrow')} title={t('empty.title')}>
+            {t('empty.body')}
           </Chapter>
           <Sheet className="p-8">
-            <Quiet href="/match">Back to your matches</Quiet>
+            <Quiet href="/match">{t('back')}</Quiet>
           </Sheet>
         </Wrap>
         <AppFooter />
@@ -232,28 +252,27 @@ export function CompareClient({
       <Spine
         at="compare"
         facts={[
-          { id: 'quote', fact: `${Object.keys(project.quotes).length} priced` },
-          { id: 'compare', fact: `${studios.length} side by side` },
+          { id: 'quote', fact: t('fact.priced', { n: Object.keys(project.quotes).length }) },
+          { id: 'compare', fact: t('fact.compare', { n: studios.length }) },
         ]}
       />
 
       <Wrap className="py-12">
         <Chapter
-          eyebrow="Side by side"
-          title={`${studios.length} quotes, written to the same lines.`}
+          eyebrow={t('eyebrow')}
+          title={t('title', { n: studios.length })}
           aside={
             <p className="oi-num m-0 whitespace-nowrap text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink2)]">
-              Same item · same size · their materials
+              {t('aside')}
             </p>
           }
         >
-          Same lines, same sizes, their own rates. Star what you care about. Tap any material you
-          do not recognise.
+          {t('intro')}
         </Chapter>
 
         {!ratesAreReal() ? (
           <p className="m-0 mb-8">
-            <Flag>Pre-launch — priced on archive rates, not each studio&rsquo;s own filed card</Flag>
+            <Flag>{t('prelaunch')}</Flag>
           </p>
         ) : null}
 
@@ -271,10 +290,10 @@ export function CompareClient({
                   <button
                     type="button"
                     onClick={() => drop(s.slug)}
-                    aria-label={`Remove ${s.name} from the comparison`}
+                    aria-label={t('remove.aria', { name: s.name })}
                     className="oi-num -mr-2 -mt-2 flex min-h-11 cursor-pointer items-center rounded-full border-0 bg-transparent px-2.5 text-[9.5px] uppercase tracking-[0.16em] text-[var(--ink2)] transition-colors hover:text-[var(--ink)]"
                   >
-                    Remove
+                    {t('remove')}
                   </button>
                 </div>
                 <p className="oi-num m-0 text-[24px] leading-none">
@@ -284,14 +303,14 @@ export function CompareClient({
                   {money(s.quote.lowPaise)}–{money(s.quote.highPaise)}
                 </p>
                 <p className="oi-num m-0 mt-3 border-t border-[var(--line)] pt-3 text-[10.5px] uppercase tracking-[0.12em] text-[var(--ink2)]">
-                  Factory {money(s.quote.modularPaise)} · site {money(s.quote.nonModularPaise)}
+                  {t('factory', { factory: money(s.quote.modularPaise) ?? '', site: money(s.quote.nonModularPaise) ?? '' })}
                 </p>
                 {isLowest && studios.length > 1 ? (
                   <p
                     className="oi-num m-0 mt-3 text-[10px] uppercase tracking-[0.14em]"
                     style={{ color: 'var(--sec-ink)' }}
                   >
-                    Lowest total — read the materials below
+                    {t('lowest')}
                   </p>
                 ) : null}
               </Sheet>
@@ -309,7 +328,7 @@ export function CompareClient({
           <Sheet className="mb-10 p-6">
             <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
               <p className="oi-eyebrow m-0">
-                On your {tally.codes.length} starred line{tally.codes.length === 1 ? '' : 's'}
+                {t(tally.codes.length === 1 ? 'starred.one' : 'starred.many', { n: tally.codes.length })}
               </p>
               <button
                 type="button"
@@ -322,7 +341,7 @@ export function CompareClient({
                 }}
                 className="oi-num -my-2 flex min-h-11 cursor-pointer items-center rounded-full border-0 bg-transparent px-2.5 text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink2)] transition-colors hover:text-[var(--ink)]"
               >
-                Clear stars
+                {t('clearStars')}
               </button>
             </div>
 
@@ -336,7 +355,7 @@ export function CompareClient({
                     {s.name}
                     {s.missing.length > 0 ? (
                       <span className="ml-2 text-[13px] text-[var(--ink2)]">
-                        did not quote {s.missing.join(', ')}
+                        {t('didNotQuote', { items: s.missing.map((m) => itemLabel(lang, m)).join(', ') })}
                       </span>
                     ) : null}
                   </span>
@@ -350,7 +369,7 @@ export function CompareClient({
                   >
                     {money(s.totalPaise)}
                     {s.missing.length > 0 ? (
-                      <span className="ml-1.5 text-[11px] text-[var(--ink2)]">part only</span>
+                      <span className="ml-1.5 text-[11px] text-[var(--ink2)]">{t('partOnly')}</span>
                     ) : null}
                   </span>
                 </li>
@@ -362,21 +381,22 @@ export function CompareClient({
                 you win a comparison you should have lost. */}
             {tally.leader && gap !== null && gap > 0 ? (
               <p className="m-0 border-t border-[var(--line)] pt-4 text-[14.5px] leading-[1.6]">
-                <span className="font-medium">{tally.leader.name}</span> is{' '}
-                <span className="oi-num" style={{ color: 'var(--sec-ink)' }}>
-                  {money(gap)}
-                </span>{' '}
-                cheaper than the next on the work you picked.
+                {withNodes(t('verdict.cheaper'), {
+                  name: <span className="font-medium">{tally.leader.name}</span>,
+                  gap: (
+                    <span className="oi-num" style={{ color: 'var(--sec-ink)' }}>
+                      {money(gap)}
+                    </span>
+                  ),
+                })}
               </p>
             ) : tally.leader && gap === 0 ? (
               <p className="m-0 border-t border-[var(--line)] pt-4 text-[14.5px] leading-[1.6]">
-                Level on price across these lines. The materials are the only thing left to
-                separate them.
+                {t('verdict.level')}
               </p>
             ) : (
               <p className="m-0 border-t border-[var(--line)] pt-4 text-[14px] leading-[1.6] text-[var(--ink2)]">
-                Only one studio priced all of these, so there is no comparison to make yet — star a
-                line they all quoted, or read what the others left out above.
+                {t('verdict.onlyOne')}
               </p>
             )}
 
@@ -385,8 +405,7 @@ export function CompareClient({
             {tally.caveats.length > 0 ? (
               <p className="m-0 mt-3 max-w-[64ch] text-[13.5px] leading-[1.6]">
                 <Flag>
-                  Before you read that as better value — they are not quoting the same material on{' '}
-                  {tally.caveats.join(', ')}
+                  {t('caveat', { items: tally.caveats.map((c) => itemLabel(lang, c)).join(', ') })}
                 </Flag>
               </p>
             ) : null}
@@ -397,9 +416,9 @@ export function CompareClient({
               ☆
             </span>
             <p className="m-0 max-w-[52ch] text-[14.5px] leading-snug">
-              Star the lines you care about and we will total just those.
+              {t('starHint')}
               <span className="block text-[13.5px] text-[var(--ink2)]">
-                The bottom row compares two slightly different houses.
+                {t('starHintSub')}
               </span>
             </p>
           </Sheet>
@@ -408,15 +427,15 @@ export function CompareClient({
         {/* ── Where the difference is ── */}
         {tellingRows.length > 0 ? (
           <Sheet className="mb-10 p-6">
-            <p className="oi-eyebrow m-0 mb-4">Where the difference is</p>
+            <p className="oi-eyebrow m-0 mb-4">{t('diff.title')}</p>
             <ul className="m-0 flex list-none flex-col gap-4 p-0">
               {tellingRows.map((row) => (
                 <li key={row.code} className="border-b border-[var(--line)] pb-4 last:border-b-0 last:pb-0">
                   <p className="m-0 mb-1.5 flex flex-wrap items-baseline justify-between gap-3">
-                    <span className="text-[14.5px] font-medium">{row.label}</span>
+                    <span className="text-[14.5px] font-medium">{itemLabel(lang, row.label)}</span>
                     {row.spreadPaise > 0 ? (
                       <span className="oi-num text-[13px]" style={{ color: 'var(--acc-ink)' }}>
-                        {money(row.spreadPaise)} apart
+                        {t('diff.apart', { amount: money(row.spreadPaise) ?? '' })}
                       </span>
                     ) : null}
                   </p>
@@ -431,7 +450,7 @@ export function CompareClient({
                             {cell.spec ? (
                               <Spec text={cell.spec} onPick={setTerm} />
                             ) : (
-                              'not quoted'
+                              t('notQuotedLower')
                             )}
                           </li>
                         );
@@ -439,15 +458,16 @@ export function CompareClient({
                     </ul>
                   ) : row.cells.some((c) => c.amountPaise === null) ? (
                     <p className="m-0 text-[13px] leading-snug text-[var(--ink2)]">
-                      {row.cells
-                        .filter((c) => c.amountPaise === null)
-                        .map((c) => studios.find((s) => s.slug === c.slug)?.name)
-                        .join(', ')}{' '}
-                      did not quote this at all — which is usually why a total is lower.
+                      {t('diff.didNot', {
+                        names: row.cells
+                          .filter((c) => c.amountPaise === null)
+                          .map((c) => studios.find((s) => s.slug === c.slug)?.name)
+                          .join(', '),
+                      })}
                     </p>
                   ) : (
                     <p className="m-0 text-[13px] leading-snug text-[var(--ink2)]">
-                      Same material both sides. This one is a straight price difference.
+                      {t('diff.same')}
                     </p>
                   )}
                 </li>
@@ -459,7 +479,7 @@ export function CompareClient({
         <ExplainDifferences slugs={entries.map((e) => e.slug)} brief={brief} plan={project.plan} />
         <p className="m-0 -mt-6 mb-10">
           <Link href="/compare/brief" className="text-[14px] font-semibold text-[var(--ink)] underline">
-            The one-page brief — to print, save or send to family →
+            {t('briefLink')}
           </Link>
         </p>
         <AskYourQuote slugs={entries.map((e) => e.slug)} brief={brief} plan={project.plan} />
@@ -480,18 +500,18 @@ export function CompareClient({
         <ul className="m-0 flex list-none flex-col gap-3 p-0 md:hidden">
           {rooms.map((room) => (
             <li key={room.room}>
-              <p className="oi-label m-0 mb-2 mt-4 first:mt-0">{room.label}</p>
+              <p className="oi-label m-0 mb-2 mt-4 first:mt-0">{roomName(lang, room.room, room.label)}</p>
               <ul className="m-0 flex list-none flex-col gap-3 p-0">
                 {room.lines.map((line: ComparedLine) => (
                   <li key={line.code} className="border border-[var(--line)] bg-[var(--card)] p-4">
                     <div className="flex items-start gap-1.5">
                       <Star
                         on={project.starred.includes(line.code)}
-                        label={line.label}
+                        label={itemLabel(lang, line.label)}
                         onToggle={() => toggleStar(line.code)}
                       />
                       <div className="min-w-0 flex-1 pt-2.5">
-                        <p className="m-0 text-[14.5px] font-medium">{line.label}</p>
+                        <p className="m-0 text-[14.5px] font-medium">{itemLabel(lang, line.label)}</p>
                         <p className="oi-num m-0 mt-1 text-[12px] leading-snug text-[var(--ink2)]">
                           {line.size}
                         </p>
@@ -512,7 +532,7 @@ export function CompareClient({
                             <div className="flex items-baseline justify-between gap-4">
                               <span className="text-[13.5px] text-[var(--ink2)]">{studio.name}</span>
                               {cell.amountPaise === null ? (
-                                <Flag>Not quoted</Flag>
+                                <Flag>{t('notQuoted')}</Flag>
                               ) : (
                                 <span
                                   className="oi-num text-[14px]"
@@ -547,7 +567,7 @@ export function CompareClient({
           ))}
 
           <li className="mt-2 flex flex-col gap-2 border-t-2 border-[var(--ink)] bg-[var(--card)] p-4">
-            <p className="oi-label m-0">Total · GST incl.</p>
+            <p className="oi-label m-0">{t('total')}</p>
             {studios.map((s) => (
               <span key={s.slug} className="flex items-baseline justify-between gap-4">
                 <span className="text-[13.5px] text-[var(--ink2)]">{s.name}</span>
@@ -573,7 +593,7 @@ export function CompareClient({
                   scope="col"
                   className="oi-label sticky left-0 top-0 z-30 border-b border-[var(--ink)] bg-[var(--card)] p-4 align-bottom"
                 >
-                  Line item
+                  {t('lineItem')}
                 </th>
                 {studios.map((s) => (
                   <th
@@ -595,7 +615,7 @@ export function CompareClient({
                     colSpan={studios.length + 1}
                     className="oi-label sticky left-0 z-10 bg-[var(--bg)] px-4 py-2.5 text-left"
                   >
-                    {room.label}
+                    {roomName(lang, room.room, room.label)}
                   </th>
                 </tr>
                 {room.lines.map((line: ComparedLine) => (
@@ -607,11 +627,11 @@ export function CompareClient({
                       <span className="flex items-start gap-1.5">
                         <Star
                           on={project.starred.includes(line.code)}
-                          label={line.label}
+                          label={itemLabel(lang, line.label)}
                           onToggle={() => toggleStar(line.code)}
                         />
                         <span className="min-w-0 pt-2.5">
-                          <span className="block text-[14.5px] font-medium">{line.label}</span>
+                          <span className="block text-[14.5px] font-medium">{itemLabel(lang, line.label)}</span>
                           <span className="oi-num mt-1 block text-[12px] leading-snug text-[var(--ink2)]">
                             {line.size}
                           </span>
@@ -639,7 +659,7 @@ export function CompareClient({
                         >
                           {cell.amountPaise === null ? (
                             // Never ₹0 — a zero reads as free.
-                            <Flag>Not quoted</Flag>
+                            <Flag>{t('notQuoted')}</Flag>
                           ) : (
                             <>
                               <span
@@ -683,7 +703,7 @@ export function CompareClient({
                   scope="row"
                   className="oi-label sticky left-0 z-10 border-t border-[var(--ink)] bg-[var(--card)] p-4 text-left"
                 >
-                  Total · GST incl.
+                  {t('total')}
                 </th>
                 {studios.map((s) => (
                   <td
@@ -701,19 +721,18 @@ export function CompareClient({
         {offer ? (
           <ExpertPitch
             offer={offer}
-            lead="Every studio here comes with the same benefits through us"
+            lead={t('pitchLead')}
             className="mt-10 max-w-[44rem]"
           />
         ) : null}
 
         <div className="mt-8 flex flex-wrap items-center gap-4">
-          <Quiet href="/match">Price another studio</Quiet>
+          <Quiet href="/match">{t('another')}</Quiet>
           {/* The one terracotta action on this screen is the expert pitch above. */}
         </div>
 
         <p className="m-0 mt-6 max-w-[58ch] text-[13px] leading-[1.6] text-[var(--ink2)]">
-          Standard scope, priced before anybody has stood in your flat — the bands say how far each
-          could move. Your architect is paid by us, never by a studio.
+          {t('footnote')}
         </p>
       </Wrap>
 
@@ -722,7 +741,7 @@ export function CompareClient({
           the table behind it. Escape closes it. */}
       <MaterialPanel material={term} onClose={() => setTerm(null)} />
 
-      <NextStepBar label={`${entries.length} quotes side by side`} offer={offer} />
+      <NextStepBar label={t('bar.label', { n: entries.length })} offer={offer} />
       <AppFooter />
     </div>
   );

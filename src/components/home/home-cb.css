@@ -1875,3 +1875,61 @@ a.foot-pill:hover {
 .cb .panel-dark .quote .label {
   color: var(--ink-2);
 }
+
+/* Benefit pictures (10 Oct 2026): the hamper and the cab, top right of their
+   cards, drawn in the card's ink. */
+.cb .bento .bento-art {
+  position: absolute;
+  top: clamp(18px, 2vw, 26px);
+  right: clamp(18px, 2vw, 26px);
+  width: clamp(84px, 7vw, 112px);
+  height: auto;
+  color: var(--ink, #0b0b0b);
+  opacity: 0.85;
+  pointer-events: none;
+  transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.cb .bento .bento-art-car {
+  width: clamp(100px, 8.5vw, 130px);
+}
+.cb .bento > li:hover .bento-art {
+  transform: translateY(-4px) rotate(-3deg);
+}
+.cb .bento > li:hover .bento-art-car {
+  transform: translateX(8px);
+}
+/* The picture sits above the big word on narrow cards, so the word never
+   runs under it. */
+.cb .bento > li:has(.bento-art) .fig {
+  margin-top: clamp(76px, 6vw, 96px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cb .bento .bento-art {
+    transition: none;
+  }
+}
+/* A phone keeps the "one" artwork and drops the word beside it. */
+@media (max-width: 560px) {
+  .cb .logo > span > span {
+    display: none;
+  }
+}
+
+/* The cursor inverts what is under it (owner, 10 Oct 2026): black on the
+   white page, white on the black panels, and a true negative over photos.
+   A white dot blended by "difference" does exactly that, everywhere, without
+   the script having to know which section it is over. The "Start" bubble
+   keeps its own colours so its label stays readable. */
+.cb .cursor,
+.cb .cursor.invert {
+  background: #fff;
+  mix-blend-mode: difference;
+}
+.cb .cursor.grow,
+.cb .cursor.invert.grow {
+  background: #fff;
+}
+.cb .cursor.view {
+  background: var(--ink);
+  mix-blend-mode: normal;
+}

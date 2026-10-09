@@ -14,7 +14,7 @@ import { compareMany } from '@/modules/quotation/first-quote';
 import { deterministicSummary } from '@/modules/quotation/compare-insights';
 import { loadProject, MIN_TO_COMPARE, type Project } from '@/modules/quotation/project-store';
 import { loadBrief } from '@/modules/brief/store';
-import { localityLabel, propertyLabel, type Brief } from '@/modules/brief/types';
+import { localityLabel, type Brief } from '@/modules/brief/types';
 import { cleanName } from '@/modules/brief/steps';
 import { scopePhrase, selectionOf } from '@/modules/quotation/scope';
 import { rankStudios, type MatchResult } from '@/modules/matching/score';
@@ -23,6 +23,9 @@ import type { Studio } from '@/modules/studio/types';
 import type { StudioRates } from '@/modules/quotation/catalogue';
 import { Mark } from '@/components/brand';
 import { ExplainDifferences, FitBlock, MaterialPrices, RoomPrices } from '../CompareInsights';
+import { useLang, useSiteT } from '@/components/app/i18n';
+import { COMPARE_DICT } from '@/modules/i18n/site/compare';
+import { PROPERTY_TX, lbl } from '@/modules/i18n/site/labels';
 
 export function BriefClient({
   studios: roster,
@@ -35,6 +38,8 @@ export function BriefClient({
 }) {
   const [project, setProject] = useState<Project | null>(null);
   const [brief, setBrief] = useState<Brief | null>(null);
+  const t = useSiteT(COMPARE_DICT);
+  const lang = useLang();
 
   useEffect(() => {
     setProject(loadProject());
@@ -59,48 +64,49 @@ export function BriefClient({
       rankStudios(brief, roster, 99, {
         allowUnverified,
         ratesFor: (slug) => filedRates[slug] ?? filedRatesFor(slug),
+        lang,
       }).map((r) => [r.studioId, r]),
     );
-  }, [brief, roster, allowUnverified, filedRates]);
+  }, [brief, roster, allowUnverified, filedRates, lang]);
 
   if (!project) return null;
   if (entries.length < MIN_TO_COMPARE) {
     return (
       <p className="m-0 text-[15px]">
-        Put at least two quotes side by side first. <Link href="/compare">Back to compare</Link>
+        {t('brief.needTwo')} <Link href="/compare">{t('brief.backToCompare')}</Link>
       </p>
     );
   }
 
   const summary = deterministicSummary(entries, compareMany(entries));
   const who = brief
-    ? [cleanName(brief.contactName), propertyLabel(brief.propertyType), localityLabel(brief.locality), scopePhrase(selectionOf(brief))]
+    ? [cleanName(brief.contactName), lbl(lang, PROPERTY_TX, brief.propertyType), localityLabel(brief.locality), scopePhrase(selectionOf(brief))]
         .filter(Boolean)
         .join(' · ')
     : null;
-  const today = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+  const today = new Date().toLocaleDateString(lang === 'en' ? 'en-IN' : `${lang}-IN`, { day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
     <article>
       <header className="mb-8 flex flex-wrap items-start justify-between gap-4 border-b border-[var(--ink)] pb-5">
         <div>
-          <p className="oi-eyebrow m-0 mb-2">Comparison brief · {today}</p>
+          <p className="oi-eyebrow m-0 mb-2">{t('brief.eyebrow', { date: today })}</p>
           <h1 className="oi-display m-0 text-[clamp(1.6rem,1.3rem+1.2vw,2.2rem)]">
             {entries.map((e) => e.name).join(' · ')}
           </h1>
-          {who ? <p className="m-0 mt-2 text-[14px] text-[var(--ink2)]">Prepared for {who}</p> : null}
+          {who ? <p className="m-0 mt-2 text-[14px] text-[var(--ink2)]">{t('brief.preparedFor', { who })}</p> : null}
         </div>
         <button
           type="button"
           onClick={() => window.print()}
           className="cursor-pointer border border-[var(--line)] bg-transparent px-4 py-2 text-[13px] text-[var(--ink)] print:hidden"
         >
-          Print or save as PDF
+          {t('brief.print')}
         </button>
       </header>
 
       {!ratesAreReal() ? (
-        <p className="oi-label m-0 mb-6">Pre-launch — priced on archive rates, not each studio&rsquo;s own filed card</p>
+        <p className="oi-label m-0 mb-6">{t('prelaunch')}</p>
       ) : null}
 
       <p className="m-0 mb-6 max-w-[68ch] text-[16px] leading-[1.6]">{summary.headline}</p>
@@ -124,7 +130,7 @@ export function BriefClient({
       <ExplainDifferences slugs={entries.map((e) => e.slug)} brief={brief} plan={project.plan} />
 
       <section className="mb-10">
-        <p className="oi-eyebrow m-0 mb-3">Worth asking every studio</p>
+        <p className="oi-eyebrow m-0 mb-3">{t('worthAsking')}</p>
         <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5">
           {summary.questions.map((q) => (
             <li key={q} className="text-[14.5px]">
@@ -136,7 +142,7 @@ export function BriefClient({
 
       <footer className="flex items-center gap-2 border-t border-[var(--ink)] pt-4 text-[12.5px] text-[var(--ink2)]">
         <Mark className="h-[14px] w-[14px] text-[var(--ink)]" />
-        One Interiors — every studio priced on the same lines and sizes. No studio pays to be shown.
+        {t('brief.footer')}
       </footer>
     </article>
   );

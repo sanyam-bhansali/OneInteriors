@@ -47,7 +47,7 @@ import { SocietyInput } from './SocietyInput';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Mark } from '@/components/brand';
+import { Mark, Wordmark } from '@/components/brand';
 import { Wrap, Sheet, DocRow } from '@/components/oi';
 import { formatINRCompact } from '@/lib/money';
 import { TIER, TIERS, perSqftLabel, tierRangeFor } from '@/modules/quotation/tiers';
@@ -80,6 +80,7 @@ import { loadBrief, saveBrief } from '@/modules/brief/store';
 import {
   CHAPTER,
   NAME_MAX,
+  STEP_IDS,
   TOTAL_STEPS,
   carpetAreaFor,
   cleanName,
@@ -226,6 +227,9 @@ export function QuizClient({
   /** The contact screen's fields. Held here, not in the brief — see contact.ts. */
   const [contact, setContact] = useState<ContactInput>(EMPTY_CONTACT);
   const [contactErrors, setContactErrors] = useState<ContactErrors>({});
+  /** Set while they are changing one answer from the brief panel: Continue
+      takes them straight back here instead of through every later step. */
+  const [returnTo, setReturnTo] = useState<number | null>(null);
 
   useEffect(() => {
     // sessionStorage first so the quiz paints immediately, then reconcile with
@@ -368,6 +372,11 @@ export function QuizClient({
       void submitContact();
       return;
     }
+    if (returnTo !== null && returnTo > step) {
+      setStep(returnTo);
+      setReturnTo(null);
+      return;
+    }
     if (step >= TOTAL_STEPS) {
       finish(brief);
       return;
@@ -377,6 +386,14 @@ export function QuizClient({
     const advanced = { ...brief, lastStep: n };
     saveBrief(advanced);
     sync(advanced);
+  }
+
+  /** Jump to the question an answer came from (the brief panel's Edit). */
+  function editStep(id: StepId) {
+    const target = STEP_IDS.indexOf(id) + 1;
+    if (target < 1 || target >= step) return;
+    setReturnTo((r) => r ?? step);
+    setStep(target);
   }
 
   function back() {
@@ -431,11 +448,11 @@ export function QuizClient({
               className="flex items-center gap-2.5 no-underline"
               aria-label={t('aria.home')}
             >
-              <Mark className="h-[18px] w-[18px] text-[var(--ink)]" />
-              {/* The mark alone on a phone: the wordmark wrapped to two lines
-                  there and pushed the chapter and time off the right edge. */}
-              <span className="oi-display hidden text-[17px] leading-none text-[var(--ink)] sm:inline">
-                One Interiors
+              {/* The mark alone on a phone, so the chapter and time keep
+                  their room; the full logo from sm up. */}
+              <Mark className="h-[20px] w-[16px] text-[var(--ink)] sm:hidden" />
+              <span className="hidden text-[var(--ink)] sm:inline-flex">
+                <Wordmark inherit showCity={false} />
               </span>
             </Link>
             {/* Time left, not a count.
@@ -449,7 +466,6 @@ export function QuizClient({
                 phone, where the three together ran off the edge of the screen;
                 the chapter and the time are the two parts that answer "how
                 much more of this is there". */}
-            {stepId === 'name' ? null : <SiteLangPicker className="hidden md:inline-flex" onPick={(l) => update({ language: SITE_TO_BRIEF[l] })} />}
             <span className="oi-num min-w-0 truncate text-right text-[10.5px] uppercase tracking-[0.16em] text-[var(--ink2)]">
               {chapterName(lang, CHAPTER[stepId])}
               <span className="hidden sm:inline">
@@ -496,7 +512,7 @@ export function QuizClient({
           <div className="grid grid-cols-1 gap-9 py-8 sm:py-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-14">
             <div key={`q-${step}`} className="oi-swap flex flex-col gap-7">
               <QuestionStep id={stepId} brief={brief} update={update} slot="ask" ctx={contactCtx} />
-              <LiveProfile brief={brief} matchCount={matchCount} className="hidden lg:block" />
+              <LiveProfile brief={brief} matchCount={matchCount} className="hidden lg:block" onEdit={editStep} current={stepId} />
             </div>
 
             <div key={`o-${step}`} className="oi-swap min-w-0">
@@ -525,7 +541,7 @@ export function QuizClient({
                   </span>
                 </summary>
                 <div className="border-t border-[var(--line)] p-4">
-                  <LiveProfile brief={brief} matchCount={matchCount} bare />
+                  <LiveProfile brief={brief} matchCount={matchCount} bare onEdit={editStep} current={stepId} />
                 </div>
               </details>
             </div>
@@ -568,7 +584,9 @@ export function QuizClient({
                   ? t('cta.writing')
                   : step === TOTAL_STEPS
                     ? t('cta.see')
-                    : t('cta.continue')}
+                    : returnTo !== null && returnTo > step
+                      ? t('cta.backToDetails')
+                      : t('cta.continue')}
               </button>
             </div>
           </div>
@@ -1586,6 +1604,8 @@ function LiveProfile({
   matchCount,
   className = '',
   bare = false,
+  onEdit,
+  current,
 }: {
   brief: Brief;
   /** Studios that still fit, capped at the stated number. */
@@ -1593,42 +1613,46 @@ function LiveProfile({
   className?: string;
   /** Inside the phone disclosure, which already draws the border. */
   bare?: boolean;
+  /** Each answer links back to its question (owner, 10 Oct 2026). */
+  onEdit?: (id: StepId) => void;
+  /** The question on screen — its own rows need no Edit link. */
+  current?: StepId;
 }) {
   const t = useSiteT(QUIZ_DICT);
   const lang = useLang();
-  const rows: Array<[string, string]> = [];
+  const rows: Array<[string, string, StepId]> = [];
 
   if (brief.propertyType) {
     const loc = localityLabel(brief.locality);
-    rows.push([t('row.home'), `${lbl(lang, PROPERTY_TX, brief.propertyType)}${loc ? ` · ${loc}` : ''}`]);
+    rows.push([t('row.home'), `${lbl(lang, PROPERTY_TX, brief.propertyType)}${loc ? ` · ${loc}` : ''}`, 'home']);
     const society = brief.society?.trim();
-    if (society) rows.push([t('row.society'), society]);
+    if (society) rows.push([t('row.society'), society, 'home']);
   }
   if (brief.scope) {
     const phrase = scopePhraseIn(lang, t, selectionOf(brief)) ?? lbl(lang, SCOPE_TX, brief.scope);
     const off = brief.excludedItems.length;
-    rows.push([t('row.scope'), off ? t('row.leftOut', { phrase, n: off }) : phrase]);
+    rows.push([t('row.scope'), off ? t('row.leftOut', { phrase, n: off }) : phrase, 'scope']);
   }
   // A running figure from the moment home and scope are known, so the early
   // answers visibly move something (principle 3, docs/UX-PRINCIPLES-PLAN.md;
   // Lemonade's live price). Until a level is picked it spans all three; once
   // one is, the budget row below takes over.
   const likely = likelyCost(brief, t);
-  if (likely && !brief.tier) rows.push([t('row.likely'), likely]);
+  if (likely && !brief.tier) rows.push([t('row.likely'), likely, 'level']);
   if (brief.budgetMinPaise) {
     rows.push([
       t('row.budget'),
       // The top band has no ceiling, so it is a floor, not a range.
       brief.budgetMaxPaise
         ? `${formatINRCompact(brief.budgetMinPaise)} – ${formatINRCompact(brief.budgetMaxPaise)}`
-        : t('budget.from', { amount: formatINRCompact(brief.budgetMinPaise) }),
+        : t('budget.from', { amount: formatINRCompact(brief.budgetMinPaise) }), 'level'
     ]);
   }
   if (brief.styleLikes.length) {
-    rows.push([t('row.leaning'), brief.styleLikes.map((s) => STYLE_LABELS[s]).join(', ')]);
+    rows.push([t('row.leaning'), brief.styleLikes.map((s) => STYLE_LABELS[s]).join(', '), 'likes']);
   }
   if (brief.styleDislikes.length) {
-    rows.push([t('row.ruledOut'), brief.styleDislikes.map((s) => STYLE_LABELS[s]).join(', ')]);
+    rows.push([t('row.ruledOut'), brief.styleDislikes.map((s) => STYLE_LABELS[s]).join(', '), 'dislikes']);
   }
   if (brief.household) {
     const h = brief.household;
@@ -1637,16 +1661,16 @@ function LiveProfile({
     if (h.elderly) parts.push(t('hh.elderlyN', { n: h.elderly }));
     if (h.pets) parts.push(t('hh.petsShort'));
     if (h.worksFromHome) parts.push(t('hh.wfhShort'));
-    rows.push([t('row.household'), parts.join(', ')]);
+    rows.push([t('row.household'), parts.join(', '), 'living']);
   }
   if (brief.priorityRanking.length) {
-    rows.push([t('row.priority'), lbl(lang, PRIORITY_TX, brief.priorityRanking[0])]);
+    rows.push([t('row.priority'), lbl(lang, PRIORITY_TX, brief.priorityRanking[0]), 'priorities']);
   }
-  if (brief.needs.length) rows.push([t('row.needs'), brief.needs.map((n) => lbl(lang, HOME_NEED_TX, n)).join(', ')]);
-  if (brief.involvement) rows.push([t('row.style'), lbl(lang, INVOLVEMENT_TX, brief.involvement)]);
+  if (brief.needs.length) rows.push([t('row.needs'), brief.needs.map((n) => lbl(lang, HOME_NEED_TX, n)).join(', '), 'living']);
+  if (brief.involvement) rows.push([t('row.style'), lbl(lang, INVOLVEMENT_TX, brief.involvement), 'working']);
   {
     const possession = possessionPhraseIn(lang, t, brief);
-    if (possession) rows.push([t('row.possession'), possession]);
+    if (possession) rows.push([t('row.possession'), possession, 'possession']);
   }
 
   return (
@@ -1666,9 +1690,27 @@ function LiveProfile({
         </p>
       ) : (
         <div className="m-0">
-          {rows.map(([k, v]) => (
-            <DocRow key={k} label={k} value={v.toUpperCase()} />
-          ))}
+          {rows.map(([k, v, id]) =>
+            onEdit && id !== current && STEP_IDS.indexOf(id) < STEP_IDS.indexOf(current ?? 'contact') ? (
+              <DocRow
+                key={k}
+                label={k}
+                value={v.toUpperCase()}
+                action={
+                  <button
+                    type="button"
+                    onClick={() => onEdit(id)}
+                    aria-label={t('profile.editAria', { what: k })}
+                    className="cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-2.5 py-0.5 text-[11.5px] font-medium leading-[1.4] text-[var(--ink2)] transition-colors hover:border-[var(--ink)] hover:text-[var(--ink)]"
+                  >
+                    {t('profile.edit')}
+                  </button>
+                }
+              />
+            ) : (
+              <DocRow key={k} label={k} value={v.toUpperCase()} />
+            ),
+          )}
         </div>
       )}
 

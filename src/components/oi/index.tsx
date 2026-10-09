@@ -151,8 +151,11 @@ export function DocRow({
   note,
   better = false,
   emphasis = false,
+  action,
 }: {
   label: string;
+  /** A small control beside the label — the quiz's "Edit". */
+  action?: React.ReactNode;
   /** "1800 × 2100 mm · 12.4 sq ft". Mono, and the point of the row. */
   quantity?: string;
   /** Money or a spec. Mono, always. */
@@ -191,6 +194,7 @@ export function DocRow({
           }
         >
           {label}
+          {action ? <span className="ml-2.5 inline-block align-middle">{action}</span> : null}
         </span>
         {value ? (
           <span

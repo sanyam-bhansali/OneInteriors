@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { FlatStage } from '@/components/landing-v3/FlatStage';
 import { LivePrice } from '@/components/landing-v3/LivePrice';
 import { VERIFIED_STUDIOS } from '@/lib/claims';
-import { Mark } from '@/components/brand';
+import { Wordmark } from '@/components/brand';
 import { CbMotion } from './CbMotion';
 import { SiteLangPicker } from '@/components/app/i18n';
 import { CHECK_LABELS, type CheckType } from '@/modules/studio/types';
@@ -179,6 +179,55 @@ const img = (photo: StylePhoto, w: number, h: number) => `${photo.src}?auto=form
 
 // ── The page ───────────────────────────────────────────────────
 
+/**
+ * Pictures for the two benefits a word alone does not explain (owner,
+ * 10 Oct 2026): a gift hamper and a cab. Line drawings in the card's own ink,
+ * decorative — the heading below says what each one is.
+ */
+function HamperArt() {
+  return (
+    <svg className="bento-art" viewBox="0 0 120 110" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      {/* What is inside, peeking over the rim */}
+      <rect x="34" y="30" width="16" height="26" rx="3" fill="#fff" />
+      <path d="M38 30v-6h8v6" />
+      <circle cx="66" cy="40" r="11" fill="#fff" />
+      <path d="M66 29c2-5 6-6 9-5" />
+      <rect x="76" y="34" width="14" height="22" rx="2" fill="#fff" />
+      {/* The handle */}
+      <path d="M22 56c0-34 76-34 76 0" />
+      {/* The basket */}
+      <path d="M14 56h92l-9 42a6 6 0 0 1-6 5H29a6 6 0 0 1-6-5Z" fill="rgba(255,255,255,.65)" />
+      <path d="M18 70h84M21 84h78" opacity=".55" />
+      <path d="M40 56l3 47M60 56v47M80 56l-3 47" opacity=".55" />
+      {/* The bow */}
+      <path d="M60 64c-9-9-19-6-15 2 3 5 15 2 15-2Zm0 0c9-9 19-6 15 2-3 5-15 2-15-2Z" fill="#fff" />
+      <path d="M57 66l-6 12M63 66l6 12" />
+    </svg>
+  );
+}
+
+function CabArt() {
+  return (
+    <svg className="bento-art bento-art-car" viewBox="0 0 140 90" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      {/* The taxi sign on the roof */}
+      <rect x="58" y="10" width="24" height="10" rx="3" fill="#fff" />
+      {/* Body */}
+      <path d="M14 62V50c0-5 3-8 8-9l14-3 12-14c3-3 6-4 10-4h28c4 0 7 1 10 4l13 14 12 3c5 1 8 4 8 9v12a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4Z" fill="rgba(255,255,255,.65)" />
+      {/* Windows */}
+      <path d="M44 38l9-11c1-1 3-2 5-2h10v13Zm30 0V25h12c2 0 4 1 5 2l9 11Z" fill="#fff" />
+      {/* Door line and handle, headlight */}
+      <path d="M72 40v24M80 47h6M124 50h4" opacity=".7" />
+      {/* Wheels */}
+      <circle cx="40" cy="66" r="11" fill="#fff" />
+      <circle cx="40" cy="66" r="4" />
+      <circle cx="104" cy="66" r="11" fill="#fff" />
+      <circle cx="104" cy="66" r="4" />
+      {/* Speed lines */}
+      <path d="M2 46h8M4 54h6" opacity=".5" />
+    </svg>
+  );
+}
+
 export function HomeCB({ offer, lang = 'en' }: { offer: OfferState; lang?: Lang }) {
   const t = translator(lang, HOME_DICT);
   /** The module's English, or its translation when there is one. */
@@ -217,8 +266,7 @@ export function HomeCB({ offer, lang = 'en' }: { offer: OfferState; lang?: Lang 
       <header className="nav">
         <div className="wrap nav-in">
           <a className="logo" href="#top" aria-label={t('nav.logo')}>
-            <Mark className="text-current" />
-            <span className="logo-word">One Interiors</span>
+            <Wordmark inherit showCity={false} />
           </a>
           <nav className="nav-links" aria-label={t('nav.aria')}>
             <a href="#how">{t('nav.how')}</a>
@@ -672,12 +720,14 @@ export function HomeCB({ offer, lang = 'en' }: { offer: OfferState; lang?: Lang 
             </li>
             <li data-reveal="" className="b-lilac">
               <span className="fig fig-sm">OneHamper</span>
+              <HamperArt />
               <span className="tag">{t('bento.hamperTag')}</span>
               <h3>{t('bento.hamperH')}</h3>
               <p>{benefit('onehamper').terms}</p>
             </li>
             <li data-reveal="" className="b-peach" style={{ ['--d' as string]: '60ms' }}>
               <span className="fig fig-sm">{t('bento.cabFig')}</span>
+              <CabArt />
               <span className="tag">{t('bento.cabTag')}</span>
               <h3>{t('bento.cabH')}</h3>
               <p>{benefit('free-cab').terms}</p>
