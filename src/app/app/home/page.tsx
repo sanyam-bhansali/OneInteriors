@@ -7,16 +7,19 @@
  */
 
 import Link from 'next/link';
-import { AskGeio, Arrow, BellIcon, ExampleTag, Frame, Tabs, useBrief } from '@/components/app/ui';
+import { Arrow, BellIcon, ExampleTag, Frame, Tabs, useBrief } from '@/components/app/ui';
 import { useMyProject, type MyProject } from '@/components/app/useMyProject';
 import { DECISION, EXAMPLE, PHOTOS, TODAY } from '@/modules/app/example-project';
-import { STAGE_SHORT, currentStage, dayLabel, dayOf, pickDecision, timeLabel } from '@/modules/app/project-view';
+import { STAGE_SHORT, currentStage, dayLabel, dayOf, daysLate, pickDecision, shortDate, timeLabel } from '@/modules/app/project-view';
+import { formatINR } from '@/lib/money';
 
 interface HomeData {
   label: string;
   hero: string | null;
   refreshed: string | null;
   stageLine: string;
+  /** The design's one delay message: the stage's status and the overall status, kept apart. */
+  status: { stage: string | null; overall: string; late: boolean };
   stages: { label: string; state: 'done' | 'now' | 'next' }[];
   decision: { id: string | null; due: string; title: string; why: string } | null;
   today: { label: string; photos: { src: string; alt: string }[]; note: string | null };
@@ -27,6 +30,7 @@ const EXAMPLE_HOME: HomeData = {
   hero: PHOTOS.homeHero,
   refreshed: 'Updated from site just now',
   stageLine: `${EXAMPLE.stage.name}, day ${EXAMPLE.stage.day} of ${EXAMPLE.stage.of}`,
+  status: { stage: `${EXAMPLE.stage.name} · on track`, overall: `Overall · ${EXAMPLE.runningLateDays} days late`, late: true },
   stages: EXAMPLE.stages.map((s, i) => ({ label: s, state: i < EXAMPLE.stageNow ? 'done' : i === EXAMPLE.stageNow ? 'now' : 'next' })),
   decision: {
     id: null,
@@ -42,12 +46,18 @@ function realHome(p: MyProject): HomeData {
   const { stage } = currentStage(p.stages);
   const { day, of } = dayOf(p.startOn, p.stages);
   const d = pickDecision(p.decisions, null);
+  const late = daysLate(p.stages);
   const open = d && (d.state === 'open' || d.state === 'due-soon') ? d : null;
   return {
     label: `With ${p.studio}`,
     hero: latest?.photos[0] ?? null,
     refreshed: latest ? `Updated from site ${dayLabel(latest.at)}, ${timeLabel(latest.at)}` : null,
     stageLine: stage ? `${STAGE_SHORT[stage.key] ?? stage.label}, day ${day} of ${of}` : 'Handed over',
+    status: {
+      stage: stage ? `${STAGE_SHORT[stage.key] ?? stage.label} · ${stage.late ? 'running late' : 'on track'}` : null,
+      overall: `Overall · ${late ? `${late} day${late === 1 ? '' : 's'} late` : 'on time'}`,
+      late: late > 0,
+    },
     stages: p.stages.map((s) => ({
       label: STAGE_SHORT[s.key] ?? s.label,
       state: s.state === 'done' ? 'done' : s.state === 'now' ? 'now' : 'next',
@@ -81,9 +91,9 @@ export default function AppHome() {
           <span className="oa-meta" style={{ color: '#fff' }}>
             {h.label}
           </span>
-          <span className="oa-bell" aria-label="Updates">
+          <Link href="/app/notifications" className="oa-bell" aria-label="Notifications">
             <BellIcon />
-          </span>
+          </Link>
         </div>
         {h.refreshed ? (
           <div className="oa-refresh" role="status">
@@ -94,8 +104,9 @@ export default function AppHome() {
           </div>
         ) : null}
         <div className="mt-auto pt-10">
-          <p className="oa-meta" style={{ color: 'rgba(255,255,255,.85)', margin: 0 }}>
-            {h.stageLine}
+          <p className="oa-status">
+            {h.status.stage ? <span>{h.status.stage}</span> : null}
+            <span className={h.status.late ? 'late' : ''}>{h.status.overall}</span>
           </p>
           <h1 style={{ margin: '8px 0 0', fontSize: 40, fontWeight: 600, letterSpacing: '-0.045em', lineHeight: 0.98 }}>
             Your home is coming together{name ? `, ${name}` : ''}.
@@ -131,6 +142,18 @@ export default function AppHome() {
           </div>
         ) : null}
 
+        {real && mine.project.money?.next ? (
+          <Link href="/app/project" className="oa-card oa-next-pay">
+            <span className="oa-label" style={{ margin: 0 }}>
+              Next payment{mine.project.money.next.dueOn ? `, due ${shortDate(mine.project.money.next.dueOn)}` : ''}
+            </span>
+            <b>{formatINR(mine.project.money.next.amountPaise)}</b>
+            <span className="oa-note">
+              To {mine.project.studio} for {mine.project.money.next.label.toLowerCase()}. You pay the studio directly; we keep track of it here.
+            </span>
+          </Link>
+        ) : null}
+
         <div className="oa-section-head" style={{ borderBottom: '1px solid var(--line)', paddingBottom: 10 }}>
           <h2>{real ? 'Latest from site' : 'Today on site'}</h2>
           <span className="oa-meta">{h.today.label}</span>
@@ -148,7 +171,6 @@ export default function AppHome() {
           <p className="oa-note">The first update from site will appear here, and on your phone, as soon as the studio posts it.</p>
         ) : null}
       </main>
-      <AskGeio from="home" />
       <Tabs />
     </Frame>
   );

@@ -14,6 +14,7 @@ import type { StaffWork } from '@/modules/portal/project-store';
 import {
   addDocumentAction,
   fixSnagAction,
+  paymentStageAction,
   postDecisionAction,
   raiseSnagAction,
   removeDocumentAction,
@@ -21,6 +22,7 @@ import {
   type WorkResult,
 } from '@/app/project-work/actions';
 import { DOC_KINDS } from '@/modules/portal/documents';
+import { formatINR } from '@/lib/money';
 
 const input = 'rounded-[8px] border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 py-2 text-[14px]';
 const ghost =
@@ -69,6 +71,8 @@ export function ProjectWork({ projectId, work }: { projectId: string; work: Staf
         ) : null}
         <DecisionForm projectId={projectId} />
       </section>
+
+      {work.money ? <Payments projectId={projectId} money={work.money} /> : null}
 
       <Documents projectId={projectId} documents={work.documents} />
 
@@ -353,6 +357,66 @@ function Documents({ projectId, documents }: { projectId: string; documents: Sta
           <p className={`m-0 basis-full text-[12.5px] ${message.ok ? 'text-[var(--color-ink-2)]' : 'text-[var(--color-terracotta)]'}`}>{message.text}</p>
         ) : null}
       </form>
+    </section>
+  );
+}
+
+/**
+ * The payment stages the customer signed, in rupees. Set when each is due —
+ * the customer is reminded two days before — and mark it received once paid.
+ * The customer pays the studio directly; this is the record they see.
+ */
+function Payments({ projectId, money }: { projectId: string; money: NonNullable<StaffWork['money']> }) {
+  const { pending, message, run } = useRun();
+  const today = new Date().toISOString().slice(0, 10);
+  return (
+    <section>
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="m-0 text-[15px] font-semibold">Payments</h3>
+        <span className={label}>
+          {formatINR(money.paidPaise)} of {formatINR(money.contractPaise)} received
+        </span>
+      </div>
+      <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0">
+        {money.stages.map((s) => (
+          <li key={s.index} className="flex flex-wrap items-center justify-between gap-2 text-[14px]">
+            <span>
+              {s.label} · {formatINR(s.amountPaise)}
+              {s.paidOn ? <span className="text-[var(--color-ink-3)]"> · received {s.paidOn}</span> : null}
+            </span>
+            <span className="flex flex-wrap items-center gap-2">
+              {!s.paidOn ? (
+                <label className="flex items-center gap-1.5 text-[13px] text-[var(--color-ink-2)]">
+                  Due
+                  <input
+                    type="date"
+                    className={input}
+                    defaultValue={s.dueOn ?? ''}
+                    disabled={pending}
+                    onChange={(e) => run(() => paymentStageAction(projectId, s.index, 'dueOn', e.target.value), 'Due date saved')}
+                  />
+                </label>
+              ) : null}
+              <button
+                type="button"
+                className={s.paidOn ? ghost : primary}
+                disabled={pending}
+                onClick={() =>
+                  run(
+                    () => paymentStageAction(projectId, s.index, 'paidOn', s.paidOn ? '' : today),
+                    s.paidOn ? 'Marked not received' : 'Marked received; the client is told',
+                  )
+                }
+              >
+                {s.paidOn ? 'Undo' : 'Mark received'}
+              </button>
+            </span>
+          </li>
+        ))}
+      </ul>
+      {message ? (
+        <p className={`m-0 mt-2 text-[13px] ${message.ok ? 'text-[var(--color-ink-2)]' : 'text-[var(--color-terracotta)]'}`}>{message.text}</p>
+      ) : null}
     </section>
   );
 }

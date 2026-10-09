@@ -7,7 +7,7 @@
  */
 
 import { revalidatePath } from 'next/cache';
-import { addDocument, fixSnag, postDecision, raiseSnagAsStaff, removeDocument, setSnagFixBy } from '@/modules/portal/project-store';
+import { addDocument, fixSnag, postDecision, raiseSnagAsStaff, removeDocument, setPaymentStage, setSnagFixBy } from '@/modules/portal/project-store';
 
 export type WorkResult = { ok: boolean; error?: string };
 
@@ -70,6 +70,13 @@ export async function addDocumentAction(form: FormData): Promise<WorkResult> {
 
 export async function removeDocumentAction(documentId: string): Promise<WorkResult> {
   const r = await removeDocument(documentId);
+  refresh();
+  return r.ok ? { ok: true } : { ok: false, error: r.error };
+}
+
+/** Set a payment stage's due date, or mark it paid (a date) or not paid (empty). */
+export async function paymentStageAction(projectId: string, index: number, field: 'dueOn' | 'paidOn', date: string): Promise<WorkResult> {
+  const r = await setPaymentStage(projectId, index, { [field]: date || null });
   refresh();
   return r.ok ? { ok: true } : { ok: false, error: r.error };
 }

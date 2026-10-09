@@ -108,7 +108,7 @@ export function SignScreen({ q, name, phone }: { q: FinalQuoteView; name: string
         </div>
 
         <p className="oa-label">How you pay</p>
-        <ol className="oa-stages">
+        <ol className="oa-paystages">
           {q.stages.map((s, i) => (
             <li key={`${s.label}-${i}`}>
               <span className="n">{i + 1}</span>

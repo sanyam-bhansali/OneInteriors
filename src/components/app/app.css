@@ -109,9 +109,9 @@
 }
 .oa-meta {
   font-family: var(--mono);
-  font-size: 12px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--ink-2);
 }
 .oa-progress {
@@ -153,9 +153,9 @@
 .oa-label {
   margin: 6px 0 0;
   font-family: var(--mono);
-  font-size: 11.5px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--ink-2);
 }
 .oa-label.accent {
@@ -273,7 +273,7 @@
 .oa-chip.small {
   min-height: 34px;
   padding: 0 12px;
-  font: 500 12.5px var(--mono);
+  font: 500 13px var(--mono);
 }
 
 /* ── Underlined input ── */
@@ -454,9 +454,9 @@
   letter-spacing: -0.04em;
 }
 .oa-tier-tag {
-  font: 500 11px var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font: 500 13px var(--mono);
+  letter-spacing: 0.01em;
+  text-transform: none;
   opacity: 0.7;
 }
 .oa-tier[aria-checked="true"] .oa-tier-tag {
@@ -512,7 +512,7 @@
   bottom: 7px;
   z-index: 1;
   color: #fff;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   text-align: left;
 }
@@ -618,7 +618,7 @@
 }
 .oa-qrow .spec {
   grid-column: 1 / -1;
-  font: 400 12.5px var(--mono);
+  font: 400 13px var(--mono);
   color: var(--ink-2);
 }
 .oa-total {
@@ -668,9 +668,9 @@
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
-  font: 500 11px var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font: 500 13px var(--mono);
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--ink-2);
 }
 .oa-cmp-cell {
@@ -703,9 +703,9 @@
 }
 .oa-day small {
   display: block;
-  font: 500 11px var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font: 500 13px var(--mono);
+  letter-spacing: 0.01em;
+  text-transform: none;
 }
 .oa-day b {
   display: block;
@@ -832,9 +832,9 @@
   bottom: calc(env(safe-area-inset-bottom, 0px) + 64px);
   text-align: center;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 0.24em;
-  text-transform: uppercase;
+  text-transform: none;
   color: rgba(244, 241, 233, 0.72);
   opacity: 0;
   animation:
@@ -968,7 +968,7 @@
   padding: 4px 0;
   color: rgba(255, 255, 255, 0.75);
   text-decoration: none;
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 500;
 }
 .oa-tab svg {
@@ -987,9 +987,9 @@
   border-radius: 999px;
   background: var(--accent-wash);
   color: var(--accent-ink);
-  font: 500 11px var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font: 500 13px var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
 }
 .oa-hero {
   position: relative;
@@ -1044,9 +1044,9 @@
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  font: 500 10px var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font: 500 13px var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
   color: rgba(255, 255, 255, 0.7);
 }
 .oa-stage i {
@@ -1187,7 +1187,7 @@
   font-size: 15px;
 }
 .oa-items li span:last-child {
-  font: 500 12px var(--mono);
+  font: 500 13px var(--mono);
   color: var(--ok);
 }
 .oa-items li.choose span:last-child {
@@ -1201,7 +1201,7 @@
   grid-template-columns: repeat(6, 1fr);
   gap: 6px;
   text-align: center;
-  font: 500 11px var(--mono);
+  font: 500 13px var(--mono);
   color: var(--ink-2);
 }
 .oa-week i {
@@ -1293,7 +1293,7 @@
   font-weight: 600;
 }
 .oa-doc span {
-  font: 400 12.5px var(--mono);
+  font: 400 13px var(--mono);
   color: var(--ink-2);
 }
 .oa-seg {
@@ -1350,8 +1350,8 @@
   background: rgba(14, 14, 13, 0.72);
   color: #f1f0ec;
   font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
+  font-size: 13px;
+  letter-spacing: 0.01em;
   white-space: nowrap;
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
@@ -1466,9 +1466,9 @@
   padding: 7px 12px;
   background: var(--accent-wash);
   color: var(--accent-ink);
-  font: 500 10.5px var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font: 500 13px var(--mono);
+  letter-spacing: 0.01em;
+  text-transform: none;
 }
 .oa-section-head {
   display: flex;
@@ -1490,7 +1490,7 @@
   padding: 7px 14px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.45);
-  font: 500 11.5px var(--mono);
+  font: 500 13px var(--mono);
 }
 .oa-bell {
   display: grid;
@@ -1524,7 +1524,7 @@
   padding: 0 12px;
   border-radius: 999px;
   border: 1px solid var(--line);
-  font: 500 12px var(--mono);
+  font: 500 13px var(--mono);
 }
 .oa-decision-hero {
   position: relative;
@@ -1817,9 +1817,9 @@
 }
 .oa-geio-head .who small {
   display: block;
-  font: 500 10.5px var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font: 500 13px var(--mono);
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--ink-2);
 }
 .oa-pill {
@@ -1861,9 +1861,9 @@
 .oa-suggest button small {
   display: block;
   margin-bottom: 8px;
-  font: 500 10.5px var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font: 500 13px var(--mono);
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--accent-ink);
 }
 .oa-chat {
@@ -1921,7 +1921,7 @@
   font-size: 14.5px;
 }
 .oa-see li span:last-child {
-  font: 500 12px var(--mono);
+  font: 500 13px var(--mono);
   color: var(--ok);
 }
 .oa-see li.watch span:last-child {
@@ -1971,7 +1971,7 @@
 .oa-composer p {
   margin: 8px 0 0;
   text-align: center;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--ink-3);
 }
 
@@ -2438,7 +2438,7 @@
 .oa-next-steps li span:first-child {
   padding-top: 3px;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 13px;
   color: #8c8a84;
 }
 .oa-next-steps li:first-child,
@@ -2579,8 +2579,8 @@
   padding: 6px 11px;
   border-radius: 999px;
   font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
+  font-size: 13px;
+  letter-spacing: 0.01em;
 }
 .oa-iso-chip.top {
   top: 12px;
@@ -2606,8 +2606,8 @@
   display: flex;
   gap: 14px;
   font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
+  font-size: 13px;
+  letter-spacing: 0.01em;
   color: var(--ink-2);
 }
 .oa-iso-legend span {
@@ -2682,9 +2682,9 @@
   gap: 8px;
   min-height: 36px;
   font-family: var(--mono);
-  font-size: 12px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  text-transform: none;
   text-decoration: none;
   color: var(--accent);
 }
@@ -2754,9 +2754,9 @@
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.7);
   font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  text-transform: none;
   color: var(--ink-2);
 }
 .oa-geio-context span.now {
@@ -2922,7 +2922,7 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.oa-seg {
+.oa-seg[role="radiogroup"] {
   align-self: flex-start;
 }
 .oa-seg button[aria-checked="true"] {
@@ -3439,13 +3439,13 @@ a.oa-match {
 .oa-expert-note b {
   color: var(--ink);
 }
-.oa-stages {
+.oa-paystages {
   margin: 0;
   padding: 0;
   list-style: none;
   border-top: 1px solid var(--line);
 }
-.oa-stages li {
+.oa-paystages li {
   display: grid;
   grid-template-columns: 26px 1fr auto;
   gap: 10px;
@@ -3454,15 +3454,15 @@ a.oa-match {
   border-bottom: 1px solid var(--line);
   font-size: 15px;
 }
-.oa-stages .n {
+.oa-paystages .n {
   font: 600 13px var(--mono);
   color: var(--accent-ink);
 }
-.oa-stages .amt {
+.oa-paystages .amt {
   font: 500 14.5px var(--mono);
   text-align: right;
 }
-.oa-stages .amt small {
+.oa-paystages .amt small {
   display: block;
   font-size: 13px;
   color: var(--ink-3);
@@ -3524,4 +3524,299 @@ a.oa-match {
 }
 .oa-tier[aria-checked="true"] .oa-tier-price {
   color: var(--gold);
+}
+
+/* ── v79: five tabs, GEIO in the middle ── */
+.oa-tabs {
+  grid-template-columns: repeat(5, 1fr);
+  align-items: end;
+}
+.oa-tab {
+  font-size: 13px;
+}
+.oa-tab.geio .oa-orb {
+  width: 46px;
+  height: 46px;
+  margin-top: -22px;
+  box-shadow:
+    0 0 0 4px var(--dark),
+    0 10px 30px -6px rgba(224, 122, 78, 0.8);
+}
+.oa-tab.geio {
+  color: #f1f0ec;
+}
+
+/* ── v79: Project payments and changes ── */
+.oa-pay {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.oa-pay .ring {
+  display: grid;
+  grid-template-columns: 132px 1fr;
+  gap: 16px;
+  align-items: center;
+}
+.oa-pay svg {
+  width: 132px;
+  height: 132px;
+}
+.oa-pay svg .big {
+  font: 650 18px var(--sans);
+  fill: var(--ink);
+}
+.oa-pay svg .small {
+  font: 500 13px var(--mono);
+  fill: var(--ink-2);
+}
+.oa-pay .legend {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-size: 14px;
+}
+.oa-pay .legend div {
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+.oa-pay .legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.oa-pay .legend span {
+  font: 500 13.5px var(--mono);
+}
+.oa-paystages li.paid .n {
+  color: var(--ok);
+}
+.oa-paystages li.next .what {
+  color: var(--accent-ink);
+}
+.oa-paystages .what small {
+  display: block;
+  margin-top: 2px;
+  font: 500 13px var(--mono);
+  color: var(--ink-2);
+}
+.oa-changes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.oa-changes .big {
+  font-size: 30px;
+  font-weight: 650;
+  letter-spacing: -0.04em;
+}
+.oa-changes ul {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.oa-changes li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  font-size: 15px;
+}
+.oa-changes li small {
+  display: block;
+  margin-top: 2px;
+  font: 500 13px var(--mono);
+  color: var(--ink-2);
+}
+.oa-changes .amt {
+  font: 500 14px var(--mono);
+  white-space: nowrap;
+}
+
+/* ── v79: Me and notifications ── */
+.oa-me {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.oa-me .oa-avatar {
+  width: 56px;
+  height: 56px;
+  font-size: 22px;
+}
+.oa-me b {
+  display: block;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+.oa-me .mono {
+  display: block;
+  margin-top: 2px;
+  font: 500 14px var(--mono);
+  color: var(--ink-2);
+}
+.oa-notice {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+  text-decoration: none;
+}
+.oa-notice .dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: var(--accent-warm);
+}
+.oa-notice .dot.read {
+  background: transparent;
+}
+.oa-notice b {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+}
+.oa-notice small {
+  display: block;
+  margin-top: 3px;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.oa-notice em {
+  flex: 0 0 auto;
+  font: normal 500 13px var(--mono);
+  color: var(--ink-3);
+}
+
+/* ── v79: Home's delay message and next payment ── */
+a.oa-bell {
+  color: #fff;
+}
+.oa-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  font: 500 13.5px var(--mono);
+  color: rgba(255, 255, 255, 0.85);
+}
+.oa-status .late {
+  color: var(--gold);
+}
+.oa-next-pay {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: inherit;
+  text-decoration: none;
+}
+.oa-next-pay b {
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.04em;
+}
+.oa-site-3d {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+.oa-site-3d b {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+}
+.oa-site-3d small {
+  display: block;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+
+/* ── v79 type rules: nothing under 13px, no all-caps labels. Mono stays for
+   numbers and dates. Applied last so every screen above follows them. ── */
+.oa .oa-meta,
+.oa .oa-label,
+.oa .oa-sample,
+.oa .oa-tier-tag,
+.oa .oa-example {
+  text-transform: none;
+  letter-spacing: 0;
+}
+.oa .oa-meta,
+.oa .oa-label {
+  font-family: var(--sans);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.oa .oa-label {
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.oa .oa-sample,
+.oa .oa-chip.small,
+.oa .oa-tab {
+  font-size: 13px;
+}
+
+/* ── v79: GEIO's sources, and the 3D card's icon ── */
+.oa-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.oa-sources .tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.oa-sources .tags button {
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: var(--accent-wash);
+  color: var(--accent-ink);
+  font: 500 13px var(--mono);
+  cursor: pointer;
+}
+.oa-sources .tags button[aria-expanded="true"] {
+  background: var(--ink);
+  color: #fff;
+}
+.oa-sources .line {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  animation: oa-in 0.4s var(--glide) both;
+}
+.oa-sources .line b {
+  font-size: 15px;
+  font-weight: 600;
+}
+.oa-sources .line .amt {
+  font: 500 14px var(--mono);
+}
+.oa-sources .line small {
+  grid-column: 1 / -1;
+  font: 500 13px var(--mono);
+  color: var(--ink-2);
+}
+.oa-site-3d svg {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
 }

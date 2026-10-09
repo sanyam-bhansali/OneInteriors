@@ -15,7 +15,9 @@ export type ProjectEvent =
   | { kind: 'decision-made'; decisionId: string; title: string; choice: string; extraPaise: number }
   | { kind: 'snag-raised'; snagId: string; title: string; room: string | null }
   | { kind: 'snag-fixed'; snagId: string; title: string }
-  | { kind: 'document'; studio: string; title: string };
+  | { kind: 'document'; studio: string; title: string }
+  | { kind: 'payment-due'; stage: string; amountPaise: number; studio: string; dueLabel: string }
+  | { kind: 'payment-recorded'; stage: string; amountPaise: number; studio: string };
 
 export interface Message {
   title: string;
@@ -71,6 +73,20 @@ export function messageFor(e: ProjectEvent): Message {
         title: 'Snag fixed',
         body: clip(e.title, 160),
         url: `/app/snags`,
+      };
+    case 'payment-due':
+      return {
+        template: 'payment.due',
+        title: `Payment coming up · ${e.studio}`,
+        body: clip(`${formatINR(e.amountPaise)} for ${e.stage}, due ${e.dueLabel}. You pay the studio directly.`, 160),
+        url: '/app/project',
+      };
+    case 'payment-recorded':
+      return {
+        template: 'payment.recorded',
+        title: `Payment received · ${e.studio}`,
+        body: clip(`${formatINR(e.amountPaise)} for ${e.stage}, marked as received.`, 160),
+        url: '/app/project',
       };
     case 'document':
       return {

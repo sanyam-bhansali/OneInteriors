@@ -65,6 +65,7 @@ function preview(question: string, name: string, expert: string, pic: boolean): 
       see: [],
       handover: `${name} sent a photo and asked: “${question.slice(0, 200)}”`,
       follow: [],
+      sources: [],
     };
   }
   const a = answerFor(topicOf(question), name, expert, question);
@@ -73,6 +74,7 @@ function preview(question: string, name: string, expert: string, pic: boolean): 
     see: (a.see ?? []).map((s) => ({ ...s, watch: Boolean(s.watch) })),
     handover: a.handover ?? null,
     follow: a.follow ?? [],
+    sources: [],
   };
 }
 
@@ -385,6 +387,7 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
                             </b>
                           </Link>
                         ) : null}
+                        {t.reply.sources?.length ? <Sources sources={t.reply.sources} /> : null}
                         {t.reply.see.length ? (
                           <div className="oa-card">
                             <span className="oa-meta">What I see</span>
@@ -530,5 +533,38 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
         <p>GEIO can make mistakes. Prices and dates are confirmed by your studio.</p>
       </form>
     </Frame>
+  );
+}
+
+/**
+ * Where the figures came from (trust fix 8): a tag per quote line GEIO used,
+ * each checked on the server to exist. Tapping one opens the line itself, so
+ * the homeowner can check the number without leaving the answer.
+ */
+function Sources({ sources }: { sources: NonNullable<GeioReply['sources']> }) {
+  const [open, setOpen] = useState<number | null>(null);
+  const shown = sources.find((s) => s.line === open) ?? null;
+  return (
+    <div className="oa-sources">
+      <span className="oa-label" style={{ margin: 0 }}>
+        From your quote
+      </span>
+      <div className="tags">
+        {sources.map((s) => (
+          <button key={s.line} type="button" aria-expanded={open === s.line} onClick={() => setOpen(open === s.line ? null : s.line)}>
+            Line {s.line} · {s.item}
+          </button>
+        ))}
+      </div>
+      {shown ? (
+        <div className="line" role="note">
+          <b>
+            Line {shown.line}, {shown.item}
+          </b>
+          <span className="amt">{shown.amount}</span>
+          <small>{shown.spec}</small>
+        </div>
+      ) : null}
+    </div>
   );
 }

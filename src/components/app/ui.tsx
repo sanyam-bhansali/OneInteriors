@@ -117,27 +117,33 @@ export function useBrief(): [Brief | null, (patch: Partial<Brief>) => void] {
   return [brief, update];
 }
 
-// ── After signing: the tab bar ─────────────────────────────────
+// ── After signing: the tab bar (v79) ──────────────────────────
+//
+// Home · Project · GEIO · Site · Me. Snags and decisions live inside
+// Project, 3D inside Site, the Locker inside Me; GEIO is the orb in the
+// middle, so there is no floating button over the screens.
 
 const TABS = [
-  { href: '/app/home', label: 'Home', icon: <HomeIcon /> },
-  { href: '/app/project', label: 'Project', icon: <ListIcon /> },
-  { href: '/app/site', label: 'On site', icon: <CameraIcon /> },
-  { href: '/app/snags', label: 'Snags', icon: <CheckIcon /> },
-  { href: '/app/locker', label: 'Locker', icon: <FolderIcon /> },
-  { href: '/app/3d', label: '3D', icon: <CubeIcon /> },
+  { href: '/app/home', label: 'Home', icon: <HomeIcon />, also: [] as string[] },
+  { href: '/app/project', label: 'Project', icon: <ListIcon />, also: ['/app/snags', '/app/decision'] },
+  { href: '/app/geio', label: 'GEIO', icon: null, also: [] },
+  { href: '/app/site', label: 'Site', icon: <CameraIcon />, also: ['/app/3d'] },
+  { href: '/app/me', label: 'Me', icon: <PersonIcon />, also: ['/app/locker', '/app/notifications'] },
 ];
 
 export function Tabs() {
   const path = usePathname();
   return (
     <nav className="oa-tabs" aria-label="Your project">
-      {TABS.map((t) => (
-        <Link key={t.href} href={t.href} className="oa-tab" aria-current={path === t.href ? 'page' : undefined}>
-          {t.icon}
-          {t.label}
-        </Link>
-      ))}
+      {TABS.map((t) => {
+        const here = path === t.href || t.also.some((a) => path?.startsWith(a));
+        return (
+          <Link key={t.href} href={t.href} className={`oa-tab${t.icon ? '' : ' geio'}`} aria-current={here ? 'page' : undefined}>
+            {t.icon ?? <span className="oa-orb" aria-hidden />}
+            {t.label}
+          </Link>
+        );
+      })}
     </nav>
   );
 }
@@ -188,7 +194,15 @@ export function CameraIcon() {
     </svg>
   );
 }
-function CheckIcon() {
+function PersonIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden {...S}>
+      <circle cx="12" cy="8.5" r="3.5" />
+      <path d="M5 19.5c1.2-3.2 3.8-5 7-5s5.8 1.8 7 5" />
+    </svg>
+  );
+}
+export function CheckIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden {...S}>
       <rect x="4.5" y="4.5" width="15" height="15" rx="2" />
@@ -196,14 +210,14 @@ function CheckIcon() {
     </svg>
   );
 }
-function FolderIcon() {
+export function FolderIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden {...S}>
       <path d="M4 7.5A1.5 1.5 0 0 1 5.5 6H10l2 2h6.5A1.5 1.5 0 0 1 20 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5Z" />
     </svg>
   );
 }
-function CubeIcon() {
+export function CubeIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden {...S}>
       <path d="m12 3.5 7.5 4.25v8.5L12 20.5l-7.5-4.25v-8.5Z" />

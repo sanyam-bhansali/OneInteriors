@@ -27,6 +27,15 @@ import {
 export interface GeioFacts {
   text: string;
   allowed: { paise: number[]; percents: number[] };
+  /** The quote lines GEIO may cite as sources, by line number (trust fix 8). */
+  lines: QuoteSource[];
+}
+
+export interface QuoteSource {
+  line: number;
+  item: string;
+  amount: string;
+  spec: string;
 }
 
 const lakh = (l: number) => Math.round(l * 100_000 * 100);
@@ -65,7 +74,11 @@ export function geioFacts(expert: string): GeioFacts {
     `DOCUMENTS IN THE LOCKER: ${DOCUMENTS.map((d) => `${d.name} (${d.meta})`).join('; ')}.`,
   ];
 
-  return { text: lines.join('\n'), allowed: { paise: withSumsAndGaps(paise), percents: [] } };
+  return {
+    text: lines.join('\n'),
+    allowed: { paise: withSumsAndGaps(paise), percents: [] },
+    lines: QUOTE_LINES.map((q) => ({ line: q.line, item: q.item, amount: formatINR(rs(q.rupees)), spec: q.spec })),
+  };
 }
 
 /** The figures, plus every sum and difference of two of them — "₹14,500 more than the sage". */

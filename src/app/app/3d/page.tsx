@@ -4,7 +4,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Arrow, AskGeio, ExampleTag, Frame, Tabs } from '@/components/app/ui';
+import { Arrow, ExampleTag, Frame, Tabs } from '@/components/app/ui';
 import { IsoFlat, ISO_ROOMS } from '@/components/app/IsoFlat';
 import { EXAMPLE, ROOMS_3D, type RoomId } from '@/modules/app/example-project';
 
@@ -105,7 +105,6 @@ export default function App3D() {
           expert checks the photos. People appear only on days someone was actually there.
         </p>
       </main>
-      <AskGeio from="3d" />
       <Tabs />
     </Frame>
   );

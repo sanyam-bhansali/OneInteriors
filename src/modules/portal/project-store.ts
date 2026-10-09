@@ -26,6 +26,8 @@ import { canChoose, checkDecision, daysLeft, decisionState, parseOptions, type D
 import { checkSnag, SNAG_LIMITS, snagLine } from './snags';
 import { checkDoc, DOC_KINDS, docMeta, type DocKind } from './documents';
 import { signedDocUrls, storeProjectDoc } from '@/modules/storage/project-docs';
+import { changesSoFar, moneyView, setMark, type ChangesView, type MoneyView } from './payments';
+import { fromDb } from '@/lib/money';
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -62,6 +64,10 @@ export interface CustomerProject {
   startOn: string;
   stages: StageView[];
   phases: PaymentPhase[] | null;
+  /** The signed total and its stages in rupees; null on a project started before signing in the app. */
+  money: MoneyView | null;
+  /** Every option chosen on a decision, and what they add to the price. */
+  changes: ChangesView;
   updates: { id: string; note: string; stage: string | null; at: string; byStudio: boolean; photos: string[] }[];
   decisions: CustomerDecision[];
   snags: CustomerSnag[];
@@ -106,6 +112,16 @@ export async function customerProjects(userId: string, now = new Date()): Promis
         startOn: p.startOn.toISOString(),
         stages: trackerView(plannedStages(p.startOn, p.totalDays), p.doneStages, now),
         phases: readPhases(p.introduction.studio.paymentPhases),
+        money: moneyView(p.contractPaise === null ? null : fromDb(p.contractPaise), p.paymentPhases, p.paidPhases),
+        changes: changesSoFar(
+          p.decisions.map((d) => ({
+            id: d.id,
+            title: d.title,
+            options: parseOptions(d.options) ?? [],
+            chosenIndex: d.chosenIndex,
+            chosenAt: d.chosenAt?.toISOString() ?? null,
+          })),
+        ),
         updates: p.updates.map((u, i) => ({
           id: u.id,
           note: u.note,
@@ -285,6 +301,8 @@ async function storePhotos(projectId: string, photos: File[]): Promise<{ ok: tru
 // ── What the studio and ops see ────────────────────────────────
 
 export interface StaffWork {
+  /** The signed total and stages, for setting due dates and marking payments; null before signing in the app. */
+  money: MoneyView | null;
   documents: { id: string; kind: DocKind; title: string; meta: string; url: string; byStudio: boolean }[];
   decisions: {
     id: string;
@@ -314,7 +332,8 @@ export interface StaffWork {
 export async function projectWork(projectId: string, now = new Date()): Promise<StaffWork | null> {
   const staff = await staffFor(projectId);
   if (!staff.ok) return null;
-  const [decisions, snags, documents] = await Promise.all([
+  const [project, decisions, snags, documents] = await Promise.all([
+    prisma.homeProject.findUnique({ where: { id: projectId }, select: { contractPaise: true, paymentPhases: true, paidPhases: true } }),
     prisma.homeDecision.findMany({ where: { projectId }, orderBy: { dueOn: 'desc' }, take: 50 }),
     prisma.homeSnag.findMany({ where: { projectId }, orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], take: 100 }),
     prisma.homeDocument.findMany({ where: { projectId, deletedAt: null }, orderBy: { createdAt: 'desc' }, take: 100 }),
@@ -324,6 +343,7 @@ export async function projectWork(projectId: string, now = new Date()): Promise<
     signedDocUrls(documents.map((d) => d.storageKey)),
   ]);
   return {
+    money: project ? moneyView(project.contractPaise === null ? null : fromDb(project.contractPaise), project.paymentPhases, project.paidPhases) : null,
     documents: documents.map((d, i) => ({
       id: d.id,
       kind: (d.kind in DOC_KINDS ? d.kind : 'OTHER') as DocKind,
@@ -410,4 +430,36 @@ export async function removeDocument(documentId: string): Promise<ActionResult> 
   if (!staff.ok) return staff;
   await prisma.homeDocument.update({ where: { id: documentId }, data: { deletedAt: new Date() } });
   return { ok: true, id: documentId };
+}
+
+// ── Payments: due dates and what is paid ───────────────────────
+
+/**
+ * The studio or ops sets when a payment stage is due, or marks it paid. The
+ * customer pays the studio directly; this is the record of it, and a paid
+ * stage tells the customer it was received.
+ */
+export async function setPaymentStage(
+  projectId: string,
+  index: number,
+  patch: { dueOn?: string | null; paidOn?: string | null },
+): Promise<ActionResult> {
+  const staff = await staffFor(projectId);
+  if (!staff.ok) return staff;
+  for (const v of [patch.dueOn, patch.paidOn]) {
+    if (v !== undefined && v !== null && !/^\d{4}-\d{2}-\d{2}$/.test(v)) return { ok: false, error: 'A date, please.' };
+  }
+  const project = await prisma.homeProject.findUnique({
+    where: { id: projectId },
+    select: { contractPaise: true, paymentPhases: true, paidPhases: true },
+  });
+  const money = project ? moneyView(project.contractPaise === null ? null : fromDb(project.contractPaise), project.paymentPhases, project.paidPhases) : null;
+  const stage = money?.stages[index];
+  if (!project || !money || !stage) return { ok: false, error: 'That payment stage is not on this project.' };
+  const marks = setMark(project.paidPhases, index, patch);
+  await prisma.homeProject.update({ where: { id: projectId }, data: { paidPhases: marks as unknown as object } });
+  if (patch.paidOn && !stage.paidOn && staff.customerId) {
+    void notify(staff.customerId, { kind: 'payment-recorded', stage: stage.label, amountPaise: stage.amountPaise, studio: staff.studioName });
+  }
+  return { ok: true };
 }

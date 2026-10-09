@@ -7,7 +7,7 @@
  */
 
 import { useRef, useState } from 'react';
-import { AskGeio, CameraIcon, ExampleTag, Frame, Tabs } from '@/components/app/ui';
+import { CameraIcon, ExampleTag, Frame, Tabs } from '@/components/app/ui';
 import { raiseSnagOnline, useMyProject } from '@/components/app/useMyProject';
 import { shrinkImage } from '@/lib/shrink-image';
 import { EXAMPLE, SNAGS } from '@/modules/app/example-project';
@@ -161,8 +161,8 @@ export default function AppSnags() {
               ) : null}
               <div className="min-w-0">
                 <b style={{ display: 'block', fontSize: 17, fontWeight: 600, lineHeight: 1.25 }}>{s.title}</b>
-                <p style={{ margin: '6px 0 0', font: '400 12.5px var(--mono)', color: 'var(--ink-2)' }}>{s.where}</p>
-                <p style={{ margin: '4px 0 0', font: '400 12.5px var(--mono)', color: s.urgent && tab === 'open' ? 'var(--accent-ink)' : 'var(--ink-2)' }}>
+                <p style={{ margin: '6px 0 0', font: '400 13px var(--mono)', color: 'var(--ink-2)' }}>{s.where}</p>
+                <p style={{ margin: '4px 0 0', font: '400 13px var(--mono)', color: s.urgent && tab === 'open' ? 'var(--accent-ink)' : 'var(--ink-2)' }}>
                   {s.status}
                 </p>
               </div>
@@ -179,7 +179,6 @@ export default function AppSnags() {
           </p>
         </div>
       </main>
-      <AskGeio from="snags" />
       <Tabs />
     </Frame>
   );

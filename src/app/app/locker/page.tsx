@@ -3,7 +3,7 @@
 /** Home locker (the owner's v1 screens): what the home is made of, and every paper about it, searchable. */
 
 import { useState } from 'react';
-import { Arrow, AskGeio, ExampleTag, Frame, SearchIcon, Tabs } from '@/components/app/ui';
+import { Arrow, ExampleTag, Frame, SearchIcon, Tabs } from '@/components/app/ui';
 import { useMyProject, type MyProject } from '@/components/app/useMyProject';
 import { DOCUMENTS, EXAMPLE, MATERIALS } from '@/modules/app/example-project';
 import { DOC_KINDS } from '@/modules/portal/documents';
@@ -37,11 +37,11 @@ function ExampleLocker() {
               {materials.map((m) => (
                 <div key={m.part}>
                   <span style={{ display: 'block', height: 72, borderRadius: 12, background: m.swatch }} aria-hidden />
-                  <span className="oa-meta" style={{ display: 'block', marginTop: 10, fontSize: 10.5 }}>
+                  <span className="oa-meta" style={{ display: 'block', marginTop: 10, fontSize: 13 }}>
                     {m.part}
                   </span>
                   <b style={{ display: 'block', marginTop: 2, fontSize: 15, fontWeight: 600 }}>{m.name}</b>
-                  <span style={{ font: '400 12px var(--mono)', color: 'var(--ink-2)' }}>{m.note}</span>
+                  <span style={{ font: '400 13px var(--mono)', color: 'var(--ink-2)' }}>{m.note}</span>
                 </div>
               ))}
             </div>
@@ -71,7 +71,6 @@ function ExampleLocker() {
 
         {materials.length === 0 && documents.length === 0 ? <p className="oa-note">Nothing matches &ldquo;{q}&rdquo;.</p> : null}
       </main>
-      <AskGeio from="locker" />
       <Tabs />
     </Frame>
   );
@@ -119,7 +118,6 @@ function RealLocker({ project }: { project: MyProject }) {
           </div>
         )}
       </main>
-      <AskGeio from="locker" />
       <Tabs />
     </Frame>
   );

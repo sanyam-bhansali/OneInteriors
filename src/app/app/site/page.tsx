@@ -2,7 +2,8 @@
 
 /** On site (the owner's v1 screens): every working day, photographed, and a day nobody came, said plainly. */
 
-import { AskGeio, ExampleTag, Frame, Tabs } from '@/components/app/ui';
+import Link from 'next/link';
+import { CubeIcon, ExampleTag, Frame, Tabs, useBrief } from '@/components/app/ui';
 import { useMyProject, type MyProject } from '@/components/app/useMyProject';
 import { EXAMPLE, PHOTOS, WEEK } from '@/modules/app/example-project';
 import { STAGE_SHORT, dayLabel, timeLabel } from '@/modules/app/project-view';
@@ -18,10 +19,11 @@ function ExampleSite() {
         <h1>On site</h1>
       </header>
       <main className="oa-body">
+        <ThreeD />
         <div style={{ borderTop: '1px solid var(--line)', paddingTop: 14 }}>
           <div className="oa-section-head">
             <b style={{ fontSize: 16 }}>This week</b>
-            <span style={{ font: '500 12px var(--mono)', color: 'var(--ink-2)' }}>
+            <span style={{ font: '500 13px var(--mono)', color: 'var(--ink-2)' }}>
               {worked} of {sofar} days worked
             </span>
           </div>
@@ -43,7 +45,7 @@ function ExampleSite() {
 
         <div className="oa-section-head">
           <h2>Today, {EXAMPLE.today}</h2>
-          <span style={{ font: '500 12px var(--mono)', color: 'var(--ink-2)' }}>5:12 pm</span>
+          <span style={{ font: '500 13px var(--mono)', color: 'var(--ink-2)' }}>5:12 pm</span>
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="oa-photo-main" src={PHOTOS.living} alt="Living room after today's work" />
@@ -70,7 +72,6 @@ function ExampleSite() {
           </p>
         </div>
       </main>
-      <AskGeio from="site" />
       <Tabs />
     </Frame>
   );
@@ -85,6 +86,7 @@ function RealSite({ project }: { project: MyProject }) {
         <h1>On site</h1>
       </header>
       <main className="oa-body">
+        <ThreeD />
         {project.updates.length === 0 ? (
           <p className="oa-sub" style={{ margin: 0 }}>
             Nothing yet. The first update from {project.studio} appears here, and on your phone, as soon as it is posted.
@@ -94,7 +96,7 @@ function RealSite({ project }: { project: MyProject }) {
           <section key={u.id} className="flex flex-col gap-3" style={{ borderTop: '1px solid var(--line)', paddingTop: 14 }}>
             <div className="oa-section-head">
               <h2>{dayLabel(u.at)}</h2>
-              <span style={{ font: '500 12px var(--mono)', color: 'var(--ink-2)' }}>{timeLabel(u.at)}</span>
+              <span style={{ font: '500 13px var(--mono)', color: 'var(--ink-2)' }}>{timeLabel(u.at)}</span>
             </div>
             {u.photos[0] ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -116,7 +118,6 @@ function RealSite({ project }: { project: MyProject }) {
           </section>
         ))}
       </main>
-      <AskGeio from="site" />
       <Tabs />
     </Frame>
   );
@@ -126,4 +127,19 @@ export default function AppSite() {
   const mine = useMyProject();
   if (mine.state === 'loading') return <Frame>{null}</Frame>;
   return mine.state === 'real' ? <RealSite project={mine.project} /> : <ExampleSite />;
+}
+
+/** 3D sits inside Site (v79), and only for full-home orders: a kitchen-and-wardrobes job has no home to walk through. */
+function ThreeD() {
+  const [brief] = useBrief();
+  if (brief?.scope && brief.scope !== 'FULL_HOME') return null;
+  return (
+    <Link href="/app/3d" className="oa-card oa-site-3d">
+      <span>
+        <b>View in 3D</b>
+        <small>Your flat, room by room, as the studio builds it</small>
+      </span>
+      <CubeIcon />
+    </Link>
+  );
 }
