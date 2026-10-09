@@ -1,6 +1,10 @@
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Body, Loading, Meta, Rise, Screen, Title } from '../../components/ui';
+import { ArrowIcon } from '../../components/icons';
+import { Body, Loading, Meta, Press, Rise, Screen, Title } from '../../components/ui';
+import { api } from '../../lib/api';
 import { dayLabel, timeLabel } from '../../lib/format';
 import { useProject } from '../../lib/project';
 import { color, font } from '../../lib/theme';
@@ -9,6 +13,11 @@ import { STAGE_SHORT } from '../../lib/types';
 /** On site (the v1 design): every update from site, newest first, photos first. */
 export default function Site() {
   const { state, refresh, refreshing } = useProject();
+  const [earned, setEarned] = useState(0);
+  const ready = state.status === 'ready';
+  useEffect(() => {
+    if (ready) void api.openedUpdate().then((r) => r.ok && setEarned(r.data.earned));
+  }, [ready]);
   if (state.status === 'loading') return <Loading />;
   if (state.status === 'none') {
     return (
@@ -24,6 +33,11 @@ export default function Site() {
     <Screen onRefresh={() => void refresh()} refreshing={refreshing}>
       <Meta>Every update from site</Meta>
       <Title size={40}>On site</Title>
+      {earned ? <Body style={styles.toast}>+{earned} Home Coins for today’s update</Body> : null}
+      <View>
+        <Link title="View in 3D" sub="Your flat, room by room, as the studio builds it" path="/app/3d" />
+        {p.updates.length ? <Link title="Your home's story" sub="Every site photo, played as one film" path="/app/story" /> : null}
+      </View>
       {p.updates.length === 0 ? <Body muted>Nothing yet. The first update from {p.studio} appears here as soon as it is posted.</Body> : null}
       {p.updates.map((u, i) => (
         <Rise key={u.id} delay={Math.min(i, 4) * 80} style={styles.update}>
@@ -50,7 +64,23 @@ export default function Site() {
   );
 }
 
+function Link({ title, sub, path }: { title: string; sub: string; path: string }) {
+  return (
+    <Press onPress={() => router.push({ pathname: '/web', params: { path, title } })} haptic={false} style={styles.link}>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={styles.linkTitle}>{title}</Text>
+        <Text style={styles.linkSub}>{sub}</Text>
+      </View>
+      <ArrowIcon color={color.ink2} />
+    </Press>
+  );
+}
+
 const styles = StyleSheet.create({
+  toast: { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: color.dark, color: color.onDark, fontSize: 14, overflow: 'hidden' },
+  link: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: color.line },
+  linkTitle: { fontFamily: font.sansSemi, fontSize: 16, color: color.ink },
+  linkSub: { fontFamily: font.sans, fontSize: 14, color: color.ink2 },
   update: { gap: 12, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.line },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   h2: { fontFamily: font.sansSemi, fontSize: 22, letterSpacing: -0.7, color: color.ink },

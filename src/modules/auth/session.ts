@@ -201,3 +201,29 @@ export async function requireRole(required: UserRole): Promise<AuthUser> {
   }
   return user as AuthUser;
 }
+
+/**
+ * The phone app's web pages (its GEIO tab and the screens it opens from Me)
+ * load the website's /app inside a WebView. The first request carries the
+ * app's bearer header; this turns that same, still-valid session into the
+ * WebView's cookie, so the page's own requests are signed in too. No new
+ * session is made and the token never appears in a URL.
+ */
+export async function adoptBearerAsCookie(authorization: string | null): Promise<boolean> {
+  const token = bearerFrom(authorization);
+  if (!token) return false;
+  const session = await prisma.session.findUnique({
+    where: { tokenHash: hashToken(token) },
+    select: { expiresAt: true, revokedAt: true },
+  });
+  if (!session || session.revokedAt || session.expiresAt.getTime() <= Date.now()) return false;
+  const jar = await cookies();
+  jar.set(COOKIE, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    expires: session.expiresAt,
+  });
+  return true;
+}

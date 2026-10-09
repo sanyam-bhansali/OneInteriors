@@ -60,6 +60,10 @@ export default function Me() {
       <View>
         <Row title="Home locker" sub="Agreement, drawings, receipts, warranties" icon={<FolderIcon color={color.ink2} />} onPress={() => router.push('/locker')} />
         <Row title="Notifications" sub="Site updates, decisions and payments" icon={<BellIcon color={color.ink2} />} onPress={() => router.push('/notifications')} />
+        <Row title="Home Coins" sub="Earn as your home comes together" onPress={() => web('/app/coins', 'Home Coins')} />
+        <Row title="Family" sub="They see every update and vote on decisions" onPress={() => web('/app/family', 'Family')} />
+        <Row title="Dream board" sub="Photos you love, shared with your studio" onPress={() => web('/app/dream', 'Dream board')} />
+        <Row title="Refer and earn" sub="Give 5,000, get 5,000" onPress={() => web('/app/refer', 'Refer')} />
         <Row title="Ask Meera" sub="Your One Interiors expert. She earns nothing from any studio." onPress={() => web('/app/geio?ask=expert', 'Meera')} />
         <Row title="Privacy and your data" sub="What we keep, and how to have it removed" onPress={() => void WebBrowser.openBrowserAsync(`${apiBase()}/privacy`)} />
       </View>

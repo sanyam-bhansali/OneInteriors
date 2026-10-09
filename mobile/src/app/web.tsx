@@ -1,10 +1,11 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { Press } from '../components/ui';
 import { apiBase } from '../lib/config';
+import { readToken } from '../lib/token';
 import { color, font } from '../lib/theme';
 
 /**
@@ -21,8 +22,19 @@ export default function Web() {
 /** A website `/app` page inside the app. The GEIO tab uses it without the close button. */
 export function AppWebView({ path, title, closable = false }: { path: string; title: string; closable?: boolean }) {
   const [loading, setLoading] = useState(true);
+  // undefined while reading the keychain; null when signed out.
+  const [token, setToken] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    void readToken().then((t) => setToken(t ?? null));
+  }, []);
   const base = apiBase();
   const safePath = path.startsWith('/app') ? path : '/app';
+  const target = `${safePath}${safePath.includes('?') ? '&' : '?'}source=app`;
+  // Signed in: go through /app/session once, which turns the app's session into
+  // the WebView's cookie, so the page's own requests are signed in too.
+  const source = token
+    ? { uri: `${base}/app/session?next=${encodeURIComponent(target)}`, headers: { Authorization: `Bearer ${token}` } }
+    : { uri: `${base}${target}` };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: color.bg }} edges={['top']}>
@@ -37,8 +49,9 @@ export function AppWebView({ path, title, closable = false }: { path: string; ti
         <Text style={styles.title}>{title}</Text>
         <View style={{ width: 44 }} />
       </View>
+      {token === undefined ? null : (
       <WebView
-        source={{ uri: `${base}${safePath}${safePath.includes('?') ? '&' : '?'}source=app` }}
+        source={source}
         onLoadEnd={() => setLoading(false)}
         style={{ flex: 1, backgroundColor: color.bg }}
         allowsBackForwardNavigationGestures
@@ -54,6 +67,7 @@ export function AppWebView({ path, title, closable = false }: { path: string; ti
           return url.pathname.startsWith('/app') || url.pathname.startsWith('/_next') || url.pathname.startsWith('/api');
         }}
       />
+      )}
       {loading ? (
         <View style={styles.loading} pointerEvents="none">
           <ActivityIndicator color={color.accent} />

@@ -42,6 +42,8 @@ export interface CustomerDecision {
   chosenIndex: number | null;
   chosenAt: string | null;
   byStudio: boolean;
+  /** Family votes: advice to the owner, who chooses. */
+  votes: { name: string; optionIndex: number; note: string | null; mine: boolean }[];
 }
 
 export interface CustomerSnag {
@@ -60,6 +62,8 @@ export interface CustomerSnag {
 
 export interface CustomerProject {
   id: string;
+  /** The owner chooses and approves; family see everything and vote. */
+  role: 'owner' | 'family';
   studio: string;
   startOn: string;
   stages: StageView[];
@@ -88,12 +92,18 @@ const UPDATES_SHOWN = 30;
 /** Every project on this customer's brief, newest first. Empty when they have none yet. */
 export async function customerProjects(userId: string, now = new Date()): Promise<CustomerProject[]> {
   const projects = await prisma.homeProject.findMany({
-    where: { introduction: { brief: { userId } } },
+    where: {
+      OR: [
+        { introduction: { brief: { userId } } },
+        { family: { some: { userId, joinedAt: { not: null }, removedAt: null } } },
+      ],
+    },
     orderBy: { startOn: 'desc' },
     include: {
-      introduction: { select: { studio: { select: { tradeName: true, paymentPhases: true } } } },
+      introduction: { select: { brief: { select: { userId: true } }, studio: { select: { tradeName: true, paymentPhases: true } } } },
       updates: { orderBy: { createdAt: 'desc' }, take: UPDATES_SHOWN },
-      decisions: { orderBy: { dueOn: 'asc' } },
+      decisions: { orderBy: { dueOn: 'asc' }, include: { votes: { orderBy: { createdAt: 'asc' } } } },
+      family: { where: { joinedAt: { not: null }, removedAt: null }, select: { userId: true, name: true } },
       snags: { orderBy: { createdAt: 'desc' } },
       documents: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },
     },
@@ -106,8 +116,10 @@ export async function customerProjects(userId: string, now = new Date()): Promis
         Promise.all(p.snags.map((s) => signedSitePhotoUrls(s.fixedPhotoPaths))),
         signedDocUrls(p.documents.map((d) => d.storageKey)),
       ]);
+      const names = new Map(p.family.map((f) => [f.userId, f.name]));
       return {
         id: p.id,
+        role: p.introduction.brief.userId === userId ? 'owner' : 'family',
         studio: p.introduction.studio.tradeName,
         startOn: p.startOn.toISOString(),
         stages: trackerView(plannedStages(p.startOn, p.totalDays), p.doneStages, now),
@@ -141,6 +153,7 @@ export async function customerProjects(userId: string, now = new Date()): Promis
           chosenIndex: d.chosenIndex,
           chosenAt: d.chosenAt?.toISOString() ?? null,
           byStudio: d.byStudio,
+          votes: d.votes.map((v) => ({ name: names.get(v.userId) ?? 'Family', optionIndex: v.optionIndex, note: v.note, mine: v.userId === userId })),
         })),
         snags: p.snags.map((s, i) => ({
           id: s.id,
@@ -301,6 +314,8 @@ async function storePhotos(projectId: string, photos: File[]): Promise<{ ok: tru
 // ── What the studio and ops see ────────────────────────────────
 
 export interface StaffWork {
+  /** The client's dream board: photos they saved for the studio to see. */
+  dream: { url: string; note: string | null }[];
   /** The signed total and stages, for setting due dates and marking payments; null before signing in the app. */
   money: MoneyView | null;
   documents: { id: string; kind: DocKind; title: string; meta: string; url: string; byStudio: boolean }[];
@@ -342,7 +357,12 @@ export async function projectWork(projectId: string, now = new Date()): Promise<
     Promise.all(snags.map((s) => signedSitePhotoUrls(s.photoPaths))),
     signedDocUrls(documents.map((d) => d.storageKey)),
   ]);
+  const pins = staff.customerId
+    ? await prisma.dreamPin.findMany({ where: { userId: staff.customerId, deletedAt: null }, orderBy: { createdAt: 'desc' }, take: 24 })
+    : [];
+  const pinUrls = await signedSitePhotoUrls(pins.map((p) => p.photoPath));
   return {
+    dream: pins.map((p, k) => ({ url: pinUrls[k] ?? '', note: p.note })).filter((p) => p.url),
     money: project ? moneyView(project.contractPaise === null ? null : fromDb(project.contractPaise), project.paymentPhases, project.paidPhases) : null,
     documents: documents.map((d, i) => ({
       id: d.id,

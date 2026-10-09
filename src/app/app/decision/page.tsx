@@ -12,6 +12,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { Chevron, Cta, ExampleTag, Foot, Frame } from '@/components/app/ui';
 import { chooseOption, useMyProject } from '@/components/app/useMyProject';
+import { voteAction } from '../engage/actions';
 import { DECISION, PHOTOS } from '@/modules/app/example-project';
 import { dayLabel, optionPrice, pickDecision } from '@/modules/app/project-view';
 import { ARCHITECT } from '@/modules/consultation/architect';
@@ -86,6 +87,19 @@ function AppDecision() {
   const selected = pick ?? d.chosen ?? 0;
   const chosen = d.options[selected]!;
   const studio = real ? mine.project.studio : 'the studio';
+  // Family vote; the owner chooses (v79 "Family vote").
+  const family = real && mine.project.role === 'family';
+  const votes = (real && found ? mine.project.decisions.find((x) => x.id === found.id)?.votes : null) ?? [];
+
+  const vote = async () => {
+    if (!d.id) return;
+    setBusy(true);
+    const r = await voteAction(d.id, selected, '');
+    setBusy(false);
+    if (!r.ok) return setStatus({ ok: false, text: r.error });
+    setStatus({ ok: true, text: `Your vote for ${chosen.name.toLowerCase()} is in. The owner decides.` });
+    mine.reload();
+  };
 
   const confirm = async () => {
     if (!d.id) {
@@ -141,6 +155,25 @@ function AppDecision() {
             </button>
           ))}
         </div>
+        {votes.length ? (
+          <section className="oa-votes" aria-label="Family vote">
+            <span className="oa-label" style={{ margin: 0 }}>
+              Family vote · {votes.length} voted
+            </span>
+            {votes.map((v, i) => (
+              <p key={i}>
+                <span className="oa-avatar small" aria-hidden>
+                  {v.name.charAt(0).toUpperCase()}
+                </span>
+                <span>
+                  {v.mine ? 'You' : v.name} voted {d.options[v.optionIndex]?.name ?? 'an option'}
+                  {v.note ? `: “${v.note}”` : ''}
+                </span>
+              </p>
+            ))}
+            {!family ? <p className="oa-note">Your vote decides.</p> : null}
+          </section>
+        ) : null}
         <p className="oa-note" style={{ margin: 0 }}>
           Not sure?{' '}
           <Link href="/app/geio?from=decision&ask=expert" style={{ color: 'var(--accent-ink)', textDecoration: 'underline' }}>
@@ -155,9 +188,15 @@ function AppDecision() {
         ) : null}
       </main>
       <Foot>
-        <Cta onClick={confirm} disabled={busy || d.closed}>
-          {d.closed ? 'This decision has closed' : `Confirm ${chosen.name.charAt(0).toLowerCase() + chosen.name.slice(1)}`}
-        </Cta>
+        {family ? (
+          <Cta onClick={vote} disabled={busy || d.closed || d.chosen !== null}>
+            {d.chosen !== null ? 'Decided' : d.closed ? 'This decision has closed' : `Vote for ${chosen.name.charAt(0).toLowerCase() + chosen.name.slice(1)}`}
+          </Cta>
+        ) : (
+          <Cta onClick={confirm} disabled={busy || d.closed}>
+            {d.closed ? 'This decision has closed' : `Confirm ${chosen.name.charAt(0).toLowerCase() + chosen.name.slice(1)}`}
+          </Cta>
+        )}
       </Foot>
     </Frame>
   );

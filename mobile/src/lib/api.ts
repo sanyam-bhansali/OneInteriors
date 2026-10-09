@@ -57,5 +57,7 @@ export const api = {
   registerDevice: (token: string, platform: 'ios' | 'android') => call<object>('POST', '/devices', { token, platform }),
   removeDevice: (token: string) => call<object>('DELETE', '/devices', { token }),
   notifications: () => call<{ unread: number; notifications: Notice[] }>('GET', '/notifications'),
+  /** Opening the day's site update earns its Home Coins (once a day). */
+  openedUpdate: () => call<{ earned: number }>('POST', '/coins/opened'),
   markRead: (ids: string[] | 'all') => call<object>('POST', '/notifications', ids === 'all' ? { all: true } : { ids }),
 };

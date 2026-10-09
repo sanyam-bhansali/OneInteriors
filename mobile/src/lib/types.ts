@@ -82,6 +82,8 @@ export interface Money {
 
 export interface Project {
   id: string;
+  /** The owner chooses and approves; family see everything and vote. Older servers omit it. */
+  role?: 'owner' | 'family';
   studio: string;
   startOn: string;
   stages: Stage[];

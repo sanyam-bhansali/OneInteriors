@@ -12,6 +12,8 @@ import { useMyProject, type MyProject } from '@/components/app/useMyProject';
 import { DECISION, EXAMPLE, PHOTOS, TODAY } from '@/modules/app/example-project';
 import { STAGE_SHORT, currentStage, dayLabel, dayOf, daysLate, pickDecision, shortDate, timeLabel } from '@/modules/app/project-view';
 import { formatINR } from '@/lib/money';
+import { useEffect, useState } from 'react';
+import { openedUpdateAction, walletAction } from '../engage/actions';
 
 interface HomeData {
   label: string;
@@ -74,6 +76,7 @@ function realHome(p: MyProject): HomeData {
 export default function AppHome() {
   const [brief] = useBrief();
   const mine = useMyProject();
+  const coins = useCoins(mine.state === 'real');
   if (mine.state === 'loading') return <Frame>{null}</Frame>;
   const real = mine.state === 'real';
   const name = brief?.contactName?.trim() || (real ? '' : 'Priya');
@@ -91,9 +94,17 @@ export default function AppHome() {
           <span className="oa-meta" style={{ color: '#fff' }}>
             {h.label}
           </span>
-          <Link href="/app/notifications" className="oa-bell" aria-label="Notifications">
-            <BellIcon />
-          </Link>
+          <span className="flex items-center gap-2">
+            {coins !== null ? (
+              <Link href="/app/coins" className="oa-coin-chip" aria-label={`${coins} Home Coins`}>
+                <i aria-hidden />
+                {coins.toLocaleString('en-IN')}
+              </Link>
+            ) : null}
+            <Link href="/app/notifications" className="oa-bell" aria-label="Notifications">
+              <BellIcon />
+            </Link>
+          </span>
         </div>
         {h.refreshed ? (
           <div className="oa-refresh" role="status">
@@ -167,6 +178,26 @@ export default function AppHome() {
           </Link>
         ) : null}
         {h.today.note ? <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.5 }}>{h.today.note}</p> : null}
+        <Link href="/app/challenge" className="oa-card oa-home-card">
+          <span className="oa-label" style={{ margin: 0 }}>
+            This week&rsquo;s challenge
+          </span>
+          <b>Spot the mistake</b>
+          <span className="oa-note">A real site photo. Find what needs fixing, win 50 coins.</span>
+        </Link>
+        <Link href="/app/homes" className="oa-card oa-home-card">
+          <span className="oa-label" style={{ margin: 0 }}>
+            Home of the month
+          </span>
+          <b>See real One Interiors homes</b>
+        </Link>
+        <Link href="/app/refer" className="oa-card oa-home-card">
+          <span className="oa-label" style={{ margin: 0 }}>
+            Refer and earn
+          </span>
+          <b>Give 5,000 coins, get 5,000</b>
+          <span className="oa-note">When a friend or neighbour signs. Three flats in your society earn everyone a bonus.</span>
+        </Link>
         {real && !mine.project.updates.length ? (
           <p className="oa-note">The first update from site will appear here, and on your phone, as soon as the studio posts it.</p>
         ) : null}
@@ -174,4 +205,20 @@ export default function AppHome() {
       <Tabs />
     </Frame>
   );
+}
+
+/** The coin balance for the header chip, settled on the way; and today's update earns its coins. */
+function useCoins(real: boolean): number | null {
+  const [n, setN] = useState<number | null>(null);
+  useEffect(() => {
+    if (!real) return;
+    let live = true;
+    void openedUpdateAction()
+      .then(() => walletAction())
+      .then((r) => live && r.ok && setN(r.wallet.balance));
+    return () => {
+      live = false;
+    };
+  }, [real]);
+  return n;
 }

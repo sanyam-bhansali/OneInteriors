@@ -74,6 +74,24 @@ export function ProjectWork({ projectId, work }: { projectId: string; work: Staf
 
       {work.money ? <Payments projectId={projectId} money={work.money} /> : null}
 
+      {work.dream.length ? (
+        <section>
+          <div className="flex items-baseline justify-between gap-3">
+            <h3 className="m-0 text-[15px] font-semibold">The client&rsquo;s dream board</h3>
+            <span className={label}>{work.dream.length} saved</span>
+          </div>
+          <ul className="m-0 mt-2 grid list-none grid-cols-3 gap-2 p-0 sm:grid-cols-4">
+            {work.dream.map((p) => (
+              <li key={p.url} className="flex flex-col gap-1">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.url} alt={p.note ?? 'A photo the client saved'} className="aspect-square w-full rounded-[8px] object-cover" loading="lazy" />
+                {p.note ? <span className="text-[12.5px] leading-[1.35] text-[var(--color-ink-2)]">{p.note}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <Documents projectId={projectId} documents={work.documents} />
 
       <section>

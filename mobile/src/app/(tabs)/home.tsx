@@ -111,7 +111,7 @@ export default function Home() {
                 <Text style={styles.cardMeta}>Your decision, due {dayLabel(decision.dueOn)}</Text>
                 <Text style={styles.cardTitle}>{decision.title}</Text>
                 <Text style={styles.cardBody}>{decision.why}</Text>
-                <Press onPress={() => router.push({ pathname: '/decision/[id]', params: { id: decision.id } })} style={styles.cardCta}>
+                <Press onPress={() => p.role === 'family' ? router.push({ pathname: '/web', params: { path: `/app/decision?id=${decision.id}`, title: 'Family vote' } }) : router.push({ pathname: '/decision/[id]', params: { id: decision.id } })} style={styles.cardCta}>
                   <Text style={styles.cardCtaText}>Decide</Text>
                   <ArrowIcon color={color.white} />
                 </Press>

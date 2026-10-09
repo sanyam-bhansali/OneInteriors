@@ -58,7 +58,7 @@ export default function Project() {
           <Row
             title="Your decision"
             sub={`${decision.title} · due ${dayLabel(decision.dueOn)}`}
-            onPress={() => router.push({ pathname: '/decision/[id]', params: { id: decision.id } })}
+            onPress={() => p.role === 'family' ? router.push({ pathname: '/web', params: { path: `/app/decision?id=${decision.id}`, title: 'Family vote' } }) : router.push({ pathname: '/decision/[id]', params: { id: decision.id } })}
           />
         ) : null}
       </View>

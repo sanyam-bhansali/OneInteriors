@@ -3,6 +3,8 @@
 /** On site (the owner's v1 screens): every working day, photographed, and a day nobody came, said plainly. */
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { openedUpdateAction } from '../engage/actions';
 import { CubeIcon, ExampleTag, Frame, Tabs, useBrief } from '@/components/app/ui';
 import { useMyProject, type MyProject } from '@/components/app/useMyProject';
 import { EXAMPLE, PHOTOS, WEEK } from '@/modules/app/example-project';
@@ -87,6 +89,8 @@ function RealSite({ project }: { project: MyProject }) {
       </header>
       <main className="oa-body">
         <ThreeD />
+        {project.updates.length ? <Story /> : null}
+        <EarnToday />
         {project.updates.length === 0 ? (
           <p className="oa-sub" style={{ margin: 0 }}>
             Nothing yet. The first update from {project.studio} appears here, and on your phone, as soon as it is posted.
@@ -129,6 +133,19 @@ export default function AppSite() {
   return mine.state === 'real' ? <RealSite project={mine.project} /> : <ExampleSite />;
 }
 
+/** Your home's story: every site photo as one film (v79). */
+function Story() {
+  return (
+    <Link href="/app/story" className="oa-card oa-site-3d">
+      <span>
+        <b>Your home&rsquo;s story</b>
+        <small>Every site photo, played as one film</small>
+      </span>
+      <span aria-hidden>▶</span>
+    </Link>
+  );
+}
+
 /** 3D sits inside Site (v79), and only for full-home orders: a kitchen-and-wardrobes job has no home to walk through. */
 function ThreeD() {
   const [brief] = useBrief();
@@ -142,4 +159,13 @@ function ThreeD() {
       <CubeIcon />
     </Link>
   );
+}
+
+/** Opening today's update earns the day's coins (Home Coins rules); says so once. */
+function EarnToday() {
+  const [earned, setEarned] = useState(0);
+  useEffect(() => {
+    void openedUpdateAction().then((r) => setEarned(r.earned));
+  }, []);
+  return earned ? <p className="oa-toast">+{earned} Home Coins for today&rsquo;s update</p> : null;
 }

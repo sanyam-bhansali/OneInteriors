@@ -1351,6 +1351,7 @@ model HomeProject {
   decisions HomeDecision[]
   snags     HomeSnag[]
   documents HomeDocument[]
+  family    FamilyMember[]
 
   @@map("home_projects")
 }
@@ -1384,8 +1385,116 @@ model HomeDecision {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  votes DecisionVote[]
+
   @@index([projectId, dueOn])
   @@map("home_decisions")
+}
+
+/// v79 engagement (9 Oct 2026). Home Coins: one row per thing that earned
+/// coins. 1 coin = ₹1 with partner brands; never spendable on the studio's
+/// bill and never cashed out (owner's rules). Each thing earns once: the
+/// unique (userId, kind, ref) is what makes every award idempotent.
+model CoinEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  /// QUIZ, SIGNED, DAILY_UPDATE, STREAK_7, DECISION_ON_TIME, SNAG_PHOTO,
+  /// CHALLENGE, SHARE_MILESTONE, FAMILY_JOINED, REFERRAL_SIGNED, SOCIETY_CIRCLE.
+  kind      String
+  coins     Int
+  /// What earned it: "decision:<id>", "day:2026-10-09", "society:<key>".
+  ref       String
+  note      String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, kind, ref])
+  @@index([userId, createdAt])
+  @@map("coin_entries")
+}
+
+/// Family on a project: invited by the owner on WhatsApp, joined by signing
+/// in with the invited number. Family see the project and vote on
+/// decisions; only the owner decides and approves payments.
+model FamilyMember {
+  id          String      @id @default(cuid())
+  projectId   String
+  project     HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  invitedById String
+  name        String
+  relation    String?
+  /// Normalised "+91…", matched against the number they sign in with.
+  phone       String
+  inviteToken String      @unique
+  /// Their account, once joined.
+  userId      String?
+  joinedAt    DateTime?
+  removedAt   DateTime?
+  createdAt   DateTime    @default(now())
+
+  @@unique([projectId, phone])
+  @@index([userId])
+  @@map("family_members")
+}
+
+/// A family vote on a decision. Advice to the owner, who still chooses.
+model DecisionVote {
+  id          String       @id @default(cuid())
+  decisionId  String
+  decision    HomeDecision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+  userId      String
+  optionIndex Int
+  note        String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([decisionId, userId])
+  @@map("decision_votes")
+}
+
+/// Dream board: photos a customer saves, which their studio can see.
+model DreamPin {
+  id        String   @id @default(cuid())
+  userId    String
+  /// Private storage key in site-photos (dream/<userId>/…).
+  photoPath String
+  note      String?
+  createdAt DateTime @default(now())
+  deletedAt DateTime?
+
+  @@index([userId, createdAt])
+  @@map("dream_pins")
+}
+
+/// "Spot the mistake": one real site photo a week, set by ops, with where
+/// the mistake is (as fractions of the photo) and what it teaches.
+model WeeklyChallenge {
+  id          String   @id @default(cuid())
+  /// Monday of the week it runs, IST.
+  weekOf      DateTime @unique
+  photoPath   String
+  x           Float
+  y           Float
+  radius      Float
+  answer      String
+  explain     String   @db.Text
+  createdById String
+  createdAt   DateTime @default(now())
+
+  answers ChallengeAnswer[]
+
+  @@map("weekly_challenges")
+}
+
+model ChallengeAnswer {
+  id          String          @id @default(cuid())
+  challengeId String
+  challenge   WeeklyChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  userId      String
+  correct     Boolean
+  createdAt   DateTime        @default(now())
+
+  @@unique([challengeId, userId])
+  @@map("challenge_answers")
 }
 
 /// Something wrong on site, to be fixed by a date (the app's "Snags").

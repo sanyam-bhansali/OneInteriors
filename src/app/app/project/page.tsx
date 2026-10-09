@@ -3,6 +3,8 @@
 /** Project tracker (v79 design): late, paid and handover up top, snags and decisions inside, payments and changes in rupees, then every stage. */
 
 import Link from 'next/link';
+import { useState } from 'react';
+import { sharedMilestoneAction } from '../engage/actions';
 import { ExampleTag, Frame, Tabs } from '@/components/app/ui';
 import { useMyProject, type MyProject } from '@/components/app/useMyProject';
 import { CARPENTRY, EXAMPLE, MILESTONES } from '@/modules/app/example-project';
@@ -162,6 +164,7 @@ function RealProject({ project }: { project: MyProject }) {
                 {s.state === 'done' ? 'Done' : `Planned ${shortDate(s.targetOn)}`}
                 {s.state === 'now' ? (s.late ? ' · running late' : ' · on track') : ''}
               </p>
+              {s.state === 'done' && project.role === 'owner' ? <ShareMilestone stageKey={s.key} label={s.label} studio={project.studio} /> : null}
               {s.late ? (
                 <div className="oa-flag">
                   <span className="oa-meta" style={{ color: 'var(--accent-ink)' }}>
@@ -316,4 +319,25 @@ export default function AppProject() {
   const mine = useMyProject();
   if (mine.state === 'loading') return <Frame>{null}</Frame>;
   return mine.state === 'real' ? <RealProject project={mine.project} /> : <ExampleProject />;
+}
+
+/** "Share this milestone" on a finished stage: the phone's share sheet, else WhatsApp. +25 coins, up to five. */
+function ShareMilestone({ stageKey, label, studio }: { stageKey: string; label: string; studio: string }) {
+  const [done, setDone] = useState<string | null>(null);
+  const share = async () => {
+    const text = `${label} is done at our new home! Built with ${studio}, through One Interiors.`;
+    try {
+      if (navigator.share) await navigator.share({ text });
+      else window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+    } catch {
+      return; // closed the sheet
+    }
+    const r = await sharedMilestoneAction(stageKey);
+    setDone(r.earned ? `Shared. +${r.earned} coins` : 'Shared');
+  };
+  return (
+    <button type="button" className="oa-inline-link" style={{ marginTop: 6 }} onClick={() => void share()}>
+      {done ?? 'Share this milestone'}
+    </button>
+  );
 }

@@ -19,6 +19,7 @@ import { useMyProject } from '@/components/app/useMyProject';
 import { ARCHITECT } from '@/modules/consultation/architect';
 import { localityLabel } from '@/modules/brief/types';
 import { TIER } from '@/modules/quotation/tiers';
+import { walletAction } from '../engage/actions';
 
 const HOMES: Record<string, string> = { BHK_1: '1 BHK', BHK_2: '2 BHK', BHK_3: '3 BHK', BHK_4_PLUS: '4+ BHK', VILLA: 'Villa' };
 const expert = ARCHITECT.name.split(' ')[0];
@@ -31,6 +32,7 @@ export default function AppMe() {
   const mine = useMyProject();
   const [me, setMe] = useState<Me | undefined>(undefined);
   const [unread, setUnread] = useState(0);
+  const [coins, setCoins] = useState<{ balance: number; streak: number } | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -42,6 +44,7 @@ export default function AppMe() {
       .then((r) => (r.ok ? r.json() : null))
       .then((b: { unread?: number } | null) => live && setUnread(b?.unread ?? 0))
       .catch(() => {});
+    void walletAction().then((r) => live && r.ok && setCoins({ balance: r.wallet.balance, streak: r.wallet.streak }));
     return () => {
       live = false;
     };
@@ -93,6 +96,14 @@ export default function AppMe() {
             sub={unread ? `${unread} unread` : 'Site updates, decisions and payments'}
             icon={<BellIcon />}
           />
+          <Row
+            href="/app/coins"
+            title="Home Coins"
+            sub={coins ? `${coins.balance.toLocaleString('en-IN')} coins${coins.streak ? ` · ${coins.streak}-day streak` : ''}` : 'Earn as your home comes together'}
+          />
+          <Row href="/app/family" title="Family" sub="They see every update and vote on decisions" />
+          <Row href="/app/dream" title="Dream board" sub="Photos you love, shared with your studio" />
+          <Row href="/app/refer" title="Refer and earn" sub="Give 5,000, get 5,000" />
           <Row href="/app/geio?ask=expert" title={`Ask ${expert}`} sub="Your One Interiors expert. She earns nothing from any studio." />
           <Row href="/app/geio" title="Ask GEIO" sub="Anything about your home, in plain words" />
           <Row href="/privacy" title="Privacy and your data" sub="What we keep, and how to have it removed" />
