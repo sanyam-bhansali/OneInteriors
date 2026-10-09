@@ -11,14 +11,14 @@ Update this whenever you change one of them — a pin with no recorded reason ge
 ```json
 "overrides": {
   "postcss": "^8.5.28",
-  "sharp": "^0.35.4",
+  "sharp": "^0.35.5",
   "deepmerge-ts": "^8.0.0"
 }
 ```
 
 ### `postcss` → `^8.5.28`
 
-Next 15.5.25 pins `postcss@8.4.31` internally. That version carries four
+Next 15.5.x pins `postcss@8.4.31` internally. That version carries four
 advisories, the significant ones being **GHSA-6g55-p6wh-862q** and
 **GHSA-r28c-9q8g-f849**: an attacker-controlled `sourceMappingURL` in a CSS
 comment can cause arbitrary `.map` file disclosure.
@@ -45,17 +45,21 @@ Prisma current.
 Re-check at each Prisma upgrade; drop the override once Prisma ships with an
 unaffected version.
 
-### `sharp` → `^0.35.4`
+### `sharp` → `^0.35.5`
 
 Next depends on `sharp@0.34.5`, which inherits four libvips CVEs
-(**GHSA-f88m-g3jw-g9cj**: CVE-2026-33327, -33328, -35590, -35591). `0.35.4` is
-patched and API-compatible for Next's image optimisation use.
+(**GHSA-f88m-g3jw-g9cj**: CVE-2026-33327, -33328, -35590, -35591), and
+`<0.35.5` carries a librsvg CVE (**GHSA-wq5f-xc86-pv6w**, CVE-2026-96889).
+`0.35.5` is patched and API-compatible for Next's image optimisation use.
 
 Relevant to us because milestone site photos and studio portfolios are
 user-uploaded images that will pass through image processing. This is not a
 theoretical exposure once Sprint 6 lands.
 
-**Result: `npm audit` reports 0 vulnerabilities.**
+**Result: `npm audit --omit=dev` reports 0 vulnerabilities** (Oct 2026: Next
+15.5.27 for GHSA-4jqv-mc3x-m676 and GHSA-mcj8-r9mp-w47p; dev-only tooling —
+vitest, eslint-config-next, pptxgenjs — still has advisories that need major
+upgrades).
 
 ---
 
@@ -72,7 +76,7 @@ npm warn deprecated eslint@9.39.5: This version is no longer supported.
 This is a **support-lifecycle notice, not a vulnerability** — `npm audit` is
 clean. ESLint 9.x is in maintenance and 10.x is current.
 
-We cannot move yet. `eslint-config-next@15.5.25` declares
+We cannot move yet. `eslint-config-next@15.5.27` declares
 `eslint: "^7.23.0 || ^8.0.0 || ^9.0.0"`, and forcing v10 fails outright:
 
 ```
