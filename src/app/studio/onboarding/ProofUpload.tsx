@@ -1,6 +1,9 @@
 'use client';
 
-import { useActionState, useRef, useState } from 'react';
+
+import { startTransition, useActionState, useRef, useState } from 'react';
+import { shrinkImage } from '@/lib/shrink-image';
+import { keepValues } from './fields';
 import { uploadProofAction, withdrawProofAction, type ProofState } from './actions';
 import { Section } from './Section';
 import {
@@ -12,6 +15,9 @@ import {
 import type { StudioDocumentView } from '@/modules/studio/documents';
 import { FileText, UploadCloud } from 'lucide-react';
 import { INLINE_ICON, PANEL_ICON } from './icon-sizes';
+
+/** Under the 4 MB server-action limit, with room for the rest of the form. */
+const MAX_SEND_BYTES = 3.5 * 1024 * 1024;
 
 const INITIAL: ProofState = { status: 'idle' };
 
@@ -55,6 +61,35 @@ export function ProofUpload({
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const [kind, setKind] = useState<DocumentKind>('GST_CERTIFICATE');
+  const [tooBig, setTooBig] = useState<string | null>(null);
+
+  /**
+   * Shrink a photo before it goes, and stop a file the request cannot carry.
+   *
+   * A server action carries at most 4 MB (next.config.ts). This said "up to
+   * 10 MB", so a 5 MB scan broke the request and crashed the page. A photo of
+   * a certificate shrinks to a few hundred KB with nothing lost for reading
+   * it; a PDF over the limit gets a sentence saying what to do instead.
+   */
+  async function upload(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const original = input.current?.files?.[0];
+    if (!original) return;
+    setTooBig(null);
+    const file = original.type.startsWith('image/') ? await shrinkImage(original) : original;
+    if (file.size > MAX_SEND_BYTES) {
+      setTooBig(
+        `${original.name} is ${(file.size / 1024 / 1024).toFixed(1)} MB. We can take up to 3.5 MB here: a phone photo of the certificate works just as well.`,
+      );
+      if (input.current) input.current.value = '';
+      return;
+    }
+    const data = new FormData();
+    data.set('kind', kind);
+    data.set('proof', file);
+    startTransition(() => action(data));
+    if (input.current) input.current.value = '';
+  }
 
   function send() {
     if (!enabled) return;
@@ -77,7 +112,7 @@ export function ProofUpload({
       ) : null}
 
       {enabled ? (
-        <form ref={form} action={action}>
+        <form ref={form} onSubmit={(e) => void upload(e)}>
           <div className="mb-3">
             <label htmlFor="kind" className="label m-0 mb-1.5 block">
               What is it?
@@ -142,11 +177,17 @@ export function ProofUpload({
           </label>
 
           <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-            <p className="m-0 text-[12.5px] text-[var(--color-ink-3)]">PDF, JPG or PNG. Up to 10 MB.</p>
+            <p className="m-0 text-[12.5px] text-[var(--color-ink-3)]">PDF, JPG or PNG. Photos are made smaller for you; a PDF up to 3.5 MB.</p>
             <p className="m-0 text-[12.5px] text-[var(--color-ink-3)]">
               Read by the person verifying you, and nobody else.
             </p>
           </div>
+
+          {tooBig ? (
+            <p role="alert" className="m-0 mt-3 rounded-[10px] border border-[var(--color-brass)]/35 bg-[var(--color-brass-soft)] px-4 py-2.5 text-[13.5px] leading-relaxed text-[var(--color-ink)]">
+              {tooBig}
+            </p>
+          ) : null}
 
           {state.status === 'error' ? (
             /* Amber, not red. Nothing has gone wrong with their business —
@@ -207,7 +248,7 @@ function DocumentRow({ doc }: { doc: StudioDocumentView }) {
         {copy.label}
       </span>
 
-      <form action={action}>
+      <form onSubmit={keepValues(action)}>
         <input type="hidden" name="id" value={doc.id} />
         <button
           type="submit"

@@ -3,7 +3,7 @@
 import { useActionState, useState } from 'react';
 import { RATE_CATEGORIES, CATEGORY, CORE_CATEGORIES } from '@/modules/quotation/categories';
 import { saveRatesAction, type StepState } from './actions';
-import { SaveBar } from './fields';
+import { SaveBar, keepValues } from './fields';
 import { QuotePreview } from './QuotePreview';
 
 const INITIAL: StepState = { status: 'idle' };
@@ -34,7 +34,14 @@ const INITIAL: StepState = { status: 'idle' };
  * way — never hidden, because a studio must always be able to see what we
  * will quote on their behalf.
  */
-export function RateCardForm({ values }: { values: Record<string, number | null> }) {
+export function RateCardForm({
+  values,
+  stillNeeded = null,
+}: {
+  values: Record<string, number | null>;
+  /** Why the step is not finished after saving, e.g. "12 quotations sent — at least 50 are needed". */
+  stillNeeded?: string | null;
+}) {
   const [state, action, pending] = useActionState(saveRatesAction, INITIAL);
   const err = state.errors ?? {};
 
@@ -53,9 +60,13 @@ export function RateCardForm({ values }: { values: Record<string, number | null>
   );
 
   const missingCore = CORE_CATEGORIES.filter((c) => values[c] == null).length;
+  /* Open or closed when the page loads, then the studio's to decide. As a
+     live prop it snapped shut the moment the sixth rate saved, hiding the
+     "Saved" line — which read as a Save that did nothing. */
+  const [openAtFirst] = useState(missingCore > 0);
 
   return (
-    <details open={missingCore > 0} className="oi-sec rounded-[16px] border border-[var(--color-rule)] bg-[var(--color-paper)]">
+    <details open={openAtFirst} className="oi-sec rounded-[16px] border border-[var(--color-rule)] bg-[var(--color-paper)]">
       <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-3 px-6 py-5">
         <span className="min-w-0">
           <span className="block text-[15.5px] font-semibold text-[var(--color-ink)]">
@@ -98,7 +109,7 @@ export function RateCardForm({ values }: { values: Record<string, number | null>
         </p>
       </div>
 
-      <form action={action} className="flex flex-col gap-7">
+      <form onSubmit={keepValues(action)} className="flex flex-col gap-7">
         <div>
           <p className="h3 mb-1">Needed to quote</p>
           <p className="m-0 mb-5 max-w-[56ch] text-[14px] leading-relaxed text-[var(--color-ink-3)]">
@@ -138,7 +149,20 @@ export function RateCardForm({ values }: { values: Record<string, number | null>
           </div>
         </div>
 
-        <SaveBar pending={pending} saved={state.status === 'saved'} formError={err.form} label="Save and continue" />
+        {/* Saving rates does not finish this step while quotations are short —
+            the owner's rule. Said beside the button, so pressing it and staying
+            put does not read as a button that does nothing. */}
+        {stillNeeded ? (
+          <p className="m-0 text-[13.5px] leading-relaxed text-[var(--color-ink-2)]">
+            Your rates save here. This step finishes once we have your quotations: {stillNeeded.charAt(0).toLowerCase() + stillNeeded.slice(1)}.
+          </p>
+        ) : null}
+        <SaveBar
+          pending={pending}
+          saved={state.status === 'saved'}
+          formError={err.form}
+          label={stillNeeded ? 'Save my rates' : 'Save and continue'}
+        />
       </form>
       </div>
 
@@ -188,7 +212,7 @@ function RateField({
           id={category}
           name={category}
           type="number"
-          step={isPercent ? '0.25' : '1'}
+          step="any"
           min="0"
           value={value}
           onChange={(e) => onChange(e.target.value)}

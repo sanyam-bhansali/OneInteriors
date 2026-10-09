@@ -23,7 +23,7 @@ import {
   ONBOARDING_STEPS,
   type OnboardingStep,
 } from '@/modules/studio/onboarding';
-import { uploadQuotations } from '@/modules/studio/quotation-archive-store';
+import { planQuotationUploads, recordUploadedQuotations, uploadQuotations } from '@/modules/studio/quotation-archive-store';
 import { uploadBusinessProof, withdrawDocument } from '@/modules/studio/documents';
 
 export interface StepState {
@@ -325,6 +325,26 @@ export async function uploadQuotationsAction(
     status: 'saved',
     message: `${result.stored} file${result.stored === 1 ? '' : 's'} sent. Somebody here will read them — you do not need to wait.`,
     skipped: result.skipped,
+  };
+}
+
+/** Step one of a direct upload: a signed link per file, after the usual checks. */
+export async function planQuotationUploadsAction(files: { name: string; type: string; size: number }[]) {
+  return planQuotationUploads(Array.isArray(files) ? files.slice(0, 100) : []);
+}
+
+/** Step two: record what the browser put in storage, and start reading it. */
+export async function recordQuotationUploadsAction(
+  files: { path: string; filename: string; contentType: string; bytes: number }[],
+  skipped: string[] = [],
+): Promise<UploadState> {
+  const result = await recordUploadedQuotations(Array.isArray(files) ? files : []);
+  if (!result.ok) return { status: 'error', message: result.error, skipped };
+  refresh();
+  return {
+    status: 'saved',
+    message: `${result.stored} file${result.stored === 1 ? '' : 's'} sent. Somebody here will read them — you do not need to wait.`,
+    skipped: [...skipped, ...(result.skipped ?? [])],
   };
 }
 

@@ -3,7 +3,7 @@
 import { useActionState, useState } from 'react';
 import { saveMatchingProfileAction, type StepState } from './actions';
 import { Section } from './Section';
-import { Chips, Field, FieldNote, SaveBar } from './fields';
+import { Chips, Field, FieldNote, SaveBar, keepValues } from './fields';
 import { LANGUAGES, LANGUAGE_LABELS, SCOPE_LABELS, type ScopeType } from '@/modules/brief/types';
 import {
   CARCASSES,
@@ -115,7 +115,7 @@ export function PracticeForm({
   };
 
   return (
-    <form action={action} className="flex flex-col gap-4">
+    <form onSubmit={keepValues(action)} className="flex flex-col gap-4">
       <p className="m-0 text-[14px] text-[var(--color-ink-2)]">
         Profile {score}% complete. Blank means &ldquo;not said yet&rdquo; — we match on what you
         tell us, and never fill anything in for you.
@@ -156,7 +156,7 @@ export function PracticeForm({
                           label="Minimum project"
                           name={`minimum_${s}`}
                           type="number"
-                          step="0.5"
+                          step="any"
                           width="xs"
                           suffix="lakh"
                           defaultValue={profile.minimumLakhs[s] ?? null}

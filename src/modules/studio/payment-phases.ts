@@ -75,7 +75,9 @@ export function parsePhasesText(text: string): PaymentPhase[] | null {
   if (parts.length === 0) return null;
   const phases: PaymentPhase[] = [];
   for (const part of parts) {
-    const m = part.match(/(\d{1,3})\s*%/);
+    // Decimals are read whole, so "12.5%" is 12.5 and checkPhases asks for a
+    // whole percent — rather than reading 5% with a label of "12.".
+    const m = part.match(/(\d{1,3}(?:\.\d+)?)\s*%/);
     if (!m) return null;
     const label = part
       .replace(m[0], ' ')

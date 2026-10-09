@@ -169,6 +169,15 @@ export async function currentStudio(): Promise<StudioContext | null> {
   try {
     return await loadStudio(user);
   } catch (error) {
+    console.error('[studio] currentStudio failed, retrying once', error);
+  }
+  /* Once more before giving up. A pooler blip used to turn straight into
+     null, which the onboarding page shows as "page not found" mid-flow and
+     every save shows as "no studio is linked to this account". */
+  try {
+    await new Promise((r) => setTimeout(r, 400));
+    return await loadStudio(user);
+  } catch (error) {
     console.error('[studio] currentStudio failed', error);
     return null;
   }

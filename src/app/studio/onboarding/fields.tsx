@@ -3,7 +3,7 @@
 /** Shared form primitives for the onboarding steps. Kept in one file so the
  *  four steps cannot drift into four slightly different-looking forms. */
 
-import { useEffect, useRef, useState } from 'react';
+import { startTransition, useEffect, useRef, useState } from 'react';
 import { FIELD_WIDTH, type FieldWidth } from '@/components/ui/form';
 import type { DraftState } from './useAutosave';
 /* Aliased: this file exports its own `Check`, which is a checkbox field. */
@@ -424,4 +424,24 @@ function SavedFlash({ pending, saved }: { pending: boolean; saved: boolean }) {
       ) : null}
     </span>
   );
+}
+
+/**
+ * Submit a form to its server action WITHOUT React 19's automatic reset.
+ *
+ * With `<form action={fn}>`, React resets every uncontrolled field once the
+ * action returns — including when it returns an error. On these steps that
+ * meant a refused save wiped what the studio had typed back to the values
+ * from page load, and the next Save quietly posted the old values over the
+ * new ones: reported as "it does not save". Calling the action ourselves from
+ * `onSubmit` keeps the form exactly as the studio left it.
+ */
+export function keepValues(action: (data: FormData) => void) {
+  return (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    if (submitter?.name) data.append(submitter.name, submitter.value);
+    startTransition(() => action(data));
+  };
 }
