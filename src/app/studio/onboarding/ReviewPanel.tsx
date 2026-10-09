@@ -1,5 +1,7 @@
 'use client';
 
+import { keepValues } from './fields';
+
 import Link from 'next/link';
 import { useActionState } from 'react';
 import { submitForReviewAction, type StepState } from './actions';
@@ -128,7 +130,7 @@ export function ReviewPanel({
         </p>
       </section>
 
-      <form action={action} className="border-t border-[var(--color-rule)] pt-6">
+      <form onSubmit={keepValues(action)} className="border-t border-[var(--color-rule)] pt-6">
         {state.status === 'error' ? (
           <p role="alert" className="m-0 mb-3 rounded-[10px] bg-[var(--color-atrisk-soft)] px-4 py-2.5 text-[14.5px] text-[var(--color-atrisk)]">
             {state.errors?.form}

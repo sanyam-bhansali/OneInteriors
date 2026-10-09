@@ -55,6 +55,10 @@ export function useAutosave(
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlight = useRef(false);
+  /* An edit that arrived while a draft was already going up. It used to be
+     dropped, and the earlier request then reported "Draft saved" for a copy
+     that did not include it. Now it runs once the first one finishes. */
+  const dirty = useRef(false);
   /* Read inside the debounce callback, which closes over whatever `pending`
      was when the timer was set — a ref is the only way to see the value at
      the moment it fires rather than the one from 1.2 seconds ago. */
@@ -63,13 +67,19 @@ export function useAutosave(
 
   const flush = useCallback(async () => {
     const form = formRef.current;
-    if (!form || inFlight.current || submitting.current) return;
+    if (!form || submitting.current) return;
+    if (inFlight.current) {
+      dirty.current = true;
+      return;
+    }
 
     inFlight.current = true;
+    dirty.current = false;
     setState('saving');
     try {
       await save(new FormData(form));
-      setState('saved');
+      // Not "saved" if more typing is waiting, or a real Save has started.
+      if (!dirty.current && !submitting.current) setState('saved');
     } catch {
       /* Swallowed on purpose. A failed background save is not something to
          interrupt somebody mid-sentence about: their work is still in the
@@ -79,8 +89,14 @@ export function useAutosave(
       setState('failed');
     } finally {
       inFlight.current = false;
+      if (dirty.current && !submitting.current) {
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => void flushRef.current(), QUIET_MS / 2);
+      }
     }
   }, [formRef, save]);
+  const flushRef = useRef(flush);
+  flushRef.current = flush;
 
   useEffect(() => {
     const form = formRef.current;
@@ -111,6 +127,7 @@ export function useAutosave(
   useEffect(() => {
     if (!pending) return;
     if (timer.current) clearTimeout(timer.current);
+    dirty.current = false;
     setState('clean');
   }, [pending]);
 

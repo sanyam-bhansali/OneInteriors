@@ -66,6 +66,8 @@ const ALLOWED = new Map<string, string>([
   ['image/webp', 'webp'],
 ]);
 
+const CONTENT_TYPE: Record<string, string> = Object.fromEntries([...ALLOWED].map(([type, ext]) => [ext, type]));
+
 /** For the hint under the control. Kept next to ALLOWED so they cannot drift. */
 export const ACCEPTED_PROOF = 'PDF, JPG, PNG';
 export const MAX_PROOF_MB = MAX_BYTES / 1024 / 1024;
@@ -102,7 +104,10 @@ export async function storeBusinessProof(studioId: string, file: File): Promise<
     return { ok: false, error: 'Sending documents is not switched on for this deployment yet.' };
   }
 
-  const extension = ALLOWED.get(file.type);
+  /* Chrome on Windows and Android often sends an empty type for HEIC, and
+     sometimes for PDFs saved from WhatsApp; the file name says what it is. */
+  const byName = (file.name.toLowerCase().match(/\.(pdf|png|jpe?g|heic|webp)$/)?.[1] ?? '').replace('jpeg', 'jpg');
+  const extension = ALLOWED.get(file.type) ?? (file.type === '' || file.type === 'application/octet-stream' ? byName || undefined : undefined);
   if (!extension) {
     return {
       ok: false,
@@ -127,7 +132,7 @@ export async function storeBusinessProof(studioId: string, file: File): Promise<
       headers: {
         Authorization: `Bearer ${key}`,
         apikey: key,
-        'Content-Type': file.type,
+        'Content-Type': file.type || CONTENT_TYPE[extension] || 'application/octet-stream',
         // Never overwrite. The path carries a fresh uuid, so an upsert could
         // only ever mean a collision we would rather hear about.
         'x-upsert': 'false',
@@ -149,7 +154,7 @@ export async function storeBusinessProof(studioId: string, file: File): Promise<
     file: {
       path,
       filename: safeDisplayName(file.name),
-      contentType: file.type,
+      contentType: file.type || CONTENT_TYPE[extension] || 'application/octet-stream',
       bytes: file.size,
     },
   };

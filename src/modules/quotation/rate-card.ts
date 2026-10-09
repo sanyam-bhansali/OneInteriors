@@ -72,7 +72,12 @@ export interface RateInput {
 }
 
 export async function saveRateCard(inputs: RateInput[]): Promise<SaveResult> {
-  const user = await requireRole('STUDIO');
+  /* A sentence, not a throw: this page is long, a session can lapse while it
+     is filled in, and a thrown error took the whole page down. */
+  const user = await requireRole('STUDIO').catch(() => null);
+  if (!user) {
+    return { ok: false, errors: { form: 'You have been signed out. Sign in again and press Save — your numbers are still in the boxes.' } };
+  }
   const context = await currentStudio();
   if (!context) return { ok: false, errors: { form: 'No studio is linked to this account.' } };
 
@@ -81,6 +86,7 @@ export async function saveRateCard(inputs: RateInput[]): Promise<SaveResult> {
   for (const input of inputs) {
     if (!(RATE_CATEGORIES as readonly string[]).includes(input.category)) continue;
     if (input.value < 0) errors[input.category] = 'A rate cannot be negative.';
+    if (input.value >= 1e8) errors[input.category] = 'That is too large to be a rate. Check for an extra digit.';
     if (CATEGORY[input.category].unit === 'percent' && input.value > 30) {
       errors[input.category] = 'A design fee over 30% is almost certainly a typo.';
     }
@@ -88,7 +94,7 @@ export async function saveRateCard(inputs: RateInput[]): Promise<SaveResult> {
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
-  await prisma.$transaction(async (tx) => {
+  const saved = await prisma.$transaction(async (tx) => {
     for (const input of inputs) {
       if (!(RATE_CATEGORIES as readonly string[]).includes(input.category)) continue;
 
@@ -142,7 +148,16 @@ export async function saveRateCard(inputs: RateInput[]): Promise<SaveResult> {
         after: { categories: inputs.map((i) => i.category) },
       },
     });
+  }, { timeout: 20_000 }).catch((error: unknown) => {
+    /* Twenty-odd writes in one transaction against a remote pooler can run
+       past Prisma's 5-second default. Said plainly, so it is pressed again
+       rather than the page crashing. */
+    console.error('[rate-card] save failed', error);
+    return 'failed' as const;
   });
+  if (saved === 'failed') {
+    return { ok: false, errors: { form: 'That did not save. Press Save again — your numbers are still in the boxes.' } };
+  }
 
   return { ok: true };
 }
