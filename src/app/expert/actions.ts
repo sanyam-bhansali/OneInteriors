@@ -1,6 +1,8 @@
 'use server';
 
 import { requestConsultation } from '@/modules/consultation/request';
+import { getLang } from '@/modules/i18n/server';
+import { localiseExpertError } from '@/modules/i18n/site/expert';
 
 export interface ExpertState {
   status: 'idle' | 'sent' | 'error';
@@ -35,6 +37,12 @@ export async function requestExpertAction(
     shareConsent: formData.get('shareConsent') === 'on',
   });
 
-  if (!result.ok) return { status: 'error', errors: result.errors };
+  if (!result.ok) {
+    const lang = await getLang();
+    const errors = Object.fromEntries(
+      Object.entries(result.errors).map(([field, message]) => [field, localiseExpertError(lang, message)]),
+    );
+    return { status: 'error', errors };
+  }
   return { status: 'sent', scheduledFor: result.scheduledFor };
 }

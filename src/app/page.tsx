@@ -1,13 +1,15 @@
 import type { Metadata } from 'next';
 import { HomeCB } from '@/components/home/HomeCB';
 import { currentOffer } from '@/modules/consultation/offer-store';
+import { translator } from '@/modules/i18n/site';
+import { getLang } from '@/modules/i18n/server';
+import { HOME_DICT } from '@/modules/i18n/site/home';
 import '@/components/home/home-cb.css';
 
-export const metadata: Metadata = {
-  title: 'One Interiors — verified interior studios in Pune',
-  description:
-    'A four-minute brief about your flat. Verified studios matched to your answers, every quote priced in seconds on their own rates, and a 30-minute call with our architect.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = translator(await getLang(), HOME_DICT);
+  return { title: t('meta.title'), description: t('meta.description') };
+}
 
 /**
  * The home page — v4 (components/home), the customer side in the manner of
@@ -17,12 +19,12 @@ export const metadata: Metadata = {
  * studio is asked for it.
  */
 
-/** Hourly, so the expert-call offer's count stays true without making the page dynamic. */
-export const revalidate = 3600;
+/** The page is in the visitor's language, read from the `oa.lang` cookie, so it renders per request. */
+export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const offer = await currentOffer();
+  const [offer, lang] = await Promise.all([currentOffer(), getLang()]);
   return (
-    <HomeCB offer={offer} />
+    <HomeCB lang={lang} offer={offer} />
   );
 }

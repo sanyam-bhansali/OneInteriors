@@ -39,10 +39,14 @@ import {
 } from '@/modules/brief/types';
 import { possessionPhrase } from '@/modules/brief/possession';
 import type { Studio } from '@/modules/studio/types';
+import type { Lang } from '@/modules/i18n/site';
+import { say } from '@/modules/i18n/site/matching';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
 const MAX_TOKENS = 300;
+/** Devanagari costs several times the tokens of English for the same sentences. */
+const MAX_TOKENS_DEVANAGARI = 900;
 const TIMEOUT_MS = 9000;
 
 export interface Explanation {
@@ -58,14 +62,20 @@ export interface Explanation {
  * model handed a studio and a customer will write an advertisement unless it
  * is told, repeatedly, that it is writing an assessment.
  */
-function systemPrompt(): string {
+function systemPrompt(lang: Lang = 'en'): string {
+  const language =
+    lang === 'en'
+      ? '- Plain British English. No marketing adjectives: no "premium", "bespoke", "exceptional", "perfect", "trusted".'
+      : `- Write in ${lang === 'hi' ? 'Hindi' : 'Marathi'}, in Devanagari script: plain, everyday words, the way a family in Pune speaks${
+          lang === 'hi' ? ', addressing the reader as "आप"' : ', addressing the reader as "तुम्ही"'
+        }. Keep studio names, style names (such as Warm Modern), place names, BHK, GST and figures in English as given. No marketing adjectives in any language.`;
   return [
     'You write one short assessment of how well an interior design studio fits a specific customer brief, for the customer to read.',
     '',
     'Rules, all of them absolute:',
     '- Use ONLY the figures given. Never invent a project, a place, a price, a material or a year.',
     '- Two or three sentences. No lists, no headings, no markdown.',
-    '- Plain British English. No marketing adjectives: no "premium", "bespoke", "exceptional", "perfect", "trusted".',
+    language,
     '- Never tell them to book, contact, hurry or decide. You are not selling.',
     '- Name the single weakest thing about this match in the last sentence. Every match has one; if you cannot find it, say what the score does not yet cover.',
     '- Do not repeat the score as a number. The customer can already see it.',
@@ -170,8 +180,10 @@ function timingLine(brief: Brief): string {
  */
 const BANNED = /\b(premium|bespoke|exceptional|perfect|trusted|world[- ]class|stunning|dream|hassle)\b/i;
 
-function usable(text: string): boolean {
-  if (text.length < 60 || text.length > 700) return false;
+function usable(text: string, lang: Lang = 'en'): boolean {
+  // Devanagari spells the same sentence in more characters (vowel signs are
+  // their own code points), so the ceiling is higher there.
+  if (text.length < 60 || text.length > (lang === 'en' ? 700 : 1000)) return false;
   if (BANNED.test(text)) return false;
   if (/[*#_`]/.test(text)) return false;
   return true;
@@ -188,14 +200,21 @@ export async function explainMatch(
   brief: Brief,
   studio: Studio,
   match: MatchResult,
+  lang: Lang = 'en',
+  /**
+   * The same match with its sentences in `lang`, for the rules sentence. The
+   * model is handed `match` (English facts) and told which language to
+   * write in. Defaults to `match`.
+   */
+  localMatch: MatchResult = match,
 ): Promise<Explanation> {
   const fallback: Explanation = {
     text:
-      matchSummary(brief, studio, match) ??
-      `Matched on what you told us about your flat. ${
+      matchSummary(brief, studio, localMatch, lang) ??
+      `${say(lang, 'explain.matched')} ${
         studio.completedProjects > 0
-          ? `${studio.completedProjects} finished projects are on record.`
-          : 'They have no finished projects on record with us yet.'
+          ? say(lang, 'explain.finished', { n: studio.completedProjects })
+          : say(lang, 'explain.none')
       }`,
     source: 'rules',
   };
@@ -216,8 +235,8 @@ export async function explainMatch(
       },
       body: JSON.stringify({
         model: anthropicModel(),
-        max_tokens: MAX_TOKENS,
-        system: systemPrompt(),
+        max_tokens: lang === 'en' ? MAX_TOKENS : MAX_TOKENS_DEVANAGARI,
+        system: systemPrompt(lang),
         messages: [{ role: 'user', content: factsAsPrompt(brief, studio, match) }],
       }),
     });
@@ -232,7 +251,7 @@ export async function explainMatch(
       .join('')
       .trim();
 
-    return usable(text) ? { text, source: 'model' } : fallback;
+    return usable(text, lang) ? { text, source: 'model' } : fallback;
   } catch {
     clearTimeout(timer);
     return fallback;

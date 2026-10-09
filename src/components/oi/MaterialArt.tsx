@@ -41,6 +41,13 @@
  * artwork: it would not translate, and it would be unreadable at card size.
  */
 
+import { createContext, useContext } from 'react';
+import { tx, type Lang } from '@/modules/i18n/site';
+import { ART_TX } from '@/modules/i18n/site/oi';
+
+/** The visitor's language, for the drawings' screen-reader descriptions. */
+const ArtLang = createContext<Lang>('en');
+
 const INK = 'var(--ink)';
 const LINE = 'var(--line)';
 const SEC = 'var(--sec)';
@@ -58,11 +65,13 @@ const ACC_INK = 'var(--acc-ink)';
 
 /** Every drawing shares the frame, the stroke weight and the round joins. */
 function Art({ children, title }: { children: React.ReactNode; title: string }) {
+  const lang = useContext(ArtLang);
+  const label = ART_TX[title] ? tx(lang, ART_TX[title]) : title;
   return (
     <svg
       viewBox="0 0 120 72"
       role="img"
-      aria-label={title}
+      aria-label={label}
       className="block h-auto w-full"
       fill="none"
       strokeWidth={2}
@@ -343,7 +352,11 @@ export const ART_KEYS = Object.keys(ART);
  * should never take a quote screen down — and the test suite makes sure no
  * material can ship with a key that is not here.
  */
-export function MaterialArt({ art }: { art: string }) {
+export function MaterialArt({ art, lang = 'en' }: { art: string; lang?: Lang }) {
   const Drawing = ART[art];
-  return Drawing ? <Drawing /> : null;
+  return Drawing ? (
+    <ArtLang.Provider value={lang}>
+      <Drawing />
+    </ArtLang.Provider>
+  ) : null;
 }

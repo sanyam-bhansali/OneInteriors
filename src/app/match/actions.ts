@@ -30,6 +30,7 @@ import { rankOnServer } from '@/modules/matching/rank-server';
 import { explainMatch, type Explanation } from '@/modules/matching/explain';
 import { sanitiseBrief } from '@/modules/matching/sanitise';
 import type { Brief } from '@/modules/brief/types';
+import { asLang } from '@/modules/i18n/site';
 
 /**
  * A caller may ask for this many reads in a window.
@@ -85,10 +86,12 @@ async function callerKey(): Promise<string> {
   );
 }
 
-export async function explainAction(brief: Brief, studioId: string): Promise<Explanation> {
+export async function explainAction(brief: Brief, studioId: string, language?: unknown): Promise<Explanation> {
   if (typeof studioId !== 'string' || studioId.length > 64) {
     return { text: '', source: 'rules' };
   }
+  // From the browser, so whitelisted like everything else: 'hi', 'mr' or English.
+  const lang = asLang(typeof language === 'string' ? language : null);
 
   // Rebuilt from a whitelist before it touches a prompt.
   const safe = sanitiseBrief(brief);
@@ -100,9 +103,16 @@ export async function explainAction(brief: Brief, studioId: string): Promise<Exp
 
   // Recomputed here rather than trusting a score posted from the browser —
   // on the same rates the card was scored on, or the two would disagree.
-  const match = (await rankOnServer(safe, studios, 99)).find((m) => m.studioId === studioId);
+  // The model reads the English facts and is told which language to write
+  // in; the rules sentence is built from the same match in that language.
+  const [ranked, localised] = await Promise.all([
+    rankOnServer(safe, studios, 99),
+    lang === 'en' ? null : rankOnServer(safe, studios, 99, { lang }),
+  ]);
+  const match = ranked.find((m) => m.studioId === studioId);
 
   if (!match) return { text: '', source: 'rules' };
+  const localMatch = localised?.find((m) => m.studioId === studioId) ?? match;
 
   // Over the limit still returns something useful — the deterministic
   // sentence — rather than an error the row would have to render.
@@ -110,5 +120,5 @@ export async function explainAction(brief: Brief, studioId: string): Promise<Exp
     return { text: '', source: 'rules' };
   }
 
-  return explainMatch(safe, studio, match);
+  return explainMatch(safe, studio, match, lang, localMatch);
 }

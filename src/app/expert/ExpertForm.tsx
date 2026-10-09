@@ -36,6 +36,9 @@ import { SlotPicker } from '@/components/SlotPicker';
 import { formatINRCompact } from '@/lib/money';
 import { Sheet, Tick } from '@/components/oi';
 import { requestExpertAction, type ExpertState } from './actions';
+import { useLang, useSiteT } from '@/components/app/i18n';
+import { EXPERT_DICT, known } from '@/modules/i18n/site/expert';
+import type { Lang } from '@/modules/i18n/site';
 
 const INITIAL: ExpertState = { status: 'idle' };
 
@@ -52,14 +55,21 @@ export interface StudioOption {
  * Every one is a real thing people ring us about and a real thing an architect
  * can answer. None of them is a lead-qualification question in disguise.
  */
-const STANDARD = [
-  'Is the cheapest quote cheaper because it is worse, or because it is smaller?',
-  'Which lines in these quotes are the ones that usually grow on site?',
-  'What happens to the price if the work runs past the agreed weeks?',
-  'Which of these studios has actually delivered a flat like mine?',
-  'Can I keep some of what I already have, and does that save anything real?',
-  'What do I have to decide before work starts, and what can wait?',
-];
+const STANDARD = ['std.0', 'std.1', 'std.2', 'std.3', 'std.4', 'std.5'] as const;
+
+/**
+ * A slot as the customer reads it. English is `slotLabel` exactly; Hindi and
+ * Marathi use the same Pune-time formatting in their own locale.
+ */
+function slotText(iso: string, lang: Lang): { day: string; time: string } {
+  if (lang === 'en') return slotLabel(iso);
+  const d = new Date(iso);
+  const locale = lang === 'hi' ? 'hi-IN' : 'mr-IN';
+  return {
+    day: d.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' }),
+    time: d.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }),
+  };
+}
 
 export function ExpertForm({
   briefId,
@@ -88,6 +98,8 @@ export function ExpertForm({
   /** A slot already picked in the app (/app/expert), kept only if it is still open. */
   initialSlot?: string | null;
 }) {
+  const t = useSiteT(EXPERT_DICT);
+  const lang = useLang();
   const [state, action, pending] = useActionState(requestExpertAction, INITIAL);
   const [slot, setSlot] = useState<string | null>(initialSlot && slots.includes(initialSlot) ? initialSlot : null);
   const booking = slots.length > 0;
@@ -104,7 +116,7 @@ export function ExpertForm({
    * Generated rather than canned, so the list opens with the thing they were
    * already wondering — with both studios named and the gap in rupees.
    */
-  const generated = useMemo(() => {
+  const generated = useMemo((): { id: string; q: string }[] => {
     if (studios.length < 2) return [];
     const byMid = [...studios].sort(
       (a, b) => (a.lowPaise + a.highPaise) / 2 - (b.lowPaise + b.highPaise) / 2,
@@ -114,14 +126,22 @@ export function ExpertForm({
     const gap = (high.lowPaise + high.highPaise) / 2 - (low.lowPaise + low.highPaise) / 2;
     if (gap <= 0) return [];
     return [
-      `Why is ${high.name} about ${formatINRCompact(Math.round(gap))} more than ${low.name}?`,
-      `Is ${low.name} leaving something out, or are they genuinely cheaper?`,
+      { id: 'gen.why', q: t('gen.why', { high: high.name, gap: formatINRCompact(Math.round(gap)), low: low.name }) },
+      { id: 'gen.leaving', q: t('gen.leaving', { low: low.name }) },
     ];
-  }, [studios]);
+  }, [studios, t]);
+
+  /** Every question on offer, by id: the ticked ones are kept as ids so a language change keeps them. */
+  const questionText = new Map<string, string>([
+    ...generated.map((g) => [g.id, g.q] as [string, string]),
+    ...fromBrief.map((q) => [`brief:${q}`, q] as [string, string]),
+    ...STANDARD.map((k) => [k, t(k)] as [string, string]),
+  ]);
+  const askedTexts = asks.map((id) => questionText.get(id) ?? id);
 
   /** Ticked questions first, then whatever they wrote. One paragraph for ops. */
   const composed = [
-    ...asks.map((q) => `• ${q}`),
+    ...askedTexts.map((q) => `• ${q}`),
     own.trim() ? `\n${own.trim()}` : '',
   ]
     .filter(Boolean)
@@ -129,35 +149,35 @@ export function ExpertForm({
     .slice(0, 2000);
 
   if (state.status === 'sent') {
-    const when = state.scheduledFor ? slotLabel(state.scheduledFor) : null;
+    const when = state.scheduledFor ? slotText(state.scheduledFor, lang) : null;
     return (
       <Sheet className="p-[clamp(22px,3vw,34px)]">
-        <p className="oi-eyebrow m-0 mb-4">{when ? 'Booked' : 'Requested'}</p>
+        <p className="oi-eyebrow m-0 mb-4">{when ? t('sent.booked') : t('sent.requested')}</p>
         <h2 className="oi-display m-0 mb-4 text-[clamp(1.5rem,1.2rem+1.2vw,2rem)]">
-          {when ? `${when.day}, ${when.time}.` : 'We\u2019ll call you.'}
+          {when ? t('sent.when', { day: when.day, time: when.time }) : t('sent.weCall')}
         </h2>
         <p className="m-0 mb-3 max-w-[58ch] text-[15px] leading-[1.65] text-[var(--ink2)]">
           {when
-            ? 'Thirty minutes, and we ring you. The invite is in your email if you gave us one. Before the call the expert reads your brief, your floor plan and every quote on your comparison — you will not have to explain any of it again.'
-            : 'Someone will be in touch within one working day to fix a time. Before the call they will read your brief, your floor plan and every quote on your comparison — you will not have to explain any of it again.'}
+            ? t('sent.bookedBody')
+            : t('sent.requestedBody')}
         </p>
         {/* Who, and the agenda — their own questions, in their order — so the
             call reads as a working session they set, not a sales call
             (principle 9, docs/UX-PRINCIPLES-PLAN.md; Superhuman, Calendly). */}
         <p className="m-0 mb-5 text-[15px] text-[var(--ink)]">
-          With <strong className="font-semibold">{ARCHITECT.name}</strong> · {ARCHITECT.role}
+          {t('sent.with')} <strong className="font-semibold">{ARCHITECT.name}</strong> · {known(lang, 'architect.role', ARCHITECT.role)}
         </p>
         {asks.length > 0 || own.trim() ? (
           <div className="mb-6 rounded-[18px] bg-[var(--card)] p-5">
-            <p className="oi-label m-0 mb-3">Your agenda</p>
+            <p className="oi-label m-0 mb-3">{t('sent.agenda')}</p>
             <ol className="m-0 flex list-decimal flex-col gap-2 pl-5 text-[15px] leading-[1.5] text-[var(--ink)]">
-              {asks.map((q) => (
+              {askedTexts.map((q) => (
                 <li key={q}>{q}</li>
               ))}
               {own.trim() ? <li>{own.trim()}</li> : null}
             </ol>
             <p className="m-0 mt-3 text-[13.5px] text-[var(--ink2)]">
-              Looked into before the call, so it starts at the answers.
+              {t('sent.agendaNote')}
             </p>
           </div>
         ) : null}
@@ -166,10 +186,10 @@ export function ExpertForm({
             <a
               href={googleCalendarUrl({
                 startsAt: state.scheduledFor,
-                title: `One Interiors · call with ${ARCHITECT.name}`,
+                title: t('cal.title', { name: ARCHITECT.name }),
                 details: [
-                  'Thirty minutes about your home and your quotes. We ring you.',
-                  ...asks.map((q) => `• ${q}`),
+                  t('cal.details'),
+                  ...askedTexts.map((q) => `• ${q}`),
                   own.trim() ? `• ${own.trim()}` : '',
                 ]
                   .filter(Boolean)
@@ -179,7 +199,7 @@ export function ExpertForm({
               rel="noreferrer"
               className="inline-flex min-h-11 items-center rounded-full border border-[var(--line)] px-5 text-[14px] font-medium text-[var(--ink)] no-underline hover:border-[var(--ink)]"
             >
-              Add to Google Calendar
+              {t('cal.add')}
             </a>
           </p>
         ) : null}
@@ -193,18 +213,16 @@ export function ExpertForm({
             honest reason to offer it. */}
         <div className="border-t border-[var(--line)] pt-6">
           <p className="m-0 mb-5 max-w-[58ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-            While you wait, go through your home room by room — what each one costs, and the one
-            decision in each that moves the number. The calls that go well are the ones where you
-            already know which three things you are choosing between.
+            {t('prep.body')}
           </p>
           <a
             href="/account#rooms"
             className="oi-cta inline-flex min-h-11 items-center px-6 py-3 text-[14.5px] no-underline"
           >
-            Prepare for the call
+            {t('prep.cta')}
           </a>
           <p className="m-0 mt-4 text-[13px] text-[var(--ink2)]">
-            About fifteen minutes. Entirely optional, and your call is booked either way.
+            {t('prep.note')}
           </p>
         </div>
       </Sheet>
@@ -231,11 +249,10 @@ export function ExpertForm({
       {/* ── Which studios ── */}
       <fieldset className="m-0 border-0 p-0">
         <legend className="oi-display mb-2 p-0 text-[21px]">
-          Which studios do you want to talk about?
+          {t('studios.legend')}
         </legend>
         <p className="m-0 mb-5 max-w-[56ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-          Pick between {minStudios} and {maxStudios}. Your architect reads all of them before the
-          call, so choosing fewer means a deeper conversation about each.
+          {t('studios.help', { min: minStudios, max: maxStudios })}
         </p>
 
         {err.studioIds ? (
@@ -279,11 +296,9 @@ export function ExpertForm({
 
       {/* ── What you want answered ── */}
       <fieldset className="m-0 border-0 p-0">
-        <legend className="oi-display mb-2 p-0 text-[21px]">What do you want answered?</legend>
+        <legend className="oi-display mb-2 p-0 text-[21px]">{t('asks.legend')}</legend>
         <p className="m-0 mb-5 max-w-[56ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-          Tick anything you want looked into before the call. The first ones are written from your
-          own quotes and your brief. Nobody is going to open with &ldquo;so, tell me about your
-          requirement&rdquo;.
+          {t('asks.help')}
         </p>
 
         {/* ── The two that came from their own numbers ──
@@ -299,11 +314,11 @@ export function ExpertForm({
             most persuasive thing on the page, and it read as a footnote. */}
         {generated.length > 0 ? (
           <div className="mb-5">
-            <p className="oi-eyebrow m-0 mb-3">From your own quotes</p>
+            <p className="oi-eyebrow m-0 mb-3">{t('asks.fromQuotes')}</p>
             <ul className="m-0 flex list-none flex-col gap-2 p-0">
-              {generated.map((q) => (
-                <li key={q}>
-                  <Ask q={q} on={asks.includes(q)} onToggle={() => toggleAsk(q)} derived />
+              {generated.map((g) => (
+                <li key={g.id}>
+                  <Ask q={g.q} on={asks.includes(g.id)} onToggle={() => toggleAsk(g.id)} derived />
                 </li>
               ))}
             </ul>
@@ -314,11 +329,11 @@ export function ExpertForm({
             what the home needs (build queue item 9). */}
         {fromBrief.length > 0 ? (
           <div className="mb-5">
-            <p className="oi-eyebrow m-0 mb-3">From your brief</p>
+            <p className="oi-eyebrow m-0 mb-3">{t('asks.fromBrief')}</p>
             <ul className="m-0 flex list-none flex-col gap-2 p-0">
               {fromBrief.map((q) => (
                 <li key={q}>
-                  <Ask q={q} on={asks.includes(q)} onToggle={() => toggleAsk(q)} derived />
+                  <Ask q={q} on={asks.includes(`brief:${q}`)} onToggle={() => toggleAsk(`brief:${q}`)} derived />
                 </li>
               ))}
             </ul>
@@ -326,27 +341,27 @@ export function ExpertForm({
         ) : null}
 
         {generated.length > 0 || fromBrief.length > 0 ? (
-          <p className="oi-eyebrow m-0 mb-3">Things most people ask</p>
+          <p className="oi-eyebrow m-0 mb-3">{t('asks.common')}</p>
         ) : null}
 
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
-          {STANDARD.map((q) => (
-            <li key={q}>
-              <Ask q={q} on={asks.includes(q)} onToggle={() => toggleAsk(q)} />
+          {STANDARD.map((k) => (
+            <li key={k}>
+              <Ask q={t(k)} on={asks.includes(k)} onToggle={() => toggleAsk(k)} />
             </li>
           ))}
         </ul>
 
         <div className="mt-5">
           <label htmlFor="ownQuestion" className="oi-label mb-2 block">
-            Anything else — optional
+            {t('asks.own')}
           </label>
           <textarea
             id="ownQuestion"
             rows={3}
             value={own}
             onChange={(e) => setOwn(e.target.value)}
-            placeholder="We have a two-year-old, so timeline matters more to us than finish."
+            placeholder={t('asks.ownPlaceholder')}
             className="w-full border border-[var(--line)] bg-[var(--card)] px-4 py-3 text-[14.5px] leading-[1.6] text-[var(--ink)] placeholder:text-[var(--ink2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--acc)]"
           />
         </div>
@@ -354,40 +369,43 @@ export function ExpertForm({
 
       {/* ── How we reach you ── */}
       <fieldset className="m-0 border-0 p-0">
-        <legend className="oi-display mb-2 p-0 text-[21px]">How do we reach you?</legend>
+        <legend className="oi-display mb-2 p-0 text-[21px]">{t('reach.legend')}</legend>
         <p className="m-0 mb-5 max-w-[56ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-          A phone number, because this is a call. We do not pass it to any studio — the
-          introduction happens after the call, and only to the one you choose.
+          {t('reach.help')}
         </p>
 
         <div className="flex flex-col gap-5">
           <Field
-            label="Your name"
+            label={t('field.name')}
             name="contactName"
             required
             defaultValue={defaultName}
             error={err.contactName}
+            optionalText={t('field.optional')}
           />
           <Field
-            label="Mobile"
+            label={t('field.mobile')}
             name="contactPhone"
             type="tel"
             required
             error={err.contactPhone}
+            optionalText={t('field.optional')}
             placeholder="98765 43210"
           />
           <Field
-            label="Email"
+            label={t('field.email')}
             name="contactEmail"
             type="email"
             defaultValue={defaultEmail}
             error={err.contactEmail}
+            optionalText={t('field.optional')}
           />
           {booking ? null : (
             <Field
-              label="When suits you?"
+              label={t('field.when')}
               name="preferredTimes"
-              placeholder="Weekday evenings, or Saturday morning"
+              placeholder={t('field.whenPlaceholder')}
+              optionalText={t('field.optional')}
             />
           )}
         </div>
@@ -395,9 +413,9 @@ export function ExpertForm({
 
       {booking ? (
         <fieldset className="m-0 border-0 p-0">
-          <legend className="oi-eyebrow m-0 mb-1 p-0">Pick a time — thirty minutes, we ring you</legend>
+          <legend className="oi-eyebrow m-0 mb-1 p-0">{t('slot.legend')}</legend>
           <p className="m-0 mb-4 text-[13.5px] text-[var(--ink2)]">
-            These are real times. Pick one and it is booked — nobody calls you back to arrange it.
+            {t('slot.help')}
           </p>
           <SlotPicker slots={slots} value={slot} onPick={setSlot} />
           <input type="hidden" name="startsAt" value={slot ?? ''} />
@@ -415,10 +433,9 @@ export function ExpertForm({
       <label className="flex cursor-pointer items-start gap-3">
         <input type="checkbox" name="shareConsent" required className="mt-1 h-4 w-4 flex-none accent-[var(--acc)]" />
         <span className="text-[14.5px] leading-snug text-[var(--ink)]">
-          Share my brief, name and number with the studios I have ticked — only once you introduce
-          me, and only so they can arrange to meet.
+          {t('consent.label')}
           <span className="mt-1 block text-[13px] text-[var(--ink2)]">
-            You can withdraw this from &ldquo;Your home&rdquo; at any time.
+            {t('consent.withdraw')}
           </span>
         </span>
       </label>
@@ -445,18 +462,16 @@ export function ExpertForm({
         >
           {pending
             ? booking
-              ? 'Booking…'
-              : 'Sending…'
+              ? t('submit.booking')
+              : t('submit.sending')
             : booking
               ? slot
-                ? `Book ${slotLabel(slot).day.split(' ')[0]} ${slotLabel(slot).time}`
-                : 'Pick a time above'
-              : 'Request the call'}
+                ? t('submit.book', { day: slotText(slot, lang).day.split(' ')[0]!, time: slotText(slot, lang).time })
+                : t('submit.pick')
+              : t('submit.request')}
         </button>
         <p className="m-0 mt-5 max-w-[58ch] text-[13.5px] leading-[1.6] text-[var(--ink2)]">
-          Free, and there is nothing to buy on the call. We are paid by the studio if you go ahead
-          with one — which is why we would rather tell you none of them fits than push you into a
-          project you regret.
+          {t('submit.note')}
         </p>
       </div>
     </form>
@@ -524,6 +539,7 @@ function Field({
   defaultValue,
   error,
   placeholder,
+  optionalText = ' — optional',
 }: {
   label: string;
   name: string;
@@ -532,12 +548,14 @@ function Field({
   defaultValue?: string | null;
   error?: string;
   placeholder?: string;
+  /** " — optional", in the visitor's language. */
+  optionalText?: string;
 }) {
   return (
     <div>
       <label htmlFor={name} className="oi-label mb-2 block">
         {label}
-        {required ? '' : ' — optional'}
+        {required ? '' : optionalText}
       </label>
       <input
         id={name}

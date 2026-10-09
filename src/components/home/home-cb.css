@@ -389,13 +389,63 @@
   transform: scaleX(1);
   transform-origin: left;
 }
+/* The language picker (English · हिंदी · मराठी) sits between the links and the pill. */
+.cb .nav-lang {
+  flex: none;
+  background: rgba(255, 255, 255, 0.7);
+}
+.cb .nav-lang button {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 12.5px;
+}
 @media (max-width: 860px) {
   .cb .nav-links {
     display: none;
   }
-  .cb .nav-in > .pill {
+  .cb .nav-in {
+    gap: 12px;
+  }
+  /* With the links gone, the picker takes the free space's edge and the pill follows it. */
+  .cb .nav-lang {
     margin-left: auto;
   }
+}
+@media (max-width: 560px) {
+  /* A phone: the word mark goes, the picker goes small, the pill stays. */
+  .cb .logo-word {
+    display: none;
+  }
+  .cb .nav-in {
+    gap: 8px;
+  }
+  .cb .nav-lang {
+    padding: 2px;
+  }
+  .cb .nav-lang button {
+    min-height: 26px;
+    padding: 0 7px;
+    font-size: 11.5px;
+  }
+  .cb .nav-in > .pill {
+    padding-left: 14px;
+    padding-right: 14px;
+    font-size: 13px;
+  }
+}
+
+/* Hindi and Marathi: Devanagari's matras rise above and hang below the line,
+   and the tight display leading and the split headings' clipped word boxes
+   cut them off. Looser leading, no negative tracking, taller word boxes. */
+.cb:is([lang='hi'], [lang='mr']) :is(.h-xl, .h-l, .h-m, h1, h2, h3) {
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+.cb:is([lang='hi'], [lang='mr']) .split .w {
+  padding-top: 0.12em;
+  margin-top: -0.12em;
+  padding-bottom: 0.22em;
+  margin-bottom: -0.22em;
 }
 
 /* ── Hero ────────────────────────────────────────────────────── */

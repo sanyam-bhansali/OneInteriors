@@ -2813,3 +2813,43 @@ p {
   font-weight: 500;
   letter-spacing: 0.06em;
 }
+
+/* ── The website's language picker (9 Oct 2026): English · हिंदी · मराठी ── */
+.oi-langs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid var(--line, #e6e6e3);
+  background: var(--card, #fff);
+}
+.oi-langs button {
+  min-height: 30px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink, #0b0b0b);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+}
+.oi-langs button[aria-checked='true'] {
+  background: var(--ink, #0b0b0b);
+  color: #fff;
+}
+.oi-langs.big button {
+  min-height: 44px;
+  padding: 0 20px;
+  font-size: 16px;
+}
+/* Devanagari has matras above and below the line; the site's tight display
+   leading clips them. */
+html:is([lang='hi'], [lang='mr']) :is(h1, h2, h3, .oi-display) {
+  line-height: 1.25 !important;
+  letter-spacing: 0 !important;
+}
+html:is([lang='hi'], [lang='mr']) .split .w {
+  padding-block: 0.08em;
+}

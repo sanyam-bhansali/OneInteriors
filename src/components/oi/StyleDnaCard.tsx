@@ -1,13 +1,18 @@
+'use client';
+
 import { styleDna, whatsappShare } from '@/modules/brief/style-dna';
+import { useSiteT } from '@/components/app/i18n';
+import { OI_DICT } from '@/modules/i18n/site/oi';
 import type { StyleTag } from '@/modules/brief/types';
 
 /** "Your style DNA" — shares, palette, materials, and a WhatsApp share (queue item 13). */
 export function StyleDnaCard({ likes, className = '' }: { likes: StyleTag[]; className?: string }) {
+  const t = useSiteT(OI_DICT);
   const dna = styleDna(likes);
   if (!dna) return null;
   return (
-    <section className={`rounded-[14px] border border-[var(--line)] bg-[var(--card)] p-5 ${className}`} aria-label="Your style DNA">
-      <p className="oi-eyebrow m-0 mb-3">Your style DNA</p>
+    <section className={`rounded-[14px] border border-[var(--line)] bg-[var(--card)] p-5 ${className}`} aria-label={t('dna.title')}>
+      <p className="oi-eyebrow m-0 mb-3">{t('dna.title')}</p>
       <div className="mb-3 flex h-3 w-full overflow-hidden rounded-full" aria-hidden>
         {dna.shares.map((s, i) => (
           <span key={s.tag} style={{ width: `${s.pct}%`, background: dna.palette[[4, 2, 1][i] ?? 0] }} />
@@ -33,7 +38,7 @@ export function StyleDnaCard({ likes, className = '' }: { likes: StyleTag[]; cla
         rel="noopener noreferrer"
         className="inline-flex min-h-10 items-center rounded-full border border-[var(--line)] px-4 text-[13.5px] font-semibold text-[var(--ink)] no-underline hover:border-[var(--ink2)]"
       >
-        Share on WhatsApp
+        {t('dna.share')}
       </a>
     </section>
   );

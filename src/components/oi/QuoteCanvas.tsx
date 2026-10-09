@@ -17,6 +17,8 @@
 import { useMemo, useState } from 'react';
 import { formatINRCompact } from '@/lib/money';
 import { checklistFor } from '@/modules/quotation/scope';
+import { useLang, useSiteT } from '@/components/app/i18n';
+import { OI_DICT, roomName } from '@/modules/i18n/site/oi';
 import type { HomeShape } from '@/modules/quotation/price-all';
 import type { FloorPlan } from '@/modules/quotation/project-store';
 import {
@@ -62,6 +64,8 @@ export function QuoteCanvas({
   /** Write the draft to the brief. */
   onSave: () => void;
 }) {
+  const t = useSiteT(OI_DICT);
+  const lang = useLang();
   const [open, setOpen] = useState<string | null>(null);
   const current = priced.find((p) => p.slug === currentSlug) ?? null;
   const groups = useMemo(() => checklistFor(shape.bhk, shape.scope), [shape]);
@@ -89,12 +93,12 @@ export function QuoteCanvas({
     >
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div className="max-w-[44ch]">
-          <p className="oi-eyebrow m-0 mb-2">Shape this quote</p>
+          <p className="oi-eyebrow m-0 mb-2">{t('canvas.eyebrow')}</p>
           <h2 id="canvas-h" className="oi-display m-0 text-[clamp(1.6rem,1.1rem+1.8vw,2.4rem)]">
-            Change it, and every studio re-prices.
+            {t('canvas.h2')}
           </h2>
           <p className="m-0 mt-2 text-[15px] leading-[1.55] text-[var(--ink2)]">
-            Take things out, put them back, set your kitchen size. Nothing is saved until you say so.
+            {t('canvas.body')}
           </p>
         </div>
       </div>
@@ -115,9 +119,9 @@ export function QuoteCanvas({
                   className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-[20px] border-0 bg-transparent px-4 py-3.5 text-left"
                 >
                   <span className="min-w-0">
-                    <span className="block text-[15.5px] font-medium text-[var(--ink)]">{g.label}</span>
+                    <span className="block text-[15.5px] font-medium text-[var(--ink)]">{roomName(lang, g.room, g.label)}</span>
                     <span className="block text-[12.5px] text-[var(--ink2)]">
-                      {inRoom === 0 ? 'Nothing in the quote' : `${inRoom} of ${g.items.length} in the quote`}
+                      {inRoom === 0 ? t('canvas.nothing') : t('canvas.inQuote', { n: inRoom, of: g.items.length })}
                     </span>
                   </span>
                   <span className="flex shrink-0 items-center gap-3">
@@ -159,7 +163,7 @@ export function QuoteCanvas({
                               </span>
                             </span>
                             <span className="shrink-0 tabular-nums text-[13.5px] text-[var(--ink2)]">
-                              {on && amount !== undefined ? money(amount) : on ? 'not priced' : 'out'}
+                              {on && amount !== undefined ? money(amount) : on ? t('canvas.notPriced') : t('canvas.out')}
                             </span>
                           </button>
                         </li>
@@ -174,7 +178,7 @@ export function QuoteCanvas({
           {hasKitchenRun ? (
             <div className="rounded-[20px] bg-[var(--bg)] px-4 py-4">
               <label htmlFor="canvas-run" className="flex items-baseline justify-between gap-3">
-                <span className="text-[15.5px] font-medium text-[var(--ink)]">Kitchen platform length</span>
+                <span className="text-[15.5px] font-medium text-[var(--ink)]">{t('canvas.run')}</span>
                 <span className="tabular-nums text-[15px] text-[var(--ink)]">{(runMm / 1000).toFixed(2)} m</span>
               </label>
               <input
@@ -189,8 +193,8 @@ export function QuoteCanvas({
               />
               <p className="m-0 mt-2 text-[12.5px] leading-[1.5] text-[var(--ink2)]">
                 {draft.kitchenRunMm !== null || plan.source !== 'standard'
-                  ? 'Priced on your real length, so every studio’s range is narrower.'
-                  : 'Measured your platform? Set the real length — the biggest guess on the quote goes away.'}
+                  ? t('canvas.runReal')
+                  : t('canvas.runGuess')}
               </p>
             </div>
           ) : null}
@@ -199,22 +203,22 @@ export function QuoteCanvas({
         {/* ── Every studio, live ── */}
         <div className="min-w-0 lg:sticky lg:top-6 lg:self-start">
           <div className="rounded-[22px] bg-[var(--ink)] p-5 text-white" aria-live="polite">
-            <p className="m-0 text-[13px] text-white/60">{current.name} · this quote</p>
+            <p className="m-0 text-[13px] text-white/60">{t('canvas.thisQuote', { name: current.name })}</p>
             <p className="m-0 mt-1 text-[clamp(2rem,1.4rem+2vw,2.8rem)] font-medium leading-none tracking-[-0.03em] tabular-nums">
               {money(current.quote.totalPaise)}
             </p>
             <p className="m-0 mt-2 text-[13px] text-white/70">
               {money(current.quote.lowPaise)}–{money(current.quote.highPaise)} · ±
-              {Math.round(current.quote.variancePct * 100)}% · incl. GST
+              {Math.round(current.quote.variancePct * 100)}% {t('canvas.inclGst')}
             </p>
             {changed ? (
               <p className="m-0 mt-3 inline-block rounded-full bg-white/10 px-3 py-1 text-[13px]">
-                {signed(delta)} from the quote you had
+                {t('canvas.fromHad', { delta: signed(delta) })}
               </p>
             ) : null}
           </div>
 
-          <p className="oi-label m-0 mb-2 mt-5">Every match, live</p>
+          <p className="oi-label m-0 mb-2 mt-5">{t('canvas.live')}</p>
           <ol className="m-0 flex list-none flex-col gap-1.5 p-0">
             {priced.map((p, i) => {
               const isCurrent = p.slug === currentSlug;
@@ -244,7 +248,7 @@ export function QuoteCanvas({
                         />
                       </span>
                       <span className="w-[4.5rem] shrink-0 text-right text-[12px] text-[var(--ink2)]">
-                        {isCurrent ? 'this one' : signed(vs)}
+                        {isCurrent ? t('canvas.thisOne') : signed(vs)}
                       </span>
                     </span>
                   </button>
@@ -260,19 +264,19 @@ export function QuoteCanvas({
                 onClick={onSave}
                 className="oi-cta inline-flex min-h-11 cursor-pointer items-center rounded-full border-0 px-5 text-[14.5px]"
               >
-                Save to my brief
+                {t('canvas.save')}
               </button>
               <button
                 type="button"
                 onClick={() => onDraft({ excludedItems: [...shape.scope.excludedItems], kitchenRunMm: null })}
                 className="min-h-11 cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-5 text-[14px] text-[var(--ink)]"
               >
-                Undo changes
+                {t('canvas.undo')}
               </button>
             </div>
           ) : (
             <p className="m-0 mt-4 text-[13px] leading-[1.5] text-[var(--ink2)]">
-              Tap a room to take things out or put them back.
+              {t('canvas.tap')}
             </p>
           )}
         </div>

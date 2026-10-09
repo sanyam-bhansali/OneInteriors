@@ -12,6 +12,8 @@ import { useMemo, useState } from 'react';
 import { localityLabel } from '@/modules/brief/types';
 import { searchSocieties } from '@/modules/brief/society';
 import type { PuneSociety } from '@/data/pune-societies';
+import { useSiteT } from '@/components/app/i18n';
+import { QUIZ_DICT } from '@/modules/i18n/site/quiz';
 
 export function SocietyInput({
   value,
@@ -24,6 +26,7 @@ export function SocietyInput({
   onPick: (society: PuneSociety) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const t = useSiteT(QUIZ_DICT);
   const results = useMemo(() => searchSocieties(value ?? ''), [value]);
   const exact = results.length === 1 && results[0]!.name.toLowerCase() === (value ?? '').trim().toLowerCase();
   const show = open && results.length > 0 && !exact;
@@ -40,7 +43,7 @@ export function SocietyInput({
         onFocus={() => setOpen(true)}
         // Late enough that a tap on a suggestion lands first.
         onBlur={() => setTimeout(() => setOpen(false), 150)}
-        placeholder="e.g. Gera World of Joy"
+        placeholder={t('soc.placeholder')}
         autoComplete="off"
         role="combobox"
         aria-expanded={show}

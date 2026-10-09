@@ -82,7 +82,7 @@ export const TIER: Record<Tier, TierDefinition> = {
       'Modular kitchen with a standard counter',
     ],
     notFor:
-      'Not the band for veneer, imported fittings or heavy custom joinery. If you want those, Premium is the honest starting point rather than a stretched Essential quote.',
+      'Want wood veneer, imported fittings or lots of custom-made furniture? Choose Premium — at this budget a studio would have to cut corners to fit them in.',
   },
   PREMIUM: {
     label: 'Premium',
@@ -97,7 +97,7 @@ export const TIER: Record<Tier, TierDefinition> = {
       'More design revisions before anything is cut',
     ],
     notFor:
-      'Not the band for imported stone, bespoke furniture design or a full civil rework. Those belong in Luxury and pricing them here means cutting somewhere else.',
+      'Want imported marble, furniture designed just for you, or walls moved and floors redone? Choose Luxury — at this budget a studio would have to cut corners to fit them in.',
   },
   LUXURY: {
     label: 'Luxury',
@@ -112,7 +112,7 @@ export const TIER: Record<Tier, TierDefinition> = {
       'A dedicated designer for the length of the project',
     ],
     notFor:
-      'Not the band for a quick turnaround. Custom work has lead times, and a studio promising Luxury finishes on an Essential timeline is telling you something about how it will end.',
+      'Not the fastest option. Custom work takes longer to make, so be careful of any studio that promises Luxury work in a hurry.',
   },
 };
 

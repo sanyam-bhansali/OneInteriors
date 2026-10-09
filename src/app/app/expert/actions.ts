@@ -14,6 +14,7 @@ import { getCurrentUser } from '@/modules/auth/session';
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { requestConsultation } from '@/modules/consultation/request';
+import { readAnonKey } from '@/modules/brief/repository';
 
 export type BookResult = { ok: true; scheduledFor: string | null; phone: string } | { ok: false; error: string; signIn?: boolean };
 
@@ -21,21 +22,26 @@ export async function bookExpertCallAction(input: { startsAt: string; studioIds:
   if (!hasDatabase()) return { ok: false, error: 'Calls cannot be booked on this test build.' };
 
   const user = await getCurrentUser();
-  if (!user) return { ok: false, signIn: true, error: 'Verify your number first, so your expert knows who to ring.' };
+  /* Signed in (when the WhatsApp code is on), or the brief this browser owns
+     (when it is off): either way the number was given at "quotes ready". */
+  const anonKey = user ? null : await readAnonKey();
+  const brief = user
+    ? await prisma.brief.findUnique({ where: { userId: user.id }, select: { id: true, contactName: true, contactPhone: true } })
+    : anonKey
+      ? await prisma.brief.findUnique({ where: { anonKey }, select: { id: true, contactName: true, contactPhone: true } })
+      : null;
+  if (!brief) return { ok: false, signIn: true, error: 'We could not find your brief. Finish the questions and try again.' };
+  if (!brief.contactPhone && !user?.phone) {
+    return { ok: false, signIn: true, error: 'Add your number first, so your expert knows who to ring.' };
+  }
 
-  const brief = await prisma.brief.findUnique({
-    where: { userId: user.id },
-    select: { id: true, contactName: true, contactPhone: true },
-  });
-  if (!brief) return { ok: false, error: 'We could not find your brief. Finish the questions and try again.' };
-
-  const phone = brief.contactPhone ?? user.phone ?? '';
+  const phone = brief.contactPhone ?? user?.phone ?? '';
   const result = await requestConsultation({
     briefId: brief.id,
     studioIds: input.studioIds.slice(0, 5),
-    contactName: brief.contactName ?? user.name ?? '',
+    contactName: brief.contactName ?? user?.name ?? '',
     contactPhone: phone,
-    contactEmail: user.email ?? '',
+    contactEmail: user?.email ?? '',
     askedAbout: '',
     preferredTimes: '',
     startsAt: input.startsAt.slice(0, 40),

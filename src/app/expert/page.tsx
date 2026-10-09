@@ -20,18 +20,30 @@ import { ARCHITECT, ARCHITECT_IS_REAL, architectFacts } from '@/modules/consulta
 import { TIER } from '@/modules/quotation/tiers';
 import { PROPERTY_LABELS, PUNE_LOCALITIES, STYLE_LABELS } from '@/modules/brief/types';
 import { ExpertForm } from './ExpertForm';
+import { getLang } from '@/modules/i18n/server';
+import { translator, tx, type Lang } from '@/modules/i18n/site';
+import { EXPERT_DICT, known } from '@/modules/i18n/site/expert';
+import { PROPERTY_TX } from '@/modules/i18n/site/labels';
 
-export const metadata: Metadata = {
-  title: 'Talk to an expert',
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = translator(await getLang(), EXPERT_DICT);
+  return {
+    title: t('meta.title'),
+    robots: { index: false, follow: false },
+  };
+}
 
 export const dynamic = 'force-dynamic';
 
 export default async function ExpertPage({ searchParams }: { searchParams: Promise<{ slot?: string }> }) {
   const { slot } = await searchParams;
   const user = await getCurrentUser();
-  if (!user) redirect('/sign-in?next=/expert&reason=expert');
+  const lang = await getLang();
+  const t = translator(lang, EXPERT_DICT);
+  /* Sign-in (a WhatsApp code) is only asked for here when the phone code is
+     switched on (owner, 9 Oct 2026: "I don't want the OTP enabled right now").
+     Off, the call books on the brief this browser holds, as on the app. */
+  if (!user && process.env.NEXT_PUBLIC_APP_PHONE_CODE === '1') redirect('/sign-in?next=/expert&reason=expert');
 
   // Both of these mean the same thing — the server has no brief for this
   // person — and neither is grounds for restarting them. The browser may still
@@ -44,14 +56,14 @@ export default async function ExpertPage({ searchParams }: { searchParams: Promi
       <div className="oi-app oi-quick min-h-dvh bg-[var(--bg)]">
         <AppHeader />
         <Spine at="expert" />
-        <BriefRescue destination="the expert call" />
+        <BriefRescue destination={t('rescue.destination')} />
         <AppFooter />
       </div>
     );
   }
 
   const studios = await studioRepository.list({ activeOnly: true });
-  const ranked = (await rankOnServer(brief, studios, 9)).slice(0, MAX_STUDIOS);
+  const ranked = (await rankOnServer(brief, studios, 9, { lang })).slice(0, MAX_STUDIOS);
   const [result, slots, callOffer] = await Promise.all([
     quoteBrief(brief, ranked.map((r) => r.studioId)),
     availableSlots(),
@@ -90,11 +102,11 @@ export default async function ExpertPage({ searchParams }: { searchParams: Promi
   const minStudios = Math.max(1, Math.min(MIN_STUDIOS, offer.quotes.length));
 
   const facts = [
-    brief.propertyType ? { label: 'Home', value: propertyLabel(brief.propertyType) ?? '—' } : null,
-    brief.carpetAreaSqft ? { label: 'Carpet', value: `${brief.carpetAreaSqft} sqft` } : null,
-    localityLabel(brief.locality) ? { label: 'Where', value: localityLabel(brief.locality)! } : null,
-    brief.tier ? { label: 'Level', value: TIER[brief.tier].label } : null,
-    { label: 'Quotes', value: String(offer.quotes.length) },
+    brief.propertyType ? { label: t('fact.home'), value: propertyLabel(brief.propertyType, lang) ?? '—' } : null,
+    brief.carpetAreaSqft ? { label: t('fact.carpet'), value: `${brief.carpetAreaSqft} sqft` } : null,
+    localityLabel(brief.locality) ? { label: t('fact.where'), value: localityLabel(brief.locality)! } : null,
+    brief.tier ? { label: t('fact.level'), value: TIER[brief.tier].label } : null,
+    { label: t('fact.quotes'), value: String(offer.quotes.length) },
   ].filter((f): f is { label: string; value: string } => f !== null);
 
   return (
@@ -103,25 +115,22 @@ export default async function ExpertPage({ searchParams }: { searchParams: Promi
       <Spine
         at="expert"
         facts={[
-          { id: 'quote', fact: `${offer.quotes.length} priced` },
-          { id: 'expert', fact: 'Reading it with you' },
+          { id: 'quote', fact: t('spine.priced', { n: offer.quotes.length }) },
+          { id: 'expert', fact: t('spine.reading') },
         ]}
       />
 
       <Wrap className="py-12">
         <Chapter
-          eyebrow="Your architect"
-          title="One call, and then we introduce you."
+          eyebrow={t('ch.eyebrow')}
+          title={t('ch.title')}
           aside={
             <p className="oi-num m-0 whitespace-nowrap text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink2)]">
-              No studio pays them
+              {t('ch.aside')}
             </p>
           }
         >
-          Someone who has read your brief, your quotes and every studio&rsquo;s delivery record
-          spends half an hour helping you choose. Then we set up the meeting or site visit with that
-          studio ourselves. It is slower than a contact button, and it is the reason people do not
-          end up in a meeting with a studio that was never going to suit them.
+          {t('ch.body')}
         </Chapter>
 
         {/* ── Who is actually going to ring ──
@@ -132,18 +141,18 @@ export default async function ExpertPage({ searchParams }: { searchParams: Promi
         <div className="oi-pane mb-10 p-[clamp(22px,3vw,32px)]">
           <div className="mb-5 flex flex-wrap items-baseline justify-between gap-x-8 gap-y-2">
             <div>
-              <p className="oi-eyebrow m-0 mb-2">Who will ring you</p>
+              <p className="oi-eyebrow m-0 mb-2">{t('who.eyebrow')}</p>
               <h2 className="oi-display m-0 text-[clamp(1.4rem,1.15rem+1vw,1.85rem)]">
                 {ARCHITECT.name}
               </h2>
               <p className="m-0 mt-1.5 text-[14px] text-[var(--ink2)]">
-                {ARCHITECT.role}
+                {known(lang, 'architect.role', ARCHITECT.role)}
               </p>
             </div>
           </div>
 
           <p className="m-0 mb-6 max-w-[60ch] text-[15px] leading-[1.65] text-[var(--ink)]">
-            &ldquo;{ARCHITECT.says}&rdquo;
+            &ldquo;{known(lang, 'architect.says', ARCHITECT.says)}&rdquo;
           </p>
 
           <CallOffer offer={callOffer} className="mb-5" />
@@ -152,8 +161,8 @@ export default async function ExpertPage({ searchParams }: { searchParams: Promi
           <div className="flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-[var(--line)] pt-5">
             {architectFacts().map((f) => (
               <p key={f.label} className="m-0 flex items-baseline gap-2">
-                <span className="oi-label m-0">{f.label}</span>
-                <span className="oi-num text-[13px]">{f.value}</span>
+                <span className="oi-label m-0">{architectFactText(lang, f.label)}</span>
+                <span className="oi-num text-[13px]">{architectFactText(lang, f.value)}</span>
               </p>
             ))}
           </div>
@@ -164,8 +173,7 @@ export default async function ExpertPage({ searchParams }: { searchParams: Promi
           {!ARCHITECT_IS_REAL ? (
             <p className="m-0 mt-5">
               <Flag>
-                Pre-launch placeholder — a named architect and their real record go here before
-                anybody is asked for a phone number
+                {t('flag.placeholder')}
               </Flag>
             </p>
           ) : null}
@@ -175,31 +183,31 @@ export default async function ExpertPage({ searchParams }: { searchParams: Promi
             claim; this is the evidence, and everything in it is drawn from the
             brief — nothing here is aspirational. */}
         <div className="mb-10">
-          <p className="oi-label m-0 mb-3">What {firstName(ARCHITECT.name)} reads before ringing</p>
+          <p className="oi-label m-0 mb-3">{t('reads.label', { name: firstName(ARCHITECT.name) })}</p>
           <Established facts={facts} />
           <ul className="m-0 mt-4 flex list-none flex-col gap-2 p-0">
-            <Read label="Your brief, in full — including what you ruled out" />
+            <Read label={t('reads.brief')} />
             <Read
               label={
                 brief.styleLikes.length || brief.styleDislikes.length
                   ? [
                       brief.styleLikes.length
-                        ? `Leaning ${brief.styleLikes.map((t) => STYLE_LABELS[t]).join(', ')}`
+                        ? t('reads.leaning', { styles: brief.styleLikes.map((s) => STYLE_LABELS[s]).join(', ') })
                         : null,
                       brief.styleDislikes.length
-                        ? `ruled out ${brief.styleDislikes.map((t) => STYLE_LABELS[t]).join(', ')}`
+                        ? t('reads.ruledOut', { styles: brief.styleDislikes.map((s) => STYLE_LABELS[s]).join(', ') })
                         : null,
                     ]
                       .filter(Boolean)
                       .join(' · ')
-                  : 'Your style answers'
+                  : t('reads.styleAnswers')
               }
             />
-            <Read label={`All ${offer.quotes.length} quotes, line by line, with the materials`} />
-            <Read label="Every studio's verification standing and delivery record" />
+            <Read label={t('reads.allQuotes', { n: offer.quotes.length })} />
+            <Read label={t('reads.verification')} />
           </ul>
           <p className="m-0 mt-4 max-w-[58ch] text-[13.5px] leading-[1.6] text-[var(--ink2)]">
-            You will not be explaining your flat again.
+            {t('reads.noExplain')}
           </p>
         </div>
 
@@ -212,8 +220,8 @@ export default async function ExpertPage({ searchParams }: { searchParams: Promi
           <Sheet className="mb-8 px-5 py-4">
             <p className="m-0 max-w-[58ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
               {offer.skipped.length === 1
-                ? `${offer.skipped[0]!.name} suits this brief but has not published rates for all of this work yet, so we cannot put a number against their name — and a studio on this call without a quote would be one you could not compare.`
-                : `${offer.skipped.length} studios that suit this brief have not published rates for all of this work yet. We have left them out rather than show you a name with no number against it.`}
+                ? t('skipped.one', { name: offer.skipped[0]!.name })
+                : t('skipped.many', { n: offer.skipped.length })}
             </p>
           </Sheet>
         ) : null}
@@ -221,9 +229,7 @@ export default async function ExpertPage({ searchParams }: { searchParams: Promi
         {offer.quotes.length === 1 ? (
           <Sheet className="mb-8 px-5 py-4">
             <p className="m-0 max-w-[58ch] text-[14.5px] leading-[1.6]">
-              There is one studio we can quote for this brief today, so this call is about whether
-              they are right for you rather than about choosing between two. If the answer is no, we
-              will say so — and we would rather tell you that than introduce you anyway.
+              {t('onlyOne')}
             </p>
           </Sheet>
         ) : null}
@@ -232,8 +238,8 @@ export default async function ExpertPage({ searchParams }: { searchParams: Promi
           briefId={id}
           minStudios={minStudios}
           maxStudios={MAX_STUDIOS}
-          defaultName={user.name}
-          defaultEmail={user.email}
+          defaultName={user?.name ?? null}
+          defaultEmail={user?.email ?? null}
           slots={slots.map((s) => s.startsAt)}
           initialSlot={typeof slot === 'string' ? slot : null}
           fromBrief={briefQuestions(brief)}
@@ -280,8 +286,21 @@ function localityLabel(slug: string | null): string | null {
  * unmapped value must render as nothing rather than as `undefined` — a defect
  * this codebase has already shipped once.
  */
-function propertyLabel(type: keyof typeof PROPERTY_LABELS): string | null {
-  return PROPERTY_LABELS[type] ?? null;
+function propertyLabel(type: keyof typeof PROPERTY_LABELS, lang: Lang): string | null {
+  if (!PROPERTY_LABELS[type]) return null;
+  const entry = PROPERTY_TX[type];
+  return entry ? tx(lang, entry) : PROPERTY_LABELS[type];
+}
+
+/** The architect's facts (consultation/architect.ts), translated while the English still matches. */
+function architectFactText(lang: Lang, english: string): string {
+  const years = /^(\d+) years$/.exec(english);
+  if (years) return known(lang, 'architect.years', english, { n: years[1]! });
+  if (english === 'Practising') return known(lang, 'architect.practising', english);
+  if (english === 'Briefs read here') return known(lang, 'architect.briefsRead', english);
+  if (english === 'Paid by a studio') return known(lang, 'architect.paidBy', english);
+  if (english === 'Never') return known(lang, 'architect.never', english);
+  return english;
 }
 
 async function briefId(): Promise<string | null> {

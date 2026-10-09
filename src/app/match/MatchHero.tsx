@@ -19,6 +19,8 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { rise } from '@/components/oi/motion';
 import { CountUp } from '@/components/oi/CountUp';
+import { useSiteT } from '@/components/app/i18n';
+import { MATCH_DICT } from '@/modules/i18n/site/match';
 
 export function MatchHero({
   fit,
@@ -32,17 +34,18 @@ export function MatchHero({
   name?: string | null;
   /** "your 3 BHK in Kharadi · Premium" — what these are the best fits for. */
   forWhat?: string | null;
-  /** "10 verified studios → 6 at Premium → 3 for you" (queue item 15). */
+  /** "10 verified studios → 6 at Premium → 3 for you" (queue item 15), already in the visitor's language. */
   reveal?: { count: number; label: string }[];
 }) {
   const reduced = useReducedMotion();
+  const t = useSiteT(MATCH_DICT);
 
   return (
     <header className="mx-auto max-w-[46rem] pb-2 text-center">
       {/* Their name, when they gave it — the first thing the brief asked, and
           the first thing this page says back. */}
       <motion.p {...rise(reduced, 0)} className="oi-eyebrow q-eyebrow-lg m-0 mb-7">
-        {name ? `Welcome, ${name}` : 'Who fits you'}
+        {name ? t('hero.welcome', { name }) : t('hero.whoFits')}
       </motion.p>
 
       {/* One sentence, set large: "Your top 5 matches." The count is the
@@ -51,8 +54,8 @@ export function MatchHero({
         {...rise(reduced, 0.06)}
         className="oi-display m-0 text-[clamp(2.6rem,1.4rem+5vw,5.4rem)] leading-[0.98] text-[var(--ink)]"
       >
-        Your top <CountUp to={fit} className="tabular-nums text-[var(--acc)]" label={fit === 1 ? 'match' : 'matches'} />
-        <span aria-hidden> {fit === 1 ? 'match' : 'matches'}.</span>
+        {t('hero.top')} <CountUp to={fit} className="tabular-nums text-[var(--acc)]" label={fit === 1 ? t('hero.word1') : t('hero.wordN')} />
+        <span aria-hidden> {fit === 1 ? t('hero.tail1') : t('hero.tailN')}</span>
       </motion.h1>
 
       {reveal.length > 1 ? (
@@ -71,7 +74,7 @@ export function MatchHero({
 
       {forWhat ? (
         <motion.p {...rise(reduced, 0.18)} className="q-body m-0 mt-3 text-[var(--ink)]">
-          For {forWhat}.
+          {t('hero.for', { what: forWhat })}
         </motion.p>
       ) : null}
 
@@ -88,8 +91,7 @@ export function MatchHero({
         {...rise(reduced, 0.22)}
         className="q-body mx-auto m-0 mt-6 max-w-[46ch] text-[var(--ink2)]"
       >
-        Ranked on your answers — your area, budget band, scope and the styles you chose. Every
-        studio here has cleared our checks; each card shows which.
+        {t('hero.footnote')}
       </motion.p>
     </header>
   );

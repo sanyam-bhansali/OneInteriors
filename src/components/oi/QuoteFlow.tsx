@@ -43,6 +43,9 @@ import { Spec, MaterialPanel } from './Material';
 import { Sheet, DocRow, Flag } from './index';
 import { Mark } from '@/components/brand';
 import { advanceIsHigh, phaseAmounts, type PaymentPhase } from '@/modules/studio/payment-phases';
+import { useLang, useSiteT } from '@/components/app/i18n';
+import { OI_DICT, roomName } from '@/modules/i18n/site/oi';
+import { known } from '@/modules/i18n/site/expert';
 
 type Phase = 'gate' | 'building' | 'done';
 
@@ -88,6 +91,7 @@ const input =
  * whole build.
  */
 function Gate({ onReady, bhk }: { onReady: (plan: FloorPlan) => void; bhk: number }) {
+  const t = useSiteT(OI_DICT);
   const [runMm, setRunMm] = useState('');
 
   const typed = Number(runMm);
@@ -96,13 +100,12 @@ function Gate({ onReady, bhk }: { onReady: (plan: FloorPlan) => void; bhk: numbe
 
   return (
     <Sheet className="mx-auto max-w-[36rem] p-[clamp(22px,3vw,32px)]">
-      <p className="oi-eyebrow m-0 mb-4">Before we price it</p>
+      <p className="oi-eyebrow m-0 mb-4">{t('gate.eyebrow')}</p>
       <h2 className="oi-display m-0 mb-3 text-[clamp(1.5rem,1.2rem+1.2vw,2rem)]">
-        One number decides most of the quote.
+        {t('gate.h2')}
       </h2>
       <p className="m-0 mb-6 text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-        The length of your kitchen platform. Measure it and we price your kitchen; skip it and we
-        price a typical one for a {bhk} BHK, and say so on the quote.
+        {t('gate.body', { bhk })}
       </p>
 
       {/* One press, first. Most people are not standing in their kitchen with
@@ -114,28 +117,25 @@ function Gate({ onReady, bhk }: { onReady: (plan: FloorPlan) => void; bhk: numbe
         className="cursor-pointer px-6 py-3 text-[14.5px] font-medium text-white transition-colors"
         style={{ background: 'var(--acc-btn)' }}
       >
-        Price it now on a standard {bhk} BHK kitchen
+        {t('gate.standard', { bhk })}
       </button>
       <p className="m-0 mt-2.5 text-[12.5px] leading-snug text-[var(--ink2)]">
-        A {standardRun.toLocaleString('en-IN')}mm platform, which is what a {bhk} BHK usually has.
-        Every other size in the quote is standard anyway. The range is ±16%, and the document says
-        so.
+        {t('gate.standardNote', { mm: standardRun.toLocaleString('en-IN'), bhk })}
       </p>
 
       <div className="mt-7 border-t border-[var(--line)] pt-5">
         <label className="mb-2 block">
-          <span className="oi-label mb-2 block">Or tell us your kitchen platform, in mm</span>
+          <span className="oi-label mb-2 block">{t('gate.own')}</span>
           <input
             inputMode="numeric"
             value={runMm}
             onChange={(e) => setRunMm(e.target.value.replace(/\D/g, ''))}
-            placeholder="e.g. 3600"
+            placeholder={t('gate.placeholder')}
             className={`${input} oi-num`}
           />
         </label>
         <p className="m-0 mb-4 text-[13px] leading-snug text-[var(--ink2)]">
-          Measure the run your counter sits on. Most Pune flats are between 3,000 and 5,500mm. A
-          rough number is worth more than none, and it narrows the range to ±12%.
+          {t('gate.measureHelp')}
         </p>
 
         {/* Says what is missing rather than sitting greyed out — a disabled
@@ -146,11 +146,11 @@ function Gate({ onReady, bhk }: { onReady: (plan: FloorPlan) => void; bhk: numbe
             onClick={() => onReady({ fileName: null, kitchenRunMm: typed, source: 'customer' })}
             className="cursor-pointer border border-[var(--ink)] bg-transparent px-5 py-2.5 text-[14px] font-medium text-[var(--ink)]"
           >
-            Build it on {typed.toLocaleString('en-IN')}mm
+            {t('gate.build', { mm: typed.toLocaleString('en-IN') })}
           </button>
         ) : runMm ? (
           <p className="m-0 text-[13px] text-[var(--ink2)]">
-            That is outside 1,500–9,000mm — check the number, or use the standard kitchen above.
+            {t('gate.outside')}
           </p>
         ) : null}
       </div>
@@ -184,6 +184,8 @@ export function QuoteDocument({
    */
   onMeasured?: (runMm: number) => void;
 }) {
+  const t = useSiteT(OI_DICT);
+  const lang = useLang();
   const money = (p: number) => formatINRCompact(p);
 
   /**
@@ -216,10 +218,10 @@ export function QuoteDocument({
               .toUpperCase()}
           </span>
           <div>
-            <p className="oi-eyebrow m-0 mb-2">First quote · generated</p>
+            <p className="oi-eyebrow m-0 mb-2">{t('doc.eyebrow')}</p>
             <h2 className="oi-display m-0 text-[clamp(1.4rem,1.15rem+1vw,1.9rem)]">{studioName}</h2>
             {preparedFor ? (
-              <p className="m-0 mt-1.5 text-[13.5px] text-[var(--ink2)]">Prepared for {preparedFor}</p>
+              <p className="m-0 mt-1.5 text-[13.5px] text-[var(--ink2)]">{t('doc.preparedFor', { name: preparedFor })}</p>
             ) : null}
           </div>
         </div>
@@ -236,7 +238,7 @@ export function QuoteDocument({
       {!ratesAreReal() ? (
         <p className="m-0 mb-6">
           <Flag>
-            Pre-launch — priced on archive rates, not this studio&rsquo;s own filed card
+            {t('doc.archive')}
           </Flag>
         </p>
       ) : null}
@@ -251,7 +253,7 @@ export function QuoteDocument({
               smallest thing on the page. It is a heading; it now reads like
               one. */}
           <div className="mb-2 flex items-baseline justify-between gap-4 border-b border-[var(--ink)] pb-2">
-            <h3 className="oi-display m-0 text-[17px]">{room.label}</h3>
+            <h3 className="oi-display m-0 text-[17px]">{roomName(lang, room.room, room.label)}</h3>
             <span className="oi-num text-[14px]">{money(room.subtotalPaise)}</span>
           </div>
 
@@ -284,41 +286,39 @@ export function QuoteDocument({
           GST" is the total less GST, not a re-addition, so the two can
           never disagree by a rounding paisa. */}
       <div className="mt-8 border-t border-[var(--ink)] pt-4">
-        <p className="oi-label m-0 mb-1">How the total is made</p>
-        <DocRow label={`Work · all ${quote.lines.length} lines`} value={money(quote.modularPaise + quote.nonModularPaise)} />
+        <p className="oi-label m-0 mb-1">{t('doc.howMade')}</p>
+        <DocRow label={t('doc.work', { n: quote.lines.length })} value={money(quote.modularPaise + quote.nonModularPaise)} />
         <p className="m-0 -mt-1 mb-1 text-[12.5px] text-[var(--ink2)]">
-          {money(quote.modularPaise)} made in the factory · {money(quote.nonModularPaise)} built on site
+          {t('doc.split', { factory: money(quote.modularPaise), site: money(quote.nonModularPaise) })}
         </p>
-        <DocRow label="+ Professional fee · 7%" value={money(quote.professionalFeePaise)} />
+        <DocRow label={t('doc.fee')} value={money(quote.professionalFeePaise)} />
         <DocRow
-          label="− Factory discount · 10%"
+          label={t('doc.factoryDiscount')}
           value={`−${money(quote.modularDiscountPaise)}`}
           better
         />
         {quote.curatedDiscountPaise ? (
           <DocRow
-            label={`− One Interiors discount · ${quote.curatedDiscountPct}%`}
+            label={t('doc.curatedDiscount', { pct: quote.curatedDiscountPct ?? 0 })}
             value={`−${money(quote.curatedDiscountPaise)}`}
             better
           />
         ) : null}
-        <DocRow label="= Before GST" value={money(quote.totalPaise - quote.gstPaise)} />
-        <DocRow label="+ GST · 18%" value={money(quote.gstPaise)} />
-        <DocRow label="= Total" value={money(quote.totalPaise)} emphasis />
+        <DocRow label={t('doc.beforeGst')} value={money(quote.totalPaise - quote.gstPaise)} />
+        <DocRow label={t('doc.gst')} value={money(quote.gstPaise)} />
+        <DocRow label={t('doc.total')} value={money(quote.totalPaise)} emphasis />
       </div>
 
       {quote.notPriced.length > 0 ? (
         <p className="m-0 mt-6 border-t border-[var(--line)] pt-4">
           <Flag>
-            {quote.notPriced.length} item
-            {quote.notPriced.length === 1 ? '' : 's'} not in this total — this studio has not filed a
-            rate for them
+            {t(quote.notPriced.length === 1 ? 'doc.notPricedOne' : 'doc.notPricedMany', { n: quote.notPriced.length })}
           </Flag>
         </p>
       ) : null}
 
       <div className="mt-7 border-t border-[var(--line)] pt-5">
-        <p className="oi-label m-0 mb-3">What this is built on</p>
+        <p className="oi-label m-0 mb-3">{t('doc.builtOn')}</p>
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
           {quote.assumptions.map((line) => (
             <li key={line} className="text-[13.5px] leading-[1.6] text-[var(--ink2)]">
@@ -327,8 +327,8 @@ export function QuoteDocument({
           ))}
           <li className="text-[13px] leading-[1.55] text-[var(--ink2)]">
             {runSourceOf(plan) === 'customer'
-              ? 'Kitchen run as you measured it.'
-              : 'No measurement — a standard kitchen was used.'}
+              ? t('doc.runMeasured')
+              : t('doc.runStandard')}
           </li>
         </ul>
       </div>
@@ -336,7 +336,7 @@ export function QuoteDocument({
       {/* When money moves. Each studio's own phases, from its quotations or
           its profile — never a schedule we invented for it. */}
       <div className="mt-7 border-t border-[var(--line)] pt-5">
-        <p className="oi-label m-0 mb-2">Payment phases</p>
+        <p className="oi-label m-0 mb-2">{t('doc.phases')}</p>
         {paymentPhases ? (
           <>
             {phaseAmounts(paymentPhases, quote.totalPaise).map((p, i) => (
@@ -344,15 +344,13 @@ export function QuoteDocument({
             ))}
             {advanceIsHigh(paymentPhases) ? (
               <p className="m-0 mt-3 text-[13px] leading-[1.6] text-[var(--ink2)]">
-                {studioName} asks {paymentPhases[0]!.pct}% at booking — more than most Pune studios.
-                Worth asking what it covers before you pay it.
+                {t('doc.advanceHigh', { studio: studioName, pct: paymentPhases[0]!.pct })}
               </p>
             ) : null}
           </>
         ) : (
           <p className="m-0 text-[13.5px] leading-[1.6] text-[var(--ink2)]">
-            {studioName} has not filed its payment schedule with us yet. Our expert confirms it with
-            them before you meet — and how much is paid before anything is installed is worth asking.
+            {t('doc.noPhases', { studio: studioName })}
           </p>
         )}
       </div>
@@ -362,19 +360,19 @@ export function QuoteDocument({
       ) : null}
 
       <p className="oi-label m-0 mt-6 border-t border-[var(--line)] pt-4 print:hidden">
-        Underlined materials open an explanation — what it is, and what the cheaper version costs
+        {t('doc.underlined')}
       </p>
 
       {/* Printed too: quotes get forwarded and carried into studio meetings,
           and the PDF is where a customer is most likely to go direct. */}
       <div className="mt-6 border-t border-[var(--line)] pt-4">
         <p className="m-0 mb-1.5 text-[13.5px] font-semibold text-[var(--ink)]">
-          Book this quote through One Interiors to keep:
+          {t('doc.keep')}
         </p>
         <p className="m-0 text-[13px] leading-[1.6] text-[var(--ink2)]">
-          {showcase().map((b) => b.short).join(' · ')}.{' '}
+          {showcase().map((b) => known(lang, `benefit.${b.id}.short`, b.short)).join(' · ')}.{' '}
           <span className="hidden print:inline">
-            Start with your expert call at oneinteriors.in/expert — {studioName} is introduced to you through us.
+            {t('doc.printCta', { studio: studioName })}
           </span>
         </p>
         {/* On screen it is a link, not an address to type (review, 8 Oct). */}
@@ -382,21 +380,21 @@ export function QuoteDocument({
           href="/expert"
           className="mt-3 inline-block text-[14px] font-semibold text-[var(--ink)] underline underline-offset-4 print:hidden"
         >
-          Start with your expert call — {studioName} is introduced to you through us →
+          {t('doc.cta', { studio: studioName })}
         </Link>
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--ink)] pt-4">
         <p className="m-0 flex items-center gap-2 text-[12.5px] text-[var(--ink2)]">
           <Mark className="h-[14px] w-[14px] text-[var(--ink)]" />
-          Powered by One Interiors
+          {t('doc.powered')}
         </p>
         <button
           type="button"
           onClick={() => window.print()}
           className="cursor-pointer border border-[var(--line)] bg-transparent px-4 py-2 text-[13px] text-[var(--ink)] print:hidden"
         >
-          Print or save as PDF
+          {t('doc.print')}
         </button>
       </div>
 
@@ -413,22 +411,22 @@ export function QuoteDocument({
  * to ±12% for every studio at once.
  */
 function MeasureKitchen({ onMeasured }: { onMeasured: (runMm: number) => void }) {
+  const t = useSiteT(OI_DICT);
   const [value, setValue] = useState('');
   const n = Number(value);
   const ok = Number.isFinite(n) && n >= 1500 && n <= 9000;
   return (
     <div className="mt-7 border-t border-[var(--line)] pt-5 print:hidden">
-      <p className="oi-label m-0 mb-2">Tighten this quote</p>
+      <p className="oi-label m-0 mb-2">{t('measure.label')}</p>
       <p className="m-0 mb-3 text-[13.5px] leading-[1.6] text-[var(--ink2)]">
-        Measure your kitchen platform and every studio is re-priced on it — the range narrows from
-        ±16% to ±12%.
+        {t('measure.body')}
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <input
           inputMode="numeric"
           value={value}
           onChange={(e) => setValue(e.target.value.replace(/\D/g, ''))}
-          placeholder="Platform length, mm"
+          placeholder={t('measure.placeholder')}
           className={`${input} oi-num w-48`}
         />
         {ok ? (
@@ -438,10 +436,10 @@ function MeasureKitchen({ onMeasured }: { onMeasured: (runMm: number) => void })
             className="cursor-pointer px-4 py-2.5 text-[14px] font-medium text-white"
             style={{ background: 'var(--acc-btn)' }}
           >
-            Re-price every studio
+            {t('measure.reprice')}
           </button>
         ) : value ? (
-          <span className="text-[13px] text-[var(--ink2)]">Between 1,500 and 9,000 mm.</span>
+          <span className="text-[13px] text-[var(--ink2)]">{t('measure.range')}</span>
         ) : null}
       </div>
     </div>

@@ -46,6 +46,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MATERIALS, type Material } from '@/modules/materials/glossary';
 import { pickQuestion, type Choice } from '@/modules/materials/quiz';
+import { useLang, useSiteT } from '@/components/app/i18n';
+import { OI_DICT, stageText } from '@/modules/i18n/site/oi';
 import { MaterialCard } from './Material';
 
 export interface Stage {
@@ -110,16 +112,7 @@ export const DEFAULT_STAGES: Stage[] = stagesFor({ bhk: 2, measured: false, rate
  * none of it won. Every one is about the wait everybody else makes you do —
  * never about the customer, their budget or their taste.
  */
-const ASIDES = [
-  'Three weeks, down to ten seconds.',
-  'Not phoning anyone. Not even once.',
-  'No “ma’am, please visit our office”.',
-  'Measuring in millimetres, like a grown-up.',
-  'Resisting the urge to write “premium ply”.',
-  'Every line is getting a quantity.',
-  'No WhatsApp forward is being prepared.',
-  'Checking that “soft-close” means something.',
-];
+const ASIDES = ['aside.0', 'aside.1', 'aside.2', 'aside.3', 'aside.4', 'aside.5', 'aside.6', 'aside.7'] as const;
 
 /** When each card lands. The first is held back so nothing arrives at once. */
 const CARD_AT = [900, 3500] as const;
@@ -141,6 +134,8 @@ export function Building({
   seenQuestions?: readonly string[];
   onAsked?: (questionId: string) => void;
 }) {
+  const t = useSiteT(OI_DICT);
+  const lang = useLang();
   const [at, at_] = useState(0);
   const [slide, slide_] = useState(-1);
   const [joke, joke_] = useState(0);
@@ -245,16 +240,16 @@ export function Building({
 
   return (
     <div className="mx-auto w-full max-w-[38rem] py-12">
-      <p className="oi-eyebrow m-0 mb-3">Building your first quote</p>
+      <p className="oi-eyebrow m-0 mb-3">{t('build.eyebrow')}</p>
       <h1 className="oi-display m-0 mb-8 text-[clamp(1.5rem,1.2rem+1.2vw,2rem)]">
-        Pricing {studioName} on your flat.
+        {t('build.h1', { studio: studioName })}
       </h1>
 
       {/* ── The work, as one line and a bar ── */}
       <div className="mb-8">
         <div className="mb-2.5 flex items-baseline justify-between gap-4">
           <p className="m-0 text-[13.5px] text-[var(--ink2)]" aria-live="polite">
-            {stagesDone ? 'Quotation ready' : current.label}
+            {stagesDone ? t('build.ready') : stageText(lang, current.label)}
           </p>
           {stagesDone ? null : (
             <button
@@ -262,7 +257,7 @@ export function Building({
               onClick={() => onDone?.()}
               className="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-[13px] font-medium text-[var(--ink)] underline underline-offset-4"
             >
-              Skip to the quote
+              {t('build.skipAll')}
             </button>
           )}
         </div>
@@ -283,17 +278,17 @@ export function Building({
           <section
             key="q"
             className="oi-card-in border border-[var(--line)] bg-[var(--card)] p-[clamp(18px,3vw,26px)]"
-            aria-label="One question while you wait"
+            aria-label={t('build.questionAria')}
           >
             <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-              <p className="oi-eyebrow m-0">Your turn</p>
+              <p className="oi-eyebrow m-0">{t('build.yourTurn')}</p>
               {picked === null ? (
                 <button
                   type="button"
                   onClick={() => skipped_(true)}
                   className="cursor-pointer border-0 bg-transparent p-0 text-[13px] text-[var(--ink2)] underline hover:text-[var(--ink)]"
                 >
-                  Skip
+                  {t('build.skip')}
                 </button>
               ) : null}
             </div>
@@ -351,7 +346,7 @@ export function Building({
                   className="oi-num m-0 mb-2 text-[10.5px] uppercase tracking-[0.16em]"
                   style={{ color: picked.correct ? 'var(--sec-ink)' : 'var(--ink2)' }}
                 >
-                  {picked.correct ? 'That is the one' : 'Not this time'}
+                  {picked.correct ? t('build.right') : t('build.wrong')}
                 </p>
                 {/* The reply to what they actually chose comes first, because
                     a wrong answer deserves a specific reply — and in almost
@@ -378,7 +373,7 @@ export function Building({
                   className="cursor-pointer px-6 py-3 text-[14.5px] font-medium text-white"
                   style={{ background: 'var(--acc-btn)' }}
                 >
-                  See your quote
+                  {t('build.see')}
                 </button>
               </div>
             ) : null}
@@ -387,9 +382,9 @@ export function Building({
           <section
             key={cards[slide]!.id}
             className="oi-card-in border border-[var(--line)] bg-[var(--card)] p-[clamp(18px,3vw,26px)]"
-            aria-label="While you wait"
+            aria-label={t('build.waitAria')}
           >
-            <p className="oi-eyebrow m-0 mb-4">Worth knowing about your quote</p>
+            <p className="oi-eyebrow m-0 mb-4">{t('build.worth')}</p>
             <MaterialCard material={cards[slide]!} compact />
           </section>
         )}
@@ -420,7 +415,7 @@ export function Building({
             key={joke}
             className="oi-swap oi-num m-0 text-right text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink2)]"
           >
-            {ASIDES[joke]}
+            {t(ASIDES[joke]!)}
           </p>
         ) : null}
       </div>

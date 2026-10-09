@@ -4,10 +4,14 @@ import { LivePrice } from '@/components/landing-v3/LivePrice';
 import { VERIFIED_STUDIOS } from '@/lib/claims';
 import { Mark } from '@/components/brand';
 import { CbMotion } from './CbMotion';
-import { CHECK_LABELS } from '@/modules/studio/types';
+import { SiteLangPicker } from '@/components/app/i18n';
+import { CHECK_LABELS, type CheckType } from '@/modules/studio/types';
 import { BENEFITS, showcaseWorthPaise } from '@/modules/portal/benefits';
 import { ARCHITECT } from '@/modules/consultation/architect';
-import type { OfferState } from '@/modules/consultation/offer';
+import { FREE_CALLS, type OfferState } from '@/modules/consultation/offer';
+import { translator, tx, type Lang, type Tx } from '@/modules/i18n/site';
+import { HOME_DICT } from '@/modules/i18n/site/home';
+import { CHECK_TX, FINISH_TX, PRIORITY_TX, ROOM_TX, itemLabel } from '@/modules/i18n/site/labels';
 import { STYLE_LABELS, STYLE_TAGS, type StyleTag } from '@/modules/brief/types';
 import { STYLE_DEFINITIONS } from '@/modules/inspiration/reading';
 import { ROOM_STYLE_PHOTOS, STYLE_PHOTOS, type StylePhoto } from '@/data/style-photos';
@@ -108,64 +112,31 @@ const Tick = () => (
 
 // ── Data ───────────────────────────────────────────────────────
 
-/** The five steps. Each card shows the room a little more lit: the v3 sequence, five frames of it. */
-const STEPS = [
-  {
-    n: '01',
-    tag: 'Brief',
-    title: 'Tell us about your home',
-    body: 'Twelve short screens: your flat, the work, the finish level, the styles you love and the ones you never want, and who lives there.',
-    chip: '12 screens · about 4 min',
-    frame: 'f00',
-  },
-  {
-    n: '02',
-    tag: 'Match',
-    title: 'Meet the studios that fit',
-    body: `${VERIFIED_STUDIOS} verified studios, scored against your answers, each with the reason in your own words. Nobody can pay to rank higher.`,
-    chip: '3–6 matches, each with its reason',
-    frame: 'f08',
-  },
-  {
-    n: '03',
-    tag: 'Quote',
-    title: 'Every quote in seconds',
-    body: 'Each studio priced on rates read from its own past quotations, line by line, with every board, finish and fitting named.',
-    chip: 'Every match priced at once',
-    frame: 'f16',
-  },
-  {
-    n: '04',
-    tag: 'Compare',
-    title: 'Compare them side by side',
-    body: 'Room by room and material by material, with a plain-language summary of where the money really differs.',
-    chip: 'Rooms · materials · summary',
-    frame: 'f24',
-  },
-  {
-    n: '05',
-    tag: 'Architect',
-    title: 'A 30-minute call with your architect',
-    body: `${ARCHITECT.name} reads your brief and every quote first, tells you where the studios differ, and sets up the meeting with the one you choose.`,
-    chip: 'Then we introduce you',
-    frame: 'f32',
-  },
-];
+type T = ReturnType<typeof translator<typeof HOME_DICT>>;
 
-const EXAMPLE_BRIEF: [string, string][] = [
-  ['Home', '2 BHK · Baner'],
-  ['Carpet area', '960 sq ft'],
-  ['Finish level', 'Premium'],
-  ['Household', '2 adults, 1 elderly'],
-  ['Leaning', 'Warm modern'],
-  ['Put first', 'Finishing on time'],
+/** The five steps. Each card shows the room a little more lit: the v3 sequence, five frames of it. Words in HOME_DICT `step.<k>.*`. */
+const STEPS = [
+  { n: '01', k: 'brief', frame: 'f00' },
+  { n: '02', k: 'match', frame: 'f08' },
+  { n: '03', k: 'quote', frame: 'f16' },
+  { n: '04', k: 'compare', frame: 'f24' },
+  { n: '05', k: 'architect', frame: 'f32' },
+] as const;
+
+const exampleBrief = (t: T, lang: Lang): [string, string][] => [
+  [t('brief.home'), '2 BHK · Baner'],
+  [t('brief.area'), '960 sq ft'],
+  [t('brief.finish'), 'Premium'],
+  [t('brief.household'), t('brief.householdV')],
+  [t('brief.leaning'), 'Warm modern'],
+  [t('brief.first'), tx(lang, PRIORITY_TX.SPEED)],
 ];
 
 const EXAMPLE_MATCHES = [
-  { score: 92, name: 'Studio A', why: 'Can start in January, when you get the keys', checks: '15/15 checks' },
-  { score: 87, name: 'Studio B', why: 'Three of their projects are like yours', checks: '14/15 checks' },
-  { score: 80, name: 'Studio C', why: 'Has designed for elderly parents before', checks: '14/15 checks' },
-];
+  { score: 92, k: 'A', checks: [15, 15] },
+  { score: 87, k: 'B', checks: [14, 15] },
+  { score: 80, k: 'C', checks: [14, 15] },
+] as const;
 
 /** The example quote, priced by the engine itself on sample rates — not typed in. */
 function exampleQuote() {
@@ -194,45 +165,32 @@ function gallery(): { tag: StyleTag; room: GalleryRoom; photo: StylePhoto }[] {
 /** The hero collage: the picker's own photographs, tilted like a table of prints. */
 const COLLAGE: StyleTag[] = ['warm-modern', 'japandi', 'indian-contemporary', 'scandinavian', 'luxe-glam', 'rustic-earthy'];
 
-const FAQ = [
-  {
-    q: 'What does One Interiors cost me?',
-    a: 'Nothing for the brief, the matches, the quotes or the comparison. The 30-minute call with our architect is ₹5,000, and free for our first 1,000 customers. A studio pays us a fee only if you book it, and that fee comes out of its margin, not your quote.',
-  },
-  {
-    q: 'How can a quote be ready in seconds?',
-    a: 'No studio is phoned. Every listed studio’s rates are read from at least fifty of its own past quotations. Our system applies them to your brief and writes the quote line by line — their pricing, not our estimate. The studio confirms or revises it after a site visit.',
-  },
-  {
-    q: 'Can a studio pay to rank higher?',
-    a: 'No. Matches are scored on your answers and on the checks a studio has cleared. There is no paid placement, and every match shows its score and the reason behind it.',
-  },
-  {
-    q: 'Will my number be passed to ten contractors?',
-    a: 'No. No studio sees your name or number until after your call with our architect — and then only the studios you choose, with your agreement.',
-  },
-  {
-    q: 'What does the architect actually do?',
-    a: `A 30-minute call. ${ARCHITECT.name} reads your brief and every quote before it, tells you where the studios really differ and what to ask them, and sets up the meeting with the one you choose. She is on our payroll, so she never earns more by pushing a particular studio.`,
-  },
-  {
-    q: 'Do you work outside Pune?',
-    a: 'Not yet. Verification means visiting sites and calling past clients, so we work one city at a time. Right now that is Pune and Pimpri-Chinchwad.',
-  },
-];
+/** The questions, in order. Words in HOME_DICT `faq.<k>.q` / `faq.<k>.a`. */
+const FAQ = ['cost', 'seconds', 'rank', 'number', 'architect', 'pune'] as const;
+
+/** The finish level's "not for" line, first sentence only. English exactly as before. */
+function firstSentence(lang: Lang, text: string): string {
+  if (lang === 'en') return `${text.split('. ')[0]}.`;
+  const stop = lang === 'hi' ? '।' : '.';
+  return `${text.split(/[।.] /)[0].replace(/[।.]$/, '')}${stop}`;
+}
 
 const img = (photo: StylePhoto, w: number, h: number) => `${photo.src}?auto=format&fit=crop&w=${w}&h=${h}&q=70`;
 
 // ── The page ───────────────────────────────────────────────────
 
-export function HomeCB({ offer }: { offer: OfferState }) {
+export function HomeCB({ offer, lang = 'en' }: { offer: OfferState; lang?: Lang }) {
+  const t = translator(lang, HOME_DICT);
+  /** The module's English, or its translation when there is one. */
+  const L = (en: string, entry?: Tx) => (lang === 'en' || !entry ? en : tx(lang, entry));
+  const dict = HOME_DICT as Record<string, Tx>;
   const quote = exampleQuote();
   const shown = quote.rooms.slice(0, 4);
   const rest = quote.rooms.slice(4);
   const restLines = rest.reduce((n, r) => n + r.lines.length, 0);
   const restPaise = rest.reduce((n, r) => n + r.subtotalPaise, 0);
   const lineCount = quote.lines.length;
-  const checks = Object.values(CHECK_LABELS);
+  const checks = (Object.keys(CHECK_LABELS) as CheckType[]).map((k) => L(CHECK_LABELS[k], CHECK_TX[k]));
   const photos = gallery();
   const counts = {
     all: photos.length,
@@ -240,57 +198,60 @@ export function HomeCB({ offer }: { offer: OfferState }) {
     BEDROOM: photos.filter((p) => p.room === 'BEDROOM').length,
     KITCHEN: photos.filter((p) => p.room === 'KITCHEN').length,
   };
-  const benefit = (id: string) => BENEFITS.find((b) => b.id === id)!;
+  const benefit = (id: string) => {
+    const b = BENEFITS.find((x) => x.id === id)!;
+    return { ...b, terms: L(b.terms ?? '', dict[`benefit.${id}`]) };
+  };
   const worth = formatINR(showcaseWorthPaise());
   const total = formatINRCompact(quote.totalPaise);
+  const freeLeft = offer.remaining ? parseInt(offer.remaining.replace(/\D/g, ''), 10) : 0;
 
   return (
-    <div className="cb">
+    <div className="cb" lang={lang === 'en' ? undefined : lang}>
       <CbMotion />
       <div className="cursor" aria-hidden="true">
-        <span className="cursor-label">Start</span>
+        <span className="cursor-label">{t('cursor.start')}</span>
       </div>
 
       {/* ── Navigation ── */}
       <header className="nav">
         <div className="wrap nav-in">
-          <a className="logo" href="#top" aria-label="One Interiors, back to top">
+          <a className="logo" href="#top" aria-label={t('nav.logo')}>
             <Mark className="text-current" />
             <span className="logo-word">One Interiors</span>
           </a>
-          <nav className="nav-links" aria-label="Main">
-            <a href="#how">How it works</a>
-            <a href="#styles">Styles</a>
-            <a href="#benefits">Benefits</a>
-            <a href="#faq">FAQ</a>
+          <nav className="nav-links" aria-label={t('nav.aria')}>
+            <a href="#how">{t('nav.how')}</a>
+            <a href="#styles">{t('nav.styles')}</a>
+            <a href="#benefits">{t('nav.benefits')}</a>
+            <a href="#faq">{t('nav.faq')}</a>
           </nav>
+          <SiteLangPicker className="nav-lang" />
           {/* "Find", never "request" — no studio is asked for this quote. */}
           <Pill href="/quiz" size="sm">
-            Find your designer
+            {t('cta.find')}
           </Pill>
         </div>
       </header>
 
       <main id="top">
         {/* ── Hero: the headline, then the prints ── */}
-        <section className="hero" aria-label="Introduction">
+        <section className="hero" aria-label={t('hero.aria')}>
           <div className="wrap hero-copy">
             <p className="hero-meta" data-reveal="" data-auto="">
               <i aria-hidden="true" />
-              Pune · {VERIFIED_STUDIOS} verified studios · Quotes you can read
+              {t('hero.meta', { n: VERIFIED_STUDIOS })}
             </p>
-            <Split as="h1" className="h-xl" text="Find the right interior designer for your home." auto />
+            <Split as="h1" className="h-xl" text={t('hero.h1')} auto />
             <p className="hero-sub" data-reveal="" data-auto="" style={{ ['--d' as string]: '450ms' }}>
-              Tell us about your flat in four minutes. We match you with studios that actually fit it,
-              price every one on its own rates, line by line, and a 30-minute call with our architect
-              helps you choose.
+              {t('hero.sub')}
             </p>
             <div className="hero-cta" data-reveal="" data-auto="" style={{ ['--d' as string]: '600ms' }}>
               <Pill href="/quiz" arrow size="lg">
-                Find your interior designer
+                {t('hero.cta')}
               </Pill>
               <Pill href="#how" tone="line" size="lg">
-                See how it works
+                {t('hero.how')}
               </Pill>
             </div>
           </div>
@@ -315,12 +276,10 @@ export function HomeCB({ offer }: { offer: OfferState }) {
         {/* ── What we do ── */}
         <section className="overview wrap" aria-labelledby="ov-h">
           <p className="label" data-reveal="">
-            What we do
+            {t('ov.label')}
           </p>
           <h2 className="ov-text" id="ov-h" data-reveal="">
-            We check Pune&rsquo;s interior studios fifteen ways, read fifty of each one&rsquo;s own
-            quotations, and turn your brief into quotes you can compare line by line — before you
-            ring anyone.
+            {t('ov.text')}
           </h2>
         </section>
 
@@ -329,15 +288,14 @@ export function HomeCB({ offer }: { offer: OfferState }) {
           <div className="soft-card price-card">
             <div className="price-head">
               <p className="label" data-reveal="">
-                What would my home cost?
+                {t('price.label')}
               </p>
-              <Split className="h-l" id="price-h" text="Your home, priced in a second." />
+              <Split className="h-l" id="price-h" text={t('price.h')} />
               <p className="lede" data-reveal="">
-                Pick your home and a finish level. This is the range for a full home at that level; your
-                brief turns it into real quotes from verified studios.
+                {t('price.lede')}
               </p>
             </div>
-            <LivePrice />
+            <LivePrice lang={lang} />
           </div>
         </section>
 
@@ -345,21 +303,21 @@ export function HomeCB({ offer }: { offer: OfferState }) {
         <section className="wrap block" id="how" aria-labelledby="how-h">
           <div className="sec-head">
             <p className="label" data-reveal="">
-              How it works · 5 steps
+              {t('how.label')}
             </p>
-            <Split className="h-l" id="how-h" text="Every home starts dark and empty. Here is how yours comes together." />
+            <Split className="h-l" id="how-h" text={t('how.h')} />
           </div>
           <ol className="stack">
             {STEPS.map((s, i) => (
               <li key={s.n} className="stack-card" style={{ ['--i' as string]: i }}>
                 <div className="stack-copy">
                   <div className="stack-top">
-                    <span className="stack-tag">{s.tag}</span>
+                    <span className="stack-tag">{t(`step.${s.k}.tag`)}</span>
                     <span className="stack-n">{s.n}</span>
                   </div>
-                  <h3>{s.title}</h3>
-                  <p>{s.body}</p>
-                  <span className="chip">{s.chip}</span>
+                  <h3>{t(`step.${s.k}.title`)}</h3>
+                  <p>{t(`step.${s.k}.body`, { n: VERIFIED_STUDIOS, name: ARCHITECT.name })}</p>
+                  <span className="chip">{t(`step.${s.k}.chip`)}</span>
                 </div>
                 <div className="stack-media" aria-hidden="true">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -373,7 +331,7 @@ export function HomeCB({ offer }: { offer: OfferState }) {
         {/* ── The fifteen checks, as a reel ── */}
         <section className="reel" aria-labelledby="reel-h">
           <h2 className="reel-h" id="reel-h" data-reveal="">
-            Every studio clears <em data-count={checks.length}>{checks.length}</em> checks
+            {t('reel.pre')} <em data-count={checks.length}>{checks.length}</em> {t('reel.post')}
           </h2>
           {[checks.slice(0, 8), checks.slice(7)].map((row, r) => (
             <div key={r} className="mq-row">
@@ -392,12 +350,12 @@ export function HomeCB({ offer }: { offer: OfferState }) {
         {/* ── The black panel: matching, the quote, the 3D flat ── */}
         <section className="panel panel-dark" id="match" aria-labelledby="match-h">
           <div className="wrap">
-            <Split className="h-l panel-h" id="match-h" text="Studios scored on your brief. Never on who paid." />
+            <Split className="h-l panel-h" id="match-h" text={t('match.h')} />
             <div className="match-grid">
               <div className="glass" data-reveal="">
-                <p className="label">An example brief</p>
+                <p className="label">{t('brief.label')}</p>
                 <dl className="brief">
-                  {EXAMPLE_BRIEF.map(([k, v]) => (
+                  {exampleBrief(t, lang).map(([k, v]) => (
                     <div key={k}>
                       <dt>{k}</dt>
                       <dd>{v}</dd>
@@ -408,41 +366,41 @@ export function HomeCB({ offer }: { offer: OfferState }) {
               <div>
                 <ol className="matches">
                   {EXAMPLE_MATCHES.map((m, i) => (
-                    <li key={m.name} className="match" data-reveal="" style={{ ['--d' as string]: `${i * 120}ms` }}>
+                    <li key={m.k} className="match" data-reveal="" style={{ ['--d' as string]: `${i * 120}ms` }}>
                       <span className="score" data-count={m.score}>
                         {m.score}
                       </span>
                       <div>
-                        <h3>{m.name}</h3>
-                        <p>{m.why}</p>
+                        <h3>{t(`match.studio${m.k}`)}</h3>
+                        <p>{t(`match.why${m.k}`)}</p>
                         <div className="bar" style={{ ['--v' as string]: m.score / 100 }}>
                           <i />
                         </div>
                       </div>
-                      <span className="checks-ok">{m.checks}</span>
+                      <span className="checks-ok">{t('match.checks', { a: m.checks[0], b: m.checks[1] })}</span>
                     </li>
                   ))}
                 </ol>
                 <p className="note">
-                  An example of how a match reads — your own matches are real studios, scored on your answers.
+                  {t('match.note')}
                 </p>
               </div>
             </div>
 
             <div className="quote" data-reveal="">
               <div className="quote-head">
-                <h3>A quote you can actually read.</h3>
+                <h3>{t('quote.h')}</h3>
                 <span className="label">
-                  Example · 2 BHK, 960 sq ft, full home · {lineCount} lines · sample rates
+                  {t('quote.label', { n: lineCount })}
                 </span>
               </div>
               {shown.map((r) => (
                 <div key={r.room} className="qrow">
-                  <span className="item">{r.label}</span>
+                  <span className="item">{L(r.label, ROOM_TX[r.room])}</span>
                   <span className="spec">
                     {r.lines
                       .slice(0, 2)
-                      .map((l) => `${l.label} ${l.size === 'Standard' ? '' : l.size}`.trim())
+                      .map((l) => `${itemLabel(lang, l.label)} ${l.size === 'Standard' ? '' : l.size}`.trim())
                       .join(' · ')}
                     {r.lines.length > 2 ? ` · +${r.lines.length - 2}` : ''}
                   </span>
@@ -451,16 +409,16 @@ export function HomeCB({ offer }: { offer: OfferState }) {
               ))}
               {rest.length > 0 ? (
                 <div className="qrow">
-                  <span className="item muted">{restLines} more lines</span>
-                  <span className="spec">{rest.map((r) => r.label).join(', ')}</span>
+                  <span className="item muted">{t('quote.more', { n: restLines })}</span>
+                  <span className="spec">{rest.map((r) => L(r.label, ROOM_TX[r.room])).join(', ')}</span>
                   <span className="amt muted">{formatINR(restPaise)}</span>
                 </div>
               ) : null}
               <div className="q-total">
                 <div>
-                  <strong>Total for all {lineCount} lines</strong>
+                  <strong>{t('quote.total', { n: lineCount })}</strong>
                   <span>
-                    Fees and GST included · ±{Math.round(quote.variancePct * 100)}% until a site visit
+                    {t('quote.fees', { pct: Math.round(quote.variancePct * 100) })}
                   </span>
                 </div>
                 <div className="sum">{total}</div>
@@ -468,8 +426,8 @@ export function HomeCB({ offer }: { offer: OfferState }) {
             </div>
           </div>
 
-          <div id="home3d" aria-label="Your home in 3D">
-            <FlatStage />
+          <div id="home3d" aria-label={t('home3d.aria')}>
+            <FlatStage lang={lang} />
           </div>
         </section>
 
@@ -477,54 +435,58 @@ export function HomeCB({ offer }: { offer: OfferState }) {
         <section className="wrap block" id="trust" aria-labelledby="trust-h">
           <div className="sec-head center">
             <p className="label" data-reveal="">
-              Why trust us
+              {t('trust.label')}
             </p>
-            <Split className="h-l" id="trust-h" text="Checked before you ever see them." />
+            <Split className="h-l" id="trust-h" text={t('trust.h')} />
           </div>
           <ul className="tiles">
             <li className="tile-stat mint" data-reveal="">
               <span className="ic" aria-hidden="true">✓</span>
               <strong data-count={checks.length}>{checks.length}</strong>
-              <span>Checks on every studio, each with a named source — from GST filings to finished sites we have stood in.</span>
+              <span>{t('trust.checks')}</span>
             </li>
             <li className="tile-stat lilac" data-reveal="" style={{ ['--d' as string]: '80ms' }}>
               <span className="ic" aria-hidden="true">◎</span>
               <strong>
                 <span data-count={50}>50</span>+
               </strong>
-              <span>Of a studio&rsquo;s own quotations read before it is listed, so every price you see is its own.</span>
+              <span>{t('trust.quotes')}</span>
             </li>
             <li className="tile-stat sand" data-reveal="" style={{ ['--d' as string]: '160ms' }}>
               <span className="ic" aria-hidden="true">₹</span>
               <strong>0</strong>
-              <span>Paid by you for the brief, the matches, the quotes or the comparison.</span>
+              <span>{t('trust.zero')}</span>
             </li>
             <li className="tile-stat wide peach" data-reveal="" id="architect">
               <div>
                 <span className="ic" aria-hidden="true">☏</span>
-                <h3>Your architect is on our payroll. Never a studio&rsquo;s.</h3>
+                <h3>{t('arch.h')}</h3>
                 <p>
-                  A 30-minute call with {ARCHITECT.name}. She reads your brief and every quote before it,
-                  tells you where the studios really differ, and sets up the meeting with the one you choose.
+                  {t('arch.p', { name: ARCHITECT.name })}
                 </p>
               </div>
               <div className="offer-box">
+                {/* English straight from offer.ts, as before; Hindi and Marathi rebuilt from the same facts. */}
                 {offer.free ? (
                   <p className="offer">
-                    <s aria-label={`Usually ${offer.price}`}>{offer.price}</s>
-                    <strong>Free</strong>
+                    <s aria-label={t('offer.usually', { price: offer.price })}>{offer.price}</s>
+                    <strong>{t('offer.free')}</strong>
                     <span>
-                      {offer.headline.replace(/^Free /, '')}
-                      {offer.remaining ? ` · ${offer.remaining}` : ''}
+                      {lang === 'en'
+                        ? offer.headline.replace(/^Free /, '')
+                        : t('offer.forFirst', { n: FREE_CALLS.toLocaleString('en-IN') })}
+                      {offer.remaining
+                        ? ` · ${lang === 'en' ? offer.remaining : t(freeLeft === 1 ? 'offer.left1' : 'offer.leftN', { n: freeLeft })}`
+                        : ''}
                     </span>
                   </p>
                 ) : (
                   <p className="offer">
-                    <span>{offer.headline}</span>
+                    <span>{lang === 'en' ? offer.headline : t('offer.paid', { price: offer.price })}</span>
                   </p>
                 )}
                 <Pill href="/expert" arrow>
-                  Book your expert call
+                  {t('cta.expert')}
                 </Pill>
               </div>
             </li>
@@ -535,22 +497,21 @@ export function HomeCB({ offer }: { offer: OfferState }) {
         <section className="wrap block" id="styles" aria-labelledby="pf-h">
           <div className="sec-head center">
             <p className="label" data-reveal="">
-              Styles · pick yours in the brief
+              {t('styles.label')}
             </p>
-            <Split className="h-l" id="pf-h" text="Twelve styles. Which one is your home?" />
+            <Split className="h-l" id="pf-h" text={t('styles.h')} />
             <p className="lede" data-reveal="">
-              The same photographs you pick from in the brief. Studios&rsquo; own finished homes take their
-              place here as they join.
+              {t('styles.lede')}
             </p>
           </div>
-          <div className="filters" role="group" aria-label="Filter by room" data-reveal="">
+          <div className="filters" role="group" aria-label={t('filter.aria')} data-reveal="">
             {(Object.keys(ROOM_WORDS) as GalleryRoom[]).map((r) => (
               <button key={r} type="button" data-filter={r} aria-pressed={r === 'LIVING'}>
-                {ROOM_WORDS[r]}s <sup>{counts[r]}</sup>
+                {t(`rooms.${r}`)} <sup>{counts[r]}</sup>
               </button>
             ))}
             <button type="button" data-filter="all" aria-pressed="false">
-              All <sup>{counts.all}</sup>
+              {t('filter.all')} <sup>{counts.all}</sup>
             </button>
           </div>
           <ul className="gallery">
@@ -563,16 +524,19 @@ export function HomeCB({ offer }: { offer: OfferState }) {
                 data-reveal=""
                 style={{ ['--d' as string]: `${(i % 3) * 90}ms` }}
               >
-                <Link className="g-img" href="/quiz" data-cursor-label="" aria-label={`Start your brief — ${STYLE_LABELS[tag]}`}>
+                <Link className="g-img" href="/quiz" data-cursor-label="" aria-label={t('gallery.aria', { style: STYLE_LABELS[tag] })}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img(photo, 720, 900)} alt={photo.alt} loading="lazy" decoding="async" />
                 </Link>
                 <div className="g-meta">
                   <h3>{STYLE_LABELS[tag]}</h3>
-                  <span>{ROOM_WORDS[room]}</span>
+                  <span>{t(`room.${room}`)}</span>
                 </div>
-                <p>{STYLE_DEFINITIONS[tag].charAt(0).toUpperCase() + STYLE_DEFINITIONS[tag].slice(1)}.</p>
-                <span className="credit">Photo: {photo.photographer} / Unsplash</span>
+                <p>
+                  {L(STYLE_DEFINITIONS[tag].charAt(0).toUpperCase() + STYLE_DEFINITIONS[tag].slice(1), dict[`style.${tag}`])}
+                  {lang === 'hi' ? '।' : '.'}
+                </p>
+                <span className="credit">{t('gallery.credit', { name: photo.photographer })}</span>
               </li>
             ))}
           </ul>
@@ -582,13 +546,14 @@ export function HomeCB({ offer }: { offer: OfferState }) {
         <section className="wrap block" id="levels" aria-labelledby="lv-h">
           <div className="sec-head">
             <p className="label" data-reveal="">
-              Finish levels · per sq ft of carpet, before GST
+              {t('levels.label')}
             </p>
-            <Split className="h-l" id="lv-h" text="Three levels, described in materials rather than adjectives." />
+            <Split className="h-l" id="lv-h" text={t('levels.h')} />
           </div>
           <div className="bands">
             {TIERS.map((tier, i) => {
               const band = TIER[tier];
+              const words = FINISH_TX[tier];
               return (
                 <article
                   key={tier}
@@ -603,13 +568,13 @@ export function HomeCB({ offer }: { offer: OfferState }) {
                   <span className="per">
                     {perSqftLabel(tier).replace(' and up', '+')} <small>/ sq ft</small>
                   </span>
-                  <p className="promise">{band.promise}</p>
+                  <p className="promise">{L(band.promise, words.promise)}</p>
                   <ul>
-                    {band.materials.map((m) => (
-                      <li key={m}>{m}</li>
+                    {band.materials.map((m, j) => (
+                      <li key={m}>{L(m, words.materials[j])}</li>
                     ))}
                   </ul>
-                  <p className="not">{band.notFor.split('. ')[0]}.</p>
+                  <p className="not">{firstSentence(lang, L(band.notFor, words.notFor))}</p>
                 </article>
               );
             })}
@@ -620,29 +585,25 @@ export function HomeCB({ offer }: { offer: OfferState }) {
         <section className="wrap block" id="benefits" aria-labelledby="ben-h">
           <div className="sec-head">
             <p className="label" data-reveal="">
-              One Interiors benefits
+              {t('ben.label')}
             </p>
-            <Split className="h-l" id="ben-h" text="Everything you get when you do up your home with us." />
+            <Split className="h-l" id="ben-h" text={t('ben.h')} />
             <p className="lede" data-reveal="">
-              The first five change how you choose a studio. The rest come only when you book through us —
-              none of it comes with ringing a studio directly.
+              {t('ben.lede')}
             </p>
           </div>
 
           <p className="ben-label" data-reveal="">
-            <span>Choosing with confidence</span>
+            <span>{t('ben.choosing')}</span>
             <span>05</span>
           </p>
           <ul className="ben-core">
             {[
-              [`${VERIFIED_STUDIOS} verified studios`, benefit('verified').terms],
-              ['A quote in seconds', benefit('instant-quote').terms],
-              ['Quotes compared in plain language', benefit('plain-compare').terms],
-              [
-                'A comparison brief you can read',
-                'A one-page summary of how your quotes differ and why, to read with your family or print.',
-              ],
-              [`A 30-minute call with ${ARCHITECT.name}`, benefit('unbiased-expert').terms],
+              [t('ben.verified', { n: VERIFIED_STUDIOS }), benefit('verified').terms],
+              [t('ben.quote'), benefit('instant-quote').terms],
+              [t('ben.compare'), benefit('plain-compare').terms],
+              [t('ben.brief'), t('ben.briefP')],
+              [t('ben.call', { name: ARCHITECT.name }), benefit('unbiased-expert').terms],
             ].map(([h, p], i) => (
               <li key={h} data-reveal="" style={{ ['--d' as string]: `${i * 60}ms` }}>
                 <span className="n">0{i + 1}</span>
@@ -653,82 +614,82 @@ export function HomeCB({ offer }: { offer: OfferState }) {
           </ul>
 
           <p className="ben-label" data-reveal="">
-            <span>Only when you book through us</span>
+            <span>{t('ben.only')}</span>
             <span>07</span>
           </p>
           <ul className="bento">
             <li data-reveal="" className="b-dark wide">
               <span className="fig">₹50,000</span>
-              <span className="tag">Up to · cashback</span>
-              <h3>Cashback on your project</h3>
+              <span className="tag">{t('bento.cashTag')}</span>
+              <h3>{t('bento.cashH')}</h3>
               <p>{benefit('cashback').terms}</p>
             </li>
             <li data-reveal="" className="b-mint" style={{ ['--d' as string]: '60ms' }}>
               <span className="fig">₹10,000</span>
               <span className="tag">OneReferrals</span>
-              <h3>Refer a friend</h3>
+              <h3>{t('bento.refH')}</h3>
               <p>{benefit('referral').terms}</p>
             </li>
             <li data-reveal="" className="b-sand" style={{ ['--d' as string]: '120ms' }}>
-              <span className="fig fig-sm">Curated</span>
-              <span className="tag">Discount</span>
-              <h3>One Interiors curated discount</h3>
+              <span className="fig fig-sm">{t('bento.discFig')}</span>
+              <span className="tag">{t('bento.discTag')}</span>
+              <h3>{t('bento.discH')}</h3>
               <p>{benefit('curated-discount').terms}</p>
             </li>
             <li data-reveal="" className="b-light wide">
               <div className="trk" aria-hidden="true">
                 <div className="trk-top">
                   <span>
-                    <b>Project tracker</b> · an example
+                    <b>{t('bento.trk')}</b> {t('bento.trkExample')}
                   </span>
-                  <span>Day 38 of 75</span>
+                  <span>{t('bento.trkDay')}</span>
                 </div>
                 <ol className="trk-stages">
-                  {['Design', 'Factory', 'Site', 'Install', 'Handover'].map((s, i) => (
+                  {(['Design', 'Factory', 'Site', 'Install', 'Handover'] as const).map((s, i) => (
                     <li key={s} className={i < 2 ? 'done' : i === 2 ? 'now' : ''}>
                       <span className="dot">{i < 2 ? <Tick /> : null}</span>
-                      {s}
+                      {t(`bento.stage.${s}`)}
                     </li>
                   ))}
                 </ol>
                 <div className="trk-status">
-                  <span>Kitchen carcasses delivered to site</span>
-                  <span className="ok">On schedule</span>
+                  <span>{t('bento.trkStatus')}</span>
+                  <span className="ok">{t('bento.trkOk')}</span>
                 </div>
               </div>
-              <span className="tag">Tracking</span>
-              <h3>Project tracker</h3>
+              <span className="tag">{t('bento.trkTag')}</span>
+              <h3>{t('bento.trk')}</h3>
               <p>{benefit('tracker').terms}</p>
             </li>
             <li data-reveal="" className="b-photo" style={{ ['--d' as string]: '60ms' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/landing/hero.webp" alt="" loading="lazy" />
               <div className="b-photo-copy">
-                <span className="tag">Film · worth ₹20,000</span>
-                <h3>Cinematic film of your home</h3>
+                <span className="tag">{t('bento.filmTag')}</span>
+                <h3>{t('bento.filmH')}</h3>
                 <p>{benefit('cinematic-shoot').terms}</p>
               </div>
             </li>
             <li data-reveal="" className="b-lilac">
               <span className="fig fig-sm">OneHamper</span>
-              <span className="tag">Handover · worth ₹5,000</span>
-              <h3>A gift at handover</h3>
+              <span className="tag">{t('bento.hamperTag')}</span>
+              <h3>{t('bento.hamperH')}</h3>
               <p>{benefit('onehamper').terms}</p>
             </li>
             <li data-reveal="" className="b-peach" style={{ ['--d' as string]: '60ms' }}>
-              <span className="fig fig-sm">Cab</span>
-              <span className="tag">Travel · worth ₹1,000</span>
-              <h3>Free cab to the studio</h3>
+              <span className="fig fig-sm">{t('bento.cabFig')}</span>
+              <span className="tag">{t('bento.cabTag')}</span>
+              <h3>{t('bento.cabH')}</h3>
               <p>{benefit('free-cab').terms}</p>
             </li>
           </ul>
 
           <div className="ben-worth" data-reveal="">
             <strong>
-              Worth up to <em>{worth}</em> — only through us.
+              {t('worth.pre')} <em>{worth}</em> {t('worth.post')}
             </strong>
             <Pill href="/quiz" arrow>
-              Find your designer
+              {t('cta.find')}
             </Pill>
           </div>
         </section>
@@ -737,24 +698,24 @@ export function HomeCB({ offer }: { offer: OfferState }) {
         <section className="panel panel-dark" id="faq" aria-labelledby="faq-h">
           <div className="wrap faq-grid">
             <div className="faq-side">
-              <Split className="h-l" id="faq-h" text="The awkward questions first." />
+              <Split className="h-l" id="faq-h" text={t('faq.h')} />
               <p data-reveal="">
-                Still unsure? Write to us at <a href="mailto:hello@oneinteriors.in">hello@oneinteriors.in</a>{' '}
-                and one of our architects will reply.
+                {t('faq.pre')} <a href="mailto:hello@oneinteriors.in">hello@oneinteriors.in</a>{' '}
+                {t('faq.post')}
               </p>
             </div>
             <div className="faq-list">
               {FAQ.map((f, i) => (
-                <details key={f.q} data-reveal="" style={{ ['--d' as string]: `${i * 60}ms` }} open={i === 0}>
+                <details key={f} data-reveal="" style={{ ['--d' as string]: `${i * 60}ms` }} open={i === 0}>
                   <summary>
-                    {f.q}
+                    {t(`faq.${f}.q`)}
                     <span className="pm" aria-hidden="true">
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                       </svg>
                     </span>
                   </summary>
-                  <p className="ans">{f.a}</p>
+                  <p className="ans">{t(`faq.${f}.a`, { name: ARCHITECT.name })}</p>
                 </details>
               ))}
             </div>
@@ -765,11 +726,11 @@ export function HomeCB({ offer }: { offer: OfferState }) {
         <section className="outro" id="start" aria-labelledby="start-h">
           <div className="glow" aria-hidden="true" />
           <div className="wrap outro-in">
-            <Split className="h-xl" id="start-h" text="Four minutes. Then a quote you can read." />
-            <p data-reveal="">No phone call, and nothing payable by you for the brief, your matches or your quotes.</p>
+            <Split className="h-xl" id="start-h" text={t('outro.h')} />
+            <p data-reveal="">{t('outro.p')}</p>
             <div data-reveal="" style={{ ['--d' as string]: '150ms' }}>
               <Pill href="/quiz" tone="light" arrow size="lg">
-                Find your designer
+                {t('cta.find')}
               </Pill>
             </div>
           </div>
@@ -783,24 +744,24 @@ export function HomeCB({ offer }: { offer: OfferState }) {
               <a className="foot-pill" href="mailto:hello@oneinteriors.in">
                 hello@oneinteriors.in
               </a>
-              <span className="foot-pill">Tue–Sun · 11:00–19:00 IST</span>
-              <p>Interior studios in Pune, checked fifteen ways and quoted line by line.</p>
+              <span className="foot-pill">{t('foot.hours')}</span>
+              <p>{t('foot.p')}</p>
             </div>
-            <nav className="foot-links" aria-label="Footer">
-              <a href="#how">How it works</a>
-              <Link href="/apply">Apply to be listed</Link>
-              <a href="#styles">Styles</a>
-              <Link href="/verification">The fifteen checks</Link>
-              <a href="#benefits">Benefits</a>
-              <Link href="/studio">Studio sign-in</Link>
-              <a href="#faq">FAQ</a>
-              <Link href="/expert">Book your expert call</Link>
+            <nav className="foot-links" aria-label={t('foot.aria')}>
+              <a href="#how">{t('nav.how')}</a>
+              <Link href="/apply">{t('foot.apply')}</Link>
+              <a href="#styles">{t('nav.styles')}</a>
+              <Link href="/verification">{t('foot.checks')}</Link>
+              <a href="#benefits">{t('nav.benefits')}</a>
+              <Link href="/studio">{t('foot.studio')}</Link>
+              <a href="#faq">{t('nav.faq')}</a>
+              <Link href="/expert">{t('cta.expert')}</Link>
             </nav>
           </div>
           <div className="foot-bottom">
-            <span>© 2026 One Interiors · Pune, Maharashtra</span>
-            <nav aria-label="Legal">
-              <Link href="/privacy">Privacy</Link>
+            <span>{t('foot.copy')}</span>
+            <nav aria-label={t('foot.legal')}>
+              <Link href="/privacy">{t('foot.privacy')}</Link>
             </nav>
           </div>
         </div>

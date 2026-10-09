@@ -74,6 +74,9 @@ import { formatINRCompact } from '@/lib/money';
 import { Drawer, Pill, PillNote } from '@/components/oi/Surfaces';
 import { studioProof, type ProofChip } from '@/modules/studio/proof';
 import type { PortfolioProject, VerificationCheck } from '@/modules/studio/types';
+import { useLang, useSiteT } from '@/components/app/i18n';
+import { MATCH_DICT, type MatchKey } from '@/modules/i18n/site/match';
+import { CHECK_TX, lbl } from '@/modules/i18n/site/labels';
 
 /**
  * One check, one pill.
@@ -83,16 +86,22 @@ import type { PortfolioProject, VerificationCheck } from '@/modules/studio/types
  * but it is a second sentence, and the pill has room for one.
  */
 function Check({ chip, i }: { chip: ProofChip; i: number }) {
+  const t = useSiteT(MATCH_DICT);
+  const lang = useLang();
+  const chipKey = `chip.${chip.type}` as const;
+  const text = chipKey in MATCH_DICT ? t(chipKey as MatchKey) : chip.text;
+  const label = chip.type in CHECK_TX ? lbl(lang, CHECK_TX, chip.type) : chip.label;
   return (
     <Pill
       i={i}
-      text={chip.text}
-      title={chip.source ? `${chip.label} — ${chip.source}` : chip.label}
+      text={text}
+      title={chip.source ? `${label} — ${chip.source}` : label}
     />
   );
 }
 
 function Plate({ project, likeYours }: { project: PortfolioProject; likeYours: boolean }) {
+  const t = useSiteT(MATCH_DICT);
   const cover = project.images[0];
   return (
     <article className="q-plate">
@@ -103,20 +112,20 @@ function Plate({ project, likeYours }: { project: PortfolioProject; likeYours: b
           // eslint-disable-next-line @next/next/no-img-element
           <img src={cover} alt="" className="absolute inset-0 h-full w-full object-cover" />
         ) : (
-          <span className="oi-label">Photo to come</span>
+          <span className="oi-label">{t('wings.photo')}</span>
         )}
         {cover && project.isRender ? (
-          <span className="oi-label absolute bottom-1.5 left-1.5 rounded-full bg-[var(--card)] px-2 py-0.5">Render</span>
+          <span className="oi-label absolute bottom-1.5 left-1.5 rounded-full bg-[var(--card)] px-2 py-0.5">{t('wings.render')}</span>
         ) : null}
       </div>
-      {likeYours ? <p className="oi-label m-0 mt-2 text-[var(--acc-ink)]">Like your home</p> : null}
+      {likeYours ? <p className="oi-label m-0 mt-2 text-[var(--acc-ink)]">{t('wings.likeYours')}</p> : null}
       <p className="oi-num m-0 mt-2.5 text-[13px] font-semibold leading-tight text-[var(--ink)]">
         {project.title}
       </p>
       <p className="oi-label m-0 mt-1.5">
         {[
           project.valuePaise ? formatINRCompact(project.valuePaise) : null,
-          project.durationDays ? `${project.durationDays} days` : null,
+          project.durationDays ? t('wings.days', { n: project.durationDays }) : null,
         ]
           .filter(Boolean)
           .join('  ·  ')}
@@ -137,6 +146,7 @@ export function ProjectWings({
   /** Project ids most like this home, best first — shown first (match@2 similar work). */
   likeYours?: string[];
 }) {
+  const t = useSiteT(MATCH_DICT);
   const similar = new Set(likeYours);
   const projects = [
     ...likeYours.map((id) => all.find((p) => p.id === id)).filter((p): p is PortfolioProject => Boolean(p)),
@@ -155,7 +165,7 @@ export function ProjectWings({
     <>
       {/* ── Inner layer: their work ── */}
       {left.length > 0 ? (
-        <Drawer side="left" label={`Work by ${studioName}`}>
+        <Drawer side="left" label={t('wings.work', { studio: studioName })}>
           {left.map((p) => (
             <Plate key={p.id} project={p} likeYours={similar.has(p.id)} />
           ))}
@@ -163,7 +173,7 @@ export function ProjectWings({
       ) : null}
 
       {right.length > 0 ? (
-        <Drawer side="right" label={`More work by ${studioName}`}>
+        <Drawer side="right" label={t('wings.moreWork', { studio: studioName })}>
           {right.map((p) => (
             <Plate key={p.id} project={p} likeYours={similar.has(p.id)} />
           ))}
@@ -172,7 +182,7 @@ export function ProjectWings({
 
       {/* ── Outer layer: what we checked ── */}
       {proof.left.length > 0 ? (
-        <Drawer as="ul" side="left" layer="far" label={`Checks ${studioName} has passed`}>
+        <Drawer as="ul" side="left" layer="far" label={t('wings.checks', { studio: studioName })}>
           {proof.left.map((chip, i) => (
             <Check key={chip.type} chip={chip} i={i} />
           ))}
@@ -189,7 +199,7 @@ export function ProjectWings({
               "eight checks exist"; this is the only thing on screen that stops
               it doing so. */}
           {proof.more > 0 ? (
-            <PillNote i={proof.right.length}>+{proof.more} more {proof.more === 1 ? 'check' : 'checks'} on their profile</PillNote>
+            <PillNote i={proof.right.length}>{t(proof.more === 1 ? 'wings.more1' : 'wings.moreN', { n: proof.more })}</PillNote>
           ) : null}
         </Drawer>
       ) : null}

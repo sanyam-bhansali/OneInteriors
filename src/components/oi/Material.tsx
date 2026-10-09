@@ -35,6 +35,8 @@ import { MATERIAL_PHOTOS } from '@/data/material-photos';
 import { useEffect, useState } from 'react';
 import { splitSpec, type Material } from '@/modules/materials/glossary';
 import { MaterialArt } from './MaterialArt';
+import { useLang, useSiteT } from '@/components/app/i18n';
+import { OI_DICT } from '@/modules/i18n/site/oi';
 
 /**
  * A spec string with its known terms marked.
@@ -52,6 +54,7 @@ export function Spec({
   onPick: (m: Material) => void;
   className?: string;
 }) {
+  const t = useSiteT(OI_DICT);
   const parts = splitSpec(text);
 
   return (
@@ -64,7 +67,7 @@ export function Spec({
             key={i}
             type="button"
             onClick={() => onPick(part.material)}
-            title={`What ${part.material.name} means`}
+            title={t('mat.what', { name: part.material.name })}
             className="cursor-pointer border-0 bg-transparent p-0 text-inherit underline decoration-dotted decoration-from-font underline-offset-[3px] hover:decoration-solid"
             style={{ textDecorationColor: 'var(--ink2)' }}
           >
@@ -115,13 +118,15 @@ export function MaterialCard({
   material: Material;
   compact?: boolean;
 }) {
+  const t = useSiteT(OI_DICT);
+  const lang = useLang();
   const [long, setLong] = useState(false);
 
   return (
     <div>
       <div className="mb-4 flex items-start gap-5">
         <div className="w-[104px] flex-none sm:w-[124px]">
-          <MaterialArt art={m.art} />
+          <MaterialArt art={m.art} lang={lang} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -143,7 +148,7 @@ export function MaterialCard({
               {m.money}
             </span>
             <span className="oi-label m-0">
-              {m.moneyIs === 'saves' ? 'to skip it' : 'either way'}
+              {m.moneyIs === 'saves' ? t('mat.saves') : t('mat.either')}
             </span>
           </p>
         </div>
@@ -159,7 +164,7 @@ export function MaterialCard({
             aria-expanded={long}
             className="cursor-pointer border-0 bg-transparent p-0 text-[13px] text-[var(--ink2)] underline hover:text-[var(--ink)]"
           >
-            {long ? 'Close' : 'The long version'}
+            {long ? t('mat.close') : t('mat.long')}
           </button>
           {long ? (
             <p className="oi-swap m-0 mt-2.5 max-w-[68ch] text-[13.5px] leading-[1.6] text-[var(--ink2)]">
@@ -185,6 +190,7 @@ export function MaterialPanel({
   material: Material | null;
   onClose: () => void;
 }) {
+  const t = useSiteT(OI_DICT);
   useEffect(() => {
     if (!m) return;
     const onKey = (e: KeyboardEvent) => {
@@ -198,7 +204,7 @@ export function MaterialPanel({
 
   return (
     <aside
-      aria-label={`What ${m.name} means`}
+      aria-label={t('mat.what', { name: m.name })}
       className="oi-rise-in fixed inset-x-0 bottom-0 z-30 max-h-[62vh] overflow-y-auto border-t border-[var(--ink)] bg-[var(--card)]"
       style={{ boxShadow: '0 -24px 50px -34px rgba(44,38,36,.5)' }}
     >
@@ -216,7 +222,7 @@ export function MaterialPanel({
                   loading="lazy"
                 />
                 <figcaption className="mt-1 text-[11px] text-[var(--ink2)]">
-                  Photo: {MATERIAL_PHOTOS[m.id]!.photographer} / Unsplash
+                  {t('mat.photo', { name: MATERIAL_PHOTOS[m.id]!.photographer })}
                 </figcaption>
               </figure>
             ) : null}
@@ -227,7 +233,7 @@ export function MaterialPanel({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close the explanation"
+            aria-label={t('mat.closeAria')}
             className="-mr-2 -mt-2 flex h-11 w-11 flex-none cursor-pointer items-center justify-center border-0 bg-transparent text-[20px] leading-none text-[var(--ink2)] hover:text-[var(--ink)]"
           >
             ✕

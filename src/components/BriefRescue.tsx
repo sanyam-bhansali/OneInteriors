@@ -39,6 +39,8 @@ import { Container, Button } from '@/components/ui';
 import { loadBrief } from '@/modules/brief/store';
 import { isBriefComplete } from '@/modules/brief/types';
 import { saveBriefAction } from '@/app/quiz/actions';
+import { useSiteT } from '@/components/app/i18n';
+import { EXPERT_DICT } from '@/modules/i18n/site/expert';
 
 type Phase = 'checking' | 'restoring' | 'empty' | 'failed';
 
@@ -97,10 +99,12 @@ export function RescueSettled() {
 
 export function BriefRescue({
   /** What the customer was trying to reach. Shown so the wait has a reason. */
-  destination = 'your quotes',
+  destination,
 }: {
   destination?: string;
 }) {
+  const t = useSiteT(EXPERT_DICT);
+  const dest = destination ?? t('rescue.defaultDest');
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>('checking');
 
@@ -156,11 +160,10 @@ export function BriefRescue({
       <main className="py-24">
         <Container size="narrow">
           <p className="m-0 font-[family-name:var(--font-mono)] text-[12px] uppercase tracking-[0.12em] text-[var(--color-ink-3)]">
-            Picking up your brief…
+            {t('rescue.picking')}
           </p>
           <p className="m-0 mt-4 max-w-[46ch] text-[16px] leading-relaxed text-[var(--color-ink-2)]">
-            Your answers were saved in this browser. We are attaching them to your account, then
-            {' '}{destination} will load.
+            {t('rescue.pickingBody', { dest })}
           </p>
         </Container>
       </main>
@@ -171,10 +174,9 @@ export function BriefRescue({
     return (
       <main className="py-20">
         <Container size="narrow">
-          <h1 className="h1 mb-4">We have your answers, but we could not save them just now.</h1>
+          <h1 className="h1 mb-4">{t('rescue.failedH1')}</h1>
           <p className="m-0 mb-8 max-w-[54ch] text-[17px] leading-relaxed text-[var(--color-ink-2)]">
-            Nothing is lost — they are still in this browser. This is our side, not yours. Try
-            again in a moment, and if it keeps happening, tell us and we will sort it out.
+            {t('rescue.failedBody')}
           </p>
           <div className="flex flex-wrap gap-4">
             <Button
@@ -184,10 +186,10 @@ export function BriefRescue({
               }}
               size="lg"
             >
-              Try again
+              {t('rescue.retry')}
             </Button>
             <Button href="/match" variant="secondary" size="lg">
-              Back to your matches
+              {t('rescue.back')}
             </Button>
           </div>
         </Container>
@@ -198,14 +200,12 @@ export function BriefRescue({
   return (
     <main className="py-20">
       <Container size="narrow">
-        <h1 className="h1 mb-4">We do not have your brief yet.</h1>
+        <h1 className="h1 mb-4">{t('rescue.emptyH1')}</h1>
         <p className="m-0 mb-8 max-w-[54ch] text-[17px] leading-relaxed text-[var(--color-ink-2)]">
-          Either it was not finished, or it was answered in a different browser — briefs are held
-          per browser until you sign in. About four minutes, and {destination} follow
-          immediately.
+          {t('rescue.emptyBody', { dest })}
         </p>
         <Button href="/quiz" size="lg">
-          Answer the questions
+          {t('rescue.answer')}
         </Button>
       </Container>
     </main>

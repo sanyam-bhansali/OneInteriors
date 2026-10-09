@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * "Your home, assembling" (build queue item 26): the brief's side panel as a
  * picture of their home rather than a list. The rooms of their configuration
@@ -11,13 +13,16 @@ import { STYLE_PALETTES } from '@/modules/brief/palettes';
 import { BEDROOMS } from '@/modules/quotation/estimate';
 import { selectionOf, scopeCandidates } from '@/modules/quotation/scope';
 import { monthLabel } from '@/modules/brief/possession';
+import { useSiteT } from '@/components/app/i18n';
+import { OI_DICT } from '@/modules/i18n/site/oi';
 
 const NEUTRAL = { wall: '#ECE8E1', floor: '#D8D1C5', accent: '#8C8A84' };
 
 export function HomeSketch({ brief }: { brief: Brief }) {
+  const t = useSiteT(OI_DICT);
   if (!brief.propertyType) {
     return (
-      <p className="m-0 text-[13px] text-[var(--ink2)]">Your home appears here as you answer.</p>
+      <p className="m-0 text-[13px] text-[var(--ink2)]">{t('sketch.empty')}</p>
     );
   }
   const bhk = BEDROOMS[brief.propertyType];
@@ -25,33 +30,35 @@ export function HomeSketch({ brief }: { brief: Brief }) {
   const fill = palette ?? NEUTRAL;
   const inWork = new Set(brief.scope ? scopeCandidates(bhk, selectionOf(brief)).map((i) => i.room) : []);
   const rooms: { key: string; label: string; x: number; y: number; w: number; h: number }[] = [
-    { key: 'MASTER_BEDROOM', label: 'Master', x: 0, y: 0, w: 40, h: 34 },
-    ...(bhk >= 2 ? [{ key: 'SECOND_BEDROOM', label: 'Bed 2', x: 0, y: 34, w: 40, h: 30 }] : []),
-    ...(bhk >= 3 ? [{ key: 'THIRD_BEDROOM', label: 'Bed 3', x: 0, y: 64, w: 40, h: 36 }] : []),
-    { key: 'LIVING_DINING', label: 'Living & dining', x: 40, y: 0, w: 60, h: 62 },
-    { key: 'BATHROOMS', label: 'Bath', x: 40, y: 62, w: 24, h: 38 },
-    { key: 'KITCHEN', label: 'Kitchen', x: 64, y: 62, w: 36, h: 38 },
+    { key: 'MASTER_BEDROOM', label: t('sketch.master'), x: 0, y: 0, w: 40, h: 34 },
+    ...(bhk >= 2 ? [{ key: 'SECOND_BEDROOM', label: t('sketch.bed2'), x: 0, y: 34, w: 40, h: 30 }] : []),
+    ...(bhk >= 3 ? [{ key: 'THIRD_BEDROOM', label: t('sketch.bed3'), x: 0, y: 64, w: 40, h: 36 }] : []),
+    { key: 'LIVING_DINING', label: t('sketch.living'), x: 40, y: 0, w: 60, h: 62 },
+    { key: 'BATHROOMS', label: t('sketch.bath'), x: 40, y: 62, w: 24, h: 38 },
+    { key: 'KITCHEN', label: t('sketch.kitchen'), x: 64, y: 62, w: 36, h: 38 },
   ];
   const h = brief.household;
   const people = h
     ? [
-        `${h.adults} adult${h.adults === 1 ? '' : 's'}`,
-        h.children ? `${h.children} child${h.children === 1 ? '' : 'ren'}` : null,
-        h.elderly ? `${h.elderly} elderly` : null,
-        h.pets ? 'pets' : null,
-        h.worksFromHome ? 'works from home' : null,
+        t(h.adults === 1 ? 'sketch.adult' : 'sketch.adults', { n: h.adults }),
+        h.children ? t(h.children === 1 ? 'sketch.child' : 'sketch.children', { n: h.children }) : null,
+        h.elderly ? t('sketch.elderly', { n: h.elderly }) : null,
+        h.pets ? t('sketch.pets') : null,
+        h.worksFromHome ? t('sketch.wfh') : null,
       ].filter(Boolean)
     : [];
   const keys =
     brief.possessionStatus === 'HAVE_KEYS'
-      ? 'Keys in hand'
+      ? t('sketch.keysInHand')
       : brief.possessionStatus === 'EXPECTED'
-        ? `Keys ${monthLabel(brief.possessionOn) ?? 'expected'}`
+        ? monthLabel(brief.possessionOn)
+          ? t('sketch.keysOn', { month: monthLabel(brief.possessionOn)! })
+          : t('sketch.keysExpected')
         : null;
 
   return (
     <figure className="m-0">
-      <svg viewBox="0 0 100 100" className="block w-full" role="img" aria-label={`A sketch of your ${bhk} BHK`}>
+      <svg viewBox="0 0 100 100" className="block w-full" role="img" aria-label={t('sketch.aria', { bhk })}>
         {rooms.map((r) => {
           const on = !brief.scope || inWork.has(r.key as never);
           return (

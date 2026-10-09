@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * The frame every customer screen sits in, and the spine that runs down it.
  *
@@ -23,6 +25,8 @@
  * and nothing is hidden to manufacture curiosity.
  */
 
+import { SiteLangPicker, useSiteT } from '@/components/app/i18n';
+import { CHROME_DICT } from '@/modules/i18n/site/chrome';
 import Link from 'next/link';
 import { Mark } from '@/components/brand';
 import { rosterIsReal } from '@/lib/env';
@@ -55,6 +59,7 @@ export type ChapterId = (typeof CHAPTERS)[number]['id'];
  * quote does not need the brand asserting itself above it.
  */
 export function AppHeader() {
+  const t = useSiteT(CHROME_DICT);
   return (
     <header className="border-b border-[var(--line)] bg-[var(--card)] print:hidden">
       <Wrap>
@@ -62,7 +67,7 @@ export function AppHeader() {
           <Link
             href="/"
             className="flex items-center gap-2.5 no-underline"
-            aria-label="One Interiors, home"
+            aria-label={t('header.homeAria')}
           >
             <Mark className="h-[18px] w-[18px] text-[var(--ink)]" />
             <span className="oi-display text-[17px] leading-none text-[var(--ink)]">
@@ -71,17 +76,18 @@ export function AppHeader() {
           </Link>
 
           <nav className="flex items-center gap-5">
+            <SiteLangPicker />
             <Link
               href="/studios"
               className="hidden text-[13.5px] text-[var(--ink2)] no-underline hover:text-[var(--ink)] sm:inline"
             >
-              Studios
+              {t('header.studios')}
             </Link>
             <Link
               href="/verification"
               className="hidden text-[13.5px] text-[var(--ink2)] no-underline hover:text-[var(--ink)] sm:inline"
             >
-              How we verify
+              {t('header.verify')}
             </Link>
             {/* Not a terracotta button. The one high-intent action belongs to
                 the screen the customer is on — a second one up here competes
@@ -91,7 +97,7 @@ export function AppHeader() {
               href="/account"
               className="border-b border-[var(--line)] pb-0.5 text-[13.5px] text-[var(--ink)] no-underline transition-colors hover:border-[var(--ink)]"
             >
-              Your project
+              {t('header.project')}
             </Link>
           </nav>
         </div>
@@ -123,10 +129,11 @@ export function Spine({
   at: ChapterId;
   facts?: SpineFact[];
 }) {
+  const t = useSiteT(CHROME_DICT);
   const known = new Map(facts.map((f) => [f.id, f.fact]));
 
   return (
-    <nav aria-label="Your project so far" className="border-b border-[var(--line)] bg-[var(--card)]">
+    <nav aria-label={t('spine.aria')} className="border-b border-[var(--line)] bg-[var(--card)]">
       <Wrap>
         {/* Scrolls sideways on a phone rather than wrapping to three rows —
             five chapters wrapped is a block of text, not a spine. */}
@@ -145,12 +152,12 @@ export function Spine({
                   className="mt-1.5 block text-[13.5px] font-medium"
                   style={{ color: here ? 'var(--ink)' : 'var(--ink2)' }}
                 >
-                  {chapter.name}
+                  {t(`spine.${chapter.id}`)}
                 </span>
                 {/* The fact, not a tick. A tick says "done"; the fact says
                     what you got for it. */}
                 <span className="oi-num mt-1 block text-[10.5px] uppercase tracking-[0.12em] text-[var(--ink2)]">
-                  {fact ?? (here ? 'reading now' : '—')}
+                  {fact ?? (here ? t('spine.readingNow') : '—')}
                 </span>
               </>
             );
@@ -195,6 +202,7 @@ export function Spine({
  * one publication.
  */
 export function AppFooter() {
+  const t = useSiteT(CHROME_DICT);
   return (
     <footer
       data-on-dark
@@ -209,19 +217,19 @@ export function AppFooter() {
               <span className="oi-display text-[18px] text-[#f4efe8]">One Interiors</span>
             </span>
             <p className="m-0 text-[13.5px] leading-[1.6] text-white/60">
-              Interior studios in Pune, checked fifteen ways and quoted line by line.
+              {t('footer.tagline')}
             </p>
           </div>
 
           <nav className="flex flex-col gap-2.5">
             <p className="oi-num m-0 mb-1 text-[10px] uppercase tracking-[0.16em] text-white/45">
-              Your project
+              {t('footer.project')}
             </p>
             {[
-              ['/quiz', 'Start the brief'],
-              ['/account', 'Everything so far'],
-              ['/studios', 'Studios'],
-              ['/verification', 'The fifteen checks'],
+              ['/quiz', t('footer.startBrief')],
+              ['/account', t('footer.everything')],
+              ['/studios', t('footer.studios')],
+              ['/verification', t('footer.checks')],
             ].map(([href, label]) => (
               <Link
                 key={href}
@@ -235,7 +243,7 @@ export function AppFooter() {
               href="/apply"
               className="mt-1.5 text-[14px] text-white/45 no-underline hover:text-white"
             >
-              For studios — apply to join
+              {t('footer.apply')}
             </Link>
           </nav>
         </div>
@@ -248,8 +256,7 @@ export function AppFooter() {
             direction to be wrong in. */}
         {!rosterIsReal() ? (
           <p className="m-0 mt-10 max-w-[74ch] border-t border-white/15 pt-6 text-[13px] leading-relaxed text-white/55">
-            Pre-launch build. The studios shown are placeholder records used to develop and review
-            the product — they are not real businesses and the registration numbers are not real.
+            {t('footer.prelaunch')}
           </p>
         ) : null}
       </Wrap>

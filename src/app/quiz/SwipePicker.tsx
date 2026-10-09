@@ -13,6 +13,8 @@ import { useEffect, useState } from 'react';
 import { motion, useReducedMotion, type PanInfo } from 'framer-motion';
 import { STYLE_LABELS, STYLE_TAGS, type StyleTag } from '@/modules/brief/types';
 import { stylePhotoFor, stylePhotoUrl, type PickerRoom } from '@/data/style-photos';
+import { useSiteT } from '@/components/app/i18n';
+import { QUIZ_DICT, fillParts } from '@/modules/i18n/site/quiz';
 
 const THRESHOLD = 90;
 
@@ -30,6 +32,7 @@ export function SwipePicker({
   onChange: (likes: StyleTag[]) => void;
 }) {
   const reduced = useReducedMotion();
+  const t = useSiteT(QUIZ_DICT);
   const deck = STYLE_TAGS.filter((t) => !exclude.includes(t));
   const [i, setI] = useState(0);
   const [likes, setLikes] = useState<StyleTag[]>(selected);
@@ -48,8 +51,10 @@ export function SwipePicker({
     return (
       <p className="rounded-[10px] bg-[var(--acc-wash)] px-4 py-3 text-[15px] text-[var(--ink2)]">
         {likes.length === 0
-          ? 'None of them — try the grid instead, or come back to it.'
-          : <>You picked <strong className="text-[var(--ink)]">{likes.map((t) => STYLE_LABELS[t]).join(', ')}</strong>.</>}
+          ? t('swipe.none')
+          : fillParts(t('swipe.picked'), {
+              styles: <strong className="text-[var(--ink)]">{likes.map((s) => STYLE_LABELS[s]).join(', ')}</strong>,
+            })}
       </p>
     );
   }
@@ -59,7 +64,7 @@ export function SwipePicker({
   return (
     <div className="mx-auto max-w-[26rem]">
       <p className="oi-num m-0 mb-2 text-[11px] uppercase tracking-[0.1em] text-[var(--ink2)]">
-        {i + 1} of {deck.length} · {likes.length} of {max} picked
+        {t('swipe.count', { i: i + 1, n: deck.length, k: likes.length, max })}
       </p>
       <motion.div
         key={tag}
@@ -83,14 +88,14 @@ export function SwipePicker({
           onClick={() => decide(false)}
           className="min-h-12 flex-1 cursor-pointer rounded-full border border-[var(--line)] bg-transparent text-[15px] font-semibold text-[var(--ink)]"
         >
-          ← Not me
+          {t('swipe.no')}
         </button>
         <button
           type="button"
           onClick={() => decide(true)}
           className="oi-cta min-h-12 flex-1 cursor-pointer border-0 text-[15px]"
         >
-          Yes, this →
+          {t('swipe.yes')}
         </button>
       </div>
     </div>
@@ -100,6 +105,7 @@ export function SwipePicker({
 /** Swipe on phones by default, the grid everywhere else; either can switch to the other. */
 export function SwipeOrGrid({ grid, swipe }: { grid: React.ReactNode; swipe: React.ReactNode }) {
   const [mode, setMode] = useState<'grid' | 'swipe' | null>(null);
+  const t = useSiteT(QUIZ_DICT);
   useEffect(() => {
     setMode(matchMedia('(pointer: coarse)').matches ? 'swipe' : 'grid');
   }, []);
@@ -112,7 +118,7 @@ export function SwipeOrGrid({ grid, swipe }: { grid: React.ReactNode; swipe: Rea
         onClick={() => setMode(current === 'swipe' ? 'grid' : 'swipe')}
         className="mt-3 cursor-pointer border-0 bg-transparent p-0 text-[13px] text-[var(--ink2)] underline"
       >
-        {current === 'swipe' ? 'See them all at once instead' : 'Swipe through them instead'}
+        {current === 'swipe' ? t('swipe.toGrid') : t('swipe.toSwipe')}
       </button>
     </div>
   );

@@ -44,9 +44,11 @@ import { DUR, EASE_OUT, riseCard } from '@/components/oi/motion';
 import { Glass, revealProps } from '@/components/oi/Surfaces';
 import { ProjectWings } from './ProjectWings';
 import { Listen } from '@/components/oi/Listen';
-import { NO_RATES_LABEL } from '@/modules/quotation/rate-policy';
 import type { Focus } from '@/components/oi/useScrollFocus';
-import { CHECK_LABELS, type Studio } from '@/modules/studio/types';
+import type { Studio } from '@/modules/studio/types';
+import { useLang, useSiteT } from '@/components/app/i18n';
+import { MATCH_DICT } from '@/modules/i18n/site/match';
+import { CHECK_TX, lbl } from '@/modules/i18n/site/labels';
 import { ENGINE_VERSION, FACTOR_LABELS, type FactorKey, type MatchResult } from '@/modules/matching/score';
 import { localityLabel, type Brief } from '@/modules/brief/types';
 
@@ -111,15 +113,23 @@ export function StudioCard({
   cardRef: (el: HTMLLIElement | null) => void;
 }) {
   const reduced = useReducedMotion();
+  const t = useSiteT(MATCH_DICT);
+  const lang = useLang();
   const [open, setOpen] = useState(false);
 
   // The engine version is part of the key: a read written under an older
-  // engine explains a score that no longer exists.
-  const key = `${briefKey(brief)}|${ENGINE_VERSION}`;
+  // engine explains a score that no longer exists. So is the language, past
+  // English, so an English read is never shown to a Hindi or Marathi reader.
+  const key = `${briefKey(brief)}|${ENGINE_VERSION}${lang === 'en' ? '' : `|${lang}`}`;
   const fresh = cachedRead?.briefKey === key ? cachedRead : undefined;
-  const [read, setRead] = useState<Explanation | null>(
-    fresh ? { text: fresh.text, source: fresh.source } : null,
-  );
+  // Held with the key it was written for, so switching language never
+  // leaves the previous language's read on the card.
+  const [got, setGot] = useState<(Explanation & { key: string }) | null>(null);
+  const read: Explanation | null = fresh
+    ? { text: fresh.text, source: fresh.source }
+    : got?.key === key
+      ? got
+      : null;
 
   /**
    * The written read arrives per card, so the page fills in rather than
@@ -130,10 +140,10 @@ export function StudioCard({
   useEffect(() => {
     if (fresh) return;
     let live = true;
-    explainAction(brief, studio.id)
+    explainAction(brief, studio.id, lang)
       .then((r) => {
         if (!live || !r.text) return;
-        setRead(r);
+        setGot({ ...r, key });
         onRead(studio.id, { text: r.text, source: r.source, briefKey: key });
       })
       .catch(() => {
@@ -150,10 +160,10 @@ export function StudioCard({
   const tags = useMemo(() => {
     const out: string[] = [];
     if (studio.localities.length > 0) out.push(studio.localities.slice(0, 2).map((l) => localityLabel(l) ?? l).join(' · '));
-    if (studio.yearsActive) out.push(`${studio.yearsActive} yrs`);
-    if (studio.teamSize) out.push(`Team of ${studio.teamSize}`);
+    if (studio.yearsActive) out.push(t('card.yrs', { n: studio.yearsActive }));
+    if (studio.teamSize) out.push(t('card.team', { n: studio.teamSize }));
     return out;
-  }, [studio.localities, studio.yearsActive, studio.teamSize]);
+  }, [studio.localities, studio.yearsActive, studio.teamSize, t]);
 
   return (
     /* Two elements, and the split is load-bearing.
@@ -192,7 +202,7 @@ export function StudioCard({
           </span>
         </div>
         <span className="oi-label m-0 whitespace-nowrap">
-          {match.factorsScored} of {match.factorsTotal} factors
+          {t('card.factors', { a: match.factorsScored, b: match.factorsTotal })}
         </span>
       </div>
 
@@ -204,7 +214,7 @@ export function StudioCard({
       <h3 className="oi-display q-h2 m-0 mt-3 text-[var(--ink)]">{studio.tradeName}</h3>
 
       <p className="q-small m-0 mt-2 text-[var(--ink2)]">
-        {studio.about || `Interior studio in ${studio.city}.`}
+        {studio.about || t('card.about', { city: studio.city })}
       </p>
 
       {tags.length > 0 ? <p className="oi-label m-0 mt-3">{tags.join('  ·  ')}</p> : null}
@@ -212,21 +222,21 @@ export function StudioCard({
       {/* ── The facts that decide a shortlist ── */}
       <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-4 border-t border-[var(--line)] pt-5 sm:grid-cols-3">
         <Fact
-          label={quotedTotalPaise !== null ? 'Your quote' : ratesFiled ? 'Not priced yet' : NO_RATES_LABEL}
+          label={quotedTotalPaise !== null ? t('card.yourQuote') : ratesFiled ? t('card.notPriced') : t('card.noRates')}
           value={quotedTotalPaise !== null ? formatINRCompact(quotedTotalPaise) : '—'}
         />
         <Fact
-          label="Projects delivered"
+          label={t('card.delivered')}
           value={studio.completedProjects > 0 ? String(studio.completedProjects) : '—'}
         />
         {/* Early is said as early: "+-2 days over" read as a typo (review, 8 Oct). */}
         <Fact
           label={
             studio.avgVarianceDays === null
-              ? 'Days over — unmeasured'
+              ? t('card.daysUnmeasured')
               : studio.avgVarianceDays < 0
-                ? 'Days early, on average'
-                : 'Days over promise'
+                ? t('card.daysEarly')
+                : t('card.daysOver')
           }
           value={
             studio.avgVarianceDays === null
@@ -248,7 +258,7 @@ export function StudioCard({
       ) : null}
       {match.widened ? (
         <p className="oi-label m-0 mt-2">
-          {match.widened === 'ANY_ZONE' ? 'Works in another part of Pune' : 'One level above the one you chose'}
+          {match.widened === 'ANY_ZONE' ? t('card.widenedZone') : t('card.widenedBand')}
         </p>
       ) : null}
 
@@ -262,7 +272,7 @@ export function StudioCard({
 
       {/* ── The read ── */}
       <div className="mt-5 border-t border-[var(--line)] pt-4">
-        <p className="oi-eyebrow m-0 mb-2">Why this one fits you</p>
+        <p className="oi-eyebrow m-0 mb-2">{t('card.whyFits')}</p>
         {/* Their first priority, answered first — flattering or not. */}
         {match.topPriority ? (
           <p className="q-small m-0 mb-2 max-w-[62ch] font-semibold text-[var(--ink)]">{match.topPriority}</p>
@@ -275,7 +285,7 @@ export function StudioCard({
             </div>
           </>
         ) : (
-          <p className="q-small m-0 text-[var(--ink2)]">Reading your brief against their work…</p>
+          <p className="q-small m-0 text-[var(--ink2)]">{t('card.reading')}</p>
         )}
       </div>
 
@@ -292,7 +302,7 @@ export function StudioCard({
           rel="noopener noreferrer"
           className="q-small mt-4 inline-flex items-center gap-2 font-semibold text-[var(--acc-ink)] underline underline-offset-4"
         >
-          <span aria-hidden>▶</span> Meet {studio.tradeName} — their intro video
+          <span aria-hidden>▶</span> {t('card.meet', { studio: studio.tradeName })}
         </a>
       ) : null}
 
@@ -308,7 +318,7 @@ export function StudioCard({
             onClick={onQuote}
             className="oi-cta min-h-11 cursor-pointer border-0 px-5 py-2.5 text-[14px]"
           >
-            Get a quote
+            {t('card.getQuote')}
           </button>
         ) : (
           <>
@@ -319,7 +329,7 @@ export function StudioCard({
             onClick={onQuote}
             className="oi-cta min-h-11 cursor-pointer border-0 px-5 py-2.5 text-[14px]"
           >
-            See the quote
+            {t('card.seeQuote')}
           </button>
           <button
             type="button"
@@ -332,7 +342,7 @@ export function StudioCard({
               color: inCompare ? 'var(--acc-ink)' : 'var(--ink)',
             }}
           >
-            {inCompare ? 'In compare' : 'Add to compare'}
+            {inCompare ? t('card.inCompare') : t('card.addCompare')}
           </button>
           </>
         )}
@@ -342,7 +352,7 @@ export function StudioCard({
           className="min-h-11 rounded-full border border-[var(--line)] px-5 py-2.5 text-[14px] font-semibold text-[var(--ink)] no-underline transition-colors hover:border-[var(--ink2)]"
           style={{ background: 'rgba(252,252,250,.55)' }}
         >
-          Their work
+          {t('card.theirWork')}
         </Link>
 
         <button
@@ -351,7 +361,7 @@ export function StudioCard({
           aria-expanded={open}
           className="ml-auto inline-flex min-h-11 cursor-pointer items-center border-0 bg-transparent px-2 text-[13.5px] font-semibold text-[var(--ink2)] underline hover:text-[var(--ink)]"
         >
-          {open ? 'Less' : 'More'}
+          {open ? t('card.less') : t('card.more')}
         </button>
       </div>
 
@@ -363,19 +373,19 @@ export function StudioCard({
           className="overflow-hidden"
         >
           <div className="mt-5 border-t border-[var(--line)] pt-4">
-            <p className="oi-eyebrow m-0 mb-3">What the score is made of</p>
+            <p className="oi-eyebrow m-0 mb-3">{t('card.scoreMadeOf')}</p>
             {match.evidence ? (
               <dl className="m-0 mb-4 grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-[10rem_1fr]">
                 {(Object.keys(FACTOR_LABELS) as FactorKey[]).map((key) => (
                   <div key={key} className="contents">
                     <dt className="oi-label m-0">
-                      {FACTOR_LABELS[key]}
+                      {t(`factor.${key}`)}
                       {match.breakdown[key] === null ? '' : ` · ${match.breakdown[key]}`}
                     </dt>
                     <dd className="q-small m-0 text-[var(--ink2)]">
                       {match.breakdown[key] === null
-                        ? 'Not known yet — not counted either way'
-                        : (match.evidence?.[key] ?? 'Measured')}
+                        ? t('card.notKnown')
+                        : (match.evidence?.[key] ?? t('card.measured'))}
                     </dd>
                   </div>
                 ))}
@@ -394,7 +404,7 @@ export function StudioCard({
                 onClick={onQuote}
                 className="mt-4 cursor-pointer border-0 bg-transparent p-0 text-[13.5px] font-semibold text-[var(--ink2)] underline hover:text-[var(--ink)]"
               >
-                See the quote in full
+                {t('card.quoteInFull')}
               </button>
             ) : null}
           </div>
@@ -407,6 +417,7 @@ export function StudioCard({
 
 /** Up to two of the studio's projects most like this brief, with a cover when there is one. */
 function LikeYours({ studio, ids }: { studio: Studio; ids: string[] }) {
+  const t = useSiteT(MATCH_DICT);
   const projects = ids
     .map((id) => studio.portfolio.find((p) => p.id === id))
     .filter((p): p is Studio['portfolio'][number] => Boolean(p))
@@ -414,7 +425,7 @@ function LikeYours({ studio, ids }: { studio: Studio; ids: string[] }) {
   if (projects.length === 0) return null;
   return (
     <div className="mt-5 border-t border-[var(--line)] pt-4">
-      <p className="oi-eyebrow m-0 mb-2">Their work like yours</p>
+      <p className="oi-eyebrow m-0 mb-2">{t('card.likeYours')}</p>
       <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2">
         {projects.map((p) => (
           <li key={p.id} className="flex items-center gap-3">
@@ -427,7 +438,7 @@ function LikeYours({ studio, ids }: { studio: Studio; ids: string[] }) {
             <span className="min-w-0">
               <span className="block truncate text-[13.5px] font-semibold text-[var(--ink)]">{p.title}</span>
               <span className="block text-[12.5px] text-[var(--ink2)]">
-                {[localityLabel(p.locality), p.valuePaise ? formatINRCompact(p.valuePaise) : null, p.durationDays ? `${p.durationDays} days` : null]
+                {[localityLabel(p.locality), p.valuePaise ? formatINRCompact(p.valuePaise) : null, p.durationDays ? t('wings.days', { n: p.durationDays }) : null]
                   .filter(Boolean)
                   .join(' · ')}
               </span>
@@ -441,6 +452,8 @@ function LikeYours({ studio, ids }: { studio: Studio; ids: string[] }) {
 
 /** "15 of 15 checks cleared", opening to each check, its source and its date. */
 function CheckList({ checks }: { checks: Studio['checks'] }) {
+  const t = useSiteT(MATCH_DICT);
+  const lang = useLang();
   const counted = checks.filter((c) => c.result !== 'NOT_APPLICABLE');
   const passed = counted.filter((c) => c.result === 'PASS');
   if (counted.length === 0) return null;
@@ -448,13 +461,13 @@ function CheckList({ checks }: { checks: Studio['checks'] }) {
     <details className="group mt-4 rounded-[16px] border border-[var(--line)] px-4 py-3">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-[14px] font-medium text-[var(--ink)]">
         <span>
-          {passed.length} of {counted.length} checks cleared
+          {t('card.checksCleared', { a: passed.length, b: counted.length })}
         </span>
         <span aria-hidden className="text-[var(--ink2)] group-open:hidden">
-          See them +
+          {t('card.seeThem')}
         </span>
         <span aria-hidden className="hidden text-[var(--ink2)] group-open:inline">
-          Hide −
+          {t('card.hide')}
         </span>
       </summary>
       <ul className="m-0 mt-3 flex list-none flex-col gap-2 p-0">
@@ -462,11 +475,11 @@ function CheckList({ checks }: { checks: Studio['checks'] }) {
           <li key={c.type} className="flex items-baseline justify-between gap-3 text-[13.5px]">
             <span className={c.result === 'PASS' ? 'text-[var(--ink)]' : 'text-[var(--ink2)]'}>
               <span aria-hidden className="mr-1.5">{c.result === 'PASS' ? '✓' : '○'}</span>
-              {CHECK_LABELS[c.type]}
-              <span className="sr-only">{c.result === 'PASS' ? ', cleared' : ', not yet cleared'}</span>
+              {lbl(lang, CHECK_TX, c.type)}
+              <span className="sr-only">{c.result === 'PASS' ? t('card.cleared') : t('card.notCleared')}</span>
             </span>
             <span className="shrink-0 text-right text-[12px] text-[var(--ink2)]">
-              {[c.source, c.checkedAt ? new Date(c.checkedAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : null]
+              {[c.source, c.checkedAt ? new Date(c.checkedAt).toLocaleDateString(`${lang}-IN`, { month: 'short', year: 'numeric' }) : null]
                 .filter(Boolean)
                 .join(' · ')}
             </span>

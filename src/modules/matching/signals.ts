@@ -21,6 +21,8 @@ import { scopeBandRange } from '@/modules/quotation/scope-band';
 import { selectionOf } from '@/modules/quotation/scope';
 import type { StudioRates } from '@/modules/quotation/catalogue';
 import { affinity, weightedAffinity } from './style-affinity';
+import { tx, type Lang } from '@/modules/i18n/site';
+import { SPECIALISM_TX, say } from '@/modules/i18n/site/matching';
 
 export interface Signal {
   value: number;
@@ -32,6 +34,8 @@ export interface SignalContext {
   today: Date;
   /** The studio's rates, when the caller has them — priced on this home. */
   ratesFor?: (slug: string) => StudioRates | undefined;
+  /** The language the evidence is written in. English when absent. */
+  lang?: Lang;
 }
 
 const clamp = (n: number) => Math.max(0, Math.min(100, n));
@@ -69,11 +73,11 @@ export function styleFit(brief: Brief, studio: Studio, ctx: SignalContext): Sign
   // the style picker before they knew whose it was. The strongest style
   // evidence there is — lifted to at least PICKED_THEIR_PHOTO.
   if (brief.styleStudioPicks?.includes(studio.id)) {
-    return { value: Math.max(value, PICKED_THEIR_PHOTO), evidence: 'You picked a photograph of their work in the style picker' };
+    return { value: Math.max(value, PICKED_THEIR_PHOTO), evidence: say(ctx.lang, 'style.picked') };
   }
   return {
     value,
-    evidence: exact > 0 ? `${exact} of their project tags are styles you picked` : 'Their work sits next to your styles rather than in them',
+    evidence: exact > 0 ? say(ctx.lang, 'style.exact', { n: exact }) : say(ctx.lang, 'style.near'),
   };
 }
 
@@ -118,20 +122,20 @@ export function budgetPosition(brief: Brief, studio: Studio, ctx: SignalContext)
            (review, 8 Oct). */
         evidence:
           work < band.lowPaise * 0.98
-            ? 'Their quote for your home comes in below your range'
+            ? say(ctx.lang, 'budget.below')
             : position <= 0.05
-            ? 'Their quote for your home comes in at the bottom of your range'
+            ? say(ctx.lang, 'budget.bottom')
             : position >= 1
-              ? 'Their quote for your home comes in above your range'
-              : `Their quote for your home sits ${position < 0.5 ? 'in the lower half' : 'in the upper half'} of your range`,
+              ? say(ctx.lang, 'budget.above')
+              : say(ctx.lang, position < 0.5 ? 'budget.lowerHalf' : 'budget.upperHalf'),
       };
     }
   }
-  return deliveredBudgetFit(brief, studio);
+  return deliveredBudgetFit(brief, studio, ctx.lang);
 }
 
 /** v1's budget fit: the studio's delivered values (or declared range) against the budget. */
-export function deliveredBudgetFit(brief: Brief, studio: Studio): Signal | null {
+export function deliveredBudgetFit(brief: Brief, studio: Studio, lang: Lang = 'en'): Signal | null {
   if (brief.budgetMinPaise === null) return null;
   const delivered = studio.portfolio
     .map((p) => p.valuePaise)
@@ -148,16 +152,16 @@ export function deliveredBudgetFit(brief: Brief, studio: Studio): Signal | null 
   } else {
     return null;
   }
-  const from = delivered.length >= 3 ? 'the projects they have delivered' : 'their stated project range';
+  const from = say(lang, delivered.length >= 3 ? 'budget.fromDelivered' : 'budget.fromStated');
   if (brief.budgetMaxPaise === null) {
     if (hi <= lo) return { value: hi >= brief.budgetMinPaise ? 100 : 0 };
     const above = Math.max(0, hi - Math.max(lo, brief.budgetMinPaise));
-    return { value: clamp((above / (hi - lo)) * 100), evidence: `From ${from}` };
+    return { value: clamp((above / (hi - lo)) * 100), evidence: from };
   }
   const overlap = Math.max(0, Math.min(brief.budgetMaxPaise, hi) - Math.max(brief.budgetMinPaise, lo));
   const width = brief.budgetMaxPaise - brief.budgetMinPaise;
   if (width <= 0) return { value: overlap > 0 ? 100 : 0 };
-  return { value: clamp((overlap / width) * 100), evidence: `From ${from}` };
+  return { value: clamp((overlap / width) * 100), evidence: from };
 }
 
 // ── Timeline (weight 5, and the SPEED priority) ────────────────
@@ -172,7 +176,8 @@ export function workCanStart(brief: Brief, today: Date): Date | null {
   return null;
 }
 
-const monthName = (d: Date) => d.toLocaleDateString('en-IN', { month: 'long', timeZone: 'UTC' });
+const monthName = (d: Date, lang: Lang = 'en') =>
+  d.toLocaleDateString(lang === 'en' ? 'en-IN' : `${lang}-IN`, { month: 'long', timeZone: 'UTC' });
 
 export interface TimelineSignal extends Signal {
   /** Over a month after the customer can start — sorted down and flagged, never hidden. */
@@ -199,11 +204,11 @@ export function timelineFit(brief: Brief, studio: Studio, ctx: SignalContext): T
   const line =
     gapDays <= 0
       ? brief.possessionStatus === 'HAVE_KEYS'
-        ? 'Can start now'
-        : `Can start in ${monthName(theirs)}, when you get the keys`
+        ? say(ctx.lang, 'time.now')
+        : say(ctx.lang, 'time.keys', { month: monthName(theirs, ctx.lang) })
       : gapDays <= 30
-        ? `Can start in ${monthName(studioStart)}, within a month of when you can`
-        : `Booked until ${monthName(studioStart)} — ${Math.round(gapDays / 7)} weeks after you can start`;
+        ? say(ctx.lang, 'time.within', { month: monthName(studioStart, ctx.lang) })
+        : say(ctx.lang, 'time.booked', { month: monthName(studioStart, ctx.lang), weeks: Math.round(gapDays / 7) });
   return { value, late, line, evidence: line };
 }
 
@@ -219,7 +224,7 @@ export function speed(brief: Brief, studio: Studio, ctx: SignalContext): Signal 
     // Against the full-home norm, scaled down for smaller scopes.
     const norm = scope === 'FULL_HOME' ? FULL_HOME_DAYS.max : scope === 'RENOVATION' ? 120 : 50;
     parts.push(clamp(100 - Math.max(0, (days - norm * 0.7) / (norm * 0.6)) * 100));
-    evidence ??= `Typically ${days} days from sign-off to handover`;
+    evidence ??= say(ctx.lang, 'time.days', { days });
   }
   if (studio.completedProjects >= MIN_PROJECTS_FOR_RELIABILITY && studio.avgVarianceDays !== null) {
     parts.push(clamp(100 - (Math.max(0, studio.avgVarianceDays) / 30) * 100));
@@ -230,7 +235,7 @@ export function speed(brief: Brief, studio: Studio, ctx: SignalContext): Signal 
 
 // ── Design ambition and material quality ───────────────────────
 
-export function designAmbition(brief: Brief, studio: Studio): Signal | null {
+export function designAmbition(brief: Brief, studio: Studio, lang: Lang = 'en'): Signal | null {
   const parts: number[] = [];
   const p = studio.matchingProfile;
   if (brief.styleLikes.length > 0 && studio.portfolio.length > 0) {
@@ -243,16 +248,19 @@ export function designAmbition(brief: Brief, studio: Studio): Signal | null {
   if (p?.dedicatedDesigner !== null && p?.dedicatedDesigner !== undefined) parts.push(p.dedicatedDesigner ? 100 : 30);
   if (parts.length === 0) return null;
   const services = [
-    p?.views3d === 'EVERY_ROOM' ? '3D views of every room' : p?.views3d === 'KEY_ROOMS' ? '3D views of key rooms' : null,
-    p?.revisions ? `${p.revisions} design revisions included` : null,
-    p?.dedicatedDesigner ? 'a dedicated designer' : null,
+    p?.views3d === 'EVERY_ROOM' ? say(lang, 'design.every') : p?.views3d === 'KEY_ROOMS' ? say(lang, 'design.key') : null,
+    p?.revisions ? say(lang, 'design.revisions', { n: p.revisions }) : null,
+    p?.dedicatedDesigner ? say(lang, 'design.designer') : null,
   ].filter(Boolean);
-  return { value: avg(parts), evidence: services.length ? `Includes ${services.join(', ')}` : undefined };
+  return {
+    value: avg(parts),
+    evidence: services.length ? say(lang, 'design.includes', { list: services.join(', ') }) : undefined,
+  };
 }
 
 const CARCASS_GRADE: Record<string, number> = { BWP_PLY: 100, SOLID_WOOD: 100, HDHMR: 75, MR_PLY: 50, MDF: 30 };
 
-export function materialQuality(studio: Studio): Signal | null {
+export function materialQuality(studio: Studio, lang: Lang = 'en'): Signal | null {
   const parts: number[] = [];
   const p = studio.matchingProfile;
   if (p && p.carcass.length > 0) parts.push(Math.max(...p.carcass.map((c) => CARCASS_GRADE[c] ?? 50)));
@@ -263,9 +271,13 @@ export function materialQuality(studio: Studio): Signal | null {
   }
   if (parts.length === 0) return null;
   const bits = [
-    p?.carcass.includes('BWP_PLY') ? 'BWP ply as standard' : p?.carcass.includes('SOLID_WOOD') ? 'solid wood as standard' : null,
-    p?.warrantyYears ? `a ${p.warrantyYears}-year warranty` : null,
-    p?.production === 'OWN_FACTORY' ? 'their own factory' : null,
+    p?.carcass.includes('BWP_PLY')
+      ? say(lang, 'material.bwp')
+      : p?.carcass.includes('SOLID_WOOD')
+        ? say(lang, 'material.solid')
+        : null,
+    p?.warrantyYears ? say(lang, 'material.warranty', { n: p.warrantyYears }) : null,
+    p?.production === 'OWN_FACTORY' ? say(lang, 'material.factory') : null,
   ].filter(Boolean);
   return { value: avg(parts), evidence: bits.length ? `${bits.join(', ')}`.replace(/^./, (c) => c.toUpperCase()) : undefined };
 }
@@ -281,9 +293,9 @@ export function prioritySignal(p: PriorityFactor, brief: Brief, studio: Studio, 
     case 'SPEED':
       return speed(brief, studio, ctx);
     case 'DESIGN_AMBITION':
-      return designAmbition(brief, studio);
+      return designAmbition(brief, studio, ctx.lang);
     case 'MATERIAL_QUALITY':
-      return materialQuality(studio);
+      return materialQuality(studio, ctx.lang);
     default:
       return null;
   }
@@ -321,7 +333,7 @@ export interface SimilarWork extends Signal {
  * configuration when the project has no area), and the place — same society
  * above same area above same zone. Three strong matches is full marks.
  */
-export function similarWork(brief: Brief, studio: Studio): SimilarWork | null {
+export function similarWork(brief: Brief, studio: Studio, lang: Lang = 'en'): SimilarWork | null {
   if (studio.portfolio.length === 0) return null;
   const scope = brief.scope ?? 'FULL_HOME';
   const area = homeShapeFor(brief).carpetAreaSqft;
@@ -342,11 +354,16 @@ export function similarWork(brief: Brief, studio: Studio): SimilarWork | null {
   const value = clamp((best.slice(0, 4).reduce((a, x) => a + x.s, 0) / 3) * 100);
   const evidence =
     sameSociety > 0
-      ? `They have done ${sameSociety === 1 ? 'a home' : `${sameSociety} homes`} in your society`
+      ? sameSociety === 1
+        ? say(lang, 'similar.society1')
+        : say(lang, 'similar.societyN', { n: sameSociety })
       : sameArea > 0 && brief.locality
-        ? `They have completed ${sameArea} ${sameArea === 1 ? 'home' : 'homes'} in ${localityLabel(brief.locality)}`
+        ? say(lang, sameArea === 1 ? 'similar.area1' : 'similar.areaN', {
+            n: sameArea,
+            place: localityLabel(brief.locality) ?? '',
+          })
         : best.length > 0
-          ? `${best.length} of their projects are like yours`
+          ? say(lang, 'similar.like', { n: best.length })
           : undefined;
   return { value, evidence, projects: best.slice(0, 3).map((x) => x.p.id), sameSociety, sameArea };
 }
@@ -355,7 +372,7 @@ export function similarWork(brief: Brief, studio: Studio): SimilarWork | null {
 
 const INVOLVEMENT_ORDER = { DECIDE_FOR_ME: 0, COLLABORATE: 1, APPROVE_EVERYTHING: 2 } as const;
 
-export function workingStyle(brief: Brief, studio: Studio): Signal | null {
+export function workingStyle(brief: Brief, studio: Studio, lang: Lang = 'en'): Signal | null {
   if (!brief.involvement) return null;
   const theirs = studio.matchingProfile?.workingStyle;
   let fit: number | null = null;
@@ -371,8 +388,8 @@ export function workingStyle(brief: Brief, studio: Studio): Signal | null {
     value,
     evidence: theirs
       ? theirs === brief.involvement
-        ? 'They run projects the way you said you want to'
-        : 'They run projects a little differently from how you said you want to'
+        ? say(lang, 'working.same')
+        : say(lang, 'working.different')
       : undefined,
   };
 }
@@ -405,7 +422,7 @@ export function wantedSpecialisms(brief: Brief): Specialism[] {
  * that has said nothing about specialisms and tagged nothing is not scored —
  * not said is not "has not done".
  */
-export function householdFit(brief: Brief, studio: Studio): Signal | null {
+export function householdFit(brief: Brief, studio: Studio, lang: Lang = 'en'): Signal | null {
   const wanted = wantedSpecialisms(brief);
   if (wanted.length === 0) return null;
   const declared = studio.matchingProfile?.specialisms ?? [];
@@ -421,7 +438,11 @@ export function householdFit(brief: Brief, studio: Studio): Signal | null {
   return {
     value: avg(credit) * 100,
     evidence: covered.length
-      ? `Experienced in ${covered.map((c) => SPECIALISM_LABELS[c].toLowerCase()).join(', ')}`
+      ? say(lang, 'household.experienced', {
+          list: covered
+            .map((c) => (lang === 'en' ? SPECIALISM_LABELS[c].toLowerCase() : tx(lang, SPECIALISM_TX[c])))
+            .join(', '),
+        })
       : undefined,
   };
 }

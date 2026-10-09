@@ -1,4 +1,8 @@
+'use client';
+
 import Link from 'next/link';
+import { useLang, useSiteT } from '@/components/app/i18n';
+import { EXPERT_DICT, known } from '@/modules/i18n/site/expert';
 import { CallOffer } from './CallOffer';
 import { showcase, showcaseWorthPaise } from '@/modules/portal/benefits';
 import { formatINR } from '@/lib/money';
@@ -15,25 +19,25 @@ import type { OfferState } from '@/modules/consultation/offer';
  */
 export function ExpertPitch({
   offer,
-  lead = 'Before you ring any studio',
+  lead,
   className = '',
 }: {
   offer: OfferState;
   lead?: string;
   className?: string;
 }) {
+  const t = useSiteT(EXPERT_DICT);
   return (
     <aside
       className={`rounded-[14px] border border-[var(--acc)] bg-[var(--card)] p-[clamp(20px,3vw,28px)] ${className}`}
-      aria-label="Book your expert call"
+      aria-label={t('pitch.cta')}
     >
-      <p className="oi-eyebrow m-0 mb-2">{lead}</p>
+      <p className="oi-eyebrow m-0 mb-2">{lead ?? t('pitch.lead')}</p>
       <p className="m-0 mb-2 text-[18px] font-semibold leading-snug text-[var(--ink)]">
-        Go through these with {ARCHITECT.name}, 30 minutes.
+        {t('pitch.title', { name: ARCHITECT.name })}
       </p>
       <p className="m-0 mb-3 max-w-[58ch] text-[14px] leading-[1.6] text-[var(--ink2)]">
-        She reads your brief and every quote first, tells you where the studios really differ, and
-        sets up the meeting with the one you choose. No studio pays her.
+        {t('pitch.body')}
       </p>
       <CallOffer offer={offer} className="mb-4" />
       <BenefitChips worth />
@@ -41,7 +45,7 @@ export function ExpertPitch({
         href="/expert"
         className="oi-cta mt-5 inline-flex min-h-11 items-center px-5 py-3 text-[14px] no-underline"
       >
-        Book your expert call
+        {t('pitch.cta')}
       </Link>
     </aside>
   );
@@ -58,20 +62,22 @@ export function BenefitChips({
   worth?: boolean;
   className?: string;
 }) {
+  const t = useSiteT(EXPERT_DICT);
+  const lang = useLang();
   const items = showcase().slice(0, limit);
   return (
     <div className={className}>
       <p className="oi-label m-0 mb-2">
-        Only when you book through us{worth ? ` · worth up to ${formatINR(showcaseWorthPaise())}` : ''}
+        {t('benefits.label')}{worth ? t('benefits.worth', { amount: formatINR(showcaseWorthPaise()) }) : ''}
       </p>
       <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
         {items.map((b) => (
           <li
             key={b.id}
-            title={b.terms}
+            title={known(lang, `benefit.${b.id}.terms`, b.terms)}
             className="rounded-full border border-[var(--line)] px-2.5 py-1 text-[12.5px] text-[var(--ink)]"
           >
-            {b.short}
+            {known(lang, `benefit.${b.id}.short`, b.short)}
           </li>
         ))}
       </ul>

@@ -50,6 +50,9 @@ import {
   type Signal,
   type SignalContext,
 } from './signals';
+import { tx, type Lang } from '@/modules/i18n/site';
+import { PRIORITY_TX } from '@/modules/i18n/site/labels';
+import { say } from '@/modules/i18n/site/matching';
 
 /**
  * 2.0.0 (29 Sep 2026): the §5 engine — band, scope and zone filters; six
@@ -141,6 +144,12 @@ export interface RankOptions {
   today?: Date;
   /** One-tap widenings, offered by name when fewer than three fit. */
   widen?: Widening[];
+  /**
+   * The language of the sentences (evidence, reasoning, the first-priority
+   * and timing lines). English when absent — and always English for what is
+   * stored or shown to ops. Changes words only, never scores or order.
+   */
+  lang?: Lang;
 }
 
 // ── Hard filters ───────────────────────────────────────────────
@@ -244,21 +253,22 @@ const SHRINK = 0.5;
 const PRIOR = 50;
 
 function contextOf(options: RankOptions): SignalContext {
-  return { today: options.today ?? new Date(), ratesFor: options.ratesFor };
+  return { today: options.today ?? new Date(), ratesFor: options.ratesFor, lang: options.lang };
 }
 
 export function scoreMatch(brief: Brief, studio: Studio, options: RankOptions = {}): MatchResult | null {
   if (!passesHardFilters(brief, studio, options)) return null;
   const ctx = contextOf(options);
 
+  const lang = options.lang ?? 'en';
   const timeline = timelineFit(brief, studio, ctx);
-  const similar = similarWork(brief, studio);
+  const similar = similarWork(brief, studio, lang);
   const signals: Record<FactorKey, Signal | null> = {
     style: styleFit(brief, studio, ctx),
     priorities: priorities(brief, studio, ctx),
     similarWork: similar,
-    workingStyle: workingStyle(brief, studio),
-    household: householdFit(brief, studio),
+    workingStyle: workingStyle(brief, studio, lang),
+    household: householdFit(brief, studio, lang),
     timeline,
   };
 
@@ -301,7 +311,7 @@ export function scoreMatch(brief: Brief, studio: Studio, options: RankOptions = 
     factorsScored,
     factorsTotal: FACTOR_COUNT,
     breakdown,
-    reasoning: [...(lead ? [lead] : []), ...buildReasoning(brief, studio, evidence, timeline)],
+    reasoning: [...(lead ? [lead] : []), ...buildReasoning(brief, studio, evidence, timeline, lang)],
     ...(lead ? { topPriority: lead } : {}),
     engineVersion: ENGINE_VERSION,
     measuredWeight,
@@ -406,12 +416,14 @@ function buildReasoning(
   studio: Studio,
   evidence: Partial<Record<FactorKey, string>>,
   timeline: { line: string; late: boolean } | null,
+  lang: Lang = 'en',
 ): string[] {
   const lines: string[] = [];
   const name = studio.tradeName;
+  const stop = say(lang, 'stop');
 
   if (evidence.style && brief.styleLikes.length > 0) {
-    lines.push(`You leaned toward ${formatStyles(brief.styleLikes)}. ${evidence.style}.`);
+    lines.push(say(lang, 'why.leaned', { styles: formatStyles(brief.styleLikes, lang), evidence: evidence.style }));
   }
 
   // Say the true thing, not the flattering one: the filter excludes only
@@ -419,37 +431,37 @@ function buildReasoning(
   if (brief.styleDislikes.length > 0) {
     const share = dislikedShare(brief, studio);
     if (share === 0) {
-      lines.push(`You ruled out ${formatStyles(brief.styleDislikes)}. None of their portfolio goes there.`);
+      lines.push(say(lang, 'why.ruledOutNone', { styles: formatStyles(brief.styleDislikes, lang) }));
     } else if (share !== null) {
       lines.push(
-        `You ruled out ${formatStyles(brief.styleDislikes)}. About ${Math.round(share * 100)}% of their work leans that way.`,
+        say(lang, 'why.ruledOutShare', {
+          styles: formatStyles(brief.styleDislikes, lang),
+          pct: Math.round(share * 100),
+        }),
       );
     }
   }
 
-  if (evidence.similarWork) lines.push(`${evidence.similarWork}.`);
-  if (evidence.household) lines.push(`${evidence.household}.`);
-  if (evidence.priorities) lines.push(`${evidence.priorities}.`);
-  if (evidence.workingStyle) lines.push(`${evidence.workingStyle}.`);
-  if (timeline) lines.push(`${timeline.line}.`);
+  if (evidence.similarWork) lines.push(`${evidence.similarWork}${stop}`);
+  if (evidence.household) lines.push(`${evidence.household}${stop}`);
+  if (evidence.priorities) lines.push(`${evidence.priorities}${stop}`);
+  if (evidence.workingStyle) lines.push(`${evidence.workingStyle}${stop}`);
+  if (timeline) lines.push(`${timeline.line}${stop}`);
 
   if (studio.completedProjects === 0) {
-    lines.push(`${name} has not completed a project with us yet, so we have no delivery record for them.`);
+    lines.push(say(lang, 'why.noRecord', { name }));
   } else if (studio.avgVarianceDays !== null && studio.completedProjects >= 3) {
     const d = Math.round(studio.avgVarianceDays);
-    lines.push(
-      d <= 0
-        ? `Their last ${studio.completedProjects} projects finished on or ahead of the committed date.`
-        : `Their last ${studio.completedProjects} projects averaged ${d} day${d === 1 ? '' : 's'} past the committed date.`,
-    );
+    const n = studio.completedProjects;
+    lines.push(d <= 0 ? say(lang, 'why.onTime', { n }) : say(lang, d === 1 ? 'why.late1' : 'why.lateN', { n, d }));
   } else {
     const n = studio.completedProjects;
-    lines.push(`${name} has completed ${n} project${n === 1 ? '' : 's'} with us — not yet enough to state a reliable delivery average.`);
+    lines.push(say(lang, n === 1 ? 'why.few1' : 'why.fewN', { name, n }));
   }
 
   if (studio.upheldDisputes > 0) {
     const n = studio.upheldDisputes;
-    lines.push(`Worth knowing: ${n} dispute${n === 1 ? '' : 's'} against them ${n === 1 ? 'was' : 'were'} upheld.`);
+    lines.push(say(lang, n === 1 ? 'why.dispute1' : 'why.disputeN', { n }));
   }
 
   return lines;
@@ -463,7 +475,7 @@ function buildReasoning(
  * clause describes a factor that scored null. Three clauses at most. No
  * number in the sentence: the score lives in one place on the card.
  */
-export function matchSummary(brief: Brief, studio: Studio, result: MatchResult): string | null {
+export function matchSummary(brief: Brief, studio: Studio, result: MatchResult, lang: Lang = 'en'): string | null {
   const b = result.breakdown;
   const e = result.evidence ?? {};
   const clauses: string[] = [];
@@ -478,7 +490,7 @@ export function matchSummary(brief: Brief, studio: Studio, result: MatchResult):
   add('similarWork', local ? 0 : 40);
   add('household', 50);
   if (b.style !== null && b.style >= 55 && brief.styleLikes.length > 0) {
-    clauses.push(`you leaned toward ${formatStyles(brief.styleLikes)} and most of their work sits there`);
+    clauses.push(say(lang, 'summary.style', { styles: formatStyles(brief.styleLikes, lang) }));
   }
   add('priorities', 60);
   add('workingStyle', 60);
@@ -486,7 +498,7 @@ export function matchSummary(brief: Brief, studio: Studio, result: MatchResult):
     clauses.push(lowerFirst(result.timeline.line));
   }
   if (clauses.length === 0) return null;
-  return `Because ${clauses.slice(0, 3).join('; ')}.`;
+  return say(lang, 'summary.because', { clauses: clauses.slice(0, 3).join('; ') });
 }
 
 /**
@@ -499,24 +511,29 @@ export function matchSummary(brief: Brief, studio: Studio, result: MatchResult):
 export function topPriorityLine(brief: Brief, studio: Studio, ctx: SignalContext = contextOf({})): string | null {
   const first = brief.priorityRanking[0];
   if (!first) return null;
-  const label = PRIORITY_LABELS[first].toLowerCase();
+  const lang = ctx.lang ?? 'en';
+  const label = lang === 'en' ? PRIORITY_LABELS[first].toLowerCase() : tx(lang, PRIORITY_TX[first]);
   const s = prioritySignal(first, brief, studio, ctx);
-  if (!s) return `You put ${label} first. We have nothing on that for ${studio.tradeName} yet.`;
+  if (!s) return say(lang, 'top.nothing', { label, studio: studio.tradeName });
+  // The pattern checks below read the English evidence; the words come from `s`.
+  const en = lang === 'en' ? s : prioritySignal(first, brief, studio, { ...ctx, lang: 'en' });
   let text = s.evidence;
-  if (!text || /^From /.test(text)) {
+  if (!text || !en?.evidence || /^From /.test(en.evidence)) {
     // The delivered-budget fallback says where its number came from, not what it is.
     text =
       first === 'BUDGET'
         ? s.value >= 60
-          ? 'Their past projects sit within your budget'
-          : 'Most of their past projects sit outside your budget'
+          ? say(lang, 'top.budgetWithin')
+          : say(lang, 'top.budgetOutside')
         : s.value >= 60
-          ? 'They measure well on it'
-          : 'They measure weakly on it';
+          ? say(lang, 'top.well')
+          : say(lang, 'top.weak');
   }
-  // The timeline's lines have no subject ("Can start in January"); give them one.
-  const subject = /^(can|cannot)\b/i.test(text) ? 'they ' : /^booked\b/i.test(text) ? 'they are ' : '';
-  return `You put ${label} first: ${subject}${lowerFirst(text)}.`;
+  // The timeline's lines have no subject ("Can start in January"); give them
+  // one. Hindi and Marathi lines carry their own.
+  const subject =
+    lang !== 'en' ? '' : /^(can|cannot)\b/i.test(text) ? 'they ' : /^booked\b/i.test(text) ? 'they are ' : '';
+  return say(lang, 'top.line', { label, text: `${subject}${lowerFirst(text)}` });
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -526,10 +543,11 @@ function lowerFirst(text: string): string {
   return /^[A-Z]{2}/.test(text) ? text : text.charAt(0).toLowerCase() + text.slice(1);
 }
 
-function formatStyles(tags: string[]): string {
+/** Style names stay in English in every language; only the "and" changes. */
+function formatStyles(tags: string[], lang: Lang = 'en'): string {
   const pretty = tags.map((t) => STYLE_LABELS[t as keyof typeof STYLE_LABELS] ?? titleCase(t));
   if (pretty.length <= 1) return pretty[0] ?? '';
-  return `${pretty.slice(0, -1).join(', ')} and ${pretty[pretty.length - 1]}`;
+  return `${pretty.slice(0, -1).join(', ')} ${say(lang, 'and')} ${pretty[pretty.length - 1]}`;
 }
 
 function titleCase(slug: string): string {

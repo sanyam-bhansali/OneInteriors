@@ -25,6 +25,8 @@ import Link from 'next/link';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { DUR, EASE_OUT } from '@/components/oi/motion';
 import { Wrap } from '@/components/oi';
+import { useSiteT } from '@/components/app/i18n';
+import { MATCH_DICT } from '@/modules/i18n/site/match';
 
 export function CompareBar({
   selected,
@@ -36,6 +38,7 @@ export function CompareBar({
   priced: number;
 }) {
   const reduced = useReducedMotion();
+  const t = useSiteT(MATCH_DICT);
   const ready = selected >= minimum;
 
   return (
@@ -69,12 +72,12 @@ export function CompareBar({
                 </span>
                 <div className="min-w-0">
                   <p className="m-0 text-[14.5px] font-semibold leading-tight text-[var(--ink)]">
-                    {ready ? 'Ready to compare' : 'Selected'}
+                    {ready ? t('compare.ready') : t('compare.selected')}
                   </p>
                   <p className="q-small m-0 text-[var(--ink2)]">
                     {ready
-                      ? 'Every line side by side, with the materials'
-                      : `Pick ${minimum - selected} more to put them side by side`}
+                      ? t('compare.readyBody')
+                      : t('compare.pick', { n: minimum - selected })}
                   </p>
                 </div>
               </div>
@@ -84,7 +87,7 @@ export function CompareBar({
                   href="/compare"
                   className="oi-cta inline-flex min-h-11 items-center px-6 py-3 text-[14.5px] no-underline"
                 >
-                  Compare {selected}
+                  {t('compare.cta', { n: selected })}
                 </Link>
               ) : null}
             </div>

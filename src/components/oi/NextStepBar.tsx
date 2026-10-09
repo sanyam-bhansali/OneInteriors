@@ -1,4 +1,9 @@
+'use client';
+
 import Link from 'next/link';
+import { useLang, useSiteT } from '@/components/app/i18n';
+import { OI_DICT } from '@/modules/i18n/site/oi';
+import { offerText } from '@/modules/i18n/site/expert';
 import { formatINRCompact } from '@/lib/money';
 import type { OfferState } from '@/modules/consultation/offer';
 import { Wrap } from '@/components/landing/parts';
@@ -30,11 +35,14 @@ export function NextStepBar({
   totalPaise?: number;
   offer?: OfferState;
 }) {
-  const note = offer
+  const t = useSiteT(OI_DICT);
+  const lang = useLang();
+  const lines = offer ? offerText(lang, offer) : null;
+  const note = offer && lines
     ? offer.free
-      ? `${offer.headline}${offer.remaining ? ` · ${offer.remaining}` : ''}`
-      : offer.headline
-    : '30 minutes with our architect, before you meet any studio';
+      ? `${lines.headline}${lines.remaining ? ` · ${lines.remaining}` : ''}`
+      : lines.headline
+    : t('bar.note');
 
   return (
     <div
@@ -51,7 +59,7 @@ export function NextStepBar({
             {totalPaise !== undefined ? (
               <p className="m-0 text-[20px] font-medium sm:text-[22px] leading-tight tracking-[-0.02em] text-[var(--ink)] tabular-nums">
                 {formatINRCompact(totalPaise)}{' '}
-                <span className="text-[12.5px] font-normal tracking-normal text-[var(--ink2)]">incl. GST</span>
+                <span className="text-[12.5px] font-normal tracking-normal text-[var(--ink2)]">{t('bar.inclGst')}</span>
               </p>
             ) : (
               <p className="m-0 text-[14.5px] font-medium leading-tight text-[var(--ink)]">{note}</p>
@@ -63,9 +71,9 @@ export function NextStepBar({
               className="oi-cta inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-full px-5 py-3 text-[14.5px] no-underline sm:px-6"
             >
               {/* One row on a phone: the short label there, the full one wider. */}
-              <span className="sm:hidden">{offer && !offer.free ? 'Book the call' : 'Book free call'}</span>
+              <span className="sm:hidden">{offer && !offer.free ? t('bar.bookShort') : t('bar.bookFreeShort')}</span>
               <span className="hidden sm:inline">
-                {offer && !offer.free ? 'Book your architect call' : 'Book your free architect call'}
+                {offer && !offer.free ? t('bar.bookLong') : t('bar.bookFreeLong')}
               </span>
             </Link>
             {totalPaise !== undefined ? (

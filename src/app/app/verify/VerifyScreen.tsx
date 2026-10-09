@@ -25,6 +25,14 @@ import { useT } from '@/components/app/i18n';
 
 const RESEND_S = 30;
 
+/**
+ * The WhatsApp code at this step is OFF unless NEXT_PUBLIC_APP_PHONE_CODE=1
+ * (owner, 9 Oct 2026: "I don't want the OTP enabled right now"). Off, the
+ * number and consent are saved on the brief and nobody is signed in by them;
+ * the expert call books on the same brief through this browser's own key.
+ */
+const REQUIRE_CODE = process.env.NEXT_PUBLIC_APP_PHONE_CODE === '1';
+
 export function VerifyScreen({ data }: { data: AppData }) {
   const { sample } = data;
   const router = useRouter();
@@ -70,7 +78,7 @@ export function VerifyScreen({ data }: { data: AppData }) {
   };
 
   const verify = async () => {
-    if (!brief || !sentTo) return;
+    if (!brief || (REQUIRE_CODE && !sentTo)) return;
     setError(null);
     if (sample) {
       router.push('/app/quote');
@@ -82,13 +90,20 @@ export function VerifyScreen({ data }: { data: AppData }) {
       setBusy(false);
       return setError(Object.values(contact.errors)[0] ?? 'Check your details and try again.');
     }
-    const v = await verifyOtpAction(phone, code, name);
+    if (REQUIRE_CODE) {
+      const v = await verifyOtpAction(phone, code, name);
+      if (!v.ok) {
+        setBusy(false);
+        return setError(v.error);
+      }
+    }
     setBusy(false);
-    if (!v.ok) return setError(v.error);
     router.push('/app/quote');
   };
 
-  const ready = Boolean(sentTo) && !changed && code.length === 6 && agreed && !busy;
+  const ready = REQUIRE_CODE
+    ? Boolean(sentTo) && !changed && code.length === 6 && agreed && !busy
+    : Boolean(normal) && agreed && !busy;
 
   return (
     <Frame>
@@ -116,7 +131,7 @@ export function VerifyScreen({ data }: { data: AppData }) {
           />
         </div>
 
-        {sentTo && !changed ? (
+        {!REQUIRE_CODE ? null : sentTo && !changed ? (
           <>
             <label className="oa-label" htmlFor="oa-code">
               {t('verify.code')}
@@ -148,7 +163,7 @@ export function VerifyScreen({ data }: { data: AppData }) {
           </button>
         )}
 
-        {sample ? <p className="oa-sample">Test build · no code is sent, nothing is saved</p> : null}
+        {sample ? <p className="oa-sample">Test build · nothing is saved</p> : null}
 
         <div className="oa-list mt-2">
           <label className="oa-row" style={{ alignItems: 'flex-start', justifyContent: 'flex-start' }}>
@@ -184,7 +199,7 @@ export function VerifyScreen({ data }: { data: AppData }) {
         ) : null}
       </Body>
       <Foot>
-        {sentTo && !agreed ? <p className="oa-foot-note">{t('verify.tick')}</p> : null}
+        {(REQUIRE_CODE ? sentTo : normal) && !agreed ? <p className="oa-foot-note">{t('verify.tick')}</p> : null}
         <Cta onClick={verify} disabled={!ready}>
           {t('verify.cta')}
         </Cta>
