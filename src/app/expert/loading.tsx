@@ -1,5 +1,6 @@
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
-import { Wrap } from '@/components/oi';
+import { FlowShell } from '@/components/home/FlowShell';
+import { Split } from '@/components/home/parts';
 import { waitLine } from '@/lib/wait-lines';
 import { getLang } from '@/modules/i18n/server';
 import { translator } from '@/modules/i18n/site';
@@ -25,22 +26,26 @@ import { EXPERT_DICT } from '@/modules/i18n/site/expert';
 export default async function ExpertLoading() {
   const t = translator(await getLang(), EXPERT_DICT);
   return (
-    <div className="oi-app min-h-dvh bg-[var(--bg)]">
+    <FlowShell>
       <AppHeader />
       <Spine at="expert" />
 
-      <Wrap className="py-16">
-        <p className="oi-eyebrow m-0 mb-5">{t('ch.eyebrow')}</p>
-        <h1 className="oi-display m-0 mb-8 max-w-[20ch] text-[clamp(1.75rem,1.1rem+2.1vw,2.6rem)]">
-          {t('loading.h1')}
-        </h1>
-
-        <p className="m-0 max-w-[54ch] border-l-2 border-[var(--line)] pl-5 text-[16px] leading-[1.6] text-[var(--ink2)]">
-          {waitLine('expert')}
-        </p>
-      </Wrap>
+      {/* The same black block the page opens with, so nothing jumps. */}
+      <main className="mx-auto w-full max-w-[1040px] px-[var(--gutter)] pb-[clamp(48px,7vw,100px)] pt-[clamp(24px,4vw,48px)]">
+        <section
+          className="panel-dark overflow-hidden rounded-[var(--r-xl)] px-[clamp(22px,4.4vw,64px)] py-[clamp(28px,4.6vw,64px)]"
+          data-reveal=""
+          data-auto=""
+        >
+          <p className="eyebrow">{t('ch.eyebrow')}</p>
+          <Split as="h1" className="h-l max-w-[18ch]" text={t('loading.h1')} auto />
+          <p className="m-0 mt-[clamp(20px,3vw,32px)] max-w-[54ch] text-[clamp(15px,0.9rem+0.2vw,17px)] leading-[1.6] text-white/70">
+            {waitLine('expert')}
+          </p>
+        </section>
+      </main>
 
       <AppFooter />
-    </div>
+    </FlowShell>
   );
 }

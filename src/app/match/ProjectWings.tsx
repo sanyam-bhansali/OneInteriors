@@ -112,17 +112,17 @@ function Plate({ project, likeYours }: { project: PortfolioProject; likeYours: b
           // eslint-disable-next-line @next/next/no-img-element
           <img src={cover} alt="" className="absolute inset-0 h-full w-full object-cover" />
         ) : (
-          <span className="oi-label">{t('wings.photo')}</span>
+          <span className="text-[12px] font-medium text-[var(--ink-2)]">{t('wings.photo')}</span>
         )}
         {cover && project.isRender ? (
-          <span className="oi-label absolute bottom-1.5 left-1.5 rounded-full bg-[var(--card)] px-2 py-0.5">{t('wings.render')}</span>
+          <span className="absolute bottom-2 left-2 rounded-full bg-white/85 px-2.5 py-1 text-[11.5px] font-medium text-[var(--ink)] backdrop-blur">{t('wings.render')}</span>
         ) : null}
       </div>
-      {likeYours ? <p className="oi-label m-0 mt-2 text-[var(--acc-ink)]">{t('wings.likeYours')}</p> : null}
-      <p className="oi-num m-0 mt-2.5 text-[13px] font-semibold leading-tight text-[var(--ink)]">
+      {likeYours ? <p className="m-0 mt-2.5 text-[12px] font-medium text-[var(--accent-ink,var(--acc-ink))]">{t('wings.likeYours')}</p> : null}
+      <p className="m-0 mt-2.5 text-[14px] font-medium leading-tight tracking-[-0.01em] text-[var(--ink)]">
         {project.title}
       </p>
-      <p className="oi-label m-0 mt-1.5">
+      <p className="m-0 mt-1.5 text-[12.5px] tabular-nums text-[var(--ink-2,var(--ink2))]">
         {[
           project.valuePaise ? formatINRCompact(project.valuePaise) : null,
           project.durationDays ? t('wings.days', { n: project.durationDays }) : null,

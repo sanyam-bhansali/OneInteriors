@@ -84,7 +84,7 @@ export function Sheet({
 }) {
   return (
     <Tag
-      className={`border border-[var(--line)] bg-[var(--card)] ${className}`}
+      className={`rounded-[clamp(20px,2.4vw,32px)] bg-[var(--card)] ${className}`}
       style={lifted ? { boxShadow: '0 26px 50px -34px rgba(44,38,36,.45)' } : undefined}
     >
       {children}
@@ -117,7 +117,7 @@ export function Chapter({
     <header className={`mb-10 flex flex-wrap items-end justify-between gap-x-10 gap-y-5 ${className}`}>
       <div className="min-w-0">
         <p className="oi-eyebrow m-0 mb-4">{eyebrow}</p>
-        <h1 className="oi-display m-0 max-w-[24ch] text-[clamp(1.75rem,1.1rem+2.1vw,2.6rem)]">
+        <h1 className="oi-display m-0 max-w-[20ch] text-[clamp(2rem,1.1rem+3.4vw,4.2rem)] leading-[1.02] tracking-[-0.035em]">
           {title}
         </h1>
         {children ? (

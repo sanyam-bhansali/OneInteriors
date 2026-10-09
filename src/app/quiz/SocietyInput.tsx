@@ -49,13 +49,13 @@ export function SocietyInput({
         aria-expanded={show}
         aria-controls="society-suggestions"
         aria-autocomplete="list"
-        className="w-full rounded-full border border-[var(--line)] bg-[var(--card)] px-4 py-2.5 text-[15px] text-[var(--ink)] placeholder:text-[var(--ink2)]"
+        className="flow-input placeholder:text-[var(--ink-3)]"
       />
       {show ? (
         <ul
           id="society-suggestions"
           role="listbox"
-          className="absolute left-0 right-0 z-20 m-0 mt-1 list-none overflow-hidden rounded-[14px] border border-[var(--line)] bg-[var(--card)] p-0 shadow-sm"
+          className="absolute left-0 right-0 z-20 m-0 mt-2 list-none overflow-hidden rounded-[var(--r-m)] bg-[var(--paper)] p-0 shadow-[0_0_0_1px_var(--line),0_24px_50px_-28px_rgba(11,11,11,0.35)]"
         >
           {results.map((s) => (
             <li key={s.name} role="option" aria-selected={false}>
@@ -66,10 +66,10 @@ export function SocietyInput({
                   onPick(s);
                   setOpen(false);
                 }}
-                className="flex w-full cursor-pointer items-center justify-between gap-3 border-0 border-b border-[var(--line)] bg-transparent px-4 py-2.5 text-left text-[14.5px] text-[var(--ink)] hover:bg-[var(--acc-wash)]"
+                className="flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent px-5 py-3 text-left text-[15px] text-[var(--ink)] transition-colors hover:bg-[var(--soft)]"
               >
                 <span>{s.name}</span>
-                <span className="text-[13px] text-[var(--ink2)]">{localityLabel(s.locality)}</span>
+                <span className="text-[13px] text-[var(--ink-2)]">{localityLabel(s.locality)}</span>
               </button>
             </li>
           ))}

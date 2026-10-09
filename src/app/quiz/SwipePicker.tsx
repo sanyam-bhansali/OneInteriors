@@ -15,6 +15,7 @@ import { STYLE_LABELS, STYLE_TAGS, type StyleTag } from '@/modules/brief/types';
 import { stylePhotoFor, stylePhotoUrl, type PickerRoom } from '@/data/style-photos';
 import { useSiteT } from '@/components/app/i18n';
 import { QUIZ_DICT, fillParts } from '@/modules/i18n/site/quiz';
+import { PillButton } from '@/components/home/parts';
 
 const THRESHOLD = 90;
 
@@ -49,11 +50,11 @@ export function SwipePicker({
 
   if (done) {
     return (
-      <p className="rounded-[10px] bg-[var(--acc-wash)] px-4 py-3 text-[15px] text-[var(--ink2)]">
+      <p className="m-0 rounded-[var(--r-m)] bg-[var(--sand)] px-5 py-4 text-[15px] leading-relaxed text-[var(--ink-2)]">
         {likes.length === 0
           ? t('swipe.none')
           : fillParts(t('swipe.picked'), {
-              styles: <strong className="text-[var(--ink)]">{likes.map((s) => STYLE_LABELS[s]).join(', ')}</strong>,
+              styles: <strong className="font-medium text-[var(--ink)]">{likes.map((s) => STYLE_LABELS[s]).join(', ')}</strong>,
             })}
       </p>
     );
@@ -63,7 +64,7 @@ export function SwipePicker({
   const photo = stylePhotoFor(tag, room);
   return (
     <div className="mx-auto max-w-[26rem]">
-      <p className="oi-num m-0 mb-2 text-[11px] uppercase tracking-[0.1em] text-[var(--ink2)]">
+      <p className="eyebrow !mb-3">
         {t('swipe.count', { i: i + 1, n: deck.length, k: likes.length, max })}
       </p>
       <motion.div
@@ -77,26 +78,18 @@ export function SwipePicker({
         }}
         initial={reduced ? false : { opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="touch-pan-y overflow-hidden rounded-[14px] shadow-sm"
+        className="touch-pan-y overflow-hidden rounded-[var(--r-l)] bg-[var(--soft)]"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={stylePhotoUrl(photo, 800)} alt={photo.alt} draggable={false} className="block aspect-[4/5] w-full object-cover" />
       </motion.div>
       <div className="mt-3 flex gap-3">
-        <button
-          type="button"
-          onClick={() => decide(false)}
-          className="min-h-12 flex-1 cursor-pointer rounded-full border border-[var(--line)] bg-transparent text-[15px] font-semibold text-[var(--ink)]"
-        >
+        <PillButton tone="line" className="flex-1" onClick={() => decide(false)}>
           {t('swipe.no')}
-        </button>
-        <button
-          type="button"
-          onClick={() => decide(true)}
-          className="oi-cta min-h-12 flex-1 cursor-pointer border-0 text-[15px]"
-        >
+        </PillButton>
+        <PillButton className="flex-1" onClick={() => decide(true)}>
           {t('swipe.yes')}
-        </button>
+        </PillButton>
       </div>
     </div>
   );
@@ -116,7 +109,7 @@ export function SwipeOrGrid({ grid, swipe }: { grid: React.ReactNode; swipe: Rea
       <button
         type="button"
         onClick={() => setMode(current === 'swipe' ? 'grid' : 'swipe')}
-        className="mt-3 cursor-pointer border-0 bg-transparent p-0 text-[13px] text-[var(--ink2)] underline"
+        className="mt-3 min-h-11 cursor-pointer border-0 bg-transparent p-0 text-[14px] text-[var(--ink-2)] underline underline-offset-2 hover:text-[var(--ink)]"
       >
         {current === 'swipe' ? t('swipe.toGrid') : t('swipe.toSwipe')}
       </button>

@@ -23,6 +23,12 @@
  * want three numbers should get three numbers without reading three profiles
  * first. The quote lands in the studio's profile either way — this is a
  * shortcut to it, not a second home for it.
+ *
+ * ## The landing's canvas (owner, 10 Oct 2026)
+ *
+ * Every view here sits in `FlowShell` — the home page's white canvas, type,
+ * pills, soft tiles and scroll reveals — so the matches and the quote read
+ * as the same site the customer started on.
  */
 
 import { revealSteps } from '@/modules/matching/reveal';
@@ -74,7 +80,9 @@ import { placementIn, scopeBandRange } from '@/modules/quotation/scope-band';
 import type { FirstQuote } from '@/modules/quotation/first-quote';
 import { homeShapeFor } from '@/modules/quotation/first-quote';
 import type { StudioRates } from '@/modules/quotation/catalogue';
-import { Wrap, Chapter, Sheet, Quiet } from '@/components/oi';
+import { Wrap } from '@/components/oi';
+import { FlowShell } from '@/components/home/FlowShell';
+import { Pill, PillButton, Split } from '@/components/home/parts';
 import { StudioCard } from './StudioCard';
 import { MatchHero } from './MatchHero';
 import { CompareBar } from './CompareBar';
@@ -427,16 +435,10 @@ export function MatchClient({
        once, not sat through six times. */
     if (built && current) {
       return (
-        <div className="oi-app min-h-dvh bg-[var(--bg)]">
+        <FlowShell className="oi-quick">
           <AppHeader />
           <Wrap className="py-10">
-            <button
-              type="button"
-              onClick={() => setQuoting(null)}
-              className="oi-num mb-8 cursor-pointer border-0 bg-transparent p-0 text-[11px] uppercase tracking-[0.16em] text-[var(--ink2)] hover:text-[var(--ink)] print:hidden"
-            >
-              {t('quote.back')}
-            </button>
+            <BackToMatches label={t('quote.back')} onBack={() => setQuoting(null)} />
             {project.seenBuild ? (
               <>
               <QuoteCanvas
@@ -499,20 +501,14 @@ export function MatchClient({
             />
           ) : null}
           <AppFooter />
-        </div>
+        </FlowShell>
       );
     }
     return (
-      <div className="oi-app min-h-dvh bg-[var(--bg)]">
+      <FlowShell className="oi-quick">
         <AppHeader />
         <Wrap className="py-10">
-          <button
-            type="button"
-            onClick={() => setQuoting(null)}
-            className="oi-num mb-8 cursor-pointer border-0 bg-transparent p-0 text-[11px] uppercase tracking-[0.16em] text-[var(--ink2)] hover:text-[var(--ink)] print:hidden"
-          >
-            {t('quote.back')}
-          </button>
+          <BackToMatches label={t('quote.back')} onBack={() => setQuoting(null)} />
 
           <QuoteFlow
             filedRates={filedRates?.[quoting.studioSlug]}
@@ -557,26 +553,22 @@ export function MatchClient({
             <ExpertPitch
               offer={offer}
               lead={t('quote.ring', { studio: quoting.studioName })}
-              className="mt-10 max-w-[40rem]"
+              className="mt-[clamp(40px,6vw,72px)] max-w-[44rem]"
             />
           ) : null}
           {built ? (
-            <div className="mt-8 flex flex-wrap items-center gap-4">
-              <Quiet href={`/studios/${quoting.studioSlug}`}>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Pill href={`/studios/${quoting.studioSlug}`} tone="line">
                 {t('quote.onPage', { studio: quoting.studioName })}
-              </Quiet>
-              <button
-                type="button"
-                onClick={() => setQuoting(null)}
-                className="cursor-pointer border-0 bg-transparent p-0 text-[13.5px] text-[var(--ink2)] underline hover:text-[var(--ink)]"
-              >
+              </Pill>
+              <PillButton tone="line" onClick={() => setQuoting(null)}>
                 {t('quote.another')}
-              </button>
+              </PillButton>
             </div>
           ) : null}
         </Wrap>
         <AppFooter />
-      </div>
+      </FlowShell>
     );
   }
 
@@ -584,7 +576,7 @@ export function MatchClient({
   const comparing = project.comparing;
 
   return (
-    <div className="oi-app oi-quick min-h-dvh bg-[var(--bg)]">
+    <FlowShell className="oi-quick">
       <AppHeader />
       <Spine
         at="match"
@@ -602,9 +594,9 @@ export function MatchClient({
         ]}
       />
 
-      <Wrap className="py-12">
+      <Wrap className="pb-[clamp(48px,7vw,100px)] pt-[clamp(40px,6vw,80px)]">
         {welcome ? (
-          <p className="mx-auto mb-6 max-w-[40rem] rounded-full border border-[var(--acc)] px-5 py-2.5 text-center text-[14px] text-[var(--ink)]">
+          <p className="mx-auto mb-8 max-w-[40rem] rounded-[var(--r-m)] bg-[var(--mint)] px-5 py-3 text-center text-[14.5px] leading-[1.5] text-[var(--ink)]">
             {welcome}
           </p>
         ) : null}
@@ -616,30 +608,34 @@ export function MatchClient({
             forWhat={forWhat(brief, lang, t)}
           />
         ) : (
-          <Chapter
-            eyebrow={t('empty.eyebrow')}
-            title={
-              !briefed ? t('empty.noBrief') : t('empty.noFit')
-            }
-          />
+          /* Keyed on which empty it is, so the heading rises again if the
+             brief arrives and the reason changes. */
+          <header key={briefed ? 'nofit' : 'nobrief'} className="mb-10 max-w-[48rem]">
+            <p className="eyebrow">{t('empty.eyebrow')}</p>
+            <Split as="h1" className="h-l" text={!briefed ? t('empty.noBrief') : t('empty.noFit')} auto />
+          </header>
         )}
 
         {!briefed ? (
-          <Sheet className="p-8">
-            <p className="m-0 mb-4 max-w-[54ch] text-[15px] leading-[1.6]">
+          <div className="flow-card max-w-[48rem]" data-reveal="" data-auto="">
+            <p className="m-0 mb-6 max-w-[54ch] text-[16px] leading-[1.6] text-[var(--ink-2)]">
               {t('empty.noBriefBody')}
             </p>
-            <Quiet href="/quiz">{t('empty.start')}</Quiet>
-          </Sheet>
+            <Pill href="/quiz" arrow>
+              {t('empty.start')}
+            </Pill>
+          </div>
         ) : matches.length === 0 && offers.length === 0 ? (
-          <Sheet className="p-8">
-            <p className="m-0 mb-4 max-w-[54ch] text-[15px] leading-[1.6]">
+          <div className="flow-card max-w-[48rem]" data-reveal="" data-auto="">
+            <p className="m-0 mb-6 max-w-[54ch] text-[16px] leading-[1.6] text-[var(--ink-2)]">
               {t('empty.noFitBody')}
             </p>
-            <Quiet href="/quiz">{t('empty.change')}</Quiet>
-          </Sheet>
+            <Pill href="/quiz" arrow>
+              {t('empty.change')}
+            </Pill>
+          </div>
         ) : matches.length === 0 ? null : (
-          <ul className="mx-auto m-0 mt-12 flex max-w-[40rem] list-none flex-col gap-6 p-0">
+          <ul className="mx-auto m-0 mt-[clamp(40px,6vw,72px)] flex max-w-[40rem] list-none flex-col gap-6 p-0">
             {matches.map((match: MatchResult, i) => {
               const studio = byId.get(match.studioId);
               if (!studio || !brief) return null;
@@ -681,18 +677,22 @@ export function MatchClient({
         )}
 
         {briefed && matches.length > 0 ? (
-          <ExpertPitch offer={offer} className="mx-auto mt-10 max-w-[40rem]" />
+          <div className="mx-auto mt-[clamp(48px,7vw,100px)] max-w-[40rem]" data-reveal="">
+            <ExpertPitch offer={offer} />
+          </div>
         ) : null}
 
         {briefed && brief && brief.styleLikes.length > 0 ? (
-          <StyleDnaCard likes={brief.styleLikes} className="mx-auto mt-10 max-w-[40rem]" />
+          <div className="mx-auto mt-4 max-w-[40rem]" data-reveal="">
+            <StyleDnaCard likes={brief.styleLikes} />
+          </div>
         ) : null}
 
         {/* Fewer than three: said plainly, with named one-tap widenings and
             what each adds — never a silent loosening of what they asked for. */}
         {briefed && offers.length > 0 ? (
-          <Sheet className="mx-auto mt-10 max-w-[40rem] p-6">
-            <p className="m-0 mb-4 text-[15px] leading-[1.6]">
+          <div className="flow-card mx-auto mt-10 max-w-[40rem]">
+            <p className="m-0 mb-5 text-[16px] leading-[1.6] text-[var(--ink)]">
               {matches.length === 0
                 ? t('few.none')
                 : matches.length === 1
@@ -700,32 +700,41 @@ export function MatchClient({
                   : t('few.many', { n: matches.length })}{' '}
               {t('few.honest')}
             </p>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2.5">
               {offers.map((o) => (
                 <button
                   key={o.kind}
                   type="button"
                   onClick={() => setWiden((w) => [...w, o.kind])}
-                  className="min-h-11 cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-5 py-2.5 text-[14px] font-semibold text-[var(--ink)] hover:border-[var(--ink2)]"
+                  className="flow-opt"
                 >
                   {t(`widen.${o.kind}`)} (+{o.adds})
                 </button>
               ))}
             </div>
-          </Sheet>
+          </div>
         ) : null}
 
         {/* Why not the others — the roster is small enough to say, and a
-            customer who knows a studio by name should not wonder. */}
+            customer who knows a studio by name should not wonder. Opens like
+            the landing's questions: a row and a round plus that turns. */}
         {briefed && others.length > 0 ? (
-          <details className="mx-auto mt-10 max-w-[40rem]">
-            <summary className="cursor-pointer text-[14px] font-semibold text-[var(--ink2)]">
+          <details className="group mx-auto mt-4 max-w-[40rem] rounded-[var(--r-l)] bg-[var(--soft)] px-[clamp(20px,2.8vw,32px)]">
+            <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 py-4 text-[16px] font-medium tracking-[-0.01em] text-[var(--ink)] [&::-webkit-details-marker]:hidden">
               {t('others.summary', { n: others.length })}
+              <span
+                aria-hidden
+                className="grid h-9 w-9 flex-none place-items-center rounded-full bg-[var(--paper)] transition-transform duration-300 group-open:rotate-45"
+              >
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                  <path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              </span>
             </summary>
-            <ul className="m-0 mt-3 flex list-none flex-col gap-1.5 p-0">
+            <ul className="m-0 flex list-none flex-col gap-2 p-0 pb-6">
               {others.map((o) => (
-                <li key={o.studioId} className="text-[13.5px] text-[var(--ink2)]">
-                  <span className="text-[var(--ink)]">{o.name}</span> — {t(`why.${o.reason}`)}
+                <li key={o.studioId} className="text-[14.5px] leading-[1.5] text-[var(--ink-2)]">
+                  <span className="font-medium text-[var(--ink)]">{o.name}</span> — {t(`why.${o.reason}`)}
                 </li>
               ))}
             </ul>
@@ -736,6 +745,18 @@ export function MatchClient({
       <CompareBar selected={comparing.length} minimum={MIN_TO_COMPARE} priced={quoted.length} />
 
       <AppFooter />
+    </FlowShell>
+  );
+}
+
+/** Back to the list — the landing's small line pill, never printed. */
+function BackToMatches({ label, onBack }: { label: string; onBack: () => void }) {
+  /* The wrapper carries print:hidden: `.pill` sets its own display. */
+  return (
+    <div className="mb-8 print:hidden">
+      <PillButton tone="line" size="sm" onClick={onBack}>
+        {label}
+      </PillButton>
     </div>
   );
 }

@@ -15,6 +15,7 @@ import { QUIZ_DICT, quizServerText } from '@/modules/i18n/site/quiz';
 import type { StyleTag } from '@/modules/brief/types';
 import type { StylePick } from '@/modules/inspiration/reading';
 import { readInspirationAction } from './actions';
+import { PillButton } from '@/components/home/parts';
 
 export function InspirationReader({
   likes,
@@ -39,42 +40,40 @@ export function InspirationReader({
   }
 
   if (state.kind === 'used') {
-    return <p className="m-0 mt-6 text-[14px] text-[var(--ink2)]">{t('insp.used')}</p>;
+    return <p className="m-0 mt-6 text-[15px] text-[var(--ink-2)]">{t('insp.used')}</p>;
   }
 
   if (state.kind === 'read') {
     const usable = state.picks.filter((p) => !dislikes.includes(p.style));
     return (
-      <div className="mt-6 rounded-[14px] border border-[var(--acc)] bg-[var(--card)] p-5">
-        <p className="oi-label m-0 mb-3">{t('insp.see')}</p>
+      <div className="flow-card mt-6">
+        <p className="eyebrow !mb-3">{t('insp.see')}</p>
         <ul className="m-0 mb-4 flex list-none flex-col gap-2 p-0">
           {state.picks.map((p) => (
             <li key={p.style} className="text-[15px] leading-snug">
-              <strong className="font-semibold">{p.label}</strong>
-              {p.why ? <span className="text-[var(--ink2)]"> — {p.why}</span> : null}
-              {dislikes.includes(p.style) ? <span className="text-[var(--acc-ink)]">{t('insp.ruledOut')}</span> : null}
+              <strong className="font-medium">{p.label}</strong>
+              {p.why ? <span className="text-[var(--ink-2)]"> — {p.why}</span> : null}
+              {dislikes.includes(p.style) ? <span className="text-[var(--accent-ink)]">{t('insp.ruledOut')}</span> : null}
             </li>
           ))}
         </ul>
         <div className="flex flex-wrap items-center gap-4">
           {usable.length > 0 ? (
-            <button
-              type="button"
+            <PillButton
+              size="sm"
               onClick={() => {
                 const merged = [...usable.map((p) => p.style), ...likes.filter((l) => !usable.some((p) => p.style === l))].slice(0, 3);
                 onUse(merged);
                 setState({ kind: 'used' });
               }}
-              className="cursor-pointer px-5 py-2.5 text-[14.5px] font-medium text-white"
-              style={{ background: 'var(--acc-btn)' }}
             >
               {t('use')}
-            </button>
+            </PillButton>
           ) : null}
           <button
             type="button"
             onClick={() => setState({ kind: 'idle', error: null })}
-            className="cursor-pointer border-0 bg-transparent p-0 text-[13.5px] text-[var(--ink2)] underline"
+            className="min-h-10 cursor-pointer border-0 bg-transparent p-0 text-[14px] text-[var(--ink-2)] underline underline-offset-2 hover:text-[var(--ink)]"
           >
             {t('insp.another')}
           </button>
@@ -84,9 +83,9 @@ export function InspirationReader({
   }
 
   return (
-    <form action={read} className="mt-8 border-t border-[var(--line)] pt-6">
-      <p className="m-0 mb-1 text-[15px] font-medium text-[var(--ink)]">{t('insp.title')}</p>
-      <p className="m-0 mb-3 text-[13.5px] text-[var(--ink2)]">
+    <form action={read} className="flow-card mt-8">
+      <p className="m-0 mb-1 text-[18px] font-medium tracking-[-0.015em] text-[var(--ink)]">{t('insp.title')}</p>
+      <p className="m-0 mb-4 text-[14.5px] leading-relaxed text-[var(--ink-2)]">
         {t('insp.body')}
       </p>
       <div className="flex flex-wrap items-center gap-3">
@@ -94,18 +93,14 @@ export function InspirationReader({
           type="file"
           name="photo"
           accept="image/jpeg,image/png,image/webp"
-          className="max-w-full border border-[var(--line)] bg-[var(--card)] px-3 py-2 text-[14px]"
+          className="w-full max-w-full cursor-pointer rounded-[var(--r-m)] bg-[var(--paper)] p-2 text-[14px] text-[var(--ink-2)] file:mr-3 file:min-h-10 file:cursor-pointer file:rounded-full file:border-0 file:bg-[var(--ink)] file:px-4 file:text-[14px] file:font-medium file:text-white"
         />
-        <button
-          type="submit"
-          disabled={state.kind === 'reading'}
-          className="cursor-pointer border border-[var(--line)] bg-transparent px-5 py-2.5 text-[14px] font-medium text-[var(--ink)] disabled:opacity-60"
-        >
+        <PillButton type="submit" tone="line" size="sm" disabled={state.kind === 'reading'}>
           {state.kind === 'reading' ? t('insp.looking') : t('insp.read')}
-        </button>
+        </PillButton>
       </div>
       {state.kind === 'idle' && state.error ? (
-        <p role="alert" className="m-0 mt-3 text-[13.5px] text-[var(--acc-ink)]">
+        <p role="alert" className="m-0 mt-3 text-[14px] text-[var(--accent-ink)]">
           {state.error}
         </p>
       ) : null}

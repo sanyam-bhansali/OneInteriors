@@ -35,8 +35,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Sheet, Wrap } from '@/components/oi';
+import { Pill, PillButton, Split } from '@/components/home/parts';
 import { loadBrief } from '@/modules/brief/store';
 import { isBriefComplete } from '@/modules/brief/types';
 import { saveBriefAction } from '@/app/quiz/actions';
@@ -171,33 +170,30 @@ export function BriefRescue({
     };
   }, [router, previewable]);
 
-  /* The customer side's look (owner, 10 Oct 2026: "make it more like our
-     theme"): a soft card, a display heading, black pill actions. */
-  const primary =
-    'oi-cta inline-flex min-h-12 cursor-pointer items-center justify-center rounded-full px-7 py-3 text-[15px] font-medium text-white no-underline';
-  const secondary =
-    'inline-flex min-h-12 cursor-pointer items-center justify-center rounded-full border border-[var(--line)] bg-transparent px-7 py-3 text-[15px] font-medium text-[var(--ink)] no-underline transition-colors hover:border-[var(--ink)]';
-
-  const frame = (children: React.ReactNode) => (
-    <main className="py-14 sm:py-20">
-      <Wrap>
-        <Sheet className="mx-auto max-w-[720px] rounded-[28px] px-6 py-10 sm:px-12 sm:py-14">{children}</Sheet>
-      </Wrap>
+  /* The landing's look (owner, 10 Oct 2026: "the design … on our landing
+     page should be in the quiz too, in the brief too and till the expert
+     page"): its soft rounded card, a large heading whose words rise, black
+     pill actions. Renders inside FlowShell (a `.cb` root). The `key` makes
+     each phase a fresh card, so its heading rises in again. */
+  const frame = (key: Phase, children: React.ReactNode) => (
+    <main className="px-[var(--gutter)] py-[clamp(48px,7vw,100px)]">
+      <div key={key} className="soft-card mx-auto max-w-[820px]" data-reveal="" data-auto="">
+        {children}
+      </div>
     </main>
   );
 
   if (phase === 'checking' || phase === 'restoring') {
     return frame(
+      'checking',
       <div className="flex items-start gap-5">
         <span
           aria-hidden
-          className="mt-1 h-6 w-6 shrink-0 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--acc)] motion-reduce:animate-none"
+          className="mt-1.5 h-7 w-7 shrink-0 animate-spin rounded-full border-2 border-[var(--soft-2)] border-t-[var(--accent)] motion-reduce:animate-none"
         />
         <div>
-          <p className="oi-eyebrow m-0">{t('rescue.picking')}</p>
-          <p className="m-0 mt-3 max-w-[46ch] text-[16px] leading-relaxed text-[var(--ink2)]">
-            {t('rescue.pickingBody', { dest })}
-          </p>
+          <p className="h-m">{t('rescue.picking')}</p>
+          <p className="lede">{t('rescue.pickingBody', { dest })}</p>
         </div>
       </div>,
     );
@@ -205,43 +201,38 @@ export function BriefRescue({
 
   if (phase === 'failed') {
     return frame(
+      'failed',
       <>
-        <h1 className="oi-display m-0 mb-4 max-w-[20ch] text-[clamp(1.9rem,1.2rem+2.4vw,2.9rem)] leading-[1.08]">
-          {t('rescue.failedH1')}
-        </h1>
-        <p className="m-0 mb-8 max-w-[54ch] text-[16.5px] leading-relaxed text-[var(--ink2)]">
-          {t('rescue.failedBody')}
-        </p>
-        <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            className={primary}
+        <Split as="h1" className="h-l max-w-[16ch]" text={t('rescue.failedH1')} auto />
+        <p className="lede">{t('rescue.failedBody')}</p>
+        <div className="mt-[clamp(28px,4vw,40px)] flex flex-wrap gap-3">
+          <PillButton
+            arrow
             onClick={() => {
               clearRescueAttempts();
               router.refresh();
             }}
           >
             {t('rescue.retry')}
-          </button>
-          <Link href="/match" className={secondary}>
+          </PillButton>
+          <Pill href="/match" tone="line">
             {t('rescue.back')}
-          </Link>
+          </Pill>
         </div>
       </>,
     );
   }
 
   return frame(
+    'empty',
     <>
-      <h1 className="oi-display m-0 mb-4 max-w-[20ch] text-[clamp(1.9rem,1.2rem+2.4vw,2.9rem)] leading-[1.08]">
-        {t('rescue.emptyH1')}
-      </h1>
-      <p className="m-0 mb-8 max-w-[54ch] text-[16.5px] leading-relaxed text-[var(--ink2)]">
-        {t('rescue.emptyBody', { dest })}
-      </p>
-      <Link href="/quiz" className={primary}>
-        {t('rescue.answer')}
-      </Link>
+      <Split as="h1" className="h-l max-w-[16ch]" text={t('rescue.emptyH1')} auto />
+      <p className="lede">{t('rescue.emptyBody', { dest })}</p>
+      <div className="mt-[clamp(28px,4vw,40px)]">
+        <Pill href="/quiz" arrow>
+          {t('rescue.answer')}
+        </Pill>
+      </div>
     </>,
   );
 }

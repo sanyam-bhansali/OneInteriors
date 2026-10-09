@@ -599,7 +599,7 @@
 
 /* ── Blocks and section heads ────────────────────────────────── */
 
-.cb .block {
+.cb section.block {
   padding-block: clamp(48px, 7vw, 100px);
 }
 .cb .sec-head {
@@ -1998,4 +1998,200 @@ a.foot-pill:hover {
   .cb .collage .tile {
     transition: none;
   }
+}
+
+/* ── The flow: quiz → matches → quote → compare → expert (10 Oct 2026) ──
+   The landing's canvas carried through the customer's journey. These are the
+   few pieces the landing never needed: a nav that stays put on a working
+   screen, the step bar, and the soft card every step sits in. */
+
+.cb.flow {
+  min-height: 100dvh;
+}
+.cb.flow-chrome {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: transparent;
+}
+.cb .nav.flow-nav {
+  position: relative;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: saturate(1.4) blur(14px);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
+  box-shadow: 0 1px 0 var(--line);
+}
+.cb .flow-nav .nav-in {
+  height: 64px;
+}
+.cb .flow-nav .nav-links {
+  font-size: 14px;
+}
+
+/* The step bar: five rounded segments, the current one in ink. */
+.cb.flow-spine {
+  padding: 14px 0 0;
+  background: transparent;
+}
+.cb.flow-spine ol {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.cb.flow-spine li {
+  flex: 1 0 8.5rem;
+}
+.cb.flow-spine a,
+.cb.flow-spine .seg {
+  display: block;
+  height: 100%;
+  padding: 12px 16px;
+  border-radius: 18px;
+  background: var(--soft);
+  color: var(--ink-2);
+  text-decoration: none;
+  transition:
+    background-color 400ms var(--ease),
+    color 400ms var(--ease);
+}
+.cb.flow-spine a:hover {
+  background: var(--soft-2);
+  color: var(--ink);
+}
+.cb.flow-spine .seg[aria-current='step'],
+.cb.flow-spine a[aria-current='step'] {
+  background: var(--ink);
+  color: #fff;
+}
+.cb.flow-spine .n {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  opacity: 0.6;
+}
+.cb.flow-spine .t {
+  display: block;
+  margin-top: 4px;
+  font-size: 14.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.cb.flow-spine .f {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+.cb.flow-spine .seg.off {
+  opacity: 0.55;
+}
+
+/* The card every step sits in: the landing's soft, rounded tile. */
+.cb .flow-card {
+  border-radius: var(--r-l);
+  background: var(--soft);
+  padding: clamp(20px, 2.8vw, 36px);
+}
+.cb .flow-card.white {
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.cb .flow-card.dark {
+  background: var(--ink);
+  color: #fff;
+}
+
+/* An option to pick: a pill that fills with ink when chosen. */
+.cb .flow-opt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font: 500 15px var(--sans);
+  cursor: pointer;
+  transition:
+    background-color 300ms var(--ease),
+    color 300ms var(--ease),
+    border-color 300ms var(--ease),
+    transform 300ms var(--ease);
+}
+.cb .flow-opt:hover {
+  border-color: var(--ink);
+}
+.cb .flow-opt[aria-pressed='true'],
+.cb .flow-opt[aria-checked='true'] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+.cb .flow-opt:active {
+  transform: scale(0.97);
+}
+
+/* A field: the landing's soft pill input. */
+.cb .flow-input {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 22px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--soft);
+  color: var(--ink);
+  font: 400 16px var(--sans);
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color 300ms var(--ease),
+    background-color 300ms var(--ease);
+}
+.cb .flow-input:focus {
+  outline: none;
+  border-color: var(--ink);
+  background: var(--paper);
+}
+.cb .pill:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+/* A field on a soft card turns white, or it disappears into the card. */
+.cb .flow-card .flow-input {
+  background: var(--paper);
+}
+.cb .flow-card .flow-input:focus {
+  background: var(--paper);
+}
+/* A long pill label (Confirm booking · Sat, 10 Oct, 11:30 am) may wrap on a phone. */
+.cb .pill.pill-wrap {
+  white-space: normal;
+  line-height: 1.25;
+  padding-block: 12px;
+  height: auto;
+}
+/* A disabled pill does not invite: no rising fill, no roll. */
+.cb .pill:disabled::before {
+  display: none;
+}
+.cb .pill:disabled .roll > span {
+  transform: none !important;
+}
+/* Figures in the same sans through the whole flow. */
+.cb.flow {
+  --font-mono: var(--sans);
+}
+.cb .pill.pill-wrap {
+  max-width: 100%;
+  text-align: left;
+}
+.cb .pill.pill-wrap .roll > span::after {
+  width: 100%;
 }

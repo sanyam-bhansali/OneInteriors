@@ -18,7 +18,9 @@ import { useEffect } from 'react';
 
 export function CbMotion() {
   useEffect(() => {
-    const root = document.querySelector<HTMLElement>('.cb');
+    // The page's own .cb root — not the header or step bar, which carry .cb
+    // only for their styling (cb-part).
+    const root = document.querySelector<HTMLElement>('.cb:not(.cb-part)');
     if (!root) return;
     root.classList.add('js');
     const cleanups: (() => void)[] = [];
@@ -43,6 +45,21 @@ export function CbMotion() {
     );
     revealEls.filter((el) => !el.hasAttribute('data-auto')).forEach((el) => io.observe(el));
     cleanups.push(() => io.disconnect());
+
+    /* Screens that change without a page load — the quiz's steps, the
+       expert form's stages — add reveal elements after this ran. Watch for
+       them, so nothing waits hidden for an observer that never saw it. */
+    const seen = new WeakSet<Element>(revealEls);
+    const mo = new MutationObserver(() => {
+      for (const el of root.querySelectorAll<HTMLElement>('[data-split],[data-reveal]')) {
+        if (seen.has(el)) continue;
+        seen.add(el);
+        if (el.hasAttribute('data-auto')) requestAnimationFrame(() => el.classList.add('is-in'));
+        else io.observe(el);
+      }
+    });
+    mo.observe(root, { childList: true, subtree: true });
+    cleanups.push(() => mo.disconnect());
 
     function countUp(scope: HTMLElement) {
       if (reduce) return;

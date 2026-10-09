@@ -29,7 +29,7 @@ import { ARCHITECT } from '@/modules/consultation/architect';
 import { formatINRCompact } from '@/lib/money';
 import { normalisePhone } from '@/modules/studio/phone';
 import { requestOtpAction, verifyOtpAction } from '@/app/sign-in/actions';
-import { Sheet, Tick } from '@/components/oi';
+import { Pill, PillButton, Split } from '@/components/home/parts';
 import { requestExpertAction, type ExpertState } from './actions';
 import { useLang, useSiteT } from '@/components/app/i18n';
 import { EXPERT_DICT, known } from '@/modules/i18n/site/expert';
@@ -157,21 +157,27 @@ export function ExpertForm({
   if (state.status === 'sent' || previewDone) {
     const scheduledFor = state.status === 'sent' ? state.scheduledFor : slot ?? undefined;
     const when = scheduledFor ? slotText(scheduledFor, lang) : null;
+    const calLabel = t('cal.add');
     return (
-      <Sheet className="rounded-[22px] p-[clamp(22px,3vw,34px)]">
-        <p className="oi-eyebrow m-0 mb-4">{when ? t('sent.booked') : t('sent.requested')}</p>
-        <h2 className="oi-display m-0 mb-4 text-[clamp(1.5rem,1.2rem+1.2vw,2rem)]">
-          {when ? t('sent.when', { day: when.day, time: when.time }) : t('sent.weCall')}
-        </h2>
-        <p className="m-0 mb-3 max-w-[58ch] text-[15px] leading-[1.65] text-[var(--ink2)]">
-          {when ? t('sent.bookedBody') : t('sent.requestedBody')}
+      <section className="flow-card" data-reveal="" data-auto="">
+        <p className="eyebrow">
+          <i aria-hidden className="mr-2.5 inline-block h-[7px] w-[7px] rounded-full bg-[var(--accent)] align-middle" />
+          {when ? t('sent.booked') : t('sent.requested')}
         </p>
-        <p className="m-0 mb-5 text-[15px] text-[var(--ink)]">
-          {t('sent.with')} <strong className="font-semibold">{ARCHITECT.name}</strong> · {known(lang, 'architect.role', ARCHITECT.role)}
+        <Split
+          as="h2"
+          className="h-l max-w-[18ch]"
+          text={when ? t('sent.when', { day: when.day, time: when.time }) : t('sent.weCall')}
+          auto
+        />
+        <p className="lede">{when ? t('sent.bookedBody') : t('sent.requestedBody')}</p>
+        <p className="m-0 mt-5 text-[16px] text-[var(--ink)]">
+          {t('sent.with')} <strong className="font-medium">{ARCHITECT.name}</strong> · {known(lang, 'architect.role', ARCHITECT.role)}
         </p>
-        {previewDone ? <p className="m-0 mb-5 text-[13px] text-[var(--acc-ink)]">{t('flow.testBuild')}</p> : null}
+        {previewDone ? <p className="m-0 mt-3 text-[13px] text-[var(--accent-ink)]">{t('flow.testBuild')}</p> : null}
         {scheduledFor ? (
-          <p className="m-0 mb-6">
+          <p className="m-0 mt-6">
+            {/* A new tab, so the landing's pill markup by hand (Pill has no target). */}
             <a
               href={googleCalendarUrl({
                 startsAt: scheduledFor,
@@ -180,22 +186,27 @@ export function ExpertForm({
               })}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex min-h-11 items-center rounded-full border border-[var(--line)] px-5 text-[14px] font-medium text-[var(--ink)] no-underline hover:border-[var(--ink)]"
+              className="pill pill-line pill-sm"
+              data-magnetic=""
             >
-              {t('cal.add')}
+              <span className="mag-inner">
+                <span className="roll">
+                  <span data-t={calLabel}>{calLabel}</span>
+                </span>
+              </span>
             </a>
           </p>
         ) : null}
 
         {/* The next thing to do, so the confirmation is not a dead end. */}
-        <div className="border-t border-[var(--line)] pt-6">
-          <p className="m-0 mb-5 max-w-[58ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">{t('prep.body')}</p>
-          <a href="/account#rooms" className="oi-cta inline-flex min-h-11 items-center rounded-full px-6 py-3 text-[14.5px] text-white no-underline">
+        <div className="mt-[clamp(28px,4vw,44px)] rounded-[var(--r-m)] bg-[var(--paper)] p-[clamp(20px,2.6vw,32px)]">
+          <p className="m-0 mb-5 max-w-[58ch] text-[15px] leading-[1.6] text-[var(--ink-2)]">{t('prep.body')}</p>
+          <Pill href="/account#rooms" arrow>
             {t('prep.cta')}
-          </a>
-          <p className="m-0 mt-4 text-[13px] text-[var(--ink2)]">{t('prep.note')}</p>
+          </Pill>
+          <p className="m-0 mt-4 text-[13px] text-[var(--ink-2)]">{t('prep.note')}</p>
         </div>
-      </Sheet>
+      </section>
     );
   }
 
@@ -269,15 +280,30 @@ export function ExpertForm({
     startTransition(() => action(data));
   };
 
-  const card = 'rounded-[22px] border border-[var(--line)] bg-[var(--card)] p-[clamp(18px,2.6vw,28px)]';
-  const pill = 'oi-cta min-h-12 cursor-pointer rounded-full border-0 px-8 py-3.5 text-[15px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-40';
+  /* The landing's palette on a soft card: white tiles, filled with ink once
+     chosen. Hand-rolled rather than `.flow-opt`, whose pill shape and centred
+     content (unlayered CSS) a utility cannot override. */
+  const tile = (on: boolean) =>
+    `cursor-pointer border-0 transition-[background-color,color,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.98] ${
+      on ? 'bg-[var(--ink)] text-white' : 'bg-[var(--paper)] text-[var(--ink)] hover:shadow-[inset_0_0_0_1px_var(--ink)]'
+    }`;
+  /* `.flow-input` sits on a soft card, so the field is white rather than soft. */
+  const field = { background: 'var(--paper)' } as const;
+  const confirmLabel =
+    confirming || pending
+      ? t('flow.confirming')
+      : slot
+        ? `${t('flow.confirm')} · ${dayChip(slot, lang)}, ${slotText(slot, lang).time}`
+        : t('flow.confirm');
+  /* The dated label is long for a phone; let it wrap there rather than clip. */
+  const longPill = 'max-w-full whitespace-normal! py-3! leading-[1.25]!';
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       {/* 1 · Studios */}
-      <section className={card}>
+      <section className="flow-card" data-reveal="" style={{ ['--d' as string]: '120ms' }}>
         <Step n={1} title={t('flow.step1')} help={t('flow.step1Help', { min: minStudios, max: maxStudios })} />
-        <ul className="m-0 grid list-none gap-2.5 p-0 sm:grid-cols-2">
+        <ul className="m-0 grid list-none gap-2 p-0 sm:grid-cols-2">
           {studios.map((studio) => {
             const checked = picked.includes(studio.id);
             return (
@@ -286,22 +312,24 @@ export function ExpertForm({
                   type="button"
                   aria-pressed={checked}
                   onClick={() => toggleStudio(studio.id)}
-                  className={`flex min-h-14 w-full cursor-pointer items-center justify-between gap-3 rounded-[16px] border px-4 py-3 text-left transition-colors ${
-                    checked ? 'border-[var(--ink)] bg-[var(--acc-wash)]' : 'border-[var(--line)] bg-[var(--bg)] hover:border-[var(--ink2)]'
-                  }`}
+                  className={`flex min-h-16 w-full items-center justify-between gap-3 rounded-[var(--r-m)] px-5 py-3 text-left ${tile(checked)}`}
                 >
                   <span className="flex items-center gap-3">
                     <span
                       aria-hidden
-                      className={`flex h-5 w-5 flex-none items-center justify-center rounded-full border ${
-                        checked ? 'border-[var(--ink)] bg-[var(--ink)] text-white' : 'border-[var(--line)]'
+                      className={`flex h-6 w-6 flex-none items-center justify-center rounded-full ${
+                        checked ? 'bg-[var(--accent)] text-white' : 'shadow-[inset_0_0_0_1.5px_var(--line)]'
                       }`}
                     >
-                      {checked ? <Tick style={{ width: 11, height: 11 }} /> : null}
+                      {checked ? (
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                          <path d="M3.5 8.4 6.6 11.4 12.5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      ) : null}
                     </span>
-                    <span className="text-[15px] font-medium text-[var(--ink)]">{studio.name}</span>
+                    <span className="text-[16px] font-medium">{studio.name}</span>
                   </span>
-                  <span className="oi-num text-[12.5px] text-[var(--ink2)]">
+                  <span className={`text-[13.5px] tabular-nums ${checked ? 'text-white/65' : 'text-[var(--ink-2)]'}`}>
                     {formatINRCompact(studio.lowPaise)}–{formatINRCompact(studio.highPaise)}
                   </span>
                 </button>
@@ -313,35 +341,38 @@ export function ExpertForm({
       </section>
 
       {/* 2 · Date, then time */}
-      <section className={card}>
+      <section className="flow-card" data-reveal="">
         <Step n={2} title={t('flow.step2')} />
         {booking ? (
           <>
-            <p className="oi-label m-0 mb-3">{t('flow.pickDay')}</p>
+            <p className="eyebrow">{t('flow.pickDay')}</p>
             <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
-              {days.slice(0, 7).map((d) => (
-                <button
-                  key={d.key}
-                  type="button"
-                  aria-pressed={day === d.key}
-                  onClick={() => {
-                    setDay(d.key);
-                    if (slot && !d.times.includes(slot)) setSlot(null);
-                  }}
-                  className={`cursor-pointer rounded-[16px] border py-3 text-center transition-colors ${
-                    day === d.key
-                      ? 'border-[var(--ink)] bg-[var(--ink)] text-white'
-                      : 'border-[var(--line)] bg-transparent text-[var(--ink)] hover:border-[var(--ink2)]'
-                  }`}
-                >
-                  <small className="oi-num block text-[13px]">{weekdayOf(d.times[0]!, lang)}</small>
-                  <b className="mt-1 block text-[24px] font-semibold leading-none">{dateOf(d.times[0]!, lang)}</b>
-                </button>
-              ))}
+              {days.slice(0, 7).map((d) => {
+                const on = day === d.key;
+                return (
+                  <button
+                    key={d.key}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => {
+                      setDay(d.key);
+                      if (slot && !d.times.includes(slot)) setSlot(null);
+                    }}
+                    className={`min-h-[76px] rounded-[var(--r-m)] py-3 text-center ${tile(on)}`}
+                  >
+                    <small className={`block text-[13px] font-medium ${on ? 'text-white/65' : 'text-[var(--ink-2)]'}`}>
+                      {weekdayOf(d.times[0]!, lang)}
+                    </small>
+                    <b className="mt-1.5 block text-[26px] font-medium leading-none tracking-[-0.04em] tabular-nums">
+                      {dateOf(d.times[0]!, lang)}
+                    </b>
+                  </button>
+                );
+              })}
             </div>
             {activeDay ? (
-              <>
-                <p className="oi-label m-0 mb-3 mt-6">{t('flow.step2Time')}</p>
+              <div className="mt-7">
+                <p className="eyebrow">{t('flow.step2Time')}</p>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {activeDay.times.map((iso) => (
                     <button
@@ -349,76 +380,66 @@ export function ExpertForm({
                       type="button"
                       aria-pressed={slot === iso}
                       onClick={() => setSlot(iso)}
-                      className={`oi-num min-h-[50px] cursor-pointer rounded-full border text-[15px] transition-colors ${
-                        slot === iso
-                          ? 'border-[var(--ink)] bg-[var(--ink)] text-white'
-                          : 'border-[var(--line)] bg-transparent text-[var(--ink)] hover:border-[var(--ink2)]'
-                      }`}
+                      className={`min-h-[52px] rounded-full text-[15px] font-medium tabular-nums ${tile(slot === iso)}`}
                     >
                       {slotText(iso, lang).time}
                     </button>
                   ))}
                 </div>
-              </>
+              </div>
             ) : null}
-            {preview ? <p className="m-0 mt-4 text-[13px] text-[var(--acc-ink)]">{t('flow.sampleHours')}</p> : null}
+            {preview ? <p className="m-0 mt-4 text-[13px] text-[var(--accent-ink)]">{t('flow.sampleHours')}</p> : null}
             {err.startsAt ? <Alert>{err.startsAt}</Alert> : null}
           </>
         ) : (
-          <p className="m-0 text-[14.5px] leading-[1.6] text-[var(--ink2)]">{t('flow.step2None')}</p>
+          <p className="m-0 max-w-[60ch] text-[15px] leading-[1.6] text-[var(--ink-2)]">{t('flow.step2None')}</p>
         )}
       </section>
 
       {/* 3 · Who it is for — already known, so a confirmation, not a form */}
-      <section className={card}>
+      <section className="flow-card" data-reveal="">
         <Step n={3} title={t('flow.step3')} />
         {editing || !name.trim() || !phoneOk ? (
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block">
-              <span className="oi-label mb-2 block">{t('flow.name')}</span>
+              <span className="mb-2 block px-1 text-[13px] font-medium text-[var(--ink-2)]">{t('flow.name')}</span>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value.slice(0, 80))}
                 autoComplete="name"
-                className="w-full rounded-full border border-[var(--line)] bg-[var(--bg)] px-5 py-3 text-[15px] text-[var(--ink)]"
+                className="flow-input"
+                style={field}
               />
             </label>
             <label className="block">
-              <span className="oi-label mb-2 block">{t('flow.mobile')}</span>
+              <span className="mb-2 block px-1 text-[13px] font-medium text-[var(--ink-2)]">{t('flow.mobile')}</span>
               <input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value.slice(0, 16))}
                 inputMode="tel"
                 autoComplete="tel-national"
                 placeholder="98765 43210"
-                className="w-full rounded-full border border-[var(--line)] bg-[var(--bg)] px-5 py-3 text-[15px] font-normal tabular-nums text-[var(--ink)]"
+                className="flow-input"
+                style={field}
               />
             </label>
             {editing && name.trim() && phoneOk ? (
               <div className="sm:col-span-2">
-                <button
-                  type="button"
-                  onClick={() => setEditing(false)}
-                  className="cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-4 py-2 text-[13.5px] font-medium text-[var(--ink)] hover:border-[var(--ink)]"
-                >
+                <PillButton tone="line" size="sm" onClick={() => setEditing(false)}>
                   {t('flow.done')}
-                </button>
+                </PillButton>
               </div>
             ) : null}
           </div>
         ) : (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="m-0 text-[16px] text-[var(--ink)]">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--r-m)] bg-[var(--paper)] px-5 py-4">
+            <p className="m-0 text-[17px] text-[var(--ink)]">
               <span className="block font-medium">{name}</span>
-              <span className="mt-1 block text-[15px] font-normal tabular-nums text-[var(--ink2)]">+91 {phone}</span>
+              <span className="mt-1 block text-[15px] font-normal tabular-nums text-[var(--ink-2)]">+91 {phone}</span>
             </p>
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-4 py-1.5 text-[13px] font-medium text-[var(--ink2)] hover:border-[var(--ink)] hover:text-[var(--ink)]"
-            >
+            <PillButton tone="line" size="sm" onClick={() => setEditing(true)}>
               {t('flow.change')}
-            </button>
+            </PillButton>
           </div>
         )}
         {err.contactName ? <Alert>{err.contactName}</Alert> : null}
@@ -426,13 +447,13 @@ export function ExpertForm({
       </section>
 
       {/* 4 · The code, then the booking */}
-      <section className={card}>
+      <section className="flow-card" data-reveal="">
         <Step n={4} title={t('flow.step4')} />
         {codeOpen ? (
           <>
-            <p className="m-0 mb-4 text-[14.5px] text-[var(--ink2)]">{t('flow.codeSent', { phone })}</p>
-            <label className="block max-w-[260px]">
-              <span className="oi-label mb-2 block">{t('flow.code')}</span>
+            <p className="m-0 mb-4 max-w-[60ch] text-[15px] text-[var(--ink-2)]">{t('flow.codeSent', { phone })}</p>
+            <label className="block max-w-[280px]">
+              <span className="mb-2 block px-1 text-[13px] font-medium text-[var(--ink-2)]">{t('flow.code')}</span>
               <input
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -440,10 +461,11 @@ export function ExpertForm({
                 autoComplete="one-time-code"
                 maxLength={6}
                 placeholder="······"
-                className="w-full rounded-full border border-[var(--line)] bg-[var(--bg)] px-5 py-3 text-center font-normal tabular-nums text-[20px] tracking-[0.4em] text-[var(--ink)]"
+                className="flow-input"
+                style={{ ...field, textAlign: 'center', fontSize: 20, letterSpacing: '0.4em' }}
               />
             </label>
-            <p className="m-0 mt-3 text-[13px] text-[var(--ink2)]">
+            <p className="m-0 mt-3 px-1 text-[13px] text-[var(--ink-2)]">
               {wait > 0 ? (
                 t('flow.resendIn', { s: wait })
               ) : (
@@ -452,8 +474,8 @@ export function ExpertForm({
                 </button>
               )}
             </p>
-            {devCode ? <p className="m-0 mt-2 text-[13px] text-[var(--acc-ink)]">Test build · your code is {devCode}</p> : null}
-            {preview ? <p className="m-0 mt-2 text-[13px] text-[var(--acc-ink)]">{t('flow.testBuild')}</p> : null}
+            {devCode ? <p className="m-0 mt-2 px-1 text-[13px] text-[var(--accent-ink)]">Test build · your code is {devCode}</p> : null}
+            {preview ? <p className="m-0 mt-2 px-1 text-[13px] text-[var(--accent-ink)]">{t('flow.testBuild')}</p> : null}
           </>
         ) : null}
 
@@ -461,40 +483,38 @@ export function ExpertForm({
         {err.form ? <Alert>{err.form}</Alert> : null}
         {err.shareConsent ? <Alert>{err.shareConsent}</Alert> : null}
 
-        <p className="m-0 mb-5 mt-5 max-w-[60ch] text-[13px] leading-[1.6] text-[var(--ink2)]">{t('flow.consent')}</p>
+        <p className="m-0 mb-5 mt-5 max-w-[60ch] text-[13.5px] leading-[1.6] text-[var(--ink-2)]">{t('flow.consent')}</p>
         {codeOpen ? (
-          <button
-            type="button"
+          <PillButton
+            arrow
+            size="lg"
+            className={longPill}
             onClick={confirm}
             disabled={Boolean(blocker) || code.length !== 6 || confirming || pending}
-            className={pill}
           >
-            {confirming || pending
-              ? t('flow.confirming')
-              : slot
-                ? `${t('flow.confirm')} · ${dayChip(slot, lang)}, ${slotText(slot, lang).time}`
-                : t('flow.confirm')}
-          </button>
+            {confirmLabel}
+          </PillButton>
         ) : (
-          <button type="button" onClick={sendCode} disabled={Boolean(blocker) || sending} className={pill}>
+          <PillButton arrow size="lg" className={longPill} onClick={sendCode} disabled={Boolean(blocker) || sending}>
             {sending ? t('flow.sending') : t('flow.sendCode')}
-          </button>
+          </PillButton>
         )}
-        {blocker ? <p className="m-0 mt-3 text-[13px] text-[var(--ink2)]">{blocker}</p> : null}
+        {blocker ? <p className="m-0 mt-3 px-1 text-[13px] text-[var(--ink-2)]">{blocker}</p> : null}
       </section>
     </div>
   );
 }
 
+/** A step's heading: the number in a small ink circle, then the landing's `.h-m`. */
 function Step({ n, title, help }: { n: number; title: string; help?: string }) {
   return (
-    <div className="mb-5 flex items-start gap-3">
-      <span className="oi-num flex h-7 w-7 flex-none items-center justify-center rounded-full bg-[var(--ink)] text-[12px] text-white">
+    <div className="mb-6 flex items-start gap-3.5">
+      <span className="mt-0.5 flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[var(--ink)] text-[13px] font-medium tabular-nums text-white sm:mt-1.5">
         {n}
       </span>
       <div>
-        <h2 className="oi-display m-0 text-[clamp(1.2rem,1.05rem+0.6vw,1.5rem)] leading-tight">{title}</h2>
-        {help ? <p className="m-0 mt-1 text-[13.5px] text-[var(--ink2)]">{help}</p> : null}
+        <Split as="h2" className="h-m" text={title} />
+        {help ? <p className="m-0 mt-2 text-[15px] text-[var(--ink-2)]">{help}</p> : null}
       </div>
     </div>
   );
@@ -502,7 +522,7 @@ function Step({ n, title, help }: { n: number; title: string; help?: string }) {
 
 function Alert({ children }: { children: React.ReactNode }) {
   return (
-    <p role="alert" className="m-0 mt-3 text-[14px]" style={{ color: 'var(--acc-ink)' }}>
+    <p role="alert" className="m-0 mt-3 px-1 text-[14px]" style={{ color: 'var(--accent-ink)' }}>
       {children}
     </p>
   );

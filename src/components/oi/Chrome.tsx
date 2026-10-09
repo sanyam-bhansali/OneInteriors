@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * The frame every customer screen sits in, and the spine that runs down it.
@@ -25,12 +25,13 @@
  * and nothing is hidden to manufacture curiosity.
  */
 
-import { useSiteT } from '@/components/app/i18n';
-import { CHROME_DICT } from '@/modules/i18n/site/chrome';
-import Link from 'next/link';
-import { Wordmark } from '@/components/brand';
-import { rosterIsReal } from '@/lib/env';
-import { Wrap } from '@/components/landing/parts';
+import { useSiteT } from "@/components/app/i18n";
+import { CHROME_DICT } from "@/modules/i18n/site/chrome";
+import Link from "next/link";
+import { Wordmark } from "@/components/brand";
+import { Pill } from "@/components/home/parts";
+import { rosterIsReal } from "@/lib/env";
+import { Wrap } from "@/components/landing/parts";
 
 /**
  * The chapters of the document, in the order they are written.
@@ -42,14 +43,14 @@ import { Wrap } from '@/components/landing/parts';
  * and "The quote" together and hand React two identical keys.
  */
 export const CHAPTERS = [
-  { id: 'brief', href: '/quiz', name: 'Your brief' },
-  { id: 'match', href: '/match', name: 'Who fits' },
-  { id: 'quote', href: '/match', name: 'The quote' },
-  { id: 'compare', href: '/compare', name: 'Side by side' },
-  { id: 'expert', href: '/expert', name: 'Your architect' },
+  { id: "brief", href: "/quiz", name: "Your brief" },
+  { id: "match", href: "/match", name: "Who fits" },
+  { id: "quote", href: "/match", name: "The quote" },
+  { id: "compare", href: "/compare", name: "Side by side" },
+  { id: "expert", href: "/expert", name: "Your architect" },
 ] as const;
 
-export type ChapterId = (typeof CHAPTERS)[number]['id'];
+export type ChapterId = (typeof CHAPTERS)[number]["id"];
 
 /**
  * The header.
@@ -60,46 +61,31 @@ export type ChapterId = (typeof CHAPTERS)[number]['id'];
  */
 export function AppHeader() {
   const t = useSiteT(CHROME_DICT);
+  /* The landing's nav (owner, 10 Oct 2026: the landing's design through the
+     whole flow), sticky rather than fixed: a working screen should not have
+     its first line slide under it. */
   return (
-    <header className="border-b border-[var(--line)] bg-[var(--card)] print:hidden">
-      <Wrap>
-        <div className="flex items-center justify-between gap-6 py-3.5">
-          <Link
-            href="/"
-            className="flex items-center gap-2.5 no-underline"
-            aria-label={t('header.homeAria')}
-          >
-            <span className="text-[var(--ink)]">
-              <Wordmark inherit showCity={false} />
-            </span>
+    <header className="cb cb-part flow-chrome print:hidden">
+      <div className="nav flow-nav">
+        <div className="wrap nav-in">
+          <Link href="/" className="logo" aria-label={t("header.homeAria")}>
+            <Wordmark inherit showCity={false} />
           </Link>
-
-          <nav className="flex items-center gap-5">
-            <Link
-              href="/studios"
-              className="hidden text-[13.5px] text-[var(--ink2)] no-underline hover:text-[var(--ink)] sm:inline"
-            >
-              {t('header.studios')}
-            </Link>
-            <Link
-              href="/verification"
-              className="hidden text-[13.5px] text-[var(--ink2)] no-underline hover:text-[var(--ink)] sm:inline"
-            >
-              {t('header.verify')}
-            </Link>
-            {/* Not a terracotta button. The one high-intent action belongs to
-                the screen the customer is on — a second one up here competes
-                with it, and on the quote screen it would be competing with
-                the thing they came to do. */}
-            <Link
-              href="/account"
-              className="border-b border-[var(--line)] pb-0.5 text-[13.5px] text-[var(--ink)] no-underline transition-colors hover:border-[var(--ink)]"
-            >
-              {t('header.project')}
-            </Link>
+          <nav className="nav-links" aria-label={t("header.homeAria")}>
+            <Link href="/studios">{t("header.studios")}</Link>
+            <Link href="/verification">{t("header.verify")}</Link>
           </nav>
+          {/* Line, not filled: the one filled action belongs to the screen. */}
+          <Pill
+            href="/account"
+            tone="line"
+            size="sm"
+            className="ml-auto min-[861px]:ml-0"
+          >
+            {t("header.project")}
+          </Pill>
         </div>
-      </Wrap>
+      </div>
     </header>
   );
 }
@@ -131,55 +117,36 @@ export function Spine({
   const known = new Map(facts.map((f) => [f.id, f.fact]));
 
   return (
-    <nav aria-label={t('spine.aria')} className="border-b border-[var(--line)] bg-[var(--card)]">
-      <Wrap>
-        {/* Scrolls sideways on a phone rather than wrapping to three rows —
-            five chapters wrapped is a block of text, not a spine. */}
-        <ol className="oi-rail m-0 flex list-none items-stretch gap-0 overflow-x-auto p-0">
+    <nav
+      aria-label={t("spine.aria")}
+      className="cb cb-part flow-spine print:hidden"
+    >
+      <div className="wrap">
+        {/* Scrolls sideways on a phone rather than wrapping to three rows. */}
+        <ol>
           {CHAPTERS.map((chapter, i) => {
             const fact = known.get(chapter.id);
             const here = chapter.id === at;
             const written = fact !== undefined || here;
-
             const body = (
               <>
-                <span className="oi-num text-[9.5px] uppercase tracking-[0.16em] text-[var(--ink2)]">
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-                <span
-                  className="mt-1.5 block text-[13.5px] font-medium"
-                  style={{ color: here ? 'var(--ink)' : 'var(--ink2)' }}
-                >
-                  {t(`spine.${chapter.id}`)}
-                </span>
-                {/* The fact, not a tick. A tick says "done"; the fact says
-                    what you got for it. */}
-                <span className="oi-num mt-1 block text-[10.5px] uppercase tracking-[0.12em] text-[var(--ink2)]">
-                  {fact ?? (here ? t('spine.readingNow') : '—')}
+                <span className="n">{String(i + 1).padStart(2, "0")}</span>
+                <span className="t">{t(`spine.${chapter.id}`)}</span>
+                {/* The fact, not a tick: what you got for it. */}
+                <span className="f">
+                  {fact ?? (here ? t("spine.readingNow") : "—")}
                 </span>
               </>
             );
-
             return (
-              <li
-                key={chapter.id}
-                className="min-w-[8.5rem] flex-1 border-l border-[var(--line)] first:border-l-0"
-                style={{
-                  // Terracotta marks where you are, and only there. It is the
-                  // one thing on this bar worth finding at a glance.
-                  boxShadow: here ? 'inset 0 -2px 0 var(--acc)' : undefined,
-                  opacity: written ? 1 : 0.5,
-                }}
-              >
+              <li key={chapter.id}>
                 {written && !here ? (
-                  <Link
-                    href={chapter.href}
-                    className="block px-4 py-3 no-underline transition-colors hover:bg-[var(--bg)]"
-                  >
-                    {body}
-                  </Link>
+                  <Link href={chapter.href}>{body}</Link>
                 ) : (
-                  <div className="px-4 py-3" aria-current={here ? 'step' : undefined}>
+                  <div
+                    className={`seg${written ? "" : " off"}`}
+                    aria-current={here ? "step" : undefined}
+                  >
                     {body}
                   </div>
                 )}
@@ -187,7 +154,7 @@ export function Spine({
             );
           })}
         </ol>
-      </Wrap>
+      </div>
     </nav>
   );
 }
@@ -205,7 +172,7 @@ export function AppFooter() {
     <footer
       data-on-dark
       className="mt-20 border-t border-[var(--line)] py-12 print:hidden"
-      style={{ background: 'var(--ink)', colorScheme: 'light' }}
+      style={{ background: "var(--ink)", colorScheme: "light" }}
     >
       <Wrap>
         <div className="flex flex-col gap-9 sm:flex-row sm:justify-between sm:gap-12">
@@ -216,19 +183,19 @@ export function AppFooter() {
               </span>
             </span>
             <p className="m-0 text-[13.5px] leading-[1.6] text-white/60">
-              {t('footer.tagline')}
+              {t("footer.tagline")}
             </p>
           </div>
 
           <nav className="flex flex-col gap-2.5">
             <p className="oi-num m-0 mb-1 text-[10px] uppercase tracking-[0.16em] text-white/45">
-              {t('footer.project')}
+              {t("footer.project")}
             </p>
             {[
-              ['/quiz', t('footer.startBrief')],
-              ['/account', t('footer.everything')],
-              ['/studios', t('footer.studios')],
-              ['/verification', t('footer.checks')],
+              ["/quiz", t("footer.startBrief")],
+              ["/account", t("footer.everything")],
+              ["/studios", t("footer.studios")],
+              ["/verification", t("footer.checks")],
             ].map(([href, label]) => (
               <Link
                 key={href}
@@ -242,7 +209,7 @@ export function AppFooter() {
               href="/apply"
               className="mt-1.5 text-[14px] text-white/45 no-underline hover:text-white"
             >
-              {t('footer.apply')}
+              {t("footer.apply")}
             </Link>
           </nav>
         </div>
@@ -255,7 +222,7 @@ export function AppFooter() {
             direction to be wrong in. */}
         {!rosterIsReal() ? (
           <p className="m-0 mt-10 max-w-[74ch] border-t border-white/15 pt-6 text-[13px] leading-relaxed text-white/55">
-            {t('footer.prelaunch')}
+            {t("footer.prelaunch")}
           </p>
         ) : null}
       </Wrap>

@@ -87,18 +87,14 @@ export function Spec({
  * without anybody deciding to concentrate.
  */
 function Versus({ good, bad }: { good: string; bad: string }) {
+  /* Two soft tiles, as the landing sets its figures: the good side in mint,
+     the other on white — no hairline grid. */
   return (
-    <div className="grid grid-cols-2 gap-px overflow-hidden border border-[var(--line)] bg-[var(--line)]">
-      <p
-        className="m-0 bg-[var(--card)] px-3.5 py-3 text-[13.5px] leading-snug"
-        style={{ boxShadow: 'inset 3px 0 0 var(--sec)' }}
-      >
+    <div className="grid grid-cols-2 gap-2">
+      <p className="m-0 rounded-[14px] bg-[var(--mint,#dff1ea)] px-3.5 py-3 text-[14px] leading-snug text-[var(--ink)]">
         {good}
       </p>
-      <p
-        className="m-0 bg-[var(--card)] px-3.5 py-3 text-[13.5px] leading-snug text-[var(--ink2)]"
-        style={{ boxShadow: 'inset 3px 0 0 var(--line)' }}
-      >
+      <p className="m-0 rounded-[14px] bg-white px-3.5 py-3 text-[14px] leading-snug text-[var(--ink2)]">
         {bad}
       </p>
     </div>
@@ -130,24 +126,24 @@ export function MaterialCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h3 className="oi-display m-0 text-[19px]">{m.name}</h3>
+            <h3 className="m-0 text-[clamp(1.2rem,1.05rem+0.6vw,1.45rem)] font-medium leading-tight tracking-[-0.025em]">{m.name}</h3>
             {m.standard ? (
-              <span className="oi-num text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink2)]">
+              <span className="rounded-full bg-white px-2.5 py-1 text-[12px] font-medium text-[var(--ink2)]">
                 {m.standard}
               </span>
             ) : null}
           </div>
-          <p className="m-0 mt-1.5 max-w-[42ch] text-[14px] leading-snug text-[var(--ink2)]">
+          <p className="m-0 mt-2 max-w-[42ch] text-[14.5px] leading-snug text-[var(--ink2)]">
             {m.tagline}
           </p>
-          <p className="m-0 mt-3 flex items-baseline gap-2">
+          <p className="m-0 mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <span
-              className="oi-num text-[20px] leading-none"
+              className="text-[26px] font-medium leading-none tracking-[-0.035em] tabular-nums"
               style={{ color: m.moneyIs === 'saves' ? 'var(--acc-ink)' : 'var(--ink2)' }}
             >
               {m.money}
             </span>
-            <span className="oi-label m-0">
+            <span className="text-[13px] text-[var(--ink2)]">
               {m.moneyIs === 'saves' ? t('mat.saves') : t('mat.either')}
             </span>
           </p>
@@ -162,7 +158,7 @@ export function MaterialCard({
             type="button"
             onClick={() => setLong((v) => !v)}
             aria-expanded={long}
-            className="cursor-pointer border-0 bg-transparent p-0 text-[13px] text-[var(--ink2)] underline hover:text-[var(--ink)]"
+            className="min-h-11 cursor-pointer border-0 bg-transparent p-0 text-[14px] text-[var(--ink2)] underline underline-offset-4 hover:text-[var(--ink)]"
           >
             {long ? t('mat.close') : t('mat.long')}
           </button>
@@ -205,8 +201,8 @@ export function MaterialPanel({
   return (
     <aside
       aria-label={t('mat.what', { name: m.name })}
-      className="oi-rise-in fixed inset-x-0 bottom-0 z-30 max-h-[62vh] overflow-y-auto border-t border-[var(--ink)] bg-[var(--card)]"
-      style={{ boxShadow: '0 -24px 50px -34px rgba(44,38,36,.5)' }}
+      className="oi-rise-in fixed inset-x-0 bottom-0 z-30 max-h-[62vh] overflow-y-auto rounded-t-[clamp(20px,2.4vw,32px)] bg-[var(--card)]"
+      style={{ boxShadow: '0 -24px 60px -30px rgba(11,11,11,.35)' }}
     >
       <div className="mx-auto w-full max-w-[72rem] px-[clamp(16px,4vw,40px)] py-6">
         <div className="flex items-start justify-between gap-5">
@@ -218,7 +214,7 @@ export function MaterialPanel({
                 <img
                   src={`${MATERIAL_PHOTOS[m.id]!.src}?auto=format&fit=crop&w=720&h=360&q=70`}
                   alt={MATERIAL_PHOTOS[m.id]!.alt}
-                  className="block aspect-[2/1] w-full rounded-[8px] object-cover"
+                  className="block aspect-[2/1] w-full rounded-[18px] object-cover"
                   loading="lazy"
                 />
                 <figcaption className="mt-1 text-[11px] text-[var(--ink2)]">
@@ -234,7 +230,7 @@ export function MaterialPanel({
             type="button"
             onClick={onClose}
             aria-label={t('mat.closeAria')}
-            className="-mr-2 -mt-2 flex h-11 w-11 flex-none cursor-pointer items-center justify-center border-0 bg-transparent text-[20px] leading-none text-[var(--ink2)] hover:text-[var(--ink)]"
+            className="flex h-11 w-11 flex-none cursor-pointer items-center justify-center rounded-full border-0 bg-white text-[16px] leading-none text-[var(--ink)] transition-colors hover:bg-[var(--ink)] hover:text-white"
           >
             ✕
           </button>
@@ -261,7 +257,7 @@ export function MaterialChip({
       type="button"
       onClick={() => onPick(m)}
       title={m.tagline}
-      className="inline-flex cursor-pointer items-center gap-1.5 border border-[var(--line)] bg-[var(--bg)] px-2 py-1 text-[11.5px] leading-none text-[var(--ink)] hover:border-[var(--ink2)]"
+      className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border-0 bg-[var(--card)] px-2.5 py-1.5 text-[12px] leading-none text-[var(--ink)] hover:shadow-[inset_0_0_0_1px_var(--ink)]"
     >
       <span
         aria-hidden

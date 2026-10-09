@@ -19,10 +19,14 @@
  *
  * It only appears once something has been priced — an empty bar pinned to the
  * bottom of a screen with nothing in it is furniture.
+ *
+ * Dressed as the landing's nav once you scroll (owner, 10 Oct 2026): white
+ * with a blur, a hairline shadow rather than a border, the action a dark pill.
+ * `.cb cb-part` so the pill is styled wherever the bar is mounted.
  */
 
-import Link from 'next/link';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { Pill } from '@/components/home/parts';
 import { DUR, EASE_OUT } from '@/components/oi/motion';
 import { Wrap } from '@/components/oi';
 import { useSiteT } from '@/components/app/i18n';
@@ -49,32 +53,33 @@ export function CompareBar({
           animate={{ y: 0, opacity: 1 }}
           exit={reduced ? undefined : { y: 70, opacity: 0 }}
           transition={{ duration: DUR.bar, ease: EASE_OUT }}
-          className="sticky bottom-0 z-20 border-t border-[var(--line)]"
+          className="cb cb-part sticky bottom-0 z-20 print:hidden"
           style={{
-            background: 'rgba(252,252,250,.82)',
-            backdropFilter: 'blur(20px) saturate(1.1)',
-            WebkitBackdropFilter: 'blur(20px) saturate(1.1)',
+            background: 'rgba(255,255,255,.82)',
+            backdropFilter: 'saturate(1.4) blur(14px)',
+            WebkitBackdropFilter: 'saturate(1.4) blur(14px)',
+            boxShadow: '0 -1px 0 var(--line)',
+            overflowX: 'visible',
             paddingBottom: 'env(safe-area-inset-bottom, 0px)',
           }}
         >
           <Wrap>
-            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-3">
               <div className="flex items-center gap-3.5">
                 <span
-                  className="oi-num flex h-11 w-11 flex-none items-center justify-center rounded-full text-[17px] font-bold"
+                  className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-[17px] font-medium tabular-nums transition-colors duration-300"
                   style={{
-                    background: ready ? 'var(--acc-wash)' : 'transparent',
-                    border: `1px solid ${ready ? 'var(--acc)' : 'var(--line)'}`,
-                    color: ready ? 'var(--acc-ink)' : 'var(--ink2)',
+                    background: ready ? 'var(--ink)' : 'var(--soft)',
+                    color: ready ? '#fff' : 'var(--ink)',
                   }}
                 >
                   {selected}
                 </span>
                 <div className="min-w-0">
-                  <p className="m-0 text-[14.5px] font-semibold leading-tight text-[var(--ink)]">
+                  <p className="m-0 text-[15px] font-medium leading-tight tracking-[-0.01em] text-[var(--ink)]">
                     {ready ? t('compare.ready') : t('compare.selected')}
                   </p>
-                  <p className="q-small m-0 text-[var(--ink2)]">
+                  <p className="m-0 mt-0.5 text-[13px] leading-snug text-[var(--ink-2)]">
                     {ready
                       ? t('compare.readyBody')
                       : t('compare.pick', { n: minimum - selected })}
@@ -83,12 +88,9 @@ export function CompareBar({
               </div>
 
               {ready ? (
-                <Link
-                  href="/compare"
-                  className="oi-cta inline-flex min-h-11 items-center px-6 py-3 text-[14.5px] no-underline"
-                >
+                <Pill href="/compare" arrow>
                   {t('compare.cta', { n: selected })}
-                </Link>
+                </Pill>
               ) : null}
             </div>
           </Wrap>

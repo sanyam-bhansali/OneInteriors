@@ -40,8 +40,9 @@ import type { Material } from '@/modules/materials/glossary';
 import type { FloorPlan } from '@/modules/quotation/project-store';
 import { Building, stagesFor } from './Building';
 import { Spec, MaterialPanel } from './Material';
-import { Sheet, DocRow, Flag } from './index';
+import { DocRow, Flag } from './index';
 import { Mark } from '@/components/brand';
+import { Arrow, PillButton, Split } from '@/components/home/parts';
 import { advanceIsHigh, phaseAmounts, type PaymentPhase } from '@/modules/studio/payment-phases';
 import { useLang, useSiteT } from '@/components/app/i18n';
 import { OI_DICT, roomName } from '@/modules/i18n/site/oi';
@@ -63,10 +64,47 @@ export interface QuoteRequest {
   plan?: FloorPlan | null;
 }
 
-// ── The gate ────────────────────────────────────────────────────
+/*
+ * The landing's look, carried through (owner, 10 Oct 2026): soft rounded
+ * cards with no hairline boxes, one sans with tabular figures for money,
+ * small uppercase labels, totals set large and medium-weight like the
+ * landing's live price, black pills for the actions. The classes used here
+ * are styled under `.cb`; on /match that is FlowShell, and on a studio's page
+ * StudioQuotePanel carries `cb cb-part` itself.
+ */
 
-const input =
-  'w-full border border-[var(--line)] bg-[var(--card)] px-3 py-2.5 text-[14px] text-[var(--ink)] placeholder:text-[var(--ink2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--acc)]';
+/** A small section label — the landing's eyebrow, without its 18px margin. */
+function Label({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <p className={`m-0 text-[12px] font-medium uppercase leading-snug tracking-[0.08em] text-[var(--ink-2)] ${className}`}>
+      {children}
+    </p>
+  );
+}
+
+/**
+ * The landing's dark pill for a label too long for one line on a phone
+ * ("Price it now on a standard 2 BHK kitchen"). `.pill` never wraps, so this
+ * keeps its fill and shape and lets the words wrap; no rolling label, which
+ * only works on one line.
+ */
+function LongPill({ children, onClick }: { children: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="pill pill-dark"
+      style={{ whiteSpace: 'normal', height: 'auto', minHeight: 52, padding: '14px 26px', textAlign: 'left', lineHeight: 1.3, maxWidth: '100%' }}
+    >
+      <span className="mag-inner">
+        <span>{children}</span>
+        <Arrow />
+      </span>
+    </button>
+  );
+}
+
+// ── The gate ────────────────────────────────────────────────────
 
 /**
  * The gate.
@@ -99,62 +137,51 @@ function Gate({ onReady, bhk }: { onReady: (plan: FloorPlan) => void; bhk: numbe
   const standardRun = standardKitchenRunMm(bhk);
 
   return (
-    <Sheet className="mx-auto max-w-[36rem] p-[clamp(22px,3vw,32px)]">
-      <p className="oi-eyebrow m-0 mb-4">{t('gate.eyebrow')}</p>
-      <h2 className="oi-display m-0 mb-3 text-[clamp(1.5rem,1.2rem+1.2vw,2rem)]">
-        {t('gate.h2')}
-      </h2>
-      <p className="m-0 mb-6 text-[14.5px] leading-[1.6] text-[var(--ink2)]">
+    <div className="flow-card mx-auto max-w-[38rem]">
+      <p className="eyebrow">{t('gate.eyebrow')}</p>
+      <Split className="h-m" text={t('gate.h2')} auto />
+      <p className="m-0 mb-7 mt-4 text-[15.5px] leading-[1.6] text-[var(--ink-2)]">
         {t('gate.body', { bhk })}
       </p>
 
       {/* One press, first. Most people are not standing in their kitchen with
           a tape measure, and the alternative to this button is not a better
           quote — it is no quote and a closed tab. */}
-      <button
-        type="button"
-        onClick={() => onReady({ fileName: null, kitchenRunMm: standardRun, source: 'standard' })}
-        className="cursor-pointer px-6 py-3 text-[14.5px] font-medium text-white transition-colors"
-        style={{ background: 'var(--acc-btn)' }}
-      >
+      <LongPill onClick={() => onReady({ fileName: null, kitchenRunMm: standardRun, source: 'standard' })}>
         {t('gate.standard', { bhk })}
-      </button>
-      <p className="m-0 mt-2.5 text-[12.5px] leading-snug text-[var(--ink2)]">
+      </LongPill>
+      <p className="m-0 mt-3 text-[13px] leading-snug text-[var(--ink-2)]">
         {t('gate.standardNote', { mm: standardRun.toLocaleString('en-IN'), bhk })}
       </p>
 
-      <div className="mt-7 border-t border-[var(--line)] pt-5">
+      <div className="mt-6 rounded-[var(--r-m)] bg-[var(--paper)] p-5">
         <label className="mb-2 block">
-          <span className="oi-label mb-2 block">{t('gate.own')}</span>
+          <Label className="mb-3">{t('gate.own')}</Label>
           <input
             inputMode="numeric"
             value={runMm}
             onChange={(e) => setRunMm(e.target.value.replace(/\D/g, ''))}
             placeholder={t('gate.placeholder')}
-            className={`${input} oi-num`}
+            className="flow-input"
           />
         </label>
-        <p className="m-0 mb-4 text-[13px] leading-snug text-[var(--ink2)]">
+        <p className="m-0 mb-4 text-[13px] leading-snug text-[var(--ink-2)]">
           {t('gate.measureHelp')}
         </p>
 
         {/* Says what is missing rather than sitting greyed out — a disabled
             button is a puzzle that says no without saying why. */}
         {runIsSane ? (
-          <button
-            type="button"
-            onClick={() => onReady({ fileName: null, kitchenRunMm: typed, source: 'customer' })}
-            className="cursor-pointer border border-[var(--ink)] bg-transparent px-5 py-2.5 text-[14px] font-medium text-[var(--ink)]"
-          >
+          <PillButton tone="line" onClick={() => onReady({ fileName: null, kitchenRunMm: typed, source: 'customer' })}>
             {t('gate.build', { mm: typed.toLocaleString('en-IN') })}
-          </button>
+          </PillButton>
         ) : runMm ? (
-          <p className="m-0 text-[13px] text-[var(--ink2)]">
+          <p className="m-0 text-[13px] text-[var(--ink-2)]">
             {t('gate.outside')}
           </p>
         ) : null}
       </div>
-    </Sheet>
+    </div>
   );
 }
 
@@ -199,8 +226,8 @@ export function QuoteDocument({
   const [term, setTerm] = useState<Material | null>(null);
 
   return (
-    <Sheet className="p-[clamp(20px,3vw,34px)]">
-      <div className="mb-7 flex flex-wrap items-end justify-between gap-x-8 gap-y-3 border-b border-[var(--ink)] pb-5">
+    <div className="flow-card">
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
         {/* The studio's own name and mark on top — the quote is theirs, priced
             on their rates. Our mark is at the foot, as the platform that
             built it (the owner's format, 29 Sep; studio logos arrive with the
@@ -208,7 +235,7 @@ export function QuoteDocument({
         <div className="flex items-start gap-4">
           <span
             aria-hidden="true"
-            className="oi-num flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] bg-[var(--acc-wash)] text-[15px] text-[var(--acc-ink)]"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--paper)] text-[15px] font-medium text-[var(--ink)]"
           >
             {studioName
               .split(/\s+/)
@@ -217,17 +244,20 @@ export function QuoteDocument({
               .slice(0, 2)
               .toUpperCase()}
           </span>
-          <div>
-            <p className="oi-eyebrow m-0 mb-2">{t('doc.eyebrow')}</p>
-            <h2 className="oi-display m-0 text-[clamp(1.4rem,1.15rem+1vw,1.9rem)]">{studioName}</h2>
+          <div className="min-w-0">
+            <Label className="mb-2">{t('doc.eyebrow')}</Label>
+            <h2 className="h-m">{studioName}</h2>
             {preparedFor ? (
-              <p className="m-0 mt-1.5 text-[13.5px] text-[var(--ink2)]">{t('doc.preparedFor', { name: preparedFor })}</p>
+              <p className="m-0 mt-2 text-[14px] text-[var(--ink-2)]">{t('doc.preparedFor', { name: preparedFor })}</p>
             ) : null}
           </div>
         </div>
+        {/* The total, set like the landing's live price. */}
         <div className="text-left sm:text-right">
-          <p className="oi-num m-0 text-[26px] leading-none">{money(quote.totalPaise)}</p>
-          <p className="oi-num m-0 mt-1.5 text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink2)]">
+          <p className="m-0 whitespace-nowrap text-[clamp(1.9rem,1.2rem+2.4vw,3.1rem)] font-medium leading-none tracking-[-0.04em] tabular-nums">
+            {money(quote.totalPaise)}
+          </p>
+          <p className="m-0 mt-2 text-[13px] tabular-nums text-[var(--ink-2)]">
             {money(quote.lowPaise)}–{money(quote.highPaise)} · ±
             {Math.round(quote.variancePct * 100)}%
           </p>
@@ -243,18 +273,26 @@ export function QuoteDocument({
         </p>
       ) : null}
 
-      {bandLine ? <p className="m-0 mb-6 text-[13.5px] leading-[1.6] text-[var(--ink2)]">{bandLine}</p> : null}
+      {bandLine ? (
+        <p className="m-0 mb-7 max-w-[62ch] rounded-[var(--r-m)] bg-[var(--paper)] px-4 py-3 text-[14px] leading-[1.6] text-[var(--ink)]">
+          {bandLine}
+        </p>
+      ) : null}
 
       <QuotePlan quote={quote} />
 
       {quote.rooms.map((room) => (
-        <section key={room.room} id={roomAnchor(room.room)} className="mb-7 scroll-mt-24">
+        <section
+          key={room.room}
+          id={roomAnchor(room.room)}
+          className="mb-3 scroll-mt-24 rounded-[var(--r-m)] bg-[var(--paper)] px-[clamp(16px,2.4vw,24px)] pb-2 pt-5"
+        >
           {/* The room heading was a 10.5px mono label, the same size as the
               smallest thing on the page. It is a heading; it now reads like
               one. */}
-          <div className="mb-2 flex items-baseline justify-between gap-4 border-b border-[var(--ink)] pb-2">
-            <h3 className="oi-display m-0 text-[17px]">{roomName(lang, room.room, room.label)}</h3>
-            <span className="oi-num text-[14px]">{money(room.subtotalPaise)}</span>
+          <div className="mb-1 flex items-baseline justify-between gap-4">
+            <h3 className="m-0 text-[19px] font-medium tracking-[-0.02em]">{roomName(lang, room.room, room.label)}</h3>
+            <span className="text-[17px] font-medium tabular-nums tracking-[-0.02em]">{money(room.subtotalPaise)}</span>
           </div>
 
           {room.lines.map((line) => (
@@ -269,7 +307,7 @@ export function QuoteDocument({
                 line.addedFor ? (
                   <>
                     <Spec text={line.spec} onPick={setTerm} />
-                    <span className="mt-0.5 block text-[12.5px] text-[var(--acc-ink)]">{line.addedFor}</span>
+                    <span className="mt-0.5 block text-[12.5px] text-[var(--accent-ink)]">{line.addedFor}</span>
                   </>
                 ) : (
                   <Spec text={line.spec} onPick={setTerm} />
@@ -285,10 +323,10 @@ export function QuoteDocument({
           by eye (principle 5, docs/UX-PRINCIPLES-PLAN.md; Wise). "Before
           GST" is the total less GST, not a re-addition, so the two can
           never disagree by a rounding paisa. */}
-      <div className="mt-8 border-t border-[var(--ink)] pt-4">
-        <p className="oi-label m-0 mb-1">{t('doc.howMade')}</p>
+      <div className="mt-8 rounded-[var(--r-m)] bg-[var(--paper)] px-[clamp(16px,2.4vw,24px)] pb-3 pt-5">
+        <Label className="mb-1">{t('doc.howMade')}</Label>
         <DocRow label={t('doc.work', { n: quote.lines.length })} value={money(quote.modularPaise + quote.nonModularPaise)} />
-        <p className="m-0 -mt-1 mb-1 text-[12.5px] text-[var(--ink2)]">
+        <p className="m-0 -mt-1 mb-1 text-[12.5px] text-[var(--ink-2)]">
           {t('doc.split', { factory: money(quote.modularPaise), site: money(quote.nonModularPaise) })}
         </p>
         <DocRow label={t('doc.fee')} value={money(quote.professionalFeePaise)} />
@@ -306,26 +344,34 @@ export function QuoteDocument({
         ) : null}
         <DocRow label={t('doc.beforeGst')} value={money(quote.totalPaise - quote.gstPaise)} />
         <DocRow label={t('doc.gst')} value={money(quote.gstPaise)} />
-        <DocRow label={t('doc.total')} value={money(quote.totalPaise)} emphasis />
+      </div>
+      {/* The sum the rows above add up to — the landing's live-price block:
+          black, the figure large and medium-weight. Printed as ink on white,
+          because a browser drops backgrounds when it prints. */}
+      <div className="mt-2 flex flex-wrap items-end justify-between gap-x-6 gap-y-2 rounded-[var(--r-m)] bg-[var(--ink)] px-[clamp(18px,2.6vw,28px)] py-5 text-white print:bg-transparent print:px-0 print:text-[var(--ink)]">
+        <span className="text-[15px] font-medium">{t('doc.total')}</span>
+        <span className="whitespace-nowrap text-[clamp(1.9rem,1.2rem+2.4vw,3.1rem)] font-medium leading-none tracking-[-0.04em] tabular-nums">
+          {money(quote.totalPaise)}
+        </span>
       </div>
 
       {quote.notPriced.length > 0 ? (
-        <p className="m-0 mt-6 border-t border-[var(--line)] pt-4">
+        <p className="m-0 mt-6">
           <Flag>
             {t(quote.notPriced.length === 1 ? 'doc.notPricedOne' : 'doc.notPricedMany', { n: quote.notPriced.length })}
           </Flag>
         </p>
       ) : null}
 
-      <div className="mt-7 border-t border-[var(--line)] pt-5">
-        <p className="oi-label m-0 mb-3">{t('doc.builtOn')}</p>
+      <div className="mt-9">
+        <Label className="mb-3">{t('doc.builtOn')}</Label>
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
           {quote.assumptions.map((line) => (
-            <li key={line} className="text-[13.5px] leading-[1.6] text-[var(--ink2)]">
+            <li key={line} className="text-[14px] leading-[1.6] text-[var(--ink-2)]">
               {line}
             </li>
           ))}
-          <li className="text-[13px] leading-[1.55] text-[var(--ink2)]">
+          <li className="text-[14px] leading-[1.6] text-[var(--ink-2)]">
             {runSourceOf(plan) === 'customer'
               ? t('doc.runMeasured')
               : t('doc.runStandard')}
@@ -335,21 +381,21 @@ export function QuoteDocument({
 
       {/* When money moves. Each studio's own phases, from its quotations or
           its profile — never a schedule we invented for it. */}
-      <div className="mt-7 border-t border-[var(--line)] pt-5">
-        <p className="oi-label m-0 mb-2">{t('doc.phases')}</p>
+      <div className="mt-9">
+        <Label className="mb-2">{t('doc.phases')}</Label>
         {paymentPhases ? (
           <>
             {phaseAmounts(paymentPhases, quote.totalPaise).map((p, i) => (
               <DocRow key={`${p.label}-${i}`} label={`${p.label} · ${p.pct}%`} value={money(p.amountPaise)} />
             ))}
             {advanceIsHigh(paymentPhases) ? (
-              <p className="m-0 mt-3 text-[13px] leading-[1.6] text-[var(--ink2)]">
+              <p className="m-0 mt-3 text-[14px] leading-[1.6] text-[var(--ink-2)]">
                 {t('doc.advanceHigh', { studio: studioName, pct: paymentPhases[0]!.pct })}
               </p>
             ) : null}
           </>
         ) : (
-          <p className="m-0 text-[13.5px] leading-[1.6] text-[var(--ink2)]">
+          <p className="m-0 text-[14px] leading-[1.6] text-[var(--ink-2)]">
             {t('doc.noPhases', { studio: studioName })}
           </p>
         )}
@@ -359,47 +405,46 @@ export function QuoteDocument({
         <MeasureKitchen onMeasured={onMeasured} />
       ) : null}
 
-      <p className="oi-label m-0 mt-6 border-t border-[var(--line)] pt-4 print:hidden">
+      <p className="m-0 mt-7 text-[13px] text-[var(--ink-2)] print:hidden">
         {t('doc.underlined')}
       </p>
 
       {/* Printed too: quotes get forwarded and carried into studio meetings,
           and the PDF is where a customer is most likely to go direct. */}
-      <div className="mt-6 border-t border-[var(--line)] pt-4">
-        <p className="m-0 mb-1.5 text-[13.5px] font-semibold text-[var(--ink)]">
+      <div className="mt-7 rounded-[var(--r-m)] bg-[var(--paper)] p-[clamp(16px,2.4vw,24px)]">
+        <p className="m-0 mb-1.5 text-[16px] font-medium tracking-[-0.01em] text-[var(--ink)]">
           {t('doc.keep')}
         </p>
-        <p className="m-0 text-[13px] leading-[1.6] text-[var(--ink2)]">
+        <p className="m-0 text-[14px] leading-[1.6] text-[var(--ink-2)]">
           {showcase().map((b) => known(lang, `benefit.${b.id}.short`, b.short)).join(' · ')}.{' '}
           <span className="hidden print:inline">
             {t('doc.printCta', { studio: studioName })}
           </span>
         </p>
-        {/* On screen it is a link, not an address to type (review, 8 Oct). */}
+        {/* On screen it is a link, not an address to type (review, 8 Oct).
+            A sentence, so a link rather than a pill — it has to wrap. */}
         <Link
           href="/expert"
-          className="mt-3 inline-block text-[14px] font-semibold text-[var(--ink)] underline underline-offset-4 print:hidden"
+          className="mt-3 inline-block text-[15px] font-medium text-[var(--ink)] underline decoration-[var(--accent)] underline-offset-4 print:hidden"
         >
           {t('doc.cta', { studio: studioName })}
         </Link>
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--ink)] pt-4">
-        <p className="m-0 flex items-center gap-2 text-[12.5px] text-[var(--ink2)]">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+        <p className="m-0 flex items-center gap-2 text-[13px] text-[var(--ink-2)]">
           <Mark className="h-[14px] w-[14px] text-[var(--ink)]" />
           {t('doc.powered')}
         </p>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="cursor-pointer border border-[var(--line)] bg-transparent px-4 py-2 text-[13px] text-[var(--ink)] print:hidden"
-        >
-          {t('doc.print')}
-        </button>
+        <span className="print:hidden">
+          <PillButton tone="line" onClick={() => window.print()}>
+            {t('doc.print')}
+          </PillButton>
+        </span>
       </div>
 
       <MaterialPanel material={term} onClose={() => setTerm(null)} />
-    </Sheet>
+    </div>
   );
 }
 
@@ -416,30 +461,25 @@ function MeasureKitchen({ onMeasured }: { onMeasured: (runMm: number) => void })
   const n = Number(value);
   const ok = Number.isFinite(n) && n >= 1500 && n <= 9000;
   return (
-    <div className="mt-7 border-t border-[var(--line)] pt-5 print:hidden">
-      <p className="oi-label m-0 mb-2">{t('measure.label')}</p>
-      <p className="m-0 mb-3 text-[13.5px] leading-[1.6] text-[var(--ink2)]">
+    <div className="mt-7 rounded-[var(--r-m)] bg-[var(--paper)] p-[clamp(16px,2.4vw,24px)] print:hidden">
+      <Label className="mb-2">{t('measure.label')}</Label>
+      <p className="m-0 mb-4 text-[14px] leading-[1.6] text-[var(--ink-2)]">
         {t('measure.body')}
       </p>
       <div className="flex flex-wrap items-center gap-3">
-        <input
-          inputMode="numeric"
-          value={value}
-          onChange={(e) => setValue(e.target.value.replace(/\D/g, ''))}
-          placeholder={t('measure.placeholder')}
-          className={`${input} oi-num w-48`}
-        />
+        <span className="w-full max-w-[14rem]">
+          <input
+            inputMode="numeric"
+            value={value}
+            onChange={(e) => setValue(e.target.value.replace(/\D/g, ''))}
+            placeholder={t('measure.placeholder')}
+            className="flow-input"
+          />
+        </span>
         {ok ? (
-          <button
-            type="button"
-            onClick={() => onMeasured(Math.round(n))}
-            className="cursor-pointer px-4 py-2.5 text-[14px] font-medium text-white"
-            style={{ background: 'var(--acc-btn)' }}
-          >
-            {t('measure.reprice')}
-          </button>
+          <PillButton onClick={() => onMeasured(Math.round(n))}>{t('measure.reprice')}</PillButton>
         ) : value ? (
-          <span className="text-[13px] text-[var(--ink2)]">{t('measure.range')}</span>
+          <span className="text-[13px] text-[var(--ink-2)]">{t('measure.range')}</span>
         ) : null}
       </div>
     </div>

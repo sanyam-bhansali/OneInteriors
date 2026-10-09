@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { Pill } from '@/components/home/parts';
 import { useLang, useSiteT } from '@/components/app/i18n';
 import { OI_DICT } from '@/modules/i18n/site/oi';
 import { offerText } from '@/modules/i18n/site/expert';
@@ -20,6 +20,10 @@ import { Wrap } from '@/components/landing/parts';
  *
  * One action, the call; the figure beside it is the quote they are reading,
  * or nothing on the comparison, where there are several. Never printed.
+ *
+ * Dressed as the landing's nav once you scroll (owner, 10 Oct 2026): white
+ * with a blur, a hairline shadow, the call a dark pill, the total set like
+ * the landing's live price. `.cb cb-part` so it is styled on any page.
  */
 export function NextStepBar({
   label,
@@ -46,38 +50,48 @@ export function NextStepBar({
 
   return (
     <div
-      className="sticky bottom-0 z-20 border-t border-[var(--line)] bg-[var(--bg)]/90 backdrop-blur print:hidden"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      className="cb cb-part sticky bottom-0 z-20 print:hidden"
+      style={{
+        background: 'rgba(255,255,255,.82)',
+        backdropFilter: 'saturate(1.4) blur(14px)',
+        WebkitBackdropFilter: 'saturate(1.4) blur(14px)',
+        boxShadow: '0 -1px 0 var(--line)',
+        overflowX: 'visible',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
     >
       <Wrap>
         <div className="flex items-center justify-between gap-4 py-3">
           <div className="min-w-0">
-            <p className="m-0 truncate text-[13px] text-[var(--ink2)]">
+            <p className="m-0 truncate text-[13px] text-[var(--ink-2)]">
               {label}
-              {change ? <span className="ml-2 text-[var(--acc-ink)]">{change}</span> : null}
+              {change ? <span className="ml-2 text-[var(--accent-ink)]">{change}</span> : null}
             </p>
             {totalPaise !== undefined ? (
-              <p className="m-0 text-[20px] font-medium sm:text-[22px] leading-tight tracking-[-0.02em] text-[var(--ink)] tabular-nums">
+              <p className="m-0 mt-0.5 text-[22px] font-medium leading-none tracking-[-0.04em] text-[var(--ink)] tabular-nums sm:text-[26px]">
                 {formatINRCompact(totalPaise)}{' '}
-                <span className="text-[12.5px] font-normal tracking-normal text-[var(--ink2)]">{t('bar.inclGst')}</span>
+                <span className="text-[12.5px] font-normal tracking-normal text-[var(--ink-2)]">{t('bar.inclGst')}</span>
               </p>
             ) : (
-              <p className="m-0 text-[14.5px] font-medium leading-tight text-[var(--ink)]">{note}</p>
+              <p className="m-0 text-[15px] font-medium leading-tight tracking-[-0.01em] text-[var(--ink)]">{note}</p>
             )}
           </div>
-          <div className="flex flex-col items-end gap-1">
-            <Link
-              href="/expert"
-              className="oi-cta inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-full px-5 py-3 text-[14.5px] no-underline sm:px-6"
-            >
-              {/* One row on a phone: the short label there, the full one wider. */}
-              <span className="sm:hidden">{offer && !offer.free ? t('bar.bookShort') : t('bar.bookFreeShort')}</span>
-              <span className="hidden sm:inline">
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            {/* One row on a phone: the short label there, the full one wider.
+                The breakpoint classes sit on wrappers — `.pill` sets its own
+                display, which a utility on the pill itself cannot undo. */}
+            <span className="sm:hidden">
+              <Pill href="/expert">
+                {offer && !offer.free ? t('bar.bookShort') : t('bar.bookFreeShort')}
+              </Pill>
+            </span>
+            <span className="hidden sm:inline-flex">
+              <Pill href="/expert" arrow>
                 {offer && !offer.free ? t('bar.bookLong') : t('bar.bookFreeLong')}
-              </span>
-            </Link>
+              </Pill>
+            </span>
             {totalPaise !== undefined ? (
-              <span className="hidden text-[12px] text-[var(--ink2)] sm:block">{note}</span>
+              <span className="hidden text-[12px] text-[var(--ink-2)] sm:block">{note}</span>
             ) : null}
           </div>
         </div>

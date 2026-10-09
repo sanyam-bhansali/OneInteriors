@@ -31,7 +31,6 @@
 import { ExpertPitch } from '@/components/oi/ExpertPitch';
 import type { OfferState } from '@/modules/consultation/offer';
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
-import Link from 'next/link';
 import { formatINRCompact } from '@/lib/money';
 import { compareMany, type ComparedLine } from '@/modules/quotation/first-quote';
 import { tallyStarred, starredGap } from '@/modules/quotation/starred';
@@ -42,8 +41,9 @@ import { saveDecisionAction } from '@/app/match/journey-actions';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
 import { NextStepBar } from '@/components/oi/NextStepBar';
 import { Spec, MaterialChip, MaterialPanel } from '@/components/oi/Material';
-import { Wrap, Chapter, Sheet, Quiet, Flag } from '@/components/oi';
-import { ExplainDifferences, AskYourQuote, FitBlock, MaterialPrices, RoomPrices } from './CompareInsights';
+import { FlowShell } from '@/components/home/FlowShell';
+import { Pill, Split } from '@/components/home/parts';
+import { ExplainDifferences, AskYourQuote, Dot, FitBlock, MaterialPrices, RoomPrices } from './CompareInsights';
 import { rankStudios, type MatchResult } from '@/modules/matching/score';
 import { loadBrief } from '@/modules/brief/store';
 import { filedRatesFor } from '@/data/filed-rates';
@@ -73,9 +73,51 @@ function withNodes(text: string, nodes: Record<string, ReactNode>): ReactNode[] 
 /** One studio's column width. Wide enough for a material, narrow enough for four. */
 const COL = 'min-w-[13.5rem]';
 
+/** The space between the page's groups of blocks, as the landing spaces its sections. */
+const GROUP = 'mt-[clamp(48px,7vw,100px)]';
+
 /** The dearest price on a row, which every bar on it is scaled against. */
 function dearest(line: ComparedLine): number {
   return Math.max(0, ...line.cells.map((c) => c.amountPaise ?? 0));
+}
+
+/** A reveal's stagger, for `data-reveal` blocks laid side by side. */
+const stagger = (i: number) => ({ ['--d' as string]: `${i * 80}ms` });
+
+/**
+ * A warning in words, with the accent as a dot beside it — "not quoted",
+ * "pre-launch". Never ₹0 and never a red box: the dot is enough to stop the eye.
+ */
+function Note({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-baseline gap-2 text-[13.5px] font-medium leading-snug text-[var(--accent-ink)]">
+      <Dot />
+      <span>{children}</span>
+    </span>
+  );
+}
+
+/** The cheapest amount on a row: a mint tint behind the figure, not a colour change. */
+function Amount({ paise, best, className = '' }: { paise: number; best: boolean; className?: string }) {
+  return (
+    <span
+      className={`inline-block whitespace-nowrap font-medium tabular-nums ${best ? '-mx-2 rounded-full bg-[var(--mint)] px-2' : ''} ${className}`}
+    >
+      {money(paise)}
+    </span>
+  );
+}
+
+/** A row's price as a bar against the dearest on that row. */
+function Bar({ width, best }: { width: number; best: boolean }) {
+  return (
+    <span aria-hidden className="mt-2 block h-[3px] overflow-hidden rounded-full bg-[var(--soft-2)]">
+      <span
+        className="block h-full rounded-full"
+        style={{ width: `${width}%`, background: best ? 'var(--accent)' : 'var(--ink-3)' }}
+      />
+    </span>
+  );
 }
 
 /**
@@ -97,17 +139,15 @@ function MaterialList({ text, onPick }: { text: string; onPick: (m: Material) =>
     .trim();
 
   if (chips.length === 0) {
-    return (
-      <span className="mt-2 block text-[12.5px] leading-snug text-[var(--ink2)]">{text}</span>
-    );
+    return <span className="mt-2.5 block text-[13px] leading-snug text-[var(--ink-2)]">{text}</span>;
   }
 
   return (
-    <span className="mt-2 flex flex-wrap items-center gap-1.5">
+    <span className="mt-2.5 flex flex-wrap items-center gap-1.5">
       {chips.map((c, i) => (
         <MaterialChip key={i} material={(c as { material: Material }).material} onPick={onPick} />
       ))}
-      {rest ? <span className="text-[12px] text-[var(--ink2)]">{rest}</span> : null}
+      {rest ? <span className="text-[12.5px] text-[var(--ink-2)]">{rest}</span> : null}
     </span>
   );
 }
@@ -116,7 +156,8 @@ function MaterialList({ text, onPick }: { text: string; onPick: (m: Material) =>
  * The star. A real button, 44px, and it says what it does.
  *
  * Not a decoration and not a favourite — pressing it changes the verdict at
- * the top of the page, so the label says so.
+ * the top of the page, so the label says so. Drawn as the landing's option
+ * pill, round: white with a hairline, filled with ink once starred.
  */
 function Star({
   on,
@@ -133,16 +174,17 @@ function Star({
       type="button"
       onClick={onToggle}
       aria-pressed={on}
-      aria-label={
-        on ? t('star.on', { label }) : t('star.off', { label })
-      }
-      className="-ml-1.5 flex h-11 w-9 flex-none cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-[15px] leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--acc)]"
-      style={{ color: on ? 'var(--acc-ink)' : 'var(--ink2)' }}
+      aria-label={on ? t('star.on', { label }) : t('star.off', { label })}
+      className="flow-opt flex-none"
+      style={{ width: 44, height: 44, minHeight: 44, padding: 0, fontSize: 16, lineHeight: 1 }}
     >
       <span aria-hidden>{on ? '★' : '☆'}</span>
     </button>
   );
 }
+
+/** A small option pill for the quiet actions — Remove, Clear stars. */
+const SMALL_OPT = { minHeight: 44, padding: '0 16px', fontSize: 14 } as const;
 
 export function CompareClient({
   studios: roster = [],
@@ -223,19 +265,25 @@ export function CompareClient({
 
   if (!comparison) {
     return (
-      <div className="oi-app oi-quick min-h-dvh bg-[var(--bg)]">
+      <FlowShell className="oi-quick">
         <AppHeader />
         <Spine at="compare" />
-        <Wrap className="py-12">
-          <Chapter eyebrow={t('eyebrow')} title={t('empty.title')}>
-            {t('empty.body')}
-          </Chapter>
-          <Sheet className="p-8">
-            <Quiet href="/match">{t('back')}</Quiet>
-          </Sheet>
-        </Wrap>
+        <div className="wrap py-[clamp(48px,7vw,100px)]">
+          <header className="max-w-[900px]">
+            <p className="eyebrow">{t('eyebrow')}</p>
+            <Split as="h1" className="h-l" text={t('empty.title')} auto />
+            <p className="lede" data-reveal="" style={stagger(2)}>
+              {t('empty.body')}
+            </p>
+            <div className="mt-10" data-reveal="" style={stagger(3)}>
+              <Pill href="/match" arrow>
+                {t('back')}
+              </Pill>
+            </div>
+          </header>
+        </div>
         <AppFooter />
-      </div>
+      </FlowShell>
     );
   }
 
@@ -245,9 +293,12 @@ export function CompareClient({
   const allLines = rooms.flatMap((r) => r.lines);
   const tally = tallyStarred(allLines, project.starred, studios);
   const gap = starredGap(tally);
+  /* The landing's tile tints, in its order, for the "where the difference
+     is" tiles. Soft enough that none of them reads as a warning. */
+  const TINTS = ['var(--sand)', 'var(--lilac)', 'var(--mint)', 'var(--peach)'];
 
   return (
-    <div className="oi-app oi-quick min-h-dvh bg-[var(--bg)]">
+    <FlowShell className="oi-quick">
       <AppHeader />
       <Spine
         at="compare"
@@ -257,63 +308,71 @@ export function CompareClient({
         ]}
       />
 
-      <Wrap className="py-12">
-        <Chapter
-          eyebrow={t('eyebrow')}
-          title={t('title', { n: studios.length })}
-          aside={
-            <p className="oi-num m-0 whitespace-nowrap text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink2)]">
-              {t('aside')}
-            </p>
-          }
-        >
-          {t('intro')}
-        </Chapter>
-
-        {!ratesAreReal() ? (
-          <p className="m-0 mb-8">
-            <Flag>{t('prelaunch')}</Flag>
+      <div className="wrap py-[clamp(40px,6vw,80px)]">
+        <header className="mb-[clamp(36px,5vw,64px)] max-w-[900px]">
+          <p className="eyebrow">{t('eyebrow')}</p>
+          <Split as="h1" className="h-l" text={t('title', { n: studios.length })} auto />
+          <p className="lede" data-reveal="" style={stagger(2)}>
+            {t('intro')}
           </p>
-        ) : null}
+          <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3" data-reveal="" style={stagger(3)}>
+            <span className="inline-flex min-h-9 items-center rounded-full bg-[var(--soft)] px-4 text-[13px] font-medium">
+              {t('aside')}
+            </span>
+            {!ratesAreReal() ? <Note>{t('prelaunch')}</Note> : null}
+          </div>
+        </header>
 
         {/* ── Fit, first ── */}
-        {roster.length > 0 ? <FitBlock entries={entries} studios={roster} matches={fit} /> : null}
+        {roster.length > 0 ? (
+          <div data-reveal="">
+            <FitBlock entries={entries} studios={roster} matches={fit} />
+          </div>
+        ) : null}
 
         {/* ── The totals ── */}
-        <div className="mb-10 grid gap-4" style={{ gridTemplateColumns: `repeat(auto-fit,minmax(15rem,1fr))` }}>
-          {studios.map((s) => {
-            const isLowest = s.quote.totalPaise === cheapestTotal;
+        <div className="mb-6 grid gap-3 sm:gap-4" style={{ gridTemplateColumns: `repeat(auto-fit,minmax(min(15rem,100%),1fr))` }}>
+          {studios.map((s, i) => {
+            const isLowest = s.quote.totalPaise === cheapestTotal && studios.length > 1;
             return (
-              <Sheet key={s.slug} className="p-5">
-                <div className="mb-3 flex items-baseline justify-between gap-3">
-                  <h2 className="oi-display m-0 text-[18px]">{s.name}</h2>
+              <section
+                key={s.slug}
+                className="flow-card flex flex-col"
+                data-reveal=""
+                style={{ ...stagger(i), ...(isLowest ? { background: 'var(--mint)' } : null) }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <h2 className="m-0 pt-2 text-[clamp(1.15rem,1rem+0.6vw,1.5rem)] font-medium leading-tight tracking-[-0.02em]">
+                    {s.name}
+                  </h2>
                   <button
                     type="button"
                     onClick={() => drop(s.slug)}
                     aria-label={t('remove.aria', { name: s.name })}
-                    className="oi-num -mr-2 -mt-2 flex min-h-11 cursor-pointer items-center rounded-full border-0 bg-transparent px-2.5 text-[9.5px] uppercase tracking-[0.16em] text-[var(--ink2)] transition-colors hover:text-[var(--ink)]"
+                    className="flow-opt flex-none"
+                    style={SMALL_OPT}
                   >
                     {t('remove')}
                   </button>
                 </div>
-                <p className="oi-num m-0 text-[24px] leading-none">
+                <p className="m-0 mt-8 text-[clamp(2.2rem,1.6rem+2vw,3.4rem)] font-medium leading-none tracking-[-0.04em] tabular-nums">
                   {money(s.quote.totalPaise)}
                 </p>
-                <p className="oi-num m-0 mt-2 text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink2)]">
+                <p className="m-0 mt-2 text-[14px] text-[var(--ink-2)] tabular-nums">
                   {money(s.quote.lowPaise)}–{money(s.quote.highPaise)}
                 </p>
-                <p className="oi-num m-0 mt-3 border-t border-[var(--line)] pt-3 text-[10.5px] uppercase tracking-[0.12em] text-[var(--ink2)]">
+                <p className="m-0 mt-4 border-t border-[var(--line)] pt-4 text-[13.5px] text-[var(--ink-2)] tabular-nums">
                   {t('factory', { factory: money(s.quote.modularPaise) ?? '', site: money(s.quote.nonModularPaise) ?? '' })}
                 </p>
-                {isLowest && studios.length > 1 ? (
-                  <p
-                    className="oi-num m-0 mt-3 text-[10px] uppercase tracking-[0.14em]"
-                    style={{ color: 'var(--sec-ink)' }}
-                  >
-                    {t('lowest')}
+                {isLowest ? (
+                  <p className="m-0 mt-4">
+                    <span className="inline-flex min-h-8 items-center gap-2 rounded-full bg-[var(--paper)] px-3 text-[12.5px] font-medium">
+                      <Dot size={6} />
+                      {t('lowest')}
+                    </span>
                   </p>
                 ) : null}
-              </Sheet>
+              </section>
             );
           })}
         </div>
@@ -325,11 +384,11 @@ export function CompareClient({
             appears only once they have starred something, because an empty
             panel explaining a feature is worse than no panel. */}
         {tally.codes.length > 0 ? (
-          <Sheet className="mb-10 p-6">
-            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-              <p className="oi-eyebrow m-0">
+          <section className="flow-card" data-reveal="">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+              <h2 className="h-m">
                 {t(tally.codes.length === 1 ? 'starred.one' : 'starred.many', { n: tally.codes.length })}
-              </p>
+              </h2>
               <button
                 type="button"
                 onClick={() => {
@@ -339,37 +398,34 @@ export function CompareClient({
                     starredCodes: [],
                   });
                 }}
-                className="oi-num -my-2 flex min-h-11 cursor-pointer items-center rounded-full border-0 bg-transparent px-2.5 text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink2)] transition-colors hover:text-[var(--ink)]"
+                className="flow-opt"
+                style={SMALL_OPT}
               >
                 {t('clearStars')}
               </button>
             </div>
 
-            <ul className="m-0 mb-4 flex list-none flex-col gap-2.5 p-0">
+            <ul className="m-0 mb-5 flex list-none flex-col p-0">
               {tally.studios.map((s, i) => (
                 <li
                   key={s.slug}
-                  className="flex flex-wrap items-baseline justify-between gap-x-5 gap-y-1"
+                  className="flex flex-wrap items-baseline justify-between gap-x-5 gap-y-1 border-t border-[var(--line)] py-3.5"
                 >
-                  <span className="text-[14.5px]">
+                  <span className="text-[16px] font-medium">
                     {s.name}
                     {s.missing.length > 0 ? (
-                      <span className="ml-2 text-[13px] text-[var(--ink2)]">
+                      <span className="ml-2 text-[13.5px] font-normal text-[var(--ink-2)]">
                         {t('didNotQuote', { items: s.missing.map((m) => itemLabel(lang, m)).join(', ') })}
                       </span>
                     ) : null}
                   </span>
-                  <span
-                    className="oi-num text-[15px]"
-                    style={
-                      s.missing.length === 0 && i === 0 && tally.leader?.slug === s.slug
-                        ? { color: 'var(--sec-ink)' }
-                        : undefined
-                    }
-                  >
-                    {money(s.totalPaise)}
+                  <span className="text-[19px] tracking-[-0.01em]">
+                    <Amount
+                      paise={s.totalPaise}
+                      best={s.missing.length === 0 && i === 0 && tally.leader?.slug === s.slug}
+                    />
                     {s.missing.length > 0 ? (
-                      <span className="ml-1.5 text-[11px] text-[var(--ink2)]">{t('partOnly')}</span>
+                      <span className="ml-1.5 text-[12.5px] text-[var(--ink-2)]">{t('partOnly')}</span>
                     ) : null}
                   </span>
                 </li>
@@ -380,84 +436,80 @@ export function CompareClient({
                 rather than credited with zero — not quoting the mandir is how
                 you win a comparison you should have lost. */}
             {tally.leader && gap !== null && gap > 0 ? (
-              <p className="m-0 border-t border-[var(--line)] pt-4 text-[14.5px] leading-[1.6]">
+              <p className="m-0 max-w-[48ch] text-[clamp(1.15rem,1rem+0.6vw,1.45rem)] font-medium leading-[1.35] tracking-[-0.015em]">
                 {withNodes(t('verdict.cheaper'), {
-                  name: <span className="font-medium">{tally.leader.name}</span>,
+                  name: <span>{tally.leader.name}</span>,
                   gap: (
-                    <span className="oi-num" style={{ color: 'var(--sec-ink)' }}>
-                      {money(gap)}
-                    </span>
+                    <span className="whitespace-nowrap rounded-full bg-[var(--mint)] px-2 tabular-nums">{money(gap)}</span>
                   ),
                 })}
               </p>
             ) : tally.leader && gap === 0 ? (
-              <p className="m-0 border-t border-[var(--line)] pt-4 text-[14.5px] leading-[1.6]">
+              <p className="m-0 max-w-[48ch] text-[clamp(1.15rem,1rem+0.6vw,1.45rem)] font-medium leading-[1.35] tracking-[-0.015em]">
                 {t('verdict.level')}
               </p>
             ) : (
-              <p className="m-0 border-t border-[var(--line)] pt-4 text-[14px] leading-[1.6] text-[var(--ink2)]">
-                {t('verdict.onlyOne')}
-              </p>
+              <p className="m-0 max-w-[60ch] text-[15px] leading-[1.6] text-[var(--ink-2)]">{t('verdict.onlyOne')}</p>
             )}
 
             {/* Never allowed to travel alone. A price verdict with no material
                 beside it is the disease this product was built against. */}
             {tally.caveats.length > 0 ? (
-              <p className="m-0 mt-3 max-w-[64ch] text-[13.5px] leading-[1.6]">
-                <Flag>
-                  {t('caveat', { items: tally.caveats.map((c) => itemLabel(lang, c)).join(', ') })}
-                </Flag>
+              <p className="m-0 mt-4 max-w-[64ch]">
+                <Note>{t('caveat', { items: tally.caveats.map((c) => itemLabel(lang, c)).join(', ') })}</Note>
               </p>
             ) : null}
-          </Sheet>
+          </section>
         ) : (
-          <Sheet className="mb-10 flex flex-wrap items-center gap-x-4 gap-y-2 p-5">
-            <span aria-hidden className="text-[19px] leading-none text-[var(--ink2)]">
+          <section className="flow-card flex items-center gap-4" data-reveal="">
+            <span
+              aria-hidden
+              className="grid h-11 w-11 flex-none place-items-center rounded-full bg-[var(--paper)] text-[18px] leading-none"
+            >
               ☆
             </span>
-            <p className="m-0 max-w-[52ch] text-[14.5px] leading-snug">
+            <p className="m-0 max-w-[56ch] text-[16px] font-medium leading-snug">
               {t('starHint')}
-              <span className="block text-[13.5px] text-[var(--ink2)]">
-                {t('starHintSub')}
-              </span>
+              <span className="mt-1 block text-[14px] font-normal text-[var(--ink-2)]">{t('starHintSub')}</span>
             </p>
-          </Sheet>
+          </section>
         )}
 
-        {/* ── Where the difference is ── */}
+        {/* ── Where the difference is ──
+            One tinted tile per row the studios disagree on, the gap set large
+            — the landing's figure tiles, holding what an architect would point at. */}
         {tellingRows.length > 0 ? (
-          <Sheet className="mb-10 p-6">
-            <p className="oi-eyebrow m-0 mb-4">{t('diff.title')}</p>
-            <ul className="m-0 flex list-none flex-col gap-4 p-0">
-              {tellingRows.map((row) => (
-                <li key={row.code} className="border-b border-[var(--line)] pb-4 last:border-b-0 last:pb-0">
-                  <p className="m-0 mb-1.5 flex flex-wrap items-baseline justify-between gap-3">
-                    <span className="text-[14.5px] font-medium">{itemLabel(lang, row.label)}</span>
-                    {row.spreadPaise > 0 ? (
-                      <span className="oi-num text-[13px]" style={{ color: 'var(--acc-ink)' }}>
-                        {t('diff.apart', { amount: money(row.spreadPaise) ?? '' })}
-                      </span>
-                    ) : null}
-                  </p>
+          <section className={GROUP}>
+            <Split as="h2" className="h-l" text={t('diff.title')} />
+            <ul className="m-0 mt-[clamp(28px,4vw,48px)] grid list-none grid-cols-1 gap-3 p-0 sm:gap-4 md:grid-cols-2">
+              {tellingRows.map((row, i) => (
+                <li
+                  key={row.code}
+                  className="flex flex-col gap-4 rounded-[var(--r-l)] p-[clamp(22px,2.6vw,34px)]"
+                  style={{ background: TINTS[i % TINTS.length], ...stagger(i % 2) }}
+                  data-reveal=""
+                >
+                  <p className="m-0 text-[17px] font-medium leading-snug">{itemLabel(lang, row.label)}</p>
+                  {row.spreadPaise > 0 ? (
+                    <p className="m-0 text-[clamp(2rem,1.5rem+1.8vw,3rem)] font-medium leading-none tracking-[-0.04em] tabular-nums">
+                      {t('diff.apart', { amount: money(row.spreadPaise) ?? '' })}
+                    </p>
+                  ) : null}
                   {row.materialsDiffer ? (
-                    <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                    <ul className="m-0 mt-auto flex list-none flex-col gap-1.5 p-0">
                       {row.cells.map((cell) => {
                         const studio = studios.find((s) => s.slug === cell.slug)!;
                         return (
-                          <li key={cell.slug} className="text-[13px] leading-snug text-[var(--ink2)]">
-                            <span className="text-[var(--ink)]">{studio.name}</span>
+                          <li key={cell.slug} className="text-[14px] leading-snug text-[var(--ink-2)]">
+                            <span className="font-medium text-[var(--ink)]">{studio.name}</span>
                             {' — '}
-                            {cell.spec ? (
-                              <Spec text={cell.spec} onPick={setTerm} />
-                            ) : (
-                              t('notQuotedLower')
-                            )}
+                            {cell.spec ? <Spec text={cell.spec} onPick={setTerm} /> : t('notQuotedLower')}
                           </li>
                         );
                       })}
                     </ul>
                   ) : row.cells.some((c) => c.amountPaise === null) ? (
-                    <p className="m-0 text-[13px] leading-snug text-[var(--ink2)]">
+                    <p className="m-0 mt-auto text-[14px] leading-snug text-[var(--ink-2)]">
                       {t('diff.didNot', {
                         names: row.cells
                           .filter((c) => c.amountPaise === null)
@@ -466,25 +518,31 @@ export function CompareClient({
                       })}
                     </p>
                   ) : (
-                    <p className="m-0 text-[13px] leading-snug text-[var(--ink2)]">
-                      {t('diff.same')}
-                    </p>
+                    <p className="m-0 mt-auto text-[14px] leading-snug text-[var(--ink-2)]">{t('diff.same')}</p>
                   )}
                 </li>
               ))}
             </ul>
-          </Sheet>
+          </section>
         ) : null}
 
-        <ExplainDifferences slugs={entries.map((e) => e.slug)} brief={brief} plan={project.plan} />
-        <p className="m-0 -mt-6 mb-10">
-          <Link href="/compare/brief" className="text-[14px] font-semibold text-[var(--ink)] underline">
-            {t('briefLink')}
-          </Link>
-        </p>
-        <AskYourQuote slugs={entries.map((e) => e.slug)} brief={brief} plan={project.plan} />
-        <RoomPrices entries={entries} />
-        <MaterialPrices entries={entries} />
+        <div className={GROUP} data-reveal="">
+          <ExplainDifferences slugs={entries.map((e) => e.slug)} brief={brief} plan={project.plan} className="mb-4" />
+          <p className="m-0 mb-6">
+            <Pill href="/compare/brief" tone="line" arrow className="pill-wrap">
+              {t('briefLink')}
+            </Pill>
+          </p>
+        </div>
+        <div data-reveal="">
+          <AskYourQuote slugs={entries.map((e) => e.slug)} brief={brief} plan={project.plan} />
+        </div>
+        <div data-reveal="">
+          <RoomPrices entries={entries} />
+        </div>
+        <div data-reveal="">
+          <MaterialPrices entries={entries} className="" />
+        </div>
 
         {/* ── Every line, on a phone ──
             The table below is unusable under about 700px: the pinned item
@@ -497,28 +555,26 @@ export function CompareClient({
             phone and keeps the thing that matters: the material sits under
             the amount, and a studio that did not quote shows as not quoted
             rather than as a gap. */}
-        <ul className="m-0 flex list-none flex-col gap-3 p-0 md:hidden">
+        <ul className={`${GROUP} m-0 flex list-none flex-col gap-3 p-0 md:hidden`}>
           {rooms.map((room) => (
-            <li key={room.room}>
-              <p className="oi-label m-0 mb-2 mt-4 first:mt-0">{roomName(lang, room.room, room.label)}</p>
+            <li key={room.room} className="mt-6 first:mt-0">
+              <p className="eyebrow">{roomName(lang, room.room, room.label)}</p>
               <ul className="m-0 flex list-none flex-col gap-3 p-0">
                 {room.lines.map((line: ComparedLine) => (
-                  <li key={line.code} className="border border-[var(--line)] bg-[var(--card)] p-4">
-                    <div className="flex items-start gap-1.5">
+                  <li key={line.code} className="rounded-[var(--r-m)] bg-[var(--soft)] p-4">
+                    <div className="flex items-start gap-3">
                       <Star
                         on={project.starred.includes(line.code)}
                         label={itemLabel(lang, line.label)}
                         onToggle={() => toggleStar(line.code)}
                       />
-                      <div className="min-w-0 flex-1 pt-2.5">
-                        <p className="m-0 text-[14.5px] font-medium">{itemLabel(lang, line.label)}</p>
-                        <p className="oi-num m-0 mt-1 text-[12px] leading-snug text-[var(--ink2)]">
-                          {line.size}
-                        </p>
+                      <div className="min-w-0 flex-1 pt-1">
+                        <p className="m-0 text-[16px] font-medium leading-snug">{itemLabel(lang, line.label)}</p>
+                        <p className="m-0 mt-0.5 text-[13px] leading-snug text-[var(--ink-2)] tabular-nums">{line.size}</p>
                       </div>
                     </div>
 
-                    <ul className="m-0 mt-3 flex list-none flex-col gap-3 border-t border-[var(--line)] p-0 pt-3">
+                    <ul className="m-0 mt-4 flex list-none flex-col gap-4 border-t border-[var(--line)] p-0 pt-4">
                       {line.cells.map((cell) => {
                         const studio = studios.find((s) => s.slug === cell.slug)!;
                         const best = line.cheapest.includes(cell.slug);
@@ -530,29 +586,16 @@ export function CompareClient({
                         return (
                           <li key={cell.slug}>
                             <div className="flex items-baseline justify-between gap-4">
-                              <span className="text-[13.5px] text-[var(--ink2)]">{studio.name}</span>
+                              <span className="text-[14px] text-[var(--ink-2)]">{studio.name}</span>
                               {cell.amountPaise === null ? (
-                                <Flag>{t('notQuoted')}</Flag>
+                                <Note>{t('notQuoted')}</Note>
                               ) : (
-                                <span
-                                  className="oi-num text-[14px]"
-                                  style={best ? { color: 'var(--sec-ink)' } : undefined}
-                                >
-                                  {money(cell.amountPaise)}
-                                </span>
+                                <Amount paise={cell.amountPaise} best={best} className="text-[15.5px]" />
                               )}
                             </div>
                             {cell.amountPaise !== null ? (
                               <>
-                                <span aria-hidden className="mt-1.5 block h-[3px] bg-[var(--line)]">
-                                  <span
-                                    className="block h-full"
-                                    style={{
-                                      width: `${width}%`,
-                                      background: best ? 'var(--sec-ink)' : 'var(--ink2)',
-                                    }}
-                                  />
-                                </span>
+                                <Bar width={width} best={best} />
                                 <MaterialList text={cell.spec ?? ''} onPick={setTerm} />
                               </>
                             ) : null}
@@ -566,12 +609,17 @@ export function CompareClient({
             </li>
           ))}
 
-          <li className="mt-2 flex flex-col gap-2 border-t-2 border-[var(--ink)] bg-[var(--card)] p-4">
-            <p className="oi-label m-0">{t('total')}</p>
+          {/* The totals, set large on ink — the line everything above adds up to. */}
+          <li className="mt-3 flex flex-col gap-3 rounded-[var(--r-l)] bg-[var(--ink)] p-5 text-white">
+            <p className="eyebrow" style={{ color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>
+              {t('total')}
+            </p>
             {studios.map((s) => (
               <span key={s.slug} className="flex items-baseline justify-between gap-4">
-                <span className="text-[13.5px] text-[var(--ink2)]">{s.name}</span>
-                <span className="oi-num text-[16px]">{money(s.quote.totalPaise)}</span>
+                <span className="text-[14.5px] text-white/70">{s.name}</span>
+                <span className="whitespace-nowrap text-[clamp(1.5rem,1.2rem+1.4vw,2rem)] font-medium leading-none tracking-[-0.035em] tabular-nums">
+                  {money(s.quote.totalPaise)}
+                </span>
               </span>
             ))}
           </li>
@@ -585,13 +633,15 @@ export function CompareClient({
             so `position: sticky` had nothing to stick to and the studio names
             left the screen after the first few rows — twenty-three rows of
             money with nothing saying whose. */}
-        <div className="oi-cmp oi-rail hidden max-h-[min(78vh,900px)] overflow-auto border border-[var(--line)] bg-[var(--card)] md:block">
+        <div
+          className={`${GROUP} oi-cmp oi-rail hidden max-h-[min(78vh,900px)] overflow-auto rounded-[var(--r-l)] bg-[var(--soft)] md:block`}
+        >
           <table className="w-full border-collapse text-left">
             <thead>
               <tr>
                 <th
                   scope="col"
-                  className="oi-label sticky left-0 top-0 z-30 border-b border-[var(--ink)] bg-[var(--card)] p-4 align-bottom"
+                  className="eyebrow sticky left-0 top-0 z-30 border-b border-[var(--line)] bg-[var(--soft)] px-5 pb-4 pt-6 align-bottom"
                 >
                   {t('lineItem')}
                 </th>
@@ -599,9 +649,11 @@ export function CompareClient({
                   <th
                     key={s.slug}
                     scope="col"
-                    className={`sticky top-0 z-20 border-b border-[var(--ink)] bg-[var(--card)] p-4 align-bottom ${COL}`}
+                    className={`sticky top-0 z-20 border-b border-[var(--line)] bg-[var(--soft)] px-5 pb-4 pt-6 align-bottom ${COL}`}
                   >
-                    <span className="oi-display block text-[15px]">{s.name}</span>
+                    <span className="block text-[clamp(1.1rem,0.95rem+0.5vw,1.4rem)] font-medium leading-tight tracking-[-0.02em]">
+                      {s.name}
+                    </span>
                   </th>
                 ))}
               </tr>
@@ -613,7 +665,7 @@ export function CompareClient({
                   <th
                     scope="colgroup"
                     colSpan={studios.length + 1}
-                    className="oi-label sticky left-0 z-10 bg-[var(--bg)] px-4 py-2.5 text-left"
+                    className="eyebrow sticky left-0 z-10 bg-[var(--paper)] px-5 py-3 text-left"
                   >
                     {roomName(lang, room.room, room.label)}
                   </th>
@@ -622,17 +674,17 @@ export function CompareClient({
                   <tr key={line.code}>
                     <th
                       scope="row"
-                      className="sticky left-0 z-10 border-b border-[var(--line)] bg-[var(--card)] p-4 align-top font-normal"
+                      className="sticky left-0 z-10 border-b border-[var(--line)] bg-[var(--soft)] px-5 py-4 align-top font-normal"
                     >
-                      <span className="flex items-start gap-1.5">
+                      <span className="flex items-start gap-3">
                         <Star
                           on={project.starred.includes(line.code)}
                           label={itemLabel(lang, line.label)}
                           onToggle={() => toggleStar(line.code)}
                         />
-                        <span className="min-w-0 pt-2.5">
-                          <span className="block text-[14.5px] font-medium">{itemLabel(lang, line.label)}</span>
-                          <span className="oi-num mt-1 block text-[12px] leading-snug text-[var(--ink2)]">
+                        <span className="min-w-0 pt-1">
+                          <span className="block text-[15.5px] font-medium leading-snug">{itemLabel(lang, line.label)}</span>
+                          <span className="mt-0.5 block text-[13px] leading-snug text-[var(--ink-2)] tabular-nums">
                             {line.size}
                           </span>
                         </span>
@@ -653,34 +705,14 @@ export function CompareClient({
                           : 0;
 
                       return (
-                        <td
-                          key={cell.slug}
-                          className={`border-b border-[var(--line)] p-4 align-top ${COL}`}
-                        >
+                        <td key={cell.slug} className={`border-b border-[var(--line)] px-5 py-4 align-top ${COL}`}>
                           {cell.amountPaise === null ? (
                             // Never ₹0 — a zero reads as free.
-                            <Flag>{t('notQuoted')}</Flag>
+                            <Note>{t('notQuoted')}</Note>
                           ) : (
                             <>
-                              <span
-                                className="oi-num block text-[14px]"
-                                style={best ? { color: 'var(--sec-ink)' } : undefined}
-                              >
-                                {money(cell.amountPaise)}
-                              </span>
-                              <span
-                                aria-hidden
-                                className="mt-1.5 block h-[3px] bg-[var(--line)]"
-                              >
-                                <span
-                                  className="block h-full"
-                                  style={{
-                                    width: `${width}%`,
-                                    // --sec-ink: raw sage is 2.32:1 on the hairline track.
-                                    background: best ? 'var(--sec-ink)' : 'var(--ink2)',
-                                  }}
-                                />
-                              </span>
+                              <Amount paise={cell.amountPaise} best={best} className="text-[15.5px]" />
+                              <Bar width={width} best={best} />
 
                               {/* Materials as chips rather than a sentence.
                                   At four columns a sentence per cell is a
@@ -697,20 +729,21 @@ export function CompareClient({
               </tbody>
             ))}
 
+            {/* The totals, set large on ink — the line everything above adds up to. */}
             <tfoot>
               <tr>
                 <th
                   scope="row"
-                  className="oi-label sticky left-0 z-10 border-t border-[var(--ink)] bg-[var(--card)] p-4 text-left"
+                  className="eyebrow sticky left-0 z-10 bg-[var(--ink)] px-5 py-6 text-left align-bottom"
+                  style={{ color: 'rgba(255,255,255,0.6)' }}
                 >
                   {t('total')}
                 </th>
                 {studios.map((s) => (
-                  <td
-                    key={s.slug}
-                    className={`border-t border-[var(--ink)] p-4 ${COL}`}
-                  >
-                    <span className="oi-num text-[17px]">{money(s.quote.totalPaise)}</span>
+                  <td key={s.slug} className={`bg-[var(--ink)] px-5 py-6 align-bottom text-white ${COL}`}>
+                    <span className="whitespace-nowrap text-[clamp(1.6rem,1.2rem+1.2vw,2.3rem)] font-medium leading-none tracking-[-0.04em] tabular-nums">
+                      {money(s.quote.totalPaise)}
+                    </span>
                   </td>
                 ))}
               </tr>
@@ -719,22 +752,20 @@ export function CompareClient({
         </div>
 
         {offer ? (
-          <ExpertPitch
-            offer={offer}
-            lead={t('pitchLead')}
-            className="mt-10 max-w-[44rem]"
-          />
+          <div className={GROUP} data-reveal="">
+            <ExpertPitch offer={offer} lead={t('pitchLead')} className="max-w-[44rem]" />
+          </div>
         ) : null}
 
-        <div className="mt-8 flex flex-wrap items-center gap-4">
-          <Quiet href="/match">{t('another')}</Quiet>
-          {/* The one terracotta action on this screen is the expert pitch above. */}
+        <div className="mt-10 flex flex-wrap items-center gap-4">
+          <Pill href="/match" tone="line">
+            {t('another')}
+          </Pill>
+          {/* The one primary action on this screen is the expert pitch above. */}
         </div>
 
-        <p className="m-0 mt-6 max-w-[58ch] text-[13px] leading-[1.6] text-[var(--ink2)]">
-          {t('footnote')}
-        </p>
-      </Wrap>
+        <p className="m-0 mt-6 max-w-[58ch] text-[13.5px] leading-[1.6] text-[var(--ink-2)]">{t('footnote')}</p>
+      </div>
 
       {/* Reference you read WHILE comparing, so it is deliberately not a
           modal — it does not take focus and it does not stop you scrolling
@@ -743,6 +774,6 @@ export function CompareClient({
 
       <NextStepBar label={t('bar.label', { n: entries.length })} offer={offer} />
       <AppFooter />
-    </div>
+    </FlowShell>
   );
 }

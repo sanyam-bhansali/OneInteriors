@@ -1716,7 +1716,9 @@ p {
    is looking. */
 .oi-cmp tbody tr:hover > th,
 .oi-cmp tbody tr:hover > td {
-  background: var(--acc-wash);
+  /* Opaque: the pinned first column must not let a sideways-scrolled row
+     show through it. Same tint as --acc-wash laid over the card. */
+  background: color-mix(in srgb, var(--ink) 5%, var(--card, #fff));
 }
 
 /* Keyboard parity. Tabbing to the star inside a row gets the same highlight,

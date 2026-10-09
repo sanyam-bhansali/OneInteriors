@@ -4,6 +4,7 @@ import { LivePrice } from '@/components/landing-v3/LivePrice';
 import { VERIFIED_STUDIOS } from '@/lib/claims';
 import { Wordmark } from '@/components/brand';
 import { CbMotion } from './CbMotion';
+import { Pill, Split } from './parts';
 import { SiteLangPicker } from '@/components/app/i18n';
 import { CHECK_LABELS, type CheckType } from '@/modules/studio/types';
 import { BENEFITS, showcaseWorthPaise } from '@/modules/portal/benefits';
@@ -31,78 +32,6 @@ import { formatINR, formatINRCompact } from '@/lib/money';
  */
 
 // ── Small parts ────────────────────────────────────────────────
-
-/** A heading whose words rise into place on scroll (home-cb.css `.split`). */
-function Split({
-  as: Tag = 'h2',
-  text,
-  className = '',
-  id,
-  auto = false,
-}: {
-  as?: 'h1' | 'h2' | 'h3';
-  text: string;
-  className?: string;
-  id?: string;
-  auto?: boolean;
-}) {
-  const words = text.split(/\s+/);
-  return (
-    <Tag className={`${className} split`} id={id} data-split="" data-auto={auto ? '' : undefined} aria-label={text}>
-      {words.map((w, i) => (
-        <span key={i} aria-hidden="true">
-          <span className="w">
-            <span className="wi" style={{ ['--i' as string]: i }}>
-              {w}
-            </span>
-          </span>{' '}
-        </span>
-      ))}
-    </Tag>
-  );
-}
-
-/** A pill button whose label rolls up on hover and whose fill rises from below. */
-function Pill({
-  href,
-  children,
-  tone = 'dark',
-  arrow = false,
-  size,
-}: {
-  href: string;
-  children: string;
-  tone?: 'dark' | 'light' | 'line' | 'accent';
-  arrow?: boolean;
-  size?: 'sm' | 'lg';
-}) {
-  const cls = `pill pill-${tone}${size ? ` pill-${size}` : ''}`;
-  const inner = (
-    <span className="mag-inner">
-      <span className="roll">
-        <span data-t={children}>{children}</span>
-      </span>
-      {arrow ? <Arrow /> : null}
-    </span>
-  );
-  return href.startsWith('#') || href.startsWith('mailto:') ? (
-    <a className={cls} href={href} data-magnetic="">
-      {inner}
-    </a>
-  ) : (
-    <Link className={cls} href={href} data-magnetic="">
-      {inner}
-    </Link>
-  );
-}
-
-const Arrow = () => (
-  <span className="pill-arrow" aria-hidden="true">
-    <svg width="14" height="14" viewBox="0 0 18 18" fill="none">
-      <path d="M3.5 9h11M10 4.5 14.5 9 10 13.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  </span>
-);
 
 const Tick = () => (
   <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">

@@ -4,6 +4,7 @@ import { siteUrl } from '@/lib/site';
 import { RosterGateBanner } from '@/components/RosterGateBanner';
 import { RegisterServiceWorker } from '@/components/RegisterServiceWorker';
 import './globals.css';
+import '@/components/home/home-cb.css';
 
 /*
  * Every face is bundled (src/app/fonts: the Latin files Google Fonts serves,

@@ -4,7 +4,6 @@ import { currentOffer } from '@/modules/consultation/offer-store';
 import { translator } from '@/modules/i18n/site';
 import { getLang } from '@/modules/i18n/server';
 import { HOME_DICT } from '@/modules/i18n/site/home';
-import '@/components/home/home-cb.css';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = translator(await getLang(), HOME_DICT);
