@@ -5,10 +5,9 @@ import 'server-only';
  *
  * `notify(userId, event)` records the event in `notifications` (the app's
  * list, read on phone and laptop alike), then pushes it to every phone the
- * person is signed in on through Expo's push service. With no phone, it falls
- * back to a WhatsApp template when one is configured
- * (`WHATSAPP_PROJECT_TEMPLATE`, approved by Meta, two body parameters: title
- * and text).
+ * person is signed in on through Expo's push service. With no phone, it goes
+ * by email with a link to the page on the site. Never WhatsApp (owner,
+ * 11 Oct): customers read their project in the app or on the website.
  *
  * Never throws into the action that caused it: a failed push must not undo a
  * posted site update. Failures are logged without the message text, which can
@@ -17,7 +16,6 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
-import { sendTemplate } from '@/modules/auth/whatsapp';
 import { sendNotice } from '@/modules/auth/email';
 import { resolveSiteUrl } from '@/lib/site';
 import { EMAILED_TO_STUDIO, messageFor, type Message, type ProjectEvent } from './messages';
@@ -43,26 +41,24 @@ export async function removeDevice(userId: string, token: string): Promise<void>
   await prisma.pushDevice.deleteMany({ where: { userId, token } });
 }
 
-export async function notify(userId: string, event: ProjectEvent): Promise<void> {
+/**
+ * `email: false` for callers that send their own email (notifyStudio,
+ * notifyOps), so nobody gets the same notice twice.
+ */
+export async function notify(userId: string, event: ProjectEvent, opts: { email?: boolean } = {}): Promise<void> {
   if (!hasDatabase()) return;
   const msg = messageFor(event);
   try {
     const devices = await prisma.pushDevice.findMany({ where: { userId }, select: { token: true } });
     const pushed = devices.length > 0 ? await push(devices.map((d) => d.token), msg) : false;
-    /* Quotations are read in the app or on the website, never on WhatsApp
-       (owner, 11 Oct): without the app, a quotation notice goes by email —
-       a link to the quote on the site — and every other notice may use the
-       WhatsApp template. */
-    const quoteNotice = NO_WHATSAPP.includes(event.kind);
-    const whatsapped = !pushed && !quoteNotice ? await viaWhatsApp(userId, msg) : false;
-    const emailed = !pushed && quoteNotice ? await viaEmail(userId, msg) : false;
+    const emailed = !pushed && opts.email !== false ? await viaEmail(userId, msg) : false;
     await prisma.notification.create({
       data: {
         userId,
-        channel: pushed ? 'push' : whatsapped ? 'whatsapp' : emailed ? 'email' : 'inbox',
+        channel: pushed ? 'push' : emailed ? 'email' : 'inbox',
         template: msg.template,
         payload: { title: msg.title, body: msg.body, url: msg.url },
-        sentAt: pushed || whatsapped || emailed ? new Date() : null,
+        sentAt: pushed || emailed ? new Date() : null,
       },
     });
   } catch (error) {
@@ -82,7 +78,7 @@ export async function notifyStudio(studioId: string, event: ProjectEvent): Promi
       where: { studioId },
       select: { userId: true, user: { select: { email: true } } },
     });
-    await Promise.all(members.map((m) => notify(m.userId, event)));
+    await Promise.all(members.map((m) => notify(m.userId, event, { email: false })));
     if (EMAILED_TO_STUDIO.includes(event.kind)) {
       const msg = messageFor(event);
       const url = `${resolveSiteUrl()}${msg.url}`;
@@ -99,7 +95,7 @@ export async function notifyOps(event: ProjectEvent): Promise<void> {
   if (!hasDatabase()) return;
   try {
     const staff = await prisma.user.findMany({ where: { role: { in: ['OPS', 'ADMIN'] } }, select: { id: true, email: true }, take: 50 });
-    await Promise.all(staff.map((u) => notify(u.id, event)));
+    await Promise.all(staff.map((u) => notify(u.id, event, { email: false })));
     const msg = messageFor(event);
     const url = `${resolveSiteUrl()}${msg.url}`;
     await Promise.all(staff.filter((u) => u.email).map((u) => sendNotice(u.email!, { title: msg.title, body: msg.body, url })));
@@ -138,9 +134,6 @@ async function push(tokens: string[], msg: Message): Promise<boolean> {
   return delivered;
 }
 
-/** Notices about a quotation: never on WhatsApp. */
-const NO_WHATSAPP: ProjectEvent['kind'][] = ['quote-sent'];
-
 /** A notice by email to the person's own address, with the full link. */
 async function viaEmail(userId: string, msg: Message): Promise<boolean> {
   // A customer signs in by phone; the address they gave is on their brief.
@@ -151,14 +144,5 @@ async function viaEmail(userId: string, msg: Message): Promise<boolean> {
   const to = user?.email ?? user?.brief?.contactEmail ?? null;
   if (!to) return false;
   const sent = await sendNotice(to, { title: msg.title, body: msg.body, url: `${resolveSiteUrl()}${msg.url}` });
-  return sent.delivered;
-}
-
-async function viaWhatsApp(userId: string, msg: Message): Promise<boolean> {
-  const template = process.env.WHATSAPP_PROJECT_TEMPLATE?.trim();
-  if (!template) return false;
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { phone: true } });
-  if (!user?.phone) return false;
-  const sent = await sendTemplate(user.phone, template, [msg.title, msg.body]);
   return sent.delivered;
 }
