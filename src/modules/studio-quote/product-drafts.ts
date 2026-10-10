@@ -150,6 +150,20 @@ export async function approveDraftRun(studioId: string, runId: string): Promise<
   let updated = 0;
   await prisma.$transaction(
     async (tx) => {
+        /* A copy of the whole product master first, so an approval can be
+           undone (scripts/quotations/restore.ts). Inside the transaction:
+           no approval without its backup. */
+        const before = await tx.studioProduct.findMany({ where: { studioId } });
+        if (before.length > 0) {
+          await tx.studioProductBackup.create({
+            data: {
+              studioId,
+              reason: `before approving ${runId}`,
+              rows: before.map((p) => ({ ...p, ratePaise: String(p.ratePaise) })) as unknown as Prisma.InputJsonValue,
+            },
+          });
+        }
+
       for (const r of rows) {
         const data = {
           code: r.code,

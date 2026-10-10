@@ -730,6 +730,7 @@ model Studio {
   branding           StudioBranding?
   products           StudioProduct[]
   productDrafts      StudioProductDraft[]
+  productBackups     StudioProductBackup[]
   studioQuotes       StudioQuote[]
   studioClients      StudioClient[]
   studioClientEvents StudioClientEvent[]
@@ -2100,6 +2101,14 @@ model StudioBranding {
   bookingAdvancePaise BigInt @default(2500000)
   /// GST a new quotation starts with: 0 (off) or 1800.
   gstBps              Int    @default(0)
+
+  /// The material specification printed on every quotation:
+  /// [{ item, spec }] — "Plywood" / "Century BWP 710, 18 mm". The
+  /// studio's own brands; null prints no table.
+  materialSpec Json?
+
+  /// How many days a quotation holds its prices. Printed as "valid until".
+  validityDays Int @default(30)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3480,6 +3489,24 @@ model WaitlistSignup {
 /// the API from a request got stuck and ran up the bill (10 Oct 2026). Ops
 /// approves the run on /ops/[slug], which upserts these into StudioProduct
 /// and asks the studio to check them. Same shape as StudioProduct on purpose.
+/// A copy of a studio's whole product master, taken before anything replaces
+/// it in bulk (an approved quotation read). Restored from the laptop with
+/// `scripts/quotations/restore.ts`. Rates are private: ops and the owner only.
+model StudioProductBackup {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  /// Why it was taken: "before approving run-…".
+  reason String
+  /// Every product row as it stood, rates in paise as strings.
+  rows   Json
+  takenAt DateTime @default(now())
+
+  @@index([studioId, takenAt])
+  @@map("studio_product_backups")
+}
+
 model StudioProductDraft {
   id        String            @id @default(cuid())
   studioId  String

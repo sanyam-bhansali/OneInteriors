@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { rupeesToPaise } from '@/lib/money';
-import { saveBranding } from '@/modules/studio-quote/store';
+import { saveBranding, parseMaterialSpec } from '@/modules/studio-quote/store';
 import { replaceLogo, clearLogo, setHideOurMark } from '@/modules/studio-quote/store';
 
 // `State` and `IDLE` live in studio/form-state.ts. A 'use server'
@@ -50,6 +50,8 @@ export async function saveBrandingAction(_prev: State, form: FormData): Promise<
     discountBps,
     bookingAdvancePaise: rupeesToPaise(advance),
     gstBps: str('gstOn') === 'yes' ? 1800 : 0,
+    materialSpec: parseMaterialSpec(String(form.get('materialSpec') ?? '')),
+    validityDays: Number(str('validityDays') || '30'),
   });
 
   if (!result.ok) return result;

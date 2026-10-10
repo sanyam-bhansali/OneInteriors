@@ -241,11 +241,31 @@ export function BrandingForm({ branding }: { branding: BrandingRow | null }) {
           />
           Add GST at 18% to new quotations
         </label>
+        <Field
+          label="A quotation holds its prices for"
+          name="validityDays"
+          defaultValue={String(branding?.validityDays ?? 30)}
+          width="xs"
+          suffix="days — printed as “valid until”"
+        />
         <p className="m-0 max-w-[64ch] text-[13px] leading-relaxed text-[var(--s-ink-3)]">
           The discount applies to modular work only — factory units carry the margin that can be
           given away, site labour does not. Discounting the whole quotation is how a studio wins a
           job and loses money on it.
         </p>
+      </Block>
+
+      <Block
+        title="Material specification"
+        note="Printed on every quotation, so a client can see the brands behind the price. One per line: what it is, a colon, then your brand and grade."
+      >
+        <textarea
+          name="materialSpec"
+          rows={7}
+          defaultValue={(branding?.materialSpec ?? []).map((r) => `${r.item}: ${r.spec}`).join('\n')}
+          placeholder={'Plywood: Century BWP 710, 18 mm\nLaminate: Merino 1 mm\nHardware: Hettich soft-close\nPaint: Asian Paints Royale'}
+          className={input}
+        />
       </Block>
 
       <div className="flex items-center gap-4">

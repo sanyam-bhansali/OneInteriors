@@ -38,6 +38,11 @@ Trigger it by asking Claude, in this repo: **`/read-quotations <studio-slug>`**
    the ops email recorded as reviewer:
    `npx tsx scripts/quotations/approve.ts <slug> <ops-email>`
 
+   Every approval first saves a backup of the studio's whole product master.
+   To undo one: `npx tsx scripts/quotations/restore.ts <slug>` lists the
+   backups, and `… restore.ts <slug> <backup-id>` puts that one back (and backs
+   up what it replaces, so a restore can be undone too).
+
 **On Windows** the `npm run … -- <args>` form loses its arguments inside the
 env wrapper. Call the scripts directly through it:
 `powershell -ExecutionPolicy Bypass -File scripts\with-env.ps1 npx tsx scripts/quotations/<fetch|submit|approve>.ts <args>`

@@ -2,9 +2,9 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { formatINR } from '@/lib/money';
 import { getQuote, totalsFor } from '@/modules/studio-quote/quotes';
-import { myBranding } from '@/modules/studio-quote/store';
+import { myBranding, myStudioProfile } from '@/modules/studio-quote/store';
+import { byRoom } from '@/modules/studio-quote/revision';
 import { UNIT_LABELS, formatQty, WORK_CODE_LABELS } from '@/modules/studio-quote/pricing';
-import { ROOM_CATEGORIES } from '@/modules/studio-quote/starter-catalogue';
 import { PrintButton } from './PrintButton';
 import { myTier } from '@/modules/studio-quote/store';
 import { signedLogoUrl } from '@/modules/storage/studio-logo';
@@ -65,7 +65,7 @@ export const dynamic = 'force-dynamic';
  */
 export default async function PrintPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [quote, branding, tier] = await Promise.all([getQuote(id), myBranding(), myTier()]);
+  const [quote, branding, tier, profile] = await Promise.all([getQuote(id), myBranding(), myTier(), myStudioProfile()]);
 
   if (!quote) notFound();
 
@@ -91,22 +91,91 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
     : '#1F5C4D';
 
   const totals = totalsFor(quote);
-  const rooms = ROOM_CATEGORIES.map((room) => ({
-    room,
-    lines: quote.lines.filter((l) => l.room === room),
-  })).filter((g) => g.lines.length > 0);
+  /* In the order the quotation has them. These were grouped by catalogue
+     category ("Bedroom"), which no built room is called ("Master bedroom"),
+     so most rooms never printed while the totals still counted them — found
+     11 Oct. */
+  const roomOrder = [...new Set(quote.lines.map((l) => l.room))];
+  const rooms = roomOrder.map((room) => ({ room, lines: quote.lines.filter((l) => l.room === room) }));
+  const summary = byRoom(quote.lines.map((l) => ({ room: l.room, product: l.product, amountPaise: l.amountPaise })));
+  const topRoom = Math.max(1, ...summary.map((r) => r.paise));
 
-  const issued = new Date(quote.quoteDate).toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  const longDate = (d: Date) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+  const issued = longDate(new Date(quote.quoteDate));
+  const validDays = branding?.validityDays ?? 30;
+  const validUntil = longDate(new Date(new Date(quote.quoteDate).getTime() + validDays * 86_400_000));
+  const flat = [quote.society, quote.locality, quote.config, quote.carpetSqft ? `${quote.carpetSqft} sq ft` : null]
+    .filter(Boolean)
+    .join(' · ');
+  const spec = branding?.materialSpec ?? [];
+  const cover = profile?.photos[0] ?? null;
+  const about = profile && (profile.about || profile.photos.length > 1) ? profile : null;
 
   return (
     <div className="quote-doc">
       <PrintButton
         filename={`${quote.clientName} — ${branding?.legalName ?? 'Quotation'} ${quote.number}`}
       />
+
+      {/* ── Cover ── */}
+      <article className={`sheet cover ${cover ? 'with-photo' : ''}`}>
+        <div className="cover-top">
+          {logoUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={logoUrl} alt="" className="logo" />
+          ) : null}
+          <p className="cover-studio">{branding?.legalName ?? profile?.tradeName ?? 'Your studio'}</p>
+        </div>
+        {cover ? (
+          <figure className="cover-photo">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={cover.url} alt="" />
+            <figcaption>
+              {cover.caption}
+              {cover.isRender ? ' (render)' : ''}
+            </figcaption>
+          </figure>
+        ) : null}
+        <div className="cover-body">
+          <p className="label">Interior quotation</p>
+          <p className="cover-client">{quote.clientName}</p>
+          {flat ? <p className="muted">{flat}</p> : null}
+          <p className="cover-meta mono">
+            {quote.number} · {issued} · valid until {validUntil}
+          </p>
+        </div>
+      </article>
+
+      {/* ── About the studio ── */}
+      {about ? (
+        <article className="sheet about">
+          <h2>About {about.tradeName}</h2>
+          {about.about ? <p className="about-text">{about.about}</p> : null}
+          <p className="muted">
+            {[
+              about.yearsActive ? `${about.yearsActive} years in practice` : null,
+              about.teamSize ? `a team of ${about.teamSize}` : null,
+              about.localities.length ? `working in ${about.localities.slice(0, 5).map((l) => l.replace(/-/g, ' ')).join(', ')}` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+          {about.photos.length > 1 ? (
+            <div className="about-photos">
+              {about.photos.slice(0, 4).map((p) => (
+                <figure key={p.url}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.url} alt="" />
+                  <figcaption>
+                    {p.caption}
+                    {p.isRender ? ' (render)' : ''}
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          ) : null}
+        </article>
+      ) : null}
 
       <article className="sheet">
         {/* ── Letterhead ── */}
@@ -132,6 +201,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
             <p className="label">Quotation</p>
             <p className="mono big">{quote.number}</p>
             <p className="muted">{issued}</p>
+            <p className="muted">Valid until {validUntil}</p>
           </div>
         </header>
 
@@ -139,11 +209,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
         <section className="to">
           <p className="label">Prepared for</p>
           <p className="name">{quote.clientName}</p>
-          <p className="muted">
-            {[quote.society, quote.locality, quote.config, quote.carpetSqft ? `${quote.carpetSqft} sq ft` : null]
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
+          <p className="muted">{flat}</p>
         </section>
 
         {quote.welcomeNote ? <p className="welcome">{quote.welcomeNote}</p> : null}
@@ -201,6 +267,27 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
           </section>
         ))}
 
+        {/* ── Where the money goes ── */}
+        {summary.length > 1 ? (
+          <section className="summary">
+            <h2>Room summary</h2>
+            <table>
+              <tbody>
+                {summary.map((r) => (
+                  <tr key={r.room}>
+                    <td className="s-room">{r.room}</td>
+                    <td className="s-bar">
+                      <span style={{ width: `${Math.max(2, Math.round((r.paise / topRoom) * 100))}%` }} />
+                    </td>
+                    <td className="mono num">{(r.shareBps / 100).toFixed(0)}%</td>
+                    <td className="mono num strong">{formatINR(r.paise)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        ) : null}
+
         {/* ── Money ── */}
         <section className="totals">
           <table>
@@ -244,6 +331,26 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
             </table>
           </section>
         ) : null}
+
+        {spec.length > 0 ? (
+          <section className="spec">
+            <h2>Material specification</h2>
+            <table>
+              <tbody>
+                {spec.map((r) => (
+                  <tr key={r.item}>
+                    <td className="strong">{r.item}</td>
+                    <td>{r.spec}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        ) : null}
+
+        <p className="validity muted">
+          Prices hold for {validDays} days, until {validUntil}.
+        </p>
 
         {quote.terms ? (
           <section className="terms">
@@ -329,6 +436,30 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
         .terms p { white-space: pre-wrap; font-size: 11.5px; line-height: 1.6; color: #3d4144; }
 
         .foot { margin-top: 32px; padding-top: 12px; border-top: 1px solid #d9dbd6; }
+
+        .sheet + .sheet { margin-top: 18px; }
+        .cover { display: flex; flex-direction: column; min-height: 420px; }
+        .cover.with-photo { min-height: 1000px; }
+        .cover-top { display: flex; align-items: center; gap: 14px; padding-bottom: 14px; border-bottom: 2px solid ${accent}; }
+        .cover-top .logo { margin: 0; }
+        .cover-studio { font-family: var(--font-display); font-size: 20px; font-weight: 600; }
+        .cover-photo { margin: 26px 0 0; flex: 1; display: flex; flex-direction: column; }
+        .cover-photo img { width: 100%; height: 520px; object-fit: cover; display: block; }
+        .cover-photo figcaption, .about-photos figcaption { font-size: 10.5px; color: #7b8085; margin-top: 5px; }
+        .cover-body { margin-top: auto; padding-top: 28px; }
+        .cover-client { font-family: var(--font-display); font-size: 34px; line-height: 1.1; margin: 4px 0 6px; letter-spacing: -.01em; }
+        .cover-meta { margin-top: 10px; font-size: 11.5px; color: #3d4144; }
+        .about-text { font-size: 13px; line-height: 1.7; white-space: pre-wrap; margin-bottom: 10px; }
+        .about-photos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 18px; }
+        .about-photos figure { margin: 0; }
+        .about-photos img { width: 100%; height: 220px; object-fit: cover; display: block; }
+
+        .summary td { padding: 5px 7px; border-bottom: 1px solid #ecedea; }
+        .summary .s-room { width: 34%; }
+        .summary .s-bar span { display: block; height: 8px; border-radius: 4px; background: ${accent}; }
+        .spec td { padding: 6px 7px; border-bottom: 1px solid #ecedea; }
+        .spec td:first-child { width: 30%; }
+        .validity { margin-top: 14px; }
         .foot p:first-child { font-weight: 600; font-size: 11.5px; }
 
         @media print {
@@ -338,7 +469,11 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
           /* A room should not be split across a page break mid-table if it can
              be helped, and a header alone at the foot of a page is worse than
              a slightly short page. */
-          .room, .stages, .totals { break-inside: avoid; }
+          .room, .stages, .totals, .summary, .spec { break-inside: avoid; }
+          .sheet + .sheet { margin-top: 0; }
+          .cover, .about { break-after: page; min-height: 0; }
+          .cover-photo img { height: 150mm; }
+          .terms { break-before: page; }
           h2 { break-after: avoid; }
           tr { break-inside: avoid; }
           @page { margin: 14mm 12mm; }

@@ -390,6 +390,42 @@ export interface BrandingRow {
   discountBps: number;
   bookingAdvancePaise: Paise;
   gstBps: number;
+  /** The material specification printed on every quotation. */
+  materialSpec: MaterialSpecRow[];
+  /** Days a quotation holds its prices. */
+  validityDays: number;
+}
+
+export interface MaterialSpecRow {
+  item: string;
+  spec: string;
+}
+
+/** A stored spec, keeping only well-formed rows. */
+export function readMaterialSpec(raw: unknown): MaterialSpecRow[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((r) => {
+    const o = (r ?? {}) as Record<string, unknown>;
+    const item = typeof o.item === 'string' ? o.item.trim().slice(0, 60) : '';
+    const spec = typeof o.spec === 'string' ? o.spec.trim().slice(0, 200) : '';
+    return item && spec ? [{ item, spec }] : [];
+  }).slice(0, 40);
+}
+
+/**
+ * "Plywood: Century BWP 710, 18 mm" per line → rows. How a studio writes its
+ * spec sheet; a line without a colon is skipped rather than guessed at.
+ */
+export function parseMaterialSpec(text: string): MaterialSpecRow[] {
+  return readMaterialSpec(
+    text
+      .split(/\r?\n/)
+      .map((line) => {
+        const at = line.indexOf(':');
+        return at > 0 ? { item: line.slice(0, at), spec: line.slice(at + 1) } : null;
+      })
+      .filter(Boolean),
+  );
 }
 
 /**
@@ -457,6 +493,8 @@ export async function myBranding(): Promise<BrandingRow | null> {
       discountBps: row.discountBps,
       bookingAdvancePaise: fromDb(row.bookingAdvancePaise),
       gstBps: row.gstBps,
+      materialSpec: readMaterialSpec(row.materialSpec),
+      validityDays: row.validityDays,
     };
   } catch (error) {
     console.error('[studio-quote] myBranding failed', error);
@@ -481,6 +519,9 @@ export interface BrandingInput {
   bookingAdvancePaise: Paise;
   /** 0 or 1800. Absent leaves it as it is. */
   gstBps?: number;
+  /** Absent leaves them as they are. */
+  materialSpec?: MaterialSpecRow[];
+  validityDays?: number;
 }
 
 /**
@@ -521,6 +562,12 @@ export async function saveBranding(input: BrandingInput): Promise<SaveResult> {
     discountBps: input.discountBps,
     bookingAdvancePaise: toDb(Math.max(0, input.bookingAdvancePaise)),
     ...(input.gstBps !== undefined ? { gstBps: input.gstBps > 0 ? 1800 : 0 } : {}),
+    ...(input.materialSpec !== undefined
+      ? { materialSpec: input.materialSpec.length > 0 ? (input.materialSpec as unknown as Prisma.InputJsonValue) : Prisma.DbNull }
+      : {}),
+    ...(input.validityDays !== undefined
+      ? { validityDays: Math.min(365, Math.max(1, Math.round(input.validityDays) || 30)) }
+      : {}),
   };
 
   try {
@@ -633,4 +680,54 @@ export async function myTier(): Promise<string | null> {
   /* A cancelled subscription is not a tier. Reading `tier` alone would leave
      a studio white-labelled for as long as the row survived their leaving. */
   return sub.status === 'CANCELLED' ? null : sub.tier;
+}
+
+// ── The studio, for the cover and About pages of a quotation ─────
+
+export interface StudioProfile {
+  tradeName: string;
+  about: string | null;
+  yearsActive: number | null;
+  teamSize: number | null;
+  localities: string[];
+  /** Up to four photographs of finished work, first image of each project. */
+  photos: { url: string; caption: string; isRender: boolean }[];
+}
+
+/** What a client reads about the studio before the figures. Null when there is no studio. */
+export async function myStudioProfile(): Promise<StudioProfile | null> {
+  const studioId = await myStudioId();
+  if (!studioId) return null;
+  try {
+    const studio = await prisma.studio.findUnique({
+      where: { id: studioId },
+      select: {
+        tradeName: true,
+        about: true,
+        yearsActive: true,
+        teamSize: true,
+        localities: true,
+        portfolio: {
+          where: { images: { isEmpty: false } },
+          orderBy: [{ completedOn: 'desc' }, { createdAt: 'desc' }],
+          take: 4,
+          select: { title: true, locality: true, images: true, isRender: true },
+        },
+      },
+    });
+    if (!studio) return null;
+    return {
+      tradeName: studio.tradeName,
+      about: studio.about?.trim() || null,
+      yearsActive: studio.yearsActive,
+      teamSize: studio.teamSize,
+      localities: studio.localities,
+      photos: studio.portfolio
+        .filter((p) => /^https:\/\//.test(p.images[0] ?? ''))
+        .map((p) => ({ url: p.images[0]!, caption: [p.title, p.locality].filter(Boolean).join(', '), isRender: p.isRender })),
+    };
+  } catch (error) {
+    console.error('[studio-quote] myStudioProfile failed', error);
+    return null;
+  }
 }
