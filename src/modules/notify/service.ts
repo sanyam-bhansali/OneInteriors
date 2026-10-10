@@ -49,14 +49,20 @@ export async function notify(userId: string, event: ProjectEvent): Promise<void>
   try {
     const devices = await prisma.pushDevice.findMany({ where: { userId }, select: { token: true } });
     const pushed = devices.length > 0 ? await push(devices.map((d) => d.token), msg) : false;
-    const whatsapped = !pushed ? await viaWhatsApp(userId, msg) : false;
+    /* Quotations are read in the app or on the website, never on WhatsApp
+       (owner, 11 Oct): without the app, a quotation notice goes by email —
+       a link to the quote on the site — and every other notice may use the
+       WhatsApp template. */
+    const quoteNotice = NO_WHATSAPP.includes(event.kind);
+    const whatsapped = !pushed && !quoteNotice ? await viaWhatsApp(userId, msg) : false;
+    const emailed = !pushed && quoteNotice ? await viaEmail(userId, msg) : false;
     await prisma.notification.create({
       data: {
         userId,
-        channel: pushed ? 'push' : whatsapped ? 'whatsapp' : 'inbox',
+        channel: pushed ? 'push' : whatsapped ? 'whatsapp' : emailed ? 'email' : 'inbox',
         template: msg.template,
         payload: { title: msg.title, body: msg.body, url: msg.url },
-        sentAt: pushed || whatsapped ? new Date() : null,
+        sentAt: pushed || whatsapped || emailed ? new Date() : null,
       },
     });
   } catch (error) {
@@ -130,6 +136,22 @@ async function push(tokens: string[], msg: Message): Promise<boolean> {
     if (gone.length) await prisma.pushDevice.deleteMany({ where: { token: { in: gone } } });
   }
   return delivered;
+}
+
+/** Notices about a quotation: never on WhatsApp. */
+const NO_WHATSAPP: ProjectEvent['kind'][] = ['quote-sent'];
+
+/** A notice by email to the person's own address, with the full link. */
+async function viaEmail(userId: string, msg: Message): Promise<boolean> {
+  // A customer signs in by phone; the address they gave is on their brief.
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, brief: { select: { contactEmail: true } } },
+  });
+  const to = user?.email ?? user?.brief?.contactEmail ?? null;
+  if (!to) return false;
+  const sent = await sendNotice(to, { title: msg.title, body: msg.body, url: `${resolveSiteUrl()}${msg.url}` });
+  return sent.delivered;
 }
 
 async function viaWhatsApp(userId: string, msg: Message): Promise<boolean> {
