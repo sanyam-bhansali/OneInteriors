@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import type { Metadata } from 'next';
 import { PageHead, PageBody } from '../StudioShell';
 import { myProducts } from '@/modules/studio-quote/store';
@@ -110,12 +109,11 @@ export default async function ProductsPage() {
         )}
 
         <p className="m-0 mt-8 max-w-[68ch] text-[13.5px] leading-relaxed text-[var(--s-ink-3)]">
-          Nobody sees this but you. Not customers, not other studios, and we never publish an
-          average of it —{' '}
-          <Link href="/studio/rates" className="text-[var(--s-accent)]">
-            the six rates we quote you at
-          </Link>{' '}
-          are a separate, shorter list, and changing one here does not change the other.
+          Nobody sees these rates but you. Not other studios, and never a customer: what a
+          customer sees is the quote they come to for their home, never a rate per sq ft. This is
+          your one price list — your own quotations are built from it, and so is the first quote
+          One Interiors shows a customer for you. Change a rate here and the next quote of each
+          kind follows it; quotations already written keep their figures.
         </p>
       </PageBody>
     </>

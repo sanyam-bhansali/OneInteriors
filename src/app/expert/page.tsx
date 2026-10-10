@@ -17,7 +17,7 @@ import { getCurrentUser } from '@/modules/auth/session';
 import { studioRepository } from '@/modules/studio/repository';
 import { rankOnServer } from '@/modules/matching/rank-server';
 import { availableSlots } from '@/modules/consultation/availability';
-import { quoteBrief } from '@/modules/quotation/generate';
+import { firstQuoteRanges } from '@/modules/quotation/first-quote-ranges';
 import { quotesAsSeen } from '@/modules/consultation/pack';
 import { MIN_STUDIOS, MAX_STUDIOS } from '@/modules/consultation/request';
 import { ARCHITECT, ARCHITECT_IS_REAL } from '@/modules/consultation/architect';
@@ -80,7 +80,7 @@ export default async function ExpertPage({
   const contact = previewBrief ? null : await loadBriefContact();
   const ranked = (await rankOnServer(brief, studios, 9, { lang })).slice(0, MAX_STUDIOS);
   const [result, slots, callOffer] = await Promise.all([
-    quoteBrief(brief, ranked.map((r) => r.studioId)),
+    firstQuoteRanges(brief, ranked.map((r) => r.studioId), studios),
     availableSlots(),
     currentOffer(),
   ]);

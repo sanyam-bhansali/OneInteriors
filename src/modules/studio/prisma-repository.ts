@@ -21,7 +21,7 @@ import { TIERS, type Tier } from '@/modules/quotation/tiers';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { fromDb } from '@/lib/money';
-import { showUnverifiedStudios } from '@/lib/env';
+import { rosterIsReal, showUnverifiedStudios } from '@/lib/env';
 import { assessTier } from '@/modules/verification/tiers';
 import type {
   CheckResult,
@@ -176,6 +176,16 @@ export class PrismaStudioRepository implements StudioRepository {
      */
     if (query.activeOnly && !showUnverifiedStudios()) {
       where.status = 'ACTIVE';
+    }
+
+    /**
+     * A real roster shows a customer only studios with approved prices: an
+     * approved product master, or live filed rates. ACTIVE alone is not
+     * enough — a studio can be approved with its starter catalogue still
+     * unpriced, and would then be matched with a quote of nothing.
+     */
+    if (query.activeOnly && rosterIsReal()) {
+      where.OR = [{ ratesFilledAt: { not: null } }, { filedRates: { some: { state: 'LIVE' } } }];
     }
 
     /**

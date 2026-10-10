@@ -97,9 +97,16 @@ export async function recordFirstQuote(input: {
   quote: BuiltQuote;
   plan: FloorPlan;
 }): Promise<void> {
+  const briefId = await currentBriefId();
+  if (briefId) await recordFirstQuoteForBrief(briefId, input);
+}
+
+/** The same, for a brief already known — the app journey records on the server. */
+export async function recordFirstQuoteForBrief(
+  briefId: string,
+  input: { studioSlug: string; quote: BuiltQuote; plan: FloorPlan },
+): Promise<void> {
   try {
-    const briefId = await currentBriefId();
-    if (!briefId) return;
 
     const studio = await prisma.studio.findUnique({
       where: { slug: input.studioSlug },

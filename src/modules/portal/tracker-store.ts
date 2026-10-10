@@ -53,6 +53,28 @@ export async function startTracker(introductionId: string, startOn: string): Pro
 
 export async function setStageDone(projectId: string, stage: string, done: boolean): Promise<TrackerResult> {
   await requireRole('OPS');
+  return writeStageDone(projectId, stage, done);
+}
+
+/**
+ * The studio marks its own progress: the stage it finished on site is the
+ * stage the customer's tracker shows as done. Only on a project introduced to
+ * this studio. Ops can still correct it (`setStageDone`).
+ */
+export async function setStudioStageDone(projectId: string, stage: string, done: boolean): Promise<TrackerResult> {
+  const ctx = await currentStudio();
+  if (!ctx) return { ok: false, error: 'Sign in as your studio first.' };
+  const project = await prisma.homeProject.findUnique({
+    where: { id: projectId },
+    select: { introduction: { select: { studioId: true } } },
+  });
+  if (!project || project.introduction.studioId !== ctx.studio.id) {
+    return { ok: false, error: 'That project is not one of yours.' };
+  }
+  return writeStageDone(projectId, stage, done);
+}
+
+async function writeStageDone(projectId: string, stage: string, done: boolean): Promise<TrackerResult> {
   if (!(STAGE_KEYS as readonly string[]).includes(stage)) return { ok: false, error: 'Unknown stage.' };
   const project = await prisma.homeProject.findUnique({ where: { id: projectId }, select: { doneStages: true } });
   if (!project) return { ok: false, error: 'That project is gone.' };

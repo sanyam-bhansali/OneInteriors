@@ -4,6 +4,7 @@ import { projectsForStudio } from '@/modules/portal/tracker-store';
 import { projectWork } from '@/modules/portal/project-store';
 import { ProjectWork } from '@/components/project-work/ProjectWork';
 import { UpdateForm } from './UpdateForm';
+import { StageTicks } from './StageTicks';
 
 export const metadata: Metadata = { title: 'Client projects', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -38,6 +39,9 @@ export default async function StudioUpdatesPage() {
                   Started {p.startOn.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} ·{' '}
                   {p.stages.filter((s) => s.state === 'done').length} of {p.stages.length} stages done
                 </p>
+                <div className="mt-3">
+                  <StageTicks projectId={p.id} stages={p.stages.map((s) => ({ key: s.key, label: s.label, state: s.state }))} />
+                </div>
                 <UpdateForm projectId={p.id} />
                 {work[i] ? <ProjectWork projectId={p.id} work={work[i]!} /> : null}
                 {p.updates.length > 0 ? (
