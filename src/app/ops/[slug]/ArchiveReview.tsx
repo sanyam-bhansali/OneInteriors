@@ -312,10 +312,10 @@ function AnalysisLine({
         <input type="hidden" name="archiveId" value={archiveId} />
         <button
           type="submit"
-          disabled={pending || known === 'READING'}
+          disabled={pending}
           className="text-[12px] text-[var(--color-ink-3)] underline underline-offset-2 hover:text-[var(--color-petrol)] disabled:no-underline disabled:opacity-50"
         >
-          {pending ? 'Starting…' : known === 'READING' ? 'Reading…' : 'Read them again'}
+          {pending ? 'Queuing…' : known === 'READING' ? 'Stuck? Queue again' : 'Queue for my read'}
         </button>
       </form>
 

@@ -8,8 +8,6 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
-import { after } from 'next/server';
-import { analyseArchive } from '@/modules/quotation/filed-rate-store';
 import { requireRole } from '@/modules/auth/session';
 import { currentStudio } from './onboarding';
 import {
@@ -207,7 +205,20 @@ export async function planQuotationUploads(
   }
   const uploads: (PlannedUpload & { index: number })[] = [];
   const skipped: string[] = [];
+  /* A file already sent (same name and size) is not sent again: a second
+     copy cost a second read and counted twice towards the 50. */
+  const already = await prisma.quotationFile.findMany({
+    where: { archive: { studioId: context.studio.id } },
+    select: { filename: true, bytes: true },
+  });
+  const seen = new Set(already.map((f) => `${f.filename.toLowerCase()}|${f.bytes}`));
   for (const [index, f] of files.entries()) {
+    const key = `${String(f.name).toLowerCase()}|${Number(f.size)}`;
+    if (seen.has(key)) {
+      skipped.push(`${String(f.name)} — already sent.`);
+      continue;
+    }
+    seen.add(key);
     const r = await planQuotationUpload(context.studio.id, { name: String(f.name), type: String(f.type), size: Number(f.size) });
     if (r.ok) uploads.push({ ...r.upload, index });
     else skipped.push(r.error);
@@ -247,24 +258,20 @@ async function recordStored(
     }
 
     /**
-     * Start reading them, without making the studio wait.
+     * Stored, not read (owner, 10 Oct 2026).
      *
-     * Twenty documents through the extractor is minutes, not seconds, so it
-     * cannot happen inside this request — the upload would time out and the
-     * studio would be told their files failed when they are sitting safely
-     * in the bucket.
-     *
-     * `after()` runs once the response is sent. It is best-effort by nature:
-     * a cold start killed mid-flight leaves the archive at NOT_STARTED,
-     * which is a state ops can see and re-run from, and is exactly where
-     * every archive sat before this existed. Nothing is lost by it not
-     * running — only time.
-     *
-     * `analyseArchive` never throws; its failures land in `analysisState`.
-     * The `catch` is belt and braces for an unhandled rejection reaching a
-     * serverless function, where it would take the instance down.
+     * Uploads used to start an AI read of the whole archive in `after()`.
+     * Every upload re-read every file, two uploads close together ran two
+     * reads at once, and a large archive outran the function's time limit
+     * and sat at READING for ever while the API bill grew. Reading now
+     * happens only when the owner runs it from their own Claude app
+     * (`/read-quotations`, see docs/READ-QUOTATIONS.md); new files put the
+     * archive back to NOT_STARTED so it shows as waiting for that read.
      */
-    after(() => analyseArchive(archiveId).catch(() => {}));
+    await prisma.quotationArchive.update({
+      where: { id: archiveId },
+      data: { analysisState: 'NOT_STARTED', analysisError: null },
+    });
   } catch {
     // The objects are in the bucket but unreferenced. Remove them rather than
     // leaving files nobody can find and nobody can delete.

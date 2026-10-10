@@ -16,12 +16,10 @@ import {
   signedUrlForArchiveFile,
 } from '@/modules/studio/quotation-archive-store';
 import type { ArchiveState } from '@/modules/studio/quotation-archive';
-import { after } from 'next/server';
 import {
   approveRates,
   rejectRate,
   requestReanalysis,
-  analyseArchive,
 } from '@/modules/quotation/filed-rate-store';
 
 /**
@@ -269,18 +267,12 @@ export async function rejectRateAction(
 
 
 /**
- * Read an archive again.
+ * Queue an archive for the owner's read (10 Oct 2026).
  *
- * The work runs in `after()` because it is minutes, not seconds — twenty
- * documents through the extractor would time out the action and leave ops
- * looking at a failure that did not happen. `requestReanalysis` marks the
- * archive READING first so the screen changes on the press, and the state it
- * leaves behind is one that can simply be pressed again if the background
- * work never ran.
- *
- * `analyseArchive` never throws; its failures land in `analysisState`. The
- * catch is for an unhandled rejection reaching a serverless function, where
- * it would take the instance down with it.
+ * This used to start an AI read in `after()` from here. Reading now happens
+ * only in the owner's own Claude app (`/read-quotations`), so this marks the
+ * archive NOT_STARTED — which also frees one stuck at READING — and spends
+ * nothing.
  */
 export async function reanalyseArchiveAction(
   _prev: RateDecision | null,
@@ -291,11 +283,9 @@ export async function reanalyseArchiveAction(
   const result = await requestReanalysis(archiveId);
   if (!result.ok) return { ok: false, error: result.error };
 
-  after(() => analyseArchive(archiveId).catch(() => {}));
-
   revalidatePath('/ops', 'layout');
   return {
     ok: true,
-    message: 'Reading them again. Refresh in a minute or two — it carries on without you.',
+    message: 'Queued. Read them in your Claude app: /read-quotations — nothing is sent to the API from here.',
   };
 }
