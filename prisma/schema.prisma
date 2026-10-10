@@ -594,6 +594,14 @@ model Studio {
   /// with itself, and knowing WHEN something was hidden is free.
   hiddenAsTestAt DateTime?
 
+  /// When ops approved a product master read from this studio's own
+  /// quotations and it was written into StudioProduct. The studio is then
+  /// asked to check it. See `modules/studio-quote/rates-gate.ts`.
+  ratesFilledAt    DateTime?
+  /// When the studio checked those rates and said they were right. Until
+  /// then the quotation builder stays shut. Null for a studio that has not.
+  ratesConfirmedAt DateTime?
+
   // Commercial
   minProjectPaise BigInt?
   maxProjectPaise BigInt?
@@ -721,6 +729,7 @@ model Studio {
   // The studio's own software. See the section at the foot of this file.
   branding           StudioBranding?
   products           StudioProduct[]
+  productDrafts      StudioProductDraft[]
   studioQuotes       StudioQuote[]
   studioClients      StudioClient[]
   studioClientEvents StudioClientEvent[]
@@ -2127,6 +2136,13 @@ model StudioProduct {
   /// every later quotation starts from their own practice.
   inStandardBuild Boolean @default(false)
 
+  /// First-quote rules, as in the Hauspire builder: `perBath`, `perBed`,
+  /// `useRun` (kitchen width follows the run), `balcony` (only with a dry
+  /// balcony), `bhk` ("1BHK".."4BHK": only for that size of home), and a
+  /// default `sqft` / `rft` for those units. Loose JSON because rules are
+  /// added as studios teach us their habits.
+  rules Json?
+
   sortOrder Int     @default(100)
   isActive  Boolean @default(true)
 
@@ -3215,6 +3231,7 @@ model QuotationArchive {
   analysedAt    DateTime?
 
   files      QuotationFile[]
+  drafts     StudioProductDraft[]
   filedRates StudioFiledRate[]
 
   @@index([studioId, uploadedAt])
@@ -3424,4 +3441,49 @@ model WaitlistSignup {
   @@index([referredByCode])
   @@index([society])
   @@map("waitlist_signups")
+}
+
+/// A product-master row read from a studio's own quotations, waiting for ops.
+///
+/// Written by the owner's local read (`/read-quotations` in Claude Code —
+/// docs/READ-QUOTATIONS.md), never by the web app: reading quotations through
+/// the API from a request got stuck and ran up the bill (10 Oct 2026). Ops
+/// approves the run on /ops/[slug], which upserts these into StudioProduct
+/// and asks the studio to check them. Same shape as StudioProduct on purpose.
+model StudioProductDraft {
+  id        String            @id @default(cuid())
+  studioId  String
+  studio    Studio            @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  archiveId String?
+  archive   QuotationArchive? @relation(fields: [archiveId], references: [id], onDelete: SetNull)
+  /// One read = one run; a newer run supersedes the older PENDING rows.
+  runId     String
+
+  name            String
+  code            StudioWorkCode @default(MODULAR)
+  unit            QuoteUnit      @default(AREA)
+  details         String?        @db.Text
+  ratePaise       BigInt
+  rooms           String[]
+  defaultWidthMm  Int?
+  defaultHeightMm Int?
+  defaultQty      Int?
+  inStandardBuild Boolean        @default(false)
+  rules           Json?
+  sortOrder       Int            @default(100)
+
+  /// How many of the studio's quotations this rate was seen in, and the
+  /// spread, so ops can tell a firm rate from a guess.
+  fromQuotations Int  @default(0)
+  evidence       Json?
+
+  /// PENDING | APPROVED | REJECTED | SUPERSEDED
+  state        String    @default("PENDING")
+  note         String?
+  createdAt    DateTime  @default(now())
+  reviewedAt   DateTime?
+  reviewedById String?
+
+  @@index([studioId, state])
+  @@map("studio_product_drafts")
 }

@@ -3,6 +3,8 @@ import type { Metadata } from 'next';
 import { PageHead, PageBody } from '../StudioShell';
 import { myProducts } from '@/modules/studio-quote/store';
 import { ProductTable } from './ProductTable';
+import { RatesGateCard } from '../RatesGateCard';
+import { myRatesGate, RATES_GATE_COPY } from '@/modules/studio-quote/rates-gate';
 
 export const metadata: Metadata = {
   title: 'Product master',
@@ -40,7 +42,7 @@ export const dynamic = 'force-dynamic';
  * recur. The numbers are theirs.
  */
 export default async function ProductsPage() {
-  const products = await myProducts();
+  const [products, gate] = await Promise.all([myProducts(), myRatesGate()]);
   const priced = products.filter((p) => p.ratePaise > 0).length;
   const blank = products.length - priced;
   const standard = products.filter((p) => p.inStandardBuild).length;
@@ -59,7 +61,11 @@ export default async function ProductsPage() {
       />
 
       <PageBody>
-        {blank > 0 ? (
+        {gate !== 'OPEN' ? (
+          <RatesGateCard gate={gate} {...RATES_GATE_COPY[gate]} where="products" />
+        ) : null}
+
+        {blank > 0 && gate === 'OPEN' ? (
           <div className="s-card mb-6 border-l-[3px] !border-l-[var(--s-warn)] p-5">
             <p className="m-0 mb-2 text-[14.5px] font-semibold">These are your prices, not ours.</p>
             <p className="m-0 max-w-[68ch] text-[14px] leading-relaxed text-[var(--s-ink-2)]">

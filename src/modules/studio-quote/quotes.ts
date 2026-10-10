@@ -24,6 +24,7 @@ import {
   type WorkCodeName,
 } from './pricing';
 import { planQuotation, type CatalogueProduct, type HomeConfig } from './configure';
+import { ratesGateFor } from './rates-gate';
 import type { ComparableLine } from './revision';
 
 export type QuoteStatusName = 'DRAFT' | 'ISSUED' | 'ACCEPTED' | 'DECLINED';
@@ -263,6 +264,20 @@ export interface NewQuoteInput {
 export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
   const studioId = await myStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
+
+  /* Shut until the studio has confirmed the rates filled from its own
+     quotations — see rates-gate.ts. Enforced here as well as on the page,
+     because an action is a route by another name. */
+  const gate = await ratesGateFor(studioId);
+  if (gate !== 'OPEN') {
+    return {
+      ok: false,
+      error:
+        gate === 'TO_CHECK'
+          ? 'Check and confirm your rates on Product master first — the builder opens as soon as you do.'
+          : 'Your rates are still being filled from your quotations. We will tell you when they are ready.',
+    };
+  }
 
   const clientName = input.clientName.trim();
   if (clientName.length < 2) return { ok: false, error: 'Who is it for?' };

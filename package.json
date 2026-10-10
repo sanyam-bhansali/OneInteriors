@@ -27,7 +27,9 @@
     "guard:destructive": "tsx prisma/guard-destructive.ts",
     "db:reset": "tsx prisma/guard-destructive.ts \"prisma migrate reset\" && prisma migrate reset",
     "shots": "node scripts/screenshots/capture.mjs",
-    "db:session": "tsx prisma/seed-session.ts"
+    "db:session": "tsx prisma/seed-session.ts",
+    "quotes:fetch": "tsx scripts/quotations/fetch.ts",
+    "quotes:submit": "tsx scripts/quotations/submit.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

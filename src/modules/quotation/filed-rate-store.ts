@@ -417,7 +417,8 @@ export async function approveRates(archiveId: string): Promise<ReviewResult> {
    * studio typing rates we could have filled in — which is exactly where they
    * were before this existed.
    */
-  const catalogue = await fillProductMaster(studioId, pending);
+  // Only the rates that went live — the held ones were just refused (10 Oct 2026 fix).
+  const catalogue = await fillProductMaster(studioId, going);
 
   return { ok: true, live: going.length, catalogue };
 }
