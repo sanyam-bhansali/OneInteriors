@@ -395,7 +395,7 @@ export const HOME_DICT = {
   'bento.filmH': { en: 'Cinematic film of your home', hi: 'आपके घर की सिनेमैटिक फ़िल्म', mr: 'तुमच्या घराची सिनेमॅटिक फिल्म' },
   'bento.hamperTag': { en: 'Handover · worth ₹5,000', hi: 'हैंडओवर · ₹5,000 का', mr: 'हँडओव्हर · ₹5,000 किमतीचा' },
   'bento.hamperH': { en: 'A gift at handover', hi: 'हैंडओवर पर एक तोहफ़ा', mr: 'हँडओव्हरला एक भेट' },
-  'bento.cabFig': { en: 'Cab', hi: 'कैब', mr: 'कॅब' },
+  'bento.cabFig': { en: 'OneCab', hi: 'OneCab', mr: 'OneCab' },
   'bento.cabTag': { en: 'Travel · worth ₹1,000', hi: 'सफ़र · ₹1,000 का', mr: 'प्रवास · ₹1,000 किमतीचा' },
   'bento.cabH': { en: 'Free cab to the studio', hi: 'स्टूडियो तक मुफ़्त कैब', mr: 'स्टुडिओपर्यंत मोफत कॅब' },
   // "{pre} <em>₹76,000</em> {post}"
