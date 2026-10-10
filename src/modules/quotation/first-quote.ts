@@ -43,6 +43,8 @@ import {
 import type { Brief } from '@/modules/brief/types';
 import { carpetAreaFor } from '@/modules/brief/steps';
 import { BEDROOMS } from './estimate';
+import type { PlanRoomSize } from '@/modules/brief/types';
+import { bedroomsInOrder, wardrobeWidthMm } from '@/modules/floorplan/sizing';
 
 const MM_PER_FOOT = 304.8;
 
@@ -128,7 +130,23 @@ export interface QuoteInput {
    * GST; never folded into the rates, never a struck-through price.
    */
   curatedDiscountPct?: number | null;
+  /**
+   * The rooms read from their own floor plan. When present, each bedroom's
+   * wardrobe and loft are sized to that bedroom's wall (floorplan/sizing.ts)
+   * instead of the standard width.
+   */
+  planRooms?: PlanRoomSize[];
 }
+
+/** Which bedroom a catalogue code is for: master, second, third. */
+const BEDROOM_OF: Record<string, number> = {
+  master_wardrobe: 0,
+  master_loft: 0,
+  second_wardrobe: 1,
+  second_loft: 1,
+  third_wardrobe: 2,
+  third_loft: 2,
+};
 
 export interface QuoteLine {
   code: string;
@@ -203,6 +221,8 @@ export function homeShapeFor(
    * earned. Null without a confirmed plan or a readable kitchen.
    */
   plan: { fileName: string | null; kitchenRunMm: number; source: 'floor_plan'; shared?: boolean } | null;
+  /** The rooms from their own plan, when it was read — see `QuoteInput.planRooms`. */
+  planRooms?: PlanRoomSize[];
 } {
   const bhk = BEDROOMS[brief.propertyType ?? 'BHK_2'];
   const { sqft, assumed } = carpetAreaFor(brief);
@@ -228,6 +248,7 @@ export function homeShapeFor(
             ...(brief.planReading.areaSource === 'society' ? { shared: true } : {}),
           }
         : null,
+    ...(brief.planReading?.rooms?.length ? { planRooms: brief.planReading.rooms } : {}),
   };
 }
 
@@ -275,6 +296,7 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
 
   const lines: QuoteLine[] = [];
   const notPriced: string[] = [];
+  const planBeds = input.planRooms ? bedroomsInOrder(input.planRooms) : [];
 
   const selection = input.scope ?? FULL_HOME;
 
@@ -318,12 +340,14 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
 
     switch (item.sizing) {
       case 'AREA': {
-        const widthMm = item.fromKitchenRun ? runMm : (item.widthMm ?? 0);
+        /* A bedroom's wardrobe and loft follow its wall when the plan was read. */
+        const bed = BEDROOM_OF[item.code] !== undefined ? planBeds[BEDROOM_OF[item.code]!] : undefined;
+        const widthMm = item.fromKitchenRun ? runMm : bed ? wardrobeWidthMm(bed) : (item.widthMm ?? 0);
         const heightMm = item.heightMm ?? 0;
         quantity = Math.round(sqft(widthMm, heightMm) * 10) / 10;
         unit = 'sq ft';
         size = `${Math.round(widthMm)} × ${heightMm} mm`;
-        standard = !(item.fromKitchenRun && measured);
+        standard = !(item.fromKitchenRun && measured) && !bed;
         break;
       }
       case 'UNIT':
@@ -428,6 +452,12 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
   } else {
     assumptions.push(
       `No floor plan yet, so the kitchen is priced on a standard ${runMm}mm platform run — what a ${input.bhk} BHK usually has. This is the number most likely to move.`,
+    );
+  }
+
+  if (planBeds.length > 0) {
+    assumptions.push(
+      `Wardrobes and lofts sized to each bedroom's longer wall on your floor plan (55% of it, between 1,200 and 2,400 mm).`,
     );
   }
 

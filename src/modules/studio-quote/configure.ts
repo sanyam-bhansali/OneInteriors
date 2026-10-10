@@ -32,6 +32,8 @@
 
 import type { RoomCategory } from './starter-catalogue';
 import { standardKitchenRunMm } from '@/modules/quotation/first-quote';
+import type { PlanRoomSize } from '@/modules/brief/types';
+import { planRoomFor, wardrobeWidthMm } from '@/modules/floorplan/sizing';
 
 /** The configurations that cover essentially every flat in Pune. */
 export const CONFIGS = ['1 BHK', '2 BHK', '3 BHK', '4 BHK'] as const;
@@ -105,6 +107,14 @@ export interface HomeConfig {
    * because an older form never asked.
    */
   balcony?: boolean;
+  /**
+   * The client's floor plan, read: wardrobes and lofts take each bedroom's
+   * wall, a room's false ceiling takes its floor area. Filled on the server
+   * from the brief, never from the browser (`applyConfiguration`).
+   */
+  planRooms?: PlanRoomSize[];
+  /** Ask the server to use the client's floor plan. */
+  usePlan?: boolean;
 }
 
 /**
@@ -337,8 +347,15 @@ export function planQuotation(home: HomeConfig, catalogue: CatalogueProduct[]): 
   }
 
   const lines: PlannedLine[] = [];
+  const planned = roomsFor(home);
+  let sizedFromPlan = 0;
 
-  for (const room of roomsFor(home)) {
+  for (const room of planned) {
+    /* The plan room for this one: bedrooms in order (master first), living,
+       study. Null without a plan, or for a room the plan does not show. */
+    const bedIndex = room.category === 'Bedroom' ? planned.filter((r) => r.category === 'Bedroom').indexOf(room) : null;
+    const fromPlan = home.planRooms?.length ? planRoomFor(room.name, bedIndex, home.planRooms) : null;
+
     for (const standard of usable) {
       if (!fitsRoom(standard, room)) continue;
       const product = kingFor(standard, room, catalogue);
@@ -346,9 +363,22 @@ export function planQuotation(home: HomeConfig, catalogue: CatalogueProduct[]): 
       /* Measured if they gave it, the standard for this configuration if not.
          A base run with no width at all would price at zero and look like a
          kitchen nobody quoted, which is worse than a stated assumption. */
-      const runWidth = takesKitchenRun(product)
-        ? (home.kitchenRunMm ?? standardRunFor(home.config))
-        : null;
+      /* In the kitchen only. A loft filed under Kitchen and Bedroom took the
+         kitchen run in every bedroom too — 4,200 mm over a wardrobe (11 Oct). */
+      const runWidth =
+        room.category === 'Kitchen' && takesKitchenRun(product)
+          ? (home.kitchenRunMm ?? standardRunFor(home.config))
+          : null;
+
+      /* From the plan: a bedroom's wardrobe or loft takes its wall; a
+         room-named ceiling (sq ft) takes the room's floor area. */
+      const planWidth =
+        fromPlan && runWidth === null && product.unit === 'AREA' && room.category === 'Bedroom' && /wardrobe|loft/i.test(product.name)
+          ? wardrobeWidthMm(fromPlan)
+          : null;
+      const planSqft =
+        fromPlan && product.unit === 'SQFT' && namedRoomOf(product.name) !== null ? fromPlan.sqft : null;
+      if (planWidth !== null || planSqft !== null) sizedFromPlan += 1;
 
       lines.push({
         room: room.name,
@@ -356,15 +386,21 @@ export function planQuotation(home: HomeConfig, catalogue: CatalogueProduct[]): 
         code: product.code,
         unit: product.unit,
         details: product.details,
-        widthMm: product.unit === 'AREA' ? (runWidth ?? product.defaultWidthMm) : null,
+        widthMm: product.unit === 'AREA' ? (runWidth ?? planWidth ?? product.defaultWidthMm) : null,
         heightMm: product.unit === 'AREA' ? product.defaultHeightMm : null,
-        qtyMilli: product.unit === 'AREA' ? null : defaultQtyMilli(product, home),
+        qtyMilli: product.unit === 'AREA' ? null : planSqft !== null ? planSqft * 1000 : defaultQtyMilli(product, home),
         ratePaise: product.ratePaise,
       });
     }
   }
 
   const notes: string[] = [];
+
+  if (sizedFromPlan > 0) {
+    notes.push(
+      `${sizedFromPlan} ${sizedFromPlan === 1 ? 'line is' : 'lines are'} sized from the client's floor plan — wardrobes and lofts to 55% of each bedroom's longer wall, ceilings to each room's area. Check them against your site measurement.`,
+    );
+  }
 
   const unpriced = new Set(usable.filter((p) => p.ratePaise <= 0).map((p) => p.name));
   if (unpriced.size > 0) {

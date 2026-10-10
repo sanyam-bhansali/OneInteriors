@@ -161,6 +161,8 @@ export function PlanReader({
                     bathrooms: bath,
                     hasStudy: r.hasStudy,
                     areaSource: edited ? 'customer' : r.carpetAreaSource,
+                    // Sizes the wardrobes and ceilings, and draws the plan.
+                    ...(r.rooms.length > 0 ? { rooms: r.rooms } : {}),
                   },
                 });
                 setState({ kind: 'idle', error: null });

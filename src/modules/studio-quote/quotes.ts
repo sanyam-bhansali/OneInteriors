@@ -29,6 +29,8 @@ import {
 import { planQuotation, readRules, type CatalogueProduct, type HomeConfig } from './configure';
 import { ratesGateFor } from './rates-gate';
 import { notify } from '@/modules/notify/service';
+import { planUseFrom } from '@/modules/brief/mapping';
+import type { PlanRoomSize } from '@/modules/brief/types';
 import { readPhases, type PaymentPhase } from '@/modules/studio/payment-phases';
 import type { ComparableLine } from './revision';
 
@@ -93,6 +95,8 @@ export interface QuoteRow {
   phases: PaymentPhase[] | null;
   /** The Sales Final this Design Final was made from. */
   basedOnId: string | null;
+  /** The client's floor plan rooms, when their brief came with a read plan. */
+  planRooms: PlanRoomSize[];
   welcomeNote: string | null;
   terms: string | null;
   issuedOn: Date | null;
@@ -208,6 +212,7 @@ export async function getQuote(id: string): Promise<QuoteRow | null> {
       where: { id, studioId },
       include: { lines: { orderBy: { sortOrder: 'asc' } }, studio: { select: { paymentPhases: true } } },
     });
+    const planRooms = row ? await planRoomsOfBrief(row.briefId) : [];
     if (!row) return null;
 
     return {
@@ -235,6 +240,7 @@ export async function getQuote(id: string): Promise<QuoteRow | null> {
       quoteDate: row.quoteDate ?? row.createdAt,
       phases: quotePhases(row.phases, row.studio.paymentPhases),
       basedOnId: row.basedOnId,
+      planRooms,
       welcomeNote: row.welcomeNote,
       terms: row.terms,
       issuedOn: row.issuedOn,
@@ -640,6 +646,19 @@ export async function quotesToCompare(currentId: string, baseId?: string): Promi
   return base ? { base, current } : null;
 }
 
+/** The rooms from a brief's read floor plan; empty without one. */
+async function planRoomsOfBrief(briefId: string | null): Promise<PlanRoomSize[]> {
+  if (!briefId) return [];
+  const b = await prisma.brief.findUnique({ where: { id: briefId }, select: { floorPlanReading: true } }).catch(() => null);
+  return planUseFrom(b?.floorPlanReading)?.rooms ?? [];
+}
+
+async function planRunOfBrief(briefId: string | null): Promise<number | null> {
+  if (!briefId) return null;
+  const b = await prisma.brief.findUnique({ where: { id: briefId }, select: { floorPlanReading: true } }).catch(() => null);
+  return planUseFrom(b?.floorPlanReading)?.kitchenRunMm ?? null;
+}
+
 /** Ownership check, reused by every write below. */
 async function ownedQuote(quoteId: string): Promise<string | null> {
   const studioId = await myStudioId();
@@ -951,6 +970,18 @@ export async function applyConfiguration(input: ApplyConfigInput): Promise<Apply
   if (!(await ownedQuote(input.quoteId))) {
     return { ok: false, error: 'That quotation is not yours.' };
   }
+
+  /* The plan comes from the client's brief, never from the browser. */
+  const { planRooms: _ignored, ...home } = input.home;
+  if (home.usePlan) {
+    const q = await prisma.studioQuote.findFirst({ where: { id: input.quoteId, studioId }, select: { briefId: true } });
+    const rooms = await planRoomsOfBrief(q?.briefId ?? null);
+    if (rooms.length > 0) {
+      (home as HomeConfig).planRooms = rooms;
+      if (home.kitchenRunMm == null) home.kitchenRunMm = (await planRunOfBrief(q?.briefId ?? null)) ?? null;
+    }
+  }
+  input = { ...input, home };
 
   try {
     const products = await prisma.studioProduct.findMany({

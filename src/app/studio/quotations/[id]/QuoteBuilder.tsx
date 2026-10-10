@@ -18,6 +18,7 @@ import {
 import { TotalsPanel, DocumentPreview, ChangesPanel } from './QuotePanels';
 import { TermsPanel, pctToBps, rupeesToPaiseText, type TermsDraft } from './TermsPanel';
 import { ClientPanel } from './ClientPanel';
+import { FloorPlanView } from '@/components/floorplan/FloorPlanView';
 import type { QuoteTermsInput } from '@/modules/studio-quote/quotes';
 
 /**
@@ -89,6 +90,19 @@ export function QuoteBuilder({
   useEffect(() => {
     setDirty(JSON.stringify(lines) !== saved.current || JSON.stringify(terms) !== savedTerms.current);
   }, [lines, terms]);
+
+  /* Lines rewritten on the server — a rebuild or a clear — arrive as new
+     props. Taken when nothing on screen is unsaved; the old state was kept
+     until a reload, so a rebuild looked as if it had done nothing (11 Oct). */
+  const server = JSON.stringify(quote.lines.map(toEditable));
+  const onScreen = useRef(lines);
+  onScreen.current = lines;
+  useEffect(() => {
+    if (server === saved.current) return;
+    if (JSON.stringify(onScreen.current) !== saved.current) return; // unsaved work wins
+    saved.current = server;
+    setLines(JSON.parse(server) as EditableLine[]);
+  }, [server]);
 
   /* The terms as figures. A half-typed percentage keeps the last good one on
      screen rather than flashing the total to zero. */
@@ -343,6 +357,12 @@ export function QuoteBuilder({
       <aside className="flex flex-col gap-4 lg:sticky lg:top-5 lg:max-h-[calc(100dvh-2.5rem)] lg:self-start lg:overflow-y-auto">
         <ClientPanel quote={quote} />
         <ConfigurePanel quote={quote} hasLines={lines.length > 0} />
+        {quote.planRooms.length > 0 ? (
+          <section className="s-card p-4">
+            <h2 className="s-label m-0 mb-2">Their floor plan</h2>
+            <FloorPlanView rooms={quote.planRooms} />
+          </section>
+        ) : null}
         <AddLinePanel
           rooms={roomOrder}
           products={products}

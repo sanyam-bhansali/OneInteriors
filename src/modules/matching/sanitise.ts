@@ -22,7 +22,7 @@ import 'server-only';
  * a case the prompt already handles ("locality not given").
  */
 
-import { cleanSociety } from '@/modules/brief/mapping';
+import { cleanSociety, planRoomsFrom } from '@/modules/brief/mapping';
 import { ITEM, ROOMS, type Room } from '@/modules/quotation/catalogue';
 import { TIERS } from '@/modules/quotation/tiers';
 import {
@@ -204,5 +204,6 @@ function planUse(value: unknown): PlanUse | null {
     bathrooms,
     hasStudy: v.hasStudy === true,
     areaSource: oneOf(v.areaSource, sources),
+    ...(planRoomsFrom((v as Record<string, unknown>).rooms) ? { rooms: planRoomsFrom((v as Record<string, unknown>).rooms) } : {}),
   };
 }

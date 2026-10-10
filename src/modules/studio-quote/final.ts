@@ -51,7 +51,7 @@ export async function finalQuoteForClient(clientId: string): Promise<QuoteResult
   if (isConfigName(client.config)) {
     await applyConfiguration({
       quoteId: created.id,
-      home: { config: client.config, kitchenRunMm: null, bathrooms: client.config === '1 BHK' ? 1 : 2, study: false },
+      home: { config: client.config, kitchenRunMm: null, bathrooms: client.config === '1 BHK' ? 1 : 2, study: false, usePlan: true },
     });
   }
   return created;

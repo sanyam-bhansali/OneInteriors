@@ -6,6 +6,7 @@ import { myBranding, myStudioProfile } from '@/modules/studio-quote/store';
 import { byRoom } from '@/modules/studio-quote/revision';
 import { UNIT_LABELS, formatQty, WORK_CODE_LABELS } from '@/modules/studio-quote/pricing';
 import { PrintButton } from './PrintButton';
+import { FloorPlanView } from '@/components/floorplan/FloorPlanView';
 import { myTier } from '@/modules/studio-quote/store';
 import { signedLogoUrl } from '@/modules/storage/studio-logo';
 import { showsOurMark, MARK_TEXT } from '@/modules/studio-quote/mark';
@@ -267,6 +268,14 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
           </section>
         ))}
 
+        {/* ── Their flat, from their floor plan ── */}
+        {quote.planRooms.length > 0 ? (
+          <section className="plan">
+            <h2>Your floor plan</h2>
+            <FloorPlanView rooms={quote.planRooms} printable />
+          </section>
+        ) : null}
+
         {/* ── Where the money goes ── */}
         {summary.length > 1 ? (
           <section className="summary">
@@ -460,6 +469,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
         .spec td { padding: 6px 7px; border-bottom: 1px solid #ecedea; }
         .spec td:first-child { width: 30%; }
         .validity { margin-top: 14px; }
+        .plan svg { max-height: 420px; }
         .foot p:first-child { font-weight: 600; font-size: 11.5px; }
 
         @media print {
@@ -469,7 +479,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
           /* A room should not be split across a page break mid-table if it can
              be helped, and a header alone at the foot of a page is worse than
              a slightly short page. */
-          .room, .stages, .totals, .summary, .spec { break-inside: avoid; }
+          .room, .stages, .totals, .summary, .spec, .plan { break-inside: avoid; }
           .sheet + .sheet { margin-top: 0; }
           .cover, .about { break-after: page; min-height: 0; }
           .cover-photo img { height: 150mm; }
