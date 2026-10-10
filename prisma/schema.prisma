@@ -2247,6 +2247,11 @@ model StudioQuote {
   /// current one, or the standard stages when it has none.
   phases Json?
 
+  /// The quotation this one was made from: a Design Final points at its
+  /// Sales Final, so the two can be compared line by line. Null for a
+  /// quotation written fresh or copied as a template.
+  basedOnId String?
+
   /// Their words on this document, snapshotted for the same reason.
   welcomeNote String? @db.Text
   terms       String? @db.Text

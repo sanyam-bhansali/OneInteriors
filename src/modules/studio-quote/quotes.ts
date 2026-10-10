@@ -35,6 +35,12 @@ import type { ComparableLine } from './revision';
 export type QuoteStatusName = 'DRAFT' | 'ISSUED' | 'ACCEPTED' | 'DECLINED';
 export type QuoteStageName = 'SALES' | 'DESIGN';
 
+/** Hauspire's two versions of a quotation: what wins the client, and what is built. */
+export const STAGE_LABELS: Record<QuoteStageName, string> = {
+  SALES: 'Sales Final',
+  DESIGN: 'Design Final',
+};
+
 export const STATUS_LABELS: Record<QuoteStatusName, string> = {
   DRAFT: 'Draft',
   ISSUED: 'Sent',
@@ -85,6 +91,8 @@ export interface QuoteRow {
   quoteDate: Date;
   /** The payment schedule this quotation uses; null = the standard stages. */
   phases: PaymentPhase[] | null;
+  /** The Sales Final this Design Final was made from. */
+  basedOnId: string | null;
   welcomeNote: string | null;
   terms: string | null;
   issuedOn: Date | null;
@@ -96,7 +104,10 @@ export interface QuoteSummary {
   id: string;
   number: string;
   status: QuoteStatusName;
+  stage: QuoteStageName;
   clientName: string;
+  clientPhone: string | null;
+  clientId: string | null;
   society: string | null;
   config: string | null;
   fromMarketplace: boolean;
@@ -106,17 +117,32 @@ export interface QuoteSummary {
 }
 
 /** The list. Newest activity first — a quotation you touched today is the one
- *  you are still thinking about. */
-export async function myQuotes(): Promise<QuoteSummary[]> {
+ *  you are still thinking about. `search` matches client, number, phone or
+ *  society, any part, any case. */
+export async function myQuotes(search?: string): Promise<QuoteSummary[]> {
   const studioId = await myStudioId();
   if (!studioId) return [];
 
+  const q = search?.trim().slice(0, 80);
+  const digits = q?.replace(/\D/g, '') ?? '';
   try {
     const rows = await prisma.studioQuote.findMany({
-      where: { studioId },
+      where: {
+        studioId,
+        ...(q
+          ? {
+              OR: [
+                { clientName: { contains: q, mode: 'insensitive' as const } },
+                { number: { contains: q, mode: 'insensitive' as const } },
+                { society: { contains: q, mode: 'insensitive' as const } },
+                ...(digits.length >= 4 ? [{ clientPhone: { contains: digits } }] : []),
+              ],
+            }
+          : {}),
+      },
       orderBy: { updatedAt: 'desc' },
       include: { lines: true },
-      take: 200,
+      take: 500,
     });
 
     return rows.map((row) => {
@@ -126,13 +152,17 @@ export async function myQuotes(): Promise<QuoteSummary[]> {
         onSpotPaise: fromDb(row.onSpotPaise),
         bookingAdvancePaise: fromDb(row.bookingAdvancePaise),
         gstBps: row.gstBps,
+        phases: readPhases(row.phases),
       });
 
       return {
         id: row.id,
         number: row.number,
         status: row.status as QuoteStatusName,
+        stage: row.stage as QuoteStageName,
         clientName: row.clientName,
+        clientPhone: row.clientPhone,
+        clientId: row.clientId,
         society: row.society,
         config: row.config,
         fromMarketplace: row.briefId !== null || row.introductionId !== null,
@@ -204,6 +234,7 @@ export async function getQuote(id: string): Promise<QuoteRow | null> {
       onSpotLabel: row.onSpotLabel,
       quoteDate: row.quoteDate ?? row.createdAt,
       phases: quotePhases(row.phases, row.studio.paymentPhases),
+      basedOnId: row.basedOnId,
       welcomeNote: row.welcomeNote,
       terms: row.terms,
       issuedOn: row.issuedOn,
@@ -476,6 +507,137 @@ export async function saveQuoteClient(quoteId: string, input: QuoteClientInput):
     console.error('[studio-quote] saveQuoteClient failed', error);
     return { ok: false, error: 'That did not save.' };
   }
+}
+
+export type CopyKind = { kind: 'template'; clientName: string } | { kind: 'design-final' };
+
+/**
+ * A new quotation from an existing one.
+ *
+ * - **Template**: every line and term, for a different client. A fresh
+ *   number, no client details, not linked to any introduction — the same
+ *   kitchen for the next flat in the same society.
+ * - **Design Final**: the same client and links, stage DESIGN, numbered
+ *   after its Sales Final ("2026-004-D") and pointing back at it, so the two
+ *   can be compared line by line. The Sales Final is left exactly as sent.
+ */
+export async function copyQuote(quoteId: string, copy: CopyKind): Promise<QuoteResult> {
+  const studioId = await myStudioId();
+  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+  const source = await prisma.studioQuote.findFirst({
+    where: { id: quoteId, studioId },
+    include: { lines: { orderBy: { sortOrder: 'asc' } } },
+  });
+  if (!source) return { ok: false, error: 'That quotation is not yours.' };
+
+  const template = copy.kind === 'template';
+  const clientName = template ? copy.clientName.trim().slice(0, 120) : source.clientName;
+  if (clientName.length < 2) return { ok: false, error: 'Who is the new quotation for?' };
+  if (!template && source.stage === 'DESIGN') return { ok: false, error: 'This is already the Design Final.' };
+
+  let number = template ? await nextNumber(studioId) : `${source.number}-D`;
+  if (!template) {
+    // A second Design Final of the same quotation gets -D2, -D3…
+    for (let n = 2; await prisma.studioQuote.findFirst({ where: { studioId, number }, select: { id: true } }); n += 1) {
+      number = `${source.number}-D${n}`;
+    }
+  }
+
+  try {
+    const created = await prisma.studioQuote.create({
+      data: {
+        studioId,
+        number,
+        stage: template ? 'SALES' : 'DESIGN',
+        status: 'DRAFT',
+        clientName,
+        ...(template
+          ? {}
+          : {
+              clientPhone: source.clientPhone,
+              clientEmail: source.clientEmail,
+              society: source.society,
+              locality: source.locality,
+              clientId: source.clientId,
+              briefId: source.briefId,
+              introductionId: source.introductionId,
+              basedOnId: source.id,
+            }),
+        config: source.config,
+        carpetSqft: source.carpetSqft,
+        kitchenRunMm: source.kitchenRunMm,
+        bathrooms: source.bathrooms,
+        feeBps: source.feeBps,
+        discountBps: source.discountBps,
+        onSpotPaise: source.onSpotPaise,
+        onSpotLabel: source.onSpotLabel,
+        bookingAdvancePaise: source.bookingAdvancePaise,
+        gstBps: source.gstBps,
+        phases: (source.phases ?? undefined) as Prisma.InputJsonValue | undefined,
+        welcomeNote: source.welcomeNote,
+        terms: source.terms,
+        lines: {
+          create: source.lines.map((l) => ({
+            room: l.room,
+            product: l.product,
+            code: l.code,
+            unit: l.unit,
+            details: l.details,
+            widthMm: l.widthMm,
+            heightMm: l.heightMm,
+            qtyMilli: l.qtyMilli,
+            ratePaise: l.ratePaise,
+            amountPaise: l.amountPaise,
+            sortOrder: l.sortOrder,
+          })),
+        },
+      },
+      select: { id: true },
+    });
+    return { ok: true, id: created.id };
+  } catch (error) {
+    console.error('[studio-quote] copyQuote failed', error);
+    return { ok: false, error: 'That did not save.' };
+  }
+}
+
+/**
+ * Delete a draft. Only a draft, and only one that is not a customer's final
+ * quote: once sent, a quotation is a record of what a client was told, and a
+ * final quote is what the customer reads in the app.
+ */
+export async function deleteQuote(quoteId: string): Promise<ActionResult> {
+  const studioId = await myStudioId();
+  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+  const q = await prisma.studioQuote.findFirst({
+    where: { id: quoteId, studioId },
+    select: { status: true, issuedOn: true, introductionId: true },
+  });
+  if (!q) return { ok: false, error: 'That quotation is not yours.' };
+  if (q.status !== 'DRAFT' || q.issuedOn) return { ok: false, error: 'Only a draft that was never sent can be deleted.' };
+  if (q.introductionId) return { ok: false, error: 'This is a One Interiors client\'s final quote — mark it lost instead.' };
+  try {
+    await prisma.studioQuote.deleteMany({ where: { id: quoteId, studioId } });
+    return { ok: true };
+  } catch (error) {
+    console.error('[studio-quote] deleteQuote failed', error);
+    return { ok: false, error: 'That did not delete.' };
+  }
+}
+
+/** Two quotations side by side: the base (usually the Sales Final) and this one. */
+export interface QuoteComparison {
+  base: QuoteRow;
+  current: QuoteRow;
+}
+
+export async function quotesToCompare(currentId: string, baseId?: string): Promise<QuoteComparison | null> {
+  const current = await getQuote(currentId);
+  if (!current) return null;
+  const id = baseId ?? current.basedOnId;
+  if (!id) return null;
+  const base = await getQuote(id);
+  return base ? { base, current } : null;
 }
 
 /** Ownership check, reused by every write below. */

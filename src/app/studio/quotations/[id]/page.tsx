@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { PageHead, PageBody } from '../../StudioShell';
-import { getQuote, STATUS_LABELS } from '@/modules/studio-quote/quotes';
+import { getQuote, STAGE_LABELS, STATUS_LABELS } from '@/modules/studio-quote/quotes';
 import { myProducts, myBranding, myTier } from '@/modules/studio-quote/store';
 import { showsOurMark, MARK_TEXT } from '@/modules/studio-quote/mark';
 import { signedLogoUrl } from '@/modules/storage/studio-logo';
@@ -53,6 +53,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
             {quote.config ? <span>· {quote.config}</span> : null}
             {quote.society ? <span>· {quote.society}</span> : null}
             <span className="text-[var(--s-ink-3)]">· {STATUS_LABELS[quote.status]}</span>
+            <span className="s-tag">{STAGE_LABELS[quote.stage]}</span>
             {quote.issuedOn ? (
               <span className="text-[var(--s-ink-3)]">
                 · sent{' '}
@@ -71,7 +72,14 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           </span>
         }
         action={
-          <StatusBar quoteId={quote.id} status={quote.status} canPrint={quote.lines.length > 0} />
+          <StatusBar
+            quoteId={quote.id}
+            status={quote.status}
+            canPrint={quote.lines.length > 0}
+            stage={quote.stage}
+            basedOnId={quote.basedOnId}
+            deletable={quote.status === 'DRAFT' && !quote.issuedOn && !quote.fromMarketplace}
+          />
         }
       />
 

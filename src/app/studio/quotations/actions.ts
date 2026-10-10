@@ -10,6 +10,8 @@ import {
   clearQuoteLines,
   saveQuoteTerms,
   saveQuoteClient,
+  copyQuote,
+  deleteQuote,
   type QuoteClientInput,
   type QuoteStatusName,
   type QuoteTermsInput,
@@ -144,6 +146,25 @@ export async function applyConfigAction(quoteId: string, home: HomeConfig): Prom
   if (!result.ok) return result;
   refresh(quoteId);
   return result;
+}
+
+/** Use as template (new client) or make the Design Final; opens the new one. */
+export async function copyQuoteAction(quoteId: string, kind: 'template' | 'design-final', clientName = ''): Promise<State> {
+  const result = await copyQuote(
+    quoteId,
+    kind === 'template' ? { kind: 'template', clientName: String(clientName) } : { kind: 'design-final' },
+  );
+  if (!result.ok) return result;
+  refresh(result.id);
+  redirect(`/studio/quotations/${result.id}`);
+}
+
+/** Delete a draft that was never sent. */
+export async function deleteQuoteAction(quoteId: string): Promise<State> {
+  const result = await deleteQuote(quoteId);
+  if (!result.ok) return result;
+  revalidatePath('/studio/quotations');
+  redirect('/studio/quotations');
 }
 
 /** Correct who the quotation is for. */
