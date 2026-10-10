@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
   dotDone: { backgroundColor: color.accentWarm, borderColor: color.accentWarm },
   dotNow: { borderWidth: 2, borderColor: color.accentWarm },
   stageText: { fontFamily: font.sansMedium, fontSize: 13, color: 'rgba(255,255,255,.7)' },
-  cardMeta: { fontFamily: font.sansMedium, fontSize: 13, color: '#f08a5d' },
+  cardMeta: { fontFamily: font.sansMedium, fontSize: 13, color: color.accentWarm },
   cardTitle: { fontFamily: font.sansBold, fontSize: 25, lineHeight: 27, letterSpacing: -0.8, color: color.white },
   cardBody: { fontFamily: font.sans, fontSize: 15, lineHeight: 22, color: 'rgba(255,255,255,.75)' },
   cardCta: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: color.accent, borderRadius: 999, paddingHorizontal: 22, minHeight: 48, marginTop: 6 },

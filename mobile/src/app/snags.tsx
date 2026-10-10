@@ -145,6 +145,6 @@ const styles = StyleSheet.create({
   thumb: { width: 84, height: 84, borderRadius: 12 },
   snagTitle: { fontFamily: font.sansSemi, fontSize: 17, lineHeight: 21, color: color.ink },
   mono: { fontFamily: font.mono, fontSize: 13, color: color.ink2 },
-  cardMeta: { fontFamily: font.sansMedium, fontSize: 13, color: '#f08a5d' },
+  cardMeta: { fontFamily: font.sansMedium, fontSize: 13, color: color.accentWarm },
   cardBody: { fontFamily: font.sans, fontSize: 15.5, lineHeight: 23, color: 'rgba(255,255,255,.85)' },
 });
