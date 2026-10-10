@@ -17,6 +17,7 @@ import {
 } from './QuoteLines';
 import { TotalsPanel, DocumentPreview, ChangesPanel } from './QuotePanels';
 import { TermsPanel, pctToBps, rupeesToPaiseText, type TermsDraft } from './TermsPanel';
+import { ClientPanel } from './ClientPanel';
 import type { QuoteTermsInput } from '@/modules/studio-quote/quotes';
 
 /**
@@ -213,6 +214,61 @@ export function QuoteBuilder({
     });
   }, []);
 
+  /**
+   * Swap a line to another of the studio's products, re-priced from it. The
+   * size carries over when the unit is the same — a wardrobe swapped for a
+   * sliding one keeps its 1800 × 2100 — and takes the product's own default
+   * when it is not.
+   */
+  const swap = useCallback((key: string, product: ProductRow) => {
+    setLines((current) =>
+      current.map((l) => {
+        if (l.key !== key) return l;
+        const same = l.unit === product.unit;
+        const defaultQty =
+          product.unit === 'SQFT' && product.rules?.sqft
+            ? Math.round(product.rules.sqft * 1000)
+            : product.unit === 'RFT' && product.rules?.rft
+              ? Math.round(product.rules.rft * 1000)
+              : product.defaultQty != null
+                ? product.defaultQty * 1000
+                : product.unit === 'UNIT'
+                  ? 1000
+                  : null;
+        return {
+          ...l,
+          product: product.name,
+          code: product.code,
+          unit: product.unit,
+          details: product.details,
+          ratePaise: product.ratePaise,
+          widthMm: product.unit === 'AREA' ? (same ? l.widthMm : product.defaultWidthMm) : null,
+          heightMm: product.unit === 'AREA' ? (same ? l.heightMm : product.defaultHeightMm) : null,
+          qtyMilli: product.unit === 'AREA' ? null : same ? l.qtyMilli : defaultQty,
+          agreedPaise: null,
+        };
+      }),
+    );
+  }, []);
+
+  /** Drag and drop, within a room: `from` takes `to`'s place. */
+  const reorder = useCallback((from: string, to: string) => {
+    setLines((current) => {
+      const a = current.findIndex((l) => l.key === from);
+      const b = current.findIndex((l) => l.key === to);
+      if (a < 0 || b < 0 || current[a]!.room !== current[b]!.room) return current;
+      const next = current.slice();
+      const [moved] = next.splice(a, 1);
+      next.splice(b, 0, moved!);
+      return next;
+    });
+  }, []);
+
+  /** Rename a room on every line in it. Renaming onto an existing room merges them. */
+  const renameRoom = useCallback((from: string, to: string) => {
+    setLines((current) => current.map((l) => (l.room === from ? { ...l, room: to } : l)));
+  }, []);
+
   const add = useCallback((room: string, product: ProductRow, size: AddSize) => {
     setLines((current) => {
       const line: EditableLine = {
@@ -285,6 +341,7 @@ export function QuoteBuilder({
      */
     <div className="grid gap-5 lg:grid-cols-[21rem_minmax(0,1fr)]">
       <aside className="flex flex-col gap-4 lg:sticky lg:top-5 lg:max-h-[calc(100dvh-2.5rem)] lg:self-start lg:overflow-y-auto">
+        <ClientPanel quote={quote} />
         <ConfigurePanel quote={quote} hasLines={lines.length > 0} />
         <AddLinePanel
           rooms={roomOrder}
@@ -379,6 +436,10 @@ export function QuoteBuilder({
                 onRemove={remove}
                 onDuplicate={duplicate}
                 onMove={move}
+                products={products}
+                onSwap={swap}
+                onReorder={reorder}
+                onRenameRoom={renameRoom}
               />
             ))}
 

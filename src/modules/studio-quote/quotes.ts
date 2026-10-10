@@ -433,6 +433,51 @@ export async function saveQuoteTerms(quoteId: string, input: QuoteTermsInput): P
   }
 }
 
+export interface QuoteClientInput {
+  clientName: string;
+  clientPhone: string;
+  clientEmail: string;
+  society: string;
+  locality: string;
+  config: string;
+  carpetSqft: number | null;
+}
+
+/**
+ * Who the quotation is for, corrected after it was started — a misspelt
+ * name, the flat number, the society. What prints on the document.
+ */
+export async function saveQuoteClient(quoteId: string, input: QuoteClientInput): Promise<ActionResult> {
+  if (!(await ownedQuote(quoteId))) return { ok: false, error: 'That quotation is not yours.' };
+  const name = input.clientName.trim().slice(0, 120);
+  if (name.length < 2) return { ok: false, error: 'Who is it for?' };
+  const email = input.clientEmail.trim().slice(0, 200);
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: 'That email does not look right.' };
+  const carpet = input.carpetSqft;
+  if (carpet != null && (!Number.isInteger(carpet) || carpet <= 0 || carpet > 100_000)) {
+    return { ok: false, error: 'Carpet area is a whole number of sq ft.' };
+  }
+  const opt = (v: string, n: number) => v.trim().slice(0, n) || null;
+  try {
+    await prisma.studioQuote.update({
+      where: { id: quoteId },
+      data: {
+        clientName: name,
+        clientPhone: opt(input.clientPhone, 20),
+        clientEmail: email || null,
+        society: opt(input.society, 120),
+        locality: opt(input.locality, 80),
+        config: opt(input.config, 20),
+        carpetSqft: carpet,
+      },
+    });
+    return { ok: true };
+  } catch (error) {
+    console.error('[studio-quote] saveQuoteClient failed', error);
+    return { ok: false, error: 'That did not save.' };
+  }
+}
+
 /** Ownership check, reused by every write below. */
 async function ownedQuote(quoteId: string): Promise<string | null> {
   const studioId = await myStudioId();

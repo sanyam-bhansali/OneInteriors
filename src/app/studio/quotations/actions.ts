@@ -9,6 +9,8 @@ import {
   applyConfiguration,
   clearQuoteLines,
   saveQuoteTerms,
+  saveQuoteClient,
+  type QuoteClientInput,
   type QuoteStatusName,
   type QuoteTermsInput,
   type SaveLineInput,
@@ -142,6 +144,14 @@ export async function applyConfigAction(quoteId: string, home: HomeConfig): Prom
   if (!result.ok) return result;
   refresh(quoteId);
   return result;
+}
+
+/** Correct who the quotation is for. */
+export async function saveClientAction(quoteId: string, input: QuoteClientInput): Promise<State> {
+  const result = await saveQuoteClient(quoteId, input);
+  if (!result.ok) return result;
+  refresh(quoteId);
+  return { ok: true };
 }
 
 export async function clearLinesAction(quoteId: string): Promise<State> {

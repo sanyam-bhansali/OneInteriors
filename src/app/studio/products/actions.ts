@@ -7,6 +7,8 @@ import {
   setProductActive,
   setProductStandard,
   addProduct,
+  updateProduct,
+  type ProductEdit,
   type SaveResult,
 } from '@/modules/studio-quote/store';
 import type { QuoteUnitName, WorkCodeName } from '@/modules/studio-quote/pricing';
@@ -57,6 +59,11 @@ export async function saveRateAction(_prev: State, form: FormData): Promise<Stat
 
 export async function toggleActiveAction(id: string, isActive: boolean): Promise<State> {
   return done(await setProductActive(id, isActive));
+}
+
+/** Edit a product: name, unit, rooms, sizes, rules. Re-checked in the store. */
+export async function updateProductAction(id: string, input: ProductEdit): Promise<State> {
+  return done(await updateProduct(String(id), input));
 }
 
 export async function addProductAction(_prev: State, form: FormData): Promise<State> {

@@ -305,6 +305,8 @@ function navFor(context: ShellContext | null): NavGroup[] {
           label: 'Quotations',
           ready: isLive('quotations'),
           count: context?.draftQuotes,
+          // The price list every quotation is built from — was reachable only from the guide.
+          children: [{ href: '/studio/products', label: 'Product master', ready: isLive('products') }],
         },
         {
           icon: 'projects',
