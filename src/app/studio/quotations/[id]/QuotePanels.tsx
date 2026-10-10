@@ -43,7 +43,16 @@ export function TotalsPanel({
               value={-totals.discountPaise}
             />
           ) : null}
-          {totals.onSpotPaise > 0 ? <Row label="On the spot" value={-totals.onSpotPaise} /> : null}
+          {totals.onSpotPaise > 0 ? (
+            <Row label={quote.onSpotLabel ?? 'Additional discount'} value={-totals.onSpotPaise} />
+          ) : null}
+          {totals.gstPaise > 0 ? (
+            <>
+              <div className="my-1 border-t border-[var(--s-rule-soft)]" />
+              <Row label="Before GST" value={totals.beforeTaxPaise} />
+              <Row label={`GST · ${quote.gstBps / 100}%`} value={totals.gstPaise} />
+            </>
+          ) : null}
         </dl>
 
         <div className="flex items-baseline justify-between gap-3 border-t border-[var(--s-rule)] bg-[var(--s-accent-wash)] px-4 py-3">
@@ -65,17 +74,27 @@ export function TotalsPanel({
                 key={s.label}
                 className="flex items-baseline justify-between gap-3 border-b border-[var(--s-rule-soft)] px-4 py-2.5 last:border-b-0"
               >
-                <span className="text-[13.5px]">{s.label}</span>
+                <span className="text-[13.5px]">
+                  {s.label}
+                  {s.pct ? <span className="ml-1.5 text-[var(--s-ink-3)]">{s.pct}%</span> : null}
+                </span>
                 <span className="s-num text-[13.5px] font-medium">{formatINR(s.amountPaise)}</span>
               </li>
             ))}
           </ul>
           <p className="m-0 border-t border-[var(--s-rule-soft)] px-4 py-2.5 text-[12px] leading-snug text-[var(--s-ink-3)]">
-            These add up to the total exactly. Set the fee, discount and advance in{' '}
-            <Link href="/studio/settings" className="text-[var(--s-accent)]">
-              Settings
-            </Link>
-            .
+            These add up to the total exactly.{' '}
+            {quote.phases?.length
+              ? 'Your own payment schedule, from your registration.'
+              : 'Set your own schedule and the defaults for new quotations in '}
+            {quote.phases?.length ? null : (
+              <>
+                <Link href="/studio/settings" className="text-[var(--s-accent)]">
+                  Settings
+                </Link>
+                .
+              </>
+            )}
           </p>
         </div>
       ) : null}
@@ -230,7 +249,7 @@ export function DocumentPreview({
           <p className="m-0 text-[12px] uppercase tracking-[.16em] text-[#6a655c]">Quotation</p>
           <p className="s-num m-0 text-[16px] font-semibold">{quote.number}</p>
           <p className="m-0 mt-1 text-[12.5px] text-[#56524b]">
-            {new Date(quote.updatedAt).toLocaleDateString('en-IN', {
+            {new Date(quote.quoteDate).toLocaleDateString('en-IN', {
               day: 'numeric',
               month: 'long',
               year: 'numeric',
@@ -302,7 +321,15 @@ export function DocumentPreview({
           {totals.discountPaise > 0 ? (
             <DocRow label="Discount" value={-totals.discountPaise} />
           ) : null}
-          {totals.onSpotPaise > 0 ? <DocRow label="On the spot" value={-totals.onSpotPaise} /> : null}
+          {totals.onSpotPaise > 0 ? (
+            <DocRow label={quote.onSpotLabel ?? 'Additional discount'} value={-totals.onSpotPaise} />
+          ) : null}
+          {totals.gstPaise > 0 ? (
+            <>
+              <DocRow label="Before GST" value={totals.beforeTaxPaise} />
+              <DocRow label={`GST · ${quote.gstBps / 100}%`} value={totals.gstPaise} />
+            </>
+          ) : null}
           <div className="mt-1 flex items-baseline justify-between gap-3 border-t-2 pt-2" style={{ borderColor: accent }}>
             <dt className="m-0 text-[14px] font-semibold">Total</dt>
             <dd className="s-num m-0 text-[16px] font-semibold">{formatINR(totals.totalPaise)}</dd>

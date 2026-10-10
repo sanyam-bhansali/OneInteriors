@@ -49,6 +49,7 @@ export async function saveBrandingAction(_prev: State, form: FormData): Promise<
     feeBps,
     discountBps,
     bookingAdvancePaise: rupeesToPaise(advance),
+    gstBps: str('gstOn') === 'yes' ? 1800 : 0,
   });
 
   if (!result.ok) return result;

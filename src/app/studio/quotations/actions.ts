@@ -8,7 +8,9 @@ import {
   saveQuoteLines,
   applyConfiguration,
   clearQuoteLines,
+  saveQuoteTerms,
   type QuoteStatusName,
+  type QuoteTermsInput,
   type SaveLineInput,
 } from '@/modules/studio-quote/quotes';
 import { isConfigName, type HomeConfig } from '@/modules/studio-quote/configure';
@@ -118,9 +120,13 @@ export async function setStatusAction(quoteId: string, status: QuoteStatusName):
  * refuses ids that are not on this quotation; nothing here assumes the
  * browser sent what the builder renders.
  */
-export async function saveLinesAction(quoteId: string, lines: SaveLineInput[]): Promise<State> {
+export async function saveLinesAction(quoteId: string, lines: SaveLineInput[], terms?: QuoteTermsInput): Promise<State> {
   const result = await saveQuoteLines(quoteId, lines);
   if (!result.ok) return result;
+  if (terms) {
+    const saved = await saveQuoteTerms(quoteId, terms);
+    if (!saved.ok) return saved;
+  }
   refresh(quoteId);
   return { ok: true };
 }

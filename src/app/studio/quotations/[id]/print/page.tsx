@@ -96,7 +96,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
     lines: quote.lines.filter((l) => l.room === room),
   })).filter((g) => g.lines.length > 0);
 
-  const issued = (quote.issuedOn ?? new Date()).toLocaleDateString('en-IN', {
+  const issued = new Date(quote.quoteDate).toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -213,9 +213,15 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
                 <tr><td>Discount ({quote.discountBps / 100}% on modular)</td><td className="mono num">− {formatINR(totals.discountPaise)}</td></tr>
               ) : null}
               {totals.onSpotPaise > 0 ? (
-                <tr><td>Additional reduction</td><td className="mono num">− {formatINR(totals.onSpotPaise)}</td></tr>
+                <tr><td>{quote.onSpotLabel ?? 'Additional discount'}</td><td className="mono num">− {formatINR(totals.onSpotPaise)}</td></tr>
               ) : null}
-              <tr className="grand"><td>Total</td><td className="mono num">{formatINR(totals.totalPaise)}</td></tr>
+              {totals.gstPaise > 0 ? (
+                <>
+                  <tr className="rule"><td>Total before GST</td><td className="mono num strong">{formatINR(totals.beforeTaxPaise)}</td></tr>
+                  <tr><td>GST ({quote.gstBps / 100}%)</td><td className="mono num">{formatINR(totals.gstPaise)}</td></tr>
+                </>
+              ) : null}
+              <tr className="grand"><td>{totals.gstPaise > 0 ? 'Total, GST included' : 'Total'}</td><td className="mono num">{formatINR(totals.totalPaise)}</td></tr>
             </tbody>
           </table>
         </section>
@@ -228,8 +234,8 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
                 {totals.stages.map((s) => (
                   <tr key={s.label}>
                     <td>
-                      <span className="item">{s.label}</span>
-                      <span className="detail">{s.detail}</span>
+                      <span className="item">{s.label}{s.pct ? ` · ${s.pct}%` : ''}</span>
+                      {s.detail ? <span className="detail">{s.detail}</span> : null}
                     </td>
                     <td className="mono num strong">{formatINR(s.amountPaise)}</td>
                   </tr>

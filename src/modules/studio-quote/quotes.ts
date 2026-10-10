@@ -12,19 +12,23 @@ import 'server-only';
  * The money is all in `pricing.ts`, which is pure and tested.
  */
 
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { fromDb, toDb, type Paise } from '@/lib/money';
 import { myStudioId, myBranding } from './store';
 import {
   computeTotals,
+  GST_BPS,
   lineAmount,
   type QuoteLineInput,
+  type QuoteTerms,
   type QuoteTotals,
   type QuoteUnitName,
   type WorkCodeName,
 } from './pricing';
 import { planQuotation, readRules, type CatalogueProduct, type HomeConfig } from './configure';
 import { ratesGateFor } from './rates-gate';
+import { readPhases, type PaymentPhase } from '@/modules/studio/payment-phases';
 import type { ComparableLine } from './revision';
 
 export type QuoteStatusName = 'DRAFT' | 'ISSUED' | 'ACCEPTED' | 'DECLINED';
@@ -73,6 +77,13 @@ export interface QuoteRow {
   discountBps: number;
   onSpotPaise: Paise;
   bookingAdvancePaise: Paise;
+  gstBps: number;
+  /** The flat discount's name; null prints as "Additional discount". */
+  onSpotLabel: string | null;
+  /** The date on the document: the one set, else the day it was made. */
+  quoteDate: Date;
+  /** The payment schedule this quotation uses; null = the standard stages. */
+  phases: PaymentPhase[] | null;
   welcomeNote: string | null;
   terms: string | null;
   issuedOn: Date | null;
@@ -113,6 +124,7 @@ export async function myQuotes(): Promise<QuoteSummary[]> {
         discountBps: row.discountBps,
         onSpotPaise: fromDb(row.onSpotPaise),
         bookingAdvancePaise: fromDb(row.bookingAdvancePaise),
+        gstBps: row.gstBps,
       });
 
       return {
@@ -163,7 +175,7 @@ export async function getQuote(id: string): Promise<QuoteRow | null> {
     // of anything, and this is a client's name and phone number.
     const row = await prisma.studioQuote.findFirst({
       where: { id, studioId },
-      include: { lines: { orderBy: { sortOrder: 'asc' } } },
+      include: { lines: { orderBy: { sortOrder: 'asc' } }, studio: { select: { paymentPhases: true } } },
     });
     if (!row) return null;
 
@@ -187,6 +199,10 @@ export async function getQuote(id: string): Promise<QuoteRow | null> {
       discountBps: row.discountBps,
       onSpotPaise: fromDb(row.onSpotPaise),
       bookingAdvancePaise: fromDb(row.bookingAdvancePaise),
+      gstBps: row.gstBps,
+      onSpotLabel: row.onSpotLabel,
+      quoteDate: row.quoteDate ?? row.createdAt,
+      phases: quotePhases(row.phases, row.studio.paymentPhases),
       welcomeNote: row.welcomeNote,
       terms: row.terms,
       issuedOn: row.issuedOn,
@@ -213,12 +229,28 @@ export async function getQuote(id: string): Promise<QuoteRow | null> {
 }
 
 export function totalsFor(quote: QuoteRow): QuoteTotals {
-  return computeTotals(quote.lines, {
+  return computeTotals(quote.lines, termsOf(quote));
+}
+
+/** The terms a quotation row is priced on — one place, so every screen agrees. */
+export function termsOf(quote: Pick<QuoteRow, 'feeBps' | 'discountBps' | 'onSpotPaise' | 'bookingAdvancePaise' | 'gstBps' | 'phases'>): QuoteTerms {
+  return {
     feeBps: quote.feeBps,
     discountBps: quote.discountBps,
     onSpotPaise: quote.onSpotPaise,
     bookingAdvancePaise: quote.bookingAdvancePaise,
-  });
+    gstBps: quote.gstBps,
+    phases: quote.phases,
+  };
+}
+
+/**
+ * The schedule a quotation is paid on: its own snapshot, else the studio's
+ * current one, else none (the standard stages). The same rule the
+ * customer's copy uses (`portal/choose.ts`), so the two never differ.
+ */
+export function quotePhases(own: unknown, studio: unknown): PaymentPhase[] | null {
+  return readPhases(own) ?? readPhases(studio);
 }
 
 export type QuoteResult = { ok: true; id: string } | { ok: false; error: string };
@@ -323,6 +355,8 @@ export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
         feeBps: branding.feeBps,
         discountBps: branding.discountBps,
         bookingAdvancePaise: toDb(branding.bookingAdvancePaise),
+        gstBps: branding.gstBps,
+        ...(await studioPhases(studioId)),
         welcomeNote: branding.welcomeNote,
         terms: branding.terms,
       },
@@ -332,6 +366,68 @@ export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
     return { ok: true, id: quote.id };
   } catch (error) {
     console.error('[studio-quote] createQuote failed', error);
+    return { ok: false, error: 'That did not save.' };
+  }
+}
+
+/** The studio's schedule, snapshotted onto a new quotation when it has one. */
+async function studioPhases(studioId: string): Promise<{ phases?: Prisma.InputJsonValue }> {
+  const row = await prisma.studio.findUnique({ where: { id: studioId }, select: { paymentPhases: true } });
+  const phases = readPhases(row?.paymentPhases);
+  return phases ? { phases: phases as unknown as Prisma.InputJsonValue } : {};
+}
+
+export interface QuoteTermsInput {
+  feeBps: number;
+  discountBps: number;
+  gstOn: boolean;
+  onSpotPaise: Paise;
+  onSpotLabel: string | null;
+  bookingAdvancePaise: Paise;
+  /** YYYY-MM-DD, or null for the day it was made. */
+  quoteDate: string | null;
+}
+
+/**
+ * This quotation's own terms — fee, discount, GST, a named flat discount,
+ * the advance and its date. Settings holds the defaults a new quotation
+ * starts from; this is the deal on this one.
+ */
+export async function saveQuoteTerms(quoteId: string, input: QuoteTermsInput): Promise<ActionResult> {
+  if (!(await ownedQuote(quoteId))) return { ok: false, error: 'That quotation is not yours.' };
+
+  const pct = (bps: number) => Number.isInteger(bps) && bps >= 0 && bps <= 5000;
+  if (!pct(input.feeBps)) return { ok: false, error: 'A professional fee between 0% and 50%, please.' };
+  if (!pct(input.discountBps)) return { ok: false, error: 'A discount between 0% and 50%, please.' };
+  if (!Number.isInteger(input.onSpotPaise) || input.onSpotPaise < 0 || input.onSpotPaise >= 1e11) {
+    return { ok: false, error: 'That discount is not an amount.' };
+  }
+  if (!Number.isInteger(input.bookingAdvancePaise) || input.bookingAdvancePaise < 0 || input.bookingAdvancePaise >= 1e11) {
+    return { ok: false, error: 'That advance is not an amount.' };
+  }
+  let quoteDate: Date | null = null;
+  if (input.quoteDate) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.quoteDate)) return { ok: false, error: 'That date is not a date.' };
+    quoteDate = new Date(`${input.quoteDate}T00:00:00Z`);
+    if (Number.isNaN(quoteDate.getTime())) return { ok: false, error: 'That date is not a date.' };
+  }
+
+  try {
+    await prisma.studioQuote.update({
+      where: { id: quoteId },
+      data: {
+        feeBps: input.feeBps,
+        discountBps: input.discountBps,
+        gstBps: input.gstOn ? GST_BPS : 0,
+        onSpotPaise: toDb(input.onSpotPaise),
+        onSpotLabel: input.onSpotPaise > 0 ? input.onSpotLabel?.trim().slice(0, 60) || null : null,
+        bookingAdvancePaise: toDb(input.bookingAdvancePaise),
+        quoteDate,
+      },
+    });
+    return { ok: true };
+  } catch (error) {
+    console.error('[studio-quote] saveQuoteTerms failed', error);
     return { ok: false, error: 'That did not save.' };
   }
 }

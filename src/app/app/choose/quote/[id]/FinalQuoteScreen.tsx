@@ -22,7 +22,7 @@ const SHOWN = 6;
 
 export function FinalQuoteScreen({ q }: { q: FinalQuoteView }) {
   const [all, setAll] = useState(false);
-  const diff = q.firstBeforeGstPaise === null ? null : q.totalPaise - q.firstBeforeGstPaise;
+  const diff = q.firstBeforeGstPaise === null ? null : q.beforeTaxPaise - q.firstBeforeGstPaise;
   const pct = diff !== null && q.firstBeforeGstPaise ? (diff / q.firstBeforeGstPaise) * 100 : null;
   const rooms = all ? q.rooms : q.rooms.slice(0, SHOWN);
 
@@ -37,7 +37,7 @@ export function FinalQuoteScreen({ q }: { q: FinalQuoteView }) {
           <p className="oa-note" style={{ margin: 0 }}>
             Total for all {q.lineCount} lines, before GST
           </p>
-          <div className="sum">{formatINR(q.totalPaise)}</div>
+          <div className="sum">{formatINR(q.beforeTaxPaise)}</div>
           {diff === null ? null : Math.abs(diff) < 100 ? (
             <p>Same as your first quote.</p>
           ) : (
@@ -83,14 +83,26 @@ export function FinalQuoteScreen({ q }: { q: FinalQuoteView }) {
           ) : null}
           {q.onSpotPaise > 0 ? (
             <div className="row minus">
-              <span>Further discount</span>
+              <span>{q.onSpotLabel ?? 'Further discount'}</span>
               <span className="amt">−{formatINR(q.onSpotPaise)}</span>
             </div>
           ) : null}
           <div className="row total">
             <span>Total, before GST</span>
-            <span className="amt">{formatINR(q.totalPaise)}</span>
+            <span className="amt">{formatINR(q.beforeTaxPaise)}</span>
           </div>
+          {q.gstPaise > 0 ? (
+            <>
+              <div className="row">
+                <span>GST 18%</span>
+                <span className="amt">+{formatINR(q.gstPaise)}</span>
+              </div>
+              <div className="row total">
+                <span>You pay</span>
+                <span className="amt">{formatINR(q.totalPaise)}</span>
+              </div>
+            </>
+          ) : null}
         </div>
 
         <section className="oa-card">

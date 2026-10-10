@@ -231,6 +231,16 @@ export function BrandingForm({ branding }: { branding: BrandingRow | null }) {
           width="xs"
           suffix="₹, taken before the stages"
         />
+        <label className="flex items-center gap-2 text-[14px]">
+          <input
+            type="checkbox"
+            name="gstOn"
+            value="yes"
+            defaultChecked={(branding?.gstBps ?? 0) > 0}
+            className="h-[16px] w-[16px] accent-[var(--s-accent)]"
+          />
+          Add GST at 18% to new quotations
+        </label>
         <p className="m-0 max-w-[64ch] text-[13px] leading-relaxed text-[var(--s-ink-3)]">
           The discount applies to modular work only — factory units carry the margin that can be
           given away, site labour does not. Discounting the whole quotation is how a studio wins a

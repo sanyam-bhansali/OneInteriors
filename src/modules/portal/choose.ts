@@ -20,7 +20,7 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/modules/auth/session';
-import { readPhases, phaseAmounts } from '@/modules/studio/payment-phases';
+import { readPhases } from '@/modules/studio/payment-phases';
 import { readProfile } from '@/modules/studio/matching-profile';
 import { computeTotals, type QuoteUnitName, type WorkCodeName } from '@/modules/studio-quote/pricing';
 import { canTransition } from '@/modules/studio/appointment-rules';
@@ -105,6 +105,9 @@ export async function chooseView(): Promise<ChooseView | null> {
           discountBps: true,
           onSpotPaise: true,
           bookingAdvancePaise: true,
+          gstBps: true,
+          phases: true,
+          studio: { select: { paymentPhases: true } },
           lines: { select: { unit: true, code: true, ratePaise: true, amountPaise: true, widthMm: true, heightMm: true, qtyMilli: true } },
         },
       })
@@ -124,7 +127,7 @@ export async function chooseView(): Promise<ChooseView | null> {
         location: a.location,
       })),
       finalQuote: q
-        ? { id: q.id, totalPaise: totalOf(q).totalPaise, issuedOn: q.issuedOn?.toISOString() ?? null, accepted: q.status === 'ACCEPTED' }
+        ? { id: q.id, totalPaise: totalOf(q).beforeTaxPaise, issuedOn: q.issuedOn?.toISOString() ?? null, accepted: q.status === 'ACCEPTED' }
         : null,
     };
   });
@@ -141,6 +144,9 @@ type QuoteRowForTotals = {
   discountBps: number;
   onSpotPaise: bigint;
   bookingAdvancePaise: bigint;
+  gstBps: number;
+  phases: unknown;
+  studio: { paymentPhases: unknown };
   lines: { unit: string; code: string; ratePaise: bigint; amountPaise: bigint; widthMm: number | null; heightMm: number | null; qtyMilli: number | null }[];
 };
 
@@ -160,6 +166,9 @@ function totalOf(q: QuoteRowForTotals) {
       discountBps: q.discountBps,
       onSpotPaise: fromDb(q.onSpotPaise),
       bookingAdvancePaise: fromDb(q.bookingAdvancePaise),
+      gstBps: q.gstBps,
+      // The schedule the studio's own builder shows (`quotePhases`).
+      phases: readPhases(q.phases) ?? readPhases(q.studio.paymentPhases),
     },
   );
 }
@@ -179,7 +188,12 @@ export interface FinalQuoteView {
   feePaise: number;
   discountPaise: number;
   onSpotPaise: number;
-  /** What they pay the studio, before GST — studio quotations carry no GST line. */
+  onSpotLabel: string | null;
+  /** After every discount, before GST — what compares with the first quote. */
+  beforeTaxPaise: number;
+  /** Zero when the studio quoted without GST. */
+  gstPaise: number;
+  /** What they pay the studio, GST included when the studio charges it. */
   totalPaise: number;
   terms: string | null;
   handoverDays: number;
@@ -206,7 +220,10 @@ export async function finalQuoteView(quoteId: string, firstBeforeGst: (slug: str
       feeBps: true,
       discountBps: true,
       onSpotPaise: true,
+      onSpotLabel: true,
       bookingAdvancePaise: true,
+      gstBps: true,
+      phases: true,
       terms: true,
       studio: { select: { slug: true, tradeName: true, paymentPhases: true, matchingProfile: true } },
       lines: {
@@ -232,10 +249,7 @@ export async function finalQuoteView(quoteId: string, firstBeforeGst: (slug: str
     rooms.set(l.room, r);
   }
 
-  const phases = readPhases(q.studio.paymentPhases);
-  const stages = phases
-    ? phaseAmounts(phases, totals.totalPaise).map((p) => ({ label: p.label, pct: p.pct, amountPaise: p.amountPaise }))
-    : totals.stages.map((s) => ({ label: s.label, pct: null, amountPaise: s.amountPaise }));
+  const stages = totals.stages.map((s) => ({ label: s.label, pct: s.pct ?? null, amountPaise: s.amountPaise }));
 
   return {
     id: q.id,
@@ -250,6 +264,9 @@ export async function finalQuoteView(quoteId: string, firstBeforeGst: (slug: str
     feePaise: totals.feePaise,
     discountPaise: totals.discountPaise,
     onSpotPaise: totals.onSpotPaise,
+    onSpotLabel: q.onSpotLabel,
+    beforeTaxPaise: totals.beforeTaxPaise,
+    gstPaise: totals.gstPaise,
     totalPaise: totals.totalPaise,
     terms: q.terms,
     handoverDays: durationFor(intro.brief.scope, readProfile(q.studio.matchingProfile).durationDays),

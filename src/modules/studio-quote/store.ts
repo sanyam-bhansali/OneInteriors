@@ -321,6 +321,7 @@ export interface BrandingRow {
   feeBps: number;
   discountBps: number;
   bookingAdvancePaise: Paise;
+  gstBps: number;
 }
 
 /**
@@ -387,6 +388,7 @@ export async function myBranding(): Promise<BrandingRow | null> {
       feeBps: row.feeBps,
       discountBps: row.discountBps,
       bookingAdvancePaise: fromDb(row.bookingAdvancePaise),
+      gstBps: row.gstBps,
     };
   } catch (error) {
     console.error('[studio-quote] myBranding failed', error);
@@ -409,6 +411,8 @@ export interface BrandingInput {
   feeBps: number;
   discountBps: number;
   bookingAdvancePaise: Paise;
+  /** 0 or 1800. Absent leaves it as it is. */
+  gstBps?: number;
 }
 
 /**
@@ -448,6 +452,7 @@ export async function saveBranding(input: BrandingInput): Promise<SaveResult> {
     feeBps: input.feeBps,
     discountBps: input.discountBps,
     bookingAdvancePaise: toDb(Math.max(0, input.bookingAdvancePaise)),
+    ...(input.gstBps !== undefined ? { gstBps: input.gstBps > 0 ? 1800 : 0 } : {}),
   };
 
   try {

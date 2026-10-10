@@ -16,6 +16,8 @@ import {
   type EditableLine,
 } from './QuoteLines';
 import { TotalsPanel, DocumentPreview, ChangesPanel } from './QuotePanels';
+import { TermsPanel, pctToBps, rupeesToPaiseText, type TermsDraft } from './TermsPanel';
+import type { QuoteTermsInput } from '@/modules/studio-quote/quotes';
 
 /**
  * The quotation builder.
@@ -75,6 +77,8 @@ export function QuoteBuilder({
   const [saving, startSave] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<'lines' | 'document' | 'changes'>('lines');
+  const [terms, setTerms] = useState<TermsDraft>(() => termsDraftOf(quote));
+  const savedTerms = useRef(JSON.stringify(termsDraftOf(quote)));
 
   /* The saved copy, for the "nothing to save" test. Compared by value rather
      than by a dirty flag alone, so typing a 3, deleting it and typing it back
@@ -82,8 +86,29 @@ export function QuoteBuilder({
   const saved = useRef(JSON.stringify(quote.lines.map(toEditable)));
 
   useEffect(() => {
-    setDirty(JSON.stringify(lines) !== saved.current);
-  }, [lines]);
+    setDirty(JSON.stringify(lines) !== saved.current || JSON.stringify(terms) !== savedTerms.current);
+  }, [lines, terms]);
+
+  /* The terms as figures. A half-typed percentage keeps the last good one on
+     screen rather than flashing the total to zero. */
+  const termsIn = useMemo(() => termsInput(terms), [terms]);
+  const live = useMemo(
+    () => ({
+      ...quote,
+      ...(termsIn
+        ? {
+            feeBps: termsIn.feeBps,
+            discountBps: termsIn.discountBps,
+            gstBps: termsIn.gstOn ? 1800 : 0,
+            onSpotPaise: termsIn.onSpotPaise,
+            onSpotLabel: termsIn.onSpotLabel,
+            bookingAdvancePaise: termsIn.bookingAdvancePaise,
+            quoteDate: termsIn.quoteDate ? new Date(`${termsIn.quoteDate}T00:00:00`) : quote.quoteDate,
+          }
+        : {}),
+    }),
+    [quote, termsIn],
+  );
 
   /**
    * The browser's own warning, and the only thing standing between forty
@@ -121,13 +146,15 @@ export function QuoteBuilder({
       computeTotals(
         priced.map((l) => ({ ...l, amountPaise: l.amountPaise })),
         {
-          feeBps: quote.feeBps,
-          discountBps: quote.discountBps,
-          onSpotPaise: quote.onSpotPaise,
-          bookingAdvancePaise: quote.bookingAdvancePaise,
+          feeBps: live.feeBps,
+          discountBps: live.discountBps,
+          onSpotPaise: live.onSpotPaise,
+          bookingAdvancePaise: live.bookingAdvancePaise,
+          gstBps: live.gstBps,
+          phases: live.phases,
         },
       ),
-    [priced, quote.feeBps, quote.discountBps, quote.onSpotPaise, quote.bookingAdvancePaise],
+    [priced, live],
   );
 
   const comparable: ComparableLine[] = useMemo(
@@ -212,6 +239,11 @@ export function QuoteBuilder({
 
   function save() {
     setError(null);
+    if (!termsIn) {
+      setError('Check the terms: a percentage between 0 and 50, and amounts in rupees.');
+      return;
+    }
+    const sentTerms = JSON.stringify(terms);
     const payload: SaveLineInput[] = lines.map((l) => ({
       id: l.id,
       room: l.room,
@@ -227,7 +259,7 @@ export function QuoteBuilder({
     }));
 
     startSave(async () => {
-      const result = await saveLinesAction(quote.id, payload);
+      const result = await saveLinesAction(quote.id, payload, termsIn);
       if (result && 'ok' in result && !result.ok) {
         setError(result.error);
         return;
@@ -235,7 +267,8 @@ export function QuoteBuilder({
       /* Marked saved from what was SENT, not from what is on screen now: a
          figure typed while the request was in flight is still unsaved. */
       saved.current = JSON.stringify(lines);
-      setDirty(JSON.stringify(lines) !== saved.current);
+      savedTerms.current = sentTerms;
+      setDirty(JSON.stringify(lines) !== saved.current || JSON.stringify(terms) !== savedTerms.current);
     });
   }
 
@@ -259,6 +292,11 @@ export function QuoteBuilder({
           quoteConfig={quote.config}
           baths={quote.bathrooms}
           onAdd={add}
+        />
+        <TermsPanel
+          terms={terms}
+          onChange={(patch) => setTerms((t) => ({ ...t, ...patch }))}
+          ownSchedule={(quote.phases?.length ?? 0) > 0}
         />
 
         {/* In the rail, beside everything that made it dirty. */}
@@ -345,14 +383,14 @@ export function QuoteBuilder({
             ))}
 
             {lines.length > 0 ? (
-              <TotalsPanel quote={quote} totals={totals} rooms={rooms} />
+              <TotalsPanel quote={live} totals={totals} rooms={rooms} />
             ) : null}
           </div>
         ) : null}
 
         {tab === 'document' ? (
           <DocumentPreview
-            quote={quote}
+            quote={live}
             lines={priced}
             rooms={roomOrder}
             totals={totals}
@@ -457,5 +495,41 @@ function toEditable(line: QuoteRow['lines'][number]): EditableLine {
       })
         ? line.amountPaise
         : null,
+  };
+}
+
+function termsDraftOf(quote: QuoteRow): TermsDraft {
+  return {
+    feePct: String(quote.feeBps / 100),
+    discountPct: String(quote.discountBps / 100),
+    gstOn: quote.gstBps > 0,
+    onSpotRupees: quote.onSpotPaise > 0 ? String(quote.onSpotPaise / 100) : '',
+    onSpotLabel: quote.onSpotLabel ?? '',
+    advanceRupees: String(quote.bookingAdvancePaise / 100),
+    quoteDate: isoDay(quote.quoteDate),
+  };
+}
+
+function isoDay(d: Date | string): string {
+  const date = new Date(d);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** The draft as the server takes it, or null when a figure is not a figure. */
+function termsInput(t: TermsDraft): QuoteTermsInput | null {
+  const feeBps = pctToBps(t.feePct);
+  const discountBps = pctToBps(t.discountPct);
+  const onSpotPaise = rupeesToPaiseText(t.onSpotRupees);
+  const bookingAdvancePaise = rupeesToPaiseText(t.advanceRupees);
+  if (feeBps === null || discountBps === null || onSpotPaise === null || bookingAdvancePaise === null) return null;
+  return {
+    feeBps,
+    discountBps,
+    gstOn: t.gstOn,
+    onSpotPaise,
+    onSpotLabel: t.onSpotLabel.trim() || null,
+    bookingAdvancePaise,
+    quoteDate: /^\d{4}-\d{2}-\d{2}$/.test(t.quoteDate) ? t.quoteDate : null,
   };
 }

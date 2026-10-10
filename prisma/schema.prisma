@@ -2091,6 +2091,8 @@ model StudioBranding {
   feeBps              Int    @default(700)
   discountBps         Int    @default(0)
   bookingAdvancePaise BigInt @default(2500000)
+  /// GST a new quotation starts with: 0 (off) or 1800.
+  gstBps              Int    @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2221,6 +2223,22 @@ model StudioQuote {
   discountBps         Int
   onSpotPaise         BigInt @default(0)
   bookingAdvancePaise BigInt
+
+  /// GST on this quotation, basis points: 0 (off) or 1800. Charged after
+  /// every discount, on what the client pays for the work.
+  gstBps Int @default(0)
+
+  /// The name of the flat discount above — "On-spot", "Festive",
+  /// "Referral". Null prints as "Additional discount".
+  onSpotLabel String?
+
+  /// The date printed on the quotation. Null means the day it was made.
+  quoteDate DateTime? @db.Date
+
+  /// The studio's payment schedule as it stood when this was made
+  /// ([{ label, pct }], `payment-phases.ts`). Null means the studio's
+  /// current one, or the standard stages when it has none.
+  phases Json?
 
   /// Their words on this document, snapshotted for the same reason.
   welcomeNote String? @db.Text
