@@ -23,7 +23,7 @@ import {
   type QuoteUnitName,
   type WorkCodeName,
 } from './pricing';
-import { planQuotation, type CatalogueProduct, type HomeConfig } from './configure';
+import { planQuotation, readRules, type CatalogueProduct, type HomeConfig } from './configure';
 import { ratesGateFor } from './rates-gate';
 import type { ComparableLine } from './revision';
 
@@ -644,6 +644,7 @@ export async function applyConfiguration(input: ApplyConfigInput): Promise<Apply
       inStandardBuild: p.inStandardBuild,
       isActive: p.isActive,
       sortOrder: p.sortOrder,
+      rules: readRules(p.rules),
     }));
 
     const { lines, notes } = planQuotation(input.home, catalogue);

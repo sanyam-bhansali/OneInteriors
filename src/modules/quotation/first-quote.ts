@@ -293,6 +293,29 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
     let size: string;
     let standard = true;
 
+    /* A studio that prices this line per flat (`perBhkPaise`) is quoted its
+       own figure for a flat this size, not a per-foot rate worked back from
+       it. */
+    const perHome =
+      item.sizing === 'PER_SQFT_CARPET' ? filed.perBhkPaise?.[Math.min(4, Math.max(1, Math.round(input.bhk)))] : undefined;
+    if (perHome !== undefined) {
+      lines.push({
+        code: item.code,
+        room: item.room,
+        label: item.label,
+        work: item.work,
+        size: `${input.bhk} BHK`,
+        quantity: 1,
+        unit: 'home',
+        ratePaise: perHome,
+        amountPaise: perHome,
+        spec: (own ? filed.spec : undefined) ?? item.spec,
+        standard: true,
+        ...(reasons.has(item.code) ? { addedFor: reasons.get(item.code)! } : {}),
+      });
+      continue;
+    }
+
     switch (item.sizing) {
       case 'AREA': {
         const widthMm = item.fromKitchenRun ? runMm : (item.widthMm ?? 0);

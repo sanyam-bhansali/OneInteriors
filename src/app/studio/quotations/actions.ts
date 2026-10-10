@@ -75,6 +75,7 @@ export async function createQuoteAction(_prev: State, form: FormData): Promise<S
         kitchenRunMm: Number.isFinite(run) && run > 0 ? Math.round(run) : null,
         bathrooms: Number.isFinite(baths) && baths >= 0 ? Math.round(baths) : 2,
         study: str(form, 'study') === 'yes',
+        balcony: str(form, 'balcony') === 'yes',
       },
     });
   }

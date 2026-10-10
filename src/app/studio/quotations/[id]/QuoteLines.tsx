@@ -94,6 +94,7 @@ export function ConfigurePanel({ quote, hasLines }: { quote: QuoteRow; hasLines:
   );
   const [bathrooms, setBathrooms] = useState(String(quote.bathrooms ?? 2));
   const [study, setStudy] = useState(false);
+  const [balcony, setBalcony] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [result, setResult] = useState<BuildState>(null);
   const [pending, start] = useTransition();
@@ -117,6 +118,7 @@ export function ConfigurePanel({ quote, hasLines }: { quote: QuoteRow; hasLines:
           kitchenRunMm: Number.isFinite(run) && run > 0 ? Math.round(run) : null,
           bathrooms: Number.isFinite(baths) && baths >= 0 ? Math.round(baths) : 0,
           study,
+          balcony,
         }),
       );
     });
@@ -173,6 +175,16 @@ export function ConfigurePanel({ quote, hasLines }: { quote: QuoteRow; hasLines:
             className="h-[16px] w-[16px] accent-[var(--s-accent)]"
           />
           Study or office
+        </label>
+
+        <label className="flex items-center gap-2 text-[13.5px]">
+          <input
+            type="checkbox"
+            checked={balcony}
+            onChange={(e) => setBalcony(e.target.checked)}
+            className="h-[16px] w-[16px] accent-[var(--s-accent)]"
+          />
+          Dry balcony
         </label>
 
         <button
