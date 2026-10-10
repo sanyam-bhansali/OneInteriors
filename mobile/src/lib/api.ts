@@ -1,6 +1,7 @@
 import { apiBase } from './config';
 import { readToken } from './token';
-import type { Notice, Project } from './types';
+import { sampleCall, SAMPLE } from './sample';
+import type { GeioReply, GeioTurn, Notice, Profile, Project } from './types';
 
 /**
  * The only place the app talks to the backend (src/app/api/app/v1 on the
@@ -13,6 +14,8 @@ export type Result<T> = { ok: true; data: T } | { ok: false; status: number; err
 const OFFLINE = 'We could not reach One Interiors. Check your connection and try again.';
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<Result<T>> {
+  // The test build's sample customer: every screen, no server (SAMPLE-DATA.md).
+  if (SAMPLE) return sampleCall<T>(method, path, body);
   const token = await readToken();
   const form = typeof FormData !== 'undefined' && body instanceof FormData;
   let res: Response;
@@ -49,7 +52,14 @@ export const api = {
   verifyCode: (phone: string, code: string, name: string) =>
     call<{ token: string }>('POST', '/auth/otp/verify', { phone, code, name }),
   signOut: () => call<object>('POST', '/auth/sign-out'),
-  me: () => call<{ user: Me }>('GET', '/me'),
+  me: () => call<{ user: Me } & Partial<Profile>>('GET', '/me'),
+  /** Who, plus their home, coins, expert and unread count. Older servers send only `user`. */
+  profile: () => call<{ user: Me } & Partial<Profile>>('GET', '/me'),
+  setLocale: (locale: 'en' | 'hi' | 'mr') => call<object>('PATCH', '/me', { locale }),
+  /** Deletes the account (store requirement). The session ends with it. */
+  deleteAccount: () => call<object>('DELETE', '/me'),
+  geio: (question: string, history: GeioTurn[], lang: 'en' | 'hi' | 'mr', image?: string) =>
+    call<{ reply: GeioReply }>('POST', '/geio', { question, history, lang, ...(image ? { image } : {}) }),
   projects: () => call<{ projects: Project[] }>('GET', '/project'),
   choose: (decisionId: string, index: number) => call<object>('POST', `/decisions/${encodeURIComponent(decisionId)}`, { index }),
   /** Multipart: projectId, title, room?, photos. */

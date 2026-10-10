@@ -123,3 +123,38 @@ export const STAGE_SHORT: Record<string, string> = {
   FINISH: 'Finish',
   HANDOVER: 'Handover',
 };
+
+/** The customer's home, from their brief (`/api/app/v1/me`). */
+export interface Home {
+  /** "Flat 1204, Baner"; null when the brief has no address yet. */
+  label: string | null;
+  locality: string | null;
+  bhk: string | null;
+  carpetSqft: number | null;
+  tier: 'essential' | 'premium' | 'luxury' | null;
+  /** Full-home orders only see the 3D view (FLOWS.md). */
+  fullHome: boolean;
+}
+
+export interface Profile {
+  home: Home | null;
+  coins: { balance: number; streak: number };
+  expert: { name: string };
+  unread: number;
+  locale: 'en' | 'hi' | 'mr';
+}
+
+/** GEIO's answer (GeioReply in the website's src/modules/app/geio.ts). */
+export interface GeioReply {
+  paragraphs: string[];
+  see: { what: string; verdict: string; watch: boolean }[];
+  /** Set when GEIO hands the question to the expert: what it passes on. */
+  handover: string | null;
+  follow: string[];
+  sources: { line: number; item: string; amount: string; spec: string }[];
+}
+
+export interface GeioTurn {
+  role: 'user' | 'assistant';
+  text: string;
+}
