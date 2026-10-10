@@ -31,3 +31,13 @@ describe('quotations sent', () => {
     expect(quotationsSent([])).toBe(0);
   });
 });
+
+describe('approval through the product master (10 Oct route)', () => {
+  it('accepts an approved product master in place of filed rates', () => {
+    expect(approvalBlockers({ quotationsRead: MIN_QUOTATIONS_FOR_RATES, liveRates: 0, productMasterApproved: true, productMaster: 75 })).toEqual([]);
+  });
+
+  it('still refuses with neither', () => {
+    expect(approvalBlockers({ quotationsRead: MIN_QUOTATIONS_FOR_RATES, liveRates: 0, productMasterApproved: false, productMaster: 75 })[0]).toContain('No rates');
+  });
+});
