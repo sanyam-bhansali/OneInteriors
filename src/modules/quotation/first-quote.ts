@@ -136,6 +136,15 @@ export interface QuoteInput {
    * instead of the standard width.
    */
   planRooms?: PlanRoomSize[];
+  /**
+   * The studio's own modular discount, % — what it gives on factory-made
+   * work, filled in by the studio (Settings → standard discount). Fee and
+   * GST are ours and the same for every studio; this one is theirs, so the
+   * first quote and the studio's final quote take the same discount
+   * (owner's decision, 11 Oct). Null is a studio that gives none. Absent —
+   * the sample studios with no database — keeps the archive median, 10%.
+   */
+  modularDiscountPct?: number | null;
 }
 
 /** Which bedroom a catalogue code is for: master, second, third. */
@@ -173,8 +182,10 @@ export interface FirstQuote {
   rooms: { room: Room; label: string; lines: QuoteLine[]; subtotalPaise: Paise }[];
   modularPaise: Paise;
   nonModularPaise: Paise;
-  /** 15% off the modular half. Shown as a line, never as a promotion. */
+  /** The studio's discount off the modular half. Shown as a line, never as a promotion. */
   modularDiscountPaise: Paise;
+  /** That discount's percentage. Optional on quotes saved before it existed. */
+  modularDiscountPct?: number;
   professionalFeePaise: Paise;
   /**
    * The One Interiors discount and its percentage. Optional because quotes
@@ -289,6 +300,11 @@ function variance(source: QuoteInput['runSource']): number {
   return 0.16;
 }
 
+/** The modular discount a quote takes: the studio's own, none, or (sample studios) the archive median. */
+export function modularDiscountFor(pct: number | null | undefined): number {
+  return pct === undefined ? MODULAR_DISCOUNT_BPS / 100 : Math.min(50, Math.max(0, pct ?? 0));
+}
+
 export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuote {
   const source = runSourceOf({ kitchenRunMm: input.kitchenRunMm, source: input.runSource });
   const runMm = input.kitchenRunMm ?? standardKitchenRunMm(input.bhk);
@@ -400,7 +416,8 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
   const professionalFeePaise = Math.round(
     ((modularPaise + nonModularPaise) * PROFESSIONAL_FEE_BPS) / 10_000,
   );
-  const modularDiscountPaise = Math.round((modularPaise * MODULAR_DISCOUNT_BPS) / 10_000);
+  const discountPct = modularDiscountFor(input.modularDiscountPct);
+  const modularDiscountPaise = Math.round((modularPaise * discountPct) / 100);
 
   const afterStudioTerms =
     modularPaise + nonModularPaise + professionalFeePaise - modularDiscountPaise;
@@ -484,6 +501,7 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
     modularPaise,
     nonModularPaise,
     modularDiscountPaise,
+    modularDiscountPct: discountPct,
     professionalFeePaise,
     curatedDiscountPaise,
     curatedDiscountPct,

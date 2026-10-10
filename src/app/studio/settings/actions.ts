@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { rupeesToPaise } from '@/lib/money';
 import { saveBranding, parseMaterialSpec } from '@/modules/studio-quote/store';
+import { revalidateRoster } from '@/modules/studio/roster-cache';
 import { replaceLogo, clearLogo, setHideOurMark } from '@/modules/studio-quote/store';
 
 // `State` and `IDLE` live in studio/form-state.ts. A 'use server'
@@ -58,6 +59,8 @@ export async function saveBrandingAction(_prev: State, form: FormData): Promise<
 
   revalidatePath('/studio/settings');
   revalidatePath('/studio/quotations');
+  // The modular discount is on customers' first quotes, read from the cached roster.
+  await revalidateRoster();
   return { ok: true };
 }
 

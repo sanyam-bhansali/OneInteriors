@@ -37,6 +37,7 @@ export interface CanvasStudio {
   slug: string;
   name: string;
   curatedDiscountPct?: number | null;
+  modularDiscountPct?: number | null;
 }
 
 export interface PricedStudio {
@@ -116,6 +117,7 @@ export function priceDraft({
         runShared: draft.kitchenRunMm === null && plan.shared === true,
         scope: { ...shape.scope, excludedItems: draft.excludedItems },
         curatedDiscountPct: s.curatedDiscountPct ?? null,
+        modularDiscountPct: s.modularDiscountPct,
       },
       rates,
     );

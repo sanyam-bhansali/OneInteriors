@@ -147,6 +147,12 @@ export const SPECIALISM_LABELS: Record<Specialism, string> = {
 // ── The profile ──────────────────────────────────────────────────
 
 export interface MatchingProfile {
+  /**
+   * The studio's modular discount, % — read from its quotation settings
+   * (StudioBranding.discountBps) by the repository, not stored here. Absent
+   * on the sample studios.
+   */
+  modularDiscountPct?: number | null;
   // 2 · The work you take on
   workMix: WorkMix | null;
   scopes: ScopeType[];

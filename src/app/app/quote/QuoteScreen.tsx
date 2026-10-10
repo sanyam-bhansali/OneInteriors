@@ -178,7 +178,7 @@ function Line({ line, range }: { line: QuoteLine; range?: LineRange }) {
 function Bill({ quote: q }: { quote: FirstQuote }) {
   const rows: [string, number, 'plus' | 'minus' | null][] = [
     [`All ${q.lines.length} lines`, q.modularPaise + q.nonModularPaise, null],
-    [`Modular discount, ${MODULAR_DISCOUNT_BPS / 100}%`, q.modularDiscountPaise, 'minus'],
+    [`Modular discount, ${q.modularDiscountPct ?? MODULAR_DISCOUNT_BPS / 100}%`, q.modularDiscountPaise, 'minus'],
     [`Design and site fee, ${PROFESSIONAL_FEE_BPS / 100}%`, q.professionalFeePaise, 'plus'],
     ...(q.curatedDiscountPaise
       ? [[`One Interiors discount${q.curatedDiscountPct ? `, ${q.curatedDiscountPct}%` : ''}`, q.curatedDiscountPaise, 'minus'] as [string, number, 'minus']]

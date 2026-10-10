@@ -39,6 +39,7 @@ import { hasSubmittedForReview } from '@/modules/studio/submitted';
 
 const INCLUDE = {
   verifications: true,
+  branding: { select: { discountBps: true } },
   portfolio: { orderBy: { completedOn: 'desc' } },
 } satisfies Prisma.StudioInclude;
 
@@ -115,7 +116,8 @@ function toStudio(row: StudioRow): Studio {
     minProjectPaise: row.minProjectPaise === null ? null : fromDb(row.minProjectPaise),
     maxProjectPaise: row.maxProjectPaise === null ? null : fromDb(row.maxProjectPaise),
     paymentPhases: readPhases(row.paymentPhases),
-    matchingProfile: readProfile(row.matchingProfile),
+    // The studio's own modular discount rides here to every first quote.
+    matchingProfile: { ...readProfile(row.matchingProfile), modularDiscountPct: (row.branding?.discountBps ?? 0) / 100 },
     band: (TIERS as readonly string[]).includes(row.band ?? '') ? (row.band as Tier) : null,
     completedProjects: row.completedProjects,
     avgVarianceDays: row.avgVarianceDays,

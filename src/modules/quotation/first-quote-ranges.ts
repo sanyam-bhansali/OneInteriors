@@ -42,7 +42,7 @@ export async function firstQuoteRanges(brief: Brief, studioIds: string[], roster
         ...shape,
         kitchenRunMm: shape.plan?.kitchenRunMm ?? null,
         runSource: shape.plan ? 'floor_plan' : 'standard',
-        curatedDiscountPct: s.matchingProfile?.curatedDiscountPct ?? null,
+        curatedDiscountPct: s.matchingProfile?.curatedDiscountPct ?? null, modularDiscountPct: s.matchingProfile?.modularDiscountPct,
       },
       r,
     );

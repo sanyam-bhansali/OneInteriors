@@ -332,7 +332,7 @@ export function MatchClient({
         .map((s) => ({
           slug: s.slug,
           name: s.tradeName,
-          curatedDiscountPct: s.matchingProfile?.curatedDiscountPct ?? null,
+          curatedDiscountPct: s.matchingProfile?.curatedDiscountPct ?? null, modularDiscountPct: s.matchingProfile?.modularDiscountPct,
         })),
       existing: project.quotes,
       ratesFor: (slug) => filedRates?.[slug] ?? filedRatesFor(slug),
@@ -361,7 +361,7 @@ export function MatchClient({
       matches
         .map((m) => byId.get(m.studioId))
         .filter((s): s is Studio => Boolean(s))
-        .map((s) => ({ slug: s.slug, name: s.tradeName, curatedDiscountPct: s.matchingProfile?.curatedDiscountPct ?? null })),
+        .map((s) => ({ slug: s.slug, name: s.tradeName, curatedDiscountPct: s.matchingProfile?.curatedDiscountPct ?? null, modularDiscountPct: s.matchingProfile?.modularDiscountPct })),
     [matches, byId],
   );
   const priced = priceDraft({

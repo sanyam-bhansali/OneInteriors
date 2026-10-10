@@ -213,12 +213,12 @@ export function BrandingForm({ branding }: { branding: BrandingRow | null }) {
             suffix="% of the work value"
           />
           <Field
-            label="Standard discount"
+            label="Your modular discount"
             name="discountPct"
             required
             defaultValue={branding ? String(branding.discountBps / 100) : '0'}
             width="xs"
-            suffix="% on modular only"
+            suffix="% on modular only — customers see it on their first quote for you"
           />
         </div>
         <Field

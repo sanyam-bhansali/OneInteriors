@@ -84,7 +84,7 @@ export function quotesForStudios(
     studios: studios.map((s) => ({
       slug: s.slug,
       name: s.tradeName,
-      curatedDiscountPct: s.matchingProfile?.curatedDiscountPct ?? null,
+      curatedDiscountPct: s.matchingProfile?.curatedDiscountPct ?? null, modularDiscountPct: s.matchingProfile?.modularDiscountPct,
     })),
     ratesFor: ratesOf(rates, fallback),
   });

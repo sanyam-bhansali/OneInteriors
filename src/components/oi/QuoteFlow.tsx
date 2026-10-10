@@ -330,11 +330,13 @@ export function QuoteDocument({
           {t('doc.split', { factory: money(quote.modularPaise), site: money(quote.nonModularPaise) })}
         </p>
         <DocRow label={t('doc.fee')} value={money(quote.professionalFeePaise)} />
-        <DocRow
-          label={t('doc.factoryDiscount')}
-          value={`−${money(quote.modularDiscountPaise)}`}
-          better
-        />
+        {quote.modularDiscountPaise > 0 ? (
+          <DocRow
+            label={`${t('doc.factoryDiscount')}${quote.modularDiscountPct !== undefined ? ` · ${quote.modularDiscountPct}%` : ''}`}
+            value={`−${money(quote.modularDiscountPaise)}`}
+            better
+          />
+        ) : null}
         {quote.curatedDiscountPaise ? (
           <DocRow
             label={t('doc.curatedDiscount', { pct: quote.curatedDiscountPct ?? 0 })}

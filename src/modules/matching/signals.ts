@@ -106,7 +106,12 @@ export function budgetPosition(brief: Brief, studio: Studio, ctx: SignalContext)
   if (rates && brief.tier && Object.keys(rates).length > 0) {
     const shape = homeShapeFor(brief);
     const quote = buildFirstQuote(
-      { ...shape, kitchenRunMm: shape.plan?.kitchenRunMm ?? null, runSource: shape.plan ? 'floor_plan' : 'standard' },
+      {
+        ...shape,
+        kitchenRunMm: shape.plan?.kitchenRunMm ?? null,
+        runSource: shape.plan ? 'floor_plan' : 'standard',
+        modularDiscountPct: studio.matchingProfile?.modularDiscountPct,
+      },
       rates,
     );
     const band = scopeBandRange(brief.tier, shape, selectionOf(brief));

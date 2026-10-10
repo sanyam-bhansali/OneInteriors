@@ -147,3 +147,23 @@ describe('ratesFromProductMaster', () => {
     expect(off.vanity).toBeUndefined();
   });
 });
+
+describe("the studio's own modular discount on the customer's first quote", () => {
+  const rates = ratesFromProductMaster(MASTER, '2026-10-10');
+  const input = { bhk: 3, carpetAreaSqft: 1150, bathrooms: 2, kitchenRunMm: 4000, runSource: 'customer' as const };
+
+  it('takes the percentage the studio filled in', () => {
+    const q = buildFirstQuote({ ...input, modularDiscountPct: 15 }, rates);
+    expect(q.modularDiscountPct).toBe(15);
+    expect(q.modularDiscountPaise).toBe(Math.round(q.modularPaise * 0.15));
+  });
+
+  it('gives none when the studio gives none', () => {
+    const q = buildFirstQuote({ ...input, modularDiscountPct: null }, rates);
+    expect(q.modularDiscountPaise).toBe(0);
+  });
+
+  it('keeps the archive median for the sample studios, which have no setting', () => {
+    expect(buildFirstQuote(input, rates).modularDiscountPct).toBe(10);
+  });
+});

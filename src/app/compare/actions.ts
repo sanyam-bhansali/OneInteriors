@@ -116,7 +116,7 @@ async function entriesFor(input: CompareInput, min: number) {
           ...shape,
           kitchenRunMm: run,
           runSource: run ? (input.measured === 'floor_plan' ? 'floor_plan' : 'customer') : 'standard',
-          curatedDiscountPct: s.matchingProfile?.curatedDiscountPct ?? null,
+          curatedDiscountPct: s.matchingProfile?.curatedDiscountPct ?? null, modularDiscountPct: s.matchingProfile?.modularDiscountPct,
         },
         rates[s.slug]?.rates ?? filedRatesFor(s.slug),
       ),
