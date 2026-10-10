@@ -324,9 +324,11 @@ export async function requestReanalysis(archiveId: string): Promise<ReviewResult
     return { ok: false, error: 'There are no files on this archive to read.' };
   }
 
+  /* Queued for the owner's local read, never read here (10 Oct 2026). This
+     also clears an archive stuck at READING by a run that died. */
   await prisma.quotationArchive.update({
     where: { id: archiveId },
-    data: { analysisState: 'READING', analysisError: null },
+    data: { analysisState: 'NOT_STARTED', analysisError: null },
   });
 
   return { ok: true, live: 0, catalogue: null };
