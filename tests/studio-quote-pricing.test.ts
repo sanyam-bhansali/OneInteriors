@@ -235,3 +235,52 @@ describe('isUnpriced', () => {
     expect(isUnpriced(area(4260, 750, 1750))).toBe(false);
   });
 });
+
+describe('computeTotals — GST, a named discount and the studio\'s own schedule', () => {
+  const unit = (rupees: number, code: 'MODULAR' | 'ONSITE' = 'MODULAR'): QuoteLineInput => ({
+    unit: 'UNIT',
+    code,
+    ratePaise: R(rupees),
+    qtyMilli: 1000,
+  });
+  const lines = [unit(1_00_000), unit(50_000, 'ONSITE')];
+
+  it('charges GST last, on the total after every discount', () => {
+    const t = computeTotals(lines, { feeBps: 700, discountBps: 1500, onSpotPaise: R(5_000), gstBps: 1800 });
+    // 1,50,000 + 7% fee 10,500 − 15% of modular 15,000 − 5,000 on the spot
+    expect(t.beforeTaxPaise).toBe(R(1_40_500));
+    expect(t.gstPaise).toBe(R(25_290));
+    expect(t.totalPaise).toBe(R(1_65_790));
+  });
+
+  it('adds nothing when GST is off', () => {
+    const t = computeTotals(lines, { feeBps: 700, discountBps: 0 });
+    expect(t.gstPaise).toBe(0);
+    expect(t.totalPaise).toBe(t.beforeTaxPaise);
+  });
+
+  it('splits the total by the studio\'s own phases, booking included, exactly', () => {
+    const t = computeTotals(lines, {
+      feeBps: 700,
+      discountBps: 0,
+      bookingAdvancePaise: R(25_000),
+      gstBps: 1800,
+      phases: [
+        { label: 'Booking', pct: 10 },
+        { label: 'Design sign-off', pct: 40 },
+        { label: 'Delivery', pct: 40 },
+        { label: 'Handover', pct: 10 },
+      ],
+    });
+    expect(t.stages.map((s) => s.label)).toEqual(['Booking', 'Design sign-off', 'Delivery', 'Handover']);
+    expect(t.stages.map((s) => s.pct)).toEqual([10, 40, 40, 10]);
+    expect(t.stages.reduce((a, s) => a + s.amountPaise, 0)).toBe(t.totalPaise);
+  });
+
+  it('keeps the advance and standard stages when the studio has no schedule', () => {
+    const t = computeTotals(lines, { feeBps: 700, discountBps: 0, bookingAdvancePaise: R(25_000), phases: null });
+    expect(t.stages[0]?.label).toBe('Booking advance');
+    expect(t.stages[0]?.amountPaise).toBe(R(25_000));
+    expect(t.stages.reduce((a, s) => a + s.amountPaise, 0)).toBe(t.totalPaise);
+  });
+});

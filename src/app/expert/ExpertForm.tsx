@@ -1,42 +1,42 @@
 'use client';
 
 /**
- * Asking for the call.
+ * Booking the expert call — as little friction as the call allows (owner,
+ * 10 Oct 2026: "I don't want this many questions to be asked").
  *
- * ## Why there is a question builder
+ * Four short steps on one screen, each a card:
  *
- * The form used to end with an empty textarea and the encouraging note that
- * "the thing you are actually worried about is the most useful sentence you
- * can write here". That is true, and almost nobody writes it — not because
- * they have no worry, but because a blank box at the end of a form is a
- * homework question, and the honest answer ("I don't know what I don't know")
- * does not fit in it.
+ *   1. Which studios to talk about — the ones they compared are ticked.
+ *   2. A date, then a time.
+ *   3. Who it is for — the name and number were taken at the start, so this
+ *      is a confirmation with a Change link, not a form.
+ *   4. A 6-digit WhatsApp code, then Confirm booking.
  *
- * So the worries are offered as a list, and several of them are generated from
- * this customer's own comparison: if two studios are ₹1.2 L apart, "why is
- * Teakline ₹1.2 L more than Chitra & Co.?" is on the list with the real names
- * and the real figure in it. Ticking is one press; writing that sentence is
- * not.
+ * The question builder and the free-text agenda are gone: the architect has
+ * already read the brief and every quote, and the call is where the questions
+ * get asked. Consent to share with the chosen studios is the sentence right
+ * above the button; pressing Confirm is the act it describes.
  *
- * ## Why it composes into `askedAbout` rather than a new column
- *
- * What the architect needs is a paragraph they can read before ringing. The
- * ticked questions and the typed sentence are the same thing — the customer's
- * agenda for the call — and splitting them across two fields would mean two
- * places for ops to look and one of them eventually not being looked at.
- *
- * The composed text is put in a hidden input on submit, and the textarea keeps
- * its own name off the wire so nothing is sent twice.
+ * The code is verified before the booking is sent, and the server refuses a
+ * booking whose number is not the signed-in, verified one (actions.ts). In a
+ * build with no database (`preview`) any six digits pass and nothing is booked.
  */
 
-import { useActionState, useMemo, useState } from 'react';
-import { slotLabel } from '@/modules/consultation/slots';
-import { SlotPicker } from '@/components/SlotPicker';
+import { startTransition, useActionState, useEffect, useState } from 'react';
+import { readContact, rememberContact } from '@/lib/remembered-contact';
+import { googleCalendarUrl, slotLabel } from '@/modules/consultation/slots';
+import { ARCHITECT } from '@/modules/consultation/architect';
 import { formatINRCompact } from '@/lib/money';
-import { Sheet, Tick } from '@/components/oi';
+import { normalisePhone } from '@/modules/studio/phone';
+import { requestOtpAction, verifyOtpAction } from '@/app/sign-in/actions';
+import { Pill, PillButton, Split } from '@/components/home/parts';
 import { requestExpertAction, type ExpertState } from './actions';
+import { useLang, useSiteT } from '@/components/app/i18n';
+import { EXPERT_DICT, known } from '@/modules/i18n/site/expert';
+import type { Lang } from '@/modules/i18n/site';
 
 const INITIAL: ExpertState = { status: 'idle' };
+const RESEND_S = 30;
 
 export interface StudioOption {
   id: string;
@@ -46,475 +46,504 @@ export interface StudioOption {
 }
 
 /**
- * The questions that apply to everybody, in the order they tend to matter.
- *
- * Every one is a real thing people ring us about and a real thing an architect
- * can answer. None of them is a lead-qualification question in disguise.
+ * A slot as the customer reads it. English is `slotLabel` exactly; Hindi and
+ * Marathi use the same Pune-time formatting in their own locale.
  */
-const STANDARD = [
-  'Is the cheapest quote cheaper because it is worse, or because it is smaller?',
-  'Which lines in these quotes are the ones that usually grow on site?',
-  'What happens to the price if the work runs past the agreed weeks?',
-  'Which of these studios has actually delivered a flat like mine?',
-  'Can I keep some of what I already have, and does that save anything real?',
-  'What do I have to decide before work starts, and what can wait?',
-];
+function slotText(iso: string, lang: Lang): { day: string; time: string } {
+  if (lang === 'en') return slotLabel(iso);
+  const d = new Date(iso);
+  const locale = lang === 'hi' ? 'hi-IN' : 'mr-IN';
+  return {
+    day: d.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' }),
+    time: d.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }),
+  };
+}
+
+/** "Fri" and "9" for the day tiles, Pune time. */
+function weekdayOf(iso: string, lang: Lang): string {
+  const locale = lang === 'en' ? 'en-IN' : `${lang}-IN`;
+  return new Date(iso).toLocaleDateString(locale, { weekday: 'short', timeZone: 'Asia/Kolkata' });
+}
+function dateOf(iso: string, lang: Lang): string {
+  const locale = lang === 'en' ? 'en-IN' : `${lang}-IN`;
+  return new Date(iso).toLocaleDateString(locale, { day: 'numeric', timeZone: 'Asia/Kolkata', numberingSystem: 'latn' });
+}
+
+/** "Sat 11 Oct" in the visitor's language, Pune time. */
+function dayChip(iso: string, lang: Lang): string {
+  const locale = lang === 'en' ? 'en-IN' : `${lang}-IN`;
+  return new Date(iso).toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
+}
+
+function dayKey(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+}
 
 export function ExpertForm({
   briefId,
   studios,
   defaultName,
+  defaultPhone = null,
   defaultEmail,
   minStudios,
   maxStudios,
   slots = [],
   preselected = [],
-  fromBrief = [],
+  initialSlot = null,
+  preview = false,
 }: {
   briefId: string;
   studios: StudioOption[];
   defaultName: string | null;
+  /** The number they gave at the start, when the server knows it. */
+  defaultPhone?: string | null;
   defaultEmail: string | null;
   minStudios: number;
   maxStudios: number;
-  /** Open 30-minute slots (ISO). Empty when no expert has hours set — then we ask when suits them. */
+  /** Open 30-minute slots (ISO). Empty when no expert has hours set — then we call to fix a time. */
   slots?: string[];
   /** The studios they compared — ticked for them. */
   preselected?: string[];
-  /** Questions from their possession, household and needs (consultation/brief-questions.ts). */
-  fromBrief?: string[];
+  /** A slot already picked in the app (/app/expert), kept only if it is still open. */
+  initialSlot?: string | null;
+  /** A build with no database: walk the flow, book nothing. */
+  preview?: boolean;
 }) {
+  const t = useSiteT(EXPERT_DICT);
+  const lang = useLang();
   const [state, action, pending] = useActionState(requestExpertAction, INITIAL);
-  const [slot, setSlot] = useState<string | null>(null);
   const booking = slots.length > 0;
+  const startSlot = initialSlot && slots.includes(initialSlot) ? initialSlot : null;
+  const [slot, setSlot] = useState<string | null>(startSlot);
+  const [day, setDay] = useState<string | null>(startSlot ? dayKey(startSlot) : slots[0] ? dayKey(slots[0]) : null);
   const [picked, setPicked] = useState<string[]>(
     preselected.length > 0 ? preselected.slice(0, maxStudios) : studios.slice(0, 2).map((s) => s.id),
   );
-  const [asks, setAsks] = useState<string[]>([]);
-  const [own, setOwn] = useState('');
+
+  /* Name and number from the start of the brief (this device, or the server). */
+  const [name, setName] = useState(defaultName ?? '');
+  const [phone, setPhone] = useState(defaultPhone ?? '');
+  const [email, setEmail] = useState(defaultEmail ?? '');
+  const [editing, setEditing] = useState(false);
+  useEffect(() => {
+    const r = readContact();
+    if (r) {
+      setName((n) => n || r.name);
+      setPhone((p) => p || r.phone);
+      setEmail((m) => m || r.email);
+    }
+  }, []);
+  useEffect(() => {
+    if (name || phone || email) rememberContact({ name, phone, email });
+  }, [name, phone, email]);
+
+  /* The code. */
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [wait, setWait] = useState(0);
+  const [devCode, setDevCode] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [codeError, setCodeError] = useState<string | null>(null);
+  const [previewDone, setPreviewDone] = useState(false);
+  useEffect(() => {
+    if (wait <= 0) return;
+    const id = setTimeout(() => setWait((w) => w - 1), 1000);
+    return () => clearTimeout(id);
+  }, [wait]);
+
   const err = state.errors ?? {};
 
-  /**
-   * Questions written out of this customer's own numbers.
-   *
-   * Generated rather than canned, so the list opens with the thing they were
-   * already wondering — with both studios named and the gap in rupees.
-   */
-  const generated = useMemo(() => {
-    if (studios.length < 2) return [];
-    const byMid = [...studios].sort(
-      (a, b) => (a.lowPaise + a.highPaise) / 2 - (b.lowPaise + b.highPaise) / 2,
-    );
-    const low = byMid[0]!;
-    const high = byMid[byMid.length - 1]!;
-    const gap = (high.lowPaise + high.highPaise) / 2 - (low.lowPaise + low.highPaise) / 2;
-    if (gap <= 0) return [];
-    return [
-      `Why is ${high.name} about ${formatINRCompact(Math.round(gap))} more than ${low.name}?`,
-      `Is ${low.name} leaving something out, or are they genuinely cheaper?`,
-    ];
-  }, [studios]);
-
-  /** Ticked questions first, then whatever they wrote. One paragraph for ops. */
-  const composed = [
-    ...asks.map((q) => `• ${q}`),
-    own.trim() ? `\n${own.trim()}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n')
-    .slice(0, 2000);
-
-  if (state.status === 'sent') {
-    const when = state.scheduledFor ? slotLabel(state.scheduledFor) : null;
+  if (state.status === 'sent' || previewDone) {
+    const scheduledFor = state.status === 'sent' ? state.scheduledFor : slot ?? undefined;
+    const when = scheduledFor ? slotText(scheduledFor, lang) : null;
+    const calLabel = t('cal.add');
     return (
-      <Sheet className="p-[clamp(22px,3vw,34px)]">
-        <p className="oi-eyebrow m-0 mb-4">{when ? 'Booked' : 'Requested'}</p>
-        <h2 className="oi-display m-0 mb-4 text-[clamp(1.5rem,1.2rem+1.2vw,2rem)]">
-          {when ? `${when.day}, ${when.time}.` : 'We\u2019ll call you.'}
-        </h2>
-        <p className="m-0 mb-3 max-w-[58ch] text-[15px] leading-[1.65] text-[var(--ink2)]">
-          {when
-            ? 'Thirty minutes, and we ring you. The invite is in your email if you gave us one. Before the call the expert reads your brief, your floor plan and every quote on your comparison — you will not have to explain any of it again.'
-            : 'Someone will be in touch within one working day to fix a time. Before the call they will read your brief, your floor plan and every quote on your comparison — you will not have to explain any of it again.'}
+      <section className="flow-card" data-reveal="" data-auto="">
+        <p className="eyebrow">
+          <i aria-hidden className="mr-2.5 inline-block h-[7px] w-[7px] rounded-full bg-[var(--accent)] align-middle" />
+          {when ? t('sent.booked') : t('sent.requested')}
         </p>
-        {asks.length > 0 ? (
-          <p className="m-0 mb-6 max-w-[58ch] text-[15px] leading-[1.65] text-[var(--ink2)]">
-            They will come to the call with your {asks.length} question
-            {asks.length === 1 ? '' : 's'} already looked into, so the call starts at the answer
-            rather than at the question.
+        <Split
+          as="h2"
+          className="h-l max-w-[18ch]"
+          text={when ? t('sent.when', { day: when.day, time: when.time }) : t('sent.weCall')}
+          auto
+        />
+        <p className="lede">{when ? t('sent.bookedBody') : t('sent.requestedBody')}</p>
+        <p className="m-0 mt-5 text-[16px] text-[var(--ink)]">
+          {t('sent.with')} <strong className="font-medium">{ARCHITECT.name}</strong> · {known(lang, 'architect.role', ARCHITECT.role)}
+        </p>
+        {previewDone ? <p className="m-0 mt-3 text-[13px] text-[var(--accent-ink)]">{t('flow.testBuild')}</p> : null}
+        {scheduledFor ? (
+          <p className="m-0 mt-6">
+            {/* A new tab, so the landing's pill markup by hand (Pill has no target). */}
+            <a
+              href={googleCalendarUrl({
+                startsAt: scheduledFor,
+                title: t('cal.title', { name: ARCHITECT.name }),
+                details: t('cal.details'),
+              })}
+              target="_blank"
+              rel="noreferrer"
+              className="pill pill-line pill-sm"
+              data-magnetic=""
+            >
+              <span className="mag-inner">
+                <span className="roll">
+                  <span data-t={calLabel}>{calLabel}</span>
+                </span>
+              </span>
+            </a>
           </p>
         ) : null}
 
-        {/* The reason this screen is not the end of the page.
-            A confirmation with nothing after it is a dead end at the highest-
-            intent moment we ever get — they have just handed over a phone
-            number, and the next thing they do is go and fill in somebody
-            else's form, because waiting is not an activity. The prep pack is
-            the activity, and it makes their own call better, which is the only
-            honest reason to offer it. */}
-        <div className="border-t border-[var(--line)] pt-6">
-          <p className="m-0 mb-5 max-w-[58ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-            While you wait, go through your home room by room — what each one costs, and the one
-            decision in each that moves the number. The calls that go well are the ones where you
-            already know which three things you are choosing between.
-          </p>
-          <a
-            href="/account#rooms"
-            className="oi-cta inline-flex min-h-11 items-center px-6 py-3 text-[14.5px] no-underline"
-          >
-            Prepare for the call
-          </a>
-          <p className="m-0 mt-4 text-[13px] text-[var(--ink2)]">
-            About fifteen minutes. Entirely optional, and your call is booked either way.
-          </p>
+        {/* The next thing to do, so the confirmation is not a dead end. */}
+        <div className="mt-[clamp(28px,4vw,44px)] rounded-[var(--r-m)] bg-[var(--paper)] p-[clamp(20px,2.6vw,32px)]">
+          <p className="m-0 mb-5 max-w-[58ch] text-[15px] leading-[1.6] text-[var(--ink-2)]">{t('prep.body')}</p>
+          <Pill href="/account#rooms" arrow>
+            {t('prep.cta')}
+          </Pill>
+          <p className="m-0 mt-4 text-[13px] text-[var(--ink-2)]">{t('prep.note')}</p>
         </div>
-      </Sheet>
+      </section>
     );
   }
 
   const toggleStudio = (id: string) =>
     setPicked((prev) =>
-      prev.includes(id)
-        ? prev.filter((p) => p !== id)
-        : prev.length < maxStudios
-          ? [...prev, id]
-          : prev,
+      prev.includes(id) ? prev.filter((p) => p !== id) : prev.length < maxStudios ? [...prev, id] : prev,
     );
 
-  const toggleAsk = (q: string) =>
-    setAsks((prev) => (prev.includes(q) ? prev.filter((a) => a !== q) : [...prev, q]));
+  /* The slots, grouped by day: a date first, then the times on it. */
+  const days: { key: string; label: string; times: string[] }[] = [];
+  for (const iso of slots) {
+    const key = dayKey(iso);
+    let d = days.find((x) => x.key === key);
+    if (!d) {
+      d = { key, label: dayChip(iso, lang), times: [] };
+      days.push(d);
+    }
+    d.times.push(iso);
+  }
+  const activeDay = days.find((d) => d.key === day) ?? null;
+
+  const phoneOk = Boolean(normalisePhone(phone));
+  /* Ten digits for display: the remembered number is stored as +91…, and the
+     copy prints its own +91 before it ("+91 +919876…" in the 11 Oct test). */
+  const shownPhone = (normalisePhone(phone) ?? phone).replace(/^\+91/, '');
+  const blocker =
+    picked.length < minStudios
+      ? t('flow.needStudios', { n: minStudios })
+      : booking && !slot
+        ? t('flow.needSlot')
+        : !phoneOk || !name.trim()
+          ? t('flow.needPhone')
+          : null;
+  const codeOpen = sentTo !== null && sentTo === phone;
+
+  const sendCode = async () => {
+    if (blocker) return;
+    setCodeError(null);
+    setCode('');
+    if (preview) {
+      setSentTo(phone);
+      setWait(RESEND_S);
+      return;
+    }
+    setSending(true);
+    const r = await requestOtpAction(phone, name);
+    setSending(false);
+    if (!r.ok) return setCodeError(r.error);
+    setSentTo(phone);
+    setDevCode(r.devCode ?? null);
+    setWait(RESEND_S);
+  };
+
+  const confirm = async () => {
+    if (blocker || code.length !== 6) return;
+    setCodeError(null);
+    if (preview) {
+      setPreviewDone(true);
+      return;
+    }
+    setConfirming(true);
+    const v = await verifyOtpAction(phone, code, name);
+    setConfirming(false);
+    if (!v.ok) return setCodeError(v.error);
+    const data = new FormData();
+    data.set('briefId', briefId);
+    picked.forEach((id) => data.append('studioIds', id));
+    data.set('contactName', name.trim());
+    data.set('contactPhone', phone);
+    data.set('contactEmail', email.trim());
+    data.set('startsAt', slot ?? '');
+    // The sentence above the button says what confirming agrees to; pressing it is the act.
+    data.set('shareConsent', 'on');
+    startTransition(() => action(data));
+  };
+
+  /* The landing's palette on a soft card: white tiles, filled with ink once
+     chosen. Hand-rolled rather than `.flow-opt`, whose pill shape and centred
+     content (unlayered CSS) a utility cannot override. */
+  const tile = (on: boolean) =>
+    `cursor-pointer border-0 transition-[background-color,color,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.98] ${
+      on ? 'bg-[var(--ink)] text-white' : 'bg-[var(--paper)] text-[var(--ink)] hover:shadow-[inset_0_0_0_1px_var(--ink)]'
+    }`;
+  /* `.flow-input` sits on a soft card, so the field is white rather than soft. */
+  const field = { background: 'var(--paper)' } as const;
+  const confirmLabel =
+    confirming || pending
+      ? t('flow.confirming')
+      : slot
+        ? `${t('flow.confirm')} · ${dayChip(slot, lang)}, ${slotText(slot, lang).time}`
+        : t('flow.confirm');
+  /* The dated label is long for a phone; let it wrap there rather than clip. */
+  const longPill = 'max-w-full whitespace-normal! py-3! leading-[1.25]!';
 
   return (
-    <form action={action} className="flex flex-col gap-10">
-      <input type="hidden" name="briefId" value={briefId} />
-      <input type="hidden" name="askedAbout" value={composed} />
-
-      {/* ── Which studios ── */}
-      <fieldset className="m-0 border-0 p-0">
-        <legend className="oi-display mb-2 p-0 text-[21px]">
-          Which studios do you want to talk about?
-        </legend>
-        <p className="m-0 mb-5 max-w-[56ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-          Pick between {minStudios} and {maxStudios}. Your architect reads all of them before the
-          call, so choosing fewer means a deeper conversation about each.
-        </p>
-
-        {err.studioIds ? (
-          <p role="alert" className="m-0 mb-3 text-[14px]" style={{ color: 'var(--acc-ink)' }}>
-            {err.studioIds}
-          </p>
-        ) : null}
-
-        <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
+    <div className="flex flex-col gap-4">
+      {/* 1 · Studios */}
+      <section className="flow-card" data-reveal="" style={{ ['--d' as string]: '120ms' }}>
+        <Step n={1} title={t('flow.step1')} help={t('flow.step1Help', { min: minStudios, max: maxStudios })} />
+        <ul className="m-0 grid list-none gap-2 p-0 sm:grid-cols-2">
           {studios.map((studio) => {
             const checked = picked.includes(studio.id);
             return (
               <li key={studio.id}>
-                <label
-                  className="flex min-h-11 cursor-pointer items-center justify-between gap-4 border px-5 py-3.5"
-                  style={{
-                    borderColor: checked ? 'var(--ink2)' : 'var(--line)',
-                    background: checked ? 'var(--acc-wash)' : 'var(--card)',
-                  }}
+                <button
+                  type="button"
+                  aria-pressed={checked}
+                  onClick={() => toggleStudio(studio.id)}
+                  className={`flex min-h-16 w-full items-center justify-between gap-3 rounded-[var(--r-m)] px-5 py-3 text-left ${tile(checked)}`}
                 >
                   <span className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      name="studioIds"
-                      value={studio.id}
-                      checked={checked}
-                      onChange={() => toggleStudio(studio.id)}
-                      className="h-4 w-4 accent-[var(--acc)]"
-                    />
-                    <span className="text-[15px]">{studio.name}</span>
+                    <span
+                      aria-hidden
+                      className={`flex h-6 w-6 flex-none items-center justify-center rounded-full ${
+                        checked ? 'bg-[var(--accent)] text-white' : 'shadow-[inset_0_0_0_1.5px_var(--line)]'
+                      }`}
+                    >
+                      {checked ? (
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                          <path d="M3.5 8.4 6.6 11.4 12.5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      ) : null}
+                    </span>
+                    <span className="text-[16px] font-medium">{studio.name}</span>
                   </span>
-                  <span className="oi-num text-[12.5px] text-[var(--ink2)]">
+                  <span className={`text-[13.5px] tabular-nums ${checked ? 'text-white/65' : 'text-[var(--ink-2)]'}`}>
                     {formatINRCompact(studio.lowPaise)}–{formatINRCompact(studio.highPaise)}
                   </span>
-                </label>
+                </button>
               </li>
             );
           })}
         </ul>
-      </fieldset>
+        {err.studioIds ? <Alert>{err.studioIds}</Alert> : null}
+      </section>
 
-      {/* ── What you want answered ── */}
-      <fieldset className="m-0 border-0 p-0">
-        <legend className="oi-display mb-2 p-0 text-[21px]">What do you want answered?</legend>
-        <p className="m-0 mb-5 max-w-[56ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-          Tick anything you want looked into before the call. The first ones are written from your
-          own quotes and your brief. Nobody is going to open with &ldquo;so, tell me about your
-          requirement&rdquo;.
-        </p>
-
-        {/* ── The two that came from their own numbers ──
-            Separated from the canned list, and labelled, because they are not
-            the same kind of thing. "Why is Teakline about ₹1.2 L more than
-            Chitra & Co.?" is the question the customer has already been
-            asking themselves since the compare screen, with both studios named
-            and the gap in rupees — computed from their quotes, not written by
-            us and hoping to land.
-
-            They were mixed into the standard list wearing a 10px grey caption.
-            A question we derived from this person's own spread is the single
-            most persuasive thing on the page, and it read as a footnote. */}
-        {generated.length > 0 ? (
-          <div className="mb-5">
-            <p className="oi-eyebrow m-0 mb-3">From your own quotes</p>
-            <ul className="m-0 flex list-none flex-col gap-2 p-0">
-              {generated.map((q) => (
-                <li key={q}>
-                  <Ask q={q} on={asks.includes(q)} onToggle={() => toggleAsk(q)} derived />
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        {/* From their life rather than their quotes — the timeline, the family,
-            what the home needs (build queue item 9). */}
-        {fromBrief.length > 0 ? (
-          <div className="mb-5">
-            <p className="oi-eyebrow m-0 mb-3">From your brief</p>
-            <ul className="m-0 flex list-none flex-col gap-2 p-0">
-              {fromBrief.map((q) => (
-                <li key={q}>
-                  <Ask q={q} on={asks.includes(q)} onToggle={() => toggleAsk(q)} derived />
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        {generated.length > 0 || fromBrief.length > 0 ? (
-          <p className="oi-eyebrow m-0 mb-3">Things most people ask</p>
-        ) : null}
-
-        <ul className="m-0 flex list-none flex-col gap-2 p-0">
-          {STANDARD.map((q) => (
-            <li key={q}>
-              <Ask q={q} on={asks.includes(q)} onToggle={() => toggleAsk(q)} />
-            </li>
-          ))}
-        </ul>
-
-        <div className="mt-5">
-          <label htmlFor="ownQuestion" className="oi-label mb-2 block">
-            Anything else — optional
-          </label>
-          <textarea
-            id="ownQuestion"
-            rows={3}
-            value={own}
-            onChange={(e) => setOwn(e.target.value)}
-            placeholder="We have a two-year-old, so timeline matters more to us than finish."
-            className="w-full border border-[var(--line)] bg-[var(--card)] px-4 py-3 text-[14.5px] leading-[1.6] text-[var(--ink)] placeholder:text-[var(--ink2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--acc)]"
-          />
-        </div>
-      </fieldset>
-
-      {/* ── How we reach you ── */}
-      <fieldset className="m-0 border-0 p-0">
-        <legend className="oi-display mb-2 p-0 text-[21px]">How do we reach you?</legend>
-        <p className="m-0 mb-5 max-w-[56ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-          A phone number, because this is a call. We do not pass it to any studio — the
-          introduction happens after the call, and only to the one you choose.
-        </p>
-
-        <div className="flex flex-col gap-5">
-          <Field
-            label="Your name"
-            name="contactName"
-            required
-            defaultValue={defaultName}
-            error={err.contactName}
-          />
-          <Field
-            label="Mobile"
-            name="contactPhone"
-            type="tel"
-            required
-            error={err.contactPhone}
-            placeholder="98765 43210"
-          />
-          <Field
-            label="Email"
-            name="contactEmail"
-            type="email"
-            defaultValue={defaultEmail}
-            error={err.contactEmail}
-          />
-          {booking ? null : (
-            <Field
-              label="When suits you?"
-              name="preferredTimes"
-              placeholder="Weekday evenings, or Saturday morning"
-            />
-          )}
-        </div>
-      </fieldset>
-
-      {booking ? (
-        <fieldset className="m-0 border-0 p-0">
-          <legend className="oi-eyebrow m-0 mb-1 p-0">Pick a time — thirty minutes, we ring you</legend>
-          <p className="m-0 mb-4 text-[13.5px] text-[var(--ink2)]">
-            These are real times. Pick one and it is booked — nobody calls you back to arrange it.
-          </p>
-          <SlotPicker slots={slots} value={slot} onPick={setSlot} />
-          <input type="hidden" name="startsAt" value={slot ?? ''} />
-          {err.startsAt ? (
-            <p role="alert" className="m-0 mt-3 text-[14px]" style={{ color: 'var(--acc-ink)' }}>
-              {err.startsAt}
-            </p>
-          ) : null}
-        </fieldset>
-      ) : null}
-
-      {/* Asked here, where they pick the studios, because this is what they
-          are agreeing to (plan §3.3). Required: an introduction without it
-          could never tell the studio who to meet. */}
-      <label className="flex cursor-pointer items-start gap-3">
-        <input type="checkbox" name="shareConsent" required className="mt-1 h-4 w-4 flex-none accent-[var(--acc)]" />
-        <span className="text-[14.5px] leading-snug text-[var(--ink)]">
-          Share my brief, name and number with the studios I have ticked — only once you introduce
-          me, and only so they can arrange to meet.
-          <span className="mt-1 block text-[13px] text-[var(--ink2)]">
-            You can withdraw this from &ldquo;Your home&rdquo; at any time.
-          </span>
-        </span>
-      </label>
-      {err.shareConsent ? (
-        <p role="alert" className="m-0 -mt-3 text-[13.5px]" style={{ color: 'var(--acc-ink)' }}>
-          {err.shareConsent}
-        </p>
-      ) : null}
-
-      <div className="border-t border-[var(--line)] pt-7">
-        {err.form ? (
-          <p
-            role="alert"
-            className="m-0 mb-4 border-l-2 px-4 py-2.5 text-[14.5px]"
-            style={{ borderColor: 'var(--acc)', color: 'var(--acc-ink)' }}
-          >
-            {err.form}
-          </p>
-        ) : null}
-        <button
-          type="submit"
-          disabled={pending || picked.length < minStudios || (booking && !slot)}
-          className="oi-cta min-h-11 cursor-pointer border-0 px-7 py-3.5 text-[15px] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {pending
-            ? booking
-              ? 'Booking…'
-              : 'Sending…'
-            : booking
-              ? slot
-                ? `Book ${slotLabel(slot).day.split(' ')[0]} ${slotLabel(slot).time}`
-                : 'Pick a time above'
-              : 'Request the call'}
-        </button>
-        <p className="m-0 mt-5 max-w-[58ch] text-[13.5px] leading-[1.6] text-[var(--ink2)]">
-          Free, and there is nothing to buy on the call. We are paid by the studio if you go ahead
-          with one — which is why we would rather tell you none of them fits than push you into a
-          project you regret.
-        </p>
-      </div>
-    </form>
-  );
-}
-
-/**
- * One question the customer can hand to the architect.
- *
- * `derived` marks the ones computed from this customer's own quote spread
- * rather than written by us. It gets a sage rule down its left edge and the
- * label sits above the group rather than inside each row: a badge on every
- * item in a group of two says the same thing twice and competes with the
- * question itself, which is the part worth reading.
- *
- * Both states are a shape as well as a colour — a tick or an empty ring — per
- * docs/DESIGN-LANGUAGE.md §4.4. Sage is verification and better-spec here,
- * never an action, so the button that submits is terracotta and these are not.
- */
-function Ask({
-  q,
-  on,
-  onToggle,
-  derived = false,
-}: {
-  q: string;
-  on: boolean;
-  onToggle: () => void;
-  derived?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-pressed={on}
-      className="flex min-h-11 w-full cursor-pointer items-start gap-3 border px-4 py-3 text-left text-[14px] leading-snug transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--acc)]"
-      style={{
-        borderColor: on ? 'var(--sec)' : 'var(--line)',
-        background: on ? 'rgba(131,144,115,.09)' : 'var(--card)',
-        borderLeftWidth: derived ? 3 : 1,
-        borderLeftColor: derived ? 'var(--sec)' : on ? 'var(--sec)' : 'var(--line)',
-      }}
-    >
-      <span className="flex h-[19px] flex-none items-center">
-        {on ? (
-          <Tick style={{ color: 'var(--sec)' }} />
+      {/* 2 · Date, then time */}
+      <section className="flow-card" data-reveal="">
+        <Step n={2} title={t('flow.step2')} />
+        {booking ? (
+          <>
+            <p className="eyebrow">{t('flow.pickDay')}</p>
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+              {days.slice(0, 7).map((d) => {
+                const on = day === d.key;
+                return (
+                  <button
+                    key={d.key}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => {
+                      setDay(d.key);
+                      if (slot && !d.times.includes(slot)) setSlot(null);
+                    }}
+                    className={`min-h-[76px] rounded-[var(--r-m)] py-3 text-center ${tile(on)}`}
+                  >
+                    <small className={`block text-[13px] font-medium ${on ? 'text-white/65' : 'text-[var(--ink-2)]'}`}>
+                      {weekdayOf(d.times[0]!, lang)}
+                    </small>
+                    <b className="mt-1.5 block text-[26px] font-medium leading-none tracking-[-0.04em] tabular-nums">
+                      {dateOf(d.times[0]!, lang)}
+                    </b>
+                  </button>
+                );
+              })}
+            </div>
+            {activeDay ? (
+              <div className="mt-7">
+                <p className="eyebrow">{t('flow.step2Time')}</p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {activeDay.times.map((iso) => (
+                    <button
+                      key={iso}
+                      type="button"
+                      aria-pressed={slot === iso}
+                      onClick={() => setSlot(iso)}
+                      className={`min-h-[52px] rounded-full text-[15px] font-medium tabular-nums ${tile(slot === iso)}`}
+                    >
+                      {slotText(iso, lang).time}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {preview ? <p className="m-0 mt-4 text-[13px] text-[var(--accent-ink)]">{t('flow.sampleHours')}</p> : null}
+            {err.startsAt ? <Alert>{err.startsAt}</Alert> : null}
+          </>
         ) : (
-          <span
-            aria-hidden
-            className="h-[13px] w-[13px] rounded-full border"
-            style={{ borderColor: 'var(--line)' }}
-          />
+          <p className="m-0 max-w-[60ch] text-[15px] leading-[1.6] text-[var(--ink-2)]">{t('flow.step2None')}</p>
         )}
-      </span>
-      <span className="min-w-0">{q}</span>
-    </button>
+      </section>
+
+      {/* 3 · Who it is for — already known, so a confirmation, not a form */}
+      <section className="flow-card" data-reveal="">
+        <Step n={3} title={t('flow.step3')} />
+        {editing || !name.trim() || !phoneOk ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-2 block px-1 text-[13px] font-medium text-[var(--ink-2)]">{t('flow.name')}</span>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value.slice(0, 80))}
+                autoComplete="name"
+                className="flow-input"
+                style={field}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-2 block px-1 text-[13px] font-medium text-[var(--ink-2)]">{t('flow.mobile')}</span>
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.slice(0, 16))}
+                inputMode="tel"
+                autoComplete="tel-national"
+                placeholder="98765 43210"
+                className="flow-input"
+                style={field}
+              />
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="mb-2 block px-1 text-[13px] font-medium text-[var(--ink-2)]">{t('flow.email')}</span>
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value.slice(0, 120))}
+                inputMode="email"
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                className="flow-input"
+                style={field}
+              />
+            </label>
+            {editing && name.trim() && phoneOk ? (
+              <div className="sm:col-span-2">
+                <PillButton tone="line" size="sm" onClick={() => setEditing(false)}>
+                  {t('flow.done')}
+                </PillButton>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--r-m)] bg-[var(--paper)] px-5 py-4">
+            <p className="m-0 text-[17px] text-[var(--ink)]">
+              <span className="block font-medium">{name}</span>
+              <span className="mt-1 block text-[15px] font-normal tabular-nums text-[var(--ink-2)]">+91 {shownPhone}</span>
+              {email.trim() ? (
+                <span className="mt-0.5 block break-all text-[15px] font-normal text-[var(--ink-2)]">{email.trim()}</span>
+              ) : null}
+            </p>
+            <PillButton tone="line" size="sm" onClick={() => setEditing(true)}>
+              {t('flow.change')}
+            </PillButton>
+          </div>
+        )}
+        {err.contactName ? <Alert>{err.contactName}</Alert> : null}
+        {err.contactPhone ? <Alert>{err.contactPhone}</Alert> : null}
+        {err.contactEmail ? <Alert>{err.contactEmail}</Alert> : null}
+      </section>
+
+      {/* 4 · The code, then the booking */}
+      <section className="flow-card" data-reveal="">
+        <Step n={4} title={t('flow.step4')} />
+        {codeOpen ? (
+          <>
+            <p className="m-0 mb-4 max-w-[60ch] text-[15px] text-[var(--ink-2)]">{t('flow.codeSent', { phone: shownPhone })}</p>
+            <label className="block max-w-[280px]">
+              <span className="mb-2 block px-1 text-[13px] font-medium text-[var(--ink-2)]">{t('flow.code')}</span>
+              <input
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                placeholder="······"
+                className="flow-input"
+                style={{ ...field, textAlign: 'center', fontSize: 20, letterSpacing: '0.4em' }}
+              />
+            </label>
+            <p className="m-0 mt-3 px-1 text-[13px] text-[var(--ink-2)]">
+              {wait > 0 ? (
+                t('flow.resendIn', { s: wait })
+              ) : (
+                <button type="button" onClick={sendCode} className="cursor-pointer border-0 bg-transparent p-0 text-[13px] text-[var(--ink)] underline">
+                  {t('flow.resend')}
+                </button>
+              )}
+            </p>
+            {devCode ? <p className="m-0 mt-2 px-1 text-[13px] text-[var(--accent-ink)]">Test build · your code is {devCode}</p> : null}
+            {preview ? <p className="m-0 mt-2 px-1 text-[13px] text-[var(--accent-ink)]">{t('flow.testBuild')}</p> : null}
+          </>
+        ) : null}
+
+        {codeError ? <Alert>{codeError}</Alert> : null}
+        {err.form ? <Alert>{err.form}</Alert> : null}
+        {err.shareConsent ? <Alert>{err.shareConsent}</Alert> : null}
+
+        <p className="m-0 mb-5 mt-5 max-w-[60ch] text-[13.5px] leading-[1.6] text-[var(--ink-2)]">{t('flow.consent')}</p>
+        {codeOpen ? (
+          <PillButton
+            arrow
+            size="lg"
+            className={longPill}
+            onClick={confirm}
+            disabled={Boolean(blocker) || code.length !== 6 || confirming || pending}
+          >
+            {confirmLabel}
+          </PillButton>
+        ) : (
+          <PillButton arrow size="lg" className={longPill} onClick={sendCode} disabled={Boolean(blocker) || sending}>
+            {sending ? t('flow.sending') : t('flow.sendCode')}
+          </PillButton>
+        )}
+        {blocker ? <p className="m-0 mt-3 px-1 text-[13px] text-[var(--ink-2)]">{blocker}</p> : null}
+      </section>
+    </div>
   );
 }
 
-function Field({
-  label,
-  name,
-  type = 'text',
-  required = false,
-  defaultValue,
-  error,
-  placeholder,
-}: {
-  label: string;
-  name: string;
-  type?: string;
-  required?: boolean;
-  defaultValue?: string | null;
-  error?: string;
-  placeholder?: string;
-}) {
+/** A step's heading: the number in a small ink circle, then the landing's `.h-m`. */
+function Step({ n, title, help }: { n: number; title: string; help?: string }) {
   return (
-    <div>
-      <label htmlFor={name} className="oi-label mb-2 block">
-        {label}
-        {required ? '' : ' — optional'}
-      </label>
-      <input
-        id={name}
-        name={name}
-        type={type}
-        required={required}
-        defaultValue={defaultValue ?? undefined}
-        placeholder={placeholder}
-        aria-invalid={Boolean(error)}
-        className="w-full border border-[var(--line)] bg-[var(--card)] px-4 py-3 text-[15px] text-[var(--ink)] placeholder:text-[var(--ink2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--acc)]"
-      />
-      {error ? (
-        <p role="alert" className="m-0 mt-1.5 text-[13.5px]" style={{ color: 'var(--acc-ink)' }}>
-          {error}
-        </p>
-      ) : null}
+    <div className="mb-6 flex items-start gap-3.5">
+      <span className="mt-0.5 flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[var(--ink)] text-[13px] font-medium tabular-nums text-white sm:mt-1.5">
+        {n}
+      </span>
+      <div>
+        <Split as="h2" className="h-m" text={title} />
+        {help ? <p className="m-0 mt-2 text-[15px] text-[var(--ink-2)]">{help}</p> : null}
+      </div>
     </div>
+  );
+}
+
+function Alert({ children }: { children: React.ReactNode }) {
+  return (
+    <p role="alert" className="m-0 mt-3 px-1 text-[14px]" style={{ color: 'var(--accent-ink)' }}>
+      {children}
+    </p>
   );
 }

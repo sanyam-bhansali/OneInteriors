@@ -15,6 +15,7 @@ import {
 } from '@/modules/studio-practice/clients';
 import { isCallOutcome } from '@/modules/studio-practice/event-copy';
 import { mergeClients } from '@/modules/studio-practice/merge';
+import { answerIntroduction, type IntroAnswer } from '@/modules/studio/introduction';
 
 // `State` and `IDLE` live in studio/form-state.ts. A 'use server'
 // file may only export async functions — and Turbopack rejects even a
@@ -235,4 +236,19 @@ export async function mergeAction(keepId: string, loserId: string): Promise<Stat
   revalidatePath(`/studio/clients/${loserId}`);
   revalidatePath('/studio/clients/bin');
   return { ok: true };
+}
+
+/** Accept or decline a client One Interiors introduced. */
+export async function answerIntroductionAction(
+  introductionId: string,
+  answer: 'accept' | 'decline',
+  reason: string,
+): Promise<IntroAnswer> {
+  if (answer !== 'accept' && answer !== 'decline') return { ok: false, error: 'Accept or decline.' };
+  const result = await answerIntroduction(String(introductionId), answer, String(reason ?? ''));
+  if (result.ok) {
+    revalidatePath('/studio/clients');
+    revalidatePath('/studio');
+  }
+  return result;
 }

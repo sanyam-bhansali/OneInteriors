@@ -22,7 +22,8 @@ export async function rankOnServer(
   brief: Brief,
   studios: Studio[],
   limit: number,
-  extra: Pick<RankOptions, 'widen'> = {},
+  /** `lang` changes only the sentences; stored and ops copies stay English. */
+  extra: Pick<RankOptions, 'widen' | 'lang'> = {},
 ): Promise<MatchResult[]> {
   const resolved = await resolveRatesForMany(studios.map((s) => s.slug));
   return rankStudios(brief, studios, limit, {

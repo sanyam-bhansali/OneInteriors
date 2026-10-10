@@ -43,6 +43,8 @@ import {
 import type { Brief } from '@/modules/brief/types';
 import { carpetAreaFor } from '@/modules/brief/steps';
 import { BEDROOMS } from './estimate';
+import type { PlanRoomSize } from '@/modules/brief/types';
+import { bedroomsInOrder, wardrobeWidthMm } from '@/modules/floorplan/sizing';
 
 const MM_PER_FOOT = 304.8;
 
@@ -128,7 +130,32 @@ export interface QuoteInput {
    * GST; never folded into the rates, never a struck-through price.
    */
   curatedDiscountPct?: number | null;
+  /**
+   * The rooms read from their own floor plan. When present, each bedroom's
+   * wardrobe and loft are sized to that bedroom's wall (floorplan/sizing.ts)
+   * instead of the standard width.
+   */
+  planRooms?: PlanRoomSize[];
+  /**
+   * The studio's own modular discount, % — what it gives on factory-made
+   * work, filled in by the studio (Settings → standard discount). Fee and
+   * GST are ours and the same for every studio; this one is theirs, so the
+   * first quote and the studio's final quote take the same discount
+   * (owner's decision, 11 Oct). Null is a studio that gives none. Absent —
+   * the sample studios with no database — keeps the archive median, 10%.
+   */
+  modularDiscountPct?: number | null;
 }
+
+/** Which bedroom a catalogue code is for: master, second, third. */
+const BEDROOM_OF: Record<string, number> = {
+  master_wardrobe: 0,
+  master_loft: 0,
+  second_wardrobe: 1,
+  second_loft: 1,
+  third_wardrobe: 2,
+  third_loft: 2,
+};
 
 export interface QuoteLine {
   code: string;
@@ -155,8 +182,10 @@ export interface FirstQuote {
   rooms: { room: Room; label: string; lines: QuoteLine[]; subtotalPaise: Paise }[];
   modularPaise: Paise;
   nonModularPaise: Paise;
-  /** 15% off the modular half. Shown as a line, never as a promotion. */
+  /** The studio's discount off the modular half. Shown as a line, never as a promotion. */
   modularDiscountPaise: Paise;
+  /** That discount's percentage. Optional on quotes saved before it existed. */
+  modularDiscountPct?: number;
   professionalFeePaise: Paise;
   /**
    * The One Interiors discount and its percentage. Optional because quotes
@@ -203,6 +232,8 @@ export function homeShapeFor(
    * earned. Null without a confirmed plan or a readable kitchen.
    */
   plan: { fileName: string | null; kitchenRunMm: number; source: 'floor_plan'; shared?: boolean } | null;
+  /** The rooms from their own plan, when it was read — see `QuoteInput.planRooms`. */
+  planRooms?: PlanRoomSize[];
 } {
   const bhk = BEDROOMS[brief.propertyType ?? 'BHK_2'];
   const { sqft, assumed } = carpetAreaFor(brief);
@@ -228,6 +259,7 @@ export function homeShapeFor(
             ...(brief.planReading.areaSource === 'society' ? { shared: true } : {}),
           }
         : null,
+    ...(brief.planReading?.rooms?.length ? { planRooms: brief.planReading.rooms } : {}),
   };
 }
 
@@ -268,6 +300,11 @@ function variance(source: QuoteInput['runSource']): number {
   return 0.16;
 }
 
+/** The modular discount a quote takes: the studio's own, none, or (sample studios) the archive median. */
+export function modularDiscountFor(pct: number | null | undefined): number {
+  return pct === undefined ? MODULAR_DISCOUNT_BPS / 100 : Math.min(50, Math.max(0, pct ?? 0));
+}
+
 export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuote {
   const source = runSourceOf({ kitchenRunMm: input.kitchenRunMm, source: input.runSource });
   const runMm = input.kitchenRunMm ?? standardKitchenRunMm(input.bhk);
@@ -275,6 +312,7 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
 
   const lines: QuoteLine[] = [];
   const notPriced: string[] = [];
+  const planBeds = input.planRooms ? bedroomsInOrder(input.planRooms) : [];
 
   const selection = input.scope ?? FULL_HOME;
 
@@ -293,14 +331,39 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
     let size: string;
     let standard = true;
 
+    /* A studio that prices this line per flat (`perBhkPaise`) is quoted its
+       own figure for a flat this size, not a per-foot rate worked back from
+       it. */
+    const perHome =
+      item.sizing === 'PER_SQFT_CARPET' ? filed.perBhkPaise?.[Math.min(4, Math.max(1, Math.round(input.bhk)))] : undefined;
+    if (perHome !== undefined) {
+      lines.push({
+        code: item.code,
+        room: item.room,
+        label: item.label,
+        work: item.work,
+        size: `${input.bhk} BHK`,
+        quantity: 1,
+        unit: 'home',
+        ratePaise: perHome,
+        amountPaise: perHome,
+        spec: (own ? filed.spec : undefined) ?? item.spec,
+        standard: true,
+        ...(reasons.has(item.code) ? { addedFor: reasons.get(item.code)! } : {}),
+      });
+      continue;
+    }
+
     switch (item.sizing) {
       case 'AREA': {
-        const widthMm = item.fromKitchenRun ? runMm : (item.widthMm ?? 0);
+        /* A bedroom's wardrobe and loft follow its wall when the plan was read. */
+        const bed = BEDROOM_OF[item.code] !== undefined ? planBeds[BEDROOM_OF[item.code]!] : undefined;
+        const widthMm = item.fromKitchenRun ? runMm : bed ? wardrobeWidthMm(bed) : (item.widthMm ?? 0);
         const heightMm = item.heightMm ?? 0;
         quantity = Math.round(sqft(widthMm, heightMm) * 10) / 10;
         unit = 'sq ft';
         size = `${Math.round(widthMm)} × ${heightMm} mm`;
-        standard = !(item.fromKitchenRun && measured);
+        standard = !(item.fromKitchenRun && measured) && !bed;
         break;
       }
       case 'UNIT':
@@ -353,7 +416,8 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
   const professionalFeePaise = Math.round(
     ((modularPaise + nonModularPaise) * PROFESSIONAL_FEE_BPS) / 10_000,
   );
-  const modularDiscountPaise = Math.round((modularPaise * MODULAR_DISCOUNT_BPS) / 10_000);
+  const discountPct = modularDiscountFor(input.modularDiscountPct);
+  const modularDiscountPaise = Math.round((modularPaise * discountPct) / 100);
 
   const afterStudioTerms =
     modularPaise + nonModularPaise + professionalFeePaise - modularDiscountPaise;
@@ -408,6 +472,12 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
     );
   }
 
+  if (planBeds.length > 0) {
+    assumptions.push(
+      `Wardrobes and lofts sized to each bedroom's longer wall on your floor plan (55% of it, between 1,200 and 2,400 mm).`,
+    );
+  }
+
   if (input.carpetAreaAssumed) {
     assumptions.push(
       `Carpet area taken as ${input.carpetAreaSqft.toLocaleString('en-IN')} sq ft, typical for a ${input.bhk} BHK — tell us yours and the ceiling, painting and electrical lines follow it.`,
@@ -431,6 +501,7 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
     modularPaise,
     nonModularPaise,
     modularDiscountPaise,
+    modularDiscountPct: discountPct,
     professionalFeePaise,
     curatedDiscountPaise,
     curatedDiscountPct,

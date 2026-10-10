@@ -35,10 +35,13 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Container, Button } from '@/components/ui';
+import { Pill, PillButton, Split } from '@/components/home/parts';
 import { loadBrief } from '@/modules/brief/store';
 import { isBriefComplete } from '@/modules/brief/types';
 import { saveBriefAction } from '@/app/quiz/actions';
+import { PREVIEW_PARAM, encodePreviewBrief } from '@/modules/brief/preview-param';
+import { useSiteT } from '@/components/app/i18n';
+import { EXPERT_DICT } from '@/modules/i18n/site/expert';
 
 type Phase = 'checking' | 'restoring' | 'empty' | 'failed';
 
@@ -97,10 +100,15 @@ export function RescueSettled() {
 
 export function BriefRescue({
   /** What the customer was trying to reach. Shown so the wait has a reason. */
-  destination = 'your quotes',
+  destination,
+  previewable = false,
 }: {
   destination?: string;
+  /** The page can render from `?preview=` when the build has no database. */
+  previewable?: boolean;
 }) {
+  const t = useSiteT(EXPERT_DICT);
+  const dest = destination ?? t('rescue.defaultDest');
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>('checking');
 
@@ -136,6 +144,17 @@ export function BriefRescue({
       .then((result) => {
         if (cancelled) return;
         if (!result.persisted) {
+          /* A build with no database cannot store it — hand the page the
+             brief in the address instead (modules/brief/preview-param). */
+          if (result.noDatabase && previewable) {
+            clearRescueAttempts();
+            const url = new URL(window.location.href);
+            url.searchParams.set(PREVIEW_PARAM, encodePreviewBrief(brief));
+            // A full load: the client router's soft replace was cut short by
+            // the page's own streaming boundary and landed back on the bare URL.
+            window.location.replace(`${url.pathname}${url.search}`);
+            return;
+          }
           setPhase('failed');
           return;
         }
@@ -149,65 +168,71 @@ export function BriefRescue({
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, previewable]);
+
+  /* The landing's look (owner, 10 Oct 2026: "the design … on our landing
+     page should be in the quiz too, in the brief too and till the expert
+     page"): its soft rounded card, a large heading whose words rise, black
+     pill actions. Renders inside FlowShell (a `.cb` root). The `key` makes
+     each phase a fresh card, so its heading rises in again. */
+  const frame = (key: Phase, children: React.ReactNode) => (
+    <main className="px-[var(--gutter)] py-[clamp(48px,7vw,100px)]">
+      <div key={key} className="soft-card mx-auto max-w-[820px]" data-reveal="" data-auto="">
+        {children}
+      </div>
+    </main>
+  );
 
   if (phase === 'checking' || phase === 'restoring') {
-    return (
-      <main className="py-24">
-        <Container size="narrow">
-          <p className="m-0 font-[family-name:var(--font-mono)] text-[12px] uppercase tracking-[0.12em] text-[var(--color-ink-3)]">
-            Picking up your brief…
-          </p>
-          <p className="m-0 mt-4 max-w-[46ch] text-[16px] leading-relaxed text-[var(--color-ink-2)]">
-            Your answers were saved in this browser. We are attaching them to your account, then
-            {' '}{destination} will load.
-          </p>
-        </Container>
-      </main>
+    return frame(
+      'checking',
+      <div className="flex items-start gap-5">
+        <span
+          aria-hidden
+          className="mt-1.5 h-7 w-7 shrink-0 animate-spin rounded-full border-2 border-[var(--soft-2)] border-t-[var(--accent)] motion-reduce:animate-none"
+        />
+        <div>
+          <p className="h-m">{t('rescue.picking')}</p>
+          <p className="lede">{t('rescue.pickingBody', { dest })}</p>
+        </div>
+      </div>,
     );
   }
 
   if (phase === 'failed') {
-    return (
-      <main className="py-20">
-        <Container size="narrow">
-          <h1 className="h1 mb-4">We have your answers, but we could not save them just now.</h1>
-          <p className="m-0 mb-8 max-w-[54ch] text-[17px] leading-relaxed text-[var(--color-ink-2)]">
-            Nothing is lost — they are still in this browser. This is our side, not yours. Try
-            again in a moment, and if it keeps happening, tell us and we will sort it out.
-          </p>
-          <div className="flex flex-wrap gap-4">
-            <Button
-              onClick={() => {
-                clearRescueAttempts();
-                router.refresh();
-              }}
-              size="lg"
-            >
-              Try again
-            </Button>
-            <Button href="/match" variant="secondary" size="lg">
-              Back to your matches
-            </Button>
-          </div>
-        </Container>
-      </main>
+    return frame(
+      'failed',
+      <>
+        <Split as="h1" className="h-l max-w-[16ch]" text={t('rescue.failedH1')} auto />
+        <p className="lede">{t('rescue.failedBody')}</p>
+        <div className="mt-[clamp(28px,4vw,40px)] flex flex-wrap gap-3">
+          <PillButton
+            arrow
+            onClick={() => {
+              clearRescueAttempts();
+              router.refresh();
+            }}
+          >
+            {t('rescue.retry')}
+          </PillButton>
+          <Pill href="/match" tone="line">
+            {t('rescue.back')}
+          </Pill>
+        </div>
+      </>,
     );
   }
 
-  return (
-    <main className="py-20">
-      <Container size="narrow">
-        <h1 className="h1 mb-4">We do not have your brief yet.</h1>
-        <p className="m-0 mb-8 max-w-[54ch] text-[17px] leading-relaxed text-[var(--color-ink-2)]">
-          Either it was not finished, or it was answered in a different browser — briefs are held
-          per browser until you sign in. About four minutes, and {destination} follow
-          immediately.
-        </p>
-        <Button href="/quiz" size="lg">
-          Answer the questions
-        </Button>
-      </Container>
-    </main>
+  return frame(
+    'empty',
+    <>
+      <Split as="h1" className="h-l max-w-[16ch]" text={t('rescue.emptyH1')} auto />
+      <p className="lede">{t('rescue.emptyBody', { dest })}</p>
+      <div className="mt-[clamp(28px,4vw,40px)]">
+        <Pill href="/quiz" arrow>
+          {t('rescue.answer')}
+        </Pill>
+      </div>
+    </>,
   );
 }

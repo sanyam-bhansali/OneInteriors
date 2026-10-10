@@ -33,7 +33,7 @@ import { cleanName } from './steps';
 export interface ContactInput {
   name: string;
   phone: string;
-  /** Optional. Filled in from a Google sign-in when there was one. */
+  /** Required on the website (owner, 10 Oct 2026); optional in the phone app, which does not ask. */
   email: string;
   /** The notice. Required. */
   agreed: boolean;
@@ -71,7 +71,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * "A 10-digit Indian mobile, please" was once read as an accusation by
  * somebody who had typed their number correctly with a leading zero.
  */
-export function checkContact(input: ContactInput): ContactCheck {
+export function checkContact(input: ContactInput, opts: { requireEmail?: boolean } = {}): ContactCheck {
   const errors: Partial<Record<ContactField, string>> = {};
 
   const name = cleanName(input.name);
@@ -83,7 +83,10 @@ export function checkContact(input: ContactInput): ContactCheck {
 
   const rawEmail = input.email.trim();
   const email = rawEmail ? rawEmail.toLowerCase().slice(0, 254) : null;
-  if (email && !EMAIL.test(email)) errors.email = 'Check the email address, or leave it empty.';
+  if (opts.requireEmail && !email) errors.email = 'We need your email to send your matches and the call details.';
+  else if (email && !EMAIL.test(email)) {
+    errors.email = opts.requireEmail ? 'Check the email address.' : 'Check the email address, or leave it empty.';
+  }
 
   if (!input.agreed) {
     errors.agreed =

@@ -21,7 +21,7 @@ import { TIERS, type Tier } from '@/modules/quotation/tiers';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { fromDb } from '@/lib/money';
-import { showUnverifiedStudios } from '@/lib/env';
+import { rosterIsReal, showUnverifiedStudios } from '@/lib/env';
 import { assessTier } from '@/modules/verification/tiers';
 import type {
   CheckResult,
@@ -39,6 +39,7 @@ import { hasSubmittedForReview } from '@/modules/studio/submitted';
 
 const INCLUDE = {
   verifications: true,
+  branding: { select: { discountBps: true } },
   portfolio: { orderBy: { completedOn: 'desc' } },
 } satisfies Prisma.StudioInclude;
 
@@ -115,7 +116,8 @@ function toStudio(row: StudioRow): Studio {
     minProjectPaise: row.minProjectPaise === null ? null : fromDb(row.minProjectPaise),
     maxProjectPaise: row.maxProjectPaise === null ? null : fromDb(row.maxProjectPaise),
     paymentPhases: readPhases(row.paymentPhases),
-    matchingProfile: readProfile(row.matchingProfile),
+    // The studio's own modular discount rides here to every first quote.
+    matchingProfile: { ...readProfile(row.matchingProfile), modularDiscountPct: (row.branding?.discountBps ?? 0) / 100 },
     band: (TIERS as readonly string[]).includes(row.band ?? '') ? (row.band as Tier) : null,
     completedProjects: row.completedProjects,
     avgVarianceDays: row.avgVarianceDays,
@@ -176,6 +178,16 @@ export class PrismaStudioRepository implements StudioRepository {
      */
     if (query.activeOnly && !showUnverifiedStudios()) {
       where.status = 'ACTIVE';
+    }
+
+    /**
+     * A real roster shows a customer only studios with approved prices: an
+     * approved product master, or live filed rates. ACTIVE alone is not
+     * enough — a studio can be approved with its starter catalogue still
+     * unpriced, and would then be matched with a quote of nothing.
+     */
+    if (query.activeOnly && rosterIsReal()) {
+      where.OR = [{ ratesFilledAt: { not: null } }, { filedRates: { some: { state: 'LIVE' } } }];
     }
 
     /**

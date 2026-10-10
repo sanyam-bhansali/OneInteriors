@@ -277,6 +277,31 @@ export async function attachFloorPlan(upload: { path: string; name: string }): P
  * The number is never written to `User.phone`: it is unverified, and that
  * column is unique and is an identity. See `modules/brief/contact.ts`.
  */
+/**
+ * The name and number this browser's brief was sent with, for sign-in.
+ *
+ * The contact step at the end of the brief takes a name and a mobile; the
+ * sign-in that follows used to ask for both again, two minutes later (review,
+ * 8 Oct). Sign-in prefills from here so the number is asked for once and only
+ * confirmed by the WhatsApp code. The anonymous brief only: a signed-in
+ * customer is not shown a sign-in form at all.
+ */
+export async function loadBriefContact(): Promise<{ name: string | null; phone: string | null } | null> {
+  if (!hasDatabase()) return null;
+  try {
+    const anonKey = await readAnonKey();
+    if (!anonKey) return null;
+    const row = await prisma.brief.findUnique({
+      where: { anonKey },
+      select: { contactName: true, contactPhone: true },
+    });
+    if (!row) return null;
+    return { name: row.contactName, phone: row.contactPhone };
+  } catch {
+    return null;
+  }
+}
+
 export async function saveContact(
   brief: Brief,
   contact: CleanContact,

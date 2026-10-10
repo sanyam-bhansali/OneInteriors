@@ -10,11 +10,14 @@ import { rankStudios } from '@/modules/matching/score';
 import { storeMatches } from '@/modules/matching/store';
 import { after } from 'next/server';
 import { filedRatesFor } from '@/data/filed-rates';
+import { getLang } from '@/modules/i18n/server';
+import { translator } from '@/modules/i18n/site';
+import { MATCH_DICT } from '@/modules/i18n/site/match';
 
-export const metadata: Metadata = {
-  title: 'Your matches',
-  description: 'Studios ranked for your home, with the reasoning shown.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = translator(await getLang(), MATCH_DICT);
+  return { title: t('meta.title'), description: t('meta.description') };
+}
 
 /**
  * Rendered per request, not at build time.

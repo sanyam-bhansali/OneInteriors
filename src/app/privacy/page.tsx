@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Container } from '@/components/ui';
-import { SiteHeader, SiteFooter } from '@/components/chrome';
+import { AppFooter, AppHeader } from '@/components/oi/Chrome';
+import { Chapter, Sheet, Wrap } from '@/components/oi';
 import { POLICY_VERSION } from '@/modules/consent/policy';
 
 export const metadata: Metadata = {
@@ -41,41 +41,78 @@ const PRIVACY = {
   updated: '29 September 2026',
 } as const;
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/**
+ * One part of the notice, as a card in the customer side's format (owner,
+ * 10 Oct 2026: "change this entire page in our format"). Numbered, so a
+ * person who writes in can say "point 05" and both sides mean the same thing.
+ */
+function Section({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+  const id = `p${String(n).padStart(2, '0')}`;
   return (
-    <section className="border-b border-[var(--color-rule)] py-9">
-      <Container size="narrow">
-        <h2 className="h2 mb-4">{title}</h2>
-        <div className="flex flex-col gap-3 text-[16px] leading-relaxed text-[var(--color-ink-2)] [&_li]:mb-2 [&_ul]:m-0 [&_ul]:pl-5">
-          {children}
+    <Sheet as="section" className="rounded-[18px] px-5 py-6 sm:px-8 sm:py-8">
+      <div id={id} className="scroll-mt-24 grid gap-4 sm:grid-cols-[64px_1fr] sm:gap-6">
+        <p className="oi-num m-0 text-[12px] tracking-[0.16em] text-[var(--acc-ink)]">{String(n).padStart(2, '0')}</p>
+        <div className="min-w-0">
+          <h2 className="oi-display m-0 mb-4 text-[clamp(1.35rem,1.05rem+1vw,1.75rem)] text-[var(--ink)]">{title}</h2>
+          <div className="flex max-w-[64ch] flex-col gap-3 text-[15.5px] leading-[1.7] text-[var(--ink2)] [&_a]:text-[var(--ink)] [&_a]:underline [&_li]:mb-2 [&_li]:pl-1 [&_strong]:font-semibold [&_strong]:text-[var(--ink)] [&_ul]:m-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:marker:text-[var(--acc)]">
+            {children}
+          </div>
         </div>
-      </Container>
-    </section>
+      </div>
+    </Sheet>
   );
 }
 
+const SECTIONS = [
+  'What we collect',
+  'Why we use it',
+  'Who sees it',
+  'How long we keep it',
+  'What you can ask us',
+  'Children',
+  'When this changes',
+] as const;
+
 export default function PrivacyPage() {
   return (
-    <>
-      <SiteHeader />
+    <div className="oi-app oi-quick min-h-dvh bg-[var(--bg)]">
+      <AppHeader />
 
-      <main>
-        <section className="border-b border-[var(--color-rule)] py-10 sm:py-14">
-          <Container size="narrow">
-            <p className="m-0 mb-3 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--color-ink-3)]">
-              Privacy · version {POLICY_VERSION} · updated {PRIVACY.updated}
+      <Wrap className="py-12">
+        <Chapter
+          eyebrow={`Privacy · version ${POLICY_VERSION}`}
+          title="What we keep about you, and why."
+          aside={
+            <p className="oi-num m-0 whitespace-nowrap text-[10.5px] uppercase tracking-[0.18em] text-[var(--ink2)]">
+              Updated {PRIVACY.updated}
             </p>
-            <h1 className="display mb-5 max-w-[18ch]">What we keep about you, and why.</h1>
-            <p className="m-0 text-[17px] leading-relaxed text-[var(--color-ink-2)]">
-              One Interiors matches homeowners in Pune with interior design studios. To do that we
-              need some information about you and your home. This page says what, why, who sees it,
-              and what you can ask us to do — in plain words, under India&rsquo;s Digital Personal
-              Data Protection Act, 2023.
-            </p>
-          </Container>
-        </section>
+          }
+        >
+          One Interiors matches homeowners in Pune with interior design studios. To do that we
+          need some information about you and your home. This page says what, why, who sees it,
+          and what you can ask us to do — in plain words, under India&rsquo;s Digital Personal
+          Data Protection Act, 2023.
+        </Chapter>
 
-        <Section title="What we collect">
+        <div className="grid gap-8 lg:grid-cols-[220px_1fr] lg:gap-12">
+          <nav aria-label="On this page" className="hidden lg:block">
+            <ol className="sticky top-24 m-0 flex list-none flex-col gap-1 p-0">
+              {SECTIONS.map((title, i) => (
+                <li key={title}>
+                  <a
+                    href={`#p${String(i + 1).padStart(2, '0')}`}
+                    className="flex items-baseline gap-3 rounded-full px-3 py-1.5 text-[13.5px] text-[var(--ink2)] no-underline hover:bg-[var(--card)] hover:text-[var(--ink)]"
+                  >
+                    <span className="oi-num text-[11px] text-[var(--acc-ink)]">{String(i + 1).padStart(2, '0')}</span>
+                    {title}
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </nav>
+
+          <main className="flex min-w-0 flex-col gap-4">
+        <Section n={1} title={SECTIONS[0]}>
           <ul>
             <li>
               <strong>Your brief</strong> — your home, where it is, possession, the work you want,
@@ -111,7 +148,7 @@ export default function PrivacyPage() {
           </ul>
         </Section>
 
-        <Section title="Why we use it">
+        <Section n={2} title={SECTIONS[1]}>
           <ul>
             <li>To rank studios for your home and explain why each one appears.</li>
             <li>To price each studio&rsquo;s first quote for your home.</li>
@@ -125,7 +162,7 @@ export default function PrivacyPage() {
           </ul>
         </Section>
 
-        <Section title="Who sees it">
+        <Section n={3} title={SECTIONS[2]}>
           <p className="m-0">
             <strong>Studios see your brief and your contact details only when you choose them</strong>{' '}
             — when you ask our expert to introduce you. No studio pays to see anyone&rsquo;s
@@ -148,7 +185,7 @@ export default function PrivacyPage() {
           </ul>
         </Section>
 
-        <Section title="How long we keep it">
+        <Section n={4} title={SECTIONS[3]}>
           <p className="m-0">
             Your brief and contact details for as long as you are using One Interiors, and for{' '}
             {PRIVACY.retentionMonths} months after your last activity — unless you ask us to delete
@@ -157,7 +194,7 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
-        <Section title="What you can ask us">
+        <Section n={5} title={SECTIONS[4]}>
           <ul>
             <li>To see the information we hold about you.</li>
             <li>To correct it, or to delete it.</li>
@@ -178,7 +215,7 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
-        <Section title="Children">
+        <Section n={6} title={SECTIONS[5]}>
           <p className="m-0">
             One Interiors is for adults planning work on their home. We do not knowingly collect
             information about anyone under 18, beyond the number of children in a household that you
@@ -186,16 +223,18 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
-        <Section title="When this changes">
+        <Section n={7} title={SECTIONS[6]}>
           <p className="m-0">
             This page has a version number, and every agreement you give is recorded against the
             version you saw. If we change how we use your information in a way that matters, we ask
             you again rather than assume your earlier agreement covers it.
           </p>
         </Section>
-      </main>
+          </main>
+        </div>
+      </Wrap>
 
-      <SiteFooter />
-    </>
+      <AppFooter />
+    </div>
   );
 }

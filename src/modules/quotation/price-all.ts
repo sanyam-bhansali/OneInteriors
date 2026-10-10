@@ -11,8 +11,8 @@
  * Pure and tested.
  */
 
-import { buildFirstQuote, runSourceOf, standardKitchenRunMm, type FirstQuote } from './first-quote';
-import type { StudioRates } from './catalogue';
+import { buildFirstQuote, modularDiscountFor, runSourceOf, standardKitchenRunMm, type FirstQuote } from './first-quote';
+import { MODULAR_DISCOUNT_BPS, type StudioRates } from './catalogue';
 import { hasRates } from './rate-policy';
 import type { FloorPlan, StoredQuote } from './project-store';
 import type { ScopeSelection } from './scope';
@@ -74,7 +74,7 @@ export function priceMatches({
   shape: HomeShape;
   plan: FloorPlan;
   /** `curatedDiscountPct` from the studio's profile; a change re-prices that studio. */
-  studios: { slug: string; name: string; curatedDiscountPct?: number | null }[];
+  studios: { slug: string; name: string; curatedDiscountPct?: number | null; modularDiscountPct?: number | null }[];
   existing: Record<string, StoredQuote>;
   ratesFor: (slug: string) => StudioRates;
   now?: Date;
@@ -87,7 +87,7 @@ export function priceMatches({
     if (!hasRates(rates)) continue;
     const had = existing[studio.slug];
     const discount = studio.curatedDiscountPct ?? null;
-    if (had?.key === key && (had.quote.curatedDiscountPct ?? null) === discount) continue;
+    if (had?.key === key && (had.quote.curatedDiscountPct ?? null) === discount && (had.quote.modularDiscountPct ?? MODULAR_DISCOUNT_BPS / 100) === modularDiscountFor(studio.modularDiscountPct)) continue;
     const quote: FirstQuote = buildFirstQuote(
       {
         bhk: shape.bhk,
@@ -99,6 +99,7 @@ export function priceMatches({
         runShared: plan.shared === true,
         scope: shape.scope,
         curatedDiscountPct: discount,
+        modularDiscountPct: studio.modularDiscountPct,
       },
       rates,
     );

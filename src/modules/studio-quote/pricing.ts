@@ -118,12 +118,28 @@ export interface QuoteTerms {
   onSpotPaise?: Paise;
   /** Taken up front, and excluded from the percentage stages below. */
   bookingAdvancePaise?: Paise;
+  /** GST, basis points (0 or 1800), on the total after every discount. */
+  gstBps?: number;
+  /**
+   * The studio's own payment schedule, percentages of what the client pays
+   * (`payment-phases.ts`). When present it replaces the booking advance and
+   * the standard stages: their booking is one of their phases.
+   */
+  phases?: { label: string; pct: number }[] | null;
 }
+
+/** The GST rate a quotation can carry. Interiors work is 18%. */
+export const GST_BPS = 1800;
+
+/** Names for the flat discount, as studios write them. Free text is allowed too. */
+export const DISCOUNT_NAMES = ['On-spot discount', 'Festive offer', 'Referral discount', 'Loyalty discount', 'Negotiated discount'] as const;
 
 export interface QuoteStage {
   label: string;
   detail: string;
   amountPaise: Paise;
+  /** The phase's percentage, when the schedule is the studio's own. */
+  pct?: number;
 }
 
 export interface QuoteTotals {
@@ -134,7 +150,10 @@ export interface QuoteTotals {
   subTotalPaise: Paise;
   discountPaise: Paise;
   onSpotPaise: Paise;
-  /** What the client pays. */
+  /** After every discount, before GST. */
+  beforeTaxPaise: Paise;
+  gstPaise: Paise;
+  /** What the client pays, GST included when it is on. */
   totalPaise: Paise;
   stages: QuoteStage[];
 }
@@ -193,12 +212,27 @@ export function computeTotals(lines: QuoteLineInput[], terms: QuoteTerms): Quote
   const discountPaise = applyBps(modularPaise, terms.discountBps);
   const onSpotPaise = terms.onSpotPaise ?? 0;
 
-  const totalPaise = subTotalPaise - discountPaise - onSpotPaise;
+  const beforeTaxPaise = subTotalPaise - discountPaise - onSpotPaise;
+  // GST last, on what is actually charged — Hauspire's order, and the law's.
+  const gstPaise = beforeTaxPaise > 0 ? applyBps(beforeTaxPaise, terms.gstBps ?? 0) : 0;
+  const totalPaise = beforeTaxPaise + gstPaise;
+
+  const stages: QuoteStage[] = [];
+
+  /* The studio's own schedule, when it has one: percentages of the whole,
+     booking included. Split with `splitAcross` like the standard stages, so
+     it adds up to the total exactly. */
+  const phases = terms.phases?.filter((p) => p.pct > 0) ?? [];
+  if (phases.length > 0) {
+    if (totalPaise > 0) {
+      const parts = splitAcross(totalPaise, phases.map((p) => p.pct));
+      phases.forEach((p, i) => stages.push({ label: p.label, detail: '', amountPaise: parts[i]!, pct: p.pct }));
+    }
+    return { modularPaise, onsitePaise, workPaise, feePaise, subTotalPaise, discountPaise, onSpotPaise, beforeTaxPaise, gstPaise, totalPaise, stages };
+  }
 
   const advance = Math.min(terms.bookingAdvancePaise ?? 0, Math.max(0, totalPaise));
   const balance = totalPaise - advance;
-
-  const stages: QuoteStage[] = [];
 
   if (advance > 0) {
     stages.push({
@@ -228,6 +262,8 @@ export function computeTotals(lines: QuoteLineInput[], terms: QuoteTerms): Quote
     subTotalPaise,
     discountPaise,
     onSpotPaise,
+    beforeTaxPaise,
+    gstPaise,
     totalPaise,
     stages,
   };

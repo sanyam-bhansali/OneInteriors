@@ -57,3 +57,6 @@ One Interiors design system (1)/design_handoff_landing_page/One Interiors - Land
 
 docs/*.pdf
 docs/*.pptx
+
+# Studio quotations downloaded for a local read (/read-quotations). Private prices.
+.quote-reading/

@@ -16,6 +16,10 @@ import {
   type EditableLine,
 } from './QuoteLines';
 import { TotalsPanel, DocumentPreview, ChangesPanel } from './QuotePanels';
+import { TermsPanel, pctToBps, rupeesToPaiseText, type TermsDraft } from './TermsPanel';
+import { ClientPanel } from './ClientPanel';
+import { FloorPlanView } from '@/components/floorplan/FloorPlanView';
+import type { QuoteTermsInput } from '@/modules/studio-quote/quotes';
 
 /**
  * The quotation builder.
@@ -75,6 +79,8 @@ export function QuoteBuilder({
   const [saving, startSave] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<'lines' | 'document' | 'changes'>('lines');
+  const [terms, setTerms] = useState<TermsDraft>(() => termsDraftOf(quote));
+  const savedTerms = useRef(JSON.stringify(termsDraftOf(quote)));
 
   /* The saved copy, for the "nothing to save" test. Compared by value rather
      than by a dirty flag alone, so typing a 3, deleting it and typing it back
@@ -82,8 +88,42 @@ export function QuoteBuilder({
   const saved = useRef(JSON.stringify(quote.lines.map(toEditable)));
 
   useEffect(() => {
-    setDirty(JSON.stringify(lines) !== saved.current);
-  }, [lines]);
+    setDirty(JSON.stringify(lines) !== saved.current || JSON.stringify(terms) !== savedTerms.current);
+  }, [lines, terms]);
+
+  /* Lines rewritten on the server — a rebuild or a clear — arrive as new
+     props. Taken when nothing on screen is unsaved; the old state was kept
+     until a reload, so a rebuild looked as if it had done nothing (11 Oct). */
+  const server = JSON.stringify(quote.lines.map(toEditable));
+  const onScreen = useRef(lines);
+  onScreen.current = lines;
+  useEffect(() => {
+    if (server === saved.current) return;
+    if (JSON.stringify(onScreen.current) !== saved.current) return; // unsaved work wins
+    saved.current = server;
+    setLines(JSON.parse(server) as EditableLine[]);
+  }, [server]);
+
+  /* The terms as figures. A half-typed percentage keeps the last good one on
+     screen rather than flashing the total to zero. */
+  const termsIn = useMemo(() => termsInput(terms), [terms]);
+  const live = useMemo(
+    () => ({
+      ...quote,
+      ...(termsIn
+        ? {
+            feeBps: termsIn.feeBps,
+            discountBps: termsIn.discountBps,
+            gstBps: termsIn.gstOn ? 1800 : 0,
+            onSpotPaise: termsIn.onSpotPaise,
+            onSpotLabel: termsIn.onSpotLabel,
+            bookingAdvancePaise: termsIn.bookingAdvancePaise,
+            quoteDate: termsIn.quoteDate ? new Date(`${termsIn.quoteDate}T00:00:00`) : quote.quoteDate,
+          }
+        : {}),
+    }),
+    [quote, termsIn],
+  );
 
   /**
    * The browser's own warning, and the only thing standing between forty
@@ -121,13 +161,15 @@ export function QuoteBuilder({
       computeTotals(
         priced.map((l) => ({ ...l, amountPaise: l.amountPaise })),
         {
-          feeBps: quote.feeBps,
-          discountBps: quote.discountBps,
-          onSpotPaise: quote.onSpotPaise,
-          bookingAdvancePaise: quote.bookingAdvancePaise,
+          feeBps: live.feeBps,
+          discountBps: live.discountBps,
+          onSpotPaise: live.onSpotPaise,
+          bookingAdvancePaise: live.bookingAdvancePaise,
+          gstBps: live.gstBps,
+          phases: live.phases,
         },
       ),
-    [priced, quote.feeBps, quote.discountBps, quote.onSpotPaise, quote.bookingAdvancePaise],
+    [priced, live],
   );
 
   const comparable: ComparableLine[] = useMemo(
@@ -186,6 +228,61 @@ export function QuoteBuilder({
     });
   }, []);
 
+  /**
+   * Swap a line to another of the studio's products, re-priced from it. The
+   * size carries over when the unit is the same — a wardrobe swapped for a
+   * sliding one keeps its 1800 × 2100 — and takes the product's own default
+   * when it is not.
+   */
+  const swap = useCallback((key: string, product: ProductRow) => {
+    setLines((current) =>
+      current.map((l) => {
+        if (l.key !== key) return l;
+        const same = l.unit === product.unit;
+        const defaultQty =
+          product.unit === 'SQFT' && product.rules?.sqft
+            ? Math.round(product.rules.sqft * 1000)
+            : product.unit === 'RFT' && product.rules?.rft
+              ? Math.round(product.rules.rft * 1000)
+              : product.defaultQty != null
+                ? product.defaultQty * 1000
+                : product.unit === 'UNIT'
+                  ? 1000
+                  : null;
+        return {
+          ...l,
+          product: product.name,
+          code: product.code,
+          unit: product.unit,
+          details: product.details,
+          ratePaise: product.ratePaise,
+          widthMm: product.unit === 'AREA' ? (same ? l.widthMm : product.defaultWidthMm) : null,
+          heightMm: product.unit === 'AREA' ? (same ? l.heightMm : product.defaultHeightMm) : null,
+          qtyMilli: product.unit === 'AREA' ? null : same ? l.qtyMilli : defaultQty,
+          agreedPaise: null,
+        };
+      }),
+    );
+  }, []);
+
+  /** Drag and drop, within a room: `from` takes `to`'s place. */
+  const reorder = useCallback((from: string, to: string) => {
+    setLines((current) => {
+      const a = current.findIndex((l) => l.key === from);
+      const b = current.findIndex((l) => l.key === to);
+      if (a < 0 || b < 0 || current[a]!.room !== current[b]!.room) return current;
+      const next = current.slice();
+      const [moved] = next.splice(a, 1);
+      next.splice(b, 0, moved!);
+      return next;
+    });
+  }, []);
+
+  /** Rename a room on every line in it. Renaming onto an existing room merges them. */
+  const renameRoom = useCallback((from: string, to: string) => {
+    setLines((current) => current.map((l) => (l.room === from ? { ...l, room: to } : l)));
+  }, []);
+
   const add = useCallback((room: string, product: ProductRow, size: AddSize) => {
     setLines((current) => {
       const line: EditableLine = {
@@ -212,6 +309,11 @@ export function QuoteBuilder({
 
   function save() {
     setError(null);
+    if (!termsIn) {
+      setError('Check the terms: a percentage between 0 and 50, and amounts in rupees.');
+      return;
+    }
+    const sentTerms = JSON.stringify(terms);
     const payload: SaveLineInput[] = lines.map((l) => ({
       id: l.id,
       room: l.room,
@@ -227,7 +329,7 @@ export function QuoteBuilder({
     }));
 
     startSave(async () => {
-      const result = await saveLinesAction(quote.id, payload);
+      const result = await saveLinesAction(quote.id, payload, termsIn);
       if (result && 'ok' in result && !result.ok) {
         setError(result.error);
         return;
@@ -235,7 +337,8 @@ export function QuoteBuilder({
       /* Marked saved from what was SENT, not from what is on screen now: a
          figure typed while the request was in flight is still unsaved. */
       saved.current = JSON.stringify(lines);
-      setDirty(JSON.stringify(lines) !== saved.current);
+      savedTerms.current = sentTerms;
+      setDirty(JSON.stringify(lines) !== saved.current || JSON.stringify(terms) !== savedTerms.current);
     });
   }
 
@@ -252,13 +355,25 @@ export function QuoteBuilder({
      */
     <div className="grid gap-5 lg:grid-cols-[21rem_minmax(0,1fr)]">
       <aside className="flex flex-col gap-4 lg:sticky lg:top-5 lg:max-h-[calc(100dvh-2.5rem)] lg:self-start lg:overflow-y-auto">
+        <ClientPanel quote={quote} />
         <ConfigurePanel quote={quote} hasLines={lines.length > 0} />
+        {quote.planRooms.length > 0 ? (
+          <section className="s-card p-4">
+            <h2 className="s-label m-0 mb-2">Their floor plan</h2>
+            <FloorPlanView rooms={quote.planRooms} />
+          </section>
+        ) : null}
         <AddLinePanel
           rooms={roomOrder}
           products={products}
           quoteConfig={quote.config}
           baths={quote.bathrooms}
           onAdd={add}
+        />
+        <TermsPanel
+          terms={terms}
+          onChange={(patch) => setTerms((t) => ({ ...t, ...patch }))}
+          ownSchedule={(quote.phases?.length ?? 0) > 0}
         />
 
         {/* In the rail, beside everything that made it dirty. */}
@@ -341,18 +456,22 @@ export function QuoteBuilder({
                 onRemove={remove}
                 onDuplicate={duplicate}
                 onMove={move}
+                products={products}
+                onSwap={swap}
+                onReorder={reorder}
+                onRenameRoom={renameRoom}
               />
             ))}
 
             {lines.length > 0 ? (
-              <TotalsPanel quote={quote} totals={totals} rooms={rooms} />
+              <TotalsPanel quote={live} totals={totals} rooms={rooms} />
             ) : null}
           </div>
         ) : null}
 
         {tab === 'document' ? (
           <DocumentPreview
-            quote={quote}
+            quote={live}
             lines={priced}
             rooms={roomOrder}
             totals={totals}
@@ -457,5 +576,41 @@ function toEditable(line: QuoteRow['lines'][number]): EditableLine {
       })
         ? line.amountPaise
         : null,
+  };
+}
+
+function termsDraftOf(quote: QuoteRow): TermsDraft {
+  return {
+    feePct: String(quote.feeBps / 100),
+    discountPct: String(quote.discountBps / 100),
+    gstOn: quote.gstBps > 0,
+    onSpotRupees: quote.onSpotPaise > 0 ? String(quote.onSpotPaise / 100) : '',
+    onSpotLabel: quote.onSpotLabel ?? '',
+    advanceRupees: String(quote.bookingAdvancePaise / 100),
+    quoteDate: isoDay(quote.quoteDate),
+  };
+}
+
+function isoDay(d: Date | string): string {
+  const date = new Date(d);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** The draft as the server takes it, or null when a figure is not a figure. */
+function termsInput(t: TermsDraft): QuoteTermsInput | null {
+  const feeBps = pctToBps(t.feePct);
+  const discountBps = pctToBps(t.discountPct);
+  const onSpotPaise = rupeesToPaiseText(t.onSpotRupees);
+  const bookingAdvancePaise = rupeesToPaiseText(t.advanceRupees);
+  if (feeBps === null || discountBps === null || onSpotPaise === null || bookingAdvancePaise === null) return null;
+  return {
+    feeBps,
+    discountBps,
+    gstOn: t.gstOn,
+    onSpotPaise,
+    onSpotLabel: t.onSpotLabel.trim() || null,
+    bookingAdvancePaise,
+    quoteDate: /^\d{4}-\d{2}-\d{2}$/.test(t.quoteDate) ? t.quoteDate : null,
   };
 }

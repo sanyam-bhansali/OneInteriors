@@ -1,0 +1,14 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    /* `@/` is the website's src/, so a shared module that imports
+       `@/lib/money` resolves the same way here as it does in Next. The app's
+       own files import each other relatively. Only pure modules may be
+       reached this way — see docs/MOBILE-APP-PLAN.md. */
+    "paths": {
+      "@/*": ["../src/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
+}

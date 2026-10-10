@@ -20,9 +20,15 @@ import { MIN_QUOTATIONS_FOR_RATES } from '@/modules/quotation/catalogue';
 export interface ApprovalFacts {
   /** Quotations read from archives whose rates ops has approved (state FILED). */
   quotationsRead: number;
-  /** LIVE filed rates. */
+  /** LIVE filed rates (the older route). */
   liveRates: number;
-  /** Products in the studio's own product master. */
+  /**
+   * Ops has approved a product master read from the studio's quotations
+   * (`Studio.ratesFilledAt`, product-drafts.ts) — the route since 10 Oct.
+   * Optional so older callers read as not approved.
+   */
+  productMasterApproved?: boolean;
+  /** PRICED products in the studio's own product master — a starter catalogue with blank rates is not one. */
   productMaster: number;
 }
 
@@ -34,8 +40,13 @@ export function approvalBlockers(f: ApprovalFacts): string[] {
       `Only ${f.quotationsRead} of their quotations have been read and approved — at least ${MIN_QUOTATIONS_FOR_RATES} are needed before they can be listed.`,
     );
   }
-  if (f.liveRates === 0) out.push('No rates are approved yet — approve the rates derived from their quotations first.');
-  if (f.productMaster === 0) out.push('Their product master is empty — it fills from their approved rates.');
+  /* Either route counts: the product master approved on this page (the one
+     price list), or live filed rates. Requiring filed rates alone would have
+     refused every studio priced the new way. */
+  if (f.liveRates === 0 && !f.productMasterApproved) {
+    out.push('No rates are approved yet — approve the product master read from their quotations first.');
+  }
+  if (f.productMaster === 0) out.push('Their product master has no priced products yet — it fills when their rates are approved.');
   return out;
 }
 

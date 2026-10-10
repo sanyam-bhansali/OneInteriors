@@ -14,14 +14,30 @@ function present(value: string | undefined): boolean {
   return Boolean(value?.trim());
 }
 
+/**
+ * Run on sample data, whatever database is configured.
+ *
+ * For a test deployment people install on a phone (8 Oct 2026). Vercel hands
+ * every preview the production DATABASE_URL, and with the customer side on
+ * there, a test signup would have been a real row in production. Set
+ * `SAMPLE_DATA_ONLY=1` on a branch's previews and the app behaves exactly as
+ * it does locally with no database: fixture studios, nothing written, no
+ * email or WhatsApp sent. `lib/prisma.ts` points the client at an address
+ * that cannot resolve, so a call that forgot to ask `hasDatabase()` fails
+ * instead of reaching production.
+ */
+export function sampleDataOnly(): boolean {
+  return process.env.SAMPLE_DATA_ONLY?.trim() === '1';
+}
+
 /** Is a database configured? When false the app serves fixture studios. */
 export function hasDatabase(): boolean {
-  return present(process.env.DATABASE_URL);
+  return !sampleDataOnly() && present(process.env.DATABASE_URL);
 }
 
 /** Is the Prisma CLI able to migrate? Needs the direct (unpooled) connection. */
 export function hasDirectDatabase(): boolean {
-  return present(process.env.DIRECT_URL);
+  return !sampleDataOnly() && present(process.env.DIRECT_URL);
 }
 
 /**

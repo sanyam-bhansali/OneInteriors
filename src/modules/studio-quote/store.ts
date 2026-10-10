@@ -22,6 +22,8 @@ import { storeLogo, removeLogo } from '@/modules/storage/studio-logo';
 import { fromDb, toDb, type Paise } from '@/lib/money';
 import { starterRowsFor } from './starter-catalogue';
 import type { QuoteUnitName, WorkCodeName } from './pricing';
+import { readRules, type ProductRules } from './configure';
+import { Prisma } from '@prisma/client';
 
 /**
  * The tenancy primitive, re-exported.
@@ -53,6 +55,8 @@ export interface ProductRow {
   isActive: boolean;
   /** Does this go on the quotation when a configuration is applied? */
   inStandardBuild: boolean;
+  /** Build rules — flat size, balcony, per bathroom, default sq ft… (`configure.ts`). */
+  rules: ProductRules | null;
 }
 
 /**
@@ -109,6 +113,7 @@ function toProductRow(row: {
   sortOrder: number;
   isActive: boolean;
   inStandardBuild: boolean;
+  rules: unknown;
 }): ProductRow {
   return {
     id: row.id,
@@ -126,6 +131,7 @@ function toProductRow(row: {
     sortOrder: row.sortOrder,
     isActive: row.isActive,
     inStandardBuild: row.inStandardBuild,
+    rules: readRules(row.rules),
   };
 }
 
@@ -254,6 +260,68 @@ export async function setProductActive(productId: string, isActive: boolean): Pr
   }
 }
 
+export interface ProductEdit {
+  name: string;
+  code: WorkCodeName;
+  unit: QuoteUnitName;
+  details: string | null;
+  rooms: string[];
+  defaultWidthMm: number | null;
+  defaultHeightMm: number | null;
+  defaultQty: number | null;
+  rules: ProductRules | null;
+}
+
+const UNITS: QuoteUnitName[] = ['AREA', 'SQFT', 'RFT', 'UNIT'];
+const CODES: WorkCodeName[] = ['MODULAR', 'ONSITE'];
+
+/**
+ * Everything about a product but its rate and its standard tick, which have
+ * their own quick controls: name, work code, unit, what it includes, rooms,
+ * default sizes and build rules.
+ *
+ * Changing it never touches a quotation already made — lines are copies.
+ */
+export async function updateProduct(productId: string, input: ProductEdit): Promise<SaveResult> {
+  const studioId = await myStudioId();
+  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+
+  const name = input.name.trim().slice(0, 120);
+  if (name.length < 2) return { ok: false, error: 'Give it a name.' };
+  if (!UNITS.includes(input.unit) || !CODES.includes(input.code)) return { ok: false, error: 'Pick how it is measured.' };
+  const mm = (v: number | null) => (v == null ? null : Number.isInteger(v) && v > 0 && v < 100_000 ? v : NaN);
+  const width = mm(input.defaultWidthMm);
+  const height = mm(input.defaultHeightMm);
+  const qty = input.defaultQty == null ? null : Number.isInteger(input.defaultQty) && input.defaultQty > 0 && input.defaultQty < 1000 ? input.defaultQty : NaN;
+  if ([width, height, qty].some((v) => Number.isNaN(v))) return { ok: false, error: 'Sizes are whole millimetres; quantity a whole number.' };
+  const rules = readRules(input.rules);
+
+  try {
+    const { count } = await prisma.studioProduct.updateMany({
+      where: { id: productId, studioId },
+      data: {
+        name,
+        code: input.code,
+        unit: input.unit,
+        details: input.details?.trim().slice(0, 1000) || null,
+        rooms: input.rooms.map((r) => String(r).slice(0, 40)).slice(0, 8),
+        defaultWidthMm: width,
+        defaultHeightMm: height,
+        defaultQty: qty,
+        rules: rules ? (rules as Prisma.InputJsonValue) : Prisma.DbNull,
+      },
+    });
+    if (count === 0) return { ok: false, error: 'That product is not yours.' };
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('Unique constraint')) {
+      return { ok: false, error: 'You already have a product with that name.' };
+    }
+    console.error('[studio-quote] updateProduct failed', error);
+    return { ok: false, error: 'That did not save.' };
+  }
+}
+
 export interface NewProductInput {
   name: string;
   code: WorkCodeName;
@@ -321,6 +389,43 @@ export interface BrandingRow {
   feeBps: number;
   discountBps: number;
   bookingAdvancePaise: Paise;
+  gstBps: number;
+  /** The material specification printed on every quotation. */
+  materialSpec: MaterialSpecRow[];
+  /** Days a quotation holds its prices. */
+  validityDays: number;
+}
+
+export interface MaterialSpecRow {
+  item: string;
+  spec: string;
+}
+
+/** A stored spec, keeping only well-formed rows. */
+export function readMaterialSpec(raw: unknown): MaterialSpecRow[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((r) => {
+    const o = (r ?? {}) as Record<string, unknown>;
+    const item = typeof o.item === 'string' ? o.item.trim().slice(0, 60) : '';
+    const spec = typeof o.spec === 'string' ? o.spec.trim().slice(0, 200) : '';
+    return item && spec ? [{ item, spec }] : [];
+  }).slice(0, 40);
+}
+
+/**
+ * "Plywood: Century BWP 710, 18 mm" per line → rows. How a studio writes its
+ * spec sheet; a line without a colon is skipped rather than guessed at.
+ */
+export function parseMaterialSpec(text: string): MaterialSpecRow[] {
+  return readMaterialSpec(
+    text
+      .split(/\r?\n/)
+      .map((line) => {
+        const at = line.indexOf(':');
+        return at > 0 ? { item: line.slice(0, at), spec: line.slice(at + 1) } : null;
+      })
+      .filter(Boolean),
+  );
 }
 
 /**
@@ -387,6 +492,9 @@ export async function myBranding(): Promise<BrandingRow | null> {
       feeBps: row.feeBps,
       discountBps: row.discountBps,
       bookingAdvancePaise: fromDb(row.bookingAdvancePaise),
+      gstBps: row.gstBps,
+      materialSpec: readMaterialSpec(row.materialSpec),
+      validityDays: row.validityDays,
     };
   } catch (error) {
     console.error('[studio-quote] myBranding failed', error);
@@ -409,6 +517,11 @@ export interface BrandingInput {
   feeBps: number;
   discountBps: number;
   bookingAdvancePaise: Paise;
+  /** 0 or 1800. Absent leaves it as it is. */
+  gstBps?: number;
+  /** Absent leaves them as they are. */
+  materialSpec?: MaterialSpecRow[];
+  validityDays?: number;
 }
 
 /**
@@ -448,6 +561,13 @@ export async function saveBranding(input: BrandingInput): Promise<SaveResult> {
     feeBps: input.feeBps,
     discountBps: input.discountBps,
     bookingAdvancePaise: toDb(Math.max(0, input.bookingAdvancePaise)),
+    ...(input.gstBps !== undefined ? { gstBps: input.gstBps > 0 ? 1800 : 0 } : {}),
+    ...(input.materialSpec !== undefined
+      ? { materialSpec: input.materialSpec.length > 0 ? (input.materialSpec as unknown as Prisma.InputJsonValue) : Prisma.DbNull }
+      : {}),
+    ...(input.validityDays !== undefined
+      ? { validityDays: Math.min(365, Math.max(1, Math.round(input.validityDays) || 30)) }
+      : {}),
   };
 
   try {
@@ -560,4 +680,54 @@ export async function myTier(): Promise<string | null> {
   /* A cancelled subscription is not a tier. Reading `tier` alone would leave
      a studio white-labelled for as long as the row survived their leaving. */
   return sub.status === 'CANCELLED' ? null : sub.tier;
+}
+
+// ── The studio, for the cover and About pages of a quotation ─────
+
+export interface StudioProfile {
+  tradeName: string;
+  about: string | null;
+  yearsActive: number | null;
+  teamSize: number | null;
+  localities: string[];
+  /** Up to four photographs of finished work, first image of each project. */
+  photos: { url: string; caption: string; isRender: boolean }[];
+}
+
+/** What a client reads about the studio before the figures. Null when there is no studio. */
+export async function myStudioProfile(): Promise<StudioProfile | null> {
+  const studioId = await myStudioId();
+  if (!studioId) return null;
+  try {
+    const studio = await prisma.studio.findUnique({
+      where: { id: studioId },
+      select: {
+        tradeName: true,
+        about: true,
+        yearsActive: true,
+        teamSize: true,
+        localities: true,
+        portfolio: {
+          where: { images: { isEmpty: false } },
+          orderBy: [{ completedOn: 'desc' }, { createdAt: 'desc' }],
+          take: 4,
+          select: { title: true, locality: true, images: true, isRender: true },
+        },
+      },
+    });
+    if (!studio) return null;
+    return {
+      tradeName: studio.tradeName,
+      about: studio.about?.trim() || null,
+      yearsActive: studio.yearsActive,
+      teamSize: studio.teamSize,
+      localities: studio.localities,
+      photos: studio.portfolio
+        .filter((p) => /^https:\/\//.test(p.images[0] ?? ''))
+        .map((p) => ({ url: p.images[0]!, caption: [p.title, p.locality].filter(Boolean).join(', '), isRender: p.isRender })),
+    };
+  } catch (error) {
+    console.error('[studio-quote] myStudioProfile failed', error);
+    return null;
+  }
 }

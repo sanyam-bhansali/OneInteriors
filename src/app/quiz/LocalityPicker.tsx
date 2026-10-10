@@ -20,14 +20,17 @@ import { useMemo, useState } from 'react';
 import {
   LOCALITIES_BY_ZONE,
   PUNE_LOCALITIES,
-  ZONE_LABELS,
   zoneOf,
   type PuneZone,
 } from '@/modules/brief/types';
+import { useLang, useSiteT } from '@/components/app/i18n';
+import type { Lang } from '@/modules/i18n/site';
+import { ZONE_TX, lbl } from '@/modules/i18n/site/labels';
+import { QUIZ_DICT } from '@/modules/i18n/site/quiz';
 
 /** Just the zone's name, without the example areas the full label lists. */
-function zoneName(zone: PuneZone): string {
-  return ZONE_LABELS[zone].split(' — ')[0]!;
+function zoneName(zone: PuneZone, lang: Lang): string {
+  return lbl(lang, ZONE_TX, zone).split(' — ')[0]!;
 }
 
 /** Lower-case, and the dashes and dots people type differently removed. */
@@ -56,6 +59,8 @@ export function LocalityPicker({
   const [editing, setEditing] = useState(selected === null);
   const [query, setQuery] = useState('');
   const [openZone, setOpenZone] = useState<PuneZone | null>(null);
+  const t = useSiteT(QUIZ_DICT);
+  const lang = useLang();
 
   const results = useMemo(() => matchingLocalities(query), [query]);
 
@@ -70,23 +75,23 @@ export function LocalityPicker({
     const zone = zoneOf(selected.slug);
     return (
       <div className="flex flex-wrap items-center gap-3">
-        <span className="inline-flex items-center gap-2 rounded-full border border-[var(--acc)] bg-[var(--acc-wash)] px-4 py-2.5 text-[14.5px] text-[var(--ink)]">
+        <span className="inline-flex min-h-12 items-center gap-2 rounded-full bg-[var(--ink)] px-5 text-[15px] font-medium text-white">
           {selected.label}
-          {zone ? <span className="text-[var(--ink2)]">· {zoneName(zone)}</span> : null}
+          {zone ? <span className="font-normal text-white/60">· {zoneName(zone, lang)}</span> : null}
         </span>
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="cursor-pointer border-0 bg-transparent p-0 text-[13.5px] text-[var(--ink2)] underline hover:text-[var(--ink)]"
+          className="min-h-11 cursor-pointer border-0 bg-transparent px-1 text-[14px] text-[var(--ink-2)] underline underline-offset-2 hover:text-[var(--ink)]"
         >
-          Change
+          {t('loc.change')}
         </button>
       </div>
     );
   }
 
   const optionClass =
-    'flex w-full cursor-pointer items-center justify-between gap-3 border-0 border-b border-[var(--line)] bg-transparent px-4 py-3 text-left text-[14.5px] text-[var(--ink)] last:border-b-0 hover:bg-[var(--acc-wash)]';
+    'flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 border-0 border-b-2 border-[var(--paper)] bg-transparent px-5 py-3 text-left text-[15px] text-[var(--ink)] transition-colors last:border-b-0 hover:bg-[var(--soft-2)]';
 
   return (
     <div>
@@ -94,56 +99,58 @@ export function LocalityPicker({
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Start typing your area — Baner, Wakad, Kharadi…"
-        aria-label="Search for your area"
+        placeholder={t('loc.placeholder')}
+        aria-label={t('loc.aria')}
         autoComplete="off"
-        className="w-full rounded-full border border-[var(--line)] bg-[var(--card)] px-5 py-3 text-[15px] text-[var(--ink)] placeholder:text-[var(--ink2)]"
+        className="flow-input placeholder:text-[var(--ink-3)]"
       />
 
       {query.trim() ? (
         results.length > 0 ? (
-          <div className="mt-2 overflow-hidden rounded-[14px] border border-[var(--line)] bg-[var(--card)]">
+          <div className="mt-2 overflow-hidden rounded-[var(--r-m)] bg-[var(--soft)]">
             {results.map((l) => (
               <button key={l.slug} type="button" onClick={() => choose(l.slug)} className={optionClass}>
                 <span>{l.label}</span>
-                <span className="text-[13px] text-[var(--ink2)]">{zoneName(l.zone)}</span>
+                <span className="text-[13px] text-[var(--ink-2)]">{zoneName(l.zone, lang)}</span>
               </button>
             ))}
           </div>
         ) : (
           /* Say what happened and what to do, rather than an empty box. */
-          <p className="m-0 mt-3 text-[14px] leading-relaxed text-[var(--ink2)]">
-            We do not have &ldquo;{query.trim()}&rdquo; yet. Pick the nearest area from your part of
-            the city below — studios are matched by part of the city, so the nearest one works.
+          <p className="m-0 mt-3 px-1 text-[14.5px] leading-relaxed text-[var(--ink-2)]">
+            {t('loc.none', { q: query.trim() })}
           </p>
         )
       ) : null}
 
       {!query.trim() || results.length === 0 ? (
-        <div className="mt-3 overflow-hidden rounded-[14px] border border-[var(--line)] bg-[var(--card)]">
+        <div className="mt-3 overflow-hidden rounded-[var(--r-m)] bg-[var(--soft)]">
           {LOCALITIES_BY_ZONE.map((group) => {
             const open = openZone === group.zone;
             return (
-              <div key={group.zone} className="border-b border-[var(--line)] last:border-b-0">
+              <div key={group.zone} className="border-b-2 border-[var(--paper)] last:border-b-0">
                 <button
                   type="button"
                   aria-expanded={open}
                   onClick={() => setOpenZone(open ? null : group.zone)}
-                  className="flex w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent px-4 py-3 text-left text-[14.5px] text-[var(--ink)]"
+                  className="flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent px-5 py-3 text-left text-[15px] text-[var(--ink)] transition-colors hover:bg-[var(--soft-2)]"
                 >
-                  <span>{group.label}</span>
-                  <span aria-hidden="true" className="text-[var(--ink2)]">
+                  <span>{lbl(lang, ZONE_TX, group.zone)}</span>
+                  <span
+                    aria-hidden="true"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--paper)] text-[15px] leading-none text-[var(--ink)]"
+                  >
                     {open ? '−' : '+'}
                   </span>
                 </button>
                 {open ? (
-                  <div className="flex flex-wrap gap-2 px-4 pb-4">
+                  <div className="flex flex-wrap gap-2 px-5 pb-5">
                     {group.localities.map((l) => (
                       <button
                         key={l.slug}
                         type="button"
                         onClick={() => choose(l.slug)}
-                        className="cursor-pointer rounded-full border border-[var(--line)] bg-[var(--bg)] px-3.5 py-2 text-[14px] text-[var(--ink2)] hover:border-[var(--acc)]"
+                        className="flow-opt !min-h-11 !px-4 !text-[14px]"
                       >
                         {l.label}
                       </button>

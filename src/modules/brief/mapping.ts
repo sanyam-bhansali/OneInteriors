@@ -14,6 +14,7 @@
  *    with nobody in it.
  */
 
+import type { Prisma } from '@prisma/client';
 import { canonicalSociety } from './society';
 import {
   EMPTY_BRIEF,
@@ -23,6 +24,7 @@ import {
   type HomeNeed,
   type Language,
   type PlanUse,
+  type PlanRoomSize,
 } from './types';
 import type {
   PropertyType,
@@ -84,10 +86,16 @@ export interface BriefRow {
 }
 
 /** A reading as a plain JSON object, checked on the way in as on the way out. */
-function planJson(value: PlanUse): Record<string, string | number | boolean | null> | undefined {
+function planJson(value: PlanUse): Prisma.InputJsonValue | undefined {
   const p = planUseFrom(value);
   return p
-    ? { kitchenRunMm: p.kitchenRunMm, bathrooms: p.bathrooms, hasStudy: p.hasStudy, areaSource: p.areaSource }
+    ? {
+        kitchenRunMm: p.kitchenRunMm,
+        bathrooms: p.bathrooms,
+        hasStudy: p.hasStudy,
+        areaSource: p.areaSource,
+        ...(p.rooms ? { rooms: p.rooms as unknown as Prisma.InputJsonValue } : {}),
+      }
     : undefined;
 }
 
@@ -109,8 +117,32 @@ export function planUseFrom(value: unknown): PlanUse | null {
     hasStudy: v.hasStudy === true,
     areaSource:
       source === 'printed' || source === 'computed' || source === 'customer' || source === 'society' ? source : null,
+    ...(planRoomsFrom(v.rooms) ? { rooms: planRoomsFrom(v.rooms) } : {}),
   };
 }
+
+const ROOM_CODES = ['KITCHEN', 'BEDROOM', 'LIVING', 'DINING', 'STUDY', 'TOILET', 'BALCONY', 'UTILITY', 'OTHER'] as const;
+
+/** Plan rooms, kept only when every number is a room's size. */
+export function planRoomsFrom(value: unknown): PlanRoomSize[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const rooms: PlanRoomSize[] = [];
+  for (const item of value.slice(0, 24)) {
+    if (!item || typeof item !== 'object') continue;
+    const r = item as Record<string, unknown>;
+    const ok = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 600 && n <= 12_000;
+    const code = ROOM_CODES.find((c) => c === r.code);
+    if (!code || !ok(r.widthMm) || !ok(r.depthMm)) continue;
+    rooms.push({
+      name: typeof r.name === 'string' ? r.name.replace(/[\u0000-\u001f]/g, '').slice(0, 40) : 'Room',
+      code,
+      widthMm: Math.round(r.widthMm as number),
+      depthMm: Math.round(r.depthMm as number),
+    });
+  }
+  return rooms.length > 0 ? rooms : undefined;
+}
+
 
 /**
  * A society name, as typed, made safe to keep.

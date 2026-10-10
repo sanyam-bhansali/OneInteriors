@@ -5,13 +5,18 @@ import { CompareClient } from './CompareClient';
 import { cachedRoster } from '@/modules/studio/roster-cache';
 import { resolveRatesForMany } from '@/modules/quotation/resolve-rates';
 import { showUnverifiedStudios } from '@/lib/env';
+import { getLang } from '@/modules/i18n/server';
+import { translator } from '@/modules/i18n/site';
+import { COMPARE_DICT } from '@/modules/i18n/site/compare';
 
-export const metadata: Metadata = {
-  title: 'Side by side',
-  description:
-    'Every quote written to the same lines, with the material under each price.',
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = translator(await getLang(), COMPARE_DICT);
+  return {
+    title: t('meta.title'),
+    description: t('meta.description'),
+    robots: { index: false, follow: false },
+  };
+}
 
 /**
  * Side by side.

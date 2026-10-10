@@ -137,6 +137,15 @@ export interface Household {
  * Written on the brief after the "We read: … — right?" step, never straight
  * from the model (modules/floorplan/reading.ts).
  */
+/** One room as the floor plan gave it — sizes for the quote, not the file. */
+export interface PlanRoomSize {
+  name: string;
+  /** reading.ts `RoomCode`. */
+  code: 'KITCHEN' | 'BEDROOM' | 'LIVING' | 'DINING' | 'STUDY' | 'TOILET' | 'BALCONY' | 'UTILITY' | 'OTHER';
+  widthMm: number;
+  depthMm: number;
+}
+
 export interface PlanUse {
   /** The platform run, mm, as confirmed. Null if the kitchen was unreadable. */
   kitchenRunMm: number | null;
@@ -145,6 +154,13 @@ export interface PlanUse {
   /** Where the carpet area on the brief came from. */
   /** 'society': taken from plans other homes in the building shared (society-library.ts). */
   areaSource: 'printed' | 'computed' | 'customer' | 'society' | null;
+  /**
+   * The rooms and their sizes, when the plan was the customer's own and read.
+   * They size the wardrobes and ceilings on the quote (floorplan/sizing.ts)
+   * and draw the 2D plan. Absent on older briefs and on a society's shared
+   * reading.
+   */
+  rooms?: PlanRoomSize[];
 }
 
 export interface Brief {

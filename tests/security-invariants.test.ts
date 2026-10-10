@@ -240,10 +240,40 @@ describe('security headers', () => {
     ).toMatch(/const dev = process\.env\.NODE_ENV === 'development'/);
   });
 
+  it('drops https-only headers for a local http test, and never on Vercel', () => {
+    // A phone on the office Wi-Fi tests a production build over plain http
+    // (8 Oct 2026). The relaxation must need an explicit opt-in AND refuse to
+    // apply on Vercel, so no deployment can ever ship without HSTS.
+    expect(config).toMatch(
+      /const plainHttp = process\.env\.LOCAL_HTTP_TEST === '1' && !process\.env\.VERCEL/,
+    );
+    expect(config).toContain("...(plainHttp ? [] : ['upgrade-insecure-requests'])");
+  });
+
   it('grants no permission the app does not use', () => {
     // camera=(self) and geolocation=(self) were allowed for features that do
     // not exist — useful only to somebody who finds an injection.
     expect(config).toContain('camera=()');
     expect(config).toContain('geolocation=()');
+  });
+});
+
+describe('sample-data deployments cannot reach a database', () => {
+  it('hasDatabase() is false with SAMPLE_DATA_ONLY, whatever DATABASE_URL says', async () => {
+    const { vi } = await import('vitest');
+    vi.stubEnv('DATABASE_URL', 'postgresql://real:real@db.example.com:5432/prod');
+    vi.stubEnv('SAMPLE_DATA_ONLY', '1');
+    const { hasDatabase, hasDirectDatabase } = await import('@/lib/env');
+    expect(hasDatabase()).toBe(false);
+    vi.stubEnv('DIRECT_URL', 'postgresql://real:real@db.example.com:5432/prod');
+    expect(hasDirectDatabase()).toBe(false);
+    vi.stubEnv('SAMPLE_DATA_ONLY', '');
+    expect(hasDatabase()).toBe(true);
+    vi.unstubAllEnvs();
+  });
+
+  it('the Prisma client is pointed away from the configured database', () => {
+    const src = read('src/lib/prisma.ts');
+    expect(src).toContain("datasourceUrl: 'postgresql://sample-data-only.invalid:5432/none'");
   });
 });

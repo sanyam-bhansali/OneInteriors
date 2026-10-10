@@ -8,8 +8,10 @@ import { formatINR, formatINRCompact } from '@/lib/money';
 import { briefByShareToken } from '@/modules/brief/share';
 import { cachedRoster } from '@/modules/studio/roster-cache';
 import { rankOnServer } from '@/modules/matching/rank-server';
-import { quoteBrief } from '@/modules/quotation/generate';
-import { compareQuotes } from '@/modules/quotation/price';
+import { buildFirstQuote, compareMany, homeShapeFor } from '@/modules/quotation/first-quote';
+import { resolveRatesForMany } from '@/modules/quotation/resolve-rates';
+import { hasRates } from '@/modules/quotation/rate-policy';
+import { deterministicSummary, roomSpreads, type Entry } from '@/modules/quotation/compare-insights';
 import { record } from '@/modules/analytics/record';
 import { PROPERTY_LABELS, SCOPE_LABELS, STYLE_LABELS } from '@/modules/brief/types';
 
@@ -34,6 +36,11 @@ import { PROPERTY_LABELS, SCOPE_LABELS, STYLE_LABELS } from '@/modules/brief/typ
  * snapshot would drift the moment a studio changed a rate, and the two of them
  * comparing different figures over dinner is worse than either figure being
  * slightly stale.
+ *
+ * It prices with the same engine and the same price list as the customer's
+ * own quotes (first-quote.ts on each studio's product master). It used the
+ * older six-line rate card until 11 Oct, which could show the spouse a
+ * different number from the one on the customer's screen.
  */
 
 export const metadata: Metadata = {
@@ -63,19 +70,32 @@ export default async function SharedPage({
 
   const studios = await cachedRoster();
   const ranked = (await rankOnServer(brief, studios, 9)).slice(0, MAX_COMPARE);
-  const result = await quoteBrief(
-    brief,
-    ranked.map((r) => r.studioId),
-  );
+  const picked = ranked.map((r) => studios.find((s) => s.id === r.studioId)).filter((s) => s !== undefined);
+  const rates = await resolveRatesForMany(picked.map((s) => s.slug));
+  const shape = homeShapeFor(brief);
 
-  if (!result.ok) notFound();
+  const entries: (Entry & { studioId: string })[] = picked.flatMap((s) => {
+    const r = rates[s.slug]?.rates;
+    if (!r || !hasRates(r)) return [];
+    const quote = buildFirstQuote(
+      {
+        ...shape,
+        kitchenRunMm: shape.plan?.kitchenRunMm ?? null,
+        runSource: shape.plan ? 'floor_plan' : 'standard',
+        curatedDiscountPct: s.matchingProfile?.curatedDiscountPct ?? null, modularDiscountPct: s.matchingProfile?.modularDiscountPct,
+      },
+      r,
+    );
+    return [{ studioId: s.id, slug: s.slug, name: s.tradeName, quote }];
+  });
 
-  await record('share.view', { studios: result.quotes.length });
+  if (entries.length === 0) notFound();
 
-  const comparison = compareQuotes(
-    result.quotes.map((q) => ({ studioId: q.studioId, quote: q.quote })),
-  );
-  const { summary } = result;
+  await record('share.view', { studios: entries.length });
+
+  const summary = deterministicSummary(entries, compareMany(entries));
+  const rooms = roomSpreads(entries);
+  const result = { quotes: entries.map((e) => ({ studioId: e.studioId, studioName: e.name, quote: e.quote })) };
 
   const home = brief.propertyType ? PROPERTY_LABELS[brief.propertyType] : 'A home';
   const scope = brief.scope ? SCOPE_LABELS[brief.scope] : null;
@@ -167,7 +187,7 @@ export default async function SharedPage({
               <thead>
                 <tr className="border-b-2 border-[var(--color-ink)]">
                   <th className="py-3 pr-4 text-left font-normal text-[var(--color-ink-3)]">
-                    Category
+                    Room
                   </th>
                   {result.quotes.map((q) => (
                     <th key={q.studioId} className="py-3 pl-4 text-right">
@@ -179,8 +199,8 @@ export default async function SharedPage({
                 </tr>
               </thead>
               <tbody>
-                {comparison.map((row) => (
-                  <tr key={row.category} className="border-b border-[var(--color-rule-soft)]">
+                {rooms.map((row) => (
+                  <tr key={row.room} className="border-b border-[var(--color-rule-soft)]">
                     <td className="py-3 pr-4 text-[var(--color-ink-2)]">
                       {row.label}
                       {row.spreadPaise > 0 ? (
@@ -189,12 +209,12 @@ export default async function SharedPage({
                         </span>
                       ) : null}
                     </td>
-                    {result.quotes.map((q) => {
-                      const amount = row.amounts[q.studioId];
-                      const isLowest = row.lowestStudioId === q.studioId;
+                    {entries.map((e) => {
+                      const amount = row.cells.find((c) => c.slug === e.slug)?.subtotalPaise ?? null;
+                      const isLowest = row.spreadPaise > 0 && amount === row.lowPaise;
                       return (
                         <td
-                          key={q.studioId}
+                          key={e.studioId}
                           className={`py-3 pl-4 text-right tabular-nums ${
                             isLowest ? 'text-[var(--color-ontrack)]' : 'text-[var(--color-ink)]'
                           }`}

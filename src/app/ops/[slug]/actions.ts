@@ -2,6 +2,12 @@
 
 import { revalidatePath } from 'next/cache';
 import {
+  approveDraftRun,
+  rejectDraft,
+  setDraftRate,
+  type DraftResult,
+} from '@/modules/studio-quote/product-drafts';
+import {
   recordCheck,
   setGstin,
   setStudioStatus,
@@ -288,4 +294,24 @@ export async function reanalyseArchiveAction(
     ok: true,
     message: 'Queued. Read them in your Claude app: /read-quotations — nothing is sent to the API from here.',
   };
+}
+
+// ── Product master read from their quotations (10 Oct 2026) ──
+
+/** Approve the owner's read: it goes into the studio's product master. */
+export async function approveDraftRunAction(studioId: string, slug: string, runId: string): Promise<DraftResult> {
+  const result = await approveDraftRun(studioId, runId);
+  if (result.ok) {
+    revalidatePath(`/ops/${slug}`);
+    revalidatePath('/studio', 'layout');
+  }
+  return result;
+}
+
+export async function setDraftRateAction(id: string, rupees: number): Promise<DraftResult> {
+  return setDraftRate(id, rupees);
+}
+
+export async function rejectDraftAction(id: string, note: string): Promise<DraftResult> {
+  return rejectDraft(id, note);
 }

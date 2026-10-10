@@ -1,0 +1,35 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": false,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://one-interiors-git-claude-detailed-review-planni-fd1989-kairos20.vercel.app"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://one-interiors-git-claude-detailed-review-planni-fd1989-kairos20.vercel.app"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://oneinteriors.in"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

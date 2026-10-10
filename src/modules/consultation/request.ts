@@ -86,10 +86,12 @@ export async function quotableStudioCount(): Promise<number> {
   try {
     const studios = await prisma.studio.findMany({
       where: { status: 'ACTIVE', pausedAt: null },
-      select: { id: true, rateCard: { select: { category: true, ratePaise: true } } },
+      select: { id: true, ratesFilledAt: true, rateCard: { select: { category: true, ratePaise: true } } },
     });
 
     return studios.filter((s) => {
+      // An approved product master is the price list now (one price list, 10 Oct).
+      if (s.ratesFilledAt) return true;
       const rates: Partial<Record<string, number>> = {};
       for (const item of s.rateCard) rates[item.category] = Number(item.ratePaise);
       return missingCoreRates(rates as never).length === 0;

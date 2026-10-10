@@ -566,6 +566,15 @@ export interface FiledRate {
    * something other than price.
    */
   spec?: string;
+  /**
+   * The studio's own price for the whole home, by bedroom count — for a
+   * per-carpet-sq-ft line (painting, electricals, false ceiling) that the
+   * studio prices per flat rather than per foot. When the flat's size is
+   * here it is used as is; otherwise `ratePaise` (derived from these)
+   * prices it per foot. Set only from a product master
+   * (`product-master-rates.ts`).
+   */
+  perBhkPaise?: Partial<Record<number, Paise>>;
 }
 
 export type StudioRates = Record<string, FiledRate>;

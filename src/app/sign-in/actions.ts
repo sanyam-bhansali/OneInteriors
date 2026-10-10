@@ -3,6 +3,7 @@
 import { headers } from 'next/headers';
 import { requestMagicLink } from '@/modules/auth/magic-link';
 import { requestOtp, verifyOtp } from '@/modules/auth/otp';
+import { requestOtpMessage, SIGN_IN_UNAVAILABLE, verifyOtpMessage } from '@/modules/auth/otp-messages';
 import { signInWithPassword } from '@/modules/auth/password-signin';
 import { signOut } from '@/modules/auth/session';
 import { redirect } from 'next/navigation';
@@ -160,8 +161,7 @@ export async function signInWithPasswordAction(
 // round trip asked someone to leave the site and find an inbox at the exact
 // moment they were one click from their quotes.
 
-const UNAVAILABLE =
-  'Sign-in is temporarily unavailable. This is our problem, not yours — try again shortly.';
+const UNAVAILABLE = SIGN_IN_UNAVAILABLE;
 
 export type OtpRequestResult =
   | { ok: true; devCode?: string }
@@ -185,17 +185,7 @@ export async function requestOtpAction(
 
     if (result.ok) return { ok: true, devCode: result.devCode };
 
-    return {
-      ok: false,
-      error:
-        result.reason === 'invalid_phone'
-          ? 'That does not look like an Indian mobile number.'
-          : result.reason === 'invalid_name'
-            ? 'Please tell us your name.'
-            : result.reason === 'cooldown'
-              ? 'Give it a few seconds before asking for another code.'
-              : 'Too many codes requested. Try again in fifteen minutes.',
-    };
+    return { ok: false, error: requestOtpMessage(result.reason) };
   } catch (error) {
     console.error('[sign-in] requestOtp threw:', error);
     return { ok: false, error: UNAVAILABLE };
@@ -229,17 +219,7 @@ export async function verifyOtpAction(
       return { ok: true };
     }
 
-    return {
-      ok: false,
-      error:
-        result.reason === 'expired'
-          ? 'That code has expired. Ask for a new one.'
-          : result.reason === 'too_many'
-            ? 'Too many wrong attempts. Ask for a new code.'
-            : result.reason === 'invalid_phone'
-              ? 'That does not look like an Indian mobile number.'
-              : 'That code is not right. Check the message and try again.',
-    };
+    return { ok: false, error: verifyOtpMessage(result.reason) };
   } catch (error) {
     console.error('[sign-in] verifyOtp threw:', error);
     return { ok: false, error: UNAVAILABLE };

@@ -7,9 +7,12 @@ import {
   setProductActive,
   setProductStandard,
   addProduct,
+  updateProduct,
+  type ProductEdit,
   type SaveResult,
 } from '@/modules/studio-quote/store';
 import type { QuoteUnitName, WorkCodeName } from '@/modules/studio-quote/pricing';
+import { confirmMyRates } from '@/modules/studio-quote/rates-gate';
 
 /**
  * The product master's writes.
@@ -58,6 +61,11 @@ export async function toggleActiveAction(id: string, isActive: boolean): Promise
   return done(await setProductActive(id, isActive));
 }
 
+/** Edit a product: name, unit, rooms, sizes, rules. Re-checked in the store. */
+export async function updateProductAction(id: string, input: ProductEdit): Promise<State> {
+  return done(await updateProduct(String(id), input));
+}
+
 export async function addProductAction(_prev: State, form: FormData): Promise<State> {
   const rupees = Number(String(form.get('rate') ?? '0').trim() || '0');
   if (!Number.isFinite(rupees) || rupees < 0) {
@@ -85,4 +93,19 @@ export async function addProductAction(_prev: State, form: FormData): Promise<St
  */
 export async function toggleStandardAction(id: string, standard: boolean): Promise<State> {
   return done(await setProductStandard(id, standard));
+}
+
+/**
+ * The studio says the rates we filled from its quotations are right.
+ *
+ * Opens the quotation builder — see `rates-gate.ts`. Every figure on the
+ * page stays editable afterwards; confirming is "these are mine now", not a
+ * lock.
+ */
+export async function confirmRatesAction(_prev: State | null): Promise<State> {
+  const result = await confirmMyRates();
+  if (result.ok) {
+    revalidatePath('/studio', 'layout');
+  }
+  return result;
 }

@@ -186,7 +186,7 @@ export async function setStudioStatus(
     await prisma.$transaction(async (tx) => {
       const before = await tx.studio.findUniqueOrThrow({
         where: { id: studioId },
-        select: { status: true, tier: true, tradeName: true },
+        select: { status: true, tier: true, tradeName: true, gstin: true },
       });
 
       /* The owner's rule (30 Sep 2026): nobody is listed until at least
@@ -199,7 +199,15 @@ export async function setStudioStatus(
         if (blockers.length > 0) throw new ApprovalBlocked(blockers);
       }
 
-      await tx.studio.update({ where: { id: studioId }, data: { status } });
+      /* Removing a studio frees its GSTIN (owner, 9 Oct 2026). The column is
+         unique, so a removed row kept the number forever and the same
+         business could not be onboarded again — not even to redo a botched
+         first attempt. The number is kept in the audit entry below. */
+      const freesGstin = status === 'REMOVED' && before.gstin !== null;
+      await tx.studio.update({
+        where: { id: studioId },
+        data: { status, ...(freesGstin ? { gstin: null } : {}) },
+      });
       const tier = await refreshTier(tx, studioId);
 
       /**
@@ -242,8 +250,8 @@ export async function setStudioStatus(
         `studio.status.${status.toLowerCase()}`,
         'Studio',
         studioId,
-        { status: before.status, tier: before.tier },
-        { status, tier, reason: trimmed },
+        { status: before.status, tier: before.tier, ...(freesGstin ? { gstin: before.gstin } : {}) },
+        { status, tier, reason: trimmed, ...(freesGstin ? { gstinReleased: true } : {}) },
       );
     });
 

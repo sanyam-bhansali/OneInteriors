@@ -133,17 +133,21 @@ export function Logotype({
 export function Wordmark({
   className = '',
   showCity = true,
+  inherit = false,
 }: {
   className?: string;
   showCity?: boolean;
+  /** Take the colour of the surrounding text — the customer side's ink is not the old palette's. */
+  inherit?: boolean;
 }) {
+  const ink = inherit ? 'text-current' : 'text-[var(--color-ink)]';
   return (
     <span className={`inline-flex items-baseline gap-2.5 ${className}`}>
       {/* Height-locked, width auto: the artwork is 2.6:1, and pinning
           both axes on a square would squash it. */}
       <svg
         viewBox={`0 0 ${WORD_W} ${WORD_H}`}
-        className="h-[22px] w-auto shrink-0 self-center text-[var(--color-ink)]"
+        className={`h-[22px] w-auto shrink-0 self-center ${ink}`}
         role="img"
         aria-label="One Interiors"
       >
@@ -154,7 +158,7 @@ export function Wordmark({
         {/* Tracked and lowercase, the way the artwork sets it. Weight
             300 so it sits under the mark rather than competing with it —
             the logo is the loud part and this is the noun. */}
-        <span className="whitespace-nowrap text-[19px] font-light leading-none tracking-[0.08em] text-[var(--color-ink)]">
+        <span className={`whitespace-nowrap text-[19px] font-light leading-none tracking-[0.08em] ${ink}`}>
           interiors
         </span>
         {showCity ? (

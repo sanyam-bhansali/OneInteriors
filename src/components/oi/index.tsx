@@ -84,7 +84,7 @@ export function Sheet({
 }) {
   return (
     <Tag
-      className={`border border-[var(--line)] bg-[var(--card)] ${className}`}
+      className={`rounded-[clamp(20px,2.4vw,32px)] bg-[var(--card)] ${className}`}
       style={lifted ? { boxShadow: '0 26px 50px -34px rgba(44,38,36,.45)' } : undefined}
     >
       {children}
@@ -117,7 +117,7 @@ export function Chapter({
     <header className={`mb-10 flex flex-wrap items-end justify-between gap-x-10 gap-y-5 ${className}`}>
       <div className="min-w-0">
         <p className="oi-eyebrow m-0 mb-4">{eyebrow}</p>
-        <h1 className="oi-display m-0 max-w-[24ch] text-[clamp(1.75rem,1.1rem+2.1vw,2.6rem)]">
+        <h1 className="oi-display m-0 max-w-[20ch] text-[clamp(2rem,1.1rem+3.4vw,4.2rem)] leading-[1.02] tracking-[-0.035em]">
           {title}
         </h1>
         {children ? (
@@ -151,8 +151,11 @@ export function DocRow({
   note,
   better = false,
   emphasis = false,
+  action,
 }: {
   label: string;
+  /** A small control beside the label — the quiz's "Edit". */
+  action?: React.ReactNode;
   /** "1800 × 2100 mm · 12.4 sq ft". Mono, and the point of the row. */
   quantity?: string;
   /** Money or a spec. Mono, always. */
@@ -191,10 +194,13 @@ export function DocRow({
           }
         >
           {label}
+          {action ? <span className="ml-2.5 inline-block align-middle">{action}</span> : null}
         </span>
         {value ? (
           <span
-            className={`oi-num ${emphasis ? 'text-[19px]' : 'text-[14.5px]'}`}
+            /* Money never wraps; a long spec ("Contemporary Minimal, Warm
+               Modern, …") must, or it runs out of its card. */
+            className={`${value.length > 22 ? 'oi-mono min-w-0 text-right' : 'oi-num'} ${emphasis ? 'text-[19px]' : 'text-[14.5px]'}`}
             style={better ? { color: 'var(--sec-ink)' } : undefined}
           >
             {value}
@@ -209,7 +215,7 @@ export function DocRow({
           because these are figures; everything that made it hard to read has
           gone. */}
       {quantity ? (
-        <p className="oi-num m-0 mt-1.5 text-[12.5px] leading-snug text-[var(--ink2)]">
+        <p className="oi-mono m-0 mt-1.5 text-[12.5px] leading-snug text-[var(--ink2)]">
           {quantity}
         </p>
       ) : null}

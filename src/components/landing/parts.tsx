@@ -232,7 +232,7 @@ export function Flag({ children }: { children: React.ReactNode }) {
           words use --acc-ink, which is the same hue dark enough to read
           at 9.5px. See the token block in globals.css. */}
       <span
-        className="oi-num text-[9.5px] uppercase tracking-[0.16em]"
+        className="oi-mono text-[9.5px] uppercase tracking-[0.16em]"
         style={{ color: 'var(--acc-ink)' }}
       >
         {children}

@@ -17,11 +17,16 @@
  * it, and a list of totals hides exactly that.
  *
  * So: generate it here, read it here, and send it to compare deliberately.
+ *
+ * The studio's page is not on the landing canvas, but the quote is the same
+ * document as on /match (owner, 10 Oct 2026: the landing's look through the
+ * flow). So this carries `cb cb-part` itself — the landing's tokens, type
+ * and pills for what it renders, nothing for the page around it.
  */
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { formatINRCompact } from '@/lib/money';
+import { Pill } from '@/components/home/parts';
 import {
   loadProject,
   saveProject,
@@ -31,7 +36,11 @@ import {
 import { loadBrief } from '@/modules/brief/store';
 import { QuoteFlow, QuoteDocument, type QuoteRequest } from './QuoteFlow';
 import { homeShapeFor } from '@/modules/quotation/first-quote';
-import { Sheet, Quiet } from './index';
+import { useLang, useSiteT } from '@/components/app/i18n';
+import { OI_DICT } from '@/modules/i18n/site/oi';
+
+/** A `.cb` part sits on the page's own ground and never clips its children. */
+const CB_PART = { background: 'transparent', overflowX: 'visible' } as const;
 
 export function StudioQuotePanel({
   studioSlug,
@@ -40,6 +49,8 @@ export function StudioQuotePanel({
   studioSlug: string;
   studioName: string;
 }) {
+  const t = useSiteT(OI_DICT);
+  const lang = useLang();
   const [project, setProject] = useState<Project | null>(null);
   const [request, setRequest] = useState<QuoteRequest | null>(null);
   const [briefed, setBriefed] = useState(false);
@@ -70,19 +81,22 @@ export function StudioQuotePanel({
 
   if (!briefed) {
     return (
-      <Sheet className="p-6">
-        <p className="oi-eyebrow m-0 mb-3">Your quote</p>
-        <p className="m-0 mb-5 max-w-[52ch] text-[14.5px] leading-[1.6] text-[var(--ink2)]">
-          About four minutes on your flat and we will price this studio line by line —
-          in about ten seconds, with every line carrying a quantity.
-        </p>
-        <Quiet href="/quiz">Start the brief</Quiet>
-      </Sheet>
+      <div className="cb cb-part" style={CB_PART}>
+        <div className="flow-card">
+          <p className="eyebrow">{t('panel.eyebrow')}</p>
+          <p className="m-0 mb-6 max-w-[52ch] text-[15.5px] leading-[1.6] text-[var(--ink-2)]">
+            {t('panel.noBrief')}
+          </p>
+          <Pill href="/quiz" arrow>
+            {t('panel.start')}
+          </Pill>
+        </div>
+      </div>
     );
   }
 
   return (
-    <section id="quote" className="flex flex-col gap-5">
+    <section id="quote" className="cb cb-part flex flex-col gap-5" style={CB_PART}>
       {stored ? (
         <>
           <QuoteDocument
@@ -91,9 +105,11 @@ export function StudioQuotePanel({
             plan={project.plan ?? { fileName: null, kitchenRunMm: null, source: 'standard' }}
           />
 
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* A choice you toggle, so the flow's option pill — ink while it is in. */}
             <button
               type="button"
+              aria-pressed={inCompare}
               onClick={() =>
                 update({
                   ...project,
@@ -102,35 +118,29 @@ export function StudioQuotePanel({
                     : [...project.comparing, studioSlug],
                 })
               }
-              className="cursor-pointer border px-5 py-3 text-[14px] font-medium transition-colors disabled:opacity-40"
-              style={{
-                borderColor: inCompare ? 'var(--acc)' : 'var(--line)',
-                background: inCompare ? 'var(--acc-wash)' : 'var(--card)',
-              }}
+              className="flow-opt"
             >
-              {inCompare ? 'In your comparison' : 'Add to compare'}
+              {inCompare ? t('panel.inCompare') : t('panel.addCompare')}
             </button>
 
             {project.comparing.length >= MIN_TO_COMPARE ? (
-              <Link
-                href="/compare"
-                className="px-5 py-3 text-[14px] font-medium text-white no-underline"
-                style={{ background: 'var(--acc-btn)' }}
-              >
-                Compare {project.comparing.length} line for line
-              </Link>
+              <Pill href="/compare" arrow>
+                {t('panel.compareN', { n: project.comparing.length })}
+              </Pill>
             ) : (
-              <span className="text-[13.5px] text-[var(--ink2)]">
+              <span className="text-[14px] text-[var(--ink-2)]">
                 {quotedCount < 2
-                  ? 'Price one more studio to compare them.'
-                  : 'Add a second quote to compare.'}
+                  ? t('panel.priceOneMore')
+                  : t('panel.addSecond')}
               </span>
             )}
 
-            <span className="oi-num text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink2)]">
-              Built {new Date(stored.builtAt).toLocaleDateString('en-IN', {
-                day: 'numeric',
-                month: 'short',
+            <span className="text-[13px] tabular-nums text-[var(--ink-2)]">
+              {t('panel.built', {
+                date: new Date(stored.builtAt).toLocaleDateString(lang === 'en' ? 'en-IN' : `${lang}-IN`, {
+                  day: 'numeric',
+                  month: 'short',
+                }),
               })}
               {' · '}
               {formatINRCompact(stored.quote.totalPaise)}

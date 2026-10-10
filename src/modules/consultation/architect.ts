@@ -47,17 +47,18 @@ export interface Architect {
 export const ARCHITECT_IS_REAL = true;
 
 /**
- * The owner's named expert, 30 Sep 2026. Three colleagues cover her hours
- * when she is away; the booking takes whoever holds the slot. Years
- * practising and the COA number are still to come from the owner — shown
- * only once they are real.
+ * The owner's named expert: Meera, confirmed real on 9 Oct 2026 (the v79
+ * app design uses her name throughout). Colleagues cover her hours when she
+ * is away; the booking takes whoever holds the slot. Surname, years
+ * practising and any registration are still to come from the owner — shown
+ * only once they are real, so no title is put in front of her name.
  */
 export const ARCHITECT: Architect = {
-  name: 'Ar. Swarupa Tondare',
-  role: 'Architect, One Interiors',
+  name: 'Meera',
+  role: 'Your One Interiors expert',
   years: null,
   briefsRead: null,
-  credential: 'Architect',
+  credential: 'Interior expert',
   says:
     'I read your brief, your floor plan and every quote before we speak, so the call starts where the studios differ rather than at your requirements. No studio pays me — if none of them suits your home, I will tell you so, and there is nothing on this call to buy.',
 };

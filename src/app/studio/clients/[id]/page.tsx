@@ -12,6 +12,9 @@ import { Timeline } from './Timeline';
 import { BriefPanel } from './BriefPanel';
 import { Duplicates } from './Duplicates';
 import { LogContact } from './LogContact';
+import { FinalQuote } from './FinalQuote';
+import { IntroAnswer } from './IntroAnswer';
+import { introStateForClient } from '@/modules/studio/introduction';
 
 export const metadata: Metadata = {
   title: 'Lead',
@@ -49,10 +52,11 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   /* Both in parallel. The brief panel only exists for a marketplace lead,
      and marketplaceContextFor returns null for everything else without a
      second round trip to find that out. */
-  const [events, brief, dupes] = await Promise.all([
+  const [events, brief, dupes, intro] = await Promise.all([
     timelineFor(id),
     client.fromMarketplace ? marketplaceContextFor(id) : Promise.resolve(null),
     duplicatesOf(id),
+    client.fromMarketplace ? introStateForClient(id) : Promise.resolve(null),
   ]);
 
   return (
@@ -103,9 +107,21 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
               </div>
             ) : null}
 
+            {intro ? (
+              <div className="mb-5">
+                <IntroAnswer state={intro} />
+              </div>
+            ) : null}
+
             {brief ? (
               <div className="mb-5">
                 <BriefPanel ctx={brief} />
+              </div>
+            ) : null}
+
+            {client.fromMarketplace ? (
+              <div className="mb-5">
+                <FinalQuote clientId={client.id} />
               </div>
             ) : null}
 

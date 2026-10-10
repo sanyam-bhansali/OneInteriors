@@ -17,8 +17,8 @@ export type AppointmentStatusName =
   | 'CANCELLED';
 export type NoShowPartyName = 'CUSTOMER' | 'STUDIO';
 
-/** Who is asking. Ops can do everything a studio can, and more. */
-export type Actor = 'STUDIO' | 'OPS';
+/** Who is asking. Ops can do everything a studio can, and more. The customer only answers a proposed time. */
+export type Actor = 'STUDIO' | 'OPS' | 'CUSTOMER';
 
 export const KIND_LABELS: Record<AppointmentKindName, string> = {
   FIRST_MEETING: 'First meeting',
@@ -60,6 +60,13 @@ const TRANSITIONS: Record<AppointmentStatusName, AppointmentStatusName[]> = {
  */
 const STUDIO_MAY: AppointmentStatusName[] = ['CONFIRMED', 'COMPLETED', 'CANCELLED'];
 
+/**
+ * What the CUSTOMER may do: say yes or no to a time the studio proposed
+ * (v79 "Meet your studios"). Whether a visit happened is not theirs to
+ * record, for the same reason it is not the studio's.
+ */
+const CUSTOMER_MAY: AppointmentStatusName[] = ['CONFIRMED', 'CANCELLED'];
+
 export function canTransition(
   from: AppointmentStatusName,
   to: AppointmentStatusName,
@@ -67,6 +74,7 @@ export function canTransition(
 ): boolean {
   if (!TRANSITIONS[from].includes(to)) return false;
   if (actor === 'OPS') return true;
+  if (actor === 'CUSTOMER') return from === 'PROPOSED' && CUSTOMER_MAY.includes(to);
   return STUDIO_MAY.includes(to);
 }
 

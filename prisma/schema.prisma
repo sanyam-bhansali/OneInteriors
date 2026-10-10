@@ -73,15 +73,18 @@ model User {
   reviewedDocs  StudioDocument[]  @relation("StudioDocumentReviewer")
   reviewedRates StudioFiledRate[] @relation("FiledRateReviewer")
 
-  @@index([role])
-  @@map("users")
-
   /// OneReferrals: this customer's personal code (modules/portal/referral.ts).
   /// Made the first time "Your home" is opened.
-  referralCode String?       @unique
+  referralCode String? @unique
 
   expertHours  ExpertHours[] @relation("ExpertHours")
   expertBlocks ExpertBlock[] @relation("ExpertBlocks")
+
+  /// Phones signed in to the app, for push (docs/CUSTOMER-PLATFORM-PLAN.md).
+  pushDevices PushDevice[]
+
+  @@index([role])
+  @@map("users")
 }
 
 /// Who a social sign-in provider says this user is. Google since 29 Sep
@@ -310,8 +313,8 @@ model Brief {
   budgetMaxPaise BigInt?
 
   // Q4 / Q5 — style image picks resolve to tag slugs
-  styleLikes    String[] @default([])
-  styleDislikes String[] @default([]) // HARD FILTER, not a weight
+  styleLikes       String[] @default([])
+  styleDislikes    String[] @default([]) // HARD FILTER, not a weight
   /// Studios whose own portfolio photo they picked in the style picker —
   /// shown unnamed, with the studio's consent (brief/picker-photos.ts).
   styleStudioPicks String[] @default([])
@@ -382,10 +385,6 @@ model Brief {
   shareToken String?   @unique
   sharedAt   DateTime?
 
-  @@index([locality, completedAt])
-  @@index([anonKey])
-  @@map("briefs")
-
   societyPlan SocietyPlan?
 
   /// The referral code this customer arrived through, if any — set once,
@@ -401,6 +400,10 @@ model Brief {
   followedUpAt    DateTime?
   /// Calls made without reaching them (NO_ANSWER / CALL_BACK). Stops at three.
   followUpTries   Int       @default(0)
+
+  @@index([locality, completedAt])
+  @@index([anonKey])
+  @@map("briefs")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -591,6 +594,14 @@ model Studio {
   /// with itself, and knowing WHEN something was hidden is free.
   hiddenAsTestAt DateTime?
 
+  /// When ops approved a product master read from this studio's own
+  /// quotations and it was written into StudioProduct. The studio is then
+  /// asked to check it. See `modules/studio-quote/rates-gate.ts`.
+  ratesFilledAt    DateTime?
+  /// When the studio checked those rates and said they were right. Until
+  /// then the quotation builder stays shut. Null for a studio that has not.
+  ratesConfirmedAt DateTime?
+
   // Commercial
   minProjectPaise BigInt?
   maxProjectPaise BigInt?
@@ -718,6 +729,8 @@ model Studio {
   // The studio's own software. See the section at the foot of this file.
   branding           StudioBranding?
   products           StudioProduct[]
+  productDrafts      StudioProductDraft[]
+  productBackups     StudioProductBackup[]
   studioQuotes       StudioQuote[]
   studioClients      StudioClient[]
   studioClientEvents StudioClientEvent[]
@@ -1326,28 +1339,262 @@ model HomeProject {
   /// Stage keys marked done (TRACKER_STAGES).
   doneStages     String[]     @default([])
 
+  /// Set when the customer signed the studio's final quote in the app (v79
+  /// "Choose & sign"). Null on trackers ops started by hand before that.
+  signedAt      DateTime?
+  /// The StudioQuote they signed. Its issued lines are the locked price.
+  signedQuoteId String?   @unique
+  /// The locked total, GST included. The money the customer pays the studio
+  /// directly; One Interiors only keeps track of it.
+  contractPaise BigInt?
+  /// The payment stages as signed, [{ label, pct, amountPaise }] — copied, so
+  /// a later change to the studio's schedule never rewrites a signed one.
+  paymentPhases Json?
+  /// When each stage was paid, by index into paymentPhases: [{ index, paidOn }].
+  /// Marked by the studio or ops; read by the customer's payment view.
+  paidPhases    Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  updates HomeProjectUpdate[]
+  updates   HomeProjectUpdate[]
+  decisions HomeDecision[]
+  snags     HomeSnag[]
+  documents HomeDocument[]
+  family    FamilyMember[]
 
   @@map("home_projects")
 }
 
-/// A dated note on the project — "Kitchen carcasses delivered to site".
-model HomeProjectUpdate {
+/// A choice the customer has to make by a date (the app's "Decision with a
+/// deadline"): posted by the studio or ops, made by the customer.
+model HomeDecision {
+  id        String      @id @default(cuid())
+  projectId String
+  project   HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  title String
+  /// What waiting costs, in the studio's words: "Shutters are cut next week…".
+  why   String   @db.Text
+  dueOn DateTime
+
+  /// [{ name, note, extraPaise (0 = in the quote), swatch? }]. Validated by
+  /// modules/portal/decisions.ts on the way in; never trusted on the way out.
+  options Json
+
+  /// Index into `options`, once chosen.
+  chosenIndex Int?
+  chosenAt    DateTime?
+  chosenById  String?
+
+  postedById String
+  byStudio   Boolean   @default(false)
+  /// Set when the 2-days-left reminder went out, so it goes out once.
+  remindedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  votes DecisionVote[]
+
+  @@index([projectId, dueOn])
+  @@map("home_decisions")
+}
+
+/// v79 engagement (9 Oct 2026). Home Coins: one row per thing that earned
+/// coins. 1 coin = ₹1 with partner brands; never spendable on the studio's
+/// bill and never cashed out (owner's rules). Each thing earns once: the
+/// unique (userId, kind, ref) is what makes every award idempotent.
+model CoinEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  /// QUIZ, SIGNED, DAILY_UPDATE, STREAK_7, DECISION_ON_TIME, SNAG_PHOTO,
+  /// CHALLENGE, SHARE_MILESTONE, FAMILY_JOINED, REFERRAL_SIGNED, SOCIETY_CIRCLE.
+  kind      String
+  coins     Int
+  /// What earned it: "decision:<id>", "day:2026-10-09", "society:<key>".
+  ref       String
+  note      String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, kind, ref])
+  @@index([userId, createdAt])
+  @@map("coin_entries")
+}
+
+/// Family on a project: invited by the owner on WhatsApp, joined by signing
+/// in with the invited number. Family see the project and vote on
+/// decisions; only the owner decides and approves payments.
+model FamilyMember {
   id          String      @id @default(cuid())
   projectId   String
   project     HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  invitedById String
+  name        String
+  relation    String?
+  /// Normalised "+91…", matched against the number they sign in with.
+  phone       String
+  inviteToken String      @unique
+  /// Their account, once joined.
+  userId      String?
+  joinedAt    DateTime?
+  removedAt   DateTime?
+  createdAt   DateTime    @default(now())
+
+  @@unique([projectId, phone])
+  @@index([userId])
+  @@map("family_members")
+}
+
+/// A family vote on a decision. Advice to the owner, who still chooses.
+model DecisionVote {
+  id          String       @id @default(cuid())
+  decisionId  String
+  decision    HomeDecision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+  userId      String
+  optionIndex Int
+  note        String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([decisionId, userId])
+  @@map("decision_votes")
+}
+
+/// Dream board: photos a customer saves, which their studio can see.
+model DreamPin {
+  id        String   @id @default(cuid())
+  userId    String
+  /// Private storage key in site-photos (dream/<userId>/…).
+  photoPath String
+  note      String?
+  createdAt DateTime @default(now())
+  deletedAt DateTime?
+
+  @@index([userId, createdAt])
+  @@map("dream_pins")
+}
+
+/// "Spot the mistake": one real site photo a week, set by ops, with where
+/// the mistake is (as fractions of the photo) and what it teaches.
+model WeeklyChallenge {
+  id          String   @id @default(cuid())
+  /// Monday of the week it runs, IST.
+  weekOf      DateTime @unique
+  photoPath   String
+  x           Float
+  y           Float
+  radius      Float
+  answer      String
+  explain     String   @db.Text
+  createdById String
+  createdAt   DateTime @default(now())
+
+  answers ChallengeAnswer[]
+
+  @@map("weekly_challenges")
+}
+
+model ChallengeAnswer {
+  id          String          @id @default(cuid())
+  challengeId String
+  challenge   WeeklyChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  userId      String
+  correct     Boolean
+  createdAt   DateTime        @default(now())
+
+  @@unique([challengeId, userId])
+  @@map("challenge_answers")
+}
+
+/// Something wrong on site, to be fixed by a date (the app's "Snags").
+/// Raised by the customer or at the handover walk-through; closed by the studio.
+model HomeSnag {
+  id        String      @id @default(cuid())
+  projectId String
+  project   HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  title      String
+  room       String?
+  note       String?  @db.Text
+  /// Paths in the private `site-photos` bucket, served only as signed links.
+  photoPaths String[] @default([])
+
+  raisedById      String
+  raisedByStudio  Boolean   @default(false)
+  fixBy           DateTime?
+  /// "OPEN" | "FIXED"
+  status          String    @default("OPEN")
+  fixedAt         DateTime?
+  fixedNote       String?   @db.Text
+  fixedPhotoPaths String[]  @default([])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId, status])
+  @@map("home_snags")
+}
+
+/// A document on a customer's project — the agreement, the signed quote,
+/// drawings, receipts, warranties — uploaded by the studio or ops, read by the
+/// customer in the app's Locker. Stored in the private `project-docs` bucket.
+model HomeDocument {
+  id        String      @id @default(cuid())
+  projectId String
+  project   HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// AGREEMENT | QUOTATION | DRAWINGS | RECEIPT | WARRANTY | OTHER
+  kind         String
+  title        String
+  storageKey   String
+  originalName String
+  contentType  String
+  bytes        Int
+
+  uploadedById String
+  byStudio     Boolean @default(false)
+
+  createdAt DateTime  @default(now())
+  /// Soft delete: a removed document stops showing and stays for the record.
+  deletedAt DateTime?
+
+  @@index([projectId, createdAt])
+  @@map("home_documents")
+}
+
+/// A phone signed in to the app. The Expo push token is what a push is sent
+/// to; a token the push service reports as gone is deleted.
+model PushDevice {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  token    String @unique
+  /// "ios" | "android"
+  platform String
+
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@map("push_devices")
+}
+
+/// A dated note on the project — "Kitchen carcasses delivered to site".
+model HomeProjectUpdate {
+  id         String      @id @default(cuid())
+  projectId  String
+  project    HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
   /// The stage it belongs to, if any.
-  stage       String?
-  note        String      @db.Text
-  postedById  String
+  stage      String?
+  note       String      @db.Text
+  postedById String
   /// Posted by the studio doing the work, not by us (queue item 22).
-  byStudio    Boolean     @default(false)
+  byStudio   Boolean     @default(false)
   /// Site photographs: paths in the private `site-photos` bucket, served
   /// only through short-lived signed links (storage/site-photos.ts).
-  photoPaths  String[]    @default([])
+  photoPaths String[]    @default([])
 
   createdAt DateTime @default(now())
 
@@ -1362,10 +1609,10 @@ model HomeProjectUpdate {
 /// offered only once two or more homes agree (modules/floorplan/society-library.ts).
 /// One row per brief: a customer who corrects their plan corrects their row.
 model SocietyPlan {
-  id             String   @id @default(cuid())
-  briefId        String   @unique
+  id             String @id @default(cuid())
+  briefId        String @unique
   /// Deleted with the brief — an erasure request takes these sizes too.
-  brief          Brief    @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  brief          Brief  @relation(fields: [briefId], references: [id], onDelete: Cascade)
   /// Lower-case letters and digits of the society name, so "Sapphire Heights"
   /// and "sapphire heights " are one building.
   societyKey     String
@@ -1421,9 +1668,9 @@ model ExpertHours {
 
 /// A day an expert is away. No slots are offered on it.
 model ExpertBlock {
-  id           String @id @default(cuid())
+  id           String  @id @default(cuid())
   expertUserId String
-  expert       User   @relation("ExpertBlocks", fields: [expertUserId], references: [id], onDelete: Cascade)
+  expert       User    @relation("ExpertBlocks", fields: [expertUserId], references: [id], onDelete: Cascade)
   /// IST date, YYYY-MM-DD.
   day          String
   reason       String?
@@ -1492,6 +1739,13 @@ model Introduction {
   /// only place that decision is made.
   withdrawnAt     DateTime?
   withdrawnReason String?
+
+  /// The studio's answer. Accepting says they will call the customer;
+  /// declining (with a reason) hands the introduction back to ops to place
+  /// elsewhere. Neither set means they have not answered yet.
+  studioAcceptedAt    DateTime?
+  studioDeclinedAt    DateTime?
+  studioDeclineReason String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1845,6 +2099,16 @@ model StudioBranding {
   feeBps              Int    @default(700)
   discountBps         Int    @default(0)
   bookingAdvancePaise BigInt @default(2500000)
+  /// GST a new quotation starts with: 0 (off) or 1800.
+  gstBps              Int    @default(0)
+
+  /// The material specification printed on every quotation:
+  /// [{ item, spec }] — "Plywood" / "Century BWP 710, 18 mm". The
+  /// studio's own brands; null prints no table.
+  materialSpec Json?
+
+  /// How many days a quotation holds its prices. Printed as "valid until".
+  validityDays Int @default(30)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1889,6 +2153,13 @@ model StudioProduct {
   /// the studio ticks what they actually fit as standard, once, and
   /// every later quotation starts from their own practice.
   inStandardBuild Boolean @default(false)
+
+  /// First-quote rules, as in the Hauspire builder: `perBath`, `perBed`,
+  /// `useRun` (kitchen width follows the run), `balcony` (only with a dry
+  /// balcony), `bhk` ("1BHK".."4BHK": only for that size of home), and a
+  /// default `sqft` / `rft` for those units. Loose JSON because rules are
+  /// added as studios teach us their habits.
+  rules Json?
 
   sortOrder Int     @default(100)
   isActive  Boolean @default(true)
@@ -1968,6 +2239,27 @@ model StudioQuote {
   discountBps         Int
   onSpotPaise         BigInt @default(0)
   bookingAdvancePaise BigInt
+
+  /// GST on this quotation, basis points: 0 (off) or 1800. Charged after
+  /// every discount, on what the client pays for the work.
+  gstBps Int @default(0)
+
+  /// The name of the flat discount above — "On-spot", "Festive",
+  /// "Referral". Null prints as "Additional discount".
+  onSpotLabel String?
+
+  /// The date printed on the quotation. Null means the day it was made.
+  quoteDate DateTime? @db.Date
+
+  /// The studio's payment schedule as it stood when this was made
+  /// ([{ label, pct }], `payment-phases.ts`). Null means the studio's
+  /// current one, or the standard stages when it has none.
+  phases Json?
+
+  /// The quotation this one was made from: a Design Final points at its
+  /// Sales Final, so the two can be compared line by line. Null for a
+  /// quotation written fresh or copied as a template.
+  basedOnId String?
 
   /// Their words on this document, snapshotted for the same reason.
   welcomeNote String? @db.Text
@@ -2978,6 +3270,7 @@ model QuotationArchive {
   analysedAt    DateTime?
 
   files      QuotationFile[]
+  drafts     StudioProductDraft[]
   filedRates StudioFiledRate[]
 
   @@index([studioId, uploadedAt])
@@ -3165,15 +3458,15 @@ model WaitlistSignup {
 
   /// Their personal link's code (oneinteriors.in/?r=CODE). Everyone who
   /// joins through it moves them up the queue (modules/waitlist/queue.ts).
-  referralCode   String?   @unique
+  referralCode   String? @unique
   /// Whose link brought them — another row's referralCode.
   referredByCode String?
 
   /// The optional "skip 20 places" answers, given after joining.
-  possession     String?   // HAVE_KEYS | WITHIN_3_MONTHS | LATER
-  bhk            String?   // 1 | 2 | 3 | 4+
-  society        String?
-  extrasAt       DateTime?
+  possession String? // HAVE_KEYS | WITHIN_3_MONTHS | LATER
+  bhk        String? // 1 | 2 | 3 | 4+
+  society    String?
+  extrasAt   DateTime?
 
   /// When the welcome message went out, and on which channel.
   welcomedAt     DateTime?
@@ -3187,4 +3480,67 @@ model WaitlistSignup {
   @@index([referredByCode])
   @@index([society])
   @@map("waitlist_signups")
+}
+
+/// A product-master row read from a studio's own quotations, waiting for ops.
+///
+/// Written by the owner's local read (`/read-quotations` in Claude Code —
+/// docs/READ-QUOTATIONS.md), never by the web app: reading quotations through
+/// the API from a request got stuck and ran up the bill (10 Oct 2026). Ops
+/// approves the run on /ops/[slug], which upserts these into StudioProduct
+/// and asks the studio to check them. Same shape as StudioProduct on purpose.
+/// A copy of a studio's whole product master, taken before anything replaces
+/// it in bulk (an approved quotation read). Restored from the laptop with
+/// `scripts/quotations/restore.ts`. Rates are private: ops and the owner only.
+model StudioProductBackup {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  /// Why it was taken: "before approving run-…".
+  reason String
+  /// Every product row as it stood, rates in paise as strings.
+  rows   Json
+  takenAt DateTime @default(now())
+
+  @@index([studioId, takenAt])
+  @@map("studio_product_backups")
+}
+
+model StudioProductDraft {
+  id        String            @id @default(cuid())
+  studioId  String
+  studio    Studio            @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  archiveId String?
+  archive   QuotationArchive? @relation(fields: [archiveId], references: [id], onDelete: SetNull)
+  /// One read = one run; a newer run supersedes the older PENDING rows.
+  runId     String
+
+  name            String
+  code            StudioWorkCode @default(MODULAR)
+  unit            QuoteUnit      @default(AREA)
+  details         String?        @db.Text
+  ratePaise       BigInt
+  rooms           String[]
+  defaultWidthMm  Int?
+  defaultHeightMm Int?
+  defaultQty      Int?
+  inStandardBuild Boolean        @default(false)
+  rules           Json?
+  sortOrder       Int            @default(100)
+
+  /// How many of the studio's quotations this rate was seen in, and the
+  /// spread, so ops can tell a firm rate from a guess.
+  fromQuotations Int  @default(0)
+  evidence       Json?
+
+  /// PENDING | APPROVED | REJECTED | SUPERSEDED
+  state        String    @default("PENDING")
+  note         String?
+  createdAt    DateTime  @default(now())
+  reviewedAt   DateTime?
+  reviewedById String?
+
+  @@index([studioId, state])
+  @@map("studio_product_drafts")
 }

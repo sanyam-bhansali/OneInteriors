@@ -7,6 +7,7 @@ import { UNIT_LABELS, WORK_CODE_LABELS, type QuoteUnitName, type WorkCodeName } 
 import type { ProductRow } from '@/modules/studio-quote/store';
 import { saveRateAction, addProductAction, toggleStandardAction } from './actions';
 import { IDLE } from '../form-state';
+import { ProductEditor } from './ProductEditor';
 
 const input =
   'rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[14px] text-[var(--s-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]';
@@ -111,6 +112,7 @@ function StandardCell({ product }: { product: ProductRow }) {
 
 export function ProductTable({ products }: { products: ProductRow[] }) {
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
   const [addState, addAction, addPending] = useActionState(addProductAction, IDLE);
 
   const grouped = ROOM_CATEGORIES.map((room) => ({
@@ -213,7 +215,9 @@ export function ProductTable({ products }: { products: ProductRow[] }) {
             {group.items.map((p) => (
               <li
                 key={p.id}
-                className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-[var(--s-rule-soft)] px-5 py-3 last:border-b-0"
+                className={`flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-[var(--s-rule-soft)] px-5 py-3 last:border-b-0 ${
+                  p.isActive ? '' : 'opacity-55'
+                }`}
               >
                 <div className="min-w-[14rem] flex-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -224,6 +228,9 @@ export function ProductTable({ products }: { products: ProductRow[] }) {
                         No rate
                       </span>
                     ) : null}
+                    {p.isActive ? null : <span className="s-tag">Switched off</span>}
+                    {p.rules?.bhk ? <span className="s-tag">{p.rules.bhk.replace(/(\d)/, '$1 ')} only</span> : null}
+                    {p.rules?.perBath ? <span className="s-tag">per bathroom</span> : null}
                   </div>
                   {p.details ? (
                     <p className="m-0 mt-0.5 max-w-[60ch] text-[13px] leading-snug text-[var(--s-ink-3)]">
@@ -234,6 +241,14 @@ export function ProductTable({ products }: { products: ProductRow[] }) {
 
                 <StandardCell product={p} />
                 <RateCell product={p} />
+                <button
+                  type="button"
+                  onClick={() => setEditing(editing === p.id ? null : p.id)}
+                  className={`${quiet} !px-2.5 !py-1.5 !text-[12.5px]`}
+                >
+                  {editing === p.id ? 'Close' : 'Edit'}
+                </button>
+                {editing === p.id ? <ProductEditor product={p} onClose={() => setEditing(null)} /> : null}
               </li>
             ))}
           </ul>

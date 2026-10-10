@@ -31,7 +31,10 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { hasDatabase, rosterIsReal } from '@/lib/env';
 import { filedRatesFor } from '@/data/filed-rates';
+import { fromDb } from '@/lib/money';
+import { readRules } from '@/modules/studio-quote/configure';
 import { liveRatesFor } from './filed-rate-store';
+import { ratesFromProductMaster, type MasterProduct } from './product-master-rates';
 import type { StudioRates } from './catalogue';
 
 export interface ResolvedRates {
@@ -66,14 +69,20 @@ export async function resolveRatesFor(slug: string): Promise<ResolvedRates> {
   if (!hasDatabase()) return { rates: placeholder, realCodes: [] };
 
   const studio = await prisma.studio
-    .findUnique({ where: { slug }, select: { id: true } })
+    .findUnique({ where: { slug }, select: { id: true, ratesFilledAt: true } })
     .catch((error: unknown) => {
       console.error('[rates] studio lookup failed, using placeholder', slug, error);
       return null;
     });
   if (!studio) return { rates: placeholder, realCodes: [] };
 
-  const live = await liveRatesFor(studio.id);
+  /* Filed rates, then the product master over them: once ops has approved a
+     studio's product master it is the one price list, for its own builder
+     and for its customers alike (`product-master-rates.ts`). */
+  const live = {
+    ...(await liveRatesFor(studio.id)),
+    ...(studio.ratesFilledAt ? await masterRatesFor(studio.id, studio.ratesFilledAt) : {}),
+  };
   const realCodes = Object.keys(live);
   // A real roster is priced on its own rates only (rate-policy.ts).
   if (rosterIsReal()) return { rates: live, realCodes };
@@ -84,6 +93,49 @@ export async function resolveRatesFor(slug: string): Promise<ResolvedRates> {
      always beats an invented one, and an item absent from `live` keeps the
      invented one rather than vanishing. */
   return { rates: { ...placeholder, ...live }, realCodes };
+}
+
+/**
+ * The customer-quote rates a studio's product master gives. Empty on any
+ * failure — the caller falls back exactly as it does for filed rates.
+ */
+async function masterRatesFor(studioId: string, filledAt: Date): Promise<StudioRates> {
+  try {
+    const [products, drafts] = await Promise.all([
+      prisma.studioProduct.findMany({
+        where: { studioId, isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+        take: 500,
+      }),
+      prisma.studioProductDraft.findMany({
+        where: { studioId, state: 'APPROVED' },
+        select: { name: true, fromQuotations: true },
+        take: 1000,
+      }),
+    ]);
+    const seen = new Map(drafts.map((d) => [d.name.toLowerCase(), d.fromQuotations]));
+    const master: MasterProduct[] = products.map((p) => ({
+      id: p.id,
+      name: p.name,
+      code: p.code as MasterProduct['code'],
+      unit: p.unit as MasterProduct['unit'],
+      details: p.details,
+      ratePaise: fromDb(p.ratePaise),
+      rooms: p.rooms,
+      defaultWidthMm: p.defaultWidthMm,
+      defaultHeightMm: p.defaultHeightMm,
+      defaultQty: p.defaultQty,
+      inStandardBuild: p.inStandardBuild,
+      isActive: p.isActive,
+      sortOrder: p.sortOrder,
+      rules: readRules(p.rules),
+      fromQuotations: seen.get(p.name.toLowerCase()) ?? 0,
+    }));
+    return ratesFromProductMaster(master, filledAt.toISOString().slice(0, 10));
+  } catch (error) {
+    console.error('[rates] product master read failed, using filed rates', studioId, error);
+    return {};
+  }
 }
 
 /** Several studios at once, for the comparison screen. */

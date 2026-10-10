@@ -23,20 +23,29 @@
  * want three numbers should get three numbers without reading three profiles
  * first. The quote lands in the studio's profile either way — this is a
  * shortcut to it, not a second home for it.
+ *
+ * ## The landing's canvas (owner, 10 Oct 2026)
+ *
+ * Every view here sits in `FlowShell` — the home page's white canvas, type,
+ * pills, soft tiles and scroll reveals — so the matches and the quote read
+ * as the same site the customer started on.
  */
 
 import { revealSteps } from '@/modules/matching/reveal';
 import { StyleDnaCard } from '@/components/oi/StyleDnaCard';
-import { SEEN_KEY, readSeen, welcomeBack } from '@/modules/matching/welcome-back';
+import { SEEN_KEY, readSeen, welcomeBack, type Seen } from '@/modules/matching/welcome-back';
 import { ExpertPitch } from '@/components/oi/ExpertPitch';
 import type { OfferState } from '@/modules/consultation/offer';
+import { NextStepBar } from '@/components/oi/NextStepBar';
+import { QuoteCanvas } from '@/components/oi/QuoteCanvas';
+import { draftChanged, draftFrom, priceDraft, type CanvasDraft } from '@/modules/quotation/canvas';
+import { saveBriefAction } from '@/app/quiz/actions';
 import { useEffect, useMemo, useState } from 'react';
 import { loadBrief, saveBrief } from '@/modules/brief/store';
 import { cleanName } from '@/modules/brief/steps';
 import { TIER } from '@/modules/quotation/tiers';
 import { formatINRCompact } from '@/lib/money';
 import {
-  FILTER_REASON_LABELS,
   rankStudios,
   whyNotTheOthers,
   wideningsFor,
@@ -51,15 +60,12 @@ import {
  */
 const BAND_UP_APPROVED = true;
 
-const WIDENING_COPY: Record<Widening, string> = {
-  ANY_ZONE: 'Include studios from other parts of Pune',
-  BAND_UP: 'Show the level above yours too, clearly marked',
-};
 import {
   loadProject,
   saveProject,
   EMPTY_PROJECT,
   MIN_TO_COMPARE,
+  type FloorPlan,
   type Project,
 } from '@/modules/quotation/project-store';
 import { AppFooter, AppHeader, Spine } from '@/components/oi/Chrome';
@@ -68,33 +74,65 @@ import { Building, stagesFor } from '@/components/oi/Building';
 import { kitchenFor, priceMatches, quoteKey } from '@/modules/quotation/price-all';
 import { runSourceOf } from '@/modules/quotation/first-quote';
 import { filedRatesFor, ratesAreReal } from '@/data/filed-rates';
-import { scopePhrase, selectionOf } from '@/modules/quotation/scope';
+import { scopePhrase, selectionOf, type ScopeSelection } from '@/modules/quotation/scope';
 import { hasRates } from '@/modules/quotation/rate-policy';
 import { placementIn, scopeBandRange } from '@/modules/quotation/scope-band';
 import type { FirstQuote } from '@/modules/quotation/first-quote';
 import { homeShapeFor } from '@/modules/quotation/first-quote';
 import type { StudioRates } from '@/modules/quotation/catalogue';
-import { Wrap, Chapter, Sheet, Quiet } from '@/components/oi';
+import { Wrap } from '@/components/oi';
+import { FlowShell } from '@/components/home/FlowShell';
+import { Pill, PillButton, Split } from '@/components/home/parts';
 import { StudioCard } from './StudioCard';
 import { MatchHero } from './MatchHero';
 import { CompareBar } from './CompareBar';
 import { useScrollFocus } from '@/components/oi/useScrollFocus';
 import { saveQuoteAction, saveDecisionAction } from './journey-actions';
 import type { Studio } from '@/modules/studio/types';
-import { localityLabel, propertyLabel, type Brief } from '@/modules/brief/types';
+import { localityLabel, type Brief } from '@/modules/brief/types';
+import { useLang, useSiteT } from '@/components/app/i18n';
+import type { Lang } from '@/modules/i18n/site';
+import { MATCH_DICT, type MatchT } from '@/modules/i18n/site/match';
+import { PROPERTY_TX, ROOM_TX, SCOPE_TX, lbl } from '@/modules/i18n/site/labels';
+
+/**
+ * `scopePhrase`, in the chosen language. English is `scopePhrase` itself, so
+ * it cannot drift; Hindi and Marathi are built the same way from the shared
+ * labels.
+ */
+function scopePhraseIn(lang: Lang, t: MatchT, selection: ScopeSelection): string | null {
+  if (lang === 'en') return scopePhrase(selection);
+  const rooms = selection.scopeRooms.filter((r) => r in ROOM_TX).map((r) => lbl(lang, ROOM_TX, r));
+  const list = rooms.length <= 1 ? rooms.join('') : `${rooms.slice(0, -1).join(', ')} ${t('scope.and')} ${rooms.at(-1)}`;
+  switch (selection.scope) {
+    case 'FULL_HOME':
+    case 'KITCHEN_WARDROBE':
+      return lbl(lang, SCOPE_TX, selection.scope);
+    case 'SINGLE_ROOM':
+      return list || lbl(lang, SCOPE_TX, selection.scope);
+    case 'RENOVATION':
+      return list ? t('scope.renoWith', { rooms: list }) : t('scope.reno');
+    default:
+      return null;
+  }
+}
 
 /**
  * "your 3 BHK in Kharadi · Premium" — what the ranking is for, in their terms.
  * Built from what they told us; a part they skipped is simply left out.
  */
-function forWhat(brief: Brief | null): string | null {
+function forWhat(brief: Brief | null, lang: Lang, t: MatchT): string | null {
   if (!brief) return null;
-  const home = propertyLabel(brief.propertyType);
+  const home = brief.propertyType ? lbl(lang, PROPERTY_TX, brief.propertyType) : null;
   const where = localityLabel(brief.locality);
   const level = brief.tier ? TIER[brief.tier].label : null;
-  const place = [home ? `your ${home}` : 'your home', where ? `in ${where}` : null]
-    .filter(Boolean)
-    .join(' ');
+  const place = home
+    ? where
+      ? t('for.homeIn', { home, where })
+      : t('for.home', { home })
+    : where
+      ? t('for.anyHomeIn', { where })
+      : t('for.anyHome');
   return level ? `${place} · ${level}` : place;
 }
 
@@ -107,34 +145,46 @@ function bandLine(
   brief: Brief | null,
   shape: { bhk: number; carpetAreaSqft: number; bathrooms: number },
   quote: FirstQuote,
+  lang: Lang,
+  t: MatchT,
 ): string | null {
   if (!brief?.tier) return null;
   const selection = selectionOf(brief);
   const band = scopeBandRange(brief.tier, shape, selection);
   if (!band) return null;
   const level = TIER[brief.tier].label;
-  const what = selection.scope && selection.scope !== 'FULL_HOME' ? ` for ${(scopePhrase(selection) ?? '').toLowerCase()}` : '';
+  const phrase = scopePhraseIn(lang, t, selection) ?? '';
+  const what =
+    selection.scope && selection.scope !== 'FULL_HOME'
+      ? t('band.what', { scope: lang === 'en' ? phrase.toLowerCase() : phrase })
+      : '';
   const range =
     band.highPaise === null
-      ? `from ${formatINRCompact(band.lowPaise)}`
+      ? t('band.from', { amount: formatINRCompact(band.lowPaise) })
       : `${formatINRCompact(band.lowPaise)}–${formatINRCompact(band.highPaise)}`;
   // The headline total includes GST and the bands do not, so name the
   // pre-GST figure — "₹29 L … inside ₹20.7 L–₹28.75 L" reads as a mistake.
   const beforeGst = quote.totalPaise - quote.gstPaise;
   const place = placementIn(beforeGst, band);
-  const lead = `Before GST it is ${formatINRCompact(beforeGst)}`;
-  if (place.kind === 'inside') return `${lead}, inside your ${level} range${what} (${range}).`;
-  return `${lead}, ${formatINRCompact(place.byPaise)} ${place.kind} your ${level} range${what} (${range}).`;
+  const lead = t('band.lead', { amount: formatINRCompact(beforeGst) });
+  if (place.kind === 'inside') return t('band.inside', { lead, level, what, range });
+  return t(place.kind === 'above' ? 'band.above' : 'band.below', {
+    lead,
+    by: formatINRCompact(place.byPaise),
+    level,
+    what,
+    range,
+  });
 }
 
 /** "Sanyam · 3 BHK · Kharadi · Kitchen & wardrobes" — who and what a quote is for. */
-function preparedFor(brief: Brief | null): string | null {
+function preparedFor(brief: Brief | null, lang: Lang, t: MatchT): string | null {
   if (!brief) return null;
   const parts = [
     cleanName(brief.contactName),
-    propertyLabel(brief.propertyType),
+    lbl(lang, PROPERTY_TX, brief.propertyType) || null,
     localityLabel(brief.locality),
-    scopePhrase(selectionOf(brief)),
+    scopePhraseIn(lang, t, selectionOf(brief)),
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(' · ') : null;
 }
@@ -171,6 +221,8 @@ export function MatchClient({
    */
   filedRates?: Record<string, StudioRates>;
 }) {
+  const t = useSiteT(MATCH_DICT);
+  const lang = useLang();
   const [brief, setBrief] = useState<Brief | null>(null);
   const [project, setProject] = useState<Project>(EMPTY_PROJECT);
   const [quoting, setQuoting] = useState<QuoteRequest | null>(null);
@@ -207,8 +259,10 @@ export function MatchClient({
       allowUnverified,
       // Each studio's rates, so the budget priority reads its quote for THIS home.
       ratesFor: (slug: string) => filedRates?.[slug] ?? filedRatesFor(slug),
+      // The engine's sentences (evidence, reasons, timing) in their language.
+      lang,
     }),
-    [allowUnverified, filedRates],
+    [allowUnverified, filedRates, lang],
   );
 
   const matches = useMemo(
@@ -278,7 +332,7 @@ export function MatchClient({
         .map((s) => ({
           slug: s.slug,
           name: s.tradeName,
-          curatedDiscountPct: s.matchingProfile?.curatedDiscountPct ?? null,
+          curatedDiscountPct: s.matchingProfile?.curatedDiscountPct ?? null, modularDiscountPct: s.matchingProfile?.modularDiscountPct,
         })),
       existing: project.quotes,
       ratesFor: (slug) => filedRates?.[slug] ?? filedRatesFor(slug),
@@ -295,16 +349,73 @@ export function MatchClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on what a quote depends on
   }, [briefed, matches, pricedFor, project.quotes]);
 
+  /* ── The Home Canvas, v0 (docs/HOME-CANVAS.md) ──
+     The quote made editable. The draft is what the customer has changed on
+     the quote screen and not yet saved; every matched studio is re-priced on
+     it on every render — pure arithmetic, a few milliseconds for the lot. */
+  const [draft, setDraft] = useState<CanvasDraft | null>(null);
+  const liveDraft = draft ?? draftFrom(shape);
+  const drafted = draftChanged(shape, liveDraft);
+  const canvasStudios = useMemo(
+    () =>
+      matches
+        .map((m) => byId.get(m.studioId))
+        .filter((s): s is Studio => Boolean(s))
+        .map((s) => ({ slug: s.slug, name: s.tradeName, curatedDiscountPct: s.matchingProfile?.curatedDiscountPct ?? null, modularDiscountPct: s.matchingProfile?.modularDiscountPct })),
+    [matches, byId],
+  );
+  const priced = priceDraft({
+    shape,
+    plan: kitchen,
+    draft: liveDraft,
+    studios: canvasStudios,
+    ratesFor: (slug) => filedRates?.[slug] ?? filedRatesFor(slug),
+  });
+
+  /** Write the draft to the brief, and re-price every match on it straight away. */
+  const saveDraft = () => {
+    if (!brief) return;
+    const next: Brief = { ...brief, excludedItems: liveDraft.excludedItems };
+    setBrief(next);
+    saveBrief(next);
+    void saveBriefAction({ ...next, contactName: null }).catch(() => {});
+    const nextShape = homeShapeFor(next);
+    const nextPlan: FloorPlan =
+      liveDraft.kitchenRunMm !== null
+        ? { fileName: null, kitchenRunMm: liveDraft.kitchenRunMm, source: 'customer' }
+        : kitchenFor(nextShape, nextShape.plan, project.plan);
+    // Priced here rather than left to the effect above, so the open quote
+    // never sees a moment where its stored copy is stale and the build
+    // screen takes over.
+    const fresh = priceMatches({
+      shape: nextShape,
+      plan: nextPlan,
+      studios: canvasStudios,
+      existing: {},
+      ratesFor: (slug) => filedRates?.[slug] ?? filedRatesFor(slug),
+    });
+    for (const q of fresh) void saveQuoteAction({ studioSlug: q.studioSlug, quote: q.quote, plan: nextPlan });
+    update({
+      ...project,
+      plan: nextPlan,
+      quotes: { ...project.quotes, ...Object.fromEntries(fresh.map((q) => [q.studioSlug, q])) },
+    });
+    setDraft(null);
+  };
+
   /* ── Welcome back (queue item 16) ──
      Which studios this device last showed, and when; anything new since
      earns a line at the top. Stored in this browser only. */
-  const [welcome, setWelcome] = useState<string | null>(null);
+  /* What the line is made of, not the line — so switching language
+     re-words it without re-reading (and overwriting) the stored visit. */
+  const [lastVisit, setLastVisit] = useState<{ seen: Seen | null; ids: string[]; now: Date } | null>(null);
+  const welcome = lastVisit ? welcomeBack(lastVisit.seen, lastVisit.ids, lastVisit.now, lang) : null;
   const matchIds = matches.map((m) => m.studioId).join(',');
   useEffect(() => {
     if (!briefed || !matchIds) return;
     try {
       const ids = matchIds.split(',');
-      setWelcome(welcomeBack(readSeen(localStorage.getItem(SEEN_KEY)), ids));
+      setLastVisit({ seen: readSeen(localStorage.getItem(SEEN_KEY)), ids, now: new Date() });
       localStorage.setItem(SEEN_KEY, JSON.stringify({ ids, at: new Date().toISOString() }));
     } catch {
       // Storage blocked: no welcome line, nothing else changes.
@@ -315,33 +426,47 @@ export function MatchClient({
   if (quoting) {
     const built = project.quotes[quoting.studioSlug];
     const current = built?.key === pricedFor;
+    // While the canvas holds unsaved changes, the document below it is the
+    // draft's, so the whole page answers the change at once.
+    const shownQuote =
+      (drafted ? priced.find((p) => p.slug === quoting.studioSlug)?.quote : undefined) ?? built?.quote;
     /* Already priced (every match is): straight to the document. The build
        plays once a visit, the first time — "a quote in ten seconds" watched
        once, not sat through six times. */
     if (built && current) {
       return (
-        <div className="oi-app min-h-dvh bg-[var(--bg)]">
+        <FlowShell className="oi-quick">
           <AppHeader />
           <Wrap className="py-10">
-            <button
-              type="button"
-              onClick={() => setQuoting(null)}
-              className="oi-num mb-8 cursor-pointer border-0 bg-transparent p-0 text-[11px] uppercase tracking-[0.16em] text-[var(--ink2)] hover:text-[var(--ink)] print:hidden"
-            >
-              ← Back to your matches
-            </button>
+            <BackToMatches label={t('quote.back')} onBack={() => setQuoting(null)} />
             {project.seenBuild ? (
+              <>
+              <QuoteCanvas
+                shape={shape}
+                plan={kitchen}
+                draft={liveDraft}
+                onDraft={setDraft}
+                priced={priced}
+                currentSlug={quoting.studioSlug}
+                savedTotalPaise={built.quote.totalPaise}
+                onPick={(slug) => {
+                  const s = studios.find((x) => x.slug === slug);
+                  if (s) setQuoting(requestFor(s));
+                }}
+                onSave={saveDraft}
+              />
               <QuoteDocument
-                quote={built.quote}
+                quote={shownQuote}
                 studioName={quoting.studioName}
                 plan={kitchen}
-                preparedFor={preparedFor(brief)}
+                preparedFor={preparedFor(brief, lang, t)}
                 paymentPhases={studios.find((s) => s.slug === quoting.studioSlug)?.paymentPhases ?? null}
-                bandLine={bandLine(brief, shape, built.quote)}
+                bandLine={bandLine(brief, shape, built.quote, lang, t)}
                 onMeasured={(runMm) =>
                   update({ ...project, plan: { fileName: null, kitchenRunMm: runMm, source: 'customer' } })
                 }
               />
+              </>
             ) : (
               <Building
                 studioName={quoting.studioName}
@@ -363,21 +488,27 @@ export function MatchClient({
               />
             )}
           </Wrap>
+          {project.seenBuild ? (
+            <NextStepBar
+              label={t('quote.label', { studio: quoting.studioName })}
+              totalPaise={shownQuote!.totalPaise}
+              offer={offer}
+              change={
+                drafted && shownQuote!.totalPaise !== built.quote.totalPaise
+                  ? t('quote.change', { change: `${shownQuote!.totalPaise < built.quote.totalPaise ? '−' : '+'}${formatINRCompact(Math.abs(shownQuote!.totalPaise - built.quote.totalPaise))}` })
+                  : undefined
+              }
+            />
+          ) : null}
           <AppFooter />
-        </div>
+        </FlowShell>
       );
     }
     return (
-      <div className="oi-app min-h-dvh bg-[var(--bg)]">
+      <FlowShell className="oi-quick">
         <AppHeader />
         <Wrap className="py-10">
-          <button
-            type="button"
-            onClick={() => setQuoting(null)}
-            className="oi-num mb-8 cursor-pointer border-0 bg-transparent p-0 text-[11px] uppercase tracking-[0.16em] text-[var(--ink2)] hover:text-[var(--ink)] print:hidden"
-          >
-            ← Back to your matches
-          </button>
+          <BackToMatches label={t('quote.back')} onBack={() => setQuoting(null)} />
 
           <QuoteFlow
             filedRates={filedRates?.[quoting.studioSlug]}
@@ -421,27 +552,23 @@ export function MatchClient({
           {built ? (
             <ExpertPitch
               offer={offer}
-              lead={`Before you ring ${quoting.studioName}`}
-              className="mt-10 max-w-[40rem]"
+              lead={t('quote.ring', { studio: quoting.studioName })}
+              className="mt-[clamp(40px,6vw,72px)] max-w-[44rem]"
             />
           ) : null}
           {built ? (
-            <div className="mt-8 flex flex-wrap items-center gap-4">
-              <Quiet href={`/studios/${quoting.studioSlug}`}>
-                See this on {quoting.studioName}&rsquo;s page
-              </Quiet>
-              <button
-                type="button"
-                onClick={() => setQuoting(null)}
-                className="cursor-pointer border-0 bg-transparent p-0 text-[13.5px] text-[var(--ink2)] underline hover:text-[var(--ink)]"
-              >
-                Price another studio
-              </button>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Pill href={`/studios/${quoting.studioSlug}`} tone="line">
+                {t('quote.onPage', { studio: quoting.studioName })}
+              </Pill>
+              <PillButton tone="line" onClick={() => setQuoting(null)}>
+                {t('quote.another')}
+              </PillButton>
             </div>
           ) : null}
         </Wrap>
         <AppFooter />
-      </div>
+      </FlowShell>
     );
   }
 
@@ -449,27 +576,27 @@ export function MatchClient({
   const comparing = project.comparing;
 
   return (
-    <div className="oi-app oi-quick min-h-dvh bg-[var(--bg)]">
+    <FlowShell className="oi-quick">
       <AppHeader />
       <Spine
         at="match"
         facts={[
           ...(briefed && brief?.propertyType
-            ? [{ id: 'brief' as const, fact: `${BEDROOMS[brief.propertyType] ?? 2} BHK` }]
+            ? [{ id: 'brief' as const, fact: t('spine.bhk', { n: BEDROOMS[brief.propertyType] ?? 2 }) }]
             : []),
-          ...(briefed ? [{ id: 'match' as const, fact: `${matches.length} fit` }] : []),
+          ...(briefed ? [{ id: 'match' as const, fact: t('spine.fit', { n: matches.length }) }] : []),
           ...(quoted.length > 0
-            ? [{ id: 'quote' as const, fact: `${quoted.length} priced` }]
+            ? [{ id: 'quote' as const, fact: t('spine.priced', { n: quoted.length }) }]
             : []),
           ...(comparing.length >= MIN_TO_COMPARE
-            ? [{ id: 'compare' as const, fact: `${comparing.length} selected` }]
+            ? [{ id: 'compare' as const, fact: t('spine.selected', { n: comparing.length }) }]
             : []),
         ]}
       />
 
-      <Wrap className="py-12">
+      <Wrap className="pb-[clamp(48px,7vw,100px)] pt-[clamp(40px,6vw,80px)]">
         {welcome ? (
-          <p className="mx-auto mb-6 max-w-[40rem] rounded-full border border-[var(--acc)] px-5 py-2.5 text-center text-[14px] text-[var(--ink)]">
+          <p className="mx-auto mb-8 max-w-[40rem] rounded-[var(--r-m)] bg-[var(--mint)] px-5 py-3 text-center text-[14.5px] leading-[1.5] text-[var(--ink)]">
             {welcome}
           </p>
         ) : null}
@@ -478,35 +605,37 @@ export function MatchClient({
             fit={matches.length}
             reveal={brief ? revealSteps(brief, studios, matches.length, rankOptions) : []}
             name={cleanName(brief?.contactName)}
-            forWhat={forWhat(brief)}
+            forWhat={forWhat(brief, lang, t)}
           />
         ) : (
-          <Chapter
-            eyebrow="Who fits"
-            title={
-              !briefed ? 'Tell us about your flat first.' : 'Nobody on the roster fits this brief.'
-            }
-          />
+          /* Keyed on which empty it is, so the heading rises again if the
+             brief arrives and the reason changes. */
+          <header key={briefed ? 'nofit' : 'nobrief'} className="mb-10 max-w-[48rem]">
+            <p className="eyebrow">{t('empty.eyebrow')}</p>
+            <Split as="h1" className="h-l" text={!briefed ? t('empty.noBrief') : t('empty.noFit')} auto />
+          </header>
         )}
 
         {!briefed ? (
-          <Sheet className="p-8">
-            <p className="m-0 mb-4 max-w-[54ch] text-[15px] leading-[1.6]">
-              Scoring studios against an empty brief would give you the roster in an arbitrary
-              order with numbers on it. About four minutes of your brief, and these become real.
+          <div className="flow-card max-w-[48rem]" data-reveal="" data-auto="">
+            <p className="m-0 mb-6 max-w-[54ch] text-[16px] leading-[1.6] text-[var(--ink-2)]">
+              {t('empty.noBriefBody')}
             </p>
-            <Quiet href="/quiz">Start the brief</Quiet>
-          </Sheet>
+            <Pill href="/quiz" arrow>
+              {t('empty.start')}
+            </Pill>
+          </div>
         ) : matches.length === 0 && offers.length === 0 ? (
-          <Sheet className="p-8">
-            <p className="m-0 mb-4 max-w-[54ch] text-[15px] leading-[1.6]">
-              Nothing on the roster matches this brief — usually the level or the kind of work.
-              Changing either is the quickest fix.
+          <div className="flow-card max-w-[48rem]" data-reveal="" data-auto="">
+            <p className="m-0 mb-6 max-w-[54ch] text-[16px] leading-[1.6] text-[var(--ink-2)]">
+              {t('empty.noFitBody')}
             </p>
-            <Quiet href="/quiz">Change your answers</Quiet>
-          </Sheet>
+            <Pill href="/quiz" arrow>
+              {t('empty.change')}
+            </Pill>
+          </div>
         ) : matches.length === 0 ? null : (
-          <ul className="mx-auto m-0 mt-12 flex max-w-[40rem] list-none flex-col gap-6 p-0">
+          <ul className="mx-auto m-0 mt-[clamp(40px,6vw,72px)] flex max-w-[40rem] list-none flex-col gap-6 p-0">
             {matches.map((match: MatchResult, i) => {
               const studio = byId.get(match.studioId);
               if (!studio || !brief) return null;
@@ -548,49 +677,64 @@ export function MatchClient({
         )}
 
         {briefed && matches.length > 0 ? (
-          <ExpertPitch offer={offer} className="mx-auto mt-10 max-w-[40rem]" />
+          <div className="mx-auto mt-[clamp(48px,7vw,100px)] max-w-[40rem]" data-reveal="">
+            <ExpertPitch offer={offer} />
+          </div>
         ) : null}
 
         {briefed && brief && brief.styleLikes.length > 0 ? (
-          <StyleDnaCard likes={brief.styleLikes} className="mx-auto mt-10 max-w-[40rem]" />
+          <div className="mx-auto mt-4 max-w-[40rem]" data-reveal="">
+            <StyleDnaCard likes={brief.styleLikes} />
+          </div>
         ) : null}
 
         {/* Fewer than three: said plainly, with named one-tap widenings and
             what each adds — never a silent loosening of what they asked for. */}
         {briefed && offers.length > 0 ? (
-          <Sheet className="mx-auto mt-10 max-w-[40rem] p-6">
-            <p className="m-0 mb-4 text-[15px] leading-[1.6]">
+          <div className="flow-card mx-auto mt-10 max-w-[40rem]">
+            <p className="m-0 mb-5 text-[16px] leading-[1.6] text-[var(--ink)]">
               {matches.length === 0
-                ? 'No studio fits everything you asked for yet.'
-                : `Only ${matches.length === 1 ? 'one studio fits' : `${matches.length} studios fit`} everything you asked for.`}{' '}
-              We would rather tell you than pad the list.
+                ? t('few.none')
+                : matches.length === 1
+                  ? t('few.one')
+                  : t('few.many', { n: matches.length })}{' '}
+              {t('few.honest')}
             </p>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2.5">
               {offers.map((o) => (
                 <button
                   key={o.kind}
                   type="button"
                   onClick={() => setWiden((w) => [...w, o.kind])}
-                  className="min-h-11 cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-5 py-2.5 text-[14px] font-semibold text-[var(--ink)] hover:border-[var(--ink2)]"
+                  className="flow-opt"
                 >
-                  {WIDENING_COPY[o.kind]} (+{o.adds})
+                  {t(`widen.${o.kind}`)} (+{o.adds})
                 </button>
               ))}
             </div>
-          </Sheet>
+          </div>
         ) : null}
 
         {/* Why not the others — the roster is small enough to say, and a
-            customer who knows a studio by name should not wonder. */}
+            customer who knows a studio by name should not wonder. Opens like
+            the landing's questions: a row and a round plus that turns. */}
         {briefed && others.length > 0 ? (
-          <details className="mx-auto mt-10 max-w-[40rem]">
-            <summary className="cursor-pointer text-[14px] font-semibold text-[var(--ink2)]">
-              Why not the others ({others.length})
+          <details className="group mx-auto mt-4 max-w-[40rem] rounded-[var(--r-l)] bg-[var(--soft)] px-[clamp(20px,2.8vw,32px)]">
+            <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 py-4 text-[16px] font-medium tracking-[-0.01em] text-[var(--ink)] [&::-webkit-details-marker]:hidden">
+              {t('others.summary', { n: others.length })}
+              <span
+                aria-hidden
+                className="grid h-9 w-9 flex-none place-items-center rounded-full bg-[var(--paper)] transition-transform duration-300 group-open:rotate-45"
+              >
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                  <path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              </span>
             </summary>
-            <ul className="m-0 mt-3 flex list-none flex-col gap-1.5 p-0">
+            <ul className="m-0 flex list-none flex-col gap-2 p-0 pb-6">
               {others.map((o) => (
-                <li key={o.studioId} className="text-[13.5px] text-[var(--ink2)]">
-                  <span className="text-[var(--ink)]">{o.name}</span> — {FILTER_REASON_LABELS[o.reason]}
+                <li key={o.studioId} className="text-[14.5px] leading-[1.5] text-[var(--ink-2)]">
+                  <span className="font-medium text-[var(--ink)]">{o.name}</span> — {t(`why.${o.reason}`)}
                 </li>
               ))}
             </ul>
@@ -601,6 +745,18 @@ export function MatchClient({
       <CompareBar selected={comparing.length} minimum={MIN_TO_COMPARE} priced={quoted.length} />
 
       <AppFooter />
+    </FlowShell>
+  );
+}
+
+/** Back to the list — the landing's small line pill, never printed. */
+function BackToMatches({ label, onBack }: { label: string; onBack: () => void }) {
+  /* The wrapper carries print:hidden: `.pill` sets its own display. */
+  return (
+    <div className="mb-8 print:hidden">
+      <PillButton tone="line" size="sm" onClick={onBack}>
+        {label}
+      </PillButton>
     </div>
   );
 }

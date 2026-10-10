@@ -10,7 +10,7 @@ const OPTIONS: Array<{ value: StudioStatus; label: string; help: string }> = [
   { value: 'ACTIVE', label: 'Active', help: 'Shown and matchable.' },
   { value: 'PAUSED', label: 'Paused', help: 'Their choice — not taking leads right now.' },
   { value: 'SUSPENDED', label: 'Suspended', help: 'Our action while a dispute is investigated. Appealable.' },
-  { value: 'REMOVED', label: 'Removed', help: 'Permanent. Misrepresentation, a pattern of upheld disputes, or a refused re-audit.' },
+  { value: 'REMOVED', label: 'Removed', help: 'Permanent. Misrepresentation, a pattern of upheld disputes, a refused re-audit — or a failed onboarding to redo. Frees their GSTIN so the business can be onboarded again.' },
 ];
 
 /**

@@ -22,6 +22,8 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { flatLayout, type LayoutRoom, type LayoutRoomKey } from '@/modules/brief/flat-layout';
 import { STYLE_PALETTES } from '@/modules/brief/palettes';
 import type { StyleTag } from '@/modules/brief/types';
+import { useSiteT } from '@/components/app/i18n';
+import { OI_DICT } from '@/modules/i18n/site/oi';
 
 const WALL_H = 1.1;
 const WALL_T = 0.09;
@@ -103,6 +105,7 @@ export function Flat3D({
   className?: string;
   label: string;
 }) {
+  const t = useSiteT(OI_DICT);
   const host = useRef<HTMLDivElement>(null);
   const progressRef = useRef<number>(progress ?? (autoBuild ? 0 : 1));
   const [failed, setFailed] = useState(false);
@@ -255,7 +258,7 @@ export function Flat3D({
   }, [bedrooms, carpetAreaSqft, style, inScope?.join(','), autoBuild]);
 
   if (failed) {
-    return <p className="m-0 text-[14px] text-[var(--ink2)]">This browser cannot draw the 3D view.</p>;
+    return <p className="m-0 text-[14px] text-[var(--ink2)]">{t('flat3d.fail')}</p>;
   }
   return <div ref={host} className={className} role="img" aria-label={label} style={{ touchAction: 'pan-y' }} />;
 }

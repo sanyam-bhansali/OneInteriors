@@ -1,4 +1,5 @@
 import 'server-only';
+import { readPhases, type PaymentPhase } from '@/modules/studio/payment-phases';
 
 /**
  * The project tracker in the database — started, advanced and annotated by
@@ -6,6 +7,7 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
+import { notify } from '@/modules/notify/service';
 import { requireRole } from '@/modules/auth/session';
 import { readProfile } from '@/modules/studio/matching-profile';
 import { currentStudio } from '@/modules/studio/onboarding';
@@ -51,6 +53,28 @@ export async function startTracker(introductionId: string, startOn: string): Pro
 
 export async function setStageDone(projectId: string, stage: string, done: boolean): Promise<TrackerResult> {
   await requireRole('OPS');
+  return writeStageDone(projectId, stage, done);
+}
+
+/**
+ * The studio marks its own progress: the stage it finished on site is the
+ * stage the customer's tracker shows as done. Only on a project introduced to
+ * this studio. Ops can still correct it (`setStageDone`).
+ */
+export async function setStudioStageDone(projectId: string, stage: string, done: boolean): Promise<TrackerResult> {
+  const ctx = await currentStudio();
+  if (!ctx) return { ok: false, error: 'Sign in as your studio first.' };
+  const project = await prisma.homeProject.findUnique({
+    where: { id: projectId },
+    select: { introduction: { select: { studioId: true } } },
+  });
+  if (!project || project.introduction.studioId !== ctx.studio.id) {
+    return { ok: false, error: 'That project is not one of yours.' };
+  }
+  return writeStageDone(projectId, stage, done);
+}
+
+async function writeStageDone(projectId: string, stage: string, done: boolean): Promise<TrackerResult> {
   if (!(STAGE_KEYS as readonly string[]).includes(stage)) return { ok: false, error: 'Unknown stage.' };
   const project = await prisma.homeProject.findUnique({ where: { id: projectId }, select: { doneStages: true } });
   if (!project) return { ok: false, error: 'That project is gone.' };
@@ -78,7 +102,7 @@ async function createUpdate(
     if (!stored.ok) return { ok: false, error: stored.error };
     photoPaths.push(stored.path);
   }
-  await prisma.homeProjectUpdate.create({
+  const created = await prisma.homeProjectUpdate.create({
     data: {
       projectId,
       note: text,
@@ -87,7 +111,13 @@ async function createUpdate(
       byStudio,
       photoPaths,
     },
+    select: { project: { select: { introduction: { select: { studio: { select: { tradeName: true } }, brief: { select: { userId: true } } } } } } },
   });
+  // The customer hears about it on their phone (docs/CUSTOMER-PLATFORM-PLAN.md).
+  const intro = created.project.introduction;
+  if (intro.brief.userId) {
+    void notify(intro.brief.userId, { kind: 'update', studio: intro.studio.tradeName, note: text, photos: photoPaths.length });
+  }
   return { ok: true };
 }
 
@@ -151,6 +181,13 @@ export async function projectsForStudio(now = new Date()): Promise<StudioProject
 
 export interface TrackerForCustomer {
   studioName: string;
+  /**
+   * The studio's filed payment schedule, or null when it has not filed one.
+   * Shown so the customer always knows what is due at which stage
+   * (principle 6, docs/UX-PRINCIPLES-PLAN.md; Klarna). We do not hold or
+   * record payments, so there is no "paid" state here — only the plan.
+   */
+  phases: PaymentPhase[] | null;
   stages: StageView[];
   updates: { note: string; stage: string | null; at: Date; byStudio: boolean; photos: string[] }[];
 }
@@ -161,7 +198,7 @@ export async function trackersForBrief(briefId: string, now = new Date()): Promi
     const projects = await prisma.homeProject.findMany({
       where: { introduction: { briefId } },
       include: {
-        introduction: { select: { studio: { select: { tradeName: true } } } },
+        introduction: { select: { studio: { select: { tradeName: true, paymentPhases: true } } } },
         updates: { orderBy: { createdAt: 'desc' }, take: 20 },
       },
     });
@@ -171,6 +208,7 @@ export async function trackersForBrief(briefId: string, now = new Date()): Promi
     );
     return projects.map((p, i) => ({
       studioName: p.introduction.studio.tradeName,
+      phases: readPhases(p.introduction.studio.paymentPhases),
       stages: trackerView(plannedStages(p.startOn, p.totalDays), p.doneStages, now),
       updates: p.updates.map((u, j) => ({
         note: u.note,

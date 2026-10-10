@@ -12,6 +12,8 @@ import {
 } from './actions';
 import type { OpsIntroduction } from '@/modules/studio/introduction-ops';
 import { TrackerControl } from './TrackerControl';
+import { ProjectWork } from '@/components/project-work/ProjectWork';
+import type { StaffWork } from '@/modules/portal/project-store';
 /**
  * The kinds come from the state machine, not from this file.
  *
@@ -46,10 +48,13 @@ const input =
 export function IntroductionCard({
   intro,
   need = null,
+  work = null,
 }: {
   intro: OpsIntroduction;
   /** What this row is waiting on us for, when it is in that queue. */
   need?: string | null;
+  /** The started project's decisions and snags (docs/CUSTOMER-PLATFORM-PLAN.md, step 2). */
+  work?: StaffWork | null;
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -124,6 +129,15 @@ export function IntroductionCard({
         <p className="m-0 mb-3 border-l-2 border-[var(--color-atrisk)] pl-3 text-[14px] leading-relaxed text-[var(--color-ink-2)]">
           Withdrawn. {intro.withdrawnReason}
         </p>
+      ) : null}
+
+      {!intro.withdrawnAt && intro.studioAnswer === 'declined' ? (
+        <p className="m-0 mb-3 border-l-2 border-[var(--color-brass)] pl-3 text-[14px] leading-relaxed text-[var(--color-ink-2)]">
+          {intro.studioName} declined: {intro.studioDeclineReason}. Withdraw this and introduce another studio.
+        </p>
+      ) : null}
+      {!intro.withdrawnAt && intro.studioAnswer === 'accepted' ? (
+        <p className="m-0 mb-3 text-[13px] text-[var(--color-ink-3)]">{intro.studioName} accepted.</p>
       ) : null}
 
       {/* Contact release. The studio sees nothing until this happens, so an
@@ -351,6 +365,7 @@ export function IntroductionCard({
       ) : null}
 
       <TrackerControl intro={intro} />
+      {intro.project && work ? <ProjectWork projectId={intro.project.id} work={work} /> : null}
     </li>
   );
 }

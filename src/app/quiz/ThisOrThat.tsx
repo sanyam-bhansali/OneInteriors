@@ -11,6 +11,9 @@ import { useMemo, useState } from 'react';
 import { STYLE_LABELS, type StyleTag } from '@/modules/brief/types';
 import { applyChoices, pairsFor } from '@/modules/brief/this-or-that';
 import { ROOM_STYLE_PHOTOS, stylePhotoFor, stylePhotoUrl, type PickerRoom } from '@/data/style-photos';
+import { useSiteT } from '@/components/app/i18n';
+import { QUIZ_DICT, fillParts } from '@/modules/i18n/site/quiz';
+import { PillButton } from '@/components/home/parts';
 
 function otherRoom(tag: StyleTag, room: PickerRoom): PickerRoom {
   const rooms = ROOM_STYLE_PHOTOS[tag];
@@ -34,25 +37,31 @@ export function ThisOrThat({
   const [open, setOpen] = useState(false);
   const [winners, setWinners] = useState<StyleTag[]>([]);
   const [done, setDone] = useState<StyleTag[] | null>(null);
+  const t = useSiteT(QUIZ_DICT);
 
   if (pairs.length === 0) return null;
   if (done) {
     return (
-      <p className="mt-5 rounded-[10px] bg-[var(--acc-wash)] px-4 py-3 text-[15px] leading-relaxed text-[var(--ink2)]">
-        Sharpened: you lean <strong className="text-[var(--ink)]">{STYLE_LABELS[done[0]!]}</strong> first
-        {done.length > 1 ? <>, then {done.slice(1).map((t) => STYLE_LABELS[t]).join(' and ')}</> : null}.
+      <p className="mt-5 rounded-[var(--r-m)] bg-[var(--sand)] px-5 py-4 text-[15px] leading-relaxed text-[var(--ink-2)]">
+        {fillParts(
+          t('tot.done', {
+            rest:
+              done.length > 1
+                ? t('tot.then', { others: done.slice(1).map((s) => STYLE_LABELS[s]).join(` ${t('and')} `) })
+                : '',
+          }),
+          { first: <strong className="font-medium text-[var(--ink)]">{STYLE_LABELS[done[0]!]}</strong> },
+        )}
       </p>
     );
   }
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="mt-5 cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-5 py-2.5 text-[14px] font-semibold text-[var(--ink)] hover:border-[var(--ink2)]"
-      >
-        Sharpen it: four quick “this or that” pairs
-      </button>
+      <div className="mt-5">
+        <PillButton tone="line" size="sm" onClick={() => setOpen(true)}>
+          {t('tot.open')}
+        </PillButton>
+      </div>
     );
   }
 
@@ -69,19 +78,19 @@ export function ThisOrThat({
 
   return (
     <div className="mt-6">
-      <p className="oi-eyebrow m-0 mb-3">
-        This or that · {i + 1} of {pairs.length}
+      <p className="eyebrow !mb-3">
+        {t('tot.eyebrow', { i: i + 1, n: pairs.length })}
       </p>
       <div className="grid grid-cols-2 gap-3">
-        {pair.map((t) => {
-          const photo = stylePhotoFor(t, otherRoom(t, room));
+        {pair.map((tag) => {
+          const photo = stylePhotoFor(tag, otherRoom(tag, room));
           return (
             <button
-              key={t}
+              key={tag}
               type="button"
-              onClick={() => choose(t)}
-              className="lift cursor-pointer overflow-hidden rounded-[10px] border-0 bg-transparent p-0 text-left"
-              aria-label={`This one — ${photo.alt}`}
+              onClick={() => choose(tag)}
+              className="lift cursor-pointer overflow-hidden rounded-[var(--r-m)] border-0 bg-[var(--soft)] p-0 text-left"
+              aria-label={t('tot.aria', { alt: photo.alt })}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={stylePhotoUrl(photo, 600)} alt={photo.alt} className="block aspect-[4/3] w-full object-cover" />
@@ -92,9 +101,9 @@ export function ThisOrThat({
       <button
         type="button"
         onClick={() => setOpen(false)}
-        className="mt-3 cursor-pointer border-0 bg-transparent p-0 text-[13px] text-[var(--ink2)] underline"
+        className="mt-3 min-h-11 cursor-pointer border-0 bg-transparent p-0 text-[14px] text-[var(--ink-2)] underline underline-offset-2 hover:text-[var(--ink)]"
       >
-        Skip this
+        {t('tot.skip')}
       </button>
     </div>
   );

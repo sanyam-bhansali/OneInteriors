@@ -32,6 +32,8 @@
 
 import type { RoomCategory } from './starter-catalogue';
 import { standardKitchenRunMm } from '@/modules/quotation/first-quote';
+import type { PlanRoomSize } from '@/modules/brief/types';
+import { planRoomFor, wardrobeWidthMm } from '@/modules/floorplan/sizing';
 
 /** The configurations that cover essentially every flat in Pune. */
 export const CONFIGS = ['1 BHK', '2 BHK', '3 BHK', '4 BHK'] as const;
@@ -99,6 +101,20 @@ export interface HomeConfig {
   kitchenRunMm: number | null;
   bathrooms: number;
   study: boolean;
+  /**
+   * A dry balcony to fit out. Absent reads as yes — nearly every Pune flat
+   * has one, and a product a studio ticked as standard should not vanish
+   * because an older form never asked.
+   */
+  balcony?: boolean;
+  /**
+   * The client's floor plan, read: wardrobes and lofts take each bedroom's
+   * wall, a room's false ceiling takes its floor area. Filled on the server
+   * from the brief, never from the browser (`applyConfiguration`).
+   */
+  planRooms?: PlanRoomSize[];
+  /** Ask the server to use the client's floor plan. */
+  usePlan?: boolean;
 }
 
 /**
@@ -147,6 +163,72 @@ export interface CatalogueProduct {
   inStandardBuild: boolean;
   isActive: boolean;
   sortOrder: number;
+  /** The product's build rules (`ProductRules`). Absent means none. */
+  rules?: ProductRules | null;
+}
+
+/**
+ * How a product behaves in the standard build — the same rules Hauspire's
+ * Quotation Studio keeps in `fq_config`, carried over by the quotation read.
+ *
+ * - `bhk` ("3BHK"): only in a flat of that size. Painting and electricals are
+ *   priced per home, one product per size.
+ * - `balcony`: only when the flat has a dry balcony.
+ * - `perBath`: one per bathroom, whatever room it is filed under.
+ * - `perBed`: a whole-home product counted once per bedroom.
+ * - `sqft` / `rft`: the default quantity of a sq ft or running ft product.
+ * - `useRun`: width is the kitchen run (the name match below also catches it).
+ */
+export interface ProductRules {
+  bhk?: string;
+  balcony?: boolean;
+  perBath?: boolean;
+  perBed?: boolean;
+  useRun?: boolean;
+  sqft?: number;
+  rft?: number;
+}
+
+/** Rules off a JSON column, keeping only what is well formed. */
+export function readRules(raw: unknown): ProductRules | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  const out: ProductRules = {};
+  if (typeof r.bhk === 'string' && /\d/.test(r.bhk)) out.bhk = r.bhk;
+  if (r.balcony === true) out.balcony = true;
+  if (r.perBath === true) out.perBath = true;
+  if (r.perBed === true) out.perBed = true;
+  if (r.useRun === true) out.useRun = true;
+  if (typeof r.sqft === 'number' && r.sqft > 0) out.sqft = r.sqft;
+  if (typeof r.rft === 'number' && r.rft > 0) out.rft = r.rft;
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+/** The bedroom count a `bhk` rule names, or null. */
+export function bhkOfRule(rule: string | undefined): number | null {
+  const m = rule?.match(/(\d)/);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * The room a product is named for, when its name says so: "False Ceiling
+ * (Kids Bedroom)". Such a product goes only in that room. Matched on words,
+ * so a studio's own spelling works.
+ */
+const ROOM_WORDS: { word: RegExp; room: RegExp }[] = [
+  { word: /\bmaster\b/i, room: /^master/i },
+  { word: /\bkids?\b/i, room: /^kids/i },
+  { word: /\bguest\b/i, room: /^guest/i },
+  { word: /\bparents?\b/i, room: /^parents/i },
+  { word: /\bsecond\b/i, room: /^second/i },
+  { word: /\bliving\b/i, room: /^living/i },
+  { word: /\bstudy\b/i, room: /^study/i },
+];
+
+export function namedRoomOf(productName: string): RegExp | null {
+  const q = productName.match(/\(([^)]*)\)/)?.[1];
+  if (!q || /balcony/i.test(q)) return null;
+  return ROOM_WORDS.find((w) => w.word.test(q))?.room ?? null;
 }
 
 /** A line the planner proposes. Deliberately the shape the builder edits. */
@@ -177,7 +259,48 @@ const RUN_WIDTH = [/\bbase\b/i, /\bwall\b/i, /\bloft\b/i, /\boverhead\b/i];
 function takesKitchenRun(product: CatalogueProduct): boolean {
   if (product.unit !== 'AREA') return false;
   if (!product.rooms.includes('Kitchen')) return false;
+  if (product.rules?.balcony) return false;
+  if (product.rules?.useRun) return true;
   return RUN_WIDTH.some((pattern) => pattern.test(product.name));
+}
+
+/** Does this product belong in this flat at all? (`bhk`, `balcony`). */
+function fitsHome(product: CatalogueProduct, home: HomeConfig): boolean {
+  const bhk = bhkOfRule(product.rules?.bhk);
+  if (bhk !== null && bhk !== Number(home.config.charAt(0))) return false;
+  if (product.rules?.balcony && home.balcony === false) return false;
+  return true;
+}
+
+/** Does this product go in this room? */
+function fitsRoom(product: CatalogueProduct, room: PlannedRoom): boolean {
+  if (product.rules?.perBath) return room.category === 'Bathroom';
+  if (!product.rooms.includes(room.category)) return false;
+  const named = namedRoomOf(product.name);
+  return named === null || named.test(room.name);
+}
+
+/**
+ * The master bedroom gets the king: a standard "Queen …" product is swapped
+ * for the studio's "King …" product of the same name there, when they have
+ * one. Hauspire's first quote does exactly this.
+ */
+function kingFor(product: CatalogueProduct, room: PlannedRoom, all: CatalogueProduct[]): CatalogueProduct {
+  if (!/^master/i.test(room.name) || !/\bqueen\b/i.test(product.name)) return product;
+  const want = squash(product.name.replace(/\bqueen\b/i, 'king'));
+  return all.find((p) => p.isActive && p.ratePaise > 0 && squash(p.name) === want) ?? product;
+}
+
+function squash(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/** The default quantity of a non-area product, in thousandths. */
+function defaultQtyMilli(product: CatalogueProduct, home: HomeConfig): number | null {
+  if (product.unit === 'SQFT' && product.rules?.sqft) return Math.round(product.rules.sqft * 1000);
+  if (product.unit === 'RFT' && product.rules?.rft) return Math.round(product.rules.rft * 1000);
+  if (product.unit === 'UNIT' && product.rules?.perBed) return bedroomCount(home.config) * 1000;
+  return product.defaultQty != null ? product.defaultQty * 1000 : product.unit === 'UNIT' ? 1000 : null;
 }
 
 export interface PlanResult {
@@ -210,7 +333,7 @@ export interface PlanResult {
  */
 export function planQuotation(home: HomeConfig, catalogue: CatalogueProduct[]): PlanResult {
   const usable = catalogue
-    .filter((p) => p.isActive && p.inStandardBuild)
+    .filter((p) => p.isActive && p.inStandardBuild && fitsHome(p, home))
     .slice()
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
@@ -224,17 +347,38 @@ export function planQuotation(home: HomeConfig, catalogue: CatalogueProduct[]): 
   }
 
   const lines: PlannedLine[] = [];
+  const planned = roomsFor(home);
+  let sizedFromPlan = 0;
 
-  for (const room of roomsFor(home)) {
-    for (const product of usable) {
-      if (!product.rooms.includes(room.category)) continue;
+  for (const room of planned) {
+    /* The plan room for this one: bedrooms in order (master first), living,
+       study. Null without a plan, or for a room the plan does not show. */
+    const bedIndex = room.category === 'Bedroom' ? planned.filter((r) => r.category === 'Bedroom').indexOf(room) : null;
+    const fromPlan = home.planRooms?.length ? planRoomFor(room.name, bedIndex, home.planRooms) : null;
+
+    for (const standard of usable) {
+      if (!fitsRoom(standard, room)) continue;
+      const product = kingFor(standard, room, catalogue);
 
       /* Measured if they gave it, the standard for this configuration if not.
          A base run with no width at all would price at zero and look like a
          kitchen nobody quoted, which is worse than a stated assumption. */
-      const runWidth = takesKitchenRun(product)
-        ? (home.kitchenRunMm ?? standardRunFor(home.config))
-        : null;
+      /* In the kitchen only. A loft filed under Kitchen and Bedroom took the
+         kitchen run in every bedroom too — 4,200 mm over a wardrobe (11 Oct). */
+      const runWidth =
+        room.category === 'Kitchen' && takesKitchenRun(product)
+          ? (home.kitchenRunMm ?? standardRunFor(home.config))
+          : null;
+
+      /* From the plan: a bedroom's wardrobe or loft takes its wall; a
+         room-named ceiling (sq ft) takes the room's floor area. */
+      const planWidth =
+        fromPlan && runWidth === null && product.unit === 'AREA' && room.category === 'Bedroom' && /wardrobe|loft/i.test(product.name)
+          ? wardrobeWidthMm(fromPlan)
+          : null;
+      const planSqft =
+        fromPlan && product.unit === 'SQFT' && namedRoomOf(product.name) !== null ? fromPlan.sqft : null;
+      if (planWidth !== null || planSqft !== null) sizedFromPlan += 1;
 
       lines.push({
         room: room.name,
@@ -242,20 +386,21 @@ export function planQuotation(home: HomeConfig, catalogue: CatalogueProduct[]): 
         code: product.code,
         unit: product.unit,
         details: product.details,
-        widthMm: product.unit === 'AREA' ? (runWidth ?? product.defaultWidthMm) : null,
+        widthMm: product.unit === 'AREA' ? (runWidth ?? planWidth ?? product.defaultWidthMm) : null,
         heightMm: product.unit === 'AREA' ? product.defaultHeightMm : null,
-        qtyMilli:
-          product.unit === 'AREA'
-            ? null
-            : product.defaultQty != null
-              ? product.defaultQty * 1000
-              : null,
+        qtyMilli: product.unit === 'AREA' ? null : planSqft !== null ? planSqft * 1000 : defaultQtyMilli(product, home),
         ratePaise: product.ratePaise,
       });
     }
   }
 
   const notes: string[] = [];
+
+  if (sizedFromPlan > 0) {
+    notes.push(
+      `${sizedFromPlan} ${sizedFromPlan === 1 ? 'line is' : 'lines are'} sized from the client's floor plan — wardrobes and lofts to 55% of each bedroom's longer wall, ceilings to each room's area. Check them against your site measurement.`,
+    );
+  }
 
   const unpriced = new Set(usable.filter((p) => p.ratePaise <= 0).map((p) => p.name));
   if (unpriced.size > 0) {

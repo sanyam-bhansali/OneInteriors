@@ -9,6 +9,7 @@
  * write costs a brief while a blocked click costs the customer.
  */
 
+import { hasDatabase } from '@/lib/env';
 import { canReadInspiration, readableInspirationType, readInspirationPhoto } from '@/modules/inspiration/read';
 import type { StylePick } from '@/modules/inspiration/reading';
 import { headers } from 'next/headers';
@@ -32,9 +33,11 @@ import type { Brief } from '@/modules/brief/types';
 import type { EventName, EventProps } from '@/modules/analytics/events';
 
 /** Persist the brief. Returns whether it actually reached Postgres. */
-export async function saveBriefAction(brief: Brief): Promise<{ persisted: boolean }> {
+export async function saveBriefAction(brief: Brief): Promise<{ persisted: boolean; noDatabase: boolean }> {
   const result = await persistBrief(brief);
-  return { persisted: result.persisted };
+  // `noDatabase`: a local or sample build, where nothing can be stored and
+  // the expert page reads the brief from the address instead (BriefRescue).
+  return { persisted: result.persisted, noDatabase: !hasDatabase() };
 }
 
 /**
@@ -109,6 +112,8 @@ const CONTACT_LIMIT = { max: 20, windowMs: 60 * 60 * 1000 };
 export async function submitContactAction(
   brief: Brief,
   input: ContactInput,
+  /** The website asks for an email and requires it; the phone app does not ask. */
+  opts: { requireEmail?: boolean } = {},
 ): Promise<ContactResult> {
   const check = checkContact({
     name: String(input?.name ?? ''),
@@ -116,7 +121,7 @@ export async function submitContactAction(
     email: String(input?.email ?? ''),
     agreed: input?.agreed === true,
     whatsappUpdates: input?.whatsappUpdates === true,
-  });
+  }, { requireEmail: opts.requireEmail === true });
   if (!check.ok) return { ok: false, errors: check.errors };
 
   const h = await headers();

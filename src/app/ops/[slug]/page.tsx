@@ -17,6 +17,8 @@ import { proposeBand } from '@/modules/studio/band';
 import { liveRatesFor } from '@/modules/quotation/filed-rate-store';
 import { HideControl } from './HideControl';
 import { ArchiveReview } from './ArchiveReview';
+import { DraftReview } from './DraftReview';
+import { pendingDraftRun } from '@/modules/studio-quote/product-drafts';
 import { archivesForStudio } from '@/modules/studio/quotation-archive-store';
 import { ratesForReview } from '@/modules/quotation/filed-rate-store';
 import type { ArchiveRow } from './ArchiveReview';
@@ -49,6 +51,7 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
   const band = proposeBand(await liveRatesFor(studio.id), studio.portfolio);
   const trail = await studioAuditTrail(studio.id, 20);
   const blockers = approvalBlockers(await approvalFactsFor(studio.id));
+  const draftRun = await pendingDraftRun(studio.id);
 
   return (
     <>
@@ -170,6 +173,38 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
                   </p>
                 </section>
               ) : null}
+
+              {/* Their product master, read from their quotations in the owner's
+                  Claude app and waiting here for approval (10 Oct 2026). */}
+              <section className="mb-8">
+                <p className="label m-0 mb-1">Product master from their quotations</p>
+                {draftRun ? (
+                  <DraftReview
+                    studioId={studio.id}
+                    slug={studio.slug}
+                    runId={draftRun.runId}
+                    readAt={draftRun.createdAt}
+                    rows={draftRun.rows.map((r) => ({
+                      id: r.id,
+                      name: r.name,
+                      code: r.code,
+                      unit: r.unit,
+                      details: r.details,
+                      ratePaise: r.ratePaise,
+                      rooms: r.rooms,
+                      inStandardBuild: r.inStandardBuild,
+                      fromQuotations: r.fromQuotations,
+                      current: draftRun.existing[r.name.toLowerCase()] ?? null,
+                    }))}
+                  />
+                ) : (
+                  <p className="m-0 max-w-[62ch] text-[13px] leading-relaxed text-[var(--color-ink-2)]">
+                    Nothing waiting. To read their quotations, in your Claude app run{' '}
+                    <code className="rounded bg-[var(--color-paper-3)] px-1.5 py-0.5 text-[12px]">/read-quotations {studio.slug}</code>{' '}
+                    — it reads them on your laptop and the product master appears here for approval.
+                  </p>
+                )}
+              </section>
 
               {/* What they sent us to build their rate card from. Sits with
                   GSTIN rather than with the checks because it is the same kind

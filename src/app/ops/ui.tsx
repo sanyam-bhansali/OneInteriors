@@ -37,6 +37,8 @@ export function OpsHeader() {
                 until now, the only half nothing on this surface could see. */}
             <OpsLink href="/ops/introductions">Introductions</OpsLink>
             <OpsLink href="/ops/funnel">Funnel</OpsLink>
+            {/* The customer app's weekly "Spot the mistake" photo. */}
+            <OpsLink href="/ops/challenge">Challenge</OpsLink>
             {/* Pre-launch signups from oneinteriors.in, and which society
                 WhatsApp group each one came through. */}
             <OpsLink href="/ops/waitlist">Waitlist</OpsLink>

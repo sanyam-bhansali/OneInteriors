@@ -13,6 +13,9 @@ import { useEffect, useState } from 'react';
 import { motion, useReducedMotion, type PanInfo } from 'framer-motion';
 import { STYLE_LABELS, STYLE_TAGS, type StyleTag } from '@/modules/brief/types';
 import { stylePhotoFor, stylePhotoUrl, type PickerRoom } from '@/data/style-photos';
+import { useSiteT } from '@/components/app/i18n';
+import { QUIZ_DICT, fillParts } from '@/modules/i18n/site/quiz';
+import { PillButton } from '@/components/home/parts';
 
 const THRESHOLD = 90;
 
@@ -30,6 +33,7 @@ export function SwipePicker({
   onChange: (likes: StyleTag[]) => void;
 }) {
   const reduced = useReducedMotion();
+  const t = useSiteT(QUIZ_DICT);
   const deck = STYLE_TAGS.filter((t) => !exclude.includes(t));
   const [i, setI] = useState(0);
   const [likes, setLikes] = useState<StyleTag[]>(selected);
@@ -46,10 +50,12 @@ export function SwipePicker({
 
   if (done) {
     return (
-      <p className="rounded-[10px] bg-[var(--acc-wash)] px-4 py-3 text-[15px] text-[var(--ink2)]">
+      <p className="m-0 rounded-[var(--r-m)] bg-[var(--sand)] px-5 py-4 text-[15px] leading-relaxed text-[var(--ink-2)]">
         {likes.length === 0
-          ? 'None of them — try the grid instead, or come back to it.'
-          : <>You picked <strong className="text-[var(--ink)]">{likes.map((t) => STYLE_LABELS[t]).join(', ')}</strong>.</>}
+          ? t('swipe.none')
+          : fillParts(t('swipe.picked'), {
+              styles: <strong className="font-medium text-[var(--ink)]">{likes.map((s) => STYLE_LABELS[s]).join(', ')}</strong>,
+            })}
       </p>
     );
   }
@@ -58,8 +64,8 @@ export function SwipePicker({
   const photo = stylePhotoFor(tag, room);
   return (
     <div className="mx-auto max-w-[26rem]">
-      <p className="oi-num m-0 mb-2 text-[11px] uppercase tracking-[0.1em] text-[var(--ink2)]">
-        {i + 1} of {deck.length} · {likes.length} of {max} picked
+      <p className="eyebrow !mb-3">
+        {t('swipe.count', { i: i + 1, n: deck.length, k: likes.length, max })}
       </p>
       <motion.div
         key={tag}
@@ -72,26 +78,18 @@ export function SwipePicker({
         }}
         initial={reduced ? false : { opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="touch-pan-y overflow-hidden rounded-[14px] shadow-sm"
+        className="touch-pan-y overflow-hidden rounded-[var(--r-l)] bg-[var(--soft)]"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={stylePhotoUrl(photo, 800)} alt={photo.alt} draggable={false} className="block aspect-[4/5] w-full object-cover" />
       </motion.div>
       <div className="mt-3 flex gap-3">
-        <button
-          type="button"
-          onClick={() => decide(false)}
-          className="min-h-12 flex-1 cursor-pointer rounded-full border border-[var(--line)] bg-transparent text-[15px] font-semibold text-[var(--ink)]"
-        >
-          ← Not me
-        </button>
-        <button
-          type="button"
-          onClick={() => decide(true)}
-          className="oi-cta min-h-12 flex-1 cursor-pointer border-0 text-[15px]"
-        >
-          Yes, this →
-        </button>
+        <PillButton tone="line" className="flex-1" onClick={() => decide(false)}>
+          {t('swipe.no')}
+        </PillButton>
+        <PillButton className="flex-1" onClick={() => decide(true)}>
+          {t('swipe.yes')}
+        </PillButton>
       </div>
     </div>
   );
@@ -100,6 +98,7 @@ export function SwipePicker({
 /** Swipe on phones by default, the grid everywhere else; either can switch to the other. */
 export function SwipeOrGrid({ grid, swipe }: { grid: React.ReactNode; swipe: React.ReactNode }) {
   const [mode, setMode] = useState<'grid' | 'swipe' | null>(null);
+  const t = useSiteT(QUIZ_DICT);
   useEffect(() => {
     setMode(matchMedia('(pointer: coarse)').matches ? 'swipe' : 'grid');
   }, []);
@@ -110,9 +109,9 @@ export function SwipeOrGrid({ grid, swipe }: { grid: React.ReactNode; swipe: Rea
       <button
         type="button"
         onClick={() => setMode(current === 'swipe' ? 'grid' : 'swipe')}
-        className="mt-3 cursor-pointer border-0 bg-transparent p-0 text-[13px] text-[var(--ink2)] underline"
+        className="mt-3 min-h-11 cursor-pointer border-0 bg-transparent p-0 text-[14px] text-[var(--ink-2)] underline underline-offset-2 hover:text-[var(--ink)]"
       >
-        {current === 'swipe' ? 'See them all at once instead' : 'Swipe through them instead'}
+        {current === 'swipe' ? t('swipe.toGrid') : t('swipe.toSwipe')}
       </button>
     </div>
   );

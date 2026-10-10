@@ -305,6 +305,8 @@ function navFor(context: ShellContext | null): NavGroup[] {
           label: 'Quotations',
           ready: isLive('quotations'),
           count: context?.draftQuotes,
+          // The price list every quotation is built from — was reachable only from the guide.
+          children: [{ href: '/studio/products', label: 'Product master', ready: isLive('products') }],
         },
         {
           icon: 'projects',
@@ -332,7 +334,7 @@ function navFor(context: ShellContext | null): NavGroup[] {
         },
         { icon: 'listing', href: '/studio/listing', label: 'Your listing', ready: isLive('listing') },
         // Updates for homes introduced through us — the customer sees them (queue item 22).
-        { icon: 'projects', href: '/studio/updates', label: 'Client updates', ready: true },
+        { icon: 'projects', href: '/studio/updates', label: 'Client projects', ready: true },
       ],
     });
   }

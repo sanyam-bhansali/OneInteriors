@@ -1,10 +1,27 @@
 'use client';
 
+import { SiteLangPicker, useLang, useSiteT } from '@/components/app/i18n';
+import { readContact, rememberContact } from '@/lib/remembered-contact';
+import { tx, type Lang } from '@/modules/i18n/site';
+import {
+  FINISH_TX,
+  HOME_NEED_TX,
+  INVOLVEMENT_TX,
+  POSSESSION_TX,
+  PRIORITY_TX,
+  PROPERTY_TX,
+  ROOM_TX,
+  SCOPE_TX,
+  lbl,
+  itemLabel,
+} from '@/modules/i18n/site/labels';
+import { QUIZ_CHAPTER_TX, QUIZ_DICT, fillParts, quizServerText, type QuizKey } from '@/modules/i18n/site/quiz';
+
 /**
  * The brief — eleven short screens in seven chapters (modules/brief/steps.ts).
  *
- * Layout: question on the left in large display serif, options on the right as
- * soft circular tiles. That split does two things at once — it gives the
+ * Layout: question on the left set as the landing page sets its headings,
+ * options on the right as soft circular tiles and pills. That split does two things at once — it gives the
  * question the weight of somebody actually asking it, and it keeps the options
  * to a small, calm cluster instead of a form.
  *
@@ -30,15 +47,16 @@ import { SocietyInput } from './SocietyInput';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Mark } from '@/components/brand';
-import { Wrap, Sheet, DocRow } from '@/components/oi';
+import { Mark, Wordmark } from '@/components/brand';
+import { DocRow } from '@/components/oi';
+import { FlowShell } from '@/components/home/FlowShell';
+import { PillButton, Split } from '@/components/home/parts';
 import { formatINRCompact } from '@/lib/money';
 import { TIER, TIERS, perSqftLabel, tierRangeFor } from '@/modules/quotation/tiers';
-import { checklistFor, roomsFor, scopePhrase, selectionOf } from '@/modules/quotation/scope';
+import { checklistFor, roomsFor, scopePhrase, selectionOf, type ScopeSelection } from '@/modules/quotation/scope';
 import { scopeBandRange, scopeShare } from '@/modules/quotation/scope-band';
 import { homeShapeFor } from '@/modules/quotation/first-quote';
 import { BEDROOMS } from '@/modules/quotation/estimate';
-import { ROOM_LABELS } from '@/modules/quotation/catalogue';
 import { ratesAreReal } from '@/data/filed-rates';
 import {
   EMPTY_BRIEF,
@@ -46,15 +64,12 @@ import {
   PRIORITY_LABELS,
   PROPERTY_LABELS,
   localityLabel,
-  POSSESSION_LABELS,
   SCOPE_LABELS,
   STYLE_LABELS,
   STYLE_TAGS,
   HOME_NEEDS,
-  HOME_NEED_LABELS,
-  LANGUAGES,
-  LANGUAGE_LABELS,
   type Brief,
+  type Language,
   type HomeNeed,
   type Involvement,
   type PossessionStatus,
@@ -67,6 +82,7 @@ import { loadBrief, saveBrief } from '@/modules/brief/store';
 import {
   CHAPTER,
   NAME_MAX,
+  STEP_IDS,
   TOTAL_STEPS,
   carpetAreaFor,
   cleanName,
@@ -87,11 +103,27 @@ import { SocialButtons, anyProvider, type Providers } from '@/components/SocialB
 import { InspirationReader } from './InspirationReader';
 import { STYLE_PHOTOS, pickerRoomFor, stylePhotoFor, stylePhotoUrl, type PickerRoom } from '@/data/style-photos';
 
+/** The website's language is also the language their studio should speak. */
+const SITE_TO_BRIEF: Record<Lang, Language> = { en: 'EN', hi: 'HI', mr: 'MR' };
+
 const NO_PROVIDERS: Providers = { google: false, apple: false, facebook: false };
+
+/** The quiz dictionary's `t`, handed to the step builders below. */
+type QT = (key: QuizKey, vars?: Record<string, string | number>) => string;
+
+/** Dates in the reader's language. */
+const LOCALE: Record<Lang, string> = { en: 'en-IN', hi: 'hi-IN', mr: 'mr-IN' };
+
+/** The header's chapter name ("Your home") in this language. */
+function chapterName(lang: Lang, en: string): string {
+  const entry = QUIZ_CHAPTER_TX[en];
+  return entry ? tx(lang, entry) : en;
+}
 
 type ContactErrors = Partial<Record<ContactField | 'form', string>>;
 import {
   FULL_HOME_DAYS,
+  monthLabel,
   possessionPhrase,
   readyWindow,
 } from '@/modules/brief/possession';
@@ -164,12 +196,12 @@ const PRIORITY_ICONS: Record<PriorityFactor, React.ComponentType<{ className?: s
  * question says "nearly done" rather than a duration, because at that point a
  * number invites arithmetic and the answer is obviously "almost none".
  */
-function minutesLeft(step: number): string {
+function minutesLeft(step: number, t: QT): string {
   const remaining = TOTAL_STEPS - step + 1;
-  if (remaining <= 1) return 'nearly done';
+  if (remaining <= 1) return t('time.nearlyDone');
   const seconds = remaining * 20;
-  if (seconds <= 60) return 'under a minute left';
-  return `about ${Math.ceil(seconds / 60)} min left`;
+  if (seconds <= 60) return t('time.underMinute');
+  return t('time.minutes', { n: Math.ceil(seconds / 60) });
 }
 
 export function QuizClient({
@@ -187,6 +219,8 @@ export function QuizClient({
   socialSignIn?: Providers;
 }) {
   const router = useRouter();
+  const t = useSiteT(QUIZ_DICT);
+  const lang = useLang();
   const [brief, setBrief] = useState<Brief>(EMPTY_BRIEF);
   const [step, setStep] = useState(1);
   const [hydrated, setHydrated] = useState(false);
@@ -195,13 +229,28 @@ export function QuizClient({
   /** The contact screen's fields. Held here, not in the brief — see contact.ts. */
   const [contact, setContact] = useState<ContactInput>(EMPTY_CONTACT);
   const [contactErrors, setContactErrors] = useState<ContactErrors>({});
+  /** Set while they are changing one answer from the brief panel: Continue
+      takes them straight back here instead of through every later step. */
+  const [returnTo, setReturnTo] = useState<number | null>(null);
 
   useEffect(() => {
     // sessionStorage first so the quiz paints immediately, then reconcile with
     // the server. A stored brief always wins over an empty local one; a local
     // brief wins when the server has never heard of this browser.
-    const local = loadBrief();
+    const remembered = readContact();
+    const stored = loadBrief();
+    // A name typed on an earlier visit fills the first screen again.
+    const local = !stored.contactName && remembered?.name ? { ...stored, contactName: remembered.name } : stored;
     setBrief(local);
+    if (local.contactName) rememberContact({ name: local.contactName });
+    if (remembered) {
+      setContact((c) => ({
+        ...c,
+        name: c.name || remembered.name,
+        phone: c.phone || remembered.phone,
+        email: c.email || remembered.email,
+      }));
+    }
     setStep(Math.min(Math.max(local.lastStep || 1, 1), TOTAL_STEPS));
     setHydrated(true);
 
@@ -300,8 +349,12 @@ export function QuizClient({
    * records the agreement before it writes a single detail.
    */
   async function submitContact() {
-    const input = { ...contact, name: contact.name || brief.contactName || '' };
-    const check = checkContact(input);
+    /* Consent by the button (owner, 10 Oct 2026): the notice sits right above
+       "See who fits", and pressing it is the affirmative act DPDP asks for —
+       no pre-ticked box, and no box to tick. WhatsApp stays a separate,
+       unticked opt-in. */
+    const input = { ...contact, agreed: true, name: contact.name || brief.contactName || '' };
+    const check = checkContact(input, { requireEmail: true });
     if (!check.ok) {
       setContactErrors(check.errors);
       return;
@@ -309,7 +362,7 @@ export function QuizClient({
     setContactErrors({});
     setFinishing(true);
 
-    const result = await submitContactAction(brief, input).catch(() => null);
+    const result = await submitContactAction(brief, input, { requireEmail: true }).catch(() => null);
     if (result && !result.ok) {
       setContactErrors(result.errors);
       setFinishing(false);
@@ -325,6 +378,11 @@ export function QuizClient({
       void submitContact();
       return;
     }
+    if (returnTo !== null && returnTo > step) {
+      setStep(returnTo);
+      setReturnTo(null);
+      return;
+    }
     if (step >= TOTAL_STEPS) {
       finish(brief);
       return;
@@ -334,6 +392,14 @@ export function QuizClient({
     const advanced = { ...brief, lastStep: n };
     saveBrief(advanced);
     sync(advanced);
+  }
+
+  /** Jump to the question an answer came from (the brief panel's Edit). */
+  function editStep(id: StepId) {
+    const target = STEP_IDS.indexOf(id) + 1;
+    if (target < 1 || target >= step) return;
+    setReturnTo((r) => r ?? step);
+    setStep(target);
   }
 
   function back() {
@@ -354,6 +420,7 @@ export function QuizClient({
     contact,
     setContact: (next) => {
       setContact(next);
+      rememberContact({ name: next.name, phone: next.phone, email: next.email });
       // An error disappears as soon as they start fixing it.
       if (Object.keys(contactErrors).length > 0) setContactErrors({});
     },
@@ -367,58 +434,57 @@ export function QuizClient({
     return shownStudioCount(rankStudios(brief, studios, 99, { allowUnverified }).length);
   }, [brief, hydrated, studios, allowUnverified]);
 
+  /* The landing's canvas (owner, 10 Oct 2026). The same FlowShell for the
+     loading frame and the quiz, so React keeps one shell — and one CbMotion —
+     across the switch. No cursor dot: this is tapping and typing in an inner
+     scroller. */
   if (!hydrated) {
     return (
-      <div className="oi-app min-h-dvh bg-[var(--bg)] py-16">
-        <Wrap>
-          <p className="oi-label m-0">Loading…</p>
-        </Wrap>
-      </div>
+      <FlowShell className="flex h-dvh flex-col overflow-hidden" cursor={false}>
+        <div className="wrap py-16">
+          <p className="eyebrow">{t('loading')}</p>
+        </div>
+      </FlowShell>
     );
   }
 
   return (
-    <div className="oi-app flex h-dvh flex-col overflow-hidden bg-[var(--bg)]">
-      <header className="sticky top-0 z-10 border-b border-[var(--line)] bg-[var(--card)]">
-        <Wrap>
-          <div className="flex items-center justify-between gap-4 py-3.5">
-            <Link
-              href="/"
-              className="flex items-center gap-2.5 no-underline"
-              aria-label="One Interiors, home"
-            >
-              <Mark className="h-[18px] w-[18px] text-[var(--ink)]" />
-              {/* The mark alone on a phone: the wordmark wrapped to two lines
-                  there and pushed the chapter and time off the right edge. */}
-              <span className="oi-display hidden text-[17px] leading-none text-[var(--ink)] sm:inline">
-                One Interiors
-              </span>
-            </Link>
-            {/* Time left, not a count.
-                "Question 3 of 9" answers a question nobody asked. What someone
-                deciding whether to keep going actually wants to know is how
-                much longer this is — and an honest estimate is far more
-                motivating than an index. Calibrated at roughly twenty seconds
-                a question, which is what the nine-questions promise on the
-                landing page implies, so the two cannot contradict. */}
-            {/* The chapter, then how long is left. The count is dropped on a
-                phone, where the three together ran off the edge of the screen;
-                the chapter and the time are the two parts that answer "how
-                much more of this is there". */}
-            <span className="oi-num min-w-0 truncate text-right text-[10.5px] uppercase tracking-[0.16em] text-[var(--ink2)]">
-              {CHAPTER[stepId]}
-              <span className="hidden sm:inline">
-                {' '}
-                · {step} of {TOTAL_STEPS}
-              </span>{' '}
-              · {minutesLeft(step)}
+    <FlowShell className="flex h-dvh flex-col overflow-hidden" cursor={false}>
+      {/* The landing's nav: white, frosted, the word mark on the left. */}
+      <header className="nav flow-nav shrink-0">
+        <div className="wrap nav-in">
+          <Link href="/" className="logo" aria-label={t('aria.home')}>
+            {/* The mark alone on a phone, so the chapter and time keep
+                their room; the full logo from sm up. */}
+            <Mark className="text-[var(--ink)] sm:hidden" />
+            <span className="hidden text-[var(--ink)] sm:inline-flex">
+              <Wordmark inherit showCity={false} />
             </span>
-          </div>
-        </Wrap>
+          </Link>
+          {/* Time left, not a count.
+              "Question 3 of 9" answers a question nobody asked. What someone
+              deciding whether to keep going actually wants to know is how
+              much longer this is — and an honest estimate is far more
+              motivating than an index. Calibrated at roughly twenty seconds
+              a question, which is what the nine-questions promise on the
+              landing page implies, so the two cannot contradict. */}
+          {/* The chapter, then how long is left. The count is dropped on a
+              phone, where the three together ran off the edge of the screen;
+              the chapter and the time are the two parts that answer "how
+              much more of this is there". */}
+          <span className="eyebrow !m-0 ml-auto min-w-0 truncate text-right">
+            {chapterName(lang, CHAPTER[stepId])}
+            <span className="hidden sm:inline">
+              {' '}
+              · {t('head.count', { n: step, of: TOTAL_STEPS })}
+            </span>{' '}
+            · {minutesLeft(step, t)}
+          </span>
+        </div>
         <div
           className="h-[3px] w-full bg-[var(--line)]"
           role="progressbar"
-          aria-label="Quiz progress"
+          aria-label={t('aria.progress')}
           aria-valuenow={step}
           aria-valuemin={1}
           aria-valuemax={TOTAL_STEPS}
@@ -430,10 +496,10 @@ export function QuizClient({
               a visual minimum only: the time remaining is stated in words
               right above it, so nothing here overstates progress. */}
           <div
-            className="h-full transition-all duration-500 ease-out"
+            className="h-full rounded-r-full transition-[width] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
             style={{
               width: `${Math.max(7, (step / TOTAL_STEPS) * 100)}%`,
-              background: 'var(--acc)',
+              background: 'var(--accent)',
             }}
           />
         </div>
@@ -445,13 +511,22 @@ export function QuizClient({
           The first build put Continue after the options AND after the running
           brief, so answering a question meant scrolling down to find the
           button — on every one of the nine. A quiz where the primary action is
-          below the fold reads as broken, however good the question above it. */}
-      <main ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
-        <Wrap>
-          <div className="grid grid-cols-1 gap-9 py-8 sm:py-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-14">
-            <div key={`q-${step}`} className="oi-swap flex flex-col gap-7">
+          below the fold reads as broken, however good the question above it.
+
+          `data-lenis-prevent`: the landing's smooth scroll drives the window,
+          and this screen scrolls inside <main>, so the wheel is left to it.
+          The mono token is pointed at the sans here — one face for words and
+          figures alike, as on the landing. */}
+      <main
+        ref={scroller}
+        data-lenis-prevent=""
+        className="min-h-0 flex-1 overflow-y-auto [--font-mono:var(--sans)]"
+      >
+        <div className="wrap">
+          <div className="grid grid-cols-1 gap-9 py-8 sm:py-12 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-16 lg:py-14">
+            <div key={`q-${step}`} className="oi-swap flex flex-col gap-9">
               <QuestionStep id={stepId} brief={brief} update={update} slot="ask" ctx={contactCtx} />
-              <LiveProfile brief={brief} matchCount={matchCount} className="hidden lg:block" />
+              <LiveProfile brief={brief} matchCount={matchCount} className="hidden lg:block" onEdit={editStep} current={stepId} />
             </div>
 
             <div key={`o-${step}`} className="oi-swap min-w-0">
@@ -465,65 +540,70 @@ export function QuizClient({
                   check what we have understood; out of the way for everyone
                   else. On a laptop it stays open in the left column, where it
                   costs no vertical space at all. */}
-              <details className="group mt-7 border border-[var(--line)] bg-[var(--card)] lg:hidden">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
-                  <span className="oi-label m-0">
+              <details className="group flow-card mt-8 !p-0 lg:hidden">
+                <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-5 py-3">
+                  <span className="eyebrow !m-0">
                     {cleanName(brief.contactName)
-                      ? `${cleanName(brief.contactName)}'s brief so far`
-                      : 'Your brief so far'}
+                      ? t('profile.titleNamed', { name: cleanName(brief.contactName) ?? '' })
+                      : t('profile.title')}
                   </span>
-                  <span className="oi-num text-[10.5px] uppercase tracking-[0.14em] text-[var(--acc-ink)] group-open:hidden">
-                    Show
+                  <span className="rounded-full bg-[var(--paper)] px-3.5 py-1.5 text-[13px] font-medium text-[var(--ink)] group-open:hidden">
+                    {t('show')}
                   </span>
-                  <span className="oi-num hidden text-[10.5px] uppercase tracking-[0.14em] text-[var(--acc-ink)] group-open:inline">
-                    Hide
+                  <span className="hidden rounded-full bg-[var(--paper)] px-3.5 py-1.5 text-[13px] font-medium text-[var(--ink)] group-open:inline">
+                    {t('hide')}
                   </span>
                 </summary>
-                <div className="border-t border-[var(--line)] p-4">
-                  <LiveProfile brief={brief} matchCount={matchCount} bare />
+                <div className="px-5 pb-5">
+                  <LiveProfile brief={brief} matchCount={matchCount} bare onEdit={editStep} current={stepId} />
                 </div>
               </details>
             </div>
           </div>
-        </Wrap>
+        </div>
       </main>
 
-      <footer className="sticky bottom-0 z-10 border-t border-[var(--line)] bg-[var(--card)]/95 backdrop-blur">
-        <Wrap>
-          <div className="flex items-center justify-between gap-4 py-4">
-            <button
-              type="button"
-              onClick={back}
-              className="cursor-pointer border border-[var(--line)] bg-[var(--card)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--ink)] transition-colors hover:border-[var(--ink2)]"
-            >
-              Back
-            </button>
+      <footer className="sticky bottom-0 z-10 shrink-0 bg-[rgba(255,255,255,0.82)] shadow-[0_-1px_0_var(--line)] backdrop-blur-[14px]">
+        <div className="wrap">
+          <div className="flex items-center justify-between gap-3 py-3.5 sm:gap-4 sm:py-4">
+            <PillButton tone="line" onClick={back} className="shrink-0 max-sm:!px-5">
+              {t('back')}
+            </PillButton>
 
-            <div className="flex items-center gap-4">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+              {/* Says what is missing, on phones too: the priorities screen
+                  wants all four ranked, and a dead button with no reason was
+                  where people stopped (review, 8 Oct). */}
               {!canAdvance ? (
-                <span className="hidden text-[13.5px] text-[var(--ink2)] sm:inline">
-                  Pick an answer to continue
+                <span className="min-w-0 text-right text-[13px] leading-snug text-[var(--ink-2)]">
+                  {stepId === 'priorities'
+                    ? t('need.rank', { n: brief.priorityRanking.length })
+                    : stepId === 'likes'
+                      ? t('need.two')
+                      : t('need.one')}
                 </span>
               ) : null}
-              {/* The one terracotta thing on the screen. */}
-              <button
-                type="button"
+              {/* The one action on the screen: the landing's black pill,
+                  terracotta rising into it on hover. */}
+              <PillButton
                 onClick={next}
                 disabled={!canAdvance || finishing}
-                className="cursor-pointer px-6 py-3 text-[14.5px] font-medium text-white transition-colors disabled:opacity-40"
-                style={{ background: 'var(--acc-btn)' }}
+                arrow={!finishing}
+                className="shrink-0 disabled:pointer-events-none max-sm:!px-5"
               >
                 {finishing
-                  ? 'Writing your brief…'
+                  ? t('cta.writing')
                   : step === TOTAL_STEPS
-                    ? 'See who fits'
-                    : 'Continue'}
-              </button>
+                    ? t('cta.see')
+                    : returnTo !== null && returnTo > step
+                      ? t('cta.backToDetails')
+                      : t('cta.continue')}
+              </PillButton>
             </div>
           </div>
-        </Wrap>
+        </div>
       </footer>
-    </div>
+    </FlowShell>
   );
 }
 
@@ -561,7 +641,9 @@ function QuestionStep({
   slot: 'ask' | 'options';
   ctx: ContactContext;
 }) {
-  const parts = stepContent(id, brief, update, ctx);
+  const t = useSiteT(QUIZ_DICT);
+  const lang = useLang();
+  const parts = stepContent(id, brief, update, ctx, t, lang);
   return <>{slot === 'ask' ? parts.ask : parts.options}</>;
 }
 
@@ -570,6 +652,8 @@ function stepContent(
   brief: Brief,
   update: (patch: Partial<Brief>) => void,
   ctx: ContactContext,
+  t: QT,
+  lang: Lang,
 ): StepParts {
   switch (id) {
     case 'contact': {
@@ -577,8 +661,8 @@ function stepContent(
       return {
         ask: (
           <Ask
-            title={name ? `${name}, where should we send your matches?` : 'Where should we send your matches?'}
-            hint="Your number is how our expert reaches you to book your call. No studio sees it until you choose one."
+            title={name ? t('contact.titleNamed', { name }) : t('contact.title')}
+            hint={t('contact.hint')}
           />
         ),
         options: (
@@ -594,34 +678,34 @@ function stepContent(
       };
     }
     case 'name':
-      return nameStep(brief, update);
+      return nameStep(brief, update, t);
     case 'home':
-      return homeStep(brief, update);
+      return homeStep(brief, update, t, lang);
     case 'plan':
       return {
         ask: (
           <Ask
-            title="Have your floor plan?"
-            hint="The builder's plan, or a photo of it. We read the sizes off it so every studio's quote is priced on your actual kitchen and rooms — not a standard one. Skip it if you don't have it to hand."
+            title={t('plan.title')}
+            hint={t('plan.hint')}
           />
         ),
         options: <PlanReader brief={brief} update={update} />,
       };
     case 'possession':
-      return possessionStep(brief, update);
+      return possessionStep(brief, update, t, lang);
     case 'scope':
-      return scopeStep(brief, update);
+      return scopeStep(brief, update, t, lang);
     case 'level':
-      return budgetStep(brief, update);
+      return budgetStep(brief, update, t, lang);
     case 'likes':
       return {
         ask: (
           <Ask
-            title="Which of these feel like your home?"
+            title={t('likes.title')}
             /* "Pick three" while Continue unlocked at one was a small lie that
                taught people the instructions here are approximate. Two or three
                is what the step actually accepts, so that is what it says. */
-            hint="Pick two or three, on instinct. Don't overthink it — we'll tell you what you chose afterwards."
+            hint={t('likes.hint')}
           />
         ),
         options: (
@@ -641,7 +725,7 @@ function stepContent(
                       styleStudioPicks: [
                         ...new Set(
                           styleLikes
-                            .map((t) => ctx.pickerPhotos[t]?.studioId)
+                            .map((s) => ctx.pickerPhotos[s]?.studioId)
                             .filter((id): id is string => Boolean(id)),
                         ),
                       ],
@@ -660,12 +744,14 @@ function stepContent(
               }
             />
             {brief.styleLikes.length === 3 ? (
-              <p className="mt-5 rounded-[10px] bg-[var(--acc-wash)] px-4 py-3 text-[15px] leading-relaxed text-[var(--ink2)]">
-                So you lean{' '}
-                <strong className="font-bold text-[var(--ink)]">
-                  {brief.styleLikes.map((t) => STYLE_LABELS[t]).join(', ')}
-                </strong>
-                . That&rsquo;s the direction we&rsquo;ll match on.
+              <p className="mt-5 rounded-[var(--r-m)] bg-[var(--sand)] px-5 py-4 text-[15px] leading-relaxed text-[var(--ink-2)]">
+                {fillParts(t('likes.lean'), {
+                  styles: (
+                    <strong className="font-medium text-[var(--ink)]">
+                      {brief.styleLikes.map((s) => STYLE_LABELS[s]).join(', ')}
+                    </strong>
+                  ),
+                })}
               </p>
             ) : null}
             {brief.styleLikes.length >= 2 ? (
@@ -689,8 +775,8 @@ function stepContent(
       return {
         ask: (
           <Ask
-            title="And which two would you never want?"
-            hint="Higher signal than what you like. Almost nobody asks this, and it rules studios out completely."
+            title={t('dislikes.title')}
+            hint={t('dislikes.hint')}
           />
         ),
         options: (
@@ -706,11 +792,11 @@ function stepContent(
         ),
       };
     case 'living':
-      return livingStep(brief, update);
+      return livingStep(brief, update, t, lang);
     case 'working':
-      return workingStep(brief, update);
+      return workingStep(brief, update, t, lang);
     case 'priorities':
-      return priorityStep(brief, update);
+      return priorityStep(brief, update, t, lang);
   }
 }
 
@@ -739,6 +825,8 @@ function ContactStep({
   setContact: (next: ContactInput) => void;
   errors: ContactErrors;
 }) {
+  const t = useSiteT(QUIZ_DICT);
+  const lang = useLang();
   const set = (patch: Partial<ContactInput>) => setContact({ ...contact, ...patch });
 
   /* Signed in — with Google or otherwise — fills the email and, if they
@@ -748,11 +836,11 @@ function ContactStep({
     if (account?.email && !contact.email) setContact({ ...contact, email: account.email });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
   }, [account?.email]);
-  const field =
-    'w-full rounded-full border bg-[var(--card)] px-5 py-3 text-[16px] text-[var(--ink)] placeholder:text-[var(--ink2)]';
-  const border = (bad: boolean) => (bad ? 'border-[var(--acc)]' : 'border-[var(--line)]');
+  /* The landing's soft pill field; a field with an error keeps a terracotta edge. */
+  const field = 'flow-input placeholder:text-[var(--ink-3)]';
+  const border = (bad: boolean) => (bad ? '!border-[var(--accent)]' : '');
   const Err = ({ text }: { text?: string }) =>
-    text ? <p className="m-0 mt-2 text-[13.5px] leading-snug text-[var(--acc-ink)]">{text}</p> : null;
+    text ? <p className="m-0 mt-2 pl-[22px] text-[13.5px] leading-snug text-[var(--accent-ink)]">{text}</p> : null;
   const name = contact.name || brief.contactName || '';
 
   return (
@@ -760,21 +848,20 @@ function ContactStep({
       {/* One tap instead of typing, and the brief is kept on their account. No
           provider gives a phone number, so the mobile is still asked below. */}
       {account ? (
-        <p className="m-0 text-[14px] text-[var(--ink2)]">
-          Signed in{account.email ? ` as ${account.email}` : ''}. Your brief is saved to your account.
+        <p className="m-0 text-[15px] text-[var(--ink-2)]">
+          {account.email ? t('contact.signedInAs', { email: account.email }) : t('contact.signedIn')}
         </p>
       ) : anyProvider(socialSignIn) ? (
-        <div className="flex flex-col gap-2 border-b border-[var(--line)] pb-5">
+        <div className="flex flex-col gap-2.5 pb-2">
           <SocialButtons providers={socialSignIn} next="/quiz" className="max-w-xs" />
-          <p className="m-0 text-[13px] leading-snug text-[var(--ink2)]">
-            Fills in your name and email and keeps your brief on your account. We still need your
-            mobile below.
+          <p className="m-0 text-[13.5px] leading-snug text-[var(--ink-2)]">
+            {t('contact.social')}
           </p>
         </div>
       ) : null}
 
       <label className="block">
-        <FieldLabel>Your name</FieldLabel>
+        <FieldLabel>{t('contact.name')}</FieldLabel>
         <input
           type="text"
           value={name}
@@ -783,11 +870,11 @@ function ContactStep({
           maxLength={NAME_MAX}
           className={`${field} ${border(!!errors.name)}`}
         />
-        <Err text={errors.name} />
+        <Err text={quizServerText(lang, errors.name)} />
       </label>
 
       <label className="block">
-        <FieldLabel>Mobile</FieldLabel>
+        <FieldLabel>{t('contact.mobile')}</FieldLabel>
         <input
           type="tel"
           inputMode="tel"
@@ -795,13 +882,13 @@ function ContactStep({
           onChange={(e) => set({ phone: e.target.value.slice(0, 20) })}
           placeholder="98765 43210"
           autoComplete="tel-national"
-          className={`oi-num ${field} ${border(!!errors.phone)}`}
+          className={`${field} ${border(!!errors.phone)}`}
         />
-        <Err text={errors.phone} />
+        <Err text={quizServerText(lang, errors.phone)} />
       </label>
 
       <label className="block">
-        <FieldLabel>Email, if you like</FieldLabel>
+        <FieldLabel>{t('contact.email')}</FieldLabel>
         <input
           type="email"
           inputMode="email"
@@ -811,42 +898,36 @@ function ContactStep({
           autoComplete="email"
           className={`${field} ${border(!!errors.email)}`}
         />
-        <Err text={errors.email} />
+        <Err text={quizServerText(lang, errors.email)} />
       </label>
 
-      <div className="flex flex-col gap-3 border-t border-[var(--line)] pt-5">
-        <label className="flex cursor-pointer items-start gap-3 text-[14.5px] leading-relaxed text-[var(--ink)]">
-          <input
-            type="checkbox"
-            checked={contact.agreed}
-            onChange={(e) => set({ agreed: e.target.checked })}
-            className="mt-1 h-4 w-4 shrink-0 accent-[var(--acc)]"
-          />
-          <span>
-            {PURPOSE_NOTICE.DATA_PROCESSING.label}.{' '}
-            <span className="text-[var(--ink2)]">{PURPOSE_NOTICE.DATA_PROCESSING.detail}</span>{' '}
-            <Link href="/privacy" target="_blank" className="text-[var(--ink2)] underline">
-              How we use it
-            </Link>
-          </span>
-        </label>
-        <Err text={errors.agreed} />
+      {/* The notice, on the landing's soft card: calm type, nothing in a box
+          of rules. The words are unchanged (PURPOSE_NOTICE). */}
+      <div className="flow-card mt-1 flex flex-col gap-4 !p-5 sm:!p-6">
+        <p className="m-0 text-[15px] leading-relaxed text-[var(--ink)]">
+          {t('contact.byContinuing')} {PURPOSE_NOTICE.DATA_PROCESSING.label.charAt(0).toLowerCase() + PURPOSE_NOTICE.DATA_PROCESSING.label.slice(1)}.{' '}
+          <span className="text-[var(--ink-2)]">{PURPOSE_NOTICE.DATA_PROCESSING.detail}</span>{' '}
+          <Link href="/privacy" target="_blank" className="text-[var(--ink)] underline underline-offset-2">
+            {t('contact.howWeUse')}
+          </Link>
+        </p>
+        <Err text={quizServerText(lang, errors.agreed)} />
 
-        <label className="flex cursor-pointer items-start gap-3 text-[14.5px] leading-relaxed text-[var(--ink2)]">
+        <label className="flex cursor-pointer items-start gap-3.5 text-[15px] leading-relaxed text-[var(--ink-2)]">
           <input
             type="checkbox"
             checked={contact.whatsappUpdates}
             onChange={(e) => set({ whatsappUpdates: e.target.checked })}
-            className="mt-1 h-4 w-4 shrink-0 accent-[var(--acc)]"
+            className="mt-[5px] h-[18px] w-[18px] shrink-0 accent-[var(--ink)]"
           />
           <span>
-            {PURPOSE_NOTICE.MARKETING_WHATSAPP.label} — optional.{' '}
+            {PURPOSE_NOTICE.MARKETING_WHATSAPP.label} — {t('contact.optional')}.{' '}
             {PURPOSE_NOTICE.MARKETING_WHATSAPP.detail}
           </span>
         </label>
       </div>
 
-      <Err text={errors.form} />
+      <Err text={quizServerText(lang, errors.form)} />
     </div>
   );
 }
@@ -860,7 +941,7 @@ function ContactStep({
  * Changing the scope clears the rooms and the unticked items — they belong to
  * the old scope's list.
  */
-function scopeStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
+function scopeStep(brief: Brief, update: (p: Partial<Brief>) => void, t: QT, lang: Lang): StepParts {
   const bhk = BEDROOMS[brief.propertyType ?? 'BHK_2'];
   const selection = selectionOf(brief);
   const needsRooms = brief.scope === 'SINGLE_ROOM' || brief.scope === 'RENOVATION';
@@ -884,8 +965,8 @@ function scopeStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts
   return {
     ask: (
       <Ask
-        title="How much of it are we doing?"
-        hint="Then untick anything you don't want. Every studio is priced on exactly what is ticked."
+        title={t('scope.title')}
+        hint={t('scope.hint')}
       />
     ),
     options: (
@@ -894,7 +975,7 @@ function scopeStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts
           {(Object.keys(SCOPE_LABELS) as ScopeType[]).map((k) => (
             <CircleTile
               key={k}
-              label={SCOPE_LABELS[k]}
+              label={lbl(lang, SCOPE_TX, k)}
               Icon={SCOPE_ICONS[k]}
               selected={brief.scope === k}
               onClick={() => update({ scope: k, scopeRooms: [], excludedItems: [] })}
@@ -906,13 +987,13 @@ function scopeStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts
           <div>
             <FieldLabel>
               {brief.scope === 'RENOVATION'
-                ? 'Any rooms to redo as well as the civil work?'
-                : 'Which rooms?'}
+                ? t('scope.renoRooms')
+                : t('scope.whichRooms')}
             </FieldLabel>
             <div className="flex flex-wrap gap-2">
               {roomsFor(bhk).map((room) => (
                 <Chip key={room} selected={brief.scopeRooms.includes(room)} onClick={() => toggleRoom(room)}>
-                  {ROOM_LABELS[room]}
+                  {lbl(lang, ROOM_TX, room)}
                 </Chip>
               ))}
             </div>
@@ -921,24 +1002,24 @@ function scopeStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts
 
         {groups.length > 0 ? (
           <div>
-            <FieldLabel>What we will price — untick anything you don&rsquo;t want</FieldLabel>
-            <div className="overflow-hidden rounded-[14px] border border-[var(--line)] bg-[var(--card)]">
+            <FieldLabel>{t('scope.price')}</FieldLabel>
+            <div className="flex flex-col gap-2">
               {groups.map((g) => (
-                <div key={g.room} className="border-b border-[var(--line)] px-4 py-3 last:border-b-0">
-                  <p className="m-0 mb-2 text-[13px] font-medium text-[var(--ink)]">{g.label}</p>
-                  <div className="flex flex-col gap-1.5">
+                <div key={g.room} className="rounded-[var(--r-m)] bg-[var(--soft)] px-5 py-4">
+                  <p className="m-0 mb-2.5 text-[15px] font-medium tracking-[-0.01em] text-[var(--ink)]">{lbl(lang, ROOM_TX, g.room)}</p>
+                  <div className="flex flex-col gap-2">
                     {g.items.map((item) => (
                       <label
                         key={item.code}
-                        className="flex cursor-pointer items-center gap-3 text-[14.5px] text-[var(--ink2)]"
+                        className="flex cursor-pointer items-center gap-3 text-[14.5px] text-[var(--ink-2)]"
                       >
                         <input
                           type="checkbox"
                           checked={!off.has(item.code)}
                           onChange={() => toggleItem(item.code)}
-                          className="h-4 w-4 accent-[var(--acc)]"
+                          className="h-[18px] w-[18px] shrink-0 accent-[var(--ink)]"
                         />
-                        {item.label}
+                        {itemLabel(lang, item.label)}
                       </label>
                     ))}
                   </div>
@@ -961,26 +1042,37 @@ function scopeStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts
  * it is sent with the number once they have agreed to the notice, and the hint
  * says exactly that.
  */
-function nameStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
+function nameStep(brief: Brief, update: (p: Partial<Brief>) => void, t: QT): StepParts {
   return {
     ask: (
       <Ask
-        title="First — what should we call you?"
-        hint="Just a first name is fine. It stays on this device until you send us your brief at the end."
+        title={t('name.title')}
+        hint={t('name.hint')}
       />
     ),
     options: (
       <div className="max-w-md">
+        {/* The language first (owner, 9 Oct 2026): it changes every page from
+            here on, and it is also the language their studio should speak.
+            Set on the soft ground the fields use, the chosen one in ink. */}
+        <FieldLabel>Your language · आपकी भाषा · तुमची भाषा</FieldLabel>
+        <SiteLangPicker
+          className="big mb-8 !border-transparent !bg-[var(--soft)] !p-1"
+          onPick={(l) => update({ language: SITE_TO_BRIEF[l] })}
+        />
         <input
           type="text"
           value={brief.contactName ?? ''}
-          onChange={(e) => update({ contactName: e.target.value.slice(0, NAME_MAX) })}
-          placeholder="Your first name"
-          aria-label="Your first name"
+          onChange={(e) => {
+            update({ contactName: e.target.value.slice(0, NAME_MAX) });
+            rememberContact({ name: e.target.value.slice(0, NAME_MAX) });
+          }}
+          placeholder={t('name.placeholder')}
+          aria-label={t('name.placeholder')}
           autoComplete="given-name"
           autoCapitalize="words"
           maxLength={NAME_MAX}
-          className="w-full rounded-full border border-[var(--line)] bg-[var(--card)] px-5 py-3.5 text-[17px] text-[var(--ink)] placeholder:text-[var(--ink2)]"
+          className="flow-input !min-h-14 !text-[17px] placeholder:text-[var(--ink-3)]"
         />
       </div>
     ),
@@ -999,14 +1091,14 @@ function nameStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts 
  * floor plan on the next screen gives it, and only a customer without one is
  * asked for it there (PlanReader).
  */
-function homeStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
+function homeStep(brief: Brief, update: (p: Partial<Brief>) => void, t: QT, lang: Lang): StepParts {
   const name = cleanName(brief.contactName);
 
   return {
     ask: (
       <Ask
-        title={name ? `${name}, what kind of home are we working with?` : 'What kind of home are we working with?'}
-        hint="And where in Pune it is, so we only show you studios who actually work there."
+        title={name ? t('home.titleNamed', { name }) : t('home.title')}
+        hint={t('home.hint')}
       />
     ),
     options: (
@@ -1015,7 +1107,7 @@ function homeStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts 
           {(Object.keys(PROPERTY_LABELS) as PropertyType[]).map((k) => (
             <CircleTile
               key={k}
-              label={PROPERTY_LABELS[k]}
+              label={lbl(lang, PROPERTY_TX, k)}
               Icon={PROPERTY_ICONS[k]}
               selected={brief.propertyType === k}
               onClick={() => update({ propertyType: k })}
@@ -1024,7 +1116,7 @@ function homeStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts 
         </TileRow>
 
         <div>
-          <FieldLabel>Where is it?</FieldLabel>
+          <FieldLabel>{t('home.where')}</FieldLabel>
           {/* Keyed on the value so a locality filled from the society collapses the picker. */}
           <LocalityPicker
             key={brief.locality ?? 'none'}
@@ -1034,7 +1126,7 @@ function homeStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts 
         </div>
 
         <label className="block sm:max-w-[26rem]">
-          <FieldLabel>Society or building, if you like</FieldLabel>
+          <FieldLabel>{t('home.society')}</FieldLabel>
           <SocietyInput
             value={brief.society}
             onChange={(society) => update({ society })}
@@ -1047,8 +1139,8 @@ function homeStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts 
 }
 
 /** Who lives there, and what the home needs. */
-function livingStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
-  const household = householdStep(brief, update);
+function livingStep(brief: Brief, update: (p: Partial<Brief>) => void, t: QT, lang: Lang): StepParts {
+  const household = householdStep(brief, update, t);
   const toggle = (need: HomeNeed) =>
     update({
       needs: brief.needs.includes(need)
@@ -1062,11 +1154,11 @@ function livingStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPart
       <div className="flex flex-col gap-7">
         {household.options}
         <div>
-          <FieldLabel>Anything the home needs? Pick any that apply</FieldLabel>
+          <FieldLabel>{t('living.needs')}</FieldLabel>
           <div className="flex flex-wrap gap-2">
             {HOME_NEEDS.map((need) => (
               <Chip key={need} selected={brief.needs.includes(need)} onClick={() => toggle(need)}>
-                {HOME_NEED_LABELS[need]}
+                {lbl(lang, HOME_NEED_TX, need)}
               </Chip>
             ))}
           </div>
@@ -1077,12 +1169,12 @@ function livingStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPart
 }
 
 /** How involved they want to be, and the language they want to work in. */
-function workingStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
+function workingStep(brief: Brief, update: (p: Partial<Brief>) => void, t: QT, lang: Lang): StepParts {
   return {
     ask: (
       <Ask
-        title="How involved do you want to be?"
-        hint="The most common reason a project goes wrong is a mismatch here — not a mismatch in taste."
+        title={t('working.title')}
+        hint={t('working.hint')}
       />
     ),
     options: (
@@ -1091,27 +1183,13 @@ function workingStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPar
           {(Object.keys(INVOLVEMENT_LABELS) as Involvement[]).map((k) => (
             <CircleTile
               key={k}
-              label={INVOLVEMENT_LABELS[k]}
+              label={lbl(lang, INVOLVEMENT_TX, k)}
               Icon={INVOLVEMENT_ICONS[k]}
               selected={brief.involvement === k}
               onClick={() => update({ involvement: k })}
             />
           ))}
         </TileRow>
-        <div>
-          <FieldLabel>The language you&rsquo;d like your studio to speak</FieldLabel>
-          <div className="flex flex-wrap gap-2">
-            {LANGUAGES.map((lang) => (
-              <Chip
-                key={lang}
-                selected={brief.language === lang}
-                onClick={() => update({ language: brief.language === lang ? null : lang })}
-              >
-                {LANGUAGE_LABELS[lang]}
-              </Chip>
-            ))}
-          </div>
-        </div>
       </div>
     ),
   };
@@ -1141,7 +1219,7 @@ function workingStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPar
  * deliver kills an unqualified expectation here, which is far cheaper for
  * everyone than killing it at the quotation.
  */
-function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
+function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void, t: QT, lang: Lang): StepParts {
   const { sqft: area, assumed: areaAssumed } = carpetAreaFor(brief);
   const shape = homeShapeFor(brief);
   const selection = selectionOf(brief);
@@ -1150,8 +1228,8 @@ function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPart
   return {
     ask: (
       <Ask
-        title="What are you planning to spend?"
-        hint="Priced for a home your size, at three levels of finish. It isn't a commitment — it stops us showing you studios who don't work at your level."
+        title={t('budget.title')}
+        hint={t('budget.hint')}
       />
     ),
     options: (
@@ -1180,30 +1258,31 @@ function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPart
                 })
               }
               aria-pressed={selected}
-              className={`rounded-[14px] border-2 p-5 text-left transition-colors ${
+              className={`cursor-pointer rounded-[var(--r-l)] px-6 py-5 text-left transition-colors duration-300 active:scale-[0.99] ${
                 selected
-                  ? 'border-[var(--acc)] bg-[var(--acc-wash)]'
-                  : 'border-[var(--line)] bg-[var(--card)] hover:border-[var(--ink2)]'
+                  ? 'bg-[var(--ink)] text-white'
+                  : 'bg-[var(--soft)] text-[var(--ink)] hover:bg-[var(--soft-2)]'
               }`}
             >
-              <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <span className="oi-display text-[21px] leading-none text-[var(--ink)]">
+              <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <span className="inline-flex items-center gap-2.5 text-[22px] font-medium leading-none tracking-[-0.02em]">
                   {definition.label}
+                  {selected ? <TickDot /> : null}
                 </span>
-                <span className="oi-num oi-display text-[19px] leading-none text-[var(--acc-ink)]">
+                <span className="whitespace-nowrap text-[19px] font-medium leading-none tracking-[-0.02em] tabular-nums">
                   {shown === null
-                    ? perSqftLabel(tier) + ' / sq ft'
+                    ? t('budget.perSqft', { rate: perSqftLabel(tier) })
                     : shown.highPaise === null
-                      ? `From ${formatINRCompact(shown.lowPaise)}`
+                      ? t('budget.from', { amount: formatINRCompact(shown.lowPaise) })
                       : `${formatINRCompact(shown.lowPaise)} – ${formatINRCompact(shown.highPaise)}`}
                 </span>
               </div>
-              <p className="m-0 text-[14.5px] leading-[1.5] text-[var(--ink2)]">
-                {definition.promise}
+              <p className={`m-0 text-[14.5px] leading-[1.5] ${selected ? 'text-white/75' : 'text-[var(--ink-2)]'}`}>
+                {tx(lang, FINISH_TX[tier].promise)}
               </p>
               {selected ? (
-                <p className="m-0 mt-2.5 border-t border-[var(--line)] pt-2.5 text-[13px] leading-[1.5] text-[var(--ink2)]">
-                  {definition.notFor}
+                <p className="m-0 mt-3 border-t border-white/15 pt-3 text-[13px] leading-[1.5] text-white/65">
+                  {tx(lang, FINISH_TX[tier].notFor)}
                 </p>
               ) : null}
             </button>
@@ -1211,24 +1290,24 @@ function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPart
         })}
 
         {partial ? (
-          <p className="m-0 mt-1 text-[13px] leading-[1.55] text-[var(--ink2)]">
+          <p className="m-0 mt-2 text-[13.5px] leading-[1.55] text-[var(--ink-2)]">
             {scopeShare(shape, selection) === null
-              ? 'We cannot put a range on civil work yet — each studio prices it on its own rates, and your quotes show it line by line. The level is what they charge per square foot of a home.'
-              : `For ${scopePhrase(selection)?.toLowerCase() ?? 'your scope'} — the level's price for your home, scaled to the part you are doing.`}
+              ? t('budget.civil')
+              : t('budget.forScope', { scope: scopePhraseIn(lang, t, selection)?.toLowerCase() ?? t('budget.yourScope') })}
           </p>
         ) : null}
-        <p className="m-0 mt-1 text-[13px] leading-[1.55] text-[var(--ink2)]">
+        <p className="m-0 mt-1 text-[13.5px] leading-[1.55] text-[var(--ink-2)]">
           {areaAssumed
-            ? `Excluding GST, for a typical ${area.toLocaleString('en-IN')} sq ft ${
-                brief.propertyType ? PROPERTY_LABELS[brief.propertyType] : 'home'
-              } — tell us your carpet area and these tighten.`
+            ? t('budget.typical', {
+                area: area.toLocaleString('en-IN'),
+                home: brief.propertyType ? lbl(lang, PROPERTY_TX, brief.propertyType) : t('budget.home'),
+              })
             : // Derived, not written as a constant (FINDINGS 1.1): until studios'
               // own filed rates are live, "their own rates" would be false.
-              `Excluding GST, for your ${area} sqft. ${
-                ratesAreReal()
-                  ? "Your real quotes come from each studio's own rates."
-                  : 'Your quotes follow, line by line.'
-              }`}
+              t('budget.yours', {
+                area,
+                rest: ratesAreReal() ? t('budget.realRates') : t('budget.followLines'),
+              })}
         </p>
       </div>
     ),
@@ -1247,12 +1326,12 @@ function budgetStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPart
  * for (see `modules/brief/possession.ts`). The old Q9 promised "we'll say so"
  * about a tight date and never did; this says only what it can back.
  */
-function possessionStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
+function possessionStep(brief: Brief, update: (p: Partial<Brief>) => void, t: QT, lang: Lang): StepParts {
   const status = brief.possessionStatus;
   const window = readyWindow(status, brief.possessionOn, brief.scope);
   const monthValue = brief.possessionOn ? brief.possessionOn.slice(0, 7) : '';
   const short = (d: Date) =>
-    d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    d.toLocaleDateString(LOCALE[lang], { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
   const option = (value: PossessionStatus, body: string) => {
     const selected = status === value;
@@ -1268,16 +1347,19 @@ function possessionStep(brief: Brief, update: (p: Partial<Brief>) => void): Step
             possessionOn: value === 'EXPECTED' ? brief.possessionOn : null,
           })
         }
-        className={`rounded-[14px] border-2 p-5 text-left transition-colors ${
+        className={`cursor-pointer rounded-[var(--r-l)] px-6 py-5 text-left transition-colors duration-300 active:scale-[0.99] ${
           selected
-            ? 'border-[var(--acc)] bg-[var(--acc-wash)]'
-            : 'border-[var(--line)] bg-[var(--card)] hover:border-[var(--ink2)]'
+            ? 'bg-[var(--ink)] text-white'
+            : 'bg-[var(--soft)] text-[var(--ink)] hover:bg-[var(--soft-2)]'
         }`}
       >
-        <span className="oi-display block text-[21px] leading-none text-[var(--ink)]">
-          {POSSESSION_LABELS[value]}
+        <span className="flex items-center gap-2.5 text-[22px] font-medium leading-none tracking-[-0.02em]">
+          {lbl(lang, POSSESSION_TX, value)}
+          {selected ? <TickDot /> : null}
         </span>
-        <span className="mt-1.5 block text-[14.5px] leading-[1.5] text-[var(--ink2)]">{body}</span>
+        <span className={`mt-2 block text-[14.5px] leading-[1.5] ${selected ? 'text-white/75' : 'text-[var(--ink-2)]'}`}>
+          {body}
+        </span>
       </button>
     );
   };
@@ -1285,36 +1367,42 @@ function possessionStep(brief: Brief, update: (p: Partial<Brief>) => void): Step
   return {
     ask: (
       <Ask
-        title="Last one — do you have possession yet?"
-        hint="Work starts from the day you get the keys, so everything we plan counts from there."
+        title={t('poss.title')}
+        hint={t('poss.hint')}
       />
     ),
     options: (
       <div className="flex flex-col gap-3">
-        {option('HAVE_KEYS', 'Work can start as soon as the design is signed off.')}
-        {option('EXPECTED', 'Tell us the month. Design can start before handover.')}
+        {option('HAVE_KEYS', t('poss.haveKeys'))}
+        {option('EXPECTED', t('poss.expected'))}
         {status === 'EXPECTED' ? (
-          <label className="-mt-1 ml-1 flex flex-wrap items-center gap-3">
-            <span className="text-[14px] text-[var(--ink2)]">Possession expected in</span>
+          <label className="ml-2 flex flex-wrap items-center gap-3">
+            <span className="text-[14.5px] text-[var(--ink-2)]">{t('poss.expectedIn')}</span>
             <input
               type="month"
               value={monthValue}
               onChange={(e) =>
                 update({ possessionOn: e.target.value ? `${e.target.value}-01` : null })
               }
-              className="oi-num rounded-full border border-[var(--line)] bg-[var(--card)] px-4 py-2.5 text-[15px] text-[var(--ink)]"
+              className="flow-input !w-auto"
             />
           </label>
         ) : null}
-        {option('NOT_SURE', 'That is fine — we will plan from when you know.')}
+        {option('NOT_SURE', t('poss.notSure'))}
 
         {window ? (
-          <p className="m-0 mt-2 max-w-[52ch] text-[14.5px] leading-relaxed text-[var(--ink2)]">
-            A full home in Pune usually takes {FULL_HOME_DAYS.min} to {FULL_HOME_DAYS.max} days from
-            design sign-off. With the design signed off by{' '}
-            {status === 'HAVE_KEYS' ? 'now' : 'the time you get the keys'}, yours could be ready
-            between <strong className="text-[var(--ink)]">{short(window.from)}</strong> and{' '}
-            <strong className="text-[var(--ink)]">{short(window.to)}</strong>.
+          <p className="m-0 mt-3 max-w-[52ch] text-[15px] leading-relaxed text-[var(--ink-2)]">
+            {fillParts(
+              t('poss.window', {
+                min: FULL_HOME_DAYS.min,
+                max: FULL_HOME_DAYS.max,
+                when: status === 'HAVE_KEYS' ? t('poss.now') : t('poss.keysTime'),
+              }),
+              {
+                from: <strong className="text-[var(--ink)]">{short(window.from)}</strong>,
+                to: <strong className="text-[var(--ink)]">{short(window.to)}</strong>,
+              },
+            )}
           </p>
         ) : null}
       </div>
@@ -1322,7 +1410,7 @@ function possessionStep(brief: Brief, update: (p: Partial<Brief>) => void): Step
   };
 }
 
-function householdStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
+function householdStep(brief: Brief, update: (p: Partial<Brief>) => void, t: QT): StepParts {
   const h = brief.household ?? {
     adults: 2,
     children: 0,
@@ -1335,27 +1423,27 @@ function householdStep(brief: Brief, update: (p: Partial<Brief>) => void): StepP
   return {
     ask: (
       <Ask
-        title="Who's going to live there?"
-        hint="Your studio sees this before your first meeting, so the design starts from how you actually live."
+        title={t('hh.title')}
+        hint={t('hh.hint')}
       />
     ),
     options: (
       <div className="flex max-w-lg flex-col gap-4">
         <Counter
-          label="Adults"
+          label={t('hh.adults')}
           Icon={IconAdults}
           value={h.adults}
           onChange={(adults) => set({ adults })}
           min={1}
         />
         <Counter
-          label="Children"
+          label={t('hh.children')}
           Icon={IconChildren}
           value={h.children}
           onChange={(children) => set({ children })}
         />
         <Counter
-          label="Parents / elderly"
+          label={t('hh.elderly')}
           Icon={IconElderly}
           value={h.elderly}
           onChange={(elderly) => set({ elderly })}
@@ -1363,14 +1451,14 @@ function householdStep(brief: Brief, update: (p: Partial<Brief>) => void): StepP
 
         <div className="mt-1 flex flex-wrap gap-2">
           <Chip selected={h.pets} onClick={() => set({ pets: !h.pets })} Icon={IconPets}>
-            Pets
+            {t('hh.pets')}
           </Chip>
           <Chip
             selected={h.worksFromHome}
             onClick={() => set({ worksFromHome: !h.worksFromHome })}
             Icon={IconWork}
           >
-            Someone works from home
+            {t('hh.wfh')}
           </Chip>
         </div>
       </div>
@@ -1378,7 +1466,7 @@ function householdStep(brief: Brief, update: (p: Partial<Brief>) => void): StepP
   };
 }
 
-function priorityStep(brief: Brief, update: (p: Partial<Brief>) => void): StepParts {
+function priorityStep(brief: Brief, update: (p: Partial<Brief>) => void, t: QT, lang: Lang): StepParts {
   const ranked = brief.priorityRanking;
   const remaining = (Object.keys(PRIORITY_LABELS) as PriorityFactor[]).filter(
     (k) => !ranked.includes(k),
@@ -1398,8 +1486,8 @@ function priorityStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPa
 
          Both lines now ask the same question, in the same direction. */
       <Ask
-        title="What matters most to you here?"
-        hint="Tap them in order, starting with the most important. Your first choice gets extra weight when we rank studios."
+        title={t('prio.title')}
+        hint={t('prio.hint')}
       />
     ),
     options: (
@@ -1416,34 +1504,35 @@ function priorityStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPa
                  number and the word "Remove", which do not compose into a
                  usable name. A screen reader user was being asked to rank four
                  things called "button". */
-              aria-label={`${PRIORITY_LABELS[k]} — ranked ${i + 1}. Tap to remove from the ranking.`}
-              className="flex items-center gap-3 rounded-full border-2 border-[var(--acc)] bg-[var(--acc-wash)] px-4 py-3 text-left text-[15px] text-[var(--ink)]"
+              aria-label={t('prio.aria', { label: lbl(lang, PRIORITY_TX, k), n: i + 1 })}
+              className="flex min-h-[54px] cursor-pointer items-center gap-3 rounded-full bg-[var(--ink)] py-2.5 pl-2.5 pr-5 text-left text-[15px] font-medium text-white transition-transform duration-300 active:scale-[0.98]"
             >
-              <span className="oi-num flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--acc-ink)] oi-num text-[11px] text-white">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[13px] font-medium tabular-nums text-white">
                 {i + 1}
               </span>
-              <Icon className="h-6 w-6 shrink-0 text-[var(--acc-ink)]" />
-              <span className="flex-1">{PRIORITY_LABELS[k]}</span>
-              <span className="oi-label m-0">Remove</span>
+              <Icon className="h-6 w-6 shrink-0 text-white/80" />
+              <span className="flex-1">{lbl(lang, PRIORITY_TX, k)}</span>
+              <span className="text-[11.5px] font-medium uppercase tracking-[0.08em] text-white/55">{t('prio.remove')}</span>
             </button>
           );
         })}
-        {remaining.map((k) => {
-          const Icon = PRIORITY_ICONS[k];
-          return (
-            <button
-              key={k}
-              type="button"
-              onClick={() => update({ priorityRanking: [...ranked, k] })}
-              aria-label={`${PRIORITY_LABELS[k]} — tap to rank it ${ranked.length + 1}.`}
-              className="flex items-center gap-3 rounded-full border border-[var(--line)] bg-[var(--card)] px-4 py-3 text-left text-[15px] text-[var(--ink2)] transition-colors hover:border-[var(--acc)]"
-            >
-              <span className="h-6 w-6 shrink-0" />
-              <Icon className="h-6 w-6 shrink-0 text-[var(--ink2)]" />
-              <span>{PRIORITY_LABELS[k]}</span>
-            </button>
-          );
-        })}
+        {/* What is still to rank sits below as circles (owner, 9 Oct 2026);
+            each tap moves it up into the list, in the order it was tapped. */}
+        {remaining.length > 0 ? (
+          <div className={ranked.length > 0 ? 'mt-4' : ''}>
+            <TileRow>
+              {remaining.map((k) => (
+                <CircleTile
+                  key={k}
+                  label={lbl(lang, PRIORITY_TX, k)}
+                  Icon={PRIORITY_ICONS[k]}
+                  selected={false}
+                  onClick={() => update({ priorityRanking: [...ranked, k] })}
+                />
+              ))}
+            </TileRow>
+          </div>
+        ) : null}
       </div>
     ),
   };
@@ -1456,11 +1545,80 @@ function priorityStep(brief: Brief, update: (p: Partial<Brief>) => void): StepPa
  * anti-dropout device in the flow, which is why it sits beside the question
  * rather than below the fold.
  */
+/**
+ * "₹11.5 L – ₹24 L+ before GST": the range across the three finish levels for
+ * this home and scope, the same figures the level step shows. Null until the
+ * home and the scope are known.
+ */
+function likelyCost(brief: Brief, t: QT): string | null {
+  if (!brief.propertyType || !brief.scope) return null;
+  const { sqft } = carpetAreaFor(brief);
+  const shape = homeShapeFor(brief);
+  const selection = selectionOf(brief);
+  const partial = brief.scope !== 'FULL_HOME' || brief.excludedItems.length > 0;
+  const band = (tier: (typeof TIERS)[number]) =>
+    partial ? scopeBandRange(tier, shape, selection) : tierRangeFor(tier, sqft);
+  const low = band(TIERS[0]);
+  const top = band(TIERS[TIERS.length - 1]);
+  if (!low || !top) return null;
+  return t('cost.range', { low: formatINRCompact(low.lowPaise), high: formatINRCompact(top.lowPaise) });
+}
+
+/** `scopePhrase` in this language: the English is scope.ts's own words, unchanged. */
+function scopePhraseIn(lang: Lang, t: QT, selection: ScopeSelection): string | null {
+  if (lang === 'en') return scopePhrase(selection);
+  const rooms = selection.scopeRooms.filter((r) => r in ROOM_TX).map((r) => lbl(lang, ROOM_TX, r));
+  const list = rooms.length <= 1 ? rooms.join('') : `${rooms.slice(0, -1).join(', ')} ${t('and')} ${rooms.at(-1)}`;
+  switch (selection.scope) {
+    case 'FULL_HOME':
+    case 'KITCHEN_WARDROBE':
+      return lbl(lang, SCOPE_TX, selection.scope);
+    case 'SINGLE_ROOM':
+      return list || lbl(lang, SCOPE_TX, 'SINGLE_ROOM');
+    case 'RENOVATION':
+      return list ? t('scope.renoWith', { list }) : t('scope.reno');
+    default:
+      return null;
+  }
+}
+
+/** `possessionPhrase` in this language: the English is possession.ts's own words, unchanged. */
+function possessionPhraseIn(lang: Lang, t: QT, brief: Brief): string | null {
+  if (lang === 'en') return possessionPhrase(brief);
+  const month = (iso: string | null | undefined) => {
+    if (!iso || !monthLabel(iso)) return null;
+    const [y, m] = iso.slice(0, 7).split('-').map(Number);
+    return new Date(Date.UTC(y!, m! - 1, 1)).toLocaleDateString(LOCALE[lang], {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+  };
+  switch (brief.possessionStatus) {
+    case 'HAVE_KEYS':
+      return t('poss.phrase.haveKeys');
+    case 'EXPECTED': {
+      const m = month(brief.possessionOn);
+      return m ? t('poss.phrase.expectedMonth', { month: m }) : t('poss.phrase.expecting');
+    }
+    case 'NOT_SURE':
+      return t('poss.phrase.notSure');
+    default: {
+      const moveIn = month(brief.moveInBy);
+      if (moveIn) return t('poss.phrase.moveIn', { month: moveIn });
+      const m = month(brief.possessionOn);
+      return m ? t('poss.phrase.month', { month: m }) : null;
+    }
+  }
+}
+
 function LiveProfile({
   brief,
   matchCount,
   className = '',
   bare = false,
+  onEdit,
+  current,
 }: {
   brief: Brief;
   /** Studios that still fit, capped at the stated number. */
@@ -1468,102 +1626,153 @@ function LiveProfile({
   className?: string;
   /** Inside the phone disclosure, which already draws the border. */
   bare?: boolean;
+  /** Each answer links back to its question (owner, 10 Oct 2026). */
+  onEdit?: (id: StepId) => void;
+  /** The question on screen — its own rows need no Edit link. */
+  current?: StepId;
 }) {
-  const rows: Array<[string, string]> = [];
+  const t = useSiteT(QUIZ_DICT);
+  const lang = useLang();
+  const rows: Array<[string, string, StepId]> = [];
 
   if (brief.propertyType) {
     const loc = localityLabel(brief.locality);
-    rows.push(['Home', `${PROPERTY_LABELS[brief.propertyType]}${loc ? ` · ${loc}` : ''}`]);
+    rows.push([t('row.home'), `${lbl(lang, PROPERTY_TX, brief.propertyType)}${loc ? ` · ${loc}` : ''}`, 'home']);
     const society = brief.society?.trim();
-    if (society) rows.push(['Society', society]);
+    if (society) rows.push([t('row.society'), society, 'home']);
   }
   if (brief.scope) {
-    const phrase = scopePhrase(selectionOf(brief)) ?? SCOPE_LABELS[brief.scope];
+    const phrase = scopePhraseIn(lang, t, selectionOf(brief)) ?? lbl(lang, SCOPE_TX, brief.scope);
     const off = brief.excludedItems.length;
-    rows.push(['Scope', off ? `${phrase} · ${off} left out` : phrase]);
+    rows.push([t('row.scope'), off ? t('row.leftOut', { phrase, n: off }) : phrase, 'scope']);
   }
+  // A running figure from the moment home and scope are known, so the early
+  // answers visibly move something (principle 3, docs/UX-PRINCIPLES-PLAN.md;
+  // Lemonade's live price). Until a level is picked it spans all three; once
+  // one is, the budget row below takes over.
+  const likely = likelyCost(brief, t);
+  if (likely && !brief.tier) rows.push([t('row.likely'), likely, 'level']);
   if (brief.budgetMinPaise) {
     rows.push([
-      'Budget',
+      t('row.budget'),
       // The top band has no ceiling, so it is a floor, not a range.
       brief.budgetMaxPaise
         ? `${formatINRCompact(brief.budgetMinPaise)} – ${formatINRCompact(brief.budgetMaxPaise)}`
-        : `From ${formatINRCompact(brief.budgetMinPaise)}`,
+        : t('budget.from', { amount: formatINRCompact(brief.budgetMinPaise) }), 'level'
     ]);
   }
   if (brief.styleLikes.length) {
-    rows.push(['Leaning', brief.styleLikes.map((t) => STYLE_LABELS[t]).join(', ')]);
+    rows.push([t('row.leaning'), brief.styleLikes.map((s) => STYLE_LABELS[s]).join(', '), 'likes']);
   }
   if (brief.styleDislikes.length) {
-    rows.push(['Ruled out', brief.styleDislikes.map((t) => STYLE_LABELS[t]).join(', ')]);
+    rows.push([t('row.ruledOut'), brief.styleDislikes.map((s) => STYLE_LABELS[s]).join(', '), 'dislikes']);
   }
   if (brief.household) {
     const h = brief.household;
-    const parts = [`${h.adults} adult${h.adults === 1 ? '' : 's'}`];
-    if (h.children) parts.push(`${h.children} child${h.children === 1 ? '' : 'ren'}`);
-    if (h.elderly) parts.push(`${h.elderly} elderly`);
-    if (h.pets) parts.push('pets');
-    if (h.worksFromHome) parts.push('WFH');
-    rows.push(['Household', parts.join(', ')]);
+    const parts = [t(h.adults === 1 ? 'hh.adult1' : 'hh.adultN', { n: h.adults })];
+    if (h.children) parts.push(t(h.children === 1 ? 'hh.child1' : 'hh.childN', { n: h.children }));
+    if (h.elderly) parts.push(t('hh.elderlyN', { n: h.elderly }));
+    if (h.pets) parts.push(t('hh.petsShort'));
+    if (h.worksFromHome) parts.push(t('hh.wfhShort'));
+    rows.push([t('row.household'), parts.join(', '), 'living']);
   }
   if (brief.priorityRanking.length) {
-    rows.push(['Priority', PRIORITY_LABELS[brief.priorityRanking[0]]]);
+    rows.push([t('row.priority'), lbl(lang, PRIORITY_TX, brief.priorityRanking[0]), 'priorities']);
   }
-  if (brief.needs.length) rows.push(['Needs', brief.needs.map((n) => HOME_NEED_LABELS[n]).join(', ')]);
-  if (brief.involvement) rows.push(['Working style', INVOLVEMENT_LABELS[brief.involvement]]);
+  if (brief.needs.length) rows.push([t('row.needs'), brief.needs.map((n) => lbl(lang, HOME_NEED_TX, n)).join(', '), 'living']);
+  if (brief.involvement) rows.push([t('row.style'), lbl(lang, INVOLVEMENT_TX, brief.involvement), 'working']);
   {
-    const possession = possessionPhrase(brief);
-    if (possession) rows.push(['Possession', possession]);
+    const possession = possessionPhraseIn(lang, t, brief);
+    if (possession) rows.push([t('row.possession'), possession, 'possession']);
   }
 
   return (
-    <Sheet
-      as="section"
-      className={bare ? `border-0 bg-transparent ${className}` : `p-5 ${className}`}
-    >
-      <p className="oi-label m-0 mb-4">
-        {cleanName(brief.contactName) ? `${cleanName(brief.contactName)}'s brief so far` : 'Your brief so far'}
+    /* The landing's soft card; inside the phone disclosure (already a card) it
+       goes bare. */
+    <section className={bare ? className : `flow-card ${className}`}>
+      <p className={`eyebrow ${bare ? 'hidden' : ''}`}>
+        {cleanName(brief.contactName)
+          ? t('profile.titleNamed', { name: cleanName(brief.contactName) ?? '' })
+          : t('profile.title')}
       </p>
 
       {rows.length === 0 ? (
-        <p className="m-0 text-[14px] text-[var(--ink2)]">
-          This fills in as you answer. Nothing is sent anywhere while you do.
+        <p className="m-0 text-[15px] leading-relaxed text-[var(--ink-2)]">
+          {t('profile.empty')}
         </p>
       ) : (
         <div className="m-0">
-          {rows.map(([k, v]) => (
-            <DocRow key={k} label={k} value={v.toUpperCase()} />
-          ))}
+          {rows.map(([k, v, id]) =>
+            onEdit && id !== current && STEP_IDS.indexOf(id) < STEP_IDS.indexOf(current ?? 'contact') ? (
+              <DocRow
+                key={k}
+                label={k}
+                value={v}
+                action={
+                  <button
+                    type="button"
+                    onClick={() => onEdit(id)}
+                    aria-label={t('profile.editAria', { what: k })}
+                    className="cursor-pointer rounded-full border-0 bg-[var(--paper)] px-3 py-1 text-[12px] font-medium leading-[1.4] text-[var(--ink)] transition-colors duration-300 hover:bg-[var(--ink)] hover:text-white"
+                  >
+                    {t('profile.edit')}
+                  </button>
+                }
+              />
+            ) : (
+              <DocRow key={k} label={k} value={v} />
+            ),
+          )}
         </div>
       )}
 
       {/* Their home, assembling as they answer (queue item 26). */}
-      <div className="mt-5 border-t border-[var(--ink)] pt-4">
+      <div className="mt-5 rounded-[var(--r-m)] bg-[var(--paper)] p-4">
         <HomeSketch brief={brief} />
       </div>
 
       {/* The counter: answering a question visibly narrows the field. Capped
           at the number the site states (lib/claims.ts). */}
-      <div className="mt-5 flex items-baseline gap-2.5 border-t border-[var(--ink)] pt-4">
-        <span className="oi-num text-[30px] leading-none" style={{ color: 'var(--sec-ink)' }}>
+      <div className="mt-3 flex items-end gap-4 rounded-[var(--r-m)] bg-[var(--mint)] px-5 py-4">
+        <strong className="text-[clamp(2.6rem,2rem+1.6vw,3.6rem)] font-medium leading-none tracking-[-0.05em] tabular-nums">
           {matchCount}
-        </span>
-        <span className="text-[13.5px] text-[var(--ink2)]">
-          of {VERIFIED_STUDIOS} verified studios still match
+        </strong>
+        <span className="max-w-[24ch] pb-1 text-[14px] leading-snug text-[var(--ink-2)]">
+          {t('profile.count', { n: VERIFIED_STUDIOS })}
         </span>
       </div>
-    </Sheet>
+    </section>
   );
 }
 
 // ── Primitives ─────────────────────────────────────────────────
 
+/**
+ * The question, as the landing sets a heading: words rising in (`Split`,
+ * `auto` because it is the first heading on the screen), `.h-l` from a tablet
+ * up. On a phone it steps down to 28px so the question and its options still
+ * share the first screen.
+ */
 function Ask({ title, hint }: { title: string; hint?: string }) {
   return (
     <div className="lg:pt-4">
-      <h1 className="h1 mb-4 max-w-[16ch]">{title}</h1>
-      {hint ? <p className="m-0 max-w-[42ch] text-[16px] leading-relaxed text-[var(--ink2)]">{hint}</p> : null}
+      <Split as="h1" className="h-l max-w-[16ch] max-sm:!text-[1.75rem]" text={title} auto />
+      {hint ? <p className="lede max-w-[44ch]">{hint}</p> : null}
     </div>
+  );
+}
+
+/** The landing's tick: white on a terracotta dot. */
+function TickDot({ className = '' }: { className?: string }) {
+  return (
+    <span
+      className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] ${className}`}
+      aria-hidden="true"
+    >
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+        <path d="m2 5.2 2 2 4-4.4" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
   );
 }
 
@@ -1572,8 +1781,9 @@ function TileRow({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * The circular option tile. Soft ground, thin line icon, label below the icon
- * inside the circle. Selection is a ring plus a tick — shape as well as colour.
+ * The circular option tile, in the landing's palette: soft ground, thin line
+ * icon, label below the icon inside the circle. Chosen, it fills with ink and
+ * carries a terracotta tick — shape as well as colour.
  */
 function CircleTile({
   label,
@@ -1602,28 +1812,22 @@ function CircleTile({
          a row, so the five home types took three rows and pushed "Where is
          it?" — the field that unlocks Continue — off the first screen. At 100
          they fit three a row. */
-      className={`relative flex h-[100px] w-[100px] shrink-0 flex-col items-center justify-center gap-1 rounded-full px-2.5 text-center transition-all sm:h-[122px] sm:w-[122px] sm:gap-1.5 sm:px-3 ${
-        selected
-          ? 'bg-[var(--acc-wash)] ring-2 ring-[var(--acc)]'
-          : 'bg-[var(--card)] hover:bg-[var(--line)]'
+      className={`relative flex h-[100px] w-[100px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-full px-2.5 text-center transition-[background-color,color,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.96] sm:h-[122px] sm:w-[122px] sm:gap-1.5 sm:px-3 ${
+        selected ? 'bg-[var(--ink)] text-white' : 'bg-[var(--soft)] text-[var(--ink)] hover:bg-[var(--soft-2)]'
       }`}
     >
-      <Icon
-        className={`h-8 w-8 sm:h-10 sm:w-10 ${selected ? 'text-[var(--acc-ink)]' : 'text-[var(--ink2)]'}`}
-      />
-      <span className="text-[12px] leading-tight text-[var(--ink2)] sm:text-[12.5px]">{label}</span>
-      {selected ? (
-        <span
-          className="absolute right-3 top-4 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--acc-ink)] text-[11px] leading-none text-white"
-          aria-hidden="true"
-        >
-          ✓
-        </span>
-      ) : null}
+      <Icon className={`h-8 w-8 sm:h-10 sm:w-10 ${selected ? 'text-white' : 'text-[var(--ink)]'}`} />
+      <span
+        className={`text-[12px] font-medium leading-tight sm:text-[12.5px] ${selected ? 'text-white' : 'text-[var(--ink-2)]'}`}
+      >
+        {label}
+      </span>
+      {selected ? <TickDot className="absolute right-2.5 top-3 sm:right-3 sm:top-4" /> : null}
     </button>
   );
 }
 
+/** A multiple-choice pill: the landing's `.flow-opt`, filled with ink when on. */
 function Chip({
   children,
   selected,
@@ -1636,16 +1840,7 @@ function Chip({
   Icon?: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={selected}
-      className={`inline-flex items-center gap-2 rounded-full border px-4 py-2.5 text-[14.5px] transition-colors ${
-        selected
-          ? 'border-[var(--acc)] bg-[var(--acc-wash)] text-[var(--ink)]'
-          : 'border-[var(--line)] bg-[var(--card)] text-[var(--ink2)] hover:border-[var(--ink2)]'
-      }`}
-    >
+    <button type="button" onClick={onClick} aria-pressed={selected} className="flow-opt">
       {Icon ? <Icon className="h-5 w-5" /> : null}
       {children}
     </button>
@@ -1653,11 +1848,7 @@ function Chip({
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="m-0 mb-3 oi-num text-[10px] uppercase tracking-[0.13em] text-[var(--ink2)]">
-      {children}
-    </p>
-  );
+  return <p className="eyebrow !mb-3">{children}</p>;
 }
 
 function Counter({
@@ -1673,27 +1864,30 @@ function Counter({
   min?: number;
   Icon: React.ComponentType<{ className?: string }>;
 }) {
+  const t = useSiteT(QUIZ_DICT);
+  const step =
+    'flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border-0 bg-[var(--paper)] text-[18px] leading-none text-[var(--ink)] transition-colors duration-300 hover:bg-[var(--ink)] hover:text-white';
   return (
-    <div className="flex items-center justify-between gap-4 rounded-full bg-[var(--card)] py-2.5 pl-5 pr-2.5">
-      <span className="flex items-center gap-3 text-[15px] text-[var(--ink)]">
-        <Icon className="h-6 w-6 text-[var(--ink2)]" />
+    <div className="flex items-center justify-between gap-4 rounded-full bg-[var(--soft)] py-2 pl-5 pr-2">
+      <span className="flex items-center gap-3 text-[15px] font-medium text-[var(--ink)]">
+        <Icon className="h-6 w-6 text-[var(--ink-2)]" />
         {label}
       </span>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <button
           type="button"
           onClick={() => onChange(Math.max(min, value - 1))}
-          aria-label={`Decrease ${label}`}
-          className="h-9 w-9 rounded-full border border-[var(--line)] bg-[var(--bg)] text-[18px] leading-none text-[var(--ink2)] transition-colors hover:border-[var(--acc)]"
+          aria-label={t('counter.dec', { label })}
+          className={step}
         >
           −
         </button>
-        <span className="oi-num w-6 text-center text-[16px]">{value}</span>
+        <span className="w-7 text-center text-[17px] font-medium tabular-nums">{value}</span>
         <button
           type="button"
           onClick={() => onChange(value + 1)}
-          aria-label={`Increase ${label}`}
-          className="h-9 w-9 rounded-full border border-[var(--line)] bg-[var(--bg)] text-[18px] leading-none text-[var(--ink2)] transition-colors hover:border-[var(--acc)]"
+          aria-label={t('counter.inc', { label })}
+          className={step}
         >
           +
         </button>
@@ -1726,18 +1920,18 @@ function StylePicker({
   /** Scope-aware: kitchens for a kitchen job, bedrooms for a bedrooms-only job. */
   room?: PickerRoom;
 }) {
+  const t = useSiteT(QUIZ_DICT);
   // Studio photos lead with living rooms, so they stand in only where living rooms are shown.
   const photos = room === 'LIVING' ? studioPhotos : {};
   function toggle(tag: StyleTag) {
     if (selected.includes(tag)) {
-      onChange(selected.filter((t) => t !== tag));
+      onChange(selected.filter((s) => s !== tag));
     } else if (selected.length < max) {
       onChange([...selected, tag]);
     }
   }
 
-  const ring =
-    tone === 'exclude' ? 'ring-2 ring-[var(--acc-ink)]' : 'ring-2 ring-[var(--acc)]';
+  const ring = 'ring-2 ring-[var(--ink)] ring-offset-2 ring-offset-[var(--paper)]';
 
   return (
     <>
@@ -1752,8 +1946,8 @@ function StylePicker({
               disabled={isBlocked}
               onClick={() => toggle(tag)}
               aria-pressed={isSelected}
-              aria-label={isSelected ? STYLE_LABELS[tag] : `Room option ${i + 1}`}
-              className={`lift relative overflow-hidden rounded-[10px] text-left disabled:cursor-not-allowed disabled:opacity-25 ${
+              aria-label={isSelected ? STYLE_LABELS[tag] : t('style.optionAria', { n: i + 1 })}
+              className={`lift relative cursor-pointer overflow-hidden rounded-[var(--r-m)] bg-[var(--soft)] text-left disabled:cursor-not-allowed disabled:opacity-25 ${
                 isSelected ? ring : ''
               }`}
             >
@@ -1781,21 +1975,24 @@ function StylePicker({
                 <StyleScene tag={tag} className="block aspect-[4/3] w-full" />
               )}
               <span
-                className={`block bg-[var(--card)] px-3 py-2 text-[12.5px] ${
-                  isSelected ? 'font-bold text-[var(--ink)]' : 'text-[var(--ink2)]'
+                className={`block px-3.5 py-2.5 text-[13px] ${
+                  isSelected ? 'bg-[var(--ink)] font-medium text-white' : 'bg-[var(--soft)] text-[var(--ink-2)]'
                 }`}
               >
-                {isSelected ? STYLE_LABELS[tag] : isBlocked ? 'Already picked' : `Room ${i + 1}`}
+                {isSelected ? STYLE_LABELS[tag] : isBlocked ? t('style.blocked') : t('style.room', { n: i + 1 })}
               </span>
+              {/* A tick for a like, an ink cross for a ruled-out style. */}
               {isSelected ? (
-                <span
-                  className={`absolute right-2.5 top-2.5 flex h-6 w-6 items-center justify-center rounded-full text-[12px] leading-none text-white ${
-                    tone === 'exclude' ? 'bg-[var(--acc-ink)]' : 'bg-[var(--acc)]'
-                  }`}
-                  aria-hidden="true"
-                >
-                  {tone === 'exclude' ? '✕' : '✓'}
-                </span>
+                tone === 'exclude' ? (
+                  <span
+                    className="absolute right-2.5 top-2.5 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--ink)] text-[12px] leading-none text-white"
+                    aria-hidden="true"
+                  >
+                    ✕
+                  </span>
+                ) : (
+                  <TickDot className="absolute right-2.5 top-2.5 !h-6 !w-6" />
+                )
               ) : null}
             </button>
           );
@@ -1803,22 +2000,22 @@ function StylePicker({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <p className="m-0 oi-num text-[11px] uppercase tracking-[0.1em] text-[var(--ink2)]">
-          {selected.length} of {max} selected
+        <p className="eyebrow !m-0">
+          {t('style.count', { n: selected.length, max })}
         </p>
-        <details className="text-[11.5px] text-[var(--ink2)]">
-          <summary className="cursor-pointer">Photo credits</summary>
+        <details className="text-[12px] text-[var(--ink-2)]">
+          <summary className="cursor-pointer">{t('style.credits')}</summary>
           <p className="m-0 mt-1 max-w-[60ch] leading-relaxed">
             {Object.keys(photos).length > 0
-              ? 'Some are finished homes by studios on One Interiors, shown with their permission and without their names. '
+              ? t('style.studioPhotos')
               : ''}
-            Photographs from Unsplash by{' '}
-            {[
-              ...new Set(
-                STYLE_TAGS.filter((t) => !photos[t]).map((t) => stylePhotoFor(t, room).photographer).filter(Boolean),
-              ),
-            ].join(', ')}
-            .
+            {t('style.unsplash', {
+              names: [
+                ...new Set(
+                  STYLE_TAGS.filter((s) => !photos[s]).map((s) => stylePhotoFor(s, room).photographer).filter(Boolean),
+                ),
+              ].join(', '),
+            })}
           </p>
         </details>
         {selected.length > 0 && tone === 'include' ? (

@@ -12,22 +12,36 @@ import 'server-only';
  * The money is all in `pricing.ts`, which is pure and tested.
  */
 
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { fromDb, toDb, type Paise } from '@/lib/money';
 import { myStudioId, myBranding } from './store';
 import {
   computeTotals,
+  GST_BPS,
   lineAmount,
   type QuoteLineInput,
+  type QuoteTerms,
   type QuoteTotals,
   type QuoteUnitName,
   type WorkCodeName,
 } from './pricing';
-import { planQuotation, type CatalogueProduct, type HomeConfig } from './configure';
+import { planQuotation, readRules, type CatalogueProduct, type HomeConfig } from './configure';
+import { ratesGateFor } from './rates-gate';
+import { notify } from '@/modules/notify/service';
+import { planUseFrom } from '@/modules/brief/mapping';
+import type { PlanRoomSize } from '@/modules/brief/types';
+import { readPhases, type PaymentPhase } from '@/modules/studio/payment-phases';
 import type { ComparableLine } from './revision';
 
 export type QuoteStatusName = 'DRAFT' | 'ISSUED' | 'ACCEPTED' | 'DECLINED';
 export type QuoteStageName = 'SALES' | 'DESIGN';
+
+/** Hauspire's two versions of a quotation: what wins the client, and what is built. */
+export const STAGE_LABELS: Record<QuoteStageName, string> = {
+  SALES: 'Sales Final',
+  DESIGN: 'Design Final',
+};
 
 export const STATUS_LABELS: Record<QuoteStatusName, string> = {
   DRAFT: 'Draft',
@@ -72,6 +86,17 @@ export interface QuoteRow {
   discountBps: number;
   onSpotPaise: Paise;
   bookingAdvancePaise: Paise;
+  gstBps: number;
+  /** The flat discount's name; null prints as "Additional discount". */
+  onSpotLabel: string | null;
+  /** The date on the document: the one set, else the day it was made. */
+  quoteDate: Date;
+  /** The payment schedule this quotation uses; null = the standard stages. */
+  phases: PaymentPhase[] | null;
+  /** The Sales Final this Design Final was made from. */
+  basedOnId: string | null;
+  /** The client's floor plan rooms, when their brief came with a read plan. */
+  planRooms: PlanRoomSize[];
   welcomeNote: string | null;
   terms: string | null;
   issuedOn: Date | null;
@@ -83,7 +108,10 @@ export interface QuoteSummary {
   id: string;
   number: string;
   status: QuoteStatusName;
+  stage: QuoteStageName;
   clientName: string;
+  clientPhone: string | null;
+  clientId: string | null;
   society: string | null;
   config: string | null;
   fromMarketplace: boolean;
@@ -93,17 +121,32 @@ export interface QuoteSummary {
 }
 
 /** The list. Newest activity first — a quotation you touched today is the one
- *  you are still thinking about. */
-export async function myQuotes(): Promise<QuoteSummary[]> {
+ *  you are still thinking about. `search` matches client, number, phone or
+ *  society, any part, any case. */
+export async function myQuotes(search?: string): Promise<QuoteSummary[]> {
   const studioId = await myStudioId();
   if (!studioId) return [];
 
+  const q = search?.trim().slice(0, 80);
+  const digits = q?.replace(/\D/g, '') ?? '';
   try {
     const rows = await prisma.studioQuote.findMany({
-      where: { studioId },
+      where: {
+        studioId,
+        ...(q
+          ? {
+              OR: [
+                { clientName: { contains: q, mode: 'insensitive' as const } },
+                { number: { contains: q, mode: 'insensitive' as const } },
+                { society: { contains: q, mode: 'insensitive' as const } },
+                ...(digits.length >= 4 ? [{ clientPhone: { contains: digits } }] : []),
+              ],
+            }
+          : {}),
+      },
       orderBy: { updatedAt: 'desc' },
       include: { lines: true },
-      take: 200,
+      take: 500,
     });
 
     return rows.map((row) => {
@@ -112,13 +155,18 @@ export async function myQuotes(): Promise<QuoteSummary[]> {
         discountBps: row.discountBps,
         onSpotPaise: fromDb(row.onSpotPaise),
         bookingAdvancePaise: fromDb(row.bookingAdvancePaise),
+        gstBps: row.gstBps,
+        phases: readPhases(row.phases),
       });
 
       return {
         id: row.id,
         number: row.number,
         status: row.status as QuoteStatusName,
+        stage: row.stage as QuoteStageName,
         clientName: row.clientName,
+        clientPhone: row.clientPhone,
+        clientId: row.clientId,
         society: row.society,
         config: row.config,
         fromMarketplace: row.briefId !== null || row.introductionId !== null,
@@ -162,8 +210,9 @@ export async function getQuote(id: string): Promise<QuoteRow | null> {
     // of anything, and this is a client's name and phone number.
     const row = await prisma.studioQuote.findFirst({
       where: { id, studioId },
-      include: { lines: { orderBy: { sortOrder: 'asc' } } },
+      include: { lines: { orderBy: { sortOrder: 'asc' } }, studio: { select: { paymentPhases: true } } },
     });
+    const planRooms = row ? await planRoomsOfBrief(row.briefId) : [];
     if (!row) return null;
 
     return {
@@ -186,6 +235,12 @@ export async function getQuote(id: string): Promise<QuoteRow | null> {
       discountBps: row.discountBps,
       onSpotPaise: fromDb(row.onSpotPaise),
       bookingAdvancePaise: fromDb(row.bookingAdvancePaise),
+      gstBps: row.gstBps,
+      onSpotLabel: row.onSpotLabel,
+      quoteDate: row.quoteDate ?? row.createdAt,
+      phases: quotePhases(row.phases, row.studio.paymentPhases),
+      basedOnId: row.basedOnId,
+      planRooms,
       welcomeNote: row.welcomeNote,
       terms: row.terms,
       issuedOn: row.issuedOn,
@@ -212,12 +267,28 @@ export async function getQuote(id: string): Promise<QuoteRow | null> {
 }
 
 export function totalsFor(quote: QuoteRow): QuoteTotals {
-  return computeTotals(quote.lines, {
+  return computeTotals(quote.lines, termsOf(quote));
+}
+
+/** The terms a quotation row is priced on — one place, so every screen agrees. */
+export function termsOf(quote: Pick<QuoteRow, 'feeBps' | 'discountBps' | 'onSpotPaise' | 'bookingAdvancePaise' | 'gstBps' | 'phases'>): QuoteTerms {
+  return {
     feeBps: quote.feeBps,
     discountBps: quote.discountBps,
     onSpotPaise: quote.onSpotPaise,
     bookingAdvancePaise: quote.bookingAdvancePaise,
-  });
+    gstBps: quote.gstBps,
+    phases: quote.phases,
+  };
+}
+
+/**
+ * The schedule a quotation is paid on: its own snapshot, else the studio's
+ * current one, else none (the standard stages). The same rule the
+ * customer's copy uses (`portal/choose.ts`), so the two never differ.
+ */
+export function quotePhases(own: unknown, studio: unknown): PaymentPhase[] | null {
+  return readPhases(own) ?? readPhases(studio);
 }
 
 export type QuoteResult = { ok: true; id: string } | { ok: false; error: string };
@@ -252,11 +323,31 @@ export interface NewQuoteInput {
   society?: string;
   config?: string;
   carpetSqft?: number;
+  /**
+   * A client One Interiors introduced: the quotation is their final quote,
+   * which the customer reads and signs in the app (v79 "Choose & sign").
+   * Callers must have checked the client is this studio's.
+   */
+  link?: { clientId: string; introductionId: string; briefId: string | null };
 }
 
 export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
   const studioId = await myStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
+
+  /* Shut until the studio has confirmed the rates filled from its own
+     quotations — see rates-gate.ts. Enforced here as well as on the page,
+     because an action is a route by another name. */
+  const gate = await ratesGateFor(studioId);
+  if (gate !== 'OPEN') {
+    return {
+      ok: false,
+      error:
+        gate === 'TO_CHECK'
+          ? 'Check and confirm your rates on Product master first — the builder opens as soon as you do.'
+          : 'Your rates are still being filled from your quotations. We will tell you when they are ready.',
+    };
+  }
 
   const clientName = input.clientName.trim();
   if (clientName.length < 2) return { ok: false, error: 'Who is it for?' };
@@ -294,11 +385,16 @@ export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
         society: input.society?.trim() || null,
         config: input.config?.trim() || null,
         carpetSqft: input.carpetSqft ?? null,
+        ...(input.link
+          ? { clientId: input.link.clientId, introductionId: input.link.introductionId, briefId: input.link.briefId }
+          : {}),
         // Snapshotted at creation. Changing the defaults in Settings later must
         // never rewrite a quotation already sent to a client.
         feeBps: branding.feeBps,
         discountBps: branding.discountBps,
         bookingAdvancePaise: toDb(branding.bookingAdvancePaise),
+        gstBps: branding.gstBps,
+        ...(await studioPhases(studioId)),
         welcomeNote: branding.welcomeNote,
         terms: branding.terms,
       },
@@ -310,6 +406,257 @@ export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
     console.error('[studio-quote] createQuote failed', error);
     return { ok: false, error: 'That did not save.' };
   }
+}
+
+/** The studio's schedule, snapshotted onto a new quotation when it has one. */
+async function studioPhases(studioId: string): Promise<{ phases?: Prisma.InputJsonValue }> {
+  const row = await prisma.studio.findUnique({ where: { id: studioId }, select: { paymentPhases: true } });
+  const phases = readPhases(row?.paymentPhases);
+  return phases ? { phases: phases as unknown as Prisma.InputJsonValue } : {};
+}
+
+export interface QuoteTermsInput {
+  feeBps: number;
+  discountBps: number;
+  gstOn: boolean;
+  onSpotPaise: Paise;
+  onSpotLabel: string | null;
+  bookingAdvancePaise: Paise;
+  /** YYYY-MM-DD, or null for the day it was made. */
+  quoteDate: string | null;
+}
+
+/**
+ * This quotation's own terms — fee, discount, GST, a named flat discount,
+ * the advance and its date. Settings holds the defaults a new quotation
+ * starts from; this is the deal on this one.
+ */
+export async function saveQuoteTerms(quoteId: string, input: QuoteTermsInput): Promise<ActionResult> {
+  if (!(await ownedQuote(quoteId))) return { ok: false, error: 'That quotation is not yours.' };
+
+  const pct = (bps: number) => Number.isInteger(bps) && bps >= 0 && bps <= 5000;
+  if (!pct(input.feeBps)) return { ok: false, error: 'A professional fee between 0% and 50%, please.' };
+  if (!pct(input.discountBps)) return { ok: false, error: 'A discount between 0% and 50%, please.' };
+  if (!Number.isInteger(input.onSpotPaise) || input.onSpotPaise < 0 || input.onSpotPaise >= 1e11) {
+    return { ok: false, error: 'That discount is not an amount.' };
+  }
+  if (!Number.isInteger(input.bookingAdvancePaise) || input.bookingAdvancePaise < 0 || input.bookingAdvancePaise >= 1e11) {
+    return { ok: false, error: 'That advance is not an amount.' };
+  }
+  let quoteDate: Date | null = null;
+  if (input.quoteDate) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.quoteDate)) return { ok: false, error: 'That date is not a date.' };
+    quoteDate = new Date(`${input.quoteDate}T00:00:00Z`);
+    if (Number.isNaN(quoteDate.getTime())) return { ok: false, error: 'That date is not a date.' };
+  }
+
+  try {
+    await prisma.studioQuote.update({
+      where: { id: quoteId },
+      data: {
+        feeBps: input.feeBps,
+        discountBps: input.discountBps,
+        gstBps: input.gstOn ? GST_BPS : 0,
+        onSpotPaise: toDb(input.onSpotPaise),
+        onSpotLabel: input.onSpotPaise > 0 ? input.onSpotLabel?.trim().slice(0, 60) || null : null,
+        bookingAdvancePaise: toDb(input.bookingAdvancePaise),
+        quoteDate,
+      },
+    });
+    return { ok: true };
+  } catch (error) {
+    console.error('[studio-quote] saveQuoteTerms failed', error);
+    return { ok: false, error: 'That did not save.' };
+  }
+}
+
+export interface QuoteClientInput {
+  clientName: string;
+  clientPhone: string;
+  clientEmail: string;
+  society: string;
+  locality: string;
+  config: string;
+  carpetSqft: number | null;
+}
+
+/**
+ * Who the quotation is for, corrected after it was started — a misspelt
+ * name, the flat number, the society. What prints on the document.
+ */
+export async function saveQuoteClient(quoteId: string, input: QuoteClientInput): Promise<ActionResult> {
+  if (!(await ownedQuote(quoteId))) return { ok: false, error: 'That quotation is not yours.' };
+  const name = input.clientName.trim().slice(0, 120);
+  if (name.length < 2) return { ok: false, error: 'Who is it for?' };
+  const email = input.clientEmail.trim().slice(0, 200);
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: 'That email does not look right.' };
+  const carpet = input.carpetSqft;
+  if (carpet != null && (!Number.isInteger(carpet) || carpet <= 0 || carpet > 100_000)) {
+    return { ok: false, error: 'Carpet area is a whole number of sq ft.' };
+  }
+  const opt = (v: string, n: number) => v.trim().slice(0, n) || null;
+  try {
+    await prisma.studioQuote.update({
+      where: { id: quoteId },
+      data: {
+        clientName: name,
+        clientPhone: opt(input.clientPhone, 20),
+        clientEmail: email || null,
+        society: opt(input.society, 120),
+        locality: opt(input.locality, 80),
+        config: opt(input.config, 20),
+        carpetSqft: carpet,
+      },
+    });
+    return { ok: true };
+  } catch (error) {
+    console.error('[studio-quote] saveQuoteClient failed', error);
+    return { ok: false, error: 'That did not save.' };
+  }
+}
+
+export type CopyKind = { kind: 'template'; clientName: string } | { kind: 'design-final' };
+
+/**
+ * A new quotation from an existing one.
+ *
+ * - **Template**: every line and term, for a different client. A fresh
+ *   number, no client details, not linked to any introduction — the same
+ *   kitchen for the next flat in the same society.
+ * - **Design Final**: the same client and links, stage DESIGN, numbered
+ *   after its Sales Final ("2026-004-D") and pointing back at it, so the two
+ *   can be compared line by line. The Sales Final is left exactly as sent.
+ */
+export async function copyQuote(quoteId: string, copy: CopyKind): Promise<QuoteResult> {
+  const studioId = await myStudioId();
+  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+  const source = await prisma.studioQuote.findFirst({
+    where: { id: quoteId, studioId },
+    include: { lines: { orderBy: { sortOrder: 'asc' } } },
+  });
+  if (!source) return { ok: false, error: 'That quotation is not yours.' };
+
+  const template = copy.kind === 'template';
+  const clientName = template ? copy.clientName.trim().slice(0, 120) : source.clientName;
+  if (clientName.length < 2) return { ok: false, error: 'Who is the new quotation for?' };
+  if (!template && source.stage === 'DESIGN') return { ok: false, error: 'This is already the Design Final.' };
+
+  let number = template ? await nextNumber(studioId) : `${source.number}-D`;
+  if (!template) {
+    // A second Design Final of the same quotation gets -D2, -D3…
+    for (let n = 2; await prisma.studioQuote.findFirst({ where: { studioId, number }, select: { id: true } }); n += 1) {
+      number = `${source.number}-D${n}`;
+    }
+  }
+
+  try {
+    const created = await prisma.studioQuote.create({
+      data: {
+        studioId,
+        number,
+        stage: template ? 'SALES' : 'DESIGN',
+        status: 'DRAFT',
+        clientName,
+        ...(template
+          ? {}
+          : {
+              clientPhone: source.clientPhone,
+              clientEmail: source.clientEmail,
+              society: source.society,
+              locality: source.locality,
+              clientId: source.clientId,
+              briefId: source.briefId,
+              introductionId: source.introductionId,
+              basedOnId: source.id,
+            }),
+        config: source.config,
+        carpetSqft: source.carpetSqft,
+        kitchenRunMm: source.kitchenRunMm,
+        bathrooms: source.bathrooms,
+        feeBps: source.feeBps,
+        discountBps: source.discountBps,
+        onSpotPaise: source.onSpotPaise,
+        onSpotLabel: source.onSpotLabel,
+        bookingAdvancePaise: source.bookingAdvancePaise,
+        gstBps: source.gstBps,
+        phases: (source.phases ?? undefined) as Prisma.InputJsonValue | undefined,
+        welcomeNote: source.welcomeNote,
+        terms: source.terms,
+        lines: {
+          create: source.lines.map((l) => ({
+            room: l.room,
+            product: l.product,
+            code: l.code,
+            unit: l.unit,
+            details: l.details,
+            widthMm: l.widthMm,
+            heightMm: l.heightMm,
+            qtyMilli: l.qtyMilli,
+            ratePaise: l.ratePaise,
+            amountPaise: l.amountPaise,
+            sortOrder: l.sortOrder,
+          })),
+        },
+      },
+      select: { id: true },
+    });
+    return { ok: true, id: created.id };
+  } catch (error) {
+    console.error('[studio-quote] copyQuote failed', error);
+    return { ok: false, error: 'That did not save.' };
+  }
+}
+
+/**
+ * Delete a draft. Only a draft, and only one that is not a customer's final
+ * quote: once sent, a quotation is a record of what a client was told, and a
+ * final quote is what the customer reads in the app.
+ */
+export async function deleteQuote(quoteId: string): Promise<ActionResult> {
+  const studioId = await myStudioId();
+  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+  const q = await prisma.studioQuote.findFirst({
+    where: { id: quoteId, studioId },
+    select: { status: true, issuedOn: true, introductionId: true },
+  });
+  if (!q) return { ok: false, error: 'That quotation is not yours.' };
+  if (q.status !== 'DRAFT' || q.issuedOn) return { ok: false, error: 'Only a draft that was never sent can be deleted.' };
+  if (q.introductionId) return { ok: false, error: 'This is a One Interiors client\'s final quote — mark it lost instead.' };
+  try {
+    await prisma.studioQuote.deleteMany({ where: { id: quoteId, studioId } });
+    return { ok: true };
+  } catch (error) {
+    console.error('[studio-quote] deleteQuote failed', error);
+    return { ok: false, error: 'That did not delete.' };
+  }
+}
+
+/** Two quotations side by side: the base (usually the Sales Final) and this one. */
+export interface QuoteComparison {
+  base: QuoteRow;
+  current: QuoteRow;
+}
+
+export async function quotesToCompare(currentId: string, baseId?: string): Promise<QuoteComparison | null> {
+  const current = await getQuote(currentId);
+  if (!current) return null;
+  const id = baseId ?? current.basedOnId;
+  if (!id) return null;
+  const base = await getQuote(id);
+  return base ? { base, current } : null;
+}
+
+/** The rooms from a brief's read floor plan; empty without one. */
+async function planRoomsOfBrief(briefId: string | null): Promise<PlanRoomSize[]> {
+  if (!briefId) return [];
+  const b = await prisma.brief.findUnique({ where: { id: briefId }, select: { floorPlanReading: true } }).catch(() => null);
+  return planUseFrom(b?.floorPlanReading)?.rooms ?? [];
+}
+
+async function planRunOfBrief(briefId: string | null): Promise<number | null> {
+  if (!briefId) return null;
+  const b = await prisma.brief.findUnique({ where: { id: briefId }, select: { floorPlanReading: true } }).catch(() => null);
+  return planUseFrom(b?.floorPlanReading)?.kitchenRunMm ?? null;
 }
 
 /** Ownership check, reused by every write below. */
@@ -379,9 +726,33 @@ export async function setQuoteStatus(
           : {}),
       },
     });
+    /* Sent to a customer One Interiors introduced: tell them it is in the app.
+       Every time it goes out, so a revised quotation is announced too. */
+    if (status === 'ISSUED') {
+      const studioId = await myStudioId();
+      if (studioId) void tellCustomer(quoteId, studioId);
+    }
     return { ok: true };
   } catch {
     return { ok: false, error: 'That did not save.' };
+  }
+}
+
+async function tellCustomer(quoteId: string, studioId: string): Promise<void> {
+  try {
+    const q = await prisma.studioQuote.findFirst({
+      where: { id: quoteId, studioId },
+      select: { number: true, introductionId: true, studio: { select: { tradeName: true } } },
+    });
+    if (!q?.introductionId) return;
+    const intro = await prisma.introduction.findUnique({
+      where: { id: q.introductionId },
+      select: { withdrawnAt: true, brief: { select: { userId: true } } },
+    });
+    if (!intro || intro.withdrawnAt || !intro.brief.userId) return;
+    await notify(intro.brief.userId, { kind: 'quote-sent', quoteId, studio: q.studio.tradeName, number: q.number });
+  } catch (error) {
+    console.error('[studio-quote] customer notify failed', error instanceof Error ? error.name : 'unknown');
   }
 }
 
@@ -600,6 +971,18 @@ export async function applyConfiguration(input: ApplyConfigInput): Promise<Apply
     return { ok: false, error: 'That quotation is not yours.' };
   }
 
+  /* The plan comes from the client's brief, never from the browser. */
+  const { planRooms: _ignored, ...home } = input.home;
+  if (home.usePlan) {
+    const q = await prisma.studioQuote.findFirst({ where: { id: input.quoteId, studioId }, select: { briefId: true } });
+    const rooms = await planRoomsOfBrief(q?.briefId ?? null);
+    if (rooms.length > 0) {
+      (home as HomeConfig).planRooms = rooms;
+      if (home.kitchenRunMm == null) home.kitchenRunMm = (await planRunOfBrief(q?.briefId ?? null)) ?? null;
+    }
+  }
+  input = { ...input, home };
+
   try {
     const products = await prisma.studioProduct.findMany({
       where: { studioId },
@@ -620,6 +1003,7 @@ export async function applyConfiguration(input: ApplyConfigInput): Promise<Apply
       inStandardBuild: p.inStandardBuild,
       isActive: p.isActive,
       sortOrder: p.sortOrder,
+      rules: readRules(p.rules),
     }));
 
     const { lines, notes } = planQuotation(input.home, catalogue);

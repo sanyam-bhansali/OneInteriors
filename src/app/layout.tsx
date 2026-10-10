@@ -2,7 +2,9 @@ import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import { siteUrl } from '@/lib/site';
 import { RosterGateBanner } from '@/components/RosterGateBanner';
+import { RegisterServiceWorker } from '@/components/RegisterServiceWorker';
 import './globals.css';
+import '@/components/home/home-cb.css';
 
 /*
  * Every face is bundled (src/app/fonts: the Latin files Google Fonts serves,
@@ -53,6 +55,26 @@ const rounded = localFont({
   display: 'swap',
 });
 
+/**
+ * Geist and Geist Mono — the customer side's faces since 8 Oct 2026, when the
+ * owner asked for it in the manner of cuberto.com: one neutral sans, set large
+ * and tight, everywhere a homeowner looks. Bound to the font tokens inside
+ * `.oi-app` (globals.css) and used directly by the home page (`.cb`). The
+ * studio and ops software keep their own faces.
+ */
+const geist = localFont({
+  src: './fonts/geist-latin.woff2',
+  weight: '100 900',
+  variable: '--font-geist',
+  display: 'swap',
+});
+const geistMono = localFont({
+  src: './fonts/geist-mono-latin.woff2',
+  weight: '400 500',
+  variable: '--font-geist-mono',
+  display: 'swap',
+});
+
 const mono = localFont({
   src: [
     { path: './fonts/ibm-plex-mono-400.woff2', weight: '400' },
@@ -78,6 +100,9 @@ export const metadata: Metadata = {
     locale: 'en_IN',
     siteName: 'One Interiors',
   },
+  // Installs to the home screen as an app (src/app/manifest.ts).
+  appleWebApp: { capable: true, title: 'One Interiors', statusBarStyle: 'default' },
+  icons: { apple: '/icons/apple-touch-icon.png', icon: '/icons/icon-192.png' },
   robots: {
     // Flip to true once the brand name and pricing are settled.
     index: false,
@@ -90,7 +115,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: 'cover', // safe-area insets for the wrapped app
   // Single value: the product is light-only by design (see globals.css).
-  themeColor: '#fdf9f2',
+  // White, the customer side's ground since the 8 Oct redesign.
+  themeColor: '#ffffff',
   colorScheme: 'light',
 };
 
@@ -106,7 +132,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // var(--font-display) silently inherits the body sans instead.
     //
     // The symptom is that the serif simply never appears and nothing errors.
-    <html lang="en-IN" className={`${display.variable} ${sans.variable} ${mono.variable} ${rounded.variable}`}>
+    <html lang="en-IN" className={`${display.variable} ${sans.variable} ${mono.variable} ${rounded.variable} ${geist.variable} ${geistMono.variable}`}>
       <body>
         {/* The verification-gate warning lives HERE, not in SiteHeader.
             It was in SiteHeader, and it silently vanished on /match — the one
@@ -123,6 +149,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             pages is worse than no banner: it teaches you to trust its
             absence. */}
         <RosterGateBanner />
+        <RegisterServiceWorker />
         {children}
       </body>
     </html>

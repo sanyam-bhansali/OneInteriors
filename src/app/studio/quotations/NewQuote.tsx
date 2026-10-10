@@ -150,6 +150,17 @@ export function StartQuote({
           Study or office
         </label>
 
+        <label className="flex items-center gap-2 py-2.5 text-[14px]">
+          <input
+            type="checkbox"
+            name="balcony"
+            value="yes"
+            defaultChecked
+            className="h-[16px] w-[16px] accent-[var(--s-accent)]"
+          />
+          Dry balcony
+        </label>
+
         <label className="flex flex-col gap-1.5">
           <span className="s-label">Carpet sq ft — optional</span>
           <input

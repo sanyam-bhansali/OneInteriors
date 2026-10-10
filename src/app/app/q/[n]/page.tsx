@@ -1,0 +1,642 @@
+'use client';
+
+/**
+ * Quiz 1–7 (the owner's v1 screens): home, scope, budget, style, household,
+ * priorities, involvement. One question a screen, the answer written to the
+ * same brief the website uses, so matching and pricing are unchanged.
+ */
+
+import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { useAppData, warmAppData } from '@/components/app/useAppData';
+import { filedRatesFor } from '@/data/filed-rates';
+import { estimateFor, studiosForTier, type EstimateRange } from '@/modules/app/estimate-range';
+import { formatINRCompact } from '@/lib/money';
+import { listedStudios } from '@/modules/app/journey';
+import type { AppData } from '../../data';
+import { Body, Cta, Foot, Frame, Head, Progress, useBrief } from '@/components/app/ui';
+import {
+  PUNE_LOCALITIES,
+  STYLE_LABELS,
+  STYLE_TAGS,
+  type Brief,
+  type Involvement,
+  type PriorityFactor,
+  type PropertyType,
+  type ScopeType,
+} from '@/modules/brief/types';
+import { carpetAreaFor } from '@/modules/brief/steps';
+import { TIER, TIERS, tierRangeFor } from '@/modules/quotation/tiers';
+import { roomsFor } from '@/modules/quotation/scope';
+import { ROOM_LABELS } from '@/modules/quotation/catalogue';
+import { BEDROOMS } from '@/modules/quotation/estimate';
+import { STYLE_PHOTOS } from '@/data/style-photos';
+import { saveBriefAction } from '@/app/quiz/actions';
+import { useT } from '@/components/app/i18n';
+
+const TOTAL = 7;
+
+const HOMES: { value: PropertyType; label: string }[] = [
+  { value: 'BHK_1', label: '1 BHK' },
+  { value: 'BHK_2', label: '2 BHK' },
+  { value: 'BHK_3', label: '3 BHK' },
+  { value: 'BHK_4_PLUS', label: '4+ BHK' },
+  { value: 'VILLA', label: 'Villa / Row house' },
+];
+
+/** The areas people pick most; the rest are a tap away. */
+const POPULAR = [
+  'kharadi',
+  'baner',
+  'wakad',
+  'hinjewadi',
+  'kothrud',
+  'viman-nagar',
+  'aundh',
+  'hadapsar',
+  'balewadi',
+  'undri',
+  'ravet',
+  'magarpatta',
+];
+
+const SCOPES: { value: ScopeType; title: string; sub: string }[] = [
+  {
+    value: 'FULL_HOME',
+    title: 'Full home',
+    sub: 'Every room, from bare walls to handover',
+  },
+  {
+    value: 'KITCHEN_WARDROBE',
+    title: 'Kitchen & wardrobes',
+    sub: 'The two jobs that need a carpenter most',
+  },
+  {
+    value: 'SINGLE_ROOM',
+    title: 'One room',
+    sub: 'A bedroom, the living room, a study',
+  },
+  {
+    value: 'RENOVATION',
+    title: 'Renovation',
+    sub: 'Change what is already there',
+  },
+];
+
+
+const PRIORITIES: { value: PriorityFactor; title: string; sub: string }[] = [
+  {
+    value: 'SPEED',
+    title: 'Finishing on time',
+    sub: 'Weighs each studio’s delivery record',
+  },
+  {
+    value: 'DESIGN_AMBITION',
+    title: 'Design ambition',
+    sub: 'Bolder, more personal past work',
+  },
+  {
+    value: 'BUDGET',
+    title: 'Staying in budget',
+    sub: 'Final bills that match the quote',
+  },
+  {
+    value: 'MATERIAL_QUALITY',
+    title: 'Material quality',
+    sub: 'Better boards, hardware and finishes',
+  },
+];
+
+const INVOLVEMENT: { value: Involvement; title: string; sub: string }[] = [
+  {
+    value: 'DECIDE_FOR_ME',
+    title: 'Decide most things for me',
+    sub: 'Studios that lead with a clear design of their own',
+  },
+  {
+    value: 'COLLABORATE',
+    title: 'Work through it together',
+    sub: 'Regular reviews; you sign off the key choices',
+  },
+  {
+    value: 'APPROVE_EVERYTHING',
+    title: 'I want to approve every detail',
+    sub: 'Every finish and fitting comes to you first',
+  },
+];
+
+function answered(brief: Brief, n: number): boolean {
+  switch (n) {
+    case 1:
+      return brief.propertyType !== null && brief.locality !== null;
+    case 2:
+      return brief.scope !== null && (brief.scope !== 'SINGLE_ROOM' || brief.scopeRooms.length > 0);
+    case 3:
+      return brief.tier !== null;
+    case 4:
+      return brief.styleLikes.length >= 2;
+    case 5:
+      return true;
+    case 6:
+      return brief.priorityRanking.length === 4;
+    case 7:
+      return brief.involvement !== null;
+    default:
+      return false;
+  }
+}
+
+export default function AppQuestion() {
+  const router = useRouter();
+  const n = Math.min(TOTAL, Math.max(1, Number(useParams<{ n: string }>().n) || 1));
+  const [brief, update] = useBrief();
+  const tr = useT();
+  // Fetch the studios now, so the matches screen has them the moment the last answer is in.
+  useEffect(() => {
+    void warmAppData();
+  }, []);
+  if (!brief) return <Frame>{null}</Frame>;
+
+  const next = () => {
+    if (n < TOTAL) {
+      update({ lastStep: n + 1 });
+      router.push(`/app/q/${n + 1}`);
+      return;
+    }
+    // The last answer: the brief is complete, kept on the server too when
+    // there is one, then their style DNA (v79), then the matches.
+    const done = {
+      ...brief,
+      completedAt: new Date().toISOString(),
+      lastStep: 12,
+    };
+    update(done);
+    // Navigate first: the router waits for a pending server action before it moves,
+    // so saving first held the matches screen back by the length of the save.
+    router.push('/app/style');
+    setTimeout(() => void saveBriefAction({ ...done, contactName: null }).catch(() => {}), 0);
+  };
+
+  const back = n === 1 ? '/app/name' : `/app/q/${n - 1}`;
+  const meta = n === TOTAL ? tr('q.last') : tr('q.meta', { n, of: TOTAL });
+  const ok = answered(brief, n);
+
+  return (
+    <Frame>
+      <Head back={back} meta={meta} />
+      <Progress step={n} of={TOTAL} />
+      <Body>
+        {n >= 2 ? <RunningEstimate brief={brief} /> : null}
+        <Step n={n} brief={brief} update={update} />
+      </Body>
+      <Foot>
+        {n === 6 && !ok && brief.priorityRanking.length > 0 ? (
+          <p className="oa-foot-note">{tr('q6.rank', { n: brief.priorityRanking.length })}</p>
+        ) : null}
+        <Cta onClick={next} disabled={!ok}>
+          {n === TOTAL ? tr('q.seeMatches') : tr('common.next')}
+        </Cta>
+      </Foot>
+    </Frame>
+  );
+}
+
+function Step({ n, brief, update }: { n: number; brief: Brief; update: (p: Partial<Brief>) => void }) {
+  switch (n) {
+    case 1:
+      return <HomeStep brief={brief} update={update} />;
+    case 2:
+      return <ScopeStep brief={brief} update={update} />;
+    case 3:
+      return <TierStep brief={brief} update={update} />;
+    case 4:
+      return <StyleStep brief={brief} update={update} />;
+    case 5:
+      return <HouseholdStep brief={brief} update={update} />;
+    case 6:
+      return <PriorityStep brief={brief} update={update} />;
+    default:
+      return <InvolvementStep brief={brief} update={update} />;
+  }
+}
+
+type StepProps = { brief: Brief; update: (p: Partial<Brief>) => void };
+
+function HomeStep({ brief, update }: StepProps) {
+  const tr = useT();
+  // In the design's order, not the alphabet's.
+  const popular = POPULAR.map((slug) => PUNE_LOCALITIES.find((l) => l.slug === slug)).filter(
+    (l): l is (typeof PUNE_LOCALITIES)[number] => Boolean(l),
+  );
+  const others = PUNE_LOCALITIES.filter((l) => !POPULAR.includes(l.slug));
+  const otherPicked = brief.locality !== null && !POPULAR.includes(brief.locality);
+  const [showOther, setShowOther] = useState(otherPicked);
+  return (
+    <>
+      <h1 className="oa-title">{tr('q1.h1')}</h1>
+      <p className="oa-sub">{tr('q1.sub')}</p>
+      <p className="oa-label">{tr('q1.type')}</p>
+      <div className="oa-chips" role="group" aria-label="Property type">
+        {HOMES.map((h) => (
+          <button
+            key={h.value}
+            type="button"
+            className="oa-chip"
+            aria-pressed={brief.propertyType === h.value}
+            onClick={() => update({ propertyType: h.value })}
+          >
+            {h.label}
+          </button>
+        ))}
+      </div>
+      <p className="oa-label">{tr('q1.locality')}</p>
+      <div className="oa-chips" role="group" aria-label="Locality">
+        {popular.map((l) => (
+          <button
+            key={l.slug}
+            type="button"
+            className="oa-chip"
+            aria-pressed={brief.locality === l.slug}
+            onClick={() => update({ locality: l.slug })}
+          >
+            {l.label}
+          </button>
+        ))}
+      </div>
+      <label className="oa-label" htmlFor="oa-area">
+        {tr('q1.area')}
+      </label>
+      <input
+        id="oa-area"
+        className="oa-input"
+        inputMode="numeric"
+        placeholder="960"
+        value={brief.carpetAreaSqft ?? ''}
+        onChange={(e) => {
+          const v = Number(e.target.value.replace(/\D/g, ''));
+          update({ carpetAreaSqft: v > 0 ? Math.min(v, 20000) : null });
+        }}
+      />
+      <p className="oa-note">{tr('q1.areaNote')}</p>
+      {showOther ? (
+      <select
+          aria-label="Another area"
+          className="oa-search"
+          value={otherPicked ? (brief.locality ?? '') : ''}
+          onChange={(e) => e.target.value && update({ locality: e.target.value })}
+        >
+          <option value="">{tr('q1.otherPick')}</option>
+          {others.map((l) => (
+            <option key={l.slug} value={l.slug}>
+              {l.label}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <button type="button" className="oa-link" style={{ alignSelf: 'flex-start', padding: 0, textDecoration: 'underline' }} onClick={() => setShowOther(true)}>
+          {tr('q1.other')}
+        </button>
+      )}
+    </>
+  );
+}
+
+function ScopeStep({ brief, update }: StepProps) {
+  const tr = useT();
+  const rooms = roomsFor(BEDROOMS[brief.propertyType ?? 'BHK_2']);
+  const about = useOptionEstimates(brief, SCOPES.map((o) => ({ scope: o.value, scopeRooms: [], excludedItems: [] })));
+  return (
+    <>
+      <h1 className="oa-title">{tr('q2.h1')}</h1>
+      <div className="oa-list" role="radiogroup" aria-label="Scope">
+        {SCOPES.map((s, i) => (
+          <button
+            key={s.value}
+            type="button"
+            role="radio"
+            aria-checked={brief.scope === s.value}
+            className="oa-row"
+            onClick={() => update({ scope: s.value, scopeRooms: [], excludedItems: [] })}
+          >
+            <span>
+              <span className="oa-row-title">{tr(`scope.${s.value}`)}</span>
+              <span className="oa-row-sub">{tr(`scope.${s.value}.sub`)}</span>
+            </span>
+            <span className="oa-row-end">
+              {about[i] && s.value !== 'SINGLE_ROOM' && s.value !== 'RENOVATION' ? (
+                <span className="oa-row-price">{tr('est.about', { x: formatINRCompact(about[i]!.midPaise) })}</span>
+              ) : null}
+              <span className="oa-radio" />
+            </span>
+          </button>
+        ))}
+      </div>
+      {brief.scope === 'SINGLE_ROOM' || brief.scope === 'RENOVATION' ? (
+        <>
+          <p className="oa-label">{tr('q2.rooms')}</p>
+          <div className="oa-chips" role="group" aria-label="Rooms">
+            {rooms.map((r) => (
+              <button
+                key={r}
+                type="button"
+                className="oa-chip"
+                aria-pressed={brief.scopeRooms.includes(r)}
+                onClick={() =>
+                  update({
+                    scopeRooms: brief.scopeRooms.includes(r) ? brief.scopeRooms.filter((x) => x !== r) : [...brief.scopeRooms, r],
+                    excludedItems: [],
+                  })
+                }
+              >
+                {ROOM_LABELS[r]}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+function TierStep({ brief, update }: StepProps) {
+  const tr = useT();
+  const { sqft } = carpetAreaFor(brief);
+  const per = useOptionEstimates(brief, TIERS.map((t) => ({ tier: t })));
+  return (
+    <>
+      <h1 className="oa-title">{tr('q3.h1')}</h1>
+      <div className="flex flex-col gap-2.5" role="radiogroup" aria-label="Finish level">
+        {TIERS.map((t, i) => {
+          const { lowPaise, highPaise } = tierRangeFor(t, sqft);
+          const est = per[i];
+          return (
+            <button
+              key={t}
+              type="button"
+              role="radio"
+              aria-checked={brief.tier === t}
+              className="oa-tier"
+              onClick={() =>
+                update({
+                  tier: t,
+                  budgetMinPaise: lowPaise,
+                  budgetMaxPaise: highPaise,
+                })
+              }
+            >
+              <span className="oa-tier-top">
+                <span className="oa-tier-name">{TIER[t].label}</span>
+                <span className="oa-tier-tag">{tr(`tier.${t}.tag`)}</span>
+              </span>
+              <p>{tr(`tier.${t}.line`)}</p>
+              {est ? (
+                <p className="oa-tier-price">
+                  {tr('est.most', { range: `${formatINRCompact(est.lowPaise)}–${formatINRCompact(est.highPaise)}` })}
+                </p>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+      <p className="oa-note">{tr('q3.note')}</p>
+    </>
+  );
+}
+
+function StyleStep({ brief, update }: StepProps) {
+  const tr = useT();
+  const picked = brief.styleLikes;
+  return (
+    <>
+      <h1 className="oa-title">{tr('q4.h1')}</h1>
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="oa-sub" style={{ margin: 0 }}>
+          {tr('q4.sub')}
+        </p>
+        <span className="oa-meta" style={{ color: 'var(--accent-ink)' }}>
+          {tr('q4.count', { n: picked.length })}
+        </span>
+      </div>
+      <div className="oa-grid3">
+        {STYLE_TAGS.map((tag) => {
+          const on = picked.includes(tag);
+          return (
+            <button
+              key={tag}
+              type="button"
+              className="oa-photo"
+              aria-pressed={on}
+              aria-label={STYLE_LABELS[tag]}
+              onClick={() =>
+                update({
+                  styleLikes: on ? picked.filter((t) => t !== tag) : picked.length >= 3 ? picked : [...picked, tag],
+                  styleDislikes: brief.styleDislikes.filter((t) => t !== tag),
+                })
+              }
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={`${STYLE_PHOTOS[tag].src}?auto=format&fit=crop&w=300&h=400&q=60`} alt="" loading="lazy" />
+              {on ? (
+                <i className="tick">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                </i>
+              ) : null}
+              <span>{STYLE_LABELS[tag]}</span>
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+function HouseholdStep({ brief, update }: StepProps) {
+  const tr = useT();
+  const h = brief.household ?? {
+    adults: 2,
+    children: 0,
+    elderly: 0,
+    pets: false,
+    worksFromHome: false,
+  };
+  const set = (patch: Partial<typeof h>) => update({ household: { ...h, ...patch } });
+  const counter = (key: 'adults' | 'children' | 'elderly', title: string, sub: string, min: number) => (
+    <div className="oa-row" style={{ cursor: 'default' }}>
+      <span>
+        <span className="oa-row-title">{title}</span>
+        <span className="oa-row-sub">{sub}</span>
+      </span>
+      <span className="oa-step">
+        <button
+          type="button"
+          aria-label={`Fewer ${title.toLowerCase()}`}
+          onClick={() => set({ [key]: Math.max(min, h[key] - 1) })}
+        >
+          −
+        </button>
+        <output aria-live="polite">{h[key]}</output>
+        <button
+          type="button"
+          className="plus"
+          aria-label={`More ${title.toLowerCase()}`}
+          onClick={() => set({ [key]: Math.min(9, h[key] + 1) })}
+        >
+          +
+        </button>
+      </span>
+    </div>
+  );
+  const toggle = (key: 'pets' | 'worksFromHome', title: string, sub: string) => (
+    <div className="oa-row" style={{ cursor: 'default' }}>
+      <span>
+        <span className="oa-row-title">{title}</span>
+        <span className="oa-row-sub">{sub}</span>
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={h[key]}
+        aria-label={title}
+        className="oa-toggle"
+        onClick={() => set({ [key]: !h[key] })}
+      />
+    </div>
+  );
+  return (
+    <>
+      <h1 className="oa-title">{tr('q5.h1')}</h1>
+      <div className="oa-list">
+        {counter('adults', tr('q5.adults'), tr('q5.adults.sub'), 1)}
+        {counter('children', tr('q5.children'), tr('q5.children.sub'), 0)}
+        {counter('elderly', tr('q5.elderly'), tr('q5.elderly.sub'), 0)}
+        {toggle('pets', tr('q5.pets'), tr('q5.pets.sub'))}
+        {toggle('worksFromHome', tr('q5.wfh'), tr('q5.wfh.sub'))}
+      </div>
+    </>
+  );
+}
+
+function PriorityStep({ brief, update }: StepProps) {
+  const tr = useT();
+  const ranking = brief.priorityRanking;
+  const tap = (p: PriorityFactor) =>
+    update({
+      priorityRanking: ranking.includes(p) ? ranking.filter((x) => x !== p) : [...ranking, p],
+    });
+  const first = PRIORITIES.find((p) => p.value === ranking[0]);
+  return (
+    <>
+      <h1 className="oa-title">{tr('q6.h1')}</h1>
+      <p className="oa-sub">{tr('q6.sub')}</p>
+      <div className="oa-list">
+        {PRIORITIES.map((p) => {
+          const at = ranking.indexOf(p.value);
+          return (
+            <button
+              key={p.value}
+              type="button"
+              className="oa-row"
+              aria-pressed={at >= 0}
+              onClick={() => tap(p.value)}
+              style={{ justifyContent: 'flex-start' }}
+            >
+              <span className={`oa-rank${at >= 0 ? ' on' : ''}`}>{at >= 0 ? at + 1 : ''}</span>
+              <span>
+                <span className="oa-row-title" style={at >= 0 ? { color: 'var(--accent-ink)' } : undefined}>
+                  {tr(`prio.${p.value}`)}
+                </span>
+                <span className="oa-row-sub">{tr(`prio.${p.value}.sub`)}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {ranking.length > 0 ? (
+        <div className="flex items-center justify-between">
+          <span className="oa-label accent" style={{ margin: 0 }}>
+            {first ? tr('q6.first', { x: tr(`prio.${first.value}`) }) : ''}
+          </span>
+          <button
+            type="button"
+            className="oa-link"
+            style={{ textDecoration: 'underline', fontSize: 14 }}
+            onClick={() => update({ priorityRanking: [] })}
+          >
+            {tr('q6.startOver')}
+          </button>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function InvolvementStep({ brief, update }: StepProps) {
+  const tr = useT();
+  return (
+    <>
+      <h1 className="oa-title">{tr('q7.h1')}</h1>
+      <div className="oa-list" role="radiogroup" aria-label="Involvement">
+        {INVOLVEMENT.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={brief.involvement === o.value}
+            className="oa-row"
+            onClick={() => update({ involvement: o.value })}
+          >
+            <span>
+              <span className="oa-row-title">{tr(`inv.${o.value}`)}</span>
+              <span className="oa-row-sub">{tr(`inv.${o.value}.sub`)}</span>
+            </span>
+            <span className="oa-radio" />
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// ── The running estimate (trust fix 3) ─────────────────────────
+
+/** Every listed studio, priced on the brief as answered so far. Null until the studios are here. */
+function useEstimate(brief: Brief, data: AppData | null): EstimateRange | null {
+  return useMemo(
+    () => (data ? estimateFor(brief, studiosForTier(listedStudios(data), brief.tier), data.rates, filedRatesFor) : null),
+    [brief, data],
+  );
+}
+
+/** The same estimate for each option on a step, as if it were chosen. */
+function useOptionEstimates(brief: Brief, patches: Partial<Brief>[]): (EstimateRange | null)[] {
+  const data = useAppData();
+  const key = JSON.stringify(patches);
+  return useMemo(() => {
+    if (!data) return patches.map(() => null);
+    const all = listedStudios(data);
+    return patches.map((p) => {
+      const b = { ...brief, ...p };
+      return estimateFor(b, studiosForTier(all, b.tier), data.rates, filedRatesFor);
+    });
+    // `key` stands for `patches`, which callers build fresh on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brief, data, key]);
+}
+
+function RunningEstimate({ brief }: { brief: Brief }) {
+  const tr = useT();
+  const data = useAppData();
+  const est = useEstimate(brief, data);
+  if (!est) return null;
+  return (
+    <div className="oa-estimate" aria-live="polite">
+      <span>{tr('est.label')}</span>
+      <b>
+        {formatINRCompact(est.lowPaise)}–{formatINRCompact(est.highPaise)}
+      </b>
+      <small>{tr('est.note', { n: est.studios })}</small>
+    </div>
+  );
+}

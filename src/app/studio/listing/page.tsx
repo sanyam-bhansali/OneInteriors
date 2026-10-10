@@ -109,7 +109,7 @@ export default async function ListingPage() {
           </Row>
 
           <Row
-            href="/studio/rates"
+            href="/studio/products"
             title="Your rates"
             state={
               studio.missingRates.length > 0

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState, useTransition } from 'react';
-import { ChevronDown, ChevronUp, Copy, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, GripVertical, X } from 'lucide-react';
 import { formatINR, paiseToRupees, rupeesToPaise } from '@/lib/money';
 import {
   UNIT_LABELS,
@@ -94,6 +94,9 @@ export function ConfigurePanel({ quote, hasLines }: { quote: QuoteRow; hasLines:
   );
   const [bathrooms, setBathrooms] = useState(String(quote.bathrooms ?? 2));
   const [study, setStudy] = useState(false);
+  const [balcony, setBalcony] = useState(true);
+  const hasPlan = quote.planRooms.length > 0;
+  const [usePlan, setUsePlan] = useState(hasPlan);
   const [confirming, setConfirming] = useState(false);
   const [result, setResult] = useState<BuildState>(null);
   const [pending, start] = useTransition();
@@ -117,6 +120,8 @@ export function ConfigurePanel({ quote, hasLines }: { quote: QuoteRow; hasLines:
           kitchenRunMm: Number.isFinite(run) && run > 0 ? Math.round(run) : null,
           bathrooms: Number.isFinite(baths) && baths >= 0 ? Math.round(baths) : 0,
           study,
+          balcony,
+          usePlan: hasPlan && usePlan,
         }),
       );
     });
@@ -174,6 +179,28 @@ export function ConfigurePanel({ quote, hasLines }: { quote: QuoteRow; hasLines:
           />
           Study or office
         </label>
+
+        <label className="flex items-center gap-2 text-[13.5px]">
+          <input
+            type="checkbox"
+            checked={balcony}
+            onChange={(e) => setBalcony(e.target.checked)}
+            className="h-[16px] w-[16px] accent-[var(--s-accent)]"
+          />
+          Dry balcony
+        </label>
+
+        {hasPlan ? (
+          <label className="flex items-center gap-2 text-[13.5px]">
+            <input
+              type="checkbox"
+              checked={usePlan}
+              onChange={(e) => setUsePlan(e.target.checked)}
+              className="h-[16px] w-[16px] accent-[var(--s-accent)]"
+            />
+            Size from the client&rsquo;s floor plan
+          </label>
+        ) : null}
 
         <button
           type="button"
@@ -297,6 +324,10 @@ export function RoomSection({
   onDuplicate,
   onMove,
   onAddTo,
+  products,
+  onSwap,
+  onReorder,
+  onRenameRoom,
 }: {
   room: string;
   lines: PricedLine[];
@@ -306,14 +337,38 @@ export function RoomSection({
   onMove: (key: string, by: -1 | 1) => void;
   /** Focuses the rail's add control with this room already chosen. */
   onAddTo?: (room: string) => void;
+  /** The studio's products, for swapping a line to another. */
+  products: ProductRow[];
+  onSwap: (key: string, product: ProductRow) => void;
+  /** Drag and drop: put `from` where `to` is, within this room. */
+  onReorder: (from: string, to: string) => void;
+  onRenameRoom: (from: string, to: string) => void;
 }) {
   const total = lines.reduce((a, l) => a + l.amountPaise, 0);
+  const [name, setName] = useState(room);
+  const commit = () => {
+    const next = name.trim();
+    if (next && next !== room) onRenameRoom(room, next);
+    else setName(room);
+  };
 
   return (
     <section className="s-card overflow-hidden">
       <div className="flex items-baseline justify-between gap-4 bg-[var(--s-accent)] px-4 py-2">
-        <h2 className="m-0 text-[13.5px] font-semibold uppercase tracking-[0.06em] text-white">
-          {room}
+        <h2 className="m-0 min-w-0 flex-1">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+              if (e.key === 'Escape') setName(room);
+            }}
+            maxLength={60}
+            aria-label={`Rename ${room}`}
+            title="Rename this room"
+            className="w-full min-w-0 rounded-[4px] border-0 bg-transparent p-0 text-[13.5px] font-semibold uppercase tracking-[0.06em] text-white outline-none focus:bg-white/15 focus:px-1"
+          />
         </h2>
         <span className="s-num text-[12.5px] text-white/70">
           {lines.length} {lines.length === 1 ? 'line' : 'lines'}
@@ -348,6 +403,9 @@ export function RoomSection({
                 onRemove={onRemove}
                 onDuplicate={onDuplicate}
                 onMove={onMove}
+                products={products}
+                onSwap={onSwap}
+                onReorder={onReorder}
               />
             ))}
           </tbody>
@@ -410,6 +468,9 @@ function LineRow({
   onRemove,
   onDuplicate,
   onMove,
+  products,
+  onSwap,
+  onReorder,
 }: {
   n: number;
   line: PricedLine;
@@ -419,7 +480,11 @@ function LineRow({
   onRemove: (key: string) => void;
   onDuplicate: (key: string) => void;
   onMove: (key: string, by: -1 | 1) => void;
+  products: ProductRow[];
+  onSwap: (key: string, product: ProductRow) => void;
+  onReorder: (from: string, to: string) => void;
 }) {
+  const [over, setOver] = useState(false);
   const area = line.unit === 'AREA';
   const overridden = line.agreedPaise != null;
 
@@ -442,9 +507,32 @@ function LineRow({
   });
 
   return (
-    <tr className="border-b border-[var(--s-rule-soft)] align-top last:border-b-0">
+    <tr
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/x-line', line.key);
+        e.dataTransfer.effectAllowed = 'move';
+      }}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes('text/x-line')) {
+          e.preventDefault();
+          setOver(true);
+        }
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setOver(false);
+        const from = e.dataTransfer.getData('text/x-line');
+        if (from && from !== line.key) onReorder(from, line.key);
+      }}
+      className={`border-b border-[var(--s-rule-soft)] align-top last:border-b-0 ${over ? 'bg-[var(--s-accent-wash)]' : ''}`}
+    >
       <td className="px-2 py-2">
         <div className="flex items-center gap-0.5">
+          <span className="cursor-grab text-[var(--s-ink-3)]" title="Drag to reorder" aria-hidden="true">
+            <GripVertical size={13} strokeWidth={2} absoluteStrokeWidth />
+          </span>
           <span className="s-num w-4 text-right text-[12px] text-[var(--s-ink-3)]">{n}</span>
           <div className="flex flex-col">
             <Icon label={`Move ${line.product} up`} disabled={first} onClick={() => onMove(line.key, -1)}>
@@ -464,6 +552,24 @@ function LineRow({
           aria-label="Product name"
           className={`${cell} font-medium`}
         />
+        <select
+          value=""
+          onChange={(e) => {
+            const p = products.find((x) => x.id === e.target.value);
+            if (p) onSwap(line.key, p);
+          }}
+          aria-label={`Swap ${line.product} for another product`}
+          className="mt-1 w-full rounded-[6px] border-0 bg-transparent p-0 text-[11.5px] text-[var(--s-ink-3)] hover:text-[var(--s-ink)]"
+        >
+          <option value="">Swap for…</option>
+          {products
+            .filter((p) => p.isActive && p.name !== line.product)
+            .map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+        </select>
         {overridden ? (
           <span className="s-tag mt-1" title="This figure was agreed, not calculated">
             agreed

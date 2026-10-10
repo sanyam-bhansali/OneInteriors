@@ -46,6 +46,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MATERIALS, type Material } from '@/modules/materials/glossary';
 import { pickQuestion, type Choice } from '@/modules/materials/quiz';
+import { useLang, useSiteT } from '@/components/app/i18n';
+import { OI_DICT, stageText } from '@/modules/i18n/site/oi';
+import { PillButton, Split } from '@/components/home/parts';
 import { MaterialCard } from './Material';
 
 export interface Stage {
@@ -110,16 +113,7 @@ export const DEFAULT_STAGES: Stage[] = stagesFor({ bhk: 2, measured: false, rate
  * none of it won. Every one is about the wait everybody else makes you do —
  * never about the customer, their budget or their taste.
  */
-const ASIDES = [
-  'Three weeks, down to ten seconds.',
-  'Not phoning anyone. Not even once.',
-  'No “ma’am, please visit our office”.',
-  'Measuring in millimetres, like a grown-up.',
-  'Resisting the urge to write “premium ply”.',
-  'Every line is getting a quantity.',
-  'No WhatsApp forward is being prepared.',
-  'Checking that “soft-close” means something.',
-];
+const ASIDES = ['aside.0', 'aside.1', 'aside.2', 'aside.3', 'aside.4', 'aside.5', 'aside.6', 'aside.7'] as const;
 
 /** When each card lands. The first is held back so nothing arrives at once. */
 const CARD_AT = [900, 3500] as const;
@@ -141,6 +135,8 @@ export function Building({
   seenQuestions?: readonly string[];
   onAsked?: (questionId: string) => void;
 }) {
+  const t = useSiteT(OI_DICT);
+  const lang = useLang();
   const [at, at_] = useState(0);
   const [slide, slide_] = useState(-1);
   const [joke, joke_] = useState(0);
@@ -232,21 +228,11 @@ export function Building({
     [picked],
   );
 
-  /* A live stopwatch, frozen when the quote is ready — "Built in 9.6
-     seconds" (queue item 20). Real time, measured here, not the budget. */
-  const startedAt = useRef<number | null>(null);
-  const [clock, clock_] = useState(0);
-  useEffect(() => {
-    startedAt.current ??= performance.now();
-    if (stagesDone) {
-      clock_(performance.now() - startedAt.current);
-      return;
-    }
-    const t = setInterval(() => clock_(performance.now() - (startedAt.current ?? performance.now())), 100);
-    return () => clearInterval(t);
-  }, [stagesDone]);
-  const seconds = (clock / 1000).toFixed(1);
-
+  /* No stopwatch. It said "Built in 12.1 seconds", but the quote is
+     calculated instantly and the seconds were this walkthrough's own pacing —
+     a measured-looking number for work that was not happening (review,
+     8 Oct). The steps are a short explanation of how the quote is made, and
+     anyone can skip them. */
   /** How far through, by time budgeted rather than stages counted. */
   const total = stages.reduce((sum, s) => sum + s.ms, 0);
   const elapsed = stages.slice(0, at).reduce((sum, s) => sum + s.ms, 0);
@@ -254,25 +240,30 @@ export function Building({
   const current = stages[Math.min(at, stages.length - 1)]!;
 
   return (
-    <div className="mx-auto w-full max-w-[38rem] py-12">
-      <p className="oi-eyebrow m-0 mb-3">Building your first quote</p>
-      <h1 className="oi-display m-0 mb-8 text-[clamp(1.5rem,1.2rem+1.2vw,2rem)]">
-        Pricing {studioName} on your flat.
-      </h1>
+    <div className="mx-auto w-full max-w-[40rem] py-12">
+      {/* The landing's screen heading: a small label, then the words rising in. */}
+      <p className="eyebrow">{t('build.eyebrow')}</p>
+      <Split as="h1" className="h-m" text={t('build.h1', { studio: studioName })} auto />
 
       {/* ── The work, as one line and a bar ── */}
-      <div className="mb-8">
-        <div className="mb-2.5 flex items-baseline justify-between gap-4">
-          <p className="m-0 text-[13.5px] text-[var(--ink2)]" aria-live="polite">
-            {stagesDone ? 'Quotation ready' : current.label}
+      <div className="mb-8 mt-8">
+        <div className="mb-3 flex items-baseline justify-between gap-4">
+          <p className="m-0 text-[14.5px] text-[var(--ink-2)]" aria-live="polite">
+            {stagesDone ? t('build.ready') : stageText(lang, current.label)}
           </p>
-          <span className="oi-num text-[11px] tracking-[0.1em] text-[var(--ink2)]" aria-live="off">
-            {stagesDone ? `Built in ${seconds} seconds` : `${pct}% · ${seconds}s`}
-          </span>
+          {stagesDone ? null : (
+            <button
+              type="button"
+              onClick={() => onDone?.()}
+              className="min-h-11 shrink-0 cursor-pointer border-0 bg-transparent p-0 text-[14px] font-medium text-[var(--ink)] underline underline-offset-4"
+            >
+              {t('build.skipAll')}
+            </button>
+          )}
         </div>
-        <div className="h-[3px] w-full bg-[var(--line)]">
+        <div className="h-1 w-full overflow-hidden rounded-full bg-[var(--soft-2)]">
           <div
-            className="oi-progress h-full"
+            className="oi-progress h-full rounded-full"
             /* --acc-ink, not --acc: the raw terracotta is 2.87:1 on the
                hairline track it runs in, which fails 1.4.11 for a graphic
                that is carrying the only progress information on screen. */
@@ -286,23 +277,30 @@ export function Building({
         {slide < 0 ? null : onQuestion ? (
           <section
             key="q"
-            className="oi-card-in border border-[var(--line)] bg-[var(--card)] p-[clamp(18px,3vw,26px)]"
-            aria-label="One question while you wait"
+            className="oi-card-in rounded-[var(--r-l)] bg-[var(--soft)] p-[clamp(20px,3vw,32px)]"
+            aria-label={t('build.questionAria')}
           >
             <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-              <p className="oi-eyebrow m-0">Your turn</p>
+              <p className="m-0 text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--ink-2)]">{t('build.yourTurn')}</p>
               {picked === null ? (
                 <button
                   type="button"
                   onClick={() => skipped_(true)}
-                  className="cursor-pointer border-0 bg-transparent p-0 text-[13px] text-[var(--ink2)] underline hover:text-[var(--ink)]"
+                  className="min-h-11 cursor-pointer border-0 bg-transparent p-0 text-[14px] text-[var(--ink-2)] underline underline-offset-4 hover:text-[var(--ink)]"
                 >
-                  Skip
+                  {t('build.skip')}
                 </button>
               ) : null}
             </div>
 
-            <h2 className="oi-display m-0 mb-5 text-[19px] leading-snug">{question.ask}</h2>
+            {/* Margin inline: a site-wide heading rule was winning over the utility
+                and the question sat on top of its first answer. */}
+            <h2
+              className="text-[clamp(1.25rem,1.05rem+0.8vw,1.6rem)] font-medium leading-[1.25] tracking-[-0.025em]"
+              style={{ margin: '0 0 20px' }}
+            >
+              {question.ask}
+            </h2>
 
             <ul className="m-0 flex list-none flex-col gap-2 p-0">
               {question.choices.map((choice) => {
@@ -321,25 +319,25 @@ export function Building({
                       onClick={() => answer(choice)}
                       disabled={reveal}
                       aria-pressed={isPicked}
-                      className="flex w-full min-h-11 cursor-pointer items-center gap-3 border px-4 py-3 text-left text-[14.5px] leading-snug transition-colors disabled:cursor-default"
+                      className="flex w-full min-h-12 cursor-pointer items-center gap-3 rounded-[var(--r-m)] border-0 px-4 py-3 text-left text-[15px] leading-snug transition-[box-shadow,background-color] duration-300 hover:shadow-[inset_0_0_0_1px_var(--ink)] disabled:cursor-default disabled:hover:shadow-none"
                       style={{
-                        borderColor: !reveal
-                          ? 'var(--line)'
+                        boxShadow: !reveal
+                          ? undefined
                           : right
-                            ? 'var(--sec)'
+                            ? 'inset 0 0 0 1.5px var(--sec)'
                             : isPicked
-                              ? 'var(--ink2)'
-                              : 'var(--line)',
-                        background: reveal && right ? 'rgba(131,144,115,.11)' : 'var(--card)',
+                              ? 'inset 0 0 0 1.5px var(--ink-2)'
+                              : undefined,
+                        background: reveal && right ? 'var(--mint)' : 'var(--paper)',
                         opacity: reveal && !right && !isPicked ? 0.82 : 1,
                       }}
                     >
                       <span
                         aria-hidden
-                        className="h-[10px] w-[10px] flex-none rounded-full border"
+                        className="h-[10px] w-[10px] flex-none rounded-full"
                         style={{
-                          borderColor: reveal && right ? 'var(--sec)' : 'var(--line)',
-                          background: reveal && right ? 'var(--sec)' : 'transparent',
+                          boxShadow: reveal && right ? undefined : 'inset 0 0 0 1px var(--ink-3)',
+                          background: reveal && right ? 'var(--sec-ink)' : 'transparent',
                         }}
                       />
                       <span>{choice.label}</span>
@@ -350,24 +348,24 @@ export function Building({
             </ul>
 
             {picked ? (
-              <div className="oi-swap mt-5 border-t border-[var(--line)] pt-4" aria-live="polite">
+              <div className="oi-swap mt-5 rounded-[var(--r-m)] bg-[var(--paper)] p-4" aria-live="polite">
                 <p
-                  className="oi-num m-0 mb-2 text-[10.5px] uppercase tracking-[0.16em]"
-                  style={{ color: picked.correct ? 'var(--sec-ink)' : 'var(--ink2)' }}
+                  className="m-0 mb-2 text-[14px] font-medium"
+                  style={{ color: picked.correct ? 'var(--sec-ink)' : 'var(--ink-2)' }}
                 >
-                  {picked.correct ? 'That is the one' : 'Not this time'}
+                  {picked.correct ? t('build.right') : t('build.wrong')}
                 </p>
                 {/* The reply to what they actually chose comes first, because
                     a wrong answer deserves a specific reply — and in almost
                     every case the wrong option is the right answer somewhere
                     else in the flat. */}
-                <p className="m-0 mb-2 max-w-[52ch] text-[14.5px] leading-[1.55]">
+                <p className="m-0 mb-2 max-w-[52ch] text-[15px] leading-[1.55]">
                   {picked.ifPicked}
                 </p>
-                <p className="m-0 max-w-[52ch] text-[14px] leading-[1.55] text-[var(--ink2)]">
+                <p className="m-0 max-w-[52ch] text-[14.5px] leading-[1.55] text-[var(--ink-2)]">
                   {question.because}
                 </p>
-                <p className="oi-num m-0 mt-3 text-[13px]" style={{ color: 'var(--acc-ink)' }}>
+                <p className="m-0 mt-3 text-[14px] font-medium tabular-nums" style={{ color: 'var(--accent-ink)' }}>
                   {question.stakes}
                 </p>
               </div>
@@ -375,25 +373,20 @@ export function Building({
 
             {/* Stages finished while they were still reading. The quote waits. */}
             {stagesDone && picked === null ? (
-              <div className="mt-5 border-t border-[var(--line)] pt-4">
-                <button
-                  type="button"
-                  onClick={() => skipped_(true)}
-                  className="cursor-pointer px-6 py-3 text-[14.5px] font-medium text-white"
-                  style={{ background: 'var(--acc-btn)' }}
-                >
-                  See your quote
-                </button>
+              <div className="mt-6">
+                <PillButton arrow onClick={() => skipped_(true)}>
+                  {t('build.see')}
+                </PillButton>
               </div>
             ) : null}
           </section>
         ) : (
           <section
             key={cards[slide]!.id}
-            className="oi-card-in border border-[var(--line)] bg-[var(--card)] p-[clamp(18px,3vw,26px)]"
-            aria-label="While you wait"
+            className="oi-card-in rounded-[var(--r-l)] bg-[var(--soft)] p-[clamp(20px,3vw,32px)]"
+            aria-label={t('build.waitAria')}
           >
-            <p className="oi-eyebrow m-0 mb-4">Worth knowing about your quote</p>
+            <p className="m-0 mb-5 text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--ink-2)]">{t('build.worth')}</p>
             <MaterialCard material={cards[slide]!} compact />
           </section>
         )}
@@ -407,10 +400,10 @@ export function Building({
           {[...cards, null].map((_, i) => (
             <li
               key={i}
-              className="h-[5px] transition-all duration-500"
+              className="h-[6px] rounded-full transition-all duration-500"
               style={{
-                width: slide === i ? 20 : 5,
-                background: slide >= i ? 'var(--ink2)' : 'var(--line)',
+                width: slide === i ? 22 : 6,
+                background: slide >= i ? 'var(--ink)' : 'var(--soft-2)',
               }}
             />
           ))}
@@ -422,9 +415,9 @@ export function Building({
           <p
             aria-hidden
             key={joke}
-            className="oi-swap oi-num m-0 text-right text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink2)]"
+            className="oi-swap m-0 text-right text-[13px] text-[var(--ink-2)]"
           >
-            {ASIDES[joke]}
+            {t(ASIDES[joke]!)}
           </p>
         ) : null}
       </div>

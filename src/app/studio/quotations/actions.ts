@@ -8,10 +8,17 @@ import {
   saveQuoteLines,
   applyConfiguration,
   clearQuoteLines,
+  saveQuoteTerms,
+  saveQuoteClient,
+  copyQuote,
+  deleteQuote,
+  type QuoteClientInput,
   type QuoteStatusName,
+  type QuoteTermsInput,
   type SaveLineInput,
 } from '@/modules/studio-quote/quotes';
 import { isConfigName, type HomeConfig } from '@/modules/studio-quote/configure';
+import { finalQuoteForClient } from '@/modules/studio-quote/final';
 
 // `State` and `IDLE` live in studio/form-state.ts. A 'use server'
 // file may only export async functions — and Turbopack rejects even a
@@ -74,6 +81,7 @@ export async function createQuoteAction(_prev: State, form: FormData): Promise<S
         kitchenRunMm: Number.isFinite(run) && run > 0 ? Math.round(run) : null,
         bathrooms: Number.isFinite(baths) && baths >= 0 ? Math.round(baths) : 2,
         study: str(form, 'study') === 'yes',
+        balcony: str(form, 'balcony') === 'yes',
       },
     });
   }
@@ -116,9 +124,13 @@ export async function setStatusAction(quoteId: string, status: QuoteStatusName):
  * refuses ids that are not on this quotation; nothing here assumes the
  * browser sent what the builder renders.
  */
-export async function saveLinesAction(quoteId: string, lines: SaveLineInput[]): Promise<State> {
+export async function saveLinesAction(quoteId: string, lines: SaveLineInput[], terms?: QuoteTermsInput): Promise<State> {
   const result = await saveQuoteLines(quoteId, lines);
   if (!result.ok) return result;
+  if (terms) {
+    const saved = await saveQuoteTerms(quoteId, terms);
+    if (!saved.ok) return saved;
+  }
   refresh(quoteId);
   return { ok: true };
 }
@@ -136,9 +148,48 @@ export async function applyConfigAction(quoteId: string, home: HomeConfig): Prom
   return result;
 }
 
+/** Use as template (new client) or make the Design Final; opens the new one. */
+export async function copyQuoteAction(quoteId: string, kind: 'template' | 'design-final', clientName = ''): Promise<State> {
+  const result = await copyQuote(
+    quoteId,
+    kind === 'template' ? { kind: 'template', clientName: String(clientName) } : { kind: 'design-final' },
+  );
+  if (!result.ok) return result;
+  refresh(result.id);
+  redirect(`/studio/quotations/${result.id}`);
+}
+
+/** Delete a draft that was never sent. */
+export async function deleteQuoteAction(quoteId: string): Promise<State> {
+  const result = await deleteQuote(quoteId);
+  if (!result.ok) return result;
+  revalidatePath('/studio/quotations');
+  redirect('/studio/quotations');
+}
+
+/** Correct who the quotation is for. */
+export async function saveClientAction(quoteId: string, input: QuoteClientInput): Promise<State> {
+  const result = await saveQuoteClient(quoteId, input);
+  if (!result.ok) return result;
+  refresh(quoteId);
+  return { ok: true };
+}
+
 export async function clearLinesAction(quoteId: string): Promise<State> {
   const result = await clearQuoteLines(quoteId);
   if (!result.ok) return result;
   refresh(quoteId);
   return { ok: true };
+}
+
+/**
+ * The final quote for a client One Interiors introduced: opens the one that
+ * exists, or starts it from the standard build, linked so the customer can
+ * read and sign it in the app once it is issued.
+ */
+export async function finalQuoteAction(clientId: string): Promise<State> {
+  const result = await finalQuoteForClient(clientId);
+  if (!result.ok) return result;
+  refresh(result.id);
+  redirect(`/studio/quotations/${result.id}`);
 }

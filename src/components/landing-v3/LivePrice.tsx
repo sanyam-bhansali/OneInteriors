@@ -14,6 +14,9 @@ import { TIER, TIERS, perSqftLabel, tierRangeFor, type Tier } from '@/modules/qu
 import { TYPICAL_CARPET_SQFT } from '@/modules/quotation/estimate';
 import { formatINRCompact } from '@/lib/money';
 import type { PropertyType } from '@/modules/brief/types';
+import { translator, tx, type Lang } from '@/modules/i18n/site';
+import { HOME_DICT } from '@/modules/i18n/site/home';
+import { FINISH_TX } from '@/modules/i18n/site/labels';
 
 const HOMES: { key: PropertyType; label: string }[] = [
   { key: 'BHK_1', label: '1 BHK' },
@@ -58,7 +61,8 @@ function useCounted(target: number, ms = 900): number {
   return shown;
 }
 
-export function LivePrice() {
+export function LivePrice({ lang = 'en' }: { lang?: Lang } = {}) {
+  const t = translator(lang, HOME_DICT);
   const [home, setHome] = useState<PropertyType>('BHK_2');
   const [tier, setTier] = useState<Tier>('PREMIUM');
   const [sqft, setSqft] = useState(TYPICAL_CARPET_SQFT.BHK_2);
@@ -70,7 +74,7 @@ export function LivePrice() {
   return (
     <div className="live-price" data-reveal="">
       <div className="lp-controls">
-        <div role="group" aria-label="Your home" className="lp-row">
+        <div role="group" aria-label={t('lp.home')} className="lp-row">
           {HOMES.map((h) => (
             <button
               key={h.key}
@@ -87,7 +91,7 @@ export function LivePrice() {
           ))}
         </div>
         <label className="lp-area">
-          <span className="mono muted">Carpet area · {sqft.toLocaleString('en-IN')} sq ft</span>
+          <span className="mono muted">{t('lp.area', { n: sqft.toLocaleString('en-IN') })}</span>
           <input
             type="range"
             min={350}
@@ -95,10 +99,10 @@ export function LivePrice() {
             step={25}
             value={sqft}
             onChange={(e) => setSqft(Number(e.target.value))}
-            aria-label="Carpet area in square feet"
+            aria-label={t('lp.areaAria')}
           />
         </label>
-        <div role="group" aria-label="Finish level" className="lp-row">
+        <div role="group" aria-label={t('lp.finish')} className="lp-row">
           {TIERS.map((t) => (
             <button key={t} type="button" aria-pressed={tier === t} data-hover="" onClick={() => setTier(t)}>
               {TIER[t].label}
@@ -108,17 +112,20 @@ export function LivePrice() {
       </div>
 
       <div className="lp-result" aria-live="polite">
-        <span className="mono muted">A full home at {TIER[tier].label} · before GST</span>
+        <span className="mono muted">{t('lp.result', { tier: TIER[tier].label })}</span>
         <span className="lp-sum">
-          {highPaise === null ? `From ${money(low)}` : `${money(low)} – ${money(high)}`}
+          {highPaise === null ? t('lp.from', { x: money(low) }) : `${money(low)} – ${money(high)}`}
         </span>
         <span className="mono muted">
-          {perSqftLabel(tier).replace(' and up', '+')} per sq ft of carpet · {TIER[tier].promise}
+          {t('lp.per', {
+            per: perSqftLabel(tier).replace(' and up', '+'),
+            promise: lang === 'en' ? TIER[tier].promise : tx(lang, FINISH_TX[tier].promise),
+          })}
         </span>
         <Link className="btn btn-accent" href="/quiz" data-magnetic="" data-hover="">
           <span className="mag-inner">
             <span className="roll">
-              <span data-t="Get it priced by real studios">Get it priced by real studios</span>
+              <span data-t={t('lp.cta')}>{t('lp.cta')}</span>
             </span>
           </span>
         </Link>
