@@ -33,6 +33,15 @@ Trigger it by asking Claude, in this repo: **`/read-quotations <studio-slug>`**
    studio's product master and asks the studio to check it. Their builder
    opens when they confirm.
 
+   When the ops page cannot be reached (a Vercel preview has no database, so
+   nobody can sign in there), approve from the laptop instead — same writes,
+   the ops email recorded as reviewer:
+   `npx tsx scripts/quotations/approve.ts <slug> <ops-email>`
+
+**On Windows** the `npm run … -- <args>` form loses its arguments inside the
+env wrapper. Call the scripts directly through it:
+`powershell -ExecutionPolicy Bypass -File scripts\with-env.ps1 npx tsx scripts/quotations/<fetch|submit|approve>.ts <args>`
+
 ## `product-master.json`
 
 ```json
