@@ -131,6 +131,15 @@ export function IntroductionCard({
         </p>
       ) : null}
 
+      {!intro.withdrawnAt && intro.studioAnswer === 'declined' ? (
+        <p className="m-0 mb-3 border-l-2 border-[var(--color-brass)] pl-3 text-[14px] leading-relaxed text-[var(--color-ink-2)]">
+          {intro.studioName} declined: {intro.studioDeclineReason}. Withdraw this and introduce another studio.
+        </p>
+      ) : null}
+      {!intro.withdrawnAt && intro.studioAnswer === 'accepted' ? (
+        <p className="m-0 mb-3 text-[13px] text-[var(--color-ink-3)]">{intro.studioName} accepted.</p>
+      ) : null}
+
       {/* Contact release. The studio sees nothing until this happens, so an
           introduction sitting here unreleased is a studio that has been told a
           brief is coming and cannot act on it. */}

@@ -1739,6 +1739,13 @@ model Introduction {
   withdrawnAt     DateTime?
   withdrawnReason String?
 
+  /// The studio's answer. Accepting says they will call the customer;
+  /// declining (with a reason) hands the introduction back to ops to place
+  /// elsewhere. Neither set means they have not answered yet.
+  studioAcceptedAt    DateTime?
+  studioDeclinedAt    DateTime?
+  studioDeclineReason String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

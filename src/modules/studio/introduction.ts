@@ -34,6 +34,7 @@ import {
    practice data, not marketplace data — see the folder-rule note at the top
    of that file for why it is the one thing there that takes a studio id. */
 import { bridgeIntroduction, redactWithdrawn } from '@/modules/studio-practice/bridge';
+import { notifyOps, notifyStudio } from '@/modules/notify/service';
 
 export type IntroResult = { ok: true; id: string; held?: string } | { ok: false; error: string };
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -158,14 +159,143 @@ export async function createIntroduction(input: {
         },
       });
 
-      return created;
+      return { ...created, clientId: 'clientId' in bridged ? bridged.clientId : null };
     });
+
+    // After the commit, and never able to undo it (notify/service.ts).
+    void tellStudio(row.id, studioId, row.clientId, releaseContact);
 
     return { ok: true, id: row.id, ...(wanted && !consented ? { held: HELD_FOR_CONSENT } : {}) };
   } catch (error) {
     console.error('[introduction] create failed', error);
     return { ok: false, error: 'That did not save.' };
   }
+}
+
+const HOME_SIZE: Record<string, string> = {
+  BHK_1: '1 BHK',
+  BHK_2: '2 BHK',
+  BHK_3: '3 BHK',
+  BHK_4_PLUS: '4 BHK',
+  VILLA: 'villa',
+};
+
+/**
+ * Tell the studio it has a new client: its board, its inbox, its email.
+ * Says the flat and the area, never the customer's name — a notification
+ * travels further than the board does.
+ */
+async function tellStudio(introductionId: string, studioId: string, clientId: string | null, contactReleased: boolean) {
+  try {
+    const intro = await prisma.introduction.findUnique({
+      where: { id: introductionId },
+      select: { brief: { select: { propertyType: true, locality: true } } },
+    });
+    const size = intro?.brief.propertyType ? HOME_SIZE[intro.brief.propertyType] : null;
+    const area = intro?.brief.locality
+      ? intro.brief.locality.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+      : null;
+    const home = size ? `A ${size}${area ? ` in ${area}` : ''}` : area ? `A home in ${area}` : 'A new home';
+    await notifyStudio(studioId, { kind: 'introduced', clientId, home, contactReleased });
+  } catch (error) {
+    console.error('[introduction] notify failed', error instanceof Error ? error.name : 'unknown');
+  }
+}
+
+export type IntroAnswer = { ok: true } | { ok: false; error: string };
+
+export interface IntroState {
+  introductionId: string;
+  answer: 'open' | 'accepted' | 'declined';
+  declineReason: string | null;
+}
+
+/**
+ * Where this studio stands on the introduction behind one of its clients,
+ * for the client page. Null for a client the studio found itself, or one
+ * that is not theirs.
+ */
+export async function introStateForClient(clientId: string): Promise<IntroState | null> {
+  const user = await getCurrentUser();
+  if (!user || !hasDatabase()) return null;
+  try {
+    const client = await prisma.studioClient.findFirst({
+      where: { id: clientId, studio: { members: { some: { userId: user.id } } } },
+      select: { introductionId: true },
+    });
+    if (!client?.introductionId) return null;
+    const intro = await prisma.introduction.findUnique({
+      where: { id: client.introductionId },
+      select: { id: true, withdrawnAt: true, studioAcceptedAt: true, studioDeclinedAt: true, studioDeclineReason: true },
+    });
+    if (!intro || intro.withdrawnAt) return null;
+    return {
+      introductionId: intro.id,
+      answer: intro.studioAcceptedAt ? 'accepted' : intro.studioDeclinedAt ? 'declined' : 'open',
+      declineReason: intro.studioDeclineReason,
+    };
+  } catch (error) {
+    console.error('[introduction] state failed', error);
+    return null;
+  }
+}
+
+/**
+ * The studio's answer to an introduction.
+ *
+ * Accepting says they will call; declining hands it back to ops with a
+ * reason, and ops places the customer elsewhere. Only the studio the
+ * introduction is for may answer, and only while it stands.
+ */
+export async function answerIntroduction(
+  introductionId: string,
+  answer: 'accept' | 'decline',
+  reason?: string,
+): Promise<IntroAnswer> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: 'Sign in again.' };
+
+  const intro = await prisma.introduction.findUnique({
+    where: { id: introductionId },
+    select: { id: true, studioId: true, withdrawnAt: true, studio: { select: { tradeName: true } } },
+  });
+  if (!intro || intro.withdrawnAt) return { ok: false, error: 'That introduction is no longer open.' };
+  const member = await prisma.studioMember.findFirst({
+    where: { studioId: intro.studioId, userId: user.id },
+    select: { id: true },
+  });
+  if (!member) return { ok: false, error: 'That introduction is not for your studio.' };
+
+  const why = (reason ?? '').trim().slice(0, 300);
+  if (answer === 'decline' && why.length < 3) {
+    return { ok: false, error: 'Say why, in a few words — we will place them with someone else.' };
+  }
+
+  try {
+    await prisma.$transaction([
+      prisma.introduction.update({
+        where: { id: introductionId },
+        data:
+          answer === 'accept'
+            ? { studioAcceptedAt: new Date(), studioDeclinedAt: null, studioDeclineReason: null }
+            : { studioDeclinedAt: new Date(), studioDeclineReason: why, studioAcceptedAt: null },
+      }),
+      prisma.auditLog.create({
+        data: {
+          actorId: user.id,
+          action: answer === 'accept' ? 'introduction.accept' : 'introduction.decline',
+          entityType: 'Introduction',
+          entityId: introductionId,
+          after: answer === 'decline' ? { reason: why } : {},
+        },
+      }),
+    ]);
+  } catch {
+    return { ok: false, error: 'That did not save.' };
+  }
+
+  if (answer === 'decline') void notifyOps({ kind: 'intro-declined', studio: intro.studio.tradeName, reason: why });
+  return { ok: true };
 }
 
 /** Release contact details on an introduction made without them. */
@@ -177,7 +307,7 @@ export async function releaseContactDetails(introductionId: string): Promise<Act
   if (!(await mayShareBriefWithStudios(intro.briefId))) return { ok: false, error: HELD_FOR_CONSENT };
 
   try {
-    await prisma.$transaction(async (tx) => {
+    const clientId = await prisma.$transaction(async (tx) => {
       await tx.introduction.update({
         where: { id: introductionId },
         data: { contactReleasedAt: new Date() },
@@ -197,7 +327,10 @@ export async function releaseContactDetails(introductionId: string): Promise<Act
           after: { board: bridged.kind },
         },
       });
+      return 'clientId' in bridged ? bridged.clientId : null;
     });
+    const row = await prisma.introduction.findUnique({ where: { id: introductionId }, select: { studioId: true } });
+    if (row) void tellStudio(introductionId, row.studioId, clientId, true);
     return { ok: true };
   } catch {
     return { ok: false, error: 'That did not save.' };

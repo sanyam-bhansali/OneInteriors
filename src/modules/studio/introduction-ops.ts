@@ -54,6 +54,9 @@ export interface OpsIntroduction {
   withdrawnReason: string | null;
   contactReleasedAt: Date | null;
   contact: ContactState;
+  /** The studio's answer: accepted, declined (with why), or not yet. */
+  studioAnswer: 'open' | 'accepted' | 'declined';
+  studioDeclineReason: string | null;
 
   studioId: string;
   studioName: string;
@@ -114,6 +117,9 @@ export async function listIntroductions(limit = 100): Promise<OpsIntroduction[]>
         withdrawnAt: true,
         withdrawnReason: true,
         contactReleasedAt: true,
+        studioAcceptedAt: true,
+        studioDeclinedAt: true,
+        studioDeclineReason: true,
         consultationId: true,
         studio: { select: { id: true, tradeName: true, slug: true } },
         brief: {
@@ -179,6 +185,8 @@ export async function listIntroductions(limit = 100): Promise<OpsIntroduction[]>
         withdrawnReason: row.withdrawnReason,
         contactReleasedAt: row.contactReleasedAt,
         contact: contactState(row),
+        studioAnswer: row.studioAcceptedAt ? 'accepted' : row.studioDeclinedAt ? 'declined' : 'open',
+        studioDeclineReason: row.studioDeclineReason,
         studioId: row.studio.id,
         studioName: row.studio.tradeName,
         studioSlug: row.studio.slug,

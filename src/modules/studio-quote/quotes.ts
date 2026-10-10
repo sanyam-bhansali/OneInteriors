@@ -28,6 +28,7 @@ import {
 } from './pricing';
 import { planQuotation, readRules, type CatalogueProduct, type HomeConfig } from './configure';
 import { ratesGateFor } from './rates-gate';
+import { notify } from '@/modules/notify/service';
 import { readPhases, type PaymentPhase } from '@/modules/studio/payment-phases';
 import type { ComparableLine } from './revision';
 
@@ -499,9 +500,33 @@ export async function setQuoteStatus(
           : {}),
       },
     });
+    /* Sent to a customer One Interiors introduced: tell them it is in the app.
+       Every time it goes out, so a revised quotation is announced too. */
+    if (status === 'ISSUED') {
+      const studioId = await myStudioId();
+      if (studioId) void tellCustomer(quoteId, studioId);
+    }
     return { ok: true };
   } catch {
     return { ok: false, error: 'That did not save.' };
+  }
+}
+
+async function tellCustomer(quoteId: string, studioId: string): Promise<void> {
+  try {
+    const q = await prisma.studioQuote.findFirst({
+      where: { id: quoteId, studioId },
+      select: { number: true, introductionId: true, studio: { select: { tradeName: true } } },
+    });
+    if (!q?.introductionId) return;
+    const intro = await prisma.introduction.findUnique({
+      where: { id: q.introductionId },
+      select: { withdrawnAt: true, brief: { select: { userId: true } } },
+    });
+    if (!intro || intro.withdrawnAt || !intro.brief.userId) return;
+    await notify(intro.brief.userId, { kind: 'quote-sent', quoteId, studio: q.studio.tradeName, number: q.number });
+  } catch (error) {
+    console.error('[studio-quote] customer notify failed', error instanceof Error ? error.name : 'unknown');
   }
 }
 

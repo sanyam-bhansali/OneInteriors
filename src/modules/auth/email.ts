@@ -383,6 +383,25 @@ export async function sendApplicationRejected(
 }
 
 /**
+ * A notice to someone at a studio — a new client, a signature — as plain
+ * text: what happened and the link to it. `notify.ts` sends these beside the
+ * inbox row, because a studio works from a laptop and email is where it looks.
+ */
+export async function sendNotice(to: string, notice: { title: string; body: string; url: string }): Promise<SendResult> {
+  const cfg = config();
+  const text = [notice.body, '', notice.url, '', 'One Interiors'].join('\n');
+  if (isFault(cfg)) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error(`[notice] ${cfg.message} — notice NOT sent to`, maskEmail(to));
+      return { delivered: false, reason: cfg.reason };
+    }
+    console.log(`\n[notice] For ${to}: ${notice.title}\n${text}\n`);
+    return { delivered: false, reason: 'dev_console' };
+  }
+  return send(cfg, to, notice.title, text, '[notice]');
+}
+
+/**
  * The one place an email is actually posted.
  *
  * Extracted because there are now four senders and they had begun to differ

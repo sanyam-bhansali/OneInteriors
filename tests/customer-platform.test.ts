@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { canChoose, checkDecision, daysLeft, decisionState, endOfIstDay, needsReminder, parseOptions } from '@/modules/portal/decisions';
 import { checkSnag, snagLine } from '@/modules/portal/snags';
-import { messageFor } from '@/modules/notify/messages';
+import { EMAILED_TO_STUDIO, messageFor } from '@/modules/notify/messages';
 import { isExpoToken } from '@/modules/notify/service';
 
 /** docs/CUSTOMER-PLATFORM-PLAN.md, step 1: decisions, snags and what notifications say. */
@@ -190,5 +190,31 @@ describe('project documents', async () => {
   it('a new one tells the customer it is in their Locker', () => {
     const m = messageFor({ kind: 'document', studio: 'Teakline Studio', title: 'Agreement' });
     expect(m).toMatchObject({ title: 'New document · Teakline Studio', body: 'Agreement', url: '/app/locker' });
+  });
+});
+
+describe('messages between the customer and the studio', () => {
+  it('tells the studio about a new client without naming them', () => {
+    const m = messageFor({ kind: 'introduced', clientId: 'c1', home: 'A 3 BHK in Baner', contactReleased: true });
+    expect(m.template).toBe('intro.new');
+    expect(m.url).toBe('/studio/clients/c1');
+    expect(m.body).toContain('A 3 BHK in Baner');
+  });
+
+  it('opens the final quote in the app for the customer', () => {
+    const m = messageFor({ kind: 'quote-sent', quoteId: 'q1', studio: 'Hauspire', number: '2026-004' });
+    expect(m.url).toBe('/app/choose/quote/q1');
+    expect(m.title).toContain('Hauspire');
+  });
+
+  it('tells the studio a quote was signed, with the amount', () => {
+    const m = messageFor({ kind: 'quote-signed', quoteId: 'q1', client: 'Asha', number: '2026-004', totalPaise: 12_50_000_00 });
+    expect(m.url).toBe('/studio/quotations/q1');
+    expect(m.body).toContain('12,50,000');
+  });
+
+  it('emails the studio the events it works from', () => {
+    expect(EMAILED_TO_STUDIO).toEqual(expect.arrayContaining(['introduced', 'quote-signed']));
+    expect(EMAILED_TO_STUDIO).not.toContain('quote-sent');
   });
 });

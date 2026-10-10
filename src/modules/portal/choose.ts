@@ -25,6 +25,7 @@ import { readProfile } from '@/modules/studio/matching-profile';
 import { computeTotals, type QuoteUnitName, type WorkCodeName } from '@/modules/studio-quote/pricing';
 import { canTransition } from '@/modules/studio/appointment-rules';
 import { durationFor } from './tracker';
+import { notifyStudio } from '@/modules/notify/service';
 import { fromDb } from '@/lib/money';
 
 const VISIBLE_QUOTE = ['ISSUED', 'ACCEPTED'] as const;
@@ -326,7 +327,7 @@ export async function signFinalQuote(view: FinalQuoteView): Promise<ChooseResult
   const mine = await myIntroductionIds(me.briefId);
   const q = await prisma.studioQuote.findFirst({
     where: { id: view.id, status: 'ISSUED', introductionId: { in: mine } },
-    select: { id: true, introductionId: true, studioId: true },
+    select: { id: true, introductionId: true, studioId: true, number: true, clientName: true },
   });
   if (!q?.introductionId) return { ok: false, error: 'This quote is no longer open for signing.' };
   const intro = await prisma.introduction.findFirst({
@@ -372,6 +373,14 @@ export async function signFinalQuote(view: FinalQuoteView): Promise<ChooseResult
         },
       });
       return created;
+    });
+    // The studio hears at once — inbox and email (notify/service.ts).
+    void notifyStudio(q.studioId, {
+      kind: 'quote-signed',
+      quoteId: q.id,
+      client: q.clientName,
+      number: q.number,
+      totalPaise: view.totalPaise,
     });
     return { ok: true, projectId: project.id };
   } catch (error) {

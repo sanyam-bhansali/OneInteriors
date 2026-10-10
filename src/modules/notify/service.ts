@@ -18,7 +18,9 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { sendTemplate } from '@/modules/auth/whatsapp';
-import { messageFor, type Message, type ProjectEvent } from './messages';
+import { sendNotice } from '@/modules/auth/email';
+import { resolveSiteUrl } from '@/lib/site';
+import { EMAILED_TO_STUDIO, messageFor, type Message, type ProjectEvent } from './messages';
 
 const EXPO_PUSH = 'https://exp.host/--/api/v2/push/send';
 const BATCH = 100;
@@ -62,14 +64,41 @@ export async function notify(userId: string, event: ProjectEvent): Promise<void>
   }
 }
 
-/** Everyone at a studio who should hear about its projects: its members with an account. */
+/**
+ * Everyone at a studio who should hear about its projects: its members with
+ * an account. The events in `EMAILED_TO_STUDIO` also go by email, to each
+ * member's address — a studio is on a laptop, not in our app.
+ */
 export async function notifyStudio(studioId: string, event: ProjectEvent): Promise<void> {
   if (!hasDatabase()) return;
   try {
-    const members = await prisma.studioMember.findMany({ where: { studioId }, select: { userId: true } });
+    const members = await prisma.studioMember.findMany({
+      where: { studioId },
+      select: { userId: true, user: { select: { email: true } } },
+    });
     await Promise.all(members.map((m) => notify(m.userId, event)));
+    if (EMAILED_TO_STUDIO.includes(event.kind)) {
+      const msg = messageFor(event);
+      const url = `${resolveSiteUrl()}${msg.url}`;
+      const emails = [...new Set(members.map((m) => m.user.email).filter((e): e is string => Boolean(e)))];
+      await Promise.all(emails.map((to) => sendNotice(to, { title: msg.title, body: msg.body, url })));
+    }
   } catch (error) {
     console.error('[notify] studio lookup failed', error instanceof Error ? error.name : 'unknown');
+  }
+}
+
+/** Everyone at One Interiors who works introductions: OPS and ADMIN users. */
+export async function notifyOps(event: ProjectEvent): Promise<void> {
+  if (!hasDatabase()) return;
+  try {
+    const staff = await prisma.user.findMany({ where: { role: { in: ['OPS', 'ADMIN'] } }, select: { id: true, email: true }, take: 50 });
+    await Promise.all(staff.map((u) => notify(u.id, event)));
+    const msg = messageFor(event);
+    const url = `${resolveSiteUrl()}${msg.url}`;
+    await Promise.all(staff.filter((u) => u.email).map((u) => sendNotice(u.email!, { title: msg.title, body: msg.body, url })));
+  } catch (error) {
+    console.error('[notify] ops lookup failed', error instanceof Error ? error.name : 'unknown');
   }
 }
 

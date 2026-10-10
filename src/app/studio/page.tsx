@@ -6,6 +6,8 @@ import { formatINR, formatINRCompact } from '@/lib/money';
 import { redirect } from 'next/navigation';
 import { crmIsOpen, standingOf, STANDING_COPY } from '@/modules/studio/standing';
 import { myAnnouncements } from '@/modules/studio/announcements';
+import { myInbox } from '@/modules/studio/inbox';
+import { Inbox } from './Inbox';
 import { myRatesGate, RATES_GATE_COPY } from '@/modules/studio-quote/rates-gate';
 import { RatesGateCard } from './RatesGateCard';
 import { StandingBanner } from './StandingBanner';
@@ -131,7 +133,7 @@ export default async function StudioHome() {
     status: studio.status,
     submittedForReview: studio.submittedForReview,
   });
-  const [announcements, ratesGate] = await Promise.all([myAnnouncements(), myRatesGate()]);
+  const [announcements, ratesGate, inbox] = await Promise.all([myAnnouncements(), myRatesGate(), myInbox()]);
   const approval = announcements.find((a) => a.template === 'studio.approved') ?? null;
 
   return (
@@ -160,6 +162,9 @@ export default async function StudioHome() {
         ) : null}
 
         <div className="flex flex-col gap-6">
+          {/* New clients, signatures, customer choices — what came in since they last looked. */}
+          <Inbox items={inbox} />
+
           {/* ── Four figures, and each one is a link to the thing it counts ── */}
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Stat
