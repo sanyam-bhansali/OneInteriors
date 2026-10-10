@@ -95,7 +95,10 @@ export function SignScreen({ q, name, phone }: { q: FinalQuoteView; name: string
           </div>
           <div className="row">
             <span>GST</span>
-            <span className="amt">On the studio&rsquo;s invoice</span>
+            {/* In the total when the studio quoted it; otherwise billed on their invoice. */}
+            <span className="amt">
+              {q.gstPaise > 0 ? `${formatINR(q.gstPaise)}, included above` : <>On the studio&rsquo;s invoice</>}
+            </span>
           </div>
           <div className="row">
             <span>Handover</span>

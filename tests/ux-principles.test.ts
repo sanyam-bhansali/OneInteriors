@@ -46,7 +46,7 @@ describe('where a quote sits against the range', () => {
     const luxury: Brief = { ...brief, tier: 'LUXURY', budgetMinPaise: 2500 * 960 * 100, budgetMaxPaise: null };
     const studio = STUDIOS.find((s) => Object.keys(filedRatesFor(s.slug)).length > 0)!;
     const signal = budgetPosition(luxury, studio, { today: TODAY, ratesFor: filedRatesFor });
-    expect(signal?.evidence).toBe('Their quote for your home comes in below your range');
+    expect(signal?.evidence).toBe('Their quote for your home, before GST, comes in below your range');
   });
 });
 

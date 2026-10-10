@@ -229,6 +229,9 @@ export function ExpertForm({
   const activeDay = days.find((d) => d.key === day) ?? null;
 
   const phoneOk = Boolean(normalisePhone(phone));
+  /* Ten digits for display: the remembered number is stored as +91…, and the
+     copy prints its own +91 before it ("+91 +919876…" in the 11 Oct test). */
+  const shownPhone = (normalisePhone(phone) ?? phone).replace(/^\+91/, '');
   const blocker =
     picked.length < minStudios
       ? t('flow.needStudios', { n: minStudios })
@@ -448,7 +451,7 @@ export function ExpertForm({
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--r-m)] bg-[var(--paper)] px-5 py-4">
             <p className="m-0 text-[17px] text-[var(--ink)]">
               <span className="block font-medium">{name}</span>
-              <span className="mt-1 block text-[15px] font-normal tabular-nums text-[var(--ink-2)]">+91 {phone}</span>
+              <span className="mt-1 block text-[15px] font-normal tabular-nums text-[var(--ink-2)]">+91 {shownPhone}</span>
               {email.trim() ? (
                 <span className="mt-0.5 block break-all text-[15px] font-normal text-[var(--ink-2)]">{email.trim()}</span>
               ) : null}
@@ -468,7 +471,7 @@ export function ExpertForm({
         <Step n={4} title={t('flow.step4')} />
         {codeOpen ? (
           <>
-            <p className="m-0 mb-4 max-w-[60ch] text-[15px] text-[var(--ink-2)]">{t('flow.codeSent', { phone })}</p>
+            <p className="m-0 mb-4 max-w-[60ch] text-[15px] text-[var(--ink-2)]">{t('flow.codeSent', { phone: shownPhone })}</p>
             <label className="block max-w-[280px]">
               <span className="mb-2 block px-1 text-[13px] font-medium text-[var(--ink-2)]">{t('flow.code')}</span>
               <input

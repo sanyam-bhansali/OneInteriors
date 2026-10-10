@@ -41,29 +41,29 @@ export const MATCHING_DICT = {
 
   // ── budget (signals.ts) ──
   'budget.below': {
-    en: 'Their quote for your home comes in below your range',
-    hi: 'आपके घर के लिए इनका कोटेशन आपकी रेंज से नीचे है',
-    mr: 'तुमच्या घरासाठी त्यांचे कोटेशन तुमच्या रेंजपेक्षा कमी आहे',
+    en: 'Their quote for your home, before GST, comes in below your range',
+    hi: 'GST से पहले, आपके घर के लिए इनका कोटेशन आपकी रेंज से नीचे है',
+    mr: 'GST आधी, तुमच्या घरासाठी त्यांचे कोटेशन तुमच्या रेंजपेक्षा कमी आहे',
   },
   'budget.bottom': {
-    en: 'Their quote for your home comes in at the bottom of your range',
-    hi: 'आपके घर के लिए इनका कोटेशन आपकी रेंज के सबसे निचले हिस्से में है',
-    mr: 'तुमच्या घरासाठी त्यांचे कोटेशन तुमच्या रेंजच्या अगदी खालच्या टोकाला आहे',
+    en: 'Their quote for your home, before GST, comes in at the bottom of your range',
+    hi: 'GST से पहले, आपके घर के लिए इनका कोटेशन आपकी रेंज के सबसे निचले हिस्से में है',
+    mr: 'GST आधी, तुमच्या घरासाठी त्यांचे कोटेशन तुमच्या रेंजच्या अगदी खालच्या टोकाला आहे',
   },
   'budget.above': {
-    en: 'Their quote for your home comes in above your range',
-    hi: 'आपके घर के लिए इनका कोटेशन आपकी रेंज से ऊपर है',
-    mr: 'तुमच्या घरासाठी त्यांचे कोटेशन तुमच्या रेंजपेक्षा जास्त आहे',
+    en: 'Their quote for your home, before GST, comes in above your range',
+    hi: 'GST से पहले, आपके घर के लिए इनका कोटेशन आपकी रेंज से ऊपर है',
+    mr: 'GST आधी, तुमच्या घरासाठी त्यांचे कोटेशन तुमच्या रेंजपेक्षा जास्त आहे',
   },
   'budget.lowerHalf': {
-    en: 'Their quote for your home sits in the lower half of your range',
-    hi: 'आपके घर के लिए इनका कोटेशन आपकी रेंज के निचले आधे हिस्से में है',
-    mr: 'तुमच्या घरासाठी त्यांचे कोटेशन तुमच्या रेंजच्या खालच्या अर्ध्या भागात आहे',
+    en: 'Their quote for your home, before GST, sits in the lower half of your range',
+    hi: 'GST से पहले, आपके घर के लिए इनका कोटेशन आपकी रेंज के निचले आधे हिस्से में है',
+    mr: 'GST आधी, तुमच्या घरासाठी त्यांचे कोटेशन तुमच्या रेंजच्या खालच्या अर्ध्या भागात आहे',
   },
   'budget.upperHalf': {
-    en: 'Their quote for your home sits in the upper half of your range',
-    hi: 'आपके घर के लिए इनका कोटेशन आपकी रेंज के ऊपरी आधे हिस्से में है',
-    mr: 'तुमच्या घरासाठी त्यांचे कोटेशन तुमच्या रेंजच्या वरच्या अर्ध्या भागात आहे',
+    en: 'Their quote for your home, before GST, sits in the upper half of your range',
+    hi: 'GST से पहले, आपके घर के लिए इनका कोटेशन आपकी रेंज के ऊपरी आधे हिस्से में है',
+    mr: 'GST आधी, तुमच्या घरासाठी त्यांचे कोटेशन तुमच्या रेंजच्या वरच्या अर्ध्या भागात आहे',
   },
   'budget.fromDelivered': {
     en: 'From the projects they have delivered',
