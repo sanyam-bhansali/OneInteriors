@@ -1,5 +1,5 @@
 import 'server-only';
-import { readPhases, type PaymentPhase } from '@/modules/studio/payment-phases';
+import type { PaymentPhase } from '@/modules/studio/payment-phases';
 
 /**
  * The project tracker in the database — started, advanced and annotated by
@@ -10,10 +10,11 @@ import { prisma } from '@/lib/prisma';
 import { notify } from '@/modules/notify/service';
 import { requireRole } from '@/modules/auth/session';
 import { readProfile } from '@/modules/studio/matching-profile';
-import { currentStudio } from '@/modules/studio/onboarding';
+import { currentMember, memberOnProject, projectsVisibleTo } from '@/modules/studio/access';
 import { localityLabel } from '@/modules/brief/types';
 import { MAX_PHOTOS_PER_UPDATE, signedSitePhotoUrls, storeSitePhoto } from '@/modules/storage/site-photos';
 import { durationFor, plannedStages, STAGE_KEYS, trackerView, UPDATE_MAX, type StageView } from './tracker';
+import { customerPhases } from './customer-project-view';
 
 export type TrackerResult = { ok: true } | { ok: false; error: string };
 
@@ -59,18 +60,13 @@ export async function setStageDone(projectId: string, stage: string, done: boole
 /**
  * The studio marks its own progress: the stage it finished on site is the
  * stage the customer's tracker shows as done. Only on a project introduced to
- * this studio. Ops can still correct it (`setStageDone`).
+ * this studio, by a member whose role ticks work off on it (studio/roles.ts
+ * `checklist.tick`: the owner, or a PM or supervisor on the project). Ops can
+ * still correct it (`setStageDone`).
  */
 export async function setStudioStageDone(projectId: string, stage: string, done: boolean): Promise<TrackerResult> {
-  const ctx = await currentStudio();
-  if (!ctx) return { ok: false, error: 'Sign in as your studio first.' };
-  const project = await prisma.homeProject.findUnique({
-    where: { id: projectId },
-    select: { introduction: { select: { studioId: true } } },
-  });
-  if (!project || project.introduction.studioId !== ctx.studio.id) {
-    return { ok: false, error: 'That project is not one of yours.' };
-  }
+  const check = await memberOnProject(projectId, 'checklist.tick');
+  if (!check.ok) return check;
   return writeStageDone(projectId, stage, done);
 }
 
@@ -129,20 +125,14 @@ export async function postUpdate(projectId: string, note: string, stage: string 
 
 /**
  * The studio doing the work posts an update itself (queue item 22) — only on
- * a project introduced to it. Everything posted appears in the customer's
- * "Your home", marked as from the studio.
+ * a project introduced to it, by a member whose role posts updates on it
+ * (`update.post`). Everything posted appears in the customer's "Your home",
+ * marked as from the studio.
  */
 export async function postStudioUpdate(projectId: string, note: string, stage: string | null, photos: File[] = []): Promise<TrackerResult> {
-  const ctx = await currentStudio();
-  if (!ctx) return { ok: false, error: 'Sign in as your studio first.' };
-  const project = await prisma.homeProject.findUnique({
-    where: { id: projectId },
-    select: { introduction: { select: { studioId: true } } },
-  });
-  if (!project || project.introduction.studioId !== ctx.studio.id) {
-    return { ok: false, error: 'That project is not one of yours.' };
-  }
-  return createUpdate(projectId, note, stage, photos, ctx.user.id, true);
+  const check = await memberOnProject(projectId, 'update.post');
+  if (!check.ok) return check;
+  return createUpdate(projectId, note, stage, photos, check.member.userId, true);
 }
 
 export interface StudioProjectView {
@@ -153,12 +143,16 @@ export interface StudioProjectView {
   updates: { note: string; stage: string | null; at: Date; byStudio: boolean; photos: number }[];
 }
 
-/** The signed projects introduced to the signed-in studio, for its update page. */
+/**
+ * The signed projects introduced to the signed-in studio that this member may
+ * read, for its update page: all of them for the owner, the assigned ones for
+ * a PM or supervisor, none for accounts (who reads payments, not projects).
+ */
 export async function projectsForStudio(now = new Date()): Promise<StudioProjectView[]> {
-  const ctx = await currentStudio();
-  if (!ctx) return [];
+  const member = await currentMember();
+  if (!member) return [];
   const projects = await prisma.homeProject.findMany({
-    where: { introduction: { studioId: ctx.studio.id } },
+    where: projectsVisibleTo(member),
     orderBy: { startOn: 'desc' },
     include: {
       introduction: { select: { brief: { select: { propertyType: true, locality: true, society: true } } } },
@@ -182,10 +176,11 @@ export async function projectsForStudio(now = new Date()): Promise<StudioProject
 export interface TrackerForCustomer {
   studioName: string;
   /**
-   * The studio's filed payment schedule, or null when it has not filed one.
+   * The payment schedule, or null when there is none to show.
    * Shown so the customer always knows what is due at which stage
-   * (principle 6, docs/UX-PRINCIPLES-PLAN.md; Klarna). We do not hold or
-   * record payments, so there is no "paid" state here — only the plan.
+   * (principle 6, docs/UX-PRINCIPLES-PLAN.md; Klarna). The plan as signed
+   * when there is one (customer-project-view.ts `customerPhases`). We do not
+   * hold or record payments, so there is no "paid" state here — only the plan.
    */
   phases: PaymentPhase[] | null;
   stages: StageView[];
@@ -208,7 +203,7 @@ export async function trackersForBrief(briefId: string, now = new Date()): Promi
     );
     return projects.map((p, i) => ({
       studioName: p.introduction.studio.tradeName,
-      phases: readPhases(p.introduction.studio.paymentPhases),
+      phases: customerPhases(p.paymentPhases, p.introduction.studio.paymentPhases),
       stages: trackerView(plannedStages(p.startOn, p.totalDays), p.doneStages, now),
       updates: p.updates.map((u, j) => ({
         note: u.note,

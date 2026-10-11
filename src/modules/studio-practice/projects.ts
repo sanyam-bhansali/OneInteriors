@@ -12,6 +12,7 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { fromDb, toDb, type Paise } from '@/lib/money';
 import { myStudioId } from '@/modules/studio-quote/store';
+import { studioIdFor } from '@/modules/studio/access';
 import { workOrderMoney } from './ledger';
 import { myStages } from './stages';
 import type { QuoteUnitName } from '@/modules/studio-quote/pricing';
@@ -33,7 +34,7 @@ export interface ProjectRow {
   startedOn: Date | null;
   targetDate: Date | null;
   handedOverOn: Date | null;
-  /** What every trade on this site has been billed and paid, in total. */
+  /** What every trade on this site has been billed and paid, in total. Zero unless the member may see vendor rates (the owner). */
   committedPaise: Paise;
   paidPaise: Paise;
   owedPaise: Paise;
@@ -46,6 +47,9 @@ export async function myProjects(): Promise<ProjectRow[]> {
   if (!studioId) return [];
 
   try {
+    /* Vendor bills are the studio's cost base: owner only (studio/roles.ts
+       `vendor.rates`). Everyone else sees the sites without them. */
+    const seesVendors = (await studioIdFor('vendor.rates')) !== null;
     const rows = await prisma.studioProject.findMany({
       where: { studioId },
       orderBy: [{ stage: 'asc' }, { updatedAt: 'desc' }],
@@ -63,7 +67,7 @@ export async function myProjects(): Promise<ProjectRow[]> {
       let committedPaise = 0;
       let paidPaise = 0;
 
-      for (const order of row.workOrders) {
+      for (const order of seesVendors ? row.workOrders : []) {
         const money = workOrderMoney(
           order.lines.map((l) => ({
             unit: l.unit as QuoteUnitName,
@@ -91,7 +95,7 @@ export async function myProjects(): Promise<ProjectRow[]> {
         committedPaise,
         paidPaise,
         owedPaise: committedPaise - paidPaise,
-        workOrderCount: row.workOrders.length,
+        workOrderCount: seesVendors ? row.workOrders.length : 0,
         updatedAt: row.updatedAt,
       };
     });

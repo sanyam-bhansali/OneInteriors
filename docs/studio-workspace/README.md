@@ -8,6 +8,8 @@ existing One Interiors app.
 | Path | What it is |
 |---|---|
 | `STUDIO-WORKSPACE-BUILD.md` | The feature brief: decisions, roles, data model, what the customer may see, six phases with "done when" tests, open decisions. **Start here.** |
+| `PHASE-1-PLAN.md` | The approved Phase 1 plan |
+| `PHASE-1-FOUNDATION.md` | What Phase 1's foundation built: the migration, the permission API (`studio/roles.ts`, `studio/access.ts`) and the customer projection |
 | `designs/README.md` | How to read the screen files, and which screen belongs to which phase |
 | `designs/studio/` | The 8 studio screens (site mode on phone, office on desktop) |
 | `designs/customer/` | The customer app screens, including the ones the studio side feeds |

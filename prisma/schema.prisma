@@ -771,11 +771,36 @@ model StudioMember {
   guideState Json?
   studioId   String
   studio     Studio  @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  /// Unique: one person belongs to one studio (owner, 11 Oct 2026). The
+  /// tenancy model rests on it — `myStudioId()` reads the studio off this row.
   userId     String  @unique
   user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Kept while code still reads it; derived from `role` (OWNER) from the
+  /// studio workspace migration on. Expand → migrate → contract: it goes
+  /// once nothing reads it. Never decide a permission on it — use `role`.
   isOwner    Boolean @default(false)
 
+  /// What this person may do (modules/studio/roles.ts `can`). Defaults to
+  /// OWNER because the only path that creates a member without saying —
+  /// studio approval — creates the owner; an invite always names a role.
+  role        StudioRole         @default(OWNER)
+  /// INVITED until their first sign-in; SUSPENDED can do nothing at all.
+  /// Phone and language are on `User` (`phone`, `locale`): one person, one
+  /// account, whichever side they sign in from.
+  status      StudioMemberStatus @default(ACTIVE)
+  /// The member who added them. SetNull, so removing the inviter keeps the row.
+  invitedById String?
+  invitedBy   StudioMember?      @relation("StudioMemberInvites", fields: [invitedById], references: [id], onDelete: SetNull)
+  invitees    StudioMember[]     @relation("StudioMemberInvites")
+  invitedAt   DateTime?
+  /// Last time they used the studio side; "last active" on Settings → Team.
+  lastSeenAt  DateTime?
+
   createdAt DateTime @default(now())
+
+  /// The customer projects this PM or supervisor is on (owners and accounts
+  /// see across the studio without rows here).
+  projects StudioProjectMember[]
 
   /// Everything this person is working. See `StudioClient.assignedTo`.
   clients StudioClient[]
@@ -787,7 +812,43 @@ model StudioMember {
   savedViews StudioSavedView[]
 
   @@index([studioId])
+  @@index([invitedById])
   @@map("studio_members")
+}
+
+/// The studio workspace roles (docs/studio-workspace/STUDIO-WORKSPACE-BUILD.md
+/// §3). The table of who may do what is `modules/studio/roles.ts`, not here.
+enum StudioRole {
+  OWNER
+  PM
+  SUPERVISOR
+  ACCOUNTS
+}
+
+/// A seat is a member who has signed in at least once and is not suspended.
+enum StudioMemberStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+}
+
+/// Which project manager or site supervisor is on which customer project.
+/// Owners and accounts need no row: they see across the studio by role. A
+/// PM or supervisor without a row on a project cannot read it at all.
+///
+/// `homeProjectId`, not `projectId`, so it is never mistaken for the older
+/// internal `StudioProject`.
+model StudioProjectMember {
+  id            String       @id @default(cuid())
+  homeProjectId String
+  homeProject   HomeProject  @relation(fields: [homeProjectId], references: [id], onDelete: Cascade)
+  memberId      String
+  member        StudioMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt     DateTime     @default(now())
+
+  @@unique([homeProjectId, memberId])
+  @@index([memberId])
+  @@map("studio_project_members")
 }
 
 // Every verification item is a row with a source and a date, because the
@@ -1370,6 +1431,11 @@ model HomeProject {
   /// so there is no counter to drift.
   assuredRequestedAt DateTime?
 
+  /// The studio's "Only your team" notes on the project workspace. Never
+  /// crosses to the customer: the projection (portal/customer-project.ts)
+  /// does not select it, and tests/customer-projection.test.ts checks.
+  teamNotes String? @db.Text
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1379,7 +1445,104 @@ model HomeProject {
   documents HomeDocument[]
   family    FamilyMember[]
 
+  /// Studio workspace Phase 1: who on the studio's team is on it, and the
+  /// plan built from the signed quote (modules/studio/quote-to-plan.ts).
+  team      StudioProjectMember[]
+  stages    HomeProjectStage[]
+  materials HomeMaterial[]
+
   @@map("home_projects")
+}
+
+/// What a stage is, whatever the studio calls it. Named so it does not clash
+/// with the internal tracker's `ProjectStage` or the pipeline's `StageKind`.
+enum ProjectStageKind {
+  DESIGN
+  CIVIL
+  CARPENTRY
+  FINISH
+  HANDOVER
+}
+
+/// How a checklist item was ticked: a tap, or confirmed from a voice note.
+enum ChecklistDoneSource {
+  TICK
+  VOICE
+}
+
+/// A stage of a customer's project, built from the signed quote. The studio
+/// owns `name` and the dates; we own `kind`, and every query reads the kind,
+/// never the name (same rule as `StudioStage`). Replaces the fixed
+/// `HomeProject.doneStages` keys: a stage is done when its items are.
+model HomeProjectStage {
+  id        String           @id @default(cuid())
+  projectId String
+  project   HomeProject      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind      ProjectStageKind
+  name      String
+  sortOrder Int              @default(0)
+
+  plannedStart DateTime
+  plannedEnd   DateTime
+  /// Set when the stage is complete. Null = not finished.
+  actualEnd    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items HomeChecklistItem[]
+
+  @@index([projectId, sortOrder])
+  @@map("home_project_stages")
+}
+
+/// One thing to get done in one room in one stage, generated from the signed
+/// quote's lines — never typed. `doneAt` null means open.
+model HomeChecklistItem {
+  id      String           @id @default(cuid())
+  stageId String
+  stage   HomeProjectStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  room        String
+  label       String
+  /// The signed quote line it came from. A snapshot reference, not a key:
+  /// quote lines are copied at signing and may be edited or deleted later.
+  quoteLineId String?
+  sortOrder   Int     @default(0)
+
+  doneAt     DateTime?
+  /// The user who ticked it (studio member or ops). Not a foreign key, as
+  /// with `postedById` on updates: a leaver's ticks stay.
+  doneById   String?
+  doneSource ChecklistDoneSource?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([stageId, sortOrder])
+  @@map("home_checklist_items")
+}
+
+/// The materials list of a signed project, copied from the quote at signing
+/// so editing the product master never changes a running project. The
+/// studio adds `productCode` when it orders.
+model HomeMaterial {
+  id        String      @id @default(cuid())
+  projectId String
+  project   HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  room        String
+  item        String
+  spec        String?
+  quoteLineId String?
+  productCode String?
+  sortOrder   Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId, sortOrder])
+  @@map("home_materials")
 }
 
 /// A choice the customer has to make by a date (the app's "Decision with a
@@ -1479,12 +1642,12 @@ model DecisionVote {
 
 /// Dream board: photos a customer saves, which their studio can see.
 model DreamPin {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
   /// Private storage key in site-photos (dream/<userId>/…).
   photoPath String
   note      String?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   deletedAt DateTime?
 
   @@index([userId, createdAt])
@@ -1571,11 +1734,25 @@ model HomeDocument {
   uploadedById String
   byStudio     Boolean @default(false)
 
+  /// When the customer could first see it. Null = a draft or an internal
+  /// drawing, which stays with the studio; the customer projection reads
+  /// only shared documents. Rows from before this column were all visible,
+  /// so the migration set them to `createdAt`.
+  sharedAt     DateTime?
+  /// 1 for a first upload; a new drawing revision is `version + 1` with
+  /// `supersedesId` pointing at the one it replaces. A shared document is
+  /// superseded, never edited.
+  version      Int            @default(1)
+  supersedesId String?
+  supersedes   HomeDocument?  @relation("HomeDocumentVersions", fields: [supersedesId], references: [id], onDelete: SetNull)
+  supersededBy HomeDocument[] @relation("HomeDocumentVersions")
+
   createdAt DateTime  @default(now())
   /// Soft delete: a removed document stops showing and stays for the record.
   deletedAt DateTime?
 
   @@index([projectId, createdAt])
+  @@index([supersedesId])
   @@map("home_documents")
 }
 
@@ -3514,9 +3691,9 @@ model StudioProductBackup {
   studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
 
   /// Why it was taken: "before approving run-…".
-  reason String
+  reason  String
   /// Every product row as it stood, rates in paise as strings.
-  rows   Json
+  rows    Json
   takenAt DateTime @default(now())
 
   @@index([studioId, takenAt])
@@ -3547,7 +3724,7 @@ model StudioProductDraft {
 
   /// How many of the studio's quotations this rate was seen in, and the
   /// spread, so ops can tell a firm rate from a guess.
-  fromQuotations Int  @default(0)
+  fromQuotations Int   @default(0)
   evidence       Json?
 
   /// PENDING | APPROVED | REJECTED | SUPERSEDED
