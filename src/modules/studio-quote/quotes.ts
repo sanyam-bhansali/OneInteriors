@@ -306,15 +306,26 @@ async function nextNumber(studioId: string): Promise<string> {
   const year = new Date().getFullYear();
   const prefix = `${year}-`;
 
-  const last = await prisma.studioQuote.findFirst({
+  /* Copies carry a suffix ("2026-002-D" for a Design Final), which sorts
+     after the plain numbers and does not parse as one: taking the last row
+     read "002-D" as NaN, restarted at 001 and clashed with the unique
+     number, so every new quotation failed once a copy existed. Read every
+     number this year and take the highest leading count. */
+  const rows = await prisma.studioQuote.findMany({
     where: { studioId, number: { startsWith: prefix } },
-    orderBy: { number: 'desc' },
     select: { number: true },
   });
+  return nextQuoteNumber(year, rows.map((r) => r.number));
+}
 
-  const n = last ? Number(last.number.slice(prefix.length)) : 0;
-  const next = Number.isFinite(n) ? n + 1 : 1;
-  return `${prefix}${String(next).padStart(3, '0')}`;
+/** The next "YYYY-NNN" after the highest count among `numbers`, suffixes ignored. Pure, for tests. */
+export function nextQuoteNumber(year: number, numbers: string[]): string {
+  const prefix = `${year}-`;
+  const top = numbers.reduce((max, n) => {
+    const m = /^(\d+)/.exec(n.startsWith(prefix) ? n.slice(prefix.length) : '');
+    return m ? Math.max(max, Number(m[1])) : max;
+  }, 0);
+  return `${prefix}${String(top + 1).padStart(3, '0')}`;
 }
 
 export interface NewQuoteInput {
@@ -676,6 +687,13 @@ export async function setQuoteStatus(
   status: QuoteStatusName,
 ): Promise<ActionResult> {
   if (!(await ownedQuote(quoteId))) return { ok: false, error: 'That quotation is not yours.' };
+
+  /* A project runs on this quotation (signed in the app, or started for the
+     studio's own client): its plan and payment stages were built from it, so
+     it stays Won. */
+  if (await prisma.homeProject.findFirst({ where: { signedQuoteId: quoteId }, select: { id: true } })) {
+    return { ok: false, error: 'A project has started from this quotation, so it stays won.' };
+  }
 
   try {
     /* Stamped ONCE, and `issuedOn === null` is the test.

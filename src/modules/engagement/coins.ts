@@ -15,6 +15,7 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { societyKey } from '@/modules/floorplan/society-library';
 import { COINS, CIRCLE_SIZE, MAX_SHARES, expiresOn, istDay, streakAwardRef, streakOf, type CoinKind } from './coin-rules';
+import { INTRODUCED_BY_US } from '@/modules/studio/introduction-source';
 
 async function award(userId: string, kind: CoinKind, ref: string, note?: string): Promise<boolean> {
   try {
@@ -40,7 +41,7 @@ export async function settleCoins(userId: string): Promise<void> {
       id: true,
       signedAt: true,
       createdAt: true,
-      introduction: { select: { studio: { select: { tradeName: true } } } },
+      introduction: { select: { source: true, studio: { select: { tradeName: true } } } },
       decisions: { where: { chosenById: userId }, select: { id: true, title: true, dueOn: true, chosenAt: true } },
       snags: { where: { raisedById: userId, raisedByStudio: false }, select: { id: true, title: true, photoPaths: true } },
       family: { where: { joinedAt: { not: null }, removedAt: null }, select: { id: true, name: true } },
@@ -62,19 +63,19 @@ export async function settleCoins(userId: string): Promise<void> {
   const me = await prisma.user.findUnique({ where: { id: userId }, select: { referralCode: true } });
   if (me?.referralCode) {
     const friends = await prisma.brief.findMany({
-      where: { referredByCode: me.referralCode, introductions: { some: { homeProject: { signedAt: { not: null } } } } },
+      where: { referredByCode: me.referralCode, introductions: { some: { ...INTRODUCED_BY_US, homeProject: { signedAt: { not: null } } } } },
       select: { id: true, contactName: true },
       take: 100,
     });
     for (const f of friends) await award(userId, 'REFERRAL_SIGNED', `friend:${f.id}`, `${f.contactName ?? 'A friend'} signed`);
   }
-  if (brief.referredByCode && projects.some((p) => p.signedAt)) {
+  if (brief.referredByCode && projects.some((p) => p.signedAt && p.introduction.source === 'ONE_INTERIORS')) {
     await award(userId, 'REFERRAL_SIGNED', `joined:${brief.id}`, 'You signed through a friend’s invite');
   }
 
   // Society circle: three flats in one society signed through us.
   const key = societyKey(brief.society);
-  if (key && projects.some((p) => p.signedAt)) {
+  if (key && projects.some((p) => p.signedAt && p.introduction.source === 'ONE_INTERIORS')) {
     const signed = await signedInSociety(key);
     if (signed >= CIRCLE_SIZE) await award(userId, 'SOCIETY_CIRCLE', `society:${key}`, `${brief.society} circle`);
   }
@@ -83,7 +84,7 @@ export async function settleCoins(userId: string): Promise<void> {
 /** How many briefs in this society have a project signed in the app. */
 export async function signedInSociety(key: string): Promise<number> {
   const rows = await prisma.brief.findMany({
-    where: { society: { not: null }, introductions: { some: { homeProject: { signedAt: { not: null } } } } },
+    where: { society: { not: null }, introductions: { some: { ...INTRODUCED_BY_US, homeProject: { signedAt: { not: null } } } } },
     select: { society: true },
     take: 2000,
   });

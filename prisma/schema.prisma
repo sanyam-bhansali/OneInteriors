@@ -401,6 +401,14 @@ model Brief {
   /// Calls made without reaching them (NO_ANSWER / CALL_BACK). Stops at three.
   followUpTries   Int       @default(0)
 
+  /// Made by a studio for one of its OWN clients when it started their
+  /// project (project/own-project.ts, docs/studio-workspace/OWN-CLIENTS.md):
+  /// a minimal brief so the customer has a home in the app. Never part of
+  /// One Interiors' own funnel or ops queues. False for every brief a
+  /// customer started themselves, including one later reused for an
+  /// own-client project.
+  madeByStudio Boolean @default(false)
+
   @@index([locality, completedAt])
   @@index([anonKey])
   @@map("briefs")
@@ -813,7 +821,9 @@ model StudioMember {
 
   /// The customer projects this PM or supervisor is on (owners and accounts
   /// see across the studio without rows here).
-  projects StudioProjectMember[]
+  projects       StudioProjectMember[]
+  /// Invites to the app this member sent their studio's own clients.
+  projectInvites HomeProjectInvite[]   @relation("ProjectInvitesSent")
 
   /// Snags the PM gave this person to fix (Phase 4).
   assignedSnags HomeSnag[]
@@ -1521,7 +1531,48 @@ model HomeProject {
   quoteChanges HomeQuoteChange[]
   events       HomeProjectEvent[]
 
+  /// A studio's own client: the invites to follow it in the app
+  /// (project/own-project.ts).
+  invites HomeProjectInvite[]
+
   @@map("home_projects")
+}
+
+/// The invite a studio sends its OWN client to follow their project in the
+/// app (docs/studio-workspace/OWN-CLIENTS.md). The customer's account is
+/// found or made by phone and linked when the project starts, so signing in
+/// with that number is enough; the code only makes the link short and says
+/// whether they have joined. Not a credential: the join page still needs a
+/// sign-in with the invited number, so the code is stored as is (like
+/// `FamilyMember.inviteToken`) and the studio can show it again.
+/// Customers never get WhatsApp: SMS when a provider exists, email when the
+/// client has one, otherwise the studio shares the link itself.
+model HomeProjectInvite {
+  id          String        @id @default(cuid())
+  projectId   String
+  project     HomeProject   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// Short, unambiguous, upper case: what goes in /app/join/<code>.
+  code        String        @unique
+  /// The customer's account (role CUSTOMER), found or made by phone.
+  userId      String
+  /// E.164, as invited. Matched against the number they sign in with.
+  phone       String
+  name        String
+  email       String?
+  createdById String?
+  createdBy   StudioMember? @relation("ProjectInvitesSent", fields: [createdById], references: [id], onDelete: SetNull)
+  /// Channels that took it: 'sms', 'email'. Empty = the studio shares the link.
+  sentVia     String[]      @default([])
+  /// When they opened the link signed in with the invited number.
+  joinedAt    DateTime?
+  /// A newer invite replaced this one.
+  revokedAt   DateTime?
+  createdAt   DateTime      @default(now())
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([createdById])
+  @@map("home_project_invites")
 }
 
 /// What a stage is, whatever the studio calls it. Named so it does not clash
@@ -2423,8 +2474,22 @@ model ExpertBlock {
 /// introduction is a judgement made on a call — if it could be triggered by a
 /// customer action, the expert call would stop being the gate and the whole
 /// quality mechanic would quietly become optional.
+/// Where an introduction came from. ONE_INTERIORS: our expert introduced
+/// the customer (the event the business is paid for). STUDIO_OWN_CLIENT: the
+/// studio's own client, linked only so they can follow the project in the
+/// app (owner, 11 Oct 2026; docs/studio-workspace/OWN-CLIENTS.md). Never in
+/// ops' queues, never counted as an introduction, no commission.
+enum IntroductionSource {
+  ONE_INTERIORS
+  STUDIO_OWN_CLIENT
+}
+
 model Introduction {
   id String @id @default(cuid())
+
+  /// See `IntroductionSource`. Every read that means "One Interiors
+  /// introduced them" filters on ONE_INTERIORS (studio/introduction-source.ts).
+  source IntroductionSource @default(ONE_INTERIORS)
 
   briefId String
   brief   Brief  @relation(fields: [briefId], references: [id], onDelete: Cascade)

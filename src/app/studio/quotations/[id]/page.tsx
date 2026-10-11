@@ -8,6 +8,8 @@ import { showsOurMark, MARK_TEXT } from '@/modules/studio-quote/mark';
 import { signedLogoUrl } from '@/modules/storage/studio-logo';
 import { QuoteBuilder } from './QuoteBuilder';
 import { StatusBar } from './StatusBar';
+import { currentMember } from '@/modules/studio/access';
+import { projectForQuote } from '@/modules/project/own-project';
 
 export const metadata: Metadata = {
   title: 'Quotation',
@@ -41,7 +43,11 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
 
   if (!quote) notFound();
 
-  const logoUrl = await signedLogoUrl(branding?.logoPath ?? null);
+  const [logoUrl, project] = await Promise.all([
+    signedLogoUrl(branding?.logoPath ?? null),
+    // A project running on this quotation, or whether one can start from it (own client, sent or won).
+    currentMember().then((m) => projectForQuote(m, quote.id)),
+  ]);
 
   return (
     <>
@@ -84,6 +90,24 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
       />
 
       <PageBody>
+        {project.projectId ? (
+          <p className="s-card mb-4 border-l-[3px] !border-l-[var(--s-good)] px-4 py-3 text-[13.5px] leading-relaxed">
+            A project is running on this quotation.{' '}
+            <Link href={`/studio/projects/${project.projectId}`} className="font-medium text-[var(--s-accent)]">
+              Open the project
+            </Link>
+          </p>
+        ) : project.canStart ? (
+          <p className="s-card mb-4 flex flex-wrap items-center gap-3 border-l-[3px] !border-l-[var(--s-accent)] px-4 py-3 text-[13.5px] leading-relaxed">
+            <span>Has {quote.clientName.split(/\s+/)[0]} accepted this quotation? Start the project from it.</span>
+            <Link
+              href={`/studio/projects/start?quote=${quote.id}`}
+              className="rounded-[8px] bg-[var(--s-accent)] px-3.5 py-1.5 text-[13.5px] font-medium text-white no-underline hover:bg-[var(--s-accent-deep)]"
+            >
+              Start project
+            </Link>
+          </p>
+        ) : null}
         {!branding ? (
           <p className="s-card mb-4 border-l-[3px] !border-l-[var(--s-accent)] px-4 py-3 text-[13.5px] leading-relaxed">
             <Link href="/studio/settings" className="font-medium text-[var(--s-accent)]">

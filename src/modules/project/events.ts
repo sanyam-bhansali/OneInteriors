@@ -75,6 +75,9 @@ export const PROJECT_EVENT_TYPES = [
   'document.shared',
   'document.superseded',
   'material.ordered',
+  // A studio's own client (docs/studio-workspace/OWN-CLIENTS.md)
+  'customer.invited',
+  'customer.joined',
 ] as const;
 
 export type ProjectEventType = (typeof PROJECT_EVENT_TYPES)[number];

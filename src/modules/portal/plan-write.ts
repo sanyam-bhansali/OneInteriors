@@ -9,7 +9,7 @@
 
 import type { Prisma } from '@prisma/client';
 import { FILED_CONTENT_TYPE, signedQuoteDocs } from './documents';
-import type { PlanMaterial, PlanStage } from './quote-to-plan';
+import { quoteToPlan, type PlanMaterial, type PlanPayment, type PlanQuoteLine, type PlanStage, type SignedStageInput } from './quote-to-plan';
 
 export type PlanDb = Pick<Prisma.TransactionClient, 'homeProjectStage' | 'homeMaterial' | 'homeDocument'>;
 
@@ -64,6 +64,8 @@ export async function fileSignedQuote(
   quote: { id: string; number: string },
   filedById: string,
   at: Date,
+  /** True when the studio started the project for its own client (project/own-project.ts) and so filed these. */
+  byStudio = false,
 ): Promise<void> {
   await db.homeDocument.createMany({
     data: signedQuoteDocs(quote.id, quote.number).map((d) => ({
@@ -75,9 +77,69 @@ export async function fileSignedQuote(
       contentType: FILED_CONTENT_TYPE,
       bytes: 0,
       uploadedById: filedById,
-      byStudio: false,
+      byStudio,
       sharedAt: at,
       createdAt: at,
     })),
   });
+}
+
+// ── A signed project, whoever started it ───────────────────────
+
+/** What creating a signed project writes to: the quote, the project and its plan. */
+export type SignedProjectDb = PlanDb & Pick<Prisma.TransactionClient, 'studioQuote' | 'homeProject'>;
+
+export interface SignedProjectInput {
+  /** The introduction the project hangs off (One Interiors' or the studio's own client's). */
+  introductionId: string;
+  quote: { id: string; number: string; lines: PlanQuoteLine[] };
+  startOn: Date;
+  totalDays: number;
+  /** The locked total, GST included. */
+  contractPaise: number;
+  /** The payment stages as the quote showed them. */
+  stages: SignedStageInput[];
+  signedAt: Date;
+  /** Who filed the agreement and the quote in the Locker. */
+  filedById: string;
+  /** The studio filed them (its own client), not the customer signing in the app. */
+  filedByStudio?: boolean;
+  assuredRequestedAt?: Date | null;
+}
+
+/**
+ * The one way a project is started from a quote — the customer signing in
+ * the app (choose.ts `signFinalQuote`) and a studio starting its own
+ * client's project (project/own-project.ts) both call this, inside their own
+ * transaction: the quote is marked accepted, the project is created with
+ * the total and the payment stages locked (split with `splitAcross`, so they
+ * sum to the contract exactly), the plan is written and the agreement and
+ * quote are filed in the Locker.
+ */
+export async function createSignedProject(db: SignedProjectDb, input: SignedProjectInput): Promise<{ id: string; payments: PlanPayment[] }> {
+  const built = quoteToPlan({
+    lines: input.quote.lines,
+    startOn: input.startOn,
+    totalDays: input.totalDays,
+    contractPaise: input.contractPaise,
+    stages: input.stages,
+  });
+  const payments = built.payments.map((s) => ({ label: s.label, pct: s.pct, amountPaise: s.amountPaise }));
+  await db.studioQuote.update({ where: { id: input.quote.id }, data: { status: 'ACCEPTED' } });
+  const created = await db.homeProject.create({
+    data: {
+      introductionId: input.introductionId,
+      startOn: input.startOn,
+      totalDays: input.totalDays,
+      signedAt: input.signedAt,
+      signedQuoteId: input.quote.id,
+      contractPaise: BigInt(input.contractPaise),
+      paymentPhases: payments,
+      assuredRequestedAt: input.assuredRequestedAt ?? null,
+    },
+    select: { id: true },
+  });
+  await writePlan(db, created.id, built);
+  await fileSignedQuote(db, created.id, { id: input.quote.id, number: input.quote.number }, input.filedById, input.signedAt, input.filedByStudio ?? false);
+  return { id: created.id, payments };
 }

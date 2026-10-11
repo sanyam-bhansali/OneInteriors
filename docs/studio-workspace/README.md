@@ -11,6 +11,7 @@ existing One Interiors app.
 | `PHASE-1-PLAN.md` | The approved Phase 1 plan |
 | `PHASE-1-FOUNDATION.md` | What Phase 1's foundation built: the migration, the permission API (`studio/roles.ts`, `studio/access.ts`) and the customer projection |
 | `PHASES-2-5-FOUNDATION.md` | The one migration for Phases 2–5 (site log, dates, snag events, decision options, payments, quote changes, event log), the shared helpers (`project/events.ts`, `working-days.ts`, `append-only.ts`) and notes per phase |
+| `OWN-CLIENTS.md` | "Start a project" for a studio's own clients (owner, 11 Oct 2026): the model chosen, the migration, the invite to the app |
 | `designs/README.md` | How to read the screen files, and which screen belongs to which phase |
 | `designs/studio/` | The 8 studio screens (site mode on phone, office on desktop) |
 | `designs/customer/` | The customer app screens, including the ones the studio side feeds |

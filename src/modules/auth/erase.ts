@@ -69,6 +69,9 @@ export async function eraseAccount(userId: string, now = new Date()): Promise<{ 
       });
     }
 
+    // A studio's invites to its own client (project/own-project.ts) copy the number, name and email.
+    await tx.homeProjectInvite.updateMany({ where: { userId }, data: { phone: '', name: '', email: null, revokedAt: now } });
+
     // Append-only, like every audit row: what happened and when, never the scrubbed values.
     await tx.auditLog.create({
       data: { actorId: userId, action: 'account.erase', entityType: 'User', entityId: userId, after: { deletedAt: now.toISOString(), by: 'self' } },

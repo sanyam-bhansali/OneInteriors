@@ -28,6 +28,8 @@ import { projectWork, type StaffWork } from '@/modules/portal/project-store';
 import { can, currentMember, memberOnProject, projectsVisibleTo, type StudioMemberRef } from './access';
 import { attentionToday, bhkLabel, firstName, homeLabel, sortRows, workspaceRow, type Attention, type WorkspaceRow } from './workspace-view';
 import { planName, type PlanName } from '@/modules/portal/plans';
+import { inviteForProject, type InviteState } from '@/modules/project/own-project';
+import { isOwnClient } from './introduction-source';
 
 const BRIEF_SELECT = {
   select: {
@@ -37,7 +39,7 @@ const BRIEF_SELECT = {
     tier: true,
     contactName: true,
     userId: true,
-    user: { select: { name: true } },
+    user: { select: { name: true, phoneVerified: true } },
   },
 } as const;
 
@@ -62,6 +64,10 @@ export interface ProjectsOverview {
   rows: WorkspaceRow[];
   attention: Attention[];
   seesMoney: boolean;
+  /** The studio's own clients' projects (docs/studio-workspace/OWN-CLIENTS.md), for the "Your own client" chip. */
+  ownClientIds: string[];
+  /** Owner or PM: may start a project for an own client. */
+  canStart: boolean;
 }
 
 /** The Projects page: every customer project this member may read, and what needs them today. Null when not a studio member. */
@@ -81,7 +87,7 @@ export async function studioProjects(now = new Date()): Promise<ProjectsOverview
       contractPaise: true,
       paymentPhases: true,
       paidPhases: true,
-      introduction: { select: { brief: BRIEF_SELECT, studio: CALENDAR_SELECT } },
+      introduction: { select: { source: true, brief: BRIEF_SELECT, studio: CALENDAR_SELECT } },
       stages: STAGE_SELECT,
       dateChanges: DATE_CHANGES_SELECT,
       updates: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } },
@@ -118,7 +124,13 @@ export async function studioProjects(now = new Date()): Promise<ProjectsOverview
       );
     }),
   );
-  return { rows, attention: attentionToday(rows), seesMoney: money };
+  return {
+    rows,
+    attention: attentionToday(rows),
+    seesMoney: money,
+    ownClientIds: projects.filter((p) => isOwnClient(p.introduction.source)).map((p) => p.id),
+    canStart: can(member, 'project.create'),
+  };
 }
 
 export interface WorkspaceStage extends StageView {
@@ -140,6 +152,14 @@ export interface ProjectWorkspace {
   assuredRequested: boolean;
   /** The customer has the phone app on a phone (a registered push device). */
   appConnected: boolean;
+  /** The customer has signed in with their number at least once (app or website). */
+  customerJoined: boolean;
+  /** The studio's own client, not introduced by One Interiors (docs/studio-workspace/OWN-CLIENTS.md). */
+  ownClient: boolean;
+  /** An own client's invite to the app: the link to share and whether they joined. Null otherwise. */
+  invite: InviteState | null;
+  /** May send the own client a new invite link (owner or PM: `project.create`). */
+  canInvite: boolean;
   row: WorkspaceRow;
   /** True when the plan was built from the signed quote; false for the old fixed stages. */
   hasPlan: boolean;
@@ -178,7 +198,7 @@ export async function projectWorkspace(projectId: string, now = new Date()): Pro
       paymentPhases: true,
       paidPhases: true,
       teamNotes: true,
-      introduction: { select: { brief: BRIEF_SELECT, studio: CALENDAR_SELECT } },
+      introduction: { select: { source: true, brief: BRIEF_SELECT, studio: CALENDAR_SELECT } },
       dateChanges: DATE_CHANGES_SELECT,
       stages: {
         orderBy: { sortOrder: 'asc' },
@@ -203,10 +223,12 @@ export async function projectWorkspace(projectId: string, now = new Date()): Pro
 
   const b = p.introduction.brief;
   const name = customerName(b);
-  const [customerView, work, devices] = await Promise.all([
+  const ownClient = isOwnClient(p.introduction.source);
+  const [customerView, work, devices, invite] = await Promise.all([
     customerViewOf(projectId, now),
     projectWork(projectId, now),
     b.userId ? prisma.pushDevice.count({ where: { userId: b.userId } }) : Promise.resolve(0),
+    ownClient ? inviteForProject(projectId) : Promise.resolve(null),
   ]);
 
   const row = workspaceRow(
@@ -259,6 +281,10 @@ export async function projectWorkspace(projectId: string, now = new Date()): Pro
       plan: planName(p.plan),
       assuredRequested: p.plan === 'BASIC' && p.assuredRequestedAt !== null,
       appConnected: devices > 0,
+      customerJoined: devices > 0 || b.user?.phoneVerified != null || invite?.joined === true,
+      ownClient,
+      invite,
+      canInvite: check.access.may('project.create'),
       row,
       hasPlan,
       stages,

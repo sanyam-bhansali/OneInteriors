@@ -45,12 +45,23 @@ export default async function ProjectsPage() {
   const [data, score] = await Promise.all([studioProjects(now), studioUpdateScore(now)]); // score: Phase 2
   const rows = data?.rows ?? [];
   const live = rows.filter((r) => r.stage !== null);
+  const own = new Set(data?.ownClientIds ?? []);
+  /* Owner or PM: one obvious way to start a project for a client of their own (OWN-CLIENTS.md). */
+  const startButton = data?.canStart ? (
+    <Link
+      href="/studio/projects/start"
+      className="rounded-[8px] bg-[var(--s-accent)] px-4 py-2 text-[14px] font-medium text-white no-underline hover:bg-[var(--s-accent-deep)]"
+    >
+      Start a project
+    </Link>
+  ) : null;
 
   return (
     <>
       <PageHead
         title="Projects"
         sub={`${shortDay(now)} · ${live.length === 0 ? 'Nothing running yet.' : `${live.length} live`}${score && score.pct !== null ? ` · Daily site updates: ${score.pct}% of working days, last 30 days${score.streakMissed >= 2 ? ` · ${score.streakMissed} days in a row missed on a site` : ''}` : ''}`}
+        action={startButton}
       />
       <PageBody>
         {rows.length === 0 ? (
@@ -60,6 +71,14 @@ export default async function ProjectsPage() {
               Signing builds the plan from the quote — the stages, each room&rsquo;s checklist, the payment stages and the
               materials — and the customer follows it in their app. Projects you are on appear here.
             </p>
+            {startButton ? (
+              <p className="m-0 mt-3 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--s-ink-2)]">
+                A client of your own has accepted your quotation? Start their project from it, and invite them to follow it in the app.{' '}
+                <Link href="/studio/projects/start" className="font-medium text-[var(--s-accent)]">
+                  Start a project
+                </Link>
+              </p>
+            ) : null}
           </div>
         ) : (
           <div className="flex flex-col gap-7">
@@ -115,7 +134,7 @@ export default async function ProjectsPage() {
                   </thead>
                   <tbody>
                     {rows.map((r) => (
-                      <Row key={r.id} r={r} money={data!.seesMoney} />
+                      <Row key={r.id} r={r} money={data!.seesMoney} own={own.has(r.id)} />
                     ))}
                   </tbody>
                 </table>
@@ -128,7 +147,7 @@ export default async function ProjectsPage() {
   );
 }
 
-function Row({ r, money }: { r: WorkspaceRow; money: boolean }) {
+function Row({ r, money, own }: { r: WorkspaceRow; money: boolean; own: boolean }) {
   const handedOver = r.stage === null;
   return (
     <tr>
@@ -136,7 +155,10 @@ function Row({ r, money }: { r: WorkspaceRow; money: boolean }) {
         <Link href={`/studio/projects/${r.id}`} className="font-semibold text-[var(--s-ink)] no-underline hover:text-[var(--s-accent)]">
           {r.home}
         </Link>
-        <div className={sub}>{r.customer}</div>
+        <div className={sub}>
+          {r.customer}
+          {own ? <span className="s-tag ml-2 align-middle">Your own client</span> : null}
+        </div>
       </td>
       <td className={td}>
         {r.stage ? (

@@ -32,6 +32,7 @@ import { contactState, type ContactState } from './introduction-access';
 import type { AppointmentKindName, AppointmentStatusName } from './appointment-rules';
 import { whatItNeeds, type IntroductionNeed } from './introduction-needs';
 import { localityLabel } from '@/modules/brief/types';
+import { INTRODUCED_BY_US } from '@/modules/studio/introduction-source';
 
 // The pure half lives next door so Vitest can reach it — CONTRIBUTING §9.5.
 export { whatItNeeds, NEED_LABEL } from './introduction-needs';
@@ -116,6 +117,8 @@ export async function listIntroductions(limit = 100): Promise<OpsIntroduction[]>
 
   try {
     const rows = await prisma.introduction.findMany({
+      // One Interiors' introductions only: a studio's own client is not ours to chase (studio/introduction-source.ts).
+      where: INTRODUCED_BY_US,
       orderBy: { introducedAt: 'desc' },
       take: limit,
       select: {
@@ -257,7 +260,7 @@ export async function introducedBriefIds(briefIds: string[]): Promise<Set<string
 
   try {
     const rows = await prisma.introduction.findMany({
-      where: { briefId: { in: [...new Set(briefIds)] } },
+      where: { briefId: { in: [...new Set(briefIds)] }, ...INTRODUCED_BY_US },
       select: { briefId: true },
     });
     return new Set(rows.map((r) => r.briefId));

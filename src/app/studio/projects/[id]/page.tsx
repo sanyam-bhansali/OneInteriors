@@ -15,6 +15,7 @@ import { DecisionsCard } from './DecisionsCard';
 import { LockerCard } from './LockerCard';
 import { PlanTab as PlanEditor } from './PlanTab';
 import { planForStudio } from '@/modules/project/plan-edit';
+import { InviteBanner } from './InviteBanner';
 
 export const metadata: Metadata = { title: 'Project', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -53,9 +54,9 @@ export default async function ProjectWorkspacePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; started?: string }>;
 }) {
-  const [{ id }, { tab: rawTab }] = await Promise.all([params, searchParams]);
+  const [{ id }, { tab: rawTab, started }] = await Promise.all([params, searchParams]);
   const now = new Date();
   const r = await projectWorkspace(id.slice(0, 64), now);
   if (!r.ok) {
@@ -86,6 +87,11 @@ export default async function ProjectWorkspacePage({
         <h1 className="m-0 mt-1 text-[22px] font-semibold tracking-tight">{w.home}</h1>
         <div className="mt-2.5 flex flex-wrap gap-2">
           <span className={chip}>{w.customer}</span>
+          {w.ownClient ? (
+            <span className={chip} title="Not introduced by One Interiors: no introduction, no commission">
+              Your own client
+            </span>
+          ) : null}
           {w.bhk || w.tier ? <span className={chip}>{[w.bhk, w.tier].filter(Boolean).join(' · ')}</span> : null}
           {money ? (
             <span className={`${chip} s-num font-[family-name:var(--font-mono)]`}>
@@ -98,12 +104,31 @@ export default async function ProjectWorkspacePage({
             className={chip}
             style={w.appConnected ? { borderColor: 'var(--s-accent)', color: 'var(--s-accent)', background: 'var(--s-accent-wash)' } : undefined}
           >
-            {w.appConnected ? 'Customer app connected' : 'Customer app not on a phone yet'}
+            {w.appConnected
+              ? 'Customer app connected'
+              : w.ownClient && !w.customerJoined
+                ? 'Invited, not joined yet'
+                : w.customerJoined
+                  ? 'Customer signed in, app not on a phone yet'
+                  : 'Customer app not on a phone yet'}
           </span>
         </div>
       </div>
 
       <PageBody>
+        {w.invite && (!w.customerJoined || started === '1') ? (
+          <InviteBanner
+            projectId={w.id}
+            customer={w.customerFirst}
+            link={w.invite.link}
+            code={w.invite.code}
+            sentVia={w.invite.sentVia}
+            messages={w.invite.messages}
+            joined={w.customerJoined}
+            justStarted={started === '1'}
+            canResend={w.canInvite}
+          />
+        ) : null}
         <div role="tablist" aria-label="Project sections" className="mb-5 flex flex-wrap gap-1.5 border-b border-[var(--s-rule)]">
           {tabs.map((t) => (
             <Link

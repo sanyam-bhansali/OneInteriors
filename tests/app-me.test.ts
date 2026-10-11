@@ -27,6 +27,7 @@ const db = vi.hoisted(() => {
     consent: { updateMany: rec('consent.updateMany') },
     brief: { findUnique: rec('brief.findUnique', null), findFirst: rec('brief.findFirst', null), update: rec('brief.update') },
     consultation: { updateMany: rec('consultation.updateMany') },
+    homeProjectInvite: { updateMany: rec('homeProjectInvite.updateMany') },
     auditLog: { create: rec('auditLog.create') },
     homeProject: { findMany: rec('homeProject.findMany', []) },
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
@@ -216,6 +217,7 @@ describe('deleting an account', () => {
       'brief.findUnique',
       'brief.update',
       'consultation.updateMany',
+      'homeProjectInvite.updateMany',
       'auditLog.create',
     ]);
 
@@ -236,7 +238,8 @@ describe('deleting an account', () => {
     const { eraseAccount } = await import('@/modules/auth/erase');
     await eraseAccount('u1');
     const ops = db.calls.map((c) => c.op);
-    expect(ops.some((o) => /homeProject|introduction|coinEntry|studioClient|delete$/.test(o))).toBe(false);
+    // The project stays; only an own-client invite's copy of the number is scrubbed (homeProjectInvite.updateMany).
+    expect(ops.some((o) => /homeProject(?!Invite)|introduction|coinEntry|studioClient|delete$/.test(o))).toBe(false);
     expect(ops).not.toContain('brief.update'); // no brief of their own
   });
 

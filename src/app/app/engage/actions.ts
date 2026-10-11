@@ -17,6 +17,7 @@ import { CIRCLE_SIZE } from '@/modules/engagement/coin-rules';
 import { familyOf, inviteFamily, joinFamily, removeFamily, voteDecision, type FamilyRow } from '@/modules/engagement/family';
 import { signedSitePhotoUrls, storeSitePhoto } from '@/modules/storage/site-photos';
 import { currentChallenge, isHit, type ChallengeView } from '@/modules/engagement/challenge';
+import { INTRODUCED_BY_US } from '@/modules/studio/introduction-source';
 
 type Fail = { ok: false; error: string; signIn?: boolean };
 const SIGN_IN: Fail = { ok: false, error: 'Sign in to see this.', signIn: true };
@@ -104,7 +105,7 @@ export async function referAction(): Promise<{ ok: true; refer: ReferView } | Fa
           where: { referredByCode: code },
           orderBy: { createdAt: 'desc' },
           take: 30,
-          select: { contactName: true, introductions: { where: { homeProject: { signedAt: { not: null } } }, select: { id: true } } },
+          select: { contactName: true, introductions: { where: { ...INTRODUCED_BY_US, homeProject: { signedAt: { not: null } } }, select: { id: true } } },
         })
       : [],
     prisma.brief.findUnique({ where: { userId: user.id }, select: { society: true } }),

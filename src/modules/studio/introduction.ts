@@ -36,6 +36,7 @@ import {
    of that file for why it is the one thing there that takes a studio id. */
 import { bridgeIntroduction, redactWithdrawn } from '@/modules/studio-practice/bridge';
 import { notifyOps, notifyStudio } from '@/modules/notify/service';
+import { INTRODUCED_BY_US } from '@/modules/studio/introduction-source';
 
 export type IntroResult = { ok: true; id: string; held?: string } | { ok: false; error: string };
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -693,9 +694,9 @@ export async function introductionCounts(
 
   try {
     const [total, withdrawn] = await Promise.all([
-      prisma.introduction.count({ where: { studioId, introducedAt: { gte: since } } }),
+      prisma.introduction.count({ where: { studioId, introducedAt: { gte: since }, ...INTRODUCED_BY_US } }),
       prisma.introduction.count({
-        where: { studioId, introducedAt: { gte: since }, withdrawnAt: { not: null } },
+        where: { studioId, introducedAt: { gte: since }, withdrawnAt: { not: null }, ...INTRODUCED_BY_US },
       }),
     ]);
     return { total, withdrawn };
