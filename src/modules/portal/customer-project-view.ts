@@ -33,6 +33,28 @@
  * `targetOn`, `state`, `late` — with each kind going out under the old key
  * the app already translates (tracker.ts `KIND_KEY`: civil → `SITE`,
  * carpentry → `INSTALL`) and the studio's stage name as the label.
+ *
+ * ## Phases 2–5: what the new tables may add here (not selected yet)
+ *
+ * The phase that shows each one adds it to the select and the mapper, and
+ * the leaky row in tests/customer-projection.test.ts already carries the
+ * internal half. May cross (brief §5, left column):
+ *
+ * - `siteLogs`: date, kind, reason, customerText/customerLang, postedAt,
+ *   correctsId; photos: storagePath (to sign), takenAt, fromGallery,
+ *   customerText; crew: crewName, crewRole, arrivedAt.
+ * - `dateChanges`: field, fromDate, toDate, reason (in plain words).
+ * - snag `events`: kind, at, photoPaths (to sign), customerText, note, fixBy.
+ * - decision `choices`: id, label, detail, photoPath (to sign), swatch,
+ *   deltaPaise, sortOrder. `pickedOptionId`.
+ * - `payments`: stageIndex, amountPaise, receivedOn, mode, receiptDocumentId
+ *   (a shared document), correctsId, customerConfirmedAt, disputedAt.
+ * - `quoteChanges`: label, deltaPaise, stageIndex, at.
+ *
+ * Never: `note` on site logs, date changes and payments; `internalNote`;
+ * `voicePath`, `transcript`, `transcriptLang`; `lat`/`lng`;
+ * `studioCostDeltaPaise`; crew `phone`; `disputeNote`; any `…ById`,
+ * `assigneeId`, `clientRef`; and nothing from `HomeProjectEvent`'s payload.
  */
 
 import type { Prisma } from '@prisma/client';

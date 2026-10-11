@@ -29,6 +29,17 @@ const SECRET = {
   staffId: 'u-staff-SECRET',
   familyUserId: 'u-family-SECRET',
   customerId: 'u-customer-SECRET',
+  // Phases 2–5 (PHASES-2-5-FOUNDATION.md): what the new tables hold that must stay inside.
+  siteNote: 'SITE-NOTE-plumber was drunk',
+  internalNote: 'INTERNAL-NOTE-only your team',
+  disputeNote: 'DISPUTE-NOTE-to our team',
+  delayNote: 'DELAY-NOTE-we forgot to order',
+  paymentNote: 'PAYMENT-NOTE-UTR 998877',
+  lat: '18.5204303',
+  eventPayload: 'EVENT-PAYLOAD-SECRET',
+  dedupeKey: 'reminder|SECRET-DEDUPE',
+  clientRef: 'client-ref-SECRET',
+  assignee: 'm-assignee-SECRET',
 };
 
 /** Keys that must never appear in the output. */
@@ -58,6 +69,20 @@ const FORBIDDEN_KEYS = [
   'paidPhases',
   'paymentPhases',
   'deletedAt',
+  // Phases 2–5
+  'disputeNote',
+  'lat',
+  'lng',
+  'recordedById',
+  'customerConfirmedById',
+  'disputedById',
+  'actorId',
+  'payload',
+  'dedupeKey',
+  'clientRef',
+  'crewMemberId',
+  'assigneeId',
+  'byId',
 ];
 
 const D = (s: string) => new Date(s);
@@ -78,6 +103,36 @@ function leakyRow(): CustomerProjectRow {
     ],
     paidPhases: [{ index: 0, paidOn: '2026-09-02', remindedAt: SECRET.studioCost }],
     teamNotes: SECRET.teamNotes,
+    siteLogs: [
+      {
+        id: 'log1',
+        date: D('2026-10-10T00:00:00Z'),
+        kind: 'UPDATE',
+        note: SECRET.siteNote,
+        voicePath: SECRET.voicePath,
+        transcript: SECRET.transcript,
+        transcriptLang: 'mr',
+        customerText: 'Kitchen carcasses are up.',
+        postedById: SECRET.staffId,
+        clientRef: SECRET.clientRef,
+        photos: [{ storagePath: SECRET.photoPath, lat: Number(SECRET.lat), lng: 73.8567437, voicePath: SECRET.voicePath, transcript: SECRET.transcript }],
+        crew: [{ crewName: 'Ramesh', crewRole: 'Carpenter', crewMemberId: 'crew-1', crewMember: { phone: SECRET.crewPhone } }],
+      },
+    ],
+    dateChanges: [{ id: 'dc1', field: 'PLANNED_END', reason: 'STUDIO', note: SECRET.delayNote, byId: SECRET.staffId }],
+    payments: [
+      {
+        id: 'pay1',
+        stageIndex: 0,
+        amountPaise: BigInt(1_00_000_00),
+        note: SECRET.paymentNote,
+        recordedById: SECRET.staffId,
+        disputeNote: SECRET.disputeNote,
+        disputedById: SECRET.customerId,
+      },
+    ],
+    events: [{ id: 'e1', type: 'site.posted', actorId: SECRET.staffId, payload: { secret: SECRET.eventPayload }, dedupeKey: SECRET.dedupeKey }],
+    quoteChanges: [{ id: 'qc1', label: 'Shutter finish: Gloss', deltaPaise: BigInt(12_000_00), byId: SECRET.customerId }],
     introduction: {
       brief: { userId: SECRET.customerId },
       studio: {
@@ -120,6 +175,10 @@ function leakyRow(): CustomerProjectRow {
         postedById: SECRET.staffId,
         remindedAt: D('2026-09-29T00:00:00Z'),
         votes: [{ userId: SECRET.familyUserId, optionIndex: 0, note: 'Matte please' }],
+        choices: [
+          { id: 'o1', label: 'Matte', deltaPaise: BigInt(0), studioCostDeltaPaise: BigInt(4242), photoPath: SECRET.photoPath },
+          { id: 'o2', label: 'Gloss', deltaPaise: BigInt(12_000_00), studioCostDeltaPaise: SECRET.studioCost },
+        ],
       },
     ],
     family: [{ userId: SECRET.familyUserId, name: 'Asha', phone: SECRET.crewPhone }],
@@ -142,6 +201,11 @@ function leakyRow(): CustomerProjectRow {
         transcript: SECRET.transcript,
         internalNote: SECRET.teamNotes,
         causedBy: SECRET.staffId,
+        assigneeId: SECRET.assignee,
+        events: [
+          { kind: 'ACCEPTED', internalNote: SECRET.internalNote, assigneeId: SECRET.assignee, byId: SECRET.staffId },
+          { kind: 'FIXED', voicePath: SECRET.voicePath, transcript: SECRET.transcript, customerText: 'Edge banding replaced' },
+        ],
       },
     ],
     documents: [
@@ -217,6 +281,30 @@ describe('what the projection reads at all', () => {
   it('selects no internal column', () => {
     // storageKey and photo paths ARE read, to sign links; the test above proves they never come out.
     for (const k of ['teamNotes', 'postedById', 'uploadedById', 'raisedById', 'chosenById', 'remindedAt', 'invitedById']) {
+      expect(selected.has(k), k).toBe(false);
+    }
+    // Phases 2–5: columns that exist now and must never be selected for the customer.
+    for (const k of [
+      'studioCostDeltaPaise',
+      'transcript',
+      'transcriptLang',
+      'voicePath',
+      'internalNote',
+      'phone',
+      'disputeNote',
+      'lat',
+      'lng',
+      'payload',
+      'dedupeKey',
+      'actorId',
+      'assigneeId',
+      'assignee',
+      'recordedById',
+      'customerConfirmedById',
+      'disputedById',
+      'clientRef',
+      'crewMember',
+    ]) {
       expect(selected.has(k), k).toBe(false);
     }
   });

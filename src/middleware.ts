@@ -43,7 +43,36 @@ function forward(request: NextRequest, pathname: string) {
   return { request: { headers } };
 }
 
+/**
+ * The phone app's web preview (Expo on localhost:8081/8082) calls the app
+ * API from another origin, so the browser asks first (CORS). The phone
+ * itself never does, so this answers only in local development and only for
+ * a localhost page: never on a deployment. The API is bearer-token only, no
+ * cookies, so allowing the origin grants nothing a token doesn't already.
+ */
+function previewCors(request: NextRequest): Headers | null {
+  if (process.env.NODE_ENV === 'production') return null;
+  if (!request.nextUrl.pathname.startsWith('/api/app/v1/')) return null;
+  const origin = request.headers.get('origin');
+  if (!origin || !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return null;
+  return new Headers({
+    'access-control-allow-origin': origin,
+    'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+    'access-control-allow-headers': 'authorization, content-type, accept',
+    'access-control-max-age': '600',
+    vary: 'origin',
+  });
+}
+
 export function middleware(request: NextRequest) {
+  const cors = previewCors(request);
+  if (cors) {
+    if (request.method === 'OPTIONS') return new NextResponse(null, { status: 204, headers: cors });
+    const res = NextResponse.next();
+    cors.forEach((v, k) => res.headers.set(k, v));
+    return res;
+  }
+
   const host = request.headers.get('host');
   const path = request.nextUrl.pathname;
 

@@ -29,6 +29,16 @@
  * - Setting when a payment stage is DUE is part of the schedule, so
  *   `plan.edit` covers it as well as `payment.record`. Marking it RECEIVED is
  *   `payment.record` only.
+ *
+ * Phases 2–5 (docs/studio-workspace/PHASES-2-5-FOUNDATION.md) reuse the rows
+ * above rather than adding near-duplicates: moving a plan date is
+ * `plan.edit`; disputing a snag is the other answer to accepting it,
+ * `snag.accept`; correcting a site log or marking nobody on site is
+ * `update.post`; filing a decision's options with the studio's cost is
+ * `decision.create`. Two studio-wide settings are new: `crew.manage` and
+ * `calendar.edit` (owner and PM, no assignment — they belong to the studio,
+ * not a project). The customer confirming or disputing a payment is the
+ * customer's own action, not a studio one, so it is not here.
  */
 
 import type { Prisma } from '@prisma/client';
@@ -65,7 +75,11 @@ export type StudioAction =
   /** See vendor rates, work orders, vendor payments and margins. */
   | 'vendor.rates'
   /** Read a project at all: its plan, updates, decisions, snags, documents. */
-  | 'project.read';
+  | 'project.read'
+  /** Keep the studio's crew list (the faces site mode taps). Studio-wide. */
+  | 'crew.manage'
+  /** Set the studio's working days and holidays (reminders count on them). Studio-wide. */
+  | 'calendar.edit';
 
 export const STUDIO_ACTIONS: readonly StudioAction[] = [
   'team.manage',
@@ -81,6 +95,8 @@ export const STUDIO_ACTIONS: readonly StudioAction[] = [
   'document.upload',
   'vendor.rates',
   'project.read',
+  'crew.manage',
+  'calendar.edit',
 ];
 
 /** What each role may do. The owner is not listed: the owner may do everything. */
@@ -96,6 +112,8 @@ const GRANTS: Record<Exclude<StudioRoleName, 'OWNER'>, readonly StudioAction[]> 
     'payment.read',
     'document.upload',
     'project.read',
+    'crew.manage',
+    'calendar.edit',
   ],
   SUPERVISOR: ['update.post', 'checklist.tick', 'snag.fix', 'project.read'],
   ACCOUNTS: ['payment.read', 'payment.record'],

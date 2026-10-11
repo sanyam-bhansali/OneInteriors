@@ -36,6 +36,9 @@ const TABLE: Record<StudioAction, Record<StudioRoleName, Cell>> = {
   'document.upload': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-' },
   'vendor.rates': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: '-' },
   'project.read': { OWNER: 'Y', PM: 'A', SUPERVISOR: 'A', ACCOUNTS: '-' },
+  // Phases 2–5: studio-wide settings, not project actions.
+  'crew.manage': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-' },
+  'calendar.edit': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-' },
 };
 
 const active = (role: StudioRoleName) => ({ role, status: 'ACTIVE' as const });

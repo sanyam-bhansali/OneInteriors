@@ -51,6 +51,8 @@ const ACTION_LABELS: Record<StudioAction, string> = {
   'document.upload': 'Upload drawings',
   'vendor.rates': 'Vendor rates and margins',
   'project.read': 'See the project',
+  'crew.manage': 'Keep the crew list',
+  'calendar.edit': 'Set working days and holidays',
 };
 
 /**
