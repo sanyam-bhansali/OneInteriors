@@ -16,6 +16,9 @@ import { color, font } from '../lib/theme';
  */
 const WAIT = 30;
 
+/** "98220 41736", as the design writes a number. */
+const spaced = (d: string) => (d.length > 5 ? `${d.slice(0, 5)} ${d.slice(5)}` : d);
+
 export default function SignIn() {
   const { signIn } = useAuth();
   const t = useT();
@@ -94,7 +97,7 @@ export default function SignIn() {
           <Text style={styles.prefix}>+91</Text>
           <TextInput
             value={phone}
-            onChangeText={(v) => setPhone(v.replace(/[^\d ]/g, '').slice(0, 11))}
+            onChangeText={(v) => setPhone(spaced(v.replace(/\D/g, '').replace(/^(91|0)(?=\d{10}$)/, '').slice(0, 10)))}
             editable={!sent}
             keyboardType="phone-pad"
             autoComplete="tel-national"

@@ -142,7 +142,10 @@ export default function GeioTab() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <Aura quiet={turns.length > 0} />
+      {/* The glow is wider than the phone; clipped in its own layer so the screen can never be scrolled sideways to it. */}
+      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
+        <Aura quiet={turns.length > 0} />
+      </View>
       <View style={styles.header}>
         {turns.length ? (
           <Press
