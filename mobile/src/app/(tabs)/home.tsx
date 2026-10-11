@@ -62,7 +62,7 @@ export default function Home() {
           </View>
           <Title size={h1Size}>{name ? t('home.welcome.name', { name }) : t('home.welcome')}</Title>
           <Body muted>{t('home.none.body')}</Body>
-          <Button label={t('welcome.cta')} onPress={() => router.push({ pathname: '/web', params: { path: '/app/name', title: t('welcome.cta') } })} />
+          <Button label={t('welcome.cta')} onPress={() => router.push('/journey/name')} />
           <Button label={t('home.none.geio')} variant="ghost" onPress={() => router.push('/geio')} />
         </ScrollView>
       </SafeAreaView>

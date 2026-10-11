@@ -5,11 +5,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { GeioOrb } from '../../components/brand';
 import { Aura, Composer, Handover, Headset, Mine, NextStep, ReplyCards, SEND, Streamed, Thinking } from '../../components/geio/parts';
 import { BackIcon, CheckIcon, FolderIcon, HomeIcon, ListIcon } from '../../components/icons';
-import { Press, Rise, Stagger } from '../../components/ui';
+import { Button, Press, Rise, Stagger } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { shortDate } from '../../lib/format';
-import { LANGS, useHeadline, useLang, type Key } from '../../lib/i18n';
+import { LANGS, useHeadline, useLang, useT, type Key } from '../../lib/i18n';
+import { usePlan } from '../../lib/plan';
 import { useProfile } from '../../lib/profile';
 import { useProject } from '../../lib/project';
 import { color, font, radius } from '../../lib/theme';
@@ -52,7 +53,39 @@ function greetKey(hour: number): Key {
   return 'geioApp.greet.evening';
 }
 
+/**
+ * GEIO is part of Assured (owner, 11 Oct 2026). Before signing it stays open,
+ * because it helps choose a studio; on Basic the tab shows what GEIO does and
+ * the way to Assured instead.
+ */
 export default function GeioTab() {
+  const { plan } = usePlan();
+  return plan === 'basic' ? <GeioLocked /> : <GeioChat />;
+}
+
+function GeioLocked() {
+  const t = useT();
+  const { requested } = usePlan();
+  return (
+    <SafeAreaView style={[styles.safe, { padding: 20, gap: 18, justifyContent: 'center' }]} edges={['top', 'left', 'right']}>
+      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
+        <Aura quiet={false} />
+      </View>
+      <GeioOrb size={64} />
+      <Rise>
+        <Text role="heading" style={[styles.h1, { fontSize: 34, lineHeight: 36 }]}>{t('plan.geio.h1')}</Text>
+      </Rise>
+      <Text style={styles.intro}>{t('plan.geio.body')}</Text>
+      {requested ? (
+        <Text style={[styles.intro, { color: color.ok, fontFamily: font.sansMedium }]}>{t('plan.requested')}</Text>
+      ) : (
+        <Button label={t('plan.see')} onPress={() => router.push('/plan')} />
+      )}
+    </SafeAreaView>
+  );
+}
+
+function GeioChat() {
   const { lang, setLang, t } = useLang();
   const headline = useHeadline(40);
   const { state: auth } = useAuth();

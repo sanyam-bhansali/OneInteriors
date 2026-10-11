@@ -12,6 +12,7 @@ import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { LANGS, useLang, useT } from '../../lib/i18n';
 import { lockEnabled, setLock } from '../../lib/lock';
+import { usePlan } from '../../lib/plan';
 import { useProfile } from '../../lib/profile';
 import { useProject } from '../../lib/project';
 import { color, font } from '../../lib/theme';
@@ -37,6 +38,7 @@ function phoneLabel(phone: string): string {
 
 export default function Me() {
   const t = useT();
+  const plan = usePlan();
   const { lang, setLang } = useLang();
   const { state, signOut } = useAuth();
   const { profile, refresh } = useProfile();
@@ -97,6 +99,22 @@ export default function Me() {
 
         <Stagger i={1} start={120}>
           <RowGroup>
+            {plan.plan ? (
+              <Row
+                title={`${t('plan.current')}: ${t(plan.assured ? 'plan.assured' : 'plan.basic')}`}
+                sub={
+                  plan.assured
+                    ? plan.expertCalls
+                      ? t('plan.calls', { used: plan.expertCalls.used, total: plan.expertCalls.total })
+                      : t('plan.assured.line')
+                    : plan.requested
+                      ? t('plan.requested')
+                      : t('plan.see')
+                }
+                icon={<ShieldIcon color={plan.assured ? color.accent : color.ink} />}
+                onPress={() => router.push('/plan')}
+              />
+            ) : null}
             <Row title={t('me.locker')} sub={t('me.locker.sub')} icon={<LockerIcon color={color.ink} />} onPress={() => router.push('/locker')} />
             <Row
               title={t('me.notifications')}
@@ -173,7 +191,7 @@ export default function Me() {
               icon={<MailIcon color={color.ink} />}
               onPress={() => void Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => {})}
             />
-            <Row title={t('me.geio')} icon={<QuestionIcon color={color.ink} />} onPress={() => router.push('/geio')} />
+            {plan.plan !== 'basic' ? <Row title={t('me.geio')} icon={<QuestionIcon color={color.ink} />} onPress={() => router.push('/geio')} /> : null}
           </RowGroup>
         </Stagger>
 

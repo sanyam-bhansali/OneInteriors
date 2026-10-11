@@ -140,7 +140,7 @@ export default function SignIn() {
       {!sent ? (
         <Pressable
           role="link"
-          onPress={() => router.replace({ pathname: '/web', params: { path: '/app/name', title: t('welcome.cta') } })}
+          onPress={() => router.push('/journey/name')}
           style={{ minHeight: 44, justifyContent: 'center' }}
         >
           <Text style={styles.link}>{t('signin.new')}</Text>

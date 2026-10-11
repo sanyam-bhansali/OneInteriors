@@ -6,4 +6,6 @@ export const kit = {
   'kit.coinsPlus': { en: '+{n} coins', hi: '+{n} कॉइन', mr: '+{n} कॉइन' },
   'kit.coinsEarned': { en: '{n} coins earned', hi: '{n} कॉइन मिले', mr: '{n} कॉइन मिळाले' },
   'kit.coinChip': { en: 'Home Coins, {n}', hi: 'होम कॉइन, {n}', mr: 'होम कॉइन, {n}' },
+  'kit.remove': { en: 'Remove', hi: 'हटाएँ', mr: 'काढा' },
+  'kit.rank': { en: 'Rank {label}', hi: '{label} को क्रम दें', mr: '{label} ला क्रम द्या' },
 } satisfies Record<string, Entry>;

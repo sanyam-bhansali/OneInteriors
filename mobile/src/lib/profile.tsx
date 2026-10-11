@@ -9,7 +9,7 @@ import type { Profile } from './types';
  * user, so every part falls back to something a screen can show.
  */
 
-const EMPTY: Profile = { home: null, coins: { balance: 0, streak: 0 }, expert: { name: 'Meera' }, unread: 0, locale: 'en' };
+const EMPTY: Profile = { plan: null, home: null, coins: { balance: 0, streak: 0 }, expert: { name: 'Meera' }, unread: 0, locale: 'en' };
 
 interface Ctx {
   profile: Profile;
@@ -27,6 +27,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     if (!res.ok) return;
     const d = res.data;
     setProfile({
+      plan: d.plan ?? null,
       home: d.home ?? null,
       coins: d.coins ?? EMPTY.coins,
       expert: d.expert ?? EMPTY.expert,
@@ -41,7 +42,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     void api.profile().then((res) => {
       if (!live || !res.ok) return;
       const d = res.data;
-      setProfile({ home: d.home ?? null, coins: d.coins ?? EMPTY.coins, expert: d.expert ?? EMPTY.expert, unread: d.unread ?? 0, locale: d.locale ?? 'en' });
+      setProfile({ plan: d.plan ?? null, home: d.home ?? null, coins: d.coins ?? EMPTY.coins, expert: d.expert ?? EMPTY.expert, unread: d.unread ?? 0, locale: d.locale ?? 'en' });
     });
     return () => {
       live = false;

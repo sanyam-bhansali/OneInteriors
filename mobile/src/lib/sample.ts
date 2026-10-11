@@ -32,7 +32,13 @@ const photo = (name: keyof typeof PHOTOS) => Asset.fromModule(PHOTOS[name]).uri;
 
 export const SAMPLE_USER = { id: 'sample', name: 'Priya', phone: '+919822041736' };
 
+/*
+ * The sample starts on Basic so the locked GEIO tab and the upgrade can be
+ * seen; asking for Assured in the sample switches it at once, as if our
+ * team had already confirmed, so the Assured screens can be seen too.
+ */
 export const SAMPLE_PROFILE: Profile = {
+  plan: { plan: 'basic', assuredRequested: false, expertCalls: null },
   home: { label: 'Flat 1204, Baner', locality: 'Baner', bhk: '2 BHK', carpetSqft: 960, tier: 'premium', fullHome: true },
   coins: { balance: 1410, streak: 6 },
   expert: { name: 'Meera' },
@@ -43,6 +49,7 @@ export const SAMPLE_PROFILE: Profile = {
 export const SAMPLE_PROJECT: Project & { overallLateDays: number } = {
   id: 'sample-project',
   role: 'owner',
+  plan: 'basic',
   studio: 'Teakline Studio',
   startOn: at(-48),
   overallLateDays: 4,
@@ -209,7 +216,13 @@ export async function sampleCall<T>(method: string, path: string, body?: unknown
     read = new Set([...read, ...(b?.all ? SAMPLE_NOTICES.map((n) => n.id) : (b?.ids ?? []))]);
     return ok({});
   }
+  if (route === 'POST /plan') {
+    SAMPLE_PROFILE.plan = { plan: 'assured', assuredRequested: true, expertCalls: { used: 1, total: 5 } };
+    SAMPLE_PROJECT.plan = 'assured';
+    return ok({ assuredRequested: true });
+  }
   if (route === 'POST /geio') {
+    if (SAMPLE_PROFILE.plan?.plan !== 'assured') return { ok: false, status: 403, error: 'plan' } as Result<T>;
     const q = String((body as { question?: string } | undefined)?.question ?? '').toLowerCase();
     return ok({ reply: /talk|meera|price|pay|discount/.test(q) ? SAMPLE_HANDOVER : SAMPLE_REPLY });
   }

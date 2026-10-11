@@ -80,7 +80,7 @@ function Welcome() {
           <Text style={styles.sub}>{t('welcome.sub')}</Text>
         </Rise>
         <View style={{ alignSelf: 'stretch', gap: 10, marginTop: 24 }}>
-          <Button label={t('welcome.cta')} onPress={() => router.push({ pathname: '/web', params: { path: '/app/name', title: t('welcome.cta') } })} />
+          <Button label={t('welcome.cta')} onPress={() => router.push('/journey/name')} />
           <Button label={t('welcome.have')} variant="ghost" arrow={false} onPress={() => router.push('/sign-in')} />
         </View>
       </View>

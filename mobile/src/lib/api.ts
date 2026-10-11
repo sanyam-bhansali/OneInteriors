@@ -56,6 +56,8 @@ export const api = {
   /** Who, plus their home, coins, expert and unread count. Older servers send only `user`. */
   profile: () => call<{ user: Me } & Partial<Profile>>('GET', '/me'),
   setLocale: (locale: 'en' | 'hi' | 'mr') => call<object>('PATCH', '/me', { locale }),
+  /** Asks for Assured (registers interest; our team confirms the fee before anything is charged). */
+  requestAssured: () => call<{ assuredRequested: boolean }>('POST', '/plan', { plan: 'assured' }),
   /** Deletes the account (store requirement). The session ends with it. */
   deleteAccount: () => call<object>('DELETE', '/me'),
   geio: (question: string, history: GeioTurn[], lang: 'en' | 'hi' | 'mr', image?: string) =>

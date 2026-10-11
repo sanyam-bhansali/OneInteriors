@@ -8,6 +8,7 @@ import { Body, Button, Card, DarkCard, Eyebrow, ErrorText, Field, Loading, Press
 import { api } from '../lib/api';
 import { dayLabel, shortDate } from '../lib/format';
 import { useHeadline, useLang, useT, type T } from '../lib/i18n';
+import { usePlan } from '../lib/plan';
 import { useProject } from '../lib/project';
 import { color, font } from '../lib/theme';
 import type { Snag } from '../lib/types';
@@ -20,6 +21,7 @@ import type { Snag } from '../lib/types';
  */
 export default function Snags() {
   const t = useT();
+  const { assured } = usePlan();
   const { lang } = useLang();
   const size = useHeadline(42);
   const { state, refresh, refreshing } = useProject();
@@ -36,7 +38,7 @@ export default function Snags() {
     return (
       <Screen back>
         {/* Promises Assured-plan service (FLOWS.md): flagged for Sanyam, kept. */}
-        <Eyebrow>{t('snags.eyebrow')}</Eyebrow>
+        <Eyebrow>{assured ? t('snags.eyebrow') : t('plan.basic.snags')}</Eyebrow>
         <Title size={size} style={titleStyle}>
           {t('snags.title')}
         </Title>
@@ -84,7 +86,7 @@ export default function Snags() {
       <View style={{ gap: 20 }}>
         <View style={{ gap: 8 }}>
           {/* Promises Assured-plan service (FLOWS.md): flagged for Sanyam, kept. */}
-          <Eyebrow>{t('snags.eyebrow')}</Eyebrow>
+          <Eyebrow>{assured ? t('snags.eyebrow') : t('plan.basic.snags')}</Eyebrow>
           <Title size={size} style={titleStyle}>
             {t('snags.title')}
           </Title>
@@ -133,7 +135,7 @@ export default function Snags() {
 
         <DarkCard style={styles.walk}>
           <Eyebrow onDark>{handover ? t('snags.walk', { date: shortDate(handover.targetOn) }) : t('snags.walkNoDate')}</Eyebrow>
-          <Text style={styles.walkBody}>{t('snags.walkBody')}</Text>
+          <Text style={styles.walkBody}>{assured ? t('snags.walkBody') : t('plan.basic.walk')}</Text>
         </DarkCard>
       </View>
     </Screen>

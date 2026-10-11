@@ -9,6 +9,7 @@ import { Body, DarkCard, Eyebrow, Loading, Meta, Rise, Screen, Stagger, Title } 
 import { api } from '../../lib/api';
 import { dayLabel, timeLabel } from '../../lib/format';
 import { useHeadline, useT, type T } from '../../lib/i18n';
+import { usePlan } from '../../lib/plan';
 import { useProfile } from '../../lib/profile';
 import { useProject } from '../../lib/project';
 import { color, font } from '../../lib/theme';
@@ -22,6 +23,7 @@ import { STAGE_SHORT, type Project } from '../../lib/types';
  */
 export default function Site() {
   const t = useT();
+  const { assured } = usePlan();
   const size = useHeadline(42);
   const { state, refresh, refreshing } = useProject();
   const { profile } = useProfile();
@@ -123,7 +125,7 @@ export default function Site() {
               <Stagger key={`gap-${item.n}`} i={Math.min(i, 4)} start={240}>
                 <DarkCard style={{ borderRadius: 18, padding: 18, gap: 8 }}>
                   <Eyebrow onDark>{t('site.gap.title', { date: dayLabel(dayIso(item.n)) })}</Eyebrow>
-                  <Text style={styles.gapBody}>{t('site.gap.body', { studio: project.studio })}</Text>
+                  <Text style={styles.gapBody}>{t(assured ? 'plan.assured.gap' : 'plan.basic.gap', { studio: project.studio })}</Text>
                 </DarkCard>
               </Stagger>
             ) : (

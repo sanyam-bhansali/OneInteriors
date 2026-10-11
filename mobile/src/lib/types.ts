@@ -84,6 +84,8 @@ export interface Money {
 
 export interface Project {
   id: string;
+  /** Basic or Assured; older servers omit it (read as Basic). */
+  plan?: 'basic' | 'assured';
   /** The owner chooses and approves; family see everything and vote. Older servers omit it. */
   role?: 'owner' | 'family';
   studio: string;
@@ -138,7 +140,17 @@ export interface Home {
   fullHome: boolean;
 }
 
+/** The customer's plan (docs/APP-API-JOURNEY.md): Basic is free; Assured is our oversight, GEIO and 5 expert calls. */
+export interface PlanInfo {
+  plan: 'basic' | 'assured';
+  /** They chose Assured; our team confirms the fee before switching them. */
+  assuredRequested: boolean;
+  expertCalls: { used: number; total: number } | null;
+}
+
 export interface Profile {
+  /** Null before they sign with a studio. */
+  plan: PlanInfo | null;
   home: Home | null;
   coins: { balance: number; streak: number };
   expert: { name: string };

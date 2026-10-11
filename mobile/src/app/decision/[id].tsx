@@ -12,6 +12,7 @@ import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { dayLabel, inr } from '../../lib/format';
 import { useHeadline, useLang, useT } from '../../lib/i18n';
+import { usePlan } from '../../lib/plan';
 import { useProfile } from '../../lib/profile';
 import { useProject } from '../../lib/project';
 import { color, font } from '../../lib/theme';
@@ -36,6 +37,7 @@ const VOTE_COLORS = [color.ok, '#8E6A3A', color.accent, color.ink2];
 
 export default function DecisionScreen() {
   const t = useT();
+  const plan = usePlan();
   const { lang } = useLang();
   const size = useHeadline(36);
   const insets = useSafeAreaInsets();
@@ -89,7 +91,12 @@ export default function DecisionScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
         <View style={[styles.hero, { height: 230 + insets.top }]}>
           {/* No decision photo comes from the server yet: the studio's kitchen render stands in. */}
-          <Image source={require('../../../assets/app/kitchen.webp')} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityLabel={t('decision.photo')} />
+          <Image
+            source={require('../../../assets/app/kitchen.webp')}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            accessibilityLabel={t('decision.photo')}
+          />
           <LinearGradient
             colors={['rgba(11,11,11,.55)', 'rgba(11,11,11,.1)', 'rgba(11,11,11,.8)']}
             locations={[0, 0.4, 1]}
@@ -99,14 +106,19 @@ export default function DecisionScreen() {
             <Press onPress={back} style={styles.back} accessibilityLabel={t('decision.back')}>
               <ChevronBack color={color.white} />
             </Press>
-            <Text style={styles.heroMeta}>{closed ? t('decision.closedOn', { day: dayLabel(d.dueOn) }) : t('decision.due', { day: dayLabel(d.dueOn) })}</Text>
+            <Text style={styles.heroMeta}>
+              {closed ? t('decision.closedOn', { day: dayLabel(d.dueOn) }) : t('decision.due', { day: dayLabel(d.dueOn) })}
+            </Text>
           </View>
         </View>
 
         <View style={styles.body}>
           <View style={{ gap: 10 }}>
             <Rise>
-              <Text role="heading" style={[styles.h1, { fontSize: size, lineHeight: lang === 'en' ? size * 0.98 : size * 1.25, letterSpacing: size * -0.045 }]}>
+              <Text
+                role="heading"
+                style={[styles.h1, { fontSize: size, lineHeight: lang === 'en' ? size * 0.98 : size * 1.25, letterSpacing: size * -0.045 }]}
+              >
                 {d.title}
               </Text>
             </Rise>
@@ -162,7 +174,10 @@ export default function DecisionScreen() {
                     <View key={`${v.name}-${i}`} style={styles.voteRow}>
                       <Avatar letter={v.name} tone={VOTE_COLORS[i % VOTE_COLORS.length]!} />
                       <Text style={styles.voteText}>
-                        <Bolded template={v.mine ? t('decision.youVoted', { option: '\u0000' }) : t('decision.voted', { name: v.name, option: '\u0000' })} bold={option} />
+                        <Bolded
+                          template={v.mine ? t('decision.youVoted', { option: '\u0000' }) : t('decision.voted', { name: v.name, option: '\u0000' })}
+                          bold={option}
+                        />
                         {v.note ? `: “${v.note}”` : ''}
                       </Text>
                     </View>
@@ -178,13 +193,21 @@ export default function DecisionScreen() {
             </View>
           ) : null}
 
-          <View style={{ gap: 2 }}>
-            <Text style={styles.ask}>{t('decision.notSure', { name: expert, day: dayLabel(d.dueOn) })}</Text>
-            <Press onPress={() => router.push('/geio')} haptic={false} accessibilityRole="link" style={styles.askLink}>
-              <Text style={styles.askLinkText}>{t('decision.ask', { name: expert })}</Text>
-              <ArrowIcon color={color.ink} size={14} />
-            </Press>
-          </View>
+          {/* The expert is Assured's (and the open pre-sign stage's); Basic has no one to ask here. */}
+          {plan.plan !== 'basic' ? (
+            <View style={{ gap: 2 }}>
+              <Text style={styles.ask}>{t('decision.notSure', { name: expert, day: dayLabel(d.dueOn) })}</Text>
+              <Press
+                onPress={() => router.push({ pathname: '/geio', params: { ask: 'expert' } })}
+                haptic={false}
+                accessibilityRole="link"
+                style={styles.askLink}
+              >
+                <Text style={styles.askLinkText}>{t('decision.ask', { name: expert })}</Text>
+                <ArrowIcon color={color.ink} size={14} />
+              </Press>
+            </View>
+          ) : null}
 
           {error ? <ErrorText>{error}</ErrorText> : null}
         </View>
@@ -266,7 +289,16 @@ const styles = StyleSheet.create({
   askLink: { alignSelf: 'flex-start', minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8 },
   askLinkText: { fontFamily: font.sansSemi, fontSize: 14.5, color: color.ink },
   footer: { paddingTop: 12, paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: color.line, backgroundColor: color.paper },
-  pill: { minHeight: 56, borderRadius: 999, backgroundColor: color.ink, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 20 },
+  pill: {
+    minHeight: 56,
+    borderRadius: 999,
+    backgroundColor: color.ink,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingHorizontal: 20,
+  },
   pillText: { flexShrink: 1, fontFamily: font.sansSemi, fontSize: 15, color: color.onDark, textAlign: 'center' },
   familyNote: { fontFamily: font.sans, fontSize: 14.5, lineHeight: 21, color: color.ink2, textAlign: 'center', paddingVertical: 8 },
 });

@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../lib/auth';
+import { BriefProvider } from '../lib/brief';
 import { LangProvider } from '../lib/i18n';
 import { LockGate } from '../lib/lock';
 import { ProfileProvider } from '../lib/profile';
@@ -29,6 +30,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <LangProvider>
+        <BriefProvider>
         <AuthProvider>
           <ProfileProvider>
             <ProjectProvider>
@@ -39,6 +41,7 @@ export default function RootLayout() {
             </ProjectProvider>
           </ProfileProvider>
         </AuthProvider>
+        </BriefProvider>
       </LangProvider>
     </SafeAreaProvider>
   );

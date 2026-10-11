@@ -1,10 +1,12 @@
 import { decision } from './decision';
 import { geio } from './geio';
 import { home } from './home';
+import { journey } from './journey';
 import { kit } from './kit';
 import { locker } from './locker';
 import { me } from './me';
 import { notifications } from './notifications';
+import { plan } from './plan';
 import { project } from './project';
 import { signin } from './signin';
 import { site } from './site';
@@ -20,6 +22,7 @@ import { welcome } from './welcome';
 export const NATIVE = {
   ...kit,
   ...welcome,
+  ...journey,
   ...signin,
   ...home,
   ...project,
@@ -30,4 +33,5 @@ export const NATIVE = {
   ...locker,
   ...notifications,
   ...geio,
+  ...plan,
 };

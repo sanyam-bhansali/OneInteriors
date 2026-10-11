@@ -322,8 +322,9 @@ export function Chip({ label, on, onPress }: { label: string; on?: boolean; onPr
  * priorities, home types). Tapping one moves it into a `RankedRow`.
  */
 export function CircleOption({ label, icon, onPress }: { label: string; icon?: ReactNode; onPress?: () => void }) {
+  const t = useLang().t;
   return (
-    <Press onPress={onPress} accessibilityLabel={`Rank ${label}`} style={styles.circle}>
+    <Press onPress={onPress} accessibilityLabel={t('kit.rank', { label })} style={styles.circle}>
       {icon}
       <Text style={styles.circleText}>{label}</Text>
     </Press>
@@ -333,19 +334,20 @@ export function CircleOption({ label, icon, onPress }: { label: string; icon?: R
 /** A ranked choice: a black row with its terracotta number, and "Remove". */
 export function RankedRow({ n, label, icon, onRemove }: { n: number; label: string; icon?: ReactNode; onRemove?: () => void }) {
   const still = useReducedMotion();
+  const t = useLang().t;
   const [v] = useState(() => new Animated.Value(still ? 1 : 0.6));
   useEffect(() => {
     if (!still) Animated.timing(v, { toValue: 1, duration: 450, easing: motion.spring, useNativeDriver: true }).start();
   }, [v, still]);
   return (
     <Animated.View style={{ transform: [{ scale: v }], opacity: v.interpolate({ inputRange: [0.6, 1], outputRange: [0, 1] }) }}>
-      <Press onPress={onRemove} accessibilityLabel={`${n}. ${label}. Remove`} style={styles.ranked}>
+      <Press onPress={onRemove} accessibilityLabel={`${n}. ${label}. ${t('kit.remove')}`} style={styles.ranked}>
         <View style={styles.rankNum}>
           <Text style={{ fontFamily: font.sansSemi, fontSize: 15, color: color.white }}>{n}</Text>
         </View>
         {icon}
         <Text style={{ flex: 1, fontFamily: font.sansMedium, fontSize: 16, color: color.white }}>{label}</Text>
-        <Text style={[type.eyebrow, { color: 'rgba(255,255,255,.6)' }]}>Remove</Text>
+        <Text style={[type.eyebrow, { color: 'rgba(255,255,255,.6)' }]}>{t('kit.remove')}</Text>
       </Press>
     </Animated.View>
   );

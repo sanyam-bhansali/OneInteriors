@@ -7,6 +7,7 @@ import { Body, Card, Eyebrow, Loading, Meta, Press, Screen, Stagger, Tile, Title
 import { dayLabel, inr, lakh, shortDate } from '../../lib/format';
 import { useHeadline, useLang, useT, type T } from '../../lib/i18n';
 import { daysLate } from '../../lib/progress';
+import { usePlan } from '../../lib/plan';
 import { useProject } from '../../lib/project';
 import { color, font } from '../../lib/theme';
 import type { Decision, Money, Project as ProjectData, Stage } from '../../lib/types';
@@ -21,6 +22,7 @@ import type { Decision, Money, Project as ProjectData, Stage } from '../../lib/t
  */
 export default function Project() {
   const t = useT();
+  const { assured } = usePlan();
   const { lang } = useLang();
   const size = useHeadline(42);
   const { state, refresh, refreshing } = useProject();
@@ -128,6 +130,8 @@ export default function Project() {
               decision={s.state === 'now' && due ? due : null}
               onDecision={openDecision}
               titleLine={titleLine}
+              assured={assured}
+              studio={p.studio}
               t={t}
             />
           ))}
@@ -151,7 +155,7 @@ export default function Project() {
         ) : null}
 
         {/* Promises Assured-plan service (FLOWS.md): flagged for Sanyam, kept. */}
-        <Text style={styles.note}>{t('project.footnote')}</Text>
+        <Text style={styles.note}>{assured ? t('project.footnote') : t('plan.basic.footnote')}</Text>
       </View>
     </Screen>
   );
@@ -171,6 +175,8 @@ function StageRow({
   decision,
   onDecision,
   titleLine,
+  assured,
+  studio,
   t,
 }: {
   stage: Stage;
@@ -179,6 +185,9 @@ function StageRow({
   decision: Decision | null;
   onDecision: (d: Decision) => void;
   titleLine: number;
+  /** Assured promises our follow-up; Basic must not. */
+  assured: boolean;
+  studio: string;
   t: T;
 }) {
   const done = s.state === 'done';
@@ -222,7 +231,7 @@ function StageRow({
           {s.late ? (
             <View style={styles.lateCard}>
               <Text style={styles.lateEyebrow}>{done ? t('project.lateDone.eyebrow') : t('project.late.eyebrow')}</Text>
-              <Text style={styles.lateBody}>{done ? t('project.lateDone.body', { date }) : t('project.late.body', { date })}</Text>
+              <Text style={styles.lateBody}>{done ? t('project.lateDone.body', { date }) : (assured ? t('project.late.body', { date }) : t('plan.basic.late', { date, studio }))}</Text>
             </View>
           ) : null}
           {decision ? (
