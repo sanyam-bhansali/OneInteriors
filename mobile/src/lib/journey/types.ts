@@ -38,7 +38,7 @@ export interface StudioCard {
   localities: string[];
 }
 
-export type ApiMatch = StudioCard & { score: number;
+export type ApiMatch = StudioCard & { score: number; quote: ApiQuote };
 
 export interface MatchesView {
   studioCount: number;
