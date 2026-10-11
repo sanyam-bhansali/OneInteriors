@@ -41,6 +41,8 @@ export interface StudioCard {
 export type ApiMatch = StudioCard & { score: number; quote: ApiQuote };
 
 export interface MatchesView {
+  /** False while studios are priced on pre-launch archive rates; the screens say so. */
+  ratesReal: boolean;
   studioCount: number;
   tiers: Record<'essential' | 'premium' | 'luxury', ApiMatch[]>;
   tier: 'essential' | 'premium' | 'luxury';

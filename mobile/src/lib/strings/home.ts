@@ -54,4 +54,6 @@ export const home = {
     hi: 'इस फ़ोन पर सेव की गई जानकारी दिख रही है। {error}',
     mr: 'या फोनवर सेव्ह केलेली माहिती दिसत आहे. {error}',
   },
+  'homeApp.choose': { en: 'Meet your studios', hi: 'अपने स्टूडियो से मिलें', mr: 'तुमच्या स्टुडिओंना भेटा' },
+  'homeApp.quotes': { en: 'See my quotes again', hi: 'मेरे कोटेशन फिर से देखें', mr: 'माझी कोटेशन पुन्हा पाहा' },
 } satisfies Record<string, Entry>;

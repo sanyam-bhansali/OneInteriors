@@ -11,6 +11,7 @@ import { Body, Button, DarkCard, Eyebrow, Loading, Press, Rise, StatusChip, Titl
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { dayLabel, inr, timeLabel } from '../../lib/format';
+import { useBrief } from '../../lib/brief';
 import { useHeadline, useLang, useT, type Key, type T } from '../../lib/i18n';
 import { daysLate } from '../../lib/progress';
 import { useProfile } from '../../lib/profile';
@@ -27,6 +28,7 @@ import type { Decision, Stage, Update } from '../../lib/types';
  */
 export default function Home() {
   const t = useT();
+  const { brief } = useBrief();
   const { lang } = useLang();
   const h1Size = useHeadline(40);
   const insets = useSafeAreaInsets();
@@ -62,7 +64,15 @@ export default function Home() {
           </View>
           <Title size={h1Size}>{name ? t('home.welcome.name', { name }) : t('home.welcome')}</Title>
           <Body muted>{t('home.none.body')}</Body>
-          <Button label={t('welcome.cta')} onPress={() => router.push('/journey/name')} />
+          {/* Signed in, brief finished, not signed with a studio yet: carry on choosing (FLOWS.md, stage 1). */}
+          {brief.completedAt ? (
+            <>
+              <Button label={t('homeApp.choose')} onPress={() => router.push('/journey/choose')} />
+              <Button label={t('homeApp.quotes')} variant="ghost" arrow={false} onPress={() => router.push('/journey/quote')} />
+            </>
+          ) : (
+            <Button label={t('welcome.cta')} onPress={() => router.push('/journey/name')} />
+          )}
           <Button label={t('home.none.geio')} variant="ghost" onPress={() => router.push('/geio')} />
         </ScrollView>
       </SafeAreaView>

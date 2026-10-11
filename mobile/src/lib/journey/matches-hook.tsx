@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { call } from '../api';
 import { useBrief } from '../brief';
 import type { MatchesView } from './types';
@@ -26,12 +26,21 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
   const [tier, setTier] = useState<Ctx['tier']>(null);
   const key = JSON.stringify(brief);
 
+  /* `load` keeps one identity per brief, and a second call while one is in
+     flight, or once this brief's answer is in, does nothing, so screens may
+     call it from an effect freely. */
+  const done = useRef<string | null>(null);
+  const inFlight = useRef<string | null>(null);
   const load = useCallback(async () => {
-    if (state.status === 'ready' && state.key === key) return;
+    if (done.current === key || inFlight.current === key) return;
+    inFlight.current = key;
     setState({ status: 'loading' });
     const res = await call<MatchesView>('POST', '/journey/matches', { brief });
+    if (inFlight.current !== key) return;
+    inFlight.current = null;
+    if (res.ok) done.current = key;
     setState(res.ok ? { status: 'ready', view: res.data, key } : { status: 'error', error: res.error });
-  }, [brief, key, state]);
+  }, [brief, key]);
 
   const value = useMemo(() => ({ state, load, tier, setTier }), [state, load, tier]);
   return <MatchesContext.Provider value={value}>{children}</MatchesContext.Provider>;
