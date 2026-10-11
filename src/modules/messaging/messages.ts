@@ -12,7 +12,11 @@ export type StudioMessage =
   /** A six-digit sign-in code for /studio/sign-in. */
   | { kind: 'code'; code: string }
   /** "You have been added to {studio}": the sign-in link, from Settings → Team. */
-  | { kind: 'invite'; name: string; studioName: string; link: string };
+  | { kind: 'invite'; name: string; studioName: string; link: string }
+  /** Site mode (Phase 2), 18:00 IST: nothing posted yet today for a site this supervisor is on. */
+  | { kind: 'site-reminder'; name: string; home: string; link: string }
+  /** Site mode (Phase 2), 21:00 IST: a second working day in a row with no post, to the owner. */
+  | { kind: 'site-missed'; name: string; home: string; days: number; link: string };
 
 /**
  * Env var for each kind's approved WhatsApp template. Unset means "not
@@ -25,10 +29,16 @@ export type StudioMessage =
 export const TEMPLATE_ENV: Record<StudioMessage['kind'], string> = {
   code: 'WHATSAPP_STUDIO_CODE_TEMPLATE',
   invite: 'WHATSAPP_STUDIO_INVITE_TEMPLATE',
+  /* UTILITY, three body parameters: name, home, link. */
+  'site-reminder': 'WHATSAPP_STUDIO_SITE_REMINDER_TEMPLATE',
+  /* UTILITY, four body parameters: name, home, days, link. */
+  'site-missed': 'WHATSAPP_STUDIO_SITE_MISSED_TEMPLATE',
 };
 
 /** The template's body parameters, in order. */
 export function templateParams(message: StudioMessage): string[] {
+  if (message.kind === 'site-reminder') return [message.name, message.home, message.link];
+  if (message.kind === 'site-missed') return [message.name, message.home, String(message.days), message.link];
   return message.kind === 'code' ? [message.code] : [message.name, message.studioName, message.link];
 }
 
@@ -37,6 +47,12 @@ export function templateParams(message: StudioMessage): string[] {
  * SMS segment for the code, and nothing a carrier's filter reads as spam.
  */
 export function plainText(message: StudioMessage): string {
+  if (message.kind === 'site-reminder') {
+    return `${message.name}, nothing is posted yet today for ${message.home}. Post today's update: ${message.link}`;
+  }
+  if (message.kind === 'site-missed') {
+    return `${message.name}, ${message.home} has had no site update for ${message.days} working days. The customer can see this. ${message.link}`;
+  }
   if (message.kind === 'code') {
     return `${message.code} is your One Interiors Studio sign-in code. It expires in 10 minutes. Do not share it.`;
   }

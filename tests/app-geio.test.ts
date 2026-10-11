@@ -89,10 +89,22 @@ const PROJECT: CustomerProject = {
       chosenAt: null,
       byStudio: true,
       votes: [],
+      choices: [],
+      pickedOptionId: null,
     },
   ],
   snags: [],
   documents: [],
+  // Phase 3 (portal/tracker-view.ts): no plan from a quote here, so no tracker.
+  tracker: null,
+  overallLateDays: 0,
+  stageStatus: null,
+  // Phase 5 (portal/money-locker-view.ts): payments from rows, materials.
+  payments: null,
+  materials: [],
+  // Phase 2 (portal/site-feed-view.ts): the daily site log.
+  siteLogs: [],
+  siteMissedDays: [],
 };
 
 describe('what the clients may send', () => {

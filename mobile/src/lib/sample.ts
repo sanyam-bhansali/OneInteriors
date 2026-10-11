@@ -19,6 +19,8 @@ const at = (days: number, hour = 10) => {
   d.setHours(hour, 0, 0, 0);
   return d.toISOString();
 };
+/** A day, 'YYYY-MM-DD', `days` from today. */
+const dayAt = (days: number) => at(days).slice(0, 10);
 const L = (lakh: number) => Math.round(lakh * 100_000 * 100);
 /* The website's own site photos, bundled, so the sample works offline. */
 const PHOTOS = {
@@ -47,13 +49,45 @@ export const SAMPLE_PROFILE: Profile = {
   locale: 'en',
 };
 
-export const SAMPLE_PROJECT: Project & { overallLateDays: number } = {
+export const SAMPLE_PROJECT: Project = {
   id: 'sample-project',
   role: 'owner',
   plan: 'basic',
   studio: 'Teakline Studio',
   startOn: at(-48),
   overallLateDays: 4,
+  stageStatus: { key: 'PRODUCTION', label: 'Carpentry', status: 'on-track', lateDays: 0 },
+  // The tracker as the server sends it (portal/tracker-view.ts): civil moved for a supplier, which pushed
+  // handover 4 days (the studio's delay), and carpentry moved 2 days waiting on Priya's pick (hers, labelled).
+  tracker: {
+    stages: [
+      { key: 'DESIGN', kind: 'DESIGN', label: 'Design sign-off', plannedStart: dayAt(-60), plannedEnd: dayAt(-48), originalEnd: dayAt(-48), actualEnd: dayAt(-50), forecastEnd: dayAt(-50), state: 'done', status: 'done', lateDays: 0, earlyDays: 2, checklist: { done: 2, total: 2 }, moved: null },
+      {
+        key: 'SITE', kind: 'CIVIL', label: 'Civil', plannedStart: dayAt(-48), plannedEnd: dayAt(-20), originalEnd: dayAt(-26), actualEnd: dayAt(-20), forecastEnd: dayAt(-20), state: 'done', status: 'done', lateDays: 5, earlyDays: 0, checklist: { done: 6, total: 6 },
+        moved: { from: dayAt(-26), to: dayAt(-20), reason: 'SUPPLIER', customer: false, words: '' },
+      },
+      {
+        key: 'PRODUCTION', kind: 'CARPENTRY', label: 'Carpentry', plannedStart: dayAt(-20), plannedEnd: dayAt(12), originalEnd: dayAt(10), actualEnd: null, forecastEnd: dayAt(12), state: 'now', status: 'on-track', lateDays: 0, earlyDays: 0, checklist: { done: 3, total: 9 },
+        moved: { from: dayAt(10), to: dayAt(12), reason: 'CUSTOMER_CHANGE', customer: true, words: '' },
+      },
+      { key: 'FINISH', kind: 'FINISH', label: 'Finishing', plannedStart: dayAt(12), plannedEnd: dayAt(55), originalEnd: dayAt(51), actualEnd: null, forecastEnd: dayAt(55), state: 'next', status: 'upcoming', lateDays: 0, earlyDays: 0, checklist: { done: 0, total: 4 }, moved: null },
+      { key: 'HANDOVER', kind: 'HANDOVER', label: 'Handover', plannedStart: dayAt(55), plannedEnd: dayAt(64), originalEnd: dayAt(60), actualEnd: null, forecastEnd: dayAt(64), state: 'later', status: 'upcoming', lateDays: 0, earlyDays: 0, checklist: { done: 0, total: 0 }, moved: null },
+    ],
+    current: {
+      key: 'PRODUCTION',
+      label: 'Carpentry',
+      rooms: [
+        { room: 'Bedroom 1', items: [{ label: 'Wardrobe carcass', done: true }, { label: 'Wardrobe frame fitted', done: true }, { label: 'Wardrobe shutters', done: false }] },
+        { room: 'Kitchen', items: [{ label: 'Carcass delivered', done: true }, { label: 'Carcass levelled and fixed', done: false }, { label: 'Shutters', done: false }, { label: 'Loft', done: false }] },
+        { room: 'Living room', items: [{ label: 'TV unit', done: false }, { label: 'False ceiling', done: false }] },
+      ],
+    },
+    moves: [
+      { at: at(-6), stage: 'Carpentry', field: 'end', from: dayAt(10), to: dayAt(12), reason: 'CUSTOMER_CHANGE', customer: true, byDecision: true, handoverTo: null, words: '' },
+      { at: at(-24), stage: 'Civil', field: 'end', from: dayAt(-26), to: dayAt(-20), reason: 'SUPPLIER', customer: false, byDecision: false, handoverTo: dayAt(64), words: '' },
+    ],
+    overall: { plannedHandover: dayAt(60), forecastHandover: dayAt(64), handedOver: false, lateDays: 4, earlyDays: 0, customerDays: 0, studioDays: 4 },
+  },
   stages: [
     { key: 'DESIGN', label: 'Design sign-off', targetOn: at(-48), state: 'done', late: false },
     { key: 'SITE', label: 'Civil', targetOn: at(-20), state: 'done', late: true },
@@ -74,23 +108,8 @@ export const SAMPLE_PROJECT: Project & { overallLateDays: number } = {
     ],
   },
   changes: { totalPaise: 0, items: [] },
+  /* Phase 2: the last few days come from the site log (siteLogs below); this older note is from before site mode. */
   updates: [
-    {
-      id: 'u1',
-      note: 'Ramesh (carpenter) and 1 helper on site from 9:40 am. Wardrobe frames fitted in both bedrooms.',
-      stage: 'Carpentry',
-      at: at(0, 9),
-      byStudio: true,
-      photos: [photo('wardrobe'), photo('bedroom'), photo('living')],
-    },
-    {
-      id: 'u2',
-      note: 'Kitchen carcasses levelled and fixed to the wall.',
-      stage: 'Carpentry',
-      at: at(-1, 17),
-      byStudio: true,
-      photos: [photo('kitchen')],
-    },
     {
       id: 'u3',
       note: 'Plywood for the wardrobes delivered and checked against the quote: 18 mm BWP.',
@@ -100,6 +119,75 @@ export const SAMPLE_PROJECT: Project & { overallLateDays: number } = {
       photos: [photo('carcass')],
     },
   ],
+  /* Phase 2: the daily site log, as the server sends it (portal/site-feed-view.ts). */
+  siteLogs: [
+    {
+      id: 'sl1',
+      day: dayAt(0),
+      kind: 'update',
+      postedAt: at(0, 17),
+      reason: null,
+      reasonText: null,
+      countsAgainstStudio: null,
+      text: null,
+      photos: [
+        { url: photo('wardrobe'), text: 'Wardrobe frame fitted in bedroom 1.', takenAt: at(0, 16), fromGallery: false },
+        { url: photo('bedroom'), text: 'Bedroom 2 wardrobe frame is done too.', takenAt: at(0, 16), fromGallery: false },
+        { url: photo('living'), text: 'Living room TV unit frame marked on the wall.', takenAt: at(0, 17), fromGallery: false },
+      ],
+      crew: [
+        { name: 'Ramesh', role: 'Carpenter', arrivedAt: at(0, 9) },
+        { name: 'Sunil', role: 'Helper', arrivedAt: at(0, 10) },
+      ],
+      done: [
+        { room: 'Bedroom 1', label: 'Wardrobe frame fitted' },
+        { room: 'Bedroom 2', label: 'Wardrobe frame fitted' },
+      ],
+      corrections: [
+        {
+          id: 'sl1c',
+          kind: 'correction',
+          postedAt: at(0, 18),
+          reason: null,
+          reasonText: null,
+          countsAgainstStudio: null,
+          text: 'The loft shutters for bedroom 1 are cut and ready to fit.',
+          photos: [],
+          crew: [],
+          done: [],
+        },
+      ],
+    },
+    {
+      id: 'sl2',
+      day: dayAt(-1),
+      kind: 'update',
+      postedAt: at(-1, 17),
+      reason: null,
+      reasonText: null,
+      countsAgainstStudio: null,
+      text: null,
+      photos: [{ url: photo('kitchen'), text: 'Kitchen carcass levelled and fixed to the wall.', takenAt: at(-1, 16), fromGallery: false }],
+      crew: [{ name: 'Ramesh', role: 'Carpenter', arrivedAt: at(-1, 9) }],
+      done: [{ room: 'Kitchen', label: 'Kitchen carcass levelled and fixed' }],
+      corrections: [],
+    },
+    {
+      id: 'sl3',
+      day: dayAt(-2),
+      kind: 'nobody',
+      postedAt: at(-2, 9),
+      reason: 'waiting-material',
+      reasonText: 'Waiting for material',
+      countsAgainstStudio: true,
+      text: null,
+      photos: [],
+      crew: [],
+      done: [],
+      corrections: [],
+    },
+  ],
+  siteMissedDays: [],
   decisions: [
     {
       id: 'd1',
@@ -134,6 +222,7 @@ export const SAMPLE_PROJECT: Project & { overallLateDays: number } = {
       photos: [photo('wardrobe')],
       fixedNote: null,
       fixedPhotos: [],
+      progress: { state: 'accepted', fixBy: at(2), fixedAt: null, fixSentence: null, studioReason: null, notFixedReason: null, closedAt: null, closedBy: null, autoClosesOn: null, daysToFix: null, canAnswer: false },
     },
     {
       id: 's2',
@@ -147,6 +236,22 @@ export const SAMPLE_PROJECT: Project & { overallLateDays: number } = {
       photos: [photo('carcass')],
       fixedNote: null,
       fixedPhotos: [],
+      progress: { state: 'raised', fixBy: null, fixedAt: null, fixSentence: null, studioReason: null, notFixedReason: null, closedAt: null, closedBy: null, autoClosesOn: null, daysToFix: null, canAnswer: false },
+    },
+    // Phase 4: a fix waiting for Priya — before and after side by side, Confirm / Not fixed.
+    {
+      id: 's4',
+      title: 'Shutter rubbing at the top',
+      room: 'Kitchen',
+      note: null,
+      status: 'FIXED',
+      line: null,
+      raisedAt: at(-5),
+      raisedByStudio: false,
+      photos: [photo('kitchen')],
+      fixedNote: 'Hinge adjusted; the shutter closes without touching.',
+      fixedPhotos: [photo('kitchen')],
+      progress: { state: 'fixed', fixBy: at(-2), fixedAt: at(-1), fixSentence: 'Hinge adjusted; the shutter closes without touching.', studioReason: null, notFixedReason: null, closedAt: null, closedBy: null, autoClosesOn: at(6), daysToFix: null, canAnswer: true },
     },
     {
       id: 's3',
@@ -160,6 +265,7 @@ export const SAMPLE_PROJECT: Project & { overallLateDays: number } = {
       photos: [photo('switchboard')],
       fixedNote: 'Moved 4 cm left and re-plastered.',
       fixedPhotos: [photo('switchboard')],
+      progress: { state: 'closed', fixBy: at(-7), fixedAt: at(-7), fixSentence: 'Moved 4 cm left and re-plastered.', studioReason: null, notFixedReason: null, closedAt: at(-6), closedBy: 'you', autoClosesOn: null, daysToFix: 2, canAnswer: false },
     },
   ],
   documents: [
@@ -169,6 +275,44 @@ export const SAMPLE_PROJECT: Project & { overallLateDays: number } = {
     { id: 'doc4', kind: 'RECEIPT', title: 'Receipt, ₹7,36,000', meta: 'At signing', url: 'https://oneinteriors.in/privacy' },
   ],
 };
+
+/*
+ * Phase 5 (studio workspace): the decision's options as rows (one takes money
+ * off), the money from the studio's payment entries (the booking recorded
+ * before confirmations started, and today's entry waiting for Priya's yes),
+ * and what the home is made of, as the server sends them
+ * (portal/money-locker-view.ts).
+ */
+Object.assign(SAMPLE_PROJECT.decisions[0]!, {
+  pickedOptionId: null,
+  choices: [
+    { id: 'o1', label: 'Sage matte', detail: 'In your quote', photo: null, swatch: '#9AA58C', deltaPaise: 0 },
+    { id: 'o2', label: 'Walnut grain', detail: 'Warmer, hides marks', photo: null, swatch: '#6B4A33', deltaPaise: 14_500_00 },
+    { id: 'o3', label: 'Plain white laminate', detail: 'Simpler, a little cheaper', photo: null, swatch: '#F4F2EC', deltaPaise: -3_200_00 },
+  ],
+});
+SAMPLE_PROJECT.payments = {
+  signedPaise: L(18.4),
+  changesPaise: 0,
+  totalPaise: L(18.4),
+  paidPaise: L(7.36),
+  waitingPaise: L(2),
+  balancePaise: L(11.04),
+  stages: [
+    { index: 0, label: 'At signing', amountPaise: L(7.36), changesPaise: 0, paidPaise: L(7.36), waitingPaise: 0, state: 'paid', dueOn: dayAt(-48) },
+    { index: 1, label: 'When finishing starts', amountPaise: L(7.36), changesPaise: 0, paidPaise: 0, waitingPaise: L(2), state: 'part', dueOn: dayAt(21) },
+    { index: 2, label: 'At handover, after snags close', amountPaise: L(3.68), changesPaise: 0, paidPaise: 0, waitingPaise: 0, state: 'later', dueOn: null },
+  ],
+  entries: [
+    { id: 'pay2', stageIndex: 1, stage: 'When finishing starts', amountPaise: L(2), receivedOn: dayAt(0), mode: 'UPI', status: 'waiting', receiptDocumentId: null, canAnswer: true },
+    { id: 'pay1', stageIndex: 0, stage: 'At signing', amountPaise: L(7.36), receivedOn: dayAt(-48), mode: null, status: 'earlier', receiptDocumentId: 'doc4', canAnswer: true },
+  ],
+};
+SAMPLE_PROJECT.materials = [
+  { id: 'm1', room: 'Kitchen', item: 'Shutters', spec: 'Sage matte laminate, 1 mm', productCode: null, ordered: false },
+  { id: 'm2', room: 'Kitchen', item: 'Hinges', spec: 'Soft-close, full overlay', productCode: 'HET-SC-110', ordered: true },
+  { id: 'm3', room: 'Master bedroom', item: 'Wardrobe carcass', spec: '18 mm BWP plywood', productCode: 'CENT-BWP-18', ordered: true },
+];
 
 const SAMPLE_NOTICES: Notice[] = [
   { id: 'n1', template: 'update', payload: { title: 'Teakline posted today’s update', body: 'Wardrobe frames fitted in both bedrooms.', url: '/site' }, readAt: null, createdAt: at(0, 9) },
@@ -232,6 +376,84 @@ export async function sampleCall<T>(method: string, path: string, body?: unknown
   }
   if (route === 'POST /coins/opened') return ok({ earned: 10 });
   if (route === 'POST /snags') return ok({ id: `s${Date.now()}` });
+  // Phase 5: a pick changes the last payment and the locker; a payment is confirmed or disputed.
+  const pickRoute = /^POST \/decisions\/([^/]+)$/.exec(route);
+  if (pickRoute) {
+    samplePick(decodeURIComponent(pickRoute[1]!), (body as { optionId?: string } | undefined)?.optionId);
+    return ok({ message: null });
+  }
+  const payRoute = /^POST \/payments\/([^/]+)\/(confirm|dispute)$/.exec(route);
+  if (payRoute) {
+    sampleAnswer(decodeURIComponent(payRoute[1]!), payRoute[2] === 'confirm');
+    return ok({});
+  }
+  // Phase 4: the customer's answer to a fix, remembered for the session.
+  const answer = /^POST \/snags\/([^/]+)\/(confirm|not-fixed)$/.exec(route);
+  if (answer) {
+    const snag = SAMPLE_PROJECT.snags.find((x) => x.id === decodeURIComponent(answer[1]!));
+    if (!snag?.progress?.canAnswer) return { ok: false, status: 400, error: 'There is no fix to answer yet.' } as Result<T>;
+    snag.progress =
+      answer[2] === 'confirm'
+        ? { ...snag.progress, state: 'closed', closedBy: 'you', closedAt: new Date().toISOString(), autoClosesOn: null, canAnswer: false, daysToFix: 4 }
+        : { ...snag.progress, state: 'reopened', notFixedReason: String((body as { reason?: string } | undefined)?.reason ?? '') || null, fixedAt: null, autoClosesOn: null, canAnswer: false };
+    snag.status = answer[2] === 'confirm' ? 'FIXED' : 'OPEN';
+    return ok({ id: snag.id });
+  }
   // Choosing, locale, devices, sign-out, delete: accepted and forgotten.
   return ok({});
+}
+
+/** Phase 5, sample only: what the server does on a pick, in the sample project. */
+function samplePick(decisionId: string, optionId: string | undefined) {
+  const d = SAMPLE_PROJECT.decisions.find((x) => x.id === decisionId);
+  const i = d?.choices?.findIndex((c) => c.id === optionId) ?? -1;
+  if (!d || !d.choices || i < 0) return;
+  const choice = d.choices[i]!;
+  Object.assign(d, { pickedOptionId: optionId, chosenIndex: i, chosenAt: new Date().toISOString(), state: 'chosen' });
+  const pay = SAMPLE_PROJECT.payments;
+  if (pay) {
+    const last = pay.stages[pay.stages.length - 1]!;
+    const move = choice.deltaPaise - last.changesPaise;
+    last.changesPaise = choice.deltaPaise;
+    last.amountPaise += move;
+    pay.changesPaise = choice.deltaPaise;
+    pay.totalPaise += move;
+    pay.balancePaise += move;
+  }
+  SAMPLE_PROJECT.changes = {
+    totalPaise: choice.deltaPaise,
+    items: [{ decisionId: d.id, title: d.title, option: choice.label, extraPaise: choice.deltaPaise, chosenAt: new Date().toISOString() }],
+  };
+  const m = SAMPLE_PROJECT.materials?.find((x) => x.id === 'm1');
+  if (m) m.spec = choice.label;
+}
+
+/** Phase 5, sample only: "Yes, I paid" or "I didn't pay this". */
+function sampleAnswer(paymentId: string, confirm: boolean) {
+  const pay = SAMPLE_PROJECT.payments;
+  const e = pay?.entries.find((x) => x.id === paymentId);
+  if (!pay || !e) return;
+  const counted = e.status === 'earlier';
+  const st = pay.stages[e.stageIndex];
+  e.status = confirm ? 'confirmed' : 'disputed';
+  e.canAnswer = false;
+  if (confirm && !counted) {
+    pay.paidPaise += e.amountPaise;
+    pay.waitingPaise -= e.amountPaise;
+    pay.balancePaise -= e.amountPaise;
+    if (st) {
+      st.paidPaise += e.amountPaise;
+      st.waitingPaise -= e.amountPaise;
+    }
+  }
+  if (!confirm && st) {
+    if (counted) {
+      pay.paidPaise -= e.amountPaise;
+      pay.balancePaise += e.amountPaise;
+      st.paidPaise -= e.amountPaise;
+    } else {
+      pay.waitingPaise -= e.amountPaise;
+      st.waitingPaise -= e.amountPaise;
+    }
+  }
 }

@@ -18,6 +18,7 @@ import 'server-only';
  * truth the app does.
  */
 
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { fromDb } from '@/lib/money';
 import { customerViewOf } from '@/modules/portal/customer-project';
@@ -40,7 +41,17 @@ const BRIEF_SELECT = {
   },
 } as const;
 
-const STAGE_SELECT = { orderBy: { sortOrder: 'asc' }, select: { kind: true, name: true, plannedEnd: true, actualEnd: true } } as const;
+const STAGE_SELECT = {
+  orderBy: { sortOrder: 'asc' },
+  select: { kind: true, name: true, plannedEnd: true, actualEnd: true, id: true, plannedStart: true },
+} as const;
+
+/* Phase 3: what "Overall" needs besides the stages — every moved date (never its note here) and the studio's calendar. */
+const DATE_CHANGES_SELECT = {
+  orderBy: [{ at: 'asc' }, { id: 'asc' }],
+  select: { stageId: true, field: true, fromDate: true, toDate: true, reason: true, decisionId: true, at: true },
+} satisfies Prisma.HomeProject$dateChangesArgs;
+const CALENDAR_SELECT = { select: { workingDays: true, holidays: { select: { day: true } } } } as const;
 
 const customerName = (b: { contactName: string | null; user: { name: string | null } | null }) => b.contactName?.trim() || b.user?.name?.trim() || 'Your customer';
 
@@ -70,9 +81,12 @@ export async function studioProjects(now = new Date()): Promise<ProjectsOverview
       contractPaise: true,
       paymentPhases: true,
       paidPhases: true,
-      introduction: { select: { brief: BRIEF_SELECT } },
+      introduction: { select: { brief: BRIEF_SELECT, studio: CALENDAR_SELECT } },
       stages: STAGE_SELECT,
+      dateChanges: DATE_CHANGES_SELECT,
       updates: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } },
+      /* Phase 2: the latest post from site mode counts as today's update too. */
+      siteLogs: { orderBy: { postedAt: 'desc' }, take: 1, select: { postedAt: true } },
       snags: { where: { status: 'OPEN' }, select: { title: true, room: true, status: true, fixBy: true } },
       decisions: { where: { chosenIndex: null }, orderBy: { dueOn: 'asc' }, select: { title: true, dueOn: true, chosenIndex: true } },
     },
@@ -93,9 +107,12 @@ export async function studioProjects(now = new Date()): Promise<ProjectsOverview
           contractPaise: money && p.contractPaise !== null ? fromDb(p.contractPaise) : null,
           paymentPhases: money ? p.paymentPhases : null,
           paidPhases: money ? p.paidPhases : null,
-          lastUpdateAt: p.updates[0]?.createdAt ?? null,
+          lastUpdateAt: latestPost(p.updates[0]?.createdAt, (p.siteLogs ?? [])[0]?.postedAt),
           snags: p.snags,
           decisions: p.decisions,
+          planStages: p.stages,
+          dateChanges: p.dateChanges,
+          calendar: p.introduction.studio,
         },
         now,
       );
@@ -161,10 +178,13 @@ export async function projectWorkspace(projectId: string, now = new Date()): Pro
       paymentPhases: true,
       paidPhases: true,
       teamNotes: true,
-      introduction: { select: { brief: BRIEF_SELECT } },
+      introduction: { select: { brief: BRIEF_SELECT, studio: CALENDAR_SELECT } },
+      dateChanges: DATE_CHANGES_SELECT,
       stages: {
         orderBy: { sortOrder: 'asc' },
         select: {
+          id: true,
+          plannedStart: true,
           kind: true,
           name: true,
           plannedEnd: true,
@@ -173,6 +193,7 @@ export async function projectWorkspace(projectId: string, now = new Date()): Pro
         },
       },
       updates: { orderBy: { createdAt: 'desc' }, take: 30, select: { id: true, note: true, stage: true, createdAt: true, byStudio: true, photoPaths: true } },
+      siteLogs: { orderBy: { postedAt: 'desc' }, take: 1, select: { postedAt: true } }, // Phase 2
       snags: { where: { status: 'OPEN' }, select: { title: true, room: true, status: true, fixBy: true } },
       decisions: { where: { chosenIndex: null }, orderBy: { dueOn: 'asc' }, select: { title: true, dueOn: true, chosenIndex: true } },
       _count: { select: { materials: true } },
@@ -201,9 +222,12 @@ export async function projectWorkspace(projectId: string, now = new Date()): Pro
       contractPaise: money && p.contractPaise !== null ? fromDb(p.contractPaise) : null,
       paymentPhases: money ? p.paymentPhases : null,
       paidPhases: money ? p.paidPhases : null,
-      lastUpdateAt: p.updates[0]?.createdAt ?? null,
+      lastUpdateAt: latestPost(p.updates[0]?.createdAt, (p.siteLogs ?? [])[0]?.postedAt),
       snags: p.snags,
       decisions: p.decisions,
+      planStages: p.stages,
+      dateChanges: p.dateChanges,
+      calendar: p.introduction.studio,
     },
     now,
   );
@@ -258,4 +282,11 @@ export async function saveTeamNotes(projectId: string, text: string): Promise<{ 
   if (notes.length > TEAM_NOTES_MAX) return { ok: false, error: `At most ${TEAM_NOTES_MAX} characters.` };
   await prisma.homeProject.update({ where: { id: projectId }, data: { teamNotes: notes || null } });
   return { ok: true };
+}
+
+/** Phase 2: the later of the last legacy update and the last site-mode post. */
+function latestPost(update: Date | undefined, siteLog: Date | undefined): Date | null {
+  if (!update) return siteLog ?? null;
+  if (!siteLog) return update;
+  return update.getTime() > siteLog.getTime() ? update : siteLog;
 }

@@ -15,6 +15,7 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { signedSitePhotoUrls } from '@/modules/storage/site-photos';
 import { signedDocUrls } from '@/modules/storage/project-docs';
+import { siteLogPhotoLinks } from '@/modules/project/site-log-storage';
 import { CUSTOMER_PROJECT_SELECT, NO_LINKS, toCustomerProject, type CustomerProject } from './customer-project-view';
 
 export type { CustomerDecision, CustomerDocument, CustomerProject, CustomerSnag } from './customer-project-view';
@@ -42,13 +43,15 @@ export async function customerProjects(userId: string, now = new Date(), opts: {
   return Promise.all(
     projects.map(async (p) => {
       if (!links) return toCustomerProject(p, userId, now, NO_LINKS);
-      const [updatePhotos, snagPhotos, fixedPhotos, docUrls] = await Promise.all([
+      const [updatePhotos, snagPhotos, fixedPhotos, docUrls, choicePhotos] = await Promise.all([
         Promise.all(p.updates.map((u) => signedSitePhotoUrls(u.photoPaths))),
         Promise.all(p.snags.map((s) => signedSitePhotoUrls(s.photoPaths))),
         Promise.all(p.snags.map((s) => signedSitePhotoUrls(s.fixedPhotoPaths))),
         signedDocUrls(p.documents.map((d) => d.storageKey)),
+        Promise.all(p.decisions.map((d) => choicePhotoLinks(d.choices))),
       ]);
-      return toCustomerProject(p, userId, now, { updatePhotos, snagPhotos, fixedPhotos, docUrls });
+      const siteLogPhotos = await siteLogPhotoLinks(p.siteLogs); // Phase 2
+      return toCustomerProject(p, userId, now, { updatePhotos, snagPhotos, fixedPhotos, docUrls, choicePhotos, siteLogPhotos });
     }),
   );
 }
@@ -67,4 +70,15 @@ export async function customerViewOf(projectId: string, now = new Date()): Promi
   const row = await prisma.homeProject.findUnique({ where: { id: projectId }, select: CUSTOMER_PROJECT_SELECT });
   if (!row) return null;
   return toCustomerProject(row, row.introduction.brief.userId ?? '', now, NO_LINKS);
+}
+
+/** Phase 5: each decision option's photo as a signed link, in option order; "" where there is none. */
+async function choicePhotoLinks(choices: { photoPath: string | null }[]): Promise<string[]> {
+  const paths = choices.map((c) => c.photoPath).filter((x): x is string => Boolean(x));
+  if (paths.length === 0) return choices.map(() => '');
+  const signed = await signedSitePhotoUrls(paths);
+  // signedSitePhotoUrls drops a link it could not make; then none can be matched to its option safely.
+  if (signed.length !== paths.length) return choices.map(() => '');
+  let k = 0;
+  return choices.map((c) => (c.photoPath ? signed[k++]! : ''));
 }

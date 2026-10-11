@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
@@ -13,8 +14,13 @@ import { DOC_KINDS, type Doc } from '../lib/types';
 /**
  * Home locker (Locker.dc.html, screen 28, opened from Me): every document
  * about the home, searchable, grouped by kind, opened through its signed
- * link in the phone's browser. The design's "What your home is made of"
- * section waits for materials data the backend does not have yet.
+ * link in the phone's browser.
+ *
+ * Phase 5 (studio workspace): "What your home is made of" — the materials
+ * from the signed quote, with the option picked on a decision in place of
+ * the quoted spec and the product code once the studio orders it. A revised
+ * drawing says its version; a filed decision outcome opens the decision
+ * screen in the app rather than a web page.
  */
 export default function Locker() {
   const t = useT();
@@ -48,6 +54,7 @@ export default function Locker() {
   const p = state.project;
   const kindName = (k: Doc['kind']) => t(`locker.kind.${k}`);
   const term = q.trim().toLowerCase();
+  const materials = (p.materials ?? []).filter((m) => !term || `${m.room} ${m.item} ${m.spec ?? ''} ${m.productCode ?? ''}`.toLowerCase().includes(term));
   const docs = p.documents.filter((d) => !term || `${d.title} ${DOC_KINDS[d.kind]} ${kindName(d.kind)} ${d.meta}`.toLowerCase().includes(term));
   const kinds = (Object.keys(DOC_KINDS) as Doc['kind'][])
     .map((k) => ({ kind: k, docs: docs.filter((d) => d.kind === k) }))
@@ -78,6 +85,31 @@ export default function Locker() {
           </View>
         </Rise>
 
+        {materials.length ? (
+          <View>
+            <Text role="heading" style={styles.h2}>
+              {t('locker.made')}
+            </Text>
+            {materials.map((m, i) => (
+              <Stagger key={m.id} i={Math.min(i, 8)} start={160}>
+                <View style={styles.doc} accessible accessibilityLabel={`${m.room}, ${m.item}. ${m.spec ?? ''}`}>
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <Text style={styles.docTitle}>
+                      {m.item} <Text style={styles.room}>· {m.room}</Text>
+                    </Text>
+                    {m.spec ? <Text style={styles.spec}>{m.spec}</Text> : null}
+                    <Text style={[styles.docMeta, !m.productCode && { color: color.ink3 }]}>
+                      {m.productCode ? t('locker.code', { code: m.productCode }) : m.ordered ? t('locker.orderedNoCode') : t('locker.codeLater')}
+                    </Text>
+                  </View>
+                </View>
+              </Stagger>
+            ))}
+            <View style={{ borderTopWidth: 1, borderTopColor: color.line }} />
+            <Meta style={{ color: color.ink3, marginTop: 8 }}>{t('locker.madeHint')}</Meta>
+          </View>
+        ) : null}
+
         <View>
           <Text role="heading" style={styles.h2}>
             {t('locker.docs')}
@@ -91,10 +123,11 @@ export default function Locker() {
                 <Stagger key={d.id} i={Math.min(g.start + j, 8)} start={160}>
                   <Press
                     haptic={false}
-                    disabled={!d.url}
+                    disabled={!d.url && !d.decisionId}
                     accessibilityRole="link"
                     accessibilityLabel={t('locker.open', { title: d.title })}
                     onPress={() => {
+                      if (d.decisionId) return router.push({ pathname: '/decision/[id]', params: { id: d.decisionId } });
                       // Signed links last minutes; pull to refresh makes fresh ones.
                       if (d.url) void WebBrowser.openBrowserAsync(d.url);
                     }}
@@ -102,7 +135,12 @@ export default function Locker() {
                   >
                     <View style={{ flex: 1, gap: 3 }}>
                       <Text style={styles.docTitle}>{d.title}</Text>
-                      {d.meta ? <Text style={styles.docMeta}>{d.meta}</Text> : null}
+                      {d.meta ? (
+                        <Text style={styles.docMeta}>
+                          {d.version && d.version > 1 ? `${t('locker.version', { n: d.version })} · ` : ''}
+                          {d.meta}
+                        </Text>
+                      ) : null}
                     </View>
                     <DocArrowIcon color={color.ink2} />
                   </Press>
@@ -148,4 +186,6 @@ const styles = StyleSheet.create({
   later: { borderBottomWidth: 1, borderBottomColor: color.line },
   docTitle: { fontFamily: font.sansMedium, fontSize: 16, color: color.ink },
   docMeta: { fontFamily: font.mono, fontSize: 13, color: color.ink2 },
+  room: { fontFamily: font.sans, fontSize: 14, color: color.ink2 },
+  spec: { fontFamily: font.sans, fontSize: 14, lineHeight: 20, color: color.ink2 },
 });

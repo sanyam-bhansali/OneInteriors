@@ -1,57 +1,55 @@
 import type { Metadata } from 'next';
 import { getLang } from '@/modules/i18n/server';
-import { translator } from '@/modules/i18n/site';
-import { STUDIO_WORDS } from '@/modules/i18n/studio';
 import { getCurrentUser } from '@/modules/auth/session';
-import { projectsForStudio } from '@/modules/portal/tracker-store';
+import { mySitesToday } from '@/modules/project/site-log';
+import { istDay } from '@/modules/project/working-days';
+import { SiteCards } from './SiteCards';
+import { siteWords } from './words';
+import { EyeIcon } from './icons';
 
 export const metadata: Metadata = { title: 'My sites today', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
 
 /**
- * Site mode, the placeholder (PHASE-1-PLAN §2): where a site supervisor
- * lands. Their assigned sites and nothing else — `projectsForStudio` reads
- * through `projectsVisibleTo`, so an unassigned project never appears.
- * Phase 2 fills it: today's update with photos and voice, snags, the bottom
- * bar. In the language they picked on the sign-in.
+ * Site mode · My sites today (studio workspace Phase 2, design
+ * studio/SiteToday.dc.html, in the studio's deep-green palette). One card
+ * per site this member may post to — `mySitesToday` reads through
+ * `projectsVisibleTo`, so an unassigned site never appears — with today's
+ * state (not posted / posted at a time / nobody on site, and anything still
+ * waiting to send from this phone), the big **Post today's update** button,
+ * **Nobody on site**, and the snag count. In the language picked at sign-in.
  */
 export default async function SiteTodayPage() {
-  const [lang, user, sites] = await Promise.all([getLang(), getCurrentUser(), projectsForStudio()]);
-  const t = translator(lang, STUDIO_WORDS);
+  const now = new Date();
+  const [lang, user, data] = await Promise.all([getLang(), getCurrentUser(), mySitesToday(now)]);
+  const t = siteWords(lang);
   const locale = lang === 'en' ? 'en-IN' : `${lang}-IN`;
-  const day = (d: Date) => d.toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
-  const first = user?.name?.split(' ')[0];
+  const date = now.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
+  const first = user?.name?.trim().split(/\s+/)[0];
+  const cards = data?.cards ?? [];
 
   return (
-    <div className="flex flex-col gap-5 px-5 py-6">
+    <div className="flex flex-col gap-5 px-4 pb-6 pt-5">
       <div>
-        <p className="m-0 text-[15px] text-[var(--s-ink-2)]">{first ? t('site.hello', { name: first }) : t('site.helloNoName')}</p>
-        <h1 className="m-0 mt-1 text-[28px] font-medium tracking-[-0.02em]">{t('site.h1')}</h1>
+        <p className="m-0 text-[15px] text-[var(--s-ink-2)]">{first ? t('hello', { name: first }) : t('helloNoName')}</p>
+        <h1 className="m-0 mt-1 text-[28px] font-semibold tracking-[-0.02em]">{t('today.h1')}</h1>
+        <p className="m-0 mt-1 font-[family-name:var(--font-mono)] text-[13px] text-[var(--s-ink-3)]">
+          {cards.length === 1 ? t('today.count1', { date }) : t('today.count', { date, n: cards.length })}
+        </p>
       </div>
 
-      {sites.length === 0 ? (
-        <p className="s-card m-0 p-5 text-[15px] leading-relaxed text-[var(--s-ink-2)]">{t('site.none')}</p>
+      {cards.length === 0 ? (
+        <p className="s-card m-0 p-5 text-[16px] leading-relaxed text-[var(--s-ink-2)]">{t('today.none')}</p>
       ) : (
-        <ul className="m-0 flex list-none flex-col gap-3 p-0">
-          {sites.map((s) => {
-            const done = s.stages.filter((x) => x.state === 'done').length;
-            const last = s.updates[0];
-            return (
-              <li key={s.id} className="s-card flex flex-col gap-1.5 p-5">
-                <p className="m-0 text-[17px] font-semibold">{s.label || 'A home'}</p>
-                <p className="m-0 text-[14px] text-[var(--s-ink-2)]">
-                  {t('site.stages', { done, total: s.stages.length })} · {t('site.started', { date: day(s.startOn) })}
-                </p>
-                <p className="m-0 text-[14px] text-[var(--s-ink-3)]">
-                  {last ? t('site.lastUpdate', { date: day(last.at) }) : t('site.noUpdate')}
-                </p>
-              </li>
-            );
-          })}
-        </ul>
+        <SiteCards cards={cards} lang={lang} today={istDay(now)} />
       )}
 
-      <p className="m-0 text-[13.5px] leading-relaxed text-[var(--s-ink-3)]">{t('site.soon')}</p>
+      <div className="flex items-start gap-2.5 rounded-[14px] bg-[var(--s-surface-2)] p-4">
+        <span className="mt-0.5 text-[var(--s-ink-2)]">
+          <EyeIcon />
+        </span>
+        <p className="m-0 text-[14px] leading-relaxed text-[var(--s-ink-2)]">{t('today.note')}</p>
+      </div>
     </div>
   );
 }

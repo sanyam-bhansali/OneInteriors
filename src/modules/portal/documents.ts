@@ -30,6 +30,9 @@ export function checkDoc(input: { kind: unknown; title: unknown }): DocCheck {
 
 /** "PDF · 1.2 MB · 3 Aug", the line under a document's name. */
 export function docMeta(d: { contentType: string; bytes: number; createdAt: Date }): string {
+  if (d.contentType === DECISION_CONTENT_TYPE) {
+    return `Your choice · ${d.createdAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })}`;
+  }
   if (d.contentType === FILED_CONTENT_TYPE) {
     return `Filed at signing · ${d.createdAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })}`;
   }
@@ -79,8 +82,25 @@ export function signedQuoteDocs(quoteId: string, quoteNumber: string): { kind: F
  * stored file, which gets a signed storage link instead.
  */
 export function generatedDocLink(storageKey: string, origin: string): string | null {
+  if (storageKey.startsWith(DECISION_PREFIX)) {
+    const decisionId = storageKey.slice(DECISION_PREFIX.length);
+    return /^[A-Za-z0-9_-]{1,64}$/.test(decisionId) ? `${origin.replace(/\/$/, '')}/app/decision?id=${decisionId}` : null;
+  }
   if (!storageKey.startsWith(SIGNED_QUOTE_PREFIX)) return null;
   const [id, kind] = storageKey.slice(SIGNED_QUOTE_PREFIX.length).split('#');
   if (!id || !/^[A-Za-z0-9_-]{1,64}$/.test(id)) return null;
   return `${origin.replace(/\/$/, '')}/app/choose/quote/${id}${kind === 'agreement' ? '#agreed' : ''}`;
 }
+
+// ── Decision outcomes (studio workspace Phase 5) ───────────────
+
+/**
+ * A decision's outcome, filed in the locker when the customer picks
+ * (project/decision-flow.ts): a record pointing at the decision
+ * (`decision:<id>`), opened as the decision page, like the signed quote
+ * above. A re-pick files a new version superseding it.
+ */
+export const DECISION_PREFIX = 'decision:';
+
+/** The content type of a filed decision outcome. */
+export const DECISION_CONTENT_TYPE = 'application/x-decision';

@@ -6,6 +6,7 @@ import { kit } from './kit';
 import { locker } from './locker';
 import { me } from './me';
 import { notifications } from './notifications';
+import { paymentsWords } from './payments';
 import { plan } from './plan';
 import { matchesWords } from './matches';
 import { quoteWords } from './quote';
@@ -34,6 +35,7 @@ export const NATIVE = {
   ...site,
   ...me,
   ...locker,
+  ...paymentsWords,
   ...notifications,
   ...geio,
   ...plan,

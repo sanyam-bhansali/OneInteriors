@@ -32,4 +32,16 @@ export const locker = {
     hi: 'हर लिंक कुछ मिनट तक खुलता है। अगर कोई न खुले, तो रिफ़्रेश करने के लिए नीचे खींचें।',
     mr: 'प्रत्येक लिंक काही मिनिटे उघडते. एखादी उघडली नाही तर रिफ्रेश करण्यासाठी खाली ओढा.',
   },
+
+  // Phase 5: materials with product codes, versions, decision outcomes.
+  'locker.made': { en: 'What your home is made of', hi: 'आपका घर किससे बना है', mr: 'तुमचे घर कशापासून बनले आहे' },
+  'locker.code': { en: 'Code {code}', hi: 'कोड {code}', mr: 'कोड {code}' },
+  'locker.codeLater': { en: 'Code added when ordered', hi: 'ऑर्डर होने पर कोड जुड़ेगा', mr: 'ऑर्डर झाल्यावर कोड जोडला जाईल' },
+  'locker.orderedNoCode': { en: 'Ordered', hi: 'ऑर्डर हो गया', mr: 'ऑर्डर झाले' },
+  'locker.version': { en: 'Version {n}', hi: 'वर्ज़न {n}', mr: 'आवृत्ती {n}' },
+  'locker.madeHint': {
+    en: 'Quote a code to any shop for a spare or a repair.',
+    hi: 'किसी भी दुकान पर स्पेयर या रिपेयर के लिए यह कोड बताइए।',
+    mr: 'सुटा भाग किंवा दुरुस्तीसाठी कोणत्याही दुकानात हा कोड सांगा.',
+  },
 } satisfies Record<string, Entry>;

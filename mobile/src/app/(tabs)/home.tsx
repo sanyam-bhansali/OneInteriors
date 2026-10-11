@@ -17,7 +17,9 @@ import { daysLate } from '../../lib/progress';
 import { useProfile } from '../../lib/profile';
 import { useProject } from '../../lib/project';
 import { color, font } from '../../lib/theme';
-import type { Decision, Stage, Update } from '../../lib/types';
+import type { Decision, Project, Stage, Update } from '../../lib/types';
+import { dayPhotos, latestFromSite } from '../../components/site/days';
+import { crewLine, reasonWords } from '../../components/site/SiteDayView';
 
 /**
  * Home after signing (Main.dc.html, screen 21): the site photo with the
@@ -80,13 +82,17 @@ export default function Home() {
   }
 
   const p = state.project;
-  const latest = p.updates[0] ?? null;
+  // Phase 2: the latest from site — a day of the studio's site log or an older note — in the shape this screen reads.
+  const latest = fromSite(p, t);
+  const missedToday = (p.siteMissedDays ?? []).includes(istDay(now));
   const stage = p.stages.find((s) => s.state === 'now') ?? null;
   const decision = pickDecision(p.decisions);
-  const late = (p as { overallLateDays?: number }).overallLateDays ?? daysLate(p.stages, now);
+  // Stage and overall status are computed on the server (Phase 3); older servers do not send them.
+  const late = p.overallLateDays ?? daysLate(p.stages, now);
+  const stageLate = p.stageStatus ? p.stageStatus.status === 'late' : !!stage?.late;
   const stageName = (s: Stage) => shortStage(s, lang, t);
   const stageChip = stage
-    ? t(stage.late ? 'home.status.late' : 'home.status.onTrack', { stage: stageName(stage) })
+    ? t(stageLate ? 'home.status.late' : 'home.status.onTrack', { stage: stageName(stage) })
     : t('home.status.done');
   const overall = late > 0 ? (late === 1 ? t('home.overall.late1') : t('home.overall.late', { n: late })) : t('home.overall.onTime');
   const nextPay = p.money?.next ?? null;
@@ -124,7 +130,7 @@ export default function Home() {
             <View style={{ gap: 16, marginTop: 40 }}>
               <View style={{ gap: 8 }}>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                  <StatusChip tone={stage?.late ? 'late' : 'ok'} label={stageChip} />
+                  <StatusChip tone={stageLate ? 'late' : 'ok'} label={stageChip} />
                   <StatusChip tone={late > 0 ? 'late' : 'ok'} label={overall} />
                 </View>
                 <Rise>
@@ -184,6 +190,7 @@ export default function Home() {
             ) : (
               <Body muted>{t('home.site.empty', { studio: p.studio })}</Body>
             )}
+            {missedToday && !today ? <Text style={styles.note}>{t('home.site.missed')}</Text> : null}
             <Press onPress={() => router.push('/site')} haptic={false} accessibilityRole="link" style={styles.more}>
               <Eyebrow style={{ color: color.ink }}>{t('home.site.all')}</Eyebrow>
               <ArrowMark color={color.ink} />
@@ -205,6 +212,24 @@ export default function Home() {
       </ScrollView>
     </View>
   );
+}
+
+/**
+ * Phase 2: the latest from site as one Update: a site-log day gives its
+ * photos and the sentences under them (or why nobody was on site), and who
+ * was there; an older note is used as it is.
+ */
+function fromSite(p: Project, t: T): Update | null {
+  const l = latestFromSite(p.updates, p.siteLogs ?? []);
+  if (!l) return null;
+  if (l.kind === 'note') return l.update;
+  const d = l.day;
+  const shots = dayPhotos(d);
+  const said = d.reason
+    ? t('home.site.nobody', { reason: reasonWords(d, t) })
+    : [...shots.map((x) => x.text), d.text, ...d.corrections.map((c) => c.text)].filter((x): x is string => !!x).join(' ');
+  const crew = d.crew.length ? t('home.site.crew', { names: d.crew.map((c) => crewLine(c, t)).join(' · ') }) : '';
+  return { id: d.id, note: [said, crew].filter(Boolean).join(' '), stage: null, at: l.at, byStudio: true, photos: shots.map((x) => x.url).filter(Boolean) };
 }
 
 /** The bell, with a terracotta dot while anything is unread. */

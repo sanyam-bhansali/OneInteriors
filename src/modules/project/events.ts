@@ -51,6 +51,7 @@ export const PROJECT_EVENT_TYPES = [
   'stage.done',
   'stage.reopened',
   'date.moved',
+  'stage.renamed',
   // Phase 4 — snags (one per HomeSnagEvent kind)
   'snag.raised',
   'snag.accepted',

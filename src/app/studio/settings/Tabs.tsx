@@ -16,6 +16,7 @@ const TABS = [
   { href: '/studio/settings', label: 'Your details' },
   { href: '/studio/settings/pipeline', label: 'Pipeline' },
   { href: '/studio/settings/fields', label: 'Fields' },
+  { href: '/studio/settings/crew', label: 'Crew' },
 ];
 
 /** Team is the owner's alone (`team.manage`), so the tab is only drawn for them. */

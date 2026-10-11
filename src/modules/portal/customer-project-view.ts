@@ -43,7 +43,9 @@
  * - `siteLogs`: date, kind, reason, customerText/customerLang, postedAt,
  *   correctsId; photos: storagePath (to sign), takenAt, fromGallery,
  *   customerText; crew: crewName, crewRole, arrivedAt.
- * - `dateChanges`: field, fromDate, toDate, reason (in plain words).
+ * - `dateChanges`: field, fromDate, toDate, reason (in plain words) —
+ *   selected since Phase 3, with `stageId`, `decisionId` and `at` to group
+ *   and attribute them (portal/tracker-view.ts).
  * - snag `events`: kind, at, photoPaths (to sign), customerText, note, fixBy.
  * - decision `choices`: id, label, detail, photoPath (to sign), swatch,
  *   deltaPaise, sortOrder. `pickedOptionId`.
@@ -58,14 +60,33 @@
  */
 
 import type { Prisma } from '@prisma/client';
-import { fromDb } from '@/lib/money';
 import { readPhases, type PaymentPhase } from '@/modules/studio/payment-phases';
 import { projectStages, type StageView } from './tracker';
 import { daysLeft, decisionState, parseOptions, type DecisionOption, type DecisionState } from './decisions';
 import { snagLine } from './snags';
+import { CUSTOMER_SNAG_EVENT_SELECT, customerSnagProgress, type CustomerSnagProgress } from './snag-view';
 import { DOC_KINDS, docMeta, type DocKind } from './documents';
-import { changesSoFar, moneyView, readSignedStages, type ChangesView, type MoneyView } from './payments';
+import { readSignedStages, type ChangesView, type MoneyView } from './payments';
 import { planName, type PlanName } from './plans';
+import { customerTracker, type CustomerStageStatus, type CustomerTracker } from './tracker-view';
+import { SITE_LOG_SELECT, siteDays, siteMissedDays, type CustomerSiteDay } from './site-feed-view';
+import {
+  changesFromQuote,
+  customerChoices,
+  customerLedger,
+  customerMaterials,
+  customerPayments,
+  CUSTOMER_CHOICE_SELECT,
+  CUSTOMER_MATERIAL_SELECT,
+  CUSTOMER_PAYMENT_SELECT,
+  CUSTOMER_QUOTE_CHANGE_SELECT,
+  docDecisionId,
+  moneyFromLedger,
+  visibleDocIndexes,
+  type CustomerMaterial,
+  type CustomerPayments,
+} from './money-locker-view';
+import type { CustomerChoice } from '@/modules/project/decision-rules';
 
 export interface CustomerDecision {
   id: string;
@@ -80,6 +101,10 @@ export interface CustomerDecision {
   byStudio: boolean;
   /** Family votes: advice to the owner, who chooses. */
   votes: { name: string; optionIndex: number; note: string | null; mine: boolean }[];
+  /* Phase 5 — the options as rows (money-locker-view.ts): photo, price change (may be negative), never the studio's cost. */
+  choices: CustomerChoice[];
+  /** The option picked, by id; null until picked. */
+  pickedOptionId: string | null;
 }
 
 export interface CustomerSnag {
@@ -94,6 +119,8 @@ export interface CustomerSnag {
   photos: string[];
   fixedNote: string | null;
   fixedPhotos: string[];
+  /* Phase 4 — snags (portal/snag-view.ts). From the snag's events: the state, fix-by, the fix sentence, Confirm / Not fixed. */
+  progress: CustomerSnagProgress;
 }
 
 export interface CustomerDocument {
@@ -103,6 +130,10 @@ export interface CustomerDocument {
   meta: string;
   /** A signed link that lasts minutes; "" when it could not be made. */
   url: string;
+  /* Phase 5: 1 for a first upload; a revision replaces the one before it in this list. */
+  version: number;
+  /** A filed decision outcome: the decision it opens. */
+  decisionId: string | null;
 }
 
 export interface CustomerProject {
@@ -124,6 +155,21 @@ export interface CustomerProject {
   decisions: CustomerDecision[];
   snags: CustomerSnag[];
   documents: CustomerDocument[];
+  /* Phase 3 — tracker and delays (portal/tracker-view.ts). Computed, never typed. */
+  /** Stages planned vs actual, the current stage's checklist, moved dates with plain reasons; null for a project with no plan. */
+  tracker: CustomerTracker | null;
+  /** "Overall · n days late": working days from planned to forecast handover (customer-caused days included, labelled in `tracker.overall`). */
+  overallLateDays: number;
+  /** "Carpentry · on track": the stage under way; null once handed over. */
+  stageStatus: CustomerStageStatus | null;
+  /* Phase 5 — payments from the rows, with each entry to confirm (money-locker-view.ts); null before signing in the app. */
+  payments: CustomerPayments | null;
+  /** What the home is made of: the materials from the quote, the decision picks, product codes once ordered. */
+  materials: CustomerMaterial[];
+  /* Phase 2 — the daily site log (portal/site-feed-view.ts): one entry per day, newest first, corrections beside the original. */
+  siteLogs: CustomerSiteDay[];
+  /** Working days of the last two weeks with nothing posted by 21:00 IST: "No update from the studio today". */
+  siteMissedDays: string[];
 }
 
 export const UPDATES_SHOWN = 30;
@@ -137,7 +183,24 @@ export const CUSTOMER_PROJECT_SELECT = {
   /* The plan built from the signed quote (quote-to-plan.ts). The stage's
      name is the studio's, chosen for the customer to read; the checklist and
      materials are not read here yet. */
-  stages: { orderBy: { sortOrder: 'asc' }, select: { kind: true, name: true, plannedEnd: true, actualEnd: true } },
+  stages: {
+    orderBy: { sortOrder: 'asc' },
+    select: {
+      kind: true,
+      name: true,
+      plannedEnd: true,
+      actualEnd: true,
+      /* Phase 3: planned vs actual and each room's checklist — labels and done only, never who ticked. */
+      id: true,
+      plannedStart: true,
+      items: { orderBy: { sortOrder: 'asc' }, select: { room: true, label: true, doneAt: true } },
+    },
+  },
+  /* Phase 3: moved dates — old, new, reason. Never the PM's `note` or `byId`. */
+  dateChanges: {
+    orderBy: [{ at: 'asc' }, { id: 'asc' }],
+    select: { stageId: true, field: true, fromDate: true, toDate: true, reason: true, decisionId: true, at: true },
+  },
   plan: true,
   contractPaise: true,
   paymentPhases: true,
@@ -145,7 +208,15 @@ export const CUSTOMER_PROJECT_SELECT = {
   introduction: {
     select: {
       brief: { select: { userId: true } },
-      studio: { select: { tradeName: true, paymentPhases: true } },
+      studio: {
+        select: {
+          tradeName: true,
+          paymentPhases: true,
+          /* Phase 3: the studio's calendar, to count working days late. */
+          workingDays: true,
+          holidays: { select: { day: true } },
+        },
+      },
     },
   },
   updates: {
@@ -165,8 +236,17 @@ export const CUSTOMER_PROJECT_SELECT = {
       chosenAt: true,
       byStudio: true,
       votes: { orderBy: { createdAt: 'asc' }, select: { userId: true, optionIndex: true, note: true } },
+      /* Phase 5: the options as rows and the pick. Never `studioCostDeltaPaise`. */
+      pickedOptionId: true,
+      choices: { orderBy: { sortOrder: 'asc' }, select: CUSTOMER_CHOICE_SELECT },
     },
   },
+  /* Phase 5: money received, quote changes from decisions, materials (money-locker-view.ts names the columns). */
+  payments: { orderBy: [{ recordedAt: 'asc' }, { id: 'asc' }], select: CUSTOMER_PAYMENT_SELECT },
+  quoteChanges: { orderBy: [{ at: 'asc' }, { id: 'asc' }], select: CUSTOMER_QUOTE_CHANGE_SELECT },
+  materials: { orderBy: { sortOrder: 'asc' }, select: CUSTOMER_MATERIAL_SELECT },
+  /* Phase 2: the daily site log (portal/site-feed-view.ts names the columns; never the voice, transcript, note, place or crew phone). */
+  siteLogs: SITE_LOG_SELECT,
   family: { where: { joinedAt: { not: null }, removedAt: null }, select: { userId: true, name: true } },
   snags: {
     orderBy: { createdAt: 'desc' },
@@ -183,12 +263,14 @@ export const CUSTOMER_PROJECT_SELECT = {
       fixedAt: true,
       fixedNote: true,
       fixedPhotoPaths: true,
+      /* Phase 4: the snag's events (portal/snag-view.ts names the columns; never the internal note, voice, transcript or assignee). */
+      events: { orderBy: { at: 'asc' }, select: CUSTOMER_SNAG_EVENT_SELECT },
     },
   },
   documents: {
     where: { deletedAt: null, sharedAt: { not: null } },
     orderBy: { createdAt: 'desc' },
-    select: { id: true, kind: true, title: true, storageKey: true, contentType: true, bytes: true, createdAt: true },
+    select: { id: true, kind: true, title: true, storageKey: true, contentType: true, bytes: true, createdAt: true, version: true, supersedesId: true },
   },
 } satisfies Prisma.HomeProjectSelect;
 
@@ -200,6 +282,10 @@ export interface CustomerProjectLinks {
   snagPhotos: string[][];
   fixedPhotos: string[][];
   docUrls: string[];
+  /** Phase 5: per decision, per option (in order), its photo's signed link or "". */
+  choicePhotos?: string[][];
+  /** Phase 2: per site log, per photo (in order), its signed link or "". */
+  siteLogPhotos?: string[][];
 }
 
 export const NO_LINKS: CustomerProjectLinks = { updatePhotos: [], snagPhotos: [], fixedPhotos: [], docUrls: [] };
@@ -219,24 +305,20 @@ export function customerPhases(signedRaw: unknown, studioRaw: unknown): PaymentP
 /** One project, as the customer (or their family) sees it. Field by field; never a spread row. */
 export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Date, links: CustomerProjectLinks = NO_LINKS): CustomerProject {
   const names = new Map(p.family.map((f) => [f.userId, f.name]));
+  const stages = projectStages(p, now);
+  const ledgerOf = customerLedger(p);
+  const tracked = customerTracker({ stages: p.stages, dateChanges: p.dateChanges, studio: p.introduction.studio }, stages, now);
   return {
     id: p.id,
     role: p.introduction.brief.userId === userId ? 'owner' : 'family',
     plan: planName(p.plan),
     studio: p.introduction.studio.tradeName,
     startOn: p.startOn.toISOString(),
-    stages: projectStages(p, now),
+    stages,
     phases: customerPhases(p.paymentPhases, p.introduction.studio.paymentPhases),
-    money: moneyView(p.contractPaise === null ? null : fromDb(p.contractPaise), p.paymentPhases, p.paidPhases),
-    changes: changesSoFar(
-      p.decisions.map((d) => ({
-        id: d.id,
-        title: d.title,
-        options: parseOptions(d.options) ?? [],
-        chosenIndex: d.chosenIndex,
-        chosenAt: d.chosenAt?.toISOString() ?? null,
-      })),
-    ),
+    /* Phase 5: from the payment rows and the recorded quote changes, never from what was marked. */
+    money: p.contractPaise === null ? null : moneyFromLedger(ledgerOf, p.paidPhases),
+    changes: changesFromQuote(p.quoteChanges),
     updates: p.updates.map((u, i) => ({
       id: u.id,
       note: u.note,
@@ -245,7 +327,7 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
       byStudio: u.byStudio,
       photos: links.updatePhotos[i] ?? [],
     })),
-    decisions: p.decisions.map((d) => ({
+    decisions: p.decisions.map((d, i) => ({
       id: d.id,
       title: d.title,
       why: d.why,
@@ -257,6 +339,8 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
       chosenAt: d.chosenAt?.toISOString() ?? null,
       byStudio: d.byStudio,
       votes: d.votes.map((v) => ({ name: names.get(v.userId) ?? 'Family', optionIndex: v.optionIndex, note: v.note, mine: v.userId === userId })),
+      choices: customerChoices(d.choices, links.choicePhotos?.[i]),
+      pickedOptionId: d.pickedOptionId ?? null,
     })),
     snags: p.snags.map((s, i) => ({
       id: s.id,
@@ -270,13 +354,26 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
       photos: links.snagPhotos[i] ?? [],
       fixedNote: s.fixedNote,
       fixedPhotos: links.fixedPhotos[i] ?? [],
+      progress: customerSnagProgress(s, p.introduction.brief.userId === userId, now),
     })),
-    documents: p.documents.map((d, i) => ({
-      id: d.id,
-      kind: (d.kind in DOC_KINDS ? d.kind : 'OTHER') as DocKind,
-      title: d.title,
-      meta: docMeta(d),
-      url: links.docUrls[i] ?? '',
-    })),
+    documents: visibleDocIndexes(p.documents).map((i) => {
+      const d = p.documents[i]!;
+      return {
+        id: d.id,
+        kind: (d.kind in DOC_KINDS ? d.kind : 'OTHER') as DocKind,
+        title: d.title,
+        meta: docMeta(d),
+        url: links.docUrls[i] ?? '',
+        version: d.version ?? 1,
+        decisionId: docDecisionId(d.storageKey),
+      };
+    }),
+    tracker: tracked.tracker,
+    overallLateDays: tracked.overallLateDays,
+    stageStatus: tracked.stageStatus,
+    payments: customerPayments(ledgerOf, p.paidPhases, p.introduction.brief.userId === userId, new Set(p.documents.map((d) => d.id))),
+    materials: customerMaterials(p.materials),
+    siteLogs: siteDays(p.siteLogs ?? [], links.siteLogPhotos),
+    siteMissedDays: siteMissedDays({ ...p, studio: p.introduction.studio, siteLogs: p.siteLogs ?? [] }, now),
   };
 }

@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { PageHead, PageBody } from '../StudioShell';
 import { formatINR } from '@/lib/money';
 import { studioProjects } from '@/modules/studio/workspace';
+import { studioUpdateScore } from '@/modules/project/site-log';
 import { ATTENTION_TITLES, clock, shortDay, type AttentionKind, type WorkspaceRow } from '@/modules/studio/workspace-view';
 
 export const metadata: Metadata = {
@@ -41,7 +42,7 @@ const sub = 'mt-0.5 text-[12.5px] text-[var(--s-ink-3)]';
 
 export default async function ProjectsPage() {
   const now = new Date();
-  const data = await studioProjects(now);
+  const [data, score] = await Promise.all([studioProjects(now), studioUpdateScore(now)]); // score: Phase 2
   const rows = data?.rows ?? [];
   const live = rows.filter((r) => r.stage !== null);
 
@@ -49,7 +50,7 @@ export default async function ProjectsPage() {
     <>
       <PageHead
         title="Projects"
-        sub={`${shortDay(now)} · ${live.length === 0 ? 'Nothing running yet.' : `${live.length} live`}`}
+        sub={`${shortDay(now)} · ${live.length === 0 ? 'Nothing running yet.' : `${live.length} live`}${score && score.pct !== null ? ` · Daily site updates: ${score.pct}% of working days, last 30 days${score.streakMissed >= 2 ? ` · ${score.streakMissed} days in a row missed on a site` : ''}` : ''}`}
       />
       <PageBody>
         {rows.length === 0 ? (
@@ -164,6 +165,11 @@ function Row({ r, money }: { r: WorkspaceRow; money: boolean }) {
         {r.lateDays > 0 ? (
           <span className="font-medium text-[var(--s-bad)]">
             {r.lateDays} day{r.lateDays === 1 ? '' : 's'} late
+            {r.customerLateDays > 0 ? (
+              <span className="block text-[12px] font-normal text-[var(--s-ink-3)]">
+                {r.customerLateDays === r.lateDays ? 'all' : r.customerLateDays} from {r.customer}, not yours
+              </span>
+            ) : null}
           </span>
         ) : (
           <span className="font-medium text-[var(--s-good)]">{handedOver ? 'Done' : 'On track'}</span>

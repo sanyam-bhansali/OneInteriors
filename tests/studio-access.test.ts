@@ -44,6 +44,9 @@ const db = vi.hoisted(() => {
           ],
           paidPhases: [],
           doneStages: [],
+          // Phase 5: money is counted from payment rows and quote changes.
+          payments: [],
+          quoteChanges: [],
         }
       : null;
   const client = {
@@ -62,7 +65,23 @@ const db = vi.hoisted(() => {
       update: rec('homeProject.update', () => ({})),
     },
     homeSnag: {
-      findUnique: rec('homeSnag.findUnique', (a: { where: { id: string } }) => ({ projectId: a.where.id.replace('snag-', ''), title: 'Chipped shutter', status: 'OPEN' })),
+      findUnique: rec('homeSnag.findUnique', (a: { where: { id: string } }) => ({
+        id: a.where.id,
+        projectId: a.where.id.replace('snag-', ''),
+        title: 'Chipped shutter',
+        status: 'OPEN',
+        // Phase 4: the snag's events (none here: the flow rebuilds them from the legacy columns).
+        createdAt: new Date('2026-10-01T00:00:00Z'),
+        fixBy: null,
+        fixedAt: null,
+        fixedNote: null,
+        photoPaths: [],
+        fixedPhotoPaths: [],
+        raisedByStudio: false,
+        assigneeId: null,
+        room: null,
+        events: [],
+      })),
       findMany: rec('homeSnag.findMany', () => []),
       update: rec('homeSnag.update', () => ({})),
       create: rec('homeSnag.create', () => ({ id: 'snag-new' })),
@@ -74,7 +93,21 @@ const db = vi.hoisted(() => {
     homeDocument: { findMany: rec('homeDocument.findMany', () => []), findUnique: rec('homeDocument.findUnique', () => null) },
     homeProjectUpdate: { create: rec('homeProjectUpdate.create', () => ({ project: project('p1') })) },
     homeProjectStage: { updateMany: rec('homeProjectStage.updateMany', () => ({ count: 0 })) },
-    $transaction: vi.fn(async (ops: Promise<unknown>[]) => Promise.all(ops)),
+    // Phase 4: snag steps run in an interactive transaction (project/snag-flow.ts).
+    homeSnagEvent: {
+      findMany: rec('homeSnagEvent.findMany', () => []),
+      create: rec('homeSnagEvent.create', () => ({ id: 'se-new' })),
+    },
+    // Phase 5: a payment row, written after locking the project row.
+    homeProjectPayment: { create: rec('homeProjectPayment.create', () => ({ id: 'pay-new' })) },
+    $queryRaw: vi.fn(async () => []),
+    homeProjectEvent: {
+      create: rec('homeProjectEvent.create', () => ({ id: 'pe-new' })),
+      createMany: rec('homeProjectEvent.createMany', () => ({ count: 1 })),
+    },
+    $transaction: vi.fn(async (ops: Promise<unknown>[] | ((tx: unknown) => Promise<unknown>)) =>
+      typeof ops === 'function' ? ops(client) : Promise.all(ops),
+    ),
     dreamPin: { findMany: rec('dreamPin.findMany', () => []) },
     studioVendor: { findMany: rec('studioVendor.findMany', () => []) },
     studioWorkOrder: { findMany: rec('studioWorkOrder.findMany', () => []) },
@@ -104,6 +137,9 @@ vi.mock('@/modules/storage/project-docs', () => ({
   signedDocUrls: vi.fn(async () => []),
   storeProjectDoc: vi.fn(async () => ({ ok: true, path: 'doc' })),
 }));
+
+/** Phase 4: marking a snag fixed needs the after photo. */
+const AFTER = [new File([new Uint8Array([1, 2, 3])], 'after.jpg', { type: 'image/jpeg' })];
 
 import { accessTo, assertCan, currentMember, memberFor, StudioAccessError } from '@/modules/studio/access';
 import { addDocument, fixSnag, postDecision, projectWork, setPaymentStage } from '@/modules/portal/project-store';
@@ -163,7 +199,7 @@ describe('access.ts', () => {
 describe('the customer project writers (project-store.ts)', () => {
   it('lets the owner fix a snag on any project of the studio, as before', async () => {
     as('u-owner');
-    expect(await fixSnag('snag-p2', 'Replaced', [])).toEqual({ ok: true, id: 'snag-p2' });
+    expect(await fixSnag('snag-p2', 'Replaced', AFTER)).toEqual({ ok: true, id: 'snag-p2' });
     expect(ops('homeSnag.update')).toHaveLength(1);
   });
 
@@ -182,7 +218,7 @@ describe('the customer project writers (project-store.ts)', () => {
 
   it('lets a supervisor fix a snag on their own site, and nothing a PM decides', async () => {
     as('u-sup');
-    expect(await fixSnag('snag-p1', 'Replaced', [])).toEqual({ ok: true, id: 'snag-p1' });
+    expect(await fixSnag('snag-p1', 'Replaced', AFTER)).toEqual({ ok: true, id: 'snag-p1' });
     expect(await postDecision('p1', { title: 'Laminate', why: 'Cutting next week', dueOn: '2026-12-01', options: [] })).toEqual(NOT_YOUR_ROLE);
     expect(await setPaymentStage('p1', 0, { paidOn: '2026-10-11' })).toEqual(NOT_YOUR_ROLE);
     expect(await addDocument('p1', { kind: 'DRAWINGS', title: 'Kitchen' }, null)).toEqual(NOT_YOUR_ROLE);
@@ -225,7 +261,7 @@ describe('the customer project writers (project-store.ts)', () => {
 
   it('still lets ops act on any project', async () => {
     as('u-ops', 'OPS');
-    expect(await fixSnag('snag-p9', 'Replaced', [])).toEqual({ ok: true, id: 'snag-p9' });
+    expect(await fixSnag('snag-p9', 'Replaced', AFTER)).toEqual({ ok: true, id: 'snag-p9' });
   });
 });
 

@@ -3,7 +3,8 @@ import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { CoinToast } from '../../components/brand';
-import { dayIso, timeline, week, type DayGroup } from '../../components/site/days';
+import { dayIso, dayOfIsoDay, timeline, week, type DayGroup } from '../../components/site/days';
+import { SiteDayView } from '../../components/site/SiteDayView';
 import { CubeIcon, SmallPill } from '../../components/site/parts';
 import { Body, DarkCard, Eyebrow, Loading, Meta, Rise, Screen, Stagger, Title } from '../../components/ui';
 import { api } from '../../lib/api';
@@ -35,9 +36,15 @@ export default function Site() {
   }, [ready]);
 
   const project = state.status === 'ready' ? state.project : null;
-  const strip = useMemo(() => week(project?.updates ?? []), [project]);
+  // Phase 2: the daily site log beside the older notes; missed days as the server counted them when it sends them.
+  const strip = useMemo(() => week(project?.updates ?? [], project?.siteLogs ?? [], project?.siteMissedDays), [project]);
   const items = useMemo(
-    () => timeline(project?.updates ?? [], strip.days.filter((d) => d.state === 'missed').map((d) => d.n)),
+    () =>
+      timeline(
+        project?.updates ?? [],
+        project?.siteMissedDays ? project.siteMissedDays.map(dayOfIsoDay) : strip.days.filter((d) => d.state === 'missed').map((d) => d.n),
+        project?.siteLogs ?? [],
+      ),
     [project, strip],
   );
 
@@ -72,7 +79,7 @@ export default function Site() {
     );
   }
 
-  const latest = items.findIndex((i) => i.kind === 'day');
+  const latest = items.findIndex((i) => i.kind !== 'gap');
   return (
     <View style={{ flex: 1 }}>
       <Screen onRefresh={() => void refresh()} refreshing={refreshing}>
@@ -92,7 +99,9 @@ export default function Site() {
                 const a11y =
                   d.state === 'done'
                     ? t('site.day.a11y.done', { day: when })
-                    : d.state === 'missed'
+                    : d.state === 'nobody'
+                      ? t('site.day.a11y.nobody', { day: when })
+                      : d.state === 'missed'
                       ? t('site.day.a11y.missed', { day: when })
                       : d.state === 'today'
                         ? t('site.day.a11y.today', { day: when })
@@ -102,7 +111,7 @@ export default function Site() {
                 return (
                   <Stagger key={d.key} i={i} start={180} style={styles.stripDay}>
                     <View accessible accessibilityLabel={a11y} style={{ width: '100%', alignItems: 'center', gap: 6 }}>
-                      <View style={[styles.bar, { backgroundColor: d.state === 'done' ? color.ink : d.state === 'missed' ? color.accent : color.line }]} />
+                      <View style={[styles.bar, { backgroundColor: d.state === 'done' ? color.ink : d.state === 'nobody' ? color.ink3 : d.state === 'missed' ? color.accent : color.line }]} />
                       <Text
                         style={[
                           styles.dayName,
@@ -124,9 +133,13 @@ export default function Site() {
             item.kind === 'gap' ? (
               <Stagger key={`gap-${item.n}`} i={Math.min(i, 4)} start={240}>
                 <DarkCard style={{ borderRadius: 18, padding: 18, gap: 8 }}>
-                  <Eyebrow onDark>{t('site.gap.title', { date: dayLabel(dayIso(item.n)) })}</Eyebrow>
+                  <Eyebrow onDark>{item.n === strip.today ? t('site.gap.today') : t('site.gap.title', { date: dayLabel(dayIso(item.n)) })}</Eyebrow>
                   <Text style={styles.gapBody}>{t(assured ? 'plan.assured.gap' : 'plan.basic.gap', { studio: project.studio })}</Text>
                 </DarkCard>
+              </Stagger>
+            ) : item.kind === 'site' ? (
+              <Stagger key={`site-${item.day.id}`} i={Math.min(i, 4)} start={240}>
+                <SiteDayView d={item.day} studio={project.studio} lead={i === latest} isToday={item.n === strip.today} t={t} />
               </Stagger>
             ) : (
               <Stagger key={`day-${item.n}`} i={Math.min(i, 4)} start={240}>

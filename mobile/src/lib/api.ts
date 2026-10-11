@@ -65,8 +65,20 @@ export const api = {
     call<{ reply: GeioReply }>('POST', '/geio', { question, history, lang, ...(image ? { image } : {}) }),
   projects: () => call<{ projects: Project[] }>('GET', '/project'),
   choose: (decisionId: string, index: number) => call<object>('POST', `/decisions/${encodeURIComponent(decisionId)}`, { index }),
+  /** Phase 5: picks by option id; the server changes the quote, the final payment and the locker. `message` says if the plan moved for a late pick. */
+  pick: (decisionId: string, optionId: string) => call<{ message?: string | null }>('POST', `/decisions/${encodeURIComponent(decisionId)}`, { optionId }),
+  /** A family member's vote; the owner's pick decides. */
+  vote: (decisionId: string, optionId: string) => call<object>('POST', `/decisions/${encodeURIComponent(decisionId)}/vote`, { optionId }),
+  /** "Yes, I paid this." */
+  confirmPayment: (paymentId: string) => call<object>('POST', `/payments/${encodeURIComponent(paymentId)}/confirm`),
+  /** "I didn't pay this": goes to One Interiors' team, with the customer's words. */
+  disputePayment: (paymentId: string, note: string) => call<object>('POST', `/payments/${encodeURIComponent(paymentId)}/dispute`, { note }),
   /** Multipart: projectId, title, room?, photos. */
   raiseSnag: (form: FormData) => call<{ id: string }>('POST', '/snags', form),
+  /** The studio's fix looks right (or the customer agrees with its reason): the snag closes. Owner only. */
+  confirmSnag: (snagId: string) => call<{ id: string }>('POST', `/snags/${encodeURIComponent(snagId)}/confirm`),
+  /** The fix did not work: the snag goes back to the studio, with an optional line. Owner only. */
+  snagNotFixed: (snagId: string, reason: string) => call<{ id: string }>('POST', `/snags/${encodeURIComponent(snagId)}/not-fixed`, { reason }),
   registerDevice: (token: string, platform: 'ios' | 'android') => call<object>('POST', '/devices', { token, platform }),
   removeDevice: (token: string) => call<object>('DELETE', '/devices', { token }),
   notifications: () => call<{ unread: number; notifications: Notice[] }>('GET', '/notifications'),

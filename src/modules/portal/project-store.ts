@@ -17,17 +17,22 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
-import { formatINR, fromDb } from '@/lib/money';
+import { formatINR } from '@/lib/money';
 import { getCurrentUser, hasRole } from '@/modules/auth/session';
 import { ACCESS_ERRORS, memberOnProject } from '@/modules/studio/access';
 import type { StudioAction } from '@/modules/studio/roles';
-import { signedSitePhotoUrls, storeSitePhoto } from '@/modules/storage/site-photos';
-import { notify, notifyStudio } from '@/modules/notify/service';
-import { canChoose, checkDecision, decisionState, parseOptions, type DecisionInput, type DecisionState } from './decisions';
-import { checkSnag, SNAG_LIMITS, snagLine } from './snags';
-import { checkDoc, DOC_KINDS, docMeta, type DocKind } from './documents';
-import { signedDocUrls, storeProjectDoc } from '@/modules/storage/project-docs';
-import { moneyView, setMark, type MoneyView } from './payments';
+import { signedSitePhotoUrls } from '@/modules/storage/site-photos';
+import { decisionState, parseOptions, type DecisionInput, type DecisionState } from './decisions';
+import { snagLine } from './snags';
+import { acceptSnag, markSnagFixed, raiseSnagAsCustomer, raiseSnagAsStudio, snagEventsOn } from '@/modules/project/snag-flow';
+import { finalPaymentGate } from '@/modules/project/snag-status';
+import { DOC_KINDS, docMeta, type DocKind } from './documents';
+import { signedDocUrls } from '@/modules/storage/project-docs';
+import { setMark, type MoneyView } from './payments';
+import { createDecision, pickOption } from '@/modules/project/decision-flow';
+import { setStagePaidFromLegacy } from '@/modules/project/payments-flow';
+import { removeDocument as removeLockerDocument, uploadDocument } from '@/modules/project/locker';
+import { CUSTOMER_PAYMENT_SELECT, CUSTOMER_QUOTE_CHANGE_SELECT, customerLedger, moneyFromLedger } from './money-locker-view';
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -42,50 +47,28 @@ export type { CustomerDecision, CustomerDocument, CustomerProject, CustomerSnag 
 
 // ── The customer's actions ─────────────────────────────────────
 
-/** The customer chooses an option; a choice can be changed until the due date. The studio hears about it. */
+/**
+ * The customer chooses an option (by index, as older apps send it). Phase 5:
+ * the pick changes the quote, the final payment and the locker in one go
+ * (project/decision-flow.ts `pickOption`); a pick can be changed until the
+ * due date, and a first pick after it counts as the customer's delay.
+ */
 export async function chooseDecision(userId: string, decisionId: string, index: unknown): Promise<ActionResult> {
-  const d = await prisma.homeDecision.findUnique({
-    where: { id: decisionId },
-    include: { project: { select: { introduction: { select: { studioId: true, brief: { select: { userId: true } } } } } } },
-  });
-  if (!d || d.project.introduction.brief.userId !== userId) return { ok: false, error: 'That decision is not on your project.' };
-  const options = parseOptions(d.options) ?? [];
-  if (!canChoose(d, options, index)) {
-    return { ok: false, error: d.dueOn.getTime() < Date.now() ? 'This decision has closed. Ask your expert.' : 'Pick one of the options.' };
-  }
-  const i = index as number;
-  await prisma.homeDecision.update({ where: { id: d.id }, data: { chosenIndex: i, chosenAt: new Date(), chosenById: userId } });
-  void notifyStudio(d.project.introduction.studioId, {
-    kind: 'decision-made',
-    decisionId: d.id,
-    title: d.title,
-    choice: options[i]!.name,
-    extraPaise: options[i]!.extraPaise,
-  });
-  return { ok: true, id: d.id };
+  return pickOption(userId, decisionId, { index });
 }
 
-/** The customer raises a snag on their own project, with up to four photos. The studio hears about it. */
+/**
+ * The customer raises a snag on their own project, with up to four photos.
+ * The studio hears about it. Phase 4: written with its RAISED event by
+ * project/snag-flow.ts (a photo is now required).
+ */
 export async function raiseSnag(
   userId: string,
   projectId: string,
   input: { title: unknown; room?: unknown; note?: unknown },
   photos: File[] = [],
 ): Promise<ActionResult> {
-  const project = await prisma.homeProject.findUnique({
-    where: { id: projectId },
-    select: { introduction: { select: { studioId: true, brief: { select: { userId: true } } } } },
-  });
-  if (!project || project.introduction.brief.userId !== userId) return { ok: false, error: 'That project is not yours.' };
-  const check = checkSnag(input);
-  if (!check.ok) return check;
-  const stored = await storePhotos(projectId, photos);
-  if (!stored.ok) return stored;
-  const snag = await prisma.homeSnag.create({
-    data: { projectId, ...check.value, photoPaths: stored.paths, raisedById: userId, raisedByStudio: false },
-  });
-  void notifyStudio(project.introduction.studioId, { kind: 'snag-raised', snagId: snag.id, title: snag.title, room: snag.room });
-  return { ok: true, id: snag.id };
+  return raiseSnagAsCustomer(userId, projectId, input, photos);
 }
 
 // ── The studio's and ops' actions ──────────────────────────────
@@ -125,65 +108,34 @@ async function staffFor(projectId: string, action?: StudioAction): Promise<Staff
   return { ok: true, ...base, byStudio: true, may: check.access.may };
 }
 
-/** A decision for the customer, with a due date and its options. The customer is told. */
+/**
+ * A decision for the customer, with a due date and its options, from the
+ * older form (name, note, what it adds). Phase 5: written with its options as
+ * rows by project/decision-flow.ts; the office's New decision screen calls
+ * `createDecision` directly, with photos and the studio's cost.
+ */
 export async function postDecision(projectId: string, input: DecisionInput): Promise<ActionResult> {
-  const staff = await staffFor(projectId, 'decision.create');
-  if (!staff.ok) return staff;
-  const check = checkDecision(input);
-  if (!check.ok) return check;
-  const { title, why, dueOn, options } = check.value;
-  const d = await prisma.homeDecision.create({
-    data: { projectId, title, why, dueOn, options: options as unknown as object, postedById: staff.userId, byStudio: staff.byStudio },
-  });
-  if (staff.customerId) {
-    void notify(staff.customerId, {
-      kind: 'decision-posted',
-      decisionId: d.id,
-      title,
-      dueLabel: dueOn.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' }).replace(',', ''),
-    });
-  }
-  return { ok: true, id: d.id };
+  const options = Array.isArray(input.options)
+    ? input.options.map((o) => {
+        const r = (o && typeof o === 'object' ? o : {}) as Record<string, unknown>;
+        return { label: r.name, detail: r.note, swatch: r.swatch, delta: typeof r.extraPaise === 'number' ? r.extraPaise / 100 : 0 };
+      })
+    : input.options;
+  return createDecision(projectId, { title: input.title, why: input.why, dueOn: input.dueOn, options });
 }
 
-/** Close a snag, with a note and a photo of the fix. The customer is told. */
+/**
+ * Mark a snag fixed, with a note and the after photo (required). It does not
+ * close: the customer confirms, or it closes after seven days
+ * (project/snag-flow.ts). The customer is told.
+ */
 export async function fixSnag(snagId: string, note: string, photos: File[] = []): Promise<ActionResult> {
-  const snag = await prisma.homeSnag.findUnique({ where: { id: snagId }, select: { projectId: true, title: true, status: true } });
-  if (!snag) return { ok: false, error: 'That snag is gone.' };
-  const staff = await staffFor(snag.projectId, 'snag.fix');
-  if (!staff.ok) return staff;
-  if (snag.status === 'FIXED') return { ok: true, id: snagId };
-  const stored = await storePhotos(snag.projectId, photos);
-  if (!stored.ok) return stored;
-  await prisma.homeSnag.update({
-    where: { id: snagId },
-    data: { status: 'FIXED', fixedAt: new Date(), fixedNote: note.trim().slice(0, SNAG_LIMITS.note) || null, fixedPhotoPaths: stored.paths },
-  });
-  if (staff.customerId) void notify(staff.customerId, { kind: 'snag-fixed', snagId, title: snag.title });
-  return { ok: true, id: snagId };
+  return markSnagFixed(snagId, { photos, text: note });
 }
 
-/** Set or move the date a snag will be fixed by. */
+/** Set or move the date a snag will be fixed by: an ACCEPTED step that keeps whoever it is assigned to. */
 export async function setSnagFixBy(snagId: string, date: string): Promise<ActionResult> {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: 'A date, please.' };
-  const snag = await prisma.homeSnag.findUnique({ where: { id: snagId }, select: { projectId: true } });
-  if (!snag) return { ok: false, error: 'That snag is gone.' };
-  const staff = await staffFor(snag.projectId, 'snag.accept');
-  if (!staff.ok) return staff;
-  await prisma.homeSnag.update({ where: { id: snagId }, data: { fixBy: new Date(`${date}T12:00:00Z`) } });
-  return { ok: true, id: snagId };
-}
-
-async function storePhotos(projectId: string, photos: File[]): Promise<{ ok: true; paths: string[] } | { ok: false; error: string }> {
-  const files = photos.filter((f) => f.size > 0);
-  if (files.length > SNAG_LIMITS.photos) return { ok: false, error: `At most ${SNAG_LIMITS.photos} photos.` };
-  const paths: string[] = [];
-  for (const f of files) {
-    const stored = await storeSitePhoto(projectId, f);
-    if (!stored.ok) return { ok: false, error: stored.error };
-    paths.push(stored.path);
-  }
-  return { ok: true, paths };
+  return acceptSnag(snagId, { fixBy: date, assigneeId: undefined }, new Date(), { assigneeOptional: true });
 }
 
 // ── What the studio and ops see ────────────────────────────────
@@ -227,8 +179,12 @@ export interface StaffWork {
 export async function projectWork(projectId: string, now = new Date()): Promise<StaffWork | null> {
   const staff = await staffFor(projectId);
   if (!staff.ok) return null;
-  const project = await prisma.homeProject.findUnique({ where: { id: projectId }, select: { contractPaise: true, paymentPhases: true, paidPhases: true } });
-  const money = project ? moneyView(project.contractPaise === null ? null : fromDb(project.contractPaise), project.paymentPhases, project.paidPhases) : null;
+  /* Phase 5: paid and balance from the payment rows and quote changes (money-locker-view.ts), never from the marks. */
+  const project = await prisma.homeProject.findUnique({
+    where: { id: projectId },
+    select: { contractPaise: true, paymentPhases: true, paidPhases: true, payments: { select: CUSTOMER_PAYMENT_SELECT }, quoteChanges: { select: CUSTOMER_QUOTE_CHANGE_SELECT } },
+  });
+  const money = project && project.contractPaise !== null ? moneyFromLedger(customerLedger(project), project.paidPhases) : null;
   if (!staff.may('project.read')) return { dream: [], money: staff.may('payment.read') ? money : null, documents: [], decisions: [], snags: [] };
   const [decisions, snags, documents] = await Promise.all([
     prisma.homeDecision.findMany({ where: { projectId }, orderBy: { dueOn: 'desc' }, take: 50 }),
@@ -282,60 +238,31 @@ export async function projectWork(projectId: string, now = new Date()): Promise<
   };
 }
 
-/** A snag found by the studio or at the handover walk-through, raised from the staff side. The customer is told it was logged. */
+/** A snag found by the studio or at the handover walk-through, raised from the staff side (project/snag-flow.ts). */
 export async function raiseSnagAsStaff(
   projectId: string,
   input: { title: unknown; room?: unknown; note?: unknown },
   photos: File[] = [],
 ): Promise<ActionResult> {
-  const staff = await staffFor(projectId, 'snag.accept');
-  if (!staff.ok) return staff;
-  const check = checkSnag(input);
-  if (!check.ok) return check;
-  const stored = await storePhotos(projectId, photos);
-  if (!stored.ok) return stored;
-  const snag = await prisma.homeSnag.create({
-    data: { projectId, ...check.value, photoPaths: stored.paths, raisedById: staff.userId, raisedByStudio: staff.byStudio },
-  });
-  return { ok: true, id: snag.id };
+  return raiseSnagAsStudio(projectId, input, photos);
 }
 
-/** Upload a document to a project. The customer is told it is in their Locker. */
+/**
+ * Upload a document to a project, shared at once. The customer is told it is
+ * in their Locker. Phase 5: through project/locker.ts, which also takes
+ * drafts and new versions.
+ */
 export async function addDocument(projectId: string, input: { kind: unknown; title: unknown }, file: File | null): Promise<ActionResult> {
-  const staff = await staffFor(projectId, 'document.upload');
-  if (!staff.ok) return staff;
-  const check = checkDoc(input);
-  if (!check.ok) return check;
-  if (!file || file.size === 0) return { ok: false, error: 'Choose the file.' };
-  const stored = await storeProjectDoc(projectId, file);
-  if (!stored.ok) return stored;
-  const doc = await prisma.homeDocument.create({
-    data: {
-      projectId,
-      ...check.value,
-      storageKey: stored.path,
-      originalName: file.name.slice(0, 200),
-      contentType: file.type,
-      bytes: file.size,
-      uploadedById: staff.userId,
-      byStudio: staff.byStudio,
-      /* Shared on upload, as every document was before drafts existed; the
-         workspace's draft upload leaves this null until the studio shares. */
-      sharedAt: new Date(),
-    },
-  });
-  if (staff.customerId) void notify(staff.customerId, { kind: 'document', studio: staff.studioName, title: check.value.title });
-  return { ok: true, id: doc.id };
+  return uploadDocument(projectId, { kind: input.kind, title: input.title, share: true }, file);
 }
 
-/** Take a document off the project. Kept for the record; the customer stops seeing it. */
+/**
+ * Take a document off the project. Phase 5: only a draft; a document the
+ * customer already has stays and can only be replaced by a new version
+ * (project/locker-rules.ts).
+ */
 export async function removeDocument(documentId: string): Promise<ActionResult> {
-  const doc = await prisma.homeDocument.findUnique({ where: { id: documentId }, select: { projectId: true } });
-  if (!doc) return { ok: false, error: 'That document is gone.' };
-  const staff = await staffFor(doc.projectId, 'document.upload');
-  if (!staff.ok) return staff;
-  await prisma.homeDocument.update({ where: { id: documentId }, data: { deletedAt: new Date() } });
-  return { ok: true, id: documentId };
+  return removeLockerDocument(documentId);
 }
 
 // ── Payments: due dates and what is paid ───────────────────────
@@ -365,13 +292,24 @@ export async function setPaymentStage(
     where: { id: projectId },
     select: { contractPaise: true, paymentPhases: true, paidPhases: true },
   });
-  const money = project ? moneyView(project.contractPaise === null ? null : fromDb(project.contractPaise), project.paymentPhases, project.paidPhases) : null;
+  const money = project && project.contractPaise !== null ? moneyFromLedger(customerLedger({ paymentPhases: project.paymentPhases }), project.paidPhases) : null;
   const stage = money?.stages[index];
   if (!project || !money || !stage) return { ok: false, error: 'That payment stage is not on this project.' };
-  const marks = setMark(project.paidPhases, index, patch);
-  await prisma.homeProject.update({ where: { id: projectId }, data: { paidPhases: marks as unknown as object } });
-  if (patch.paidOn && !stage.paidOn && staff.customerId) {
-    void notify(staff.customerId, { kind: 'payment-recorded', stage: stage.label, amountPaise: stage.amountPaise, studio: staff.studioName });
+  // Phase 4: the last payment cannot be due while any snag is open (project/snag-status.ts).
+  if (patch.dueOn && index === money.stages.length - 1) {
+    const gate = finalPaymentGate({ stageIndex: index, stageCount: money.stages.length, eventsBySnag: await snagEventsOn(projectId), now: new Date() });
+    if (!gate.ok) return { ok: false, error: gate.error };
+  }
+  if (patch.dueOn !== undefined) {
+    const marks = setMark(project.paidPhases, index, { dueOn: patch.dueOn });
+    await prisma.homeProject.update({ where: { id: projectId }, data: { paidPhases: marks as unknown as object } });
+  }
+  /* Phase 5: "received" is a payment row (project/payments-flow.ts), the
+     stage's open amount, which the customer is asked to confirm; "undo" is a
+     correction to zero. `paidPhases[].paidOn` follows the rows. */
+  if (patch.paidOn !== undefined) {
+    const r = await setStagePaidFromLegacy(projectId, index, patch.paidOn);
+    if (!r.ok) return r;
   }
   return { ok: true };
 }

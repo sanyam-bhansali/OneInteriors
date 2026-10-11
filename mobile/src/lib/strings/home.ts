@@ -54,6 +54,10 @@ export const home = {
     hi: 'इस फ़ोन पर सेव की गई जानकारी दिख रही है। {error}',
     mr: 'या फोनवर सेव्ह केलेली माहिती दिसत आहे. {error}',
   },
+  // Phase 2: the daily site log on Home.
+  'home.site.nobody': { en: 'Nobody on site today: {reason}.', hi: 'आज साइट पर कोई नहीं: {reason}।', mr: 'आज साइटवर कोणी नाही: {reason}.' },
+  'home.site.missed': { en: 'No update from the studio today.', hi: 'आज स्टूडियो से कोई अपडेट नहीं।', mr: 'आज स्टुडिओकडून अपडेट नाही.' },
+  'home.site.crew': { en: 'On site: {names}', hi: 'साइट पर: {names}', mr: 'साइटवर: {names}' },
   'homeApp.choose': { en: 'Meet your studios', hi: 'अपने स्टूडियो से मिलें', mr: 'तुमच्या स्टुडिओंना भेटा' },
   'homeApp.quotes': { en: 'See my quotes again', hi: 'मेरे कोटेशन फिर से देखें', mr: 'माझी कोटेशन पुन्हा पाहा' },
 } satisfies Record<string, Entry>;

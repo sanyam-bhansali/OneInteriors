@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { ArrowIcon } from '../../components/icons';
 import { CalendarIcon, GrowLine, NowDot, SnagIcon } from '../../components/project/parts';
+import { MovedNote, MovesCard, StageChecklist, stageLine } from '../../components/project/tracker';
 import { Body, Card, Eyebrow, Loading, Meta, Press, Screen, Stagger, Tile, Title } from '../../components/ui';
 import { dayLabel, inr, lakh, shortDate } from '../../lib/format';
 import { useHeadline, useLang, useT, type T } from '../../lib/i18n';
@@ -10,7 +11,8 @@ import { daysLate } from '../../lib/progress';
 import { usePlan } from '../../lib/plan';
 import { useProject } from '../../lib/project';
 import { color, font } from '../../lib/theme';
-import type { Decision, Money, Project as ProjectData, Stage } from '../../lib/types';
+import { PaymentEntries } from '../../components/project/payment-entries';
+import type { Decision, Money, Payments as PaymentsData, Project as ProjectData, Stage, Tracker, TrackerStage } from '../../lib/types';
 
 /**
  * Project (design #22, Tracker): overall delay, paid and handover as tinted
@@ -39,7 +41,10 @@ export default function Project() {
   }
 
   const p = state.project;
-  const late = (p as { overallLateDays?: number }).overallLateDays ?? daysLate(p.stages, now);
+  // Computed on the server (planned vs forecast handover); older servers do not send it.
+  const late = p.overallLateDays ?? daysLate(p.stages, now);
+  const tracker = p.tracker ?? null;
+  const customerDays = tracker?.overall.customerDays ?? 0;
   const handover = p.stages.find((s) => s.key === 'HANDOVER') ?? p.stages[p.stages.length - 1];
   const open = p.snags.filter((s) => s.status === 'OPEN').length;
   const fixed = p.snags.length - open;
@@ -87,6 +92,8 @@ export default function Project() {
           </Stagger>
         </View>
 
+        {late > 0 && customerDays > 0 ? <Text style={styles.note}>{t('project.customerDays', { n: customerDays })}</Text> : null}
+
         <View style={styles.row2}>
           <Stagger i={3} start={120} style={{ flex: 1 }}>
             <Press onPress={() => router.push('/snags')} accessibilityLabel={`${t('project.snags')}. ${snagSub}`} style={styles.snagTile}>
@@ -132,12 +139,16 @@ export default function Project() {
               titleLine={titleLine}
               assured={assured}
               studio={p.studio}
+              tracked={tracker && tracker.stages.length === p.stages.length ? (tracker.stages[i] ?? null) : null}
+              current={s.state === 'now' ? (tracker?.current ?? null) : null}
               t={t}
             />
           ))}
         </View>
 
-        {p.money ? <Payments money={p.money} changes={p.changes} t={t} /> : null}
+        {tracker ? <MovesCard moves={tracker.moves} t={t} /> : null}
+
+        {p.money ? <Payments money={p.money} changes={p.changes} payments={p.payments ?? null} onChanged={() => void refresh()} t={t} /> : null}
         {!p.money && p.phases ? (
           <Card>
             <View style={styles.cardHead}>
@@ -177,6 +188,8 @@ function StageRow({
   titleLine,
   assured,
   studio,
+  tracked,
+  current,
   t,
 }: {
   stage: Stage;
@@ -188,18 +201,24 @@ function StageRow({
   /** Assured promises our follow-up; Basic must not. */
   assured: boolean;
   studio: string;
+  /** The server's planned-vs-actual for this stage (Phase 3); null from older servers. */
+  tracked: TrackerStage | null;
+  /** The current stage's room checklist. */
+  current: Tracker['current'];
   t: T;
 }) {
   const done = s.state === 'done';
   const nowStage = s.state === 'now';
   const date = shortDate(s.targetOn);
-  const line = done
-    ? t('project.plannedDone', { date })
-    : nowStage
-      ? s.late
-        ? t('project.dueLate', { date })
-        : t('project.dueOnTrack', { date })
-      : t('project.planned', { date });
+  const line = tracked
+    ? stageLine(tracked, t)
+    : done
+      ? t('project.plannedDone', { date })
+      : nowStage
+        ? s.late
+          ? t('project.dueLate', { date })
+          : t('project.dueOnTrack', { date })
+        : t('project.planned', { date });
   return (
     <Stagger i={i} start={220}>
       <View role="listitem" style={styles.tlInner}>
@@ -228,6 +247,8 @@ function StageRow({
             {nowStage ? t('project.stageNow', { stage: s.label }) : s.label}
           </Text>
           <Text style={styles.mono}>{line}</Text>
+          {tracked ? <MovedNote stage={tracked} t={t} /> : null}
+          {current ? <StageChecklist current={current} t={t} /> : null}
           {s.late ? (
             <View style={styles.lateCard}>
               <Text style={styles.lateEyebrow}>{done ? t('project.lateDone.eyebrow') : t('project.late.eyebrow')}</Text>
@@ -246,8 +267,28 @@ function StageRow({
   );
 }
 
-function Payments({ money, changes, t }: { money: Money; changes: ProjectData['changes']; t: T }) {
+/**
+ * The payments card. Phase 5: with `payments` (servers since the studio
+ * workspace), each stage's line comes from the studio's recorded entries —
+ * waiting for you, part paid, paid — the last stage says what your decisions
+ * added, and each entry the studio marked received asks you to confirm it.
+ */
+function Payments({
+  money,
+  changes,
+  payments,
+  onChanged,
+  t,
+}: {
+  money: Money;
+  changes: ProjectData['changes'];
+  payments: PaymentsData | null;
+  onChanged: () => void;
+  t: T;
+}) {
   const n = changes?.items.length ?? 0;
+  const ledger = (i: number) => payments?.stages.find((x) => x.index === i) ?? null;
+  const signed = (paise: number) => (paise < 0 ? t('decision.less', { amount: inr(-paise) }) : `+${inr(paise)}`);
   return (
     <Card>
       <View style={styles.cardHead}>
@@ -261,25 +302,33 @@ function Payments({ money, changes, t }: { money: Money; changes: ProjectData['c
             <Text style={[styles.mono, s.state === 'paid' && { color: color.ok }]}>
               {s.paidOn
                 ? t('project.payPaid', { date: shortDate(s.paidOn) })
+                : ledger(s.index)?.state === 'waiting'
+                  ? t('pay.stageWaiting')
+                  : ledger(s.index)?.state === 'part'
+                    ? t('pay.stagePart', { paid: inr(ledger(s.index)!.paidPaise), total: inr(s.amountPaise) })
                 : s.dueOn
                   ? t('project.payDue', { date: shortDate(s.dueOn) })
                   : s.state === 'next'
                     ? t('project.payNext')
                     : t('project.payLater')}
             </Text>
+            {ledger(s.index)?.changesPaise ? <Text style={styles.mono}>{t('pay.includesChanges', { amount: signed(ledger(s.index)!.changesPaise) })}</Text> : null}
           </View>
           <Text style={styles.amt}>{inr(s.amountPaise)}</Text>
         </View>
       ))}
+      {payments ? <PaymentEntries payments={payments} onChanged={onChanged} t={t} /> : null}
       {changes ? (
         <View style={styles.payRow}>
           <Text style={[styles.payLabel, { flex: 1 }]}>{t('project.changes')}</Text>
           <Text style={styles.amt}>
             {n === 0 || !changes.totalPaise
               ? t('project.changesNone')
-              : n === 1
-                ? t('project.changesOne', { amount: inr(changes.totalPaise) })
-                : t('project.changesMany', { amount: inr(changes.totalPaise), n })}
+              : changes.totalPaise < 0
+                ? signed(changes.totalPaise)
+                : n === 1
+                  ? t('project.changesOne', { amount: inr(changes.totalPaise) })
+                  : t('project.changesMany', { amount: inr(changes.totalPaise), n })}
           </Text>
         </View>
       ) : null}

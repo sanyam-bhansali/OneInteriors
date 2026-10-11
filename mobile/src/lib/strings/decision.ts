@@ -40,4 +40,34 @@ export const decision = {
     hi: 'चुनाव इस प्रोजेक्ट के मालिक पक्का करते हैं। हर विकल्प और उसकी क़ीमत आप यहाँ देख सकते हैं।',
     mr: 'निवड या प्रोजेक्टचे मालक नक्की करतात. प्रत्येक पर्याय आणि त्याची किंमत तुम्ही इथे पाहू शकता.',
   },
+
+  // Phase 5: options as rows, prices that can go down, late picks, family votes.
+  'decision.less': { en: '−{amount}', hi: '−{amount}', mr: '−{amount}' },
+  'decision.adds': {
+    en: 'Picking {option} adds {amount} to your last payment.',
+    hi: '{option} चुनने से आपके आख़िरी भुगतान में {amount} जुड़ेंगे।',
+    mr: '{option} निवडल्यास तुमच्या शेवटच्या पेमेंटमध्ये {amount} वाढतील.',
+  },
+  'decision.saves': {
+    en: 'Picking {option} takes {amount} off your last payment.',
+    hi: '{option} चुनने से आपके आख़िरी भुगतान में {amount} कम होंगे।',
+    mr: '{option} निवडल्यास तुमच्या शेवटच्या पेमेंटमधून {amount} कमी होतील.',
+  },
+  'decision.same': {
+    en: '{option} is in your quote. Your payments stay as they are.',
+    hi: '{option} आपके कोटेशन में है। आपके भुगतान वैसे ही रहेंगे।',
+    mr: '{option} तुमच्या कोटेशनमध्ये आहे. तुमची पेमेंट तशीच राहतील.',
+  },
+  'decision.lateOpen': {
+    en: 'The date has passed. You can still choose; the plan moves by the working days it is late.',
+    hi: 'तारीख निकल गई है। आप अब भी चुन सकते हैं; जितने कामकाजी दिन देर हुई, प्लान उतना आगे जाएगा।',
+    mr: 'तारीख उलटून गेली आहे. तुम्ही अजूनही निवडू शकता; जितके कामाचे दिवस उशीर, तितका प्लान पुढे जाईल.',
+  },
+  'decision.lateDue': { en: 'Was due {day}', hi: '{day} तक था', mr: '{day} पर्यंत होते' },
+  'decision.vote': { en: 'Vote for {option}', hi: '{option} को वोट दें', mr: '{option} ला मत द्या' },
+  'decision.voted.done': {
+    en: 'Your vote is in. The owner of this project decides.',
+    hi: 'आपका वोट दर्ज हो गया। फ़ैसला प्रोजेक्ट के मालिक का है।',
+    mr: 'तुमचे मत नोंदले. निर्णय प्रोजेक्टचे मालक घेतील.',
+  },
 } satisfies Record<string, Entry>;

@@ -115,8 +115,73 @@ function leakyRow(): CustomerProjectRow {
         customerText: 'Kitchen carcasses are up.',
         postedById: SECRET.staffId,
         clientRef: SECRET.clientRef,
-        photos: [{ storagePath: SECRET.photoPath, lat: Number(SECRET.lat), lng: 73.8567437, voicePath: SECRET.voicePath, transcript: SECRET.transcript }],
-        crew: [{ crewName: 'Ramesh', crewRole: 'Carpenter', crewMemberId: 'crew-1', crewMember: { phone: SECRET.crewPhone } }],
+        // Phase 2: the rest of a real row, selected or not.
+        reason: null,
+        customerLang: 'en',
+        postedAt: D('2026-10-10T11:30:00Z'),
+        createdAt: D('2026-10-10T14:00:00Z'),
+        correctsId: null,
+        stageId: 'stage-SECRET',
+        photos: [
+          {
+            storagePath: SECRET.photoPath,
+            lat: Number(SECRET.lat),
+            lng: 73.8567437,
+            voicePath: SECRET.voicePath,
+            transcript: SECRET.transcript,
+            transcriptLang: 'mr',
+            takenAt: D('2026-10-10T11:20:00Z'),
+            fromGallery: true,
+            customerText: 'Kitchen carcass levelled and fixed to the wall.',
+            customerLang: 'en',
+          },
+        ],
+        crew: [
+          {
+            crewName: 'Ramesh Pawar',
+            crewRole: 'Carpenter',
+            arrivedAt: D('2026-10-10T04:10:00Z'),
+            crewMemberId: 'crew-1',
+            phone: SECRET.crewPhone,
+            wages: SECRET.wages,
+            crewMember: { phone: SECRET.crewPhone },
+          },
+        ],
+        ticked: [{ room: 'Kitchen', label: 'Carcass levelled', doneById: SECRET.staffId }],
+      },
+      {
+        id: 'log2',
+        date: D('2026-10-10T00:00:00Z'),
+        kind: 'CORRECTION',
+        reason: null,
+        note: SECRET.siteNote,
+        voicePath: SECRET.voicePath,
+        transcript: SECRET.transcript,
+        customerText: 'The loft shutters went up after lunch.',
+        customerLang: 'en',
+        postedAt: D('2026-10-10T12:30:00Z'),
+        correctsId: 'log1',
+        postedById: SECRET.staffId,
+        clientRef: `${SECRET.clientRef}-2`,
+        photos: [],
+        crew: [],
+        ticked: [],
+      },
+      {
+        id: 'log3',
+        date: D('2026-10-09T00:00:00Z'),
+        kind: 'NOBODY',
+        reason: 'WAITING_CUSTOMER_DECISION',
+        note: SECRET.siteNote,
+        customerText: null,
+        customerLang: null,
+        postedAt: D('2026-10-09T05:00:00Z'),
+        correctsId: null,
+        postedById: SECRET.staffId,
+        clientRef: `${SECRET.clientRef}-3`,
+        photos: [],
+        crew: [],
+        ticked: [],
       },
     ],
     dateChanges: [{ id: 'dc1', field: 'PLANNED_END', reason: 'STUDIO', note: SECRET.delayNote, byId: SECRET.staffId }],
@@ -129,6 +194,11 @@ function leakyRow(): CustomerProjectRow {
         recordedById: SECRET.staffId,
         disputeNote: SECRET.disputeNote,
         disputedById: SECRET.customerId,
+        // Phase 5: paid is counted from the rows, so this one is the customer's confirmed payment.
+        receivedOn: D('2026-09-02T00:00:00Z'),
+        recordedAt: D('2026-09-02T10:00:00Z'),
+        customerConfirmedAt: D('2026-09-03T10:00:00Z'),
+        customerConfirmedById: SECRET.customerId,
       },
     ],
     events: [{ id: 'e1', type: 'site.posted', actorId: SECRET.staffId, payload: { secret: SECRET.eventPayload }, dedupeKey: SECRET.dedupeKey }],
@@ -203,8 +273,8 @@ function leakyRow(): CustomerProjectRow {
         causedBy: SECRET.staffId,
         assigneeId: SECRET.assignee,
         events: [
-          { kind: 'ACCEPTED', internalNote: SECRET.internalNote, assigneeId: SECRET.assignee, byId: SECRET.staffId },
-          { kind: 'FIXED', voicePath: SECRET.voicePath, transcript: SECRET.transcript, customerText: 'Edge banding replaced' },
+          { kind: 'ACCEPTED', at: D('2026-10-02T06:00:00Z'), fixBy: D('2026-10-05T00:00:00Z'), internalNote: SECRET.internalNote, assigneeId: SECRET.assignee, byId: SECRET.staffId },
+          { kind: 'FIXED', at: D('2026-10-04T00:00:00Z'), photoPaths: [SECRET.photoPath], voicePath: SECRET.voicePath, transcript: SECRET.transcript, transcriptLang: 'mr', customerText: 'Edge banding replaced' },
         ],
       },
     ],
@@ -379,6 +449,277 @@ describe('the stages the customer sees', () => {
   });
 
   it('selects only what the tracker needs from the plan', () => {
-    expect(CUSTOMER_PROJECT_SELECT.stages.select).toEqual({ kind: true, name: true, plannedEnd: true, actualEnd: true });
+    // Phase 3 adds the id, the start and each item's room, label and done (never who ticked it).
+    expect(CUSTOMER_PROJECT_SELECT.stages.select).toEqual({
+      kind: true,
+      name: true,
+      plannedEnd: true,
+      actualEnd: true,
+      id: true,
+      plannedStart: true,
+      items: { orderBy: { sortOrder: 'asc' }, select: { room: true, label: true, doneAt: true } },
+    });
   });
 });
+
+describe('Phase 4: a snag’s progress, from its events (portal/snag-view.ts)', () => {
+  const fixed = D('2026-10-04T00:00:00Z');
+  const row = (events: unknown[], userId = SECRET.customerId, now = D('2026-10-06T00:00:00Z')) => {
+    const r = leakyRow() as unknown as { snags: { events: unknown[] }[] };
+    r.snags[0]!.events = events;
+    return toCustomerProject(r as unknown as CustomerProjectRow, userId, now, NO_LINKS_FOR_TEST);
+  };
+  const RAISED = { id: 'e0', kind: 'RAISED', at: D('2026-10-02T00:00:00Z'), photoPaths: [SECRET.photoPath], byId: SECRET.customerId };
+  const ACCEPTED = { id: 'e1', kind: 'ACCEPTED', at: D('2026-10-02T06:00:00Z'), fixBy: D('2026-10-05T12:00:00Z'), internalNote: SECRET.internalNote, assigneeId: SECRET.assignee };
+  const FIXED = { id: 'e2', kind: 'FIXED', at: fixed, photoPaths: [SECRET.photoPath], voicePath: SECRET.voicePath, transcript: SECRET.transcript, customerText: 'Filler strip fitted.' };
+
+  it('a fix waits for the owner, with the sentence, the fix-by date and when it closes by itself', () => {
+    const out = row([RAISED, ACCEPTED, FIXED]);
+    expect(out.snags[0]!.progress).toEqual({
+      state: 'fixed',
+      fixBy: '2026-10-05T12:00:00.000Z',
+      fixedAt: fixed.toISOString(),
+      fixSentence: 'Filler strip fitted.',
+      studioReason: null,
+      notFixedReason: null,
+      closedAt: null,
+      closedBy: null,
+      autoClosesOn: '2026-10-11T00:00:00.000Z',
+      daysToFix: null,
+      canAnswer: true,
+    });
+    const json = JSON.stringify(out);
+    for (const v of [SECRET.internalNote, SECRET.assignee, SECRET.transcript, SECRET.voicePath]) expect(json).not.toContain(v);
+  });
+
+  it('family see it but cannot answer', () => {
+    expect(row([RAISED, FIXED], SECRET.familyUserId).snags[0]!.progress.canAnswer).toBe(false);
+  });
+
+  it('closes by itself seven days after the fix, before any cron', () => {
+    const p = row([RAISED, FIXED], SECRET.customerId, D('2026-10-11T00:00:00Z')).snags[0]!.progress;
+    expect(p).toMatchObject({ state: 'closed', closedBy: 'auto', canAnswer: false, daysToFix: 2 });
+  });
+
+  it('shows the studio’s dispute reason, and the customer may agree', () => {
+    const p = row([RAISED, { id: 'e3', kind: 'DISPUTED', at: D('2026-10-03T00:00:00Z'), note: 'Hairline in the natural stone' }]).snags[0]!.progress;
+    expect(p).toMatchObject({ state: 'disputed', studioReason: 'Hairline in the natural stone', canAnswer: true });
+  });
+
+  it('a confirmed fix says the customer closed it', () => {
+    const p = row([RAISED, FIXED, { id: 'e4', kind: 'CONFIRMED', at: D('2026-10-05T00:00:00Z') }]).snags[0]!.progress;
+    expect(p).toMatchObject({ state: 'closed', closedBy: 'you', daysToFix: 2 });
+  });
+
+  it('selects only the event columns the customer may see', () => {
+    const snags = CUSTOMER_PROJECT_SELECT.snags.select as unknown as { events: { select: Record<string, boolean> } };
+    expect(Object.keys(snags.events.select).sort()).toEqual(['at', 'customerText', 'fixBy', 'id', 'kind', 'note']);
+  });
+});
+
+const NO_LINKS_FOR_TEST = { updatePhotos: [], snagPhotos: [], fixedPhotos: [], docUrls: [] };
+
+describe('Phase 2: the site feed from the daily site log (portal/site-feed-view.ts)', () => {
+  const now = D('2026-10-11T06:00:00Z');
+  const out = toCustomerProject(leakyRow(), SECRET.customerId, now, {
+    updatePhotos: [['https://signed/1']],
+    snagPhotos: [],
+    fixedPhotos: [],
+    docUrls: [],
+    siteLogPhotos: [['https://signed/site-1'], [], []],
+  });
+
+  it('shows each day once, newest first, with the correction beside the original, never instead of it', () => {
+    expect(out.siteLogs.map((d) => [d.day, d.kind])).toEqual([
+      ['2026-10-10', 'update'],
+      ['2026-10-09', 'nobody'],
+    ]);
+    expect(out.siteLogs[0]!.corrections).toHaveLength(1);
+    expect(out.siteLogs[0]!.corrections[0]).toMatchObject({ kind: 'correction', text: 'The loft shutters went up after lunch.' });
+  });
+
+  it('puts each photo with its own sentence, its time and the gallery label', () => {
+    expect(out.siteLogs[0]!.photos).toEqual([
+      { url: 'https://signed/site-1', text: 'Kitchen carcass levelled and fixed to the wall.', takenAt: '2026-10-10T11:20:00.000Z', fromGallery: true },
+    ]);
+    expect(out.siteLogs[0]!.text).toBe('Kitchen carcasses are up.');
+    expect(out.siteLogs[0]!.done).toEqual([{ room: 'Kitchen', label: 'Carcass levelled' }]);
+  });
+
+  it('gives the crew as first name, role and arrival time only', () => {
+    expect(out.siteLogs[0]!.crew).toEqual([{ name: 'Ramesh', role: 'Carpenter', arrivedAt: '2026-10-10T04:10:00.000Z' }]);
+    expect(JSON.stringify(out.siteLogs)).not.toContain('Pawar');
+  });
+
+  it('says why nobody was on site, and that waiting on the customer is not the studio’s delay', () => {
+    expect(out.siteLogs[1]).toMatchObject({
+      reason: 'waiting-customer-decision',
+      reasonText: 'Waiting for your decision',
+      countsAgainstStudio: false,
+      photos: [],
+    });
+  });
+
+  it('carries no recording, transcript, place, note, poster or crew phone from the site log', () => {
+    const json = JSON.stringify(out.siteLogs);
+    for (const v of [SECRET.voicePath, SECRET.transcript, SECRET.siteNote, SECRET.lat, SECRET.staffId, SECRET.clientRef, SECRET.crewPhone, SECRET.wages, SECRET.photoPath, 'stage-SECRET']) {
+      expect(json).not.toContain(v);
+    }
+    const keys = keysOf(out.siteLogs);
+    for (const k of ['voicePath', 'transcript', 'transcriptLang', 'note', 'lat', 'lng', 'postedById', 'clientRef', 'crewMemberId', 'crewMember', 'phone', 'storagePath', 'doneById', 'stageId']) {
+      expect(keys.has(k), k).toBe(false);
+    }
+  });
+
+  it('selects only the customer’s columns from the site log', () => {
+    const sel = keysOf(CUSTOMER_PROJECT_SELECT.siteLogs);
+    for (const k of ['note', 'voicePath', 'transcript', 'transcriptLang', 'lat', 'lng', 'postedById', 'clientRef', 'crewMember', 'crewMemberId', 'doneById', 'phone']) {
+      expect(sel.has(k), k).toBe(false);
+    }
+  });
+
+  it('lists working days with nothing posted by 21:00 IST, from the day site work started', () => {
+    const row = leakyRow() as unknown as Record<string, unknown>;
+    // Posts on Fri 9 and Sat 10 Oct; Mon 12 and Tue 13 are working days with nothing.
+    const at = (iso: string) => toCustomerProject({ ...row, updates: [] } as unknown as CustomerProjectRow, SECRET.customerId, D(iso)).siteMissedDays;
+    expect(at('2026-10-13T10:00:00Z')).toEqual(['2026-10-12']); // 15:30 IST: today not missed yet
+    expect(at('2026-10-13T16:00:00Z')).toEqual(['2026-10-13', '2026-10-12']); // 21:30 IST
+    expect(at('2026-10-11T16:00:00Z')).toEqual([]); // Sunday: not a working day
+  });
+});
+
+describe('Phase 3: the tracker, moved dates and computed statuses (portal/tracker-view.ts)', () => {
+  const now = D('2026-10-11T00:00:00Z'); // a Sunday in India
+  const row = () =>
+    ({
+      ...(leakyRow() as unknown as Record<string, unknown>),
+      stages: [
+        { id: 'st1', kind: 'DESIGN', name: 'Design', plannedStart: D('2026-09-01T00:00:00Z'), plannedEnd: D('2026-09-15T00:00:00Z'), actualEnd: D('2026-09-14T00:00:00Z'), items: [] },
+        {
+          id: 'st2',
+          kind: 'CIVIL',
+          name: 'Civil and electrical',
+          plannedStart: D('2026-09-15T00:00:00Z'),
+          plannedEnd: D('2026-10-05T00:00:00Z'),
+          actualEnd: null,
+          items: [
+            { room: 'Kitchen', label: 'Plumbing points', doneAt: D('2026-10-01T00:00:00Z'), doneById: SECRET.staffId, doneSource: 'VOICE' },
+            { room: 'Kitchen', label: 'Dado tiles', doneAt: null },
+            { room: 'Bedroom 1', label: 'Wiring', doneAt: null },
+          ],
+        },
+        { id: 'st3', kind: 'CARPENTRY', name: 'Carpentry', plannedStart: D('2026-10-05T00:00:00Z'), plannedEnd: D('2026-11-15T00:00:00Z'), actualEnd: null, items: [] },
+        { id: 'st4', kind: 'FINISH', name: 'Painting', plannedStart: D('2026-11-15T00:00:00Z'), plannedEnd: D('2026-11-25T00:00:00Z'), actualEnd: null, items: [] },
+        { id: 'st5', kind: 'HANDOVER', name: 'Handover', plannedStart: D('2026-11-25T00:00:00Z'), plannedEnd: D('2026-11-30T00:00:00Z'), actualEnd: null, items: [] },
+      ],
+      dateChanges: [
+        {
+          id: 'dc9',
+          stageId: 'st5',
+          field: 'HANDOVER',
+          fromDate: D('2026-11-25T00:00:00Z'),
+          toDate: D('2026-11-30T00:00:00Z'),
+          reason: 'CUSTOMER_CHANGE',
+          decisionId: null,
+          note: SECRET.delayNote,
+          byId: SECRET.staffId,
+          at: D('2026-10-02T06:00:00Z'),
+        },
+      ],
+    }) as unknown as CustomerProjectRow;
+  const out = toCustomerProject(row(), SECRET.customerId, now);
+  const t = out.tracker!;
+
+  it('shows a moved date as old date, new date and the reason in plain words, never the PM note', () => {
+    expect(t.moves).toHaveLength(1);
+    expect(t.moves[0]).toMatchObject({ field: 'handover', from: '2026-11-25', to: '2026-11-30', reason: 'CUSTOMER_CHANGE', customer: true });
+    expect(t.moves[0]!.words).toBe('Handover is now 30 Nov (was 25 Nov): a change you asked for.');
+    const json = JSON.stringify(t);
+    expect(json).not.toContain(SECRET.delayNote);
+    expect(json).not.toContain(SECRET.staffId);
+    expect(keysOf(t).has('note')).toBe(false);
+    expect(keysOf(t).has('byId')).toBe(false);
+  });
+
+  it('computes stage and overall status, never typed, with the customer days labelled as theirs', () => {
+    expect(out.stageStatus).toEqual({ key: 'SITE', label: 'Civil and electrical', status: 'late', lateDays: 5 });
+    // Planned 25 Nov; now 30 Nov + 5 working days of overrun = 5 Dec: 9 working days late, 4 of them the customer's.
+    expect(t.overall).toMatchObject({ plannedHandover: '2026-11-25', forecastHandover: '2026-12-05', lateDays: 9, customerDays: 4, studioDays: 5 });
+    expect(out.overallLateDays).toBe(9);
+  });
+
+  it('sends planned vs actual per stage and the current room checklist, without who ticked', () => {
+    expect(t.stages.map((s) => [s.key, s.status])).toEqual([
+      ['DESIGN', 'done'],
+      ['SITE', 'late'],
+      ['INSTALL', 'upcoming'],
+      ['FINISH', 'upcoming'],
+      ['HANDOVER', 'upcoming'],
+    ]);
+    expect(t.stages[0]).toMatchObject({ plannedEnd: '2026-09-15', actualEnd: '2026-09-14', earlyDays: 1 });
+    expect(t.stages[4]).toMatchObject({ originalEnd: '2026-11-25', plannedEnd: '2026-11-30', moved: { customer: true } });
+    expect(t.current).toEqual({
+      key: 'SITE',
+      label: 'Civil and electrical',
+      rooms: [
+        { room: 'Kitchen', items: [{ label: 'Plumbing points', done: true }, { label: 'Dado tiles', done: false }] },
+        { room: 'Bedroom 1', items: [{ label: 'Wiring', done: false }] },
+      ],
+    });
+    expect(keysOf(out).has('doneById')).toBe(false);
+    expect(keysOf(out).has('doneSource')).toBe(false);
+  });
+
+  it('selects the date changes without the note or who moved them', () => {
+    expect(CUSTOMER_PROJECT_SELECT.dateChanges.select).toEqual({ stageId: true, field: true, fromDate: true, toDate: true, reason: true, decisionId: true, at: true });
+  });
+
+  it('still sends overallLateDays and stageStatus for a project with no plan (no tracker)', () => {
+    const legacy = toCustomerProject({ ...(row() as unknown as Record<string, unknown>), stages: [] } as unknown as CustomerProjectRow, SECRET.customerId, now);
+    expect(legacy.tracker).toBeNull();
+    expect(typeof legacy.overallLateDays).toBe('number');
+    expect(legacy.stageStatus).not.toBeUndefined();
+  });
+});
+
+import { NO_LINKS as NO_LINKS_P5 } from '@/modules/portal/customer-project-view';
+
+describe('Phase 5: decisions as rows, money from payment rows, the locker (portal/money-locker-view.ts)', () => {
+  const now = D('2026-10-11T00:00:00Z');
+  const out = toCustomerProject(leakyRow(), SECRET.customerId, now, { ...NO_LINKS_P5, choicePhotos: [['https://signed/o1', '']] });
+
+  it('sends the options with their price change and photo link, never the studio cost or the storage path', () => {
+    expect(out.decisions[0]!.choices).toEqual([
+      { id: 'o1', label: 'Matte', detail: null, photo: 'https://signed/o1', swatch: null, deltaPaise: 0 },
+      { id: 'o2', label: 'Gloss', detail: null, photo: null, swatch: null, deltaPaise: 12_000_00 },
+    ]);
+    const json = JSON.stringify(out.decisions);
+    expect(json).not.toContain('4242');
+    expect(json).not.toContain('studioCost');
+  });
+
+  it('counts paid from the payment rows, with each entry and nothing internal', () => {
+    expect(out.payments).toMatchObject({ paidPaise: 1_00_000_00, waitingPaise: 0, changesPaise: 12_000_00, totalPaise: 10_12_000_00 });
+    expect(out.payments!.entries).toEqual([
+      { id: 'pay1', stageIndex: 0, stage: 'Booking', amountPaise: 1_00_000_00, receivedOn: '2026-09-02', mode: null, status: 'confirmed', receiptDocumentId: null, canAnswer: false },
+    ]);
+    expect(out.money?.contractPaise).toBe(10_12_000_00);
+  });
+
+  it('lets only the owner answer for a payment', () => {
+    const asFamily = toCustomerProject(leakyRow(), SECRET.familyUserId, now);
+    expect(asFamily.payments!.entries.every((e) => !e.canAnswer)).toBe(true);
+  });
+
+  it('reads the changes so far from the recorded quote changes', () => {
+    expect(out.changes.totalPaise).toBe(12_000_00);
+  });
+
+  it('selects no internal payment, quote-change or option column', () => {
+    const sel = CUSTOMER_PROJECT_SELECT as unknown as Record<string, { select: Record<string, unknown> }>;
+    for (const k of ['note', 'disputeNote', 'recordedById', 'customerConfirmedById', 'disputedById']) expect(sel.payments!.select[k], k).toBeUndefined();
+    expect(sel.quoteChanges!.select.byId).toBeUndefined();
+    expect((CUSTOMER_PROJECT_SELECT.decisions.select.choices.select as Record<string, unknown>).studioCostDeltaPaise).toBeUndefined();
+  });
+});
+

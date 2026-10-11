@@ -5,6 +5,7 @@ import { notify } from '@/modules/notify/service';
 import { daysLeft, needsReminder } from '@/modules/portal/decisions';
 import { moneyView, paymentNeedsReminder, readMarks } from '@/modules/portal/payments';
 import { fromDb } from '@/lib/money';
+import { expireDecisions } from '@/modules/project/decision-flow';
 
 /**
  * GET /api/cron/decision-reminders — once a day (vercel.json, 09:30 IST):
@@ -84,5 +85,7 @@ export async function GET(req: Request) {
       reminded += 1;
     }
   }
-  return Response.json({ ok: true, reminded });
+  // Phase 5: decisions past their date with no pick (once each; the studio is told any delay from here is the customer's).
+  const expired = await expireDecisions(now);
+  return Response.json({ ok: true, reminded, expired });
 }

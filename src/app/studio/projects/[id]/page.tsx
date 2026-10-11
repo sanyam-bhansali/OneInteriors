@@ -7,6 +7,14 @@ import { projectWorkspace, TEAM_NOTES_MAX, type ProjectWorkspace, type Workspace
 import { clock, istDay, shortDay } from '@/modules/studio/workspace-view';
 import { CustomerSees, OnlyYourTeam } from '../marks';
 import { TeamNotes } from './TeamNotes';
+import { SiteLogTab } from './SiteLogTab';
+import { SnagsTab as SnagsPanel } from './SnagsTab';
+/* Phase 5: payments from the rows, the customer's decisions, the locker (project/payments-flow.ts, decision-flow.ts, locker.ts). */
+import { PaymentsTab as PaymentsPanel } from './PaymentsTab';
+import { DecisionsCard } from './DecisionsCard';
+import { LockerCard } from './LockerCard';
+import { PlanTab as PlanEditor } from './PlanTab';
+import { planForStudio } from '@/modules/project/plan-edit';
 
 export const metadata: Metadata = { title: 'Project', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -64,7 +72,7 @@ export default async function ProjectWorkspacePage({
   const tab: Tab = tabs.some((t) => t.key === rawTab) ? (rawTab as Tab) : 'plan';
   const counts: Record<Tab, number | null> = {
     plan: w.stages.length,
-    log: w.updates.length,
+    log: null, // Phase 2: the Site log tab counts its own days
     snags: w.work?.snags.filter((s) => s.status === 'OPEN').length ?? 0,
     payments: w.work?.money?.stages.length ?? null,
   };
@@ -115,14 +123,16 @@ export default async function ProjectWorkspacePage({
 
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="min-w-0">
-            {tab === 'plan' ? <PlanTab w={w} /> : null}
-            {tab === 'log' ? <LogTab w={w} now={now} /> : null}
-            {tab === 'snags' ? <SnagsTab w={w} /> : null}
-            {tab === 'payments' ? <PaymentsTab w={w} /> : null}
+            {tab === 'plan' ? <PlanSection w={w} now={now} /> : null}
+            {/* Phase 2: the daily site log (SiteLogTab.tsx), with the old notes under it. */}
+            {tab === 'log' ? <SiteLogTab projectId={w.id} customer={w.customerFirst} now={now} legacy={w.updates} /> : null}
+            {tab === 'snags' ? <SnagsPanel projectId={w.id} now={now} /> : null}
+            {tab === 'payments' ? <PaymentsPanel projectId={w.id} customer={w.customerFirst} /> : null}
           </div>
           <aside className="flex flex-col gap-4" aria-label={`What ${w.customerFirst} sees`}>
             <CustomerPanel w={w} now={now} />
-            <Locker w={w} />
+            <DecisionsCard projectId={w.id} customer={w.customerFirst} />
+            <LockerCard projectId={w.id} customer={w.customerFirst} />
             <OnlyYourTeam>
               <TeamNotes projectId={w.id} initial={w.teamNotes} canEdit={w.canEditNotes} max={TEAM_NOTES_MAX} />
             </OnlyYourTeam>
@@ -138,6 +148,13 @@ function stateLine(s: WorkspaceStage): { text: string; tone: string } {
   if (s.late) return { text: `Late · was due ${shortDay(s.targetOn)}`, tone: 'var(--s-bad)' };
   if (s.state === 'now') return { text: 'Now · on track', tone: 'var(--s-accent)' };
   return { text: s.state === 'next' ? 'Next' : 'Later', tone: 'var(--s-ink-3)' };
+}
+
+/** Phase 3: the editable plan when it was built from the quote; the read-only standard stages otherwise. */
+async function PlanSection({ w, now }: { w: ProjectWorkspace; now: Date }) {
+  const r = w.hasPlan ? await planForStudio(w.id, now) : null;
+  if (r?.ok && r.plan) return <PlanEditor plan={r.plan} customer={w.customerFirst} />;
+  return <PlanTab w={w} />;
 }
 
 function PlanTab({ w }: { w: ProjectWorkspace }) {
@@ -198,141 +215,6 @@ function PlanTab({ w }: { w: ProjectWorkspace }) {
   );
 }
 
-function LogTab({ w, now }: { w: ProjectWorkspace; now: Date }) {
-  const today = istDay(now);
-  const postedToday = w.updates.some((u) => istDay(u.at) === today);
-  return (
-    <section aria-label="Site log" className="s-card p-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className={h2}>Site log</h2>
-        <CustomerSees name={w.customerFirst} />
-      </div>
-      <p className={`m-0 mt-1 ${muted}`}>
-        Every update reaches {w.customerFirst}&rsquo;s app. Post from{' '}
-        <Link href="/studio/updates" className="text-[var(--s-accent)]">
-          Client projects
-        </Link>{' '}
-        for now.
-      </p>
-      <ul className="m-0 mt-4 flex list-none flex-col p-0">
-        {!postedToday && w.row.stage ? (
-          <li className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 border-t border-[var(--s-rule)] py-3 text-[14px]">
-            <span className="font-[family-name:var(--font-mono)] text-[12.5px] text-[var(--s-ink-3)]">{shortDay(now)}</span>
-            <span className="font-medium text-[var(--s-warn)]">Not posted yet today.</span>
-          </li>
-        ) : null}
-        {w.updates.map((u) => (
-          <li key={u.id} className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 border-t border-[var(--s-rule)] py-3 text-[14px]">
-            <span className="font-[family-name:var(--font-mono)] text-[12.5px] text-[var(--s-ink-3)]">{shortDay(u.at)}</span>
-            <span>
-              {u.note}
-              <span className={`block ${muted}`}>
-                {clock(u.at)}
-                {u.photos ? ` · ${u.photos} photo${u.photos === 1 ? '' : 's'}` : ''}
-                {u.byStudio ? '' : ' · from One Interiors'}
-              </span>
-            </span>
-          </li>
-        ))}
-        {w.updates.length === 0 ? <li className={`border-t border-[var(--s-rule)] py-3 ${muted}`}>Nothing posted yet.</li> : null}
-      </ul>
-    </section>
-  );
-}
-
-function SnagsTab({ w }: { w: ProjectWorkspace }) {
-  const snags = w.work?.snags ?? [];
-  return (
-    <section aria-label="Snags" className="s-card p-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className={h2}>Snags</h2>
-        <CustomerSees name={w.customerFirst} />
-      </div>
-      <p className={`m-0 mt-1 ${muted}`}>
-        Set fix-by dates and close snags from{' '}
-        <Link href="/studio/updates" className="text-[var(--s-accent)]">
-          Client projects
-        </Link>{' '}
-        for now.
-      </p>
-      <ul className="m-0 mt-4 flex list-none flex-col p-0">
-        {snags.map((s) => (
-          <li key={s.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-t border-[var(--s-rule)] py-3 text-[14px]">
-            <span>
-              <span className="font-medium">{s.title}</span>
-              <span className={`block ${muted}`}>
-                {[s.room, `raised by ${s.raisedByStudio ? 'your team' : w.customerFirst}, ${iso(s.raisedAt)}`].filter(Boolean).join(' · ')}
-              </span>
-            </span>
-            <span className="text-right text-[13px]">
-              {s.status === 'FIXED' ? (
-                <span className="text-[var(--s-good)]">Fixed</span>
-              ) : (
-                <>
-                  <span className="font-medium">Open</span>
-                  <span className={`block ${muted}`}>{s.fixBy ? `fix by ${iso(`${s.fixBy}T12:00:00Z`)}` : 'no fix-by date'}</span>
-                </>
-              )}
-            </span>
-          </li>
-        ))}
-        {snags.length === 0 ? <li className={`border-t border-[var(--s-rule)] py-3 ${muted}`}>No snags.</li> : null}
-      </ul>
-    </section>
-  );
-}
-
-function PaymentsTab({ w }: { w: ProjectWorkspace }) {
-  const m = w.work?.money ?? null;
-  return (
-    <section aria-label="Payments" className="s-card p-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className={h2}>
-          Payments{' '}
-          {m ? (
-            <span className="s-num font-[family-name:var(--font-mono)] text-[13px] font-normal text-[var(--s-ink-3)]">
-              {formatINR(m.paidPaise)} of {formatINR(m.contractPaise)} received
-            </span>
-          ) : null}
-        </h2>
-        <CustomerSees name={w.customerFirst} />
-      </div>
-      <p className={`m-0 mt-1 ${muted}`}>
-        {w.customerFirst} pays you directly; this is the record of it, as signed. Mark a payment received from{' '}
-        <Link href="/studio/updates" className="text-[var(--s-accent)]">
-          Client projects
-        </Link>{' '}
-        for now.
-      </p>
-      {m ? (
-        <ul className="m-0 mt-4 flex list-none flex-col p-0">
-          {m.stages.map((s) => (
-            <li key={s.index} className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-4 border-t border-[var(--s-rule)] py-3 text-[14px]">
-              <span>
-                {s.label}
-                {s.pct !== null ? <span className={`block ${muted}`}>{s.pct}%</span> : null}
-              </span>
-              <span className="s-num font-[family-name:var(--font-mono)]">{formatINR(s.amountPaise)}</span>
-              <span className="text-right text-[13px]">
-                {s.paidOn ? (
-                  <span className="text-[var(--s-good)]">Received {iso(`${s.paidOn}T12:00:00Z`)}</span>
-                ) : s.dueOn ? (
-                  `Due ${iso(`${s.dueOn}T12:00:00Z`)}`
-                ) : (
-                  <span className="text-[var(--s-ink-3)]">No date set</span>
-                )}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className={`m-0 mt-4 ${muted}`}>This project was started before signing in the app, so it has no signed payment plan.</p>
-      )}
-    </section>
-  );
-}
-
-/** The dark panel: the customer projection, as the app shows it now. */
 function CustomerPanel({ w, now }: { w: ProjectWorkspace; now: Date }) {
   const v = w.customerView;
   const ink2 = 'rgba(255,255,255,0.72)';
@@ -341,6 +223,13 @@ function CustomerPanel({ w, now }: { w: ProjectWorkspace; now: Date }) {
   const current = v.stages.find((s) => s.state === 'now') ?? null;
   const today = istDay(now);
   const todays = v.updates.find((u) => istDay(new Date(u.at)) === today) ?? null;
+  /* Phase 2: today's post from site mode comes first. */
+  const todaysLog = v.siteLogs.find((d) => d.day === today) ?? null;
+  const siteLine = todaysLog
+    ? todaysLog.kind === 'nobody'
+      ? `Nobody on site: ${(todaysLog.reasonText ?? 'no reason').toLowerCase()}.`
+      : `${todaysLog.photos.length} photo${todaysLog.photos.length === 1 ? '' : 's'}${todaysLog.photos[0]?.text ? `: ${todaysLog.photos[0].text}` : todaysLog.text ? `: ${todaysLog.text}` : ''} (${clock(new Date(todaysLog.postedAt))})`
+    : null;
   const decision = v.decisions.find((d) => d.state !== 'chosen') ?? null;
   const next = v.money?.next ?? null;
   return (
@@ -369,7 +258,7 @@ function CustomerPanel({ w, now }: { w: ProjectWorkspace; now: Date }) {
         <p className={label} style={{ color: ink2 }}>
           Today on site
         </p>
-        <span className="text-[13.5px] leading-snug">{todays ? `${todays.note} (${clock(new Date(todays.at))})` : 'Nothing posted yet today.'}</span>
+        <span className="text-[13.5px] leading-snug">{siteLine ?? (todays ? `${todays.note} (${clock(new Date(todays.at))})` : 'Nothing posted yet today.')}</span>
       </div>
       {decision ? (
         <div className="flex flex-col gap-1">
@@ -393,34 +282,6 @@ function CustomerPanel({ w, now }: { w: ProjectWorkspace; now: Date }) {
         {v.snags.filter((s) => s.status === 'OPEN').length} open snag{v.snags.filter((s) => s.status === 'OPEN').length === 1 ? '' : 's'} ·{' '}
         {v.documents.length} document{v.documents.length === 1 ? '' : 's'} in the Locker · {v.plan === 'assured' ? 'Assured' : 'Basic'}
       </span>
-    </section>
-  );
-}
-
-function Locker({ w }: { w: ProjectWorkspace }) {
-  const docs = w.customerView?.documents ?? [];
-  const drafts = (w.work?.documents ?? []).filter((d) => !d.shared).length;
-  return (
-    <section className="s-card flex flex-col gap-2 p-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="m-0 text-[15px] font-semibold">Home locker</h2>
-        <CustomerSees name={w.customerFirst} />
-      </div>
-      {docs.length ? (
-        <ul className="m-0 flex list-none flex-col gap-1 p-0">
-          {docs.map((d) => (
-            <li key={d.id} className="text-[13.5px]">
-              {d.title} <span className={muted}>· {d.meta}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className={`m-0 ${muted}`}>Nothing shared yet.</p>
-      )}
-      <p className={`m-0 ${muted}`}>
-        {w.hasPlan ? `${w.materials} material${w.materials === 1 ? '' : 's'} from the quote. ` : ''}
-        {drafts ? `${drafts} draft${drafts === 1 ? '' : 's'} only your team can see.` : ''}
-      </p>
     </section>
   );
 }

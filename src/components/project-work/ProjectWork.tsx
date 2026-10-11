@@ -266,11 +266,11 @@ function SnagRow({ snag }: { snag: StaffWork['snags'][number] }) {
               e.preventDefault();
               const data = new FormData(e.currentTarget);
               data.set('snagId', snag.id);
-              run(async () => fixSnagAction(await withShrunkPhotos(data)), 'Marked fixed. The client has been told.', () => setFixing(false));
+              run(async () => fixSnagAction(await withShrunkPhotos(data)), 'Marked fixed. It closes when the client confirms, or in 7 days.', () => setFixing(false));
             }}
           >
             <input name="note" maxLength={600} placeholder="What was done — “Panel replaced”" className={`${input} min-w-[14rem] flex-1`} />
-            <input type="file" name="photos" accept="image/jpeg,image/png,image/webp" className="text-[12.5px]" aria-label="Photo of the fix" />
+            <input type="file" name="photos" required accept="image/jpeg,image/png,image/webp" className="text-[12.5px]" aria-label="After photo of the fix (needed: the client sees it beside theirs)" />
             <button type="submit" className={primary} disabled={pending}>
               {pending ? 'Saving…' : 'Fixed'}
             </button>

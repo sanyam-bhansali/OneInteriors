@@ -16,8 +16,15 @@ import type { Snag } from '../lib/types';
 /**
  * Snags (design #24): "Photograph a problem" opens the camera; the photo, a
  * few words and the room go to the studio, which sets a fix-by date and
- * closes it with a photo. Open and Fixed tabs with counts, then the
+ * fixes it with an after photo. Open and Fixed tabs with counts, then the
  * handover walk-through note.
+ *
+ * Studio workspace Phase 4: only the customer closes a snag. A fix waiting
+ * for them sits on top: before and after side by side, the studio's
+ * sentence, and two clear buttons, Confirm and Not fixed, with the date it
+ * closes by itself if they never answer. A studio's "not a defect" reply
+ * shows its reason and an Agree button. Older servers send no `progress`;
+ * then the screen is as it was.
  */
 export default function Snags() {
   const t = useT();
@@ -47,9 +54,14 @@ export default function Snags() {
     );
   }
   const p = state.project;
-  const openCount = p.snags.filter((s) => s.status === 'OPEN').length;
-  const fixedCount = p.snags.length - openCount;
-  const list = p.snags.filter((s) => s.status === tab);
+  // Fixes (and studio replies) waiting for the owner's answer sit on top, out of the tabs while they wait.
+  const toCheck = p.snags.filter((s) => s.progress?.canAnswer);
+  const waiting = new Set(toCheck.map((s) => s.id));
+  const tabOf = (s: Snag): 'OPEN' | 'FIXED' => (s.progress ? (s.progress.state === 'closed' ? 'FIXED' : 'OPEN') : s.status);
+  const inTabs = p.snags.filter((s) => !waiting.has(s.id));
+  const openCount = inTabs.filter((s) => tabOf(s) === 'OPEN').length;
+  const fixedCount = inTabs.length - openCount;
+  const list = inTabs.filter((s) => tabOf(s) === tab);
   const handover = p.stages.find((s) => s.key === 'HANDOVER') ?? p.stages[p.stages.length - 1];
 
   const take = async (from: 'camera' | 'library') => {
@@ -121,6 +133,24 @@ export default function Snags() {
           </View>
         ) : null}
 
+        {toCheck.length ? (
+          <View style={{ gap: 12 }}>
+            <Eyebrow>{toCheck.length === 1 ? t('snags.check') : t('snags.checkMany', { n: toCheck.length })}</Eyebrow>
+            {toCheck.map((s) => (
+              <CheckFix
+                key={s.id}
+                snag={s}
+                studio={p.studio}
+                t={t}
+                onDone={(text) => {
+                  setMsg({ ok: true, text });
+                  void refresh();
+                }}
+              />
+            ))}
+          </View>
+        ) : null}
+
         <View role="tablist" aria-label={t('snags.filter')} style={{ flexDirection: 'row', gap: 8 }}>
           <Tab label={t('snags.open')} count={openCount} on={tab === 'OPEN'} onPress={() => setTab('OPEN')} i={0} />
           <Tab label={t('snags.fixed')} count={fixedCount} on={tab === 'FIXED'} onPress={() => setTab('FIXED')} i={1} />
@@ -160,8 +190,28 @@ function Tab({ label, count, on, onPress, i }: { label: string; count: number; o
   );
 }
 
-/** The server's English status line ("Fix by Sat 10 Oct", "Fixed 26 Sep"), in the app's language. */
+/** The status line: from the snag's progress when the server sends it, else the server's English line, in the app's language. */
 function statusLine(s: Snag, t: T): { text: string; tone: string } {
+  const g = s.progress;
+  if (g) {
+    switch (g.state) {
+      case 'accepted':
+        return g.fixBy ? { text: t('snags.fixBy', { day: shortDate(g.fixBy) }), tone: color.accentInk } : { text: t('snags.stateRaised'), tone: color.ink2 };
+      case 'raised':
+        return { text: t('snags.stateRaised'), tone: color.ink2 };
+      case 'reopened':
+        return { text: t('snags.stateReopened'), tone: color.accentInk };
+      case 'disputed':
+        return { text: t('snags.stateDisputed'), tone: color.ink2 };
+      case 'fixed':
+        return { text: t('snags.stateFixed'), tone: color.ok };
+      case 'closed':
+        return {
+          text: g.closedBy === 'auto' ? t('snags.closedAuto') : g.daysToFix !== null ? t('snags.closedYou', { n: g.daysToFix }) : t('snags.closedYouNoDays'),
+          tone: color.ok,
+        };
+    }
+  }
   const line = s.line ?? '';
   if (s.status === 'FIXED') {
     const day = line.startsWith('Fixed ') ? line.slice(6) : null;
@@ -188,7 +238,96 @@ function SnagRow({ snag: s, i, t }: { snag: Snag; i: number; t: T }) {
   );
 }
 
+/**
+ * One fix to answer: before and after side by side, the studio's sentence,
+ * Confirm and Not fixed (with an optional line), and when it closes by
+ * itself. Or, for a studio's "not a defect" reply, its reason and Agree.
+ */
+function CheckFix({ snag: s, studio, t, onDone }: { snag: Snag; studio: string; t: T; onDone: (text: string) => void }) {
+  const g = s.progress!;
+  const [busy, setBusy] = useState<'confirm' | 'back' | null>(null);
+  const [telling, setTelling] = useState(false);
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const disputed = g.state === 'disputed';
+
+  const confirm = async () => {
+    setBusy('confirm');
+    setError(null);
+    const r = await api.confirmSnag(s.id);
+    setBusy(null);
+    if (!r.ok) return setError(r.error);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    onDone(t('snags.confirmed'));
+  };
+  const sendBack = async () => {
+    setBusy('back');
+    setError(null);
+    const r = await api.snagNotFixed(s.id, reason.trim());
+    setBusy(null);
+    if (!r.ok) return setError(r.error);
+    onDone(t('snags.sentBack', { studio }));
+  };
+
+  return (
+    <Card style={{ gap: 14 }}>
+      <View style={{ gap: 4 }}>
+        <Text style={styles.snagTitle}>{s.title}</Text>
+        {s.room ? <Text style={styles.mono}>{s.room}</Text> : null}
+      </View>
+      {disputed ? (
+        <View style={{ gap: 6 }}>
+          <Text style={[styles.mono, { color: color.ink2 }]}>{t('snags.studioSays', { studio })}</Text>
+          <Text style={styles.sentence}>{`\u201C${g.studioReason ?? ''}\u201D`}</Text>
+        </View>
+      ) : (
+        <>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Pair uri={s.photos[0]} caption={s.raisedByStudio ? t('snags.beforeStudio') : t('snags.before')} t={t} />
+            <Pair uri={s.fixedPhotos[0]} caption={g.fixedAt ? t('snags.after', { day: dayLabel(g.fixedAt) }) : t('snags.afterNoDay')} t={t} />
+          </View>
+          {g.fixSentence ? <Text style={styles.sentence}>{`\u201C${g.fixSentence}\u201D`}</Text> : null}
+        </>
+      )}
+
+      {telling ? (
+        <View style={{ gap: 10 }}>
+          <Field label={t('snags.notFixedWhat')} value={reason} onChangeText={setReason} placeholder={t('snags.notFixedHint')} maxLength={300} />
+          <Button label={t('snags.sendBack')} onPress={() => void sendBack()} busy={busy === 'back'} />
+          <Button label={t('snags.cancel')} variant="quiet" onPress={() => setTelling(false)} />
+        </View>
+      ) : (
+        <View style={{ gap: 8 }}>
+          <Button label={disputed ? t('snags.agree') : t('snags.confirm')} onPress={() => void confirm()} busy={busy === 'confirm'} />
+          {disputed ? null : <Button label={t('snags.notFixed')} variant="light" arrow={false} onPress={() => setTelling(true)} />}
+        </View>
+      )}
+      {error ? <ErrorText>{error}</ErrorText> : null}
+      <Text style={[styles.mono, { color: color.ink2 }]}>
+        {disputed ? t('snags.disputeHelp') : g.autoClosesOn ? t('snags.autoClose', { day: shortDate(g.autoClosesOn) }) : ''}
+      </Text>
+    </Card>
+  );
+}
+
+function Pair({ uri, caption, t }: { uri: string | undefined; caption: string; t: T }) {
+  return (
+    <View style={{ flex: 1, gap: 6 }}>
+      {uri ? (
+        <Image source={{ uri }} style={styles.pair} contentFit="cover" accessibilityLabel={caption} />
+      ) : (
+        <View style={[styles.pair, { backgroundColor: color.soft, alignItems: 'center', justifyContent: 'center' }]}>
+          <Text style={styles.mono}>{t('snags.noPhoto')}</Text>
+        </View>
+      )}
+      <Text style={styles.mono}>{caption}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  pair: { width: '100%', aspectRatio: 3 / 4, borderRadius: 14 },
+  sentence: { fontFamily: font.sansMedium, fontSize: 16, lineHeight: 23, color: color.ink },
   preview: { width: '100%', aspectRatio: 4 / 3, borderRadius: 12 },
   camera: {
     minHeight: 60,

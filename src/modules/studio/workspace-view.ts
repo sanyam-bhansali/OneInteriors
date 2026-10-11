@@ -10,9 +10,10 @@
  *   when there is one, else the old fixed stages), with "day N of M" of the
  *   whole project. Null once every stage is done: handed over.
  * - **Today on site** — the time of today's latest update, in India time.
- * - **Overall** — days late, the customer app's own rule
- *   (app/project-view.ts `daysLate`): the latest stage past its date and
- *   not done. 0 is on track.
+ * - **Overall** — working days from planned to forecast handover
+ *   (project-rules.ts `overallDelay`, Phase 3), with the customer's share
+ *   apart; without a plan, the old rule (app/project-view.ts `daysLate`).
+ *   0 is on track.
  * - **Snags** — open ones, and those past their fix-by date.
  * - **Waiting on the customer** — decisions they have not made. A delay
  *   from these is not the studio's, and the strip says so.
@@ -27,6 +28,8 @@ import { projectStages, type PlanStageRow, type StageView } from '@/modules/port
 import { moneyView } from '@/modules/portal/payments';
 import { decisionState } from '@/modules/portal/decisions';
 import { planName, type DbPlan, type PlanName } from '@/modules/portal/plans';
+import { overallDelay, type DateField, type DelayReason, type StageKind } from '@/modules/project/project-rules';
+import { calendarOf, dayFromDb, istDay as istDayOf } from '@/modules/project/working-days';
 
 const IST = 'Asia/Kolkata';
 
@@ -61,6 +64,37 @@ export interface WorkspaceInput {
   lastUpdateAt: Date | null;
   snags: { title: string; room: string | null; status: string; fixBy: Date | null }[];
   decisions: { title: string; dueOn: Date; chosenIndex: number | null }[];
+  /* Phase 3: with these, "Overall" is planned vs forecast handover (project-rules.ts) instead of the old late-stage rule. */
+  planStages?: { id: string; kind: string; name: string; plannedStart: Date; plannedEnd: Date; actualEnd: Date | null }[];
+  dateChanges?: { stageId: string | null; field: string; fromDate: Date; toDate: Date; reason: string; decisionId: string | null; at: Date }[];
+  calendar?: { workingDays?: unknown; holidays?: { day: Date }[] };
+}
+
+/** Planned vs forecast handover, and the customer's share of the delay (project-rules.ts `overallDelay`); null without a plan. */
+export function overallOf(p: Pick<WorkspaceInput, 'planStages' | 'dateChanges' | 'calendar'>, now: Date): { lateDays: number; customerDays: number } | null {
+  if (!p.planStages || p.planStages.length === 0 || p.planStages.some((s) => !s.id || !s.plannedEnd)) return null;
+  const o = overallDelay(
+    p.planStages.map((s) => ({
+      id: s.id,
+      kind: s.kind as StageKind,
+      name: s.name,
+      plannedStart: istDayOf(s.plannedStart ?? s.plannedEnd),
+      plannedEnd: istDayOf(s.plannedEnd),
+      actualEnd: s.actualEnd ? istDayOf(s.actualEnd) : null,
+    })),
+    (p.dateChanges ?? []).map((c) => ({
+      stageId: c.stageId,
+      field: c.field as DateField,
+      from: dayFromDb(c.fromDate),
+      to: dayFromDb(c.toDate),
+      reason: c.reason as DelayReason,
+      decisionId: c.decisionId,
+      at: c.at,
+    })),
+    istDayOf(now),
+    calendarOf({ workingDays: p.calendar?.workingDays, holidays: p.calendar?.holidays ?? [] }),
+  );
+  return { lateDays: o.lateDays, customerDays: o.customerDays };
 }
 
 export interface WorkspaceRow {
@@ -75,6 +109,8 @@ export interface WorkspaceRow {
   /** Today's latest update, or null when nothing is posted yet today. */
   postedToday: Date | null;
   lateDays: number;
+  /** Of `lateDays`, the customer's (their changes, late decisions): shown, not counted against the studio. */
+  customerLateDays: number;
   snags: { open: number; overdue: { title: string; room: string | null; fixBy: Date }[] };
   waiting: { title: string; dueOn: Date; overdue: boolean }[];
   nextPayment: { label: string; amountPaise: number; dueOn: string | null; toRecord: boolean } | null;
@@ -89,6 +125,7 @@ export function workspaceRow(p: WorkspaceInput, now: Date): WorkspaceRow {
   const next = money?.next ?? null;
   const today = istDay(now);
   const open = p.snags.filter((s) => s.status !== 'FIXED');
+  const overall = overallOf(p, now);
   return {
     id: p.id,
     home: p.home,
@@ -98,7 +135,8 @@ export function workspaceRow(p: WorkspaceInput, now: Date): WorkspaceRow {
     stage: current ? { label: current.label, day, of } : null,
     started: p.startOn.getTime() <= now.getTime(),
     postedToday: p.lastUpdateAt && istDay(p.lastUpdateAt) === today ? p.lastUpdateAt : null,
-    lateDays: daysLate(wire, now),
+    lateDays: overall ? overall.lateDays : daysLate(wire, now),
+    customerLateDays: overall?.customerDays ?? 0,
     snags: {
       open: open.length,
       overdue: open

@@ -11,7 +11,7 @@ import { Body, Button, ErrorText, Loading, Press, Rise, Stagger } from '../../co
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { dayLabel, inr } from '../../lib/format';
-import { useHeadline, useLang, useT } from '../../lib/i18n';
+import { useHeadline, useLang, useT, type T } from '../../lib/i18n';
 import { usePlan } from '../../lib/plan';
 import { useProfile } from '../../lib/profile';
 import { useProject } from '../../lib/project';
@@ -20,16 +20,34 @@ import type { Decision } from '../../lib/types';
 
 /**
  * A decision with a deadline (design #23): the photo, when it is due and
- * what waiting costs, each option with its swatch and price against the
- * quote, then confirm. Once chosen, the button becomes a status pill;
- * picking another option before the due date brings the button back.
- * Family see everything but the owner confirms. Family votes show only when
- * the server sends them.
+ * what waiting costs, each option with its swatch or photo and its price
+ * against the quote, then confirm. Once chosen, the button becomes a status
+ * pill; picking another option before the due date brings the button back.
+ *
+ * Phase 5 (studio workspace): the options come as rows (`choices`) with the
+ * studio's photo and a price change that can go down as well as up; the
+ * screen says what the pick does to the last payment before it is
+ * confirmed, and the server changes the quote, the final payment and the
+ * locker at once. A first pick after the date is still taken, and says the
+ * plan moves by the days it is late. Family vote with one tap; the owner's
+ * pick decides. Older servers (no `choices`) work as before.
  */
 
-/** A family member's vote, as the website's project-store sends it. Not in types.ts yet. */
-type Vote = { name: string; optionIndex: number; note: string | null; mine: boolean };
-type WithVotes = Decision & { votes?: Vote[] };
+/** One option, whichever shape the server sent. */
+type Opt = { key: string; id: string | null; name: string; note: string | null; swatch: string | null; photo: string | null; deltaPaise: number };
+
+function optionsOf(d: Decision): Opt[] {
+  if (d.choices?.length) {
+    return d.choices.map((c) => ({ key: c.id, id: c.id, name: c.label, note: c.detail, swatch: c.swatch, photo: c.photo, deltaPaise: c.deltaPaise }));
+  }
+  return d.options.map((o, i) => ({ key: `${o.name}-${i}`, id: null, name: o.name, note: o.note || null, swatch: o.swatch, photo: null, deltaPaise: o.extraPaise }));
+}
+
+function priceText(paise: number, t: T): string {
+  if (paise > 0) return `+${inr(paise)}`;
+  if (paise < 0) return t('decision.less', { amount: inr(-paise) });
+  return t('decision.inQuote');
+}
 
 /* The design's own tints (Decision.dc.html), not theme tokens. */
 const DUE_ON_PHOTO = '#F5C3A9';
@@ -47,11 +65,13 @@ export default function DecisionScreen() {
   const { state: auth } = useAuth();
   const [pick, setPick] = useState<number | null>(null);
   const [confirmedIndex, setConfirmedIndex] = useState<number | null>(null);
+  const [lateMessage, setLateMessage] = useState<string | null>(null);
+  const [voted, setVoted] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (state.status === 'loading') return <Loading />;
-  const d = state.status === 'ready' ? (state.project.decisions.find((x) => x.id === id) as WithVotes | undefined) : undefined;
+  const d = state.status === 'ready' ? state.project.decisions.find((x) => x.id === id) : undefined;
   if (!d || state.status !== 'ready') {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: color.paper, padding: 20, gap: 18 }}>
@@ -61,42 +81,74 @@ export default function DecisionScreen() {
     );
   }
 
+  const options = optionsOf(d);
   const studio = state.project.studio;
   const expert = profile.expert.name;
   const family = state.project.role === 'family';
-  const closed = d.daysLeft < 0 || d.state === 'overdue';
-  const locked = family || closed;
-  const confirmed = confirmedIndex ?? d.chosenIndex;
+  const past = d.daysLeft < 0 || d.state === 'overdue';
+  const serverPick = d.pickedOptionId ? options.findIndex((o) => o.id === d.pickedOptionId) : d.chosenIndex;
+  const confirmed = confirmedIndex ?? (serverPick !== null && serverPick >= 0 ? serverPick : null);
+  // A first pick after the date is still taken (and is the customer's delay); a pick made can change only until the date.
+  const closed = past && confirmed !== null;
+  const late = past && confirmed === null;
+  const locked = closed;
   const selected = pick ?? confirmed ?? 0;
-  const chosen = d.options[selected];
+  const chosen = options[selected];
   const showPill = confirmed !== null && selected === confirmed;
   const votes = d.votes ?? [];
   const firstName = auth.status === 'signed-in' ? (auth.user.name ?? '').trim() : '';
+  const canVote = family && !past && confirmed === null && chosen?.id !== null && chosen?.id !== undefined;
 
   const confirm = async () => {
+    if (!chosen) return;
     setBusy(true);
     setError(null);
-    const res = await api.choose(d.id, selected);
+    const res = chosen.id ? await api.pick(d.id, chosen.id) : await api.choose(d.id, selected);
     setBusy(false);
     if (!res.ok) return setError(res.error);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setConfirmedIndex(selected);
+    const message = (res.data as { message?: string | null }).message;
+    setLateMessage(message ?? null);
+    void refresh();
+  };
+
+  const vote = async () => {
+    if (!chosen?.id) return;
+    setBusy(true);
+    setError(null);
+    const res = await api.vote(d.id, chosen.id);
+    setBusy(false);
+    if (!res.ok) return setError(res.error);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setVoted(selected);
     void refresh();
   };
 
   const back = () => (router.canGoBack() ? router.back() : router.replace('/project'));
+  const effect = chosen
+    ? chosen.deltaPaise > 0
+      ? t('decision.adds', { option: chosen.name, amount: inr(chosen.deltaPaise) })
+      : chosen.deltaPaise < 0
+        ? t('decision.saves', { option: chosen.name, amount: inr(-chosen.deltaPaise) })
+        : t('decision.same', { option: chosen.name })
+    : null;
 
   return (
     <View style={{ flex: 1, backgroundColor: color.paper }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
         <View style={[styles.hero, { height: 230 + insets.top }]}>
-          {/* No decision photo comes from the server yet: the studio's kitchen render stands in. */}
-          <Image
-            source={require('../../../assets/app/kitchen.webp')}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            accessibilityLabel={t('decision.photo')}
-          />
+          {chosen?.photo ? (
+            <Image source={{ uri: chosen.photo }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityLabel={chosen.name} transition={180} />
+          ) : (
+            /* No photo for this option: the studio's kitchen render stands in. */
+            <Image
+              source={require('../../../assets/app/kitchen.webp')}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              accessibilityLabel={t('decision.photo')}
+            />
+          )}
           <LinearGradient
             colors={['rgba(11,11,11,.55)', 'rgba(11,11,11,.1)', 'rgba(11,11,11,.8)']}
             locations={[0, 0.4, 1]}
@@ -107,7 +159,7 @@ export default function DecisionScreen() {
               <ChevronBack color={color.white} />
             </Press>
             <Text style={styles.heroMeta}>
-              {closed ? t('decision.closedOn', { day: dayLabel(d.dueOn) }) : t('decision.due', { day: dayLabel(d.dueOn) })}
+              {closed ? t('decision.closedOn', { day: dayLabel(d.dueOn) }) : late ? t('decision.lateDue', { day: dayLabel(d.dueOn) }) : t('decision.due', { day: dayLabel(d.dueOn) })}
             </Text>
           </View>
         </View>
@@ -125,14 +177,15 @@ export default function DecisionScreen() {
             <Rise delay={120}>
               <Text style={styles.why}>{d.why}</Text>
             </Rise>
+            {late && !family ? <Text style={styles.lateNote}>{t('decision.lateOpen')}</Text> : null}
           </View>
 
           <View role="radiogroup" aria-label={t('decision.options')} aria-disabled={locked} style={styles.options}>
-            {d.options.map((o, i) => {
+            {options.map((o, i) => {
               const on = i === selected;
-              const price = o.extraPaise > 0 ? `+${inr(o.extraPaise)}` : t('decision.inQuote');
+              const price = priceText(o.deltaPaise, t);
               return (
-                <Stagger key={`${o.name}-${i}`} i={i} start={220}>
+                <Stagger key={o.key} i={i} start={220}>
                   <Press
                     disabled={locked}
                     haptic={!locked}
@@ -147,19 +200,25 @@ export default function DecisionScreen() {
                   >
                     <Pop on={on}>
                       <View style={[styles.swatchRing, { borderColor: on ? color.ink : 'transparent' }]}>
-                        <View style={[styles.swatch, { backgroundColor: o.swatch ?? color.soft }]} />
+                        {o.photo ? (
+                          <Image source={{ uri: o.photo }} style={styles.swatch} contentFit="cover" accessibilityIgnoresInvertColors />
+                        ) : (
+                          <View style={[styles.swatch, { backgroundColor: o.swatch ?? color.soft }]} />
+                        )}
                       </View>
                     </Pop>
                     <View style={{ flex: 1, gap: 3 }}>
                       <Text style={styles.optName}>{o.name}</Text>
                       {o.note ? <Text style={styles.optNote}>{o.note}</Text> : null}
                     </View>
-                    <Text style={[styles.price, o.extraPaise === 0 && { color: color.ok }]}>{price}</Text>
+                    <Text style={[styles.price, o.deltaPaise <= 0 && { color: color.ok }]}>{price}</Text>
                   </Press>
                 </Stagger>
               );
             })}
           </View>
+
+          {effect && !family && !locked ? <Text style={styles.effect}>{effect}</Text> : null}
 
           {votes.length ? (
             <View style={styles.votes}>
@@ -169,7 +228,7 @@ export default function DecisionScreen() {
               </View>
               <View style={{ gap: 8 }}>
                 {votes.map((v, i) => {
-                  const option = d.options[v.optionIndex]?.name ?? '';
+                  const option = options[v.optionIndex]?.name ?? '';
                   return (
                     <View key={`${v.name}-${i}`} style={styles.voteRow}>
                       <Avatar letter={v.name} tone={VOTE_COLORS[i % VOTE_COLORS.length]!} />
@@ -215,14 +274,21 @@ export default function DecisionScreen() {
 
       <View style={[styles.footer, { paddingBottom: Math.max(20, insets.bottom + 12) }]}>
         {showPill && chosen ? (
-          <View role="status" aria-live="polite" accessibilityLiveRegion="polite" style={styles.pill}>
-            <TickIcon color={color.accentWarm} />
-            <Text style={styles.pillText} numberOfLines={2}>
-              {t('decision.confirmed', { option: chosen.name, studio })}
-            </Text>
+          <View role="status" aria-live="polite" accessibilityLiveRegion="polite" style={{ gap: 8 }}>
+            <View style={styles.pill}>
+              <TickIcon color={color.accentWarm} />
+              <Text style={styles.pillText} numberOfLines={2}>
+                {t('decision.confirmed', { option: chosen.name, studio })}
+              </Text>
+            </View>
+            {lateMessage ? <Text style={styles.familyNote}>{lateMessage}</Text> : null}
           </View>
         ) : family ? (
-          <Text style={styles.familyNote}>{t('decision.family')}</Text>
+          canVote && voted !== selected ? (
+            <Button label={t('decision.vote', { option: lowerFirst(chosen?.name ?? '', lang) })} onPress={() => void vote()} busy={busy} />
+          ) : (
+            <Text style={styles.familyNote}>{voted !== null ? t('decision.voted.done') : t('decision.family')}</Text>
+          )
         ) : (
           <Button
             label={closed ? t('decision.closed') : t('decision.confirm', { option: lowerFirst(chosen?.name ?? '', lang) })}
@@ -270,6 +336,7 @@ const styles = StyleSheet.create({
   body: { paddingTop: 22, paddingHorizontal: 20, gap: 18 },
   h1: { fontFamily: font.sansMedium, color: color.ink },
   why: { fontFamily: font.sans, fontSize: 15, lineHeight: 22.5, color: color.ink2 },
+  lateNote: { fontFamily: font.sansMedium, fontSize: 14, lineHeight: 21, color: color.accentInk },
   options: { borderBottomWidth: 1, borderBottomColor: color.line },
   option: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderTopWidth: 1, borderTopColor: color.line },
   swatchRing: { padding: 0, borderWidth: 3, borderRadius: 13 },
@@ -277,6 +344,7 @@ const styles = StyleSheet.create({
   optName: { fontFamily: font.sansSemi, fontSize: 18, letterSpacing: -0.36, color: color.ink },
   optNote: { fontFamily: font.sans, fontSize: 13.5, lineHeight: 19, color: color.ink2 },
   price: { fontFamily: font.mono, fontSize: 13, color: color.ink },
+  effect: { fontFamily: font.sans, fontSize: 14, lineHeight: 21, color: color.ink2, marginTop: -6 },
   votes: { backgroundColor: color.soft, borderRadius: 24, paddingVertical: 14, paddingHorizontal: 16, gap: 10 },
   votesHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 },
   votesTitle: { fontFamily: font.sansSemi, fontSize: 15.5, color: color.ink },

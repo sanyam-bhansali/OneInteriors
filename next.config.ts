@@ -173,6 +173,21 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      /* Site mode is the one exception (studio workspace Phase 2): a site
+         supervisor takes photos, records voice notes and the post keeps the
+         phone's place. Only this subtree, only our own origin. Later in the
+         list, so it overrides the header above for these paths (Next: the
+         last matching header with the same key wins). `:path*` also matches
+         /studio/site itself and covers /studio/site/snag/** (Phase 4). */
+      {
+        source: '/studio/site/:path*',
+        headers: [
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(self), microphone=(self), geolocation=(self), interest-cohort=()',
+          },
+        ],
+      },
     ];
   },
 };

@@ -1,7 +1,13 @@
 import { fail, gate, json, readJson, signedIn } from '@/modules/app-api/http';
-import { chooseDecision } from '@/modules/portal/project-store';
+import { pickOption } from '@/modules/project/decision-flow';
 
-/** POST /api/app/v1/decisions/:id — { index } chooses an option; it can be changed until the due date. */
+/**
+ * POST /api/app/v1/decisions/:id — { optionId } (the app since Phase 5) or
+ * { index } (older apps) picks an option. The pick changes the quote, the
+ * final payment and the locker at once (project/decision-flow.ts). It can be
+ * changed until the due date; a first pick after it is taken and counted as
+ * the customer's delay.
+ */
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +17,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const me = await signedIn();
   if (!me.ok) return me.response;
   const { id } = await params;
-  const body = (await readJson(req)) as { index?: unknown } | null;
-  const result = await chooseDecision(me.user.id, id.slice(0, 40), body?.index);
-  return result.ok ? json({ ok: true }) : fail(400, result.error);
+  const body = (await readJson(req)) as { index?: unknown; optionId?: unknown } | null;
+  const result = await pickOption(me.user.id, id.slice(0, 40), { optionId: body?.optionId, index: body?.index });
+  return result.ok ? json({ ok: true, message: result.message ?? null }) : fail(400, result.error);
 }
