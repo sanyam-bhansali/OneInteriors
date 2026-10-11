@@ -7,6 +7,9 @@ import { locker } from './locker';
 import { me } from './me';
 import { notifications } from './notifications';
 import { plan } from './plan';
+import { matchesWords } from './matches';
+import { quoteWords } from './quote';
+import { chooseWords } from './choose';
 import { project } from './project';
 import { signin } from './signin';
 import { site } from './site';
@@ -34,4 +37,7 @@ export const NATIVE = {
   ...notifications,
   ...geio,
   ...plan,
+  ...matchesWords,
+  ...quoteWords,
+  ...chooseWords,
 };

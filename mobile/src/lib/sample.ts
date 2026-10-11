@@ -1,5 +1,6 @@
 import { Asset } from 'expo-asset';
 import type { Result } from './api';
+import { SAMPLE_JOURNEY } from './journey/sample';
 import type { GeioReply, Notice, Profile, Project } from './types';
 
 /**
@@ -203,6 +204,9 @@ export async function sampleCall<T>(method: string, path: string, body?: unknown
   await new Promise((r) => setTimeout(r, 250));
   const ok = (data: unknown) => ({ ok: true, data: data as T }) as const;
   const route = `${method} ${path.split('?')[0]}`;
+  // The first visit's answers (matches, quotes, expert, choose and sign), one file per area.
+  const journey = SAMPLE_JOURNEY.find((h) => h.match(route));
+  if (journey) return ok(journey.answer(route, body));
   if (route === 'POST /auth/otp/request') return ok({ devCode: '123456' });
   if (route === 'POST /auth/otp/verify') return ok({ token: 'sample' });
   if (route === 'GET /me') return ok({ user: SAMPLE_USER, ...SAMPLE_PROFILE, unread: SAMPLE_NOTICES.filter((n) => !n.readAt && !read.has(n.id)).length });

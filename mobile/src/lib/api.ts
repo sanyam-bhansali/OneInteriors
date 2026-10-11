@@ -13,7 +13,8 @@ export type Result<T> = { ok: true; data: T } | { ok: false; status: number; err
 
 const OFFLINE = 'We could not reach One Interiors. Check your connection and try again.';
 
-async function call<T>(method: string, path: string, body?: unknown): Promise<Result<T>> {
+/** Exported for the per-area clients in lib/journey/*.ts; screens use those or `api`, never this directly. */
+export async function call<T>(method: string, path: string, body?: unknown): Promise<Result<T>> {
   // The test build's sample customer: every screen, no server (SAMPLE-DATA.md).
   if (SAMPLE) return sampleCall<T>(method, path, body);
   const token = await readToken();
