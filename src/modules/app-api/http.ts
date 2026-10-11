@@ -2,7 +2,8 @@ import 'server-only';
 
 import { hasDatabase } from '@/lib/env';
 import { customerLive } from '@/lib/host';
-import { getCurrentUser, type AuthUser } from '@/modules/auth/session';
+import { getCurrentUser, hashIp, type AuthUser } from '@/modules/auth/session';
+import { addressOf, bucketFor, consume, waitPhrase, type Limit } from '@/modules/rate-limit/store';
 
 /**
  * The plumbing every `/api/app/v1` route shares.
@@ -64,4 +65,18 @@ export function clientIp(req: Request): string | null {
 
 export function str(value: unknown, max = 200): string {
   return typeof value === 'string' ? value.slice(0, max) : '';
+}
+
+/**
+ * The public journey routes answer without sign-in, so they are limited per
+ * address, keyed on a hash of it (CONTRIBUTING §7) — the same store the
+ * website's quiz actions use. Generous, because a phone network puts many
+ * customers behind one address and each quiz screen asks for an estimate:
+ * this stops a script, not a family. Null means go ahead.
+ */
+export const PUBLIC_LIMIT: Limit = { max: 600, windowMs: 60 * 60 * 1000 };
+
+export async function limitByIp(req: Request, name: string, limit: Limit = PUBLIC_LIMIT): Promise<Response | null> {
+  const verdict = await consume(bucketFor(`app-${name}`, hashIp(addressOf(req.headers.get('x-forwarded-for'))) ?? 'unknown'), limit);
+  return verdict.allowed ? null : fail(429, `That is a lot from one connection. Try again ${waitPhrase(verdict.retryInSeconds)}.`);
 }

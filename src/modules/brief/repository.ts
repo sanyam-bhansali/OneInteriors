@@ -305,6 +305,8 @@ export async function loadBriefContact(): Promise<{ name: string | null; phone: 
 export async function saveContact(
   brief: Brief,
   contact: CleanContact,
+  /** The account to save onto, when the caller has just verified it (the phone app's sign-in). */
+  opts: { userId?: string } = {},
 ): Promise<SaveResult> {
   if (!hasDatabase()) return { ok: true, persisted: false };
 
@@ -315,7 +317,7 @@ export async function saveContact(
       contactPhone: contact.phone,
       contactEmail: contact.email,
     };
-    const user = await getCurrentUser();
+    const user = opts.userId ? { id: opts.userId } : await getCurrentUser();
 
     if (user) {
       await prisma.brief.upsert({

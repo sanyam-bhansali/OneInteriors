@@ -28,6 +28,7 @@ import { checkDoc, DOC_KINDS, docMeta, type DocKind } from './documents';
 import { signedDocUrls, storeProjectDoc } from '@/modules/storage/project-docs';
 import { changesSoFar, moneyView, setMark, type ChangesView, type MoneyView } from './payments';
 import { fromDb } from '@/lib/money';
+import { planName, type PlanName } from './plans';
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -64,6 +65,8 @@ export interface CustomerProject {
   id: string;
   /** The owner chooses and approves; family see everything and vote. */
   role: 'owner' | 'family';
+  /** Basic or Assured (portal/plans.ts). Asking for Assured does not change it; ops does. */
+  plan: PlanName;
   studio: string;
   startOn: string;
   stages: StageView[];
@@ -129,6 +132,7 @@ export async function customerProjects(userId: string, now = new Date(), opts: {
       return {
         id: p.id,
         role: p.introduction.brief.userId === userId ? 'owner' : 'family',
+        plan: planName(p.plan),
         studio: p.introduction.studio.tradeName,
         startOn: p.startOn.toISOString(),
         stages: trackerView(plannedStages(p.startOn, p.totalDays), p.doneStages, now),

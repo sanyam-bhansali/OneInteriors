@@ -10,36 +10,10 @@
 import { Body, Cta, Foot, Frame, Head } from '@/components/app/ui';
 import { useJourney } from '@/components/app/useJourney';
 import { formatINRCompact } from '@/lib/money';
-import { lateness, plainWords, type AppQuote } from '@/modules/app/journey';
-import type { Studio } from '@/modules/studio/types';
+import { lateness, plainWords } from '@/modules/app/journey';
+import { COUNTER, handoverWeeks, kitchenPart, SHUTTER, wardrobeBoard } from '@/modules/app/journey-view';
 import { useAppData } from '@/components/app/useAppData';
 import type { AppData } from '../data';
-
-/** The first part of a " · " spec, e.g. "18mm BWP carcass". */
-const head = (spec: string | undefined) => spec?.split(' · ')[0]?.replace(/ carcass$/, '') ?? '—';
-
-function wardrobeBoard(q: AppQuote): string {
-  return head(q.quote.lines.find((l) => /wardrobe/i.test(l.label))?.spec);
-}
-
-/** A part of the kitchen's spec, e.g. its shutter or its counter; "—" when the quote does not say. */
-function kitchenPart(q: AppQuote, part: RegExp): string {
-  for (const l of q.quote.lines.filter((x) => x.room === 'KITCHEN')) {
-    const hit = l.spec.split(' · ').find((p) => part.test(p));
-    if (hit) return hit;
-  }
-  return '—';
-}
-
-/** Median of the studio's finished projects, in weeks; null without a record. */
-function handoverWeeks(studio: Studio | undefined): string {
-  const days = (studio?.portfolio ?? [])
-    .map((p) => p.durationDays)
-    .filter((d): d is number => typeof d === 'number' && d > 0)
-    .sort((a, b) => a - b);
-  if (days.length === 0) return 'No record';
-  return `${Math.round(days[Math.floor(days.length / 2)]! / 7)} weeks`;
-}
 
 function oddOut(values: string[]): boolean[] {
   const counts = new Map<string, number>();
@@ -72,20 +46,23 @@ export function CompareScreen({ data }: { data: AppData }) {
   const studio = (slug: string) => matches.find((m) => m.studio.slug === slug)?.studio;
   const cols = `repeat(${quotes.length}, minmax(0, 1fr))`;
   const rows: { label: string; values: string[]; mark?: boolean }[] = [
-    { label: 'Wardrobe board', values: quotes.map(wardrobeBoard), mark: true },
+    { label: 'Wardrobe board', values: quotes.map((q) => wardrobeBoard(q) ?? '—'), mark: true },
     {
       label: 'Kitchen shutter',
-      values: quotes.map((q) => kitchenPart(q, /shutter/i)),
+      values: quotes.map((q) => kitchenPart(q, SHUTTER) ?? '—'),
       mark: true,
     },
     {
       label: 'Kitchen counter',
-      values: quotes.map((q) => kitchenPart(q, /quartz|granite|counter/i)),
+      values: quotes.map((q) => kitchenPart(q, COUNTER) ?? '—'),
       mark: true,
     },
     {
       label: 'Time to handover',
-      values: quotes.map((q) => handoverWeeks(studio(q.slug))),
+      values: quotes.map((q) => {
+        const weeks = handoverWeeks(studio(q.slug));
+        return weeks === null ? 'No record' : `${weeks} weeks`;
+      }),
     },
     {
       label: 'Usually late by',

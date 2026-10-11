@@ -19,6 +19,7 @@ import { localityLabel, STYLE_LABELS } from '@/modules/brief/types';
 import { CHECK_LABELS, CHECK_MEANINGS, describeDelivery, type VerificationCheck } from '@/modules/studio/types';
 import { formatINRCompact } from '@/lib/money';
 import { useAppData } from '@/components/app/useAppData';
+import { matchReasons } from '@/modules/app/journey-view';
 import type { AppData } from '../../data';
 
 type Tab = 'homes' | 'checks' | 'record' | 'reviews';
@@ -85,9 +86,7 @@ export function ProfileScreen({ data, slug }: { data: AppData; slug: string }) {
   ]
     .filter(Boolean)
     .join(' · ');
-  const reasons = match
-    ? [match.topPriority, ...match.reasoning.filter((r) => r !== match.topPriority)].filter((r): r is string => Boolean(r)).slice(0, 3)
-    : [];
+  const reasons = match ? matchReasons(match) : [];
   const homes = [...studio.portfolio].sort((a, b) => (b.completedOn ?? '').localeCompare(a.completedOn ?? ''));
 
   return (

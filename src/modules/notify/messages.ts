@@ -24,7 +24,9 @@ export type ProjectEvent =
   | { kind: 'quote-signed'; quoteId: string; client: string; number: string; totalPaise: number }
   | { kind: 'intro-declined'; studio: string; reason: string }
   // To ops: GEIO passed a customer's question to the expert.
-  | { kind: 'geio-handover'; customer: string; home: string | null; note: string };
+  | { kind: 'geio-handover'; customer: string; home: string | null; note: string }
+  // To ops: a customer asked for the Assured plan (portal/plans.ts). Ops confirms the fee and switches it.
+  | { kind: 'assured-requested'; customer: string; studio: string; atSigning: boolean };
 
 /** Events a studio also gets by email: it works from a laptop, not our app. */
 export const EMAILED_TO_STUDIO: ProjectEvent['kind'][] = ['introduced', 'quote-signed', 'decision-made', 'snag-raised'];
@@ -138,6 +140,17 @@ export function messageFor(e: ProjectEvent): Message {
         title: `GEIO handed over · ${clip(e.customer, 40)}`,
         body: clip(e.home ? `${e.home}. ${e.note}` : e.note, 160),
         url: '/ops/consultations',
+      };
+    case 'assured-requested':
+      // The plan is switched on the project's tracker, under its introduction.
+      return {
+        template: 'plan.assured-requested',
+        title: `Assured requested · ${clip(e.customer, 40)}`,
+        body: clip(
+          `${e.customer} asked for Assured ${e.atSigning ? 'when signing' : 'after signing'} with ${e.studio}. Confirm the fee with them, then switch the plan.`,
+          160,
+        ),
+        url: '/ops/introductions',
       };
     case 'document':
       return {

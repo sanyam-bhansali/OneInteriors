@@ -11,7 +11,8 @@
 import { ARCHITECT } from '@/modules/consultation/architect';
 import type { GeioImage, GeioLang, GeioReply, GeioTurn } from './geio';
 
-export type GeioResult = { ok: true; reply: GeioReply } | { ok: false; reason: 'unavailable' | 'busy' | 'empty' };
+/** `plan`: they have signed and their project is on Basic; GEIO comes with Assured. */
+export type GeioResult = { ok: true; reply: GeioReply } | { ok: false; reason: 'unavailable' | 'busy' | 'empty' | 'plan' };
 
 const WINDOW_MS = 10 * 60_000;
 const MAX_PER_WINDOW = 20;

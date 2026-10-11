@@ -19,7 +19,7 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/modules/auth/session';
+import { getCurrentUser, type AuthUser } from '@/modules/auth/session';
 import { readPhases } from '@/modules/studio/payment-phases';
 import { readProfile } from '@/modules/studio/matching-profile';
 import { computeTotals, type QuoteUnitName, type WorkCodeName } from '@/modules/studio-quote/pricing';
@@ -27,6 +27,8 @@ import { canTransition } from '@/modules/studio/appointment-rules';
 import { durationFor } from './tracker';
 import { notifyStudio } from '@/modules/notify/service';
 import { fromDb } from '@/lib/money';
+import { tellOpsAssured } from './plan-store';
+import type { PlanName } from './plans';
 
 const VISIBLE_QUOTE = ['ISSUED', 'ACCEPTED'] as const;
 
@@ -60,11 +62,11 @@ async function myIntroductionIds(briefId: string): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
-async function myBriefId(): Promise<{ userId: string; briefId: string } | null> {
+async function myBriefId(): Promise<{ userId: string; user: AuthUser; briefId: string } | null> {
   const user = await getCurrentUser();
   if (!user) return null;
   const brief = await prisma.brief.findUnique({ where: { userId: user.id }, select: { id: true } });
-  return brief ? { userId: user.id, briefId: brief.id } : null;
+  return brief ? { userId: user.id, user, briefId: brief.id } : null;
 }
 
 export async function chooseView(): Promise<ChooseView | null> {
@@ -319,7 +321,11 @@ export async function answerVisit(appointmentId: string, to: 'CONFIRMED' | 'CANC
  * onto a new project, marks the quotation accepted, records the win, and
  * starts the tracker today.
  */
-export async function signFinalQuote(view: FinalQuoteView): Promise<ChooseResult & { projectId?: string }> {
+export async function signFinalQuote(
+  view: FinalQuoteView,
+  /** Basic, or Assured — which only registers interest: the project starts on Basic and ops is told (portal/plans.ts). */
+  plan: PlanName = 'basic',
+): Promise<ChooseResult & { projectId?: string }> {
   const me = await myBriefId();
   if (!me) return { ok: false, error: 'Sign in first.' };
   if (view.accepted) return { ok: false, error: 'This quote is already signed.' };
@@ -355,6 +361,7 @@ export async function signFinalQuote(view: FinalQuoteView): Promise<ChooseResult
           signedQuoteId: q.id,
           contractPaise: BigInt(view.totalPaise),
           paymentPhases: stages,
+          assuredRequestedAt: plan === 'assured' ? now : null,
         },
         select: { id: true },
       });
@@ -369,7 +376,7 @@ export async function signFinalQuote(view: FinalQuoteView): Promise<ChooseResult
           action: 'quote.signed',
           entityType: 'StudioQuote',
           entityId: q.id,
-          after: { totalPaise: view.totalPaise, projectId: created.id },
+          after: { totalPaise: view.totalPaise, projectId: created.id, plan },
         },
       });
       return created;
@@ -382,6 +389,7 @@ export async function signFinalQuote(view: FinalQuoteView): Promise<ChooseResult
       number: q.number,
       totalPaise: view.totalPaise,
     });
+    if (plan === 'assured') void tellOpsAssured(me.user, view.studioName, true);
     return { ok: true, projectId: project.id };
   } catch (error) {
     console.error('[choose] sign failed', error);

@@ -114,6 +114,20 @@ export function slotLabel(iso: string): { day: string; time: string } {
   };
 }
 
+/**
+ * Open slots grouped by IST day, each with its time as the customer reads
+ * it ("11:30 am") — the phone app's day and time picker
+ * (`GET /api/app/v1/expert/slots`). Days in order, times in order.
+ */
+export function slotDays(slots: Pick<Slot, 'startsAt'>[]): { date: string; slots: { startsAt: string; label: string }[] }[] {
+  const days = new Map<string, { startsAt: string; label: string }[]>();
+  for (const s of [...slots].sort((a, b) => a.startsAt.localeCompare(b.startsAt))) {
+    const date = istDate(new Date(s.startsAt));
+    days.set(date, [...(days.get(date) ?? []), { startsAt: s.startsAt, label: slotLabel(s.startsAt).time }]);
+  }
+  return [...days.entries()].map(([date, list]) => ({ date, slots: list }));
+}
+
 // ── The calendar invite ────────────────────────────────────────
 
 const icsDate = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');

@@ -10,8 +10,9 @@ import { askGeioFor } from '@/modules/app/geio-ask';
  * thousands of customers behind one address.
  *
  * 200 `{ ok: true, reply }`, or `{ ok: false, reason }` with 400 (`empty`),
- * 429 (`busy`) or 503 (`unavailable`: no model on this deployment, the
- * monthly budget is spent, or the call failed). The photo makes the body
+ * 403 (`plan`: signed with a studio on Basic — GEIO is part of Assured; before
+ * signing it stays open), 429 (`busy`) or 503 (`unavailable`: no model on
+ * this deployment, the monthly budget is spent, or the call failed). The photo makes the body
  * larger than `readJson` allows, so this route reads its own.
  */
 export const runtime = 'nodejs';
@@ -19,7 +20,7 @@ export const dynamic = 'force-dynamic';
 
 /** A ~1.5 MB photo as base64, plus the turns. Matches the image cap in geio-input.ts. */
 const MAX_BODY = 2_200_000;
-const STATUS = { empty: 400, busy: 429, unavailable: 503 } as const;
+const STATUS = { empty: 400, plan: 403, busy: 429, unavailable: 503 } as const;
 
 async function body(req: Request): Promise<Record<string, unknown> | null> {
   const text = await req.text().catch(() => '');

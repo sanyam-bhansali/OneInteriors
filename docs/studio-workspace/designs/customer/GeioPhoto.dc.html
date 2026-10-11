@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GEIO: photo check</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0B0B0B}a:hover{color:#A6461F}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #BA5329;outline-offset:3px}
+/* motion and depth layer */
+@keyframes oiRise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes oiKen{from{transform:scale(1.12)}to{transform:scale(1)}}
+@keyframes oiGrowX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes oiPop{0%{transform:scale(.95)}60%{transform:scale(1.03)}100%{transform:scale(1)}}
+h1{animation:oiRise .8s cubic-bezier(.22,1,.36,1) both}
+h1 ~ p,h1 + span{animation:oiRise .8s cubic-bezier(.22,1,.36,1) .12s both}
+[role="radiogroup"] > *,[role="group"] > *,ol > li,fieldset > div > *,[role="tablist"] > *{animation:oiRise .7s cubic-bezier(.22,1,.36,1) both}
+[role="radiogroup"] > *:nth-child(1),[role="group"] > *:nth-child(1),ol > li:nth-child(1),fieldset > div > *:nth-child(1),[role="tablist"] > *:nth-child(1){animation-delay:0.22s}
+[role="radiogroup"] > *:nth-child(2),[role="group"] > *:nth-child(2),ol > li:nth-child(2),fieldset > div > *:nth-child(2),[role="tablist"] > *:nth-child(2){animation-delay:0.28s}
+[role="radiogroup"] > *:nth-child(3),[role="group"] > *:nth-child(3),ol > li:nth-child(3),fieldset > div > *:nth-child(3),[role="tablist"] > *:nth-child(3){animation-delay:0.34s}
+[role="radiogroup"] > *:nth-child(4),[role="group"] > *:nth-child(4),ol > li:nth-child(4),fieldset > div > *:nth-child(4),[role="tablist"] > *:nth-child(4){animation-delay:0.40s}
+[role="radiogroup"] > *:nth-child(5),[role="group"] > *:nth-child(5),ol > li:nth-child(5),fieldset > div > *:nth-child(5),[role="tablist"] > *:nth-child(5){animation-delay:0.46s}
+[role="radiogroup"] > *:nth-child(6),[role="group"] > *:nth-child(6),ol > li:nth-child(6),fieldset > div > *:nth-child(6),[role="tablist"] > *:nth-child(6){animation-delay:0.52s}
+[role="radiogroup"] > *:nth-child(7),[role="group"] > *:nth-child(7),ol > li:nth-child(7),fieldset > div > *:nth-child(7),[role="tablist"] > *:nth-child(7){animation-delay:0.58s}
+[role="radiogroup"] > *:nth-child(8),[role="group"] > *:nth-child(8),ol > li:nth-child(8),fieldset > div > *:nth-child(8),[role="tablist"] > *:nth-child(8){animation-delay:0.64s}
+[role="radiogroup"] > *:nth-child(9),[role="group"] > *:nth-child(9),ol > li:nth-child(9),fieldset > div > *:nth-child(9),[role="tablist"] > *:nth-child(9){animation-delay:0.70s}
+[role="radiogroup"] > *:nth-child(10),[role="group"] > *:nth-child(10),ol > li:nth-child(10),fieldset > div > *:nth-child(10),[role="tablist"] > *:nth-child(10){animation-delay:0.76s}
+[role="radiogroup"] > *:nth-child(11),[role="group"] > *:nth-child(11),ol > li:nth-child(11),fieldset > div > *:nth-child(11),[role="tablist"] > *:nth-child(11){animation-delay:0.82s}
+[role="radiogroup"] > *:nth-child(12),[role="group"] > *:nth-child(12),ol > li:nth-child(12),fieldset > div > *:nth-child(12),[role="tablist"] > *:nth-child(12){animation-delay:0.88s}
+[role="progressbar"] > span{transform-origin:left center;animation:oiGrowX .9s cubic-bezier(.22,1,.36,1) both}
+[role="progressbar"] > span:nth-child(1){animation-delay:0.05s}
+[role="progressbar"] > span:nth-child(2){animation-delay:0.10s}
+[role="progressbar"] > span:nth-child(3){animation-delay:0.15s}
+[role="progressbar"] > span:nth-child(4){animation-delay:0.20s}
+[role="progressbar"] > span:nth-child(5){animation-delay:0.25s}
+[role="progressbar"] > span:nth-child(6){animation-delay:0.30s}
+[role="progressbar"] > span:nth-child(7){animation-delay:0.35s}
+img[style*="inset: 0"]{animation:oiKen 18s ease-in-out both alternate infinite}
+a,button{transition:transform .28s cubic-bezier(.34,1.56,.64,1),box-shadow .28s ease,background-color .28s ease,color .28s ease}
+a:active,button:active{transform:scale(.965)}
+button[aria-pressed="true"],button[aria-checked="true"]{animation:oiPop .45s cubic-bezier(.34,1.56,.64,1)}
+a[style*="background: rgb(11, 11, 11)"][style*="border-radius: 999px"],button[style*="background: rgb(11, 11, 11)"][style*="border-radius: 999px"]{box-shadow:0 14px 30px -16px rgba(11,11,11,.45)}
+div[style*="background: rgb(11, 11, 11)"][style*="border-radius: 20px"],div[style*="background: rgb(11, 11, 11)"][style*="border-radius: 18px"],article[style*="background: rgb(11, 11, 11)"]{box-shadow:0 28px 56px -26px rgba(11,11,11,.6),inset 0 1px 0 rgba(255,255,255,.06)}
+div[style*="background: rgb(186, 83, 41)"][style*="border-radius: 20px"]{box-shadow:0 28px 56px -22px rgba(186,83,41,.65),inset 0 1px 0 rgba(255,255,255,.18)}
+img[style*="border-radius: 12px"],img[style*="border-radius: 16px"],img[style*="border-radius: 14px"]{box-shadow:0 14px 30px -18px rgba(11,11,11,.5)}
+nav a[aria-current="page"] svg{animation:oiPop .7s cubic-bezier(.34,1.56,.64,1) both}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.01ms!important}}
+
+/* GEIO */
+@keyframes gBreathe{50%{transform:scale(1.07)}}
+@keyframes gSpin{to{transform:rotate(360deg)}}
+@keyframes gDrift{from{transform:translateX(-7%) rotate(-5deg)}to{transform:translateX(7%) rotate(5deg)}}
+@keyframes gCaret{50%{opacity:0}}
+@keyframes gShimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+@keyframes gWave{0%,100%{transform:scaleY(.25)}50%{transform:scaleY(1)}}
+@keyframes gIn{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes gRing{0%{transform:scale(1);opacity:.55}100%{transform:scale(2.1);opacity:0}}
+.g-orb{position:relative;flex-shrink:0;border-radius:50%;background:radial-gradient(circle at 34% 28%,#FFF6E6 0%,#F2C98A 26%,#E07A4E 56%,#BA5329 80%,#6E2A10 100%);box-shadow:0 0 0 1px rgba(186,83,41,.14),0 10px 34px -8px rgba(224,122,78,.75),0 0 70px -12px rgba(242,201,138,.95);animation:gBreathe 4.2s ease-in-out infinite}
+.g-orb::after{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,transparent 0 28%,rgba(255,248,236,.6) 40%,transparent 54%);mix-blend-mode:screen;animation:gSpin 5.5s linear infinite}
+.g-orb.busy{animation:gBreathe 1.1s ease-in-out infinite}
+.g-orb.busy::after{animation-duration:1.4s}
+.g-aura{position:absolute;left:-35%;right:-35%;top:-150px;height:470px;pointer-events:none;z-index:0;background:radial-gradient(38% 48% at 30% 52%,rgba(224,122,78,.36),transparent 70%),radial-gradient(34% 44% at 70% 40%,rgba(242,201,138,.5),transparent 70%),radial-gradient(28% 38% at 52% 74%,rgba(186,83,41,.2),transparent 70%);filter:blur(34px);animation:gDrift 11s ease-in-out infinite alternate}
+.g-aura.hot{opacity:1;filter:blur(26px);animation-duration:3s}
+.g-grad{background:linear-gradient(92deg,#A6461F 0%,#E07A4E 45%,#C9973F 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.g-caret{display:inline-block;width:8px;height:1.05em;margin-left:2px;vertical-align:-2px;border-radius:2px;background:#E07A4E;animation:gCaret .9s steps(1) infinite}
+.g-think{background:linear-gradient(90deg,#5F5F5F 0%,#5F5F5F 35%,#E07A4E 50%,#5F5F5F 65%,#5F5F5F 100%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:gShimmer 1.8s linear infinite}
+.g-in{animation:gIn .7s cubic-bezier(.22,1,.36,1) both}
+.g-wave span{display:block;width:4px;border-radius:2px;background:linear-gradient(180deg,#F2C98A,#BA5329);transform-origin:center;animation:gWave 1s ease-in-out infinite}
+.g-ring{position:absolute;inset:0;border-radius:50%;border:2px solid #E07A4E;animation:gRing 1.6s ease-out infinite}
+.g-chip{min-height:40px;padding:0 14px;border-radius:999px;border:1px solid #E6E6E3;background:#FFFFFF;color:#0B0B0B;font-size:14px;font-weight:500;display:inline-flex;align-items:center;gap:8px;text-decoration:none;white-space:nowrap;flex-shrink:0}
+.g-chip:hover{color:#0B0B0B;border-color:#BA5329}
+.g-scroll{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:0 20px}
+.g-scroll::-webkit-scrollbar{display:none}
+@media (prefers-reduced-motion: reduce){.g-orb,.g-orb::after,.g-aura,.g-caret,.g-think,.g-wave span,.g-ring{animation:none!important}.g-think{color:#5F5F5F}}
+[style*="overflow-y: auto"] > *{flex-shrink:0}
+
+/* website skin (one-interiors home-cb.css) */
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"],button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"],a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]{position:relative;overflow:hidden;isolation:isolate;transition:transform .45s cubic-bezier(.22,1,.36,1),color .35s}
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]::before,button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]::before,a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:#C1582E;transform:translateY(101%);border-top-left-radius:50% 40%;border-top-right-radius:50% 40%;transition:transform .55s cubic-bezier(.22,1,.36,1),border-radius .55s cubic-bezier(.22,1,.36,1)}
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]:hover::before,button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]:hover::before,a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]:hover::before{transform:none;border-radius:999px}
+a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]:hover{color:#FFFFFF!important}
+a[style*="min-height: 56px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 52px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 46px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 56px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 46px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child{width:28px;height:28px;padding:7px;box-sizing:border-box;border-radius:50%;background:#FFFFFF;color:#0B0B0B;margin-right:-12px;flex-shrink:0}
+a[style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child{background:#0B0B0B!important;color:#FFFFFF!important}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; display: flex; flex-direction: column; background: #FFFFFF; color: #0B0B0B; font-family: 'Geist', sans-serif; overflow: hidden">
+  <div class="g-aura" style="opacity: .55"></div>
+  <header style="position: relative; z-index: 2; flex-shrink: 0; padding: 18px 16px 10px; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 8px">
+    <a href="GeioHome.dc.html" aria-label="Back" style="width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: #0B0B0B; background: rgba(255,255,255,.6)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></a>
+    <div style="display: flex; align-items: center; justify-content: center; gap: 8px">
+      <span class="g-orb" style="width: 18px; height: 18px"></span>
+      <span style="font-size: 17px; font-weight: 700; letter-spacing: .02em">GEIO</span>
+    </div>
+    <a href="GeioHuman.dc.html" style="min-height: 40px; padding: 0 12px; border-radius: 999px; background: #0B0B0B; color: #F1F0EC; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; text-decoration: none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2"></path><rect x="2.5" y="13" width="4" height="6" rx="1.5"></rect><rect x="17.5" y="13" width="4" height="6" rx="1.5"></rect><path d="M19.5 19c0 1.5-2 2.5-5 2.5"></path></svg>Meera</a>
+  </header>
+
+  <div style="position: relative; z-index: 1; flex: 1; overflow-y: auto; padding: 14px 20px 20px; display: flex; flex-direction: column; gap: 20px">
+      <div class="g-in" style="align-self: flex-end; max-width: 82%; display: flex; flex-direction: column; align-items: flex-end; gap: 6px">
+        <img src="/_blob/6d5fcbb5257e9434f0e337cfdffe3f1a" alt="Your photo: a line along the wardrobe top in bedroom 1" style="width: 210px; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 18px 18px 6px 18px; display: block"><div style="background: #0B0B0B; color: #F1F0EC; border-radius: 22px 22px 6px 22px; padding: 12px 16px; font-size: 15.5px; line-height: 1.45">Is this normal?</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; align-items: start">
+        <span class="{{orbClass}}" style="width: 28px; height: 28px; margin-top: 2px"></span>
+        <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0" aria-live="polite">
+          <sc-if value="{{thinking}}" hint-placeholder-val="{{ false }}">
+            <span class="g-think" style="font-size: 15px; font-weight: 500; padding-top: 5px">Looking closely at your photo…</span>
+          </sc-if>
+          <sc-for list="{{paras}}" as="p" hint-placeholder-count="2">
+            <sc-if value="{{p.on}}" hint-placeholder-val="{{ true }}">
+              <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #0B0B0B">{{p.t}}</p>
+            </sc-if>
+          </sc-for>
+          <sc-if value="{{streaming}}" hint-placeholder-val="{{ false }}"><span class="g-caret" aria-hidden="true"></span></sc-if>
+          <sc-if value="{{done}}" hint-placeholder-val="{{ true }}">
+            <div class="g-in" style="border-radius: 24px; background: #F3F3F1; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px">
+              <span style="font-size: 13px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; color: #5F5F5F">What I see</span>
+              <div style="display: flex; flex-direction: column; font-size: 14.5px">
+                <span style="display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid #E6E6E3"><span>Hairline gap at the joint</span><span style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #2F6B42">Common</span></span>
+                <span style="display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid #E6E6E3"><span>Edge band lifting at the corner</span><span style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #A6461F">Needs fixing</span></span>
+              </div>
+            </div>
+            <div class="g-in" style="animation-delay: .12s; display: flex; flex-direction: column; gap: 8px">
+              <a href="Snags.dc.html" style="min-height: 48px; border-radius: 999px; background: #0B0B0B; color: #FFFFFF; font-weight: 500; font-size: 15px; display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none">Add to my snag list <svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3.5 9h11M10 4.5 14.5 9 10 13.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg></a>
+              <a href="GeioHuman.dc.html" style="min-height: 48px; border-radius: 999px; background: #F3F3F1; color: #0B0B0B; font-weight: 600; font-size: 15px; display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none">Ask Meera to check it</a>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+
+  </div>
+  <div style="position: relative; z-index: 2; flex-shrink: 0; padding: 10px 0 26px; background: linear-gradient(180deg, rgba(255,255,255,0) 0%, #F1F0EC 22%)">
+    <div style="margin: 0 16px; min-height: 60px; border-radius: 30px; background: #FFFFFF; box-shadow: 0 18px 40px -22px rgba(11,11,11,.45), 0 0 0 1px #E6E6E3; display: flex; align-items: center; gap: 2px; padding: 8px">
+      <a href="GeioPhoto.dc.html" aria-label="Send a photo" style="width: 44px; height: 44px; border-radius: 22px; background: #FFFFFF; color: #0B0B0B; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"></path><circle cx="12" cy="13" r="3.5"></circle></svg></a>
+      <input type="text" aria-label="Message GEIO" placeholder="Ask GEIO anything" style="flex: 1; min-width: 0; border: 0; background: transparent; font-size: 16px; color: #0B0B0B; outline: none; min-height: 44px; font-family: inherit">
+      <a href="GeioHome.dc.html" aria-label="Speak to GEIO" style="width: 44px; height: 44px; border: 0; border-radius: 22px; background: transparent; color: #5F5F5F; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></a>
+      <button type="button" aria-label="Send" style="width: 44px; height: 44px; border: 0; border-radius: 22px; background: #BA5329; color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"></path></svg></button>
+    </div>
+    <p style="margin: 8px 24px 0; text-align: center; font-size: 13px; line-height: 1.4; color: #8A8780">GEIO can make mistakes. Prices and dates are confirmed by your studio.</p>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { phase: 'think', n: 0 };
+    this.timers = [];
+    this.P = ["Thanks, Priya. This is the top of the bedroom 1 wardrobe. The thin line along the joint is normal at this stage: the panels are not filled and polished yet, and the polisher closes gaps like this during finishing.", "The corner is different. The edge band there has started to lift. If it's left, moisture gets into the board. It's a 10-minute fix for the carpenter while he's still on site, so it's worth flagging now."];
+    this.T = 1700;
+  }
+  componentDidMount() { this.run(); }
+  componentWillUnmount() { this.stop(); }
+  stop() { this.timers.forEach((t) => clearTimeout(t)); if (this.iv) clearInterval(this.iv); this.timers = []; }
+  run() {
+    this.stop();
+    const total = this.P.join('').length;
+    const calm = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (calm) { this.setState({ phase: 'done', n: total }); return; }
+    this.setState({ phase: 'think', n: 0 });
+    this.timers.push(setTimeout(() => {
+      this.setState({ phase: 'stream' });
+      this.iv = setInterval(() => {
+        const n = Math.min(total, this.state.n + 3);
+        if (n >= total) { clearInterval(this.iv); this.setState({ n, phase: 'done' }); }
+        else this.setState({ n });
+      }, 22);
+    }, this.T));
+  }
+  renderVals() {
+    let left = this.state.n;
+    const paras = this.P.map((t) => { const s = t.slice(0, Math.max(0, left)); left -= t.length; return { t: s, on: s.length > 0 }; });
+    const ph = this.state.phase;
+    return {
+      paras,
+      thinking: ph === 'think',
+      streaming: ph === 'stream',
+      done: ph === 'done',
+      orbClass: ph === 'done' ? 'g-orb' : 'g-orb busy',
+      again: () => this.run()
+    };
+  }
+}
+</script>
+</body>
+</html>

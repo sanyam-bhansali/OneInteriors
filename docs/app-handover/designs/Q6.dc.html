@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Quiz 6: priorities, ranked</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0B0B0B}
+a:focus-visible,button:focus-visible{outline:2px solid #BA5329;outline-offset:3px}
+button{font-family:inherit}
+.rk{width:100%;min-height:58px;border:0;border-radius:999px;background:#0B0B0B;color:#FFFFFF;padding:8px 20px 8px 9px;display:flex;align-items:center;gap:12px;cursor:pointer;text-align:left;font-size:16px;font-weight:500;animation:oiPop .45s cubic-bezier(.34,1.56,.64,1) both}
+.rk .num{width:38px;height:38px;flex:none;border-radius:50%;background:#C1582E;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.rk .ic{color:rgba(255,255,255,.8);display:flex}
+.rk .rm{font-size:12px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55)}
+.ct{width:104px;height:104px;flex:none;border:0;border-radius:50%;background:#F3F3F1;color:#0B0B0B;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:0 10px;text-align:center;cursor:pointer;font-size:13.5px;font-weight:500;line-height:1.15;transition:background-color .3s,transform .3s}
+.ct:hover{background:#EBEBE8}
+.ct:active{transform:scale(.96)}
+.go{width:100%;min-height:56px;border:0;border-radius:999px;background:#0B0B0B;color:#FFFFFF;font-size:16px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:12px;text-decoration:none;cursor:pointer}
+.go svg{width:28px;height:28px;padding:7px;box-sizing:border-box;border-radius:50%;background:#FFFFFF;color:#0B0B0B;margin-right:-12px}
+.go:disabled{background:#EBEBE8;color:#8D8D8D;cursor:default}
+/* motion and depth layer */
+@keyframes oiRise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes oiKen{from{transform:scale(1.12)}to{transform:scale(1)}}
+@keyframes oiGrowX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes oiPop{0%{transform:scale(.95)}60%{transform:scale(1.03)}100%{transform:scale(1)}}
+h1{animation:oiRise .8s cubic-bezier(.22,1,.36,1) both}
+h1 ~ p,h1 + span{animation:oiRise .8s cubic-bezier(.22,1,.36,1) .12s both}
+[role="radiogroup"] > *,[role="group"] > *,ol > li,fieldset > div > *,[role="tablist"] > *{animation:oiRise .7s cubic-bezier(.22,1,.36,1) both}
+[role="radiogroup"] > *:nth-child(1),[role="group"] > *:nth-child(1),ol > li:nth-child(1),fieldset > div > *:nth-child(1),[role="tablist"] > *:nth-child(1){animation-delay:0.22s}
+[role="radiogroup"] > *:nth-child(2),[role="group"] > *:nth-child(2),ol > li:nth-child(2),fieldset > div > *:nth-child(2),[role="tablist"] > *:nth-child(2){animation-delay:0.28s}
+[role="radiogroup"] > *:nth-child(3),[role="group"] > *:nth-child(3),ol > li:nth-child(3),fieldset > div > *:nth-child(3),[role="tablist"] > *:nth-child(3){animation-delay:0.34s}
+[role="radiogroup"] > *:nth-child(4),[role="group"] > *:nth-child(4),ol > li:nth-child(4),fieldset > div > *:nth-child(4),[role="tablist"] > *:nth-child(4){animation-delay:0.40s}
+[role="radiogroup"] > *:nth-child(5),[role="group"] > *:nth-child(5),ol > li:nth-child(5),fieldset > div > *:nth-child(5),[role="tablist"] > *:nth-child(5){animation-delay:0.46s}
+[role="radiogroup"] > *:nth-child(6),[role="group"] > *:nth-child(6),ol > li:nth-child(6),fieldset > div > *:nth-child(6),[role="tablist"] > *:nth-child(6){animation-delay:0.52s}
+[role="radiogroup"] > *:nth-child(7),[role="group"] > *:nth-child(7),ol > li:nth-child(7),fieldset > div > *:nth-child(7),[role="tablist"] > *:nth-child(7){animation-delay:0.58s}
+[role="radiogroup"] > *:nth-child(8),[role="group"] > *:nth-child(8),ol > li:nth-child(8),fieldset > div > *:nth-child(8),[role="tablist"] > *:nth-child(8){animation-delay:0.64s}
+[role="radiogroup"] > *:nth-child(9),[role="group"] > *:nth-child(9),ol > li:nth-child(9),fieldset > div > *:nth-child(9),[role="tablist"] > *:nth-child(9){animation-delay:0.70s}
+[role="radiogroup"] > *:nth-child(10),[role="group"] > *:nth-child(10),ol > li:nth-child(10),fieldset > div > *:nth-child(10),[role="tablist"] > *:nth-child(10){animation-delay:0.76s}
+[role="radiogroup"] > *:nth-child(11),[role="group"] > *:nth-child(11),ol > li:nth-child(11),fieldset > div > *:nth-child(11),[role="tablist"] > *:nth-child(11){animation-delay:0.82s}
+[role="radiogroup"] > *:nth-child(12),[role="group"] > *:nth-child(12),ol > li:nth-child(12),fieldset > div > *:nth-child(12),[role="tablist"] > *:nth-child(12){animation-delay:0.88s}
+[role="progressbar"] > span{transform-origin:left center;animation:oiGrowX .9s cubic-bezier(.22,1,.36,1) both}
+[role="progressbar"] > span:nth-child(1){animation-delay:0.05s}
+[role="progressbar"] > span:nth-child(2){animation-delay:0.10s}
+[role="progressbar"] > span:nth-child(3){animation-delay:0.15s}
+[role="progressbar"] > span:nth-child(4){animation-delay:0.20s}
+[role="progressbar"] > span:nth-child(5){animation-delay:0.25s}
+[role="progressbar"] > span:nth-child(6){animation-delay:0.30s}
+[role="progressbar"] > span:nth-child(7){animation-delay:0.35s}
+img[style*="inset: 0"]{animation:oiKen 18s ease-in-out both alternate infinite}
+a,button{transition:transform .28s cubic-bezier(.34,1.56,.64,1),box-shadow .28s ease,background-color .28s ease,color .28s ease}
+a:active,button:active{transform:scale(.965)}
+button[aria-pressed="true"],button[aria-checked="true"]{animation:oiPop .45s cubic-bezier(.34,1.56,.64,1)}
+a[style*="background: rgb(11, 11, 11)"][style*="border-radius: 999px"],button[style*="background: rgb(11, 11, 11)"][style*="border-radius: 999px"]{box-shadow:0 14px 30px -16px rgba(11,11,11,.45)}
+div[style*="background: rgb(11, 11, 11)"][style*="border-radius: 20px"],div[style*="background: rgb(11, 11, 11)"][style*="border-radius: 18px"],article[style*="background: rgb(11, 11, 11)"]{box-shadow:0 28px 56px -26px rgba(11,11,11,.6),inset 0 1px 0 rgba(255,255,255,.06)}
+div[style*="background: rgb(186, 83, 41)"][style*="border-radius: 20px"]{box-shadow:0 28px 56px -22px rgba(186,83,41,.65),inset 0 1px 0 rgba(255,255,255,.18)}
+img[style*="border-radius: 12px"],img[style*="border-radius: 16px"],img[style*="border-radius: 14px"]{box-shadow:0 14px 30px -18px rgba(11,11,11,.5)}
+nav a[aria-current="page"] svg{animation:oiPop .7s cubic-bezier(.34,1.56,.64,1) both}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.01ms!important}}
+[style*="overflow-y: auto"] > *{flex-shrink:0}
+
+/* website skin (one-interiors home-cb.css) */
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"],button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"],a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]{position:relative;overflow:hidden;isolation:isolate;transition:transform .45s cubic-bezier(.22,1,.36,1),color .35s}
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]::before,button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]::before,a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:#C1582E;transform:translateY(101%);border-top-left-radius:50% 40%;border-top-right-radius:50% 40%;transition:transform .55s cubic-bezier(.22,1,.36,1),border-radius .55s cubic-bezier(.22,1,.36,1)}
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]:hover::before,button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]:hover::before,a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]:hover::before{transform:none;border-radius:999px}
+a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]:hover{color:#FFFFFF!important}
+a[style*="min-height: 56px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 52px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 46px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 56px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 46px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child{width:28px;height:28px;padding:7px;box-sizing:border-box;border-radius:50%;background:#FFFFFF;color:#0B0B0B;margin-right:-12px;flex-shrink:0}
+a[style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child{background:#0B0B0B!important;color:#FFFFFF!important}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; background: #FFFFFF; color: #0B0B0B; font-family: 'Geist', sans-serif; overflow: hidden">
+
+  <div style="flex-shrink: 0; padding: 20px 20px 0 12px; display: flex; flex-direction: column; gap: 14px">
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <a href="Q5.dc.html" aria-label="Back" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #0B0B0B">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+      </a>
+      <span style="font-size: 13px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; color: #5F5F5F">Question 6 of 7</span>
+    </div>
+    <div role="progressbar" aria-label="Question 6 of 7" aria-valuenow="6" aria-valuemin="1" aria-valuemax="7" style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; padding-left: 8px">
+      <span style="height: 3px; border-radius: 2px; background: #0B0B0B"></span><span style="height: 3px; border-radius: 2px; background: #0B0B0B"></span><span style="height: 3px; border-radius: 2px; background: #0B0B0B"></span><span style="height: 3px; border-radius: 2px; background: #0B0B0B"></span><span style="height: 3px; border-radius: 2px; background: #0B0B0B"></span><span style="height: 3px; border-radius: 2px; background: #0B0B0B"></span><span style="height: 3px; border-radius: 2px; background: #E6E6E3"></span>
+    </div>
+  </div>
+
+  <div style="flex: 1; overflow-y: auto; padding: 28px 20px 20px; display: flex; flex-direction: column; gap: 20px">
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <h1 style="margin: 0; font-size: 40px; font-weight: 500; letter-spacing: -0.045em; line-height: .98">What matters most to you here?</h1>
+      <p style="margin: 0; font-size: 15px; color: #5F5F5F">Tap them in order, most important first.</p>
+    </div>
+
+    <sc-if value="{{hasRanked}}" hint-placeholder-val="{{ false }}">
+      <ol aria-label="Your ranking" style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px">
+        <sc-for list="{{ranked}}" as="r" hint-placeholder-count="2">
+          <li><button type="button" class="rk" aria-label="{{r.aria}}" onClick="{{r.tap}}">
+            <span class="num">{{r.n}}</span>
+            <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{r.icon}}"/></svg></span>
+            <span style="flex: 1">{{r.title}}</span>
+            <span class="rm">Remove</span>
+          </button></li>
+        </sc-for>
+      </ol>
+    </sc-if>
+
+    <sc-if value="{{hasLeft}}" hint-placeholder-val="{{ true }}">
+      <div role="group" aria-label="Still to rank" style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start">
+        <sc-for list="{{left}}" as="c" hint-placeholder-count="4">
+          <button type="button" class="ct" aria-label="{{c.aria}}" onClick="{{c.tap}}">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{c.icon}}"/></svg>
+            <span>{{c.title}}</span>
+          </button>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <div style="display: flex; justify-content: space-between; align-items: center">
+      <span role="status" style="font-size: 13px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; color: #C1582E">{{status}}</span>
+      <button type="button" onClick="{{reset}}" style="border: 0; background: none; padding: 8px 4px; cursor: pointer; font-size: 14px; color: #5F5F5F; text-decoration: underline; text-underline-offset: 3px">Start over</button>
+    </div>
+  </div>
+
+  <div style="flex-shrink: 0; padding: 12px 20px 36px">
+    <sc-if value="{{done}}" hint-placeholder-val="{{ true }}">
+      <a class="go" href="Q7.dc.html">Next
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3.5 9h11M10 4.5 14.5 9 10 13.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg></a>
+    </sc-if>
+    <sc-if value="{{notDone}}" hint-placeholder-val="{{ false }}">
+      <button type="button" class="go" disabled="disabled">{{waitLabel}}</button>
+    </sc-if>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { order: [] };
+  }
+  renderVals() {
+    const list = [
+      { id: 'time', title: 'Finishing on time', icon: 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z' },
+      { id: 'design', title: 'Design ambition', icon: 'M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z' },
+      { id: 'budget', title: 'Staying in budget', icon: 'M7 5h10M7 9h10M13 9a4 4 0 0 1-4 4H7l7 7M9 5a4 4 0 0 1 4 4' },
+      { id: 'quality', title: 'Material quality', icon: 'M12 3 3 7.5l9 4.5 9-4.5zM3 12l9 4.5 9-4.5M3 16.5 12 21l9-4.5' }
+    ];
+    const order = this.state.order;
+    const ord = ['1st', '2nd', '3rd', '4th'];
+    const byId = (id) => list.find((x) => x.id === id);
+    const leftList = list.filter((x) => order.indexOf(x.id) < 0);
+    const first = byId(order[0]);
+    return {
+      ranked: order.map((id, i) => ({ ...byId(id), n: String(i + 1), aria: byId(id).title + ', ranked ' + ord[i] + '. Tap to remove.', tap: () => this.setState({ order: order.filter((x) => x !== id) }) })),
+      left: leftList.map((it) => ({ ...it, aria: it.title + '. Tap to rank ' + ord[order.length] + '.', tap: () => this.setState({ order: order.concat([it.id]) }) })),
+      hasRanked: order.length > 0,
+      hasLeft: leftList.length > 0,
+      status: leftList.length === 0 ? (first ? first.title + ' first' : '') : (order.length === 0 ? 'Tap your top priority' : 'Now your ' + ord[order.length]),
+      done: leftList.length === 0,
+      notDone: leftList.length > 0,
+      waitLabel: 'Rank ' + leftList.length + ' more to continue',
+      reset: () => this.setState({ order: [] })
+    };
+  }
+}
+</script>
+</body>
+</html>

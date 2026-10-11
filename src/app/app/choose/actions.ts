@@ -3,10 +3,14 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { getCurrentUser } from '@/modules/auth/session';
-import { requestOtp, verifyOtp } from '@/modules/auth/otp';
-import { requestOtpMessage, verifyOtpMessage } from '@/modules/auth/otp-messages';
-import { answerVisit, finalQuoteView, signFinalQuote, type ChooseResult } from '@/modules/portal/choose';
-import { firstBeforeGst } from './first';
+import { answerVisit, type ChooseResult } from '@/modules/portal/choose';
+import { requestSignCode, signWithCode, type CodeResult } from '@/modules/portal/sign';
+import { parsePlan } from '@/modules/portal/plans';
+
+/**
+ * The Choose & sign screens' actions. Signing and its code are
+ * `modules/portal/sign.ts`, shared with the phone app's API.
+ */
 
 /** Yes or no to a visit time the studio proposed. */
 export async function answerVisitAction(appointmentId: string, yes: boolean): Promise<ChooseResult> {
@@ -15,45 +19,25 @@ export async function answerVisitAction(appointmentId: string, yes: boolean): Pr
   return r;
 }
 
-export type CodeResult = { ok: true; to: string; devCode?: string } | { ok: false; error: string };
+export type { CodeResult };
 
-/**
- * A 6-digit WhatsApp code to the number on their account, to sign with.
- * Always their own number: the screen never chooses where the code goes.
- */
+const ipOf = (h: Headers) => h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+
 export async function requestSignCodeAction(): Promise<CodeResult> {
-  const user = await getCurrentUser();
-  if (!user?.phone) return { ok: false, error: 'Sign in with your number first.' };
-  const h = await headers();
-  const r = await requestOtp(user.phone, user.name ?? '', { ip: h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null });
-  if (!r.ok) return { ok: false, error: requestOtpMessage(r.reason) };
-  return { ok: true, to: user.phone, devCode: r.devCode };
+  return requestSignCode(await getCurrentUser(), ipOf(await headers()));
 }
 
-/**
- * Sign the final quote: the agreement ticked, the code right, the quote
- * still open and theirs. The quote is re-read here rather than trusted from
- * the screen, so what is locked is what the studio issued.
- */
-export async function signAction(input: { quoteId: string; code: string; agreed: boolean }): Promise<ChooseResult> {
-  if (!input.agreed) return { ok: false, error: 'Tick the box to say you have read and agree.' };
-  const user = await getCurrentUser();
-  if (!user?.phone) return { ok: false, error: 'Sign in with your number first.' };
-
+/** Sign with the code; Basic, or Assured as interest the team confirms (portal/plans.ts). */
+export async function signAction(input: { quoteId: string; code: string; agreed: boolean; plan: string }): Promise<ChooseResult> {
+  const plan = parsePlan(input.plan);
+  if (!plan) return { ok: false, error: 'Choose Basic or Assured.' };
   const h = await headers();
-  const v = await verifyOtp(user.phone, input.code, user.name, {
+  const r = await signWithCode(await getCurrentUser(), { quoteId: input.quoteId, code: input.code, agreed: input.agreed, plan }, {
     userAgent: h.get('user-agent'),
-    ip: h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+    ip: ipOf(h),
   });
-  if (!v.ok) return { ok: false, error: verifyOtpMessage(v.reason) };
-  if (v.userId !== user.id) return { ok: false, error: 'That code is for a different account.' };
-
-  const view = await finalQuoteView(input.quoteId, firstBeforeGst);
-  if (!view) return { ok: false, error: 'We could not find that quote on your project.' };
-  const r = await signFinalQuote(view);
-  if (r.ok) {
-    revalidatePath('/app/choose');
-    revalidatePath('/app/home');
-  }
-  return r.ok ? { ok: true } : r;
+  if (!r.ok) return { ok: false, error: r.error };
+  revalidatePath('/app/choose');
+  revalidatePath('/app/home');
+  return { ok: true };
 }

@@ -50,6 +50,8 @@ const BRIEF: HomeBrief = {
 const PROJECT: CustomerProject = {
   id: 'p1',
   role: 'owner',
+  // GEIO is part of Assured (portal/plans.ts); the gate itself is tested in app-plans.test.ts.
+  plan: 'assured',
   studio: 'Teakline Studio',
   startOn: day('2026-09-01').toISOString(),
   stages: [

@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Team and roles</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1F2119}a:hover{color:#A8502F}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #A8502F;outline-offset:2px}
+button,input{font-family:inherit}
+.rl{display:flex;align-items:center;min-height:40px;padding:0 12px;border-radius:10px;font-size:14.5px;font-weight:500;text-decoration:none;color:#1F2119}
+.rl:hover{background:#DFE0D2;color:#1F2119}
+.rl[aria-current="page"]{background:#FBFBF6;color:#1F2119;font-weight:600;box-shadow:inset 3px 0 0 #A8502F}
+.rh{padding:16px 12px 6px;font-size:13px;font-weight:600;color:#4F5147}
+.mono{font-family:'Geist Mono',monospace}
+.lbl{font-size:13.5px;font-weight:600;color:#4F5147}
+.fld{box-sizing:border-box;width:100%;min-height:46px;padding:0 14px;border:0;border-radius:12px;background:#ECEDDF;font-size:15px;color:#1F2119}
+th{font-size:13px;font-weight:600;color:#4F5147;text-align:left;padding:12px 14px;white-space:nowrap}
+td{font-size:14px;padding:14px;border-top:1px solid #E4E5D8;vertical-align:top}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-wrap: wrap; background: #DFE0D2; color: #1F2119; font-family: 'Geist', sans-serif">
+
+  <nav aria-label="Studio" style="flex: 0 0 232px; box-sizing: border-box; background: #ECEDDF; padding: 20px 12px; display: flex; flex-direction: column; gap: 2px">
+    <div style="display: flex; flex-direction: column; gap: 2px; padding: 0 12px 14px">
+      <span style="font-size: 16px; font-weight: 600; letter-spacing: -0.02em">Teakline Studio</span>
+      <span style="font-size: 13px; color: #4F5147">One Interiors Studio</span>
+    </div>
+    <a href="StudioProjects.dc.html" class="rl">Dashboard</a>
+    <span class="rh">Your work</span>
+    <a href="StudioProjects.dc.html" class="rl">Quotations</a>
+    <a href="StudioProjects.dc.html" class="rl">Product master</a>
+    <a href="StudioProjects.dc.html" class="rl">Clients</a>
+    <a href="StudioProjects.dc.html" class="rl">Projects</a>
+    <a href="StudioProjects.dc.html" class="rl">Vendors</a>
+    <span class="rh">From us</span>
+    <a href="StudioProjects.dc.html" class="rl">Calendar</a>
+    <a href="StudioProjects.dc.html" class="rl">Your listing</a>
+    <span class="rh">Settings</span>
+    <a href="StudioTeam.dc.html" class="rl" aria-current="page">Team</a>
+    <a href="StudioProjects.dc.html" class="rl">Pipeline and fields</a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 28px 32px 40px; display: flex; flex-direction: column; gap: 20px">
+
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 14px; color: #4F5147">Settings</span>
+        <h1 style="margin: 0; font-size: 34px; font-weight: 500; letter-spacing: -0.035em">Team</h1>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 14px; background: #FBFBF6">
+        <div role="img" aria-label="4 of 5 free seats used" style="display: grid; grid-template-columns: repeat(5, 18px); gap: 4px">
+          <span style="height: 18px; border-radius: 5px; background: #1F2119"></span>
+          <span style="height: 18px; border-radius: 5px; background: #1F2119"></span>
+          <span style="height: 18px; border-radius: 5px; background: #1F2119"></span>
+          <span style="height: 18px; border-radius: 5px; background: #1F2119"></span>
+          <span style="height: 18px; border-radius: 5px; box-shadow: inset 0 0 0 1.5px #8E9081"></span>
+        </div>
+        <span style="font-size: 14px"><span class="mono" style="font-weight: 500">4 of 5</span> free seats used</span>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+
+      <section aria-labelledby="h-members" style="flex: 999 1 560px; min-width: 0; background: #FBFBF6; border-radius: 18px; display: flex; flex-direction: column">
+        <div style="padding: 16px 18px 6px; display: flex; flex-direction: column; gap: 3px">
+          <h2 id="h-members" style="margin: 0; font-size: 17px; font-weight: 600">People</h2>
+          <span style="font-size: 13px; color: #4F5147">Everyone signs in with their mobile number. A supervisor only sees the sites listed here.</span>
+        </div>
+        <div style="overflow-x: auto">
+          <table style="width: 100%; min-width: 720px; border-collapse: collapse">
+            <thead><tr><th scope="col">Name</th><th scope="col">Role</th><th scope="col">Can see</th><th scope="col">Last active</th><th scope="col"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Actions</span></th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span style="font-weight: 600">Vikram Rao</span><div class="mono" style="font-size: 13px; color: #4F5147; margin-top: 3px">+91 98810 22410</div></td>
+                <td>Owner</td>
+                <td>Everything</td>
+                <td>Now</td>
+                <td></td>
+              </tr>
+              <tr>
+                <td><span style="font-weight: 600">Neha Joshi</span><div class="mono" style="font-size: 13px; color: #4F5147; margin-top: 3px">+91 97660 18332</div></td>
+                <td>Project manager</td>
+                <td>Baner 1204 · Balewadi 602 · Hinjewadi 902</td>
+                <td>Today, 11:02 am</td>
+                <td><button type="button" style="min-height: 34px; padding: 0 12px; border: 0; border-radius: 999px; background: #ECEDDF; color: #1F2119; font-size: 13px; font-weight: 500; cursor: pointer">Edit</button></td>
+              </tr>
+              <tr>
+                <td><span style="font-weight: 600">Ramesh Pawar</span><div class="mono" style="font-size: 13px; color: #4F5147; margin-top: 3px">+91 98220 55310</div></td>
+                <td>Site supervisor</td>
+                <td>Baner 1204 · Balewadi 602</td>
+                <td>Today, 10:12 am<div style="font-size: 13px; color: #4F5147; margin-top: 3px">Marathi</div></td>
+                <td><button type="button" style="min-height: 34px; padding: 0 12px; border: 0; border-radius: 999px; background: #ECEDDF; color: #1F2119; font-size: 13px; font-weight: 500; cursor: pointer">Edit</button></td>
+              </tr>
+              <tr>
+                <td><span style="font-weight: 600">Sunita Kale</span><div class="mono" style="font-size: 13px; color: #4F5147; margin-top: 3px">+91 90110 47285</div></td>
+                <td>Accounts</td>
+                <td>Payments on all projects</td>
+                <td>Yesterday</td>
+                <td><button type="button" style="min-height: 34px; padding: 0 12px; border: 0; border-radius: 999px; background: #ECEDDF; color: #1F2119; font-size: 13px; font-weight: 500; cursor: pointer">Edit</button></td>
+              </tr>
+              <tr>
+                <td><span style="font-weight: 600">Santosh More</span><div class="mono" style="font-size: 13px; color: #4F5147; margin-top: 3px">+91 95450 31907</div></td>
+                <td>Site supervisor</td>
+                <td>Kharadi 1103 · Hinjewadi 902</td>
+                <td><span style="color: #4F5147">Invite sent, not signed in yet</span><div style="font-size: 13px; color: #4F5147; margin-top: 3px">Not using a seat</div></td>
+                <td><button type="button" style="min-height: 34px; padding: 0 12px; border: 0; border-radius: 999px; background: #ECEDDF; color: #1F2119; font-size: 13px; font-weight: 500; cursor: pointer">Resend</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section aria-labelledby="h-invite" style="flex: 1 1 340px; min-width: 0; background: #FBFBF6; border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 16px">
+        <h2 id="h-invite" style="margin: 0; font-size: 17px; font-weight: 600">Add someone</h2>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <label for="i-name" class="lbl">Name</label>
+            <input id="i-name" class="fld" type="text" value="Imran Shaikh">
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <label for="i-phone" class="lbl">Mobile number</label>
+            <input id="i-phone" class="fld mono" type="tel" value="98500 66124">
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <span id="i-role" class="lbl">Role</span>
+          <div role="radiogroup" aria-labelledby="i-role" style="display: flex; flex-direction: column; gap: 8px">
+            <sc-for list="{{roles}}" as="r" hint-placeholder-count="4">
+              <button type="button" role="radio" aria-checked="{{r.on}}" onClick="{{r.pick}}" style="min-height: 56px; padding: 10px 14px; border: 0; border-radius: 14px; text-align: left; cursor: pointer; background: {{r.bg}}; color: {{r.fg}}; display: flex; flex-direction: column; gap: 3px">
+                <span style="font-size: 15px; font-weight: 600">{{r.name}}</span>
+                <span style="font-size: 13px; line-height: 1.4; color: {{r.sub}}">{{r.line}}</span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+        <sc-if value="{{needsProjects}}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <span id="i-proj" class="lbl">Which sites?</span>
+            <div role="group" aria-labelledby="i-proj" style="display: flex; flex-wrap: wrap; gap: 8px">
+              <sc-for list="{{projects}}" as="p" hint-placeholder-count="6">
+                <button type="button" aria-pressed="{{p.on}}" onClick="{{p.flip}}" style="min-height: 40px; padding: 0 12px; border: 0; border-radius: 999px; font-size: 13.5px; font-weight: 500; cursor: pointer; background: {{p.bg}}; color: {{p.fg}}">{{p.label}}</button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+        <button type="button" onClick="{{invite}}" style="min-height: 50px; border: 0; border-radius: 999px; background: {{invBg}}; color: #FBFBF6; font-size: 15.5px; font-weight: 500; cursor: pointer">{{invLabel}}</button>
+        <span style="font-size: 13px; line-height: 1.45; color: #4F5147">{{invNote}}</span>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { role: 'sup', proj: { baner: true, balewadi: false, kharadi: false, wakad: false, aundh: false, hinjewadi: false }, sent: false }; }
+  renderVals() {
+    const s = this.state;
+    const R = [
+      ['pm', 'Project manager', 'Runs the plan, decisions and snags for the projects you pick. Sees no vendor rates.'],
+      ['sup', 'Site supervisor', 'Phone only. Posts the daily update and fixes snags on the sites you pick. Nothing else.'],
+      ['acc', 'Accounts', 'Records payments and receipts across all projects.'],
+      ['own', 'Owner', 'Everything, including team, prices and margins.']
+    ];
+    const P = [['baner', 'Baner 1204'], ['balewadi', 'Balewadi 602'], ['kharadi', 'Kharadi 1103'], ['wakad', 'Wakad 404'], ['aundh', 'Aundh kitchen'], ['hinjewadi', 'Hinjewadi 902']];
+    const n = P.filter((p) => s.proj[p[0]]).length;
+    return {
+      roles: R.map(([id, name, line]) => ({ name, line, on: id === s.role ? 'true' : 'false', bg: id === s.role ? '#1F2119' : '#ECEDDF', fg: id === s.role ? '#FBFBF6' : '#1F2119', sub: id === s.role ? '#D6D7C8' : '#4F5147', pick: () => this.setState({ role: id, sent: false }) })),
+      needsProjects: s.role === 'pm' || s.role === 'sup',
+      projects: P.map(([id, label]) => ({ label, on: s.proj[id] ? 'true' : 'false', bg: s.proj[id] ? '#1F2119' : '#ECEDDF', fg: s.proj[id] ? '#FBFBF6' : '#1F2119', flip: () => this.setState({ proj: Object.assign({}, s.proj, { [id]: !s.proj[id] }), sent: false }) })),
+      invite: () => this.setState({ sent: true }),
+      invBg: s.sent ? '#2F6B42' : '#1F2119',
+      invLabel: s.sent ? 'Invite sent on WhatsApp' : 'Send invite on WhatsApp',
+      invNote: s.sent ? 'Imran joins the moment he signs in with 98500 66124. That will use your 5th free seat.' : 'He gets a WhatsApp link and signs in with this number. A seat is used only once he signs in.' + ((s.role === 'sup' || s.role === 'pm') ? ' ' + n + (n === 1 ? ' site' : ' sites') + ' selected.' : '')
+    };
+  }
+}
+</script>
+</body>
+</html>

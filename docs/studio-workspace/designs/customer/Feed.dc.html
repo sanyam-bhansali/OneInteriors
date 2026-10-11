@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>On site</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0B0B0B}
+a:focus-visible,button:focus-visible{outline:2px solid #BA5329;outline-offset:3px}
+/* motion and depth layer */
+@keyframes oiRise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes oiKen{from{transform:scale(1.12)}to{transform:scale(1)}}
+@keyframes oiGrowX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes oiPop{0%{transform:scale(.95)}60%{transform:scale(1.03)}100%{transform:scale(1)}}
+h1{animation:oiRise .8s cubic-bezier(.22,1,.36,1) both}
+h1 ~ p,h1 + span{animation:oiRise .8s cubic-bezier(.22,1,.36,1) .12s both}
+[role="radiogroup"] > *,[role="group"] > *,ol > li,fieldset > div > *,[role="tablist"] > *{animation:oiRise .7s cubic-bezier(.22,1,.36,1) both}
+[role="radiogroup"] > *:nth-child(1),[role="group"] > *:nth-child(1),ol > li:nth-child(1),fieldset > div > *:nth-child(1),[role="tablist"] > *:nth-child(1){animation-delay:0.22s}
+[role="radiogroup"] > *:nth-child(2),[role="group"] > *:nth-child(2),ol > li:nth-child(2),fieldset > div > *:nth-child(2),[role="tablist"] > *:nth-child(2){animation-delay:0.28s}
+[role="radiogroup"] > *:nth-child(3),[role="group"] > *:nth-child(3),ol > li:nth-child(3),fieldset > div > *:nth-child(3),[role="tablist"] > *:nth-child(3){animation-delay:0.34s}
+[role="radiogroup"] > *:nth-child(4),[role="group"] > *:nth-child(4),ol > li:nth-child(4),fieldset > div > *:nth-child(4),[role="tablist"] > *:nth-child(4){animation-delay:0.40s}
+[role="radiogroup"] > *:nth-child(5),[role="group"] > *:nth-child(5),ol > li:nth-child(5),fieldset > div > *:nth-child(5),[role="tablist"] > *:nth-child(5){animation-delay:0.46s}
+[role="radiogroup"] > *:nth-child(6),[role="group"] > *:nth-child(6),ol > li:nth-child(6),fieldset > div > *:nth-child(6),[role="tablist"] > *:nth-child(6){animation-delay:0.52s}
+[role="radiogroup"] > *:nth-child(7),[role="group"] > *:nth-child(7),ol > li:nth-child(7),fieldset > div > *:nth-child(7),[role="tablist"] > *:nth-child(7){animation-delay:0.58s}
+[role="radiogroup"] > *:nth-child(8),[role="group"] > *:nth-child(8),ol > li:nth-child(8),fieldset > div > *:nth-child(8),[role="tablist"] > *:nth-child(8){animation-delay:0.64s}
+[role="radiogroup"] > *:nth-child(9),[role="group"] > *:nth-child(9),ol > li:nth-child(9),fieldset > div > *:nth-child(9),[role="tablist"] > *:nth-child(9){animation-delay:0.70s}
+[role="radiogroup"] > *:nth-child(10),[role="group"] > *:nth-child(10),ol > li:nth-child(10),fieldset > div > *:nth-child(10),[role="tablist"] > *:nth-child(10){animation-delay:0.76s}
+[role="radiogroup"] > *:nth-child(11),[role="group"] > *:nth-child(11),ol > li:nth-child(11),fieldset > div > *:nth-child(11),[role="tablist"] > *:nth-child(11){animation-delay:0.82s}
+[role="radiogroup"] > *:nth-child(12),[role="group"] > *:nth-child(12),ol > li:nth-child(12),fieldset > div > *:nth-child(12),[role="tablist"] > *:nth-child(12){animation-delay:0.88s}
+[role="progressbar"] > span{transform-origin:left center;animation:oiGrowX .9s cubic-bezier(.22,1,.36,1) both}
+[role="progressbar"] > span:nth-child(1){animation-delay:0.05s}
+[role="progressbar"] > span:nth-child(2){animation-delay:0.10s}
+[role="progressbar"] > span:nth-child(3){animation-delay:0.15s}
+[role="progressbar"] > span:nth-child(4){animation-delay:0.20s}
+[role="progressbar"] > span:nth-child(5){animation-delay:0.25s}
+[role="progressbar"] > span:nth-child(6){animation-delay:0.30s}
+[role="progressbar"] > span:nth-child(7){animation-delay:0.35s}
+img[style*="inset: 0"]{animation:oiKen 18s ease-in-out both alternate infinite}
+a,button{transition:transform .28s cubic-bezier(.34,1.56,.64,1),box-shadow .28s ease,background-color .28s ease,color .28s ease}
+a:active,button:active{transform:scale(.965)}
+button[aria-pressed="true"],button[aria-checked="true"]{animation:oiPop .45s cubic-bezier(.34,1.56,.64,1)}
+a[style*="background: rgb(11, 11, 11)"][style*="border-radius: 999px"],button[style*="background: rgb(11, 11, 11)"][style*="border-radius: 999px"]{box-shadow:0 14px 30px -16px rgba(11,11,11,.45)}
+div[style*="background: rgb(11, 11, 11)"][style*="border-radius: 20px"],div[style*="background: rgb(11, 11, 11)"][style*="border-radius: 18px"],article[style*="background: rgb(11, 11, 11)"]{box-shadow:0 28px 56px -26px rgba(11,11,11,.6),inset 0 1px 0 rgba(255,255,255,.06)}
+div[style*="background: rgb(186, 83, 41)"][style*="border-radius: 20px"]{box-shadow:0 28px 56px -22px rgba(186,83,41,.65),inset 0 1px 0 rgba(255,255,255,.18)}
+img[style*="border-radius: 12px"],img[style*="border-radius: 16px"],img[style*="border-radius: 14px"]{box-shadow:0 14px 30px -18px rgba(11,11,11,.5)}
+nav a[aria-current="page"] svg{animation:oiPop .7s cubic-bezier(.34,1.56,.64,1) both}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.01ms!important}}
+
+
+/* bottom bar */
+@keyframes gBreathe{50%{transform:scale(1.07)}}
+@keyframes gSpin{to{transform:rotate(360deg)}}
+.oi-tab{min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;text-decoration:none;color:#A9A7A1!important;font-size:13px;font-weight:500}
+.oi-tab[aria-current="page"]{color:#E07A4E!important;font-weight:600}
+.oi-geio{position:relative;width:52px;height:52px;margin-top:-22px;border-radius:50%;background:radial-gradient(circle at 34% 28%,#FFF6E6 0%,#F2C98A 26%,#E07A4E 56%,#BA5329 80%,#6E2A10 100%);box-shadow:0 0 0 5px #0B0B0B,0 0 26px -2px rgba(242,201,138,.75);animation:gBreathe 4.2s ease-in-out infinite}
+.oi-geio::after{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,transparent 0 28%,rgba(255,248,236,.6) 40%,transparent 54%);mix-blend-mode:screen;animation:gSpin 5.5s linear infinite}
+@media (prefers-reduced-motion: reduce){.oi-geio,.oi-geio::after{animation:none!important}}
+[style*="overflow-y: auto"] > *{flex-shrink:0}
+
+/* website skin (one-interiors home-cb.css) */
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"],button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"],a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]{position:relative;overflow:hidden;isolation:isolate;transition:transform .45s cubic-bezier(.22,1,.36,1),color .35s}
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]::before,button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]::before,a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:#C1582E;transform:translateY(101%);border-top-left-radius:50% 40%;border-top-right-radius:50% 40%;transition:transform .55s cubic-bezier(.22,1,.36,1),border-radius .55s cubic-bezier(.22,1,.36,1)}
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]:hover::before,button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]:hover::before,a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]:hover::before{transform:none;border-radius:999px}
+a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]:hover{color:#FFFFFF!important}
+a[style*="min-height: 56px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 52px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 46px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 56px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 46px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child{width:28px;height:28px;padding:7px;box-sizing:border-box;border-radius:50%;background:#FFFFFF;color:#0B0B0B;margin-right:-12px;flex-shrink:0}
+a[style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child{background:#0B0B0B!important;color:#FFFFFF!important}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; display: flex; flex-direction: column; background: #FFFFFF; color: #0B0B0B; font-family: 'Geist', sans-serif; overflow: hidden">
+
+  <div style="flex: 1; overflow-y: auto; padding: 28px 20px 24px; display: flex; flex-direction: column; gap: 22px">
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <span style="font-size: 13px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; color: #5F5F5F">Every working day</span>
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px">
+        <h1 style="margin: 0; font-size: 42px; font-weight: 500; letter-spacing: -0.05em; line-height: .95">On site</h1>
+        <sc-if value="{{fullHome}}" hint-placeholder-val="{{ true }}">
+          <a href="Home3D.dc.html" style="min-height: 44px; padding: 0 16px; border-radius: 999px; background: #0B0B0B; color: #F1F0EC; font-size: 14.5px; font-weight: 600; display: flex; align-items: center; gap: 8px; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 3 7v10l9 5 9-5V7z"></path><path d="M3 7l9 5 9-5M12 12v10"></path></svg>View in 3D</a>
+        </sc-if>
+      </div>
+    </div>
+
+    <a href="Timelapse.dc.html" style="position: relative; display: grid; grid-template-columns: 88px minmax(0, 1fr) 24px; gap: 14px; align-items: center; background: #0B0B0B; color: #F1F0EC; border-radius: 20px; padding: 12px; text-decoration: none; color: #F1F0EC">
+      <span style="position: relative; width: 88px; height: 88px; border-radius: 14px; overflow: hidden; background: #2A2A28"><img src="/_blob/232d60b704bdb9bfc844c361224aed01" alt="" style="width: 100%; height: 100%; object-fit: cover; display: block"><span style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(11,11,11,.3)"><svg width="26" height="26" viewBox="0 0 24 24" fill="#FFFFFF" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"></path></svg></span></span>
+      <span style="display: flex; flex-direction: column; gap: 3px"><span style="font-size: 13px; font-weight: 600; color: #E8B867">New · 46 days in 48 seconds</span><span style="font-size: 17px; font-weight: 600">Your home's story</span><span style="font-size: 14px; color: #B5B3AD">A timelapse from every site photo</span></span>
+      <span style="color: #8D8D8D"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></span>
+    </a>
+
+    <div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #E6E6E3; border-bottom: 1px solid #E6E6E3; padding: 14px 0">
+      <div style="display: flex; justify-content: space-between; align-items: baseline">
+        <span style="font-size: 15px; font-weight: 600">This week</span>
+        <span style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #5F5F5F">3 of 4 days worked</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px">
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: center"><span style="width: 100%; height: 4px; border-radius: 2px; background: #0B0B0B"></span><span style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #5F5F5F">MON</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: center"><span style="width: 100%; height: 4px; border-radius: 2px; background: #BA5329"></span><span style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #A6461F">TUE</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: center"><span style="width: 100%; height: 4px; border-radius: 2px; background: #0B0B0B"></span><span style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #5F5F5F">WED</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: center"><span style="width: 100%; height: 4px; border-radius: 2px; background: #0B0B0B"></span><span style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #0B0B0B">THU</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: center"><span style="width: 100%; height: 4px; border-radius: 2px; background: #E6E6E3"></span><span style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #8D8D8D">FRI</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: center"><span style="width: 100%; height: 4px; border-radius: 2px; background: #E6E6E3"></span><span style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #8D8D8D">SAT</span></div>
+      </div>
+    </div>
+
+    <article style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; justify-content: space-between; align-items: baseline">
+        <h2 style="margin: 0; font-size: 22px; font-weight: 500; letter-spacing: -0.03em">Today, Thu 8 Oct</h2>
+        <span style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #5F5F5F">5:12 pm</span>
+      </div>
+      <img src="/_blob/232d60b704bdb9bfc844c361224aed01" alt="Living room after today's work" style="width: 100%; height: 200px; object-fit: cover; border-radius: 16px">
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px">
+        <img src="/_blob/f60e3293a5cd9a3e7b83a435545cf41d" alt="Bedroom 1" style="width: 100%; height: 110px; object-fit: cover; border-radius: 12px">
+        <img src="/_blob/b33143fe0a531c7c056e4baf9aa000d3" alt="Kitchen" style="width: 100%; height: 110px; object-fit: cover; border-radius: 12px">
+      </div>
+      <p style="margin: 0; font-size: 15.5px; line-height: 1.5">Wardrobe frames fitted in both bedrooms. Kitchen carcass levelled and fixed to the wall.</p>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap">
+        <span style="font-family: 'Geist Mono', monospace; font-size: 13px; padding: 7px 12px; border-radius: 999px; box-shadow: inset 0 0 0 1px rgba(11,11,11,.18)">Ramesh, carpenter, 9:40 am</span>
+        <span style="font-family: 'Geist Mono', monospace; font-size: 13px; padding: 7px 12px; border-radius: 999px; box-shadow: inset 0 0 0 1px rgba(11,11,11,.18)">1 helper</span>
+      </div>
+    </article>
+
+    <article style="background: #0B0B0B; color: #F1F0EC; border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 8px">
+      <span style="font-size: 13px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; color: #E07A4E">Tue 6 Oct, nobody on site</span>
+      <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #D6D4CE">The studio says the carpenter was finishing another job. This day counts in your project's running delay.</p>
+    </article>
+
+    <article style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #E6E6E3; padding-top: 16px">
+      <h2 style="margin: 0; font-size: 22px; font-weight: 500; letter-spacing: -0.03em">Mon 5 Oct</h2>
+      <p style="margin: 0; font-size: 15.5px; line-height: 1.5">Plywood and laminate delivered. Counted against the order: 42 sheets, all present.</p>
+    </article>
+  </div>
+
+  <nav aria-label="Main" style="flex-shrink: 0; position: relative; z-index: 4; background: #0B0B0B; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; padding: 8px 4px 22px">
+    <a href="Main.dc.html" class="oi-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>Home</a>
+    <a href="Tracker.dc.html" class="oi-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h6"></path></svg>Project</a>
+    <a href="GeioHome.dc.html" class="oi-tab" aria-label="Ask GEIO"><span class="oi-geio" aria-hidden="true"></span>GEIO</a>
+    <a href="Feed.dc.html" class="oi-tab" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>Site</a>
+    <a href="Me.dc.html" class="oi-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>Me</a>
+  </nav>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"fullHome":{"editor":"boolean","default":true,"section":"Order"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const fullHome = this.props.fullHome ?? true;
+    const navExtra = { fullHome: fullHome, navCols: fullHome ? 6 : 5 };
+    return { ...navExtra };
+  }
+}
+</script>
+</body>
+</html>

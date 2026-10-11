@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { hasDatabase } from '@/lib/env';
 import { finalQuoteView } from '@/modules/portal/choose';
-import { firstBeforeGst } from '../../first';
+import { firstBeforeGst } from '@/modules/app/first-before-gst';
 import { FinalQuoteScreen } from './FinalQuoteScreen';
 
 export const metadata: Metadata = { title: 'Your final quote', robots: { index: false, follow: false } };

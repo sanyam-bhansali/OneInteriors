@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Home Coins</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0B0B0B}a:hover{color:#A6461F}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #BA5329;outline-offset:3px}
+button{font-family:inherit}
+[style*="overflow-y: auto"] > *{flex-shrink:0}
+/* motion and depth layer */
+@keyframes oiRise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes oiKen{from{transform:scale(1.12)}to{transform:scale(1)}}
+@keyframes oiGrowX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes oiPop{0%{transform:scale(.95)}60%{transform:scale(1.03)}100%{transform:scale(1)}}
+h1{animation:oiRise .8s cubic-bezier(.22,1,.36,1) both}
+h1 ~ p,h1 + span{animation:oiRise .8s cubic-bezier(.22,1,.36,1) .12s both}
+[role="radiogroup"] > *,[role="group"] > *,ol > li,fieldset > div > *,[role="tablist"] > *{animation:oiRise .7s cubic-bezier(.22,1,.36,1) both}
+[role="radiogroup"] > *:nth-child(1),[role="group"] > *:nth-child(1),ol > li:nth-child(1),fieldset > div > *:nth-child(1),[role="tablist"] > *:nth-child(1){animation-delay:0.22s}
+[role="radiogroup"] > *:nth-child(2),[role="group"] > *:nth-child(2),ol > li:nth-child(2),fieldset > div > *:nth-child(2),[role="tablist"] > *:nth-child(2){animation-delay:0.28s}
+[role="radiogroup"] > *:nth-child(3),[role="group"] > *:nth-child(3),ol > li:nth-child(3),fieldset > div > *:nth-child(3),[role="tablist"] > *:nth-child(3){animation-delay:0.34s}
+[role="radiogroup"] > *:nth-child(4),[role="group"] > *:nth-child(4),ol > li:nth-child(4),fieldset > div > *:nth-child(4),[role="tablist"] > *:nth-child(4){animation-delay:0.40s}
+[role="radiogroup"] > *:nth-child(5),[role="group"] > *:nth-child(5),ol > li:nth-child(5),fieldset > div > *:nth-child(5),[role="tablist"] > *:nth-child(5){animation-delay:0.46s}
+[role="radiogroup"] > *:nth-child(6),[role="group"] > *:nth-child(6),ol > li:nth-child(6),fieldset > div > *:nth-child(6),[role="tablist"] > *:nth-child(6){animation-delay:0.52s}
+[role="radiogroup"] > *:nth-child(7),[role="group"] > *:nth-child(7),ol > li:nth-child(7),fieldset > div > *:nth-child(7),[role="tablist"] > *:nth-child(7){animation-delay:0.58s}
+[role="radiogroup"] > *:nth-child(8),[role="group"] > *:nth-child(8),ol > li:nth-child(8),fieldset > div > *:nth-child(8),[role="tablist"] > *:nth-child(8){animation-delay:0.64s}
+[role="radiogroup"] > *:nth-child(9),[role="group"] > *:nth-child(9),ol > li:nth-child(9),fieldset > div > *:nth-child(9),[role="tablist"] > *:nth-child(9){animation-delay:0.70s}
+[role="radiogroup"] > *:nth-child(10),[role="group"] > *:nth-child(10),ol > li:nth-child(10),fieldset > div > *:nth-child(10),[role="tablist"] > *:nth-child(10){animation-delay:0.76s}
+[role="radiogroup"] > *:nth-child(11),[role="group"] > *:nth-child(11),ol > li:nth-child(11),fieldset > div > *:nth-child(11),[role="tablist"] > *:nth-child(11){animation-delay:0.82s}
+[role="radiogroup"] > *:nth-child(12),[role="group"] > *:nth-child(12),ol > li:nth-child(12),fieldset > div > *:nth-child(12),[role="tablist"] > *:nth-child(12){animation-delay:0.88s}
+[role="progressbar"] > span{transform-origin:left center;animation:oiGrowX .9s cubic-bezier(.22,1,.36,1) both}
+[role="progressbar"] > span:nth-child(1){animation-delay:0.05s}
+[role="progressbar"] > span:nth-child(2){animation-delay:0.10s}
+[role="progressbar"] > span:nth-child(3){animation-delay:0.15s}
+[role="progressbar"] > span:nth-child(4){animation-delay:0.20s}
+[role="progressbar"] > span:nth-child(5){animation-delay:0.25s}
+[role="progressbar"] > span:nth-child(6){animation-delay:0.30s}
+[role="progressbar"] > span:nth-child(7){animation-delay:0.35s}
+img[style*="inset: 0"]{animation:oiKen 18s ease-in-out both alternate infinite}
+a,button{transition:transform .28s cubic-bezier(.34,1.56,.64,1),box-shadow .28s ease,background-color .28s ease,color .28s ease}
+a:active,button:active{transform:scale(.965)}
+button[aria-pressed="true"],button[aria-checked="true"]{animation:oiPop .45s cubic-bezier(.34,1.56,.64,1)}
+a[style*="background: rgb(11, 11, 11)"][style*="border-radius: 999px"],button[style*="background: rgb(11, 11, 11)"][style*="border-radius: 999px"]{box-shadow:0 14px 30px -16px rgba(11,11,11,.45)}
+div[style*="background: rgb(11, 11, 11)"][style*="border-radius: 20px"],div[style*="background: rgb(11, 11, 11)"][style*="border-radius: 18px"],article[style*="background: rgb(11, 11, 11)"]{box-shadow:0 28px 56px -26px rgba(11,11,11,.6),inset 0 1px 0 rgba(255,255,255,.06)}
+div[style*="background: rgb(186, 83, 41)"][style*="border-radius: 20px"]{box-shadow:0 28px 56px -22px rgba(186,83,41,.65),inset 0 1px 0 rgba(255,255,255,.18)}
+img[style*="border-radius: 12px"],img[style*="border-radius: 16px"],img[style*="border-radius: 14px"]{box-shadow:0 14px 30px -18px rgba(11,11,11,.5)}
+nav a[aria-current="page"] svg{animation:oiPop .7s cubic-bezier(.34,1.56,.64,1) both}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.01ms!important}}
+
+/* coins */
+@keyframes cPop{0%{opacity:0;transform:translate(-50%,10px) scale(.6)}18%{opacity:1;transform:translate(-50%,0) scale(1.08)}30%{transform:translate(-50%,0) scale(1)}80%{opacity:1;transform:translate(-50%,-6px)}100%{opacity:0;transform:translate(-50%,-26px)}}
+@keyframes cSpin{0%{transform:rotateY(0)}100%{transform:rotateY(360deg)}}
+@keyframes cShine{to{background-position:-200% 0}}
+.coin{display:inline-block;flex-shrink:0;border-radius:50%;background:radial-gradient(circle at 35% 30%,#FFF1C9 0%,#F2C98A 30%,#D9A23F 70%,#A8741E 100%);box-shadow:inset 0 0 0 1.5px rgba(122,82,20,.45),0 2px 6px -2px rgba(168,116,30,.6);position:relative}
+.coin::after{content:"";position:absolute;inset:22%;border-radius:50%;box-shadow:inset 0 0 0 1.5px rgba(122,82,20,.4)}
+.coin.spin{animation:cSpin 2.4s cubic-bezier(.45,0,.2,1) .4s both}
+.c-toast{position:absolute;left:50%;z-index:9;display:flex;align-items:center;gap:8px;padding:9px 16px 9px 10px;border-radius:999px;background:#0B0B0B;color:#F2C98A;font-size:15px;font-weight:700;white-space:nowrap;box-shadow:0 18px 36px -14px rgba(11,11,11,.7);animation:cPop 2.6s cubic-bezier(.22,1,.36,1) both}
+.c-shine{background:linear-gradient(100deg,#F2C98A 0%,#FFF1C9 45%,#F2C98A 60%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:cShine 2.8s linear infinite}
+@media (prefers-reduced-motion: reduce){.coin.spin,.c-toast,.c-shine{animation:none!important}.c-toast{opacity:1;transform:translate(-50%,0)}}
+
+/* bottom bar */
+@keyframes gBreathe{50%{transform:scale(1.07)}}
+@keyframes gSpin{to{transform:rotate(360deg)}}
+.oi-tab{min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;text-decoration:none;color:#A9A7A1!important;font-size:13px;font-weight:500}
+.oi-tab[aria-current="page"]{color:#E07A4E!important;font-weight:600}
+.oi-geio{position:relative;width:52px;height:52px;margin-top:-22px;border-radius:50%;background:radial-gradient(circle at 34% 28%,#FFF6E6 0%,#F2C98A 26%,#E07A4E 56%,#BA5329 80%,#6E2A10 100%);box-shadow:0 0 0 5px #0B0B0B,0 0 26px -2px rgba(242,201,138,.75);animation:gBreathe 4.2s ease-in-out infinite}
+.oi-geio::after{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,transparent 0 28%,rgba(255,248,236,.6) 40%,transparent 54%);mix-blend-mode:screen;animation:gSpin 5.5s linear infinite}
+@media (prefers-reduced-motion: reduce){.oi-geio,.oi-geio::after{animation:none!important}}
+
+/* website skin (one-interiors home-cb.css) */
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"],button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"],a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]{position:relative;overflow:hidden;isolation:isolate;transition:transform .45s cubic-bezier(.22,1,.36,1),color .35s}
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]::before,button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]::before,a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:#C1582E;transform:translateY(101%);border-top-left-radius:50% 40%;border-top-right-radius:50% 40%;transition:transform .55s cubic-bezier(.22,1,.36,1),border-radius .55s cubic-bezier(.22,1,.36,1)}
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]:hover::before,button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]:hover::before,a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]:hover::before{transform:none;border-radius:999px}
+a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]:hover{color:#FFFFFF!important}
+a[style*="min-height: 56px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 52px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 46px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 56px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 46px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child{width:28px;height:28px;padding:7px;box-sizing:border-box;border-radius:50%;background:#FFFFFF;color:#0B0B0B;margin-right:-12px;flex-shrink:0}
+a[style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child{background:#0B0B0B!important;color:#FFFFFF!important}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; display: flex; flex-direction: column; background: #FFFFFF; color: #0B0B0B; font-family: 'Geist', sans-serif; overflow: hidden">
+  <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 16px 0 10px">
+    <a href="Me.dc.html" aria-label="Back" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #0B0B0B"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></a>
+    
+  </div>
+  <div style="flex: 1; overflow-y: auto; padding: 8px 20px 24px; display: flex; flex-direction: column; gap: 18px">
+
+    <sc-if value="{{redeemed}}" hint-placeholder-val="{{ false }}"><div class="c-toast" role="status" style="top: 10px"><span class="coin" aria-hidden="true" style="width: 22px; height: 22px"></span>Reward saved to your Locker</div></sc-if>
+    <div style="position: relative; background: #0B0B0B; color: #F1F0EC; border-radius: 20px; padding: 22px 20px; overflow: hidden; display: flex; flex-direction: column; gap: 16px">
+      <div style="position: absolute; right: -40px; top: -40px; width: 180px; height: 180px; border-radius: 50%; background: radial-gradient(circle, rgba(242,201,138,.35), transparent 70%)"></div>
+      <span style="font-size: 14px; color: #B5B3AD">Your Home Coins</span>
+      <div style="display: flex; align-items: center; gap: 14px">
+        <span class="coin spin" aria-hidden="true" style="width: 48px; height: 48px"></span>
+        <span class="c-shine" style="font-size: 52px; font-weight: 700; letter-spacing: -0.05em; line-height: 1; font-variant-numeric: tabular-nums">{{bal}}</span>
+      </div>
+      <span style="font-size: 14px; color: #B5B3AD">1 coin = ₹1 with our partners · expires 12 months after handover</span>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <span style="font-size: 14px; font-weight: 600">6-day streak. One more day for +100</span>
+        <div style="display: flex; gap: 4px"><span style="flex: 1; height: 34px; border-radius: 10px; background: #F2C98A; color: #0B0B0B; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center">F</span><span style="flex: 1; height: 34px; border-radius: 10px; background: #F2C98A; color: #0B0B0B; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center">S</span><span style="flex: 1; height: 34px; border-radius: 10px; background: #F2C98A; color: #0B0B0B; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center">S</span><span style="flex: 1; height: 34px; border-radius: 10px; background: #F2C98A; color: #0B0B0B; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center">M</span><span style="flex: 1; height: 34px; border-radius: 10px; background: #F2C98A; color: #0B0B0B; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center">T</span><span style="flex: 1; height: 34px; border-radius: 10px; background: #F2C98A; color: #0B0B0B; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center">W</span><span style="flex: 1; height: 34px; border-radius: 10px; background: rgba(255,255,255,.1); color: #8D8D8D; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center">T</span></div>
+      </div>
+    </div>
+
+    <a href="Refer.dc.html" style="background: #F3F3F1; border-radius: 24px; padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; text-decoration: none; color: #0B0B0B">
+      <span style="display: flex; flex-direction: column; gap: 3px"><span style="font-size: 16.5px; font-weight: 600">Earn 5,000 coins</span><span style="font-size: 14px; color: #5F5F5F">For every friend who signs. They get 5,000 too.</span></span>
+      <span style="color: #BA5329"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></span>
+    </a>
+
+    <section style="display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 500; letter-spacing: -0.02em">Spend your coins</h2>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px"><button type="button" onClick="{{redeem}}" style="border: 0; padding: 0; background: #F3F3F1; border-radius: 24px; overflow: hidden; text-align: left; cursor: pointer; display: flex; flex-direction: column; color: #0B0B0B"><img src="/_blob/dca6c1a1ba1add69fc9f21195994aed2" alt="" style="width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block"><span style="padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 3px"><span style="font-size: 13px; font-weight: 600; color: #5F5F5F">Oakhaus Furniture</span><span style="font-size: 14.5px; font-weight: 600; line-height: 1.3">₹1,500 off any sofa</span><span style="display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: #A8741E; padding-top: 4px"><span class="coin" aria-hidden="true" style="width: 16px; height: 16px"></span>1,500</span></span></button><button type="button" onClick="{{redeem}}" style="border: 0; padding: 0; background: #F3F3F1; border-radius: 24px; overflow: hidden; text-align: left; cursor: pointer; display: flex; flex-direction: column; color: #0B0B0B"><img src="/_blob/a88c1e4210564f3afbf8b61a52f44072" alt="" style="width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block"><span style="padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 3px"><span style="font-size: 13px; font-weight: 600; color: #5F5F5F">Deep clean after handover</span><span style="font-size: 14.5px; font-weight: 600; line-height: 1.3">Whole flat, by our partner</span><span style="display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: #A8741E; padding-top: 4px"><span class="coin" aria-hidden="true" style="width: 16px; height: 16px"></span>2,000</span></span></button><button type="button" onClick="{{redeem}}" style="border: 0; padding: 0; background: #F3F3F1; border-radius: 24px; overflow: hidden; text-align: left; cursor: pointer; display: flex; flex-direction: column; color: #0B0B0B"><img src="/_blob/2039698d81755a52a309cb4fda95c4ae" alt="" style="width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block"><span style="padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 3px"><span style="font-size: 13px; font-weight: 600; color: #5F5F5F">Loom &amp; Knot Rugs</span><span style="font-size: 14.5px; font-weight: 600; line-height: 1.3">₹750 off a hand-knotted rug</span><span style="display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: #A8741E; padding-top: 4px"><span class="coin" aria-hidden="true" style="width: 16px; height: 16px"></span>750</span></span></button><button type="button" onClick="{{redeem}}" style="border: 0; padding: 0; background: #F3F3F1; border-radius: 24px; overflow: hidden; text-align: left; cursor: pointer; display: flex; flex-direction: column; color: #0B0B0B"><img src="/_blob/54fc647dde8a495a1b5303e9b568a166" alt="" style="width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block"><span style="padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 3px"><span style="font-size: 13px; font-weight: 600; color: #5F5F5F">Hearth Appliances</span><span style="font-size: 14.5px; font-weight: 600; line-height: 1.3">₹1,000 off a kitchen chimney</span><span style="display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: #A8741E; padding-top: 4px"><span class="coin" aria-hidden="true" style="width: 16px; height: 16px"></span>1,000</span></span></button></div>
+      <span style="font-size: 13.5px; color: #5F5F5F">Coins can't be used on your studio's bill or cashed out.</span>
+    </section>
+
+    <section style="display: flex; flex-direction: column">
+      <h2 style="margin: 0 0 6px; font-size: 20px; font-weight: 500; letter-spacing: -0.02em">Recent</h2>
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 12px 0; border-top: 1px solid #EDEDEA"><span style="font-size: 15.5px; font-weight: 600">Opened today's site update</span><span style="font-size: 15.5px; font-weight: 700; color: #A8741E">+10</span><span style="font-size: 14px; color: #5F5F5F">Day 6 of your streak</span><span style="font-size: 13px; color: #8D8D8D; text-align: right">Today</span></div><div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 12px 0; border-top: 1px solid #EDEDEA"><span style="font-size: 15.5px; font-weight: 600">Reported a snag with a photo</span><span style="font-size: 15.5px; font-weight: 700; color: #A8741E">+50</span><span style="font-size: 14px; color: #5F5F5F">Gap between wardrobe and ceiling</span><span style="font-size: 13px; color: #8D8D8D; text-align: right">Wed</span></div><div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 12px 0; border-top: 1px solid #EDEDEA"><span style="font-size: 15.5px; font-weight: 600">Spot the mistake, week 6</span><span style="font-size: 15.5px; font-weight: 700; color: #A8741E">+50</span><span style="font-size: 14px; color: #5F5F5F">Found the lifted edge band</span><span style="font-size: 13px; color: #8D8D8D; text-align: right">Mon</span></div><div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 12px 0; border-top: 1px solid #EDEDEA"><span style="font-size: 15.5px; font-weight: 600">Decided before the due date</span><span style="font-size: 15.5px; font-weight: 700; color: #A8741E">+200</span><span style="font-size: 14px; color: #5F5F5F">Floor tile colour</span><span style="font-size: 13px; color: #8D8D8D; text-align: right">18 Sep</span></div><div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 12px 0; border-top: 1px solid #EDEDEA"><span style="font-size: 15.5px; font-weight: 600">Welcome to your project</span><span style="font-size: 15.5px; font-weight: 700; color: #A8741E">+1,000</span><span style="font-size: 14px; color: #5F5F5F">Signed with Teakline Studio</span><span style="font-size: 13px; color: #8D8D8D; text-align: right">3 Aug</span></div>
+    </section>
+
+    <section style="display: flex; flex-direction: column">
+      <h2 style="margin: 0 0 6px; font-size: 20px; font-weight: 500; letter-spacing: -0.02em">Ways to earn</h2>
+      <div style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid #EDEDEA; font-size: 15px"><span>Check the site update</span><span style="font-weight: 700; color: #A8741E">10 a day</span></div><div style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid #EDEDEA; font-size: 15px"><span>7-day streak</span><span style="font-weight: 700; color: #A8741E">100</span></div><div style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid #EDEDEA; font-size: 15px"><span>Decide on time</span><span style="font-weight: 700; color: #A8741E">200</span></div><div style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid #EDEDEA; font-size: 15px"><span>Snag with a photo</span><span style="font-weight: 700; color: #A8741E">50</span></div><div style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid #EDEDEA; font-size: 15px"><span>Spot the mistake</span><span style="font-weight: 700; color: #A8741E">50</span></div><div style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid #EDEDEA; font-size: 15px"><span>Friend signs</span><span style="font-weight: 700; color: #A8741E">5,000</span></div>
+    </section>
+
+  </div>
+  <nav aria-label="Main" style="flex-shrink: 0; position: relative; z-index: 4; background: #0B0B0B; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; padding: 8px 4px 22px">
+    <a href="Main.dc.html" class="oi-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>Home</a>
+    <a href="Tracker.dc.html" class="oi-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h6"></path></svg>Project</a>
+    <a href="GeioHome.dc.html" class="oi-tab" aria-label="Ask GEIO"><span class="oi-geio" aria-hidden="true"></span>GEIO</a>
+    <a href="Feed.dc.html" class="oi-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>Site</a>
+    <a href="Me.dc.html" class="oi-tab" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>Me</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { n: 0, redeemed: false }; }
+  componentDidMount() {
+    const start = performance.now(), to = 1410, dur = 1300;
+    const step = (now) => { const p = Math.min(1, (now - start) / dur); this.setState({ n: Math.round(to * (1 - Math.pow(1 - p, 3))) }); if (p < 1) this.raf = requestAnimationFrame(step); };
+    this.raf = requestAnimationFrame(step);
+  }
+  componentWillUnmount() { cancelAnimationFrame(this.raf); }
+  renderVals() {
+    return { bal: this.state.n.toLocaleString('en-IN'), redeemed: this.state.redeemed, redeem: () => this.setState({ redeemed: false }, () => setTimeout(() => this.setState({ redeemed: true }), 20)) };
+  }
+}
+</script>
+</body>
+</html>

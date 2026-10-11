@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Welcome</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0B0B0B}
+a:focus-visible,button:focus-visible{outline:2px solid #E07A4E;outline-offset:3px}
+/* motion and depth layer */
+@keyframes oiRise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes oiKen{from{transform:scale(1.12)}to{transform:scale(1)}}
+@keyframes oiGrowX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes oiPop{0%{transform:scale(.95)}60%{transform:scale(1.03)}100%{transform:scale(1)}}
+h1{animation:oiRise .8s cubic-bezier(.22,1,.36,1) both}
+h1 ~ p,h1 + span{animation:oiRise .8s cubic-bezier(.22,1,.36,1) .12s both}
+[role="radiogroup"] > *,[role="group"] > *,ol > li,fieldset > div > *,[role="tablist"] > *{animation:oiRise .7s cubic-bezier(.22,1,.36,1) both}
+[role="radiogroup"] > *:nth-child(1),[role="group"] > *:nth-child(1),ol > li:nth-child(1),fieldset > div > *:nth-child(1),[role="tablist"] > *:nth-child(1){animation-delay:0.22s}
+[role="radiogroup"] > *:nth-child(2),[role="group"] > *:nth-child(2),ol > li:nth-child(2),fieldset > div > *:nth-child(2),[role="tablist"] > *:nth-child(2){animation-delay:0.28s}
+[role="radiogroup"] > *:nth-child(3),[role="group"] > *:nth-child(3),ol > li:nth-child(3),fieldset > div > *:nth-child(3),[role="tablist"] > *:nth-child(3){animation-delay:0.34s}
+[role="radiogroup"] > *:nth-child(4),[role="group"] > *:nth-child(4),ol > li:nth-child(4),fieldset > div > *:nth-child(4),[role="tablist"] > *:nth-child(4){animation-delay:0.40s}
+[role="radiogroup"] > *:nth-child(5),[role="group"] > *:nth-child(5),ol > li:nth-child(5),fieldset > div > *:nth-child(5),[role="tablist"] > *:nth-child(5){animation-delay:0.46s}
+[role="radiogroup"] > *:nth-child(6),[role="group"] > *:nth-child(6),ol > li:nth-child(6),fieldset > div > *:nth-child(6),[role="tablist"] > *:nth-child(6){animation-delay:0.52s}
+[role="radiogroup"] > *:nth-child(7),[role="group"] > *:nth-child(7),ol > li:nth-child(7),fieldset > div > *:nth-child(7),[role="tablist"] > *:nth-child(7){animation-delay:0.58s}
+[role="radiogroup"] > *:nth-child(8),[role="group"] > *:nth-child(8),ol > li:nth-child(8),fieldset > div > *:nth-child(8),[role="tablist"] > *:nth-child(8){animation-delay:0.64s}
+[role="radiogroup"] > *:nth-child(9),[role="group"] > *:nth-child(9),ol > li:nth-child(9),fieldset > div > *:nth-child(9),[role="tablist"] > *:nth-child(9){animation-delay:0.70s}
+[role="radiogroup"] > *:nth-child(10),[role="group"] > *:nth-child(10),ol > li:nth-child(10),fieldset > div > *:nth-child(10),[role="tablist"] > *:nth-child(10){animation-delay:0.76s}
+[role="radiogroup"] > *:nth-child(11),[role="group"] > *:nth-child(11),ol > li:nth-child(11),fieldset > div > *:nth-child(11),[role="tablist"] > *:nth-child(11){animation-delay:0.82s}
+[role="radiogroup"] > *:nth-child(12),[role="group"] > *:nth-child(12),ol > li:nth-child(12),fieldset > div > *:nth-child(12),[role="tablist"] > *:nth-child(12){animation-delay:0.88s}
+[role="progressbar"] > span{transform-origin:left center;animation:oiGrowX .9s cubic-bezier(.22,1,.36,1) both}
+[role="progressbar"] > span:nth-child(1){animation-delay:0.05s}
+[role="progressbar"] > span:nth-child(2){animation-delay:0.10s}
+[role="progressbar"] > span:nth-child(3){animation-delay:0.15s}
+[role="progressbar"] > span:nth-child(4){animation-delay:0.20s}
+[role="progressbar"] > span:nth-child(5){animation-delay:0.25s}
+[role="progressbar"] > span:nth-child(6){animation-delay:0.30s}
+[role="progressbar"] > span:nth-child(7){animation-delay:0.35s}
+img[style*="inset: 0"]{animation:oiKen 18s ease-in-out both alternate infinite}
+a,button{transition:transform .28s cubic-bezier(.34,1.56,.64,1),box-shadow .28s ease,background-color .28s ease,color .28s ease}
+a:active,button:active{transform:scale(.965)}
+button[aria-pressed="true"],button[aria-checked="true"]{animation:oiPop .45s cubic-bezier(.34,1.56,.64,1)}
+a[style*="background: rgb(11, 11, 11)"][style*="border-radius: 999px"],button[style*="background: rgb(11, 11, 11)"][style*="border-radius: 999px"]{box-shadow:0 14px 30px -16px rgba(11,11,11,.45)}
+div[style*="background: rgb(11, 11, 11)"][style*="border-radius: 20px"],div[style*="background: rgb(11, 11, 11)"][style*="border-radius: 18px"],article[style*="background: rgb(11, 11, 11)"]{box-shadow:0 28px 56px -26px rgba(11,11,11,.6),inset 0 1px 0 rgba(255,255,255,.06)}
+div[style*="background: rgb(186, 83, 41)"][style*="border-radius: 20px"]{box-shadow:0 28px 56px -22px rgba(186,83,41,.65),inset 0 1px 0 rgba(255,255,255,.18)}
+img[style*="border-radius: 12px"],img[style*="border-radius: 16px"],img[style*="border-radius: 14px"]{box-shadow:0 14px 30px -18px rgba(11,11,11,.5)}
+nav a[aria-current="page"] svg{animation:oiPop .7s cubic-bezier(.34,1.56,.64,1) both}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.01ms!important}}
+[style*="overflow-y: auto"] > *{flex-shrink:0}
+
+/* website skin (one-interiors home-cb.css) */
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"],button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"],a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]{position:relative;overflow:hidden;isolation:isolate;transition:transform .45s cubic-bezier(.22,1,.36,1),color .35s}
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]::before,button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]::before,a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:#C1582E;transform:translateY(101%);border-top-left-radius:50% 40%;border-top-right-radius:50% 40%;transition:transform .55s cubic-bezier(.22,1,.36,1),border-radius .55s cubic-bezier(.22,1,.36,1)}
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]:hover::before,button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]:hover::before,a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]:hover::before{transform:none;border-radius:999px}
+a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]:hover{color:#FFFFFF!important}
+a[style*="min-height: 56px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 52px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 46px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 56px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 46px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child{width:28px;height:28px;padding:7px;box-sizing:border-box;border-radius:50%;background:#FFFFFF;color:#0B0B0B;margin-right:-12px;flex-shrink:0}
+a[style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child{background:#0B0B0B!important;color:#FFFFFF!important}
+
+/* website hero: the logo, the meta pill and a tilted table of prints */
+.oi-mark{-webkit-mask:url(/_blob/bcba52f114ab49b6deb05107a4e5f397) center/contain no-repeat;mask:url(/_blob/bcba52f114ab49b6deb05107a4e5f397) center/contain no-repeat;background:#0B0B0B;animation:oiRise .8s cubic-bezier(.22,1,.36,1) both}
+.oi-collage{position:relative;flex:1;min-height:150px;margin-top:22px;perspective:1200px;overflow:hidden}
+.oi-tilt{position:absolute;left:50%;top:6px;width:560px;translate:-50% 0;display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:120px;gap:10px;transform-origin:50% 0;rotate:x 22deg;animation:oiRise 1.1s cubic-bezier(.22,1,.36,1) .35s both}
+.oi-tilt figure{margin:0;position:relative;border-radius:16px;overflow:hidden;background:#F3F3F1;rotate:z -6deg;box-shadow:0 30px 60px -30px rgba(11,11,11,.35)}
+.oi-tilt figure.hero{grid-row:span 2}
+.oi-tilt img{width:100%;height:100%;object-fit:cover;display:block}
+.oi-tilt figcaption{position:absolute;left:10px;bottom:10px;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.86);font-size:12.5px;font-weight:500;color:#0B0B0B}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; display: flex; flex-direction: column; background: #FFFFFF; color: #0B0B0B; font-family: 'Geist', sans-serif; overflow: hidden">
+  <div style="flex-shrink: 0; display: flex; justify-content: flex-end; padding: 18px 16px 0">
+    <div role="radiogroup" aria-label="Language" style="display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: #F3F3F1">
+      <sc-for list="{{langs}}" as="l" hint-placeholder-count="3">
+        <button type="button" role="radio" aria-checked="{{l.on}}" aria-label="{{l.full}}" onClick="{{l.pick}}" style="min-width: 44px; min-height: 36px; padding: 0 10px; border: 0; border-radius: 999px; font-size: 14px; font-weight: 500; cursor: pointer; background: {{l.bg}}; color: {{l.fg}}">{{l.short}}</button>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="flex-shrink: 0; padding: 14px 22px 0; display: flex; flex-direction: column; align-items: center; text-align: center">
+    <div class="oi-mark" role="img" aria-label="One Interiors" style="width: 240px; height: 76px"></div>
+    <p style="margin: 22px 0 0; display: inline-flex; align-items: center; gap: 10px; padding: 8px 16px; border-radius: 999px; background: #F3F3F1; font-size: 13px; font-weight: 500; color: #5F5F5F">
+      <i style="width: 7px; height: 7px; border-radius: 50%; background: #C1582E; box-shadow: 0 0 0 4px rgba(193,88,46,.18)"></i>{{t.kicker}}
+    </p>
+    <h1 style="margin: 20px 0 0; text-align: center; font-weight: 500; letter-spacing: -0.04em; line-height: 1; font-size: {{h1Size}}; text-wrap: balance">{{t.h1}}</h1>
+    <p style="margin: 16px 0 0; text-align: center; font-size: 16px; line-height: 1.5; color: #5F5F5F; max-width: 32ch">{{t.sub}}</p>
+    <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 24px">
+      <a href="Name.dc.html" style="min-height: 56px; border-radius: 999px; background: #0B0B0B; color: #FFFFFF; font-size: 16px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 12px; text-decoration: none">{{t.cta}}
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3.5 9h11M10 4.5 14.5 9 10 13.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg></a>
+      <a href="Main.dc.html" style="min-height: 52px; border-radius: 999px; background: transparent; box-shadow: inset 0 0 0 1px rgba(11,11,11,.22); color: #0B0B0B; font-size: 15px; font-weight: 500; display: flex; align-items: center; justify-content: center; text-decoration: none">{{t.have}}</a>
+    </div>
+  </div>
+
+  <div class="oi-collage" aria-hidden="true">
+    <div class="oi-tilt">
+      <figure><img src="/_blob/3e20272681902e8c4b71b0f1dc6887a8" alt=""><figcaption>Scandinavian</figcaption></figure>
+      <figure class="hero"><img src="/_blob/dca6c1a1ba1add69fc9f21195994aed2" alt=""><figcaption>Warm modern</figcaption></figure>
+      <figure><img src="/_blob/2039698d81755a52a309cb4fda95c4ae" alt=""><figcaption>Indian classic</figcaption></figure>
+      <figure><img src="/_blob/a88c1e4210564f3afbf8b61a52f44072" alt=""></figure>
+      <figure><img src="/_blob/54fc647dde8a495a1b5303e9b568a166" alt=""></figure>
+      <figure><img src="/_blob/58bb4fd3d115ea8a5154ad5b45e7048e" alt=""></figure>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { lang: 'en' }; }
+  renderVals() {
+    const T = {
+      en: { short: 'EN', full: 'English', kicker: 'Pune, 14 verified studios', h1: 'Find the right interior designer for your home.', sub: 'Seven questions, three studios matched to your flat, and a quote you can read line by line.', cta: 'Find your designer', have: 'I already have an account', size: '40px' },
+      hi: { short: 'हिं', full: 'हिंदी', kicker: 'पुणे, 14 सत्यापित स्टूडियो', h1: 'अपने घर के लिए सही इंटीरियर डिज़ाइनर चुनें।', sub: 'सात सवाल, आपके फ्लैट के लिए तीन स्टूडियो, और लाइन-दर-लाइन समझ आने वाला कोटेशन।', cta: 'अपना डिज़ाइनर खोजें', have: 'मेरा अकाउंट पहले से है', size: '34px' },
+      mr: { short: 'मरा', full: 'मराठी', kicker: 'पुणे, 14 पडताळलेले स्टुडिओ', h1: 'तुमच्या घरासाठी योग्य इंटिरियर डिझायनर शोधा.', sub: 'सात प्रश्न, तुमच्या फ्लॅटसाठी तीन स्टुडिओ, आणि ओळ-न-ओळ समजणारे कोटेशन.', cta: 'तुमचा डिझायनर शोधा', have: 'माझे खाते आधीच आहे', size: '34px' }
+    };
+    const cur = this.state.lang;
+    return {
+      t: T[cur],
+      h1Size: T[cur].size,
+      langs: ['en', 'hi', 'mr'].map((k) => ({ short: T[k].short, full: T[k].full, on: k === cur ? 'true' : 'false', bg: k === cur ? '#0B0B0B' : 'transparent', fg: k === cur ? '#FFFFFF' : '#5F5F5F', pick: () => this.setState({ lang: k }) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -167,3 +167,19 @@ export function needsRefresh(
   }
   return [...stale];
 }
+
+/**
+ * The decisions taken at "quotes ready", on the website's contact step and
+ * the phone app's sign-in alike: passing the brief on (required, so always
+ * granted by the time this is called) and WhatsApp updates, recorded
+ * either way — "they said no" and "we never asked" are different.
+ */
+export function contactConsent(whatsappUpdates: boolean): { purpose: ConsentPurpose; granted: boolean }[] {
+  return [
+    { purpose: 'DATA_PROCESSING', granted: true },
+    { purpose: 'MARKETING_WHATSAPP', granted: whatsappUpdates },
+  ];
+}
+
+/** The `source` both surfaces record those decisions under. */
+export const CONTACT_CONSENT_SOURCE = 'quiz_contact_step';

@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { hasDatabase } from '@/lib/env';
 import { getCurrentUser } from '@/modules/auth/session';
 import { finalQuoteView } from '@/modules/portal/choose';
-import { firstBeforeGst } from '../../first';
+import { firstBeforeGst } from '@/modules/app/first-before-gst';
 import { SignScreen } from './SignScreen';
 
 export const metadata: Metadata = { title: 'Sign', robots: { index: false, follow: false } };

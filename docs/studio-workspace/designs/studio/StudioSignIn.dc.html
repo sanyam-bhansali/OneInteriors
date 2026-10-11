@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Studio sign in</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1F2119}a:hover{color:#A8502F}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #A8502F;outline-offset:3px}
+button,input{font-family:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; background: #DFE0D2; color: #1F2119; font-family: 'Geist', sans-serif; overflow: hidden">
+
+  <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 22px 20px 0">
+    <div style="display: flex; align-items: center; gap: 8px">
+      <span style="font-size: 17px; font-weight: 600; letter-spacing: -0.02em">One Interiors</span>
+      <span style="padding: 3px 9px; border-radius: 999px; background: #1F2119; color: #FBFBF6; font-size: 13px; font-weight: 500">Studio</span>
+    </div>
+    <div role="radiogroup" aria-label="Language" style="display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: #ECEDDF">
+      <sc-for list="{{langs}}" as="l" hint-placeholder-count="3">
+        <button type="button" role="radio" aria-checked="{{l.on}}" aria-label="{{l.full}}" onClick="{{l.pick}}" style="min-width: 44px; min-height: 36px; padding: 0 8px; border: 0; border-radius: 999px; font-size: 14px; font-weight: 500; cursor: pointer; background: {{l.bg}}; color: {{l.fg}}">{{l.short}}</button>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="flex: 1; padding: 48px 20px 20px; display: flex; flex-direction: column; gap: 28px">
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <h1 style="margin: 0; font-size: 38px; font-weight: 500; letter-spacing: -0.04em; line-height: 1.02">{{t.h1}}</h1>
+      <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #4F5147">{{t.sub}}</p>
+    </div>
+
+    <div style="background: #FBFBF6; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 18px">
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <label for="studio-phone" style="font-size: 14px; font-weight: 500; color: #4F5147">{{t.phone}}</label>
+        <div style="display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 0 16px; border-radius: 14px; background: #ECEDDF">
+          <span style="font-family: 'Geist Mono', monospace; font-size: 17px; color: #4F5147">+91</span>
+          <input id="studio-phone" type="tel" value="98220 55310" autocomplete="tel-national" style="flex: 1; min-width: 0; border: 0; background: transparent; font-family: 'Geist Mono', monospace; font-size: 19px; color: #1F2119">
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <span id="code-label" style="font-size: 14px; font-weight: 500; color: #4F5147">{{t.code}}</span>
+        <div role="group" aria-labelledby="code-label" style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px">
+          <input aria-label="Digit 1" value="4" maxlength="1" inputmode="numeric" style="min-height: 52px; border: 0; border-radius: 12px; background: #ECEDDF; text-align: center; font-family: 'Geist Mono', monospace; font-size: 22px; color: #1F2119">
+          <input aria-label="Digit 2" value="8" maxlength="1" inputmode="numeric" style="min-height: 52px; border: 0; border-radius: 12px; background: #ECEDDF; text-align: center; font-family: 'Geist Mono', monospace; font-size: 22px; color: #1F2119">
+          <input aria-label="Digit 3" value="1" maxlength="1" inputmode="numeric" style="min-height: 52px; border: 0; border-radius: 12px; background: #ECEDDF; text-align: center; font-family: 'Geist Mono', monospace; font-size: 22px; color: #1F2119">
+          <input aria-label="Digit 4" value="7" maxlength="1" inputmode="numeric" style="min-height: 52px; border: 0; border-radius: 12px; background: #ECEDDF; text-align: center; font-family: 'Geist Mono', monospace; font-size: 22px; color: #1F2119">
+          <input aria-label="Digit 5" value="" maxlength="1" inputmode="numeric" style="min-height: 52px; border: 0; border-radius: 12px; background: #ECEDDF; box-shadow: inset 0 0 0 2px #A8502F; text-align: center; font-family: 'Geist Mono', monospace; font-size: 22px; color: #1F2119">
+          <input aria-label="Digit 6" value="" maxlength="1" inputmode="numeric" style="min-height: 52px; border: 0; border-radius: 12px; background: #ECEDDF; text-align: center; font-family: 'Geist Mono', monospace; font-size: 22px; color: #1F2119">
+        </div>
+        <span style="font-size: 14px; color: #4F5147">{{t.sent}}</span>
+      </div>
+    </div>
+
+    <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #4F5147">{{t.note}}</p>
+  </div>
+
+  <div style="flex-shrink: 0; padding: 12px 20px 36px; display: flex; flex-direction: column; gap: 14px; align-items: center">
+    <a href="SiteToday.dc.html" style="width: 100%; box-sizing: border-box; min-height: 56px; border-radius: 999px; background: #1F2119; color: #FBFBF6; font-size: 16px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none">{{t.cta}}
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3.5 9h11M10 4.5 14.5 9 10 13.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg></a>
+    <span style="font-size: 14px; color: #4F5147">{{t.newStudio}}</span>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { lang: 'en' }; }
+  renderVals() {
+    const T = {
+      en: { short: 'EN', full: 'English', h1: 'Sign in to your studio', sub: 'Use the mobile number your studio added you with. No password.', phone: 'Mobile number', code: '6-digit code', sent: 'Sent on WhatsApp to 98220 55310. New code in 0:24', note: 'Your studio owner adds team members from Settings, Team. Once you are in, you only see the sites you are working on.', cta: 'Sign in', newStudio: 'New studio? Apply to join One Interiors' },
+      hi: { short: 'हिं', full: 'हिंदी', h1: 'अपने स्टूडियो में साइन इन करें', sub: 'वही मोबाइल नंबर डालें जिससे स्टूडियो ने आपको जोड़ा है। पासवर्ड नहीं चाहिए।', phone: 'मोबाइल नंबर', code: '6 अंकों का कोड', sent: '98220 55310 पर WhatsApp से भेजा गया। नया कोड 0:24 में', note: 'स्टूडियो के मालिक Settings, Team से लोगों को जोड़ते हैं। अंदर आने के बाद आपको सिर्फ़ अपनी साइट दिखेंगी।', cta: 'साइन इन करें', newStudio: 'नया स्टूडियो? One Interiors से जुड़ें' },
+      mr: { short: 'मरा', full: 'मराठी', h1: 'तुमच्या स्टुडिओमध्ये साइन इन करा', sub: 'स्टुडिओने ज्या मोबाइल नंबरने तुम्हाला जोडले तो वापरा. पासवर्ड नको.', phone: 'मोबाइल नंबर', code: '6 अंकी कोड', sent: '98220 55310 वर WhatsApp ने पाठवला. नवा कोड 0:24 मध्ये', note: 'स्टुडिओचे मालक Settings, Team मधून लोक जोडतात. आत आल्यावर तुम्हाला फक्त तुमच्या साइट दिसतील.', cta: 'साइन इन करा', newStudio: 'नवा स्टुडिओ? One Interiors मध्ये सामील व्हा' }
+    };
+    const cur = this.state.lang;
+    return {
+      t: T[cur],
+      langs: ['en', 'hi', 'mr'].map((k) => ({ short: T[k].short, full: T[k].full, on: k === cur ? 'true' : 'false', bg: k === cur ? '#1F2119' : 'transparent', fg: k === cur ? '#FBFBF6' : '#4F5147', pick: () => this.setState({ lang: k }) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

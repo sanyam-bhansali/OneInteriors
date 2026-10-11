@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Post today's update</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1F2119}a:hover{color:#A8502F}
+a:focus-visible,button:focus-visible{outline:2px solid #A8502F;outline-offset:3px}
+button{font-family:inherit}
+@keyframes micPulse{0%{box-shadow:0 0 0 0 rgba(168,80,47,.45)}100%{box-shadow:0 0 0 14px rgba(168,80,47,0)}}
+.mic-live{animation:micPulse 1.2s ease-out infinite}
+@media (prefers-reduced-motion: reduce){.mic-live{animation:none}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; background: #DFE0D2; color: #1F2119; font-family: 'Geist', sans-serif; overflow: hidden">
+
+  <div style="flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 16px 16px 6px 8px">
+    <a href="SiteToday.dc.html" aria-label="Back to my sites" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #1F2119"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></a>
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <h1 style="margin: 0; font-size: 21px; font-weight: 600; letter-spacing: -0.02em">Today on site</h1>
+      <span style="font-size: 14px; color: #4F5147">Flat 1204, Baner · Thu 8 Oct</span>
+    </div>
+  </div>
+
+  <sc-if value="{{editing}}" hint-placeholder-val="{{ true }}">
+    <div style="flex: 1; overflow-y: auto; padding: 8px 16px 16px; display: flex; flex-direction: column; gap: 12px">
+
+      <section aria-labelledby="h-photos" style="background: #FBFBF6; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 3px">
+          <h2 id="h-photos" style="margin: 0; font-size: 16px; font-weight: 600">1 · Photos, and say what you did</h2>
+          <span style="font-size: 13px; color: #4F5147">Tap the mic under a photo and speak, in any language. No typing.</span>
+        </div>
+
+        <sc-for list="{{photos}}" as="p" hint-placeholder-count="3">
+          <div style="display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 12px; padding: 10px; border-radius: 14px; background: #ECEDDF">
+            <img src="{{p.src}}" alt="{{p.alt}}" style="width: 76px; height: 76px; object-fit: cover; border-radius: 10px; display: block">
+            <div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+              <span style="font-size: 13px; font-weight: 600; color: #4F5147">{{p.room}}</span>
+              <sc-if value="{{p.empty}}" hint-placeholder-val="{{ false }}">
+                <button type="button" onClick="{{p.rec}}" aria-label="{{p.micLabel}}" style="align-self: flex-start; min-height: 44px; padding: 0 16px 0 6px; border: 0; border-radius: 999px; background: #A8502F; color: #FFFFFF; display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 500; cursor: pointer">
+                  <span aria-hidden="true" class="mic-live" style="width: 32px; height: 32px; border-radius: 50%; background: #FBFBF6; color: #A8502F; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></span>
+                  Speak about this</button>
+              </sc-if>
+              <sc-if value="{{p.done}}" hint-placeholder-val="{{ true }}">
+                <div style="display: flex; flex-direction: column; gap: 4px">
+                  <span style="font-size: 13.5px; line-height: 1.35; color: #4F5147">{{p.heard}}</span>
+                  <span style="font-size: 14.5px; line-height: 1.35; font-weight: 500">{{p.text}}</span>
+                  <div style="display: flex; align-items: center; gap: 10px">
+                    <span class="mono" style="font-family: 'Geist Mono', monospace; font-size: 12.5px; color: #4F5147">{{p.meta}}</span>
+                    <button type="button" onClick="{{p.rec}}" style="min-height: 32px; padding: 0 10px; border: 0; border-radius: 999px; background: #FBFBF6; color: #1F2119; font-size: 13px; font-weight: 500; cursor: pointer">Redo</button>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+        </sc-for>
+
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+          <button type="button" style="min-height: 48px; border: 0; border-radius: 14px; background: #1F2119; color: #FBFBF6; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14.5px; font-weight: 500; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>Another photo</button>
+          <button type="button" style="min-height: 48px; border: 0; border-radius: 14px; background: #ECEDDF; color: #1F2119; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14.5px; font-weight: 500; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>Say something else</button>
+        </div>
+      </section>
+
+      <section aria-labelledby="h-crew" style="background: #FBFBF6; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+        <h2 id="h-crew" style="margin: 0; font-size: 16px; font-weight: 600">2 · Who is on site?</h2>
+        <div role="group" aria-labelledby="h-crew" style="display: flex; flex-wrap: wrap; gap: 8px">
+          <sc-for list="{{crew}}" as="c" hint-placeholder-count="3">
+            <button type="button" aria-pressed="{{c.on}}" onClick="{{c.flip}}" style="min-height: 46px; padding: 0 14px; border: 0; border-radius: 999px; font-size: 15px; font-weight: 500; cursor: pointer; background: {{c.bg}}; color: {{c.fg}}">{{c.label}}</button>
+          </sc-for>
+          <button type="button" style="min-height: 46px; padding: 0 14px; border: 0; border-radius: 999px; font-size: 15px; font-weight: 500; cursor: pointer; background: transparent; color: #1F2119; box-shadow: inset 0 0 0 1px #B9BAAA">+ Add</button>
+        </div>
+      </section>
+
+      <section aria-labelledby="h-done" style="background: #FBFBF6; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; flex-direction: column; gap: 3px">
+          <h2 id="h-done" style="margin: 0; font-size: 16px; font-weight: 600">3 · What got done today?</h2>
+          <span style="font-size: 13px; color: #4F5147">Ticked from what you said. Tap to change.</span>
+        </div>
+        <sc-for list="{{items}}" as="i" hint-placeholder-count="4">
+          <button type="button" role="checkbox" aria-checked="{{i.on}}" onClick="{{i.flip}}" style="min-height: 52px; padding: 0 14px; border: 0; border-radius: 14px; background: {{i.bg}}; display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer; color: #1F2119">
+            <span aria-hidden="true" style="flex-shrink: 0; width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: {{i.box}}; box-shadow: inset 0 0 0 1.5px {{i.ring}}; color: #FFFFFF; font-size: 16px; font-weight: 700">{{i.mark}}</span>
+            <span style="display: flex; flex-direction: column; gap: 1px">
+              <span style="font-size: 15px; font-weight: 500">{{i.label}}</span>
+              <span style="font-size: 13px; color: #4F5147">{{i.sub}}</span>
+            </span>
+          </button>
+        </sc-for>
+      </section>
+
+      <section aria-labelledby="h-reads" style="background: #FBFBF6; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+        <span id="h-reads" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #A8502F"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>Priya will read, in English</span>
+        <p style="margin: 0; font-size: 15px; line-height: 1.45">{{summary}}</p>
+        <span style="font-size: 13px; color: #4F5147">Each sentence sits under its own photo in her app. Your voice stays with your team.</span>
+      </section>
+    </div>
+
+    <div style="flex-shrink: 0; padding: 10px 16px 30px; background: #DFE0D2">
+      <button type="button" onClick="{{post}}" style="width: 100%; min-height: 60px; border: 0; border-radius: 999px; background: #1F2119; color: #FBFBF6; font-size: 17px; font-weight: 500; cursor: pointer">Post update</button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{posted}}" hint-placeholder-val="{{ false }}">
+    <div style="flex: 1; padding: 40px 20px; display: flex; flex-direction: column; gap: 22px">
+      <span aria-hidden="true" style="width: 64px; height: 64px; border-radius: 50%; background: #2F6B42; color: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></span>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <h2 style="margin: 0; font-size: 32px; font-weight: 500; letter-spacing: -0.035em; line-height: 1.05">Posted. Priya can see it now.</h2>
+        <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #4F5147">{{postedLine}}</p>
+      </div>
+      <div style="background: #FBFBF6; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 14px; font-weight: 600">Updated in Priya's app</span>
+        <span style="font-size: 15px; color: #1F2119">Site feed · Home "Today on site" · Project tracker</span>
+        <span style="font-size: 13px; color: #4F5147">A posted update cannot be edited. To fix a mistake, add a correction from Today.</span>
+      </div>
+      <a href="SiteToday.dc.html" style="min-height: 56px; border-radius: 999px; background: #1F2119; color: #FBFBF6; font-size: 16px; font-weight: 500; display: flex; align-items: center; justify-content: center; text-decoration: none">Back to my sites</a>
+      <button type="button" onClick="{{again}}" style="min-height: 48px; border: 0; background: transparent; color: #1F2119; font-size: 15px; font-weight: 500; text-decoration: underline; cursor: pointer">See the form again</button>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      crew: { ramesh: true, sunil: true, imran: false },
+      voice: { p1: true, p2: true, p3: false },
+      manual: {},
+      posted: false
+    };
+  }
+  renderVals() {
+    const s = this.state;
+    const PH = [
+      { id: 'p1', item: 'b1', src: '/_blob/f60e3293a5cd9a3e7b83a435545cf41d', alt: 'Bedroom 1 wardrobe frame', room: 'Bedroom 1', heard: '"बेडरूम एकमधल्या वॉर्डरोबची फ्रेम आज बसवली."', text: 'Wardrobe frame fitted in bedroom 1.', meta: '0:06 · Marathi' },
+      { id: 'p2', item: 'b2', src: '/_blob/232d60b704bdb9bfc844c361224aed01', alt: 'Bedroom 2 wardrobe frame', room: 'Bedroom 2', heard: '"दुसऱ्या बेडरूमची फ्रेमपण पूर्ण झाली."', text: 'Bedroom 2 wardrobe frame is done too.', meta: '0:04 · Marathi' },
+      { id: 'p3', item: 'kc', src: '/_blob/b33143fe0a531c7c056e4baf9aa000d3', alt: 'Kitchen carcass', room: 'Kitchen', heard: '"किचनचा कार्कस लेव्हल करून भिंतीला फिक्स केला."', text: 'Kitchen carcass levelled and fixed to the wall.', meta: '0:07 · Marathi' }
+    ];
+    const C = [['ramesh', 'Ramesh · carpenter'], ['sunil', 'Sunil · helper'], ['imran', 'Imran · electrician']];
+    const I = [['b1', 'Wardrobe frame fitted', 'Bedroom 1'], ['b2', 'Wardrobe frame fitted', 'Bedroom 2'], ['kc', 'Kitchen carcass levelled and fixed', 'Kitchen'], ['tv', 'TV unit frame', 'Living room']];
+    const fromVoice = {};
+    PH.forEach((p) => { if (s.voice[p.id]) fromVoice[p.item] = true; });
+    const isDone = (id) => (id in s.manual) ? s.manual[id] : !!fromVoice[id];
+    const onCrew = C.filter((c) => s.crew[c[0]]).length;
+    const doneN = I.filter((i) => isDone(i[0])).length;
+    const lines = PH.filter((p) => s.voice[p.id]).map((p) => p.text);
+    return {
+      editing: !s.posted,
+      posted: s.posted,
+      photos: PH.map((p) => ({
+        src: p.src, alt: p.alt, room: p.room, heard: p.heard, text: p.text, meta: p.meta,
+        empty: !s.voice[p.id], done: !!s.voice[p.id],
+        micLabel: 'Speak about the ' + p.room.toLowerCase() + ' photo',
+        rec: () => this.setState({ voice: Object.assign({}, s.voice, { [p.id]: !s.voice[p.id] }) })
+      })),
+      crew: C.map(([id, label]) => ({ label, on: s.crew[id] ? 'true' : 'false', bg: s.crew[id] ? '#1F2119' : '#ECEDDF', fg: s.crew[id] ? '#FBFBF6' : '#1F2119', flip: () => this.setState({ crew: Object.assign({}, s.crew, { [id]: !s.crew[id] }) }) })),
+      items: I.map(([id, label, room]) => {
+        const on = isDone(id);
+        const auto = on && !(id in s.manual) && fromVoice[id];
+        return { label, sub: auto ? room + ' · from your voice note' : room, on: on ? 'true' : 'false', bg: on ? '#E3EDE2' : '#ECEDDF', box: on ? '#2F6B42' : 'transparent', ring: on ? '#2F6B42' : '#8E9081', mark: on ? '✓' : '', flip: () => this.setState({ manual: Object.assign({}, s.manual, { [id]: !on }) }) };
+      }),
+      summary: lines.length ? lines.join(' ') : 'Tap a mic under a photo and say what was done.',
+      post: () => this.setState({ posted: true }),
+      again: () => this.setState({ posted: false }),
+      postedLine: '3 photos, ' + onCrew + (onCrew === 1 ? ' person' : ' people') + ' on site, ' + doneN + (doneN === 1 ? ' item' : ' items') + ' ticked off in Carpentry.'
+    };
+  }
+}
+</script>
+</body>
+</html>

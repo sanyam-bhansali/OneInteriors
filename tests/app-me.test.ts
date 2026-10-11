@@ -28,6 +28,7 @@ const db = vi.hoisted(() => {
     brief: { findUnique: rec('brief.findUnique', null), findFirst: rec('brief.findFirst', null), update: rec('brief.update') },
     consultation: { updateMany: rec('consultation.updateMany') },
     auditLog: { create: rec('auditLog.create') },
+    homeProject: { findMany: rec('homeProject.findMany', []) },
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
       calls.push({ op: 'tx.begin', args: null });
       const out = await fn(client);
@@ -159,6 +160,7 @@ describe('/api/app/v1/me', () => {
     expect(body.expert.name).not.toMatch(/\s|^Ar\./);
     expect(body.unread).toBe(4);
     expect(body.locale).toBe('en');
+    expect(body.plan).toBeNull(); // no project yet
   });
 
   it('home is null when there is no brief', async () => {

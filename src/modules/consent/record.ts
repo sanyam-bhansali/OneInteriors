@@ -39,16 +39,22 @@ export interface ConsentDecision {
 export async function recordConsent(
   decisions: ConsentDecision[],
   source: string,
+  /**
+   * Whose decisions these are, when the caller knows better than the
+   * request: the phone app's sign-in records them for the account it has
+   * just verified, before that account's token exists on any request.
+   */
+  owner?: { userId: string },
 ): Promise<{ ok: boolean }> {
   if (!hasDatabase() || decisions.length === 0) return { ok: false };
 
   try {
-    const user = await getCurrentUser();
-    const anonKey = user ? null : await ensureAnonKey();
+    const userId = owner?.userId ?? (await getCurrentUser())?.id ?? null;
+    const anonKey = userId ? null : await ensureAnonKey();
 
     await prisma.consent.createMany({
       data: decisions.map((d) => ({
-        userId: user?.id ?? null,
+        userId,
         anonKey,
         purpose: d.purpose as Prisma.ConsentCreateManyInput['purpose'],
         granted: d.granted,

@@ -15,6 +15,7 @@ import { customerProjects } from '@/modules/portal/project-store';
 import { notifyOps } from '@/modules/notify/service';
 import { briefFacts, geioFacts, projectFacts, type GeioFacts } from './geio-facts';
 import { homeSummary, type HomeBrief } from './home-summary';
+import { geioOpen } from '@/modules/portal/plans';
 
 const HOME_FIELDS = {
   propertyType: true,
@@ -51,12 +52,19 @@ export async function homeBriefFor(userId: string): Promise<HomeBrief | null> {
 /**
  * What GEIO is told for this person: their project and brief when signed in,
  * the labelled example only when nobody is (or there is no database to read).
+ *
+ * `locked` once they have signed and no project of theirs is on Assured:
+ * GEIO is part of that plan (portal/plans.ts). Read off the same projects
+ * the facts come from, so the gate costs no extra query.
  */
-export async function geioFactsFor(userId: string | null, expert: string, now = new Date()): Promise<GeioFacts> {
-  if (!userId || !hasDatabase()) return geioFacts(expert);
+export type GeioContext = { locked: true } | { locked: false; facts: GeioFacts };
+
+export async function geioContextFor(userId: string | null, expert: string, now = new Date()): Promise<GeioContext> {
+  if (!userId || !hasDatabase()) return { locked: false, facts: geioFacts(expert) };
   const [projects, brief] = await Promise.all([customerProjects(userId, now, { links: false }), homeBriefFor(userId)]);
+  if (!geioOpen(projects.map((p) => p.plan))) return { locked: true };
   const project = projects[0];
-  return project ? projectFacts(expert, project, brief, now) : briefFacts(expert, brief, now);
+  return { locked: false, facts: project ? projectFacts(expert, project, brief, now) : briefFacts(expert, brief, now) };
 }
 
 /**
