@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useMemo, useState, useTransition } from 'react';
+import Link from 'next/link';
 import { formatINRCompact } from '@/lib/money';
 // Values from the PURE module. `clients.ts` carries `server-only`, and a label
 // map is a value rather than a type — importing it from there pulls Prisma into
@@ -336,7 +337,10 @@ function Card({
   members,
   meId,
   draggable,
+  seesAll,
 }: {
+  /** Owner or PM: assign and delete from the card. A salesperson does neither. */
+  seesAll: boolean;
   client: ClientRow;
   today: Date;
   stages: StageRow[];
@@ -405,7 +409,14 @@ function Card({
             />
           </span>
           <div className="min-w-0">
-            <p className="m-0 truncate text-[14.5px] font-semibold">{client.name}</p>
+            {/* The name opens the lead page (Studio OS Phase 1): calls, files, quotations, booking. */}
+            <Link
+              href={`/studio/clients/${client.id}`}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="m-0 block truncate text-[14.5px] font-semibold text-[var(--s-ink)] no-underline hover:underline"
+            >
+              {client.name}
+            </Link>
             {client.phone ? (
               <a
                 href={`tel:${client.phone}`}
@@ -434,7 +445,7 @@ function Card({
             client.fromMarketplace ? '!bg-[var(--s-accent-wash)] !text-[var(--s-accent-deep)]' : ''
           }`}
         >
-          {SOURCE_LABELS[client.source]}
+          {client.leadSourceName ?? SOURCE_LABELS[client.source]}
         </span>
         {client.config ? <span className="s-tag">{client.config}</span> : null}
         {client.society ? <span className="s-tag">{client.society}</span> : null}
@@ -474,13 +485,13 @@ function Card({
       </p>
 
       <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-[var(--s-rule-soft)] pt-2.5">
-        <Assign
+        {seesAll ? <Assign
           clientId={client.id}
           assignedToId={client.assignedToId}
           assignedToName={client.assignedToName}
           members={members}
           meId={meId}
-        />
+        /> : null}
         <button type="button" onClick={() => setOpen(!open)} className={quiet}>
           {open ? 'Close' : 'Update'}
         </button>
@@ -573,7 +584,7 @@ function Card({
           sitting next to "→ next stage" is a delete button pressed by
           accident. It is reversible for thirty days, but a card that vanishes
           mid-scroll is still alarming. */}
-      {open ? <Bin id={client.id} name={client.name} /> : null}
+      {open && seesAll ? <Bin id={client.id} name={client.name} /> : null}
     </li>
   );
 }
@@ -599,7 +610,7 @@ function Card({
  * A fixed sheet with its own backdrop cannot be clipped by anything, closes
  * itself when the row is written, and is reachable from the empty state too.
  */
-function AddClient({ label, fields }: { label: string; fields: FieldRow[] }) {
+function AddClient({ label, fields, sources = [] }: { label: string; fields: FieldRow[]; sources?: { id: string; name: string }[] }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(addClientAction, IDLE);
 
@@ -660,6 +671,10 @@ function AddClient({ label, fields }: { label: string; fields: FieldRow[] }) {
                 .map((s) => (
                   <option key={s} value={s}>{SOURCE_LABELS[s]}</option>
                 ))}
+              {/* The studio's own names (Settings, Lead sources). */}
+              {sources.map((o) => (
+                <option key={o.id} value={`own:${o.id}`}>{o.name}</option>
+              ))}
             </select>
           </label>
         </div>
@@ -763,13 +778,13 @@ function DemoStrip() {
   );
 }
 
-export function AddClientButton({ fields }: { fields: FieldRow[] }) {
-  return <AddClient label="+ Add a client" fields={fields} />;
+export function AddClientButton({ fields, sources }: { fields: FieldRow[]; sources?: { id: string; name: string }[] }) {
+  return <AddClient label="+ Add a client" fields={fields} sources={sources} />;
 }
 
 /** The same form, reached from the empty state. See the note on `AddClient`. */
-export function AddFirstClientButton({ fields }: { fields: FieldRow[] }) {
-  return <AddClient label="Add the first one" fields={fields} />;
+export function AddFirstClientButton({ fields, sources }: { fields: FieldRow[]; sources?: { id: string; name: string }[] }) {
+  return <AddClient label="Add the first one" fields={fields} sources={sources} />;
 }
 
 /**
@@ -801,7 +816,10 @@ export function Board({
   members,
   meId,
   views,
+  seesAll = true,
 }: {
+  /** Owner or PM (Studio OS Phase 1). A salesperson sees only their own leads and no pool controls. */
+  seesAll?: boolean;
   clients: ClientRow[];
   stages: StageRow[];
   fields: FieldRow[];
@@ -844,6 +862,30 @@ export function Board({
   };
 
   const nameOf = (id: string) => members.find((m) => m.id === id)?.name ?? null;
+
+  /* Search and filters (Studio OS Phase 1, the lead audit): name or phone,
+     where from, which column. Who has it is the "Showing" control below. */
+  const [query, setQuery] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
+  const [stageFilter, setStageFilter] = useState('');
+  const sourceKey = (c: ClientRow) => (c.leadSourceId ? `own:${c.leadSourceId}` : c.source);
+  const sourceOptions = [...new Map(clients.map((c) => [sourceKey(c), c.leadSourceName ?? SOURCE_LABELS[c.source]])).entries()].sort((a, b) =>
+    a[1].localeCompare(b[1]),
+  );
+  const matches = (c: ClientRow) => {
+    const q = query.trim().toLowerCase();
+    if (q) {
+      const digits = q.replace(/\D/g, '');
+      const hit =
+        c.name.toLowerCase().includes(q) ||
+        (c.society ?? '').toLowerCase().includes(q) ||
+        (digits.length >= 3 && (c.phone ?? '').includes(digits));
+      if (!hit) return false;
+    }
+    if (sourceFilter && sourceKey(c) !== sourceFilter) return false;
+    return true;
+  };
+  const filtering = query.trim() !== '' || sourceFilter !== '' || stageFilter !== '';
 
   /**
    * Where a dragged card has been put, before the server agrees.
@@ -899,10 +941,10 @@ export function Board({
   }
   const team = members.length > 1;
 
-  const board = stages.filter((s) => BOARD_KINDS.includes(s.kind));
+  const board = stages.filter((s) => BOARD_KINDS.includes(s.kind)).filter((s) => !stageFilter || s.id === stageFilter);
   const closedStages = stages.filter((s) => !BOARD_KINDS.includes(s.kind));
   const closedIds = new Set(closedStages.map((s) => s.id));
-  const closed = clients.filter((c) => closedIds.has(stageOf(c)));
+  const closed = clients.filter((c) => closedIds.has(stageOf(c)) && matches(c) && (!stageFilter || stageOf(c) === stageFilter));
 
   /** The next column along, in the studio's order. Null at the end. */
   const nextAfter = (stageId: string): StageRow | null => {
@@ -910,7 +952,7 @@ export function Board({
     return i >= 0 && i < stages.length - 1 ? (stages[i + 1] ?? null) : null;
   };
 
-  const allOpen = clients.filter((c) => !closedIds.has(stageOf(c)));
+  const allOpen = clients.filter((c) => !closedIds.has(stageOf(c)) && matches(c));
   const pool = allOpen.filter((c) => c.assignedToId === null);
   // Not `quiet` — that name is taken by the button class at the top of this
   // file, and shadowing it here silently restyles every button below.
@@ -944,7 +986,7 @@ export function Board({
       {/* The pool is a filter on this board, not a second screen. A studio
           that has to go somewhere else to find the clients nobody has taken
           is a studio that never goes. */}
-      {team && pool.length > 0 ? (
+      {seesAll && team && pool.length > 0 ? (
         <div className="s-card flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
           <p className="m-0 text-[14px]">
             <span className="s-num font-semibold">{pool.length}</span>{' '}
@@ -961,16 +1003,62 @@ export function Board({
         </div>
       ) : null}
 
-      <SavedViews
+      <div className="flex flex-wrap items-end gap-2.5">
+        <label className="flex min-w-[12rem] flex-1 flex-col gap-1">
+          <span className="s-label">Find</span>
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Name or phone" className={`${input} py-1.5`} />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="s-label">Where from</span>
+          <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className={`${input} py-1.5`}>
+            <option value="">Any source</option>
+            {sourceOptions.map(([k, label]) => (
+              <option key={k} value={k}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="s-label">Column</span>
+          <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className={`${input} py-1.5`}>
+            <option value="">Every column</option>
+            {stages.map((st) => (
+              <option key={st.id} value={st.id}>
+                {st.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {filtering ? (
+          <button
+            type="button"
+            onClick={() => {
+              setQuery('');
+              setSourceFilter('');
+              setStageFilter('');
+            }}
+            className={quiet}
+          >
+            Clear
+          </button>
+        ) : null}
+      </div>
+
+      {seesAll && team && filtering && open.length > 0 ? (
+        <GiveShown ids={open.filter((c) => !stageFilter || stageOf(c) === stageFilter).map((c) => c.id)} members={members} />
+      ) : null}
+
+      {seesAll ? <SavedViews
         views={views}
         current={currentView}
         onApply={applyView}
         memberName={nameOf}
-      />
+      /> : null}
 
       {(groupable.length > 0 || team || quietOnes.length > 0) ? (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
-          {team || quietOnes.length > 0 ? (
+          {(seesAll && team) || quietOnes.length > 0 ? (
             <div className="flex flex-wrap items-center gap-2.5">
               <span className="s-label">Showing</span>
               <select
@@ -982,8 +1070,8 @@ export function Board({
                 {quietOnes.length > 0 ? (
                   <option value="quiet">Gone quiet ({quietOnes.length})</option>
                 ) : null}
-                {team ? <option value="pool">Nobody has taken ({pool.length})</option> : null}
-                {team
+                {seesAll && team ? <option value="pool">Nobody has taken ({pool.length})</option> : null}
+                {seesAll && team
                   ? members.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.id === meId ? `${m.name} (you)` : m.name} (
@@ -1092,6 +1180,7 @@ export function Board({
                           members={members}
                           meId={meId}
                           draggable={!inFlight[client.id]}
+                          seesAll={seesAll}
                         />
                       ))}
                     </ul>
@@ -1112,7 +1201,9 @@ export function Board({
           <ul className="m-0 grid list-none grid-cols-1 gap-2 p-0 md:grid-cols-2 xl:grid-cols-3">
             {closed.map((c) => (
               <li key={c.id} className="s-card flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3">
-                <span className="text-[14px] font-medium">{c.name}</span>
+                <Link href={`/studio/clients/${c.id}`} className="text-[14px] font-medium text-[var(--s-ink)] no-underline hover:underline">
+                  {c.name}
+                </Link>
                 <span className="s-label">{SOURCE_LABELS[c.source]}</span>
                 <span className="ml-auto flex items-center gap-2">
                   <StageTag name={c.stageName} colour={c.stageColour} />
@@ -1126,6 +1217,70 @@ export function Board({
             ))}
           </ul>
         </details>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Give every lead the filters show to one person (owner and PM, Studio OS
+ * Phase 1): filter the board to the Facebook leads in Enquiry, then hand
+ * them over in one go. Asks first.
+ */
+function GiveShown({ ids, members }: { ids: string[]; members: { id: string; name: string }[] }) {
+  const [to, setTo] = useState('');
+  const [sure, setSure] = useState(false);
+  const [busy, start] = useTransition();
+  const [said, setSaid] = useState<string | null>(null);
+  const [bad, setBad] = useState(false);
+  if (ids.length === 0) return null;
+  return (
+    <div className="s-card flex flex-wrap items-center gap-2 px-4 py-3 text-[13.5px]">
+      <span>Give the {ids.length} shown to</span>
+      <select
+        value={to}
+        onChange={(e) => {
+          setTo(e.target.value);
+          setSure(false);
+        }}
+        className={`${input} py-1.5`}
+        aria-label="Give these leads to"
+      >
+        <option value="">pick a person…</option>
+        {members.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.name}
+          </option>
+        ))}
+      </select>
+      {to ? (
+        sure ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              start(async () => {
+                const r = await assignAction(ids, to);
+                const failed = 'ok' in r && !r.ok;
+                setBad(failed);
+                setSaid(failed && 'error' in r ? r.error : `Done. ${ids.length} lead${ids.length === 1 ? '' : 's'} assigned; they have been told.`);
+                setSure(false);
+              })
+            }
+            className={primary}
+          >
+            {busy ? 'Assigning…' : `Yes, give all ${ids.length}`}
+          </button>
+        ) : (
+          <button type="button" onClick={() => setSure(true)} className={quiet}>
+            Assign
+          </button>
+        )
+      ) : null}
+      {said ? (
+        <span role="status" className={bad ? 'text-[var(--s-bad)]' : 'text-[var(--s-good)]'}>
+          {said}
+        </span>
       ) : null}
     </div>
   );

@@ -84,6 +84,8 @@ export const PROJECT_EVENT_TYPES = [
   // A studio's own client (docs/studio-workspace/OWN-CLIENTS.md)
   'customer.invited',
   'customer.joined',
+  // Studio OS Phase 1 (docs/studio-os/PHASE-1-SALES.md): the booking advance refunded
+  'project.cancelled',
 ] as const;
 
 export type ProjectEventType = (typeof PROJECT_EVENT_TYPES)[number];

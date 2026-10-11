@@ -31,6 +31,7 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 import { myStudioId } from '@/modules/studio-quote/store';
+import { leadStudioId } from '@/modules/studio/lead-scope';
 import {
   DEFAULT_STAGES,
   BOARD_KINDS,
@@ -74,7 +75,7 @@ export type Result = { ok: true } | { ok: false; error: string };
  * does not find it handed back on the next page load.
  */
 export async function myStages(): Promise<StageRow[]> {
-  const studioId = await myStudioId();
+  const studioId = await leadStudioId();
   if (!studioId) return [];
 
   try {

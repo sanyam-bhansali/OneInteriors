@@ -143,7 +143,7 @@ export function fieldKeyFrom(label: string): string {
 // ── Clients ────────────────────────────────────────────────────
 
 export type ClientSourceName =
-  | 'ONE_INTERIORS' | 'REFERRAL' | 'REPEAT_CLIENT' | 'INSTAGRAM'
+  | 'ONE_INTERIORS' | 'REFERRAL' | 'REPEAT_CLIENT' | 'INSTAGRAM' | 'FACEBOOK'
   | 'WEBSITE' | 'WALK_IN' | 'ARCHITECT' | 'OTHER';
 
 export type LostReasonName =
@@ -155,6 +155,7 @@ export const SOURCE_LABELS: Record<ClientSourceName, string> = {
   REFERRAL: 'Referral',
   REPEAT_CLIENT: 'Repeat client',
   INSTAGRAM: 'Instagram',
+  FACEBOOK: 'Facebook',
   WEBSITE: 'Website',
   WALK_IN: 'Walk-in',
   ARCHITECT: 'Architect',

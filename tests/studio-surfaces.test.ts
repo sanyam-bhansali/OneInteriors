@@ -11,7 +11,7 @@ import { plainText } from '@/modules/messaging/messages';
  * the studio sign-in's address and MessageSender's fallback order.
  */
 
-type Role = 'OWNER' | 'PM' | 'SUPERVISOR' | 'ACCOUNTS';
+type Role = 'OWNER' | 'PM' | 'SUPERVISOR' | 'ACCOUNTS' | 'SALES';
 type Status = 'INVITED' | 'ACTIVE' | 'SUSPENDED';
 const m = (role: Role, status: Status = 'ACTIVE') => ({ role, status });
 
@@ -38,7 +38,23 @@ describe('mayOpen and homeFor', () => {
     for (const p of office) expect(mayOpen(m('PM'), p), p).toBe(true);
     expect(mayOpen(m('PM'), '/studio/settings/team')).toBe(false);
     expect(mayOpen(m('PM'), '/studio/vendors')).toBe(false);
-    expect(homeFor('PM')).toBe('/studio');
+    expect(homeFor('PM')).toBe('/studio/today');
+    expect(homeFor('OWNER')).toBe('/studio/today');
+  });
+
+  it('a salesperson opens Today, the leads board and a lead, and quotations — nothing else', () => {
+    for (const p of ['/studio/today', '/studio/clients', '/studio/clients/c1', '/studio/quotations', '/studio/quotations/q1', '/studio/quotations/q1/compare']) {
+      expect(mayOpen(m('SALES'), p), p).toBe(true);
+    }
+    for (const p of ['/studio', '/studio/clients/pool', '/studio/clients/import', '/studio/clients/bin', '/studio/clients/analytics', '/studio/products', '/studio/settings', '/studio/projects', '/studio/payments', '/studio/site', '/studio/vendors', '/studio/todayx']) {
+      expect(mayOpen(m('SALES'), p), p).toBe(false);
+    }
+    expect(homeFor('SALES')).toBe('/studio/today');
+  });
+
+  it('the payment stages are the owner’s alone', () => {
+    expect(mayOpen(m('OWNER'), '/studio/settings/payments')).toBe(true);
+    expect(mayOpen(m('PM'), '/studio/settings/payments')).toBe(false);
   });
 
   it('the owner opens everything', () => {
@@ -69,7 +85,7 @@ const db = vi.hoisted(() => {
         if (!row) return null;
         if (a.where.status && row.status !== a.where.status) return null;
         if (a.where.role && !a.where.role.in.includes(row.role)) return null;
-        return { studioId: row.studioId };
+        return { id: `m-${a.where.userId}`, userId: a.where.userId, ...row };
       }),
     },
     studioProduct: {
@@ -112,6 +128,7 @@ describe('the office modules find no studio for site and accounts roles', () => 
       'u-acc': { studioId: 's1', role: 'ACCOUNTS', status: 'ACTIVE' },
       'u-gone': { studioId: 's1', role: 'OWNER', status: 'SUSPENDED' },
       'u-new': { studioId: 's1', role: 'PM', status: 'INVITED' },
+      'u-sales': { studioId: 's1', role: 'SALES', status: 'ACTIVE' },
     });
     vi.stubEnv('DATABASE_URL', 'postgres://test');
     vi.stubEnv('SAMPLE_DATA_ONLY', '');
@@ -129,6 +146,8 @@ describe('the office modules find no studio for site and accounts roles', () => 
     ['u-acc', null],
     ['u-gone', null],
     ['u-new', null],
+    // A salesperson is not office: every older office module finds no studio.
+    ['u-sales', null],
   ] as const) {
     it(`myStudioId for ${user} is ${studio}`, async () => {
       session.userId = user;
@@ -146,6 +165,12 @@ describe('the office modules find no studio for site and accounts roles', () => 
     session.userId = 'u-acc';
     expect(await myProducts()).toEqual([]);
     expect(db.calls).toEqual([]);
+  });
+
+  it('a salesperson reads the products quoting needs (and nothing else opens for them)', async () => {
+    session.userId = 'u-sales';
+    await myProducts();
+    expect(db.calls).toContain('studioProduct.findMany');
   });
 
   it('a project manager still can', async () => {

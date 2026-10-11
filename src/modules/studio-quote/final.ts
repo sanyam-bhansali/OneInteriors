@@ -13,16 +13,19 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
-import { myStudioId } from '@/modules/studio/tenancy';
+import { myLeadScope } from '@/modules/studio/lead-scope';
 import { isConfigName } from './configure';
 import { applyConfiguration, createQuote, type QuoteResult } from './quotes';
 
 export async function finalQuoteForClient(clientId: string): Promise<QuoteResult> {
-  const studioId = await myStudioId();
-  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+  /* The lead scope (Studio OS Phase 1): a salesperson makes the final
+     quote for a One Interiors lead assigned to them. */
+  const scope = await myLeadScope();
+  const studioId = scope?.studioId ?? null;
+  if (!scope || !studioId) return { ok: false, error: 'No studio on this account.' };
 
   const client = await prisma.studioClient.findFirst({
-    where: { id: clientId, studioId },
+    where: { ...scope.leads, id: clientId, studioId },
     select: { id: true, name: true, phone: true, society: true, config: true, carpetSqft: true, introductionId: true, briefId: true },
   });
   if (!client) return { ok: false, error: 'That client is not yours.' };
@@ -31,7 +34,7 @@ export async function finalQuoteForClient(clientId: string): Promise<QuoteResult
   }
 
   const existing = await prisma.studioQuote.findFirst({
-    where: { studioId, introductionId: client.introductionId },
+    where: { ...scope.quotes, studioId, introductionId: client.introductionId },
     orderBy: { createdAt: 'desc' },
     select: { id: true },
   });

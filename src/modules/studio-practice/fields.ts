@@ -22,6 +22,7 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 import { myStudioId } from '@/modules/studio-quote/store';
+import { leadStudioId } from '@/modules/studio/lead-scope';
 import { fieldKeyFrom, GROUPABLE_TYPES, type FieldTypeName } from './vocabulary';
 import { nextSortOrder } from './pipeline-rules';
 
@@ -51,7 +52,7 @@ export type Result = { ok: true } | { ok: false; error: string };
  * type a society.
  */
 export async function myFields(): Promise<FieldRow[]> {
-  const studioId = await myStudioId();
+  const studioId = await leadStudioId();
   if (!studioId) return [];
 
   try {

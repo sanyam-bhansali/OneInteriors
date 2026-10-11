@@ -91,7 +91,16 @@ export async function fileSignedQuote(
 // ── A signed project, whoever started it ───────────────────────
 
 /** What creating a signed project writes to: the quote, the project and its plan. */
-export type SignedProjectDb = PlanDb & Pick<Prisma.TransactionClient, 'studioQuote' | 'homeProject'>;
+/**
+ * Transaction limits for the writes that build a whole plan at signing or
+ * booking (stages, ~44 steps, materials, payments, documents, events). Done
+ * one row at a time, that outlasts Prisma's default 5 s on a slow connection
+ * and is then rolled back with nothing started, so the signing transactions
+ * pass these instead.
+ */
+export const PLAN_TX = { maxWait: 10_000, timeout: 30_000 } as const;
+
+export type SignedProjectDb =PlanDb & Pick<Prisma.TransactionClient, 'studioQuote' | 'homeProject'>;
 
 export interface SignedProjectInput {
   /** The introduction the project hangs off (One Interiors' or the studio's own client's). */

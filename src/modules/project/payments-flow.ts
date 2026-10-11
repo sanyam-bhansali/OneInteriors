@@ -105,7 +105,7 @@ export function ledgerOf(p: MoneyRecord): Ledger | null {
 }
 
 /** Lock the project row for the rest of the transaction: payments on it are checked and written one at a time. */
-async function lockProject(tx: Tx, projectId: string): Promise<void> {
+export async function lockProject(tx: Tx, projectId: string): Promise<void> {
   await tx.$queryRaw`SELECT "id" FROM "home_projects" WHERE "id" = ${projectId} FOR UPDATE`;
 }
 
@@ -117,7 +117,7 @@ async function moneyIn(tx: Tx, projectId: string): Promise<{ record: MoneyRecord
 }
 
 /** Rewrite `paidPhases[].paidOn` from the rows, inside the same transaction. */
-async function mirror(tx: Tx, projectId: string): Promise<void> {
+export async function mirror(tx: Tx, projectId: string): Promise<void> {
   const now = await moneyIn(tx, projectId);
   if (!now) return;
   await tx.homeProject.update({ where: { id: projectId }, data: { paidPhases: mirrorPaidOn(now.record.paidPhases, now.ledger) as unknown as Prisma.InputJsonValue } });
@@ -532,7 +532,7 @@ export async function paymentsDesk(): Promise<DeskProject[]> {
   const mayDue = mayRecord || can(member, 'plan.edit', { assigned: true });
   const mayOpen = can(member, 'project.read', { assigned: true });
   const rows = await prisma.homeProject.findMany({
-    where: projectsVisibleTo(member, 'payments'),
+    where: { ...projectsVisibleTo(member, 'payments'), cancelledAt: null },
     orderBy: { startOn: 'desc' },
     take: 200,
     select: {

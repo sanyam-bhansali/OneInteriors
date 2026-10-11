@@ -10,6 +10,9 @@ import { QuoteBuilder } from './QuoteBuilder';
 import { StatusBar } from './StatusBar';
 import { currentMember } from '@/modules/studio/access';
 import { projectForQuote } from '@/modules/project/own-project';
+import { quoteSalesView } from '@/modules/studio-sales/revisions';
+import { can } from '@/modules/studio/roles';
+import { Revisions } from './Revisions';
 
 export const metadata: Metadata = {
   title: 'Quotation',
@@ -43,11 +46,15 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
 
   if (!quote) notFound();
 
-  const [logoUrl, project] = await Promise.all([
+  const member = await currentMember();
+  const [logoUrl, project, sales] = await Promise.all([
     signedLogoUrl(branding?.logoPath ?? null),
     // A project running on this quotation, or whether one can start from it (own client, sent or won).
-    currentMember().then((m) => projectForQuote(m, quote.id)),
+    projectForQuote(member, quote.id),
+    // Revisions sent and the sales final (Studio OS Phase 1).
+    quoteSalesView(quote.id),
   ]);
+  const mayBook = member !== null && can(member, 'booking.record');
 
   return (
     <>
@@ -56,6 +63,11 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
         sub={
           <span className="flex flex-wrap items-center gap-2">
             <span className="s-num">{quote.number}</span>
+            {quote.clientId ? (
+              <Link href={`/studio/clients/${quote.clientId}`} className="text-[var(--s-accent)]">
+                · open the lead
+              </Link>
+            ) : null}
             {quote.config ? <span>· {quote.config}</span> : null}
             {quote.society ? <span>· {quote.society}</span> : null}
             <span className="text-[var(--s-ink-3)]">· {STATUS_LABELS[quote.status]}</span>
@@ -90,6 +102,8 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
       />
 
       <PageBody>
+        {/* Keyed on the revision count so the compare and sales-final pickers start on the newest revision after a send. */}
+        {sales ? <Revisions key={sales.revisions.length} view={sales} leadHref={quote.clientId ? `/studio/clients/${quote.clientId}` : null} mayBook={mayBook} /> : null}
         {project.projectId ? (
           <p className="s-card mb-4 border-l-[3px] !border-l-[var(--s-good)] px-4 py-3 text-[13.5px] leading-relaxed">
             A project is running on this quotation.{' '}
@@ -97,7 +111,8 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
               Open the project
             </Link>
           </p>
-        ) : project.canStart ? (
+        ) : project.canStart && !quote.clientId ? (
+          // A quotation on a lead is booked from its sales final (Record booking), so only unlinked ones keep the older "Start project".
           <p className="s-card mb-4 flex flex-wrap items-center gap-3 border-l-[3px] !border-l-[var(--s-accent)] px-4 py-3 text-[13.5px] leading-relaxed">
             <span>Has {quote.clientName.split(/\s+/)[0]} accepted this quotation? Start the project from it.</span>
             <Link

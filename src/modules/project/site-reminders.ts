@@ -39,7 +39,7 @@ export async function runSiteReminders(now = new Date()): Promise<ReminderRun> {
   const today = istDay(now);
   const since = addDays(today, -14);
   const projects = await prisma.homeProject.findMany({
-    where: { startOn: { lte: now } },
+    where: { startOn: { lte: now }, cancelledAt: null },
     select: {
       id: true,
       plan: true,

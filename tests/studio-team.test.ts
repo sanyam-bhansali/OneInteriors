@@ -236,7 +236,7 @@ describe('seats', () => {
     expect(roleCan('SUPERVISOR')).toEqual(['Post site updates', 'Tick the checklist', 'Fix snags', 'See the project']);
     expect(roleCan('PM')).not.toContain('Vendor rates and margins');
     expect(roleCan('PM')).not.toContain('Add and remove people');
-    expect(roleCan('ACCOUNTS')).toEqual(['Record payments', 'See payments']);
+    expect(roleCan('ACCOUNTS')).toEqual(['Record payments', 'See payments', 'Record the booking advance', 'Refund a booking']);
     expect(roleCan('OWNER')).toContain('Add and remove people');
   });
 });

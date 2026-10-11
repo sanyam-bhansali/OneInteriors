@@ -39,10 +39,13 @@ export type ProjectEvent =
   // …or says "I didn't pay this", which goes to our team (ops), not the studio.
   | { kind: 'payment-disputed'; customer: string; studio: string; stage: string; amountPaise: number; note: string | null }
   // To the studio: a decision passed its date with no pick (customer delay from here).
-  | { kind: 'decision-expired'; decisionId: string; title: string; projectId: string };
+  | { kind: 'decision-expired'; decisionId: string; title: string; projectId: string }
+  // Studio OS Phase 1: leads, to the studio's people (never to a customer)
+  | { kind: 'lead-assigned'; clientId: string | null; count: number; name: string; by: string | null }
+  | { kind: 'lead-new'; clientId: string; name: string; source: string; again: boolean };
 
 /** Events a studio also gets by email: it works from a laptop, not our app. */
-export const EMAILED_TO_STUDIO: ProjectEvent['kind'][] = ['introduced', 'quote-signed', 'decision-made', 'snag-raised'];
+export const EMAILED_TO_STUDIO: ProjectEvent['kind'][] = ['introduced', 'quote-signed', 'decision-made', 'snag-raised', 'lead-new'];
 
 export interface Message {
   title: string;
@@ -206,6 +209,20 @@ export function messageFor(e: ProjectEvent): Message {
         title: `Payment disputed · ${clip(e.customer, 40)}`,
         body: clip(`${e.customer} says they did not pay ${formatINR(e.amountPaise)} for ${e.stage} (${e.studio}).${e.note ? ` “${e.note}”` : ''}`, 160),
         url: '/ops/introductions',
+      };
+    case 'lead-assigned':
+      return {
+        template: 'lead.assigned',
+        title: e.count === 1 ? `A lead for you: ${clip(e.name, 60)}` : `${e.count} leads for you`,
+        body: clip(`${e.by ? `${e.by} gave you ` : 'You have '}${e.count === 1 ? e.name : `${e.count} leads, starting with ${e.name}`}. They are on your Today list.`, 160),
+        url: e.count === 1 && e.clientId ? `/studio/clients/${e.clientId}` : '/studio/today',
+      };
+    case 'lead-new':
+      return {
+        template: e.again ? 'lead.form-again' : 'lead.new',
+        title: e.again ? `${clip(e.name, 60)} filled in your form again` : `New lead: ${clip(e.name, 60)}`,
+        body: clip(e.again ? 'Their message is on the lead’s timeline.' : `From ${e.source}. It is in the pool: give it to someone from Today or the lead.`, 160),
+        url: `/studio/clients/${e.clientId}`,
       };
     case 'decision-expired':
       return {

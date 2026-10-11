@@ -33,7 +33,13 @@ export type EventKindName =
   | 'LOST'
   | 'BINNED'
   | 'RESTORED'
-  | 'WITHDRAWN';
+  | 'WITHDRAWN'
+  | 'EDITED'
+  | 'FILE'
+  | 'MEETING'
+  | 'SALES_FINAL'
+  | 'BOOKED'
+  | 'REFUNDED';
 
 /**
  * How a lead got here. Not the `ClientSource` enum.
@@ -195,8 +201,8 @@ export function lostSummary(reason: LostReasonName | null, note?: string | null)
 export type EventTone = 'accent' | 'good' | 'quiet';
 
 export function toneFor(kind: EventKindName): EventTone {
-  if (kind === 'QUOTED' || kind === 'CONTACTED') return 'good';
-  if (kind === 'CREATED' || kind === 'STAGE_CHANGED') return 'accent';
+  if (kind === 'QUOTED' || kind === 'CONTACTED' || kind === 'BOOKED' || kind === 'SALES_FINAL') return 'good';
+  if (kind === 'CREATED' || kind === 'STAGE_CHANGED' || kind === 'MEETING') return 'accent';
   return 'quiet';
 }
 
@@ -212,6 +218,12 @@ export const KIND_LABELS: Record<EventKindName, string> = {
   BINNED: 'Deleted',
   RESTORED: 'Restored',
   WITHDRAWN: 'Withdrawn',
+  EDITED: 'Edited',
+  FILE: 'File',
+  MEETING: 'Meeting',
+  SALES_FINAL: 'Sales final',
+  BOOKED: 'Booked',
+  REFUNDED: 'Refunded',
 };
 
 /**

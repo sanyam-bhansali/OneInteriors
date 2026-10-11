@@ -25,6 +25,14 @@
  * A project manager keeps today's office except the two owner-only rows of
  * the permission table: the team (`team.manage`) and vendor rates
  * (`vendor.rates`).
+ *
+ * ## Sales (Studio OS Phase 1)
+ *
+ * A salesperson works in the office frame (the rail, search) but opens only
+ * Today, the leads board and a lead, and quotations. They are NOT in
+ * `OFFICE_ROLES`: every older office module keeps finding no studio for
+ * them, and the screens they do open read through `studio/lead-scope.ts`,
+ * which narrows every query to the leads assigned to them.
  */
 
 import type { Prisma } from '@prisma/client';
@@ -47,15 +55,27 @@ export function usesOffice(member: MemberRole): boolean {
 }
 
 export const SITE_HOME = '/studio/site';
+export const TODAY_HOME = '/studio/today';
 export const PAYMENTS_HOME = '/studio/payments';
 export const TEAM_PATH = '/studio/settings/team';
+export const PAYMENT_STAGES_PATH = '/studio/settings/payments';
 
 /** Where a member lands after signing in, and where the layout sends them back to. */
 export function homeFor(role: StudioRoleName): string {
   if (role === 'SUPERVISOR') return SITE_HOME;
   if (role === 'ACCOUNTS') return PAYMENTS_HOME;
-  return '/studio';
+  return TODAY_HOME;
 }
+
+/** Who gets the office frame (the rail and search): the office roles, and sales. */
+export function usesOfficeShell(member: MemberRole): boolean {
+  return usesOffice(member) || (member.status === 'ACTIVE' && member.role === 'SALES');
+}
+
+/** What a salesperson may open: Today, the board and a lead, quotations. */
+const SALES_OPEN = [TODAY_HOME, '/studio/clients', '/studio/quotations'];
+/** Inside the leads section, the owner's and PM's screens. */
+const SALES_CLOSED = ['/studio/clients/pool', '/studio/clients/import', '/studio/clients/bin', '/studio/clients/analytics'];
 
 function under(path: string, prefix: string): boolean {
   return path === prefix || path.startsWith(`${prefix}/`);
@@ -71,7 +91,9 @@ export function mayOpen(member: MemberRole, path: string): boolean {
   if (member.status !== 'ACTIVE') return false;
   if (member.role === 'SUPERVISOR') return under(path, SITE_HOME);
   if (member.role === 'ACCOUNTS') return under(path, PAYMENTS_HOME);
+  if (member.role === 'SALES') return SALES_OPEN.some((p) => under(path, p)) && !SALES_CLOSED.some((p) => under(path, p));
   if (under(path, TEAM_PATH)) return can(member, 'team.manage');
+  if (under(path, PAYMENT_STAGES_PATH)) return can(member, 'payments.template');
   if (under(path, '/studio/vendors')) return can(member, 'vendor.rates');
   return usesOffice(member);
 }

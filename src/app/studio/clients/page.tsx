@@ -9,6 +9,8 @@ import { myFields } from '@/modules/studio-practice/fields';
 import { assignableMembers, myMembershipId } from '@/modules/studio-practice/team';
 import { myViews } from '@/modules/studio-practice/saved-views';
 import { boardCounts } from '@/modules/studio-practice/analytics';
+import { myLeadScope } from '@/modules/studio/lead-scope';
+import { myLeadSources } from '@/modules/studio-sales/settings';
 import { NeedsAttention } from './NeedsAttention';
 import { Board, AddClientButton, AddFirstClientButton } from './Board';
 
@@ -39,7 +41,7 @@ const importLink =
  * with no date sits at the bottom, which is a quiet argument for setting one.
  */
 export default async function ClientsPage() {
-  const [clients, stages, fields, members, meId, views, counts] = await Promise.all([
+  const [clients, stages, fields, members, meId, views, counts, scope, sources] = await Promise.all([
     myClients(),
     myStages(),
     myFields(),
@@ -50,13 +52,19 @@ export default async function ClientsPage() {
        "overdue" would silently stop counting at 400 and read as an
        improvement. */
     boardCounts(),
+    myLeadScope(),
+    myLeadSources(),
   ]);
+  /* Owner and PM see every lead and the pool; a salesperson only their own
+     (Studio OS Phase 1), with no import, bin or pool controls. */
+  const seesAll = scope?.seesAll ?? false;
 
   const today = new Date();
   today.setHours(23, 59, 59, 999);
 
   const open = clients.filter((c) => BOARD_KINDS.includes(c.stageKind));
-  const due = open.filter((c) => c.nextActionOn !== null && c.nextActionOn <= today).length;
+  // The sample lead is never "waiting on you" (the lead audit): listed, never counted.
+  const due = open.filter((c) => !c.isDemo && c.nextActionOn !== null && c.nextActionOn <= today).length;
 
   const { state, facts } = await guideContext();
   const dismissed = state.dismissed.includes('leads');
@@ -72,10 +80,12 @@ export default async function ClientsPage() {
         }
         action={
           <>
-            <Link href="/studio/clients/import" className={importLink}>
-              Import a list
-            </Link>
-            <AddClientButton fields={fields} />
+            {seesAll ? (
+              <Link href="/studio/clients/import" className={importLink}>
+                Import a list
+              </Link>
+            ) : null}
+            <AddClientButton fields={fields} sources={sources} />
           </>
         }
       />
@@ -83,10 +93,10 @@ export default async function ClientsPage() {
       <PageBody>
         {/* Above everything, and gone entirely when there is nothing wrong. */}
         <div className="mb-5 empty:mb-0">
-          <NeedsAttention counts={counts} />
+          {seesAll ? <NeedsAttention counts={counts} /> : null}
         </div>
 
-        <GuidePanel guide="leads" facts={facts} dismissed={dismissed} />
+        {seesAll ? <GuidePanel guide="leads" facts={facts} dismissed={dismissed} /> : null}
 
         {clients.length === 0 ? (
           <div className="s-card p-8">
@@ -107,7 +117,7 @@ export default async function ClientsPage() {
               again — you get to check every column before anything is saved.
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-3">
-              <AddFirstClientButton fields={fields} />
+              <AddFirstClientButton fields={fields} sources={sources} />
               <Link href="/studio/clients/import" className={importLink}>
                 Import a list
               </Link>
@@ -121,16 +131,19 @@ export default async function ClientsPage() {
             members={members}
             meId={meId}
             views={views}
+            seesAll={seesAll}
           />
         )}
 
         {/* Quiet, and at the bottom. A bin people can find when they need it
             and never notice otherwise. */}
-        <p className="mt-8 mb-0 text-[13px] text-[var(--s-ink-3)]">
-          <Link href="/studio/clients/bin" className="underline">
-            Deleted clients
-          </Link>
-        </p>
+        {seesAll ? (
+          <p className="mt-8 mb-0 text-[13px] text-[var(--s-ink-3)]">
+            <Link href="/studio/clients/bin" className="underline">
+              Deleted clients
+            </Link>
+          </p>
+        ) : null}
       </PageBody>
     </>
   );

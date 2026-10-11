@@ -54,7 +54,7 @@ export async function GET(req: Request) {
 
   // Payment stages with a due date set, not yet paid.
   const signed = await prisma.homeProject.findMany({
-    where: { contractPaise: { not: null }, paidPhases: { not: Prisma.DbNull } },
+    where: { contractPaise: { not: null }, paidPhases: { not: Prisma.DbNull }, cancelledAt: null },
     select: {
       id: true,
       contractPaise: true,

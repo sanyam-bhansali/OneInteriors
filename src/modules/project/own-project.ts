@@ -26,7 +26,7 @@ import { prisma } from '@/lib/prisma';
 import { siteUrl } from '@/lib/site';
 import { sendNotice } from '@/modules/auth/email';
 import { smsProvider } from '@/modules/messaging/sms';
-import { createSignedProject } from '@/modules/portal/plan-write';
+import { createSignedProject, PLAN_TX } from '@/modules/portal/plan-write';
 import { quoteTotals } from '@/modules/portal/choose';
 import { durationFor } from '@/modules/portal/tracker';
 import { can, needsAssignment } from '@/modules/studio/roles';
@@ -177,7 +177,21 @@ export interface OwnInvite {
   messages: Record<InviteLang, string>;
 }
 
-export type StartOwnProjectResult = { ok: true; projectId: string; invite: OwnInvite } | { ok: false; error: string };
+export type StartOwnProjectResult = { ok: true; projectId: string; introductionId: string; invite: OwnInvite } | { ok: false; error: string };
+
+/**
+ * How the booking (Studio OS Phase 1, studio-sales/booking.ts) reuses this
+ * path: the payment stages and contract come from the quotation's sales
+ * final rather than its current terms, the right checked is booking.record
+ *  (accounts, owner, PM), and the booking's own writes (the
+ * payment row, the lead) run inside the same transaction.
+ */
+export interface StartOwnProjectOptions {
+  action?: 'project.create' | 'booking.record';
+  contractPaise?: number;
+  stages?: { label: string; pct: number | null; amountPaise: number }[];
+  onCreated?: (tx: Prisma.TransactionClient, project: { id: string; introductionId: string; customerUserId: string }) => Promise<void>;
+}
 
 /** A refusal raised inside the transaction, so nothing is written. */
 class Refused extends Error {
@@ -195,9 +209,14 @@ const freshCode = () => inviteCode((n) => new Uint8Array(randomBytes(n)));
  * project and its plan exactly as signing builds it, the PM on the project,
  * the events, the invite. Then the invite goes out (never WhatsApp).
  */
-export async function startOwnProject(member: StudioMemberRef | null, input: StartOwnProjectInput, now = new Date()): Promise<StartOwnProjectResult> {
+export async function startOwnProject(
+  member: StudioMemberRef | null,
+  input: StartOwnProjectInput,
+  now = new Date(),
+  opts: StartOwnProjectOptions = {},
+): Promise<StartOwnProjectResult> {
   if (!member) return { ok: false, error: ACCESS_ERRORS.signIn };
-  if (!can(member, 'project.create')) return { ok: false, error: ACCESS_ERRORS.notYourRole };
+  if (!can(member, opts.action ?? 'project.create')) return { ok: false, error: ACCESS_ERRORS.notYourRole };
 
   const customer = checkCustomer(input.customer);
   if (!customer.ok) return customer;
@@ -218,7 +237,7 @@ export async function startOwnProject(member: StudioMemberRef | null, input: Sta
     briefId: q.briefId,
     client: q.client,
     lineCount: q.lines.length,
-    totalPaise: totals.totalPaise,
+    totalPaise: opts.contractPaise ?? totals.totalPaise,
     alreadyStarted,
   });
   if (refusal) return { ok: false, error: refusal };
@@ -232,7 +251,7 @@ export async function startOwnProject(member: StudioMemberRef | null, input: Sta
   const signedAt = now;
   const code = freshCode();
   try {
-    const projectId = await prisma.$transaction(async (tx) => {
+    const started = await prisma.$transaction(async (tx) => {
       // The customer's account: theirs if they have one (CUSTOMER only, checked above), else made now.
       // `phoneVerified` stays empty until they sign in with the number — that is "joined".
       const user =
@@ -283,8 +302,8 @@ export async function startOwnProject(member: StudioMemberRef | null, input: Sta
         quote: { id: q.id, number: q.number, lines: q.lines },
         startOn,
         totalDays,
-        contractPaise: totals.totalPaise,
-        stages: totals.stages.map((s) => ({ label: s.label, pct: s.pct ?? null, amountPaise: s.amountPaise })),
+        contractPaise: opts.contractPaise ?? totals.totalPaise,
+        stages: opts.stages ?? totals.stages.map((s) => ({ label: s.label, pct: s.pct ?? null, amountPaise: s.amountPaise })),
         signedAt,
         filedById: member.userId,
         filedByStudio: true,
@@ -318,11 +337,13 @@ export async function startOwnProject(member: StudioMemberRef | null, input: Sta
           after: { quoteId: q.id, totalPaise: totals.totalPaise, newAccount: !existing },
         },
       });
-      return project.id;
-    });
+      await opts.onCreated?.(tx, { id: project.id, introductionId: intro.id, customerUserId: user.id });
+      return { projectId: project.id, introductionId: intro.id };
+    }, PLAN_TX);
 
+    const { projectId, introductionId } = started;
     const invite = await sendOwnInvite({ projectId, code, phone, email, name, studio: q.studio.tradeName });
-    return { ok: true, projectId, invite };
+    return { ok: true, projectId, introductionId, invite };
   } catch (error) {
     if (error instanceof Refused) return { ok: false, error: error.reason };
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {

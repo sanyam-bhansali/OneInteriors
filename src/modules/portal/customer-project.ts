@@ -32,6 +32,8 @@ export async function customerProjects(userId: string, now = new Date(), opts: {
   const links = opts.links !== false;
   const projects = await prisma.homeProject.findMany({
     where: {
+      // A refunded booking (Studio OS Phase 1) is kept but is not their project any more.
+      cancelledAt: null,
       OR: [
         { introduction: { brief: { userId } } },
         { family: { some: { userId, joinedAt: { not: null }, removedAt: null } } },

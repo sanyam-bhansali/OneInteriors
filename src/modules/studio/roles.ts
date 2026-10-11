@@ -39,14 +39,24 @@
  * `calendar.edit` (owner and PM, no assignment — they belong to the studio,
  * not a project). The customer confirming or disputing a payment is the
  * customer's own action, not a studio one, so it is not here.
+ *
+ * ## Leads, quotations and bookings (Studio OS Phase 1)
+ *
+ * docs/studio-os/PHASE-1-SALES.md made the lead rights per action instead
+ * of all or nothing, and added SALES. For a salesperson the `assigned` fact
+ * means "this lead is assigned to them": they read and work only their own
+ * leads (`OWN_LEAD_ONLY`), never the pool or a colleague's. Owner and PM see
+ * every lead. Assigning, merging, deleting, importing and the pool are owner
+ * and PM only. Recording a booking is accounts, owner and PM; the payment
+ * stages template is the owner's.
  */
 
 import type { Prisma } from '@prisma/client';
 
-export type StudioRoleName = 'OWNER' | 'PM' | 'SUPERVISOR' | 'ACCOUNTS';
+export type StudioRoleName = 'OWNER' | 'PM' | 'SUPERVISOR' | 'ACCOUNTS' | 'SALES';
 export type StudioMemberStatusName = 'INVITED' | 'ACTIVE' | 'SUSPENDED';
 
-export const STUDIO_ROLES: readonly StudioRoleName[] = ['OWNER', 'PM', 'SUPERVISOR', 'ACCOUNTS'];
+export const STUDIO_ROLES: readonly StudioRoleName[] = ['OWNER', 'PM', 'SUPERVISOR', 'ACCOUNTS', 'SALES'];
 
 /** One per row of the brief's table, plus reading a project and its payments. */
 export type StudioAction =
@@ -79,7 +89,33 @@ export type StudioAction =
   /** Keep the studio's crew list (the faces site mode taps). Studio-wide. */
   | 'crew.manage'
   /** Set the studio's working days and holidays (reminders count on them). Studio-wide. */
-  | 'calendar.edit';
+  | 'calendar.edit'
+  /** See a lead, its timeline, files and quotations. SALES: own leads only. */
+  | 'lead.read'
+  /** Work a lead: details, calls, notes, files, meeting, column. SALES: own leads only. */
+  | 'lead.edit'
+  /** Add a lead by hand. */
+  | 'lead.add'
+  /** Give leads to somebody, or back to the pool. */
+  | 'lead.assign'
+  /** Fold a duplicate lead into another. */
+  | 'lead.merge'
+  /** Delete to the bin, restore, erase. */
+  | 'lead.delete'
+  /** Import a spreadsheet of leads. */
+  | 'lead.import'
+  /** See the pool: leads nobody has. */
+  | 'lead.pool'
+  /** Write and send a lead's quotations. SALES: own leads only. */
+  | 'quote.write'
+  /** Mark a quotation revision as the sales final. SALES: own leads only. */
+  | 'quote.salesFinal'
+  /** Record the booking advance on a sales final (creates the project). */
+  | 'booking.record'
+  /** Refund a booking within the refund days (the owner may also later). */
+  | 'booking.refund'
+  /** Set the studio's payment stages (Settings, Payment stages). */
+  | 'payments.template';
 
 export const STUDIO_ACTIONS: readonly StudioAction[] = [
   'team.manage',
@@ -97,11 +133,42 @@ export const STUDIO_ACTIONS: readonly StudioAction[] = [
   'project.read',
   'crew.manage',
   'calendar.edit',
+  'lead.read',
+  'lead.edit',
+  'lead.add',
+  'lead.assign',
+  'lead.merge',
+  'lead.delete',
+  'lead.import',
+  'lead.pool',
+  'quote.write',
+  'quote.salesFinal',
+  'booking.record',
+  'booking.refund',
+  'payments.template',
+];
+
+/** Everything a PM does with leads and sales: all of it, across the studio. */
+const PM_SALES: readonly StudioAction[] = [
+  'lead.read',
+  'lead.edit',
+  'lead.add',
+  'lead.assign',
+  'lead.merge',
+  'lead.delete',
+  'lead.import',
+  'lead.pool',
+  'quote.write',
+  'quote.salesFinal',
+  'booking.record',
+  'booking.refund',
 ];
 
 /** What each role may do. The owner is not listed: the owner may do everything. */
 const GRANTS: Record<Exclude<StudioRoleName, 'OWNER'>, readonly StudioAction[]> = {
+  SALES: ['lead.read', 'lead.edit', 'lead.add', 'quote.write', 'quote.salesFinal'],
   PM: [
+    ...PM_SALES,
     'project.create',
     'plan.edit',
     'update.post',
@@ -116,8 +183,11 @@ const GRANTS: Record<Exclude<StudioRoleName, 'OWNER'>, readonly StudioAction[]> 
     'calendar.edit',
   ],
   SUPERVISOR: ['update.post', 'checklist.tick', 'snag.fix', 'project.read'],
-  ACCOUNTS: ['payment.read', 'payment.record'],
+  ACCOUNTS: ['payment.read', 'payment.record', 'booking.record', 'booking.refund'],
 };
+
+/** Lead actions a salesperson may take only on a lead assigned to them. */
+const OWN_LEAD_ONLY: ReadonlySet<StudioAction> = new Set<StudioAction>(['lead.read', 'lead.edit', 'quote.write', 'quote.salesFinal']);
 
 /** Actions on one project, which a PM or supervisor may take only when assigned to it. */
 const NEEDS_ASSIGNMENT: ReadonlySet<StudioAction> = new Set<StudioAction>([
@@ -153,8 +223,33 @@ export function can(member: MemberRole, action: StudioAction, ctx: { assigned?: 
   if (member.status !== 'ACTIVE') return false;
   if (member.role === 'OWNER') return true;
   if (!GRANTS[member.role]?.includes(action)) return false;
+  // A lead action: only a salesperson is limited, to their own leads.
+  if (OWN_LEAD_ONLY.has(action)) return member.role !== 'SALES' || ctx.assigned === true;
   if (STUDIO_WIDE_ROLES.has(member.role) || !NEEDS_ASSIGNMENT.has(action)) return true;
   return ctx.assigned === true;
+}
+
+/**
+ * The leads a member may see, as a `where` for `prisma.studioClient`: the
+ * whole studio for owner and PM, only those assigned to them for a
+ * salesperson, none for anyone else. Always scoped to their own studio. The
+ * caller still adds `deletedAt: null` (LISTED or LIVE).
+ */
+export function leadsVisibleTo(member: MemberRole & { id: string; studioId: string }): Prisma.StudioClientWhereInput {
+  if (!can(member, 'lead.read', { assigned: true })) return { studioId: member.studioId, id: { in: [] } };
+  if (member.role === 'SALES') return { studioId: member.studioId, assignedToId: member.id };
+  return { studioId: member.studioId };
+}
+
+/**
+ * The quotations a member may see, as a `where` for `prisma.studioQuote`:
+ * the studio's for owner and PM; for a salesperson only quotations of a
+ * lead assigned to them (a quotation with no lead is not theirs to see).
+ */
+export function quotesVisibleTo(member: MemberRole & { id: string; studioId: string }): Prisma.StudioQuoteWhereInput {
+  if (!can(member, 'quote.write', { assigned: true })) return { studioId: member.studioId, id: { in: [] } };
+  if (member.role === 'SALES') return { studioId: member.studioId, client: { assignedToId: member.id, deletedAt: null } };
+  return { studioId: member.studioId };
 }
 
 /** Whether this role needs a `StudioProjectMember` row to act on a project. */
@@ -193,3 +288,6 @@ export const isSeat = (m: { status: StudioMemberStatusName }): boolean => m.stat
  * from the role when the session is made, so nothing is stored.
  */
 export const sessionDaysFor = (role: StudioRoleName): number => (role === 'SUPERVISOR' ? 90 : 30);
+
+/** Roles that are put on particular projects (site chips on Settings → Team). */
+export const PICKS_SITES: readonly StudioRoleName[] = ['PM', 'SUPERVISOR'];

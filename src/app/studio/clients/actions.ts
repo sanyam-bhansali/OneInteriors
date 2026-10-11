@@ -51,7 +51,9 @@ export async function addClientAction(_prev: State, form: FormData): Promise<Sta
     phone: str(form, 'phone'),
     society: str(form, 'society'),
     config: str(form, 'config'),
-    source: (str(form, 'source') || 'OTHER') as ClientSourceName,
+    // 'own:<id>' is one of the studio's own source names (Studio OS Phase 1).
+    source: (str(form, 'source').startsWith('own:') ? 'OTHER' : str(form, 'source') || 'OTHER') as ClientSourceName,
+    leadSourceId: str(form, 'source').startsWith('own:') ? str(form, 'source').slice(4) : undefined,
     sourceNote: str(form, 'sourceNote'),
     nextAction: str(form, 'nextAction'),
     nextActionOn: str(form, 'nextActionOn'),

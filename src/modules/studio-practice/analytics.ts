@@ -148,13 +148,15 @@ export async function leadAnalytics(): Promise<LeadAnalytics | null> {
         where: { studioId, ...LIVE },
         _count: { _all: true },
       }),
+      /* By source AND the studio's own source name (Studio OS Phase 1), so
+         "Housing.com" counts as itself rather than as Other. */
       prisma.studioClient.groupBy({
-        by: ['source'],
+        by: ['source', 'leadSourceId'],
         where: { studioId, ...LIVE },
         _count: { _all: true },
       }),
       prisma.studioClient.groupBy({
-        by: ['source'],
+        by: ['source', 'leadSourceId'],
         where: { studioId, ...LIVE, stageId: { in: wonIds } },
         _count: { _all: true },
       }),
@@ -178,7 +180,14 @@ export async function leadAnalytics(): Promise<LeadAnalytics | null> {
     ]);
 
     const stageCount = new Map(byStageRaw.map((r) => [r.stageId, r._count._all]));
-    const wonBySource = new Map(wonSourceRaw.map((r) => [r.source, r._count._all]));
+    const ownNames = new Map(
+      (await prisma.studioLeadSource.findMany({ where: { studioId }, select: { id: true, name: true } })).map((s) => [s.id, s.name]),
+    );
+    const sourceName = (r: { source: string; leadSourceId: string | null }) => (r.leadSourceId ? (ownNames.get(r.leadSourceId) ?? r.source) : r.source);
+    const wonBySource = new Map<string, number>();
+    for (const r of wonSourceRaw) wonBySource.set(sourceName(r), (wonBySource.get(sourceName(r)) ?? 0) + r._count._all);
+    const totalBySource = new Map<string, number>();
+    for (const r of bySourceRaw) totalBySource.set(sourceName(r), (totalBySource.get(sourceName(r)) ?? 0) + r._count._all);
 
     const closed = won + lost;
 
@@ -203,11 +212,11 @@ export async function leadAnalytics(): Promise<LeadAnalytics | null> {
         colour: s.colour,
         count: stageCount.get(s.id) ?? 0,
       })),
-      bySource: bySourceRaw
-        .map((r) => ({
-          source: r.source,
-          total: r._count._all,
-          won: wonBySource.get(r.source) ?? 0,
+      bySource: [...totalBySource.entries()]
+        .map(([source, total]) => ({
+          source,
+          total,
+          won: wonBySource.get(source) ?? 0,
         }))
         .sort((a, b) => b.total - a.total),
       lostReasons: lostReasonRaw

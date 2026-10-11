@@ -13,6 +13,12 @@ import { DEMO_LEAD, LISTED, LIVE } from './demo-lead';
 import { prisma } from '@/lib/prisma';
 import { fromDb, type Paise } from '@/lib/money';
 import { myStudioId } from '@/modules/studio-quote/store';
+import { myLeadScope } from '@/modules/studio/lead-scope';
+import { can } from '@/modules/studio/roles';
+import { notify } from '@/modules/notify/service';
+import { getCurrentUser } from '@/modules/auth/session';
+
+const getCurrentUserId = async (): Promise<string | null> => (await getCurrentUser())?.id ?? null;
 import { myStages, intakeStageId } from './stages';
 import { myFields } from './fields';
 import { cleanValues, problemSentence, readValues, type FieldValues } from './field-values';
@@ -73,10 +79,42 @@ export interface ClientRow {
   updatedAt: Date;
   /** The sample we put on an empty board. Listed, never counted — demo-lead.ts. */
   isDemo: boolean;
+  /** Studio OS Phase 1: what they said they would spend. */
+  budgetPaise: number | null;
+  meetingAt: Date | null;
+  meetingNote: string | null;
+  /** One of the studio's own source names (source is then OTHER). */
+  leadSourceId: string | null;
+  leadSourceName: string | null;
+  /** The booking advance was recorded: the project hangs off this introduction. */
+  bookedIntroductionId: string | null;
+  bookedAt: Date | null;
+}
+
+/** The Phase 1 columns of a client row, read the same way everywhere. */
+function salesColumns(row: {
+  budgetPaise: bigint | null;
+  meetingAt: Date | null;
+  meetingNote: string | null;
+  leadSourceId: string | null;
+  leadSource?: { name: string } | null;
+  bookedIntroductionId: string | null;
+  bookedAt: Date | null;
+}) {
+  return {
+    budgetPaise: row.budgetPaise === null ? null : fromDb(row.budgetPaise),
+    meetingAt: row.meetingAt,
+    meetingNote: row.meetingNote,
+    leadSourceId: row.leadSourceId,
+    leadSourceName: row.leadSource?.name ?? null,
+    bookedIntroductionId: row.bookedIntroductionId,
+    bookedAt: row.bookedAt,
+  };
 }
 
 export async function myClients(): Promise<ClientRow[]> {
-  const studioId = await myStudioId();
+  const scope = await myLeadScope();
+  const studioId = scope?.studioId ?? null;
   if (!studioId) return [];
 
   try {
@@ -88,18 +126,19 @@ export async function myClients(): Promise<ClientRow[]> {
        including one who added a real lead and then binned it — a board that
        re-seeds itself after somebody clears it is a board arguing with its
        owner. */
-    await seedDemoLead(studioId);
+    if (scope?.seesAll) await seedDemoLead(studioId);
 
     const rows = await prisma.studioClient.findMany({
       // `LISTED`, not `LIVE`: the board shows the sample, the counts do not.
       // `deletedAt: null` on every read of this table, without exception.
       // A deleted client reappearing on the board is worse than one that
       // never deleted — see the note on the column in schema.prisma.
-      where: { studioId, ...LISTED },
+      where: { ...scope?.leads, studioId, ...LISTED },
       orderBy: [{ nextActionOn: { sort: 'asc', nulls: 'last' } }, { updatedAt: 'desc' }],
       include: {
         stage: { select: { id: true, name: true, kind: true, colour: true } },
         assignedTo: { select: { id: true, user: { select: { name: true, email: true } } } },
+        leadSource: { select: { name: true } },
       },
       take: 400,
     });
@@ -155,6 +194,7 @@ export async function myClients(): Promise<ClientRow[]> {
         lastContactedAt: row.lastContactedAt,
         fields: readValues(row.fields),
         updatedAt: row.updatedAt,
+        ...salesColumns(row),
       };
     });
   } catch (error) {
@@ -214,6 +254,8 @@ export interface NewClientInput {
   nextActionOn?: string;
   /** Whatever the studio defined in Settings → Fields, keyed by field key. */
   custom?: Record<string, string>;
+  /** One of the studio's own source names (Studio OS Phase 1); source becomes OTHER. */
+  leadSourceId?: string;
   /**
    * Add it anyway, despite a matching phone number.
    *
@@ -341,8 +383,10 @@ export async function removeDemoLead(): Promise<Result> {
 }
 
 export async function addClient(input: NewClientInput): Promise<AddResult> {
-  const studioId = await myStudioId();
-  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+  const scope = await myLeadScope();
+  const studioId = scope?.studioId ?? null;
+  if (!scope || !studioId) return { ok: false, error: 'No studio on this account.' };
+  if (!can(scope.member, 'lead.add')) return { ok: false, error: 'Your role in the studio does not include adding leads.' };
 
   const name = input.name.trim();
   if (name.length < 2) return { ok: false, error: 'Who is it?' };
@@ -414,6 +458,10 @@ export async function addClient(input: NewClientInput): Promise<AddResult> {
   const { values, problems } = cleanValues(await myFields(), input.custom ?? {});
   if (problems.length > 0) return { ok: false, error: problemSentence(problems) };
 
+  const ownSource = input.leadSourceId
+    ? await prisma.studioLeadSource.findFirst({ where: { id: input.leadSourceId, studioId }, select: { id: true } })
+    : null;
+
   try {
     const row = await prisma.studioClient.create({
       data: {
@@ -432,9 +480,14 @@ export async function addClient(input: NewClientInput): Promise<AddResult> {
         // says whether the roster is worth paying for stops meaning anything.
         source: input.source === 'ONE_INTERIORS' ? 'OTHER' : input.source,
         sourceNote: input.sourceNote?.trim() || null,
+        ...(ownSource ? { source: 'OTHER' as const, leadSourceId: ownSource.id } : {}),
         nextAction: action,
         nextActionOn: on ? new Date(on) : null,
         fields: values,
+        /* Owner and PM add to the pool and assign (owner, 12 Oct). A
+           salesperson's own walk-in is theirs: in the pool they could not
+           see it at all. */
+        assignedToId: scope.seesAll ? null : scope.member.id,
       },
       select: { id: true },
     });
@@ -464,7 +517,8 @@ export interface UpdateClientInput {
 }
 
 export async function updateClient(input: UpdateClientInput): Promise<Result> {
-  const studioId = await myStudioId();
+  const scope = await myLeadScope();
+  const studioId = scope?.studioId ?? null;
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   // The MEANING of the column decides the behaviour, never its name — a
@@ -499,7 +553,7 @@ export async function updateClient(input: UpdateClientInput): Promise<Result> {
        Only fetched when a stage move is actually happening. */
     const before = input.stageId
       ? await prisma.studioClient.findFirst({
-          where: { id: input.id, studioId, deletedAt: null },
+          where: { ...scope?.leads, id: input.id, studioId, deletedAt: null },
           select: { stageId: true, stage: { select: { name: true } } },
         })
       : null;
@@ -507,7 +561,7 @@ export async function updateClient(input: UpdateClientInput): Promise<Result> {
     // `updateMany` scoped by studioId: an id from a form is not proof of
     // ownership, and this simply matches nothing when it is not theirs.
     const { count } = await prisma.studioClient.updateMany({
-      where: { id: input.id, studioId, deletedAt: null },
+      where: { ...scope?.leads, id: input.id, studioId, deletedAt: null },
       data: {
         ...(input.stageId ? { stageId: input.stageId } : {}),
         ...(values ? { fields: values } : {}),
@@ -653,6 +707,20 @@ export async function assignClients(ids: string[], memberId: string | null): Pro
       })),
     );
 
+    /* The person told, in their inbox (and by email when they have one):
+       Studio OS Phase 1. Not when somebody takes a lead themselves. */
+    if (memberId) {
+      const [to, me, first] = await Promise.all([
+        prisma.studioMember.findFirst({ where: { id: memberId, studioId }, select: { userId: true } }),
+        getCurrentUserId(),
+        prisma.studioClient.findFirst({ where: { id: targets[0]!.id, studioId }, select: { id: true, name: true } }),
+      ]);
+      if (to && to.userId !== me && first) {
+        const by = me ? await prisma.user.findUnique({ where: { id: me }, select: { name: true } }) : null;
+        void notify(to.userId, { kind: 'lead-assigned', clientId: first.id, count: targets.length, name: first.name, by: by?.name ?? null });
+      }
+    }
+
     return { ok: true };
   } catch (error) {
     return saveFailed('assignClients', error);
@@ -681,7 +749,8 @@ export async function logContact(
   outcome?: CallOutcomeId,
   note?: string | null,
 ): Promise<Result> {
-  const studioId = await myStudioId();
+  const scope = await myLeadScope();
+  const studioId = scope?.studioId ?? null;
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   try {
@@ -706,7 +775,7 @@ export async function logContact(
     const due = outcome ? followupDue(outcome, now) : null;
 
     const { count } = await prisma.studioClient.updateMany({
-      where: { id, studioId, deletedAt: null },
+      where: { ...scope?.leads, id, studioId, deletedAt: null },
       data: {
         lastContactedAt: now,
         /* Both or neither, which is the rule addClient already enforces: an
@@ -977,6 +1046,8 @@ export async function importClients(
    * cannot mark its own spreadsheet as leads we sent.
    */
   source: ClientSourceName = IMPORT_SOURCE,
+  /** One of the studio's own source names (Studio OS Phase 1); the source is then OTHER. */
+  leadSourceId?: string | null,
 ): Promise<ImportResult | { ok: false; error: string }> {
   const studioId = await myStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
@@ -1015,6 +1086,10 @@ export async function importClients(
        row from an overlapping import would give it a duplicate CREATED line,
        and missing one would give it none. */
     const startedAt = new Date();
+    const fields = await myFields();
+    const ownSource = leadSourceId
+      ? await prisma.studioLeadSource.findFirst({ where: { id: leadSourceId, studioId }, select: { id: true } })
+      : null;
 
     const result = await prisma.studioClient.createMany({
       data: fresh.map((r) => ({
@@ -1027,8 +1102,12 @@ export async function importClients(
         locality: r.locality,
         config: r.config,
         notes: r.notes,
-        source: source === 'ONE_INTERIORS' ? 'OTHER' : source,
+        source: ownSource ? 'OTHER' : source === 'ONE_INTERIORS' ? 'OTHER' : source,
+        leadSourceId: ownSource?.id ?? null,
         sourceNote: IMPORT_NOTE,
+        // The studio's own fields, where a column was mapped to one; a value that
+        // does not fit its field (a word in a number) is left out, not guessed.
+        fields: r.custom ? cleanValues(fields, r.custom).values : {},
         // Unassigned on purpose. See the note above.
         assignedToId: null,
       })),
@@ -1049,7 +1128,7 @@ export async function importClients(
           studioId,
           clientId: w.id,
           kind: 'CREATED' as const,
-          summary: createdSummary('imported', IMPORT_SOURCE),
+          summary: createdSummary('imported', source),
         })),
       );
     }
@@ -1093,16 +1172,18 @@ export interface FoundClient {
  * the sample doing its job.
  */
 export async function clientById(id: string): Promise<ClientRow | null> {
-  const studioId = await myStudioId();
+  const scope = await myLeadScope();
+  const studioId = scope?.studioId ?? null;
   if (!studioId) return null;
 
   try {
     const row = await prisma.studioClient.findFirst({
-      where: { id, studioId, ...LISTED },
+      where: { ...scope?.leads, id, studioId, ...LISTED },
       include: {
         stage: { select: { id: true, name: true, kind: true, colour: true } },
         assignedTo: { select: { id: true, user: { select: { name: true, email: true } } } },
         quotes: { select: { id: true, lines: { select: { amountPaise: true } } } },
+        leadSource: { select: { name: true } },
       },
     });
     if (!row) return null;
@@ -1140,6 +1221,7 @@ export async function clientById(id: string): Promise<ClientRow | null> {
       lastContactedAt: row.lastContactedAt,
       fields: readValues(row.fields),
       updatedAt: row.updatedAt,
+      ...salesColumns(row),
     };
   } catch (error) {
     console.error('[studio-practice] clientById failed', error);
@@ -1148,7 +1230,8 @@ export async function clientById(id: string): Promise<ClientRow | null> {
 }
 
 export async function findClients(query: string): Promise<FoundClient[]> {
-  const studioId = await myStudioId();
+  const scope = await myLeadScope();
+  const studioId = scope?.studioId ?? null;
   if (!studioId) return [];
 
   const q = query.trim();
@@ -1159,6 +1242,7 @@ export async function findClients(query: string): Promise<FoundClient[]> {
   try {
     const rows = await prisma.studioClient.findMany({
       where: {
+        ...scope?.leads,
         studioId,
         deletedAt: null,
         OR: [

@@ -40,6 +40,8 @@ import { consume, bucketFor, waitPhrase, type Limit } from '@/modules/rate-limit
 import { validate, type CaptureInput } from './capture-fields';
 import { record } from './events';
 import { DEFAULT_STAGES } from './vocabulary';
+import { formAgainSummary, formLanding } from '@/modules/studio-sales/intake-rules';
+import { notify, notifyStudio } from '@/modules/notify/service';
 
 /**
  * One person, hammering. Low, because a genuine enquirer submits once.
@@ -157,6 +159,34 @@ export async function submitEnquiry(
   }
 
   try {
+    /* One person, one lead (Studio OS Phase 1): the same duplicate check as
+       adding by hand. Somebody already on the board who fills in the form
+       again gets a line on their own timeline, not a second card; whoever
+       has the lead (or the owner and PMs, for a pool lead) is told. */
+    const matches = checked.value.phone
+      ? await prisma.studioClient.findMany({
+          where: { studioId: form.studioId, phone: checked.value.phone },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true, deletedAt: true, isDemo: true, name: true, assignedTo: { select: { userId: true, status: true } } },
+          take: 10,
+        })
+      : [];
+    const landing = formLanding(matches);
+    if (landing.kind === 'attach') {
+      await record({
+        studioId: form.studioId,
+        clientId: landing.id,
+        kind: 'NOTE',
+        summary: formAgainSummary(checked.value.message),
+        by: null,
+      });
+      const match = matches.find((m) => m.id === landing.id)!;
+      const event = { kind: 'lead-new' as const, clientId: landing.id, name: match.name, source: 'your enquiry form', again: true };
+      if (match.assignedTo && match.assignedTo.status === 'ACTIVE') void notify(match.assignedTo.userId, event);
+      else void notifyStudio(form.studioId, event);
+      return { status: 'ok' };
+    }
+
     const stageId = await intakeStageFor(form.studioId);
     if (!stageId) return { status: 'error', message: 'We could not take that just now.' };
 
@@ -197,6 +227,9 @@ export async function submitEnquiry(
       summary: 'Came in through your enquiry form',
       by: null,
     });
+
+    // In the pool: the owner and PMs hear about it, in the inbox and by email.
+    void notifyStudio(form.studioId, { kind: 'lead-new', clientId: client.id, name: checked.value.name, source: 'your enquiry form', again: false });
 
     return { status: 'ok' };
   } catch (error) {

@@ -21,6 +21,7 @@
  */
 
 import type { ClientSourceName } from './vocabulary';
+import { customKeyOf, isCustomColumn } from '@/modules/studio-sales/intake-rules';
 
 // ── Parsing ────────────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ export function parseCsv(text: string): string[][] {
 
   return rows.filter((r) => r.some((c) => c.trim().length > 0));
 }
+
 
 // ── Column mapping ─────────────────────────────────────────────
 
@@ -247,6 +249,8 @@ export interface ImportRow {
   locality: string | null;
   config: string | null;
   notes: string | null;
+  /** Columns mapped to the studio's own fields (`custom:<key>`), by field key. Checked on write. */
+  custom?: Record<string, string>;
 }
 
 export interface ImportPlan {
@@ -275,7 +279,7 @@ export interface ImportPlan {
  * that reports what it did afterwards is an import nobody trusts the second
  * time.
  */
-export function planImport(rows: string[][], mapping: ColumnKey[]): ImportPlan {
+export function planImport(rows: string[][], mapping: readonly (ColumnKey | string)[]): ImportPlan {
   const [, ...body] = rows;
   const plan: ImportPlan = {
     rows: [],
@@ -330,6 +334,7 @@ export function planImport(rows: string[][], mapping: ColumnKey[]): ImportPlan {
       locality: value('locality'),
       config: value('config'),
       notes: value('notes'),
+      ...customOf(row, mapping),
     });
   }
 
@@ -347,3 +352,14 @@ export function planImport(rows: string[][], mapping: ColumnKey[]): ImportPlan {
  */
 export const IMPORT_SOURCE: ClientSourceName = 'OTHER';
 export const IMPORT_NOTE = 'Imported from a spreadsheet';
+
+/** The studio's own fields in this row (Studio OS Phase 1), from columns mapped custom:<key>. */
+function customOf(row: string[], mapping: readonly string[]): { custom?: Record<string, string> } {
+  const custom: Record<string, string> = {};
+  mapping.forEach((m, i) => {
+    if (!isCustomColumn(m)) return;
+    const v = (row[i] ?? '').trim();
+    if (v) custom[customKeyOf(m)] = v.slice(0, 200);
+  });
+  return Object.keys(custom).length > 0 ? { custom } : {};
+}

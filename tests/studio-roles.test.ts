@@ -23,22 +23,36 @@ import {
  */
 type Cell = 'Y' | 'A' | '-';
 const TABLE: Record<StudioAction, Record<StudioRoleName, Cell>> = {
-  'team.manage': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: '-' },
-  'project.create': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-' },
-  'plan.edit': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-' },
-  'update.post': { OWNER: 'Y', PM: 'A', SUPERVISOR: 'A', ACCOUNTS: '-' },
-  'checklist.tick': { OWNER: 'Y', PM: 'A', SUPERVISOR: 'A', ACCOUNTS: '-' },
-  'decision.create': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-' },
-  'snag.accept': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-' },
-  'snag.fix': { OWNER: 'Y', PM: 'A', SUPERVISOR: 'A', ACCOUNTS: '-' },
-  'payment.record': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: 'Y' },
-  'payment.read': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: 'Y' },
-  'document.upload': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-' },
-  'vendor.rates': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: '-' },
-  'project.read': { OWNER: 'Y', PM: 'A', SUPERVISOR: 'A', ACCOUNTS: '-' },
+  'team.manage': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-' },
+  'project.create': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-' },
+  'plan.edit': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-' },
+  'update.post': { OWNER: 'Y', PM: 'A', SUPERVISOR: 'A', ACCOUNTS: '-', SALES: '-' },
+  'checklist.tick': { OWNER: 'Y', PM: 'A', SUPERVISOR: 'A', ACCOUNTS: '-', SALES: '-' },
+  'decision.create': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-' },
+  'snag.accept': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-' },
+  'snag.fix': { OWNER: 'Y', PM: 'A', SUPERVISOR: 'A', ACCOUNTS: '-', SALES: '-' },
+  'payment.record': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: 'Y', SALES: '-' },
+  'payment.read': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: 'Y', SALES: '-' },
+  'document.upload': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-' },
+  'vendor.rates': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-' },
+  'project.read': { OWNER: 'Y', PM: 'A', SUPERVISOR: 'A', ACCOUNTS: '-', SALES: '-' },
   // Phases 2–5: studio-wide settings, not project actions.
-  'crew.manage': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-' },
-  'calendar.edit': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-' },
+  'crew.manage': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-' },
+  'calendar.edit': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-' },
+  // Studio OS Phase 1: leads and sales. For SALES, 'A' means "a lead assigned to them".
+  'lead.read': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: 'A' },
+  'lead.edit': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: 'A' },
+  'lead.add': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: 'Y' },
+  'lead.assign': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-' },
+  'lead.merge': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-' },
+  'lead.delete': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-' },
+  'lead.import': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-' },
+  'lead.pool': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-' },
+  'quote.write': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: 'A' },
+  'quote.salesFinal': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: 'A' },
+  'booking.record': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: 'Y', SALES: '-' },
+  'booking.refund': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: 'Y', SALES: '-' },
+  'payments.template': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-' },
 };
 
 const active = (role: StudioRoleName) => ({ role, status: 'ACTIVE' as const });
@@ -76,7 +90,7 @@ describe('the cells that matter most', () => {
     const accounts = active('ACCOUNTS');
     expect(can(accounts, 'payment.read', { assigned: false })).toBe(true);
     expect(can(accounts, 'payment.record', { assigned: false })).toBe(true);
-    const others = STUDIO_ACTIONS.filter((a) => a !== 'payment.read' && a !== 'payment.record');
+    const others = STUDIO_ACTIONS.filter((a) => !['payment.read', 'payment.record', 'booking.record', 'booking.refund'].includes(a));
     for (const a of others) expect(can(accounts, a, { assigned: true }), a).toBe(false);
   });
 

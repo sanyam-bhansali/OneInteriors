@@ -95,7 +95,7 @@ export default async function StudioHome() {
   today.setHours(23, 59, 59, 999);
 
   const due = clients.filter(
-    (c) => BOARD_KINDS.includes(c.stageKind) && c.nextActionOn !== null && c.nextActionOn <= today,
+    (c) => !c.isDemo && BOARD_KINDS.includes(c.stageKind) && c.nextActionOn !== null && c.nextActionOn <= today,
   );
   const owed = vendors.reduce((sum, v) => sum + Math.max(0, v.balancePaise), 0);
   const drafts = quotes.filter((q) => q.status === 'DRAFT');
@@ -112,7 +112,7 @@ export default async function StudioHome() {
    * two hundred rows that nobody has begun are exactly what a studio needs
    * shown back to them on day two.
    */
-  const open = clients.filter((c) => BOARD_KINDS.includes(c.stageKind));
+  const open = clients.filter((c) => !c.isDemo && BOARD_KINDS.includes(c.stageKind));
   const quietLine = Date.now() - QUIET_AFTER_DAYS * 86_400_000;
   const quietClients = open.filter(
     (c) => c.lastContactedAt === null || c.lastContactedAt.getTime() < quietLine,

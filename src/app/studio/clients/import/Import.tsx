@@ -10,6 +10,7 @@ import {
   type ColumnKey,
 } from '@/modules/studio-practice/csv';
 import { importCsvAction, type ImportState } from './actions';
+import { SOURCE_LABELS, type ClientSourceName } from '@/modules/studio-practice/vocabulary';
 
 /** Lives here rather than in `actions.ts`, which exports only its action. */
 const IMPORT_IDLE: ImportState = { idle: true };
@@ -50,10 +51,20 @@ function short(cell: string): string {
   return cell.length > 40 ? `${cell.slice(0, 40)}…` : cell;
 }
 
-export function Import() {
+export function Import({
+  fields = [],
+  sources = [],
+}: {
+  /** The studio's own fields, which a column can be mapped to. */
+  fields?: { key: string; label: string }[];
+  /** The studio's own source names. */
+  sources?: { id: string; name: string }[];
+}) {
   const [text, setText] = useState('');
   const [fileName, setFileName] = useState('');
-  const [mapping, setMapping] = useState<ColumnKey[]>([]);
+  const [mapping, setMapping] = useState<string[]>([]);
+  /* Where this list came from: one of ours (FACEBOOK…) or 'own:<id>'. Asked, because the analytics page counts it. */
+  const [source, setSource] = useState('');
   const [readError, setReadError] = useState('');
   const [state, setState] = useState<ImportState>(IMPORT_IDLE);
   const [pending, start] = useTransition();
@@ -234,7 +245,7 @@ export function Import() {
                       value={mapping[i] ?? 'skip'}
                       onChange={(e) => {
                         const next = [...mapping];
-                        const chosen = e.target.value as ColumnKey;
+                        const chosen = e.target.value;
                         // One column per field. Picking a field that is already
                         // taken moves it, rather than creating two columns that
                         // both claim to be the phone number.
@@ -251,6 +262,11 @@ export function Import() {
                       {KEYS.map((k) => (
                         <option key={k} value={k}>
                           {COLUMN_LABELS[k]}
+                        </option>
+                      ))}
+                      {fields.map((f) => (
+                        <option key={f.key} value={`custom:${f.key}`}>
+                          {f.label} (your field)
                         </option>
                       ))}
                     </select>
@@ -374,13 +390,33 @@ export function Import() {
             </table>
           </div>
 
+          <label className="mt-5 flex max-w-[26rem] flex-col gap-1.5">
+            <span className="s-label">Where did these leads come from?</span>
+            <select value={source} onChange={(e) => setSource(e.target.value)} className={input}>
+              <option value="">Pick one…</option>
+              {(Object.keys(SOURCE_LABELS) as ClientSourceName[])
+                .filter((k) => k !== 'ONE_INTERIORS')
+                .map((k) => (
+                  <option key={k} value={k}>
+                    {SOURCE_LABELS[k]}
+                  </option>
+                ))}
+              {sources.map((o) => (
+                <option key={o.id} value={`own:${o.id}`}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <button
               type="button"
-              disabled={pending}
+              disabled={pending || !source}
               onClick={() =>
                 start(async () => {
-                  setState(await importCsvAction(text, mapping));
+                  const own = source.startsWith('own:') ? source.slice(4) : null;
+                  setState(await importCsvAction(text, mapping, own ? 'OTHER' : source, own));
                 })
               }
               className={primary}

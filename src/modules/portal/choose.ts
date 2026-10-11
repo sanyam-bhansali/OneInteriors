@@ -28,7 +28,7 @@ import { durationFor } from './tracker';
 import { notifyStudio } from '@/modules/notify/service';
 import { fromDb } from '@/lib/money';
 import { tellOpsAssured } from './plan-store';
-import { createSignedProject } from './plan-write';
+import { createSignedProject, PLAN_TX } from './plan-write';
 import type { PlanName } from './plans';
 
 const VISIBLE_QUOTE = ['ISSUED', 'ACCEPTED'] as const;
@@ -410,7 +410,7 @@ export async function signFinalQuote(
         },
       });
       return created;
-    });
+    }, PLAN_TX);
     // The studio hears at once — inbox and email (notify/service.ts).
     void notifyStudio(q.studioId, {
       kind: 'quote-signed',

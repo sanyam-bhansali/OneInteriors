@@ -17,14 +17,18 @@ const TABS = [
   { href: '/studio/settings/pipeline', label: 'Pipeline' },
   { href: '/studio/settings/fields', label: 'Fields' },
   { href: '/studio/settings/crew', label: 'Crew' },
+  { href: '/studio/settings/sources', label: 'Lead sources' },
 ];
+
+/** The payment stages for the studio's own sales are the owner's (`payments.template`). */
+const PAYMENTS_TAB = { href: '/studio/settings/payments', label: 'Payment stages' };
 
 /** Team is the owner's alone (`team.manage`), so the tab is only drawn for them. */
 const TEAM_TAB = { href: '/studio/settings/team', label: 'Team' };
 
 export function SettingsTabs({ team = false }: { team?: boolean }) {
   const pathname = usePathname();
-  const tabs = team ? [...TABS, TEAM_TAB] : TABS;
+  const tabs = team ? [...TABS, PAYMENTS_TAB, TEAM_TAB] : TABS;
 
   return (
     <nav className="flex gap-1 overflow-x-auto">

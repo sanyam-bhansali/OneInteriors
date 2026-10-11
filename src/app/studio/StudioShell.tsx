@@ -32,9 +32,11 @@ import { Search } from './Search';
 
 type IconName =
   | 'home' | 'quote' | 'calendar' | 'products' | 'listing'
-  | 'clients' | 'projects' | 'vendors' | 'settings';
+  | 'clients' | 'projects' | 'vendors' | 'settings' | 'today';
 
 const PATHS: Record<IconName, string> = {
+  // A sun over a list line: what needs doing today.
+  today: 'M12 3.2v2.2M5.8 5.8l1.5 1.5M18.2 5.8l-1.5 1.5M3.2 12h2.2M18.6 12h2.2M8.4 12a3.6 3.6 0 0 1 7.2 0M4.4 16h15.2M7.4 19.6h9.2',
   home: 'M3.4 11.2 12 4.2l8.6 7M6 12.6v7.2M18 12.6v7.2M7.6 15.2a5 5 0 0 1 8.8 0',
   quote: 'M6.4 3.4h8.2l4 4v13.2H6.4zM14.2 3.6v4.2h4.2M9.2 13h6M9.2 16.4h4',
   calendar: 'M4.2 5.8h15.6v14H4.2zM4.2 10h15.6M8.6 3.6v4M15.4 3.6v4',

@@ -76,7 +76,7 @@ export async function studioProjects(now = new Date()): Promise<ProjectsOverview
   if (!member) return null;
   const money = seesMoney(member);
   const projects = await prisma.homeProject.findMany({
-    where: projectsVisibleTo(member),
+    where: { ...projectsVisibleTo(member), cancelledAt: null },
     orderBy: { startOn: 'desc' },
     select: {
       id: true,

@@ -4,7 +4,7 @@ import { PageHead, PageBody } from '../StudioShell';
 import { GuidePanel } from '../GuidePanel';
 import { guideContext } from '@/modules/studio/guide-store';
 import { formatINR } from '@/lib/money';
-import { myQuotes, STAGE_LABELS, STATUS_LABELS, type QuoteStatusName, type QuoteSummary } from '@/modules/studio-quote/quotes';
+import { mayQuote, myQuotes, STAGE_LABELS, STATUS_LABELS, type QuoteStatusName, type QuoteSummary } from '@/modules/studio-quote/quotes';
 import { myProducts } from '@/modules/studio-quote/store';
 import { StartQuote } from './NewQuote';
 import { RatesGateCard } from '../RatesGateCard';
@@ -33,7 +33,9 @@ const TONE: Record<QuoteStatusName, string> = {
  */
 export default async function QuotationsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const search = String((await searchParams).q ?? '').trim().slice(0, 80);
-  const [quotes, products, gate] = await Promise.all([myQuotes(search), myProducts(), myRatesGate()]);
+  const [quotes, products, gate, quoting] = await Promise.all([myQuotes(search), myProducts(), myRatesGate(), mayQuote()]);
+  // A salesperson's quotation is always for a lead (Studio OS Phase 1).
+  const leadRequired = quoting?.seesAll === false;
   const folders = byClient(quotes);
 
   /* Shut until the studio has confirmed the rates filled from its own
@@ -76,7 +78,7 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
         }
         action={
           quotes.length > 0 ? (
-            <StartQuote priced={priced} standard={standard} total={products.length} compact />
+            <StartQuote priced={priced} standard={standard} total={products.length} compact leadRequired={leadRequired} />
           ) : null
         }
       />
@@ -98,7 +100,7 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
             drawer. Now the first screen writes a quotation. */}
         {quotes.length === 0 && !search ? (
           <div className="flex flex-col gap-4">
-            <StartQuote priced={priced} standard={standard} total={products.length} />
+            <StartQuote priced={priced} standard={standard} total={products.length} leadRequired={leadRequired} />
 
             <p className="m-0 max-w-[68ch] px-1 text-[13.5px] leading-relaxed text-[var(--s-ink-3)]">
               Yours, on your letterhead, for your own clients as much as the ones we introduce. We

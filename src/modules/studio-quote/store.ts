@@ -35,6 +35,7 @@ import { Prisma } from '@prisma/client';
  * twenty-odd files that import it from this path did not all have to change.
  */
 import { myStudioId } from '@/modules/studio/tenancy';
+import { quotingStudioId } from '@/modules/studio/lead-scope';
 
 export { myStudioId };
 
@@ -75,7 +76,7 @@ export interface ProductRow {
  * index, so a studio who deleted a line does not get it handed back.
  */
 export async function myProducts(): Promise<ProductRow[]> {
-  const studioId = await myStudioId();
+  const studioId = await quotingStudioId();
   if (!studioId) return [];
 
   try {
@@ -467,7 +468,7 @@ export function parseMaterialSpec(text: string): MaterialSpecRow[] {
  * 2026. The copy is the record.
  */
 export async function myBranding(): Promise<BrandingRow | null> {
-  const studioId = await myStudioId();
+  const studioId = await quotingStudioId();
   if (!studioId) return null;
 
   try {
@@ -670,7 +671,7 @@ export async function setHideOurMark(hide: boolean): Promise<SaveResult> {
  * treats as unentitled — the safe direction.
  */
 export async function myTier(): Promise<string | null> {
-  const studioId = await myStudioId();
+  const studioId = await quotingStudioId();
   if (!studioId) return null;
   const sub = await prisma.subscription.findUnique({
     where: { studioId },
@@ -696,7 +697,7 @@ export interface StudioProfile {
 
 /** What a client reads about the studio before the figures. Null when there is no studio. */
 export async function myStudioProfile(): Promise<StudioProfile | null> {
-  const studioId = await myStudioId();
+  const studioId = await quotingStudioId();
   if (!studioId) return null;
   try {
     const studio = await prisma.studio.findUnique({

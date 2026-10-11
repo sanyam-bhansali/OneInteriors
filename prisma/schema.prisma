@@ -646,6 +646,16 @@ model Studio {
   /// stored value that fails the checks is read as none.
   paymentPhases Json?
 
+  /// Studio OS Phase 1 (docs/studio-os/PHASE-1-SALES.md): the studio's
+  /// payment schedule for its own sales, set in Settings, Payment stages
+  /// (owner): [{ label, note, kind: 'FIXED' | 'PCT', amountPaise?, pct?,
+  /// refundDays? }]. Fixed amounts first (Hauspire's booking advance), the
+  /// percentages are of the contract after them and total exactly 100.
+  /// Checked by `modules/studio-sales/payment-template.ts`; null or a stored
+  /// value that fails the checks reads as Hauspire's default. Copied onto a
+  /// quotation's sales final, so a later change never rewrites a booked one.
+  paymentTemplate Json?
+
   /// The matching profile: work mix (modular / carpentry / both), scopes and
   /// minimums, civil capability, home types, city-wide and societies,
   /// capacity, earliest start, durations, how they work, materials,
@@ -757,6 +767,11 @@ model Studio {
   studioProjects     StudioProject[]
   studioVendors      StudioVendor[]
   studioWorkOrders   StudioWorkOrder[]
+  /// Studio OS Phase 1: lead files, the studio's own source names, and the
+  /// frozen copy of each quotation as it was sent.
+  studioClientFiles  StudioClientFile[]
+  studioLeadSources  StudioLeadSource[]
+  quoteRevisions     StudioQuoteRevision[]
 
   /// Studio workspace Phase 2: the saved crew faces site mode taps, and the
   /// days off that are not reminder days.
@@ -837,6 +852,11 @@ model StudioMember {
   /// Their own saved views. Cascade — see the model.
   savedViews StudioSavedView[]
 
+  /// Studio OS Phase 1: files they attached to leads, quotation revisions
+  /// they sent. SetNull on removal, so who did it stays as a name.
+  clientFiles    StudioClientFile[]
+  quoteRevisions StudioQuoteRevision[]
+
   @@index([studioId])
   @@index([invitedById])
   @@map("studio_members")
@@ -849,6 +869,9 @@ enum StudioRole {
   PM
   SUPERVISOR
   ACCOUNTS
+  /// Studio OS Phase 1: a salesperson. Sees only the leads assigned to them,
+  /// those leads' quotations and files; nothing of projects or payments.
+  SALES
 }
 
 /// A seat is a member who has signed in at least once and is not suspended.
@@ -1506,6 +1529,13 @@ model HomeProject {
   /// crosses to the customer: the projection (portal/customer-project.ts)
   /// does not select it, and tests/customer-projection.test.ts checks.
   teamNotes String? @db.Text
+
+  /// Studio OS Phase 1: the booking advance was refunded (within three days,
+  /// or later by the owner). The project is kept, never deleted: its payment
+  /// rows show the advance and its correction. A cancelled project is left out
+  /// of the customer's app, the reminders and the studio's live lists.
+  cancelledAt  DateTime?
+  cancelReason String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3073,6 +3103,19 @@ model StudioQuote {
 
   issuedOn DateTime?
 
+  /// Studio OS Phase 1: every send is a frozen, numbered revision (R1, R2…).
+  revisions StudioQuoteRevision[] @relation("QuoteRevisions")
+
+  /// The revision marked "Sales final", with the payment schedule agreed for
+  /// this client (payment-template.ts shape), when and by whom. Marking a
+  /// later revision moves the mark; the lead's timeline keeps the history.
+  /// The booking is recorded against this revision.
+  salesFinalRevisionId String?              @unique
+  salesFinalRevision   StudioQuoteRevision? @relation("SalesFinal", fields: [salesFinalRevisionId], references: [id], onDelete: SetNull)
+  salesFinalSchedule   Json?
+  salesFinalAt         DateTime?
+  salesFinalById       String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -3128,6 +3171,46 @@ model StudioQuoteLine {
   @@map("studio_quote_lines")
 }
 
+/// A quotation as it was sent, frozen (Studio OS Phase 1). Each send makes
+/// the next number (R1, R2, R3); drafts in between are not revisions. Never
+/// edited, and deleted only with its quotation (project/append-only.ts).
+/// Any two can be compared; one is marked the sales final on the quotation.
+model StudioQuoteRevision {
+  id String @id @default(cuid())
+
+  /// Denormalised, like StudioClientEvent: every read is "this studio's".
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  quoteId String
+  quote   StudioQuote @relation("QuoteRevisions", fields: [quoteId], references: [id], onDelete: Cascade)
+
+  /// 1, 2, 3… per quotation.
+  n Int
+
+  /// Every line as sent (room, product, code, unit, details, sizes, rate,
+  /// amount; paise as plain numbers).
+  lines      Json
+  /// The terms it was priced on: fee, discounts, GST, advance, phases.
+  terms      Json
+  /// What the client was told they pay, GST included.
+  totalPaise BigInt
+  /// The total's parts (work, fee, discounts, GST), for the comparison.
+  totals     Json
+
+  sentAt     DateTime      @default(now())
+  sentById   String?
+  sentBy     StudioMember? @relation(fields: [sentById], references: [id], onDelete: SetNull)
+  sentByName String?
+
+  salesFinalOf StudioQuote? @relation("SalesFinal")
+
+  @@unique([quoteId, n])
+  @@index([studioId, sentAt])
+  @@index([sentById])
+  @@map("studio_quote_revisions")
+}
+
 // ─────────────────────────────────────────────────────────────
 // RUNNING THE PRACTICE
 //
@@ -3159,6 +3242,8 @@ enum ClientSource {
   REFERRAL
   REPEAT_CLIENT
   INSTAGRAM
+  /// Studio OS Phase 1: Facebook ads and page messages.
+  FACEBOOK
   WEBSITE
   WALK_IN
   ARCHITECT
@@ -3361,12 +3446,38 @@ model StudioClient {
   /// filter every count uses, so this rule lives in one place.
   isDemo Boolean @default(false)
 
+  /// Studio OS Phase 1 (docs/studio-os/PHASE-1-SALES.md).
+  ///
+  /// What they said they would spend, in paise. Theirs to say; nothing is
+  /// computed from it.
+  budgetPaise BigInt?
+  /// The next meeting ("Office meeting Sat 11 am"), shown on Today that day.
+  /// No calendar in this phase.
+  meetingAt   DateTime?
+  meetingNote String?
+
+  /// One of the studio's own source names, when `source` is OTHER and the
+  /// studio picked one ("Housing.com", "Builder tie-up"). SetNull: removing a
+  /// name returns its leads to plain Other rather than deleting anything.
+  leadSourceId String?
+  leadSource   StudioLeadSource? @relation(fields: [leadSourceId], references: [id], onDelete: SetNull)
+
+  /// The project this lead booked: the introduction `own-project.ts` made
+  /// when the booking advance was recorded (lead → quote → project is one
+  /// chain). Not `introductionId`, which means "introduced by One
+  /// Interiors" everywhere it is read.
+  bookedIntroductionId String?   @unique
+  bookedAt             DateTime?
+  /// The column it was in when booked, so a refunded booking goes back there.
+  preBookingStageId    String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   quotes   StudioQuote[]
   projects StudioProject[]
   events   StudioClientEvent[]
+  files    StudioClientFile[]
 
   /// Where this row went when somebody merged it into another.
   ///
@@ -3390,7 +3501,75 @@ model StudioClient {
   /// The board, the pool and the bin are all "this studio, not deleted".
   @@index([studioId, deletedAt])
   @@index([studioId, assignedToId, deletedAt])
+  /// Today's "meetings today", and the bin purge.
+  @@index([studioId, meetingAt])
+  @@index([deletedAt])
+  @@index([leadSourceId])
   @@map("studio_clients")
+}
+
+/// What a lead file is. The floor plan is what the salesperson waits for;
+/// the rest is whatever else the client sent.
+enum ClientFileKind {
+  FLOOR_PLAN
+  OTHER
+}
+
+/// A file attached to a lead (Studio OS Phase 1): the floor plan the client
+/// sent on WhatsApp, or anything else. In the private `lead-files` bucket,
+/// opened only through short signed links for somebody who may see the lead.
+/// Erased with the lead by the bin purge (storage object first, then rows).
+model StudioClientFile {
+  id String @id @default(cuid())
+
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  clientId String
+  client   StudioClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  kind        ClientFileKind @default(OTHER)
+  /// `studio_<studioId>/lead_<clientId>/<uuid>.<ext>` in `lead-files`.
+  storagePath String
+  /// As it was named on their phone or laptop.
+  name        String
+  contentType String
+  bytes       Int
+
+  uploadedById   String?
+  uploadedBy     StudioMember? @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  uploadedByName String?
+
+  /// What "Read rooms" found on a floor plan (floorplan/reading.ts shape),
+  /// only after somebody pressed it. Never read automatically.
+  reading Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([clientId, createdAt])
+  @@index([studioId, createdAt])
+  @@index([uploadedById])
+  @@map("studio_client_files")
+}
+
+/// A studio's own name for where leads come from, beyond our list
+/// (Studio OS Phase 1). A lead using one has `source = OTHER` and
+/// `leadSourceId` set, so the enum still counts and filters, and the
+/// studio's name shows wherever the source does.
+model StudioLeadSource {
+  id String @id @default(cuid())
+
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  name String
+
+  createdAt DateTime @default(now())
+
+  clients StudioClient[]
+
+  @@unique([studioId, name])
+  @@map("studio_lead_sources")
 }
 
 /// What kind of thing happened to a lead.
@@ -3423,6 +3602,18 @@ enum ClientEventKind {
   RESTORED
   /// The customer asked One Interiors to withdraw the introduction.
   WITHDRAWN
+  /// Studio OS Phase 1. Details changed (name, phone, budget…).
+  EDITED
+  /// A file attached or removed.
+  FILE
+  /// A meeting set, moved or cleared.
+  MEETING
+  /// A quotation revision marked as the sales final, or the mark moved.
+  SALES_FINAL
+  /// The booking advance recorded: the project exists.
+  BOOKED
+  /// The booking advance refunded: the project is cancelled.
+  REFUNDED
 }
 
 /// Who did it.
@@ -4349,4 +4540,61 @@ model StudioProductDraft {
 
   @@index([studioId, state])
   @@map("studio_product_drafts")
+}
+
+// ── Floor plan → first quotation (studio-quote, 12 Oct 2026) ──────────────
+// Migration 20261012130000_studio_quote_floorplan. Plain id columns, no
+// relations, so no existing model is edited (three agents share this file).
+
+/// One Claude read of one floor plan, per studio, keyed by the file's
+/// content hash: the same file is never read twice (floorplan/plan-cache.ts).
+model StudioPlanReading {
+  id            String   @id @default(cuid())
+  studioId      String
+  /// sha256 (hex) of the file's bytes.
+  contentHash   String
+  /// READING | READ | FAILED
+  status        String   @default("READING")
+  /// Why it failed, as a short code (never the plan or the reply).
+  reason        String?
+  /// floorplan/reading.ts shape, when READ.
+  reading       Json?
+  attempts      Int      @default(1)
+  lastAttemptAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([studioId, contentHash])
+  @@index([studioId, lastAttemptAt])
+  @@map("studio_plan_readings")
+}
+
+/// The latest "read this plan and build the first quotation" run for one
+/// lead file, so the lead page can say what happened after a reload.
+model StudioPlanJob {
+  id         String    @id @default(cuid())
+  studioId   String
+  clientId   String
+  fileId     String    @unique
+  /// READING | BUILT | READ | FALLBACK | FAILED
+  status     String
+  message    String?
+  quoteId    String?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  @@index([studioId, clientId])
+  @@map("studio_plan_jobs")
+}
+
+/// Which lead file a quotation's rooms were read from ("Read rooms" on a
+/// draft, or the first quotation built from a plan).
+model StudioQuotePlan {
+  quoteId   String   @id
+  studioId  String
+  fileId    String
+  createdAt DateTime @default(now())
+
+  @@index([studioId])
+  @@map("studio_quote_plans")
 }

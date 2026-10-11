@@ -81,6 +81,8 @@ export default async function TeamPage() {
                         ? 'Everything'
                         : p.role === 'ACCOUNTS'
                           ? 'Payments on all projects'
+                          : p.role === 'SALES'
+                            ? 'Their own leads'
                           : p.sites.length
                             ? p.sites.map((s) => s.label).join(' · ')
                             : 'No sites yet'}

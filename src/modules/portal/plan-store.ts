@@ -18,6 +18,7 @@ const LIVE_CALL = ['scheduled', 'completed'];
 
 /** Projects this person may read: their own, or one they joined as family (as `customerProjects`). */
 const readable = (userId: string) => ({
+  cancelledAt: null,
   OR: [
     { introduction: { brief: { userId } } },
     { family: { some: { userId, joinedAt: { not: null }, removedAt: null } } },

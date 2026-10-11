@@ -16,16 +16,19 @@
  *   payment — but never deleted or upserted. A payment's amount, stage, day
  *   and mode are never changed: a correction is a new row with `correctsId`.
  *
+ * Studio OS Phase 1 adds a quotation's sent revisions (`studioQuoteRevision`):
+ * the copy a client received is never edited.
+ *
  * Rows still go when their project does (ON DELETE CASCADE): that is
  * erasure of the whole record, not an edit of it.
  */
 
 /** Prisma client property names. */
-export const APPEND_ONLY_MODELS = ['homeProjectEvent', 'homeSnagEvent', 'homeProjectDateChange', 'homeSiteLog', 'homeQuoteChange'] as const;
+export const APPEND_ONLY_MODELS = ['homeProjectEvent', 'homeSnagEvent', 'homeProjectDateChange', 'homeSiteLog', 'homeQuoteChange', 'studioQuoteRevision'] as const;
 export const NEVER_DELETED_MODELS = ['homeSiteLogPhoto', 'homeSiteLogCrew', 'homeProjectPayment'] as const;
 
 /** The same, as table names, for raw SQL. */
-export const APPEND_ONLY_TABLES = ['home_project_events', 'home_snag_events', 'home_project_date_changes', 'home_site_logs', 'home_quote_changes'] as const;
+export const APPEND_ONLY_TABLES = ['home_project_events', 'home_snag_events', 'home_project_date_changes', 'home_site_logs', 'home_quote_changes', 'studio_quote_revisions'] as const;
 export const NEVER_DELETED_TABLES = ['home_site_log_photos', 'home_site_log_crew', 'home_project_payments'] as const;
 
 const EDITS = ['update', 'updateMany', 'updateManyAndReturn', 'delete', 'deleteMany', 'upsert'] as const;

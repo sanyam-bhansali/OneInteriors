@@ -4,6 +4,9 @@ import { PageHead, PageBody } from '../StudioShell';
 import { formatINR } from '@/lib/money';
 import { paymentsDesk } from '@/modules/project/payments-flow';
 import { PaymentsBody } from '../projects/[id]/PaymentsTab';
+import { bookingDraft, bookingsToRecord, recentBookings } from '@/modules/studio-sales/booking';
+import { currentMember } from '@/modules/studio/access';
+import { Bookings } from './Bookings';
 
 export const metadata: Metadata = { title: 'Payments', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -19,7 +22,10 @@ export const dynamic = 'force-dynamic';
  * says they did not make, then money waiting for their yes.
  */
 export default async function PaymentsDeskPage() {
-  const projects = await paymentsDesk();
+  const [projects, member, toBook, recent] = await Promise.all([paymentsDesk(), currentMember(), bookingsToRecord(), recentBookings()]);
+  /* Studio OS Phase 1: the booking advance is recorded here too, on the
+     sales final, with the same form as the lead page. */
+  const drafts = Object.fromEntries(await Promise.all(toBook.map(async (w) => [w.quoteId, await bookingDraft(member, w.quoteId)] as const)));
   const weight = (p: (typeof projects)[number]) => {
     const rows = p.payments?.rows ?? [];
     if (rows.some((r) => r.status === 'disputed')) return 0;
@@ -38,6 +44,9 @@ export default async function PaymentsDeskPage() {
         sub="Every project’s payment stages. Record money the day it arrives, with the receipt; the customer confirms it in the app, and it files in their locker."
       />
       <PageBody>
+        <div className="mb-6 empty:mb-0">
+          <Bookings waiting={toBook} drafts={drafts} recent={recent} isOwner={member?.role === 'OWNER'} />
+        </div>
         {projects.length === 0 ? (
           <p className="m-0 text-[15px] text-[var(--s-ink-2)]">No projects yet. A project appears here once a client signs with your studio.</p>
         ) : (

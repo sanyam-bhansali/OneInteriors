@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useActionState, useState } from 'react';
 import { CONFIGS, standardRunFor, type ConfigName } from '@/modules/studio-quote/configure';
 import { createQuoteAction } from './actions';
+import { searchAction } from '../search-actions';
+import type { FoundClient } from '@/modules/studio-practice/clients';
 import { IDLE } from '../form-state';
 
 const input =
@@ -48,6 +50,7 @@ export function StartQuote({
   standard,
   total,
   compact,
+  leadRequired = false,
 }: {
   /** Products with a rate. */
   priced: number;
@@ -56,11 +59,32 @@ export function StartQuote({
   total: number;
   /** Folded away by default, for the page that already has quotations on it. */
   compact?: boolean;
+  /** A salesperson: the quotation must be for a lead (theirs, or a new one). */
+  leadRequired?: boolean;
 }) {
   const [open, setOpen] = useState(!compact);
   const [state, action, pending] = useActionState(createQuoteAction, IDLE);
   const [config, setConfig] = useState<ConfigName>('3 BHK');
   const [build, setBuild] = useState(true);
+  /* Who it is for (Studio OS Phase 1): an existing lead, found by name or
+     phone, or a new person (added to the leads unless unticked). */
+  const [lead, setLead] = useState<FoundClient | null>(null);
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [society, setSociety] = useState('');
+  const [found, setFound] = useState<FoundClient[]>([]);
+  const [addLead, setAddLead] = useState(true);
+
+  async function look(text: string) {
+    setName(text);
+    setLead(null);
+    if (text.trim().length < 2) {
+      setFound([]);
+      return;
+    }
+    const rows = await searchAction(text);
+    setFound(rows.slice(0, 6));
+  }
 
   if (!open) {
     return (
@@ -87,20 +111,71 @@ export function StartQuote({
       </div>
 
       <div className="flex flex-wrap gap-4">
-        <label className="flex min-w-[14rem] flex-1 flex-col gap-1.5">
-          <span className="s-label">Who is it for</span>
-          <input name="clientName" required autoFocus placeholder="Mrs Kothari" className={input} />
-        </label>
+        <input type="hidden" name="clientId" value={lead?.id ?? ''} />
+        <input type="hidden" name="addLead" value={!lead && (addLead || leadRequired) ? 'yes' : 'no'} />
+        <div className="relative flex min-w-[14rem] flex-1 flex-col gap-1.5">
+          <label className="flex flex-col gap-1.5">
+            <span className="s-label">Who is it for — a lead&apos;s name or phone, or someone new</span>
+            <input
+              name="clientName"
+              required
+              autoFocus
+              autoComplete="off"
+              value={name}
+              onChange={(e) => void look(e.target.value)}
+              placeholder="Mrs Kothari"
+              className={input}
+            />
+          </label>
+          {lead ? (
+            <p className="m-0 text-[12.5px] text-[var(--s-good)]">
+              For the lead {lead.name}
+              {lead.phone ? ` · ${lead.phone}` : ''}.{' '}
+              <button type="button" onClick={() => setLead(null)} className="text-[var(--s-ink-3)] underline">
+                Not them
+              </button>
+            </p>
+          ) : found.length > 0 ? (
+            <ul className="s-card m-0 flex list-none flex-col p-1 shadow-md">
+              {found.map((f) => (
+                <li key={f.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLead(f);
+                      setName(f.name);
+                      setPhone(f.phone ?? '');
+                      setSociety(f.society ?? '');
+                      setFound([]);
+                    }}
+                    className="flex w-full flex-wrap items-baseline gap-x-2 rounded-[8px] px-2.5 py-1.5 text-left text-[13.5px] hover:bg-[var(--s-surface-2)]"
+                  >
+                    <span className="font-medium">{f.name}</span>
+                    <span className="text-[12px] text-[var(--s-ink-3)]">
+                      {[f.phone, f.society, f.stageName].filter(Boolean).join(' · ')}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
 
         <label className="flex flex-col gap-1.5">
-          <span className="s-label">Phone — optional</span>
-          <input name="clientPhone" inputMode="tel" className={`${input} w-[10rem]`} />
+          <span className="s-label">Phone{leadRequired ? '' : ' — optional'}</span>
+          <input name="clientPhone" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={`${input} w-[10rem]`} />
         </label>
 
         <label className="flex min-w-[12rem] flex-1 flex-col gap-1.5">
           <span className="s-label">Society or address — optional</span>
-          <input name="society" placeholder="Kalyani Nagar" className={input} />
+          <input name="society" value={society} onChange={(e) => setSociety(e.target.value)} placeholder="Kalyani Nagar" className={input} />
         </label>
+        {!lead && !leadRequired ? (
+          <label className="flex basis-full items-center gap-2 text-[13.5px]">
+            <input type="checkbox" checked={addLead} onChange={(e) => setAddLead(e.target.checked)} className="h-[16px] w-[16px] accent-[var(--s-accent)]" />
+            Also add them to my leads (their quotations then show on the lead)
+          </label>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-end gap-4 border-t border-[var(--s-rule-soft)] pt-4">

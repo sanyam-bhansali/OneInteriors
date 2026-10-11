@@ -4,6 +4,8 @@ import { PageHead, PageBody } from '../../StudioShell';
 import { myCaptureForm } from '@/modules/studio-practice/capture';
 import { Import } from './Import';
 import { CaptureLink } from './CaptureLink';
+import { myFields } from '@/modules/studio-practice/fields';
+import { myLeadSources } from '@/modules/studio-sales/settings';
 
 export const metadata: Metadata = {
   title: 'Import clients',
@@ -29,7 +31,7 @@ export default async function ImportPage() {
   /* Created on first read, like the stage seeder — no migration step, and no
      moment where a studio has an account but not the thing the screen is
      about. */
-  const form = await myCaptureForm();
+  const [form, fields, sources] = await Promise.all([myCaptureForm(), myFields(), myLeadSources()]);
 
   return (
     <>
@@ -48,7 +50,7 @@ export default async function ImportPage() {
 
       <PageBody>
         {form ? <CaptureLink slug={form.slug} active={form.active} /> : null}
-        <Import />
+        <Import fields={fields.map((f) => ({ key: f.key, label: f.label }))} sources={sources.map((o) => ({ id: o.id, name: o.name }))} />
       </PageBody>
     </>
   );

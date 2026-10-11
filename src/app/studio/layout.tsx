@@ -14,7 +14,7 @@ import { headers } from 'next/headers';
 import { PATH_HEADER, STUDIO_SIGN_IN } from '@/lib/host';
 import { memberFor } from '@/modules/studio/access';
 import { can, type MemberRole } from '@/modules/studio/roles';
-import { TEAM_PATH, homeFor, mayOpen, usesOffice } from '@/modules/studio/surfaces';
+import { TEAM_PATH, TODAY_HOME, homeFor, mayOpen, usesOfficeShell } from '@/modules/studio/surfaces';
 import { RoleFrame } from './RoleFrame';
 import { getLang } from '@/modules/i18n/server';
 import { tx } from '@/modules/i18n/site';
@@ -97,7 +97,7 @@ export default async function StudioLayout({ children }: { children: React.React
     /* No header (middleware did not run) means no redirect: redirecting on a
        guess could loop. The module layer still holds. */
     if (path && !mayOpen(member, path)) redirect(homeFor(member.role));
-    if (!usesOffice(member)) {
+    if (!usesOfficeShell(member)) {
       return (
         <RoleFrame
           member={member}
@@ -111,6 +111,22 @@ export default async function StudioLayout({ children }: { children: React.React
   }
 
   const context = await shellContext(user.id);
+
+  /* A salesperson (Studio OS Phase 1): the office frame, with only what
+     they open — Today, their leads, their quotations. */
+  if (member && member.role === 'SALES') {
+    return (
+      <StudioShell
+        groups={salesNav()}
+        studioName={context?.tradeName ?? 'Your studio'}
+        email={user.email}
+        publicHref={null}
+        signOut={<SignOutButton />}
+      >
+        {children}
+      </StudioShell>
+    );
+  }
 
   return (
     <StudioShell
@@ -335,7 +351,13 @@ function navFor(context: ShellContext | null, member: MemberRole | null): NavGro
      pill and does not link — see modules/studio/features.ts for why a pill
      beside a working link was not enough. */
   const groups: NavGroup[] = [
-    { items: [{ icon: 'home', href: '/studio', label: 'Dashboard', ready: true }] },
+    {
+      items: [
+        /* Studio OS Phase 1: what needs doing today, first. */
+        { icon: 'today', href: TODAY_HOME, label: 'Today', ready: true },
+        { icon: 'home', href: '/studio', label: 'Dashboard', ready: true },
+      ],
+    },
     {
       label: 'Your work',
       items: [
@@ -421,4 +443,18 @@ function navFor(context: ShellContext | null, member: MemberRole | null): NavGro
   });
 
   return groups;
+}
+
+/** A salesperson's rail: Today, their leads, their quotations. Nothing they cannot open. */
+function salesNav(): NavGroup[] {
+  return [
+    { items: [{ icon: 'today', href: TODAY_HOME, label: 'Today', ready: true }] },
+    {
+      label: 'Your work',
+      items: [
+        { icon: 'clients', href: '/studio/clients', label: 'My leads', ready: true },
+        { icon: 'quote', href: '/studio/quotations', label: 'Quotations', ready: true },
+      ],
+    },
+  ];
 }

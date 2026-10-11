@@ -19,6 +19,7 @@ import {
 } from '@/modules/studio-quote/quotes';
 import { isConfigName, type HomeConfig } from '@/modules/studio-quote/configure';
 import { finalQuoteForClient } from '@/modules/studio-quote/final';
+import { addClient } from '@/modules/studio-practice/clients';
 
 // `State` and `IDLE` live in studio/form-state.ts. A 'use server'
 // file may only export async functions — and Turbopack rejects even a
@@ -60,12 +61,35 @@ export async function createQuoteAction(_prev: State, form: FormData): Promise<S
   const carpet = Number(str(form, 'carpetSqft'));
   const config = str(form, 'config');
 
+  /* The lead it is for (Studio OS Phase 1): one picked on the screen, or —
+     when "add them to my leads" is ticked — a new one made now. A phone
+     already on a lead is refused with the name, so the person picks that
+     lead instead of making a second. */
+  let clientId = str(form, 'clientId') || undefined;
+  if (!clientId && str(form, 'addLead') === 'yes') {
+    const added = await addClient({
+      name: str(form, 'clientName'),
+      phone: str(form, 'clientPhone'),
+      society: str(form, 'society'),
+      config,
+      source: 'OTHER',
+    });
+    if (!added.ok) {
+      if ('duplicate' in added) {
+        return { ok: false, error: `${added.duplicate.name} already has that number. Search for them in "Who is it for" and pick them.` };
+      }
+      return added;
+    }
+    clientId = added.id;
+  }
+
   const result = await createQuote({
     clientName: str(form, 'clientName'),
     clientPhone: str(form, 'clientPhone'),
     society: str(form, 'society'),
     config,
     carpetSqft: Number.isFinite(carpet) && carpet > 0 ? Math.round(carpet) : undefined,
+    clientId,
   });
 
   if (!result.ok) return result;

@@ -14,7 +14,7 @@ import {
   STUDIO_ROLES,
   can,
   isSeat,
-  needsAssignment,
+  PICKS_SITES,
   type StudioAction,
   type StudioMemberStatusName,
   type StudioRoleName,
@@ -25,17 +25,19 @@ export const ROLE_NAMES: Record<StudioRoleName, string> = {
   PM: 'Project manager',
   SUPERVISOR: 'Site supervisor',
   ACCOUNTS: 'Accounts',
+  SALES: 'Sales',
 };
 
 /** The one-line explanation on each role card, in the order the card list shows them. */
 export const ROLE_LINES: Record<StudioRoleName, string> = {
   PM: 'Runs the plan, decisions and snags for the projects you pick. Sees no vendor rates and cannot change the team.',
   SUPERVISOR: 'Phone only. Posts the daily update, ticks the checklist and fixes snags on the sites you pick. Nothing else.',
-  ACCOUNTS: 'Records payments and receipts across all projects. Sees nothing else.',
+  ACCOUNTS: 'Records payments and receipts across all projects, and the booking advance. Sees nothing else.',
+  SALES: 'Works the leads you give them: calls, floor plans, quotations, the sales final. Sees only their own leads.',
   OWNER: 'Everything, including the team, prices and margins.',
 };
 
-export const ROLE_ORDER: readonly StudioRoleName[] = ['PM', 'SUPERVISOR', 'ACCOUNTS', 'OWNER'];
+export const ROLE_ORDER: readonly StudioRoleName[] = ['SALES', 'PM', 'SUPERVISOR', 'ACCOUNTS', 'OWNER'];
 
 const ACTION_LABELS: Record<StudioAction, string> = {
   'team.manage': 'Add and remove people',
@@ -53,6 +55,19 @@ const ACTION_LABELS: Record<StudioAction, string> = {
   'project.read': 'See the project',
   'crew.manage': 'Keep the crew list',
   'calendar.edit': 'Set working days and holidays',
+  'lead.read': 'See leads',
+  'lead.edit': 'Work leads: calls, notes, floor plans',
+  'lead.add': 'Add leads',
+  'lead.assign': 'Give leads to people',
+  'lead.merge': 'Merge duplicate leads',
+  'lead.delete': 'Delete leads',
+  'lead.import': 'Import a list of leads',
+  'lead.pool': 'See leads nobody has',
+  'quote.write': 'Write and send quotations',
+  'quote.salesFinal': 'Mark the sales final',
+  'booking.record': 'Record the booking advance',
+  'booking.refund': 'Refund a booking',
+  'payments.template': 'Set the payment stages',
 };
 
 /**
@@ -65,7 +80,7 @@ export function roleCan(role: StudioRoleName): string[] {
 }
 
 /** Roles that see only the sites picked for them, so the invite asks which. */
-export const pickSites = (role: StudioRoleName): boolean => needsAssignment(role);
+export const pickSites = (role: StudioRoleName): boolean => PICKS_SITES.includes(role);
 
 export const isStudioRole = (v: unknown): v is StudioRoleName => typeof v === 'string' && (STUDIO_ROLES as readonly string[]).includes(v);
 
