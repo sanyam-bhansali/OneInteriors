@@ -67,7 +67,9 @@
         {
           "faceIDPermission": "To lock the app, which holds photos of the inside of your home."
         }
-      ]
+      ],
+      "expo-video",
+      "expo-asset"
     ],
     "scheme": "oneinteriors",
     "experiments": {

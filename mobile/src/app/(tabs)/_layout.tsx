@@ -5,6 +5,7 @@ import { GeioOrb } from '../../components/brand';
 import { CameraIcon, HomeIcon, ListIcon, PersonIcon } from '../../components/icons';
 import { Loading } from '../../components/ui';
 import { useAuth } from '../../lib/auth';
+import { useT } from '../../lib/i18n';
 import { registerForPush } from '../../lib/push';
 import { color, font } from '../../lib/theme';
 
@@ -17,6 +18,7 @@ import { color, font } from '../../lib/theme';
  */
 export default function TabsLayout() {
   const { state } = useAuth();
+  const t = useT();
   useEffect(() => {
     if (state.status === 'signed-in') void registerForPush();
   }, [state.status]);
@@ -38,11 +40,11 @@ export default function TabsLayout() {
         tabBarStyle: { backgroundColor: color.ink, borderTopWidth: 0, height: 88, paddingTop: 8 },
       }}
     >
-      <Tabs.Screen name="home" options={{ tabBarLabel: label('Home'), tabBarIcon: ({ color: c }) => <HomeIcon color={c} /> }} />
-      <Tabs.Screen name="project" options={{ tabBarLabel: label('Project'), tabBarIcon: ({ color: c }) => <ListIcon color={c} /> }} />
-      <Tabs.Screen name="geio" options={{ tabBarLabel: label('GEIO'), tabBarAccessibilityLabel: 'Ask GEIO', tabBarIcon: () => <GeioOrb size={52} ring style={{ marginTop: -30 }} /> }} />
-      <Tabs.Screen name="site" options={{ tabBarLabel: label('Site'), tabBarIcon: ({ color: c }) => <CameraIcon color={c} /> }} />
-      <Tabs.Screen name="me" options={{ tabBarLabel: label('Me'), tabBarIcon: ({ color: c }) => <PersonIcon color={c} /> }} />
+      <Tabs.Screen name="home" options={{ tabBarLabel: label(t('tab.home')), tabBarIcon: ({ color: c }) => <HomeIcon color={c} /> }} />
+      <Tabs.Screen name="project" options={{ tabBarLabel: label(t('tab.project')), tabBarIcon: ({ color: c }) => <ListIcon color={c} /> }} />
+      <Tabs.Screen name="geio" options={{ tabBarLabel: label(t('tab.geio')), tabBarAccessibilityLabel: t('me.geio'), tabBarIcon: () => <GeioOrb size={52} ring style={{ marginTop: -30 }} /> }} />
+      <Tabs.Screen name="site" options={{ tabBarLabel: label(t('tab.site')), tabBarIcon: ({ color: c }) => <CameraIcon color={c} /> }} />
+      <Tabs.Screen name="me" options={{ tabBarLabel: label(t('tab.me')), tabBarIcon: ({ color: c }) => <PersonIcon color={c} /> }} />
     </Tabs>
   );
 }

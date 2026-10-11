@@ -29,6 +29,8 @@ export interface Decision {
   options: DecisionOption[];
   chosenIndex: number | null;
   chosenAt: string | null;
+  /** Family votes (read-only in the app for now). Older servers omit it. */
+  votes?: { name: string; optionIndex: number; note: string | null; mine: boolean }[];
 }
 
 export interface Snag {

@@ -1,4 +1,4 @@
-import { Image } from 'react-native';
+import { Asset } from 'expo-asset';
 import type { Result } from './api';
 import type { GeioReply, Notice, Profile, Project } from './types';
 
@@ -28,7 +28,7 @@ const PHOTOS = {
   living: require('../../assets/sample/living.webp'),
   switchboard: require('../../assets/sample/switchboard.webp'),
 } as const;
-const photo = (name: keyof typeof PHOTOS) => Image.resolveAssetSource(PHOTOS[name]).uri;
+const photo = (name: keyof typeof PHOTOS) => Asset.fromModule(PHOTOS[name]).uri;
 
 export const SAMPLE_USER = { id: 'sample', name: 'Priya', phone: '+919822041736' };
 
@@ -102,6 +102,10 @@ export const SAMPLE_PROJECT: Project & { overallLateDays: number } = {
       state: 'open',
       chosenIndex: null,
       chosenAt: null,
+      votes: [
+        { name: 'Rahul', optionIndex: 0, note: null, mine: false },
+        { name: 'Aai', optionIndex: 1, note: 'Walnut will not show turmeric stains.', mine: false },
+      ],
       options: [
         { name: 'Sage matte', note: 'In your quote', extraPaise: 0, swatch: '#9AA58C' },
         { name: 'Walnut grain', note: 'Warmer, hides marks', extraPaise: 14_500_00, swatch: '#6B4A33' },
@@ -176,6 +180,15 @@ const SAMPLE_REPLY: GeioReply = {
   sources: [],
 };
 
+/* Asking for a person, or about money, hands over to the expert (GeioHuman, #33). */
+const SAMPLE_HANDOVER: GeioReply = {
+  paragraphs: ['That is one for Meera, your expert. She has your quote and site record in front of her.'],
+  see: [],
+  handover: 'Priya wants to talk about the kitchen shutter finish and whether Walnut grain (+₹14,500) is worth it.',
+  follow: [],
+  sources: [],
+};
+
 let read = new Set<string>();
 
 /** Answers a call as the server would, for the sample customer. */
@@ -196,7 +209,10 @@ export async function sampleCall<T>(method: string, path: string, body?: unknown
     read = new Set([...read, ...(b?.all ? SAMPLE_NOTICES.map((n) => n.id) : (b?.ids ?? []))]);
     return ok({});
   }
-  if (route === 'POST /geio') return ok({ reply: SAMPLE_REPLY });
+  if (route === 'POST /geio') {
+    const q = String((body as { question?: string } | undefined)?.question ?? '').toLowerCase();
+    return ok({ reply: /talk|meera|price|pay|discount/.test(q) ? SAMPLE_HANDOVER : SAMPLE_REPLY });
+  }
   if (route === 'POST /coins/opened') return ok({ earned: 10 });
   if (route === 'POST /snags') return ok({ id: `s${Date.now()}` });
   // Choosing, locale, devices, sign-out, delete: accepted and forgotten.

@@ -22,7 +22,9 @@ export type ProjectEvent =
   | { kind: 'introduced'; clientId: string | null; home: string; contactReleased: boolean }
   | { kind: 'quote-sent'; quoteId: string; studio: string; number: string }
   | { kind: 'quote-signed'; quoteId: string; client: string; number: string; totalPaise: number }
-  | { kind: 'intro-declined'; studio: string; reason: string };
+  | { kind: 'intro-declined'; studio: string; reason: string }
+  // To ops: GEIO passed a customer's question to the expert.
+  | { kind: 'geio-handover'; customer: string; home: string | null; note: string };
 
 /** Events a studio also gets by email: it works from a laptop, not our app. */
 export const EMAILED_TO_STUDIO: ProjectEvent['kind'][] = ['introduced', 'quote-signed', 'decision-made', 'snag-raised'];
@@ -128,6 +130,14 @@ export function messageFor(e: ProjectEvent): Message {
         title: `${e.studio} declined an introduction`,
         body: clip(e.reason, 160),
         url: '/ops/introductions',
+      };
+    case 'geio-handover':
+      // No customer page in ops yet; the expert works from the call queue.
+      return {
+        template: 'geio.handover',
+        title: `GEIO handed over · ${clip(e.customer, 40)}`,
+        body: clip(e.home ? `${e.home}. ${e.note}` : e.note, 160),
+        url: '/ops/consultations',
       };
     case 'document':
       return {

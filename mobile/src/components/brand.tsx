@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { Animated, Easing, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
+import { useT } from '../lib/i18n';
 import { useReducedMotion } from '../lib/motion';
 import { color, font, motion } from '../lib/theme';
 import { Press } from './ui';
@@ -35,11 +36,12 @@ export function Coin({ size = 26 }: { size?: number }) {
 
 /** The balance on Home's header: a coin and the count, on the photo. */
 export function CoinChip({ balance, onPress }: { balance: number; onPress?: () => void }) {
+  const t = useT();
   const shown = balance.toLocaleString('en-IN');
   return (
     <Press
       onPress={onPress}
-      accessibilityLabel={`Home Coins, ${shown}`}
+      accessibilityLabel={t('kit.coinChip', { n: shown })}
       style={{
         minHeight: 44,
         paddingLeft: 8,
@@ -62,6 +64,7 @@ export function CoinChip({ balance, onPress }: { balance: number; onPress?: () =
  * time coins are earned; `onDone` is called once it has gone.
  */
 export function CoinToast({ amount, onDone }: { amount: number; onDone?: () => void }) {
+  const t = useT();
   const still = useReducedMotion();
   const [v] = useState(() => new Animated.Value(0));
   useEffect(() => {
@@ -86,7 +89,7 @@ export function CoinToast({ amount, onDone }: { amount: number; onDone?: () => v
   return (
     <Animated.View
       accessibilityLiveRegion="polite"
-      accessibilityLabel={`${amount} coins earned`}
+      accessibilityLabel={t('kit.coinsEarned', { n: amount.toLocaleString('en-IN') })}
       pointerEvents="none"
       style={{
         position: 'absolute',
@@ -122,7 +125,7 @@ export function CoinToast({ amount, onDone }: { amount: number; onDone?: () => v
       }}
     >
       <Coin size={22} />
-      <Text style={{ fontFamily: font.sansBold, fontSize: 15, color: color.gold }}>+{amount.toLocaleString('en-IN')} coins</Text>
+      <Text style={{ fontFamily: font.sansBold, fontSize: 15, color: color.gold }}>{t('kit.coinsPlus', { n: amount.toLocaleString('en-IN') })}</Text>
     </Animated.View>
   );
 }
@@ -265,7 +268,7 @@ export function GeioOrb({
             }}
           >
             <Svg width={size} height={size}>
-              <Path d={wedge} fill="#FFF8EC" fillOpacity={0.24} />
+              <Path d={wedge} fill="#FFF8EC" fillOpacity={0.13} />
             </Svg>
           </Animated.View>
         )}

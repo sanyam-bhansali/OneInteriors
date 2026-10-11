@@ -3,19 +3,25 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { CameraIcon } from '../components/icons';
-import { Body, Button, Chip, DarkCard, ErrorText, Field, Loading, Meta, Press, Rise, Screen, Title } from '../components/ui';
+import { SnapIcon } from '../components/project/parts';
+import { Body, Button, Card, DarkCard, Eyebrow, ErrorText, Field, Loading, Press, Screen, Stagger, Title } from '../components/ui';
 import { api } from '../lib/api';
-import { dayLabel } from '../lib/format';
+import { dayLabel, shortDate } from '../lib/format';
+import { useHeadline, useLang, useT, type T } from '../lib/i18n';
 import { useProject } from '../lib/project';
 import { color, font } from '../lib/theme';
+import type { Snag } from '../lib/types';
 
 /**
- * Snags (the v1 design): fixed by a date, or we chase it. "Photograph a
- * problem" opens the camera; the photo, a few words and the room go to the
- * studio, which sets a fix-by date and closes it with a photo.
+ * Snags (design #24): "Photograph a problem" opens the camera; the photo, a
+ * few words and the room go to the studio, which sets a fix-by date and
+ * closes it with a photo. Open and Fixed tabs with counts, then the
+ * handover walk-through note.
  */
 export default function Snags() {
+  const t = useT();
+  const { lang } = useLang();
+  const size = useHeadline(42);
   const { state, refresh, refreshing } = useProject();
   const [tab, setTab] = useState<'OPEN' | 'FIXED'>('OPEN');
   const [photo, setPhoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
@@ -23,24 +29,31 @@ export default function Snags() {
   const [room, setRoom] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const titleStyle = { letterSpacing: size * -0.05, lineHeight: lang === 'en' ? size * 0.98 : size * 1.25 };
 
   if (state.status === 'loading') return <Loading />;
   if (state.status === 'none') {
     return (
       <Screen back>
-        <Meta>Fixed by a date, or we chase it</Meta>
-        <Title>Snags</Title>
-        <Body muted>Once your project starts, photograph anything wrong and it goes straight to the studio.</Body>
+        {/* Promises Assured-plan service (FLOWS.md): flagged for Sanyam, kept. */}
+        <Eyebrow>{t('snags.eyebrow')}</Eyebrow>
+        <Title size={size} style={titleStyle}>
+          {t('snags.title')}
+        </Title>
+        <Body muted>{t('snags.none')}</Body>
       </Screen>
     );
   }
   const p = state.project;
+  const openCount = p.snags.filter((s) => s.status === 'OPEN').length;
+  const fixedCount = p.snags.length - openCount;
   const list = p.snags.filter((s) => s.status === tab);
+  const handover = p.stages.find((s) => s.key === 'HANDOVER') ?? p.stages[p.stages.length - 1];
 
   const take = async (from: 'camera' | 'library') => {
     setMsg(null);
     const perm = from === 'camera' ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return setMsg({ ok: false, text: 'Allow access in your phone’s settings to add a photo.' });
+    if (!perm.granted) return setMsg({ ok: false, text: t('snags.permission') });
     const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7, exif: false };
     const r = from === 'camera' ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
     if (!r.canceled && r.assets[0]) setPhoto(r.assets[0]);
@@ -62,89 +75,155 @@ export default function Snags() {
     setPhoto(null);
     setTitle('');
     setRoom('');
-    setMsg({ ok: true, text: `Sent to ${p.studio}. You will hear when it has a fix-by date.` });
+    setMsg({ ok: true, text: t('snags.sent', { studio: p.studio }) });
     void refresh();
   };
 
   return (
     <Screen back onRefresh={() => void refresh()} refreshing={refreshing}>
-      <Meta>Fixed by a date, or we chase it</Meta>
-      <Title size={40}>Snags</Title>
-
-      {photo ? (
-        <View style={styles.card}>
-          <Image source={{ uri: photo.uri }} style={styles.preview} contentFit="cover" />
-          <Field label="What is wrong" value={title} onChangeText={setTitle} placeholder="Gap between wardrobe and ceiling" maxLength={120} />
-          <Field label="Where (optional)" value={room} onChangeText={setRoom} placeholder="Bedroom 1" maxLength={40} />
-          <Button label="Send to the studio" onPress={() => void send()} busy={busy} disabled={title.trim().length < 3} />
-          <Button label="Cancel" variant="quiet" onPress={() => setPhoto(null)} />
-        </View>
-      ) : (
+      <View style={{ gap: 20 }}>
         <View style={{ gap: 8 }}>
-          <Press onPress={() => void take('camera')} style={styles.camera}>
-            <CameraIcon color={color.white} />
-            <Text style={styles.cameraText}>Photograph a problem</Text>
-          </Press>
-          <Button label="Choose from photos" variant="quiet" onPress={() => void take('library')} />
+          {/* Promises Assured-plan service (FLOWS.md): flagged for Sanyam, kept. */}
+          <Eyebrow>{t('snags.eyebrow')}</Eyebrow>
+          <Title size={size} style={titleStyle}>
+            {t('snags.title')}
+          </Title>
         </View>
-      )}
-      {msg ? (msg.ok ? <Body style={styles.toast}>{msg.text}</Body> : <ErrorText>{msg.text}</ErrorText>) : null}
 
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <Chip label={`Open ${p.snags.filter((s) => s.status === 'OPEN').length}`} on={tab === 'OPEN'} onPress={() => setTab('OPEN')} />
-        <Chip label={`Fixed ${p.snags.filter((s) => s.status === 'FIXED').length}`} on={tab === 'FIXED'} onPress={() => setTab('FIXED')} />
+        {photo ? (
+          <Card style={{ gap: 14 }}>
+            <Image source={{ uri: photo.uri }} style={styles.preview} contentFit="cover" accessibilityLabel={t('snags.photo')} />
+            <Field label={t('snags.what')} value={title} onChangeText={setTitle} placeholder={t('snags.whatHint')} maxLength={120} />
+            <Field label={t('snags.where')} value={room} onChangeText={setRoom} placeholder={t('snags.whereHint')} maxLength={40} />
+            <Button
+              label={t('snags.send')}
+              onPress={() => void send()}
+              busy={busy}
+              disabled={title.trim().length < 3}
+              reason={title.trim().length < 3 ? t('snags.sendReason') : undefined}
+            />
+            <Button label={t('snags.cancel')} variant="quiet" onPress={() => setPhoto(null)} />
+          </Card>
+        ) : (
+          <View style={{ gap: 4 }}>
+            <Press onPress={() => void take('camera')} style={styles.camera} accessibilityLabel={t('snags.photograph')}>
+              <SnapIcon color={color.white} />
+              <Text style={styles.cameraText}>{t('snags.photograph')}</Text>
+            </Press>
+            <Button label={t('snags.library')} variant="quiet" onPress={() => void take('library')} />
+          </View>
+        )}
+        {msg ? (
+          <View role="status" aria-live="polite" accessibilityLiveRegion="polite">
+            {msg.ok ? <Text style={styles.toast}>{msg.text}</Text> : <ErrorText>{msg.text}</ErrorText>}
+          </View>
+        ) : null}
+
+        <View role="tablist" aria-label={t('snags.filter')} style={{ flexDirection: 'row', gap: 8 }}>
+          <Tab label={t('snags.open')} count={openCount} on={tab === 'OPEN'} onPress={() => setTab('OPEN')} i={0} />
+          <Tab label={t('snags.fixed')} count={fixedCount} on={tab === 'FIXED'} onPress={() => setTab('FIXED')} i={1} />
+        </View>
+
+        <View role="tabpanel" style={list.length ? styles.list : null}>
+          {list.map((s, i) => (
+            <SnagRow key={s.id} snag={s} i={i} t={t} />
+          ))}
+          {list.length === 0 ? <Body muted>{tab === 'OPEN' ? t('snags.emptyOpen') : t('snags.emptyFixed')}</Body> : null}
+        </View>
+
+        <DarkCard style={styles.walk}>
+          <Eyebrow onDark>{handover ? t('snags.walk', { date: shortDate(handover.targetOn) }) : t('snags.walkNoDate')}</Eyebrow>
+          <Text style={styles.walkBody}>{t('snags.walkBody')}</Text>
+        </DarkCard>
       </View>
-
-      <View>
-        {list.map((s, i) => {
-          const img = tab === 'FIXED' ? (s.fixedPhotos[0] ?? s.photos[0]) : s.photos[0];
-          return (
-            <Rise key={s.id} delay={Math.min(i, 8) * 60} style={styles.snag}>
-              {img ? <Image source={{ uri: img }} style={styles.thumb} contentFit="cover" /> : null}
-              <View style={{ flex: 1, gap: 4 }}>
-                <Text style={styles.snagTitle}>{s.title}</Text>
-                <Text style={styles.mono}>{[s.room, `raised ${dayLabel(s.raisedAt)}`].filter(Boolean).join(', ')}</Text>
-                <Text style={[styles.mono, tab === 'OPEN' && s.line?.startsWith('Fix by') && { color: color.accentInk }]}>
-                  {tab === 'FIXED' ? [s.line, s.fixedNote].filter(Boolean).join(' · ') : (s.line ?? 'With the studio')}
-                </Text>
-              </View>
-            </Rise>
-          );
-        })}
-        {list.length === 0 ? <Body muted>{tab === 'OPEN' ? 'Nothing open. Good.' : 'Nothing fixed yet.'}</Body> : null}
-      </View>
-
-      <DarkCard>
-        <Text style={styles.cardMeta}>Handover walk-through</Text>
-        <Text style={styles.cardBody}>We walk the flat with you room by room and add everything here. The last payment is due only once these are closed.</Text>
-      </DarkCard>
     </Screen>
   );
 }
 
+function Tab({ label, count, on, onPress, i }: { label: string; count: number; on: boolean; onPress: () => void; i: number }) {
+  return (
+    <Stagger i={i} start={220}>
+      <Press
+        onPress={onPress}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: on }}
+        accessibilityLabel={`${label} ${count}`}
+        style={[styles.tab, on ? { backgroundColor: color.ink, borderColor: color.ink } : null]}
+      >
+        <Text style={[styles.tabText, on && { color: color.white }]}>
+          {label} <Text style={[styles.tabCount, on && { color: color.white }]}>{count}</Text>
+        </Text>
+      </Press>
+    </Stagger>
+  );
+}
+
+/** The server's English status line ("Fix by Sat 10 Oct", "Fixed 26 Sep"), in the app's language. */
+function statusLine(s: Snag, t: T): { text: string; tone: string } {
+  const line = s.line ?? '';
+  if (s.status === 'FIXED') {
+    const day = line.startsWith('Fixed ') ? line.slice(6) : null;
+    const text = [day ? t('snags.fixedOn', { day }) : t('snags.fixed'), s.fixedNote].filter(Boolean).join(' · ');
+    return { text, tone: color.ok };
+  }
+  if (line.startsWith('Fix by ')) return { text: t('snags.fixBy', { day: line.slice(7) }), tone: color.accentInk };
+  return { text: line || t('snags.withStudio'), tone: color.ink2 };
+}
+
+function SnagRow({ snag: s, i, t }: { snag: Snag; i: number; t: T }) {
+  const img = s.status === 'FIXED' ? (s.fixedPhotos[0] ?? s.photos[0]) : s.photos[0];
+  const raised = s.room ? t('snags.roomRaised', { room: s.room, day: dayLabel(s.raisedAt) }) : t('snags.raised', { day: dayLabel(s.raisedAt) });
+  const status = statusLine(s, t);
+  return (
+    <Stagger i={Math.min(i, 8)} start={280} style={styles.snag}>
+      {img ? <Image source={{ uri: img }} style={styles.thumb} contentFit="cover" accessibilityLabel={t('snags.photoOf', { title: s.title })} /> : <View style={[styles.thumb, { backgroundColor: color.soft }]} />}
+      <View style={{ flex: 1, gap: 4 }}>
+        <Text style={styles.snagTitle}>{s.title}</Text>
+        <Text style={styles.mono}>{raised}</Text>
+        <Text style={[styles.mono, { color: status.tone }]}>{status.text}</Text>
+      </View>
+    </Stagger>
+  );
+}
+
 const styles = StyleSheet.create({
-  card: { gap: 14, padding: 16, borderRadius: 18, backgroundColor: color.white, borderWidth: 1, borderColor: '#e2e0da' },
   preview: { width: '100%', aspectRatio: 4 / 3, borderRadius: 12 },
   camera: {
-    minHeight: 56,
+    minHeight: 60,
     borderRadius: 999,
-    backgroundColor: color.accent,
+    backgroundColor: color.ink,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    shadowColor: color.accent,
+    gap: 12,
+    paddingHorizontal: 24,
+    shadowColor: color.ink,
     shadowOpacity: 0.45,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 15,
+    shadowOffset: { width: 0, height: 14 },
     elevation: 6,
   },
-  cameraText: { fontFamily: font.sansSemi, fontSize: 16.5, color: color.white },
-  toast: { backgroundColor: color.dark, color: color.onDark, borderRadius: 999, paddingVertical: 12, paddingHorizontal: 16, textAlign: 'center', overflow: 'hidden' },
-  snag: { flexDirection: 'row', gap: 14, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: color.line },
+  cameraText: { fontFamily: font.sansMedium, fontSize: 16, color: color.white },
+  toast: {
+    backgroundColor: color.ink,
+    color: color.onDark,
+    borderRadius: 999,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    textAlign: 'center',
+    overflow: 'hidden',
+    fontFamily: font.sansMedium,
+    fontSize: 14.5,
+    lineHeight: 20,
+  },
+  tab: { minHeight: 44, paddingHorizontal: 18, borderRadius: 999, borderWidth: 1, borderColor: color.ring, justifyContent: 'center' },
+  tabText: { fontFamily: font.sansMedium, fontSize: 14.5, color: color.ink },
+  tabCount: { fontFamily: font.mono, fontSize: 13, color: color.ink },
+  list: { borderBottomWidth: 1, borderBottomColor: color.line },
+  snag: { flexDirection: 'row', gap: 14, paddingVertical: 14, borderTopWidth: 1, borderTopColor: color.line },
   thumb: { width: 84, height: 84, borderRadius: 12 },
-  snagTitle: { fontFamily: font.sansSemi, fontSize: 17, lineHeight: 21, color: color.ink },
-  mono: { fontFamily: font.mono, fontSize: 13, color: color.ink2 },
-  cardMeta: { fontFamily: font.sansMedium, fontSize: 13, color: color.accentWarm },
-  cardBody: { fontFamily: font.sans, fontSize: 15.5, lineHeight: 23, color: 'rgba(255,255,255,.85)' },
+  snagTitle: { fontFamily: font.sansSemi, fontSize: 17, lineHeight: 21, letterSpacing: -0.34, color: color.ink },
+  mono: { fontFamily: font.mono, fontSize: 13, lineHeight: 18, color: color.ink2 },
+  walk: { borderRadius: 18, padding: 18, gap: 8 },
+  walkBody: { fontFamily: font.sans, fontSize: 15, lineHeight: 22.5, color: '#D6D4CE' },
 });

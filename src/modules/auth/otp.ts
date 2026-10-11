@@ -76,11 +76,16 @@ export type RequestOtpResult =
 export async function requestOtp(
   rawPhone: string,
   rawName: string,
-  meta: { ip?: string | null } = {},
+  /**
+   * `nameOptional`: the phone app's "I already have an account" sign-in asks
+   * for the number alone (design screen #12, returning customers). A name
+   * that is given must still be valid.
+   */
+  meta: { ip?: string | null; nameOptional?: boolean } = {},
 ): Promise<RequestOtpResult> {
   const phone = normalisePhone(rawPhone);
   if (!phone) return { ok: false, reason: 'invalid_phone' };
-  if (!isValidName(rawName)) return { ok: false, reason: 'invalid_name' };
+  if (!(meta.nameOptional && !rawName.trim()) && !isValidName(rawName)) return { ok: false, reason: 'invalid_name' };
 
   const now = Date.now();
 

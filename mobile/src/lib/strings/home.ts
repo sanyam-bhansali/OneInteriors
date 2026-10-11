@@ -1,4 +1,57 @@
 import type { Entry } from './entry';
 
 /** The home screen's words, English, Hindi and Marathi (first draft: Sanyam reviews). */
-export const home = {} satisfies Record<string, Entry>;
+export const home = {
+  'home.welcome.name': { en: 'Welcome, {name}.', hi: 'स्वागत है, {name}।', mr: 'स्वागत आहे, {name}.' },
+  'home.welcome': { en: 'Welcome.', hi: 'स्वागत है।', mr: 'स्वागत आहे.' },
+  'home.none.body': {
+    en: 'Your project appears here the day you sign with a studio: every site update, the decisions you need to make, and the snag list, with a notification each time something happens.',
+    hi: 'जिस दिन आप किसी स्टूडियो के साथ साइन करेंगे, आपका प्रोजेक्ट यहाँ दिखेगा: साइट का हर अपडेट, आपको लेने वाले फ़ैसले, और स्नैग लिस्ट। कुछ भी होने पर आपको सूचना मिलेगी।',
+    mr: 'ज्या दिवशी तुम्ही स्टुडिओसोबत साइन कराल, त्या दिवशी तुमचा प्रोजेक्ट इथे दिसेल: साइटचा प्रत्येक अपडेट, तुम्हाला घ्यायचे निर्णय आणि स्नॅग लिस्ट. काहीही घडलं की तुम्हाला सूचना मिळेल.',
+  },
+  'home.none.geio': { en: 'Ask GEIO', hi: 'GEIO से पूछें', mr: 'GEIO ला विचारा' },
+  'home.bell.new': { en: 'Notifications, {n} new', hi: 'सूचनाएँ, {n} नई', mr: 'सूचना, {n} नवीन' },
+  'home.with': { en: 'With {studio}', hi: '{studio} के साथ', mr: '{studio} सोबत' },
+  'home.updated.now': { en: 'Updated from site just now', hi: 'साइट से अभी-अभी अपडेट', mr: 'साइटवरून आत्ताच अपडेट' },
+  'home.updated.today': { en: 'Updated from site at {time}', hi: 'साइट से {time} पर अपडेट', mr: 'साइटवरून {time} ला अपडेट' },
+  'home.updated.day': { en: 'Updated from site {day}', hi: 'साइट से {day} को अपडेट', mr: 'साइटवरून {day} ला अपडेट' },
+  'home.status.onTrack': { en: '{stage} · on track', hi: '{stage} · समय पर', mr: '{stage} · वेळेवर' },
+  'home.status.late': { en: '{stage} · running late', hi: '{stage} · देरी से चल रहा है', mr: '{stage} · उशिरा चालू आहे' },
+  'home.status.done': { en: 'All stages done', hi: 'सभी चरण पूरे', mr: 'सर्व टप्पे पूर्ण' },
+  'home.overall.late': { en: 'Overall · {n} days late', hi: 'कुल मिलाकर · {n} दिन देर', mr: 'एकूण · {n} दिवस उशीर' },
+  'home.overall.late1': { en: 'Overall · 1 day late', hi: 'कुल मिलाकर · 1 दिन देर', mr: 'एकूण · 1 दिवस उशीर' },
+  'home.overall.onTime': { en: 'Overall · on time', hi: 'कुल मिलाकर · समय पर', mr: 'एकूण · वेळेवर' },
+  'home.h1.name': { en: 'Your home is coming together, {name}.', hi: 'आपका घर तैयार हो रहा है, {name}।', mr: 'तुमचं घर आकार घेत आहे, {name}.' },
+  'home.h1': { en: 'Your home is coming together.', hi: 'आपका घर तैयार हो रहा है।', mr: 'तुमचं घर आकार घेत आहे.' },
+  'home.track': { en: 'Open the project timeline', hi: 'प्रोजेक्ट की टाइमलाइन खोलें', mr: 'प्रोजेक्टची टाइमलाइन उघडा' },
+  'home.stage.DESIGN': { en: 'Design', hi: 'डिज़ाइन', mr: 'डिझाइन' },
+  'home.stage.PRODUCTION': { en: 'Factory', hi: 'फ़ैक्टरी', mr: 'फॅक्टरी' },
+  'home.stage.SITE': { en: 'Site work', hi: 'साइट का काम', mr: 'साइटचं काम' },
+  'home.stage.INSTALL': { en: 'Install', hi: 'फ़िटिंग', mr: 'फिटिंग' },
+  'home.stage.FINISH': { en: 'Finish', hi: 'फ़िनिशिंग', mr: 'फिनिशिंग' },
+  'home.stage.HANDOVER': { en: 'Handover', hi: 'हैंडओवर', mr: 'हँडओव्हर' },
+  'home.decision.due': { en: 'Your decision, due {date}', hi: 'आपका फ़ैसला, {date} तक', mr: 'तुमचा निर्णय, {date} पर्यंत' },
+  'home.decision.overdue': { en: 'Your decision, was due {date}', hi: 'आपका फ़ैसला, {date} तक देना था', mr: 'तुमचा निर्णय, {date} पर्यंत द्यायचा होता' },
+  'home.decision.cta': { en: 'Choose an option', hi: 'एक विकल्प चुनें', mr: 'एक पर्याय निवडा' },
+  'home.decision.vote': { en: 'Add your vote', hi: 'अपना वोट दें', mr: 'तुमचं मत द्या' },
+  'home.site.today': { en: 'Today on site', hi: 'आज साइट पर', mr: 'आज साइटवर' },
+  'home.site.latest': { en: 'Latest from site', hi: 'साइट से ताज़ा अपडेट', mr: 'साइटवरचं ताजं अपडेट' },
+  'home.site.all': { en: 'Every day on site', hi: 'साइट का हर दिन', mr: 'साइटवरचा प्रत्येक दिवस' },
+  'home.site.empty': {
+    en: 'The first update from {studio} appears here, and on your phone, as soon as it is posted.',
+    hi: '{studio} का पहला अपडेट डालते ही यहाँ और आपके फ़ोन पर दिखेगा।',
+    mr: '{studio} चा पहिला अपडेट टाकताच इथे आणि तुमच्या फोनवर दिसेल.',
+  },
+  'home.site.photo': { en: 'Site photo {n}', hi: 'साइट फ़ोटो {n}', mr: 'साइट फोटो {n}' },
+  'home.pay.title': { en: 'Next payment', hi: 'अगला भुगतान', mr: 'पुढचं पेमेंट' },
+  'home.pay.body': {
+    en: 'To {studio} {when}. You pay the studio directly; we keep track of it here.',
+    hi: '{studio} को, {when}। आप सीधे स्टूडियो को भुगतान करते हैं; हम उसका हिसाब यहाँ रखते हैं।',
+    mr: '{studio} ला, {when}. तुम्ही थेट स्टुडिओला पेमेंट करता; आम्ही त्याचा हिशोब इथे ठेवतो.',
+  },
+  'home.stale': {
+    en: 'Showing what was saved on this phone. {error}',
+    hi: 'इस फ़ोन पर सेव की गई जानकारी दिख रही है। {error}',
+    mr: 'या फोनवर सेव्ह केलेली माहिती दिसत आहे. {error}',
+  },
+} satisfies Record<string, Entry>;

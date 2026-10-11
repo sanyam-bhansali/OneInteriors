@@ -210,6 +210,13 @@ export default function PrivacyPage() {
             </li>
           </ul>
           <p className="m-0">
+            You can delete your account yourself in the One Interiors app, under Me → Privacy →
+            Delete my account, or by writing to us at{' '}
+            <a href={`mailto:${PRIVACY.contact}`}>{PRIVACY.contact}</a>. Your name, number and email
+            go straight away and you are signed out everywhere. If a studio is already working on your
+            home, the record of that work stays, without them.
+          </p>
+          <p className="m-0">
             Write to <a href={`mailto:${PRIVACY.contact}`}>{PRIVACY.contact}</a>. We answer within{' '}
             {PRIVACY.responseDays} days.
           </p>

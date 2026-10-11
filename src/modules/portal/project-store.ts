@@ -89,8 +89,15 @@ export interface CustomerDocument {
 
 const UPDATES_SHOWN = 30;
 
-/** Every project on this customer's brief, newest first. Empty when they have none yet. */
-export async function customerProjects(userId: string, now = new Date()): Promise<CustomerProject[]> {
+/**
+ * Every project on this customer's brief, newest first. Empty when they have none yet.
+ *
+ * `links: false` leaves photo and document links empty instead of signing
+ * them: GEIO reads the project on every question and never shows a photo, so
+ * it should not cost a storage round trip per picture.
+ */
+export async function customerProjects(userId: string, now = new Date(), opts: { links?: boolean } = {}): Promise<CustomerProject[]> {
+  const links = opts.links !== false;
   const projects = await prisma.homeProject.findMany({
     where: {
       OR: [
@@ -110,12 +117,14 @@ export async function customerProjects(userId: string, now = new Date()): Promis
   });
   return Promise.all(
     projects.map(async (p) => {
-      const [updatePhotos, snagPhotos, fixedPhotos, docUrls] = await Promise.all([
-        Promise.all(p.updates.map((u) => signedSitePhotoUrls(u.photoPaths))),
-        Promise.all(p.snags.map((s) => signedSitePhotoUrls(s.photoPaths))),
-        Promise.all(p.snags.map((s) => signedSitePhotoUrls(s.fixedPhotoPaths))),
-        signedDocUrls(p.documents.map((d) => d.storageKey)),
-      ]);
+      const [updatePhotos, snagPhotos, fixedPhotos, docUrls] = links
+        ? await Promise.all([
+            Promise.all(p.updates.map((u) => signedSitePhotoUrls(u.photoPaths))),
+            Promise.all(p.snags.map((s) => signedSitePhotoUrls(s.photoPaths))),
+            Promise.all(p.snags.map((s) => signedSitePhotoUrls(s.fixedPhotoPaths))),
+            signedDocUrls(p.documents.map((d) => d.storageKey)),
+          ])
+        : [[], [], [], []];
       const names = new Map(p.family.map((f) => [f.userId, f.name]));
       return {
         id: p.id,

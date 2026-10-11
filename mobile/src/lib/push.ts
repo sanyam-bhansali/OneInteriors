@@ -26,12 +26,12 @@ Notifications.setNotificationHandler({
 
 /** Register this phone for push. Quietly does nothing on a simulator, without permission, or before an EAS project exists. */
 export async function registerForPush(): Promise<void> {
-  if (!Device.isDevice) return;
+  if (!Device.isDevice || Platform.OS === 'web') return;
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
       name: 'Project updates',
       importance: Notifications.AndroidImportance.HIGH,
-      lightColor: '#ba5329',
+      lightColor: '#C1582E',
     });
   }
   const current = await Notifications.getPermissionsAsync();
@@ -60,7 +60,13 @@ export function routeFor(url: string | undefined): Href | null {
   if (!url) return null;
   const [path, query = ''] = url.split('?');
   const id = new URLSearchParams(query).get('id');
+  // App paths, as the sample and newer notices send them.
+  if (path && /^\/(home|project|site|geio|me|snags|locker|notifications)$/.test(path)) return path as Href;
+  const decision = /^\/decision\/([^/]+)$/.exec(path ?? '');
+  if (decision) return { pathname: '/decision/[id]', params: { id: decision[1]! } };
   switch (path) {
+    case '/app/project':
+      return '/project';
     case '/app/site':
       return '/site';
     case '/app/snags':
@@ -77,7 +83,8 @@ export function routeFor(url: string | undefined): Href | null {
 /** Opens the screen a tapped notification points at, including the one that launched the app. */
 export function useNotificationRouting(enabled: boolean): void {
   useEffect(() => {
-    if (!enabled) return;
+    // The web build is only for previewing screens; it has no push.
+    if (!enabled || Platform.OS === 'web') return;
     const open = (r: Notifications.NotificationResponse | null) => {
       const href = routeFor((r?.notification.request.content.data as { url?: string } | undefined)?.url);
       if (href) router.push(href);

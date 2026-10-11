@@ -17,6 +17,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLang } from '../lib/i18n';
 import { useReducedMotion } from '../lib/motion';
 import { color, font, motion, radius, space, type, type Tint } from '../lib/theme';
 import { ArrowIcon, BackIcon } from './icons';
@@ -132,11 +133,12 @@ export function Screen({
   back?: boolean;
 }) {
   const bg = dark ? color.ink : color.paper;
+  const t = useLang().t;
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={['top', 'left', 'right']}>
       {back ? (
         <View style={{ paddingHorizontal: 12, paddingTop: 4 }}>
-          <Press onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))} style={styles.back} accessibilityLabel="Back">
+          <Press onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))} style={styles.back} accessibilityLabel={t('kit.back')}>
             <BackIcon color={dark ? color.white : color.ink} />
           </Press>
         </View>
@@ -166,9 +168,11 @@ export function Eyebrow({ children, style, onDark }: { children: ReactNode; styl
 
 /** The headline: 40 px, weight 500, set tight. Hindi and Marathi pass 34. */
 export function Title({ children, style, size = 40 }: { children: ReactNode; style?: StyleProp<TextStyle>; size?: number }) {
+  // Devanagari's marks above the line need room a tight Latin headline does not.
+  const tall = useLang().lang !== 'en';
   return (
     <Rise>
-      <Text role="heading" style={[type.headline, { fontSize: size, lineHeight: size, letterSpacing: size * -0.045 }, style]}>
+      <Text role="heading" style={[type.headline, { fontSize: size, lineHeight: tall ? size * 1.3 : size, letterSpacing: tall ? 0 : size * -0.045 }, style]}>
         {children}
       </Text>
     </Rise>

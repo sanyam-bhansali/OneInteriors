@@ -1,6 +1,7 @@
 import { decision } from './decision';
 import { geio } from './geio';
 import { home } from './home';
+import { kit } from './kit';
 import { locker } from './locker';
 import { me } from './me';
 import { notifications } from './notifications';
@@ -17,6 +18,7 @@ import { welcome } from './welcome';
  * by tests/mobile-i18n.test.ts); a key here must not repeat one there.
  */
 export const NATIVE = {
+  ...kit,
   ...welcome,
   ...signin,
   ...home,
