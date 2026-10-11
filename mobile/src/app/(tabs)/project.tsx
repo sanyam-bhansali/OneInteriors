@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { ArrowIcon } from '../../components/icons';
 import { CalendarIcon, GrowLine, NowDot, SnagIcon } from '../../components/project/parts';
-import { MovedNote, MovesCard, StageChecklist, stageLine } from '../../components/project/tracker';
+import { MovedNote, MovesCard, ProgressBar, StageChecklist, StageSteps, stageLine } from '../../components/project/tracker';
 import { Body, Card, Eyebrow, Loading, Meta, Press, Screen, Stagger, Tile, Title } from '../../components/ui';
 import { dayLabel, inr, lakh, shortDate } from '../../lib/format';
 import { useHeadline, useLang, useT, type T } from '../../lib/i18n';
@@ -20,7 +20,10 @@ import type { Decision, Money, Payments as PaymentsData, Project as ProjectData,
  * line that fills from the top, the current one pulsing. Stage status and
  * overall status always show together (FLOWS.md). Payments and changes so
  * far follow in one soft card. No savings meter: the server has no savings
- * figures yet, and none are made up here.
+ * figures yet, and none are made up here. With the step tracker the server
+ * also sends how much of the home is done, overall and per stage, and each
+ * stage's steps; the percentage card leads, and the stage under way lists
+ * its steps (older servers: its room checklist).
  */
 export default function Project() {
   const t = useT();
@@ -93,6 +96,17 @@ export default function Project() {
         </View>
 
         {late > 0 && customerDays > 0 ? <Text style={styles.note}>{t('project.customerDays', { n: customerDays })}</Text> : null}
+
+        {typeof p.progressPct === 'number' ? (
+          <Card>
+            <View style={styles.cardHead}>
+              <Text style={styles.cardTitle}>{t('project.progress')}</Text>
+              <Text style={styles.progressPct}>{p.progressPct}%</Text>
+            </View>
+            <ProgressBar pct={p.progressPct} label={t('project.progress.a11y', { n: p.progressPct })} />
+            <Text style={styles.note}>{t('project.progress.body', { studio: p.studio })}</Text>
+          </Card>
+        ) : null}
 
         <View style={styles.row2}>
           <Stagger i={3} start={120} style={{ flex: 1 }}>
@@ -246,9 +260,16 @@ function StageRow({
           >
             {nowStage ? t('project.stageNow', { stage: s.label }) : s.label}
           </Text>
-          <Text style={styles.mono}>{line}</Text>
+          <Text style={styles.mono}>
+            {line}
+            {typeof tracked?.progressPct === 'number' && tracked.steps?.length ? ` · ${t('project.stagePct', { n: tracked.progressPct })}` : ''}
+          </Text>
           {tracked ? <MovedNote stage={tracked} t={t} /> : null}
-          {current ? <StageChecklist current={current} t={t} /> : null}
+          {nowStage && tracked?.steps?.length ? (
+            <StageSteps steps={tracked.steps} pct={tracked.progressPct ?? 0} t={t} />
+          ) : current ? (
+            <StageChecklist current={current} t={t} />
+          ) : null}
           {s.late ? (
             <View style={styles.lateCard}>
               <Text style={styles.lateEyebrow}>{done ? t('project.lateDone.eyebrow') : t('project.late.eyebrow')}</Text>
@@ -374,4 +395,6 @@ const styles = StyleSheet.create({
   payLabel: { fontFamily: font.sansMedium, fontSize: 14.5, color: color.ink },
   amt: { fontFamily: font.monoMedium, fontSize: 13.5, color: color.ink, textAlign: 'right', flexShrink: 1 },
   note: { fontFamily: font.sans, fontSize: 13.5, lineHeight: 20, color: color.ink2 },
+  progressPct: { fontFamily: font.mono, fontSize: 24, color: color.ink },
+
 });

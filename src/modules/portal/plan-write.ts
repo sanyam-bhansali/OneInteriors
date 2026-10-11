@@ -1,6 +1,6 @@
 /**
  * Writing a project's plan (quote-to-plan.ts) to its `HomeProject`: the
- * stages with each room's checklist items, the materials, and the documents
+ * stages with their steps, the materials, and the documents
  * signing files. Takes the database client as an argument — the signing
  * transaction (choose.ts `signFinalQuote`) and the backfill script
  * (scripts/studio/build-plans.ts) pass their own — so it has no
@@ -13,7 +13,7 @@ import { quoteToPlan, type PlanMaterial, type PlanPayment, type PlanQuoteLine, t
 
 export type PlanDb = Pick<Prisma.TransactionClient, 'homeProjectStage' | 'homeMaterial' | 'homeDocument'>;
 
-/** The stages, each with its items, then the materials. One create per stage (items nested), one for the materials. */
+/** The stages, each with its steps, then the materials. One create per stage (steps nested), one for the materials. */
 export async function writePlan(db: PlanDb, projectId: string, plan: { stages: PlanStage[]; materials: PlanMaterial[] }): Promise<void> {
   for (const s of plan.stages) {
     await db.homeProjectStage.create({
@@ -31,7 +31,11 @@ export async function writePlan(db: PlanDb, projectId: string, plan: { stages: P
             label: it.label,
             quoteLineId: it.quoteLineId,
             sortOrder: it.sortOrder,
+            weightBp: it.weightBp,
+            inScope: it.inScope,
+            plannedOn: it.plannedOn,
             doneAt: it.doneAt ?? null,
+            doneSource: it.doneAt ? (it.doneSource ?? null) : null,
           })),
         },
       },

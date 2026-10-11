@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import type { StudioPlan, PlanStageView, PlanEditResult } from '@/modules/project/plan-edit';
+import { useRouter } from 'next/navigation';
+import type { StudioPlan, PlanStageView, PlanStepView, PlanEditResult } from '@/modules/project/plan-edit';
 import {
   dayWords,
   gateWords,
@@ -15,19 +16,37 @@ import {
   type RuleStage,
 } from '@/modules/project/project-rules';
 import { calendarOf, daysBetween, istDay } from '@/modules/project/working-days';
+import { doneLabel, parsePercent } from '@/modules/project/step-rules';
 import { CustomerSees, OnlyYourTeam } from '../marks';
-import { markStageDoneAction, moveDateAction, renameStageAction, tickItemAction } from './plan-actions';
+import { newClientRef, uploadFile } from '../../site/lib/queue';
+import { readyPhoto, type ReadyPhoto } from '../../site/lib/photo';
+import {
+  addStepAction,
+  markStageDoneAction,
+  moveDateAction,
+  removeStepAction,
+  renameStageAction,
+  renameStepAction,
+  reweightStepAction,
+  scopeStepAction,
+  untickStepAction,
+} from './plan-actions';
 
 /**
- * The Plan tab (studio workspace Phase 3, design StudioProject.dc.html):
- * every stage planned against actual or forecast, what the customer sees for
- * it, each room's checklist with ticks, and "Move a date" with a reason and
- * a preview of exactly what the customer will read before anything is saved.
+ * The Plan tab (studio workspace Phase 3 and the step tracker, design
+ * StudioProject.dc.html; docs/studio-workspace/STEP-TRACKER.md): the
+ * project's percentage done, every stage planned against actual or forecast
+ * with its own percentage and what the customer sees for it, each stage's
+ * steps group by group with their share of the project, and "Move a date"
+ * with a reason and a preview of exactly what the customer will read before
+ * anything is saved.
  *
- * One obvious action per place: tick an item, move a date, mark a stage
- * done. Ticks answer at once and undo themselves if the server says no.
- * Nothing here is typed by hand for the customer: statuses come from
- * project-rules.ts, the same rules the customer's app reads.
+ * One obvious action per place: tick a step (with a photo and a sentence,
+ * posted to today's site log), move a date, mark a stage done. The owner or
+ * PM also edits steps: name, weight, in or out of scope, add, remove, untick.
+ * Nothing here is typed by hand for the customer's tracker: statuses and
+ * percentages come from project-rules.ts and step-rules.ts, the same rules
+ * the customer's app reads.
  */
 
 type Toast = { ok: boolean; text: string } | null;
@@ -56,7 +75,7 @@ export function PlanTab({ plan, customer }: { plan: StudioPlan; customer: string
           <CustomerSees name={customer} />
         </div>
         <p className={`m-0 mt-1 ${muted}`}>
-          Made from the signed quote. A stage finishes when its last item is ticked and a site photo from it is posted.
+          Hauspire&rsquo;s steps, each worth a share of the project. A stage finishes when its last step in scope is ticked, each with its photo.
         </p>
         <div className="mt-4 hidden grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1.4fr)] gap-3 px-1 pb-2 text-[12px] font-semibold text-[var(--s-ink-3)] md:grid">
           <span>Stage</span>
@@ -99,8 +118,17 @@ function Overall({ plan, customer, onMove }: { plan: StudioPlan; customer: strin
   const overallLine = o.lateDays > 0 ? `Overall · ${days(o.lateDays)} late` : o.earlyDays > 0 ? `Overall · ${days(o.earlyDays)} early` : 'Overall · on time';
   return (
     <div className="s-card flex flex-wrap items-center justify-between gap-4 p-5">
+      <div className="flex w-full flex-col gap-1.5">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[13px] font-semibold text-[var(--s-ink-2)]">Project done</span>
+          <span className="s-num font-[family-name:var(--font-mono)] text-[22px] font-semibold">{plan.progressPct}%</span>
+        </div>
+        <Bar pct={plan.progressPct} label={`Project ${plan.progressPct}% done`} />
+        <span className={muted}>From the steps ticked, each by its share. {customer} sees this percentage go up as steps are ticked.</span>
+      </div>
       <div className="flex min-w-0 flex-col gap-1">
         <div className="flex flex-wrap gap-2">
+
           <Chip tone={c?.status === 'late' ? 'bad' : 'good'}>{stageLine}</Chip>
           <Chip tone={o.studioDays > 0 ? 'bad' : o.lateDays > 0 ? 'warn' : 'good'}>{overallLine}</Chip>
         </div>
@@ -163,6 +191,16 @@ function customerLine(s: PlanStageView): { text: string; tone: string } {
   return { text: s.state === 'next' ? 'Next' : 'Later', tone: 'var(--s-ink-3)' };
 }
 
+/** A thin progress bar: only ever goes up. */
+function Bar({ pct, label }: { pct: number; label: string }) {
+  const v = Math.max(0, Math.min(100, pct));
+  return (
+    <span role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={v} className="block h-2 w-full overflow-hidden rounded-full bg-[var(--s-surface-2)]">
+      <span className="block h-full rounded-full" style={{ width: `${v}%`, background: v >= 100 ? 'var(--s-good)' : 'var(--s-accent)' }} />
+    </span>
+  );
+}
+
 function StageRow({
   plan,
   stage: s,
@@ -181,7 +219,8 @@ function StageRow({
   const [pending, start] = useTransition();
   const line = customerLine(s);
   const moved = s.lastMove;
-  const hasItems = s.completion.total > 0;
+  const hasSteps = s.groups.some((g) => g.steps.length > 0);
+  const pct = s.progressPct ?? (s.state === 'done' ? 100 : 0);
 
   const mark = (done: boolean) => {
     if (!done && !window.confirm(`Reopen ${s.name}? ${customer} will see it as not done again.`)) return;
@@ -204,8 +243,15 @@ function StageRow({
               ) : null}
             </span>
           )}
+          <span className="mt-1.5 flex items-center gap-2">
+            <span className="w-[120px] flex-none">
+              <Bar pct={pct} label={`${s.name}: ${pct}% done`} />
+            </span>
+            <span className="s-num font-[family-name:var(--font-mono)] text-[13px] font-semibold">{pct}%</span>
+          </span>
           <span className={`block ${muted}`}>
-            {hasItems ? `${s.completion.done} of ${s.completion.total} ticked` : 'No checklist'} · {s.photos} photo{s.photos === 1 ? '' : 's'}
+            {s.completion.total ? `${s.completion.done} of ${s.completion.total} steps ticked` : 'No step in scope'} · {s.sharePct}% of the project · {s.photos} photo
+            {s.photos === 1 ? '' : 's'}
           </span>
         </div>
         <span className="s-num font-[family-name:var(--font-mono)] text-[13px] text-[var(--s-ink-2)]">
@@ -232,9 +278,9 @@ function StageRow({
       </div>
 
       <div className="mt-2.5 flex flex-wrap items-center gap-2">
-        {hasItems ? (
+        {hasSteps ? (
           <button type="button" className="s-btn-ghost min-h-[40px]" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-            {open ? 'Hide checklist' : `Show checklist (${s.completion.open} open)`}
+            {open ? 'Hide steps' : s.completion.open ? `Show steps (${s.completion.open} to do)` : 'Show steps'}
           </button>
         ) : null}
         {plan.canEdit && s.state !== 'done' ? (
@@ -242,7 +288,7 @@ function StageRow({
             Move a date
           </button>
         ) : null}
-        {plan.canTick && s.state !== 'done' && (!hasItems || s.completion.complete) ? (
+        {plan.canTick && s.state !== 'done' && (s.completion.total === 0 || s.completion.complete) ? (
           s.gate.ok ? (
             <button type="button" className="s-btn min-h-[40px]" disabled={pending} onClick={() => mark(true)}>
               {pending ? 'Saving…' : 'Mark done'}
@@ -258,7 +304,7 @@ function StageRow({
         ) : null}
       </div>
 
-      {open && hasItems ? <Checklist plan={plan} stage={s} say={say} /> : null}
+      {open && hasSteps ? <Steps plan={plan} stage={s} customer={customer} say={say} /> : null}
     </li>
   );
 }
@@ -297,70 +343,464 @@ function Rename({ plan, stage, onDone }: { plan: StudioPlan; stage: PlanStageVie
   );
 }
 
-// ── The checklist ──────────────────────────────────────────────
+// ── The steps ──────────────────────────────────────────────────
 
-function Checklist({ plan, stage, say }: { plan: StudioPlan; stage: PlanStageView; say: (r: PlanEditResult) => void }) {
-  /* Ticks show at once; a refusal puts the box back and says why. */
-  const [local, setLocal] = useState<Record<string, boolean>>({});
-  const [, start] = useTransition();
-  const toggle = (id: string, next: boolean) => {
-    setLocal((m) => ({ ...m, [id]: next }));
-    start(async () => {
-      const r = await tickItemAction(plan.projectId, id, next);
-      if (!r.ok) setLocal((m) => ({ ...m, [id]: !next }));
-      say(r);
-    });
+const field = 'min-h-[40px] rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 text-[14.5px]';
+
+/**
+ * A stage's steps, group by group. One obvious action per step: "Tick with
+ * a photo" while it is open, "Untick" once it is done (owner or PM: a
+ * correction), and "Edit" for the owner or PM (name, weight, scope, remove).
+ */
+function Steps({ plan, stage, customer, say }: { plan: StudioPlan; stage: PlanStageView; customer: string; say: (r: PlanEditResult) => void }) {
+  const [ticking, setTicking] = useState<PlanStepView | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [adding, setAdding] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const canTick = plan.canTick && plan.canPost;
+
+  const untick = (st: PlanStepView) => {
+    if (!window.confirm(`Untick “${st.label}”? ${customer}'s percentage goes back down. The photo stays in the site log.`)) return;
+    start(async () => say(await untickStepAction(plan.projectId, st.id)));
   };
+
   return (
-    <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {stage.rooms.map((room) => (
-        <div key={room.room} className="rounded-[10px] bg-[var(--s-surface-2)] p-3">
-          <p className="m-0 mb-1.5 text-[12.5px] font-semibold text-[var(--s-ink-2)]">{room.room}</p>
-          <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
-            {room.items.map((it) => {
-              const done = local[it.id] ?? it.done;
-              const box = (
-                <span
-                  aria-hidden="true"
-                  className="inline-flex h-5 w-5 flex-none items-center justify-center rounded-[6px] border text-[12px] font-bold"
-                  style={done ? { background: 'var(--s-accent)', borderColor: 'var(--s-accent)', color: '#fff' } : { borderColor: 'var(--s-ink-3)', background: 'var(--s-surface)' }}
-                >
-                  {done ? '✓' : ''}
-                </span>
-              );
-              const text = (
-                <span className="min-w-0 flex-1 text-left">
-                  <span className={done ? 'text-[var(--s-ink-3)]' : undefined}>{it.label}</span>
-                  {done && it.doneOn ? <span className={`ml-1.5 ${muted}`}>{dayWords(it.doneOn)}</span> : null}
-                  {it.fromVoice ? <span className={`ml-1.5 ${muted}`}>· from a voice note</span> : null}
-                </span>
-              );
-              return (
-                <li key={it.id}>
-                  {plan.canTick ? (
-                    <button
-                      type="button"
-                      aria-pressed={done}
-                      onClick={() => toggle(it.id, !done)}
-                      className="flex min-h-[40px] w-full items-center gap-2.5 rounded-[8px] px-1.5 text-[14px] hover:bg-[var(--s-surface)]"
-                    >
-                      {box}
-                      {text}
-                    </button>
-                  ) : (
-                    <span className="flex min-h-[36px] items-center gap-2.5 px-1.5 text-[14px]">
-                      {box}
-                      {text}
-                      <span className="sr-only">{done ? '(done)' : '(open)'}</span>
-                    </span>
-                  )}
-                </li>
-              );
-            })}
+    <div className="mt-3 flex flex-col gap-3">
+      <p className={`m-0 ${muted}`}>
+        A step is ticked with a photo and a sentence: both go into today&rsquo;s site log, labelled &ldquo;Done: step&rdquo;. Each % is the step&rsquo;s share of the whole project.
+        {plan.canEdit ? ` Weights in scope add up to ${plan.weightTotalPct}%; every share is worked out again so the project always totals 100%.` : ''}
+      </p>
+      {stage.groups.map((g) => (
+        <div key={g.group} className="rounded-[10px] bg-[var(--s-surface-2)] p-3">
+          <p className="m-0 mb-1.5 text-[12.5px] font-semibold text-[var(--s-ink-2)]">{g.group}</p>
+          <ul className="m-0 flex list-none flex-col gap-1 p-0">
+            {g.steps.map((st) =>
+              editing === st.id ? (
+                <StepEditor key={st.id} plan={plan} step={st} customer={customer} onDone={(r) => { setEditing(null); if (r) say(r); }} />
+              ) : (
+                <StepRow
+                  key={st.id}
+                  plan={plan}
+                  step={st}
+                  customer={customer}
+                  busy={pending}
+                  onTick={canTick ? () => setTicking(st) : null}
+                  onUntick={plan.canEdit ? () => untick(st) : null}
+                  onEdit={plan.canEdit ? () => setEditing(st.id) : null}
+                />
+              ),
+            )}
           </ul>
+          {plan.canEdit ? (
+            adding === g.group ? (
+              <AddStep plan={plan} stageId={stage.id} group={g.group} onDone={(r) => { setAdding(null); if (r) say(r); }} />
+            ) : (
+              <button type="button" onClick={() => setAdding(g.group)} className="mt-1.5 min-h-[36px] text-[13px] text-[var(--s-accent)] underline-offset-2 hover:underline">
+                + Add a step to {g.group}
+              </button>
+            )
+          ) : null}
         </div>
       ))}
+      {ticking ? <TickDialog plan={plan} step={ticking} customer={customer} onClose={() => setTicking(null)} say={say} /> : null}
     </div>
+  );
+}
+
+function StepRow({
+  step: st,
+  customer,
+  busy,
+  onTick,
+  onUntick,
+  onEdit,
+}: {
+  plan: StudioPlan;
+  step: PlanStepView;
+  customer: string;
+  busy: boolean;
+  onTick: (() => void) | null;
+  onUntick: (() => void) | null;
+  onEdit: (() => void) | null;
+}) {
+  const how = st.hasPhoto ? 'photo in the site log' : st.backfilled ? 'done with its stage, no photo' : st.fromVoice ? 'from a voice note' : null;
+  const meta = !st.inScope
+    ? `Not in scope · ${customer} does not see it`
+    : st.done
+      ? `Done ${st.doneOn ? dayWords(st.doneOn) : ''}${how ? ` · ${how}` : ''}`
+      : st.plannedOn
+        ? `Planned ${dayWords(st.plannedOn)}`
+        : 'Open';
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[8px] px-1.5 py-1.5 hover:bg-[var(--s-surface)]">
+      <span
+        aria-hidden="true"
+        className="inline-flex h-5 w-5 flex-none items-center justify-center rounded-[6px] border text-[12px] font-bold"
+        style={
+          st.done
+            ? { background: 'var(--s-accent)', borderColor: 'var(--s-accent)', color: '#fff' }
+            : { borderColor: st.inScope ? 'var(--s-ink-3)' : 'var(--s-rule)', background: 'var(--s-surface)', borderStyle: st.inScope ? 'solid' : 'dashed' }
+        }
+      >
+        {st.done ? '✓' : ''}
+      </span>
+      <span className="min-w-0 flex-1 basis-[220px]">
+        <span className={`block text-[14px] ${st.done || !st.inScope ? 'text-[var(--s-ink-3)]' : ''} ${!st.inScope ? 'line-through' : ''}`}>
+          {st.label}
+          <span className="sr-only">{st.done ? ' (done)' : st.inScope ? ' (open)' : ' (not in scope)'}</span>
+        </span>
+        <span className={`block ${muted}`}>{meta}</span>
+      </span>
+      <span className="s-num w-[52px] flex-none text-right font-[family-name:var(--font-mono)] text-[13px] text-[var(--s-ink-2)]" title="Its share of the whole project">
+        {st.inScope ? `${st.effectivePct}%` : '—'}
+      </span>
+      <span className="flex flex-none flex-wrap items-center gap-1.5">
+        {!st.done && st.inScope && onTick ? (
+          <button type="button" className="s-btn min-h-[36px] px-3 text-[13.5px]" disabled={busy} onClick={onTick}>
+            Tick with a photo
+          </button>
+        ) : null}
+        {st.done && onUntick ? (
+          <button type="button" className="s-btn-ghost min-h-[36px] px-3 text-[13px]" disabled={busy} onClick={onUntick}>
+            Untick
+          </button>
+        ) : null}
+        {onEdit ? (
+          <button type="button" className="s-btn-ghost min-h-[36px] px-3 text-[13px]" disabled={busy} onClick={onEdit} aria-label={`Edit ${st.label}`}>
+            Edit
+          </button>
+        ) : null}
+      </span>
+    </li>
+  );
+}
+
+/** Owner or PM: the step's name, its weight, whether it is in scope; remove it if it was never ticked. Saves together. */
+function StepEditor({ plan, step, customer, onDone }: { plan: StudioPlan; step: PlanStepView; customer: string; onDone: (r: PlanEditResult | null) => void }) {
+  const [label, setLabel] = useState(step.label);
+  const [weight, setWeight] = useState(String(step.weightPct));
+  const [inScope, setInScope] = useState(step.inScope);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const typed = parsePercent(weight);
+
+  const save = () =>
+    start(async () => {
+      setError(null);
+      const said: string[] = [];
+      const run = async (r: PlanEditResult) => {
+        if (!r.ok) throw new Error(r.error);
+        if (r.message !== 'No change.') said.push(r.message);
+      };
+      try {
+        if (label.trim() !== step.label) await run(await renameStepAction(plan.projectId, step.id, label));
+        if (typed === null) throw new Error('Type a percentage from 0 to 100, like 4 or 0.5.');
+        if (typed !== step.weightBp) await run(await reweightStepAction(plan.projectId, step.id, weight));
+        if (inScope !== step.inScope) await run(await scopeStepAction(plan.projectId, step.id, inScope));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'That did not save. Try again.');
+        return;
+      }
+      onDone(said.length ? { ok: true, message: said.join(' ') } : null);
+    });
+
+  const remove = () => {
+    if (!window.confirm(`Remove “${step.label}” from the plan? ${customer} stops seeing it, and its weight is shared across the other steps.`)) return;
+    start(async () => {
+      const r = await removeStepAction(plan.projectId, step.id);
+      if (r.ok) onDone(r);
+      else setError(r.error);
+    });
+  };
+
+  return (
+    <li className="rounded-[10px] border border-[var(--s-accent)] bg-[var(--s-surface)] p-3">
+      <form
+        className="flex flex-col gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save();
+        }}
+      >
+        <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-[var(--s-ink-2)]">
+          Step name ({customer} sees this)
+          <input value={label} maxLength={120} autoFocus onChange={(e) => setLabel(e.target.value)} className={`${field} font-normal text-[var(--s-ink)]`} />
+        </label>
+        <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-[var(--s-ink-2)]">
+          Weight, % of the project
+          <span className="flex flex-wrap items-center gap-2 font-normal">
+            <input value={weight} inputMode="decimal" onChange={(e) => setWeight(e.target.value)} className={`${field} w-[90px] text-[var(--s-ink)]`} aria-invalid={typed === null} />
+            <span className={muted}>
+              {typed === null ? 'Type a number from 0 to 100, like 4 or 0.5.' : `Counts for ${step.effectivePct}% now. In-scope weights add up to ${plan.weightTotalPct}%; shares are worked out so the project totals 100%.`}
+            </span>
+          </span>
+        </label>
+        <label className="flex min-h-[40px] cursor-pointer items-center gap-2.5 text-[14px]">
+          <input type="checkbox" checked={inScope} disabled={step.done && step.inScope} onChange={(e) => setInScope(e.target.checked)} className="h-5 w-5 accent-[var(--s-accent)]" />
+          In scope for this home
+          {step.done && step.inScope ? <span className={muted}>· ticked, so it stays in scope (untick it first)</span> : null}
+        </label>
+        {!inScope && step.inScope ? <p className={`m-0 ${muted}`}>Not in scope: {customer} stops seeing it, and its weight is shared across the other steps.</p> : null}
+        {error ? (
+          <p role="alert" className="m-0 text-[13.5px] font-medium text-[var(--s-bad)]">
+            {error}
+          </p>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="submit" className="s-btn min-h-[40px]" disabled={pending}>
+            {pending ? 'Saving…' : 'Save'}
+          </button>
+          <button type="button" className="s-btn-ghost min-h-[40px]" disabled={pending} onClick={() => onDone(null)}>
+            Cancel
+          </button>
+          {!step.done ? (
+            <button type="button" className="ml-auto min-h-[40px] px-2 text-[13px] text-[var(--s-bad)] underline-offset-2 hover:underline" disabled={pending} onClick={remove}>
+              Remove step
+            </button>
+          ) : null}
+        </div>
+      </form>
+    </li>
+  );
+}
+
+function AddStep({ plan, stageId, group, onDone }: { plan: StudioPlan; stageId: string; group: string; onDone: (r: PlanEditResult | null) => void }) {
+  const [label, setLabel] = useState('');
+  const [weight, setWeight] = useState('1');
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const save = () =>
+    start(async () => {
+      const r = await addStepAction(plan.projectId, { stageId, group, label, percent: weight });
+      if (r.ok) onDone(r);
+      else setError(r.error);
+    });
+  return (
+    <form
+      className="mt-2 flex flex-col gap-2 rounded-[10px] border border-[var(--s-accent)] bg-[var(--s-surface)] p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save();
+      }}
+    >
+      <p className="m-0 text-[13px] font-semibold">New step in {group}</p>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-[12.5px] text-[var(--s-ink-2)]">
+          Name
+          <input value={label} maxLength={120} autoFocus onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Kitchen backsplash tiles fixed" className={`${field} text-[var(--s-ink)]`} />
+        </label>
+        <label className="flex flex-col gap-1 text-[12.5px] text-[var(--s-ink-2)]">
+          Weight, %
+          <input value={weight} inputMode="decimal" onChange={(e) => setWeight(e.target.value)} className={`${field} w-[90px] text-[var(--s-ink)]`} />
+        </label>
+      </div>
+      {error ? (
+        <p role="alert" className="m-0 text-[13.5px] font-medium text-[var(--s-bad)]">
+          {error}
+        </p>
+      ) : null}
+      <div className="flex gap-2">
+        <button type="submit" className="s-btn min-h-[40px]" disabled={pending}>
+          {pending ? 'Adding…' : 'Add step'}
+        </button>
+        <button type="button" className="s-btn-ghost min-h-[40px]" disabled={pending} onClick={() => onDone(null)}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** Why the post route refused a tick, in plain words. */
+function tickError(code: unknown): string {
+  switch (code) {
+    case 'sign_in':
+      return 'You were signed out. Sign in again, then tick it.';
+    case 'not_your_role':
+    case 'not_yours':
+      return 'Your role cannot post to this site log. Ask your studio owner.';
+    case 'tick_photo':
+      return 'Each tick needs its own photo with a sentence under it.';
+    case 'items':
+      return 'That step is not open on this plan any more. Reload the page.';
+    case 'storage':
+      return 'Photos cannot be stored right now. Try again in a minute.';
+    case 'busy':
+      return 'Someone posted to this site at the same moment. Try again.';
+    default:
+      return 'That did not post, and nothing was ticked. Try again.';
+  }
+}
+
+/**
+ * "Tick with a photo": the photo that shows the step done and one sentence
+ * for the customer, previewed exactly as they will read it, then posted to
+ * today's site log (an update, or added to today's if there is one) through
+ * the same route site mode uses, which ticks the step.
+ */
+function TickDialog({ plan, step, customer, onClose, say }: { plan: StudioPlan; step: PlanStepView; customer: string; onClose: () => void; say: (r: PlanEditResult) => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  const [photo, setPhoto] = useState<{ url: string; ready: ReadyPhoto } | null>(null);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState<'photo' | 'posting' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const d = ref.current;
+    if (d && !d.open) d.showModal();
+  }, []);
+  useEffect(() => () => (photo ? URL.revokeObjectURL(photo.url) : undefined), [photo]);
+
+  const close = () => {
+    ref.current?.close();
+    onClose();
+  };
+
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    setError(null);
+    setBusy('photo');
+    try {
+      // From a laptop it is a picked file, never a camera capture: the customer sees "from gallery".
+      const ready = await readyPhoto(file, true);
+      setPhoto({ url: URL.createObjectURL(ready.blob), ready });
+    } catch {
+      setError('That photo could not be read. Pick another one.');
+    }
+    setBusy(null);
+  };
+
+  const sentence = text.replace(/\s+/g, ' ').trim();
+  const post = async () => {
+    if (!photo) return setError('Add the photo that shows it done.');
+    if (sentence.length < 3) return setError(`Write one sentence for ${customer} about what was done.`);
+    setError(null);
+    setBusy('posting');
+    try {
+      const path = await uploadFile(plan.projectId, 'site', photo.ready.blob, photo.ready.type);
+      const res = await fetch('/api/studio/site/post', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          projectId: plan.projectId,
+          clientRef: newClientRef(),
+          kind: 'UPDATE',
+          postedAt: new Date().toISOString(),
+          photos: [{ path, takenAt: photo.ready.takenAt, fromGallery: photo.ready.fromGallery, lat: null, lng: null, text: sentence }],
+          voice: null,
+          crew: [],
+          ticks: [{ itemId: step.id, source: 'TICK', photoIndex: 0 }],
+        }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; post?: { ticked?: number } };
+      if (!res.ok || !json.ok) {
+        setError(tickError(json.error));
+        setBusy(null);
+        return;
+      }
+      say(
+        json.post?.ticked
+          ? { ok: true, message: `Ticked: ${step.label}. The photo and your sentence are in today's site log, and ${customer} sees them now.` }
+          : { ok: false, error: `The photo is in today's site log, but “${step.label}” was already ticked.` },
+      );
+      close();
+      router.refresh();
+    } catch {
+      setError('That did not post: check the connection and try again. Nothing was ticked.');
+      setBusy(null);
+    }
+  };
+
+  const label = 'mb-1.5 block text-[13px] font-semibold text-[var(--s-ink-2)]';
+  return (
+    <dialog
+      ref={ref}
+      onCancel={(e) => {
+        e.preventDefault();
+        if (busy !== 'posting') close();
+      }}
+      aria-labelledby="tick-title"
+      className="m-auto w-[min(560px,calc(100vw-24px))] max-h-[calc(100vh-24px)] overflow-y-auto rounded-[16px] border border-[var(--s-rule)] bg-[var(--s-surface)] p-0 text-[var(--s-ink)] shadow-2xl backdrop:bg-black/40"
+    >
+      <div className="flex flex-col gap-5 p-5 sm:p-6">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 id="tick-title" className="m-0 text-[19px] font-semibold">
+              Add photo and what was done
+            </h2>
+            <p className={`m-0 mt-1 ${muted}`}>
+              {step.label} · {step.effectivePct}% of the project
+            </p>
+          </div>
+          <button type="button" onClick={close} disabled={busy === 'posting'} className="s-btn-ghost min-h-[40px]" aria-label="Close without ticking">
+            Close
+          </button>
+        </div>
+
+        <div>
+          <span className={label}>1 · The photo that shows it done</span>
+          {photo ? (
+            <div className="flex items-start gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photo.url} alt={`Photo for ${step.label}`} className="h-[120px] w-[160px] flex-none rounded-[10px] bg-[var(--s-surface-2)] object-cover" />
+              <button type="button" className="s-btn-ghost min-h-[40px]" disabled={busy !== null} onClick={() => input.current?.click()}>
+                Change photo
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="s-btn min-h-[48px] px-5" disabled={busy !== null} onClick={() => input.current?.click()}>
+              {busy === 'photo' ? 'Getting the photo ready…' : 'Choose a photo'}
+            </button>
+          )}
+          <input ref={input} type="file" accept="image/*" className="hidden" onChange={(e) => void pick(e.target.files?.[0]).then(() => (e.target.value = ''))} />
+        </div>
+
+        <div>
+          <label htmlFor="tick-text" className={label}>
+            2 · One sentence for {customer}
+          </label>
+          <textarea
+            id="tick-text"
+            rows={2}
+            maxLength={300}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="e.g. POP framing is up in the living room and both bedrooms."
+            className="w-full resize-y rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[14.5px]"
+          />
+          <span className={muted}>{300 - text.length} characters left</span>
+        </div>
+
+        <div className="flex flex-col gap-2 rounded-[12px] p-4 text-white" style={{ background: 'var(--s-accent-deep)' }}>
+          <p className="m-0 text-[12px] font-semibold uppercase tracking-[0.06em] text-white/70">{customer} will read, in the site feed</p>
+          {photo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={photo.url} alt="" className="max-h-[180px] w-full rounded-[8px] object-cover" />
+          ) : null}
+          <p className="m-0 text-[15.5px] font-semibold leading-snug">{doneLabel(step.label)}</p>
+          <p className="m-0 text-[15px] leading-snug text-white/90">{sentence || 'Your sentence shows here.'}</p>
+          <p className="m-0 text-[12.5px] text-white/70">Today, with the time you post it · from gallery</p>
+        </div>
+
+        {error ? (
+          <p role="alert" className="m-0 text-[14px] font-medium text-[var(--s-bad)]">
+            {error}
+          </p>
+        ) : null}
+
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="s-btn min-h-[48px] px-6 text-[15px]" disabled={busy !== null} onClick={() => void post()}>
+            {busy === 'posting' ? 'Posting…' : 'Tick and post'}
+          </button>
+          <button type="button" className="s-btn-ghost min-h-[48px]" disabled={busy === 'posting'} onClick={close}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </dialog>
   );
 }
 

@@ -14,6 +14,14 @@
  *   twice lands once.
  * - Nobody on site needs a reason. Waiting for the customer's decision and
  *   the customer asking us not to come do not count against the studio.
+ * - Ticking a step needs a photo and a sentence (the step tracker,
+ *   docs/studio-workspace/STEP-TRACKER.md): each tick names one of the
+ *   post's photos (`photoIndex`), one photo per tick, and that photo
+ *   carries what the customer will read — typed (`text`) or said into its
+ *   mic (`customerText`, or a recording still to be written down when the
+ *   post was saved offline). A tick without one is refused (`tick_photo`),
+ *   so a post queued on a phone before this rule fails with a reason
+ *   instead of ticking a step with no photo.
  */
 
 import { istDay } from './working-days';
@@ -64,6 +72,8 @@ export const MAX_CREW = 30;
 export const MAX_TICKS = 200;
 export const MAX_TEXT = 2000;
 export const MAX_SENTENCE = 280;
+/** A sentence typed under a photo (instead of, or after, its mic). */
+export const MAX_TYPED = 300;
 /** How old an offline post may be when it finally arrives. */
 export const MAX_AGE_DAYS = 30;
 /** A phone's clock may run a little fast. */
@@ -94,6 +104,8 @@ export type CrewInput =
 export interface TickInput {
   itemId: string;
   source: 'TICK' | 'VOICE';
+  /** The post's photo that shows it done (index into `photos`). */
+  photoIndex: number;
 }
 
 export interface PostInput {
@@ -109,7 +121,7 @@ export interface PostInput {
   ticks: TickInput[];
 }
 
-export type ParseError = 'invalid' | 'too_old' | 'in_future' | 'empty' | 'bad_path' | 'no_reason';
+export type ParseError = 'invalid' | 'too_old' | 'in_future' | 'empty' | 'bad_path' | 'no_reason' | 'tick_photo';
 
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const REF_RE = /^[A-Za-z0-9_-]{8,64}$/;
@@ -139,15 +151,22 @@ export function uploadPath(projectId: string, kind: 'site' | 'voice', uuid: stri
 function spoken(o: Record<string, unknown>, projectId: string, unstored: boolean): SpokenInput | 'bad_path' {
   const voicePath = str(o.voicePath, 200);
   if (voicePath && !ownsPath(projectId, voicePath, 'voice', unstored)) return 'bad_path';
-  const customerText = str(o.customerText, MAX_SENTENCE);
+  /* A sentence typed under a photo is what the supervisor settled on (the
+     box starts with what the mic wrote, and may be corrected): it wins. Its
+     language is the one the phone says, if any. */
+  const typed = typeof o.text === 'string' ? o.text.replace(/\s+/g, ' ').trim().slice(0, MAX_TYPED) || null : null;
+  const customerText = typed ?? str(o.customerText, MAX_SENTENCE);
   return {
     voicePath,
     transcript: str(o.transcript, MAX_TEXT),
     transcriptLang: lang(o.transcriptLang),
     customerText,
-    customerLang: customerText ? lang(o.customerLang) : null,
+    customerLang: customerText ? (typed ? lang(o.textLang) : lang(o.customerLang)) : null,
   };
 }
+
+/** Whether a photo carries a sentence for the customer, or a recording that will become one. */
+export const hasSentence = (p: Pick<SpokenInput, 'customerText' | 'voicePath'>): boolean => Boolean(p.customerText?.trim() || p.voicePath);
 
 /**
  * The phone's post, checked. Everything the client sends is re-read here
@@ -211,13 +230,22 @@ export function parsePost(raw: unknown, now: Date, opts: { unstored?: boolean } 
     crew.push({ crewMemberId: null, name, role: str(r.role, 40) ?? 'Crew', arrivedAt, save: r.save === true });
   }
 
+  /* Every tick names its own photo, and that photo has a sentence. One bad
+     tick refuses the whole post: the supervisor fixes it and posts again,
+     rather than the customer getting the photo with a step quietly left
+     open. */
   const ticks: TickInput[] = [];
   const ticked = new Set<string>();
+  const used = new Set<number>();
   for (const t of Array.isArray(o.ticks) ? o.ticks.slice(0, MAX_TICKS) : []) {
     const r = obj(t);
     if (!r || typeof r.itemId !== 'string' || !ID_RE.test(r.itemId) || ticked.has(r.itemId)) continue;
+    const at = r.photoIndex;
+    if (typeof at !== 'number' || !Number.isInteger(at) || at < 0 || at >= photos.length || used.has(at)) return { ok: false, error: 'tick_photo' };
+    if (!hasSentence(photos[at]!)) return { ok: false, error: 'tick_photo' };
     ticked.add(r.itemId);
-    ticks.push({ itemId: r.itemId, source: r.source === 'VOICE' ? 'VOICE' : 'TICK' });
+    used.add(at);
+    ticks.push({ itemId: r.itemId, source: r.source === 'VOICE' ? 'VOICE' : 'TICK', photoIndex: at });
   }
 
   if (photos.length === 0 && !voice && ticks.length === 0) return { ok: false, error: 'empty' };

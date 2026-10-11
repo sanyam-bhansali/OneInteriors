@@ -47,6 +47,8 @@ import {
   type NewDecisionInput,
 } from './decision-rules';
 import { handoverStage, planMove, type RuleStage, type StageKind } from './project-rules';
+import { shiftStepsWithStage } from './stage-settle';
+
 import { addWorkingDays, calendarOf, dayToDb, istDay, workingDaysBetween } from './working-days';
 
 export type DecisionResult = { ok: true; id?: string; message?: string } | { ok: false; error: string };
@@ -272,6 +274,9 @@ async function lateDecisionDelay(
   if (!planned.ok) return 0;
   for (const s of planned.plan.stages) {
     await tx.homeProjectStage.update({ where: { id: s.stageId }, data: { plannedStart: dayToDb(s.plannedStart), plannedEnd: dayToDb(s.plannedEnd) } });
+    // Its steps' planned days move with it (the step tracker).
+    const was = stages.find((x) => x.id === s.stageId)!;
+    await shiftStepsWithStage(tx, s.stageId, { start: was.plannedStart, end: was.plannedEnd }, { start: s.plannedStart, end: s.plannedEnd });
   }
   let leadId: string | null = null;
   for (const r of planned.plan.rows) {

@@ -191,7 +191,7 @@ function PlanTab({ w }: { w: ProjectWorkspace }) {
       </div>
       <p className={`m-0 mt-1 ${muted}`}>
         {w.hasPlan
-          ? `Made from the signed quote: ${w.materials} material${w.materials === 1 ? '' : 's'} listed. Stages move when the site ticks items off.`
+          ? `Made from the signed quote: ${w.materials} material${w.materials === 1 ? '' : 's'} listed. A stage finishes when the site ticks its last step, with a photo.`
           : 'Signed before plans were built from the quote, so this shows the standard stages. Its plan is built once the backfill runs.'}
       </p>
       <ol className="m-0 mt-4 flex list-none flex-col gap-0 p-0">

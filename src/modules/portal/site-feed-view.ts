@@ -10,14 +10,16 @@
  * - nobody-on-site days with the reason (as a slug the apps translate, and
  *   plain English for the website), and whether it counts against the studio;
  * - corrections beside the day's original, never instead of it;
- * - the checklist items ticked off that day (room and label);
+ * - the checklist items ticked off that day (room and label), and, on a
+ *   photo that ticked a step (the step tracker), the step's name — "Done:
+ *   {step}" under it, with the time it was taken;
  * - working days with no post by 21:00 IST ("No update from the studio
  *   today").
  *
  * Never selected: `note`, `voicePath`, `transcript`, `transcriptLang`,
  * `lat`/`lng`, `postedById`, `clientRef`, `crewMember` (and so its phone),
- * `doneById`. tests/customer-projection.test.ts checks the select and the
- * output.
+ * `doneById`, the step's `donePhotoId` or weight. tests/customer-projection.test.ts
+ * checks the select and the output.
  */
 
 import type { Prisma } from '@prisma/client';
@@ -45,7 +47,15 @@ export const SITE_LOG_SELECT = {
     customerLang: true,
     photos: {
       orderBy: { sortOrder: 'asc' },
-      select: { storagePath: true, takenAt: true, fromGallery: true, customerText: true, customerLang: true },
+      select: {
+        storagePath: true,
+        takenAt: true,
+        fromGallery: true,
+        customerText: true,
+        customerLang: true,
+        /* The step this photo ticked: its name only. */
+        doneStep: { select: { label: true } },
+      },
     },
     crew: { orderBy: { createdAt: 'asc' }, select: { crewName: true, crewRole: true, arrivedAt: true } },
     ticked: { orderBy: { sortOrder: 'asc' }, select: { room: true, label: true } },
@@ -61,6 +71,8 @@ export interface CustomerSitePhoto {
   text: string | null;
   takenAt: string;
   fromGallery: boolean;
+  /** The step this photo ticked ("Done: {step}"), or null. The apps add "Done:" in the customer's language. */
+  doneStep: string | null;
 }
 
 export interface CustomerSiteEntry {
@@ -98,7 +110,14 @@ function entry(l: SiteLogRow, urls: readonly string[]): CustomerSiteEntry {
     reasonText: reason ? REASON_WORDS[reason] : null,
     countsAgainstStudio: reason ? countsAgainstStudio(reason) : null,
     text: l.customerText,
-    photos: l.photos.map((p, i) => ({ url: urls[i] ?? '', text: p.customerText, takenAt: p.takenAt.toISOString(), fromGallery: p.fromGallery })),
+    photos: l.photos.map((p, i) => ({
+      url: urls[i] ?? '',
+      text: p.customerText,
+      takenAt: p.takenAt.toISOString(),
+      fromGallery: p.fromGallery,
+      doneStep: p.doneStep?.label ?? null,
+    })),
+
     crew: l.crew.map((c) => ({ name: crewFirstName(c.crewName), role: c.crewRole, arrivedAt: c.arrivedAt?.toISOString() ?? null })),
     done: l.ticked.map((t) => ({ room: t.room, label: t.label })),
   };

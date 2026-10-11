@@ -5,9 +5,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * The daily site log (studio workspace Phase 2): one UPDATE or NOBODY per
  * project per IST day, a second post that day becomes a CORRECTION beside
  * it, an offline resend with the same clientRef lands once, nobody on site
- * needs a reason, and only a member on the project may post. Prisma and the
- * session are mocked with a small in-memory store that enforces the two
- * unique indexes the way Postgres does (P2002).
+ * needs a reason, and only a member on the project may post. Ticking a step
+ * needs its own photo with a sentence (the step tracker), the step points at
+ * that photo, and the stage finishes in the same transaction when its last
+ * step is ticked. Prisma and the session are mocked with a small in-memory
+ * store that enforces the two unique indexes the way Postgres does (P2002).
  *
  * Studio s1: owner, a supervisor on p1 (not p2), accounts. p9 is another
  * studio's project.
@@ -29,10 +31,11 @@ const db = vi.hoisted(() => {
     events: [] as Row[],
     ticks: [] as { where: unknown; data: unknown }[],
     crewMade: [] as Row[],
-    items: new Map<string, { doneAt: Date | null }>([
-      ['i1', { doneAt: null }],
-      ['i2', { doneAt: null }],
+    items: new Map<string, { doneAt: Date | null; donePhotoId: string | null; inScope: boolean }>([
+      ['i1', { doneAt: null, donePhotoId: null, inScope: true }],
+      ['i2', { doneAt: null, donePhotoId: null, inScope: true }],
     ]),
+    stageDone: null as Date | null,
     raceOnce: false,
     seq: 0,
   };
@@ -83,19 +86,35 @@ vi.mock('@/lib/prisma', () => {
         crew: (data.crew as { create: unknown[] }).create,
       };
       state.logs.push(row);
-      return { id: row.id };
+      return { id: row.id, photos: (row.photos as unknown[]).map((_, i) => ({ id: `ph-${row.id}-${i}` })) };
     }),
+    findMany: vi.fn(async () => []),
   };
   const tx = {
     homeSiteLog,
     homeChecklistItem: {
-      updateMany: vi.fn(async (args: { where: { id: string }; data: { doneAt: Date } }) => {
+      updateMany: vi.fn(async (args: { where: { id: string }; data: { doneAt: Date; donePhotoId: string } }) => {
         state.ticks.push(args);
         const item = state.items.get(args.where.id);
         if (!item || item.doneAt) return { count: 0 };
         item.doneAt = args.data.doneAt;
+        item.donePhotoId = args.data.donePhotoId;
         return { count: 1 };
       }),
+    },
+    homeProjectStage: {
+      findFirst: vi.fn(async ({ where }: { where: { id: string } }) =>
+        where.id === 'st-carp' ? { id: 'st-carp', kind: 'CARPENTRY', actualEnd: state.stageDone, items: [...state.items.values()] } : null,
+      ),
+      update: vi.fn(async ({ data }: { data: { actualEnd: Date | null } }) => {
+        state.stageDone = data.actualEnd;
+        return {};
+      }),
+    },
+    homeProjectUpdate: { findMany: vi.fn(async () => []) },
+    homeProject: {
+      findUnique: vi.fn(async () => ({ doneStages: [] as string[] })),
+      update: vi.fn(async () => ({})),
     },
     homeProjectEvent: {
       create: vi.fn(async ({ data }: { data: Row }) => {
@@ -136,8 +155,9 @@ vi.mock('@/lib/prisma', () => {
                     name: 'Carpentry',
                     actualEnd: null,
                     items: [
-                      { id: 'i1', room: 'Bedroom 1', label: 'Wardrobe frame fitted', doneAt: null },
-                      { id: 'i2', room: 'Kitchen', label: 'Kitchen carcass levelled and fixed', doneAt: null },
+                      { id: 'i1', room: 'Execution stage 2A', label: 'Carcass complete with hardware', doneAt: null, inScope: true, quoteLineId: null },
+                      { id: 'i2', room: 'Execution stage 2B', label: 'Shutters delivered', doneAt: null, inScope: true, quoteLineId: null },
+                      { id: 'i3', room: 'Execution stage 2B', label: 'Name plate ordered', doneAt: null, inScope: false, quoteLineId: null },
                     ],
                   },
                 ],
@@ -195,9 +215,12 @@ const update = (over: Record<string, unknown> = {}) => ({
     },
   ],
   crew: [{ crewMemberId: 'crew-ramesh', arrivedAt: '2026-10-14T04:10:00Z' }],
-  ticks: [{ itemId: 'i1', source: 'VOICE' }],
+  ticks: [{ itemId: 'i1', source: 'VOICE', photoIndex: 0 }],
   ...over,
 });
+
+/** A second photo, with a typed sentence. */
+const typedPhoto = (text = 'Shutters delivered and stacked in the hall.') => ({ path: 'project_p1/site/b.jpg', takenAt: '2026-10-14T11:25:00Z', text });
 
 beforeEach(() => {
   vi.stubEnv('DATABASE_URL', 'postgres://test');
@@ -206,8 +229,9 @@ beforeEach(() => {
   db.state.events.length = 0;
   db.state.ticks.length = 0;
   db.state.crewMade.length = 0;
-  db.state.items.set('i1', { doneAt: null });
-  db.state.items.set('i2', { doneAt: null });
+  db.state.items.set('i1', { doneAt: null, donePhotoId: null, inScope: true });
+  db.state.items.set('i2', { doneAt: null, donePhotoId: null, inScope: true });
+  db.state.stageDone = null;
   db.state.raceOnce = false;
   notified.length = 0;
   session.user = null;
@@ -226,7 +250,11 @@ describe('posting today’s update', () => {
     ]);
     // Name and role copied at posting.
     expect(log.crew).toEqual([expect.objectContaining({ crewName: 'Ramesh Pawar', crewRole: 'Carpenter', crewMember: { connect: { id: 'crew-ramesh' } } })]);
-    expect(db.state.ticks[0]).toMatchObject({ where: { id: 'i1', doneAt: null, stage: { projectId: 'p1' } }, data: { doneSource: 'VOICE', doneById: 'u-sup', doneSiteLogId: log.id } });
+    expect(db.state.ticks[0]).toMatchObject({
+      where: { id: 'i1', doneAt: null, inScope: true, stage: { projectId: 'p1' } },
+      data: { doneSource: 'VOICE', doneById: 'u-sup', doneSiteLogId: log.id, donePhotoId: `ph-${log.id}-0` },
+    });
+    expect(db.state.stageDone).toBeNull(); // the stage has another step open
     expect(db.state.events.map((e) => e.type)).toEqual(['site.posted', 'checklist.ticked']);
     expect(db.state.events[0]).toMatchObject({ refId: log.id, actorType: 'STUDIO', actorId: 'u-sup', at: new Date('2026-10-14T11:30:00Z') });
     expect(JSON.stringify(db.state.events)).not.toContain('बेडरूम'); // no transcript in a payload
@@ -245,13 +273,25 @@ describe('posting today’s update', () => {
   it('a second post the same day is a CORRECTION beside the first, never an edit', async () => {
     as('u-sup');
     const first = await postSiteLog(update(), NOW);
-    const second = await postSiteLog(update({ clientRef: 'ref-bbbbbbbb', ticks: [{ itemId: 'i1', source: 'TICK' }, { itemId: 'i2', source: 'TICK' }] }), NOW);
+    const second = await postSiteLog(
+      update({
+        clientRef: 'ref-bbbbbbbb',
+        photos: [...update().photos, typedPhoto()],
+        ticks: [
+          { itemId: 'i1', source: 'TICK', photoIndex: 0 },
+          { itemId: 'i2', source: 'TICK', photoIndex: 1 },
+        ],
+      }),
+      NOW,
+    );
     expect(second).toMatchObject({ ok: true, post: { kind: 'CORRECTION' } });
     expect(db.state.logs).toHaveLength(2);
     expect(db.state.logs[1]).toMatchObject({ kind: 'CORRECTION', correctsId: first.ok ? first.post.id : '' });
-    expect(db.state.events.map((e) => e.type)).toEqual(['site.posted', 'checklist.ticked', 'site.corrected', 'checklist.ticked']);
-    // i1 was ticked by the first post; only i2 is new.
+    // i1 was ticked by the first post; only i2 is new — and it was the stage's last step in scope.
     expect(second.ok && second.post.ticked).toBe(1);
+    expect(db.state.items.get('i2')).toMatchObject({ donePhotoId: `ph-${db.state.logs[1]!.id}-1` });
+    expect(db.state.events.map((e) => e.type)).toEqual(['site.posted', 'checklist.ticked', 'site.corrected', 'checklist.ticked', 'stage.done']);
+    expect(db.state.stageDone).toEqual(new Date('2026-10-14T11:30:00Z'));
   });
 
   it('two different posts racing for the same day: the loser becomes the correction', async () => {
@@ -294,8 +334,50 @@ describe('posting today’s update', () => {
     const bad = update({ photos: [{ path: 'project_p9/site/x.jpg', takenAt: '2026-10-14T11:00:00Z' }] });
     expect(await postSiteLog(bad, NOW)).toEqual({ ok: false, error: 'bad_path' });
     expect(await postSiteLog(update({ crew: [{ crewMemberId: 'crew-other-studio' }] }), NOW)).toEqual({ ok: false, error: 'crew' });
-    expect(await postSiteLog(update({ ticks: [{ itemId: 'i-not-here' }] }), NOW)).toEqual({ ok: false, error: 'items' });
+    expect(await postSiteLog(update({ ticks: [{ itemId: 'i-not-here', photoIndex: 0 }] }), NOW)).toEqual({ ok: false, error: 'items' });
+    // A step marked not in scope cannot be ticked.
+    expect(await postSiteLog(update({ ticks: [{ itemId: 'i3', photoIndex: 0 }] }), NOW)).toEqual({ ok: false, error: 'items' });
     expect(db.state.logs).toHaveLength(0);
+  });
+});
+
+describe('ticking a step needs its own photo with a sentence', () => {
+  it('refuses a tick with no photo — a post queued before the rule — and writes nothing', async () => {
+    as('u-sup');
+    expect(await postSiteLog(update({ ticks: [{ itemId: 'i1', source: 'TICK' }] }), NOW)).toEqual({ ok: false, error: 'tick_photo' });
+    expect(await postSiteLog(update({ ticks: [{ itemId: 'i1', photoIndex: 3 }] }), NOW)).toEqual({ ok: false, error: 'tick_photo' });
+    expect(await postSiteLog(update({ ticks: [{ itemId: 'i1', photoIndex: 0.5 }] }), NOW)).toEqual({ ok: false, error: 'tick_photo' });
+    expect(await postSiteLog(update({ photos: [], ticks: [{ itemId: 'i1', photoIndex: 0 }] }), NOW)).toEqual({ ok: false, error: 'tick_photo' });
+    expect(db.state.logs).toHaveLength(0);
+    expect(db.state.ticks).toHaveLength(0);
+  });
+
+  it('one photo per tick', () => {
+    const r = parsePost(update({ ticks: [{ itemId: 'i1', photoIndex: 0 }, { itemId: 'i2', photoIndex: 0 }] }), NOW);
+    expect(r).toEqual({ ok: false, error: 'tick_photo' });
+  });
+
+  it('the photo needs a sentence: typed, from its mic, or a recording still to be written down', () => {
+    const bare = { path: 'project_p1/site/b.jpg', takenAt: '2026-10-14T11:25:00Z' };
+    expect(parsePost(update({ photos: [bare] }), NOW)).toEqual({ ok: false, error: 'tick_photo' });
+    expect(parsePost(update({ photos: [{ ...bare, text: '   ' }] }), NOW)).toEqual({ ok: false, error: 'tick_photo' });
+    expect(parsePost(update({ photos: [{ ...bare, voicePath: 'project_p1/voice/b.webm' }] }), NOW).ok).toBe(true);
+    expect(parsePost(update({ photos: [{ ...bare, customerText: 'Carcass fixed.' }] }), NOW).ok).toBe(true);
+  });
+
+  it('a typed sentence is what the customer reads: trimmed, capped, and it wins over the mic’s', () => {
+    const r = parsePost(update({ photos: [{ ...update().photos[0]!, text: '  Carcass   fixed in the master bedroom.  ' }] }), NOW);
+    expect(r.ok && r.input.photos[0]).toMatchObject({ customerText: 'Carcass fixed in the master bedroom.', customerLang: null, transcript: expect.any(String) });
+    const long = parsePost(update({ photos: [typedPhoto('x'.repeat(400))], ticks: [{ itemId: 'i1', photoIndex: 0 }] }), NOW);
+    expect(long.ok && long.input.photos[0]!.customerText).toHaveLength(300);
+  });
+
+  it('a typed sentence is posted under the photo that ticked the step', async () => {
+    as('u-owner');
+    const r = await postSiteLog(update({ photos: [typedPhoto()], ticks: [{ itemId: 'i2', source: 'TICK', photoIndex: 0 }] }), NOW);
+    expect(r).toMatchObject({ ok: true, post: { ticked: 1 } });
+    expect(db.state.logs[0]!.photos).toEqual([expect.objectContaining({ customerText: 'Shutters delivered and stacked in the hall.', voicePath: null })]);
+    expect(db.state.items.get('i2')).toMatchObject({ donePhotoId: `ph-${db.state.logs[0]!.id}-0` });
   });
 });
 
@@ -322,8 +404,8 @@ describe('nobody on site', () => {
 describe('who may post', () => {
   it('a supervisor cannot post to a site they are not on, nor to another studio’s', async () => {
     as('u-sup');
-    expect(await postSiteLog(update({ projectId: 'p2', photos: [{ path: 'project_p2/site/a.jpg' }] }), NOW)).toEqual({ ok: false, error: 'not_yours' });
-    expect(await postSiteLog(update({ projectId: 'p9', photos: [{ path: 'project_p9/site/a.jpg' }] }), NOW)).toEqual({ ok: false, error: 'not_yours' });
+    expect(await postSiteLog(update({ projectId: 'p2', photos: [{ path: 'project_p2/site/a.jpg' }], ticks: [] }), NOW)).toEqual({ ok: false, error: 'not_yours' });
+    expect(await postSiteLog(update({ projectId: 'p9', photos: [{ path: 'project_p9/site/a.jpg' }], ticks: [] }), NOW)).toEqual({ ok: false, error: 'not_yours' });
     expect(db.state.logs).toHaveLength(0);
   });
 
@@ -349,12 +431,13 @@ describe('parsePost', () => {
   });
 
   it('keeps the place only as a pair, and a photo time no later than the post', () => {
-    const r = parsePost(update({ photos: [{ path: 'project_p1/site/a.jpg', takenAt: '2026-10-15T00:00:00Z', lat: 18.5 }] }), NOW);
+    const r = parsePost(update({ photos: [{ path: 'project_p1/site/a.jpg', takenAt: '2026-10-15T00:00:00Z', lat: 18.5 }], ticks: [] }), NOW);
     expect(r.ok && r.input.photos[0]).toMatchObject({ lat: null, lng: null, takenAt: new Date('2026-10-14T11:30:00Z') });
   });
 
   it('drops a duplicate crew face or tick', () => {
-    const r = parsePost(update({ crew: [{ crewMemberId: 'c1' }, { crewMemberId: 'c1' }], ticks: [{ itemId: 'i1' }, { itemId: 'i1' }] }), NOW);
+    const r = parsePost(update({ crew: [{ crewMemberId: 'c1' }, { crewMemberId: 'c1' }], ticks: [{ itemId: 'i1', photoIndex: 0 }, { itemId: 'i1', photoIndex: 0 }] }), NOW);
+
     expect(r.ok && [r.input.crew.length, r.input.ticks.length]).toEqual([1, 1]);
   });
 

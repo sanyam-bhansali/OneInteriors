@@ -237,7 +237,11 @@ export function makeDb() {
         return st;
       },
     },
-    homeChecklistItem: { findFirst: async (a: Row) => s.checklist.find((c) => c.quoteLineId === a.where.quoteLineId) ?? null },
+    homeChecklistItem: {
+      findFirst: async (a: Row) => s.checklist.find((c) => c.quoteLineId === a.where.quoteLineId) ?? null,
+      // Steps with planned days (the step tracker); none in these tests.
+      findMany: async () => [],
+    },
     homeProjectDateChange: {
       create: async (a: Row) => {
         const row = { id: nextId('dc'), ...a.data };

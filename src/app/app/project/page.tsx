@@ -80,11 +80,24 @@ function ExampleProject() {
   );
 }
 
+/** A progress bar that only ever goes up (the step tracker). */
+function Progress({ pct, label }: { pct: number; label: string }) {
+  const v = Math.max(0, Math.min(100, pct));
+  return (
+    <span role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={v} style={{ display: 'block', height: 8, borderRadius: 99, background: 'var(--line)', overflow: 'hidden' }}>
+      <span style={{ display: 'block', height: '100%', width: `${v}%`, borderRadius: 99, background: v >= 100 ? 'var(--ok)' : 'var(--accent)' }} />
+    </span>
+  );
+}
+
 /**
- * The real project (v79 + trust fixes 5 and 7): overall delay, paid so far
- * and handover up top; snags and the next decision one tap away; the payment
- * stages in rupees with what is paid and what is next; every change made on
- * a decision, totalled; then every stage with its date.
+ * The real project (v79 + trust fixes 5 and 7, and the step tracker):
+ * how much of the home is done, overall delay, paid so far and handover up
+ * top; snags and the next decision one tap away; the payment stages in
+ * rupees with what is paid and what is next; every change made on a
+ * decision, totalled; then every stage with its date, its percentage and
+ * its steps — ticked with the day, or the day planned. Photos live in the
+ * site feed, never here.
  */
 function RealProject({ project }: { project: MyProject }) {
   const late = daysLate(project.stages);
@@ -94,6 +107,9 @@ function RealProject({ project }: { project: MyProject }) {
   const fixed = project.snags.length - open;
   const decision = pickDecision(project.decisions, null);
   const pending = decision && (decision.state === 'open' || decision.state === 'due-soon') ? decision : null;
+  const tracker = project.tracker;
+  // The server's per-stage steps line up with the stages only when both come from the plan.
+  const tracked = tracker && tracker.stages.length === project.stages.length ? tracker.stages : null;
   return (
     <Frame>
       <header className="oa-page-head">
@@ -103,6 +119,18 @@ function RealProject({ project }: { project: MyProject }) {
         <h1>Your project</h1>
       </header>
       <main className="oa-body">
+        {project.progressPct !== null && project.progressPct !== undefined ? (
+          <section aria-label="How much is done" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <span className="oa-meta">Done so far</span>
+              <b style={{ font: '600 28px var(--mono)' }}>{project.progressPct}%</b>
+            </div>
+            <Progress pct={project.progressPct} label={`Your home is ${project.progressPct}% done`} />
+            <p className="oa-note" style={{ margin: 0 }}>
+              Goes up as {project.studio} ticks off each step, with a photo you can see in Site.
+            </p>
+          </section>
+        ) : null}
         <div className="oa-stats">
           <div>
             <span className="oa-meta">Overall</span>
@@ -155,7 +183,7 @@ function RealProject({ project }: { project: MyProject }) {
           <h2>Every stage</h2>
         </div>
         <ol className="oa-timeline">
-          {project.stages.map((s) => (
+          {project.stages.map((s, i) => (
             <li key={s.key} className={`oa-tl ${s.state === 'done' ? 'done' : s.state === 'now' ? 'now' : 'next'}`}>
               <h3 style={s.state === 'next' || s.state === 'later' ? { color: 'var(--ink-2)' } : undefined}>
                 {s.state === 'now' ? `${s.label}, now` : s.label}
@@ -163,7 +191,9 @@ function RealProject({ project }: { project: MyProject }) {
               <p style={MONO}>
                 {s.state === 'done' ? 'Done' : `Planned ${shortDate(s.targetOn)}`}
                 {s.state === 'now' ? (s.late ? ' · running late' : ' · on track') : ''}
+                {tracked?.[i] ? ` · ${tracked[i]!.progressPct}% done` : ''}
               </p>
+              {tracked?.[i] && tracked[i]!.steps.length ? <StageSteps stage={tracked[i]!} open={s.state === 'now'} /> : null}
               {s.state === 'done' && project.role === 'owner' ? <ShareMilestone stageKey={s.key} label={s.label} studio={project.studio} /> : null}
               {s.late ? (
                 <div className="oa-flag">
@@ -199,7 +229,34 @@ function RealProject({ project }: { project: MyProject }) {
   );
 }
 
+/** A stage's steps: ticked with the day it was done, or the day it is planned. No photos here. */
+function StageSteps({ stage, open }: { stage: NonNullable<MyProject['tracker']>['stages'][number]; open: boolean }) {
+  const done = stage.steps.filter((x) => x.done).length;
+  return (
+    <details open={open} style={{ marginTop: 8 }}>
+      <summary className="oa-meta" style={{ cursor: 'pointer', color: 'var(--accent-ink)' }}>
+        {done} of {stage.steps.length} steps done
+      </summary>
+      <div style={{ margin: '8px 0 4px' }}>
+        <Progress pct={stage.progressPct} label={`${stage.label} ${stage.progressPct}% done`} />
+      </div>
+      <ul className="oa-items" style={{ marginTop: 6 }}>
+        {stage.steps.map((x, j) => (
+          <li key={`${x.label}-${j}`} className={x.done ? 'done' : 'next'}>
+            <span>
+              {x.done ? '✓ ' : ''}
+              {x.label}
+            </span>
+            <span>{x.done && x.doneOn ? `Done ${shortDate(x.doneOn)}` : x.plannedOn ? `Planned ${shortDate(x.plannedOn)}` : ''}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 /** Paid, next and after that, in rupees, as a ring; then each stage with its amount and date (trust fix 5). */
+
 function Payments({ money, studio }: { money: NonNullable<MyProject['money']>; studio: string }) {
   const R = 52;
   const C = 2 * Math.PI * R;

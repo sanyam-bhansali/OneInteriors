@@ -97,6 +97,7 @@ const PROJECT: CustomerProject = {
   documents: [],
   // Phase 3 (portal/tracker-view.ts): no plan from a quote here, so no tracker.
   tracker: null,
+  progressPct: null,
   overallLateDays: 0,
   stageStatus: null,
   // Phase 5 (portal/money-locker-view.ts): payments from rows, materials.

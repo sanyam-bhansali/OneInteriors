@@ -1585,10 +1585,14 @@ enum ProjectStageKind {
   HANDOVER
 }
 
-/// How a checklist item was ticked: a tap, or confirmed from a voice note.
+/// How a step was ticked: a tap, or confirmed from a voice note — either way
+/// with its photo since the step tracker (docs/studio-workspace/STEP-TRACKER.md)
+/// — or BACKFILL: ticked by scripts/studio/steps-from-template.ts because its
+/// stage was already done, with no photo.
 enum ChecklistDoneSource {
   TICK
   VOICE
+  BACKFILL
 }
 
 /// A stage of a customer's project, built from the signed quote. The studio
@@ -1623,15 +1627,31 @@ model HomeProjectStage {
   @@map("home_project_stages")
 }
 
-/// One thing to get done in one room in one stage, generated from the signed
-/// quote's lines — never typed. `doneAt` null means open.
+/// One step of a stage (docs/studio-workspace/STEP-TRACKER.md): Hauspire's
+/// execution steps with their weights (project/step-template.ts), which the
+/// studio may rename, re-weight, add to, remove or mark not in scope.
+/// `doneAt` null means open. Ticking needs a photo with a sentence, which
+/// lands in that day's site log (`donePhotoId`). Older rows were generated
+/// from the signed quote's lines, one per room (quoteLineId set).
 model HomeChecklistItem {
   id      String           @id @default(cuid())
   stageId String
   stage   HomeProjectStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
 
+  /// The step's group inside its stage ("Execution stage 2A"); a room on
+  /// the older quote-line items.
   room        String
   label       String
+  /// The step's weight in basis points (10 000 = 100% of the project). What
+  /// counts is the effective weight: in-scope weights shared so they sum to
+  /// 100% (project/step-rules.ts). Never sent to the customer as stored.
+  weightBp    Int       @default(0)
+  /// False = not in scope for this home: hidden from the customer, its
+  /// weight shared across the in-scope steps, never needed to finish a stage.
+  inScope     Boolean   @default(true)
+  /// The planned day, spread across the stage's window from the template's
+  /// sheet days; moves with the stage.
+  plannedOn   DateTime? @db.Date
   /// The signed quote line it came from. A snapshot reference, not a key:
   /// quote lines are copied at signing and may be edited or deleted later.
   quoteLineId String?
@@ -1647,6 +1667,11 @@ model HomeChecklistItem {
   /// made outside a post (office, or before Phase 2).
   doneSiteLogId String?
   doneSiteLog   HomeSiteLog?         @relation(fields: [doneSiteLogId], references: [id], onDelete: SetNull)
+  /// The site-log photo that ticked it ("Done: {step}" in the customer's
+  /// feed). Null for an untick, a backfill or an older tick. Unticking
+  /// clears it; the photo stays in the log (append-only).
+  donePhotoId   String?              @unique
+  donePhoto     HomeSiteLogPhoto?    @relation("ChecklistDonePhoto", fields: [donePhotoId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2192,6 +2217,9 @@ model HomeSiteLogPhoto {
 
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
+
+  /// The step this photo ticked, if any (the link is on the step).
+  doneStep HomeChecklistItem? @relation("ChecklistDonePhoto")
 
   @@index([siteLogId, sortOrder])
   @@map("home_site_log_photos")

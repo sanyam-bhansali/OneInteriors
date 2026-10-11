@@ -30,7 +30,7 @@ async function main() {
           l.projectId,
           l.source === 'quote' ? 'from the signed quote' : 'from the tracker',
           `${l.stages} stages`,
-          `${l.items} checklist items`,
+          `${l.items} steps`,
           `${l.materials} materials`,
           `${l.doneStages} already done`,
           l.filesDocuments ? 'files agreement + quotation' : 'no documents to file',

@@ -71,8 +71,8 @@ describe('the photo gate: can mark stage done', () => {
   });
 
   it('says why in plain words', () => {
-    expect(gateWords({ ok: false, why: 'items-open', open: 1 })).toMatch(/1 item is still open/);
-    expect(gateWords({ ok: false, why: 'items-open', open: 3 })).toMatch(/3 items are still open/);
+    expect(gateWords({ ok: false, why: 'items-open', open: 1 })).toMatch(/1 step is still open/);
+    expect(gateWords({ ok: false, why: 'items-open', open: 3 })).toMatch(/3 steps are still open/);
     expect(gateWords({ ok: false, why: 'no-photo', open: 0 })).toMatch(/site photo/);
   });
 

@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   KIND_NAMES,
-  STANDARD_ITEM,
   STANDARD_PAYMENTS,
-  WHOLE_HOME,
   carryDone,
-  checklistByRoom,
   kindWeights,
   paymentSchedule,
   quoteToPlan,
@@ -14,6 +11,7 @@ import {
   trackerToPlan,
   type PlanQuoteLine,
 } from '@/modules/portal/quote-to-plan';
+import { STEP_TEMPLATE, templateFor } from '@/modules/project/step-template';
 import { STARTER_CATALOGUE } from '@/modules/studio-quote/starter-catalogue';
 import { computeTotals } from '@/modules/studio-quote/pricing';
 import { PLAN_KINDS } from '@/modules/portal/tracker';
@@ -130,29 +128,34 @@ describe('quoteToPlan', () => {
     expect(plan.stages.every((s) => s.actualEnd === null)).toBe(true);
   });
 
-  it('files each line’s item under its stage and room, pointing at the line', () => {
-    const items = (k: string) => plan.stages.find((s) => s.kind === k)!.items.map((i) => `${i.room}: ${i.label}`);
-    expect(items('DESIGN')).toEqual(['Whole home: 3D design and drawings']);
-    expect(items('CIVIL')).toEqual(['Kitchen: Dado and backsplash tiling', 'Living: False ceiling — designer', 'Whole home: Electrical points']);
-    expect(items('CARPENTRY')).toEqual(['Kitchen: Base cabinets', 'Kitchen: Countertop', 'Bedroom 1: Wardrobe', 'Bedroom 1: Wardrobe (2)']);
-    expect(items('FINISH')).toEqual(['Living: Painting — putty, primer and two coats']);
-    expect(items('HANDOVER')).toEqual(['Whole home: Deep cleaning']);
-    const all = plan.stages.flatMap((s) => s.items);
-    expect(all.find((i) => i.label === 'Base cabinets')!.quoteLineId).toBe(LINES[0]!.id);
-    expect(all.some((i) => i.label.includes('supervision'))).toBe(false);
-    for (const s of plan.stages) expect(s.items.map((i) => i.sortOrder)).toEqual(s.items.map((_, i) => i));
-  });
-
-  it('gives a stage no line fell in its one standard item', () => {
-    const p = quoteToPlan({ lines: [line('Kitchen', 'Base cabinets', 'MODULAR')], startOn: START, totalDays: 45, contractPaise: 100_00, stages: [] });
-    for (const s of p.stages.filter((s) => s.kind !== 'CARPENTRY')) {
-      expect(s.items).toEqual([{ room: WHOLE_HOME, label: STANDARD_ITEM[s.kind], quoteLineId: null, sortOrder: 0 }]);
+  it('gives every stage Hauspire’s steps for its kind, in order, grouped, weighted and in scope — never the quote’s lines', () => {
+    for (const s of plan.stages) {
+      const t = templateFor(s.kind);
+      expect(s.items.map((i) => i.label)).toEqual(t.map((x) => x.label));
+      expect(s.items.map((i) => i.room)).toEqual(t.map((x) => x.group));
+      expect(s.items.map((i) => i.weightBp)).toEqual(t.map((x) => x.weightBp));
+      expect(s.items.map((i) => i.sortOrder)).toEqual(s.items.map((_, i) => i));
+      expect(s.items.every((i) => i.inScope && i.quoteLineId === null && !i.doneAt)).toBe(true);
     }
+    expect(plan.stages.flatMap((s) => s.items).reduce((a, i) => a + i.weightBp, 0)).toBe(10_000);
+    expect(plan.stages.flatMap((s) => s.items).length).toBe(STEP_TEMPLATE.length);
   });
 
-  it('builds a plan from an empty quote: five stages, one item each', () => {
+  it('plans each step’s day inside its stage’s window, first on its start and last on its end', () => {
+    for (const s of plan.stages) {
+      const days = s.items.map((i) => i.plannedOn!.getTime());
+      expect(days).toEqual([...days].sort((a, b) => a - b));
+      expect(Math.min(...days)).toBeGreaterThanOrEqual(s.plannedStart.getTime());
+      expect(Math.max(...days)).toBe(s.plannedEnd.getTime());
+      if (s.items.length > 1) expect(days[0]).toBe(s.plannedStart.getTime());
+    }
+    // Design's one step is the sign-off at its end.
+    expect(day(plan.stages[0]!.items[0]!.plannedOn!)).toBe('2026-11-21');
+  });
+
+  it('builds the same steps from an empty quote', () => {
     const p = quoteToPlan({ lines: [], startOn: START, totalDays: 30, contractPaise: 0, stages: [] });
-    expect(p.stages.map((s) => s.items.length)).toEqual([1, 1, 1, 1, 1]);
+    expect(p.stages.map((s) => s.items.length)).toEqual([1, 8, 22, 6, 7]);
     expect(p.materials).toEqual([]);
     expect(p.payments).toEqual([]);
   });
@@ -172,15 +175,6 @@ describe('quoteToPlan', () => {
     expect(plan.materials[2]!.spec).toBeNull();
   });
 
-  it('groups the checklist by room', () => {
-    const rooms = checklistByRoom(plan.stages);
-    expect(rooms.map((r) => r.room)).toEqual(['Whole home', 'Kitchen', 'Living', 'Bedroom 1']);
-    expect(rooms.find((r) => r.room === 'Kitchen')!.items).toEqual([
-      { kind: 'CIVIL', label: 'Dado and backsplash tiling' },
-      { kind: 'CARPENTRY', label: 'Base cabinets' },
-      { kind: 'CARPENTRY', label: 'Countertop' },
-    ]);
-  });
 
   it('builds the payment schedule from the signed stages, summing exactly to the contract', () => {
     expect(plan.payments.map((p) => p.label)).toEqual(['Booking', 'Design closure', 'Dispatch', 'Handover']);
@@ -258,12 +252,14 @@ describe('paymentSchedule always sums to the contract', () => {
 describe('carrying the old tracker across', () => {
   const now = new Date('2026-12-20T00:00:00Z');
 
-  it('marks a kind done when every old stage it covers was, at its planned end or today, items ticked', () => {
+  it('marks a kind done when every old stage it covers was, at its planned end or today, its steps ticked without a photo', () => {
     const stages = trackerToPlan({ startOn: START, totalDays: 100, doneStages: ['DESIGN', 'SITE', 'PRODUCTION'] }, now);
     expect(stages.map((s) => s.actualEnd && day(s.actualEnd))).toEqual(['2026-11-21', '2026-12-11', null, null, null]);
-    expect(stages[0]!.items.every((i) => i.doneAt?.getTime() === stages[0]!.actualEnd!.getTime())).toBe(true);
-    expect(stages[2]!.items.every((i) => !i.doneAt)).toBe(true);
+    expect(stages[0]!.items.every((i) => i.doneAt?.getTime() === stages[0]!.actualEnd!.getTime() && i.doneSource === 'BACKFILL')).toBe(true);
+    expect(stages[1]!.items).toHaveLength(8);
+    expect(stages[2]!.items.every((i) => !i.doneAt && !i.doneSource)).toBe(true);
   });
+
 
   it('never dates a done stage in the future', () => {
     const early = new Date('2026-11-05T00:00:00Z');

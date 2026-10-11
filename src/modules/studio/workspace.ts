@@ -209,7 +209,8 @@ export async function projectWorkspace(projectId: string, now = new Date()): Pro
           name: true,
           plannedEnd: true,
           actualEnd: true,
-          items: { orderBy: { sortOrder: 'asc' }, select: { room: true, label: true, doneAt: true } },
+          // In-scope steps only (the step tracker): a step marked not in scope is not part of the plan the customer sees.
+          items: { where: { inScope: true }, orderBy: { sortOrder: 'asc' }, select: { room: true, label: true, doneAt: true } },
         },
       },
       updates: { orderBy: { createdAt: 'desc' }, take: 30, select: { id: true, note: true, stage: true, createdAt: true, byStudio: true, photoPaths: true } },

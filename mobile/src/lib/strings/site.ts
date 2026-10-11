@@ -73,4 +73,6 @@ export const site = {
   'site.crew': { en: '{name}, {role}', hi: '{name}, {role}', mr: '{name}, {role}' },
   'site.crew.at': { en: '{name}, {role}, {time}', hi: '{name}, {role}, {time}', mr: '{name}, {role}, {time}' },
   'site.done': { en: 'Done today: {items}', hi: 'आज हुआ: {items}', mr: 'आज झाले: {items}' },
+  // The step tracker: a photo that ticked a step.
+  'site.stepDone': { en: 'Done: {step}', hi: 'पूरा हुआ: {step}', mr: 'पूर्ण झाले: {step}' },
 } satisfies Record<string, Entry>;

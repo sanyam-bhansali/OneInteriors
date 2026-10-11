@@ -83,6 +83,12 @@ const FORBIDDEN_KEYS = [
   'crewMemberId',
   'assigneeId',
   'byId',
+  // The step tracker: a step's stored weight, scope, photo link and post link stay inside (weights cross only as pct).
+  'weightBp',
+  'inScope',
+  'donePhotoId',
+  'doneSiteLogId',
+  'doneSource',
 ];
 
 const D = (s: string) => new Date(s);
@@ -134,6 +140,8 @@ function leakyRow(): CustomerProjectRow {
             fromGallery: true,
             customerText: 'Kitchen carcass levelled and fixed to the wall.',
             customerLang: 'en',
+            // The step this photo ticked (the step tracker): only its name may cross.
+            doneStep: { id: 'step-SECRET', label: 'Carcass complete with hardware', doneById: SECRET.staffId, weightBp: 1000, donePhotoId: 'photo-SECRET' },
           },
         ],
         crew: [
@@ -457,8 +465,89 @@ describe('the stages the customer sees', () => {
       actualEnd: true,
       id: true,
       plannedStart: true,
-      items: { orderBy: { sortOrder: 'asc' }, select: { room: true, label: true, doneAt: true } },
+      items: { orderBy: { sortOrder: 'asc' }, select: { room: true, label: true, doneAt: true, weightBp: true, inScope: true, plannedOn: true } },
     });
+  });
+});
+
+describe('the step tracker: percentages and steps (docs/studio-workspace/STEP-TRACKER.md)', () => {
+  const now = D('2026-10-11T00:00:00Z');
+  const step = (label: string, weightBp: number, doneAt: Date | null, more: Record<string, unknown> = {}) => ({
+    id: `step-${label}`,
+    room: 'Execution stage 1',
+    label,
+    weightBp,
+    inScope: true,
+    plannedOn: D('2026-10-01T00:00:00Z'),
+    doneAt,
+    doneById: SECRET.staffId,
+    doneSource: doneAt ? 'TICK' : null,
+    donePhotoId: doneAt ? 'photo-SECRET' : null,
+    doneSiteLogId: doneAt ? 'log-SECRET' : null,
+    ...more,
+  });
+  const row = () =>
+    ({
+      ...(leakyRow() as unknown as Record<string, unknown>),
+      stages: [
+        {
+          id: 'st1',
+          kind: 'DESIGN',
+          name: 'Design',
+          plannedStart: D('2026-09-01T00:00:00Z'),
+          plannedEnd: D('2026-09-15T00:00:00Z'),
+          actualEnd: D('2026-09-14T00:00:00Z'),
+          items: [step('Design signed off', 2000, D('2026-09-14T00:00:00Z'), { room: 'Design' })],
+        },
+        {
+          id: 'st2',
+          kind: 'CIVIL',
+          name: 'POP, civil and electricals',
+          plannedStart: D('2026-09-15T00:00:00Z'),
+          plannedEnd: D('2026-10-20T00:00:00Z'),
+          actualEnd: null,
+          items: [
+            step('POP framing', 2000, D('2026-10-02T06:00:00Z')),
+            step('POP sheets', 2000, null),
+            step('PVC POP work', 2000, null, { inScope: false, label: 'PVC POP work SECRET-OUT-OF-SCOPE' }),
+          ],
+        },
+        { id: 'st3', kind: 'CARPENTRY', name: 'Carpentry', plannedStart: D('2026-10-20T00:00:00Z'), plannedEnd: D('2026-11-15T00:00:00Z'), actualEnd: null, items: [step('Carcass complete', 2000, null, { room: 'Execution stage 2A' })] },
+        { id: 'st4', kind: 'FINISH', name: 'Finishing', plannedStart: D('2026-11-15T00:00:00Z'), plannedEnd: D('2026-11-25T00:00:00Z'), actualEnd: null, items: [] },
+        { id: 'st5', kind: 'HANDOVER', name: 'Handover', plannedStart: D('2026-11-25T00:00:00Z'), plannedEnd: D('2026-11-30T00:00:00Z'), actualEnd: null, items: [] },
+      ],
+      dateChanges: [],
+    }) as unknown as CustomerProjectRow;
+  const out = toCustomerProject(row(), SECRET.customerId, now);
+  const t = out.tracker!;
+
+  it('sends the project’s percentage and each stage’s, sharing a not-in-scope step’s weight', () => {
+    // In scope: 2000 + 2000 + 2000 + 2000 = 8000; done 4000 → 50%.
+    expect(out.progressPct).toBe(50);
+    expect(t.progressPct).toBe(50);
+    expect(t.stages.map((s) => s.progressPct)).toEqual([100, 50, 0, 0, 0]);
+  });
+
+  it('sends each in-scope step with its group, share as a percentage, done and days — never a not-in-scope one', () => {
+    expect(t.stages[1]!.steps).toEqual([
+      { label: 'POP framing', group: 'Execution stage 1', pct: 25, done: true, doneOn: '2026-10-02', plannedOn: '2026-10-01' },
+      { label: 'POP sheets', group: 'Execution stage 1', pct: 25, done: false, doneOn: null, plannedOn: '2026-10-01' },
+    ]);
+    expect(t.stages[1]!.checklist).toEqual({ done: 1, total: 2 });
+    expect(t.current!.rooms).toEqual([{ room: 'Execution stage 1', items: [{ label: 'POP framing', done: true }, { label: 'POP sheets', done: false }] }]);
+    expect(JSON.stringify(out)).not.toContain('SECRET-OUT-OF-SCOPE');
+  });
+
+  it('carries no stored weight, scope, photo link, post link or who ticked', () => {
+    const keys = keysOf(out);
+    for (const k of FORBIDDEN_KEYS) expect(keys.has(k), k).toBe(false);
+    const json = JSON.stringify(out);
+    for (const v of [SECRET.staffId, 'photo-SECRET', 'log-SECRET', 'step-SECRET']) expect(json).not.toContain(v);
+  });
+
+  it('is null with no plan', () => {
+    const legacy = toCustomerProject({ ...(row() as unknown as Record<string, unknown>), stages: [] } as unknown as CustomerProjectRow, SECRET.customerId, now);
+    expect(legacy.progressPct).toBeNull();
   });
 });
 
@@ -540,8 +629,16 @@ describe('Phase 2: the site feed from the daily site log (portal/site-feed-view.
 
   it('puts each photo with its own sentence, its time and the gallery label', () => {
     expect(out.siteLogs[0]!.photos).toEqual([
-      { url: 'https://signed/site-1', text: 'Kitchen carcass levelled and fixed to the wall.', takenAt: '2026-10-10T11:20:00.000Z', fromGallery: true },
+      {
+        url: 'https://signed/site-1',
+        text: 'Kitchen carcass levelled and fixed to the wall.',
+        takenAt: '2026-10-10T11:20:00.000Z',
+        fromGallery: true,
+        doneStep: 'Carcass complete with hardware',
+      },
     ]);
+    const json = JSON.stringify(out.siteLogs);
+    for (const v of ['step-SECRET', 'photo-SECRET', SECRET.staffId]) expect(json).not.toContain(v);
     expect(out.siteLogs[0]!.text).toBe('Kitchen carcasses are up.');
     expect(out.siteLogs[0]!.done).toEqual([{ room: 'Kitchen', label: 'Carcass levelled' }]);
   });
@@ -573,9 +670,10 @@ describe('Phase 2: the site feed from the daily site log (portal/site-feed-view.
 
   it('selects only the customer’s columns from the site log', () => {
     const sel = keysOf(CUSTOMER_PROJECT_SELECT.siteLogs);
-    for (const k of ['note', 'voicePath', 'transcript', 'transcriptLang', 'lat', 'lng', 'postedById', 'clientRef', 'crewMember', 'crewMemberId', 'doneById', 'phone']) {
+    for (const k of ['note', 'voicePath', 'transcript', 'transcriptLang', 'lat', 'lng', 'postedById', 'clientRef', 'crewMember', 'crewMemberId', 'doneById', 'phone', 'donePhotoId', 'weightBp']) {
       expect(sel.has(k), k).toBe(false);
     }
+
   });
 
   it('lists working days with nothing posted by 21:00 IST, from the day site work started', () => {

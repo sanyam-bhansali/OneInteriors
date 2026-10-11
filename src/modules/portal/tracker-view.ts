@@ -6,10 +6,13 @@
  * and tests/project-rules.test.ts.
  *
  * What crosses (brief §5): stage names, planned / original / actual /
- * forecast dates, how many items are ticked, the current stage's room
- * checklist (labels and done), and each moved date as old date, new date
- * and the reason in plain words. Never the PM's note on a move, who moved
- * it, or who ticked what.
+ * forecast dates, how many steps are ticked, each in-scope step (label,
+ * group, its share as a percentage, done, the day it was done and its
+ * planned day), the project's and each stage's percentage done (the step
+ * tracker, docs/studio-workspace/STEP-TRACKER.md), and each moved date as
+ * old date, new date and the reason in plain words. Never the PM's note on
+ * a move, who moved it, who ticked what, a step's stored weight, its photo
+ * (photos live in the site feed), or a step marked not in scope.
  *
  * Statuses are computed (project-rules.ts), never typed: "Carpentry · on
  * track", "Overall · 4 days late", with the customer's own share of the
@@ -33,7 +36,22 @@ import {
   type StageKind,
   type StageStatusName,
 } from '@/modules/project/project-rules';
+import { bpToPct, progressOf } from '@/modules/project/step-rules';
 import { KIND_KEY, PLAN_KINDS, type PlanKind, type StageView, type TrackerStageKey } from './tracker';
+
+/** One step as the customer sees it: never its stored weight, who ticked it or its photo. */
+export interface CustomerStep {
+  label: string;
+  /** The step's group inside its stage ("Execution stage 2A"). */
+  group: string;
+  /** Its share of the whole project, as a percentage (may have decimals: 0.5). */
+  pct: number;
+  done: boolean;
+  /** The IST day it was ticked. */
+  doneOn: string | null;
+  /** The IST day it is planned for. */
+  plannedOn: string | null;
+}
 
 export interface CustomerTrackerStage {
   /** The key the app already translates (tracker.ts `KIND_KEY`). */
@@ -51,7 +69,12 @@ export interface CustomerTrackerStage {
   status: StageStatusName;
   lateDays: number;
   earlyDays: number;
+  /** In-scope steps ticked, of in scope. */
   checklist: { done: number; total: number };
+  /** Whole percent of the stage done, rounded down: 100 only when every step in it is ticked. */
+  progressPct: number;
+  /** The stage's in-scope steps, in plan order. */
+  steps: CustomerStep[];
   /** The latest move of its end, in plain words; null if it never moved. */
   moved: { from: string; to: string; reason: DelayReason; customer: boolean; words: string } | null;
 }
@@ -75,6 +98,8 @@ export interface CustomerMove {
 }
 
 export interface CustomerTracker {
+  /** Whole percent of the project done, rounded down: 100 only when every step is ticked. */
+  progressPct: number;
   stages: CustomerTrackerStage[];
   /** The stage under way and its checklist, room by room; null once handed over. */
   current: { key: TrackerStageKey; label: string; rooms: { room: string; items: { label: string; done: boolean }[] }[] } | null;
@@ -109,7 +134,7 @@ export interface TrackerInputRow {
     plannedStart?: Date;
     plannedEnd: Date;
     actualEnd: Date | null;
-    items?: readonly { room: string; label: string; doneAt: Date | null }[];
+    items?: readonly { id?: string; room: string; label: string; doneAt: Date | null; weightBp?: number; inScope?: boolean; plannedOn?: Date | null }[];
   }[] | null;
   dateChanges?: readonly {
     stageId?: string | null;
@@ -180,6 +205,12 @@ export function customerTracker(row: TrackerInputRow, views: readonly StageView[
     });
   }
 
+  /* The steps: in scope only. Older rows with no weight share equally. */
+  const steps = stored.map((s, i) => (s.items ?? []).filter((it) => it.inScope !== false).map((it, j) => ({ ...it, key: it.id ?? `${i}-${j}` })));
+  const progress = progressOf(
+    steps.flatMap((list, i) => list.map((it) => ({ id: it.key, stageId: rules[i]!.id, weightBp: it.weightBp ?? 0, inScope: true, done: it.doneAt !== null }))),
+  );
+
   const statuses = stageStatuses(rules, changes, today, cal);
   const overall = overallDelay(rules, changes, today, cal);
   const cur = currentStatus(statuses);
@@ -187,8 +218,9 @@ export function customerTracker(row: TrackerInputRow, views: readonly StageView[
   const handover = handoverStage(rules);
 
   const stages: CustomerTrackerStage[] = statuses.map((s, i) => {
-    const items = stored[i]!.items ?? [];
+    const items = steps[i]!;
     const c = stageCompletion(items.map((it) => ({ done: it.doneAt !== null })));
+    const sp = progress.stages.get(s.id);
     const m = s.lastMove;
     return {
       key: KIND_KEY[s.kind],
@@ -204,6 +236,16 @@ export function customerTracker(row: TrackerInputRow, views: readonly StageView[
       lateDays: s.lateDays,
       earlyDays: s.earlyDays,
       checklist: { done: c.done, total: c.total },
+      // A stage with no step in scope is as done as the stage itself.
+      progressPct: sp?.pct ?? (s.actualEnd ? 100 : 0),
+      steps: items.map((it) => ({
+        label: it.label,
+        group: it.room,
+        pct: bpToPct(progress.weights.get(it.key) ?? 0),
+        done: it.doneAt !== null,
+        doneOn: it.doneAt ? day(it.doneAt) : null,
+        plannedOn: it.plannedOn ? dayFromDb(it.plannedOn) : null,
+      })),
       moved: m
         ? {
             from: m.from,
@@ -222,12 +264,13 @@ export function customerTracker(row: TrackerInputRow, views: readonly StageView[
       ? {
           key: KIND_KEY[statuses[currentIndex]!.kind],
           label: statuses[currentIndex]!.name,
-          rooms: byRoom(stored[currentIndex]!.items ?? []),
+          rooms: byRoom(steps[currentIndex]!),
         }
       : null;
 
   return {
-    tracker: { stages, current, moves: movesOf(changes, names, handover?.id ?? null), overall: {
+    tracker: { progressPct: steps.some((l) => l.length) ? progress.pct : stages.every((s) => s.actualEnd) ? 100 : 0, stages, current, moves: movesOf(changes, names, handover?.id ?? null), overall: {
+
       plannedHandover: overall.plannedHandover,
       forecastHandover: overall.forecastHandover,
       handedOver: overall.handedOver,

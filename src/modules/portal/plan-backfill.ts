@@ -7,12 +7,12 @@
  * For each `HomeProject` with no `HomeProjectStage` rows:
  *
  * - **Signed in the app** (`signedQuoteId` and the quote still there): the
- *   plan from the signed quote's lines, exactly as signing builds it now —
- *   stages, each room's checklist, materials — and the agreement and signed
+ *   plan from the signed quote, exactly as signing builds it now —
+ *   stages with their steps, the materials from its lines — and the agreement and signed
  *   quotation filed in the Locker if they are not already. The payment plan
  *   is left alone: it was copied at signing (`paymentPhases`).
  * - **Started by ops by hand** (no signed quote): the five stages with their
- *   standard items.
+ *   template steps.
  *
  * Either way, stages the old tracker had ticked (`doneStages`) come across
  * as done (quote-to-plan.ts `carryDone`), so the customer's tracker shows the

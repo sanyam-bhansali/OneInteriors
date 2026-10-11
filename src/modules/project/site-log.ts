@@ -13,8 +13,10 @@ import 'server-only';
  *   assigned to the project. A supervisor cannot post to a site they are
  *   not on (tests/site-log.test.ts);
  * - is one `$transaction`: the `HomeSiteLog` with its photos and crew, the
- *   checklist ticks, and the `HomeProjectEvent`s (`site.posted` /
- *   `site.nobody` / `site.corrected`, `checklist.ticked`);
+ *   step ticks — each pointing at the photo that shows it done
+ *   (`donePhotoId`, the step tracker) — the stages that finish because of
+ *   them, and the `HomeProjectEvent`s (`site.posted` / `site.nobody` /
+ *   `site.corrected`, `checklist.ticked`, `stage.done`);
  * - is append-only: a site log is never updated or deleted. A second post on
  *   the same day becomes a CORRECTION beside the first.
  *
@@ -35,6 +37,8 @@ import { firstName, homeLabel } from '@/modules/studio/workspace-view';
 import { langOfLocale } from '@/modules/i18n/studio';
 import { asSpeechLang, listen, type Heard, type SpeechLang, type TickItem } from '@/modules/speech';
 import { recordEvent } from './events';
+import { settleStageAfterTicks } from './stage-settle';
+import { doneLabel } from './step-rules';
 import { addDays, calendarOf, dayFromDb, dayToDb, istDay, isWorkingDay } from './working-days';
 import { activeSinceOf, combineScores, missedDays, needsDailyPost, updateScore, type UpdateScore } from './reminder-rules';
 import {
@@ -158,7 +162,7 @@ export async function postSiteLog(raw: unknown, now = new Date()): Promise<PostR
       introduction: { select: { brief: BRIEF, studio: { select: { tradeName: true } } } },
       stages: {
         orderBy: { sortOrder: 'asc' },
-        select: { id: true, name: true, actualEnd: true, items: { select: { id: true, room: true, label: true, doneAt: true } } },
+        select: { id: true, name: true, actualEnd: true, items: { select: { id: true, room: true, label: true, doneAt: true, inScope: true } } },
       },
     },
   });
@@ -166,7 +170,8 @@ export async function postSiteLog(raw: unknown, now = new Date()): Promise<PostR
   const brief = project.introduction.brief;
   const lang = customerLang(brief);
   const stage = project.stages.find((s) => s.actualEnd === null) ?? null;
-  const allItems = new Map(project.stages.flatMap((s) => s.items.map((i) => [i.id, i] as const)));
+  // Any step of the project may be ticked (the office ticks from any stage), but only one in scope.
+  const allItems = new Map(project.stages.flatMap((s) => s.items.filter((i) => i.inScope).map((i) => [i.id, { ...i, stageId: s.id }] as const)));
   if (input.ticks.some((t) => !allItems.has(t.itemId))) return { ok: false, error: 'items' };
 
   const member = check.member;
@@ -177,11 +182,12 @@ export async function postSiteLog(raw: unknown, now = new Date()): Promise<PostR
   if (crewRows.length !== known.length) return { ok: false, error: 'crew' };
   const crewById = new Map(crewRows.map((c) => [c.id, c]));
 
-  const openItems: TickItem[] = (stage?.items ?? []).filter((i) => i.doneAt === null).map((i) => ({ id: i.id, label: i.label, room: i.room }));
+  const openItems: TickItem[] = (stage?.items ?? []).filter((i) => i.doneAt === null && i.inScope).map((i) => ({ id: i.id, label: i.label, room: i.room }));
   const photos = await Promise.all(input.photos.map(async (p) => ({ ...p, ...(await fillSpeech(p, lang, openItems, stage?.name ?? null)) })));
   const voice = input.voice ? await fillSpeech(input.voice, lang, openItems, stage?.name ?? null) : null;
 
-  const write = () => writePost(input, { photos, voice, crewById, member, stageId: stage?.id ?? null, now });
+  const stageOf = new Map([...allItems.values()].map((i) => [i.id, i.stageId]));
+  const write = () => writePost(input, { photos, voice, crewById, member, stageId: stage?.id ?? null, stageOf, now });
   let result: { id: string; kind: PostSummary['kind']; ticked: number };
   try {
     result = await write();
@@ -237,6 +243,8 @@ async function writePost(
     crewById: Map<string, { id: string; name: string; role: string }>;
     member: StudioMemberRef;
     stageId: string | null;
+    /** Each tickable step's stage, to finish the stages its ticks complete. */
+    stageOf: Map<string, string>;
     now: Date;
   },
 ): Promise<{ id: string; kind: PostSummary['kind']; ticked: number }> {
@@ -298,15 +306,18 @@ async function writePost(
         },
         crew: { create: crew },
       },
-      select: { id: true },
+      select: { id: true, photos: { orderBy: { sortOrder: 'asc' }, select: { id: true } } },
     });
 
-    // Ticks: only items still open, so a resend or a correction never re-dates one.
+    /* Ticks: only steps still open and in scope, so a resend or a correction
+       never re-dates one. Each points at the photo that shows it done. */
     const ticked: string[] = [];
     for (const t of input.ticks) {
+      const photoId = log.photos[t.photoIndex]?.id ?? null;
+      if (!photoId) continue;
       const r = await tx.homeChecklistItem.updateMany({
-        where: { id: t.itemId, doneAt: null, stage: { projectId: input.projectId } },
-        data: { doneAt: input.postedAt, doneById: ctx.member.userId, doneSource: t.source, doneSiteLogId: log.id },
+        where: { id: t.itemId, doneAt: null, inScope: true, stage: { projectId: input.projectId } },
+        data: { doneAt: input.postedAt, doneById: ctx.member.userId, doneSource: t.source, doneSiteLogId: log.id, donePhotoId: photoId },
       });
       if (r.count === 1) ticked.push(t.itemId);
     }
@@ -331,6 +342,10 @@ async function writePost(
     });
     if (ticked.length) {
       await recordEvent(tx, { projectId: input.projectId, type: 'checklist.ticked', actor, refId: log.id, at: input.postedAt, payload: { items: ticked, siteLogId: log.id } });
+      // A stage whose last in-scope step was just ticked shows done.
+      for (const stageId of new Set(ticked.map((id) => ctx.stageOf.get(id)).filter((x): x is string => Boolean(x)))) {
+        await settleStageAfterTicks(tx, input.projectId, stageId, actor, input.postedAt);
+      }
     }
     return { id: log.id, kind, ticked: ticked.length };
   });
@@ -415,13 +430,25 @@ export async function mySitesToday(now = new Date()): Promise<{ cards: SiteCard[
   return { cards, studio: studio?.tradeName ?? null };
 }
 
+export interface PostStep {
+  id: string;
+  /** The stage's name, for the group heading. */
+  stage: string;
+  /** The step's group inside its stage ("Execution stage 1"). */
+  group: string;
+  label: string;
+  done: boolean;
+}
+
 export interface PostContext {
   projectId: string;
   home: string;
   customerFirst: string;
   customerLang: SpeechLang;
   stage: { name: string } | null;
-  items: { id: string; room: string; label: string; done: boolean }[];
+  /** The in-scope steps of the stage under way and the one after it, in plan order: what may get done today. */
+  items: PostStep[];
+  /** Rooms a photo can be tagged with, on an older plan built from quote lines; empty on a plan of steps. */
   rooms: string[];
   crew: { id: string; name: string; role: string }[];
   /** Owners and PMs save a new face to the crew list; a supervisor adds them for today. */
@@ -441,7 +468,11 @@ export async function postContext(projectId: string, now = new Date()): Promise<
       introduction: { select: { brief: BRIEF } },
       stages: {
         orderBy: { sortOrder: 'asc' },
-        select: { name: true, actualEnd: true, items: { orderBy: { sortOrder: 'asc' }, select: { id: true, room: true, label: true, doneAt: true } } },
+        select: {
+          name: true,
+          actualEnd: true,
+          items: { where: { inScope: true }, orderBy: { sortOrder: 'asc' }, select: { id: true, room: true, label: true, doneAt: true, quoteLineId: true } },
+        },
       },
       siteLogs: { where: { date: dayToDb(istDay(now)), kind: { in: ['UPDATE', 'NOBODY'] } }, take: 1, select: { kind: true, postedAt: true } },
     },
@@ -453,8 +484,11 @@ export async function postContext(projectId: string, now = new Date()): Promise<
     select: { id: true, name: true, role: true },
     take: 60,
   });
-  const stage = p.stages.find((s) => s.actualEnd === null) ?? null;
-  const items = (stage?.items ?? []).map((i) => ({ id: i.id, room: i.room, label: i.label, done: i.doneAt !== null }));
+  const at = p.stages.findIndex((s) => s.actualEnd === null);
+  const stage = at >= 0 ? p.stages[at]! : null;
+  // Today's work is in the stage under way, and sometimes already in the next one.
+  const shown = at >= 0 ? p.stages.slice(at, at + 2).filter((s) => s.actualEnd === null) : [];
+  const items: PostStep[] = shown.flatMap((s) => s.items.map((i) => ({ id: i.id, stage: s.name, group: i.room, label: i.label, done: i.doneAt !== null })));
   const original = p.siteLogs[0];
   return {
     ok: true,
@@ -465,7 +499,8 @@ export async function postContext(projectId: string, now = new Date()): Promise<
       customerLang: customerLang(p.introduction.brief),
       stage: stage ? { name: stage.name } : null,
       items,
-      rooms: [...new Set(items.map((i) => i.room))],
+      // Rooms come from an older plan's quote-line items; a plan of steps has groups, not rooms.
+      rooms: [...new Set((stage?.items ?? []).filter((i) => i.quoteLineId !== null).map((i) => i.room))],
       crew,
       canSaveCrew: can(check.member, 'crew.manage'),
       canTick: check.access.may('checklist.tick'),
@@ -495,7 +530,7 @@ export async function hearVoiceNote(
     where: { id: projectId },
     select: {
       introduction: { select: { brief: BRIEF } },
-      stages: { orderBy: { sortOrder: 'asc' }, select: { name: true, actualEnd: true, items: { where: { doneAt: null }, orderBy: { sortOrder: 'asc' }, select: { id: true, room: true, label: true } } } },
+      stages: { orderBy: { sortOrder: 'asc' }, select: { name: true, actualEnd: true, items: { where: { doneAt: null, inScope: true }, orderBy: { sortOrder: 'asc' }, select: { id: true, room: true, label: true } } } },
     },
   });
   if (!p) return { ok: false, error: 'gone' };
@@ -529,7 +564,8 @@ export interface OfficeLog {
   arrivedAt: Date;
   postedBy: string;
   voice: (OfficeSpoken & { hasRecording: boolean }) | null;
-  photos: (OfficeSpoken & { url: string | null; takenAt: Date; fromGallery: boolean; hasRecording: boolean })[];
+  /** `step`: "Done: {step}" when this photo ticked a step. */
+  photos: (OfficeSpoken & { url: string | null; takenAt: Date; fromGallery: boolean; hasRecording: boolean; step: string | null })[];
   crew: { name: string; role: string; arrivedAt: Date | null }[];
   ticked: { room: string; label: string }[];
 }
@@ -576,7 +612,16 @@ export async function siteLogForOffice(projectId: string, now = new Date()): Pro
           customerText: true,
           photos: {
             orderBy: { sortOrder: 'asc' },
-            select: { storagePath: true, takenAt: true, fromGallery: true, voicePath: true, transcript: true, transcriptLang: true, customerText: true },
+            select: {
+              storagePath: true,
+              takenAt: true,
+              fromGallery: true,
+              voicePath: true,
+              transcript: true,
+              transcriptLang: true,
+              customerText: true,
+              doneStep: { select: { label: true } },
+            },
           },
           crew: { select: { crewName: true, crewRole: true, arrivedAt: true } },
           ticked: { select: { room: true, label: true } },
@@ -607,7 +652,9 @@ export async function siteLogForOffice(projectId: string, now = new Date()): Pro
       transcriptLang: ph.transcriptLang,
       customerText: ph.customerText,
       hasRecording: Boolean(ph.voicePath),
+      step: ph.doneStep ? doneLabel(ph.doneStep.label) : null,
     })),
+
     crew: l.crew.map((c) => ({ name: c.crewName, role: c.crewRole, arrivedAt: c.arrivedAt })),
     ticked: l.ticked,
   });

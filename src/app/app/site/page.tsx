@@ -212,6 +212,11 @@ function EntryView({ e, label, dark = false }: { e: SiteEntry; label?: string; d
             // eslint-disable-next-line @next/next/no-img-element
             <img className="oa-photo-main" src={p.url} alt={p.text ?? 'Site photo'} />
           ) : null}
+          {p.doneStep ? (
+            <span style={{ fontSize: 15, fontWeight: 600, color: dark ? '#fff' : 'var(--ok)' }}>
+              Done: {p.doneStep} <span style={{ fontWeight: 400, color: dark ? 'rgba(255,255,255,.7)' : 'var(--ink-2)' }}>· {timeLabel(p.takenAt)}</span>
+            </span>
+          ) : null}
           {p.text ? <figcaption style={{ fontSize: 16, lineHeight: 1.5, color: ink }}>{p.text}</figcaption> : null}
           {p.fromGallery ? (
             <span className="oa-who" style={{ alignSelf: 'flex-start' }}>
@@ -231,11 +236,17 @@ function EntryView({ e, label, dark = false }: { e: SiteEntry; label?: string; d
           ))}
         </div>
       ) : null}
-      {e.done.length ? (
+      {/* Steps ticked without their own photo here (older posts); a step's photo already says "Done:". */}
+      {e.done.some((x) => !e.photos.some((p) => p.doneStep === x.label)) ? (
         <p style={{ margin: 0, fontSize: 14.5, color: dark ? 'rgba(255,255,255,.8)' : 'var(--ink-2)' }}>
-          Done: {e.done.map((x) => `${x.label} (${x.room})`).join(', ')}
+          Done:{' '}
+          {e.done
+            .filter((x) => !e.photos.some((p) => p.doneStep === x.label))
+            .map((x) => x.label)
+            .join(', ')}
         </p>
       ) : null}
+
     </div>
   );
 }

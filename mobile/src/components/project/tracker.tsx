@@ -3,17 +3,73 @@ import { Card, Meta } from '../ui';
 import { shortDate } from '../../lib/format';
 import type { Key, T } from '../../lib/i18n';
 import { color, font } from '../../lib/theme';
-import type { Tracker, TrackerMove, TrackerStage } from '../../lib/types';
+import type { Tracker, TrackerMove, TrackerStage, TrackerStep } from '../../lib/types';
 import { TickIcon } from './parts';
 
 /**
  * The Project screen's Phase 3 parts, from what the server computes
  * (portal/tracker-view.ts): the line under each stage (planned vs actual,
- * days early or late, a moved date), the current stage's checklist room
- * by room, and every moved date with its reason in plain words — the
- * customer's own changes labelled as theirs. Nothing here works a status
- * out; it only says what the server sent.
+ * days early or late, a moved date), the percentage done (the step
+ * tracker: it only goes up, step by step), the current stage's steps
+ * group by group with the day each was done or is planned — the older
+ * room checklist from servers that send no steps — and every moved date
+ * with its reason in plain words, the customer's own changes labelled as
+ * theirs. Nothing here works a status or a percentage out; it only says
+ * what the server sent. Photos are in Site, never here.
  */
+
+/** A thin bar for a percentage. */
+export function ProgressBar({ pct, label }: { pct: number; label: string }) {
+  const v = Math.max(0, Math.min(100, pct));
+  return (
+    <View style={styles.bar} accessible accessibilityRole="progressbar" accessibilityLabel={label} accessibilityValue={{ min: 0, max: 100, now: v }}>
+      <View style={[styles.barFill, { width: `${v}%`, backgroundColor: v >= 100 ? color.ok : color.accent }]} />
+    </View>
+  );
+}
+
+/** The stage's steps, group by group: ticked with the day it was done, or the day it is planned. */
+export function StageSteps({ steps, pct, t }: { steps: TrackerStep[]; pct: number; t: T }) {
+  if (steps.length === 0) return null;
+  const done = steps.filter((s) => s.done).length;
+  const groups: { group: string; steps: TrackerStep[] }[] = [];
+  for (const s of steps) {
+    const last = groups[groups.length - 1];
+    if (last && last.group === s.group) last.steps.push(s);
+    else groups.push({ group: s.group, steps: [s] });
+  }
+  return (
+    <View style={styles.checklist}>
+      <View style={styles.head}>
+        <Text style={styles.headTitle}>{t('project.steps.title')}</Text>
+        <Meta>{t('project.steps.count', { done, total: steps.length })}</Meta>
+      </View>
+      <ProgressBar pct={pct} label={t('project.stagePct', { n: pct })} />
+      {groups.map((g) => (
+        <View key={g.group} style={{ gap: 6 }}>
+          <Text style={styles.room}>{g.group}</Text>
+          {g.steps.map((s, i) => {
+            const when = s.done && s.doneOn ? t('project.step.doneOn', { date: shortDate(s.doneOn) }) : s.plannedOn ? t('project.step.plannedOn', { date: shortDate(s.plannedOn) }) : null;
+            return (
+              <View
+                key={`${g.group}-${i}`}
+                style={styles.item}
+                accessible
+                accessibilityLabel={`${s.label}, ${s.done ? t('project.checklist.done') : t('project.checklist.open')}${when ? `, ${when}` : ''}`}
+              >
+                <View style={[styles.box, s.done ? styles.boxDone : null]}>{s.done ? <TickIcon color={color.white} size={13} /> : null}</View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.itemText, s.done && { color: color.ink2 }]}>{s.label}</Text>
+                  {when ? <Text style={styles.when}>{when}</Text> : null}
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
 
 /** "Planned 31 Oct, done 2 Nov · 2 days late" and friends, for one stage. */
 export function stageLine(s: TrackerStage, t: T): string {
@@ -113,4 +169,8 @@ const styles = StyleSheet.create({
   itemText: { flex: 1, fontFamily: font.sans, fontSize: 14.5, lineHeight: 20, color: color.ink },
   moveRow: { gap: 3, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.line },
   moveLine: { fontFamily: font.sansMedium, fontSize: 14.5, color: color.ink },
+  bar: { height: 8, borderRadius: 99, backgroundColor: color.line, overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: 99 },
+  when: { fontFamily: font.mono, fontSize: 12.5, color: color.ink2 },
 });
+

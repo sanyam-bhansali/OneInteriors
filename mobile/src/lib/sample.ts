@@ -1,7 +1,7 @@
 import { Asset } from 'expo-asset';
 import type { Result } from './api';
 import { SAMPLE_JOURNEY } from './journey/sample';
-import type { GeioReply, Notice, Profile, Project } from './types';
+import type { GeioReply, Notice, Profile, Project, TrackerStep } from './types';
 
 /**
  * The sample customer (docs/app-handover/SAMPLE-DATA.md): Priya, flat 1204
@@ -33,6 +33,91 @@ const PHOTOS = {
 } as const;
 const photo = (name: keyof typeof PHOTOS) => Asset.fromModule(PHOTOS[name]).uri;
 
+/*
+ * The step tracker as the server sends it (portal/tracker-view.ts): Hauspire's
+ * steps per stage with their share of the project in %, the first `done` of
+ * them ticked a day apart from `from` days ago, the rest planned a few days apart.
+ */
+const steps = (group: string, rows: [string, number][], done: number, from: number): TrackerStep[] =>
+  rows.map(([label, pct], i) => ({
+    label,
+    group,
+    pct,
+    done: i < done,
+    doneOn: i < done ? dayAt(from + i) : null,
+    plannedOn: dayAt(from + i * 2),
+  }));
+const DESIGN_STEPS = steps('Design', [['Final design and drawings signed off', 2]], 1, -50);
+const CIVIL_STEPS = steps(
+  'Execution stage 1',
+  [
+    ['POP, civil, fabrication and electrical work started', 1],
+    ['POP framing', 4],
+    ['POP wiring', 3],
+    ['POP sheets', 4],
+    ['POP lights', 2],
+    ['PVC POP work', 2],
+    ['Fabrication work', 3],
+    ['Civil work', 4],
+  ],
+  8,
+  -40,
+);
+const CARPENTRY_STEPS = [
+  ...steps(
+    'Execution stage 2A',
+    [
+      ['Site inspection of POP and civil work by the designer', 1],
+      ['Material at site: moulding, safety-door jali, ply', 2],
+      ['Site discussion and carpentry started', 1],
+      ['Materials delivered from the factory', 3],
+      ['Hardware stage 1 ordered (tandems, channels, folding mechanisms)', 1],
+      ['CNC work and PU material ordered', 1],
+      ['Carcass complete with hardware', 10],
+      ['Shutters measured and ordered', 1],
+      ['Hardware stage 2 ordered (hinges, handles, push magnets, hydraulics)', 1],
+      ['Handles, knobs and locks ordered', 1],
+      ['Site inspection at carcass stage by the designer', 1],
+    ],
+    5,
+    -18,
+  ),
+  ...steps(
+    'Execution stage 2B',
+    [
+      ['Name plate ordered', 0.5],
+      ['Manual carpentry work complete', 6],
+      ['Shutters delivered', 4],
+      ['Handles and locks installed', 3],
+      ['Safety door installed', 2],
+      ['Carpentry complete and site cleaned', 3],
+    ],
+    0,
+    2,
+  ),
+];
+const FINISH_STEPS = steps(
+  'Finishing',
+  [
+    ['Profile door and mirror installed', 3],
+    ['Painting started', 2],
+    ['Painting complete', 8],
+    ['Cleaning complete', 2],
+  ],
+  0,
+  14,
+);
+const HANDOVER_STEPS = steps(
+  'Handover',
+  [
+    ['Snag list closed', 2],
+    ['Final inspection with the client', 1],
+    ['Handover', 2],
+  ],
+  0,
+  56,
+);
+
 export const SAMPLE_USER = { id: 'sample', name: 'Priya', phone: '+919822041736' };
 
 /*
@@ -59,27 +144,33 @@ export const SAMPLE_PROJECT: Project = {
   stageStatus: { key: 'PRODUCTION', label: 'Carpentry', status: 'on-track', lateDays: 0 },
   // The tracker as the server sends it (portal/tracker-view.ts): civil moved for a supplier, which pushed
   // handover 4 days (the studio's delay), and carpentry moved 2 days waiting on Priya's pick (hers, labelled).
+  // The step tracker (a shortened list of steps): design, POP and civil done, five carpentry steps ticked.
+  progressPct: 38,
   tracker: {
+    progressPct: 38,
     stages: [
-      { key: 'DESIGN', kind: 'DESIGN', label: 'Design sign-off', plannedStart: dayAt(-60), plannedEnd: dayAt(-48), originalEnd: dayAt(-48), actualEnd: dayAt(-50), forecastEnd: dayAt(-50), state: 'done', status: 'done', lateDays: 0, earlyDays: 2, checklist: { done: 2, total: 2 }, moved: null },
+      { key: 'DESIGN', kind: 'DESIGN', label: 'Design sign-off', plannedStart: dayAt(-60), plannedEnd: dayAt(-48), originalEnd: dayAt(-48), actualEnd: dayAt(-50), forecastEnd: dayAt(-50), state: 'done', status: 'done', lateDays: 0, earlyDays: 2, checklist: { done: 1, total: 1 }, moved: null, progressPct: 100, steps: DESIGN_STEPS },
       {
-        key: 'SITE', kind: 'CIVIL', label: 'Civil', plannedStart: dayAt(-48), plannedEnd: dayAt(-20), originalEnd: dayAt(-26), actualEnd: dayAt(-20), forecastEnd: dayAt(-20), state: 'done', status: 'done', lateDays: 5, earlyDays: 0, checklist: { done: 6, total: 6 },
+        key: 'SITE', kind: 'CIVIL', label: 'POP, civil and electricals', plannedStart: dayAt(-48), plannedEnd: dayAt(-20), originalEnd: dayAt(-26), actualEnd: dayAt(-20), forecastEnd: dayAt(-20), state: 'done', status: 'done', lateDays: 5, earlyDays: 0, checklist: { done: 8, total: 8 },
         moved: { from: dayAt(-26), to: dayAt(-20), reason: 'SUPPLIER', customer: false, words: '' },
+        progressPct: 100,
+        steps: CIVIL_STEPS,
       },
       {
-        key: 'PRODUCTION', kind: 'CARPENTRY', label: 'Carpentry', plannedStart: dayAt(-20), plannedEnd: dayAt(12), originalEnd: dayAt(10), actualEnd: null, forecastEnd: dayAt(12), state: 'now', status: 'on-track', lateDays: 0, earlyDays: 0, checklist: { done: 3, total: 9 },
+        key: 'PRODUCTION', kind: 'CARPENTRY', label: 'Carpentry', plannedStart: dayAt(-20), plannedEnd: dayAt(12), originalEnd: dayAt(10), actualEnd: null, forecastEnd: dayAt(12), state: 'now', status: 'on-track', lateDays: 0, earlyDays: 0, checklist: { done: 5, total: 17 },
         moved: { from: dayAt(10), to: dayAt(12), reason: 'CUSTOMER_CHANGE', customer: true, words: '' },
+        progressPct: 19,
+        steps: CARPENTRY_STEPS,
       },
-      { key: 'FINISH', kind: 'FINISH', label: 'Finishing', plannedStart: dayAt(12), plannedEnd: dayAt(55), originalEnd: dayAt(51), actualEnd: null, forecastEnd: dayAt(55), state: 'next', status: 'upcoming', lateDays: 0, earlyDays: 0, checklist: { done: 0, total: 4 }, moved: null },
-      { key: 'HANDOVER', kind: 'HANDOVER', label: 'Handover', plannedStart: dayAt(55), plannedEnd: dayAt(64), originalEnd: dayAt(60), actualEnd: null, forecastEnd: dayAt(64), state: 'later', status: 'upcoming', lateDays: 0, earlyDays: 0, checklist: { done: 0, total: 0 }, moved: null },
+      { key: 'FINISH', kind: 'FINISH', label: 'Finishing', plannedStart: dayAt(12), plannedEnd: dayAt(55), originalEnd: dayAt(51), actualEnd: null, forecastEnd: dayAt(55), state: 'next', status: 'upcoming', lateDays: 0, earlyDays: 0, checklist: { done: 0, total: 4 }, moved: null, progressPct: 0, steps: FINISH_STEPS },
+      { key: 'HANDOVER', kind: 'HANDOVER', label: 'Handover', plannedStart: dayAt(55), plannedEnd: dayAt(64), originalEnd: dayAt(60), actualEnd: null, forecastEnd: dayAt(64), state: 'later', status: 'upcoming', lateDays: 0, earlyDays: 0, checklist: { done: 0, total: 3 }, moved: null, progressPct: 0, steps: HANDOVER_STEPS },
     ],
     current: {
       key: 'PRODUCTION',
       label: 'Carpentry',
       rooms: [
-        { room: 'Bedroom 1', items: [{ label: 'Wardrobe carcass', done: true }, { label: 'Wardrobe frame fitted', done: true }, { label: 'Wardrobe shutters', done: false }] },
-        { room: 'Kitchen', items: [{ label: 'Carcass delivered', done: true }, { label: 'Carcass levelled and fixed', done: false }, { label: 'Shutters', done: false }, { label: 'Loft', done: false }] },
-        { room: 'Living room', items: [{ label: 'TV unit', done: false }, { label: 'False ceiling', done: false }] },
+        { room: 'Execution stage 2A', items: CARPENTRY_STEPS.filter((s) => s.group === 'Execution stage 2A').map((s) => ({ label: s.label, done: s.done })) },
+        { room: 'Execution stage 2B', items: CARPENTRY_STEPS.filter((s) => s.group === 'Execution stage 2B').map((s) => ({ label: s.label, done: s.done })) },
       ],
     },
     moves: [
@@ -90,7 +181,7 @@ export const SAMPLE_PROJECT: Project = {
   },
   stages: [
     { key: 'DESIGN', label: 'Design sign-off', targetOn: at(-48), state: 'done', late: false },
-    { key: 'SITE', label: 'Civil', targetOn: at(-20), state: 'done', late: true },
+    { key: 'SITE', label: 'POP, civil and electricals', targetOn: at(-20), state: 'done', late: true },
     { key: 'PRODUCTION', label: 'Carpentry', targetOn: at(12), state: 'now', late: false },
     { key: 'FINISH', label: 'Finishing', targetOn: at(55), state: 'next', late: false },
     { key: 'HANDOVER', label: 'Handover', targetOn: at(64), state: 'later', late: false },
@@ -131,18 +222,15 @@ export const SAMPLE_PROJECT: Project = {
       countsAgainstStudio: null,
       text: null,
       photos: [
-        { url: photo('wardrobe'), text: 'Wardrobe frame fitted in bedroom 1.', takenAt: at(0, 16), fromGallery: false },
-        { url: photo('bedroom'), text: 'Bedroom 2 wardrobe frame is done too.', takenAt: at(0, 16), fromGallery: false },
-        { url: photo('living'), text: 'Living room TV unit frame marked on the wall.', takenAt: at(0, 17), fromGallery: false },
+        { url: photo('wardrobe'), text: 'Wardrobe carcasses in both bedrooms are up, with their hardware.', takenAt: at(0, 16), fromGallery: false, doneStep: 'Carcass complete with hardware' },
+        { url: photo('bedroom'), text: 'Bedroom 2 wardrobe frame is done too.', takenAt: at(0, 16), fromGallery: false, doneStep: null },
+        { url: photo('living'), text: 'Living room TV unit frame marked on the wall.', takenAt: at(0, 17), fromGallery: false, doneStep: null },
       ],
       crew: [
         { name: 'Ramesh', role: 'Carpenter', arrivedAt: at(0, 9) },
         { name: 'Sunil', role: 'Helper', arrivedAt: at(0, 10) },
       ],
-      done: [
-        { room: 'Bedroom 1', label: 'Wardrobe frame fitted' },
-        { room: 'Bedroom 2', label: 'Wardrobe frame fitted' },
-      ],
+      done: [{ room: 'Execution stage 2A', label: 'Carcass complete with hardware' }],
       corrections: [
         {
           id: 'sl1c',
@@ -167,9 +255,10 @@ export const SAMPLE_PROJECT: Project = {
       reasonText: null,
       countsAgainstStudio: null,
       text: null,
-      photos: [{ url: photo('kitchen'), text: 'Kitchen carcass levelled and fixed to the wall.', takenAt: at(-1, 16), fromGallery: false }],
+      photos: [{ url: photo('kitchen'), text: 'Kitchen hardware for the drawers and lofts is on site.', takenAt: at(-1, 16), fromGallery: false, doneStep: 'Hardware stage 1 ordered (tandems, channels, folding mechanisms)' }],
       crew: [{ name: 'Ramesh', role: 'Carpenter', arrivedAt: at(-1, 9) }],
-      done: [{ room: 'Kitchen', label: 'Kitchen carcass levelled and fixed' }],
+      done: [{ room: 'Execution stage 2A', label: 'Hardware stage 1 ordered (tandems, channels, folding mechanisms)' }],
+
       corrections: [],
     },
     {

@@ -152,6 +152,8 @@ export interface Project {
   materials?: Material[];
   /** Stages planned vs actual, the current checklist and moved dates (portal/tracker-view.ts). Older servers omit it; null with no plan. */
   tracker?: Tracker | null;
+  /** The step tracker: whole percent of the home done, rounded down. Older servers omit it; null with no plan. */
+  progressPct?: number | null;
   /** "Overall · n days late", computed on the server. Older servers omit it. */
   overallLateDays?: number;
   /** "Carpentry · on track": the stage under way; null once handed over. Older servers omit it. */
@@ -176,8 +178,11 @@ export interface SiteEntry {
   countsAgainstStudio: boolean | null;
   /** The sentence not about any one photo. */
   text: string | null;
-  /** Each photo with its own sentence, in the customer's language. `url` is "" when it could not be signed. */
-  photos: { url: string; text: string | null; takenAt: string; fromGallery: boolean }[];
+  /**
+   * Each photo with its own sentence, in the customer's language. `url` is "" when it could not be signed.
+   * `doneStep`: the step this photo ticked ("Done: {step}"); older servers omit it.
+   */
+  photos: { url: string; text: string | null; takenAt: string; fromGallery: boolean; doneStep?: string | null }[];
   /** First name, work and arrival time only. */
   crew: { name: string; role: string; arrivedAt: string | null }[];
   done: { room: string; label: string }[];
@@ -208,6 +213,20 @@ export interface TrackerStage {
   earlyDays: number;
   checklist: { done: number; total: number };
   moved: { from: string; to: string; reason: DelayReason; customer: boolean; words: string } | null;
+  /** The step tracker: the stage's whole percent done. Older servers omit it. */
+  progressPct?: number;
+  /** The stage's steps in plan order (never a photo; those are in the site feed). Older servers omit it. */
+  steps?: TrackerStep[];
+}
+
+/** One step: its group, its share of the whole project as a percentage, done, and its days ('YYYY-MM-DD'). */
+export interface TrackerStep {
+  label: string;
+  group: string;
+  pct: number;
+  done: boolean;
+  doneOn: string | null;
+  plannedOn: string | null;
 }
 
 /** A moved date: old, new, and why. */
@@ -226,7 +245,10 @@ export interface TrackerMove {
 }
 
 export interface Tracker {
+  /** The step tracker: whole percent of the home done. Older servers omit it. */
+  progressPct?: number;
   stages: TrackerStage[];
+
   current: { key: string; label: string; rooms: { room: string; items: { label: string; done: boolean }[] }[] } | null;
   moves: TrackerMove[];
   overall: {

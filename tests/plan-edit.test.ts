@@ -7,7 +7,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * one move writes its rows with one `at` and its note only once, a late
  * decision becomes customer delay, and the brief's table holds — owner and
  * assigned PM move dates, a supervisor ticks but never moves a date, an
- * unassigned PM cannot even see the project.
+ * unassigned PM cannot even see the project. The step tracker: steps move
+ * with their stage, only the owner or PM edits or unticks them, a ticked
+ * step is never removed, and a stage settles on its in-scope steps.
  *
  * Studio s1: owner, PM and supervisor (both assigned to p1, not p2).
  */
@@ -23,16 +25,40 @@ const db = vi.hoisted(() => {
   };
   const assigned = new Set(['p1:m-pm', 'p1:m-sup']);
   const D = (s: string) => new Date(`${s}T00:00:00Z`);
+  type Item = {
+    id: string;
+    label: string;
+    room: string;
+    doneAt: Date | null;
+    inScope: boolean;
+    weightBp: number;
+    donePhotoId: string | null;
+    plannedOn: Date | null;
+    sortOrder: number;
+    stageId?: string;
+  };
   const state = {
-    stages: [] as { id: string; kind: string; name: string; plannedStart: Date; plannedEnd: Date; actualEnd: Date | null; items: { id: string; label: string; doneAt: Date | null }[] }[],
+    stages: [] as { id: string; kind: string; name: string; plannedStart: Date; plannedEnd: Date; actualEnd: Date | null; items: Item[] }[],
     photos: 0,
     doneStages: [] as string[],
   };
+  const item = (id: string, label: string, doneAt: Date | null, more: Partial<Item> = {}): Item => ({
+    id,
+    label,
+    room: 'Execution stage 2A',
+    doneAt,
+    inScope: true,
+    weightBp: 1000,
+    donePhotoId: null,
+    plannedOn: null,
+    sortOrder: 0,
+    ...more,
+  });
   const reset = () => {
     state.stages = [
       { id: 'carp', kind: 'CARPENTRY', name: 'Carpentry', plannedStart: D('2026-10-05'), plannedEnd: D('2026-10-31'), actualEnd: null, items: [
-        { id: 'i1', label: 'Wardrobe frame', doneAt: D('2026-10-08') },
-        { id: 'i2', label: 'Wardrobe shutters', doneAt: null },
+        item('i1', 'Carcass complete with hardware', D('2026-10-08'), { plannedOn: D('2026-10-20'), sortOrder: 0 }),
+        item('i2', 'Shutters delivered', null, { plannedOn: D('2026-10-31'), sortOrder: 1 }),
       ] },
       { id: 'finish', kind: 'FINISH', name: 'Painting', plannedStart: D('2026-11-01'), plannedEnd: D('2026-11-20'), actualEnd: null, items: [] },
       { id: 'hand', kind: 'HANDOVER', name: 'Handover', plannedStart: D('2026-11-20'), plannedEnd: D('2026-11-25'), actualEnd: null, items: [] },
@@ -77,15 +103,24 @@ const db = vi.hoisted(() => {
     homeProjectDateChange: { create: rec('homeProjectDateChange.create', () => ({ id: `dc${++n}` })) },
     homeDecision: { findFirst: rec('homeDecision.findFirst', (a: { where: { id: string } }) => (a.where.id === 'd1' ? { id: 'd1' } : null)) },
     homeChecklistItem: {
-      findFirst: rec('homeChecklistItem.findFirst', (a: { where: { id: string } }) => {
-        for (const s of state.stages) {
-          const it = s.items.find((i) => i.id === a.where.id);
-          if (it) return { ...it, stageId: s.id };
-        }
-        return null;
+      findMany: rec('homeChecklistItem.findMany', (a: { where: { stageId?: string; stage?: { projectId: string } } }) =>
+        state.stages
+          .filter((s) => !a.where.stageId || s.id === a.where.stageId)
+          .flatMap((s) => s.items.map((i) => ({ ...i, stageId: s.id })))
+          .filter((i) => !a.where.stageId || i.plannedOn !== null),
+      ),
+      update: rec('homeChecklistItem.update', (a: { where: { id: string }; data: Partial<Item> }) => {
+        for (const s of state.stages) for (const i of s.items) if (i.id === a.where.id) Object.assign(i, a.data);
+        return {};
       }),
-      update: rec('homeChecklistItem.update', (a: { where: { id: string }; data: { doneAt: Date | null } }) => {
-        for (const s of state.stages) for (const i of s.items) if (i.id === a.where.id) i.doneAt = a.data.doneAt;
+      create: rec('homeChecklistItem.create', (a: { data: Item & { stageId: string } }) => {
+        const s = state.stages.find((x) => x.id === a.data.stageId)!;
+        const made = { ...a.data, id: `new${++n}`, doneAt: null, donePhotoId: null };
+        s.items.push(made);
+        return { id: made.id };
+      }),
+      delete: rec('homeChecklistItem.delete', (a: { where: { id: string } }) => {
+        for (const s of state.stages) s.items = s.items.filter((i) => i.id !== a.where.id);
         return {};
       }),
     },
@@ -104,7 +139,8 @@ vi.mock('@/modules/auth/session', () => ({
   hasRole: (user: { role: string } | null) => !!user,
 }));
 
-import { markStageDone, moveDate, renameStage, tickItem } from '@/modules/project/plan-edit';
+import { addStep, markStageDone, moveDate, removeStep, renameStage, renameStep, reweightStep, scopeStep, untickStep } from '@/modules/project/plan-edit';
+import { settleStageAfterTicks } from '@/modules/project/stage-settle';
 
 const as = (userId: string) => {
   session.user = { id: userId, role: 'STUDIO' };
@@ -192,48 +228,138 @@ describe('moving a date', () => {
     as('u-pm');
     expect((await moveDate({ ...move, note: 'x'.repeat(501) }, NOW)).ok).toBe(false);
   });
+
+  it('moves the stage’s steps by the days its end moved, inside its new window', async () => {
+    as('u-pm');
+    await moveDate({ ...move, shiftLater: false }, NOW);
+    const days = db.state.stages[0]!.items.map((i) => i.plannedOn!.toISOString().slice(0, 10));
+    expect(days).toEqual(['2026-10-25', '2026-11-05']);
+  });
 });
 
-describe('ticks and done', () => {
-  it('a supervisor on the project may tick; the last tick finishes the stage only with a photo', async () => {
-    as('u-sup');
-    db.state.photos = 0;
-    expect(await tickItem('p1', 'i2', true, NOW)).toEqual({ ok: true, message: 'Ticked: Wardrobe shutters.' });
-    expect(db.state.stages[0]!.actualEnd).toBeNull();
-    expect(ops('homeProjectEvent.create').map((c) => (c.args as { data: { type: string } }).data.type)).toEqual(['checklist.ticked']);
+const types = () => ops('homeProjectEvent.create').map((c) => (c.args as { data: { type: string } }).data.type);
 
-    db.reset();
-    db.calls.length = 0;
-    db.state.photos = 2;
-    const r = await tickItem('p1', 'i2', true, NOW);
-    expect(r).toMatchObject({ ok: true, message: expect.stringMatching(/stage now shows done/) });
+describe('settling a stage on its steps', () => {
+  const actor = { type: 'STUDIO' as const, id: 'u-sup' };
+
+  it('finishes when the last in-scope step is ticked, its photo meeting the photo gate', async () => {
+    db.state.stages[0]!.items[0]!.donePhotoId = 'ph1';
+    db.state.stages[0]!.items[1]!.doneAt = NOW;
+    db.state.stages[0]!.items[1]!.donePhotoId = 'ph2';
+    expect(await settleStageAfterTicks(db.client as never, 'p1', 'carp', actor, NOW)).toBe('mark-done');
     expect(db.state.stages[0]!.actualEnd).toEqual(NOW);
     expect(db.state.doneStages).toEqual(['PRODUCTION', 'INSTALL']);
-    expect(ops('homeProjectEvent.create').map((c) => (c.args as { data: { type: string } }).data.type)).toEqual(['checklist.ticked', 'stage.done']);
+    expect(types()).toEqual(['stage.done']);
   });
 
-  it('unticking an item reopens a finished stage', async () => {
+  it('ignores a step not in scope', async () => {
+    db.state.stages[0]!.items[0]!.donePhotoId = 'ph1';
+    db.state.stages[0]!.items[1]!.inScope = false;
+    expect(await settleStageAfterTicks(db.client as never, 'p1', 'carp', actor, NOW)).toBe('mark-done');
+  });
+
+  it('does not finish without any photo (an older tick, no site photo)', async () => {
+    db.state.stages[0]!.items[1]!.doneAt = NOW;
+    expect(await settleStageAfterTicks(db.client as never, 'p1', 'carp', actor, NOW)).toBe('keep');
+    expect(db.state.stages[0]!.actualEnd).toBeNull();
+  });
+});
+
+describe('unticking a step', () => {
+  it('owner or PM only: a correction; never a supervisor or accounts', async () => {
+    as('u-sup');
+    expect(await untickStep('p1', 'i1', NOW)).toEqual(NOT_YOUR_ROLE);
+    as('u-acc');
+    expect(await untickStep('p1', 'i1', NOW)).toEqual(NOT_YOUR_ROLE);
+    expect(writes()).toEqual([]);
+  });
+
+  it('reopens a finished stage, clears the step’s photo link and keeps the photo', async () => {
     as('u-pm');
     db.state.stages[0]!.actualEnd = new Date('2026-10-10T00:00:00Z');
+    db.state.stages[0]!.items[0]!.donePhotoId = 'ph1';
     db.state.stages[0]!.items[1]!.doneAt = new Date('2026-10-10T00:00:00Z');
     db.state.doneStages = ['DESIGN', 'PRODUCTION', 'INSTALL'];
-    const r = await tickItem('p1', 'i1', false, NOW);
-    expect(r).toMatchObject({ ok: true, message: expect.stringMatching(/open again/) });
+    const r = await untickStep('p1', 'i1', NOW);
+    expect(r).toMatchObject({ ok: true, message: expect.stringMatching(/photo stays in the site log.*open again/) });
+    expect(db.state.stages[0]!.items[0]).toMatchObject({ doneAt: null, donePhotoId: null });
     expect(db.state.stages[0]!.actualEnd).toBeNull();
     expect(db.state.doneStages).toEqual(['DESIGN']);
+    expect(types()).toEqual(['checklist.unticked', 'stage.reopened']);
+    expect(db.calls.some((c) => /^homeSiteLogPhoto\./.test(c.op))).toBe(false);
   });
 
-  it('a tick on an item of another project is refused; accounts cannot tick', async () => {
+  it('refuses a step of another project', async () => {
+    as('u-pm');
+    expect(await untickStep('p1', 'nope', NOW)).toEqual({ ok: false, error: expect.stringMatching(/not on this plan/) });
+  });
+});
+
+describe('editing steps', () => {
+  it('owner or PM; never a supervisor', async () => {
     as('u-sup');
-    expect((await tickItem('p1', 'nope', true, NOW)).ok).toBe(false);
-    as('u-acc');
-    expect(await tickItem('p1', 'i2', true, NOW)).toEqual(NOT_YOUR_ROLE);
+    expect(await renameStep('p1', 'i2', 'Shutters fixed')).toEqual(NOT_YOUR_ROLE);
+    expect(await reweightStep('p1', 'i2', 500)).toEqual(NOT_YOUR_ROLE);
+    expect(await scopeStep('p1', 'i2', false, NOW)).toEqual(NOT_YOUR_ROLE);
+    expect(await addStep('p1', { stageId: 'carp', group: 'Execution stage 2A', label: 'Loft', weightBp: 100 }, NOW)).toEqual(NOT_YOUR_ROLE);
+    expect(await removeStep('p1', 'i2', NOW)).toEqual(NOT_YOUR_ROLE);
+    expect(writes()).toEqual([]);
   });
 
+  it('renames and re-weights, each with its event', async () => {
+    as('u-pm');
+    expect(await renameStep('p1', 'i2', '  Shutters   fixed ')).toEqual({ ok: true, message: expect.stringMatching(/Renamed to “Shutters fixed”/) });
+    expect(db.state.stages[0]!.items[1]!.label).toBe('Shutters fixed');
+    expect((await renameStep('p1', 'i2', 'x')).ok).toBe(false);
+    expect(await reweightStep('p1', 'i2', 450)).toEqual({ ok: true, message: expect.stringMatching(/4.5%/) });
+    expect(db.state.stages[0]!.items[1]!.weightBp).toBe(450);
+    expect((await reweightStep('p1', 'i2', 10_001)).ok).toBe(false);
+    expect(types()).toEqual(['step.renamed', 'step.reweighted']);
+  });
+
+  it('marks a step not in scope, which finishes a stage whose other steps are ticked', async () => {
+    as('u-owner');
+    db.state.stages[0]!.items[0]!.donePhotoId = 'ph1';
+    const r = await scopeStep('p1', 'i2', false, NOW);
+    expect(r).toMatchObject({ ok: true, message: expect.stringMatching(/not in scope.*stage now shows done/) });
+    expect(db.state.stages[0]!.items[1]!.inScope).toBe(false);
+    expect(db.state.stages[0]!.actualEnd).toEqual(NOW);
+    expect(types()).toEqual(['step.scoped', 'stage.done']);
+  });
+
+  it('never takes a ticked step out of scope, and never the last step in scope', async () => {
+    as('u-owner');
+    expect(await scopeStep('p1', 'i1', false, NOW)).toEqual({ ok: false, error: expect.stringMatching(/ticked/) });
+    db.state.stages[0]!.items[0]!.inScope = false;
+    db.state.stages[0]!.items[0]!.doneAt = null;
+    expect(await scopeStep('p1', 'i2', false, NOW)).toEqual({ ok: false, error: expect.stringMatching(/at least one step/) });
+  });
+
+  it('adds a step inside its group, after the group’s last step', async () => {
+    as('u-pm');
+    const r = await addStep('p1', { stageId: 'carp', group: 'Execution stage 2A', label: 'Loft shutters fixed', weightBp: 150 }, NOW);
+    expect(r).toMatchObject({ ok: true, message: expect.stringMatching(/Added “Loft shutters fixed”/) });
+    const made = db.state.stages[0]!.items.find((i) => i.label === 'Loft shutters fixed')!;
+    expect(made).toMatchObject({ room: 'Execution stage 2A', weightBp: 150, inScope: true, sortOrder: 2 });
+    expect(made.plannedOn).toEqual(db.state.stages[0]!.items[1]!.plannedOn);
+    expect(types()).toContain('step.added');
+  });
+
+  it('removes an open step, never a ticked one', async () => {
+    as('u-pm');
+    expect(await removeStep('p1', 'i1', NOW)).toEqual({ ok: false, error: expect.stringMatching(/ticked, so it stays/) });
+    expect(await removeStep('p1', 'i2', NOW)).toMatchObject({ ok: true });
+    expect(db.state.stages[0]!.items.map((i) => i.id)).toEqual(['i1']);
+    expect(types()).toContain('step.removed');
+  });
+});
+
+describe('stages done', () => {
   it('marking a stage done by hand needs a photo and nothing left open', async () => {
+
     as('u-sup');
     expect(await markStageDone('p1', 'finish', true, NOW)).toEqual({ ok: false, error: expect.stringMatching(/site photo/) });
-    expect(await markStageDone('p1', 'carp', true, NOW)).toEqual({ ok: false, error: expect.stringMatching(/1 item is still open/) });
+    expect(await markStageDone('p1', 'carp', true, NOW)).toEqual({ ok: false, error: expect.stringMatching(/1 step is still open/) });
     expect(ops('homeProjectStage.update')).toEqual([]);
   });
 });

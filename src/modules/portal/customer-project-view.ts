@@ -156,8 +156,10 @@ export interface CustomerProject {
   snags: CustomerSnag[];
   documents: CustomerDocument[];
   /* Phase 3 — tracker and delays (portal/tracker-view.ts). Computed, never typed. */
-  /** Stages planned vs actual, the current stage's checklist, moved dates with plain reasons; null for a project with no plan. */
+  /** Stages planned vs actual with their steps and percentages, the current stage's checklist, moved dates with plain reasons; null for a project with no plan. */
   tracker: CustomerTracker | null;
+  /** The step tracker: whole percent of the project done (rounded down); null for a project with no plan. */
+  progressPct: number | null;
   /** "Overall · n days late": working days from planned to forecast handover (customer-caused days included, labelled in `tracker.overall`). */
   overallLateDays: number;
   /** "Carpentry · on track": the stage under way; null once handed over. */
@@ -181,8 +183,8 @@ export const CUSTOMER_PROJECT_SELECT = {
   totalDays: true,
   doneStages: true,
   /* The plan built from the signed quote (quote-to-plan.ts). The stage's
-     name is the studio's, chosen for the customer to read; the checklist and
-     materials are not read here yet. */
+     name is the studio's, chosen for the customer to read; its steps are
+     read below, the materials in money-locker-view.ts. */
   stages: {
     orderBy: { sortOrder: 'asc' },
     select: {
@@ -190,10 +192,13 @@ export const CUSTOMER_PROJECT_SELECT = {
       name: true,
       plannedEnd: true,
       actualEnd: true,
-      /* Phase 3: planned vs actual and each room's checklist — labels and done only, never who ticked. */
+      /* Phase 3: planned vs actual and the steps — labels, group, done and
+         days only, never who ticked or the photo. The stored weight and the
+         scope are read to work out each step's percentage and to hide
+         not-in-scope steps (portal/tracker-view.ts); neither goes out. */
       id: true,
       plannedStart: true,
-      items: { orderBy: { sortOrder: 'asc' }, select: { room: true, label: true, doneAt: true } },
+      items: { orderBy: { sortOrder: 'asc' }, select: { room: true, label: true, doneAt: true, weightBp: true, inScope: true, plannedOn: true } },
     },
   },
   /* Phase 3: moved dates — old, new, reason. Never the PM's `note` or `byId`. */
@@ -369,6 +374,8 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
       };
     }),
     tracker: tracked.tracker,
+    progressPct: tracked.tracker ? tracked.tracker.progressPct : null,
+
     overallLateDays: tracked.overallLateDays,
     stageStatus: tracked.stageStatus,
     payments: customerPayments(ledgerOf, p.paidPhases, p.introduction.brief.userId === userId, new Set(p.documents.map((d) => d.id))),

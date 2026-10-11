@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 /**
  * Signing builds the plan (studio workspace Phase 1): in the same
  * transaction that creates the customer's project, `signFinalQuote` writes
- * the five stages with each room's checklist, the materials, and files the
+ * the five stages with their steps, the materials, and files the
  * agreement and the signed quotation in the Locker, shared. Everything it
  * did before — accepting the quote, the payment plan, the win, the audit
  * line, telling the studio — still happens. Prisma is mocked.
@@ -61,6 +61,8 @@ vi.mock('@/modules/portal/plan-store', () => ({ tellOpsAssured: vi.fn(async () =
 
 import { signFinalQuote, type FinalQuoteView } from '@/modules/portal/choose';
 import { PLAN_KINDS } from '@/modules/portal/tracker';
+import { templateFor } from '@/modules/project/step-template';
+
 import { FILED_CONTENT_TYPE, generatedDocLink } from '@/modules/portal/documents';
 
 const TOTAL = 18_40_000_01;
@@ -126,17 +128,18 @@ describe('signing builds the plan', () => {
     expect(data.paymentPhases.map((s) => s.label)).toEqual(['At signing', 'When finishing starts', 'At handover']);
   });
 
-  it('writes the five stages, each with its checklist, against the new project', async () => {
+  it('writes the five stages, each with Hauspire’s steps, against the new project', async () => {
     await signFinalQuote(view);
-    const stages = ops('tx.homeProjectStage.create').map((c) => (c.args as { data: { projectId: string; kind: string; items: { create: { room: string; label: string; quoteLineId: string | null }[] } } }).data);
+    type Step = { room: string; label: string; quoteLineId: string | null; weightBp: number; inScope: boolean; plannedOn: Date | null };
+    const stages = ops('tx.homeProjectStage.create').map((c) => (c.args as { data: { projectId: string; kind: string; items: { create: Step[] } } }).data);
     expect(stages.map((s) => s.kind)).toEqual([...PLAN_KINDS]);
     expect(stages.every((s) => s.projectId === 'hp1')).toBe(true);
-    const items = (k: string) => stages.find((s) => s.kind === k)!.items.create.map((i) => `${i.room}: ${i.label}`);
-    expect(items('CARPENTRY')).toEqual(['Kitchen: Base cabinets', 'Bedroom 1: Wardrobe']);
-    expect(items('CIVIL')).toEqual(['Kitchen: Dado and backsplash tiling']);
-    expect(items('FINISH')).toEqual(['Whole home: Painting — putty, primer and two coats']);
-    expect(items('DESIGN')).toEqual(['Whole home: Design signed off']);
-    expect(stages.find((s) => s.kind === 'CARPENTRY')!.items.create[0]!.quoteLineId).toBe('l1');
+    const steps = (k: string) => stages.find((s) => s.kind === k)!.items.create;
+    expect(steps('DESIGN').map((i) => `${i.room}: ${i.label}`)).toEqual(['Design: Final design and drawings signed off']);
+    expect(steps('CIVIL').map((i) => i.label)).toEqual(templateFor('CIVIL').map((t) => t.label));
+    const all = stages.flatMap((s) => s.items.create);
+    expect(all.reduce((a, i) => a + i.weightBp, 0)).toBe(10_000);
+    expect(all.every((i) => i.inScope && i.quoteLineId === null && i.plannedOn instanceof Date)).toBe(true);
     // The handover stage ends on the planned handover, 90 days from today.
     const last = ops('tx.homeProjectStage.create').at(-1)!.args as { data: { plannedStart: Date; plannedEnd: Date } };
     const first = ops('tx.homeProjectStage.create')[0]!.args as { data: { plannedStart: Date } };

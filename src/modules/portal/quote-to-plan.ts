@@ -1,7 +1,7 @@
 /**
  * The plan of a signed project, built from the quote the customer signed
  * (studio workspace Phase 1, docs/studio-workspace/PHASE-1-PLAN.md §4): the
- * five stages with planned dates, a checklist per room, the payment schedule
+ * five stages with planned dates, each stage's steps, the payment schedule
  * and the materials list. Nobody types any of it. Pure, and tested
  * (tests/quote-to-plan.test.ts); the writes are in plan-write.ts.
  *
@@ -14,7 +14,18 @@
  * factory production plus installation), in whole days with `splitAcross`,
  * so the last stage ends exactly on the planned handover.
  *
- * ## Which stage a quote line's work belongs to
+ * ## Steps (the step tracker, owner 11 Oct 2026)
+ *
+ * Every stage gets Hauspire's execution steps for its kind, with their
+ * default weights (project/step-template.ts; docs/studio-workspace/
+ * STEP-TRACKER.md), each step's group in `room`, and each step's planned
+ * day spread across the stage's window (project/step-rules.ts
+ * `spreadStepDays`). The quote's lines no longer become things to tick:
+ * they are the materials list. Projects built before the step tracker have
+ * one item per quote line, in its room, until
+ * scripts/studio/steps-from-template.ts replaces them.
+ *
+ * ## Which stage a quote line's work belongs to (for the materials)
  *
  * A quote line carries a product name and a work code, nothing more, so the
  * rule reads those two, on the product NAME only (details are prose — "with
@@ -22,8 +33,7 @@
  * electrical work). First match wins, in this order:
  *
  * 1. **Services** — supervision, project management, transport, freight,
- *    a design or professional fee, consultation: no checklist item and no
- *    material. There is nothing on site to tick off.
+ *    a design or professional fee, consultation: not a material.
  * 2. **Design** — design, drawings, 3D, renders, moodboard → `DESIGN`.
  * 3. **Modular** (factory-made) lines → `CARPENTRY`, whatever they are
  *    called: a wardrobe, a vanity, a mirror cabinet are all built in the
@@ -43,10 +53,6 @@
  *      carcass is fixed)
  *    - anything else on site → `CIVIL`, the stage where site work happens.
  *
- * A stage that gets no line gets one standard item ("Design signed off",
- * "Handover walk-through done", "{stage} complete") in "Whole home", so every
- * stage can be finished by ticking its list.
- *
  * ## Payments
  *
  * The stages the customer signed (`FinalQuoteView.stages`), split again over
@@ -61,28 +67,23 @@
  */
 
 import { splitAcross } from '@/lib/money';
+import { templateFor } from '@/modules/project/step-template';
+import { spreadStepDays } from '@/modules/project/step-rules';
+import { dayToDb, istDay } from '@/modules/project/working-days';
 import { KIND_TRACKER_KEYS, PLAN_KINDS, TRACKER_STAGES, type PlanKind } from './tracker';
 
 export type { PlanKind } from './tracker';
 
-/** The default name of each stage. The studio may rename; we read the kind. */
+/** The default name of each stage (the step tracker's names). The studio may rename; we read the kind. */
 export const KIND_NAMES: Record<PlanKind, string> = {
   DESIGN: 'Design',
-  CIVIL: 'Civil, electrical and plumbing',
+  CIVIL: 'POP, civil and electricals',
   CARPENTRY: 'Carpentry',
-  FINISH: 'Painting and finishing',
+  FINISH: 'Finishing',
   HANDOVER: 'Handover',
 };
 
-/** The item a stage gets when no quote line falls in it. */
-export const STANDARD_ITEM: Record<PlanKind, string> = {
-  DESIGN: 'Design signed off',
-  CIVIL: 'Civil, electrical and plumbing complete',
-  CARPENTRY: 'Carpentry complete',
-  FINISH: 'Painting and finishing complete',
-  HANDOVER: 'Handover walk-through done',
-};
-
+/** Where a quote line with no room is filed in the materials. */
 export const WHOLE_HOME = 'Whole home';
 
 /** The brief's schedule, for a quote that carried none. */
@@ -106,13 +107,23 @@ export interface SignedStageInput {
   amountPaise: number;
 }
 
+/** One step of a stage, stored as a `HomeChecklistItem`. */
 export interface PlanItem {
+  /** The step's group ("Execution stage 2A"), stored in the `room` column. */
   room: string;
   label: string;
+  /** Null on a step; set only on the older quote-line items. */
   quoteLineId: string | null;
   sortOrder: number;
-  /** Set only by the backfill, with its stage's `actualEnd`. */
+  /** Basis points of the project (project/step-rules.ts reads the effective weight). */
+  weightBp: number;
+  inScope: boolean;
+  /** The step's planned day, as the plan's dates are stored (midnight UTC = the IST day). */
+  plannedOn: Date | null;
+  /** Set only by the backfills, with its stage's `actualEnd`. */
   doneAt?: Date | null;
+  /** BACKFILL on a step ticked because its stage was already done: no photo. */
+  doneSource?: 'BACKFILL' | null;
 }
 
 export interface PlanStage {
@@ -155,7 +166,7 @@ const FINISH = /paint|polish|putty|texture|wallpaper|curtain|blind|upholster|sof
 const CIVIL = /civil|break|demoli|\btil(e|es|ing)\b|dado|floor|ceiling|gypsum|\bpop\b|electric|wiring|\bpoints?\b|plumb|waterproof|\bdoors?\b|window|grill/;
 const CARPENTRY = /carpent|wood|\bply|laminate|veneer|wardrobe|cabinet|shutter|\bunits?\b|panel|\bbed\b|shel(f|ves)|storage|countertop|granite|stone|marble|quartz/;
 
-/** The stage a quote line's work belongs to, or null for a service line (no item, no material). See the rule above. */
+/** The stage a quote line's work belongs to, or null for a service line (not a material). See the rule above. */
 export function stageForLine(line: Pick<PlanQuoteLine, 'product' | 'code'>): PlanKind | null {
   const name = line.product.toLowerCase();
   if (SERVICE.test(name)) return null;
@@ -217,52 +228,59 @@ export interface QuotePlanInput {
   stages: SignedStageInput[];
 }
 
-/** Five empty stages with their dates and default names. */
-function emptyStages(startOn: Date, totalDays: number): PlanStage[] {
-  return stageDates(startOn, totalDays).map((d, i) => ({ ...d, name: KIND_NAMES[d.kind], sortOrder: i, actualEnd: null, items: [] }));
-}
-
-/** Give a stage with no items its one standard item. */
-function fillEmpty(stages: PlanStage[]): PlanStage[] {
-  return stages.map((s) =>
-    s.items.length > 0 ? s : { ...s, items: [{ room: WHOLE_HOME, label: STANDARD_ITEM[s.kind], quoteLineId: null, sortOrder: 0 }] },
+/** A stage's template steps, each with its planned day inside the stage's window. */
+export function stepsFor(kind: PlanKind, plannedStart: Date, plannedEnd: Date): PlanItem[] {
+  const template = templateFor(kind);
+  const days = spreadStepDays(
+    template.map((t) => t.sheetDay),
+    { start: istDay(plannedStart), end: istDay(plannedEnd) },
   );
+  return template.map((t, i) => ({
+    room: t.group,
+    label: t.label,
+    quoteLineId: null,
+    sortOrder: i,
+    weightBp: t.weightBp,
+    inScope: true,
+    plannedOn: dayToDb(days[i]!),
+  }));
 }
 
-/** Signed quote → stages with each room's checklist, the payment schedule and the materials. */
-export function quoteToPlan(input: QuotePlanInput): QuotePlan {
-  const stages = emptyStages(input.startOn, input.totalDays);
-  const byKind = new Map(stages.map((s) => [s.kind, s]));
-  const materials: PlanMaterial[] = [];
-  /* Two "Wardrobe" lines in one bedroom are two things to tick; number the
-     second so the list says which. */
-  const seen = new Map<string, number>();
+/** The five stages with their dates, default names and template steps. */
+export function templateStages(startOn: Date, totalDays: number): PlanStage[] {
+  return stageDates(startOn, totalDays).map((d, i) => ({
+    ...d,
+    name: KIND_NAMES[d.kind],
+    sortOrder: i,
+    actualEnd: null,
+    items: stepsFor(d.kind, d.plannedStart, d.plannedEnd),
+  }));
+}
 
+/** Signed quote → stages with their steps, the payment schedule and the materials. */
+export function quoteToPlan(input: QuotePlanInput): QuotePlan {
+  const materials: PlanMaterial[] = [];
   for (const line of input.lines) {
     const kind = stageForLine(line);
-    if (!kind) continue;
-    const room = line.room.trim() || WHOLE_HOME;
-    const product = line.product.trim() || 'Item';
-    const key = `${kind}|${room.toLowerCase()}|${product.toLowerCase()}`;
-    const n = (seen.get(key) ?? 0) + 1;
-    seen.set(key, n);
-    const stage = byKind.get(kind)!;
-    stage.items.push({ room, label: n === 1 ? product : `${product} (${n})`, quoteLineId: line.id, sortOrder: stage.items.length });
-    if (kind === 'CIVIL' || kind === 'CARPENTRY' || kind === 'FINISH') {
-      materials.push({ room, item: product, spec: line.details?.trim() || null, quoteLineId: line.id, sortOrder: materials.length });
-    }
+    if (kind !== 'CIVIL' && kind !== 'CARPENTRY' && kind !== 'FINISH') continue;
+    materials.push({
+      room: line.room.trim() || WHOLE_HOME,
+      item: line.product.trim() || 'Item',
+      spec: line.details?.trim() || null,
+      quoteLineId: line.id,
+      sortOrder: materials.length,
+    });
   }
-
-  return { stages: fillEmpty(stages), payments: paymentSchedule(input.contractPaise, input.stages), materials };
+  return { stages: templateStages(input.startOn, input.totalDays), payments: paymentSchedule(input.contractPaise, input.stages), materials };
 }
 
 /**
  * The plan of a project that has no signed quote to read (a tracker ops
- * started by hand): the five stages and their standard items, with the
+ * started by hand): the five stages and their template steps, with the
  * stages the old tracker had ticked carried over as done.
  */
 export function trackerToPlan(input: { startOn: Date; totalDays: number; doneStages: string[] }, now: Date): PlanStage[] {
-  return carryDone(fillEmpty(emptyStages(input.startOn, input.totalDays)), input.doneStages, now);
+  return carryDone(templateStages(input.startOn, input.totalDays), input.doneStages, now);
 }
 
 /**
@@ -270,26 +288,13 @@ export function trackerToPlan(input: { startOn: Date; totalDays: number; doneSta
  * done in the plan: a kind is done when every old stage it covers was. When
  * it was done was never recorded, so `actualEnd` is the planned end, or
  * today if that is still ahead — never a date later than the truth could be.
- * Their items are ticked with it.
+ * Their steps are ticked with it, with no photo (`doneSource` BACKFILL).
  */
 export function carryDone(stages: PlanStage[], doneStages: string[], now: Date): PlanStage[] {
   return stages.map((s) => {
     const done = KIND_TRACKER_KEYS[s.kind].every((k) => doneStages.includes(k));
     if (!done) return s;
     const actualEnd = new Date(Math.min(s.plannedEnd.getTime(), now.getTime()));
-    return { ...s, actualEnd, items: s.items.map((it) => ({ ...it, doneAt: actualEnd })) };
+    return { ...s, actualEnd, items: s.items.map((it) => ({ ...it, doneAt: actualEnd, doneSource: 'BACKFILL' as const })) };
   });
-}
-
-/** Each room's checklist across the stages: rooms in the order they first appear, stage by stage. */
-export function checklistByRoom(stages: Pick<PlanStage, 'kind' | 'items'>[]): { room: string; items: { kind: PlanKind; label: string }[] }[] {
-  const rooms = new Map<string, { kind: PlanKind; label: string }[]>();
-  for (const s of stages) {
-    for (const it of s.items) {
-      const list = rooms.get(it.room) ?? [];
-      list.push({ kind: s.kind, label: it.label });
-      rooms.set(it.room, list);
-    }
-  }
-  return [...rooms.entries()].map(([room, items]) => ({ room, items }));
 }

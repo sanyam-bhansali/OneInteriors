@@ -147,8 +147,29 @@ export const SITE_WORDS = {
   'role.Mason': { en: 'Mason', hi: 'मिस्त्री', mr: 'गवंडी' },
 
   's3.h': { en: '3 · What got done today?', hi: '3 · आज क्या काम हुआ?', mr: '3 · आज काय काम झाले?' },
-  's3.sub': { en: 'Ticked from what you said. Tap to change.', hi: 'आपकी बात से टिक किए गए। बदलने के लिए दबाएँ।', mr: 'तुम्ही जे सांगितले त्यावरून टिक केले. बदलण्यासाठी दाबा.' },
-  's3.none': { en: 'No checklist for this stage.', hi: 'इस चरण की कोई चेकलिस्ट नहीं।', mr: 'या टप्प्याची चेकलिस्ट नाही.' },
+  's3.sub': {
+    en: 'Tick each step finished today. Each one needs its own photo and a sentence: say it or type it.',
+    hi: 'आज पूरा हुआ हर काम टिक करें। हर एक के लिए उसकी अपनी फ़ोटो और एक वाक्य चाहिए: बोलें या लिखें।',
+    mr: 'आज पूर्ण झालेले प्रत्येक काम टिक करा. प्रत्येकासाठी त्याचा स्वतःचा फोटो आणि एक वाक्य हवे: बोला किंवा लिहा.',
+  },
+  's3.none': { en: 'No steps left open in this stage.', hi: 'इस चरण में कोई काम बाकी नहीं।', mr: 'या टप्प्यात कोणतेही काम बाकी नाही.' },
+  'step.photo': { en: 'Add the photo that shows it done', hi: 'वह फ़ोटो लें जिसमें यह पूरा दिखे', mr: 'हे पूर्ण झालेले दिसेल असा फोटो घ्या' },
+  'step.take': { en: 'Take its photo', hi: 'इसकी फ़ोटो लें', mr: 'याचा फोटो घ्या' },
+  'step.retake': { en: 'Take again', hi: 'फिर से लें', mr: 'पुन्हा घ्या' },
+  'step.sentence': { en: 'What was done ({customer} reads this)', hi: 'क्या काम हुआ ({customer} यह पढ़ेंगे)', mr: 'काय काम झाले ({customer} हे वाचतील)' },
+  'step.sentencePh': {
+    en: 'e.g. POP framing is up in the living room.',
+    hi: 'जैसे: लिविंग रूम में POP फ्रेमिंग हो गई।',
+    mr: 'उदा. लिव्हिंग रूममध्ये POP फ्रेमिंग झाले.',
+  },
+  'step.say': { en: 'Or say it', hi: 'या बोलकर बताएँ', mr: 'किंवा बोलून सांगा' },
+  'step.done': { en: 'Done: {step}', hi: 'पूरा हुआ: {step}', mr: 'पूर्ण झाले: {step}' },
+  'step.need1': { en: 'Add its photo and a sentence', hi: 'इसकी फ़ोटो और एक वाक्य जोड़ें', mr: 'याचा फोटो आणि एक वाक्य जोडा' },
+  'step.need': {
+    en: 'Add a photo and a sentence for {n} ticked step(s)',
+    hi: '{n} टिक किए काम के लिए फ़ोटो और वाक्य जोड़ें',
+    mr: '{n} टिक केलेल्या कामासाठी फोटो आणि वाक्य जोडा',
+  },
   'tick.voice': { en: 'from your voice note', hi: 'आपके वॉइस नोट से', mr: 'तुमच्या व्हॉइस नोटमधून' },
   'tick.earlier': { en: 'Done before', hi: 'पहले हो चुका', mr: 'आधीच झाले' },
 
@@ -199,6 +220,11 @@ export const SITE_WORDS = {
   'err.not_your_role': { en: 'Your role cannot post here. Ask your studio owner.', hi: 'आपकी भूमिका में यहाँ डालना नहीं है। स्टूडियो मालिक से पूछें।', mr: 'तुमच्या भूमिकेत इथे टाकता येत नाही. स्टुडिओ मालकांना विचारा.' },
   'err.too_old': { en: 'This was saved more than 30 days ago and cannot be sent now.', hi: 'यह 30 दिन से पुराना है, अब भेजा नहीं जा सकता।', mr: 'हे 30 दिवसांपेक्षा जुने आहे, आता पाठवता येत नाही.' },
   'err.storage': { en: 'Photos cannot be stored right now. It will try again.', hi: 'अभी फ़ोटो सेव नहीं हो रहीं। फिर से कोशिश होगी।', mr: 'आत्ता फोटो सेव्ह होत नाहीत. पुन्हा प्रयत्न होईल.' },
+  'err.tick_photo': {
+    en: 'Each ticked step needs its own photo with a sentence. Post it again from Today.',
+    hi: 'हर टिक किए काम के लिए उसकी अपनी फ़ोटो और वाक्य चाहिए। "आज" से फिर से डालें।',
+    mr: 'प्रत्येक टिक केलेल्या कामासाठी त्याचा स्वतःचा फोटो आणि वाक्य हवे. "आज" मधून पुन्हा टाका.',
+  },
   'err.other': { en: 'Something is wrong with this post. Ask your office.', hi: 'इस अपडेट में कुछ गड़बड़ है। ऑफ़िस से पूछें।', mr: 'या अपडेटमध्ये काहीतरी चूक आहे. ऑफिसला विचारा.' },
 } satisfies Record<string, Tx>;
 
@@ -211,6 +237,7 @@ export const CREW_ROLES = ['Carpenter', 'Helper', 'Electrician', 'Plumber', 'Pai
 
 /** A failure code from the site routes, as words. */
 export function errorWords(t: SiteT, code: string | undefined): string {
-  if (code === 'sign_in' || code === 'not_yours' || code === 'not_your_role' || code === 'too_old' || code === 'storage') return t(`err.${code}`);
+  if (code === 'sign_in' || code === 'not_yours' || code === 'not_your_role' || code === 'too_old' || code === 'storage' || code === 'tick_photo') return t(`err.${code}`);
+
   return t('err.other');
 }

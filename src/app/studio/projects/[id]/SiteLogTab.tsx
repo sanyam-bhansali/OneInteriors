@@ -134,6 +134,7 @@ function Entry({ log: l, customer }: { log: OfficeLog; customer: string }) {
               ) : (
                 <span className="flex aspect-[4/3] w-full items-center justify-center rounded-[8px] bg-[var(--s-surface-2)] text-[12px] text-[var(--s-ink-3)]">Photo {i + 1}</span>
               )}
+              {p.step ? <span className="text-[13px] font-semibold text-[var(--s-good)]">{p.step}</span> : null}
               <span className="text-[13.5px] leading-snug">{p.customerText ?? <span className="text-[var(--s-ink-3)]">No sentence</span>}</span>
               <span className={muted}>
                 {clock(p.takenAt)}
@@ -150,7 +151,7 @@ function Entry({ log: l, customer }: { log: OfficeLog; customer: string }) {
         </p>
       ) : null}
       {l.ticked.length ? (
-        <p className="m-0 text-[13.5px] text-[var(--s-ink-2)]">Ticked off: {l.ticked.map((t) => `${t.label} (${t.room})`).join(', ')}</p>
+        <p className="m-0 text-[13.5px] text-[var(--s-ink-2)]">Ticked off: {l.ticked.map((t) => t.label).join(', ')}</p>
       ) : null}
       {said.length ? (
         <OnlyYourTeam title={`Only your team · what was said (${customer} never hears or reads this)`}>

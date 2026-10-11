@@ -69,6 +69,7 @@ export function crewLine(c: SiteEntry['crew'][number], t: T): string {
 
 function Entry({ e, t, lead, dark = false }: { e: SiteEntry; t: T; lead: boolean; dark?: boolean }) {
   const ink = dark ? color.onDark : color.ink;
+  const unshown = e.done.filter((x) => !e.photos.some((p) => p.doneStep === x.label));
   return (
     <View style={{ gap: 12 }}>
       {e.reason ? <Text style={[styles.note, { color: ink }]}>{t('site.nobody.short', { reason: reasonWords(e, t) })}</Text> : null}
@@ -82,6 +83,11 @@ function Entry({ e, t, lead, dark = false }: { e: SiteEntry; t: T; lead: boolean
               contentFit="cover"
               transition={300}
             />
+          ) : null}
+          {p.doneStep ? (
+            <Text style={[styles.stepDone, dark && { color: color.onDark }]}>
+              {t('site.stepDone', { step: p.doneStep })} <Text style={[styles.mono, dark && { color: color.onDark2 }]}>· {timeLabel(p.takenAt)}</Text>
+            </Text>
           ) : null}
           {p.text ? <Text style={[styles.note, { color: ink }]}>{p.text}</Text> : null}
           {p.fromGallery ? <Text style={[styles.tag, dark && { color: color.onDark2, borderColor: 'rgba(255,255,255,.3)' }]}>{t('site.gallery')}</Text> : null}
@@ -97,7 +103,8 @@ function Entry({ e, t, lead, dark = false }: { e: SiteEntry; t: T; lead: boolean
           ))}
         </View>
       ) : null}
-      {e.done.length ? <Text style={[styles.done, dark && { color: color.onDark2 }]}>{t('site.done', { items: e.done.map((x) => `${x.label} (${x.room})`).join(', ') })}</Text> : null}
+      {/* Steps ticked without their own photo here (older posts): a step's photo already says "Done:". */}
+      {unshown.length ? <Text style={[styles.done, dark && { color: color.onDark2 }]}>{t('site.done', { items: unshown.map((x) => x.label).join(', ') })}</Text> : null}
     </View>
   );
 }
@@ -113,6 +120,8 @@ const styles = StyleSheet.create({
   note: { fontFamily: font.sans, fontSize: 15.5, lineHeight: 23, color: color.ink },
   darkBody: { fontFamily: font.sans, fontSize: 15, lineHeight: 22.5, color: '#D6D4CE' },
   done: { fontFamily: font.sans, fontSize: 14, lineHeight: 20, color: color.ink2 },
+  stepDone: { fontFamily: font.sansSemi, fontSize: 15, lineHeight: 21, color: color.ok },
+
   added: { borderLeftWidth: 2, borderLeftColor: color.accent, paddingLeft: 12, gap: 8 },
   addedLabel: { fontFamily: font.mono, fontSize: 12.5, color: color.accentInk, textTransform: 'uppercase' },
   tag: {

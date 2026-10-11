@@ -46,6 +46,8 @@ export interface QueuedPhoto {
   lat: number | null;
   lng: number | null;
   voice: QueuedVoice | null;
+  /** The sentence typed under the photo (the step tracker); absent on posts saved before it. */
+  text?: string | null;
 }
 
 export type QueuedCrew = { crewMemberId: string; arrivedAt: string | null } | { crewMemberId: null; name: string; role: string; arrivedAt: string | null; save: boolean };
@@ -60,7 +62,13 @@ export interface QueuedPost {
   photos: QueuedPhoto[];
   voice: QueuedVoice | null;
   crew: QueuedCrew[];
-  ticks: { itemId: string; source: 'TICK' | 'VOICE' }[];
+  /**
+   * Each tick names the photo that shows it done (`photoIndex` into
+   * `photos`). Posts saved on a phone before the step tracker have none; the
+   * server refuses them (`tick_photo`) and they show as not sent, with the
+   * reason, rather than ticking a step with no photo.
+   */
+  ticks: { itemId: string; source: 'TICK' | 'VOICE'; photoIndex?: number }[];
   status: 'waiting' | 'sending' | 'sent' | 'failed';
   error: string | null;
   sentAt: string | null;
@@ -229,7 +237,8 @@ async function sendOne(post: QueuedPost): Promise<void> {
       kind: p.kind,
       reason: p.reason,
       postedAt: p.postedAt,
-      photos: p.photos.map((ph) => ({ path: ph.path, takenAt: ph.takenAt, fromGallery: ph.fromGallery, lat: ph.lat, lng: ph.lng, ...spoken(ph.voice) })),
+      photos: p.photos.map((ph) => ({ path: ph.path, takenAt: ph.takenAt, fromGallery: ph.fromGallery, lat: ph.lat, lng: ph.lng, ...spoken(ph.voice), text: ph.text ?? null })),
+
       voice: p.voice ? spoken(p.voice) : null,
       crew: p.crew,
       ticks: p.ticks,

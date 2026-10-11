@@ -52,6 +52,12 @@ export const PROJECT_EVENT_TYPES = [
   'stage.reopened',
   'date.moved',
   'stage.renamed',
+  // The step tracker (docs/studio-workspace/STEP-TRACKER.md): the studio editing its steps
+  'step.added',
+  'step.removed',
+  'step.renamed',
+  'step.reweighted',
+  'step.scoped',
   // Phase 4 — snags (one per HomeSnagEvent kind)
   'snag.raised',
   'snag.accepted',

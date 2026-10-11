@@ -186,3 +186,29 @@ through the `assured-requested` notice (linking to `/ops/introductions`) and
 switches the plan there, on the project's tracker ("Switch to Assured (fee
 agreed)" / "Move back to Basic"; `setProjectPlan`, OPS only, audited as
 `plan.set`).
+
+## The step tracker (owner, 11 Oct 2026; as built)
+
+docs/studio-workspace/STEP-TRACKER.md. The plan is Hauspire's execution steps,
+each worth a share of the project. `GET /project` adds, without changing any
+existing field:
+
+- `progressPct: number | null` on each project — whole percent of the home
+  done, rounded down (100 only when every step in scope is ticked); null for a
+  project with no plan. The same figure is `tracker.progressPct`.
+- On each `tracker.stages[]`: `progressPct: number` (the stage's own whole
+  percent; a stage with no step in scope reads 100 once done, else 0) and
+  `steps: { label, group, pct, done, doneOn, plannedOn }[]` — the stage's
+  in-scope steps in plan order. `group` is the sheet's section ("Execution
+  stage 2A"); `pct` is the step's share of the whole project as a percentage
+  (may carry decimals, e.g. 0.5); `doneOn` / `plannedOn` are IST days
+  (`YYYY-MM-DD`) or null. Steps the studio marked not in scope are never sent.
+  A step's stored weight, its photo, and who ticked it never cross.
+- `tracker.stages[].checklist` and `tracker.current.rooms` keep their shape
+  and now count in-scope steps (rooms are the steps' groups).
+- In `siteLogs[]` (and their `corrections[]`), each photo adds
+  `doneStep: string | null` — the step that photo ticked. The apps show
+  "Done: {step}" (translated) with the photo's `takenAt`. The entry's `done`
+  list still names every step ticked in that post.
+
+Older apps ignore the new fields and keep working.

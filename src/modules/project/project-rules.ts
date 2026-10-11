@@ -75,7 +75,7 @@ export function canMarkStageDone(stage: { items: readonly { done: boolean }[]; p
 /** What the plain words of a refused gate are, for the studio. */
 export function gateWords(g: Exclude<DoneGate, { ok: true }>): string {
   return g.why === 'items-open'
-    ? `${g.open} item${g.open === 1 ? ' is' : 's are'} still open on this stage. Tick ${g.open === 1 ? 'it' : 'them'} off first.`
+    ? `${g.open} step${g.open === 1 ? ' is' : 's are'} still open on this stage. Tick ${g.open === 1 ? 'it' : 'them'} off first, each with a photo.`
     : 'Post at least one site photo from this stage first. A stage shows done to the customer only with a photo.';
 }
 
