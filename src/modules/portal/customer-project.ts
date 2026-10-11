@@ -52,3 +52,19 @@ export async function customerProjects(userId: string, now = new Date(), opts: {
     }),
   );
 }
+
+/**
+ * One project exactly as its customer (the owner of the brief) sees it in
+ * the app right now — the same select and the same mapper, so the studio's
+ * "What {customer} sees right now" panel cannot show a different truth.
+ * Links are left empty: the panel shows counts and words, not files.
+ *
+ * Reads without checking who is asking. The caller must already have
+ * authorised the studio member on this project (studio/workspace.ts does,
+ * through studio/access.ts `memberOnProject`).
+ */
+export async function customerViewOf(projectId: string, now = new Date()): Promise<CustomerProject | null> {
+  const row = await prisma.homeProject.findUnique({ where: { id: projectId }, select: CUSTOMER_PROJECT_SELECT });
+  if (!row) return null;
+  return toCustomerProject(row, row.introduction.brief.userId ?? '', now, NO_LINKS);
+}

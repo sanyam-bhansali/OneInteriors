@@ -55,7 +55,16 @@ export function hasWhatsApp(): boolean {
  * the sort of detail that produces a silent non-delivery if you get it wrong,
  * so it is stripped here rather than at every call site.
  */
-export async function sendOtp(to: string, code: string): Promise<SendResult> {
+export async function sendOtp(
+  to: string,
+  code: string,
+  /**
+   * Another approved AUTHENTICATION template for the same code: the studio
+   * side's (modules/messaging/sender.ts). Left out, the customer's
+   * WHATSAPP_OTP_TEMPLATE, exactly as before.
+   */
+  opts: { template?: string } = {},
+): Promise<SendResult> {
   const cfg = config();
 
   if (!cfg) {
@@ -90,7 +99,7 @@ export async function sendOtp(to: string, code: string): Promise<SendResult> {
           to: to.replace(/^\+/, ''),
           type: 'template',
           template: {
-            name: cfg.template,
+            name: opts.template || cfg.template,
             language: { code: cfg.locale },
             components: [
               { type: 'body', parameters: [{ type: 'text', text: code }] },

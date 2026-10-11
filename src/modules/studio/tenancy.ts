@@ -34,6 +34,7 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { getCurrentUser, hasRole } from '@/modules/auth/session';
+import { OFFICE_MEMBER } from './surfaces';
 
 export async function myStudioId(): Promise<string | null> {
   const user = await getCurrentUser();
@@ -42,9 +43,14 @@ export async function myStudioId(): Promise<string | null> {
   try {
     /* `StudioMember.userId` is unique — one studio per user. That uniqueness
        is the whole tenancy model, and it is enforced by the database rather
-       than by this function. */
+       than by this function.
+
+       `OFFICE_MEMBER`: only an ACTIVE owner or project manager gets the
+       studio id. Everything in studio-practice/ and studio-quote/ starts
+       here, so a site supervisor, an accounts member, or anyone invited or
+       suspended finds no studio in any office module (studio/surfaces.ts). */
     const member = await prisma.studioMember.findUnique({
-      where: { userId: user.id },
+      where: { userId: user.id, ...OFFICE_MEMBER },
       select: { studioId: true },
     });
     return member?.studioId ?? null;

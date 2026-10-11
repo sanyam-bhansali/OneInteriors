@@ -115,6 +115,21 @@ export function FinalQuoteScreen({ q }: { q: FinalQuoteView }) {
             <li>Handover in about {Math.round(q.handoverDays / 7)} weeks from signing</li>
           </ul>
         </section>
+
+        {/* The agreement filed in their Locker at signing opens here
+            (portal/documents.ts `signedQuoteDocs`): what they agreed to is
+            this quote and the studio's terms, so the terms are shown. */}
+        {q.accepted ? (
+          <section className="oa-card" id="agreed">
+            <p className="oa-label" style={{ marginTop: 0 }}>
+              What you agreed
+            </p>
+            <p style={{ margin: 0 }}>
+              You read this quote{q.terms ? ` and ${q.studioName}’s terms` : ''} and agreed to the price, timeline and payment stages.
+            </p>
+            {q.terms ? <div className="oa-terms">{q.terms}</div> : null}
+          </section>
+        ) : null}
       </Body>
       <Foot>
         {q.accepted ? (

@@ -18,12 +18,16 @@ const TABS = [
   { href: '/studio/settings/fields', label: 'Fields' },
 ];
 
-export function SettingsTabs() {
+/** Team is the owner's alone (`team.manage`), so the tab is only drawn for them. */
+const TEAM_TAB = { href: '/studio/settings/team', label: 'Team' };
+
+export function SettingsTabs({ team = false }: { team?: boolean }) {
   const pathname = usePathname();
+  const tabs = team ? [...TABS, TEAM_TAB] : TABS;
 
   return (
     <nav className="flex gap-1 overflow-x-auto">
-      {TABS.map((tab) => {
+      {tabs.map((tab) => {
         const active = pathname === tab.href;
         return (
           <Link

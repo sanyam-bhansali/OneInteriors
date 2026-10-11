@@ -23,12 +23,22 @@
  *   keep showing the studio's filed schedule, which is all there is.
  * - Documents are only those the studio shared (`sharedAt` set). Drafts and
  *   internal drawings stay with the studio.
+ *
+ * ## Stages
+ *
+ * Read from the plan built at signing (`HomeProjectStage`) when the project
+ * has one, else from the fixed stages and `doneStages` as before
+ * (tracker.ts `projectStages`), so nothing changes for a project until the
+ * backfill gives it a plan. The payload keeps its shape — `key`, `label`,
+ * `targetOn`, `state`, `late` — with each kind going out under the old key
+ * the app already translates (tracker.ts `KIND_KEY`: civil → `SITE`,
+ * carpentry → `INSTALL`) and the studio's stage name as the label.
  */
 
 import type { Prisma } from '@prisma/client';
 import { fromDb } from '@/lib/money';
 import { readPhases, type PaymentPhase } from '@/modules/studio/payment-phases';
-import { plannedStages, trackerView, type StageView } from './tracker';
+import { projectStages, type StageView } from './tracker';
 import { daysLeft, decisionState, parseOptions, type DecisionOption, type DecisionState } from './decisions';
 import { snagLine } from './snags';
 import { DOC_KINDS, docMeta, type DocKind } from './documents';
@@ -102,6 +112,10 @@ export const CUSTOMER_PROJECT_SELECT = {
   startOn: true,
   totalDays: true,
   doneStages: true,
+  /* The plan built from the signed quote (quote-to-plan.ts). The stage's
+     name is the studio's, chosen for the customer to read; the checklist and
+     materials are not read here yet. */
+  stages: { orderBy: { sortOrder: 'asc' }, select: { kind: true, name: true, plannedEnd: true, actualEnd: true } },
   plan: true,
   contractPaise: true,
   paymentPhases: true,
@@ -189,7 +203,7 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
     plan: planName(p.plan),
     studio: p.introduction.studio.tradeName,
     startOn: p.startOn.toISOString(),
-    stages: trackerView(plannedStages(p.startOn, p.totalDays), p.doneStages, now),
+    stages: projectStages(p, now),
     phases: customerPhases(p.paymentPhases, p.introduction.studio.paymentPhases),
     money: moneyView(p.contractPaise === null ? null : fromDb(p.contractPaise), p.paymentPhases, p.paidPhases),
     changes: changesSoFar(

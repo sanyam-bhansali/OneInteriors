@@ -10,6 +10,15 @@ import { isLive } from '@/modules/studio/features';
 import { crmIsOpen } from '@/modules/studio/standing';
 import { StudioShell, type NavGroup } from './StudioShell';
 import { hasSubmittedForReview } from '@/modules/studio/submitted';
+import { headers } from 'next/headers';
+import { PATH_HEADER, STUDIO_SIGN_IN } from '@/lib/host';
+import { memberFor } from '@/modules/studio/access';
+import { can, type MemberRole } from '@/modules/studio/roles';
+import { TEAM_PATH, homeFor, mayOpen, usesOffice } from '@/modules/studio/surfaces';
+import { RoleFrame } from './RoleFrame';
+import { getLang } from '@/modules/i18n/server';
+import { tx } from '@/modules/i18n/site';
+import { STUDIO_WORDS } from '@/modules/i18n/studio';
 
 /**
  * The studio surface's auth gate, and its frame.
@@ -22,7 +31,9 @@ import { hasSubmittedForReview } from '@/modules/studio/submitted';
 export default async function StudioLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
 
-  if (!user) redirect('/sign-in?next=/studio');
+  /* Signed out: the studio sign-in, by phone — which links to the email
+     sign-in for owners who use that. */
+  if (!user) redirect(STUDIO_SIGN_IN);
 
   /**
    * Signed in, but not as a studio.
@@ -44,9 +55,9 @@ export default async function StudioLayout({ children }: { children: React.React
               linked to a studio.
             </p>
             <p className="m-0 mb-8 text-[15px] leading-relaxed text-[var(--color-ink-2)]">
-              If you are a studio owner, this usually means you signed in by phone. Studio accounts
-              use the email address we approved you on — sign out and use the email form, and you
-              will land in the right place.
+              If you are a studio owner, this usually means you signed in on the customer page.
+              Sign out and use the email address we approved you on. If you work for a studio, sign
+              in at {STUDIO_SIGN_IN} with the number your studio owner added.
             </p>
             <div className="flex flex-wrap items-center gap-4">
               <form action={signOutAction}>
@@ -67,27 +78,88 @@ export default async function StudioLayout({ children }: { children: React.React
     );
   }
 
+  /**
+   * Which part of the studio this person works in (studio/surfaces.ts).
+   *
+   * A supervisor or an accounts member who opens an office screen is sent to
+   * their own; the office rail is never drawn for them. This is the door. The
+   * lock is the module layer — the office modules find no studio for them
+   * (`OFFICE_MEMBER` in `myStudioId()`) — because a layout does not re-run on
+   * every in-app navigation.
+   *
+   * No membership (an ops account, a studio account not yet linked, or
+   * fixtures mode with no database) keeps today's behaviour below.
+   */
+  const member = hasDatabase() ? await memberFor(user.id).catch(() => null) : null;
+  if (member) {
+    if (member.status !== 'ACTIVE') return <NotActive suspended={member.status === 'SUSPENDED'} />;
+    const path = (await headers()).get(PATH_HEADER);
+    /* No header (middleware did not run) means no redirect: redirecting on a
+       guess could loop. The module layer still holds. */
+    if (path && !mayOpen(member, path)) redirect(homeFor(member.role));
+    if (!usesOffice(member)) {
+      return (
+        <RoleFrame
+          member={member}
+          name={user.name}
+          signOut={<SignOutButton label={member.role === 'SUPERVISOR' ? tx(await getLang(), STUDIO_WORDS['site.signOut']) : undefined} />}
+        >
+          {children}
+        </RoleFrame>
+      );
+    }
+  }
+
   const context = await shellContext(user.id);
 
   return (
     <StudioShell
-      groups={navFor(context)}
+      groups={navFor(context, member)}
       studioName={context?.tradeName ?? 'Your studio'}
       email={user.email}
       publicHref={context?.live ? `/studios/${context.slug}` : null}
-      signOut={
-        <form action={signOutAction}>
-          <button
-            type="submit"
-            className="text-[12.5px] text-[var(--s-ink-3)] underline-offset-2 hover:text-[var(--s-ink)] hover:underline"
-          >
-            Sign out
-          </button>
-        </form>
-      }
+      signOut={<SignOutButton />}
     >
       {children}
     </StudioShell>
+  );
+}
+
+function SignOutButton({ label = 'Sign out' }: { label?: string }) {
+  return (
+    <form action={signOutAction}>
+      <button
+        type="submit"
+        className="text-[12.5px] text-[var(--s-ink-3)] underline-offset-2 hover:text-[var(--s-ink)] hover:underline"
+      >
+        {label}
+      </button>
+    </form>
+  );
+}
+
+/**
+ * A team member whose access is not on: invited but signed in some other way
+ * than their phone, or suspended with a session that outlived the
+ * suspension's sign-out. Nothing of the studio is shown.
+ */
+function NotActive({ suspended }: { suspended: boolean }) {
+  return (
+    <main className="studio-app flex min-h-dvh items-center justify-center bg-[var(--s-ground)] px-5 py-12">
+      <div className="max-w-md rounded-[18px] bg-[var(--s-surface)] p-6 shadow-[var(--s-lift)]">
+        <h1 className="m-0 text-[20px] font-semibold tracking-tight">
+          {suspended ? 'Your access to this studio is paused.' : 'Finish joining your studio.'}
+        </h1>
+        <p className="m-0 mt-2 text-[15px] leading-relaxed text-[var(--s-ink-2)]">
+          {suspended
+            ? 'Ask your studio owner. They can turn it back on from Settings, Team.'
+            : `Sign in at ${STUDIO_SIGN_IN} with the mobile number your studio owner added.`}
+        </p>
+        <div className="mt-5">
+          <SignOutButton />
+        </div>
+      </div>
+    </main>
   );
 }
 
@@ -234,7 +306,10 @@ async function shellContext(userId: string): Promise<ShellContext | null> {
  * builder to somebody who has not finished onboarding buries the five steps
  * that are actually in their way.
  */
-function navFor(context: ShellContext | null): NavGroup[] {
+function navFor(context: ShellContext | null, member: MemberRole | null): NavGroup[] {
+  /* No membership row (an ops account looking in, fixtures mode) keeps the
+     rail as it was. A project manager loses the two owner-only rows. */
+  const owner = member === null || can(member, 'team.manage');
   /* Their own software stays reachable unless they never finished setup.
      A pause is a marketplace state: it stops us sending briefs, and it does
      not repossess a studio's client list.
@@ -308,13 +383,11 @@ function navFor(context: ShellContext | null): NavGroup[] {
           // The price list every quotation is built from — was reachable only from the guide.
           children: [{ href: '/studio/products', label: 'Product master', ready: isLive('products') }],
         },
-        {
-          icon: 'projects',
-          href: '/studio/projects',
-          label: 'Project tracker',
-          ready: isLive('projects'),
-        },
-        { icon: 'vendors', href: '/studio/vendors', label: 'Vendors', ready: isLive('vendors') },
+        /* The customer projects this person runs (studio workspace Phase 1).
+           Owners see all; a PM only the ones they are on. */
+        { icon: 'projects', href: '/studio/projects', label: 'Projects', ready: true },
+        /* Vendor rates are the owner's alone (roles.ts `vendor.rates`). */
+        ...(owner ? [{ icon: 'vendors' as const, href: '/studio/vendors', label: 'Vendors', ready: isLive('vendors') }] : []),
       ],
     },
   ];
@@ -340,7 +413,11 @@ function navFor(context: ShellContext | null): NavGroup[] {
   }
 
   groups.push({
-    items: [{ icon: 'settings', href: '/studio/settings', label: 'Settings', ready: true }],
+    items: [
+      { icon: 'settings', href: '/studio/settings', label: 'Settings', ready: true },
+      /* Who is on the team, and which sites they see. Owner only (`team.manage`). */
+      ...(member !== null && owner ? [{ icon: 'clients' as const, href: TEAM_PATH, label: 'Team', ready: true }] : []),
+    ],
   });
 
   return groups;

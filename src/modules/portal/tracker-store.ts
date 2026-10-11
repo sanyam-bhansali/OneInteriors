@@ -13,7 +13,7 @@ import { readProfile } from '@/modules/studio/matching-profile';
 import { currentMember, memberOnProject, projectsVisibleTo } from '@/modules/studio/access';
 import { localityLabel } from '@/modules/brief/types';
 import { MAX_PHOTOS_PER_UPDATE, signedSitePhotoUrls, storeSitePhoto } from '@/modules/storage/site-photos';
-import { durationFor, plannedStages, STAGE_KEYS, trackerView, UPDATE_MAX, type StageView } from './tracker';
+import { durationFor, kindForKey, projectStages, STAGE_KEYS, UPDATE_MAX, type StageView } from './tracker';
 import { customerPhases } from './customer-project-view';
 
 export type TrackerResult = { ok: true } | { ok: false; error: string };
@@ -70,12 +70,24 @@ export async function setStudioStageDone(projectId: string, stage: string, done:
   return writeStageDone(projectId, stage, done);
 }
 
+/**
+ * Marks a stage done or not. Writes both records while both exist: the old
+ * `doneStages` key, and — on a project with a plan built from its quote —
+ * the plan stage of that kind (`actualEnd`), which is what the customer's
+ * tracker reads once the plan is there (tracker.ts `projectStages`).
+ */
 async function writeStageDone(projectId: string, stage: string, done: boolean): Promise<TrackerResult> {
   if (!(STAGE_KEYS as readonly string[]).includes(stage)) return { ok: false, error: 'Unknown stage.' };
   const project = await prisma.homeProject.findUnique({ where: { id: projectId }, select: { doneStages: true } });
   if (!project) return { ok: false, error: 'That project is gone.' };
   const next = done ? [...new Set([...project.doneStages, stage])] : project.doneStages.filter((s) => s !== stage);
-  await prisma.homeProject.update({ where: { id: projectId }, data: { doneStages: next } });
+  const kind = kindForKey(stage)!;
+  await prisma.$transaction([
+    prisma.homeProject.update({ where: { id: projectId }, data: { doneStages: next } }),
+    done
+      ? prisma.homeProjectStage.updateMany({ where: { projectId, kind, actualEnd: null }, data: { actualEnd: new Date() } })
+      : prisma.homeProjectStage.updateMany({ where: { projectId, kind }, data: { actualEnd: null } }),
+  ]);
   return { ok: true };
 }
 
@@ -157,6 +169,7 @@ export async function projectsForStudio(now = new Date()): Promise<StudioProject
     include: {
       introduction: { select: { brief: { select: { propertyType: true, locality: true, society: true } } } },
       updates: { orderBy: { createdAt: 'desc' }, take: 10 },
+      stages: { orderBy: { sortOrder: 'asc' }, select: { kind: true, name: true, plannedEnd: true, actualEnd: true } },
     },
   });
   return projects.map((p) => {
@@ -167,7 +180,7 @@ export async function projectsForStudio(now = new Date()): Promise<StudioProject
         .filter(Boolean)
         .join(' · '),
       startOn: p.startOn,
-      stages: trackerView(plannedStages(p.startOn, p.totalDays), p.doneStages, now),
+      stages: projectStages(p, now),
       updates: p.updates.map((u) => ({ note: u.note, stage: u.stage, at: u.createdAt, byStudio: u.byStudio, photos: u.photoPaths.length })),
     };
   });
@@ -195,6 +208,7 @@ export async function trackersForBrief(briefId: string, now = new Date()): Promi
       include: {
         introduction: { select: { studio: { select: { tradeName: true, paymentPhases: true } } } },
         updates: { orderBy: { createdAt: 'desc' }, take: 20 },
+        stages: { orderBy: { sortOrder: 'asc' }, select: { kind: true, name: true, plannedEnd: true, actualEnd: true } },
       },
     });
     // Signed links for this customer's own site photos, minutes long.
@@ -204,7 +218,7 @@ export async function trackersForBrief(briefId: string, now = new Date()): Promi
     return projects.map((p, i) => ({
       studioName: p.introduction.studio.tradeName,
       phases: customerPhases(p.paymentPhases, p.introduction.studio.paymentPhases),
-      stages: trackerView(plannedStages(p.startOn, p.totalDays), p.doneStages, now),
+      stages: projectStages(p, now),
       updates: p.updates.map((u, j) => ({
         note: u.note,
         stage: u.stage,

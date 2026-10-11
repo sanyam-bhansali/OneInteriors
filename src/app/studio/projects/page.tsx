@@ -1,12 +1,9 @@
-import { isLive } from '@/modules/studio/features';
-import { ComingSoon } from '../ComingSoon';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { PageHead, PageBody } from '../StudioShell';
-import { formatINR, formatINRCompact } from '@/lib/money';
-import { myProjects, PROJECT_STAGE_LABELS } from '@/modules/studio-practice/projects';
-import { myClients } from '@/modules/studio-practice/clients';
-import { NewProject, StageMover } from './ProjectControls';
+import { formatINR } from '@/lib/money';
+import { studioProjects } from '@/modules/studio/workspace';
+import { ATTENTION_TITLES, clock, shortDay, type AttentionKind, type WorkspaceRow } from '@/modules/studio/workspace-view';
 
 export const metadata: Metadata = {
   title: 'Projects',
@@ -16,141 +13,113 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 /**
- * Sites that are running.
+ * The studio's live customer projects (studio workspace Phase 1, design
+ * docs/studio-workspace/designs/studio/StudioProjects.dc.html), in the
+ * studio's own deep-green palette.
  *
- * ## What the numbers mean, and what they do not
+ * Every row is a customer's project (`HomeProject`) with a customer app
+ * behind it: what the studio records shows there. Read-only in this phase;
+ * site updates, decisions, snags and payments are still recorded on
+ * /studio/updates until phase 2 replaces it.
  *
- * `Contract` is what the client agreed, frozen when the project was created.
- * `Committed` is what every trade on the site has been billed — summed from the
- * work orders, never stored.
- *
- * The gap between them is NOT margin, and the page does not call it that. A
- * studio's real cost also includes material bought directly, factory work, and
- * its own time, none of which this holds yet. Calling an incomplete subtraction
- * "profit" is how somebody prices the next job wrong, so the two figures sit
- * side by side and the arithmetic is left to the person who knows what is
- * missing.
+ * This replaced the feature-gated list of the studio's internal
+ * `StudioProject`s that lived here (owner decision, 11 Oct 2026: everything
+ * lives on the customer's project). That code is untouched in
+ * studio-practice/projects.ts.
  */
+
+const ACCENT: Record<AttentionKind, { bar: string; ink: string }> = {
+  'no-update': { bar: 'var(--s-warn)', ink: 'var(--s-warn)' },
+  'snag-overdue': { bar: 'var(--s-bad)', ink: 'var(--s-bad)' },
+  payment: { bar: 'var(--s-accent)', ink: 'var(--s-accent)' },
+  waiting: { bar: 'var(--s-ink-3)', ink: 'var(--s-ink-2)' },
+};
+
+const th = 'whitespace-nowrap px-3.5 py-3 text-left text-[12.5px] font-semibold text-[var(--s-ink-2)]';
+const td = 'border-t border-[var(--s-rule)] px-3.5 py-3.5 align-top text-[14px]';
+const sub = 'mt-0.5 text-[12.5px] text-[var(--s-ink-3)]';
+
 export default async function ProjectsPage() {
-  /* Not in the pilot. The rail already stops linking here; this stops a
-     bookmark or a typed URL reaching a screen we are not standing behind
-     yet. Flip the flag in modules/studio/features.ts to ship it. */
-  if (!isLive('projects')) return <ComingSoon feature="projects" />;
-
-  const [projects, clients] = await Promise.all([myProjects(), myClients()]);
-
-  const live = projects.filter((p) => p.stage !== 'CLOSED');
-  const closed = projects.filter((p) => p.stage === 'CLOSED');
-  const owed = projects.reduce((sum, p) => sum + Math.max(0, p.owedPaise), 0);
-
-  // Only a client who has actually been won can become a project.
-  // Won, by the studio's own definition of won — whatever they called the
-  // column. See `stages.ts`.
-  const eligible = clients.filter((c) => c.stageKind === 'WON');
+  const now = new Date();
+  const data = await studioProjects(now);
+  const rows = data?.rows ?? [];
+  const live = rows.filter((r) => r.stage !== null);
 
   return (
     <>
       <PageHead
         title="Projects"
-        sub={
-          projects.length === 0
-            ? 'Nothing running.'
-            : `${live.length} live${owed > 0 ? ` · ${formatINRCompact(owed)} owed to trades` : ''}`
-        }
-        action={<NewProject clients={eligible.map((c) => ({ id: c.id, name: c.name }))} />}
+        sub={`${shortDay(now)} · ${live.length === 0 ? 'Nothing running yet.' : `${live.length} live`}`}
       />
-
       <PageBody>
-        {projects.length === 0 ? (
+        {rows.length === 0 ? (
           <div className="s-card p-8">
-            <p className="m-0 mb-2 text-[15.5px] font-semibold">A project is a client you won.</p>
-            <p className="m-0 mb-4 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--s-ink-2)]">
-              It holds the contract figure, the dates, and every work order you raise against the
-              site. Vendors get paid against a project, so this is what has to exist before the
-              ledger means anything.
+            <p className="m-0 mb-2 text-[15.5px] font-semibold">A project starts when a customer signs your final quote.</p>
+            <p className="m-0 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--s-ink-2)]">
+              Signing builds the plan from the quote — the stages, each room&rsquo;s checklist, the payment stages and the
+              materials — and the customer follows it in their app. Projects you are on appear here.
             </p>
-            {eligible.length === 0 ? (
-              <p className="m-0 text-[14px] text-[var(--s-ink-3)]">
-                Mark a client as booked on the{' '}
-                <Link href="/studio/clients" className="text-[var(--s-accent)]">
-                  clients board
-                </Link>{' '}
-                first — a project needs somebody to belong to.
-              </p>
-            ) : null}
           </div>
         ) : (
-          <div className="flex flex-col gap-6">
-            <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0 xl:grid-cols-2">
-              {live.map((p) => (
-                <li key={p.id} className="s-card p-4">
-                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <span className="text-[15.5px] font-semibold">{p.name}</span>
-                    <span className="s-tag">{PROJECT_STAGE_LABELS[p.stage]}</span>
-                    {p.targetDate ? (
-                      <span className="s-label ml-auto">
-                        due {p.targetDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <p className="m-0 mt-0.5 text-[13.5px] text-[var(--s-ink-2)]">
-                    {p.clientName}
-                    {p.clientPhone ? (
-                      <a href={`tel:${p.clientPhone}`} className="s-num ml-2 text-[var(--s-accent)] no-underline">
-                        {p.clientPhone}
-                      </a>
-                    ) : null}
-                  </p>
-
-                  <dl className="m-0 mt-3 grid grid-cols-3 gap-2 border-t border-[var(--s-rule-soft)] pt-3">
-                    <Figure label="Contract" value={p.contractPaise} />
-                    <Figure label="Committed to trades" value={p.committedPaise} />
-                    <Figure label="Owed" value={p.owedPaise} emphasis={p.owedPaise > 0} />
-                  </dl>
-
-                  <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--s-rule-soft)] pt-3">
-                    <StageMover projectId={p.id} stage={p.stage} />
-                    <Link
-                      href="/studio/vendors"
-                      className="text-[13px] text-[var(--s-accent)] no-underline"
-                    >
-                      {p.workOrderCount === 0
-                        ? 'Raise a work order →'
-                        : `${p.workOrderCount} work order${p.workOrderCount === 1 ? '' : 's'} →`}
-                    </Link>
-                  </div>
-                </li>
-              ))}
-            </ul>
-
-            {closed.length > 0 ? (
-              <details>
-                <summary className="mb-3 cursor-pointer select-none text-[13.5px] font-medium text-[var(--s-ink-2)]">
-                  Closed ({closed.length})
-                </summary>
-                <ul className="m-0 flex list-none flex-col gap-2 p-0">
-                  {closed.map((p) => (
-                    <li key={p.id} className="s-card flex flex-wrap items-baseline gap-x-4 px-4 py-3">
-                      <span className="text-[14px] font-medium">{p.name}</span>
-                      <span className="text-[13px] text-[var(--s-ink-3)]">{p.clientName}</span>
-                      <span className="s-num ml-auto text-[13.5px]">
-                        {p.contractPaise ? formatINR(p.contractPaise) : '—'}
-                      </span>
+          <div className="flex flex-col gap-7">
+            <section aria-labelledby="h-attn" className="flex flex-col gap-3">
+              <h2 id="h-attn" className="m-0 text-[16px] font-semibold">
+                Needs attention today
+              </h2>
+              {data!.attention.length === 0 ? (
+                <p className="m-0 text-[14px] text-[var(--s-ink-2)]">Nothing. Every live site has posted today and nothing is overdue.</p>
+              ) : (
+                <ul className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-3 p-0">
+                  {data!.attention.map((a, i) => (
+                    <li key={`${a.kind}-${a.projectId}-${i}`}>
+                      <Link
+                        href={`/studio/projects/${a.projectId}`}
+                        className="s-card flex h-full flex-col gap-1.5 p-4 no-underline"
+                        style={{ boxShadow: `inset 4px 0 0 ${ACCENT[a.kind].bar}, var(--s-lift)` }}
+                      >
+                        <span className="text-[12.5px] font-semibold" style={{ color: ACCENT[a.kind].ink }}>
+                          {ATTENTION_TITLES[a.kind]}
+                        </span>
+                        <span className="text-[15px] font-semibold text-[var(--s-ink)]">{a.home}</span>
+                        <span className="text-[13.5px] leading-snug text-[var(--s-ink-2)]">{a.text}</span>
+                      </Link>
                     </li>
                   ))}
                 </ul>
-              </details>
-            ) : null}
+              )}
+            </section>
 
-            <p className="m-0 max-w-[70ch] text-[13px] leading-relaxed text-[var(--s-ink-3)]">
-              <strong className="font-semibold text-[var(--s-ink-2)]">
-                Contract minus committed is not your margin.
-              </strong>{' '}
-              It leaves out material you buy directly, factory work and your own time. We show both
-              figures rather than the subtraction, because an incomplete one would price your next
-              job wrong.
-            </p>
+            <section aria-labelledby="h-live" className="s-card">
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-4 pb-2">
+                <h2 id="h-live" className="m-0 text-[16px] font-semibold">
+                  Projects <span className="s-num font-[family-name:var(--font-mono)] text-[13px] font-normal text-[var(--s-ink-3)]">{rows.length}</span>
+                </h2>
+                <span className="text-[12.5px] text-[var(--s-ink-3)]">
+                  Each row has a customer app behind it. What your team records in a project shows there.
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[980px] border-collapse">
+                  <thead>
+                    <tr>
+                      <th scope="col" className={th}>Home and customer</th>
+                      <th scope="col" className={th}>Stage</th>
+                      <th scope="col" className={th}>Today on site</th>
+                      <th scope="col" className={th}>Overall</th>
+                      <th scope="col" className={th}>Snags</th>
+                      <th scope="col" className={th}>Waiting on customer</th>
+                      {data!.seesMoney ? <th scope="col" className={th}>Next payment</th> : null}
+                      <th scope="col" className={th}>Plan</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <Row key={r.id} r={r} money={data!.seesMoney} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
           </div>
         )}
       </PageBody>
@@ -158,23 +127,87 @@ export default async function ProjectsPage() {
   );
 }
 
-function Figure({
-  label,
-  value,
-  emphasis = false,
-}: {
-  label: string;
-  value: number | null;
-  emphasis?: boolean;
-}) {
+function Row({ r, money }: { r: WorkspaceRow; money: boolean }) {
+  const handedOver = r.stage === null;
   return (
-    <div>
-      <dt className="s-label m-0">{label}</dt>
-      <dd
-        className={`s-num m-0 mt-0.5 text-[14.5px] ${emphasis ? 'font-semibold text-[var(--s-accent)]' : 'font-medium'}`}
-      >
-        {value === null ? '—' : formatINR(value)}
-      </dd>
-    </div>
+    <tr>
+      <td className={td}>
+        <Link href={`/studio/projects/${r.id}`} className="font-semibold text-[var(--s-ink)] no-underline hover:text-[var(--s-accent)]">
+          {r.home}
+        </Link>
+        <div className={sub}>{r.customer}</div>
+      </td>
+      <td className={td}>
+        {r.stage ? (
+          <>
+            {r.stage.label}
+            <div className={`${sub} s-num font-[family-name:var(--font-mono)]`}>
+              day {r.stage.day} of {r.stage.of}
+            </div>
+          </>
+        ) : (
+          'Handed over'
+        )}
+      </td>
+      <td className={td}>
+        {handedOver ? (
+          <span className="text-[var(--s-ink-3)]">—</span>
+        ) : !r.started ? (
+          'Not started'
+        ) : r.postedToday ? (
+          <span className="font-medium text-[var(--s-good)]">Posted {clock(r.postedToday)}</span>
+        ) : (
+          <span className="font-medium text-[var(--s-warn)]">Not posted yet</span>
+        )}
+      </td>
+      <td className={td}>
+        {r.lateDays > 0 ? (
+          <span className="font-medium text-[var(--s-bad)]">
+            {r.lateDays} day{r.lateDays === 1 ? '' : 's'} late
+          </span>
+        ) : (
+          <span className="font-medium text-[var(--s-good)]">{handedOver ? 'Done' : 'On track'}</span>
+        )}
+      </td>
+      <td className={td}>
+        {r.snags.open === 0 ? (
+          'None'
+        ) : (
+          <>
+            {r.snags.open} open
+            {r.snags.overdue.length ? <div className="mt-0.5 text-[12.5px] font-medium text-[var(--s-bad)]">{r.snags.overdue.length} overdue</div> : null}
+          </>
+        )}
+      </td>
+      <td className={td}>
+        {r.waiting.length === 0 ? (
+          'None'
+        ) : (
+          <>
+            {r.waiting[0]!.title}
+            <div className={sub}>
+              due {shortDay(r.waiting[0]!.dueOn)}
+              {r.waiting.length > 1 ? ` · ${r.waiting.length - 1} more` : ''}
+            </div>
+          </>
+        )}
+      </td>
+      {money ? (
+        <td className={td}>
+          {r.nextPayment ? (
+            <>
+              <span className="s-num font-[family-name:var(--font-mono)]">{formatINR(r.nextPayment.amountPaise)}</span>
+              <div className={sub} style={r.nextPayment.toRecord ? { color: 'var(--s-accent)', fontWeight: 600 } : undefined}>
+                {r.nextPayment.label}
+                {r.nextPayment.toRecord ? ' · due, record it' : r.nextPayment.dueOn ? ` · ${shortDay(new Date(`${r.nextPayment.dueOn}T12:00:00Z`))}` : ''}
+              </div>
+            </>
+          ) : (
+            <span className="text-[var(--s-ink-3)]">—</span>
+          )}
+        </td>
+      ) : null}
+      <td className={td}>{r.plan === 'assured' ? 'Assured' : 'Basic'}</td>
+    </tr>
   );
 }

@@ -18,6 +18,7 @@ import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { sendNotice } from '@/modules/auth/email';
 import { resolveSiteUrl } from '@/lib/site';
+import { OFFICE_MEMBER } from '@/modules/studio/surfaces';
 import { EMAILED_TO_STUDIO, messageFor, type Message, type ProjectEvent } from './messages';
 
 const EXPO_PUSH = 'https://exp.host/--/api/v2/push/send';
@@ -75,7 +76,10 @@ export async function notifyStudio(studioId: string, event: ProjectEvent): Promi
   if (!hasDatabase()) return;
   try {
     const members = await prisma.studioMember.findMany({
-      where: { studioId },
+      /* The office: active owners and project managers. A site supervisor or
+         accounts member must not get word of projects they are not on, and
+         an invited or suspended one gets nothing (studio/surfaces.ts). */
+      where: { studioId, ...OFFICE_MEMBER },
       select: { userId: true, user: { select: { email: true } } },
     });
     await Promise.all(members.map((m) => notify(m.userId, event, { email: false })));

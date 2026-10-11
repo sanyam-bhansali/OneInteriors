@@ -28,6 +28,8 @@ import { durationFor } from './tracker';
 import { notifyStudio } from '@/modules/notify/service';
 import { fromDb } from '@/lib/money';
 import { tellOpsAssured } from './plan-store';
+import { quoteToPlan } from './quote-to-plan';
+import { fileSignedQuote, writePlan } from './plan-write';
 import type { PlanName } from './plans';
 
 const VISIBLE_QUOTE = ['ISSUED', 'ACCEPTED'] as const;
@@ -320,6 +322,12 @@ export async function answerVisit(appointmentId: string, to: 'CONFIRMED' | 'CANC
  * and that they ticked the agreement. Locks the total and the payment stages
  * onto a new project, marks the quotation accepted, records the win, and
  * starts the tracker today.
+ *
+ * In the same transaction it builds the project's plan from the signed
+ * lines (quote-to-plan.ts: the five stages, each room's checklist, the
+ * materials) and files the agreement and the signed quotation in the
+ * customer's Locker (documents.ts `signedQuoteDocs`). If any of it fails,
+ * nothing is signed.
  */
 export async function signFinalQuote(
   view: FinalQuoteView,
@@ -333,7 +341,14 @@ export async function signFinalQuote(
   const mine = await myIntroductionIds(me.briefId);
   const q = await prisma.studioQuote.findFirst({
     where: { id: view.id, status: 'ISSUED', introductionId: { in: mine } },
-    select: { id: true, introductionId: true, studioId: true, number: true, clientName: true },
+    select: {
+      id: true,
+      introductionId: true,
+      studioId: true,
+      number: true,
+      clientName: true,
+      lines: { orderBy: { sortOrder: 'asc' }, select: { id: true, room: true, product: true, details: true, code: true } },
+    },
   });
   if (!q?.introductionId) return { ok: false, error: 'This quote is no longer open for signing.' };
   const intro = await prisma.introduction.findFirst({
@@ -343,11 +358,20 @@ export async function signFinalQuote(
   if (!intro) return { ok: false, error: 'This quote is not on your project.' };
   if (intro.homeProject) return { ok: false, error: 'You have already signed with this studio.' };
 
-  // The stages as signed, with their rupee amounts, so a later change to the
-  // studio's schedule never rewrites what this customer agreed to.
-  const stages = view.stages.map((s) => ({ label: s.label, pct: s.pct, amountPaise: s.amountPaise }));
   const now = new Date();
   const startOn = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  // The stages as signed, with their rupee amounts, so a later change to the
+  // studio's schedule never rewrites what this customer agreed to. Split
+  // again over the total with `splitAcross` (quote-to-plan.ts), so they sum
+  // to the contract exactly: the same figures the quote showed.
+  const built = quoteToPlan({
+    lines: q.lines,
+    startOn,
+    totalDays: view.handoverDays,
+    contractPaise: view.totalPaise,
+    stages: view.stages.map((s) => ({ label: s.label, pct: s.pct, amountPaise: s.amountPaise })),
+  });
+  const stages = built.payments.map((s) => ({ label: s.label, pct: s.pct, amountPaise: s.amountPaise }));
 
   try {
     const project = await prisma.$transaction(async (tx) => {
@@ -365,6 +389,8 @@ export async function signFinalQuote(
         },
         select: { id: true },
       });
+      await writePlan(tx, created.id, built);
+      await fileSignedQuote(tx, created.id, { id: q.id, number: q.number }, me.userId, now);
       await tx.quoteDecision.upsert({
         where: { briefId: intro.briefId },
         create: { briefId: intro.briefId, wonByStudioId: q.studioId, outcomeSource: 'CUSTOMER_REPORTED', decidedAt: now },

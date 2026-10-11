@@ -73,6 +73,8 @@ const db = vi.hoisted(() => {
     },
     homeDocument: { findMany: rec('homeDocument.findMany', () => []), findUnique: rec('homeDocument.findUnique', () => null) },
     homeProjectUpdate: { create: rec('homeProjectUpdate.create', () => ({ project: project('p1') })) },
+    homeProjectStage: { updateMany: rec('homeProjectStage.updateMany', () => ({ count: 0 })) },
+    $transaction: vi.fn(async (ops: Promise<unknown>[]) => Promise.all(ops)),
     dreamPin: { findMany: rec('dreamPin.findMany', () => []) },
     studioVendor: { findMany: rec('studioVendor.findMany', () => []) },
     studioWorkOrder: { findMany: rec('studioWorkOrder.findMany', () => []) },

@@ -384,7 +384,7 @@ function Documents({ projectId, documents }: { projectId: string; documents: Sta
  * the customer is reminded two days before — and mark it received once paid.
  * The customer pays the studio directly; this is the record they see.
  */
-function Payments({ projectId, money }: { projectId: string; money: NonNullable<StaffWork['money']> }) {
+export function Payments({ projectId, money }: { projectId: string; money: NonNullable<StaffWork['money']> }) {
   const { pending, message, run } = useRun();
   const today = new Date().toISOString().slice(0, 10);
   return (

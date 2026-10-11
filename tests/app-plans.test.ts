@@ -36,6 +36,10 @@ const db = vi.hoisted(() => {
     introduction: { findMany: rec('introduction.findMany', []), findFirst: rec('introduction.findFirst', null) },
     studioQuote: { findFirst: rec('studioQuote.findFirst', null), update: rec('studioQuote.update') },
     quoteDecision: { upsert: rec('quoteDecision.upsert') },
+    // Signing builds the plan and files the documents (portal/plan-write.ts).
+    homeProjectStage: { create: rec('homeProjectStage.create', { id: 'st' }) },
+    homeMaterial: { createMany: rec('homeMaterial.createMany', { count: 0 }) },
+    homeDocument: { createMany: rec('homeDocument.createMany', { count: 2 }) },
     appointment: { findFirst: rec('appointment.findFirst', null) },
     notification: { count: rec('notification.count', 0) },
     user: { findUnique: rec('user.findUnique', { locale: 'en' }) },
@@ -212,7 +216,7 @@ describe('Choose & sign in the app', () => {
     db.next('introduction.findFirst', { brief: { scope: 'FULL_HOME' } });
     db.next('brief.findUnique', { id: 'b1' });
     db.next('introduction.findMany', [{ id: 'i1' }]);
-    db.next('studioQuote.findFirst', { id: 'q1', introductionId: 'i1', studioId: 's1', number: 'Q-101', clientName: 'Priya' });
+    db.next('studioQuote.findFirst', { id: 'q1', introductionId: 'i1', studioId: 's1', number: 'Q-101', clientName: 'Priya', lines: [] });
     db.next('introduction.findFirst', { id: 'i1', briefId: 'b1', homeProject: null });
   };
   const sign = async (body: unknown) =>

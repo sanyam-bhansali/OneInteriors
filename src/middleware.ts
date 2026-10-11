@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { opsWithoutAuth } from '@/lib/env';
-import { audienceFor, isAlwaysAllowed, route } from '@/lib/host';
+import { PATH_HEADER, audienceFor, isAlwaysAllowed, route } from '@/lib/host';
 
 /**
  * Two jobs: put each hostname in front of its own product, and keep a
@@ -29,6 +29,20 @@ import { audienceFor, isAlwaysAllowed, route } from '@/lib/host';
  * would be trusting an unverified claim. No cookie, no point rendering. **Do
  * not add authorisation logic here.**
  */
+/**
+ * Hand the path the app will render to server components, as a request
+ * header (`PATH_HEADER`). `app/studio/layout.tsx` uses it to send a site
+ * supervisor or an accounts member to their own screen when they open an
+ * office one (studio/surfaces.ts). It is a routing hint, not authorisation:
+ * the header is always overwritten here, so a client cannot supply its own,
+ * and the module layer refuses those members office data regardless.
+ */
+function forward(request: NextRequest, pathname: string) {
+  const headers = new Headers(request.headers);
+  headers.set(PATH_HEADER, pathname);
+  return { request: { headers } };
+}
+
 export function middleware(request: NextRequest) {
   const host = request.headers.get('host');
   const path = request.nextUrl.pathname;
@@ -74,7 +88,7 @@ export function middleware(request: NextRequest) {
   if (decision.kind === 'rewrite') {
     const url = request.nextUrl.clone();
     url.pathname = decision.to;
-    return NextResponse.rewrite(url);
+    return NextResponse.rewrite(url, forward(request, decision.to));
   }
 
   // ── 2. The /ops cookie pre-filter ──
@@ -95,13 +109,13 @@ export function middleware(request: NextRequest) {
     !isAlwaysAllowed(path) &&
     (path === '/ops' || path.startsWith('/ops/') || audienceFor(host) === 'ops');
 
-  if (!servingOps) return NextResponse.next();
+  if (!servingOps) return NextResponse.next(forward(request, path));
 
   // The development bypass has to be honoured here too, or the cookie check
   // below redirects to /sign-in before the layout ever gets to allow it.
   // Read `opsWithoutAuth` in src/lib/env.ts before relying on this: it refuses
   // to work once the roster is declared real, and in production outright.
-  if (opsWithoutAuth()) return NextResponse.next();
+  if (opsWithoutAuth()) return NextResponse.next(forward(request, path));
 
   if (!request.cookies.get('oi_session')?.value) {
     const url = request.nextUrl.clone();
@@ -110,7 +124,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return NextResponse.next();
+  return NextResponse.next(forward(request, path));
 }
 
 /**

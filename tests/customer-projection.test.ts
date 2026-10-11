@@ -259,3 +259,38 @@ describe('customerPhases', () => {
     expect(customerPhases(null, null)).toBeNull();
   });
 });
+
+describe('the stages the customer sees', () => {
+  const now = D('2026-10-11T00:00:00Z');
+  const withStages = (stages: unknown) => ({ ...(leakyRow() as unknown as Record<string, unknown>), stages }) as unknown as CustomerProjectRow;
+
+  it('reads the plan built from the quote when the project has one, in the same shape, under the keys the app knows', () => {
+    const row = withStages([
+      { kind: 'DESIGN', name: 'Design', plannedEnd: D('2026-09-20T00:00:00Z'), actualEnd: D('2026-09-18T00:00:00Z'), notes: SECRET.teamNotes },
+      { kind: 'CIVIL', name: 'Civil and electrical', plannedEnd: D('2026-10-05T00:00:00Z'), actualEnd: null },
+      { kind: 'CARPENTRY', name: 'Carpentry', plannedEnd: D('2026-11-15T00:00:00Z'), actualEnd: null },
+      { kind: 'FINISH', name: 'Painting and finishing', plannedEnd: D('2026-11-25T00:00:00Z'), actualEnd: null },
+      { kind: 'HANDOVER', name: 'Handover', plannedEnd: D('2026-11-30T00:00:00Z'), actualEnd: null },
+    ]);
+    const out = toCustomerProject(row, SECRET.customerId, now);
+    expect(out.stages).toEqual([
+      { key: 'DESIGN', label: 'Design', targetOn: D('2026-09-20T00:00:00Z'), state: 'done', late: false },
+      { key: 'SITE', label: 'Civil and electrical', targetOn: D('2026-10-05T00:00:00Z'), state: 'now', late: true },
+      { key: 'INSTALL', label: 'Carpentry', targetOn: D('2026-11-15T00:00:00Z'), state: 'next', late: false },
+      { key: 'FINISH', label: 'Painting and finishing', targetOn: D('2026-11-25T00:00:00Z'), state: 'later', late: false },
+      { key: 'HANDOVER', label: 'Handover', targetOn: D('2026-11-30T00:00:00Z'), state: 'later', late: false },
+    ]);
+    expect(JSON.stringify(out)).not.toContain(SECRET.teamNotes);
+  });
+
+  it('falls back to the fixed stages and doneStages for a project with no plan yet', () => {
+    for (const stages of [undefined, []]) {
+      const out = toCustomerProject(withStages(stages), SECRET.customerId, now);
+      expect(out.stages.map((s) => s.key)).toEqual(['DESIGN', 'PRODUCTION', 'SITE', 'INSTALL', 'FINISH', 'HANDOVER']);
+    }
+  });
+
+  it('selects only what the tracker needs from the plan', () => {
+    expect(CUSTOMER_PROJECT_SELECT.stages.select).toEqual({ kind: true, name: true, plannedEnd: true, actualEnd: true });
+  });
+});
