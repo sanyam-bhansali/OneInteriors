@@ -474,7 +474,7 @@ export function buildFirstQuote(input: QuoteInput, rates: StudioRates): FirstQuo
 
   if (planBeds.length > 0) {
     assumptions.push(
-      `Wardrobes and lofts sized to each bedroom's longer wall on your floor plan (55% of it, between 1,200 and 2,400 mm).`,
+      `Wardrobes and lofts sized to each bedroom's shorter wall on your floor plan (55% of it, between 1,200 and 2,400 mm).`,
     );
   }
 

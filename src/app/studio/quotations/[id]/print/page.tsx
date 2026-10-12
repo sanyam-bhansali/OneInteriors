@@ -210,6 +210,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
         <section className="to">
           <p className="label">Prepared for</p>
           <p className="name">{quote.clientName}</p>
+          {quote.clientPhone ? <p className="muted mono">{quote.clientPhone}</p> : null}
           <p className="muted">{flat}</p>
         </section>
 
@@ -222,6 +223,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
             <table>
               <thead>
                 <tr>
+                  <th className="w-no">#</th>
                   <th className="w-desc">Item</th>
                   <th className="w-spec">Size</th>
                   <th className="w-qty">Qty</th>
@@ -230,8 +232,9 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
                 </tr>
               </thead>
               <tbody>
-                {group.lines.map((l) => (
+                {group.lines.map((l, i) => (
                   <tr key={l.id}>
+                    <td className="mono muted">{i + 1}</td>
                     <td>
                       <span className="item">{l.product}</span>
                       {l.details ? <span className="detail">{l.details}</span> : null}
@@ -258,7 +261,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={4}>{group.room} total</td>
+                  <td colSpan={5}>{group.room} total</td>
                   <td className="mono num strong">
                     {formatINR(group.lines.reduce((a, l) => a + l.amountPaise, 0))}
                   </td>
@@ -433,7 +436,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
         .detail { display: block; color: #5d6266; font-size: 11px; line-height: 1.45; margin-top: 1px; }
         .code { display: inline-block; margin-top: 3px; font-family: var(--font-mono); font-size: 9px;
                 text-transform: uppercase; letter-spacing: .09em; color: #7b8085; }
-        .w-spec { width: 108px; } .w-qty { width: 96px; } .w-rate { width: 92px; } .w-amt { width: 104px; }
+        .w-no { width: 26px; } .w-spec { width: 108px; } .w-qty { width: 96px; } .w-rate { width: 92px; } .w-amt { width: 104px; }
 
         .totals { margin-top: 26px; display: flex; justify-content: flex-end; }
         .totals table { width: 330px; }

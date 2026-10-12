@@ -18,8 +18,9 @@ const ROOMS: PlanRoomSize[] = [
 ];
 
 describe('floor plan sizing (Hauspire rules)', () => {
-  it('sizes a wardrobe to 55% of the longer wall, rounded and kept between 1200 and 2400', () => {
-    expect(wardrobeWidthMm({ widthMm: 3658, depthMm: 4267 })).toBe(2350); // 4267 × .55 = 2347 → 2350
+  it('sizes a wardrobe to 55% of the shorter wall, rounded and kept between 1200 and 2400', () => {
+    /* Shorter, as Hauspire's locked buildQuote.ts has it (12 Oct 2026; was the longer wall). */
+    expect(wardrobeWidthMm({ widthMm: 3658, depthMm: 4267 })).toBe(2000); // 3658 × .55 = 2012 → 2000
     expect(wardrobeWidthMm({ widthMm: 1800, depthMm: 2000 })).toBe(1200);
     expect(wardrobeWidthMm({ widthMm: 5000, depthMm: 6000 })).toBe(2400);
   });
@@ -59,9 +60,9 @@ describe('a first quote from the plan', () => {
   it('sizes each bedroom wardrobe and loft to its wall, and says so', () => {
     const q = buildFirstQuote({ ...base, planRooms: ROOMS }, rates);
     const master = q.lines.find((l) => l.code === 'master_wardrobe')!;
-    expect(master.size).toBe('2350 × 2100 mm');
+    expect(master.size).toBe('2000 × 2100 mm');
     expect(master.standard).toBe(false);
-    expect(q.lines.find((l) => l.code === 'master_loft')!.size).toBe('2350 × 600 mm');
+    expect(q.lines.find((l) => l.code === 'master_loft')!.size).toBe('2000 × 600 mm');
     expect(q.lines.find((l) => l.code === 'second_wardrobe')!.size).toBe(`${wardrobeWidthMm(ROOMS[2]!)} × 2100 mm`);
     expect(q.assumptions.some((a) => a.includes('floor plan'))).toBe(true);
   });
@@ -97,7 +98,7 @@ describe('a studio build from the plan', () => {
     const { lines, notes } = planQuotation({ config: '3 BHK', kitchenRunMm: 4000, bathrooms: 2, study: false, planRooms: ROOMS }, catalogue);
     const wardrobes = lines.filter((l) => /wardrobe/i.test(l.product)).map((l) => `${l.room}: ${l.widthMm}`);
     expect(wardrobes).toEqual([
-      'Master bedroom: 2350',
+      'Master bedroom: 2000',
       `Kids bedroom: ${wardrobeWidthMm(ROOMS[2]!)}`,
       `Guest bedroom: ${wardrobeWidthMm(ROOMS[0]!)}`,
     ]);

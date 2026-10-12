@@ -115,6 +115,24 @@ export interface HomeConfig {
   planRooms?: PlanRoomSize[];
   /** Ask the server to use the client's floor plan. */
   usePlan?: boolean;
+  /**
+   * The master bedroom gets the studio's "King …" product in place of the
+   * "Queen …" one (Hauspire's "Master: King bed"). Absent reads as yes, which
+   * is what every build did before the switch existed.
+   */
+  kingMaster?: boolean;
+  /**
+   * Room-wise false ceiling (Hauspire's "False ceiling (room-wise)"): one line
+   * per room — kitchen, bedrooms, living, study — from the studio's own
+   * "False ceiling (Room)" product, sized to the room on the plan.
+   */
+  falseCeiling?: boolean;
+  /**
+   * A rate for a plain "False ceiling" line, per sq ft, used only when the
+   * studio has no false-ceiling product at all. Typed on the quotation, never
+   * invented: without it, a studio with no such product gets a note instead.
+   */
+  falseCeilingRatePaise?: number | null;
 }
 
 /**
@@ -223,6 +241,9 @@ const ROOM_WORDS: { word: RegExp; room: RegExp }[] = [
   { word: /\bsecond\b/i, room: /^second/i },
   { word: /\bliving\b/i, room: /^living/i },
   { word: /\bstudy\b/i, room: /^study/i },
+  /* "False Ceiling (Kitchen)": without this the kitchen's ceiling was never
+     sized from the plan, and the room-wise toggle skipped it as already done. */
+  { word: /\bkitchen\b/i, room: /^kitchen/i },
 ];
 
 export function namedRoomOf(productName: string): RegExp | null {
@@ -264,9 +285,18 @@ function takesKitchenRun(product: CatalogueProduct): boolean {
   return RUN_WIDTH.some((pattern) => pattern.test(product.name));
 }
 
+/**
+ * The flat size a product is for: its `bhk` rule, else its own name
+ * ("Painting - 3BHK (Emulsion)", "Electricals (2 BHK)") — Hauspire's BHK
+ * variant selection, which reads the size off the product name.
+ */
+export function bhkOfProduct(product: Pick<CatalogueProduct, 'name' | 'rules'>): number | null {
+  return bhkOfRule(product.rules?.bhk) ?? bhkOfRule(product.name.match(/\b([1-6])\s*bhk\b/i)?.[1]);
+}
+
 /** Does this product belong in this flat at all? (`bhk`, `balcony`). */
 function fitsHome(product: CatalogueProduct, home: HomeConfig): boolean {
-  const bhk = bhkOfRule(product.rules?.bhk);
+  const bhk = bhkOfProduct(product);
   if (bhk !== null && bhk !== Number(home.config.charAt(0))) return false;
   if (product.rules?.balcony && home.balcony === false) return false;
   return true;
@@ -285,7 +315,8 @@ function fitsRoom(product: CatalogueProduct, room: PlannedRoom): boolean {
  * for the studio's "King …" product of the same name there, when they have
  * one. Hauspire's first quote does exactly this.
  */
-function kingFor(product: CatalogueProduct, room: PlannedRoom, all: CatalogueProduct[]): CatalogueProduct {
+function kingFor(product: CatalogueProduct, room: PlannedRoom, all: CatalogueProduct[], home: HomeConfig): CatalogueProduct {
+  if (home.kingMaster === false) return product;
   if (!/^master/i.test(room.name) || !/\bqueen\b/i.test(product.name)) return product;
   const want = squash(product.name.replace(/\bqueen\b/i, 'king'));
   return all.find((p) => p.isActive && p.ratePaise > 0 && squash(p.name) === want) ?? product;
@@ -301,6 +332,179 @@ function defaultQtyMilli(product: CatalogueProduct, home: HomeConfig): number | 
   if (product.unit === 'RFT' && product.rules?.rft) return Math.round(product.rules.rft * 1000);
   if (product.unit === 'UNIT' && product.rules?.perBed) return bedroomCount(home.config) * 1000;
   return product.defaultQty != null ? product.defaultQty * 1000 : product.unit === 'UNIT' ? 1000 : null;
+}
+
+/**
+ * Hauspire's standard first-quote selection, by product name
+ * (`firstQuoteDefaults.ts standardPatch`), in our room categories.
+ *
+ * Used only when a studio has ticked nothing as standard: their own ticks
+ * always win. Generalised in two ways — names are matched loosely, so a
+ * studio's own spelling of "Base cabinets" still lands, and the sizes it
+ * carries are defaults a product's own sizes override.
+ */
+export interface StandardPatch {
+  rooms: RoomCategory[];
+  rules?: ProductRules;
+  widthMm?: number;
+  heightMm?: number;
+  qty?: number;
+}
+
+export function standardSelectionFor(name: string, unit: CatalogueProduct['unit']): StandardPatch | null {
+  const s = name.toLowerCase();
+  const bhk = s.match(/([1-4])\s*bhk/)?.[1];
+  const dims = (w: number, h: number) => (unit === 'AREA' ? { widthMm: w, heightMm: h } : {});
+
+  // Kitchen
+  if (/tandem/.test(s) && /(horizon|horizant)/.test(s)) return { rooms: ['Kitchen'], qty: 3 };
+  if (/tandem/.test(s) && /(vertical|bottle)/.test(s)) return { rooms: ['Kitchen'], qty: 1 };
+  if (/tandem/.test(s)) return { rooms: ['Kitchen'], qty: 4 };
+  if (/base cabinet/.test(s)) return { rooms: ['Kitchen'], rules: { useRun: true }, heightMm: 750 };
+  if (/wall cabinet/.test(s) && /(glass|profile shutter)/.test(s)) return { rooms: ['Kitchen'], qty: 1 };
+  if (/wall cabinet/.test(s)) return { rooms: ['Kitchen'], rules: { useRun: true }, heightMm: 600 };
+  if (/\bloft\b/.test(s)) return { rooms: ['Kitchen', 'Bedroom', 'Study'], rules: { useRun: true }, ...dims(1500, 600) };
+  if (/dry balcony/.test(s)) return { rooms: ['Kitchen'], rules: { balcony: true }, ...dims(1200, 600) };
+
+  // Bedroom
+  if (/wardrobe/.test(s) && !/walk/.test(s)) return { rooms: ['Bedroom', 'Study'], ...dims(1500, 2100) };
+  if (/bed/.test(s) && /(hydraulic|storage)/.test(s) && !/king/.test(s)) return { rooms: ['Bedroom'], qty: 1 };
+  if (/headboard/.test(s) && !/king/.test(s)) return { rooms: ['Bedroom'], qty: 1 };
+  if (/dressing/.test(s) && /(base|back)\s*storage/.test(s)) return { rooms: ['Bedroom'], qty: 1 };
+  if (/dressing/.test(s) && /mirror/.test(s)) return { rooms: ['Bedroom'], qty: 1 };
+  if (/workstation/.test(s) && !/overhead/.test(s) && !/fold/.test(s)) return { rooms: ['Bedroom', 'Study'], ...dims(1200, 750) };
+
+  // Living
+  if (/tv unit/.test(s) && !/ledge/.test(s) && !/base/.test(s)) return { rooms: ['Living'], ...dims(1500, 2100) };
+  if (/safety door/.test(s)) return { rooms: ['Living'], qty: 1 };
+  if (/mandir/.test(s)) return { rooms: ['Living'], ...dims(600, 1800) };
+  if (/(console|shoe rack)/.test(s)) return { rooms: ['Living'], ...dims(1200, 900) };
+
+  // Other services
+  if (/vanity/.test(s)) return { rooms: ['Bathroom'], rules: { perBath: true }, ...dims(600, 600) };
+  if (/painting/.test(s) && !/lust/.test(s)) return { rooms: ['Whole home'], ...(bhk ? { rules: { bhk: `${bhk}BHK` } } : {}) };
+  if (/electrical/.test(s)) return { rooms: ['Whole home'], ...(bhk ? { rules: { bhk: `${bhk}BHK` } } : {}) };
+
+  return null;
+}
+
+/**
+ * The catalogue with Hauspire's standard selection applied — only when the
+ * studio has not ticked a single active product as standard. Returns the
+ * catalogue unchanged otherwise, and says which happened.
+ */
+export function withStandardSelection(catalogue: CatalogueProduct[]): { catalogue: CatalogueProduct[]; applied: boolean } {
+  if (catalogue.some((p) => p.isActive && p.inStandardBuild)) return { catalogue, applied: false };
+  let applied = false;
+  const out = catalogue.map((p) => {
+    if (!p.isActive) return p;
+    const patch = standardSelectionFor(p.name, p.unit);
+    if (!patch) return p;
+    applied = true;
+    return {
+      ...p,
+      inStandardBuild: true,
+      rooms: patch.rooms,
+      rules: { ...(patch.rules ?? {}), ...(p.rules ?? {}) },
+      defaultWidthMm: p.defaultWidthMm ?? patch.widthMm ?? null,
+      defaultHeightMm: p.defaultHeightMm ?? patch.heightMm ?? null,
+      defaultQty: p.defaultQty ?? patch.qty ?? null,
+    };
+  });
+  return { catalogue: out, applied };
+}
+
+/**
+ * The order lines sit in within a room, as Hauspire's real quotations list
+ * them (`buildQuote.ts ITEM_ORDER`): base cabinets before tandems before wall
+ * cabinets before the loft; wardrobe before dressing before bed; TV unit
+ * before console before mandir. A product the list does not know keeps the
+ * studio's own order, after the known ones.
+ */
+const ITEM_ORDER: ((s: string) => boolean)[] = [
+  // Kitchen
+  (s) => /base cabinet/.test(s) && !/tandem/.test(s),
+  (s) => /tandem/.test(s) && /horiz/.test(s),
+  (s) => /tandem/.test(s) && /(vertical|bottle)/.test(s),
+  (s) => /tandem/.test(s),
+  (s) => /wall cabinet/.test(s) && !/glass|profile shutter/.test(s),
+  (s) => /wall cabinet/.test(s) && /(glass|profile shutter)/.test(s),
+  (s) => /\bloft\b/.test(s),
+  (s) => /tall pantry/.test(s),
+  (s) => /appliance/.test(s),
+  (s) => /crockery/.test(s),
+  (s) => /breakfast/.test(s),
+  (s) => /platform/.test(s),
+  (s) => /dry balcony/.test(s),
+  // Bedroom
+  (s) => /wardrobe/.test(s) && !/walk/.test(s),
+  (s) => /walk.?in/.test(s) && /wardrobe/.test(s),
+  (s) => /dressing/.test(s) && /(base|back)\s*storage/.test(s),
+  (s) => /dressing/.test(s) && /mirror/.test(s),
+  (s) => /bed/.test(s) && /(hydraulic|storage)/.test(s),
+  (s) => /headboard/.test(s),
+  (s) => /side table/.test(s),
+  (s) => /workstation/.test(s) && !/overhead/.test(s),
+  (s) => /workstation/.test(s) && /overhead/.test(s),
+  (s) => /bay window/.test(s),
+  // Living
+  (s) => /tv unit/.test(s) && !/base/.test(s),
+  (s) => /tv unit/.test(s),
+  (s) => /(console|shoe rack)/.test(s),
+  (s) => /safety door/.test(s),
+  (s) => /mandir/.test(s),
+  (s) => /foyer/.test(s),
+  // Other services
+  (s) => /vanity/.test(s),
+  (s) => /painting/.test(s),
+  (s) => /electrical/.test(s),
+  (s) => /windows/.test(s),
+  (s) => /civil|plumbing/.test(s),
+  (s) => /false ceiling/.test(s),
+];
+
+export function itemRank(name: string): number {
+  const s = name.toLowerCase();
+  const i = ITEM_ORDER.findIndex((t) => t(s));
+  return i < 0 ? ITEM_ORDER.length : i;
+}
+
+/** The rooms that take a false ceiling: not bathrooms, not the whole-home line. */
+function takesCeiling(room: PlannedRoom): boolean {
+  return room.category !== 'Bathroom' && room.category !== 'Whole home';
+}
+
+/** A room's key for matching "False Ceiling (Kids Bedroom)" to "Kids bedroom". */
+function ceilingKey(room: PlannedRoom): string {
+  if (room.category === 'Study') return 'study';
+  if (room.category === 'Living') return 'living';
+  if (room.category === 'Kitchen') return 'kitchen';
+  return room.name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+const isCeiling = (p: Pick<CatalogueProduct, 'name'>) => /false\s*ceiling/i.test(p.name);
+
+/**
+ * The studio's false-ceiling product for a room: the room-named one
+ * ("False Ceiling (Master Bedroom)"), the plainest name first, skipping
+ * balcony / bathroom / utility variants; else a plain "False ceiling" with
+ * no room in its name. Null when they have neither.
+ */
+export function ceilingProductFor(room: PlannedRoom, catalogue: CatalogueProduct[]): CatalogueProduct | null {
+  const ceilings = catalogue.filter((p) => p.isActive && isCeiling(p));
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const key = ceilingKey(room);
+  const named = ceilings
+    .filter((p) => {
+      const inner = norm(p.name).replace(/^.*false ceiling/, '').trim();
+      return inner.includes(key) && !/balcony|bathroom|toilet|utility/.test(inner);
+    })
+    .sort((a, b) => a.name.length - b.name.length);
+  if (named[0]) return named[0];
+  const plain = ceilings
+    .filter((p) => !/\(/.test(p.name) || /per room/i.test(p.name))
+    .sort((a, b) => a.name.length - b.name.length);
+  return plain[0] ?? null;
 }
 
 export interface PlanResult {
@@ -331,11 +535,14 @@ export interface PlanResult {
  *   would silently produce a shorter quotation than the studio's own
  *   specification, and short is the direction that loses money.
  */
-export function planQuotation(home: HomeConfig, catalogue: CatalogueProduct[]): PlanResult {
+export function planQuotation(home: HomeConfig, studioCatalogue: CatalogueProduct[]): PlanResult {
+  const standard = withStandardSelection(studioCatalogue);
+  const catalogue = standard.catalogue;
+  /* Hauspire's order within a room, the studio's own order after that. */
   const usable = catalogue
     .filter((p) => p.isActive && p.inStandardBuild && fitsHome(p, home))
     .slice()
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+    .sort((a, b) => itemRank(a.name) - itemRank(b.name) || a.sortOrder - b.sortOrder);
 
   if (usable.length === 0) {
     return {
@@ -349,6 +556,8 @@ export function planQuotation(home: HomeConfig, catalogue: CatalogueProduct[]): 
   const lines: PlannedLine[] = [];
   const planned = roomsFor(home);
   let sizedFromPlan = 0;
+  let ceilingsFromPlan = 0;
+  let noCeilingProduct = false;
 
   for (const room of planned) {
     /* The plan room for this one: bedrooms in order (master first), living,
@@ -356,9 +565,9 @@ export function planQuotation(home: HomeConfig, catalogue: CatalogueProduct[]): 
     const bedIndex = room.category === 'Bedroom' ? planned.filter((r) => r.category === 'Bedroom').indexOf(room) : null;
     const fromPlan = home.planRooms?.length ? planRoomFor(room.name, bedIndex, home.planRooms) : null;
 
-    for (const standard of usable) {
-      if (!fitsRoom(standard, room)) continue;
-      const product = kingFor(standard, room, catalogue);
+    for (const standardProduct of usable) {
+      if (!fitsRoom(standardProduct, room)) continue;
+      const product = kingFor(standardProduct, room, catalogue, home);
 
       /* Measured if they gave it, the standard for this configuration if not.
          A base run with no width at all would price at zero and look like a
@@ -376,8 +585,15 @@ export function planQuotation(home: HomeConfig, catalogue: CatalogueProduct[]): 
         fromPlan && runWidth === null && product.unit === 'AREA' && room.category === 'Bedroom' && /wardrobe|loft/i.test(product.name)
           ? wardrobeWidthMm(fromPlan)
           : null;
+      /* In the kitchen, only the ceiling takes the floor area: a "Backsplash
+         (Kitchen)" priced per sq ft is wall, not floor. */
       const planSqft =
-        fromPlan && product.unit === 'SQFT' && namedRoomOf(product.name) !== null ? fromPlan.sqft : null;
+        fromPlan &&
+        product.unit === 'SQFT' &&
+        namedRoomOf(product.name) !== null &&
+        (room.category !== 'Kitchen' || isCeiling(product))
+          ? fromPlan.sqft
+          : null;
       if (planWidth !== null || planSqft !== null) sizedFromPlan += 1;
 
       lines.push({
@@ -392,13 +608,75 @@ export function planQuotation(home: HomeConfig, catalogue: CatalogueProduct[]): 
         ratePaise: product.ratePaise,
       });
     }
+
+    /* Room-wise false ceiling (Hauspire's toggle): the studio's product for
+       this room, sized to the room on the plan — area for sq ft, the room's
+       two sides for a W × H product, one for a per-room price. Skipped where
+       the standard build already put a ceiling in this room. */
+    if (home.falseCeiling && takesCeiling(room) && !lines.some((l) => l.room === room.name && isCeiling({ name: l.product }))) {
+      const ceilingRoom = home.planRooms?.length ? planRoomFor(room.name, bedIndex, home.planRooms) : null;
+      const fc = ceilingProductFor(room, catalogue);
+      if (fc) {
+        const sqft = ceilingRoom?.sqft ?? null;
+        lines.push({
+          room: room.name,
+          product: fc.name,
+          code: fc.code,
+          unit: fc.unit,
+          details: fc.details,
+          widthMm: fc.unit === 'AREA' ? (ceilingRoom?.widthMm ?? fc.defaultWidthMm) : null,
+          heightMm: fc.unit === 'AREA' ? (ceilingRoom?.depthMm ?? fc.defaultHeightMm) : null,
+          qtyMilli:
+            fc.unit === 'AREA'
+              ? null
+              : fc.unit === 'SQFT' && sqft !== null
+                ? sqft * 1000
+                : defaultQtyMilli(fc, home),
+          ratePaise: fc.ratePaise,
+        });
+        if (ceilingRoom) ceilingsFromPlan += 1;
+      } else if (home.falseCeilingRatePaise && home.falseCeilingRatePaise > 0) {
+        lines.push({
+          room: room.name,
+          product: 'False ceiling',
+          code: 'ONSITE',
+          unit: 'SQFT',
+          details: 'Single-layer false ceiling with concealed wiring and panel lights. Priced by room area.',
+          widthMm: null,
+          heightMm: null,
+          qtyMilli: ceilingRoom ? ceilingRoom.sqft * 1000 : null,
+          ratePaise: home.falseCeilingRatePaise,
+        });
+        if (ceilingRoom) ceilingsFromPlan += 1;
+      } else {
+        noCeilingProduct = true;
+      }
+    }
   }
 
   const notes: string[] = [];
 
+  if (standard.applied) {
+    notes.push(
+      'Nothing in your product list is ticked as standard, so the standard selection was used by product name (kitchen units on the run, a wardrobe and bed per bedroom, a vanity per bathroom, painting and electricals for the flat size). Tick your own in Products and the build follows them instead.',
+    );
+  }
+
+  if (ceilingsFromPlan > 0) {
+    notes.push(
+      `${ceilingsFromPlan} false-ceiling ${ceilingsFromPlan === 1 ? 'line is' : 'lines are'} sized to the room on the floor plan.`,
+    );
+  }
+
+  if (noCeilingProduct) {
+    notes.push(
+      'False ceiling is on, but your product list has no false-ceiling product. Add one (for example "False Ceiling (Master Bedroom)", per sq ft), or type a rate per sq ft on the quotation and rebuild.',
+    );
+  }
+
   if (sizedFromPlan > 0) {
     notes.push(
-      `${sizedFromPlan} ${sizedFromPlan === 1 ? 'line is' : 'lines are'} sized from the client's floor plan — wardrobes and lofts to 55% of each bedroom's longer wall, ceilings to each room's area. Check them against your site measurement.`,
+      `${sizedFromPlan} ${sizedFromPlan === 1 ? 'line is' : 'lines are'} sized from the client's floor plan — wardrobes and lofts to 55% of each bedroom's shorter wall, ceilings to each room's area. Check them against your site measurement.`,
     );
   }
 

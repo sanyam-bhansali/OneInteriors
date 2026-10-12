@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { formatINR } from '@/lib/money';
-import { computeTotals, isUnpriced, lineAmount } from '@/modules/studio-quote/pricing';
+import { computeTotals, isUnpriced, keptFeeBps, lineAmount } from '@/modules/studio-quote/pricing';
 import { compareToIssued, byRoom, type ComparableLine } from '@/modules/studio-quote/revision';
 import type { QuoteRow } from '@/modules/studio-quote/quotes';
 import type { ProductRow } from '@/modules/studio-quote/store';
@@ -57,6 +57,8 @@ export function QuoteBuilder({
   showMark,
   markText,
   logoUrl,
+  planReader,
+  mayAddProducts = false,
 }: {
   quote: QuoteRow;
   products: ProductRow[];
@@ -73,6 +75,8 @@ export function QuoteBuilder({
   showMark: boolean;
   markText: string;
   logoUrl: string | null;
+  planReader?: { canRead: boolean; leadHasPlan: boolean };
+  mayAddProducts?: boolean;
 }) {
   const [lines, setLines] = useState<EditableLine[]>(() => quote.lines.map(toEditable));
   const [dirty, setDirty] = useState(false);
@@ -106,7 +110,7 @@ export function QuoteBuilder({
 
   /* The terms as figures. A half-typed percentage keeps the last good one on
      screen rather than flashing the total to zero. */
-  const termsIn = useMemo(() => termsInput(terms), [terms]);
+  const termsIn = useMemo(() => termsInput(terms, quote.feeBps), [terms, quote.feeBps]);
   const live = useMemo(
     () => ({
       ...quote,
@@ -278,6 +282,22 @@ export function QuoteBuilder({
     });
   }, []);
 
+  /**
+   * Move a whole room up or down (Hauspire's "Room order"): its lines move
+   * together, every other room keeps its place, and the document follows.
+   */
+  const moveRoom = useCallback((room: string, by: -1 | 1) => {
+    setLines((current) => {
+      const order: string[] = [];
+      for (const l of current) if (!order.includes(l.room)) order.push(l.room);
+      const at = order.indexOf(room);
+      const to = at + by;
+      if (at < 0 || to < 0 || to >= order.length) return current;
+      [order[at], order[to]] = [order[to]!, order[at]!];
+      return order.flatMap((r) => current.filter((l) => l.room === r));
+    });
+  }, []);
+
   /** Rename a room on every line in it. Renaming onto an existing room merges them. */
   const renameRoom = useCallback((from: string, to: string) => {
     setLines((current) => current.map((l) => (l.room === from ? { ...l, room: to } : l)));
@@ -356,7 +376,7 @@ export function QuoteBuilder({
     <div className="grid gap-5 lg:grid-cols-[21rem_minmax(0,1fr)]">
       <aside className="flex flex-col gap-4 lg:sticky lg:top-5 lg:max-h-[calc(100dvh-2.5rem)] lg:self-start lg:overflow-y-auto">
         <ClientPanel quote={quote} />
-        <ConfigurePanel quote={quote} hasLines={lines.length > 0} />
+        <ConfigurePanel quote={quote} hasLines={lines.length > 0} planReader={planReader} />
         {quote.planRooms.length > 0 ? (
           <section className="s-card p-4">
             <h2 className="s-label m-0 mb-2">Their floor plan</h2>
@@ -447,10 +467,14 @@ export function QuoteBuilder({
               </div>
             ) : null}
 
-            {roomOrder.map((room) => (
+            {roomOrder.map((room, i) => (
               <RoomSection
                 key={room}
                 room={room}
+                onMoveRoom={moveRoom}
+                firstRoom={i === 0}
+                lastRoom={i === roomOrder.length - 1}
+                mayAddProducts={mayAddProducts}
                 lines={priced.filter((l) => l.room === room)}
                 onUpdate={update}
                 onRemove={remove}
@@ -581,7 +605,7 @@ function toEditable(line: QuoteRow['lines'][number]): EditableLine {
 
 function termsDraftOf(quote: QuoteRow): TermsDraft {
   return {
-    feePct: String(quote.feeBps / 100),
+    feeOn: quote.feeBps > 0,
     discountPct: String(quote.discountBps / 100),
     gstOn: quote.gstBps > 0,
     onSpotRupees: quote.onSpotPaise > 0 ? String(quote.onSpotPaise / 100) : '',
@@ -598,12 +622,14 @@ function isoDay(d: Date | string): string {
 }
 
 /** The draft as the server takes it, or null when a figure is not a figure. */
-function termsInput(t: TermsDraft): QuoteTermsInput | null {
-  const feeBps = pctToBps(t.feePct);
+function termsInput(t: TermsDraft, storedFeeBps: number): QuoteTermsInput | null {
+  /* The quotation's own fee while the box stays on (an older 10% stays
+     10%); 7% only when a fee is turned on from off. */
+  const feeBps = keptFeeBps(storedFeeBps, t.feeOn);
   const discountBps = pctToBps(t.discountPct);
   const onSpotPaise = rupeesToPaiseText(t.onSpotRupees);
   const bookingAdvancePaise = rupeesToPaiseText(t.advanceRupees);
-  if (feeBps === null || discountBps === null || onSpotPaise === null || bookingAdvancePaise === null) return null;
+  if (discountBps === null || onSpotPaise === null || bookingAdvancePaise === null) return null;
   return {
     feeBps,
     discountBps,

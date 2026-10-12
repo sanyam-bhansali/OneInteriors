@@ -21,7 +21,7 @@ import {
 } from '@/modules/studio-quote/configure';
 import type { QuoteRow } from '@/modules/studio-quote/quotes';
 import type { ProductRow } from '@/modules/studio-quote/store';
-import { applyConfigAction, clearLinesAction, type BuildState } from '../actions';
+import { addLineToProductsAction, applyConfigAction, clearLinesAction, readRoomsForQuoteAction, type BuildState } from '../actions';
 import { Combobox } from './Combobox';
 
 const field =
@@ -85,7 +85,16 @@ export type PricedLine = EditableLine & { amountPaise: number };
  * with a confirmation attached, not a keystroke, so the round trip costs
  * nothing anybody notices.
  */
-export function ConfigurePanel({ quote, hasLines }: { quote: QuoteRow; hasLines: boolean }) {
+export function ConfigurePanel({
+  quote,
+  hasLines,
+  planReader,
+}: {
+  quote: QuoteRow;
+  hasLines: boolean;
+  /** Floor-plan reading: on for this deployment, and whether the lead has a plan attached. */
+  planReader?: { canRead: boolean; leadHasPlan: boolean };
+}) {
   const [config, setConfig] = useState<ConfigName>(
     isConfigName(quote.config) ? quote.config : '2 BHK',
   );
@@ -97,6 +106,11 @@ export function ConfigurePanel({ quote, hasLines }: { quote: QuoteRow; hasLines:
   const [balcony, setBalcony] = useState(true);
   const hasPlan = quote.planRooms.length > 0;
   const [usePlan, setUsePlan] = useState(hasPlan);
+  const [king, setKing] = useState(true);
+  const [ceiling, setCeiling] = useState(hasPlan);
+  const [ceilingRate, setCeilingRate] = useState('');
+  const [reading, startReading] = useTransition();
+  const [readSaid, setReadSaid] = useState<{ ok: boolean; message?: string; error?: string } | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [result, setResult] = useState<BuildState>(null);
   const [pending, start] = useTransition();
@@ -122,6 +136,12 @@ export function ConfigurePanel({ quote, hasLines }: { quote: QuoteRow; hasLines:
           study,
           balcony,
           usePlan: hasPlan && usePlan,
+          kingMaster: king,
+          falseCeiling: ceiling,
+          falseCeilingRatePaise: (() => {
+            const r = Number(ceilingRate.replace(/[,₹\s]/g, ''));
+            return ceilingRate.trim() && Number.isFinite(r) && r > 0 ? Math.round(r * 100) : null;
+          })(),
         }),
       );
     });
@@ -200,6 +220,81 @@ export function ConfigurePanel({ quote, hasLines }: { quote: QuoteRow; hasLines:
             />
             Size from the client&rsquo;s floor plan
           </label>
+        ) : null}
+
+        <label className="flex items-center gap-2 text-[13.5px]">
+          <input
+            type="checkbox"
+            checked={king}
+            onChange={(e) => setKing(e.target.checked)}
+            className="h-[16px] w-[16px] accent-[var(--s-accent)]"
+          />
+          Master bedroom: king bed
+        </label>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="flex items-center gap-2 text-[13.5px]">
+            <input
+              type="checkbox"
+              checked={ceiling}
+              onChange={(e) => setCeiling(e.target.checked)}
+              className="h-[16px] w-[16px] accent-[var(--s-accent)]"
+            />
+            False ceiling, room by room
+          </label>
+          {ceiling ? (
+            <label className="ml-6 flex items-center gap-2 text-[12.5px] text-[var(--s-ink-2)]">
+              <span>If you have no false-ceiling product: ₹ per sq ft</span>
+              <input
+                value={ceilingRate}
+                onChange={(e) => setCeilingRate(e.target.value)}
+                inputMode="numeric"
+                placeholder="—"
+                aria-label="False ceiling rate per sq ft"
+                className={`${field} s-num w-[5rem] text-right`}
+              />
+            </label>
+          ) : null}
+        </div>
+
+        {quote.clientId && planReader ? (
+          <div className="flex flex-col gap-1">
+            {planReader.canRead ? (
+              planReader.leadHasPlan ? (
+                <button
+                  type="button"
+                  disabled={reading}
+                  onClick={() => {
+                    setReadSaid(null);
+                    startReading(async () => {
+                      try {
+                        const r = await readRoomsForQuoteAction(quote.id);
+                        setReadSaid(r.ok ? { ok: true, message: r.message } : r);
+                        if (r.ok) {
+                          setUsePlan(true);
+                          setCeiling(true);
+                        }
+                      } catch {
+                        setReadSaid({ ok: false, error: 'That did not go through. Try again.' });
+                      }
+                    });
+                  }}
+                  className={quiet}
+                >
+                  {reading ? 'Reading the plan…' : hasPlan ? 'Read rooms again from the lead’s floor plan' : 'Read rooms from the lead’s floor plan'}
+                </button>
+              ) : (
+                <p className="m-0 text-[12px] text-[var(--s-ink-3)]">Attach the floor plan on the lead page and its rooms can size this quotation.</p>
+              )
+            ) : (
+              <p className="m-0 text-[12px] text-[var(--s-ink-3)]">Floor-plan reading isn&rsquo;t switched on yet.</p>
+            )}
+            {readSaid ? (
+              <p role={readSaid.ok ? 'status' : 'alert'} className={`m-0 text-[12.5px] ${readSaid.ok ? 'text-[var(--s-good)]' : 'text-[var(--s-bad)]'}`}>
+                {readSaid.ok ? readSaid.message : readSaid.error}
+              </p>
+            ) : null}
+          </div>
         ) : null}
 
         <button
@@ -328,6 +423,10 @@ export function RoomSection({
   onSwap,
   onReorder,
   onRenameRoom,
+  onMoveRoom,
+  firstRoom,
+  lastRoom,
+  mayAddProducts,
 }: {
   room: string;
   lines: PricedLine[];
@@ -343,6 +442,12 @@ export function RoomSection({
   /** Drag and drop: put `from` where `to` is, within this room. */
   onReorder: (from: string, to: string) => void;
   onRenameRoom: (from: string, to: string) => void;
+  /** Move the whole room up or down the quotation (Hauspire's room order). */
+  onMoveRoom?: (room: string, by: -1 | 1) => void;
+  firstRoom?: boolean;
+  lastRoom?: boolean;
+  /** Owner and PM: a typed product not in the list can be added to it. */
+  mayAddProducts?: boolean;
 }) {
   const total = lines.reduce((a, l) => a + l.amountPaise, 0);
   const [name, setName] = useState(room);
@@ -373,6 +478,30 @@ export function RoomSection({
         <span className="s-num text-[12.5px] text-white/70">
           {lines.length} {lines.length === 1 ? 'line' : 'lines'}
         </span>
+        {onMoveRoom ? (
+          <span className="flex items-center gap-0.5 self-center">
+            <button
+              type="button"
+              disabled={firstRoom}
+              onClick={() => onMoveRoom(room, -1)}
+              title="Move this room up"
+              aria-label={`Move ${room} up`}
+              className="rounded-[4px] p-0.5 text-white/80 hover:bg-white/15 disabled:opacity-30"
+            >
+              <ChevronUp size={14} strokeWidth={2.5} absoluteStrokeWidth />
+            </button>
+            <button
+              type="button"
+              disabled={lastRoom}
+              onClick={() => onMoveRoom(room, 1)}
+              title="Move this room down"
+              aria-label={`Move ${room} down`}
+              className="rounded-[4px] p-0.5 text-white/80 hover:bg-white/15 disabled:opacity-30"
+            >
+              <ChevronDown size={14} strokeWidth={2.5} absoluteStrokeWidth />
+            </button>
+          </span>
+        ) : null}
       </div>
 
       <div className="overflow-x-auto">
@@ -406,6 +535,7 @@ export function RoomSection({
                 products={products}
                 onSwap={onSwap}
                 onReorder={onReorder}
+                mayAddProducts={mayAddProducts === true}
               />
             ))}
           </tbody>
@@ -471,6 +601,7 @@ function LineRow({
   products,
   onSwap,
   onReorder,
+  mayAddProducts,
 }: {
   n: number;
   line: PricedLine;
@@ -483,9 +614,14 @@ function LineRow({
   products: ProductRow[];
   onSwap: (key: string, product: ProductRow) => void;
   onReorder: (from: string, to: string) => void;
+  mayAddProducts: boolean;
 }) {
   const [over, setOver] = useState(false);
   const area = line.unit === 'AREA';
+  const [adding, startAdding] = useTransition();
+  const [added, setAdded] = useState<string | null>(null);
+  const squash = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const known = line.product.trim().length < 2 || products.some((p) => squash(p.name) === squash(line.product));
   const overridden = line.agreedPaise != null;
 
   const whole = (raw: string): number | null => {
@@ -575,6 +711,40 @@ function LineRow({
             agreed
           </span>
         ) : null}
+        {!known && added === null ? (
+          <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[11.5px] text-[var(--s-ink-3)]">
+            <span className="s-tag" title="Typed on this quotation; not one of your products">not in your products</span>
+            {mayAddProducts ? (
+              <button
+                type="button"
+                disabled={adding}
+                onClick={() =>
+                  startAdding(async () => {
+                    try {
+                      const r = await addLineToProductsAction({
+                        name: line.product.trim(),
+                        code: line.code,
+                        unit: line.unit,
+                        rateRupees: line.ratePaise / 100,
+                        room: line.room,
+                        details: line.details,
+                      });
+                      setAdded(r.ok ? 'Added to your products.' : 'error' in r ? r.error : 'That did not save.');
+                    } catch {
+                      setAdded('That did not save.');
+                    }
+                  })
+                }
+                className="font-medium text-[var(--s-accent)] disabled:opacity-40"
+              >
+                {adding ? 'Adding…' : 'Add to products'}
+              </button>
+            ) : (
+              <span>ask your studio owner to add it</span>
+            )}
+          </span>
+        ) : null}
+        {added ? <span className="mt-1 block text-[11.5px] text-[var(--s-ink-2)]">{added}</span> : null}
       </td>
 
       <td className="px-3 py-2">

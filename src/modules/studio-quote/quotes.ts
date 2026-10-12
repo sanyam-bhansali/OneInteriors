@@ -18,7 +18,9 @@ import { fromDb, toDb, type Paise } from '@/lib/money';
 import { myBranding } from './store';
 import {
   computeTotals,
+  FEE_BPS,
   GST_BPS,
+  keptFeeBps,
   lineAmount,
   type QuoteLineInput,
   type QuoteTerms,
@@ -37,6 +39,7 @@ import { leadInScope, myLeadScope, type LeadScope } from '@/modules/studio/lead-
 import { can } from '@/modules/studio/roles';
 import { record as recordLeadEvent } from '@/modules/studio-practice/events';
 import { issueRevision } from '@/modules/studio-sales/revisions';
+import { quoteWriteRefusal } from './write-rules';
 
 export type QuoteStatusName = 'DRAFT' | 'ISSUED' | 'ACCEPTED' | 'DECLINED';
 export type QuoteStageName = 'SALES' | 'DESIGN';
@@ -221,7 +224,7 @@ export async function getQuote(id: string): Promise<QuoteRow | null> {
       where: { ...qs?.where, id, studioId },
       include: { lines: { orderBy: { sortOrder: 'asc' } }, studio: { select: { paymentPhases: true } } },
     });
-    const planRooms = row ? await planRoomsOfBrief(row.briefId, row.clientId, studioId) : [];
+    const planRooms = row ? await planRoomsOfBrief(row.briefId, row.clientId, studioId, row.id) : [];
     if (!row) return null;
 
     return {
@@ -443,8 +446,9 @@ export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
             ? { clientId: lead.id }
             : {}),
         // Snapshotted at creation. Changing the defaults in Settings later must
-        // never rewrite a quotation already sent to a client.
-        feeBps: branding.feeBps,
+        // never rewrite a quotation already sent to a client. The fee is 7%
+        // for every studio (owner, 12 Oct 2026), whatever an older setting says.
+        feeBps: FEE_BPS,
         discountBps: branding.discountBps,
         bookingAdvancePaise: toDb(branding.bookingAdvancePaise),
         gstBps: branding.gstBps,
@@ -498,10 +502,12 @@ export interface QuoteTermsInput {
  * starts from; this is the deal on this one.
  */
 export async function saveQuoteTerms(quoteId: string, input: QuoteTermsInput): Promise<ActionResult> {
-  if (!(await ownedQuote(quoteId))) return { ok: false, error: 'That quotation is not yours.' };
+  const writable = await writableQuote(quoteId);
+  if (!writable.ok) return writable;
 
   const pct = (bps: number) => Number.isInteger(bps) && bps >= 0 && bps <= 5000;
-  if (!pct(input.feeBps)) return { ok: false, error: 'A professional fee between 0% and 50%, please.' };
+  /* The fee is 7% or off — any other figure from a browser is read as "on". */
+  if (!Number.isInteger(input.feeBps) || input.feeBps < 0) return { ok: false, error: 'The professional fee is 7%, on or off.' };
   if (!pct(input.discountBps)) return { ok: false, error: 'A discount between 0% and 50%, please.' };
   if (!Number.isInteger(input.onSpotPaise) || input.onSpotPaise < 0 || input.onSpotPaise >= 1e11) {
     return { ok: false, error: 'That discount is not an amount.' };
@@ -520,7 +526,10 @@ export async function saveQuoteTerms(quoteId: string, input: QuoteTermsInput): P
     await prisma.studioQuote.update({
       where: { id: quoteId },
       data: {
-        feeBps: input.feeBps,
+        /* On or off only: the quotation keeps its own fee while it stays on
+           (one made at 10% before the fee was fixed stays 10%); 7% only
+           when a fee is turned on from off. */
+        feeBps: keptFeeBps(writable.feeBps, input.feeBps > 0),
         discountBps: input.discountBps,
         gstBps: input.gstOn ? GST_BPS : 0,
         onSpotPaise: toDb(input.onSpotPaise),
@@ -720,11 +729,21 @@ export async function quotesToCompare(currentId: string, baseId?: string): Promi
 }
 
 /**
- * The client's read floor plan: their brief's, or — for the studio's own
- * lead (Studio OS Phase 1) — the newest floor plan somebody pressed "Read
- * rooms" on, on the lead page. Never read automatically.
+ * The client's read floor plan: their brief's; for the studio's own lead,
+ * the plan this quotation was built from or read against
+ * (`StudioQuotePlan`, floor plan → first quotation, 12 Oct 2026); else the
+ * newest read floor plan on the lead.
  */
-async function planReadingOf(q: { briefId: string | null; clientId?: string | null; studioId?: string }): Promise<unknown> {
+async function planReadingOf(q: { briefId: string | null; clientId?: string | null; studioId?: string; quoteId?: string }): Promise<unknown> {
+  if (q.quoteId && q.studioId && q.clientId) {
+    const link = await prisma.studioQuotePlan.findFirst({ where: { quoteId: q.quoteId, studioId: q.studioId }, select: { fileId: true } }).catch(() => null);
+    if (link) {
+      const f = await prisma.studioClientFile
+        .findFirst({ where: { id: link.fileId, studioId: q.studioId, clientId: q.clientId }, select: { reading: true } })
+        .catch(() => null);
+      if (f?.reading) return f.reading;
+    }
+  }
   if (q.briefId) {
     const b = await prisma.brief.findUnique({ where: { id: q.briefId }, select: { floorPlanReading: true } }).catch(() => null);
     if (b?.floorPlanReading) return b.floorPlanReading;
@@ -743,12 +762,12 @@ async function planReadingOf(q: { briefId: string | null; clientId?: string | nu
 }
 
 /** The rooms from the client's read floor plan; empty without one. */
-async function planRoomsOfBrief(briefId: string | null, clientId?: string | null, studioId?: string): Promise<PlanRoomSize[]> {
-  return planUseFrom(await planReadingOf({ briefId, clientId, studioId }))?.rooms ?? [];
+async function planRoomsOfBrief(briefId: string | null, clientId?: string | null, studioId?: string, quoteId?: string): Promise<PlanRoomSize[]> {
+  return planUseFrom(await planReadingOf({ briefId, clientId, studioId, quoteId }))?.rooms ?? [];
 }
 
-async function planRunOfBrief(briefId: string | null, clientId?: string | null, studioId?: string): Promise<number | null> {
-  return planUseFrom(await planReadingOf({ briefId, clientId, studioId }))?.kitchenRunMm ?? null;
+async function planRunOfBrief(briefId: string | null, clientId?: string | null, studioId?: string, quoteId?: string): Promise<number | null> {
+  return planUseFrom(await planReadingOf({ briefId, clientId, studioId, quoteId }))?.kitchenRunMm ?? null;
 }
 
 /** Ownership check, reused by every write below. */
@@ -762,6 +781,26 @@ async function ownedQuote(quoteId: string): Promise<string | null> {
     select: { id: true },
   });
   return row?.id ?? null;
+}
+
+/**
+ * Ownership, and that the quotation may still be changed: no live
+ * (non-cancelled) project runs on it (`write-rules.ts`). Every write to
+ * lines, terms or the standard build goes through this.
+ */
+async function writableQuote(quoteId: string): Promise<{ ok: true; id: string; feeBps: number; status: string } | { ok: false; error: string }> {
+  const qs = await quoteScope();
+  const studioId = qs?.studioId ?? null;
+  if (!studioId) return { ok: false, error: 'That quotation is not yours.' };
+  const row = await prisma.studioQuote.findFirst({
+    where: { ...qs?.where, id: quoteId, studioId },
+    select: { id: true, feeBps: true, status: true },
+  });
+  if (!row) return { ok: false, error: 'That quotation is not yours.' };
+  const live = await prisma.homeProject.findFirst({ where: { signedQuoteId: row.id, cancelledAt: null }, select: { id: true } });
+  const refusal = quoteWriteRefusal({ liveProject: live !== null });
+  if (refusal) return { ok: false, error: refusal };
+  return { ok: true, id: row.id, feeBps: row.feeBps, status: row.status };
 }
 
 export async function setQuoteStatus(
@@ -971,7 +1010,8 @@ export async function saveQuoteLines(
   quoteId: string,
   rawLines: SaveLineInput[],
 ): Promise<ActionResult> {
-  if (!(await ownedQuote(quoteId))) return { ok: false, error: 'That quotation is not yours.' };
+  const writable = await writableQuote(quoteId);
+  if (!writable.ok) return writable;
 
   if (rawLines.length > 500) {
     return { ok: false, error: 'That is more lines than a quotation can hold.' };
@@ -1075,18 +1115,25 @@ export async function applyConfiguration(input: ApplyConfigInput): Promise<Apply
   const qs = await quoteScope();
   const studioId = qs?.studioId ?? null;
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
-  if (!(await ownedQuote(input.quoteId))) {
-    return { ok: false, error: 'That quotation is not yours.' };
-  }
+  const writable = await writableQuote(input.quoteId);
+  if (!writable.ok) return writable;
 
   /* The plan comes from the client's brief, never from the browser. */
-  const { planRooms: _ignored, ...home } = input.home;
+  const { planRooms: _ignored, ...raw } = input.home;
+  const ceilingRate = raw.falseCeilingRatePaise;
+  const home: HomeConfig = {
+    ...raw,
+    kingMaster: raw.kingMaster !== false,
+    falseCeiling: raw.falseCeiling === true,
+    falseCeilingRatePaise:
+      typeof ceilingRate === 'number' && Number.isInteger(ceilingRate) && ceilingRate > 0 && ceilingRate < 1e8 ? ceilingRate : null,
+  };
   if (home.usePlan) {
     const q = await prisma.studioQuote.findFirst({ where: { id: input.quoteId, studioId }, select: { briefId: true, clientId: true } });
-    const rooms = await planRoomsOfBrief(q?.briefId ?? null, q?.clientId, studioId);
+    const rooms = await planRoomsOfBrief(q?.briefId ?? null, q?.clientId, studioId, input.quoteId);
     if (rooms.length > 0) {
       (home as HomeConfig).planRooms = rooms;
-      if (home.kitchenRunMm == null) home.kitchenRunMm = (await planRunOfBrief(q?.briefId ?? null, q?.clientId, studioId)) ?? null;
+      if (home.kitchenRunMm == null) home.kitchenRunMm = (await planRunOfBrief(q?.briefId ?? null, q?.clientId, studioId, input.quoteId)) ?? null;
     }
   }
   input = { ...input, home };
@@ -1165,7 +1212,8 @@ export async function applyConfiguration(input: ApplyConfigInput): Promise<Apply
 
 /** Start again from nothing, keeping the client and the terms. */
 export async function clearQuoteLines(quoteId: string): Promise<ActionResult> {
-  if (!(await ownedQuote(quoteId))) return { ok: false, error: 'That quotation is not yours.' };
+  const writable = await writableQuote(quoteId);
+  if (!writable.ok) return writable;
 
   try {
     await prisma.$transaction([

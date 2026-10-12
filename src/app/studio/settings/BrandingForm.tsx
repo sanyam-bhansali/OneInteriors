@@ -208,9 +208,9 @@ export function BrandingForm({ branding }: { branding: BrandingRow | null }) {
             label="Professional fee"
             name="feePct"
             required
-            defaultValue={branding ? String(branding.feeBps / 100) : '7'}
+            defaultValue="7"
             width="xs"
-            suffix="% of the work value"
+            suffix="% of the work value — 7% for every studio, switched on or off per quotation"
           />
           <Field
             label="Your modular discount"

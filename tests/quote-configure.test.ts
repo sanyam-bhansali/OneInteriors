@@ -197,7 +197,9 @@ describe('planQuotation', () => {
   });
 
   it('says so plainly when the catalogue has nothing marked', () => {
-    const { lines, notes } = planQuotation(home(), [product({ inStandardBuild: false })]);
+    /* A product the standard selection does not know by name: nothing to build.
+       (A "Wardrobe" is now picked up by Hauspire's standard selection.) */
+    const { lines, notes } = planQuotation(home(), [product({ name: 'Bespoke bar unit', inStandardBuild: false })]);
     expect(lines).toEqual([]);
     expect(notes).toHaveLength(1);
     expect(notes[0]).toContain('marked as standard');

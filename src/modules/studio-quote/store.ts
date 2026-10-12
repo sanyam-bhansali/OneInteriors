@@ -21,7 +21,7 @@ import { prisma } from '@/lib/prisma';
 import { storeLogo, removeLogo } from '@/modules/storage/studio-logo';
 import { fromDb, toDb, type Paise } from '@/lib/money';
 import { starterRowsFor } from './starter-catalogue';
-import type { QuoteUnitName, WorkCodeName } from './pricing';
+import { FEE_BPS, type QuoteUnitName, type WorkCodeName } from './pricing';
 import { readRules, type ProductRules } from './configure';
 import { Prisma } from '@prisma/client';
 
@@ -559,7 +559,8 @@ export async function saveBranding(input: BrandingInput): Promise<SaveResult> {
     website: input.website?.trim() || null,
     welcomeNote: input.welcomeNote?.trim() || null,
     terms: input.terms?.trim() || null,
-    feeBps: input.feeBps,
+    // 7% for every studio (owner, 12 Oct 2026); the setting no longer moves it.
+    feeBps: FEE_BPS,
     discountBps: input.discountBps,
     bookingAdvancePaise: toDb(Math.max(0, input.bookingAdvancePaise)),
     ...(input.gstBps !== undefined ? { gstBps: input.gstBps > 0 ? 1800 : 0 } : {}),

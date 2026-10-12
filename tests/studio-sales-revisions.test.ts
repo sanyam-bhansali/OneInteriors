@@ -105,6 +105,10 @@ describe('marking the sales final', () => {
     expect(salesFinalRefusal({ ...ok, booked: true })).toBe(SALES_FINAL_ERRORS.booked);
   });
 
+  it('refuses a One Interiors quotation: the customer signs it in the app', () => {
+    expect(salesFinalRefusal({ ...ok, fromOneInteriors: true })).toBe(SALES_FINAL_ERRORS.oneInteriors);
+  });
+
   it('says on the timeline when the mark moves', () => {
     expect(salesFinalSummary('2026-004', 3, null)).toBe('Marked R3 of quotation 2026-004 as the sales final');
     expect(salesFinalSummary('2026-004', 3, 2)).toBe('Sales final moved from R2 to R3 of quotation 2026-004');

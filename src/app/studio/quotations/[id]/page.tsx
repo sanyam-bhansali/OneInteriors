@@ -13,6 +13,7 @@ import { projectForQuote } from '@/modules/project/own-project';
 import { quoteSalesView } from '@/modules/studio-sales/revisions';
 import { can } from '@/modules/studio/roles';
 import { Revisions } from './Revisions';
+import { planReaderFor } from '@/modules/studio-quote/from-plan';
 
 export const metadata: Metadata = {
   title: 'Quotation',
@@ -47,13 +48,17 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   if (!quote) notFound();
 
   const member = await currentMember();
-  const [logoUrl, project, sales] = await Promise.all([
+  const [logoUrl, project, sales, planReader] = await Promise.all([
     signedLogoUrl(branding?.logoPath ?? null),
     // A project running on this quotation, or whether one can start from it (own client, sent or won).
     projectForQuote(member, quote.id),
     // Revisions sent and the sales final (Studio OS Phase 1).
     quoteSalesView(quote.id),
+    // Floor plan → first quotation: "Read rooms" on this draft (12 Oct 2026).
+    planReaderFor(quote.clientId),
   ]);
+  /* Owner and PM may add a typed line to the product list; a salesperson asks. */
+  const mayAddProducts = member !== null && (member.role === 'OWNER' || member.role === 'PM');
   const mayBook = member !== null && can(member, 'booking.record');
 
   return (
@@ -155,6 +160,8 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           showMark={showsOurMark({ tier, hideRequested: branding?.hideOurMark ?? false })}
           markText={MARK_TEXT}
           logoUrl={logoUrl}
+          planReader={planReader}
+          mayAddProducts={mayAddProducts}
         />
       </PageBody>
     </>

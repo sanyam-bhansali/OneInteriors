@@ -330,7 +330,7 @@ export async function markSalesFinal(quoteId: string, n: number, stages: Payment
   const refusal = salesFinalRefusal({
     revisionFound: revision !== null,
     quoteStage: q.stage as 'SALES' | 'DESIGN',
-    fromOneInteriors: q.briefId !== null || q.introductionId !== null,
+    fromOneInteriors: q.briefId !== null || q.introductionId !== null || q.client?.source === 'ONE_INTERIORS' || q.client?.introductionId != null,
     booked,
     alreadyMarked: q.salesFinalRevision?.n === n,
   });

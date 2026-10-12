@@ -152,12 +152,14 @@ export const SALES_FINAL_ERRORS = {
   notFound: 'That revision is not on this quotation. Send the quotation first; each send is a revision.',
   design: 'This is the Design Final. The sales final is marked on the quotation the client booked on.',
   booked: 'The booking is recorded on the current sales final, so it stays. Refund the booking first to change it.',
+  oneInteriors: 'This client came through One Interiors: they read and sign this quotation in the app, so there is no sales final to mark.',
 } as const;
 
 /** Why this revision cannot be marked the sales final, or null when it can. */
 export function salesFinalRefusal(f: SalesFinalFacts): string | null {
   if (!f.revisionFound) return SALES_FINAL_ERRORS.notFound;
   if (f.quoteStage === 'DESIGN') return SALES_FINAL_ERRORS.design;
+  if (f.fromOneInteriors) return SALES_FINAL_ERRORS.oneInteriors;
   if (f.booked) return SALES_FINAL_ERRORS.booked;
   return null;
 }

@@ -8,7 +8,8 @@
  */
 
 import Link from 'next/link';
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { formatINR } from '@/lib/money';
 import { SOURCE_LABELS, type ClientSourceName } from '@/modules/studio-practice/vocabulary';
 import { LEAD_FILE_ACCEPT, checkLeadFile, fileSize, meetingInputs, budgetInput, type NextStep } from '@/modules/studio-sales/lead-rules';
@@ -20,13 +21,14 @@ import {
   attachFileAction,
   editLeadAction,
   newQuoteForLeadAction,
-  readRoomsAction,
   recordBookingAction,
   refundBookingAction,
   removeFileAction,
   setMeetingAction,
 } from '../../sales-actions';
 import { Said, useAct, inputClass, primaryClass, quietClass } from '../../SalesUi';
+import { buildFromPlanAction, planJobsAction } from '../../quotations/actions';
+import type { PlanJobView } from '@/modules/studio-quote/from-plan-rules';
 
 const box = 'rounded-[12px] border border-[var(--s-rule)] px-4 py-3.5';
 const h2 = 'm-0 mb-2 text-[15px] font-semibold';
@@ -395,6 +397,12 @@ export function AssignBox({ clientId, assignedToId, members }: { clientId: strin
 
 // ── Files ──────────────────────────────────────────────────────
 
+/** The floor plan types the reader takes (floorplan/plan-cache.ts). */
+const READABLE = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+
+type PlanJobs = { canRead: boolean; jobs: Record<string, PlanJobView> } | null;
+type BuildSaid = { ok: boolean; message?: string; error?: string; quoteId?: string | null } | null;
+
 export function FilesBox({ clientId, files, may, mayReadRooms }: { clientId: string; files: LeadFileView[]; may: boolean; mayReadRooms: boolean }) {
   const [kind, setKind] = useState<'FLOOR_PLAN' | 'OTHER'>(files.some((f) => f.kind === 'FLOOR_PLAN') ? 'OTHER' : 'FLOOR_PLAN');
   const [over, setOver] = useState(false);
@@ -402,9 +410,42 @@ export function FilesBox({ clientId, files, may, mayReadRooms }: { clientId: str
   const [said, setSaid] = useState<{ ok: boolean; message?: string; error?: string } | null>(null);
   const picker = useRef<HTMLInputElement>(null);
   const act = useAct();
+  const router = useRouter();
+
+  /* Floor plan → first quotation (12 Oct 2026): the last run of each plan,
+     and whether reading is switched on, read after the page has drawn. */
+  const [plans, setPlans] = useState<PlanJobs>(null);
+  const [building, setBuilding] = useState<string | null>(null);
+  const [built, setBuilt] = useState<BuildSaid>(null);
+  const fileIds = files.map((f) => f.id).join(',');
+  const loadPlans = useCallback(() => {
+    planJobsAction(clientId)
+      .then(setPlans)
+      .catch(() => undefined);
+  }, [clientId]);
+  useEffect(() => {
+    loadPlans();
+  }, [loadPlans, fileIds]);
+
+  /** Read the plan and build the quotation; says what happened under the box. */
+  async function buildFrom(ref: { fileId?: string; path?: string }, mode: 'auto' | 'manual' | 'read', label: string) {
+    setBuilding(label);
+    setBuilt(null);
+    try {
+      const r = await buildFromPlanAction(clientId, ref, mode);
+      setBuilt(r.ok ? { ok: r.status !== 'FAILED', message: r.message, error: r.message, quoteId: r.quoteId } : r);
+      router.refresh();
+      loadPlans();
+    } catch {
+      setBuilt({ ok: false, error: 'That did not go through. Check your connection and try again.' });
+    } finally {
+      setBuilding(null);
+    }
+  }
 
   async function upload(file: File) {
     setSaid(null);
+    setBuilt(null);
     const type = file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : '');
     const check = checkLeadFile(type, file.size);
     if (!check.ok) {
@@ -430,7 +471,16 @@ export function FilesBox({ clientId, files, may, mayReadRooms }: { clientId: str
           return;
         }
       }
-      act.run(() => attachFileAction({ clientId, path: ticket.path!, name: file.name, contentType: type, bytes: file.size, kind }));
+      const path = ticket.path;
+      const asKind = kind;
+      act.run(
+        () => attachFileAction({ clientId, path, name: file.name, contentType: type, bytes: file.size, kind: asKind }),
+        (r) => {
+          /* After the upload has answered: read the plan and build the
+             first quotation from it, with the state on screen. */
+          if (r.ok && asKind === 'FLOOR_PLAN') void buildFrom({ path }, 'auto', 'Reading the plan and building the first quotation…');
+        },
+      );
     } catch {
       setSaid({ ok: false, error: 'The upload did not finish. Check your connection and try again.' });
     } finally {
@@ -465,11 +515,18 @@ export function FilesBox({ clientId, files, may, mayReadRooms }: { clientId: str
             </select>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <button type="button" disabled={busy || act.pending} onClick={() => picker.current?.click()} className={primaryClass}>
+            <button type="button" disabled={busy || act.pending || building !== null} onClick={() => picker.current?.click()} className={primaryClass}>
               {busy || act.pending ? 'Attaching…' : 'Choose a file'}
             </button>
             <span className="text-[12.5px] text-[var(--s-ink-3)]">or drag it here · PDF or photo, up to 15 MB</span>
           </div>
+          {kind === 'FLOOR_PLAN' ? (
+            <p className="m-0 text-[12.5px] leading-relaxed text-[var(--s-ink-3)]">
+              {plans && !plans.canRead
+                ? "Floor-plan reading isn't switched on yet, so the first quotation is built from the lead's BHK."
+                : 'The plan is read and the first quotation is built from it: rooms, sizes, kitchen run, bathrooms and false ceilings. You check it and send it.'}
+            </p>
+          ) : null}
           <input
             ref={picker}
             type="file"
@@ -483,12 +540,38 @@ export function FilesBox({ clientId, files, may, mayReadRooms }: { clientId: str
         </div>
       ) : null}
       <Said result={said ?? act.result} />
+      {building ? (
+        <p role="status" className="m-0 mt-2 flex items-center gap-2 text-[13px] text-[var(--s-ink-2)]">
+          <span aria-hidden className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[var(--s-accent)] border-t-transparent" />
+          {building}
+        </p>
+      ) : null}
+      {built ? (
+        <div className="mt-2">
+          <Said result={built.ok ? { ok: true, message: built.message } : { ok: false, error: built.error ?? built.message ?? '' }} />
+          {built.quoteId ? (
+            <Link href={`/studio/quotations/${built.quoteId}`} className={`${quietClass} mt-1.5 inline-block`}>
+              Open the quotation
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
       {files.length === 0 ? (
         <p className="m-0 mt-3 text-[13.5px] text-[var(--s-ink-3)]">Nothing attached yet. Ask for the floor plan on WhatsApp, then attach it here.</p>
       ) : (
         <ul className="m-0 mt-3 flex list-none flex-col gap-2 p-0">
           {files.map((f) => (
-            <FileRow key={f.id} clientId={clientId} f={f} may={may} mayReadRooms={mayReadRooms} />
+            <FileRow
+              key={f.id}
+              clientId={clientId}
+              f={f}
+              may={may}
+              mayReadRooms={mayReadRooms}
+              job={plans?.jobs[f.id] ?? null}
+              canRead={plans?.canRead ?? true}
+              building={building !== null}
+              onBuild={(mode) => void buildFrom({ fileId: f.id }, mode, mode === 'read' ? 'Reading the plan…' : 'Reading the plan and building a quotation…')}
+            />
           ))}
         </ul>
       )}
@@ -496,14 +579,41 @@ export function FilesBox({ clientId, files, may, mayReadRooms }: { clientId: str
   );
 }
 
-function FileRow({ clientId, f, may, mayReadRooms }: { clientId: string; f: LeadFileView; may: boolean; mayReadRooms: boolean }) {
+const JOB_TONE: Record<PlanJobView['status'], string> = {
+  READING: 'text-[var(--s-ink-2)]',
+  BUILT: 'text-[var(--s-good)]',
+  READ: 'text-[var(--s-good)]',
+  FALLBACK: 'text-[var(--s-warn)]',
+  FAILED: 'text-[var(--s-bad)]',
+};
+
+function FileRow({
+  clientId,
+  f,
+  may,
+  mayReadRooms,
+  job,
+  canRead,
+  building,
+  onBuild,
+}: {
+  clientId: string;
+  f: LeadFileView;
+  may: boolean;
+  mayReadRooms: boolean;
+  job: PlanJobView | null;
+  canRead: boolean;
+  building: boolean;
+  onBuild: (mode: 'manual' | 'read') => void;
+}) {
   const [sure, setSure] = useState(false);
   const { pending, result, run } = useAct();
-  const readable = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(f.contentType);
+  const readable = READABLE.includes(f.contentType);
+  const plan = f.kind === 'FLOOR_PLAN';
   return (
     <li className="flex flex-col gap-1 rounded-[10px] bg-[var(--s-surface-2)] px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="s-tag">{f.kind === 'FLOOR_PLAN' ? 'Floor plan' : 'File'}</span>
+        <span className="s-tag">{plan ? 'Floor plan' : 'File'}</span>
         {f.url ? (
           <a href={f.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-[var(--s-accent)]">
             {f.name}
@@ -516,12 +626,33 @@ function FileRow({ clientId, f, may, mayReadRooms }: { clientId: string; f: Lead
           {f.uploadedByName ? ` · ${f.uploadedByName}` : ''}
         </span>
       </div>
+      {job && job.message ? (
+        <p className={`m-0 text-[12.5px] leading-relaxed ${JOB_TONE[job.status]}`}>
+          {job.message}{' '}
+          {job.quoteId && job.quoteNumber ? (
+            <Link href={`/studio/quotations/${job.quoteId}`} className="font-medium text-[var(--s-accent)]">
+              Open {job.quoteNumber}
+            </Link>
+          ) : null}
+        </p>
+      ) : null}
       {may ? (
         <div className="flex flex-wrap items-center gap-3 text-[12.5px]">
           {f.roomsRead !== null ? <span className="text-[var(--s-good)]">{f.roomsRead} rooms read</span> : null}
-          {mayReadRooms && readable && f.roomsRead === null ? (
-            <button type="button" disabled={pending} onClick={() => run(() => readRoomsAction(clientId, f.id))} className="text-[var(--s-accent)]" title="Optional: the floor-plan reader fills the next quotation's rooms">
-              {pending ? 'Reading…' : 'Read rooms'}
+          {plan && (readable || !canRead) ? (
+            <button
+              type="button"
+              disabled={building || pending}
+              onClick={() => onBuild('manual')}
+              className="font-medium text-[var(--s-accent)] disabled:opacity-40"
+              title={canRead ? 'Reads the plan (once — a plan read before is not read again) and makes a new draft quotation from it' : "Floor-plan reading isn't switched on yet: builds a draft from the lead's BHK"}
+            >
+              {job?.status === 'FAILED' ? 'Try again: build a quotation from this plan' : 'Build a quotation from this plan'}
+            </button>
+          ) : null}
+          {mayReadRooms && canRead && readable && f.roomsRead === null ? (
+            <button type="button" disabled={building || pending} onClick={() => onBuild('read')} className="text-[var(--s-accent)] disabled:opacity-40" title="Reads the rooms only: the next quotation starts from them">
+              Read rooms
             </button>
           ) : null}
           {sure ? (

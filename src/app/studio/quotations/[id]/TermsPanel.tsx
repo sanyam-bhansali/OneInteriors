@@ -4,7 +4,8 @@ import { DISCOUNT_NAMES } from '@/modules/studio-quote/pricing';
 
 /** This quotation's terms, as the builder holds them. Rupees and percents as typed. */
 export interface TermsDraft {
-  feePct: string;
+  /** The professional fee: 7% for every studio, on or off on this quotation. */
+  feeOn: boolean;
   discountPct: string;
   gstOn: boolean;
   onSpotRupees: string;
@@ -42,16 +43,17 @@ export function TermsPanel({
       <h2 className="s-label m-0 mb-3">Terms on this quotation</h2>
 
       <div className="flex flex-col gap-3">
+        <label className="flex items-center gap-2 text-[13.5px]">
+          <input
+            type="checkbox"
+            checked={terms.feeOn}
+            onChange={(e) => onChange({ feeOn: e.target.checked })}
+            className="h-[16px] w-[16px] accent-[var(--s-accent)]"
+          />
+          Professional fee, 7%
+        </label>
+
         <div className="flex gap-3">
-          <label className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="s-label">Fee %</span>
-            <input
-              value={terms.feePct}
-              onChange={(e) => onChange({ feePct: e.target.value })}
-              inputMode="decimal"
-              className={`${field} s-num w-full text-right`}
-            />
-          </label>
           <label className="flex min-w-0 flex-1 flex-col gap-1">
             <span className="s-label">Modular discount %</span>
             <input
