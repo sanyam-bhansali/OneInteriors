@@ -29,6 +29,7 @@ import { readSignedStages } from './payments';
 import { carryDone, quoteToPlan, trackerToPlan, type PlanMaterial, type PlanStage } from './quote-to-plan';
 import { fileSignedQuote, writePlan } from './plan-write';
 import { SIGNED_QUOTE_PREFIX } from './documents';
+import { bhkOf, readDesignTemplate } from '@/modules/studio-design/template';
 
 export type BackfillDb = Pick<PrismaClient, 'homeProject' | 'studioQuote' | '$transaction'>;
 
@@ -52,7 +53,8 @@ const PROJECT_SELECT = {
   signedQuoteId: true,
   contractPaise: true,
   paymentPhases: true,
-  introduction: { select: { brief: { select: { userId: true } } } },
+  /* Studio OS Phase 2: the studio's design steps and the flat size, as signing and booking read them (studio-design/plan-input.ts). */
+  introduction: { select: { brief: { select: { userId: true, propertyType: true } }, studio: { select: { designTemplate: true } } } },
   documents: { where: { storageKey: { startsWith: SIGNED_QUOTE_PREFIX } }, select: { id: true } },
 } satisfies Prisma.HomeProjectSelect;
 
@@ -82,6 +84,11 @@ export async function backfillPlans(db: BackfillDb, opts: { apply: boolean; now?
         totalDays: p.totalDays,
         contractPaise: p.contractPaise === null ? 0 : fromDb(p.contractPaise),
         stages: readSignedStages(p.paymentPhases) ?? [],
+        // The same DESIGN stage signing builds now: the studio's design steps (Hauspire's when it has none) and the flat size's days.
+        design: {
+          template: p.introduction.studio?.designTemplate ? readDesignTemplate(p.introduction.studio.designTemplate) : null,
+          bhk: bhkOf(p.introduction.brief.propertyType ?? null),
+        },
       });
       stages = carryDone(built.stages, p.doneStages, now);
       materials = built.materials;

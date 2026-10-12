@@ -18,7 +18,7 @@
  *   outcome (a record pointing at the decision, `decision:<id>`).
  */
 
-import { DECISION_PREFIX } from '@/modules/portal/documents';
+import { DECISION_CONTENT_TYPE, DECISION_PREFIX } from '@/modules/portal/documents';
 
 export interface DocRow {
   id: string;
@@ -85,3 +85,12 @@ export function decisionOfDoc(storageKey: string): string | null {
 export function decisionDocTitle(title: string, option: string, price: string): string {
   return `Your choice: ${title}, ${option}${price === 'As quoted' ? '' : ` (${price})`}`.slice(0, 100);
 }
+
+/**
+ * Money documents: the signed quotation and agreement, payment receipts and a
+ * decision's outcome (its price change). Only those who see payments or write
+ * quotations open them; a designer or site supervisor (`project.read` only)
+ * sees the drawings and the rest (Studio OS Phase 2: a designer sees no money).
+ */
+export const MONEY_DOC = (d: { kind: string; contentType: string; storageKey: string }) =>
+  d.kind === 'RECEIPT' || d.kind === 'QUOTATION' || d.kind === 'AGREEMENT' || d.contentType === DECISION_CONTENT_TYPE || d.storageKey.startsWith('signed-quote:');

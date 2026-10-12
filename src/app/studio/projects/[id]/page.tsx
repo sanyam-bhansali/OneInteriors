@@ -16,6 +16,9 @@ import { LockerCard } from './LockerCard';
 import { PlanTab as PlanEditor } from './PlanTab';
 import { planForStudio } from '@/modules/project/plan-edit';
 import { InviteBanner } from './InviteBanner';
+/* Studio OS Phase 2: the design phase (modules/studio-design). */
+import { DesignTab as DesignSection } from './DesignTab';
+import { currentMember } from '@/modules/studio/access';
 
 export const metadata: Metadata = { title: 'Project', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -38,6 +41,7 @@ export const dynamic = 'force-dynamic';
 
 const TABS = [
   { key: 'plan', label: 'Plan' },
+  { key: 'design', label: 'Design' },
   { key: 'log', label: 'Site log' },
   { key: 'snags', label: 'Snags' },
   { key: 'payments', label: 'Payments' },
@@ -70,9 +74,12 @@ export default async function ProjectWorkspacePage({
   const w = r.workspace;
   const money = w.contractPaise !== null;
   const tabs = TABS.filter((t) => t.key !== 'payments' || money);
-  const tab: Tab = tabs.some((t) => t.key === rawTab) ? (rawTab as Tab) : 'plan';
+  // A designer (Studio OS Phase 2) opens on the Design tab.
+  const fallback: Tab = (await currentMember())?.role === 'DESIGNER' ? 'design' : 'plan';
+  const tab: Tab = tabs.some((t) => t.key === rawTab) ? (rawTab as Tab) : fallback;
   const counts: Record<Tab, number | null> = {
     plan: w.stages.length,
+    design: null,
     log: null, // Phase 2: the Site log tab counts its own days
     snags: w.work?.snags.filter((s) => s.status === 'OPEN').length ?? 0,
     payments: w.work?.money?.stages.length ?? null,
@@ -135,7 +142,7 @@ export default async function ProjectWorkspacePage({
               key={t.key}
               role="tab"
               aria-selected={t.key === tab}
-              href={`/studio/projects/${w.id}${t.key === 'plan' ? '' : `?tab=${t.key}`}`}
+              href={`/studio/projects/${w.id}?tab=${t.key}`}
               className={`-mb-px border-b-2 px-3 py-2 text-[14px] no-underline ${
                 t.key === tab ? 'border-[var(--s-accent)] font-semibold text-[var(--s-ink)]' : 'border-transparent text-[var(--s-ink-2)] hover:text-[var(--s-ink)]'
               }`}
@@ -149,6 +156,7 @@ export default async function ProjectWorkspacePage({
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="min-w-0">
             {tab === 'plan' ? <PlanSection w={w} now={now} /> : null}
+            {tab === 'design' ? <DesignSection projectId={w.id} now={now} /> : null}
             {/* Phase 2: the daily site log (SiteLogTab.tsx), with the old notes under it. */}
             {tab === 'log' ? <SiteLogTab projectId={w.id} customer={w.customerFirst} now={now} legacy={w.updates} /> : null}
             {tab === 'snags' ? <SnagsPanel projectId={w.id} now={now} /> : null}

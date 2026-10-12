@@ -25,6 +25,13 @@
  * one item per quote line, in its room, until
  * scripts/studio/steps-from-template.ts replaces them.
  *
+ * Studio OS Phase 2 (docs/studio-os/PHASE-2-DESIGN.md): a signed or booked
+ * project's DESIGN stage gets the studio's design steps instead (Hauspire's
+ * 19 by default; studio-design/template.ts), sharing the stage's 2% so the
+ * execution weights are unchanged, each planned the previous step's day plus
+ * its gap, with its responsible role, document-required flag and payment
+ * gate. With the flat size known, design lasts that size's days.
+ *
  * ## Which stage a quote line's work belongs to (for the materials)
  *
  * A quote line carries a product name and a work code, nothing more, so the
@@ -68,6 +75,8 @@
 
 import { splitAcross } from '@/lib/money';
 import { templateFor } from '@/modules/project/step-template';
+import { designSteps } from '@/modules/studio-design/rules';
+import { designDaysFor, HAUSPIRE_DESIGN, type DesignTemplateStep } from '@/modules/studio-design/template';
 import { spreadStepDays } from '@/modules/project/step-rules';
 import { dayToDb, istDay } from '@/modules/project/working-days';
 import { KIND_TRACKER_KEYS, PLAN_KINDS, TRACKER_STAGES, type PlanKind } from './tracker';
@@ -124,6 +133,22 @@ export interface PlanItem {
   doneAt?: Date | null;
   /** BACKFILL on a step ticked because its stage was already done: no photo. */
   doneSource?: 'BACKFILL' | null;
+  /* Studio OS Phase 2: a design step's who, file, payment gate and days after the previous step. */
+  responsible?: string | null;
+  needsDocument?: boolean;
+  gatePayment?: number | null;
+  gapDays?: number | null;
+}
+
+/**
+ * Studio OS Phase 2 (docs/studio-os/PHASE-2-DESIGN.md): what the DESIGN
+ * stage is built from — the studio's design steps (Hauspire's when null) and
+ * the flat size, which sets how long design lasts (studio-design/template.ts
+ * `DESIGN_DAYS`). Without a flat size, design keeps its usual share.
+ */
+export interface DesignPlanInput {
+  template?: readonly DesignTemplateStep[] | null;
+  bhk?: number | null;
 }
 
 export interface PlanStage {
@@ -190,9 +215,17 @@ export function kindWeights(): number[] {
   );
 }
 
-/** Planned start and end of each stage, back to back from the start, the last ending on handover. */
-export function stageDates(startOn: Date, totalDays: number): { kind: PlanKind; plannedStart: Date; plannedEnd: Date }[] {
-  const days = splitAcross(Math.max(0, Math.round(totalDays)), kindWeights());
+/**
+ * Planned start and end of each stage, back to back from the start, the last
+ * ending on handover. With `designDays` (Studio OS Phase 2: the flat size's
+ * design days), design lasts exactly that and the other four share the rest
+ * by their usual weights — when that leaves each of them at least a day.
+ */
+export function stageDates(startOn: Date, totalDays: number, designDays: number | null = null): { kind: PlanKind; plannedStart: Date; plannedEnd: Date }[] {
+  const total = Math.max(0, Math.round(totalDays));
+  const weights = kindWeights();
+  const fixed = designDays !== null && Number.isInteger(designDays) && designDays > 0 && total - designDays >= PLAN_KINDS.length - 1;
+  const days = fixed ? [designDays, ...splitAcross(total - designDays, weights.slice(1))] : splitAcross(total, weights);
   let at = startOn.getTime();
   return PLAN_KINDS.map((kind, i) => {
     const plannedStart = new Date(at);
@@ -226,6 +259,8 @@ export interface QuotePlanInput {
   contractPaise: number;
   /** The payment stages as signed. */
   stages: SignedStageInput[];
+  /** Studio OS Phase 2: the studio's design steps and the flat size. Hauspire's steps when left out. */
+  design?: DesignPlanInput | null;
 }
 
 /** A stage's template steps, each with its planned day inside the stage's window. */
@@ -246,14 +281,41 @@ export function stepsFor(kind: PlanKind, plannedStart: Date, plannedEnd: Date): 
   }));
 }
 
-/** The five stages with their dates, default names and template steps. */
-export function templateStages(startOn: Date, totalDays: number): PlanStage[] {
-  return stageDates(startOn, totalDays).map((d, i) => ({
+/**
+ * The DESIGN stage's design steps (Studio OS Phase 2): the studio's template
+ * (Hauspire's when none), each step the previous one's day plus its gap,
+ * scaled to the stage's window, gates matched to the payment stages by name
+ * (studio-design/rules.ts `designSteps`).
+ */
+export function designStepsFor(plannedStart: Date, plannedEnd: Date, template: readonly DesignTemplateStep[] | null | undefined, payments: readonly { label: string }[]): PlanItem[] {
+  return designSteps(template && template.length ? template : HAUSPIRE_DESIGN, { start: istDay(plannedStart), end: istDay(plannedEnd) }, payments).map((st) => ({
+    room: st.room,
+    label: st.label,
+    quoteLineId: null,
+    sortOrder: st.sortOrder,
+    weightBp: st.weightBp,
+    inScope: true,
+    plannedOn: dayToDb(st.plannedOn),
+    responsible: st.responsible,
+    needsDocument: st.needsDocument,
+    gatePayment: st.gatePayment,
+    gapDays: st.gapDays,
+  }));
+}
+
+/**
+ * The five stages with their dates, default names and template steps. With
+ * `design` (a signed or booked project), the DESIGN stage gets the design
+ * steps and, when the flat size is known, its design days; without it (a
+ * tracker ops started by hand) the stages are as before.
+ */
+export function templateStages(startOn: Date, totalDays: number, design?: (DesignPlanInput & { payments: readonly { label: string }[] }) | null): PlanStage[] {
+  return stageDates(startOn, totalDays, design ? designDaysFor(design.bhk) : null).map((d, i) => ({
     ...d,
     name: KIND_NAMES[d.kind],
     sortOrder: i,
     actualEnd: null,
-    items: stepsFor(d.kind, d.plannedStart, d.plannedEnd),
+    items: design && d.kind === 'DESIGN' ? designStepsFor(d.plannedStart, d.plannedEnd, design.template, design.payments) : stepsFor(d.kind, d.plannedStart, d.plannedEnd),
   }));
 }
 
@@ -271,7 +333,8 @@ export function quoteToPlan(input: QuotePlanInput): QuotePlan {
       sortOrder: materials.length,
     });
   }
-  return { stages: templateStages(input.startOn, input.totalDays), payments: paymentSchedule(input.contractPaise, input.stages), materials };
+  const payments = paymentSchedule(input.contractPaise, input.stages);
+  return { stages: templateStages(input.startOn, input.totalDays, { ...(input.design ?? {}), payments }), payments, materials };
 }
 
 /**

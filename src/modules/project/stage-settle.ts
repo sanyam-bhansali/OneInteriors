@@ -18,7 +18,7 @@ import type { Prisma } from '@prisma/client';
 import { KIND_TRACKER_KEYS, PLAN_KINDS, type PlanKind } from '@/modules/portal/tracker';
 import { recordEvent, type ProjectActor } from './events';
 import { settleStage } from './project-rules';
-import { shiftStepDay } from './step-rules';
+import { shiftDesignStepDay, shiftStepDay } from './step-rules';
 import { dayFromDb, dayToDb } from './working-days';
 
 type Db = Prisma.TransactionClient;
@@ -32,11 +32,16 @@ export const countedSteps = <T extends { inScope?: boolean | null }>(items: read
  * Site photos for each stage: photos on a site log whose stage it is
  * (Phase 2), photos older free-text updates tagged with one of the stage
  * kind's tracker keys, and the photos its own steps were ticked with.
+ *
+ * Design (Studio OS Phase 2): design steps are ticked on the Design tab,
+ * not with a site photo, each one a deliberate act by the designer or the
+ * PM, some with their file. So for the DESIGN stage every ticked step counts
+ * as its evidence (a backfilled tick does not).
  */
 export async function photosByStage(
   db: Db,
   projectId: string,
-  stages: readonly { id: string; kind: string; items?: readonly { donePhotoId?: string | null }[] }[],
+  stages: readonly { id: string; kind: string; items?: readonly { donePhotoId?: string | null; doneAt?: Date | null; doneSource?: string | null }[] }[],
 ): Promise<Map<string, number>> {
   const ids = stages.map((s) => s.id);
   const [logs, updates] = await Promise.all([
@@ -53,7 +58,7 @@ export async function photosByStage(
   const out = new Map<string, number>(ids.map((id) => [id, 0]));
   for (const l of logs) if (l.stageId) out.set(l.stageId, (out.get(l.stageId) ?? 0) + l._count.photos);
   for (const s of stages) {
-    const own = (s.items ?? []).filter((i) => i.donePhotoId).length;
+    const own = (s.items ?? []).filter((i) => i.donePhotoId || (s.kind === 'DESIGN' && i.doneAt && i.doneSource !== 'BACKFILL')).length;
     if (own) out.set(s.id, (out.get(s.id) ?? 0) + own);
     if (!isKind(s.kind)) continue;
     const keys = KIND_TRACKER_KEYS[s.kind] as readonly string[];
@@ -83,8 +88,12 @@ export async function writeDone(db: Db, projectId: string, stage: { id: string; 
 
 /**
  * A stage's dates moved (a moved date, or a late decision's automatic move):
- * its steps' planned days move with it (step-rules.ts `shiftStepDay`). Days
- * are 'YYYY-MM-DD'. Call inside the transaction that moves the stage.
+ * its OPEN steps' planned days move with it (step-rules.ts `shiftStepDay`); a
+ * ticked step keeps the day it was planned for. The DESIGN stage's steps are
+ * linked and move only with its start (`shiftDesignStepDay`, Studio OS
+ * Phase 2), so stretching design to catch up with a late step does not move
+ * them again. Days are 'YYYY-MM-DD'. Call inside the transaction that moves
+ * the stage.
  */
 export async function shiftStepsWithStage(
   db: Db,
@@ -93,10 +102,13 @@ export async function shiftStepsWithStage(
   after: { start: string; end: string },
 ): Promise<void> {
   if (before.start === after.start && before.end === after.end) return;
-  const steps = await db.homeChecklistItem.findMany({ where: { stageId, plannedOn: { not: null } }, select: { id: true, plannedOn: true } });
+  const steps = await db.homeChecklistItem.findMany({
+    where: { stageId, plannedOn: { not: null }, doneAt: null },
+    select: { id: true, plannedOn: true, stage: { select: { kind: true } } },
+  });
   for (const st of steps) {
     const from = dayFromDb(st.plannedOn!);
-    const to = shiftStepDay(from, before, after);
+    const to = (st.stage?.kind === 'DESIGN' ? shiftDesignStepDay : shiftStepDay)(from, before, after);
     if (to && to !== from) await db.homeChecklistItem.update({ where: { id: st.id }, data: { plannedOn: dayToDb(to) } });
   }
 }
@@ -109,7 +121,7 @@ export async function shiftStepsWithStage(
 export async function settleStageAfterTicks(db: Db, projectId: string, stageId: string, actor: ProjectActor, now = new Date()): Promise<'mark-done' | 'reopen' | 'keep'> {
   const stage = await db.homeProjectStage.findFirst({
     where: { id: stageId, projectId },
-    select: { id: true, kind: true, actualEnd: true, items: { select: { doneAt: true, inScope: true, donePhotoId: true } } },
+    select: { id: true, kind: true, actualEnd: true, items: { select: { doneAt: true, inScope: true, donePhotoId: true, doneSource: true } } },
   });
   if (!stage) return 'keep';
   const photos = (await photosByStage(db, projectId, [stage])).get(stage.id) ?? 0;

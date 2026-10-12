@@ -86,6 +86,20 @@ export const PROJECT_EVENT_TYPES = [
   'customer.joined',
   // Studio OS Phase 1 (docs/studio-os/PHASE-1-SALES.md): the booking advance refunded
   'project.cancelled',
+  // Studio OS Phase 2 (docs/studio-os/PHASE-2-DESIGN.md): design
+  'designer.assigned',
+  'design.ticked',
+  'design.step_moved',
+  'design.step_edited',
+  'design.steps_applied',
+  'design.shared',
+  'design.answered',
+  'design.closed',
+  'moodboard.shared',
+  'moodboard.edited',
+  'visit.booked',
+  'visit.updated',
+  'measurements.saved',
 ] as const;
 
 export type ProjectEventType = (typeof PROJECT_EVENT_TYPES)[number];

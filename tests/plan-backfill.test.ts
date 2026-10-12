@@ -12,7 +12,7 @@ import { SIGNED_QUOTE_PREFIX } from '@/modules/portal/documents';
 
 type Stage = { projectId: string; kind: string; actualEnd: Date | null; items: { create: { label: string; doneAt: Date | null }[] } };
 
-function fakeDb() {
+function fakeDb(signedIntro: Record<string, unknown> = { brief: { userId: 'u1' } }) {
   const stages: Stage[] = [];
   const materials: { projectId: string; item: string }[] = [];
   const documents: { projectId: string; kind: string; storageKey: string; sharedAt: Date }[] = [];
@@ -26,7 +26,7 @@ function fakeDb() {
       signedQuoteId: 'q1',
       contractPaise: BigInt(10_00_000_00),
       paymentPhases: [{ label: 'Booking', pct: 100, amountPaise: 10_00_000_00 }],
-      introduction: { brief: { userId: 'u1' } },
+      introduction: signedIntro,
     },
     {
       id: 'by-ops',
@@ -151,5 +151,16 @@ describe('the plan backfill', () => {
     expect(lines.find((l) => l.projectId === 'signed')!.written).toBe(false);
     expect(f.stages.filter((s) => s.projectId === 'signed')).toHaveLength(1);
     expect(f.documents).toEqual([]);
+  });
+
+  it("gives a signed project the studio's own design steps, like signing does (Studio OS Phase 2)", async () => {
+    const template = [
+      { label: 'Site visit', responsible: 'DESIGNER', needsDocument: false, gate: null, days: 0, weight: 1 },
+      { label: 'Layout', responsible: 'DESIGNER', needsDocument: true, gate: null, days: 3, weight: 2 },
+    ];
+    const f = fakeDb({ brief: { userId: 'u1', propertyType: 'BHK_1' }, studio: { designTemplate: template } });
+    await backfillPlans(f.db, { apply: true, now: NOW });
+    const design = f.stages.find((s) => s.projectId === 'signed' && s.kind === 'DESIGN')!;
+    expect(design.items.create.map((i) => i.label)).toEqual(['Site visit', 'Layout']);
   });
 });

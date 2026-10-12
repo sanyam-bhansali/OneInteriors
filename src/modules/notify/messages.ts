@@ -23,6 +23,8 @@ export type ProjectEvent =
   | { kind: 'snag-auto-closed'; snagId: string; title: string }
   | { kind: 'snag-not-fixed'; snagId: string; projectId: string; title: string; site?: boolean }
   | { kind: 'document'; studio: string; title: string }
+  // Studio OS Phase 2: something of the design shared with the customer (a drawing to approve, the mood board, a site visit).
+  | { kind: 'design'; studio: string; title: string }
   | { kind: 'payment-due'; stage: string; amountPaise: number; studio: string; dueLabel: string }
   | { kind: 'payment-recorded'; stage: string; amountPaise: number; studio: string }
   // Between the customer and the studio, before signing.
@@ -247,6 +249,13 @@ export function messageFor(e: ProjectEvent): Message {
         title: `New document · ${e.studio}`,
         body: clip(e.title, 160),
         url: '/app/locker',
+      };
+    case 'design':
+      return {
+        template: 'project.design',
+        title: `Your design · ${e.studio}`,
+        body: clip(e.title, 160),
+        url: '/app/project',
       };
   }
 }

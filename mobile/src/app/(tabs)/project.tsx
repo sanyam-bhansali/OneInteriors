@@ -12,6 +12,7 @@ import { usePlan } from '../../lib/plan';
 import { useProject } from '../../lib/project';
 import { color, font } from '../../lib/theme';
 import { PaymentEntries } from '../../components/project/payment-entries';
+import { DesignCard } from '../../components/project/design';
 import type { Decision, Money, Payments as PaymentsData, Project as ProjectData, Stage, Tracker, TrackerStage } from '../../lib/types';
 
 /**
@@ -106,6 +107,11 @@ export default function Project() {
             <ProgressBar pct={p.progressPct} label={t('project.progress.a11y', { n: p.progressPct })} />
             <Text style={styles.note}>{t('project.progress.body', { studio: p.studio })}</Text>
           </Card>
+        ) : null}
+
+        {/* Studio OS Phase 2: the design phase, while it runs and once it closes with what changed. */}
+        {p.design && p.design.steps.length > 0 && (!p.design.done || p.design.changes) ? (
+          <DesignCard design={p.design} studio={p.studio} owner={p.role !== 'family'} docs={p.documents} onChanged={() => void refresh()} t={t} />
         ) : null}
 
         <View style={styles.row2}>

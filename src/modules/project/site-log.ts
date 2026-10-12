@@ -162,7 +162,7 @@ export async function postSiteLog(raw: unknown, now = new Date()): Promise<PostR
       introduction: { select: { brief: BRIEF, studio: { select: { tradeName: true } } } },
       stages: {
         orderBy: { sortOrder: 'asc' },
-        select: { id: true, name: true, actualEnd: true, items: { select: { id: true, room: true, label: true, doneAt: true, inScope: true } } },
+        select: { id: true, kind: true, name: true, actualEnd: true, items: { select: { id: true, room: true, label: true, doneAt: true, inScope: true } } },
       },
     },
   });
@@ -171,7 +171,10 @@ export async function postSiteLog(raw: unknown, now = new Date()): Promise<PostR
   const lang = customerLang(brief);
   const stage = project.stages.find((s) => s.actualEnd === null) ?? null;
   // Any step of the project may be ticked (the office ticks from any stage), but only one in scope.
-  const allItems = new Map(project.stages.flatMap((s) => s.items.filter((i) => i.inScope).map((i) => [i.id, { ...i, stageId: s.id }] as const)));
+  // Design steps are ticked on the Design tab (Studio OS Phase 2: gates and files), never from a site post.
+  const allItems = new Map(
+    project.stages.filter((s) => s.kind !== 'DESIGN').flatMap((s) => s.items.filter((i) => i.inScope).map((i) => [i.id, { ...i, stageId: s.id }] as const)),
+  );
   if (input.ticks.some((t) => !allItems.has(t.itemId))) return { ok: false, error: 'items' };
 
   const member = check.member;
@@ -471,7 +474,8 @@ export async function postContext(projectId: string, now = new Date()): Promise<
         select: {
           name: true,
           actualEnd: true,
-          items: { where: { inScope: true }, orderBy: { sortOrder: 'asc' }, select: { id: true, room: true, label: true, doneAt: true, quoteLineId: true } },
+          // Design steps are ticked on the office's Design tab, not from site mode (Studio OS Phase 2).
+          items: { where: { inScope: true, stage: { kind: { not: 'DESIGN' } } }, orderBy: { sortOrder: 'asc' }, select: { id: true, room: true, label: true, doneAt: true, quoteLineId: true } },
         },
       },
       siteLogs: { where: { date: dayToDb(istDay(now)), kind: { in: ['UPDATE', 'NOBODY'] } }, take: 1, select: { kind: true, postedAt: true } },
@@ -530,7 +534,7 @@ export async function hearVoiceNote(
     where: { id: projectId },
     select: {
       introduction: { select: { brief: BRIEF } },
-      stages: { orderBy: { sortOrder: 'asc' }, select: { name: true, actualEnd: true, items: { where: { doneAt: null, inScope: true }, orderBy: { sortOrder: 'asc' }, select: { id: true, room: true, label: true } } } },
+      stages: { orderBy: { sortOrder: 'asc' }, select: { name: true, actualEnd: true, items: { where: { doneAt: null, inScope: true, stage: { kind: { not: 'DESIGN' } } }, orderBy: { sortOrder: 'asc' }, select: { id: true, room: true, label: true } } } },
     },
   });
   if (!p) return { ok: false, error: 'gone' };

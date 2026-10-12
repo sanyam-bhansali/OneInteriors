@@ -9,7 +9,7 @@
 
 import type { Prisma } from '@prisma/client';
 import { FILED_CONTENT_TYPE, signedQuoteDocs } from './documents';
-import { quoteToPlan, type PlanMaterial, type PlanPayment, type PlanQuoteLine, type PlanStage, type SignedStageInput } from './quote-to-plan';
+import { quoteToPlan, type DesignPlanInput, type PlanMaterial, type PlanPayment, type PlanQuoteLine, type PlanStage, type SignedStageInput } from './quote-to-plan';
 
 export type PlanDb = Pick<Prisma.TransactionClient, 'homeProjectStage' | 'homeMaterial' | 'homeDocument'>;
 
@@ -36,6 +36,10 @@ export async function writePlan(db: PlanDb, projectId: string, plan: { stages: P
             plannedOn: it.plannedOn,
             doneAt: it.doneAt ?? null,
             doneSource: it.doneAt ? (it.doneSource ?? null) : null,
+            // Studio OS Phase 2: a design step's who, file, payment gate and gap.
+            ...(it.responsible
+              ? { responsible: it.responsible, needsDocument: it.needsDocument === true, gatePayment: it.gatePayment ?? null, gapDays: it.gapDays ?? null }
+              : {}),
           })),
         },
       },
@@ -118,6 +122,8 @@ export interface SignedProjectInput {
   /** The studio filed them (its own client), not the customer signing in the app. */
   filedByStudio?: boolean;
   assuredRequestedAt?: Date | null;
+  /** Studio OS Phase 2: the studio's design steps and the flat size (Hauspire's steps, usual design share when left out). */
+  design?: DesignPlanInput | null;
 }
 
 /**
@@ -136,6 +142,7 @@ export async function createSignedProject(db: SignedProjectDb, input: SignedProj
     totalDays: input.totalDays,
     contractPaise: input.contractPaise,
     stages: input.stages,
+    design: input.design ?? null,
   });
   const payments = built.payments.map((s) => ({ label: s.label, pct: s.pct, amountPaise: s.amountPaise }));
   await db.studioQuote.update({ where: { id: input.quote.id }, data: { status: 'ACCEPTED' } });

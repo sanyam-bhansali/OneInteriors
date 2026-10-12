@@ -30,6 +30,7 @@ import { fromDb } from '@/lib/money';
 import { tellOpsAssured } from './plan-store';
 import { createSignedProject, PLAN_TX } from './plan-write';
 import type { PlanName } from './plans';
+import { designPlanInput } from '@/modules/studio-design/plan-input';
 
 const VISIBLE_QUOTE = ['ISSUED', 'ACCEPTED'] as const;
 
@@ -376,6 +377,8 @@ export async function signFinalQuote(
 
   const now = new Date();
   const startOn = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  // Studio OS Phase 2: the studio's design steps and the flat size, for the DESIGN stage.
+  const design = await designPlanInput(q.studioId, { briefId: intro.briefId });
 
   try {
     const project = await prisma.$transaction(async (tx) => {
@@ -394,6 +397,7 @@ export async function signFinalQuote(
         signedAt: now,
         filedById: me.userId,
         assuredRequestedAt: plan === 'assured' ? now : null,
+        design,
       });
       await tx.quoteDecision.upsert({
         where: { briefId: intro.briefId },

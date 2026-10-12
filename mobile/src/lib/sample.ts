@@ -277,6 +277,39 @@ export const SAMPLE_PROJECT: Project = {
     },
   ],
   siteMissedDays: [],
+  // Studio OS Phase 2: design is done and closed, so the card shows what changed against the first quotation.
+  design: {
+    designer: 'Meera',
+    pct: 100,
+    done: true,
+    closedOn: dayAt(-50),
+    steps: [
+      { label: 'Site visit and measurement', done: true, doneOn: dayAt(-58), plannedOn: dayAt(-58), yours: false, waitingFor: null, moved: null },
+      { label: 'Mood board shared', done: true, doneOn: dayAt(-57), plannedOn: dayAt(-57), yours: false, waitingFor: null, moved: null },
+      { label: 'First draft (FD) meeting', done: true, doneOn: dayAt(-54), plannedOn: dayAt(-55), yours: false, waitingFor: null, moved: 'Moved to a day that suits you.' },
+      { label: 'First 3D and renders', done: true, doneOn: dayAt(-52), plannedOn: dayAt(-52), yours: false, waitingFor: null, moved: null },
+      { label: 'Handover to execution', done: true, doneOn: dayAt(-50), plannedOn: dayAt(-50), yours: false, waitingFor: null, moved: null },
+    ],
+    next: null,
+    moodBoard: { shared: true, sharedOn: dayAt(-57), note: 'Pick two looks you like for the living room.' },
+    visits: [{ at: at(-58, 11), purpose: 'Measurement', status: 'done' }],
+    measurements: [
+      { room: 'Living', size: "15' × 12'", height: `9' 6"` },
+      { room: 'Kitchen', size: "10' × 8'", height: null },
+    ],
+    drawings: [
+      { id: 'sample-dr1', kind: 'LAYOUT_2D', kindLabel: '2D layout', room: 'Living', title: '2D layout, Living', version: 2, state: 'approved', answeredOn: dayAt(-55), comment: null },
+      { id: 'sample-dr2', kind: 'RENDER_3D', kindLabel: '3D render', room: 'Kitchen', title: '3D render, Kitchen', version: 1, state: 'approved', answeredOn: dayAt(-52), comment: null },
+    ],
+    changes: {
+      salesTotalPaise: 18_40_000_00,
+      designTotalPaise: 18_72_500_00,
+      lines: [
+        { kind: 'ADDED', room: 'Living', product: 'TV unit with back panel', wasPaise: 0, nowPaise: 42_500_00 },
+        { kind: 'REMOVED', room: 'Kitchen', product: 'Loft shutters', wasPaise: 10_000_00, nowPaise: 0 },
+      ],
+    },
+  },
   decisions: [
     {
       id: 'd1',

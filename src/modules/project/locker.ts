@@ -25,7 +25,7 @@ import { checkDoc, DECISION_CONTENT_TYPE, DOC_KINDS, docMeta, type DocKind } fro
 import { signedDocUrls, storeProjectDoc } from '@/modules/storage/project-docs';
 import { recordEvent, type ProjectActor } from './events';
 import { staffOn } from './flow-access';
-import { canRemove, canSupersede, checkProductCode, customerVisible, decisionDocKey, decisionDocTitle, newestVersions } from './locker-rules';
+import { canRemove, canSupersede, checkProductCode, customerVisible, decisionDocKey, decisionDocTitle, MONEY_DOC, newestVersions } from './locker-rules';
 
 export type LockerResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -240,7 +240,7 @@ export interface StudioLocker {
 const AUTOMATIC = (d: { kind: string; contentType: string; storageKey: string }) =>
   d.kind === 'RECEIPT' || d.contentType === DECISION_CONTENT_TYPE || d.storageKey.startsWith('signed-quote:');
 
-/** The locker for the studio's workspace card (`project.read`). */
+/** The locker for the studio's workspace card (`project.read`); money documents only with `payment.read` or `quote.write`. */
 export async function studioLocker(projectId: string): Promise<StudioLocker | null> {
   const staff = await staffOn(projectId, 'project.read');
   if (!staff.ok) return null;
@@ -253,7 +253,8 @@ export async function studioLocker(projectId: string): Promise<StudioLocker | nu
       select: { id: true, room: true, item: true, spec: true, productCode: true, orderedAt: true },
     }),
   ]);
-  const docs = newestVersions(all);
+  const seesMoney = staff.may('payment.read') || staff.may('quote.write');
+  const docs = newestVersions(all).filter((d) => seesMoney || !MONEY_DOC(d));
   const urls = await signedDocUrls(docs.map((d) => d.storageKey));
   return {
     projectId,

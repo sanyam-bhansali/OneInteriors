@@ -165,6 +165,21 @@ export function shiftStepDay(day: string | null, before: { start: string; end: s
   return moved;
 }
 
+/**
+ * A DESIGN step's planned day after the design stage's dates moved (Studio OS
+ * Phase 2). Design steps are linked: each is the one before plus its gap, and
+ * "running late" (studio-design/rules.ts `planStepMove`) has already moved the
+ * late step and every open one after it. So they move as one block with the
+ * stage's START only — never by the end, which is usually moved to catch up
+ * with that very overrun (moving them again would shift them twice) — and are
+ * never clamped into the window, which would pile them on one day. A step past
+ * the new end shows as the design running over on the Design tab.
+ */
+export function shiftDesignStepDay(day: string | null, before: { start: string; end: string }, after: { start: string; end: string }): string | null {
+  if (!day) return null;
+  return addDays(day, daysBetween(before.start, after.start));
+}
+
 // ── What the studio may change ────────────────────────────────
 
 export type StepCheck = { ok: true } | { ok: false; error: string };

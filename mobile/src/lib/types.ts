@@ -162,6 +162,53 @@ export interface Project {
   siteLogs?: SiteDay[];
   /** Phase 2: working days of the last two weeks with nothing posted by 21:00 IST. Older servers omit it. */
   siteMissedDays?: string[];
+  /** Studio OS Phase 2: the design phase (studio-design/customer-view.ts). Older servers omit it; null with no design stage. */
+  design?: Design | null;
+}
+
+/** A design step as the customer sees it: never the team's note or who ticked it. */
+export interface DesignStep {
+  label: string;
+  done: boolean;
+  doneOn: string | null;
+  plannedOn: string | null;
+  /** The client's own step. */
+  yours: boolean;
+  /** Locked until this payment is recorded. */
+  waitingFor: string | null;
+  /** Why it moved, in plain words. */
+  moved: string | null;
+}
+
+export interface DesignDrawing {
+  /** The shared document's id: what the customer answers. Its link is in `documents`. */
+  id: string;
+  kind: 'LAYOUT_2D' | 'FURNITURE' | 'RENDER_3D' | 'WORKING' | 'SITE_PHOTO';
+  kindLabel: string;
+  room: string | null;
+  title: string;
+  version: number;
+  state: 'waiting' | 'approved' | 'changes' | 'shared';
+  answeredOn: string | null;
+  comment: string | null;
+}
+
+export interface Design {
+  designer: string | null;
+  pct: number | null;
+  done: boolean;
+  closedOn: string | null;
+  steps: DesignStep[];
+  next: DesignStep | null;
+  moodBoard: { shared: boolean; sharedOn: string | null; note: string | null };
+  visits: { at: string; purpose: string; status: 'booked' | 'done' }[];
+  measurements: { room: string; size: string; height: string | null }[];
+  drawings: DesignDrawing[];
+  changes: {
+    salesTotalPaise: number;
+    designTotalPaise: number;
+    lines: { kind: 'ADDED' | 'REMOVED' | 'REPRICED'; room: string; product: string; wasPaise: number; nowPaise: number }[];
+  } | null;
 }
 
 /** Phase 2: why nobody was on site, as the server names it. */

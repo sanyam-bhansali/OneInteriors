@@ -189,7 +189,7 @@ export async function markStageDone(projectId: string, stageId: string, done: bo
   if (!check.ok) return check;
   const stage = await prisma.homeProjectStage.findFirst({
     where: { id: stageId, projectId },
-    select: { id: true, kind: true, name: true, actualEnd: true, items: { select: { doneAt: true, inScope: true, donePhotoId: true } } },
+    select: { id: true, kind: true, name: true, actualEnd: true, items: { select: { doneAt: true, inScope: true, donePhotoId: true, doneSource: true } } },
   });
   if (!stage) return { ok: false, error: 'That stage is not on this plan any more. Reload the page.' };
   if ((stage.actualEnd !== null) === done) return { ok: true, message: done ? 'Already done.' : 'Already open.' };
@@ -247,7 +247,8 @@ export async function untickStep(projectId: string, stepId: string, now = new Da
   const outcome = await prisma.$transaction(async (tx) => {
     await tx.homeChecklistItem.update({
       where: { id: step.id },
-      data: { doneAt: null, doneById: null, doneSource: null, doneSiteLogId: null, donePhotoId: null },
+      // A design step's note and file stay in the locker and the event log; the step just lets go of them.
+      data: { doneAt: null, doneById: null, doneSource: null, doneSiteLogId: null, donePhotoId: null, doneNote: null, doneDocumentId: null },
     });
     await recordEvent(tx, { projectId, type: 'checklist.unticked', actor, refId: step.id, at: now });
     return settleStageAfterTicks(tx, projectId, step.stageId, actor, now);

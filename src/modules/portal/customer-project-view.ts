@@ -53,6 +53,11 @@
  *   (a shared document), correctsId, customerConfirmedAt, disputedAt.
  * - `quoteChanges`: label, deltaPaise, stageIndex, at.
  *
+ * Studio OS Phase 2 adds the design card (studio-design/customer-view.ts
+ * names its columns and builds it): never a design step's `doneNote` or
+ * file, a site visit's or a moved step's `note`, a measurement's note, the
+ * designer's id or phone, or a draft drawing.
+ *
  * Never: `note` on site logs, date changes and payments; `internalNote`;
  * `voicePath`, `transcript`, `transcriptLang`; `lat`/`lng`;
  * `studioCostDeltaPaise`; crew `phone`; `disputeNote`; any `…ById`,
@@ -87,6 +92,7 @@ import {
   type CustomerPayments,
 } from './money-locker-view';
 import type { CustomerChoice } from '@/modules/project/decision-rules';
+import { CUSTOMER_DESIGN_SELECT, toCustomerDesign, type CustomerDesign } from '@/modules/studio-design/customer-view';
 
 export interface CustomerDecision {
   id: string;
@@ -172,6 +178,8 @@ export interface CustomerProject {
   siteLogs: CustomerSiteDay[];
   /** Working days of the last two weeks with nothing posted by 21:00 IST: "No update from the studio today". */
   siteMissedDays: string[];
+  /* Studio OS Phase 2 — design (studio-design/customer-view.ts): steps, the next one and the payment that opens it, mood board, visits, measurements, drawings to approve, what changed at closing. Null with no DESIGN stage. */
+  design: CustomerDesign | null;
 }
 
 export const UPDATES_SHOWN = 30;
@@ -198,7 +206,11 @@ export const CUSTOMER_PROJECT_SELECT = {
          not-in-scope steps (portal/tracker-view.ts); neither goes out. */
       id: true,
       plannedStart: true,
-      items: { orderBy: { sortOrder: 'asc' }, select: { room: true, label: true, doneAt: true, weightBp: true, inScope: true, plannedOn: true } },
+      /* Studio OS Phase 2: a design step's id (to place a moved day; never sent), whose step it is and its payment gate. */
+      items: {
+        orderBy: { sortOrder: 'asc' },
+        select: { room: true, label: true, doneAt: true, weightBp: true, inScope: true, plannedOn: true, id: true, responsible: true, gatePayment: true },
+      },
     },
   },
   /* Phase 3: moved dates — old, new, reason. Never the PM's `note` or `byId`. */
@@ -275,8 +287,10 @@ export const CUSTOMER_PROJECT_SELECT = {
   documents: {
     where: { deletedAt: null, sharedAt: { not: null } },
     orderBy: { createdAt: 'desc' },
-    select: { id: true, kind: true, title: true, storageKey: true, contentType: true, bytes: true, createdAt: true, version: true, supersedesId: true },
+    select: { id: true, kind: true, title: true, storageKey: true, contentType: true, bytes: true, createdAt: true, version: true, supersedesId: true, designKind: true, room: true },
   },
+  /* Studio OS Phase 2: the design card's columns (studio-design/customer-view.ts names them). */
+  ...CUSTOMER_DESIGN_SELECT,
 } satisfies Prisma.HomeProjectSelect;
 
 export type CustomerProjectRow = Prisma.HomeProjectGetPayload<{ select: typeof CUSTOMER_PROJECT_SELECT }>;
@@ -382,5 +396,11 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
     materials: customerMaterials(p.materials),
     siteLogs: siteDays(p.siteLogs ?? [], links.siteLogPhotos),
     siteMissedDays: siteMissedDays({ ...p, studio: p.introduction.studio, siteLogs: p.siteLogs ?? [] }, now),
+    design: toCustomerDesign(
+      (p.stages ?? []).find((s) => s.kind === 'DESIGN') ?? null,
+      p,
+      p.documents ?? [],
+      ledgerOf ? ledgerOf.stages.map((s) => ({ index: s.index, label: s.label, state: s.state })) : null,
+    ),
   };
 }

@@ -10,6 +10,8 @@ import { useMyProject, type MyProject } from '@/components/app/useMyProject';
 import { CARPENTRY, EXAMPLE, MILESTONES } from '@/modules/app/example-project';
 import { dayLabel, daysLate, pickDecision, shortDate } from '@/modules/app/project-view';
 import { formatINR, formatINRCompact } from '@/lib/money';
+import { DesignCard } from './DesignCard';
+import { PaymentEntries } from './PaymentEntries';
 
 const MONO = { margin: '4px 0 0', font: '400 13px var(--mono)', color: 'var(--ink-2)' } as const;
 
@@ -99,7 +101,7 @@ function Progress({ pct, label }: { pct: number; label: string }) {
  * its steps — ticked with the day, or the day planned. Photos live in the
  * site feed, never here.
  */
-function RealProject({ project }: { project: MyProject }) {
+function RealProject({ project, reload }: { project: MyProject; reload: () => void }) {
   const late = daysLate(project.stages);
   const handover = project.stages[project.stages.length - 1];
   const money = project.money;
@@ -176,7 +178,12 @@ function RealProject({ project }: { project: MyProject }) {
           ) : null}
         </div>
 
-        {money ? <Payments money={money} studio={project.studio} /> : null}
+        {/* Studio OS Phase 2: the design phase, while it runs and once it closes. */}
+        {project.design && project.design.steps.length > 0 && (!project.design.done || project.design.changes) ? (
+          <DesignCard design={project.design} studio={project.studio} owner={project.role === 'owner'} docs={project.documents} onChanged={reload} />
+        ) : null}
+
+        {money ? <Payments money={money} studio={project.studio} payments={project.payments} owner={project.role === 'owner'} onChanged={reload} /> : null}
         {project.changes.items.length ? <Changes changes={project.changes} contractPaise={money?.contractPaise ?? null} /> : null}
 
         <div className="oa-section-head">
@@ -257,7 +264,22 @@ function StageSteps({ stage, open }: { stage: NonNullable<MyProject['tracker']>[
 
 /** Paid, next and after that, in rupees, as a ring; then each stage with its amount and date (trust fix 5). */
 
-function Payments({ money, studio }: { money: NonNullable<MyProject['money']>; studio: string }) {
+function Payments({
+  money,
+  studio,
+  payments,
+  owner,
+  onChanged,
+}: {
+  money: NonNullable<MyProject['money']>;
+  studio: string;
+  /** The recorded payments (studio workspace Phase 5): what waits on the customer's yes. */
+  payments: MyProject['payments'];
+  owner: boolean;
+  onChanged: () => void;
+}) {
+  // A stage the studio recorded money on that the customer has not confirmed yet.
+  const waitingOn = new Set((payments?.stages ?? []).filter((s) => s.waitingPaise > 0).map((s) => s.index));
   const R = 52;
   const C = 2 * Math.PI * R;
   const total = Math.max(1, money.contractPaise);
@@ -321,7 +343,11 @@ function Payments({ money, studio }: { money: NonNullable<MyProject['money']>; s
               <small>
                 {s.paidOn
                   ? `Paid ${shortDate(s.paidOn)}`
-                  : s.dueOn
+                  : waitingOn.has(s.index)
+                    ? owner
+                      ? 'Recorded by the studio — please confirm'
+                      : 'Recorded by the studio — waiting for the owner to confirm'
+                    : s.dueOn
                     ? `Due ${shortDate(s.dueOn)}`
                     : s.state === 'next'
                       ? 'Next · the studio sets the date'
@@ -335,6 +361,7 @@ function Payments({ money, studio }: { money: NonNullable<MyProject['money']>; s
           </li>
         ))}
       </ol>
+      {payments ? <PaymentEntries payments={payments} onChanged={onChanged} /> : null}
       <p className="oa-note">
         You pay {studio} directly. We remind you two days before each payment is due, and keep every receipt in your Home locker.
       </p>
@@ -375,7 +402,7 @@ function Changes({ changes, contractPaise }: { changes: MyProject['changes']; co
 export default function AppProject() {
   const mine = useMyProject();
   if (mine.state === 'loading') return <Frame>{null}</Frame>;
-  return mine.state === 'real' ? <RealProject project={mine.project} /> : <ExampleProject />;
+  return mine.state === 'real' ? <RealProject project={mine.project} reload={mine.reload} /> : <ExampleProject />;
 }
 
 /** "Share this milestone" on a finished stage: the phone's share sheet, else WhatsApp. +25 coins, up to five. */

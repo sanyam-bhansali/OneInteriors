@@ -32,6 +32,7 @@ import { durationFor } from '@/modules/portal/tracker';
 import { can, needsAssignment } from '@/modules/studio/roles';
 import { readProfile } from '@/modules/studio/matching-profile';
 import { ACCESS_ERRORS, type StudioMemberRef } from '@/modules/studio/access';
+import { designPlanInput } from '@/modules/studio-design/plan-input';
 import { recordEvent } from './events';
 import { deliverInvite, type InviteChannel } from './own-project-invite';
 import {
@@ -250,6 +251,8 @@ export async function startOwnProject(
 
   const signedAt = now;
   const code = freshCode();
+  // Studio OS Phase 2: the studio's design steps and the flat size, for the DESIGN stage.
+  const design = await designPlanInput(member.studioId, { propertyType: propertyTypeFrom(q.config ?? q.client?.config) });
   try {
     const started = await prisma.$transaction(async (tx) => {
       // The customer's account: theirs if they have one (CUSTOMER only, checked above), else made now.
@@ -307,6 +310,7 @@ export async function startOwnProject(
         signedAt,
         filedById: member.userId,
         filedByStudio: true,
+        design,
       });
 
       // A PM sees only projects they are on; the one who started it is on it.

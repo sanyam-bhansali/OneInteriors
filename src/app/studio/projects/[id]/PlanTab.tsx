@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { StudioPlan, PlanStageView, PlanStepView, PlanEditResult } from '@/modules/project/plan-edit';
 import {
@@ -357,7 +358,9 @@ function Steps({ plan, stage, customer, say }: { plan: StudioPlan; stage: PlanSt
   const [editing, setEditing] = useState<string | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const canTick = plan.canTick && plan.canPost;
+  // Studio OS Phase 2: design steps are ticked on the Design tab (payment gates, files), never with a site photo.
+  const design = stage.kind === 'DESIGN';
+  const canTick = plan.canTick && plan.canPost && !design;
 
   const untick = (st: PlanStepView) => {
     if (!window.confirm(`Untick “${st.label}”? ${customer}'s percentage goes back down. The photo stays in the site log.`)) return;
@@ -370,6 +373,15 @@ function Steps({ plan, stage, customer, say }: { plan: StudioPlan; stage: PlanSt
         A step is ticked with a photo and a sentence: both go into today&rsquo;s site log, labelled &ldquo;Done: step&rdquo;. Each % is the step&rsquo;s share of the whole project.
         {plan.canEdit ? ` Weights in scope add up to ${plan.weightTotalPct}%; every share is worked out again so the project always totals 100%.` : ''}
       </p>
+      {design ? (
+        <p className={`m-0 ${muted}`}>
+          Design steps are ticked on the{' '}
+          <Link href={`/studio/projects/${plan.projectId}?tab=design`} className="text-[var(--s-accent)]">
+            Design tab
+          </Link>
+          , with their files and payment gates.
+        </p>
+      ) : null}
       {stage.groups.map((g) => (
         <div key={g.group} className="rounded-[10px] bg-[var(--s-surface-2)] p-3">
           <p className="m-0 mb-1.5 text-[12.5px] font-semibold text-[var(--s-ink-2)]">{g.group}</p>

@@ -1,0 +1,109 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
+import {
+  addMoodBoardPieces,
+  applyDesignSteps,
+  assignDesigner,
+  bookVisit,
+  closeDesign,
+  editDesignStep,
+  makeDesignFinal,
+  moveDesignStep,
+  saveMeasurements,
+  setVisitStatus,
+  shareDrawing,
+  shareMoodBoard,
+  tickDesignStep,
+  uploadDrawing,
+  type DesignResult,
+} from '@/modules/studio-design/design-flow';
+
+/**
+ * The Design tab's writes (Studio OS Phase 2). Every check — who may, on
+ * which project, what a tick needs — is in the module
+ * (modules/studio-design/design-flow.ts); these only clip input and refresh
+ * the page.
+ */
+
+const id = (v: unknown) => String(v ?? '').slice(0, 64);
+const text = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '');
+const fileOf = (v: FormDataEntryValue | null): File | null => (v && typeof v !== 'string' && v.size > 0 ? v : null);
+
+function done(projectId: string, r: DesignResult): DesignResult {
+  if (r.ok) revalidatePath(`/studio/projects/${projectId}`);
+  return r;
+}
+
+export async function assignDesignerAction(projectId: string, memberId: string): Promise<DesignResult> {
+  return done(id(projectId), await assignDesigner(id(projectId), memberId ? id(memberId) : null));
+}
+
+export async function tickDesignStepAction(form: FormData): Promise<DesignResult> {
+  const projectId = id(form.get('projectId'));
+  return done(projectId, await tickDesignStep(projectId, id(form.get('stepId')), { note: text(form.get('note'), 600), share: form.get('share') }, fileOf(form.get('file'))));
+}
+
+export async function moveDesignStepAction(input: { projectId: string; stepId: string; to: string; reason: string; note: string }): Promise<DesignResult> {
+  const projectId = id(input.projectId);
+  return done(projectId, await moveDesignStep(projectId, id(input.stepId), { to: text(input.to, 10), reason: text(input.reason, 40), note: text(input.note, 600) }));
+}
+
+export async function editDesignStepAction(input: { projectId: string; stepId: string; responsible: string; needsDocument: boolean; gatePayment: string }): Promise<DesignResult> {
+  const projectId = id(input.projectId);
+  return done(projectId, await editDesignStep(projectId, id(input.stepId), { responsible: text(input.responsible, 20) || null, needsDocument: input.needsDocument === true, gatePayment: text(input.gatePayment, 3) }));
+}
+
+export async function applyDesignStepsAction(projectId: string): Promise<DesignResult> {
+  return done(id(projectId), await applyDesignSteps(id(projectId)));
+}
+
+export async function shareMoodBoardAction(projectId: string, note: string): Promise<DesignResult> {
+  return done(id(projectId), await shareMoodBoard(id(projectId), text(note, 400)));
+}
+
+export async function addMoodBoardPiecesAction(projectId: string, roomKey: string, slugs: string[]): Promise<DesignResult> {
+  return done(id(projectId), await addMoodBoardPieces(id(projectId), text(roomKey, 40), Array.isArray(slugs) ? slugs.slice(0, 24).map((s) => text(s, 80)) : []));
+}
+
+export async function bookVisitAction(input: { projectId: string; day: string; time: string; purpose: string; note: string }): Promise<DesignResult> {
+  const projectId = id(input.projectId);
+  return done(projectId, await bookVisit(projectId, { day: text(input.day, 10), time: text(input.time, 5), purpose: text(input.purpose, 100), note: text(input.note, 600) }));
+}
+
+export async function setVisitStatusAction(projectId: string, visitId: string, status: string): Promise<DesignResult> {
+  return done(id(projectId), await setVisitStatus(id(projectId), id(visitId), text(status, 12)));
+}
+
+export async function saveMeasurementsAction(projectId: string, rows: { room: string; length: string; width: string; height: string; note: string }[]): Promise<DesignResult> {
+  const clean = (Array.isArray(rows) ? rows : []).slice(0, 60).map((r) => ({ room: text(r.room, 80), length: text(r.length, 20), width: text(r.width, 20), height: text(r.height, 20), note: text(r.note, 220) }));
+  return done(id(projectId), await saveMeasurements(id(projectId), clean));
+}
+
+export async function uploadDrawingAction(form: FormData): Promise<DesignResult> {
+  const projectId = id(form.get('projectId'));
+  return done(
+    projectId,
+    await uploadDrawing(
+      projectId,
+      { kind: text(form.get('kind'), 20), room: text(form.get('room'), 80), title: text(form.get('title'), 120), supersedesId: text(form.get('supersedesId'), 64), share: form.get('share') },
+      fileOf(form.get('file')),
+    ),
+  );
+}
+
+export async function shareDrawingAction(projectId: string, documentId: string): Promise<DesignResult> {
+  return done(id(projectId), await shareDrawing(id(projectId), id(documentId)));
+}
+
+/** Makes (or finds) the Design Final, then opens it in the quotation builder. */
+export async function makeDesignFinalAction(projectId: string): Promise<DesignResult> {
+  const r = await makeDesignFinal(id(projectId));
+  if (r.ok && r.id) redirect(`/studio/quotations/${r.id}`);
+  return r;
+}
+
+export async function closeDesignAction(projectId: string): Promise<DesignResult> {
+  return done(id(projectId), await closeDesign(id(projectId)));
+}

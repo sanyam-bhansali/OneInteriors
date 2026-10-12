@@ -1,0 +1,795 @@
+'use client';
+
+import Link from 'next/link';
+import { useState, useTransition } from 'react';
+import type { DesignStepView, DesignTab, DrawingView } from '@/modules/studio-design/store';
+import { CLIENT_REASONS, DESIGN_KINDS, STUDIO_REASONS, type DesignKind } from '@/modules/studio-design/rules';
+import { RESPONSIBLE_LABEL, RESPONSIBLES } from '@/modules/studio-design/template';
+import { formatINR } from '@/lib/money';
+import { CustomerSees, OnlyYourTeam } from '../marks';
+import {
+  addMoodBoardPiecesAction,
+  applyDesignStepsAction,
+  assignDesignerAction,
+  bookVisitAction,
+  closeDesignAction,
+  editDesignStepAction,
+  makeDesignFinalAction,
+  moveDesignStepAction,
+  saveMeasurementsAction,
+  setVisitStatusAction,
+  shareDrawingAction,
+  shareMoodBoardAction,
+  tickDesignStepAction,
+  uploadDrawingAction,
+} from './design-actions';
+
+/**
+ * The project's Design tab (Studio OS Phase 2, docs/studio-os/PHASE-2-DESIGN.md):
+ * the designer, the design steps with their payment gates and files, the site
+ * visit and measurements, the mood board, drawings for approval and the design
+ * final. One obvious action per row. Everything the client sees carries the
+ * "sees this" mark; the team's notes sit in "Only your team".
+ */
+
+const muted = 'text-[12.5px] text-[var(--s-ink-3)]';
+const h2 = 'm-0 text-[16px] font-semibold';
+const small = 'text-[12.5px]';
+
+const dayWords = (iso: string | null) =>
+  iso ? new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).replace(',', '') : '';
+const whenWords = (iso: string) =>
+  new Date(iso).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+
+type Result = { ok: true; message: string } | { ok: false; error: string };
+
+function useRun() {
+  const [pending, start] = useTransition();
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const run = (fn: () => Promise<Result>, after?: () => void) =>
+    start(async () => {
+      setMessage(null);
+      const r = await fn();
+      setMessage(r.ok ? { ok: true, text: r.message } : { ok: false, text: r.error });
+      if (r.ok) after?.();
+    });
+  return { pending, message, run };
+}
+
+function Message({ m }: { m: { ok: boolean; text: string } | null }) {
+  if (!m) return null;
+  return (
+    <p role={m.ok ? 'status' : 'alert'} className={`m-0 ${small} ${m.ok ? 'text-[var(--s-good)]' : 'text-[var(--s-bad)]'}`}>
+      {m.text}
+    </p>
+  );
+}
+
+export function DesignPanel({ tab }: { tab: DesignTab }) {
+  return (
+    <div className="flex flex-col gap-5">
+      <Overview tab={tab} />
+      <Steps tab={tab} />
+      <VisitAndSizes tab={tab} />
+      <MoodBoard tab={tab} />
+      <Drawings tab={tab} />
+      <DesignFinal tab={tab} />
+    </div>
+  );
+}
+
+// ── Overview and the designer ─────────────────────────────────
+
+function Overview({ tab }: { tab: DesignTab }) {
+  const { pending, message, run } = useRun();
+  const [pick, setPick] = useState(tab.designer?.id ?? '');
+  const next = tab.next;
+  return (
+    <section aria-label="Design" className="s-card flex flex-col gap-3 p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className={h2}>
+          Design {tab.pct !== null ? <span className="s-num font-[family-name:var(--font-mono)] text-[var(--s-accent)]">{tab.pct}%</span> : null}
+        </h2>
+        <CustomerSees name={tab.customerFirst} />
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-[var(--s-rule)]" role="progressbar" aria-label={`Design ${tab.pct ?? 0}% done`} aria-valuenow={tab.pct ?? 0} aria-valuemin={0} aria-valuemax={100}>
+        <div className="h-full rounded-full bg-[var(--s-accent)]" style={{ width: `${tab.pct ?? 0}%` }} />
+      </div>
+      {tab.stage ? (
+        <p className={`m-0 ${muted}`}>
+          {tab.stage.done ? 'Design is done.' : `Planned ${dayWords(tab.stage.plannedStart)} to ${dayWords(tab.stage.plannedEnd)}`}
+          {tab.bhk ? ` · ${tab.bhk} BHK` : ''}
+        </p>
+      ) : (
+        <p className={`m-0 ${muted}`}>This project has no design stage in its plan.</p>
+      )}
+      {next ? (
+        <p className="m-0 text-[14.5px]">
+          <span className="font-semibold">Next: {next.label}</span>
+          {next.plannedOn ? ` · ${dayWords(next.plannedOn)}` : ''}
+          {next.lockedBy ? <span className="ml-1 text-[var(--s-warn)]"> · opens when the {next.lockedBy} is recorded</span> : null}
+        </p>
+      ) : null}
+      {tab.overrunDays > 0 ? (
+        <p className="m-0 rounded-[10px] bg-[var(--s-warn-wash)] p-3 text-[13.5px] text-[var(--s-warn)]">
+          Design now ends {tab.overrunDays} day{tab.overrunDays === 1 ? '' : 's'} after the plan&rsquo;s date.{' '}
+          {tab.canEditPlan ? (
+            <Link href={`/studio/projects/${tab.projectId}`} className="text-[var(--s-accent)]">
+              Move the plan&rsquo;s dates
+            </Link>
+          ) : (
+            'Tell your project manager.'
+          )}
+        </p>
+      ) : null}
+      {tab.legacySteps && tab.canEditPlan ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-[10px] bg-[var(--s-surface-2)] p-3">
+          <span className="text-[13.5px]">This project started before design steps. Give it your studio&rsquo;s design steps?</span>
+          <button type="button" className="s-btn min-h-[36px] px-3 text-[13.5px]" disabled={pending} onClick={() => run(() => applyDesignStepsAction(tab.projectId))}>
+            Use our design steps
+          </button>
+        </div>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-2 border-t border-[var(--s-rule)] pt-3">
+        <span className="text-[13.5px] font-semibold">Designer</span>
+        {tab.canAssign ? (
+          <>
+            <select className="s-input min-h-[36px] max-w-[240px]" value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Designer">
+              <option value="">Nobody yet</option>
+              {tab.designers.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                  {d.role !== 'DESIGNER' ? ` (${d.role === 'OWNER' ? 'owner' : 'project manager'})` : ''}
+                </option>
+              ))}
+            </select>
+            <button type="button" className="s-btn min-h-[36px] px-3 text-[13.5px]" disabled={pending || pick === (tab.designer?.id ?? '')} onClick={() => run(() => assignDesignerAction(tab.projectId, pick))}>
+              Save
+            </button>
+            {tab.designers.every((d) => d.role !== 'DESIGNER') ? <span className={muted}>Add designers in Settings, Team.</span> : null}
+          </>
+        ) : (
+          <span className="text-[13.5px]">{tab.designer?.name ?? 'Nobody yet'}</span>
+        )}
+      </div>
+      <Message m={message} />
+    </section>
+  );
+}
+
+// ── Steps ─────────────────────────────────────────────────────
+
+function Steps({ tab }: { tab: DesignTab }) {
+  const [open, setOpen] = useState<{ id: string; what: 'tick' | 'move' | 'edit' } | null>(null);
+  const { message, run, pending } = useRun();
+  if (tab.steps.length === 0) return null;
+  return (
+    <section aria-label="Design steps" className="s-card flex flex-col gap-2 p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className={h2}>Design steps</h2>
+        <CustomerSees name={tab.customerFirst} />
+      </div>
+      <p className={`m-0 ${muted}`}>Each % is the step&rsquo;s share of the design. A locked step opens when its payment is recorded by accounts.</p>
+      <ul className="m-0 flex list-none flex-col gap-1 p-0">
+        {tab.steps.map((st) => (
+          <li key={st.id} className="rounded-[8px] px-1.5 py-2 hover:bg-[var(--s-surface-2)]">
+            <StepLine tab={tab} st={st} onOpen={(what) => setOpen(open?.id === st.id && open.what === what ? null : { id: st.id, what })} />
+            {open?.id === st.id && open.what === 'tick' ? <TickForm tab={tab} st={st} onDone={() => setOpen(null)} /> : null}
+            {open?.id === st.id && open.what === 'move' ? <MoveForm tab={tab} st={st} onDone={() => setOpen(null)} /> : null}
+            {open?.id === st.id && open.what === 'edit' ? (
+              <EditForm
+                tab={tab}
+                st={st}
+                busy={pending}
+                onSave={(v) => run(() => editDesignStepAction({ projectId: tab.projectId, stepId: st.id, ...v }), () => setOpen(null))}
+              />
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      <Message m={message} />
+    </section>
+  );
+}
+
+function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onOpen: (what: 'tick' | 'move' | 'edit') => void }) {
+  const meta = !st.inScope
+    ? `Not in scope · ${tab.customerFirst} does not see it`
+    : st.done
+      ? `Done ${dayWords(st.doneOn)}`
+      : st.plannedOn
+        ? `Planned ${dayWords(st.plannedOn)}${st.lateDays ? ` · ${st.lateDays} day${st.lateDays === 1 ? '' : 's'} late` : ''}`
+        : 'Open';
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      <span
+        aria-hidden="true"
+        className="inline-flex h-5 w-5 flex-none items-center justify-center rounded-[6px] border text-[12px] font-bold"
+        style={st.done ? { background: 'var(--s-accent)', borderColor: 'var(--s-accent)', color: '#fff' } : { borderColor: 'var(--s-ink-3)', background: 'var(--s-surface)' }}
+      >
+        {st.done ? '✓' : st.lockedBy ? '🔒' : ''}
+      </span>
+      <span className="min-w-0 flex-1 basis-[240px]">
+        <span className={`block text-[14px] ${st.done || !st.inScope ? 'text-[var(--s-ink-3)]' : ''}`}>
+          {st.label}
+          <span className="sr-only">{st.done ? ' (done)' : st.lockedBy ? ' (locked)' : ' (open)'}</span>
+        </span>
+        <span className={`block ${muted} ${st.lateDays && !st.done ? '!text-[var(--s-bad)]' : ''}`}>
+          {meta}
+          {st.responsibleLabel ? ` · ${st.responsibleLabel}` : ''}
+          {st.needsDocument ? ' · needs its file' : ''}
+          {st.lockedBy ? ` · opens when the ${st.lockedBy} is recorded` : ''}
+        </span>
+        {st.moves.length ? (
+          <span className={`block ${muted}`}>
+            Moved {st.moves.length === 1 ? 'once' : `${st.moves.length} times`}: last {dayWords(st.moves.at(-1)!.from)} → {dayWords(st.moves.at(-1)!.to)} ({st.moves.at(-1)!.side === 'CLIENT' ? 'client side' : 'studio side'}: {st.moves.at(-1)!.reason.toLowerCase()})
+          </span>
+        ) : null}
+        {st.done && (st.doneNote || st.doneFile) ? (
+          <span className={`block ${muted}`}>
+            {st.doneNote ? `Team note: ${st.doneNote}` : ''}
+            {st.doneFile ? (
+              <>
+                {st.doneNote ? ' · ' : ''}
+                <a href={st.doneFile.url} target="_blank" rel="noreferrer" className="text-[var(--s-accent)]">
+                  {st.doneFile.title}
+                </a>
+              </>
+            ) : null}
+          </span>
+        ) : null}
+      </span>
+      <span className="s-num w-[48px] flex-none text-right font-[family-name:var(--font-mono)] text-[13px] text-[var(--s-ink-2)]" title="Its share of the design">
+        {st.inScope ? `${st.sharePct}%` : '—'}
+      </span>
+      <span className="flex flex-none flex-wrap items-center gap-1.5">
+        {tab.canWork && st.inScope && !st.done ? (
+          <button type="button" className="s-btn min-h-[36px] px-3 text-[13.5px]" disabled={Boolean(st.lockedBy)} onClick={() => onOpen('tick')} title={st.lockedBy ? `Opens when the ${st.lockedBy} is recorded` : undefined}>
+            Tick
+          </button>
+        ) : null}
+        {tab.canWork && st.inScope && !st.done && st.plannedOn ? (
+          <button type="button" className="s-btn-ghost min-h-[36px] px-3 text-[13px]" onClick={() => onOpen('move')}>
+            Running late
+          </button>
+        ) : null}
+        {tab.canEditPlan ? (
+          <button type="button" className="s-btn-ghost min-h-[36px] px-3 text-[13px]" onClick={() => onOpen('edit')} aria-label={`Edit ${st.label}`}>
+            Edit
+          </button>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
+function TickForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onDone: () => void }) {
+  const { pending, message, run } = useRun();
+  return (
+    <form
+      className="mt-2 flex flex-col gap-2 rounded-[10px] border border-[var(--s-rule)] p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const data = new FormData(e.currentTarget);
+        data.set('projectId', tab.projectId);
+        data.set('stepId', st.id);
+        run(() => tickDesignStepAction(data), onDone);
+      }}
+    >
+      <label className="flex flex-col gap-1 text-[13px]">
+        {st.needsDocument ? 'The file (required): PDF or image' : 'A file, if there is one'}
+        <input type="file" name="file" accept="application/pdf,image/jpeg,image/png,image/webp" required={st.needsDocument} className="text-[13px]" />
+      </label>
+      <label className="flex items-center gap-2 text-[13px]">
+        <input type="checkbox" name="share" /> Show the file to {tab.customerFirst} too
+      </label>
+      <OnlyYourTeam>
+        <label className="flex flex-col gap-1 text-[13px]">
+          What was done (optional)
+          <textarea name="note" rows={2} maxLength={500} className="s-input" />
+        </label>
+      </OnlyYourTeam>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="submit" className="s-btn min-h-[36px] px-3 text-[13.5px]" disabled={pending}>
+          Tick {st.label}
+        </button>
+        <button type="button" className="s-btn-ghost min-h-[36px] px-3 text-[13px]" onClick={onDone}>
+          Cancel
+        </button>
+      </div>
+      <Message m={message} />
+    </form>
+  );
+}
+
+function MoveForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onDone: () => void }) {
+  const { pending, message, run } = useRun();
+  const [to, setTo] = useState(st.plannedOn ?? tab.today);
+  const [reason, setReason] = useState('');
+  const [note, setNote] = useState('');
+  return (
+    <form
+      className="mt-2 flex flex-col gap-2 rounded-[10px] border border-[var(--s-rule)] p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        run(() => moveDesignStepAction({ projectId: tab.projectId, stepId: st.id, to, reason, note }), onDone);
+      }}
+    >
+      <div className="flex flex-wrap gap-2">
+        <label className="flex flex-col gap-1 text-[13px]">
+          New day
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="s-input" required />
+        </label>
+        <label className="flex flex-col gap-1 text-[13px]">
+          Why
+          <select value={reason} onChange={(e) => setReason(e.target.value)} className="s-input" required>
+            <option value="">Pick one</option>
+            <optgroup label="Client side">
+              {Object.entries(CLIENT_REASONS).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Studio side">
+              {Object.entries(STUDIO_REASONS).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </optgroup>
+          </select>
+        </label>
+      </div>
+      <OnlyYourTeam>
+        <label className="flex flex-col gap-1 text-[13px]">
+          Note (optional)
+          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} className="s-input" />
+        </label>
+      </OnlyYourTeam>
+      <p className={`m-0 ${muted}`}>The open steps after this one move by the same days. {tab.customerFirst} sees the new day and the reason, never the note.</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="submit" className="s-btn min-h-[36px] px-3 text-[13.5px]" disabled={pending}>
+          Move
+        </button>
+        <button type="button" className="s-btn-ghost min-h-[36px] px-3 text-[13px]" onClick={onDone}>
+          Cancel
+        </button>
+      </div>
+      <Message m={message} />
+    </form>
+  );
+}
+
+function EditForm({ tab, st, busy, onSave }: { tab: DesignTab; st: DesignStepView; busy: boolean; onSave: (v: { responsible: string; needsDocument: boolean; gatePayment: string }) => void }) {
+  const [responsible, setResponsible] = useState<string>(st.responsible ?? '');
+  const [needsDocument, setNeedsDocument] = useState(st.needsDocument);
+  const [gate, setGate] = useState(st.gatePayment === null ? '' : String(st.gatePayment));
+  return (
+    <div className="mt-2 flex flex-wrap items-end gap-2 rounded-[10px] border border-[var(--s-rule)] p-3">
+      <label className="flex flex-col gap-1 text-[13px]">
+        Who does it
+        <select value={responsible} onChange={(e) => setResponsible(e.target.value)} className="s-input">
+          <option value="">Not set</option>
+          {RESPONSIBLES.map((r) => (
+            <option key={r} value={r}>
+              {RESPONSIBLE_LABEL[r]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-[13px]">
+        Opens when this payment is recorded
+        <select value={gate} onChange={(e) => setGate(e.target.value)} className="s-input">
+          <option value="">No payment needed</option>
+          {tab.payments.map((p) => (
+            <option key={p.index} value={String(p.index)}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex min-h-[36px] items-center gap-2 text-[13px]">
+        <input type="checkbox" checked={needsDocument} onChange={(e) => setNeedsDocument(e.target.checked)} /> Needs its file to tick
+      </label>
+      <button type="button" className="s-btn min-h-[36px] px-3 text-[13.5px]" disabled={busy} onClick={() => onSave({ responsible, needsDocument, gatePayment: gate })}>
+        Save
+      </button>
+      <span className={muted}>Rename, weight or scope it in the Plan tab.</span>
+    </div>
+  );
+}
+
+// ── Site visit and measurements ──────────────────────────────
+
+function VisitAndSizes({ tab }: { tab: DesignTab }) {
+  const { pending, message, run } = useRun();
+  const [day, setDay] = useState(tab.today);
+  const [time, setTime] = useState('11:00');
+  const [purpose, setPurpose] = useState('Measurement');
+  const [note, setNote] = useState('');
+  const blank = { room: '', length: '', width: '', height: '', note: '' };
+  const [rows, setRows] = useState(tab.measurements.length ? tab.measurements.map((m) => ({ ...m, note: m.note ?? '' })) : [blank]);
+  const set = (i: number, k: keyof typeof blank, v: string) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+  return (
+    <section aria-label="Site visit and measurements" className="s-card flex flex-col gap-3 p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className={h2}>Site visit and measurements</h2>
+        <CustomerSees name={tab.customerFirst} />
+      </div>
+      {tab.visits.length ? (
+        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+          {tab.visits.map((v) => (
+            <li key={v.id} className="flex flex-wrap items-center gap-2 text-[14px]">
+              <span className={v.status === 'CANCELLED' ? 'text-[var(--s-ink-3)] line-through' : ''}>
+                {v.purpose} · {whenWords(v.at)}
+              </span>
+              <span className={muted}>{v.status === 'DONE' ? 'Done' : v.status === 'CANCELLED' ? 'Cancelled' : 'Booked'}</span>
+              {v.note ? <span className={muted}>· Team note: {v.note}</span> : null}
+              {tab.canWork && v.status === 'BOOKED' ? (
+                <>
+                  <button type="button" className="s-btn-ghost min-h-[32px] px-2.5 text-[13px]" disabled={pending} onClick={() => run(() => setVisitStatusAction(tab.projectId, v.id, 'DONE'))}>
+                    Done
+                  </button>
+                  <button type="button" className="s-btn-ghost min-h-[32px] px-2.5 text-[13px]" disabled={pending} onClick={() => run(() => setVisitStatusAction(tab.projectId, v.id, 'CANCELLED'))}>
+                    Cancel
+                  </button>
+                </>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className={`m-0 ${muted}`}>No visit booked yet.</p>
+      )}
+      {tab.canWork ? (
+        <form
+          className="flex flex-wrap items-end gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            run(() => bookVisitAction({ projectId: tab.projectId, day, time, purpose, note }), () => setNote(''));
+          }}
+        >
+          <label className="flex flex-col gap-1 text-[13px]">
+            Day
+            <input type="date" value={day} onChange={(e) => setDay(e.target.value)} className="s-input" required />
+          </label>
+          <label className="flex flex-col gap-1 text-[13px]">
+            Time
+            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="s-input" required />
+          </label>
+          <label className="flex flex-col gap-1 text-[13px]">
+            For
+            <input value={purpose} onChange={(e) => setPurpose(e.target.value)} maxLength={80} className="s-input" required />
+          </label>
+          <label className="flex flex-col gap-1 text-[13px]">
+            Team note
+            <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} className="s-input" />
+          </label>
+          <button type="submit" className="s-btn min-h-[40px] px-3 text-[13.5px]" disabled={pending}>
+            Book the visit
+          </button>
+        </form>
+      ) : null}
+      <div className="border-t border-[var(--s-rule)] pt-3">
+        <p className="m-0 mb-2 text-[13.5px] font-semibold">Rooms, in feet (like 10.5 or 10&apos;6&quot;)</p>
+        <div className="flex flex-col gap-1.5">
+          {rows.map((r, i) => (
+            <div key={i} className="grid grid-cols-2 gap-1.5 sm:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_minmax(0,2fr)]">
+              <input aria-label={`Room ${i + 1}`} placeholder="Room" value={r.room} onChange={(e) => set(i, 'room', e.target.value)} className="s-input" disabled={!tab.canWork} />
+              <input aria-label={`Length ${i + 1}`} placeholder="Length" value={r.length} onChange={(e) => set(i, 'length', e.target.value)} className="s-input" disabled={!tab.canWork} />
+              <input aria-label={`Width ${i + 1}`} placeholder="Width" value={r.width} onChange={(e) => set(i, 'width', e.target.value)} className="s-input" disabled={!tab.canWork} />
+              <input aria-label={`Height ${i + 1}`} placeholder="Height" value={r.height} onChange={(e) => set(i, 'height', e.target.value)} className="s-input" disabled={!tab.canWork} />
+              <input aria-label={`Note ${i + 1}`} placeholder="Note (team only)" value={r.note} onChange={(e) => set(i, 'note', e.target.value)} className="s-input" disabled={!tab.canWork} />
+            </div>
+          ))}
+        </div>
+        {tab.canWork ? (
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" className="s-btn-ghost min-h-[36px] px-3 text-[13px]" onClick={() => setRows((rs) => [...rs, blank])}>
+              + Add a room
+            </button>
+            <button type="button" className="s-btn min-h-[36px] px-3 text-[13.5px]" disabled={pending} onClick={() => run(() => saveMeasurementsAction(tab.projectId, rows))}>
+              Save the sizes
+            </button>
+          </div>
+        ) : null}
+      </div>
+      <p className={`m-0 ${muted}`}>Site photos go in Drawings below as &ldquo;Site photo&rdquo;.</p>
+      <Message m={message} />
+    </section>
+  );
+}
+
+// ── Mood board ────────────────────────────────────────────────
+
+function MoodBoard({ tab }: { tab: DesignTab }) {
+  const { pending, message, run } = useRun();
+  const mb = tab.moodBoard;
+  const [note, setNote] = useState(mb.note ?? '');
+  const [room, setRoom] = useState(mb.roomOptions[0]?.key ?? '');
+  const [picked, setPicked] = useState<string[]>([]);
+  const pieces = mb.roomOptions.find((r) => r.key === room)?.pieces ?? [];
+  return (
+    <section aria-label="Mood board" className="s-card flex flex-col gap-3 p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className={h2}>Mood board</h2>
+        <CustomerSees name={tab.customerFirst} />
+      </div>
+      <p className={`m-0 ${muted}`}>
+        {mb.sharedOn ? `Shared ${dayWords(mb.sharedOn)}. ${tab.customerFirst} fills it in the app.` : `Not shared yet. ${tab.customerFirst} picks what they like for each room in the app.`}
+      </p>
+      {tab.canWork ? (
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex min-w-[240px] flex-1 flex-col gap-1 text-[13px]">
+            Message to {tab.customerFirst}
+            <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} className="s-input" placeholder="Pick two looks you like for the living room" />
+          </label>
+          <button type="button" className="s-btn min-h-[40px] px-3 text-[13.5px]" disabled={pending} onClick={() => run(() => shareMoodBoardAction(tab.projectId, note))}>
+            {mb.sharedOn ? 'Share again' : 'Share the mood board'}
+          </button>
+        </div>
+      ) : null}
+      {mb.rooms.length ? (
+        <ul className="m-0 grid list-none gap-2 p-0 sm:grid-cols-2">
+          {mb.rooms.map((r) => (
+            <li key={r.roomKey} className="rounded-[10px] bg-[var(--s-surface-2)] p-3 text-[13.5px]">
+              <p className="m-0 font-semibold">
+                {r.label}
+                {r.styleLabel ? <span className={`ml-1 ${muted}`}>· {r.styleLabel}</span> : null}
+              </p>
+              {r.choice ? <p className="m-0">Chose: {r.choice}</p> : null}
+              {r.board.length ? <p className="m-0">{r.board.map((b) => b.label).join(' · ')}</p> : null}
+              {r.note ? <p className={`m-0 ${muted}`}>&ldquo;{r.note}&rdquo;</p> : null}
+              {r.budgetFlag ? <p className="m-0 text-[12.5px] text-[var(--s-warn)]">{r.budgetFlag}</p> : null}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className={`m-0 ${muted}`}>Nothing picked yet.</p>
+      )}
+      {tab.canWork ? (
+        <details className="rounded-[10px] border border-[var(--s-rule)] p-3">
+          <summary className="cursor-pointer text-[13.5px] font-semibold">Add pieces to a room for {tab.customerFirst}</summary>
+          <div className="mt-2 flex flex-col gap-2">
+            <select value={room} onChange={(e) => { setRoom(e.target.value); setPicked([]); }} className="s-input max-w-[260px]" aria-label="Room">
+              {mb.roomOptions.map((r) => (
+                <option key={r.key} value={r.key}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+            <div className="flex max-h-[220px] flex-wrap gap-1.5 overflow-auto">
+              {pieces.map((p) => (
+                <label key={p.slug} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--s-rule)] px-2.5 py-1 text-[13px]">
+                  <input type="checkbox" checked={picked.includes(p.slug)} onChange={(e) => setPicked((xs) => (e.target.checked ? [...xs, p.slug] : xs.filter((x) => x !== p.slug)))} />
+                  {p.label}
+                </label>
+              ))}
+            </div>
+            <button type="button" className="s-btn self-start min-h-[36px] px-3 text-[13.5px]" disabled={pending || picked.length === 0} onClick={() => run(() => addMoodBoardPiecesAction(tab.projectId, room, picked), () => setPicked([]))}>
+              Add {picked.length || ''} to the board
+            </button>
+          </div>
+        </details>
+      ) : null}
+      <Message m={message} />
+    </section>
+  );
+}
+
+// ── Drawings ──────────────────────────────────────────────────
+
+const STATE_WORDS: Record<DrawingView['state'], { text: string; tone: string }> = {
+  draft: { text: 'Draft · only your team', tone: 'var(--s-ink-3)' },
+  waiting: { text: 'Waiting for the client', tone: 'var(--s-warn)' },
+  approved: { text: 'Approved', tone: 'var(--s-good)' },
+  changes: { text: 'Changes asked', tone: 'var(--s-bad)' },
+  shared: { text: 'Shared', tone: 'var(--s-accent)' },
+};
+
+function Drawings({ tab }: { tab: DesignTab }) {
+  const { pending, message, run } = useRun();
+  const [replacing, setReplacing] = useState<DrawingView | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  return (
+    <section aria-label="Drawings and 3D" className="s-card flex flex-col gap-3 p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className={h2}>Drawings and 3D</h2>
+        <CustomerSees name={tab.customerFirst} />
+      </div>
+      {tab.drawings.length === 0 ? <p className={`m-0 ${muted}`}>Nothing uploaded yet.</p> : null}
+      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+        {tab.drawings.map((d) => {
+          const s = STATE_WORDS[d.state];
+          return (
+            <li key={d.id} className="flex flex-col gap-1 border-t border-[var(--s-rule)] pt-2 text-[14px]">
+              <div className="flex flex-wrap items-center gap-2">
+                <a href={d.url || undefined} target="_blank" rel="noreferrer" className="font-semibold text-[var(--s-ink)]">
+                  {d.title}
+                </a>
+                <span className={muted}>
+                  {d.kindLabel}
+                  {d.room ? ` · ${d.room}` : ''} · R{d.version}
+                  {d.revisions ? ` (${d.revisions} revision${d.revisions === 1 ? '' : 's'})` : ''}
+                </span>
+                <span className="text-[12.5px] font-medium" style={{ color: s.tone }}>
+                  {s.text}
+                  {d.state === 'waiting' && d.waitingDays ? ` · ${d.waitingDays} day${d.waitingDays === 1 ? '' : 's'}` : ''}
+                </span>
+              </div>
+              {d.askedFor ? <span className={muted}>Asked for: &ldquo;{d.askedFor}&rdquo;</span> : null}
+              {d.answer?.comment ? (
+                <span className={muted}>
+                  {tab.customerFirst} on {dayWords(d.answer.on)}: &ldquo;{d.answer.comment}&rdquo;
+                </span>
+              ) : null}
+              {d.reminder ? (
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className={muted}>Remind {tab.customerFirst} yourself (we send nothing):</span>
+                  <button
+                    type="button"
+                    className="text-[12.5px] text-[var(--s-accent)] underline"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(d.reminder!).then(() => setCopied(d.id));
+                    }}
+                  >
+                    {copied === d.id ? 'Copied' : 'Copy the reminder'}
+                  </button>
+                </span>
+              ) : null}
+              {tab.canWork ? (
+                <span className="flex flex-wrap gap-2">
+                  {d.state === 'draft' ? (
+                    <button type="button" className="s-btn-ghost min-h-[32px] px-2.5 text-[13px]" disabled={pending} onClick={() => run(() => shareDrawingAction(tab.projectId, d.id))}>
+                      Share with {tab.customerFirst}
+                    </button>
+                  ) : null}
+                  <button type="button" className="s-btn-ghost min-h-[32px] px-2.5 text-[13px]" onClick={() => setReplacing(d)}>
+                    Upload R{d.version + 1}
+                  </button>
+                </span>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+      {tab.canWork ? <UploadDrawing tab={tab} replacing={replacing} onDone={() => setReplacing(null)} /> : null}
+      <Message m={message} />
+    </section>
+  );
+}
+
+function UploadDrawing({ tab, replacing, onDone }: { tab: DesignTab; replacing: DrawingView | null; onDone: () => void }) {
+  const { pending, message, run } = useRun();
+  const [kind, setKind] = useState<DesignKind>('LAYOUT_2D');
+  return (
+    <form
+      key={replacing?.id ?? 'new'}
+      className="flex flex-col gap-2 rounded-[10px] border border-[var(--s-rule)] p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const form = e.currentTarget;
+        const data = new FormData(form);
+        data.set('projectId', tab.projectId);
+        if (replacing) data.set('supersedesId', replacing.id);
+        run(() => uploadDrawingAction(data), () => {
+          form.reset();
+          onDone();
+        });
+      }}
+    >
+      <p className="m-0 text-[13.5px] font-semibold">{replacing ? `New version of ${replacing.title} (R${replacing.version + 1})` : 'Upload a drawing, render or site photo'}</p>
+      {!replacing ? (
+        <div className="flex flex-wrap gap-2">
+          <label className="flex flex-col gap-1 text-[13px]">
+            What it is
+            <select name="kind" value={kind} onChange={(e) => setKind(e.target.value as DesignKind)} className="s-input">
+              {Object.entries(DESIGN_KINDS).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-[13px]">
+            Room
+            <input name="room" maxLength={60} className="s-input" placeholder="Living room" />
+          </label>
+          <label className="flex flex-col gap-1 text-[13px]">
+            Name (optional)
+            <input name="title" maxLength={100} className="s-input" />
+          </label>
+        </div>
+      ) : null}
+      <input type="file" name="file" accept="application/pdf,image/jpeg,image/png,image/webp" required className="text-[13px]" />
+      <label className="flex items-center gap-2 text-[13px]">
+        <input type="checkbox" name="share" defaultChecked={kind !== 'SITE_PHOTO' && kind !== 'WORKING'} />
+        {replacing || ['LAYOUT_2D', 'FURNITURE', 'RENDER_3D'].includes(kind) ? `Share with ${tab.customerFirst} for approval (one notice)` : `Share with ${tab.customerFirst}`}
+      </label>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="submit" className="s-btn min-h-[36px] px-3 text-[13.5px]" disabled={pending}>
+          Upload
+        </button>
+        {replacing ? (
+          <button type="button" className="s-btn-ghost min-h-[36px] px-3 text-[13px]" onClick={onDone}>
+            Cancel
+          </button>
+        ) : null}
+      </div>
+      <Message m={message} />
+    </form>
+  );
+}
+
+// ── Design final ──────────────────────────────────────────────
+
+function DesignFinal({ tab }: { tab: DesignTab }) {
+  const { pending, message, run } = useRun();
+  const f = tab.final;
+  return (
+    <section aria-label="Design final" className="s-card flex flex-col gap-3 p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className={h2}>Design final</h2>
+        <CustomerSees name={tab.customerFirst} />
+      </div>
+      {!f.seesQuotes ? (
+        // A designer sees no money: the quotations are the owner's and the project manager's.
+        <p className={`m-0 ${muted}`}>The sales final and the Design Final are kept by the owner and the project manager.</p>
+      ) : f.signed ? (
+        <p className="m-0 text-[14px]">
+          Sales final:{' '}
+          <Link href={`/studio/quotations/${f.signed.id}`} className="text-[var(--s-accent)]">
+            {f.signed.number}
+          </Link>
+          {f.designFinal ? (
+            <>
+              {' '}
+              · Design Final:{' '}
+              <Link href={`/studio/quotations/${f.designFinal.id}`} className="text-[var(--s-accent)]">
+                {f.designFinal.number}
+              </Link>{' '}
+              <span className={muted}>({f.designFinal.status === 'DRAFT' ? 'draft' : f.designFinal.status === 'ISSUED' ? 'sent' : f.designFinal.status.toLowerCase()})</span> ·{' '}
+              <Link href={`/studio/quotations/${f.designFinal.id}/compare`} className="text-[var(--s-accent)]">
+                Compare with the sales final
+              </Link>
+            </>
+          ) : null}
+        </p>
+      ) : (
+        <p className={`m-0 ${muted}`}>This project was not started from a quotation.</p>
+      )}
+      {f.closedOn ? (
+        <div className="flex flex-col gap-1 text-[14px]">
+          <p className="m-0 font-semibold text-[var(--s-good)]">Design closed {dayWords(f.closedOn)}.</p>
+          {f.changes ? (
+            <p className="m-0">
+              {tab.customerFirst} sees {f.changes.lines.length} change{f.changes.lines.length === 1 ? '' : 's'}: {formatINR(f.changes.salesTotalPaise)} → {formatINR(f.changes.designTotalPaise)}.
+            </p>
+          ) : null}
+        </div>
+      ) : f.seesQuotes && tab.canAssign && f.signed ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {!f.designFinal ? (
+            <button type="button" className="s-btn min-h-[40px] px-3 text-[13.5px]" disabled={pending} onClick={() => run(() => makeDesignFinalAction(tab.projectId))}>
+              Make Design Final
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="s-btn min-h-[40px] px-3 text-[13.5px]"
+              disabled={pending}
+              onClick={() => {
+                if (window.confirm(`Close the design on ${f.designFinal!.number}? ${tab.customerFirst} sees what changed against the sales final.`)) run(() => closeDesignAction(tab.projectId));
+              }}
+            >
+              Close the design
+            </button>
+          )}
+          <span className={muted}>{!f.designFinal ? 'A copy of the sales final for the changes the design made.' : 'Send the Design Final first, then close.'}</span>
+        </div>
+      ) : null}
+      <Message m={message} />
+    </section>
+  );
+}

@@ -465,7 +465,11 @@ describe('the stages the customer sees', () => {
       actualEnd: true,
       id: true,
       plannedStart: true,
-      items: { orderBy: { sortOrder: 'asc' }, select: { room: true, label: true, doneAt: true, weightBp: true, inScope: true, plannedOn: true } },
+      // Studio OS Phase 2: a design step's id (to place a moved day; never sent), whose step it is and its payment gate.
+      items: {
+        orderBy: { sortOrder: 'asc' },
+        select: { room: true, label: true, doneAt: true, weightBp: true, inScope: true, plannedOn: true, id: true, responsible: true, gatePayment: true },
+      },
     });
   });
 });
@@ -821,3 +825,128 @@ describe('Phase 5: decisions as rows, money from payment rows, the locker (porta
   });
 });
 
+
+describe('Studio OS Phase 2: the design card (studio-design/customer-view.ts) never leaks the team’s side', () => {
+  const now = D('2026-10-11T00:00:00Z');
+  const DESIGN_SECRET = {
+    doneNote: 'DONE-NOTE-client was rude on call',
+    visitNote: 'VISIT-NOTE-gate code 4455',
+    delayNote: 'DELAY-NOTE-Meera forgot',
+    measureNote: 'MEASURE-NOTE-wall is crooked',
+    designerId: 'm-designer-SECRET',
+    stepId: 'step-SECRET-1',
+    fileId: 'doc-step-SECRET',
+  };
+  const row = {
+    ...(leakyRow() as unknown as Record<string, unknown>),
+    paymentPhases: [
+      { label: 'Booking advance', pct: null, amountPaise: 25_000_00 },
+      { label: 'Design advance', pct: 5, amountPaise: 50_000_00 },
+      { label: 'Design closure', pct: 10, amountPaise: 1_00_000_00 },
+    ],
+    payments: [],
+    quoteChanges: [],
+    stages: [
+      {
+        id: 'st-d',
+        kind: 'DESIGN',
+        name: 'Design',
+        plannedStart: D('2026-10-01T00:00:00Z'),
+        plannedEnd: D('2026-10-25T00:00:00Z'),
+        actualEnd: null,
+        items: [
+          {
+            id: DESIGN_SECRET.stepId,
+            room: 'Design',
+            label: 'Site visit and measurement',
+            doneAt: D('2026-10-02T06:00:00Z'),
+            weightBp: 20,
+            inScope: true,
+            plannedOn: D('2026-10-02T00:00:00Z'),
+            responsible: 'DESIGNER',
+            gatePayment: null,
+            doneNote: DESIGN_SECRET.doneNote,
+            doneById: SECRET.staffId,
+            doneDocumentId: DESIGN_SECRET.fileId,
+          },
+          { id: 'step-2', room: 'Design', label: 'First draft (FD) meeting', doneAt: null, weightBp: 20, inScope: true, plannedOn: D('2026-10-09T00:00:00Z'), responsible: 'DESIGNER', gatePayment: 1 },
+          { id: 'step-3', room: 'Design', label: 'Approve the layout', doneAt: null, weightBp: 10, inScope: true, plannedOn: D('2026-10-10T00:00:00Z'), responsible: 'CLIENT', gatePayment: null },
+          { id: 'step-4', room: 'Design', label: 'SECRET-OUT-OF-SCOPE-DESIGN', doneAt: null, weightBp: 10, inScope: false, plannedOn: null, responsible: 'DESIGNER', gatePayment: null },
+        ],
+      },
+    ],
+    designerId: DESIGN_SECRET.designerId,
+    designer: { id: DESIGN_SECRET.designerId, user: { name: 'Meera Joshi', phone: SECRET.crewPhone } },
+    moodBoardSharedAt: D('2026-10-03T06:00:00Z'),
+    moodBoardNote: 'Pick two looks for the living room.',
+    siteVisits: [
+      { id: 'v1', at: D('2026-10-14T05:30:00Z'), purpose: 'Measurement', status: 'BOOKED', note: DESIGN_SECRET.visitNote, byId: SECRET.staffId },
+      { id: 'v2', at: D('2026-10-12T05:30:00Z'), purpose: 'Called off', status: 'CANCELLED', note: DESIGN_SECRET.visitNote, byId: SECRET.staffId },
+    ],
+    measurements: [{ room: 'Living', lengthMm: 4572, widthMm: 3658, heightMm: 2896, note: DESIGN_SECRET.measureNote, updatedById: SECRET.staffId }],
+    documents: [
+      { id: 'dr1', kind: 'DRAWINGS', title: '2D layout, Living', storageKey: SECRET.storageKey, contentType: 'application/pdf', bytes: 1000, createdAt: D('2026-10-04T00:00:00Z'), sharedAt: D('2026-10-04T00:00:00Z'), version: 1, supersedesId: null, designKind: 'LAYOUT_2D', room: 'Living', uploadedById: SECRET.staffId },
+      { id: 'dr2', kind: 'DRAWINGS', title: '2D layout, Living', storageKey: SECRET.storageKey, contentType: 'application/pdf', bytes: 1000, createdAt: D('2026-10-06T00:00:00Z'), sharedAt: D('2026-10-06T00:00:00Z'), version: 2, supersedesId: 'dr1', designKind: 'LAYOUT_2D', room: 'Living', uploadedById: SECRET.staffId },
+    ],
+    designReviews: [
+      { documentId: 'dr1', verdict: 'CHANGES', comment: 'Move the TV wall', at: D('2026-10-05T00:00:00Z'), byUserId: SECRET.customerId },
+      { documentId: 'dr2', verdict: 'APPROVED', comment: null, at: D('2026-10-07T00:00:00Z'), byUserId: SECRET.customerId },
+    ],
+    stepDelays: [{ stepId: 'step-2', toDate: D('2026-10-09T00:00:00Z'), reason: 'CLIENT_UNAVAILABLE', side: 'CLIENT', note: DESIGN_SECRET.delayNote, byId: SECRET.staffId }],
+    designClosedAt: null,
+    designChanges: null,
+  } as unknown as CustomerProjectRow;
+  const out = toCustomerProject(row, SECRET.customerId, now);
+  const design = out.design!;
+  const json = JSON.stringify(out);
+
+  it('shows the steps, the next one and the payment that opens it, whose step it is and why one moved', () => {
+    expect(design.designer).toBe('Meera');
+    expect(design.steps.map((s) => s.label)).toEqual(['Site visit and measurement', 'First draft (FD) meeting', 'Approve the layout']);
+    expect(design.next).toMatchObject({ label: 'First draft (FD) meeting', waitingFor: 'Design advance', moved: 'Moved to a day that suits you.' });
+    expect(design.steps[2]!.yours).toBe(true);
+    expect(design.pct).toBe(40);
+  });
+
+  it('shows the mood board message, the booked visit (not the cancelled one), the sizes and the drawing’s answer', () => {
+    expect(design.moodBoard).toEqual({ shared: true, sharedOn: '2026-10-03', note: 'Pick two looks for the living room.' });
+    expect(design.visits).toEqual([{ at: '2026-10-14T05:30:00.000Z', purpose: 'Measurement', status: 'booked' }]);
+    expect(design.measurements).toEqual([{ room: 'Living', size: "15' × 12'", height: "9' 6\"" }]);
+    expect(design.drawings).toEqual([
+      { id: 'dr2', kind: 'LAYOUT_2D', kindLabel: '2D layout', room: 'Living', title: '2D layout, Living', version: 2, state: 'approved', answeredOn: '2026-10-07', comment: null },
+    ]);
+  });
+
+  it('carries no step note, file, visit note, delay note, measurement note, designer id or phone', () => {
+    for (const [name, value] of Object.entries({ ...DESIGN_SECRET, crewPhone: SECRET.crewPhone, staffId: SECRET.staffId, storageKey: SECRET.storageKey })) {
+      expect(json, name).not.toContain(value);
+    }
+    expect(json).not.toContain('SECRET-OUT-OF-SCOPE-DESIGN');
+    const keys = keysOf(out.design);
+    for (const k of ['doneNote', 'doneDocumentId', 'byUserId', 'designerId', 'byId', 'updatedById', 'phone', 'gatePayment', 'responsible', 'weightBp']) expect(keys.has(k), k).toBe(false);
+  });
+
+  it('selects none of the team’s design columns', () => {
+    const selected = keysOf(CUSTOMER_PROJECT_SELECT);
+    for (const k of ['doneNote', 'doneDocumentId', 'byUserId', 'designerId', 'updatedById']) expect(selected.has(k), k).toBe(false);
+    const sel = CUSTOMER_PROJECT_SELECT as unknown as Record<string, { select: Record<string, unknown> }>;
+    expect(sel.siteVisits!.select.note).toBeUndefined();
+    expect(sel.stepDelays!.select.note).toBeUndefined();
+    expect(sel.measurements!.select.note).toBeUndefined();
+    expect((sel.designer!.select.user as { select: Record<string, unknown> }).select.phone).toBeUndefined();
+  });
+
+  it('shows what changed at closing, read defensively', () => {
+    const closed = toCustomerProject(
+      {
+        ...(row as unknown as Record<string, unknown>),
+        designClosedAt: D('2026-10-20T00:00:00Z'),
+        designChanges: { salesTotalPaise: 100, designTotalPaise: 150, lines: [{ kind: 'ADDED', room: 'Living', product: 'TV unit', wasPaise: 0, nowPaise: 50 }, { kind: 'BOGUS' }] },
+      } as unknown as CustomerProjectRow,
+      SECRET.customerId,
+      now,
+    ).design!;
+    expect(closed.closedOn).toBe('2026-10-20');
+    expect(closed.changes).toEqual({ salesTotalPaise: 100, designTotalPaise: 150, lines: [{ kind: 'ADDED', room: 'Living', product: 'TV unit', wasPaise: 0, nowPaise: 50 }] });
+  });
+});

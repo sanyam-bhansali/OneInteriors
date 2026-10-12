@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { hasDatabase } from '@/lib/env';
 import { getCurrentUser } from '@/modules/auth/session';
 import { joinOwnProject, joinView } from '@/modules/project/own-project';
+import { switchNumberAction } from './actions';
 
 export const metadata: Metadata = { title: 'Follow your home’s project', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -34,12 +35,13 @@ export default async function JoinProjectPage({ params }: { params: Promise<{ co
           ? `This link is for a different number. Sign in with ${view.phoneHint}, the number you gave ${view.studio}, to follow the work.`
           : `Follow it here or in the One Interiors app: a site update every working day, the plan, payments and your documents. Sign in with ${view.phoneHint}.`
       }
-      cta={{ href: `/sign-in?next=${encodeURIComponent(`/app/join/${code}`)}`, label: user ? 'Sign in with another number' : 'Sign in to follow it' }}
+      cta={user ? undefined : { href: `/sign-in?next=${encodeURIComponent(`/app/join/${code}`)}`, label: 'Sign in to follow it' }}
+      switchCode={user ? code : undefined}
     />
   );
 }
 
-function Shell({ title, body, cta }: { title: string; body: string; cta?: { href: string; label: string } }) {
+function Shell({ title, body, cta, switchCode }: { title: string; body: string; cta?: { href: string; label: string }; switchCode?: string }) {
   return (
     <div className="oa-frame">
       <main className="oa-body" style={{ paddingTop: 72 }}>
@@ -49,6 +51,14 @@ function Shell({ title, body, cta }: { title: string; body: string; cta?: { href
           <Link href={cta.href} className="oa-cta">
             {cta.label}
           </Link>
+        ) : null}
+        {switchCode ? (
+          // Signed in with another number: sign out first, or sign-in would send them straight back here.
+          <form action={switchNumberAction.bind(null, switchCode)}>
+            <button type="submit" className="oa-cta">
+              Sign in with another number
+            </button>
+          </form>
         ) : null}
       </main>
     </div>

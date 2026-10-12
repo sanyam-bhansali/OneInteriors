@@ -12,6 +12,7 @@ import {
   type PlanQuoteLine,
 } from '@/modules/portal/quote-to-plan';
 import { STEP_TEMPLATE, templateFor } from '@/modules/project/step-template';
+import { HAUSPIRE_DESIGN } from '@/modules/studio-design/template';
 import { STARTER_CATALOGUE } from '@/modules/studio-quote/starter-catalogue';
 import { computeTotals } from '@/modules/studio-quote/pricing';
 import { PLAN_KINDS } from '@/modules/portal/tracker';
@@ -128,8 +129,8 @@ describe('quoteToPlan', () => {
     expect(plan.stages.every((s) => s.actualEnd === null)).toBe(true);
   });
 
-  it('gives every stage Hauspire’s steps for its kind, in order, grouped, weighted and in scope — never the quote’s lines', () => {
-    for (const s of plan.stages) {
+  it('gives every execution stage Hauspire’s steps for its kind, in order, grouped, weighted and in scope — never the quote’s lines', () => {
+    for (const s of plan.stages.filter((x) => x.kind !== 'DESIGN')) {
       const t = templateFor(s.kind);
       expect(s.items.map((i) => i.label)).toEqual(t.map((x) => x.label));
       expect(s.items.map((i) => i.room)).toEqual(t.map((x) => x.group));
@@ -138,7 +139,17 @@ describe('quoteToPlan', () => {
       expect(s.items.every((i) => i.inScope && i.quoteLineId === null && !i.doneAt)).toBe(true);
     }
     expect(plan.stages.flatMap((s) => s.items).reduce((a, i) => a + i.weightBp, 0)).toBe(10_000);
-    expect(plan.stages.flatMap((s) => s.items).length).toBe(STEP_TEMPLATE.length);
+    expect(plan.stages.flatMap((s) => s.items).length).toBe(STEP_TEMPLATE.length - 1 + HAUSPIRE_DESIGN.length);
+  });
+
+  it('gives the DESIGN stage the design steps (Studio OS Phase 2), sharing the 2% design always had', () => {
+    const design = plan.stages[0]!;
+    expect(design.items.map((i) => i.label)).toEqual(HAUSPIRE_DESIGN.map((t) => t.label));
+    expect(design.items.reduce((a, i) => a + i.weightBp, 0)).toBe(templateFor('DESIGN').reduce((a, t) => a + t.weightBp, 0));
+    expect(design.items.map((i) => i.responsible)).toEqual(HAUSPIRE_DESIGN.map((t) => t.responsible));
+    expect(design.items.filter((i) => i.needsDocument).map((i) => i.label)).toEqual(HAUSPIRE_DESIGN.filter((t) => t.needsDocument).map((t) => t.label));
+    // These signed stages have a design closure (index 1) but no design advance: only the BOQ is gated.
+    expect(design.items.filter((i) => i.gatePayment !== null).map((i) => [i.label, i.gatePayment])).toEqual([['BOQ', 1]]);
   });
 
   it('plans each step’s day inside its stage’s window, first on its start and last on its end', () => {
@@ -149,13 +160,46 @@ describe('quoteToPlan', () => {
       expect(Math.max(...days)).toBe(s.plannedEnd.getTime());
       if (s.items.length > 1) expect(days[0]).toBe(s.plannedStart.getTime());
     }
-    // Design's one step is the sign-off at its end.
-    expect(day(plan.stages[0]!.items[0]!.plannedOn!)).toBe('2026-11-21');
+    // Design ends with the handover to execution on its last day.
+    expect(day(plan.stages[0]!.items.at(-1)!.plannedOn!)).toBe('2026-11-21');
+  });
+
+  it('with the flat size, design lasts that size’s days and the steps are linked; gates match the payment names', () => {
+    const hauspire = [
+      { label: 'Booking advance', pct: null, amountPaise: 25_000_00 },
+      { label: 'Design advance', pct: 5, amountPaise: 1 },
+      { label: 'Design closure', pct: 10, amountPaise: 1 },
+      { label: 'Material procurement', pct: 40, amountPaise: 1 },
+      { label: 'Material dispatch', pct: 40, amountPaise: 1 },
+      { label: 'Project handover', pct: 5, amountPaise: 1 },
+    ];
+    for (const [bhk, days] of [
+      [1, 14],
+      [2, 24],
+      [3, 27],
+      [4, 29],
+    ] as const) {
+      const p = quoteToPlan({ lines: [], startOn: START, totalDays: 100, contractPaise: 10_00_000_00, stages: hauspire, design: { bhk } });
+      const d = p.stages[0]!;
+      expect((d.plannedEnd.getTime() - d.plannedStart.getTime()) / DAY).toBe(days);
+      expect(p.stages.at(-1)!.plannedEnd.getTime()).toBe(START.getTime() + 100 * DAY);
+      const by = (label: string) => d.items.find((i) => i.label === label)!;
+      expect(by('First draft (FD) meeting').gatePayment).toBe(1);
+      expect(by('BOQ').gatePayment).toBe(2);
+      expect(by('Mood board shared').gatePayment).toBeNull();
+    }
+    // A 2 BHK is Hauspire's own days: each step is the previous one plus its gap.
+    const two = quoteToPlan({ lines: [], startOn: START, totalDays: 100, contractPaise: 0, stages: [], design: { bhk: 2 } }).stages[0]!;
+    let at = START.getTime();
+    two.items.forEach((it, i) => {
+      at += HAUSPIRE_DESIGN[i]!.days * DAY;
+      expect(it.plannedOn!.getTime()).toBe(at);
+    });
   });
 
   it('builds the same steps from an empty quote', () => {
     const p = quoteToPlan({ lines: [], startOn: START, totalDays: 30, contractPaise: 0, stages: [] });
-    expect(p.stages.map((s) => s.items.length)).toEqual([1, 8, 22, 6, 7]);
+    expect(p.stages.map((s) => s.items.length)).toEqual([HAUSPIRE_DESIGN.length, 8, 22, 6, 7]);
     expect(p.materials).toEqual([]);
     expect(p.payments).toEqual([]);
   });

@@ -106,6 +106,8 @@ const PROJECT: CustomerProject = {
   // Phase 2 (portal/site-feed-view.ts): the daily site log.
   siteLogs: [],
   siteMissedDays: [],
+  // Studio OS Phase 2: the design card.
+  design: null,
 };
 
 describe('what the clients may send', () => {
