@@ -34,15 +34,15 @@ describe('mayOpen and homeFor', () => {
     for (const p of [...office, '/studio/site', '/studio/settings/team', '/studio/vendors/labour', '/studio/settings/trades']) {
       expect(mayOpen(m('ACCOUNTS'), p), p).toBe(false);
     }
-    expect(homeFor('ACCOUNTS')).toBe('/studio/payments');
+    expect(homeFor('ACCOUNTS')).toBe('/studio/home');
   });
 
   it('a project manager keeps the office, except the team and vendor rates', () => {
     for (const p of office) expect(mayOpen(m('PM'), p), p).toBe(true);
     expect(mayOpen(m('PM'), '/studio/settings/team')).toBe(false);
     expect(mayOpen(m('PM'), '/studio/vendors')).toBe(false);
-    expect(homeFor('PM')).toBe('/studio/today');
-    expect(homeFor('OWNER')).toBe('/studio/today');
+    expect(homeFor('PM')).toBe('/studio/home');
+    expect(homeFor('OWNER')).toBe('/studio/home');
   });
 
   it('a salesperson opens Today, the leads board and a lead, and quotations — nothing else', () => {
@@ -52,7 +52,7 @@ describe('mayOpen and homeFor', () => {
     for (const p of ['/studio', '/studio/clients/import', '/studio/clients/bin', '/studio/clients/analytics', '/studio/products', '/studio/settings', '/studio/projects', '/studio/payments', '/studio/site', '/studio/vendors', '/studio/todayx']) {
       expect(mayOpen(m('SALES'), p), p).toBe(false);
     }
-    expect(homeFor('SALES')).toBe('/studio/today');
+    expect(homeFor('SALES')).toBe('/studio/home');
   });
 
   it('the payment stages are the owner’s alone', () => {

@@ -1,0 +1,162 @@
+/* Studio additions on top of studio-ui.css (the generated copy of the owner's
+   design files).
+
+   ## The bridge
+
+   Every studio screen built before the 12 Oct 2026 handoff paints with the
+   `--s-*` tokens (and onboarding with the customer `--color-*` ones, which
+   globals.css already re-points at `--s-*` inside `.studio-app`). Pointing
+   those at the design's tokens gives every older screen the new palette and
+   the dark theme at once, while each app is rebuilt in the new components.
+   Higher specificity than globals.css's `.studio-app` block on purpose. */
+.oi-studio,
+.oi-studio .studio-app,
+.oi-studio.studio-app {
+  --s-ground: var(--ground);
+  --s-rail: var(--fill2);
+  --s-rail-active: var(--acc-soft);
+  --s-surface: var(--paper);
+  --s-surface-2: var(--fill);
+  --s-rule: var(--fill2);
+  --s-rule-soft: var(--soft);
+  --s-ink: var(--ink);
+  --s-ink-2: var(--text2);
+  --s-ink-3: var(--muted);
+  --s-accent: var(--acc);
+  --s-accent-bright: var(--acc);
+  --s-accent-deep: var(--acc-h);
+  --s-accent-wash: var(--acc-soft);
+  --s-tag: var(--fill);
+  --s-tag-ink: var(--text2);
+  --s-good: var(--good);
+  --s-good-wash: var(--good-bg);
+  --s-warn: var(--warn);
+  --s-warn-wash: var(--warn-bg);
+  --s-bad: var(--bad);
+  --s-bad-wash: var(--bad-bg);
+  --s-lift: 0 1px 0 var(--line);
+  --s-lift-2: 0 14px 30px -18px rgba(var(--sh), 0.45);
+  --font-sans: var(--font-geist), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-geist), system-ui, sans-serif;
+}
+html[data-theme='dark'] .oi-studio,
+html[data-theme='dark'] .oi-studio .studio-app {
+  color-scheme: dark;
+}
+
+/* Older cards: the design's cards have no border and a softer radius. */
+.oi-studio .s-card {
+  border-color: transparent;
+  border-radius: 18px;
+}
+
+/* Hard white surfaces in older markup follow the paper colour, so they do not
+   glow in the dark theme. */
+.oi-studio .bg-white {
+  background-color: var(--paper);
+}
+
+/* Inputs and selects in older markup: the design's soft field. */
+.oi-studio input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+.oi-studio select,
+.oi-studio textarea {
+  color: var(--ink);
+}
+.oi-studio input::placeholder,
+.oi-studio textarea::placeholder {
+  color: var(--muted);
+}
+
+/* ── The frame ─────────────────────────────────────────────── */
+.oi-studio .oi-frame {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.oi-studio .oi-page {
+  flex: 1;
+  min-width: 0;
+}
+.oi-studio .apphead .topr .search {
+  flex: 0 1 300px;
+  min-width: 200px;
+}
+@media (max-width: 760px) {
+  .oi-studio .apphead {
+    padding: 10px 14px;
+    gap: 10px;
+  }
+  .oi-studio .apphead .atabs {
+    order: 5;
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  .oi-studio .apphead .atabs a {
+    white-space: nowrap;
+  }
+  .oi-studio .apphead .topr .search {
+    min-width: 0;
+    flex: 0 0 42px;
+    width: 42px;
+    padding: 0;
+    justify-content: center;
+  }
+  .oi-studio .apphead .topr .search span,
+  .oi-studio .apphead .topr .search kbd {
+    display: none;
+  }
+  .oi-studio .lgrid2 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+/* The role home's header row folds on a phone. */
+@media (max-width: 760px) {
+  .oi-studio .homehead {
+    padding: 14px 16px !important;
+  }
+  .oi-studio .homehead .pwby {
+    display: none;
+  }
+  .oi-studio .homemain {
+    padding: 12px 16px 48px !important;
+  }
+  .oi-studio .homemain h1 {
+    font-size: 30px !important;
+  }
+  .oi-studio .lgrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+
+/* The search palette's results list scrolls inside the sheet. */
+.oi-studio .palette .pres {
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+}
+.oi-studio .palette .pr[aria-selected='true'] {
+  background: var(--fill);
+}
+
+/* Sign out, in the apps menu. */
+.oi-studio .linkbtn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+}
+.oi-studio .linkbtn:hover {
+  color: var(--ink);
+}
+
+/* The opening splash plays once per browser session (home/HomeBits.tsx). */
+html[data-splash='seen'] .oi-studio .splash {
+  display: none;
+}

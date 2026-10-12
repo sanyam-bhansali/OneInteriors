@@ -16,6 +16,11 @@ import { memberFor } from '@/modules/studio/access';
 import { can, type MemberRole } from '@/modules/studio/roles';
 import { TEAM_PATH, TODAY_HOME, homeFor, mayOpen, usesOfficeShell } from '@/modules/studio/surfaces';
 import { RoleFrame } from './RoleFrame';
+import { APPS, appsFor } from '@/modules/studio/apps';
+import { StudioFrame } from './ui/StudioFrame';
+import { THEME_SCRIPT } from './ui/theme-script';
+import './studio-ui.css';
+import './studio-extra.css';
 import { getLang } from '@/modules/i18n/server';
 import { tx } from '@/modules/i18n/site';
 import { STUDIO_WORDS } from '@/modules/i18n/studio';
@@ -92,52 +97,84 @@ export default async function StudioLayout({ children }: { children: React.React
    */
   const member = hasDatabase() ? await memberFor(user.id).catch(() => null) : null;
   if (member) {
-    if (member.status !== 'ACTIVE') return <NotActive suspended={member.status === 'SUSPENDED'} />;
+    if (member.status !== 'ACTIVE') return <Themed><NotActive suspended={member.status === 'SUSPENDED'} /></Themed>;
     const path = (await headers()).get(PATH_HEADER);
     /* No header (middleware did not run) means no redirect: redirecting on a
        guess could loop. The module layer still holds. */
     if (path && !mayOpen(member, path)) redirect(homeFor(member.role));
-    if (!usesOfficeShell(member)) {
+    /* A site supervisor: site mode on the phone, nothing of the office. */
+    if (member.role === 'SUPERVISOR') {
       return (
-        <RoleFrame
-          member={member}
-          name={user.name}
-          signOut={<SignOutButton label={member.role === 'SUPERVISOR' ? tx(await getLang(), STUDIO_WORDS['site.signOut']) : undefined} />}
-        >
-          {children}
-        </RoleFrame>
+        <Themed>
+          <RoleFrame
+            member={member}
+            name={user.name}
+            signOut={<SignOutButton label={tx(await getLang(), STUDIO_WORDS['site.signOut'])} />}
+          >
+            {children}
+          </RoleFrame>
+        </Themed>
       );
     }
   }
 
   const context = await shellContext(user.id);
 
-  /* A salesperson (Studio OS Phase 1): the office frame, with only what
-     they open — Today, their leads, their quotations. */
-  if (member && member.role === 'SALES') {
+  /* A studio still in setup keeps the setup frame: the software opens when they
+     submit (crmIsOpen), and until then Setup is the only thing in their way. */
+  const ownSoftware =
+    context !== null && crmIsOpen({ status: context.status, submittedForReview: context.submittedForReview });
+  if (!ownSoftware && (!member || member.role === 'OWNER')) {
     return (
-      <StudioShell
-        groups={salesNav()}
-        studioName={context?.tradeName ?? 'Your studio'}
-        email={user.email}
-        publicHref={null}
-        signOut={<SignOutButton />}
-      >
-        {children}
-      </StudioShell>
+      <Themed>
+        <StudioShell
+          groups={navFor(context, member)}
+          studioName={context?.tradeName ?? 'Your studio'}
+          email={user.email}
+          publicHref={context?.live ? `/studios/${context.slug}` : null}
+          signOut={<SignOutButton />}
+        >
+          {children}
+        </StudioShell>
+      </Themed>
     );
   }
 
+  /* Everyone else: the app frame from the owner's UI handoff (12 Oct 2026).
+     No side menu; a home of app tiles and an apps menu with only this
+     member's apps (`appsFor` asks `mayOpen` for each, so a tile never points
+     at a screen the door above would bounce). No membership row (an ops
+     account looking in) sees every app, as the old rail did. */
+  const apps = member ? appsFor(member) : [...APPS];
+  const office = !member || usesOfficeShell(member);
   return (
-    <StudioShell
-      groups={navFor(context, member)}
-      studioName={context?.tradeName ?? 'Your studio'}
-      email={user.email}
-      publicHref={context?.live ? `/studios/${context.slug}` : null}
-      signOut={<SignOutButton />}
-    >
+    <Themed>
+      <StudioFrame
+        apps={apps}
+        studioName={context?.tradeName ?? 'Your studio'}
+        verified={context?.live ?? false}
+        canSearchClients={office}
+        alerts={office ? (context?.toConfirm ?? 0) + (context?.clientsDue ?? 0) : 0}
+        signOut={signOutAction}
+      >
+        {children}
+      </StudioFrame>
+    </Themed>
+  );
+}
+
+/**
+ * The studio's theme and look (studio-ui.css): light or dark from the
+ * person's choice, set on <html> before the first paint so the page never
+ * flashes the wrong one. `studio-app` keeps the older screens' tokens
+ * bridged to the new ones (studio-extra.css).
+ */
+function Themed({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="oi-studio studio-app">
+      <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       {children}
-    </StudioShell>
+    </div>
   );
 }
 
@@ -444,31 +481,4 @@ function navFor(context: ShellContext | null, member: MemberRole | null): NavGro
   });
 
   return groups;
-}
-
-/** A salesperson's rail: Today, their leads, their quotations. Nothing they cannot open. */
-function salesNav(): NavGroup[] {
-  return [
-    {
-      items: [
-        { icon: 'today', href: TODAY_HOME, label: 'Today', ready: true },
-        { icon: 'chart', href: '/studio/dashboard', label: 'Dashboard', ready: true },
-        { icon: 'calendar', href: '/studio/calendar', label: 'Calendar', ready: true },
-      ],
-    },
-    {
-      label: 'Your work',
-      items: [
-        {
-          icon: 'clients',
-          href: '/studio/clients',
-          label: 'My leads',
-          ready: true,
-          /* The pool, to claim from (owner, 12 Oct 2026). */
-          children: [{ href: '/studio/clients/pool', label: 'Pool', ready: true }],
-        },
-        { icon: 'quote', href: '/studio/quotations', label: 'Quotations', ready: true },
-      ],
-    },
-  ];
 }

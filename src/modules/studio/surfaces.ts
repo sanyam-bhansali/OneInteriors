@@ -55,6 +55,8 @@ export function usesOffice(member: MemberRole): boolean {
 }
 
 export const SITE_HOME = '/studio/site';
+/** Every role's home (the app launcher, UI handoff 12 Oct 2026), except the supervisor's, which is site mode. */
+export const STUDIO_HOME = '/studio/home';
 export const TODAY_HOME = '/studio/today';
 export const PAYMENTS_HOME = '/studio/payments';
 export const TEAM_PATH = '/studio/settings/team';
@@ -70,9 +72,7 @@ export const CREW_SETTINGS_PATH = '/studio/settings/trades';
 /** Where a member lands after signing in, and where the layout sends them back to. */
 export function homeFor(role: StudioRoleName): string {
   if (role === 'SUPERVISOR') return SITE_HOME;
-  if (role === 'ACCOUNTS') return PAYMENTS_HOME;
-  if (role === 'DESIGNER') return DESIGN_HOME;
-  return TODAY_HOME;
+  return STUDIO_HOME;
 }
 
 /**
@@ -111,6 +111,8 @@ function under(path: string, prefix: string): boolean {
 export function mayOpen(member: MemberRole, path: string): boolean {
   if (member.status !== 'ACTIVE') return false;
   if (member.role === 'SUPERVISOR') return under(path, SITE_HOME);
+  /* Every other role's home: the launcher, which shows only the apps below. */
+  if (path === STUDIO_HOME) return true;
   /* Phase 3: accounts keeps the crews and pays them; labour against the contract is the owner's. */
   if (member.role === 'ACCOUNTS') return under(path, PAYMENTS_HOME) || (under(path, CREWS_HOME) && !under(path, LABOUR_PATH));
   if (member.role === 'SALES') return SALES_OPEN.some((p) => under(path, p)) && !SALES_CLOSED.some((p) => under(path, p));
