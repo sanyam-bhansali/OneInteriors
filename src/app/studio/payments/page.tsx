@@ -7,6 +7,7 @@ import { PaymentsBody } from '../projects/[id]/PaymentsTab';
 import { bookingDraft, bookingsToRecord, recentBookings } from '@/modules/studio-sales/booking';
 import { currentMember } from '@/modules/studio/access';
 import { Bookings } from './Bookings';
+import { CrewToday } from '../vendors/CrewToday';
 
 export const metadata: Metadata = { title: 'Payments', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -46,6 +47,10 @@ export default async function PaymentsDeskPage() {
       <PageBody>
         <div className="mb-6 empty:mb-0">
           <Bookings waiting={toBook} drafts={drafts} recent={recent} isOwner={member?.role === 'OWNER'} />
+        </div>
+        {/* Studio OS Phase 3: crews whose work is done or due, with what is owed. */}
+        <div className="mb-6 empty:mb-0">
+          <CrewToday />
         </div>
         {projects.length === 0 ? (
           <p className="m-0 text-[15px] text-[var(--s-ink-2)]">No projects yet. A project appears here once a client signs with your studio.</p>

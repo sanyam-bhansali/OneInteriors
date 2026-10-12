@@ -26,9 +26,12 @@ describe('mayOpen and homeFor', () => {
     expect(homeFor('SUPERVISOR')).toBe('/studio/site');
   });
 
-  it('accounts opens the payments desk and nothing else', () => {
+  it('accounts opens the payments desk and the crews (Phase 3), and nothing else', () => {
     expect(mayOpen(m('ACCOUNTS'), '/studio/payments')).toBe(true);
-    for (const p of [...office, '/studio/site', '/studio/settings/team', '/studio/vendors']) {
+    expect(mayOpen(m('ACCOUNTS'), '/studio/vendors')).toBe(true);
+    expect(mayOpen(m('ACCOUNTS'), '/studio/vendors/pay')).toBe(true);
+    expect(mayOpen(m('ACCOUNTS'), '/studio/vendors/orders/wo1/statement')).toBe(true);
+    for (const p of [...office, '/studio/site', '/studio/settings/team', '/studio/vendors/labour', '/studio/settings/trades']) {
       expect(mayOpen(m('ACCOUNTS'), p), p).toBe(false);
     }
     expect(homeFor('ACCOUNTS')).toBe('/studio/payments');

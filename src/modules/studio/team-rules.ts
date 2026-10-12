@@ -31,9 +31,9 @@ export const ROLE_NAMES: Record<StudioRoleName, string> = {
 
 /** The one-line explanation on each role card, in the order the card list shows them. */
 export const ROLE_LINES: Record<StudioRoleName, string> = {
-  PM: 'Runs the plan, decisions and snags for the projects you pick. Sees no vendor rates and cannot change the team.',
+  PM: 'Runs the plan, decisions, snags and crews’ work orders for the projects you pick. Sees quantities, never crew rates or payments, and cannot change the team.',
   SUPERVISOR: 'Phone only. Posts the daily update, ticks the checklist and fixes snags on the sites you pick. Nothing else.',
-  ACCOUNTS: 'Records payments and receipts across all projects, and the booking advance. Sees nothing else.',
+  ACCOUNTS: 'Records payments and receipts across all projects and the booking advance; keeps the crews, their rates, and pays them. Sees nothing else.',
   SALES: 'Works the leads you give them: calls, floor plans, quotations, the sales final. Sees their own leads and the pool, and claims leads from it; never a colleague’s.',
   DESIGNER: 'Runs the design of the projects you make them the designer on: steps, drawings, mood board, site visits. Sees no money.',
   OWNER: 'Everything, including the team, prices and margins.',
@@ -75,6 +75,13 @@ const ACTION_LABELS: Record<StudioAction, string> = {
   'design.assign': 'Pick the designer, close the design',
   'design.template': 'Set the design steps',
   'design.workload': "See designers' workload",
+  'crew.list': 'See the crews, to pick one',
+  'crew.edit': 'Keep crews, their KYC and rate cards',
+  'crew.settings': 'Set trades and routing',
+  'workorder.read': 'See which crew is on which job',
+  'workorder.build': 'Make work orders, enter quantities, mark work done',
+  'workorder.money': 'Crew rates, bills and balances',
+  'crew.pay': 'Pay crews',
 };
 
 /**

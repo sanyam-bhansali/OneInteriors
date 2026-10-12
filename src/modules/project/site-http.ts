@@ -17,7 +17,7 @@ export function reply(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
 }
 
-const STATUS: Record<string, number> = { sign_in: 401, not_yours: 404, not_your_role: 403, gone: 404, busy: 409 };
+const STATUS: Record<string, number> = { sign_in: 401, not_yours: 404, not_your_role: 403, gone: 404, busy: 409, locked: 409 };
 
 /** An error code as a response; 400 for anything the phone sent wrong. */
 export const refuse = (error: string) => reply({ ok: false, error }, STATUS[error] ?? 400);

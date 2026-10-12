@@ -59,6 +59,17 @@
  * measurements). No payments, no leads. Picking the designer is
  * `design.assign` (owner, PM on the project); the studio's design steps are
  * the owner's (`design.template`); the designers' workload is owner and PM.
+ *
+ * ## Site crews (Studio OS Phase 3)
+ *
+ * docs/studio-os/PHASE-3-EXECUTION.md: accounts keeps the crews, their KYC,
+ * rates and payments (`crew.edit`, `workorder.money`, `crew.pay`, studio-wide
+ * like the rest of accounts). The PM builds work orders on their projects
+ * (`workorder.build`) and sees quantities only — never `workorder.money`; the
+ * server strips money from every read for them (studio-crews/rules.ts
+ * `stripMoney`). A supervisor sees which crew is on which of their jobs
+ * (`workorder.read`). Trades and routing are the owner's (`crew.settings`);
+ * labour cost against the contract stays `vendor.rates` (owner).
  */
 
 import type { Prisma } from '@prisma/client';
@@ -135,7 +146,21 @@ export type StudioAction =
   /** Set the studio's design steps (Settings, Design steps). */
   | 'design.template'
   /** See every designer's design projects and load (Phase 2). */
-  | 'design.workload';
+  | 'design.workload'
+  /** Phase 3: see the studio's crews to pick one (names, trades, phone; no KYC, no rates). */
+  | 'crew.list'
+  /** Phase 3: add and edit crews, their KYC scans, payee details and rate cards; archive. */
+  | 'crew.edit'
+  /** Phase 3: the studio's trades, routing, rate templates and crew settings. */
+  | 'crew.settings'
+  /** Phase 3: see a project's work orders: which crew is on which job (money only with `workorder.money`). */
+  | 'workorder.read'
+  /** Phase 3: build work orders, pick crews, enter quantities and extras, mark work done. */
+  | 'workorder.build'
+  /** Phase 3: see and set rates, agreed amounts, bills, balances and payments on work orders. */
+  | 'workorder.money'
+  /** Phase 3: record a payment to a crew, or correct one. */
+  | 'crew.pay';
 
 export const STUDIO_ACTIONS: readonly StudioAction[] = [
   'team.manage',
@@ -171,6 +196,13 @@ export const STUDIO_ACTIONS: readonly StudioAction[] = [
   'design.assign',
   'design.template',
   'design.workload',
+  'crew.list',
+  'crew.edit',
+  'crew.settings',
+  'workorder.read',
+  'workorder.build',
+  'workorder.money',
+  'crew.pay',
 ];
 
 /** Everything a PM does with leads and sales: all of it, across the studio. */
@@ -210,9 +242,13 @@ const GRANTS: Record<Exclude<StudioRoleName, 'OWNER'>, readonly StudioAction[]> 
     'design.work',
     'design.assign',
     'design.workload',
+    /* Phase 3: quantities only — never `workorder.money` or `crew.pay`. */
+    'crew.list',
+    'workorder.read',
+    'workorder.build',
   ],
-  SUPERVISOR: ['update.post', 'checklist.tick', 'snag.fix', 'project.read'],
-  ACCOUNTS: ['payment.read', 'payment.record', 'booking.record', 'booking.refund'],
+  SUPERVISOR: ['update.post', 'checklist.tick', 'snag.fix', 'project.read', 'workorder.read'],
+  ACCOUNTS: ['payment.read', 'payment.record', 'booking.record', 'booking.refund', 'crew.list', 'crew.edit', 'workorder.read', 'workorder.money', 'crew.pay'],
   /* Studio OS Phase 2: only the projects they are the designer on; no money. */
   DESIGNER: ['project.read', 'document.upload', 'design.work'],
 };
@@ -234,6 +270,8 @@ const NEEDS_ASSIGNMENT: ReadonlySet<StudioAction> = new Set<StudioAction>([
   'project.read',
   'design.work',
   'design.assign',
+  'workorder.read',
+  'workorder.build',
 ]);
 
 /** Accounts works across every project, so assignment never applies to it. */

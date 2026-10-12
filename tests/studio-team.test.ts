@@ -233,10 +233,20 @@ describe('seats', () => {
   });
 
   it('role cards are read off the permission table', () => {
-    expect(roleCan('SUPERVISOR')).toEqual(['Post site updates', 'Tick the checklist', 'Fix snags', 'See the project']);
+    expect(roleCan('SUPERVISOR')).toEqual(['Post site updates', 'Tick the checklist', 'Fix snags', 'See the project', 'See which crew is on which job']);
     expect(roleCan('PM')).not.toContain('Vendor rates and margins');
     expect(roleCan('PM')).not.toContain('Add and remove people');
-    expect(roleCan('ACCOUNTS')).toEqual(['Record payments', 'See payments', 'Record the booking advance', 'Refund a booking']);
+    expect(roleCan('ACCOUNTS')).toEqual([
+      'Record payments',
+      'See payments',
+      'Record the booking advance',
+      'Refund a booking',
+      'See the crews, to pick one',
+      'Keep crews, their KYC and rate cards',
+      'See which crew is on which job',
+      'Crew rates, bills and balances',
+      'Pay crews',
+    ]);
     expect(roleCan('OWNER')).toContain('Add and remove people');
   });
 });

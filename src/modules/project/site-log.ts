@@ -53,8 +53,10 @@ import {
   type SpokenInput,
 } from './site-log-rules';
 import { readVoice, signedPhotoMap, unstoredAllowed } from './site-log-storage';
+/* Studio OS Phase 3: a step waiting for a client payment (material procurement, dispatch) is not ticked. */
+import { lockedSteps } from '@/modules/studio-crews/locks';
 
-export type SiteError = ParseError | 'sign_in' | 'not_yours' | 'not_your_role' | 'gone' | 'crew' | 'items' | 'busy';
+export type SiteError = ParseError | 'sign_in' | 'not_yours' | 'not_your_role' | 'gone' | 'crew' | 'items' | 'busy' | 'locked';
 
 const ACCESS_CODE: Record<string, SiteError> = {
   [ACCESS_ERRORS.signIn]: 'sign_in',
@@ -176,6 +178,10 @@ export async function postSiteLog(raw: unknown, now = new Date()): Promise<PostR
     project.stages.filter((s) => s.kind !== 'DESIGN').flatMap((s) => s.items.filter((i) => i.inScope).map((i) => [i.id, { ...i, stageId: s.id }] as const)),
   );
   if (input.ticks.some((t) => !allItems.has(t.itemId))) return { ok: false, error: 'items' };
+  if (input.ticks.length) {
+    const locked = await lockedSteps(input.projectId);
+    if (input.ticks.some((t) => locked.has(t.itemId))) return { ok: false, error: 'locked' };
+  }
 
   const member = check.member;
   const known = input.crew.filter((c): c is Extract<typeof c, { crewMemberId: string }> => c.crewMemberId !== null);
@@ -492,7 +498,9 @@ export async function postContext(projectId: string, now = new Date()): Promise<
   const stage = at >= 0 ? p.stages[at]! : null;
   // Today's work is in the stage under way, and sometimes already in the next one.
   const shown = at >= 0 ? p.stages.slice(at, at + 2).filter((s) => s.actualEnd === null) : [];
-  const items: PostStep[] = shown.flatMap((s) => s.items.map((i) => ({ id: i.id, stage: s.name, group: i.room, label: i.label, done: i.doneAt !== null })));
+  // Steps waiting for a client payment (Studio OS Phase 3) are not offered for a tick.
+  const locked = await lockedSteps(projectId);
+  const items: PostStep[] = shown.flatMap((s) => s.items.filter((i) => !locked.has(i.id)).map((i) => ({ id: i.id, stage: s.name, group: i.room, label: i.label, done: i.doneAt !== null })));
   const original = p.siteLogs[0];
   return {
     ok: true,

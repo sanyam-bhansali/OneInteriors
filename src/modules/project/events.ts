@@ -58,6 +58,8 @@ export const PROJECT_EVENT_TYPES = [
   'step.renamed',
   'step.reweighted',
   'step.scoped',
+  // Customer milestones (docs/studio-os/CUSTOMER-MILESTONES.md): a step starred or unstarred
+  'step.starred',
   // Phase 4 — snags (one per HomeSnagEvent kind)
   'snag.raised',
   'snag.accepted',
@@ -100,6 +102,12 @@ export const PROJECT_EVENT_TYPES = [
   'visit.booked',
   'visit.updated',
   'measurements.saved',
+  // Studio OS Phase 3: site crews' work orders and payments (internal; never read for a customer).
+  'crew.ordered',
+  'crew.order_changed',
+  'crew.status',
+  'crew.paid',
+  'crew.corrected',
 ] as const;
 
 export type ProjectEventType = (typeof PROJECT_EVENT_TYPES)[number];

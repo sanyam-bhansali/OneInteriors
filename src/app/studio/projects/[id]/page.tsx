@@ -5,7 +5,7 @@ import { PageBody } from '../../StudioShell';
 import { formatINR } from '@/lib/money';
 import { projectWorkspace, TEAM_NOTES_MAX, type ProjectWorkspace, type WorkspaceStage } from '@/modules/studio/workspace';
 import { clock, istDay, shortDay } from '@/modules/studio/workspace-view';
-import { CustomerSees, OnlyYourTeam } from '../marks';
+import { OnlyYourTeam } from '../marks';
 import { TeamNotes } from './TeamNotes';
 import { SiteLogTab } from './SiteLogTab';
 import { SnagsTab as SnagsPanel } from './SnagsTab';
@@ -19,6 +19,9 @@ import { InviteBanner } from './InviteBanner';
 /* Studio OS Phase 2: the design phase (modules/studio-design). */
 import { DesignTab as DesignSection } from './DesignTab';
 import { currentMember } from '@/modules/studio/access';
+/* Studio OS Phase 3: the site crews' work orders (modules/studio-crews). */
+import { CrewsTab as CrewsSection } from './CrewsTab';
+import { can as roleCan } from '@/modules/studio/roles';
 
 export const metadata: Metadata = { title: 'Project', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -45,6 +48,7 @@ const TABS = [
   { key: 'log', label: 'Site log' },
   { key: 'snags', label: 'Snags' },
   { key: 'payments', label: 'Payments' },
+  { key: 'crews', label: 'Crews' },
 ] as const;
 type Tab = (typeof TABS)[number]['key'];
 
@@ -73,9 +77,12 @@ export default async function ProjectWorkspacePage({
   }
   const w = r.workspace;
   const money = w.contractPaise !== null;
-  const tabs = TABS.filter((t) => t.key !== 'payments' || money);
+  const viewer = await currentMember();
+  // Studio OS Phase 3: Crews for those who see work orders (owner, PM, accounts), never a designer.
+  const crews = viewer === null || roleCan(viewer, 'workorder.read', { assigned: true });
+  const tabs = TABS.filter((t) => (t.key !== 'payments' || money) && (t.key !== 'crews' || crews));
   // A designer (Studio OS Phase 2) opens on the Design tab.
-  const fallback: Tab = (await currentMember())?.role === 'DESIGNER' ? 'design' : 'plan';
+  const fallback: Tab = viewer?.role === 'DESIGNER' ? 'design' : 'plan';
   const tab: Tab = tabs.some((t) => t.key === rawTab) ? (rawTab as Tab) : fallback;
   const counts: Record<Tab, number | null> = {
     plan: w.stages.length,
@@ -83,6 +90,7 @@ export default async function ProjectWorkspacePage({
     log: null, // Phase 2: the Site log tab counts its own days
     snags: w.work?.snags.filter((s) => s.status === 'OPEN').length ?? 0,
     payments: w.work?.money?.stages.length ?? null,
+    crews: null,
   };
 
   return (
@@ -161,6 +169,7 @@ export default async function ProjectWorkspacePage({
             {tab === 'log' ? <SiteLogTab projectId={w.id} customer={w.customerFirst} now={now} legacy={w.updates} /> : null}
             {tab === 'snags' ? <SnagsPanel projectId={w.id} now={now} /> : null}
             {tab === 'payments' ? <PaymentsPanel projectId={w.id} customer={w.customerFirst} /> : null}
+            {tab === 'crews' ? <CrewsSection projectId={w.id} now={now} /> : null}
           </div>
           <aside className="flex flex-col gap-4" aria-label={`What ${w.customerFirst} sees`}>
             <CustomerPanel w={w} now={now} />
@@ -195,7 +204,8 @@ function PlanTab({ w }: { w: ProjectWorkspace }) {
     <section aria-label="Plan" className="s-card p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 className={h2}>Plan</h2>
-        <CustomerSees name={w.customerFirst} />
+        {/* The client sees the stages and only the starred steps; the rest stays with the team. */}
+        <span className="text-[11.5px] font-medium text-[var(--s-accent)]">{w.customerFirst} sees the stages and ★ steps only</span>
       </div>
       <p className={`m-0 mt-1 ${muted}`}>
         {w.hasPlan
@@ -265,6 +275,8 @@ function CustomerPanel({ w, now }: { w: ProjectWorkspace; now: Date }) {
     : null;
   const decision = v.decisions.find((d) => d.state !== 'chosen') ?? null;
   const next = v.money?.next ?? null;
+  /* Customer milestones (docs/studio-os/CUSTOMER-MILESTONES.md): the stage under way and only its starred steps, as the app shows them. */
+  const nowStage = v.tracker?.stages.find((s) => s.state === 'now') ?? null;
   return (
     <section className="flex flex-col gap-4 rounded-[14px] p-5 text-white" style={{ background: 'var(--s-accent-deep)' }}>
       <p className="m-0 inline-flex items-center gap-1.5 text-[13.5px] font-semibold">
@@ -287,6 +299,32 @@ function CustomerPanel({ w, now }: { w: ProjectWorkspace; now: Date }) {
           />
         ))}
       </div>
+      {nowStage ? (
+        <div className="flex flex-col gap-1">
+          <p className={label} style={{ color: ink2 }}>
+            {nowStage.label} · {nowStage.progressPct}% · ★ {nowStage.steps.length} milestone{nowStage.steps.length === 1 ? '' : 's'}
+          </p>
+          {nowStage.steps.length ? (
+            <ul className="m-0 flex list-none flex-col gap-0.5 p-0 text-[13.5px]">
+              {nowStage.steps.map((m, i) => (
+                <li key={`${m.label}-${i}`} className="flex justify-between gap-3">
+                  <span>
+                    {m.done ? '✓ ' : ''}
+                    {m.label}
+                  </span>
+                  <span className="s-num whitespace-nowrap font-[family-name:var(--font-mono)] text-[12.5px]" style={{ color: ink2 }}>
+                    {m.done && m.doneOn ? `done ${iso(m.doneOn)}` : m.plannedOn ? iso(m.plannedOn) : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <span className="text-[13px]" style={{ color: ink2 }}>
+              No starred step: they see the stage and its % only. Star 2 or 3 on the Plan tab.
+            </span>
+          )}
+        </div>
+      ) : null}
       <div className="flex flex-col gap-1">
         <p className={label} style={{ color: ink2 }}>
           Today on site

@@ -6,6 +6,7 @@ import { istDay } from '@/modules/project/working-days';
 import { SiteCards } from './SiteCards';
 import { siteWords } from './words';
 import { EyeIcon } from './icons';
+import { crewsOnMySites } from '@/modules/studio-crews/store';
 
 export const metadata: Metadata = { title: 'My sites today', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -21,7 +22,7 @@ export const dynamic = 'force-dynamic';
  */
 export default async function SiteTodayPage() {
   const now = new Date();
-  const [lang, user, data] = await Promise.all([getLang(), getCurrentUser(), mySitesToday(now)]);
+  const [lang, user, data, crews] = await Promise.all([getLang(), getCurrentUser(), mySitesToday(now), crewsOnMySites()]);
   const t = siteWords(lang);
   const locale = lang === 'en' ? 'en-IN' : `${lang}-IN`;
   const date = now.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
@@ -43,6 +44,18 @@ export default async function SiteTodayPage() {
       ) : (
         <SiteCards cards={cards} lang={lang} today={istDay(now)} />
       )}
+
+      {/* Studio OS Phase 3: which crew is on which of these jobs. Names only, never money. */}
+      {crews.length ? (
+        <section className="s-card flex flex-col gap-2 p-4" aria-label="Crews on your sites">
+          {crews.map((c) => (
+            <div key={c.projectId}>
+              <p className="m-0 text-[14px] font-semibold">{c.projectName}</p>
+              <p className="m-0 text-[14px] text-[var(--s-ink-2)]">{c.crews.map((x) => `${x.name} (${x.trades})`).join(' · ')}</p>
+            </div>
+          ))}
+        </section>
+      ) : null}
 
       <div className="flex items-start gap-2.5 rounded-[14px] bg-[var(--s-surface-2)] p-4">
         <span className="mt-0.5 text-[var(--s-ink-2)]">

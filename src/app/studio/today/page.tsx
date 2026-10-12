@@ -10,6 +10,7 @@ import { currentMember } from '@/modules/studio/access';
 import { myInboxFor } from '@/modules/studio-sales/inbox';
 import { Inbox } from '../Inbox';
 import { TodayList } from './TodayList';
+import { CrewToday } from '../vendors/CrewToday';
 
 export const metadata: Metadata = { title: 'Today', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -53,6 +54,8 @@ export default async function TodayPage() {
       <PageBody>
         <div className="flex max-w-[56rem] flex-col gap-5">
           {inbox.length > 0 ? <Inbox items={inbox} /> : null}
+          {/* Studio OS Phase 3: lines to measure, work to mark done, crews to pay. */}
+          <CrewToday />
           {count === 0 ? (
             <div className="s-card p-6">
               <p className="m-0 text-[15.5px] font-semibold">All clear.</p>

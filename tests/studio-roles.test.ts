@@ -59,6 +59,14 @@ const TABLE: Record<StudioAction, Record<StudioRoleName, Cell>> = {
   'design.assign': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
   'design.template': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
   'design.workload': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
+  // Studio OS Phase 3: site crews. The PM builds and measures but never sees or sets money.
+  'crew.list': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: 'Y', SALES: '-', DESIGNER: '-' },
+  'crew.edit': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: 'Y', SALES: '-', DESIGNER: '-' },
+  'crew.settings': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
+  'workorder.read': { OWNER: 'Y', PM: 'A', SUPERVISOR: 'A', ACCOUNTS: 'Y', SALES: '-', DESIGNER: '-' },
+  'workorder.build': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
+  'workorder.money': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: 'Y', SALES: '-', DESIGNER: '-' },
+  'crew.pay': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: 'Y', SALES: '-', DESIGNER: '-' },
 };
 
 const active = (role: StudioRoleName) => ({ role, status: 'ACTIVE' as const });
@@ -92,11 +100,13 @@ describe('the cells that matter most', () => {
     expect(can(active('PM'), 'vendor.rates', { assigned: true })).toBe(false);
   });
 
-  it('accounts sees payments on every project and nothing else', () => {
+  it('accounts sees payments on every project, keeps and pays the crews (Phase 3), and nothing else', () => {
     const accounts = active('ACCOUNTS');
     expect(can(accounts, 'payment.read', { assigned: false })).toBe(true);
     expect(can(accounts, 'payment.record', { assigned: false })).toBe(true);
-    const others = STUDIO_ACTIONS.filter((a) => !['payment.read', 'payment.record', 'booking.record', 'booking.refund'].includes(a));
+    const crews = ['crew.list', 'crew.edit', 'workorder.read', 'workorder.money', 'crew.pay'];
+    for (const a of crews) expect(can(accounts, a as (typeof STUDIO_ACTIONS)[number], { assigned: false }), a).toBe(true);
+    const others = STUDIO_ACTIONS.filter((a) => ![...crews, 'payment.read', 'payment.record', 'booking.record', 'booking.refund'].includes(a));
     for (const a of others) expect(can(accounts, a, { assigned: true }), a).toBe(false);
   });
 

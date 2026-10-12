@@ -62,6 +62,10 @@ export const PAYMENT_STAGES_PATH = '/studio/settings/payments';
 /** Studio OS Phase 2: a designer's home, and the owner's and PM's designers' workload. */
 export const DESIGN_HOME = '/studio/design';
 export const DESIGN_STEPS_PATH = '/studio/settings/design';
+/** Studio OS Phase 3: the crews (owner, accounts), the owner's labour page, and Settings → Crews and trades (owner). */
+export const CREWS_HOME = '/studio/vendors';
+export const LABOUR_PATH = '/studio/vendors/labour';
+export const CREW_SETTINGS_PATH = '/studio/settings/trades';
 
 /** Where a member lands after signing in, and where the layout sends them back to. */
 export function homeFor(role: StudioRoleName): string {
@@ -107,12 +111,14 @@ function under(path: string, prefix: string): boolean {
 export function mayOpen(member: MemberRole, path: string): boolean {
   if (member.status !== 'ACTIVE') return false;
   if (member.role === 'SUPERVISOR') return under(path, SITE_HOME);
-  if (member.role === 'ACCOUNTS') return under(path, PAYMENTS_HOME);
+  /* Phase 3: accounts keeps the crews and pays them; labour against the contract is the owner's. */
+  if (member.role === 'ACCOUNTS') return under(path, PAYMENTS_HOME) || (under(path, CREWS_HOME) && !under(path, LABOUR_PATH));
   if (member.role === 'SALES') return SALES_OPEN.some((p) => under(path, p)) && !SALES_CLOSED.some((p) => under(path, p));
   if (member.role === 'DESIGNER') return designerMayOpen(path);
   if (under(path, TEAM_PATH)) return can(member, 'team.manage');
   if (under(path, PAYMENT_STAGES_PATH)) return can(member, 'payments.template');
   if (under(path, DESIGN_STEPS_PATH)) return can(member, 'design.template');
+  if (under(path, CREW_SETTINGS_PATH)) return can(member, 'crew.settings');
   if (under(path, '/studio/vendors')) return can(member, 'vendor.rates');
   return usesOffice(member);
 }

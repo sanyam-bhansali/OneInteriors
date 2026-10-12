@@ -414,8 +414,9 @@ function navFor(context: ShellContext | null, member: MemberRole | null): NavGro
            Owners see all; a PM only the ones they are on. */
         /* Studio OS Phase 2: the designers' page (owner, PM). */
         { icon: 'projects', href: '/studio/projects', label: 'Projects', ready: true, children: [{ href: '/studio/design', label: 'Design', ready: true }] },
-        /* Vendor rates are the owner's alone (roles.ts `vendor.rates`). */
-        ...(owner ? [{ icon: 'vendors' as const, href: '/studio/vendors', label: 'Vendors', ready: isLive('vendors') }] : []),
+        /* Studio OS Phase 3: the site crews (the old Vendors screen, switched on). The owner's in this
+           rail; accounts reaches it from its own frame (RoleFrame), a PM works crews on a project's Crews tab. */
+        ...(owner ? [{ icon: 'vendors' as const, href: '/studio/vendors', label: 'Crews', ready: isLive('vendors') }] : []),
       ],
     },
   ];

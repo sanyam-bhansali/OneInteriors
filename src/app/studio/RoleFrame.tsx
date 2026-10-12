@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
-import { DESIGN_HOME } from '@/modules/studio/surfaces';
+import { CREWS_HOME, DESIGN_HOME, PAYMENTS_HOME } from '@/modules/studio/surfaces';
 import { getLang } from '@/modules/i18n/server';
 import type { StudioMemberRef } from '@/modules/studio/access';
 import { ROLE_NAMES } from '@/modules/studio/team-rules';
@@ -44,6 +44,20 @@ export async function RoleFrame({
             <Link href={DESIGN_HOME} className="text-[13.5px] font-medium text-[var(--s-accent)] no-underline hover:underline">
               My design work
             </Link>
+          ) : null}
+          {/* Studio OS Phase 3: accounts keeps and pays the crews as well as the payments desk. */}
+          {member.role === 'ACCOUNTS' ? (
+            <nav aria-label="Accounts" className="flex items-center gap-4">
+              <Link href={PAYMENTS_HOME} className="text-[13.5px] font-medium text-[var(--s-accent)] no-underline hover:underline">
+                Payments desk
+              </Link>
+              <Link href={CREWS_HOME} className="text-[13.5px] font-medium text-[var(--s-accent)] no-underline hover:underline">
+                Crews
+              </Link>
+              <Link href={`${CREWS_HOME}/pay`} className="text-[13.5px] font-medium text-[var(--s-accent)] no-underline hover:underline">
+                Pay crews
+              </Link>
+            </nav>
           ) : null}
           {site ? <LangSwitch value={lang} /> : null}
           {signOut}

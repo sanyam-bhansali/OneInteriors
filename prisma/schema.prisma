@@ -663,6 +663,15 @@ model Studio {
   /// DESIGN stage, so a later change never rewrites a running one.
   designTemplate Json?
 
+  /// Studio OS Phase 3 (docs/studio-os/PHASE-3-EXECUTION.md): the studio's
+  /// trades, its own routing rules (product name -> trade), rate templates,
+  /// the due days, the labour-margin target, the advance limit, the
+  /// installation rate and the execution payment locks. Set in Settings,
+  /// Crews and trades (owner). Read only through
+  /// modules/studio-crews/settings.ts, which repairs a bad value to
+  /// Hauspire's defaults.
+  crewSettings Json?
+
   /// The matching profile: work mix (modular / carpentry / both), scopes and
   /// minimums, civil capability, home types, city-wide and societies,
   /// capacity, earliest start, durations, how they work, materials,
@@ -781,6 +790,10 @@ model Studio {
   quoteRevisions     StudioQuoteRevision[]
   /// Leads at scale (12 Oct 2026): calendar tasks.
   studioTasks        StudioTask[]
+  /// Studio OS Phase 3: work orders for site crews on customer projects, and
+  /// what was paid against them.
+  homeWorkOrders     HomeWorkOrder[]
+  homeCrewPayments   HomeCrewPayment[]
 
   /// Studio workspace Phase 2: the saved crew faces site mode taps, and the
   /// days off that are not reminder days.
@@ -1600,6 +1613,10 @@ model HomeProject {
   designReviews      HomeDesignReview[]
   stepDelays         HomeStepDelay[]
 
+  /// Studio OS Phase 3: the site crews' work orders. Internal: never in any
+  /// customer projection.
+  workOrders HomeWorkOrder[]
+
   @@map("home_projects")
 }
 
@@ -1751,6 +1768,11 @@ model HomeChecklistItem {
   doneNote       String? @db.Text
   doneDocumentId String?
   delays         HomeStepDelay[]
+
+  /// A starred step (owner, 12 Oct 2026; docs/studio-os/CUSTOMER-MILESTONES.md):
+  /// one of the stage's 2–3 milestones the customer sees. Every other step
+  /// is the studio's own; percentages still count every step.
+  customerMilestone Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -4011,13 +4033,42 @@ model StudioVendor {
   notes    String? @db.Text
   isActive Boolean @default(true)
 
+  /// Studio OS Phase 3 — a site crew (docs/studio-os/PHASE-3-EXECUTION.md).
+  /// TEMPORARY needs a name and a trade; PERMANENT also a phone, PAN and
+  /// Aadhaar (modules/studio-crews/kyc.ts). `trade` stays the primary trade's
+  /// key; `trades` holds every trade they work in (keys from the studio's
+  /// trade list). The full Aadhaar number is never stored: last 4 only.
+  /// Scans and the agreement sit in the private `crew-kyc` bucket, owner and
+  /// accounts only. Payee details are for paying them. Archived, never
+  /// deleted once they have work.
+  kind              CrewKind  @default(TEMPORARY)
+  trades            String[]  @default([])
+  altPhone          String?
+  address           String?
+  workingSince      String?
+  panNumber         String?
+  aadhaarLast4      String?
+  aadhaarDocPath    String?
+  panDocPath        String?
+  agreementDocPath  String?
+  kycCheckedAt      DateTime?
+  kycCheckedById    String?
+  upiId             String?
+  bankAccountName   String?
+  bankAccountNumber String?
+  bankIfsc          String?
+  archivedAt        DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  rates      StudioVendorRate[]
-  workOrders StudioWorkOrder[]
+  rates          StudioVendorRate[]
+  workOrders     StudioWorkOrder[]
+  homeWorkOrders HomeWorkOrder[]
 
   @@unique([studioId, name])
+  /// A PAN belongs to one crew per studio (NULLs do not clash).
+  @@unique([studioId, panNumber])
   @@index([studioId, trade])
   @@map("studio_vendors")
 }
@@ -4034,7 +4085,16 @@ model StudioVendorRate {
 
   item      String
   unit      QuoteUnit @default(SQFT)
-  ratePaise BigInt
+  /// Null = "agree it per job" (a customised item). Studio OS Phase 3: a 0 is
+  /// read as null too, so a line never silently prices at ₹0.
+  ratePaise BigInt?
+
+  /// Studio OS Phase 3: the crew's unit (sq ft, running ft, point, number,
+  /// lump sum). Null on older rows, which read `unit`.
+  crewUnit  CrewUnit?
+  /// The trade key this item belongs to, for the card's grouping.
+  trade     String?
+  sortOrder Int       @default(0)
 
   @@unique([vendorId, item])
   @@map("studio_vendor_rates")
@@ -4811,4 +4871,203 @@ model HomeStepDelay {
   @@index([projectId, at])
   @@index([stepId])
   @@map("home_step_delays")
+}
+
+// ─────────────────────────────────────────────────────────────
+// STUDIO OS PHASE 3 — SITE CREWS (docs/studio-os/PHASE-3-EXECUTION.md)
+//
+// Hauspire's Vendor Ledger, ported (docs/studio-os/HAUSPIRE-VENDOR-APP.md):
+// one work order per crew per project, built from the design final (else
+// the sales final); every line freezes the quote's figures and the crew's
+// rate when it is raised; measured beats quoted and an agreed amount beats
+// rate × quantity; bill, paid and balance are never stored, always added up
+// (modules/studio-crews/money.ts). Internal only: crews never log in, and no
+// customer projection reads these tables. Money is integer paise.
+// ─────────────────────────────────────────────────────────────
+
+/// Temporary: a one-site hire, name and trade only. Permanent: phone, PAN
+/// and Aadhaar (last 4) on file.
+enum CrewKind {
+  TEMPORARY
+  PERMANENT
+}
+
+/// How a crew is paid for an item.
+enum CrewUnit {
+  SQFT
+  RFT
+  POINT
+  NOS
+  LUMP
+}
+
+/// Where a work order is. SETTLED is marked by owner or accounts once the
+/// balance is within ₹1; WORK_DONE is the PM's signal that it can be paid.
+enum WorkOrderStatus {
+  DRAFT
+  ISSUED
+  IN_PROGRESS
+  WORK_DONE
+  SETTLED
+}
+
+/// Where a line's quantity came from: the quote's own sizes, a person's
+/// estimate, measured on site, added by hand, or billed on invoice.
+enum CrewQtySource {
+  QUOTE
+  ESTIMATE
+  SITE
+  MANUAL
+  INVOICE
+}
+
+/// A carpentry line: installation only (the units come made; per sq ft,
+/// ₹150 by default) or full carpentry (per sq ft per product type).
+enum CarpentryMode {
+  INSTALL
+  FULL
+}
+
+/// A payment against the balance, an advance (may run ahead of the bill up
+/// to the studio's advance limit), or a correction (reverses one earlier
+/// payment; the right one is then recorded again).
+enum CrewPaymentKind {
+  PAYMENT
+  ADVANCE
+  CORRECTION
+}
+
+/// One crew's work on one customer project. One per crew per project:
+/// a crew working in two trades gets one work order, so their balance stays
+/// in one place. Never deleted once anything is paid; archived instead.
+model HomeWorkOrder {
+  id       String @id @default(cuid())
+  /// Denormalised: every overview reads "this studio's".
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  projectId String
+  project   HomeProject  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  vendorId  String
+  vendor    StudioVendor @relation(fields: [vendorId], references: [id])
+
+  /// 1, 2, 3… per project, for the statement's reference.
+  number Int
+  /// The trade keys on this work order.
+  trades String[]        @default([])
+  status WorkOrderStatus @default(DRAFT)
+  dueOn  DateTime?       @db.Date
+
+  /// The quotation it was built from, and which final that was
+  /// (DESIGN_FINAL or SALES_FINAL).
+  sourceQuoteId String?
+  sourceKind    String?
+
+  /// Tracker steps (HomeChecklistItem ids of this project) linked to it, so
+  /// the PM sees the work's progress beside it. Not keys: steps may be
+  /// removed from the plan.
+  stepIds String[] @default([])
+
+  notes String? @db.Text
+
+  workDoneAt     DateTime?
+  workDoneByName String?
+  settledAt      DateTime?
+  archivedAt     DateTime?
+  createdById    String?
+  createdByName  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines    HomeWorkOrderLine[]
+  payments HomeCrewPayment[]
+
+  @@unique([projectId, vendorId])
+  @@unique([projectId, number])
+  @@index([studioId, status])
+  @@index([vendorId])
+  @@map("home_work_orders")
+}
+
+/// One line of a work order. A SNAPSHOT: the quote's room, product, sizes,
+/// quantity and client value, and the crew's item, unit and rate as they
+/// were when it was raised. Changing a rate card never re-prices it.
+model HomeWorkOrderLine {
+  id          String        @id @default(cuid())
+  workOrderId String
+  workOrder   HomeWorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  /// The quote line it came from (a reference, not a key). Null for extras.
+  quoteLineId String?
+
+  room     String
+  product  String
+  code     StudioWorkCode?
+  details  String?         @db.Text
+  widthMm  Int?
+  heightMm Int?
+  /// What the client is charged for this line, paise. Null for extras.
+  quotedAmountPaise BigInt?
+
+  /// The trade key it was routed to, and whether the router only guessed.
+  trade   String
+  guessed Boolean @default(false)
+
+  /// The crew's item, unit and rate (paise per unit; null = needs a price).
+  item       String
+  unit       CrewUnit
+  ratePaise  BigInt?
+  /// The rate differs from the crew's card for this project only.
+  rateEdited Boolean        @default(false)
+  carpentry  CarpentryMode?
+
+  /// Thousandths. The quantity from the quote (or a person's estimate);
+  /// `measuredQtyMilli`, measured on site, wins over it.
+  qtyMilli         Int?
+  measuredQtyMilli Int?
+  qtySource        CrewQtySource @default(QUOTE)
+  /// Agreed for this line, paise: wins over rate × quantity entirely.
+  agreedPaise      BigInt?
+  /// Work outside the quotation (no client value).
+  isExtra          Boolean       @default(false)
+
+  sortOrder Int       @default(0)
+  /// Taken off the work order (the bill recomputes). Kept for the record.
+  removedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workOrderId, sortOrder])
+  @@map("home_work_order_lines")
+}
+
+/// Money paid to a crew. Append-only: a mistake is reversed by a CORRECTION
+/// row (negative amount, `correctsId`) and the right payment recorded again.
+/// Recorded BY NAME: the person, not a role.
+model HomeCrewPayment {
+  id          String        @id @default(cuid())
+  studioId    String
+  studio      Studio        @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  workOrderId String
+  workOrder   HomeWorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  kind        CrewPaymentKind @default(PAYMENT)
+  /// Paise; negative only on a CORRECTION.
+  amountPaise BigInt
+  mode        PaymentMode     @default(UPI)
+  reference   String?
+  note        String?
+  paidOn      DateTime        @db.Date
+  byId        String?
+  byName      String
+  /// The payment this one reverses. Unique: a payment is corrected once.
+  correctsId  String?         @unique
+
+  createdAt DateTime @default(now())
+
+  @@index([workOrderId, paidOn])
+  @@index([studioId, paidOn])
+  @@map("home_crew_payments")
 }
