@@ -13,6 +13,10 @@
  *   template was taken from (start 17 Jul 2026, handover 4 Nov 2026). They
  *   are never shown: step-rules.ts `spreadStepDays` turns them into each
  *   step's planned day inside its own project's stage window.
+ * - **Milestones** (owner, 12 Oct 2026; docs/studio-os/CUSTOMER-MILESTONES.md):
+ *   2–3 starred steps per stage are what the customer sees under it. The
+ *   studio stars or unstars any step on a project's Plan tab; these are the
+ *   defaults a new plan starts with (and the migration's backfill, by name).
  */
 
 import type { PlanKind } from '@/modules/portal/tracker';
@@ -25,7 +29,21 @@ export interface TemplateStep {
   weightBp: number;
   /** The step's expected day on the source sheet, 'YYYY-MM-DD'. */
   sheetDay: string;
+  /** Starred by default: one of the stage's milestones the customer sees. */
+  milestone: boolean;
 }
+
+/**
+ * The default stars, by stage kind and step name. Kept in step with the
+ * backfill in prisma/migrations/20261012170000_customer_milestones.
+ */
+export const TEMPLATE_MILESTONES: Readonly<Record<PlanKind, readonly string[]>> = {
+  DESIGN: ['Final design and drawings signed off'],
+  CIVIL: ['POP, civil, fabrication and electrical work started', 'POP sheets'],
+  CARPENTRY: ['Materials delivered from the factory', 'Carcass complete with hardware', 'Shutters delivered'],
+  FINISH: ['Painting started', 'Painting complete'],
+  HANDOVER: ['Snags listed', 'Handover'],
+};
 
 /** The sheet's first day: where every offset counts from. */
 export const SHEET_START = '2026-07-17';
@@ -38,6 +56,7 @@ const step = (kind: PlanKind, group: string, label: string, pct: number, sheetDa
   label,
   weightBp: Math.round(pct * 100),
   sheetDay,
+  milestone: TEMPLATE_MILESTONES[kind].includes(label),
 });
 
 const S1 = 'Execution stage 1';

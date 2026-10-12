@@ -50,7 +50,7 @@ describe('a studio’s own design steps', () => {
   const good = [{ label: 'Kick-off call', responsible: 'DESIGNER', needsDocument: false, gate: '', days: 0, weight: 1 }];
 
   it('take a name, who, days and a weight; an empty gate is no gate; weight defaults to 1', () => {
-    expect(checkDesignTemplate(good)).toEqual({ ok: true, steps: [{ label: 'Kick-off call', responsible: 'DESIGNER', needsDocument: false, gate: null, days: 0, weight: 1 }] });
+    expect(checkDesignTemplate(good)).toEqual({ ok: true, steps: [{ label: 'Kick-off call', responsible: 'DESIGNER', needsDocument: false, gate: null, days: 0, weight: 1, milestone: false }] });
     expect(checkDesignTemplate([{ label: 'Layout', responsible: 'CLIENT', days: 3 }])).toMatchObject({ ok: true, steps: [{ weight: 1, gate: null }] });
   });
 

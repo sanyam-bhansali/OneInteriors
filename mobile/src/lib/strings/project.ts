@@ -72,7 +72,7 @@ export const project = {
     mr: '{studio} प्रत्येक काम पूर्ण करून टिक करतो तसे हे वाढते. त्याचा फोटो साइटमध्ये दिसतो.',
   },
   'project.stagePct': { en: '{n}% done', hi: '{n}% पूरा', mr: '{n}% पूर्ण' },
-  'project.steps.title': { en: 'Steps in this stage', hi: 'इस चरण के काम', mr: 'या टप्प्यातील कामे' },
+  'project.steps.title': { en: 'Milestones in this stage', hi: 'इस चरण के मुख्य पड़ाव', mr: 'या टप्प्यातील मुख्य टप्पे' },
   'project.steps.count': { en: '{done} of {total} done', hi: '{total} में से {done} पूरे', mr: '{total} पैकी {done} पूर्ण' },
   'project.step.doneOn': { en: 'Done {date}', hi: '{date} को पूरा', mr: '{date} ला पूर्ण' },
   'project.step.plannedOn': { en: 'Planned {date}', hi: '{date} को तय', mr: '{date} ला ठरले' },

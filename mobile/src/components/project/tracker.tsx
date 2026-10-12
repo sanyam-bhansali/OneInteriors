@@ -10,9 +10,10 @@ import { TickIcon } from './parts';
  * The Project screen's Phase 3 parts, from what the server computes
  * (portal/tracker-view.ts): the line under each stage (planned vs actual,
  * days early or late, a moved date), the percentage done (the step
- * tracker: it only goes up, step by step), the current stage's steps
- * group by group with the day each was done or is planned — the older
- * room checklist from servers that send no steps — and every moved date
+ * tracker: it only goes up, step by step), each stage's milestones — the
+ * 2–3 steps its studio starred (docs/studio-os/CUSTOMER-MILESTONES.md) —
+ * with the day each was done or is planned — the older room checklist
+ * from servers that send no steps — and every moved date
  * with its reason in plain words, the customer's own changes labelled as
  * theirs. Nothing here works a status or a percentage out; it only says
  * what the server sent. Photos are in Site, never here.
@@ -28,16 +29,14 @@ export function ProgressBar({ pct, label }: { pct: number; label: string }) {
   );
 }
 
-/** The stage's steps, group by group: ticked with the day it was done, or the day it is planned. */
+/**
+ * A stage's milestones (the steps its studio starred): ticked with the day
+ * it was done, or the day it is planned. The bar is the stage's % from every
+ * step; the other steps are the studio's own and never sent.
+ */
 export function StageSteps({ steps, pct, t }: { steps: TrackerStep[]; pct: number; t: T }) {
   if (steps.length === 0) return null;
   const done = steps.filter((s) => s.done).length;
-  const groups: { group: string; steps: TrackerStep[] }[] = [];
-  for (const s of steps) {
-    const last = groups[groups.length - 1];
-    if (last && last.group === s.group) last.steps.push(s);
-    else groups.push({ group: s.group, steps: [s] });
-  }
   return (
     <View style={styles.checklist}>
       <View style={styles.head}>
@@ -45,28 +44,33 @@ export function StageSteps({ steps, pct, t }: { steps: TrackerStep[]; pct: numbe
         <Meta>{t('project.steps.count', { done, total: steps.length })}</Meta>
       </View>
       <ProgressBar pct={pct} label={t('project.stagePct', { n: pct })} />
-      {groups.map((g) => (
-        <View key={g.group} style={{ gap: 6 }}>
-          <Text style={styles.room}>{g.group}</Text>
-          {g.steps.map((s, i) => {
-            const when = s.done && s.doneOn ? t('project.step.doneOn', { date: shortDate(s.doneOn) }) : s.plannedOn ? t('project.step.plannedOn', { date: shortDate(s.plannedOn) }) : null;
-            return (
-              <View
-                key={`${g.group}-${i}`}
-                style={styles.item}
-                accessible
-                accessibilityLabel={`${s.label}, ${s.done ? t('project.checklist.done') : t('project.checklist.open')}${when ? `, ${when}` : ''}`}
-              >
-                <View style={[styles.box, s.done ? styles.boxDone : null]}>{s.done ? <TickIcon color={color.white} size={13} /> : null}</View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.itemText, s.done && { color: color.ink2 }]}>{s.label}</Text>
-                  {when ? <Text style={styles.when}>{when}</Text> : null}
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      ))}
+      <MilestoneLine steps={steps} t={t} />
+    </View>
+  );
+}
+
+/** A stage's milestones as a short list, for a stage not under way: done with its day, or its planned day. */
+export function MilestoneLine({ steps, t }: { steps: TrackerStep[]; t: T }) {
+  if (steps.length === 0) return null;
+  return (
+    <View style={{ gap: 6 }}>
+      {steps.map((s, i) => {
+        const when = s.done && s.doneOn ? t('project.step.doneOn', { date: shortDate(s.doneOn) }) : s.plannedOn ? t('project.step.plannedOn', { date: shortDate(s.plannedOn) }) : null;
+        return (
+          <View
+            key={`${s.label}-${i}`}
+            style={styles.item}
+            accessible
+            accessibilityLabel={`${s.label}, ${s.done ? t('project.checklist.done') : t('project.checklist.open')}${when ? `, ${when}` : ''}`}
+          >
+            <View style={[styles.box, s.done ? styles.boxDone : null]}>{s.done ? <TickIcon color={color.white} size={13} /> : null}</View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.itemText, s.done && { color: color.ink2 }]}>{s.label}</Text>
+              {when ? <Text style={styles.when}>{when}</Text> : null}
+            </View>
+          </View>
+        );
+      })}
     </View>
   );
 }

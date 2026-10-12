@@ -6,13 +6,19 @@
  * and tests/project-rules.test.ts.
  *
  * What crosses (brief §5): stage names, planned / original / actual /
- * forecast dates, how many steps are ticked, each in-scope step (label,
+ * forecast dates, the project's and each stage's percentage done (the step
+ * tracker, docs/studio-workspace/STEP-TRACKER.md, counted from EVERY
+ * in-scope step), and each moved date as old date, new date and the reason
+ * in plain words.
+ *
+ * Steps (owner, 12 Oct 2026; docs/studio-os/CUSTOMER-MILESTONES.md): only
+ * the steps the studio STARRED cross — each stage's 2–3 milestones (label,
  * group, its share as a percentage, done, the day it was done and its
- * planned day), the project's and each stage's percentage done (the step
- * tracker, docs/studio-workspace/STEP-TRACKER.md), and each moved date as
- * old date, new date and the reason in plain words. Never the PM's note on
- * a move, who moved it, who ticked what, a step's stored weight, its photo
- * (photos live in the site feed), or a step marked not in scope.
+ * planned day). `steps`, `checklist` and `current.rooms` carry the starred
+ * in-scope steps only; every other step is the studio's own and never
+ * leaves this file. Never the PM's note on a move, who moved it, who ticked
+ * what, a step's stored weight, its photo (photos live in the site feed), a
+ * step marked not in scope or a step not starred.
  *
  * Statuses are computed (project-rules.ts), never typed: "Carpentry · on
  * track", "Overall · 4 days late", with the customer's own share of the
@@ -69,11 +75,11 @@ export interface CustomerTrackerStage {
   status: StageStatusName;
   lateDays: number;
   earlyDays: number;
-  /** In-scope steps ticked, of in scope. */
+  /** Starred in-scope steps (milestones) ticked, of starred in scope. */
   checklist: { done: number; total: number };
   /** Whole percent of the stage done, rounded down: 100 only when every step in it is ticked. */
   progressPct: number;
-  /** The stage's in-scope steps, in plan order. */
+  /** The stage's milestones: its starred in-scope steps, in plan order. Never a step the studio did not star. */
   steps: CustomerStep[];
   /** The latest move of its end, in plain words; null if it never moved. */
   moved: { from: string; to: string; reason: DelayReason; customer: boolean; words: string } | null;
@@ -101,7 +107,7 @@ export interface CustomerTracker {
   /** Whole percent of the project done, rounded down: 100 only when every step is ticked. */
   progressPct: number;
   stages: CustomerTrackerStage[];
-  /** The stage under way and its checklist, room by room; null once handed over. */
+  /** The stage under way and its milestones, group by group; null once handed over. */
   current: { key: TrackerStageKey; label: string; rooms: { room: string; items: { label: string; done: boolean }[] }[] } | null;
   /** Every moved date, newest first, one entry per move (later stages that moved with it fold in). */
   moves: CustomerMove[];
@@ -134,7 +140,7 @@ export interface TrackerInputRow {
     plannedStart?: Date;
     plannedEnd: Date;
     actualEnd: Date | null;
-    items?: readonly { id?: string; room: string; label: string; doneAt: Date | null; weightBp?: number; inScope?: boolean; plannedOn?: Date | null }[];
+    items?: readonly { id?: string; room: string; label: string; doneAt: Date | null; weightBp?: number; inScope?: boolean; plannedOn?: Date | null; customerMilestone?: boolean }[];
   }[] | null;
   dateChanges?: readonly {
     stageId?: string | null;
@@ -217,8 +223,11 @@ export function customerTracker(row: TrackerInputRow, views: readonly StageView[
   const names = new Map(rules.map((r) => [r.id, r.name]));
   const handover = handoverStage(rules);
 
+  /* What the customer reads by name: the starred steps. The percentages above count every step. */
+  const milestones = steps.map((list) => list.filter((it) => it.customerMilestone === true));
+
   const stages: CustomerTrackerStage[] = statuses.map((s, i) => {
-    const items = steps[i]!;
+    const items = milestones[i]!;
     const c = stageCompletion(items.map((it) => ({ done: it.doneAt !== null })));
     const sp = progress.stages.get(s.id);
     const m = s.lastMove;
@@ -264,7 +273,7 @@ export function customerTracker(row: TrackerInputRow, views: readonly StageView[
       ? {
           key: KIND_KEY[statuses[currentIndex]!.kind],
           label: statuses[currentIndex]!.name,
-          rooms: byRoom(steps[currentIndex]!),
+          rooms: byRoom(milestones[currentIndex]!),
         }
       : null;
 

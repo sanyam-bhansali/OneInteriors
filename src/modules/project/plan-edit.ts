@@ -223,7 +223,7 @@ export async function renameStage(projectId: string, stageId: string, name: stri
 
 // ── Editing the steps (owner, PM: plan.edit) ──────────────────
 
-const STEP_SELECT = { id: true, stageId: true, label: true, room: true, weightBp: true, inScope: true, doneAt: true, plannedOn: true, sortOrder: true } as const;
+const STEP_SELECT = { id: true, stageId: true, label: true, room: true, weightBp: true, inScope: true, doneAt: true, plannedOn: true, sortOrder: true, customerMilestone: true } as const;
 
 /** One step of this project, and every step of it (for the rules that look at the whole plan). */
 async function stepOn(projectId: string, stepId: string) {
@@ -271,7 +271,7 @@ export async function renameStep(projectId: string, stepId: string, name: string
     await tx.homeChecklistItem.update({ where: { id: step.id }, data: { label: label.label } });
     await recordEvent(tx, { projectId, type: 'step.renamed', actor, refId: step.id });
   });
-  return { ok: true, message: `Renamed to “${label.label}”. The customer sees the new name.` };
+  return { ok: true, message: `Renamed to “${label.label}”.${step.customerMilestone ? ' It is starred, so the customer sees the new name.' : ''}` };
 }
 
 /** Changes a step's weight (basis points). The in-scope steps are shared again so the project still adds to 100%. */
@@ -314,8 +314,34 @@ export async function scopeStep(projectId: string, stepId: string, inScope: bool
   return {
     ok: true,
     message: inScope
-      ? `${step.label} is back in scope. The customer sees it again.${tail}`
-      : `${step.label} is not in scope. The customer no longer sees it, and its weight is shared across the other steps.${tail}`,
+      ? `${step.label} is back in scope.${step.customerMilestone ? ' It is starred, so the customer sees it again.' : ''}${tail}`
+      : `${step.label} is not in scope. Its weight is shared across the other steps${step.customerMilestone ? ', and the customer no longer sees it' : ''}.${tail}`,
+  };
+}
+
+/**
+ * Stars or unstars a step (owner, 12 Oct 2026; docs/studio-os/CUSTOMER-MILESTONES.md):
+ * a starred step is one of its stage's milestones the customer sees; every
+ * other step is the studio's own. Percentages do not change. No limit: the
+ * Plan and Design tabs only warn when a stage has none or more than
+ * `MILESTONES_WARN_ABOVE`.
+ */
+export async function starStep(projectId: string, stepId: string, starred: boolean): Promise<PlanEditResult> {
+  const check = await memberOnProject(projectId, 'plan.edit');
+  if (!check.ok) return check;
+  const { step } = await stepOn(projectId, stepId);
+  if (!step) return { ok: false, error: GONE };
+  if (step.customerMilestone === starred) return { ok: true, message: 'No change.' };
+  const actor: ProjectActor = { type: 'STUDIO', id: check.member.userId };
+  await prisma.$transaction(async (tx) => {
+    await tx.homeChecklistItem.update({ where: { id: step.id }, data: { customerMilestone: starred } });
+    await recordEvent(tx, { projectId, type: 'step.starred', actor, refId: step.id, payload: { starred } });
+  });
+  return {
+    ok: true,
+    message: starred
+      ? `Starred “${step.label}”. The client sees it as a milestone${step.inScope ? '' : ' once it is back in scope'}.`
+      : `“${step.label}” is no longer starred. Only your team sees it.`,
   };
 }
 
@@ -364,7 +390,7 @@ export async function addStep(
     // A stage that was done has an open step now.
     await settleStageAfterTicks(tx, projectId, stage.id, actor, now);
   });
-  return { ok: true, message: `Added “${label.label}” to ${group.group}. The customer sees it in ${stage.name}.` };
+  return { ok: true, message: `Added “${label.label}” to ${group.group}. Only your team sees it until you star it.` };
 }
 
 /** Removes a step that was never ticked. A ticked step stays: untick it first. */
@@ -406,6 +432,8 @@ export interface PlanStepView {
   hasPhoto: boolean;
   /** Ticked by the backfill because its stage was already done. */
   backfilled: boolean;
+  /** Starred: a milestone the customer sees (docs/studio-os/CUSTOMER-MILESTONES.md). */
+  milestone: boolean;
 }
 
 export interface PlanStageView extends StageStatus {
@@ -418,6 +446,8 @@ export interface PlanStageView extends StageStatus {
   /** In-scope steps ticked / in scope; every in-scope step ticked. */
   completion: { done: number; total: number; open: number; complete: boolean };
   groups: { group: string; steps: PlanStepView[] }[];
+  /** Starred steps in scope: what the customer sees under this stage. */
+  milestones: number;
 }
 
 export interface PlanMoveView extends CustomerMove {
@@ -469,7 +499,7 @@ export async function planForStudio(projectId: string, now = new Date()): Promis
           actualEnd: true,
           items: {
             orderBy: { sortOrder: 'asc' },
-            select: { id: true, room: true, label: true, weightBp: true, inScope: true, plannedOn: true, doneAt: true, doneSource: true, donePhotoId: true },
+            select: { id: true, room: true, label: true, weightBp: true, inScope: true, plannedOn: true, doneAt: true, doneSource: true, donePhotoId: true, customerMilestone: true },
           },
         },
       },
@@ -533,6 +563,7 @@ export async function planForStudio(projectId: string, now = new Date()): Promis
             fromVoice: it.doneSource === 'VOICE',
             hasPhoto: it.donePhotoId !== null,
             backfilled: it.doneSource === 'BACKFILL',
+            milestone: it.customerMilestone,
           });
           groups.set(it.room, list);
         }
@@ -545,6 +576,7 @@ export async function planForStudio(projectId: string, now = new Date()): Promis
           sharePct: bpToPct(sp?.totalBp ?? 0),
           completion: { done, total: flags.length, open: flags.length - done, complete: flags.length > 0 && done === flags.length },
           groups: [...groups.entries()].map(([group, steps]) => ({ group, steps })),
+          milestones: items.filter((it) => it.inScope && it.customerMilestone).length,
         };
       }),
       overall: overallDelay(stages, changes, today, cal),

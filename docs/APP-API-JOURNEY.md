@@ -205,10 +205,43 @@ existing field:
   (`YYYY-MM-DD`) or null. Steps the studio marked not in scope are never sent.
   A step's stored weight, its photo, and who ticked it never cross.
 - `tracker.stages[].checklist` and `tracker.current.rooms` keep their shape
-  and now count in-scope steps (rooms are the steps' groups).
+  and now count in-scope steps (rooms are the steps' groups). (Since 12 Oct
+  2026, starred steps only: see Customer milestones below.)
 - In `siteLogs[]` (and their `corrections[]`), each photo adds
   `doneStep: string | null` — the step that photo ticked. The apps show
   "Done: {step}" (translated) with the photo's `takenAt`. The entry's `done`
-  list still names every step ticked in that post.
+  list still names every step ticked in that post. (Since 12 Oct 2026 both
+  name starred steps only: see Customer milestones below.)
 
 Older apps ignore the new fields and keep working.
+
+## Customer milestones (owner, 12 Oct 2026; as built)
+
+docs/studio-os/CUSTOMER-MILESTONES.md. The customer sees each stage (name,
+status, % done, planned end) and under it only the 2–3 steps the studio
+**starred**. Every other step is the studio's own. `GET /project` keeps every
+field and its shape; what changes is which steps the arrays carry
+(the choice: `steps` now carries only milestones; no new `milestones` field):
+
+- `tracker.stages[].steps` — only the stage's starred in-scope steps, same
+  shape `{ label, group, pct, done, doneOn, plannedOn }`. May be `[]` (the
+  studio starred nothing in that stage): show the stage and its % only.
+- `tracker.stages[].checklist` — `{ done, total }` of those milestones (was:
+  of every in-scope step).
+- `tracker.current.rooms` — the current stage's milestones, by group.
+- `progressPct` (project and `tracker.progressPct`) and
+  `tracker.stages[].progressPct` are unchanged: they still count **every**
+  in-scope step, starred or not.
+- `design.steps` — only the starred design steps. `design.pct` is unchanged
+  (every in-scope design step). `design.next` is the next milestone not done;
+  its `waitingFor` is the payment that opens the design's next step (starred
+  or not), when unrecorded. New: `design.waitingFor: string | null` (the same
+  payment, also when no milestone is left) and `design.yourStep: string | null`
+  (the design's next step when it is the client's own, starred or not).
+  Show the design card when `design.pct !== null`, not when `steps` is
+  non-empty.
+- `siteLogs[].photos[].doneStep` names the step only when it is starred, else
+  null (the photo and its sentence still show). `siteLogs[].done` lists only
+  starred steps ticked in that post.
+
+Older apps keep working: they show fewer steps.

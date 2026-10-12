@@ -15,7 +15,9 @@ import { ProgressBar } from './tracker';
 
 /**
  * The design card on the Project screen (Studio OS Phase 2): how far the
- * design is, what is next and which payment opens it, the site visit, the
+ * design is, its milestones (the steps the studio starred,
+ * docs/studio-os/CUSTOMER-MILESTONES.md), what is next and which payment
+ * opens it, a step that waits on you, the site visit, the
  * mood board to fill (on the website, inside the app), the drawings to
  * approve or ask changes on, and once the design is closed, what changed
  * against the first quotation. Everything comes from the server's projection;
@@ -50,6 +52,20 @@ export function DesignCard({ design, studio, owner, docs, onChanged, t }: { desi
           {next.plannedOn ? <Text style={styles.mono}>{t('design.planned', { date: shortDate(next.plannedOn) })}</Text> : null}
           {next.waitingFor ? <Text style={[styles.note, { color: color.accentInk }]}>{t('design.waitingFor', { payment: next.waitingFor })}</Text> : null}
           {next.moved ? <Text style={styles.note}>{next.moved}</Text> : null}
+        </View>
+      ) : null}
+
+      {!next && design.waitingFor && !design.done ? (
+        <View style={styles.next}>
+          <Text style={styles.eyebrow}>{t('design.next')}</Text>
+          <Text style={[styles.note, { color: color.accentInk }]}>{t('design.waitingFor', { payment: design.waitingFor })}</Text>
+        </View>
+      ) : null}
+
+      {design.yourStep && !design.done ? (
+        <View style={styles.next}>
+          <Text style={styles.eyebrow}>{t('design.yourTurn')}</Text>
+          <Text style={styles.nextTitle}>{design.yourStep}</Text>
         </View>
       ) : null}
 

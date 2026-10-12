@@ -198,8 +198,14 @@ export interface Design {
   pct: number | null;
   done: boolean;
   closedOn: string | null;
+  /** The design milestones: only the steps the studio starred (servers since 12 Oct 2026; older ones sent every step). */
   steps: DesignStep[];
+  /** The next milestone not done yet. */
   next: DesignStep | null;
+  /** The payment that opens the design's next step, when it is not recorded yet. Older servers omit it. */
+  waitingFor?: string | null;
+  /** The design's next step when it is yours to do. Older servers omit it. */
+  yourStep?: string | null;
   moodBoard: { shared: boolean; sharedOn: string | null; note: string | null };
   visits: { at: string; purpose: string; status: 'booked' | 'done' }[];
   measurements: { room: string; size: string; height: string | null }[];
@@ -227,7 +233,7 @@ export interface SiteEntry {
   text: string | null;
   /**
    * Each photo with its own sentence, in the customer's language. `url` is "" when it could not be signed.
-   * `doneStep`: the step this photo ticked ("Done: {step}"); older servers omit it.
+   * `doneStep`: the milestone this photo ticked ("Done: {step}"); null for a step the studio did not star; older servers omit it.
    */
   photos: { url: string; text: string | null; takenAt: string; fromGallery: boolean; doneStep?: string | null }[];
   /** First name, work and arrival time only. */
@@ -258,11 +264,16 @@ export interface TrackerStage {
   status: 'done' | 'on-track' | 'late' | 'upcoming';
   lateDays: number;
   earlyDays: number;
+  /** Milestones done, of milestones (servers since 12 Oct 2026; every step before). */
   checklist: { done: number; total: number };
   moved: { from: string; to: string; reason: DelayReason; customer: boolean; words: string } | null;
   /** The step tracker: the stage's whole percent done. Older servers omit it. */
   progressPct?: number;
-  /** The stage's steps in plan order (never a photo; those are in the site feed). Older servers omit it. */
+  /**
+   * The stage's milestones in plan order: only the 2–3 steps its studio starred
+   * (servers since 12 Oct 2026; older ones sent every step). Never a photo; those
+   * are in the site feed. Older servers omit it.
+   */
   steps?: TrackerStep[];
 }
 

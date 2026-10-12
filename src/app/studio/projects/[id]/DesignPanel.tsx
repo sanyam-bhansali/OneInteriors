@@ -7,6 +7,7 @@ import { CLIENT_REASONS, DESIGN_KINDS, STUDIO_REASONS, type DesignKind } from '@
 import { RESPONSIBLE_LABEL, RESPONSIBLES } from '@/modules/studio-design/template';
 import { formatINR } from '@/lib/money';
 import { CustomerSees, OnlyYourTeam } from '../marks';
+import { MilestoneCount, STAR_HINT, StarToggle } from './StarToggle';
 import {
   addMoodBoardPiecesAction,
   applyDesignStepsAction,
@@ -162,17 +163,31 @@ function Overview({ tab }: { tab: DesignTab }) {
 function Steps({ tab }: { tab: DesignTab }) {
   const [open, setOpen] = useState<{ id: string; what: 'tick' | 'move' | 'edit' } | null>(null);
   const { message, run, pending } = useRun();
+  const [starred, setStarred] = useState<{ ok: boolean; text: string } | null>(null);
   if (tab.steps.length === 0) return null;
+  const stars = tab.steps.filter((s) => s.inScope && s.milestone).length;
   return (
     <section aria-label="Design steps" className="s-card flex flex-col gap-2 p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 className={h2}>Design steps</h2>
         <CustomerSees name={tab.customerFirst} />
       </div>
-      <p className={`m-0 ${muted}`}>Each % is the step&rsquo;s share of the design. A locked step opens when its payment is recorded by accounts.</p>
+      <p className={`m-0 ${muted}`}>
+        <span className="font-medium text-[var(--s-accent)]">★ {STAR_HINT}</span> {tab.customerFirst} sees the design&rsquo;s % from every step. Each % is the step&rsquo;s share of the design. A locked step opens when its payment is recorded by accounts.
+      </p>
+      <MilestoneCount n={stars} />
       <ul className="m-0 flex list-none flex-col gap-1 p-0">
         {tab.steps.map((st) => (
-          <li key={st.id} className="rounded-[8px] px-1.5 py-2 hover:bg-[var(--s-surface-2)]">
+          <li key={st.id} className="flex items-start gap-1.5 rounded-[8px] px-1.5 py-2 hover:bg-[var(--s-surface-2)]">
+            <StarToggle
+              projectId={tab.projectId}
+              stepId={st.id}
+              label={st.label}
+              starred={st.milestone}
+              canEdit={tab.canEditPlan}
+              say={(r) => setStarred(r.ok ? { ok: true, text: r.message } : { ok: false, text: r.error })}
+            />
+            <div className="min-w-0 flex-1">
             <StepLine tab={tab} st={st} onOpen={(what) => setOpen(open?.id === st.id && open.what === what ? null : { id: st.id, what })} />
             {open?.id === st.id && open.what === 'tick' ? <TickForm tab={tab} st={st} onDone={() => setOpen(null)} /> : null}
             {open?.id === st.id && open.what === 'move' ? <MoveForm tab={tab} st={st} onDone={() => setOpen(null)} /> : null}
@@ -184,10 +199,12 @@ function Steps({ tab }: { tab: DesignTab }) {
                 onSave={(v) => run(() => editDesignStepAction({ projectId: tab.projectId, stepId: st.id, ...v }), () => setOpen(null))}
               />
             ) : null}
+            </div>
           </li>
         ))}
       </ul>
       <Message m={message} />
+      <Message m={starred} />
     </section>
   );
 }

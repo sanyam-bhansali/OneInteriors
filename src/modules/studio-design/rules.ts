@@ -60,6 +60,8 @@ export interface DesignPlanStep {
   needsDocument: boolean;
   gatePayment: number | null;
   gapDays: number;
+  /** Starred: a milestone the client sees. */
+  customerMilestone: boolean;
 }
 
 /** The design steps of a new project, inside the DESIGN stage's window, gates matched to its payment stages. */
@@ -82,6 +84,7 @@ export function designSteps(template: readonly DesignTemplateStep[], window: { s
     needsDocument: t.needsDocument,
     gatePayment: gateIndexFor(t.gate, payments),
     gapDays: t.days,
+    customerMilestone: t.milestone === true,
   }));
 }
 

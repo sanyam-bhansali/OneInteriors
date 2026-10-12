@@ -19,6 +19,7 @@ import {
 import { calendarOf, daysBetween, istDay } from '@/modules/project/working-days';
 import { doneLabel, parsePercent } from '@/modules/project/step-rules';
 import { CustomerSees, OnlyYourTeam } from '../marks';
+import { MilestoneCount, STAR_HINT, StarToggle } from './StarToggle';
 import { newClientRef, uploadFile } from '../../site/lib/queue';
 import { readyPhoto, type ReadyPhoto } from '../../site/lib/photo';
 import {
@@ -73,7 +74,8 @@ export function PlanTab({ plan, customer }: { plan: StudioPlan; customer: string
       <div className="s-card p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h2 className="m-0 text-[16px] font-semibold">Stages</h2>
-          <CustomerSees name={customer} />
+          {/* The client sees the stages and only the starred steps; the rest stays with the team. */}
+          <span className="text-[11.5px] font-medium text-[var(--s-accent)]">{customer} sees the stages and ★ steps only</span>
         </div>
         <p className={`m-0 mt-1 ${muted}`}>
           Hauspire&rsquo;s steps, each worth a share of the project. A stage finishes when its last step in scope is ticked, each with its photo.
@@ -254,6 +256,11 @@ function StageRow({
             {s.completion.total ? `${s.completion.done} of ${s.completion.total} steps ticked` : 'No step in scope'} · {s.sharePct}% of the project · {s.photos} photo
             {s.photos === 1 ? '' : 's'}
           </span>
+          {hasSteps ? (
+            <span className="mt-0.5 block">
+              <MilestoneCount n={s.milestones} />
+            </span>
+          ) : null}
         </div>
         <span className="s-num font-[family-name:var(--font-mono)] text-[13px] text-[var(--s-ink-2)]">
           <span className="md:hidden">Planned </span>
@@ -370,7 +377,8 @@ function Steps({ plan, stage, customer, say }: { plan: StudioPlan; stage: PlanSt
   return (
     <div className="mt-3 flex flex-col gap-3">
       <p className={`m-0 ${muted}`}>
-        A step is ticked with a photo and a sentence: both go into today&rsquo;s site log, labelled &ldquo;Done: step&rdquo;. Each % is the step&rsquo;s share of the whole project.
+        <span className="font-medium text-[var(--s-accent)]">★ {STAR_HINT}</span> {customer} sees each stage&rsquo;s % from every step, and only the starred ones by name.{' '}
+        A step is ticked with a photo and a sentence: both go into today&rsquo;s site log. Each % is the step&rsquo;s share of the whole project.
         {plan.canEdit ? ` Weights in scope add up to ${plan.weightTotalPct}%; every share is worked out again so the project always totals 100%.` : ''}
       </p>
       {design ? (
@@ -396,6 +404,7 @@ function Steps({ plan, stage, customer, say }: { plan: StudioPlan; stage: PlanSt
                   step={st}
                   customer={customer}
                   busy={pending}
+                  say={say}
                   onTick={canTick ? () => setTicking(st) : null}
                   onUntick={plan.canEdit ? () => untick(st) : null}
                   onEdit={plan.canEdit ? () => setEditing(st.id) : null}
@@ -420,9 +429,11 @@ function Steps({ plan, stage, customer, say }: { plan: StudioPlan; stage: PlanSt
 }
 
 function StepRow({
+  plan,
   step: st,
   customer,
   busy,
+  say,
   onTick,
   onUntick,
   onEdit,
@@ -431,6 +442,7 @@ function StepRow({
   step: PlanStepView;
   customer: string;
   busy: boolean;
+  say: (r: PlanEditResult) => void;
   onTick: (() => void) | null;
   onUntick: (() => void) | null;
   onEdit: (() => void) | null;
@@ -445,6 +457,7 @@ function StepRow({
         : 'Open';
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[8px] px-1.5 py-1.5 hover:bg-[var(--s-surface)]">
+      <StarToggle projectId={plan.projectId} stepId={st.id} label={st.label} starred={st.milestone} canEdit={plan.canEdit} say={say} />
       <span
         aria-hidden="true"
         className="inline-flex h-5 w-5 flex-none items-center justify-center rounded-[6px] border text-[12px] font-bold"
@@ -517,7 +530,7 @@ function StepEditor({ plan, step, customer, onDone }: { plan: StudioPlan; step: 
     });
 
   const remove = () => {
-    if (!window.confirm(`Remove “${step.label}” from the plan? ${customer} stops seeing it, and its weight is shared across the other steps.`)) return;
+    if (!window.confirm(`Remove “${step.label}” from the plan?${step.milestone ? ` ${customer} stops seeing it.` : ''} Its weight is shared across the other steps.`)) return;
     start(async () => {
       const r = await removeStepAction(plan.projectId, step.id);
       if (r.ok) onDone(r);
@@ -535,7 +548,7 @@ function StepEditor({ plan, step, customer, onDone }: { plan: StudioPlan; step: 
         }}
       >
         <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-[var(--s-ink-2)]">
-          Step name ({customer} sees this)
+          Step name{step.milestone ? ` (starred: ${customer} sees this)` : ''}
           <input value={label} maxLength={120} autoFocus onChange={(e) => setLabel(e.target.value)} className={`${field} font-normal text-[var(--s-ink)]`} />
         </label>
         <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-[var(--s-ink-2)]">
@@ -552,7 +565,7 @@ function StepEditor({ plan, step, customer, onDone }: { plan: StudioPlan; step: 
           In scope for this home
           {step.done && step.inScope ? <span className={muted}>· ticked, so it stays in scope (untick it first)</span> : null}
         </label>
-        {!inScope && step.inScope ? <p className={`m-0 ${muted}`}>Not in scope: {customer} stops seeing it, and its weight is shared across the other steps.</p> : null}
+        {!inScope && step.inScope ? <p className={`m-0 ${muted}`}>Not in scope: its weight is shared across the other steps{step.milestone ? `, and ${customer} stops seeing it` : ''}.</p> : null}
         {error ? (
           <p role="alert" className="m-0 text-[13.5px] font-medium text-[var(--s-bad)]">
             {error}
@@ -639,6 +652,8 @@ function tickError(code: unknown): string {
       return 'Photos cannot be stored right now. Try again in a minute.';
     case 'busy':
       return 'Someone posted to this site at the same moment. Try again.';
+    case 'locked':
+      return 'This step opens once its payment is recorded by accounts. Nothing was ticked.';
     default:
       return 'That did not post, and nothing was ticked. Try again.';
   }

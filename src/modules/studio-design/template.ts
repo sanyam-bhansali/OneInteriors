@@ -45,6 +45,12 @@ export interface DesignTemplateStep {
   days: number;
   /** Relative weight inside the design phase (1 to 10). */
   weight: number;
+  /**
+   * Starred: one of the design milestones the client sees (owner, 12 Oct
+   * 2026; docs/studio-os/CUSTOMER-MILESTONES.md). Every other step is the
+   * studio's own.
+   */
+  milestone: boolean;
 }
 
 export const DESIGN_STEPS_MIN = 1;
@@ -60,6 +66,9 @@ export const DESIGN_SHARE_BP = 200;
 /** The group the design steps are filed under inside the DESIGN stage (the step's `room` column). */
 export const DESIGN_GROUP = 'Design';
 
+/** Hauspire's design milestones: the steps starred by default (and in the migration's backfill, by name). */
+export const DESIGN_MILESTONES: readonly string[] = ['Site visit and measurement', 'First 3D and renders', 'Design closure'];
+
 const s = (label: string, responsible: Responsible, days: number, weight: number, opts: { doc?: boolean; gate?: string } = {}): DesignTemplateStep => ({
   label,
   responsible,
@@ -67,6 +76,7 @@ const s = (label: string, responsible: Responsible, days: number, weight: number
   gate: opts.gate ?? null,
   days,
   weight,
+  milestone: DESIGN_MILESTONES.includes(label),
 });
 
 /** Hauspire's design steps, in order (their tracker, owner 12 Oct 2026). The days add up to 24: a 2 BHK. */
@@ -151,7 +161,9 @@ export function checkDesignTemplate(raw: unknown): TemplateCheck {
     if (!Number.isInteger(days) || days < 0 || days > DAYS_MAX) return { ok: false, error: `Step ${n}: days after the previous step is a whole number from 0 to ${DAYS_MAX}.` };
     const weight = o.weight === undefined || o.weight === null || o.weight === '' ? 1 : Number(o.weight);
     if (!Number.isInteger(weight) || weight < 1 || weight > WEIGHT_MAX) return { ok: false, error: `Step ${n}: weight is a whole number from 1 to ${WEIGHT_MAX}.` };
-    steps.push({ label, responsible: o.responsible, needsDocument: o.needsDocument === true, gate: gate || null, days, weight });
+    // A template saved before stars existed has no `milestone`: it gets Hauspire's stars by name.
+    const milestone = o.milestone === undefined ? DESIGN_MILESTONES.includes(label) : o.milestone === true;
+    steps.push({ label, responsible: o.responsible, needsDocument: o.needsDocument === true, gate: gate || null, days, weight, milestone });
   }
   return { ok: true, steps };
 }

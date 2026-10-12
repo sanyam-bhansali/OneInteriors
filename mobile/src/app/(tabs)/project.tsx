@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { ArrowIcon } from '../../components/icons';
 import { CalendarIcon, GrowLine, NowDot, SnagIcon } from '../../components/project/parts';
-import { MovedNote, MovesCard, ProgressBar, StageChecklist, StageSteps, stageLine } from '../../components/project/tracker';
+import { MilestoneLine, MovedNote, MovesCard, ProgressBar, StageChecklist, StageSteps, stageLine } from '../../components/project/tracker';
 import { Body, Card, Eyebrow, Loading, Meta, Press, Screen, Stagger, Tile, Title } from '../../components/ui';
 import { dayLabel, inr, lakh, shortDate } from '../../lib/format';
 import { useHeadline, useLang, useT, type T } from '../../lib/i18n';
@@ -110,7 +110,7 @@ export default function Project() {
         ) : null}
 
         {/* Studio OS Phase 2: the design phase, while it runs and once it closes with what changed. */}
-        {p.design && p.design.steps.length > 0 && (!p.design.done || p.design.changes) ? (
+        {p.design && (typeof p.design.pct === 'number' || p.design.steps.length > 0) && (!p.design.done || p.design.changes) ? (
           <DesignCard design={p.design} studio={p.studio} owner={p.role !== 'family'} docs={p.documents} onChanged={() => void refresh()} t={t} />
         ) : null}
 
@@ -268,12 +268,15 @@ function StageRow({
           </Text>
           <Text style={styles.mono}>
             {line}
-            {typeof tracked?.progressPct === 'number' && tracked.steps?.length ? ` · ${t('project.stagePct', { n: tracked.progressPct })}` : ''}
+            {typeof tracked?.progressPct === 'number' && tracked.steps ? ` · ${t('project.stagePct', { n: tracked.progressPct })}` : ''}
           </Text>
           {tracked ? <MovedNote stage={tracked} t={t} /> : null}
-          {nowStage && tracked?.steps?.length ? (
+          {/* Customer milestones: every stage shows its starred steps; the current one also its bar. */}
+          {tracked?.steps?.length && nowStage ? (
             <StageSteps steps={tracked.steps} pct={tracked.progressPct ?? 0} t={t} />
-          ) : current ? (
+          ) : tracked?.steps?.length ? (
+            <MilestoneLine steps={tracked.steps} t={t} />
+          ) : nowStage && !tracked?.steps && current ? (
             <StageChecklist current={current} t={t} />
           ) : null}
           {s.late ? (

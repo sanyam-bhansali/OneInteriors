@@ -162,7 +162,7 @@ export interface CustomerProject {
   snags: CustomerSnag[];
   documents: CustomerDocument[];
   /* Phase 3 — tracker and delays (portal/tracker-view.ts). Computed, never typed. */
-  /** Stages planned vs actual with their steps and percentages, the current stage's checklist, moved dates with plain reasons; null for a project with no plan. */
+  /** Stages planned vs actual with their percentages and starred milestones, the current stage's milestones, moved dates with plain reasons; null for a project with no plan. */
   tracker: CustomerTracker | null;
   /** The step tracker: whole percent of the project done (rounded down); null for a project with no plan. */
   progressPct: number | null;
@@ -178,7 +178,7 @@ export interface CustomerProject {
   siteLogs: CustomerSiteDay[];
   /** Working days of the last two weeks with nothing posted by 21:00 IST: "No update from the studio today". */
   siteMissedDays: string[];
-  /* Studio OS Phase 2 — design (studio-design/customer-view.ts): steps, the next one and the payment that opens it, mood board, visits, measurements, drawings to approve, what changed at closing. Null with no DESIGN stage. */
+  /* Studio OS Phase 2 — design (studio-design/customer-view.ts): % done, the starred milestones, the next one and the payment that opens the next step, mood board, visits, measurements, drawings to approve, what changed at closing. Null with no DESIGN stage. */
   design: CustomerDesign | null;
 }
 
@@ -209,7 +209,8 @@ export const CUSTOMER_PROJECT_SELECT = {
       /* Studio OS Phase 2: a design step's id (to place a moved day; never sent), whose step it is and its payment gate. */
       items: {
         orderBy: { sortOrder: 'asc' },
-        select: { room: true, label: true, doneAt: true, weightBp: true, inScope: true, plannedOn: true, id: true, responsible: true, gatePayment: true },
+        /* customerMilestone: the studio's star. Only starred steps cross by name (tracker-view.ts, studio-design/customer-view.ts). */
+        select: { room: true, label: true, doneAt: true, weightBp: true, inScope: true, plannedOn: true, id: true, responsible: true, gatePayment: true, customerMilestone: true },
       },
     },
   },

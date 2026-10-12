@@ -138,6 +138,8 @@ export interface PlanItem {
   needsDocument?: boolean;
   gatePayment?: number | null;
   gapDays?: number | null;
+  /** Starred: one of the stage's milestones the customer sees (docs/studio-os/CUSTOMER-MILESTONES.md). */
+  customerMilestone?: boolean;
 }
 
 /**
@@ -278,6 +280,7 @@ export function stepsFor(kind: PlanKind, plannedStart: Date, plannedEnd: Date): 
     weightBp: t.weightBp,
     inScope: true,
     plannedOn: dayToDb(days[i]!),
+    customerMilestone: t.milestone,
   }));
 }
 
@@ -300,6 +303,7 @@ export function designStepsFor(plannedStart: Date, plannedEnd: Date, template: r
     needsDocument: st.needsDocument,
     gatePayment: st.gatePayment,
     gapDays: st.gapDays,
+    customerMilestone: st.customerMilestone,
   }));
 }
 

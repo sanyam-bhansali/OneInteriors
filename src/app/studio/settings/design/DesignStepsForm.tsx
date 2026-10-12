@@ -2,17 +2,27 @@
 
 import { useState, useTransition } from 'react';
 import { RESPONSIBLE_LABEL, RESPONSIBLES, type DesignTemplateStep } from '@/modules/studio-design/template';
+import { milestoneWarning } from '@/modules/project/step-rules';
 import { resetDesignStepsAction, saveDesignStepsAction } from './actions';
 
 /**
  * The studio's design steps, as rows: name, who, days after the previous
- * step, the payment that opens it, whether it needs its file, its weight.
- * Move up or down, add, remove; one Save.
+ * step, the payment that opens it, whether it needs its file, its weight,
+ * and its star: a starred step is a milestone the client sees
+ * (docs/studio-os/CUSTOMER-MILESTONES.md). Move up or down, add, remove; one Save.
  */
 
-type Row = { label: string; responsible: string; days: string; gate: string; needsDocument: boolean; weight: string };
+type Row = { label: string; responsible: string; days: string; gate: string; needsDocument: boolean; weight: string; milestone: boolean };
 
-const toRow = (s: DesignTemplateStep): Row => ({ label: s.label, responsible: s.responsible, days: String(s.days), gate: s.gate ?? '', needsDocument: s.needsDocument, weight: String(s.weight) });
+const toRow = (s: DesignTemplateStep): Row => ({
+  label: s.label,
+  responsible: s.responsible,
+  days: String(s.days),
+  gate: s.gate ?? '',
+  needsDocument: s.needsDocument,
+  weight: String(s.weight),
+  milestone: s.milestone,
+});
 
 export function DesignStepsForm({ initial, custom }: { initial: DesignTemplateStep[]; custom: boolean }) {
   const [rows, setRows] = useState<Row[]>(initial.map(toRow));
@@ -28,10 +38,12 @@ export function DesignStepsForm({ initial, custom }: { initial: DesignTemplateSt
       return out;
     });
   const total = rows.reduce((a, r) => a + (Number(r.days) || 0), 0);
+  const stars = rows.filter((r) => r.milestone).length;
+  const warn = milestoneWarning(stars);
   const save = () =>
     start(async () => {
       setMessage(null);
-      const r = await saveDesignStepsAction(rows.map((x) => ({ label: x.label, responsible: x.responsible, days: Number(x.days), gate: x.gate, needsDocument: x.needsDocument, weight: Number(x.weight) })));
+      const r = await saveDesignStepsAction(rows.map((x) => ({ label: x.label, responsible: x.responsible, days: Number(x.days), gate: x.gate, needsDocument: x.needsDocument, weight: Number(x.weight), milestone: x.milestone })));
       setMessage(r.ok ? { ok: true, text: r.message } : { ok: false, text: r.error });
     });
   return (
@@ -40,6 +52,9 @@ export function DesignStepsForm({ initial, custom }: { initial: DesignTemplateSt
         <table className="w-full min-w-[760px] border-collapse text-[13.5px]">
           <thead>
             <tr className="text-left text-[12px] text-[var(--s-ink-3)]">
+              <th className="px-2 py-2 font-medium" title="Starred steps are what the client sees">
+                ★ Client sees
+              </th>
               <th className="px-3 py-2 font-medium">Step</th>
               <th className="px-2 py-2 font-medium">Who</th>
               <th className="px-2 py-2 font-medium">Days after</th>
@@ -52,6 +67,15 @@ export function DesignStepsForm({ initial, custom }: { initial: DesignTemplateSt
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} className="border-t border-[var(--s-rule-soft)]">
+                <td className="px-2 py-1.5 text-center">
+                  <input
+                    aria-label={`Step ${i + 1}: the client sees it (starred)`}
+                    type="checkbox"
+                    checked={r.milestone}
+                    onChange={(e) => set(i, { milestone: e.target.checked })}
+                    className="h-4 w-4 accent-[var(--s-accent)]"
+                  />
+                </td>
                 <td className="px-3 py-1.5">
                   <input aria-label={`Step ${i + 1} name`} value={r.label} onChange={(e) => set(i, { label: e.target.value })} maxLength={120} className="s-input w-full" />
                 </td>
@@ -93,11 +117,11 @@ export function DesignStepsForm({ initial, custom }: { initial: DesignTemplateSt
         </table>
       </div>
       <p className="m-0 text-[12.5px] text-[var(--s-ink-3)]">
-        {rows.length} steps · {total} days for a 2 BHK. The payment is matched by name to each project&apos;s payment stages (&ldquo;design advance&rdquo; matches
+        {rows.length} steps · {total} days for a 2 BHK · ★ {stars} shown to the client{warn ? ` (${warn})` : ''}. Starred steps are what the client sees; the rest are for your team. The payment is matched by name to each project&apos;s payment stages (&ldquo;design advance&rdquo; matches
         &ldquo;Design advance 5%&rdquo;).
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className="s-btn-ghost min-h-[40px]" onClick={() => setRows((rs) => [...rs, { label: '', responsible: 'DESIGNER', days: '1', gate: '', needsDocument: false, weight: '1' }])}>
+        <button type="button" className="s-btn-ghost min-h-[40px]" onClick={() => setRows((rs) => [...rs, { label: '', responsible: 'DESIGNER', days: '1', gate: '', needsDocument: false, weight: '1', milestone: false }])}>
           + Add a step
         </button>
         <button type="button" className="s-btn min-h-[40px]" disabled={pending} onClick={save}>

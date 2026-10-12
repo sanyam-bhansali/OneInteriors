@@ -53,12 +53,12 @@ export const SITE_LOG_SELECT = {
         fromGallery: true,
         customerText: true,
         customerLang: true,
-        /* The step this photo ticked: its name only. */
-        doneStep: { select: { label: true } },
+        /* The step this photo ticked: its name only, and only when it is starred (docs/studio-os/CUSTOMER-MILESTONES.md). */
+        doneStep: { select: { label: true, customerMilestone: true } },
       },
     },
     crew: { orderBy: { createdAt: 'asc' }, select: { crewName: true, crewRole: true, arrivedAt: true } },
-    ticked: { orderBy: { sortOrder: 'asc' }, select: { room: true, label: true } },
+    ticked: { orderBy: { sortOrder: 'asc' }, select: { room: true, label: true, customerMilestone: true } },
   },
 } satisfies Prisma.HomeProject$siteLogsArgs;
 
@@ -71,7 +71,7 @@ export interface CustomerSitePhoto {
   text: string | null;
   takenAt: string;
   fromGallery: boolean;
-  /** The step this photo ticked ("Done: {step}"), or null. The apps add "Done:" in the customer's language. */
+  /** The milestone this photo ticked ("Done: {step}"), or null — also null for a step the studio did not star. The apps add "Done:" in the customer's language. */
   doneStep: string | null;
 }
 
@@ -89,7 +89,7 @@ export interface CustomerSiteEntry {
   text: string | null;
   photos: CustomerSitePhoto[];
   crew: { name: string; role: string; arrivedAt: string | null }[];
-  /** Checklist items ticked off in this post. */
+  /** Milestones (starred steps) ticked off in this post. */
   done: { room: string; label: string }[];
 }
 
@@ -115,11 +115,12 @@ function entry(l: SiteLogRow, urls: readonly string[]): CustomerSiteEntry {
       text: p.customerText,
       takenAt: p.takenAt.toISOString(),
       fromGallery: p.fromGallery,
-      doneStep: p.doneStep?.label ?? null,
+      // A step the studio did not star stays the studio's own: the photo and its sentence still show.
+      doneStep: p.doneStep?.customerMilestone === true ? p.doneStep.label : null,
     })),
 
     crew: l.crew.map((c) => ({ name: crewFirstName(c.crewName), role: c.crewRole, arrivedAt: c.arrivedAt?.toISOString() ?? null })),
-    done: l.ticked.map((t) => ({ room: t.room, label: t.label })),
+    done: l.ticked.filter((t) => t.customerMilestone === true).map((t) => ({ room: t.room, label: t.label })),
   };
 }
 

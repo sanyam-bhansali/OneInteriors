@@ -6,15 +6,19 @@
  * tests/customer-projection.test.ts can feed it a row stuffed with internal
  * fields and check none come out.
  *
- * May cross: the designer's first name; the design steps' names, done, days,
- * whose step it is when it is the client's, which payment opens a locked one,
- * a moved step's reason in plain words; the mood board's message; site
- * visits' day, time, purpose and status; measurements; shared drawings with
- * their version and the client's own answers; the frozen "what changed" at
- * closing.
+ * May cross: the designer's first name; the design's % done (from every
+ * in-scope step); the STARRED design steps only — the milestones (owner,
+ * 12 Oct 2026; docs/studio-os/CUSTOMER-MILESTONES.md): names, done, days,
+ * whose step it is when it is the client's, which payment opens a locked
+ * one, a moved step's reason in plain words; what waits on the client now
+ * (the payment that opens the next step, the client's own step); the mood
+ * board's message; site visits' day, time, purpose and status;
+ * measurements; shared drawings with their version and the client's own
+ * answers; the frozen "what changed" at closing.
  *
- * Never: a step's note (`doneNote`), its file id, who ticked it, a visit's
- * note, a delay's note or who moved it, drafts, any member id or phone.
+ * Never: a step the studio did not star (its name, day or count), a step's
+ * note (`doneNote`), its file id, who ticked it, a visit's note, a delay's
+ * note or who moved it, drafts, any member id or phone.
  */
 
 import type { Prisma } from '@prisma/client';
@@ -48,6 +52,8 @@ export interface DesignStepRow {
   inScope: boolean;
   responsible?: string | null;
   gatePayment?: number | null;
+  /** The studio's star: only starred steps cross by name. */
+  customerMilestone?: boolean;
 }
 
 export interface DesignDocRow {
@@ -111,8 +117,14 @@ export interface CustomerDesign {
   pct: number | null;
   done: boolean;
   closedOn: string | null;
+  /** The design milestones: the starred in-scope steps, in order. Never a step the studio did not star. */
   steps: CustomerDesignStep[];
+  /** The next milestone not done yet; its `waitingFor` is the payment holding up the design right now, if any. */
   next: CustomerDesignStep | null;
+  /** The payment that opens the design's next step (starred or not), when it is not recorded yet. */
+  waitingFor: string | null;
+  /** The design's next step when it is the client's own to do (starred or not): its name, so they know it is on them. */
+  yourStep: string | null;
   moodBoard: { shared: boolean; sharedOn: string | null; note: string | null };
   visits: { at: string; purpose: string; status: 'booked' | 'done' }[];
   measurements: { room: string; size: string; height: string | null }[];
@@ -157,7 +169,7 @@ export function toCustomerDesign(
   const progress = progressOf(live.map((i, k) => ({ id: String(k), stageId: 'design', weightBp: i.weightBp, inScope: true, done: i.doneAt !== null })));
   const movedById = new Map<string, string>();
   for (const d of row.stepDelays ?? []) if (isDelayReasonKey(d.reason)) movedById.set(d.stepId, CUSTOMER_REASON[d.reason]);
-  const steps: CustomerDesignStep[] = live.map((i) => {
+  const all: CustomerDesignStep[] = live.map((i) => {
     const gate = gateOf(i.gatePayment ?? null, gateStages);
     return {
       label: i.label,
@@ -201,15 +213,22 @@ export function toCustomerDesign(
           },
         ],
   );
-  const stepList = steps;
-  const next = nextStep(live.map((i, k) => ({ k, done: i.doneAt !== null, inScope: true })));
+  /* What waits on the client right now comes from the design's next step, starred or not; only its payment and (when it is theirs) its name cross. */
+  const upNext = nextStep(live.map((i, k) => ({ k, done: i.doneAt !== null, inScope: true })));
+  const nowStep = upNext ? all[upNext.k]! : null;
+  const waitingFor = nowStep?.waitingFor ?? null;
+  /* The client reads only the starred steps by name. */
+  const steps = all.filter((_, k) => live[k]!.customerMilestone === true);
+  const nextMilestone = steps.find((s) => !s.done) ?? null;
   return {
     designer: firstName(row.designer?.user?.name),
     pct: progress.stages.get('design')?.pct ?? null,
     done: stage.actualEnd !== null,
     closedOn: isoDay(row.designClosedAt),
-    steps: stepList,
-    next: next ? stepList[next.k]! : null,
+    steps,
+    next: nextMilestone ? { ...nextMilestone, waitingFor: waitingFor ?? nextMilestone.waitingFor } : null,
+    waitingFor,
+    yourStep: nowStep?.yours ? nowStep.label : null,
     moodBoard: { shared: Boolean(row.moodBoardSharedAt), sharedOn: isoDay(row.moodBoardSharedAt), note: row.moodBoardSharedAt ? (row.moodBoardNote ?? null) : null },
     visits: (row.siteVisits ?? [])
       .filter((v) => v.status !== 'CANCELLED')

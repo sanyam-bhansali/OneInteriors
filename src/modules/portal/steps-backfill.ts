@@ -100,6 +100,7 @@ export async function stepsFromTemplate(db: StepsBackfillDb, opts: { apply: bool
               plannedOn: st.plannedOn,
               doneAt: st.doneAt,
               doneSource: st.doneSource,
+              customerMilestone: st.customerMilestone === true,
             })),
           });
         }

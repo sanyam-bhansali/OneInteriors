@@ -179,7 +179,7 @@ function RealProject({ project, reload }: { project: MyProject; reload: () => vo
         </div>
 
         {/* Studio OS Phase 2: the design phase, while it runs and once it closes. */}
-        {project.design && project.design.steps.length > 0 && (!project.design.done || project.design.changes) ? (
+        {project.design && (project.design.pct !== null || project.design.steps.length > 0) && (!project.design.done || project.design.changes) ? (
           <DesignCard design={project.design} studio={project.studio} owner={project.role === 'owner'} docs={project.documents} onChanged={reload} />
         ) : null}
 
@@ -200,7 +200,7 @@ function RealProject({ project, reload }: { project: MyProject; reload: () => vo
                 {s.state === 'now' ? (s.late ? ' · running late' : ' · on track') : ''}
                 {tracked?.[i] ? ` · ${tracked[i]!.progressPct}% done` : ''}
               </p>
-              {tracked?.[i] && tracked[i]!.steps.length ? <StageSteps stage={tracked[i]!} open={s.state === 'now'} /> : null}
+              {tracked?.[i] && tracked[i]!.steps.length ? <StageMilestones stage={tracked[i]!} /> : null}
               {s.state === 'done' && project.role === 'owner' ? <ShareMilestone stageKey={s.key} label={s.label} studio={project.studio} /> : null}
               {s.late ? (
                 <div className="oa-flag">
@@ -236,18 +236,17 @@ function RealProject({ project, reload }: { project: MyProject; reload: () => vo
   );
 }
 
-/** A stage's steps: ticked with the day it was done, or the day it is planned. No photos here. */
-function StageSteps({ stage, open }: { stage: NonNullable<MyProject['tracker']>['stages'][number]; open: boolean }) {
-  const done = stage.steps.filter((x) => x.done).length;
+/**
+ * A stage's milestones: the 2–3 steps its studio starred
+ * (docs/studio-os/CUSTOMER-MILESTONES.md), ticked with the day it was done
+ * or the day it is planned. The stage's % above counts every step; the rest
+ * of the steps are the studio's own. No photos here.
+ */
+function StageMilestones({ stage }: { stage: NonNullable<MyProject['tracker']>['stages'][number] }) {
   return (
-    <details open={open} style={{ marginTop: 8 }}>
-      <summary className="oa-meta" style={{ cursor: 'pointer', color: 'var(--accent-ink)' }}>
-        {done} of {stage.steps.length} steps done
-      </summary>
-      <div style={{ margin: '8px 0 4px' }}>
-        <Progress pct={stage.progressPct} label={`${stage.label} ${stage.progressPct}% done`} />
-      </div>
-      <ul className="oa-items" style={{ marginTop: 6 }}>
+    <div style={{ marginTop: 8 }}>
+      <Progress pct={stage.progressPct} label={`${stage.label} ${stage.progressPct}% done`} />
+      <ul className="oa-items" style={{ marginTop: 6 }} aria-label={`${stage.label} milestones`}>
         {stage.steps.map((x, j) => (
           <li key={`${x.label}-${j}`} className={x.done ? 'done' : 'next'}>
             <span>
@@ -258,7 +257,7 @@ function StageSteps({ stage, open }: { stage: NonNullable<MyProject['tracker']>[
           </li>
         ))}
       </ul>
-    </details>
+    </div>
   );
 }
 

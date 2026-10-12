@@ -10,6 +10,7 @@ import {
   renameStep,
   reweightStep,
   scopeStep,
+  starStep,
   untickStep,
   type PlanEditResult,
 } from '@/modules/project/plan-edit';
@@ -77,6 +78,12 @@ export async function reweightStepAction(projectId: string, stepId: string, perc
 export async function scopeStepAction(projectId: string, stepId: string, inScope: boolean): Promise<PlanEditResult> {
   const p = id(projectId);
   return done(p, await scopeStep(p, id(stepId), inScope === true));
+}
+
+/** Star or unstar a step: a starred step is a milestone the client sees (Plan and Design tabs). */
+export async function starStepAction(projectId: string, stepId: string, starred: boolean): Promise<PlanEditResult> {
+  const p = id(projectId);
+  return done(p, await starStep(p, id(stepId), starred === true));
 }
 
 export async function addStepAction(projectId: string, input: { stageId: string; group: string; label: string; percent: string }): Promise<PlanEditResult> {

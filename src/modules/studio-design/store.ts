@@ -107,6 +107,8 @@ export interface DesignStepView {
   doneFile: { id: string; title: string; url: string } | null;
   /** Its moves, oldest first. */
   moves: { from: string; to: string; side: 'CLIENT' | 'STUDIO'; reason: string; note: string | null; at: string }[];
+  /** Starred: a design milestone the client sees (docs/studio-os/CUSTOMER-MILESTONES.md). */
+  milestone: boolean;
 }
 
 export interface DrawingView {
@@ -218,6 +220,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
               doneDocumentId: true,
               inScope: true,
               weightBp: true,
+              customerMilestone: true,
               delays: { orderBy: { at: 'asc' }, select: { fromDate: true, toDate: true, side: true, reason: true, note: true, at: true } },
             },
           },
@@ -283,6 +286,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
         note: d.note,
         at: d.at.toISOString(),
       })),
+      milestone: i.customerMilestone,
     };
   });
   const lastOpen = [...steps].reverse().find((s) => s.inScope && !s.done && s.plannedOn);

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CUSTOMER_PROJECT_SELECT, customerPhases, toCustomerProject, type CustomerProjectRow } from '@/modules/portal/customer-project-view';
+import { toCustomerDesign } from '@/modules/studio-design/customer-view';
 
 /**
  * What crosses to the customer (docs/studio-workspace/STUDIO-WORKSPACE-
@@ -140,8 +141,8 @@ function leakyRow(): CustomerProjectRow {
             fromGallery: true,
             customerText: 'Kitchen carcass levelled and fixed to the wall.',
             customerLang: 'en',
-            // The step this photo ticked (the step tracker): only its name may cross.
-            doneStep: { id: 'step-SECRET', label: 'Carcass complete with hardware', doneById: SECRET.staffId, weightBp: 1000, donePhotoId: 'photo-SECRET' },
+            // The step this photo ticked (the step tracker): only its name may cross, and only when it is starred (customer milestones).
+            doneStep: { id: 'step-SECRET', label: 'Carcass complete with hardware', doneById: SECRET.staffId, weightBp: 1000, donePhotoId: 'photo-SECRET', customerMilestone: true },
           },
         ],
         crew: [
@@ -155,7 +156,11 @@ function leakyRow(): CustomerProjectRow {
             crewMember: { phone: SECRET.crewPhone },
           },
         ],
-        ticked: [{ room: 'Kitchen', label: 'Carcass levelled', doneById: SECRET.staffId }],
+        ticked: [
+          { room: 'Kitchen', label: 'Carcass levelled', doneById: SECRET.staffId, customerMilestone: true },
+          // Not starred: the studio's own step, never named to the customer.
+          { room: 'Kitchen', label: 'Hardware stage 1 ordered SECRET-UNSTARRED', doneById: SECRET.staffId, customerMilestone: false },
+        ],
       },
       {
         id: 'log2',
@@ -468,7 +473,8 @@ describe('the stages the customer sees', () => {
       // Studio OS Phase 2: a design step's id (to place a moved day; never sent), whose step it is and its payment gate.
       items: {
         orderBy: { sortOrder: 'asc' },
-        select: { room: true, label: true, doneAt: true, weightBp: true, inScope: true, plannedOn: true, id: true, responsible: true, gatePayment: true },
+        // Customer milestones: the studio's star, read to keep every other step back.
+        select: { room: true, label: true, doneAt: true, weightBp: true, inScope: true, plannedOn: true, id: true, responsible: true, gatePayment: true, customerMilestone: true },
       },
     });
   });
@@ -501,7 +507,7 @@ describe('the step tracker: percentages and steps (docs/studio-workspace/STEP-TR
           plannedStart: D('2026-09-01T00:00:00Z'),
           plannedEnd: D('2026-09-15T00:00:00Z'),
           actualEnd: D('2026-09-14T00:00:00Z'),
-          items: [step('Design signed off', 2000, D('2026-09-14T00:00:00Z'), { room: 'Design' })],
+          items: [step('Design signed off', 2000, D('2026-09-14T00:00:00Z'), { room: 'Design', customerMilestone: true })],
         },
         {
           id: 'st2',
@@ -511,9 +517,11 @@ describe('the step tracker: percentages and steps (docs/studio-workspace/STEP-TR
           plannedEnd: D('2026-10-20T00:00:00Z'),
           actualEnd: null,
           items: [
-            step('POP framing', 2000, D('2026-10-02T06:00:00Z')),
-            step('POP sheets', 2000, null),
-            step('PVC POP work', 2000, null, { inScope: false, label: 'PVC POP work SECRET-OUT-OF-SCOPE' }),
+            step('POP framing', 2000, D('2026-10-02T06:00:00Z'), { customerMilestone: true }),
+            // Customer milestones: a step the studio did not star counts in the % but never crosses by name, day or count.
+            step('POP wiring', 2000, D('2026-10-03T06:00:00Z'), { label: 'POP wiring SECRET-UNSTARRED', plannedOn: D('2026-10-09T00:00:00Z') }),
+            step('POP sheets', 2000, null, { customerMilestone: true }),
+            step('PVC POP work', 2000, null, { inScope: false, label: 'PVC POP work SECRET-OUT-OF-SCOPE', customerMilestone: true }),
           ],
         },
         { id: 'st3', kind: 'CARPENTRY', name: 'Carpentry', plannedStart: D('2026-10-20T00:00:00Z'), plannedEnd: D('2026-11-15T00:00:00Z'), actualEnd: null, items: [step('Carcass complete', 2000, null, { room: 'Execution stage 2A' })] },
@@ -525,21 +533,31 @@ describe('the step tracker: percentages and steps (docs/studio-workspace/STEP-TR
   const out = toCustomerProject(row(), SECRET.customerId, now);
   const t = out.tracker!;
 
-  it('sends the project’s percentage and each stage’s, sharing a not-in-scope step’s weight', () => {
-    // In scope: 2000 + 2000 + 2000 + 2000 = 8000; done 4000 → 50%.
-    expect(out.progressPct).toBe(50);
-    expect(t.progressPct).toBe(50);
-    expect(t.stages.map((s) => s.progressPct)).toEqual([100, 50, 0, 0, 0]);
+  it('sends the project’s percentage and each stage’s from EVERY in-scope step, starred or not, sharing a not-in-scope step’s weight', () => {
+    // In scope: 2000 + (2000 + 2000 + 2000) + 2000 = 10 000; done 2000 + 2000 + 2000 (the unstarred one too) → 60%.
+    expect(out.progressPct).toBe(60);
+    expect(t.progressPct).toBe(60);
+    expect(t.stages.map((s) => s.progressPct)).toEqual([100, 66, 0, 0, 0]);
   });
 
-  it('sends each in-scope step with its group, share as a percentage, done and days — never a not-in-scope one', () => {
+  it('sends only the starred in-scope steps (the milestones), with their group, share, done and days — never an unstarred or not-in-scope one', () => {
     expect(t.stages[1]!.steps).toEqual([
-      { label: 'POP framing', group: 'Execution stage 1', pct: 25, done: true, doneOn: '2026-10-02', plannedOn: '2026-10-01' },
-      { label: 'POP sheets', group: 'Execution stage 1', pct: 25, done: false, doneOn: null, plannedOn: '2026-10-01' },
+      { label: 'POP framing', group: 'Execution stage 1', pct: 20, done: true, doneOn: '2026-10-02', plannedOn: '2026-10-01' },
+      { label: 'POP sheets', group: 'Execution stage 1', pct: 20, done: false, doneOn: null, plannedOn: '2026-10-01' },
     ]);
     expect(t.stages[1]!.checklist).toEqual({ done: 1, total: 2 });
     expect(t.current!.rooms).toEqual([{ room: 'Execution stage 1', items: [{ label: 'POP framing', done: true }, { label: 'POP sheets', done: false }] }]);
-    expect(JSON.stringify(out)).not.toContain('SECRET-OUT-OF-SCOPE');
+    // A stage with no star shows its % and no step.
+    expect(t.stages[2]!.steps).toEqual([]);
+    expect(t.stages[2]!.checklist).toEqual({ done: 0, total: 0 });
+    const json = JSON.stringify(out);
+    expect(json).not.toContain('SECRET-OUT-OF-SCOPE');
+    expect(json).not.toContain('SECRET-UNSTARRED');
+    // Nor the unstarred steps' days, nor an unstarred stage's step.
+    const tj = JSON.stringify(t);
+    expect(tj).not.toContain('2026-10-09');
+    expect(tj).not.toContain('2026-10-03');
+    expect(tj).not.toContain('Carcass complete');
   });
 
   it('carries no stored weight, scope, photo link, post link or who ticked', () => {
@@ -645,6 +663,15 @@ describe('Phase 2: the site feed from the daily site log (portal/site-feed-view.
     for (const v of ['step-SECRET', 'photo-SECRET', SECRET.staffId]) expect(json).not.toContain(v);
     expect(out.siteLogs[0]!.text).toBe('Kitchen carcasses are up.');
     expect(out.siteLogs[0]!.done).toEqual([{ room: 'Kitchen', label: 'Carcass levelled' }]);
+    expect(json).not.toContain('SECRET-UNSTARRED');
+  });
+
+  it('names the step a photo ticked only when the studio starred it (customer milestones)', () => {
+    const row = leakyRow() as unknown as { siteLogs: { photos: { doneStep: Record<string, unknown> | null }[] }[] };
+    row.siteLogs[0]!.photos[0]!.doneStep = { ...row.siteLogs[0]!.photos[0]!.doneStep, label: 'POP wiring SECRET-UNSTARRED', customerMilestone: false };
+    const feed = toCustomerProject(row as unknown as CustomerProjectRow, SECRET.customerId, now).siteLogs;
+    expect(feed[0]!.photos[0]).toMatchObject({ text: 'Kitchen carcass levelled and fixed to the wall.', doneStep: null });
+    expect(JSON.stringify(feed)).not.toContain('SECRET-UNSTARRED');
   });
 
   it('gives the crew as first name, role and arrival time only', () => {
@@ -705,9 +732,10 @@ describe('Phase 3: the tracker, moved dates and computed statuses (portal/tracke
           plannedEnd: D('2026-10-05T00:00:00Z'),
           actualEnd: null,
           items: [
-            { room: 'Kitchen', label: 'Plumbing points', doneAt: D('2026-10-01T00:00:00Z'), doneById: SECRET.staffId, doneSource: 'VOICE' },
-            { room: 'Kitchen', label: 'Dado tiles', doneAt: null },
-            { room: 'Bedroom 1', label: 'Wiring', doneAt: null },
+            { room: 'Kitchen', label: 'Plumbing points', doneAt: D('2026-10-01T00:00:00Z'), doneById: SECRET.staffId, doneSource: 'VOICE', customerMilestone: true },
+            { room: 'Kitchen', label: 'Dado tiles', doneAt: null, customerMilestone: true },
+            { room: 'Bedroom 1', label: 'Wiring', doneAt: null, customerMilestone: true },
+            { room: 'Bedroom 1', label: 'Conduit SECRET-UNSTARRED', doneAt: null },
           ],
         },
         { id: 'st3', kind: 'CARPENTRY', name: 'Carpentry', plannedStart: D('2026-10-05T00:00:00Z'), plannedEnd: D('2026-11-15T00:00:00Z'), actualEnd: null, items: [] },
@@ -768,6 +796,8 @@ describe('Phase 3: the tracker, moved dates and computed statuses (portal/tracke
         { room: 'Bedroom 1', items: [{ label: 'Wiring', done: false }] },
       ],
     });
+    // Customer milestones: an unstarred step of the current stage is not in its checklist either.
+    expect(JSON.stringify(t)).not.toContain('SECRET-UNSTARRED');
     expect(keysOf(out).has('doneById')).toBe(false);
     expect(keysOf(out).has('doneSource')).toBe(false);
   });
@@ -868,10 +898,13 @@ describe('Studio OS Phase 2: the design card (studio-design/customer-view.ts) ne
             doneNote: DESIGN_SECRET.doneNote,
             doneById: SECRET.staffId,
             doneDocumentId: DESIGN_SECRET.fileId,
+            customerMilestone: true,
           },
-          { id: 'step-2', room: 'Design', label: 'First draft (FD) meeting', doneAt: null, weightBp: 20, inScope: true, plannedOn: D('2026-10-09T00:00:00Z'), responsible: 'DESIGNER', gatePayment: 1 },
-          { id: 'step-3', room: 'Design', label: 'Approve the layout', doneAt: null, weightBp: 10, inScope: true, plannedOn: D('2026-10-10T00:00:00Z'), responsible: 'CLIENT', gatePayment: null },
-          { id: 'step-4', room: 'Design', label: 'SECRET-OUT-OF-SCOPE-DESIGN', doneAt: null, weightBp: 10, inScope: false, plannedOn: null, responsible: 'DESIGNER', gatePayment: null },
+          // Not starred (customer milestones): the studio's own step. Its payment gate still says what the design waits on.
+          { id: 'step-2', room: 'Design', label: 'First draft SECRET-UNSTARRED', doneAt: null, weightBp: 20, inScope: true, plannedOn: D('2026-10-09T00:00:00Z'), responsible: 'DESIGNER', gatePayment: 1 },
+          { id: 'step-3', room: 'Design', label: 'Approve the layout', doneAt: null, weightBp: 10, inScope: true, plannedOn: D('2026-10-10T00:00:00Z'), responsible: 'CLIENT', gatePayment: null, customerMilestone: true },
+          { id: 'step-4', room: 'Design', label: 'SECRET-OUT-OF-SCOPE-DESIGN', doneAt: null, weightBp: 10, inScope: false, plannedOn: null, responsible: 'DESIGNER', gatePayment: null, customerMilestone: true },
+          { id: 'step-5', room: 'Design', label: 'First 3D and renders', doneAt: null, weightBp: 10, inScope: true, plannedOn: D('2026-10-15T00:00:00Z'), responsible: 'DESIGNER', gatePayment: null, customerMilestone: true },
         ],
       },
     ],
@@ -900,12 +933,43 @@ describe('Studio OS Phase 2: the design card (studio-design/customer-view.ts) ne
   const design = out.design!;
   const json = JSON.stringify(out);
 
-  it('shows the steps, the next one and the payment that opens it, whose step it is and why one moved', () => {
+  it('shows only the starred steps (milestones), the next one, the payment the design waits on and whose step it is', () => {
     expect(design.designer).toBe('Meera');
-    expect(design.steps.map((s) => s.label)).toEqual(['Site visit and measurement', 'First draft (FD) meeting', 'Approve the layout']);
-    expect(design.next).toMatchObject({ label: 'First draft (FD) meeting', waitingFor: 'Design advance', moved: 'Moved to a day that suits you.' });
-    expect(design.steps[2]!.yours).toBe(true);
-    expect(design.pct).toBe(40);
+    expect(design.steps.map((s) => s.label)).toEqual(['Site visit and measurement', 'Approve the layout', 'First 3D and renders']);
+    // The next milestone; the payment comes from the design's next step, starred or not.
+    expect(design.next).toMatchObject({ label: 'Approve the layout', yours: true, waitingFor: 'Design advance', moved: null });
+    expect(design.waitingFor).toBe('Design advance');
+    expect(design.yourStep).toBeNull();
+    expect(design.steps[2]).toMatchObject({ done: false, plannedOn: '2026-10-15', waitingFor: null });
+    // % from every in-scope step: 20 done of 20 + 20 + 10 + 10.
+    expect(design.pct).toBe(33);
+  });
+
+  it('never names an unstarred design step, its day or why it moved', () => {
+    expect(json).not.toContain('SECRET-UNSTARRED');
+    const dj = JSON.stringify({ design: out.design, tracker: out.tracker });
+    expect(dj).not.toContain('2026-10-09');
+    expect(dj).not.toContain('Moved to a day that suits you.');
+  });
+
+  it('names the client’s own next step even when it is not starred, so they know it waits on them', () => {
+    const own = toCustomerDesign(
+      {
+        actualEnd: null,
+        items: [
+          { label: 'Brief', doneAt: D('2026-10-02T06:00:00Z'), plannedOn: null, weightBp: 10, inScope: true, responsible: 'DESIGNER', customerMilestone: true },
+          { label: 'Send your floor plan', doneAt: null, plannedOn: D('2026-10-05T00:00:00Z'), weightBp: 10, inScope: true, responsible: 'CLIENT' },
+          { label: 'Internal review SECRET-UNSTARRED', doneAt: null, plannedOn: null, weightBp: 10, inScope: true, responsible: 'DESIGNER' },
+        ],
+      },
+      {},
+      [],
+      null,
+    )!;
+    expect(own.yourStep).toBe('Send your floor plan');
+    expect(own.steps.map((s) => s.label)).toEqual(['Brief']);
+    expect(own.next).toBeNull();
+    expect(JSON.stringify(own)).not.toContain('SECRET-UNSTARRED');
   });
 
   it('shows the mood board message, the booked visit (not the cancelled one), the sizes and the drawing’s answer', () => {

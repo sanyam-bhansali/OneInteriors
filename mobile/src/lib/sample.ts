@@ -47,6 +47,25 @@ const steps = (group: string, rows: [string, number][], done: number, from: numb
     doneOn: i < done ? dayAt(from + i) : null,
     plannedOn: dayAt(from + i * 2),
   }));
+/*
+ * Customer milestones (docs/studio-os/CUSTOMER-MILESTONES.md): the server
+ * sends only the steps the studio starred. The lists below are the studio's
+ * whole plan; `ms` keeps the starred ones (the template's default stars).
+ */
+const STARRED = new Set([
+  'Final design and drawings signed off',
+  'POP, civil, fabrication and electrical work started',
+  'POP sheets',
+  'Materials delivered from the factory',
+  'Carcass complete with hardware',
+  'Shutters delivered',
+  'Painting started',
+  'Painting complete',
+  'Snags listed',
+  'Handover',
+]);
+const ms = (list: TrackerStep[]): TrackerStep[] => list.filter((s) => STARRED.has(s.label));
+const cl = (list: TrackerStep[]) => ({ done: ms(list).filter((s) => s.done).length, total: ms(list).length });
 const DESIGN_STEPS = steps('Design', [['Final design and drawings signed off', 2]], 1, -50);
 const CIVIL_STEPS = steps(
   'Execution stage 1',
@@ -149,28 +168,28 @@ export const SAMPLE_PROJECT: Project = {
   tracker: {
     progressPct: 38,
     stages: [
-      { key: 'DESIGN', kind: 'DESIGN', label: 'Design sign-off', plannedStart: dayAt(-60), plannedEnd: dayAt(-48), originalEnd: dayAt(-48), actualEnd: dayAt(-50), forecastEnd: dayAt(-50), state: 'done', status: 'done', lateDays: 0, earlyDays: 2, checklist: { done: 1, total: 1 }, moved: null, progressPct: 100, steps: DESIGN_STEPS },
+      { key: 'DESIGN', kind: 'DESIGN', label: 'Design sign-off', plannedStart: dayAt(-60), plannedEnd: dayAt(-48), originalEnd: dayAt(-48), actualEnd: dayAt(-50), forecastEnd: dayAt(-50), state: 'done', status: 'done', lateDays: 0, earlyDays: 2, checklist: cl(DESIGN_STEPS), moved: null, progressPct: 100, steps: ms(DESIGN_STEPS) },
       {
-        key: 'SITE', kind: 'CIVIL', label: 'POP, civil and electricals', plannedStart: dayAt(-48), plannedEnd: dayAt(-20), originalEnd: dayAt(-26), actualEnd: dayAt(-20), forecastEnd: dayAt(-20), state: 'done', status: 'done', lateDays: 5, earlyDays: 0, checklist: { done: 8, total: 8 },
+        key: 'SITE', kind: 'CIVIL', label: 'POP, civil and electricals', plannedStart: dayAt(-48), plannedEnd: dayAt(-20), originalEnd: dayAt(-26), actualEnd: dayAt(-20), forecastEnd: dayAt(-20), state: 'done', status: 'done', lateDays: 5, earlyDays: 0, checklist: cl(CIVIL_STEPS),
         moved: { from: dayAt(-26), to: dayAt(-20), reason: 'SUPPLIER', customer: false, words: '' },
         progressPct: 100,
-        steps: CIVIL_STEPS,
+        steps: ms(CIVIL_STEPS),
       },
       {
-        key: 'PRODUCTION', kind: 'CARPENTRY', label: 'Carpentry', plannedStart: dayAt(-20), plannedEnd: dayAt(12), originalEnd: dayAt(10), actualEnd: null, forecastEnd: dayAt(12), state: 'now', status: 'on-track', lateDays: 0, earlyDays: 0, checklist: { done: 5, total: 17 },
+        key: 'PRODUCTION', kind: 'CARPENTRY', label: 'Carpentry', plannedStart: dayAt(-20), plannedEnd: dayAt(12), originalEnd: dayAt(10), actualEnd: null, forecastEnd: dayAt(12), state: 'now', status: 'on-track', lateDays: 0, earlyDays: 0, checklist: cl(CARPENTRY_STEPS),
         moved: { from: dayAt(10), to: dayAt(12), reason: 'CUSTOMER_CHANGE', customer: true, words: '' },
         progressPct: 19,
-        steps: CARPENTRY_STEPS,
+        steps: ms(CARPENTRY_STEPS),
       },
-      { key: 'FINISH', kind: 'FINISH', label: 'Finishing', plannedStart: dayAt(12), plannedEnd: dayAt(55), originalEnd: dayAt(51), actualEnd: null, forecastEnd: dayAt(55), state: 'next', status: 'upcoming', lateDays: 0, earlyDays: 0, checklist: { done: 0, total: 4 }, moved: null, progressPct: 0, steps: FINISH_STEPS },
-      { key: 'HANDOVER', kind: 'HANDOVER', label: 'Handover', plannedStart: dayAt(55), plannedEnd: dayAt(64), originalEnd: dayAt(60), actualEnd: null, forecastEnd: dayAt(64), state: 'later', status: 'upcoming', lateDays: 0, earlyDays: 0, checklist: { done: 0, total: 3 }, moved: null, progressPct: 0, steps: HANDOVER_STEPS },
+      { key: 'FINISH', kind: 'FINISH', label: 'Finishing', plannedStart: dayAt(12), plannedEnd: dayAt(55), originalEnd: dayAt(51), actualEnd: null, forecastEnd: dayAt(55), state: 'next', status: 'upcoming', lateDays: 0, earlyDays: 0, checklist: cl(FINISH_STEPS), moved: null, progressPct: 0, steps: ms(FINISH_STEPS) },
+      { key: 'HANDOVER', kind: 'HANDOVER', label: 'Handover', plannedStart: dayAt(55), plannedEnd: dayAt(64), originalEnd: dayAt(60), actualEnd: null, forecastEnd: dayAt(64), state: 'later', status: 'upcoming', lateDays: 0, earlyDays: 0, checklist: cl(HANDOVER_STEPS), moved: null, progressPct: 0, steps: ms(HANDOVER_STEPS) },
     ],
     current: {
       key: 'PRODUCTION',
       label: 'Carpentry',
       rooms: [
-        { room: 'Execution stage 2A', items: CARPENTRY_STEPS.filter((s) => s.group === 'Execution stage 2A').map((s) => ({ label: s.label, done: s.done })) },
-        { room: 'Execution stage 2B', items: CARPENTRY_STEPS.filter((s) => s.group === 'Execution stage 2B').map((s) => ({ label: s.label, done: s.done })) },
+        { room: 'Execution stage 2A', items: ms(CARPENTRY_STEPS).filter((s) => s.group === 'Execution stage 2A').map((s) => ({ label: s.label, done: s.done })) },
+        { room: 'Execution stage 2B', items: ms(CARPENTRY_STEPS).filter((s) => s.group === 'Execution stage 2B').map((s) => ({ label: s.label, done: s.done })) },
       ],
     },
     moves: [
@@ -255,9 +274,9 @@ export const SAMPLE_PROJECT: Project = {
       reasonText: null,
       countsAgainstStudio: null,
       text: null,
-      photos: [{ url: photo('kitchen'), text: 'Kitchen hardware for the drawers and lofts is on site.', takenAt: at(-1, 16), fromGallery: false, doneStep: 'Hardware stage 1 ordered (tandems, channels, folding mechanisms)' }],
+      photos: [{ url: photo('kitchen'), text: 'Kitchen hardware for the drawers and lofts is on site.', takenAt: at(-1, 16), fromGallery: false, doneStep: null }],
       crew: [{ name: 'Ramesh', role: 'Carpenter', arrivedAt: at(-1, 9) }],
-      done: [{ room: 'Execution stage 2A', label: 'Hardware stage 1 ordered (tandems, channels, folding mechanisms)' }],
+      done: [],
 
       corrections: [],
     },
@@ -284,13 +303,14 @@ export const SAMPLE_PROJECT: Project = {
     done: true,
     closedOn: dayAt(-50),
     steps: [
+      // Only the starred design steps (the milestones) cross to the customer.
       { label: 'Site visit and measurement', done: true, doneOn: dayAt(-58), plannedOn: dayAt(-58), yours: false, waitingFor: null, moved: null },
-      { label: 'Mood board shared', done: true, doneOn: dayAt(-57), plannedOn: dayAt(-57), yours: false, waitingFor: null, moved: null },
-      { label: 'First draft (FD) meeting', done: true, doneOn: dayAt(-54), plannedOn: dayAt(-55), yours: false, waitingFor: null, moved: 'Moved to a day that suits you.' },
-      { label: 'First 3D and renders', done: true, doneOn: dayAt(-52), plannedOn: dayAt(-52), yours: false, waitingFor: null, moved: null },
-      { label: 'Handover to execution', done: true, doneOn: dayAt(-50), plannedOn: dayAt(-50), yours: false, waitingFor: null, moved: null },
+      { label: 'First 3D and renders', done: true, doneOn: dayAt(-52), plannedOn: dayAt(-52), yours: false, waitingFor: null, moved: 'Moved to a day that suits you.' },
+      { label: 'Design closure', done: true, doneOn: dayAt(-50), plannedOn: dayAt(-50), yours: false, waitingFor: null, moved: null },
     ],
     next: null,
+    waitingFor: null,
+    yourStep: null,
     moodBoard: { shared: true, sharedOn: dayAt(-57), note: 'Pick two looks you like for the living room.' },
     visits: [{ at: at(-58, 11), purpose: 'Measurement', status: 'done' }],
     measurements: [

@@ -321,6 +321,7 @@ export async function applyDesignSteps(projectId: string, now = new Date()): Pro
           needsDocument: st.needsDocument === true,
           gatePayment: st.gatePayment ?? null,
           gapDays: st.gapDays ?? null,
+          customerMilestone: st.customerMilestone === true,
         })),
       });
       await recordEvent(tx, { projectId, type: 'design.steps_applied', actor, refId: stage.id, payload: { steps: steps.length } });

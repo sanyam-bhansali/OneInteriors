@@ -36,6 +36,7 @@ export async function writePlan(db: PlanDb, projectId: string, plan: { stages: P
             plannedOn: it.plannedOn,
             doneAt: it.doneAt ?? null,
             doneSource: it.doneAt ? (it.doneSource ?? null) : null,
+            customerMilestone: it.customerMilestone === true,
             // Studio OS Phase 2: a design step's who, file, payment gate and gap.
             ...(it.responsible
               ? { responsible: it.responsible, needsDocument: it.needsDocument === true, gatePayment: it.gatePayment ?? null, gapDays: it.gapDays ?? null }

@@ -8,8 +8,9 @@ import { shortDate } from '@/modules/app/project-view';
 
 /**
  * The design phase on the website (Studio OS Phase 2,
- * docs/studio-os/PHASE-2-DESIGN.md §7): how far the design is, what is next
- * and which payment opens it, the site visit, the mood board to fill, the
+ * docs/studio-os/PHASE-2-DESIGN.md §7): how far the design is, its
+ * milestones (the steps the studio starred, docs/studio-os/CUSTOMER-MILESTONES.md),
+ * what waits on you (a payment, your own step), the site visit, the mood board to fill, the
  * drawings to approve or ask changes on, and — once the design is closed —
  * what changed against the first quotation. The phone app shows the same,
  * from the same projection.
@@ -56,6 +57,22 @@ export function DesignCard({ design, studio, owner, docs, onChanged }: { design:
             {next.waitingFor ? ` · opens when your ${next.waitingFor} is paid` : ''}
           </p>
           {next.moved ? <p style={MONO}>{next.moved}</p> : null}
+        </div>
+      ) : null}
+
+      {!next && design.waitingFor && !design.done ? (
+        <div className="oa-card" style={{ padding: 14 }}>
+          <span className="oa-meta">Next</span>
+          <p style={{ margin: '4px 0 0', fontWeight: 600 }}>The design goes on when your {design.waitingFor} is paid</p>
+        </div>
+      ) : null}
+
+      {design.yourStep && !design.done ? (
+        <div className="oa-flag">
+          <span className="oa-meta" style={{ color: 'var(--accent-ink)' }}>
+            Waiting on you
+          </span>
+          <p style={{ margin: '6px 0 0' }}>{design.yourStep}</p>
         </div>
       ) : null}
 
@@ -106,10 +123,9 @@ export function DesignCard({ design, studio, owner, docs, onChanged }: { design:
         </details>
       ) : null}
 
-      <details>
-        <summary className="oa-meta" style={{ cursor: 'pointer', color: 'var(--accent-ink)' }}>
-          {design.steps.filter((s) => s.done).length} of {design.steps.length} design steps done
-        </summary>
+      {design.steps.length ? (
+      <div>
+        <span className="oa-meta">Milestones</span>
         <ul className="oa-items" style={{ marginTop: 6 }}>
           {design.steps.map((s, i) => (
             <li key={`${s.label}-${i}`} className={s.done ? 'done' : 'next'}>
@@ -121,7 +137,8 @@ export function DesignCard({ design, studio, owner, docs, onChanged }: { design:
             </li>
           ))}
         </ul>
-      </details>
+      </div>
+      ) : null}
 
       {design.changes ? (
         <div className="oa-card oa-changes">

@@ -45,7 +45,7 @@ describe('the customer design card dates', () => {
     const d = toCustomerDesign(
       {
         actualEnd: null,
-        items: [{ label: 'Mood board shared', doneAt: new Date('2026-10-12T19:45:00Z'), plannedOn: new Date('2026-10-13T00:00:00Z'), weightBp: 100, inScope: true }],
+        items: [{ label: 'Mood board shared', doneAt: new Date('2026-10-12T19:45:00Z'), plannedOn: new Date('2026-10-13T00:00:00Z'), weightBp: 100, inScope: true, customerMilestone: true }],
       },
       { designClosedAt: new Date('2026-10-20T20:00:00Z'), moodBoardSharedAt: new Date('2026-10-12T19:00:00Z') },
       [],

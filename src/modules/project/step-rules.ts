@@ -223,3 +223,18 @@ export function checkScope(step: Pick<RuleStep, 'id' | 'done' | 'inScope'>, inSc
 
 /** "Done: POP framing" — the label a step's photo carries in the site log and the customer's feed. */
 export const doneLabel = (step: string): string => `Done: ${step}`;
+
+// ── Customer milestones (docs/studio-os/CUSTOMER-MILESTONES.md) ──
+
+/** More stars than this in one stage and the Plan and Design tabs suggest fewer. A warning, never a block. */
+export const MILESTONES_WARN_ABOVE = 4;
+
+/** "2 shown to the client", for the stage's counter. */
+export const milestonesShown = (n: number): string => `${n} shown to the client`;
+
+/** The soft warning for a stage's stars, or null when 1 to 4 are starred. Never stops a save. */
+export function milestoneWarning(n: number): string | null {
+  if (n <= 0) return 'No step is starred: the client sees only the stage and its %.';
+  if (n > MILESTONES_WARN_ABOVE) return `${n} starred: 2 or 3 big moments read better for the client.`;
+  return null;
+}
