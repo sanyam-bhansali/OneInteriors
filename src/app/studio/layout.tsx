@@ -155,6 +155,7 @@ export default async function StudioLayout({ children }: { children: React.React
         verified={context?.live ?? false}
         canSearchClients={office}
         alerts={office ? (context?.toConfirm ?? 0) + (context?.clientsDue ?? 0) : 0}
+        userName={user.name}
         signOut={signOutAction}
       >
         {children}

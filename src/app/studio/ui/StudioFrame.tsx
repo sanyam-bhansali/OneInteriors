@@ -10,6 +10,7 @@ import { AppIcon, LineIcon } from './icons';
 import { Oim, Verified } from './brand';
 import { ThemeToggle } from './theme';
 import { THEME_KEY } from './theme-script';
+import { ProfileMenu } from './ProfileMenu';
 
 /**
  * The studio frame from the owner's UI handoff (12 Oct 2026): no side menu.
@@ -31,6 +32,7 @@ export function StudioFrame({
   verified,
   canSearchClients,
   alerts,
+  userName,
   signOut,
   children,
 }: {
@@ -40,6 +42,8 @@ export function StudioFrame({
   canSearchClients: boolean;
   /** Things waiting on this person (the bell's dot). */
   alerts: number;
+  /** The signed-in person, for the profile icon's initials. */
+  userName: string | null;
   signOut: () => Promise<void>;
   children: React.ReactNode;
 }) {
@@ -130,6 +134,7 @@ export function StudioFrame({
             <Link href={STUDIO_HOME} className="iconbtn" aria-label="Home">
               <LineIcon name="home" />
             </Link>
+            <ProfileMenu name={userName} signOut={signOut} />
           </div>
         </header>
       ) : null}

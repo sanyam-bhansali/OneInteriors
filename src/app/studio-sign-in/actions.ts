@@ -10,6 +10,7 @@ import { localeFor, type StudioWord } from '@/modules/i18n/studio';
 import { currentMember, memberFor } from '@/modules/studio/access';
 import type { StudioRoleName } from '@/modules/studio/roles';
 import { homeFor } from '@/modules/studio/surfaces';
+import { landingFor } from '@/modules/studio/profile';
 import { myToday } from '@/modules/studio-sales/today';
 import type { SectionId } from '@/modules/studio-sales/today-rules';
 import { designWorkload } from '@/modules/studio-design/store';
@@ -72,7 +73,9 @@ export async function verifyStudioCodeAction(phone: string, code: string, lang: 
     const studio = member
       ? ((await prisma.studio.findUnique({ where: { id: member.studioId }, select: { tradeName: true } }).catch(() => null))?.tradeName ?? null)
       : null;
-    return { ok: true, to: homeFor(role), role, mismatch: roleMismatch(asPicked(picked), role), studio };
+    /* Their own "after signing in, open" choice (profile menu), if they still may open it. */
+    const to = member ? await landingFor(member, homeFor(role)).catch(() => homeFor(role)) : homeFor(role);
+    return { ok: true, to, role, mismatch: roleMismatch(asPicked(picked), role), studio };
   } catch (error) {
     console.error('[studio-sign-in] verifyOtp threw:', error);
     return { ok: false, error: 'err.unavailable' };
@@ -129,7 +132,8 @@ export async function welcomeAction(): Promise<Welcome | null> {
     console.error('[studio-sign-in] welcome read failed', error instanceof Error ? error.name : 'unknown');
   }
   const first = (user.name ?? '').trim().split(/\s+/)[0] || null;
-  return { name: first, studio, role: member.role, to: homeFor(member.role), waiting: waiting.slice(0, 3) };
+  const to = await landingFor(member, homeFor(member.role)).catch(() => homeFor(member.role));
+  return { name: first, studio, role: member.role, to, waiting: waiting.slice(0, 3) };
 }
 
 /** "Pick again" on the mismatch card, and "Not you? Sign out": end this session and stay on the page. */

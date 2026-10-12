@@ -10,7 +10,11 @@ import type { SectionId, TodaySection } from '@/modules/studio-sales/today-rules
 import { prisma } from '@/lib/prisma';
 import { getLang } from '@/modules/i18n/server';
 import { AppIcon } from '../ui/icons';
-import { Mark, Oim, PoweredBy, Verified, initials } from '../ui/brand';
+import { Mark, Oim, PoweredBy, Verified } from '../ui/brand';
+import { ProfileMenu } from '../ui/ProfileMenu';
+import { signOutAction } from '@/app/sign-in/actions';
+import { myHomePrefs } from '@/modules/studio/profile';
+import { DEFAULT_HOME_PREFS, homeTiles } from '@/modules/studio/home-prefs';
 import { ThemeToggle } from '../ui/theme';
 import { HomeSearch, LangSeg, Splash } from './HomeBits';
 import { SalesCalls, YourList, type ListRow } from './HomeSections';
@@ -35,7 +39,11 @@ export default async function StudioHomePage() {
   const [user, member] = await Promise.all([getCurrentUser(), currentMember()]);
   if (member?.role === 'SUPERVISOR') redirect(SITE_HOME);
 
-  const apps = member ? appsFor(member) : [...APPS];
+  /* The person's own home (profile menu): their tile order, hidden tiles and
+     the "Right now" strip. Only ever a subset of `appsFor`. */
+  const allApps = member ? appsFor(member) : [...APPS];
+  const prefs = member ? await myHomePrefs(member.id) : DEFAULT_HOME_PREFS;
+  const apps = homeTiles(allApps, prefs);
   const role = member?.role ?? 'OWNER';
   /* The lower sections read through the same scoped module functions as the
      screens they summarise: a salesperson's own leads (myToday), the sites
@@ -64,8 +72,8 @@ export default async function StudioHomePage() {
 
   const sections = today?.sections ?? [];
   const n = (id: SectionId) => sectionCount(sections, id);
-  const strip = stripFor(sections, apps);
-  const sees = new Set(apps.map((a) => a.key));
+  const strip = prefs.strip ? stripFor(sections, allApps) : [];
+  const sees = new Set(allApps.map((a) => a.key));
   const leadsWord = member?.role === 'SALES' ? 'lead' : 'client';
   const cards = sites?.cards ?? [];
   const calls = sections.find((x) => x.id === 'calls');
@@ -99,9 +107,7 @@ export default async function StudioHomePage() {
             </svg>
             {strip.length > 0 ? <span className="pip" /> : null}
           </Link>
-          <span className="av" style={{ width: 42, height: 42 }} title={user?.name ?? undefined}>
-            {initials(user?.name)}
-          </span>
+          <ProfileMenu name={user?.name ?? null} signOut={signOutAction} />
         </div>
       </header>
 
@@ -121,6 +127,7 @@ export default async function StudioHomePage() {
             </svg>
             {strip.length > 0 ? <span className="pip" /> : null}
           </Link>
+          <ProfileMenu name={user?.name ?? null} signOut={signOutAction} size={40} />
         </div>
       </header>
 

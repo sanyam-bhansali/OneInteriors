@@ -178,3 +178,139 @@ html[data-splash='seen'] .oi-studio .splash {
 .oi-studio .hstack {
   max-width: 100%;
 }
+
+/* ── The profile menu (top right) ─────────────────────────── */
+.oi-studio .avbtn {
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  transition: box-shadow 0.2s ease;
+}
+.oi-studio .avbtn:hover,
+.oi-studio .avbtn[aria-expanded='true'] {
+  box-shadow: 0 0 0 3px var(--acc-soft), 0 0 0 4px var(--line);
+}
+.oi-studio .pfover {
+  justify-content: flex-end;
+  padding: 64px 24px;
+}
+.oi-studio .pfsheet {
+  position: relative;
+  z-index: 1;
+  max-width: 520px;
+  max-height: calc(100dvh - 96px);
+}
+.oi-studio .pfhead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border-bottom: 1px solid var(--fill2);
+}
+.oi-studio .pfbody {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.oi-studio .pfsec {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--fill2);
+}
+.oi-studio .pfsec h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.oi-studio .pfkv {
+  display: grid;
+  grid-template-columns: minmax(110px, auto) 1fr;
+  gap: 8px 14px;
+  margin: 0;
+}
+.oi-studio .pfkv dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+.oi-studio .pfkv dd {
+  margin: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.oi-studio .pfrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.oi-studio .pfapps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.oi-studio .pfapps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  background: var(--soft);
+}
+.oi-studio .pfapps li.off {
+  opacity: 0.55;
+}
+.oi-studio .pfmini {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  cursor: pointer;
+  border-radius: 9px;
+  font-size: 14px;
+}
+.oi-studio .pfmini:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.oi-studio .pftoggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text2);
+  cursor: pointer;
+  min-width: 72px;
+}
+.oi-studio .pftoggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--acc);
+}
+.oi-studio .pffoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--fill2);
+}
+@media (max-width: 760px) {
+  .oi-studio .pfover {
+    padding: 12px;
+    justify-content: center;
+  }
+  .oi-studio .pfsheet {
+    max-height: calc(100dvh - 24px);
+  }
+  .oi-studio .apphead .topr .avbtn {
+    width: 38px !important;
+    height: 38px !important;
+  }
+}

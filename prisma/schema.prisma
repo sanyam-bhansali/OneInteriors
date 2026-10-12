@@ -827,6 +827,12 @@ model StudioMember {
   /// `modules/studio/guide.ts`. Deliberately loose JSON: guides are added and
   /// retired often, and a migration per tour step is a tax on improving them.
   guideState Json?
+  /// Their own home, set from the profile menu (12 Oct 2026): which app tiles
+  /// show and in what order, whether "Right now" shows, and where they land
+  /// after signing in. `{ order, hidden, strip, landing }`, read through
+  /// `modules/studio/home-prefs.ts`, which ignores anything not in their apps.
+  /// Personal, never a permission: the door (`mayOpen`) still decides.
+  homePrefs  Json?
   studioId   String
   studio     Studio  @relation(fields: [studioId], references: [id], onDelete: Cascade)
   /// Unique: one person belongs to one studio (owner, 11 Oct 2026). The
