@@ -160,3 +160,21 @@ html[data-theme='dark'] .oi-studio .studio-app {
 html[data-splash='seen'] .oi-studio .splash {
   display: none;
 }
+
+/* A wide table scrolls inside its box on a phone. The box is the containing
+   block, so absolutely placed bits inside the table (screen-reader labels,
+   menus) are clipped with it instead of stretching the whole page sideways. */
+.oi-studio .tscroll {
+  position: relative;
+  max-width: 100%;
+}
+
+/* Pill tabs never push past the screen; they wrap. */
+.oi-studio .tabs {
+  max-width: 100%;
+}
+
+/* A row of controls never makes the page wider than the screen. */
+.oi-studio .hstack {
+  max-width: 100%;
+}
