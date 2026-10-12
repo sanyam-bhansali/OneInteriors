@@ -148,7 +148,7 @@ export type ClientSourceName =
 
 export type LostReasonName =
   | 'BUDGET' | 'TIMELINE' | 'WENT_ELSEWHERE' | 'NO_RESPONSE'
-  | 'NOT_SERIOUS' | 'POSTPONED' | 'OTHER';
+  | 'NOT_SERIOUS' | 'POSTPONED' | 'WRONG_NUMBER' | 'OTHER';
 
 export const SOURCE_LABELS: Record<ClientSourceName, string> = {
   ONE_INTERIORS: 'One Interiors',
@@ -169,6 +169,7 @@ export const LOST_LABELS: Record<LostReasonName, string> = {
   NO_RESPONSE: 'Stopped replying',
   NOT_SERIOUS: 'Not serious',
   POSTPONED: 'Postponed',
+  WRONG_NUMBER: 'Wrong number',
   OTHER: 'Other',
 };
 

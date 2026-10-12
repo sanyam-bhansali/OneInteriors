@@ -30,10 +30,10 @@ import {
   removeDemoLeadAction,
 } from './actions';
 import { IDLE } from '../form-state';
-import { SavedViews } from './SavedViews';
+import { moreCardsAction } from './list-actions';
 import { DragBoard, DragHandle, DropColumn, useCardDrag } from './Dnd';
-import type { SavedView } from '@/modules/studio-practice/saved-views';
-import type { ViewFilters } from '@/modules/studio-practice/view-filters';
+
+
 
 const input =
   'rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[14px] text-[var(--s-ink)] placeholder:text-[var(--s-ink-3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]';
@@ -214,50 +214,6 @@ function Assign({
         <span role="alert" className="text-[12px] text-[var(--s-bad)]">{error}</span>
       ) : null}
     </>
-  );
-}
-
-/**
- * Take the whole pool at once.
- *
- * The honest case for this button: in a two-person studio the pool after an
- * import is "everything", and sharing two hundred rows out one at a time is
- * not going to happen. One click to own the lot, then hand individual ones
- * over from the cards, is the order people actually work in.
- *
- * It asks first. Bulk assignment is easy to undo but annoying to notice.
- */
-function TakeAll({ ids, meId }: { ids: string[]; meId: string }) {
-  const [busy, start] = useTransition();
-  const [confirming, setConfirming] = useState(false);
-
-  if (!confirming) {
-    return (
-      <button type="button" onClick={() => setConfirming(true)} className={quiet}>
-        Take all {ids.length}
-      </button>
-    );
-  }
-
-  return (
-    <span className="flex items-center gap-2">
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() =>
-          start(async () => {
-            await assignAction(ids, meId);
-            setConfirming(false);
-          })
-        }
-        className={primary}
-      >
-        {busy ? 'Taking…' : `Yes, all ${ids.length}`}
-      </button>
-      <button type="button" onClick={() => setConfirming(false)} className={quiet}>
-        Cancel
-      </button>
-    </span>
   );
 }
 
@@ -782,6 +738,11 @@ export function AddClientButton({ fields, sources }: { fields: FieldRow[]; sourc
   return <AddClient label="+ Add a client" fields={fields} sources={sources} />;
 }
 
+/** "+ Add lead" in the leads header (the AxLeads look). */
+export function AddLeadButton({ fields, sources }: { fields: FieldRow[]; sources?: { id: string; name: string }[] }) {
+  return <AddClient label="+ Add lead" fields={fields} sources={sources} />;
+}
+
 /** The same form, reached from the empty state. See the note on `AddClient`. */
 export function AddFirstClientButton({ fields, sources }: { fields: FieldRow[]; sources?: { id: string; name: string }[] }) {
   return <AddClient label="Add the first one" fields={fields} sources={sources} />;
@@ -815,11 +776,15 @@ export function Board({
   fields,
   members,
   meId,
-  views,
   seesAll = true,
+  columns,
+  closedCount,
+  query,
+  poolCount = 0,
 }: {
   /** Owner or PM (Studio OS Phase 1). A salesperson sees only their own leads and no pool controls. */
   seesAll?: boolean;
+  /** The first 50 cards of each column (leads at scale), already filtered by the server. */
   clients: ClientRow[];
   stages: StageRow[];
   fields: FieldRow[];
@@ -827,8 +792,14 @@ export function Board({
   members: { id: string; name: string }[];
   /** The signed-in person's membership row, for "Take it". */
   meId: string | null;
-  /** This person's named filters. Empty until they save one. */
-  views: SavedView[];
+  /** Per column: how many leads match, and how many are due, counted in SQL. */
+  columns: { stageId: string; count: number; due: number }[];
+  /** Finished and lost leads matching the filters. */
+  closedCount: number;
+  /** The filters as a query string, for "Show more" and the list links. */
+  query: string;
+  /** Open leads nobody has (owner, PM), counted in SQL. */
+  poolCount?: number;
 }) {
   const today = useMemo(() => {
     const d = new Date();
@@ -837,55 +808,31 @@ export function Board({
   }, []);
 
   const groupable = fields.filter((f) => f.groupBy);
+  const [grouping, setGrouping] = useState('');
 
-  /* The starred view decides what the board opens with, so it seeds the
-     state rather than being applied afterwards — applying it in an effect
-     would render the unfiltered board first and then rearrange it under
-     somebody already reaching for a card. */
-  const opening = views.find((v) => v.isDefault)?.filters ?? {};
-  const [grouping, setGrouping] = useState(opening.groupBy ?? '');
+  /**
+   * Cards loaded by "Show more", per column (leads at scale). The board
+   * draws the first 50 of each column; more arrive 50 at a time, with the
+   * same filters, from the server.
+   */
+  const [extra, setExtra] = useState<Record<string, ClientRow[]>>({});
+  const [loading, setLoading] = useState<string | null>(null);
+  const [, startMore] = useTransition();
+  useEffect(() => setExtra({}), [clients]);
+  const all = useMemo(() => {
+    const seen = new Set(clients.map((c) => c.id));
+    return [...clients, ...Object.values(extra).flat().filter((c) => !seen.has(c.id))];
+  }, [clients, extra]);
+  const countOf = new Map(columns.map((c) => [c.stageId, c]));
 
-  // '' everyone · 'pool' nobody has taken it · a member id · 'quiet'
-  const [who, setWho] = useState(opening.who ?? '');
-
-  /* What the two controls above add up to, in the shape a saved view holds.
-     Empty strings are dropped so an unfiltered board compares equal to a
-     view carrying no filters at all. */
-  const currentView: ViewFilters = {
-    ...(who ? { who } : {}),
-    ...(grouping ? { groupBy: grouping } : {}),
-  };
-
-  const applyView = (f: ViewFilters) => {
-    setWho(f.who ?? '');
-    setGrouping(f.groupBy ?? '');
-  };
-
-  const nameOf = (id: string) => members.find((m) => m.id === id)?.name ?? null;
-
-  /* Search and filters (Studio OS Phase 1, the lead audit): name or phone,
-     where from, which column. Who has it is the "Showing" control below. */
-  const [query, setQuery] = useState('');
-  const [sourceFilter, setSourceFilter] = useState('');
-  const [stageFilter, setStageFilter] = useState('');
-  const sourceKey = (c: ClientRow) => (c.leadSourceId ? `own:${c.leadSourceId}` : c.source);
-  const sourceOptions = [...new Map(clients.map((c) => [sourceKey(c), c.leadSourceName ?? SOURCE_LABELS[c.source]])).entries()].sort((a, b) =>
-    a[1].localeCompare(b[1]),
-  );
-  const matches = (c: ClientRow) => {
-    const q = query.trim().toLowerCase();
-    if (q) {
-      const digits = q.replace(/\D/g, '');
-      const hit =
-        c.name.toLowerCase().includes(q) ||
-        (c.society ?? '').toLowerCase().includes(q) ||
-        (digits.length >= 3 && (c.phone ?? '').includes(digits));
-      if (!hit) return false;
-    }
-    if (sourceFilter && sourceKey(c) !== sourceFilter) return false;
-    return true;
-  };
-  const filtering = query.trim() !== '' || sourceFilter !== '' || stageFilter !== '';
+  function showMore(stageId: string, loaded: number) {
+    setLoading(stageId);
+    startMore(async () => {
+      const more = await moreCardsAction(query, stageId, loaded);
+      setExtra((e) => ({ ...e, [stageId]: [...(e[stageId] ?? []), ...more] }));
+      setLoading(null);
+    });
+  }
 
   /**
    * Where a dragged card has been put, before the server agrees.
@@ -919,17 +866,8 @@ export function Board({
         return next;
       });
 
-      /* The override is dropped either way.
-         
-         On failure it puts the card back where it was — leaving the
-         optimistic position standing after a refusal is the worst of both,
-         because the screen says one thing and the next reload says another.
-         
-         On success it has to go too, and that is the less obvious half: the
-         server action revalidates, so `clients` arrives carrying the new
-         stage. Keeping the override would then pin the card to OUR guess
-         for as long as the page lives — including if somebody else moved it
-         somewhere different a moment later. */
+      /* The override is dropped either way: on failure it puts the card
+         back; on success the revalidated rows carry the new stage. */
       setMoved((m) => {
         const next = { ...m };
         delete next[clientId];
@@ -939,12 +877,13 @@ export function Board({
       if ('error' in result) setDragError(result.error);
     });
   }
-  const team = members.length > 1;
 
+  const params = new URLSearchParams(query);
+  const stageFilter = params.get('stage') ?? '';
   const board = stages.filter((s) => BOARD_KINDS.includes(s.kind)).filter((s) => !stageFilter || s.id === stageFilter);
   const closedStages = stages.filter((s) => !BOARD_KINDS.includes(s.kind));
   const closedIds = new Set(closedStages.map((s) => s.id));
-  const closed = clients.filter((c) => closedIds.has(stageOf(c)) && matches(c) && (!stageFilter || stageOf(c) === stageFilter));
+  const closed = all.filter((c) => closedIds.has(stageOf(c)) && (!stageFilter || stageOf(c) === stageFilter));
 
   /** The next column along, in the studio's order. Null at the end. */
   const nextAfter = (stageId: string): StageRow | null => {
@@ -952,162 +891,46 @@ export function Board({
     return i >= 0 && i < stages.length - 1 ? (stages[i + 1] ?? null) : null;
   };
 
-  const allOpen = clients.filter((c) => !closedIds.has(stageOf(c)) && matches(c));
-  const pool = allOpen.filter((c) => c.assignedToId === null);
-  // Not `quiet` — that name is taken by the button class at the top of this
-  // file, and shadowing it here silently restyles every button below.
-  const quietOnes = allOpen.filter((c) => quiet7(c.lastContactedAt));
-
-  const open =
-    who === ''
-      ? allOpen
-      : who === 'pool'
-        ? pool
-        : who === 'quiet'
-          ? quietOnes
-          : allOpen.filter((c) => c.assignedToId === who);
-
-  const groups =
-    grouping.length > 0 ? groupBy(open, grouping) : [{ label: '', rows: open }];
+  const open = all.filter((c) => !closedIds.has(stageOf(c)));
+  const groups = grouping.length > 0 ? groupBy(open, grouping) : [{ label: '', rows: open }];
+  const listHref = (extraParams: Record<string, string>) => {
+    const p = new URLSearchParams(query);
+    for (const [k, v] of Object.entries(extraParams)) p.set(k, v);
+    p.set('view', 'list');
+    return `/studio/clients?${p.toString()}`;
+  };
 
   return (
     <div className="flex flex-col gap-6">
-      {/* What the sample is, said once, at the top.
-          The badge on the card says "this is not a person"; this says why it
-          is here and how to get rid of it. Above the board rather than beside
-          the card, because it is a statement about the screen rather than
-          about that lead — and a studio scanning for the exit should not have
-          to find a particular card first.
+      {all.some((c) => c.isDemo) ? <DemoStrip /> : null}
 
-          It disappears the moment the sample is removed, so nobody who has
-          cleared it is told about it again. */}
-      {clients.some((c) => c.isDemo) ? <DemoStrip /> : null}
-
-      {/* The pool is a filter on this board, not a second screen. A studio
-          that has to go somewhere else to find the clients nobody has taken
-          is a studio that never goes. */}
-      {seesAll && team && pool.length > 0 ? (
+      {/* The pool is a filter on the list, not a second screen: share them
+          out there, many at a time (leads at scale). */}
+      {seesAll && members.length > 1 && poolCount > 0 && params.get('owner') !== 'pool' ? (
         <div className="s-card flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
           <p className="m-0 text-[14px]">
-            <span className="s-num font-semibold">{pool.length}</span>{' '}
-            {pool.length === 1 ? 'client has' : 'clients have'} nobody working on them.
+            <span className="s-num font-semibold">{poolCount.toLocaleString('en-IN')}</span>{' '}
+            {poolCount === 1 ? 'open lead has' : 'open leads have'} nobody working on them.
           </p>
-          <button
-            type="button"
-            onClick={() => setWho(who === 'pool' ? '' : 'pool')}
-            className={`${quiet} ml-auto`}
-          >
-            {who === 'pool' ? 'Show everyone' : 'Show me those'}
-          </button>
-          {meId ? <TakeAll ids={pool.map((c) => c.id)} meId={meId} /> : null}
+          <Link href="/studio/clients?view=list&owner=pool&kind=open&sort=oldest" className={`${quiet} ml-auto no-underline`}>
+            Share them out
+          </Link>
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-end gap-2.5">
-        <label className="flex min-w-[12rem] flex-1 flex-col gap-1">
-          <span className="s-label">Find</span>
-          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Name or phone" className={`${input} py-1.5`} />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="s-label">Where from</span>
-          <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className={`${input} py-1.5`}>
-            <option value="">Any source</option>
-            {sourceOptions.map(([k, label]) => (
-              <option key={k} value={k}>
-                {label}
+      {groupable.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="s-label">Group by</span>
+          <select value={grouping} onChange={(e) => setGrouping(e.target.value)} className={`${input} py-1.5`}>
+            <option value="">No grouping</option>
+            {groupable.map((f) => (
+              <option key={f.id} value={f.key}>
+                {f.label}
               </option>
             ))}
           </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="s-label">Column</span>
-          <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} className={`${input} py-1.5`}>
-            <option value="">Every column</option>
-            {stages.map((st) => (
-              <option key={st.id} value={st.id}>
-                {st.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {filtering ? (
-          <button
-            type="button"
-            onClick={() => {
-              setQuery('');
-              setSourceFilter('');
-              setStageFilter('');
-            }}
-            className={quiet}
-          >
-            Clear
-          </button>
-        ) : null}
-      </div>
-
-      {seesAll && team && filtering && open.length > 0 ? (
-        <GiveShown ids={open.filter((c) => !stageFilter || stageOf(c) === stageFilter).map((c) => c.id)} members={members} />
-      ) : null}
-
-      {seesAll ? <SavedViews
-        views={views}
-        current={currentView}
-        onApply={applyView}
-        memberName={nameOf}
-      /> : null}
-
-      {(groupable.length > 0 || team || quietOnes.length > 0) ? (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
-          {(seesAll && team) || quietOnes.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="s-label">Showing</span>
-              <select
-                value={who}
-                onChange={(e) => setWho(e.target.value)}
-                className={`${input} py-1.5`}
-              >
-                <option value="">Everyone ({allOpen.length})</option>
-                {quietOnes.length > 0 ? (
-                  <option value="quiet">Gone quiet ({quietOnes.length})</option>
-                ) : null}
-                {seesAll && team ? <option value="pool">Nobody has taken ({pool.length})</option> : null}
-                {seesAll && team
-                  ? members.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.id === meId ? `${m.name} (you)` : m.name} (
-                        {allOpen.filter((c) => c.assignedToId === m.id).length})
-                      </option>
-                    ))
-                  : null}
-              </select>
-            </div>
-          ) : null}
-
-          {groupable.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="s-label">Group by</span>
-              <select
-                value={grouping}
-                onChange={(e) => setGrouping(e.target.value)}
-                className={`${input} py-1.5`}
-              >
-                <option value="">No grouping</option>
-                {groupable.map((f) => (
-                  <option key={f.id} value={f.key}>{f.label}</option>
-                ))}
-              </select>
-            </div>
-          ) : null}
+          {grouping ? <span className="text-[12.5px] text-[var(--s-ink-3)]">Grouping the cards shown; use Show more to bring in the rest.</span> : null}
         </div>
-      ) : null}
-
-      {open.length === 0 && allOpen.length > 0 ? (
-        <p className="m-0 text-[14px] text-[var(--s-ink-2)]">
-          Nothing matches that.{' '}
-          <button type="button" onClick={() => setWho('')} className="underline">
-            Show everyone
-          </button>
-        </p>
       ) : null}
 
       {dragError ? (
@@ -1116,87 +939,88 @@ export function Board({
         </p>
       ) : null}
 
-      <DragBoard
-        onMove={moveCard}
-        labelFor={(id) => clients.find((c) => c.id === id)?.name ?? 'this lead'}
-      >
-      {groups.map((group) => (
-        <section key={group.label || 'all'} className="flex flex-col gap-2">
-          {group.label ? (
-            <h2 className="m-0 flex items-baseline gap-2 text-[15px] font-semibold">
-              {group.label}
-              <span className="s-num s-label">{group.rows.length}</span>
-            </h2>
-          ) : null}
+      <DragBoard onMove={moveCard} labelFor={(id) => all.find((c) => c.id === id)?.name ?? 'this lead'}>
+        {groups.map((group) => (
+          <section key={group.label || 'all'} className="flex flex-col gap-2">
+            {group.label ? (
+              <h2 className="m-0 flex items-baseline gap-2 text-[15px] font-semibold">
+                {group.label}
+                <span className="s-num s-label">{group.rows.length}</span>
+              </h2>
+            ) : null}
 
-          <div className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-2">
-            {board.map((stage) => {
-              const items = group.rows.filter((c) => stageOf(c) === stage.id);
-              const due = items.filter((c) => overdue(c.nextActionOn, today)).length;
-              const c = colourOf(stage.colour);
+            <div className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-2">
+              {board.map((stage) => {
+                const items = group.rows.filter((c) => stageOf(c) === stage.id);
+                const loaded = all.filter((c) => c.stageId === stage.id).length;
+                const counts = countOf.get(stage.id);
+                const total = group.label ? items.length : Math.max(counts?.count ?? 0, items.length);
+                const due = group.label ? items.filter((c) => overdue(c.nextActionOn, today)).length : (counts?.due ?? 0);
+                const c = colourOf(stage.colour);
 
-              return (
-                <DropColumn
-                  key={stage.id}
-                  /* Namespaced by group. When the board is grouped, EVERY
-                     group draws the same columns — a bare stage id would
-                     register five droppables sharing one id and dnd-kit
-                     could not tell them apart. The real stage id travels in
-                     the droppable's data. */
-                  dropId={`${group.label || 'all'}::${stage.id}`}
-                  stageId={stage.id}
-                  stageName={stage.name}
-                  className="flex w-[17.5rem] flex-none snap-start flex-col gap-2 rounded-[12px] bg-[var(--s-surface-2)] p-2.5"
-                >
-                  <div className="flex items-baseline justify-between gap-2 px-1">
-                    <h3 className="m-0 flex items-center gap-2 text-[13.5px] font-semibold">
-                      <span
-                        aria-hidden
-                        className="inline-block h-2 w-2 flex-none rounded-full"
-                        style={{ background: c.dot }}
-                      />
-                      <span className="truncate">{stage.name}</span>
-                    </h3>
-                    <span className="s-num s-label flex-none">
-                      {due > 0 ? `${due} due · ` : ''}
-                      {items.length}
-                    </span>
-                  </div>
+                return (
+                  <DropColumn
+                    key={stage.id}
+                    /* Namespaced by group: every group draws the same columns. */
+                    dropId={`${group.label || 'all'}::${stage.id}`}
+                    stageId={stage.id}
+                    stageName={stage.name}
+                    className="flex w-[17.5rem] flex-none snap-start flex-col gap-2 rounded-[12px] bg-[var(--s-surface-2)] p-2.5"
+                  >
+                    <div className="flex items-baseline justify-between gap-2 px-1">
+                      <h3 className="m-0 flex items-center gap-2 text-[13.5px] font-semibold">
+                        <span aria-hidden className="inline-block h-2 w-2 flex-none rounded-full" style={{ background: c.dot }} />
+                        <span className="truncate">{stage.name}</span>
+                      </h3>
+                      <span className="s-num s-label flex-none">
+                        {due > 0 ? `${due.toLocaleString('en-IN')} due · ` : ''}
+                        {total.toLocaleString('en-IN')}
+                      </span>
+                    </div>
 
-                  {items.length === 0 ? (
-                    <p className="m-0 px-1 py-3 text-[12.5px] italic text-[var(--s-ink-3)]">
-                      Nothing here.
-                    </p>
-                  ) : (
-                    <ul className="m-0 flex list-none flex-col gap-2 p-0">
-                      {items.map((client) => (
-                        <Card
-                          key={client.id}
-                          client={client}
-                          today={today}
-                          stages={stages}
-                          fields={fields}
-                          next={nextAfter(client.stageId)}
-                          members={members}
-                          meId={meId}
-                          draggable={!inFlight[client.id]}
-                          seesAll={seesAll}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                </DropColumn>
-              );
-            })}
-          </div>
-        </section>
-      ))}
+                    {items.length === 0 ? (
+                      <p className="m-0 px-1 py-3 text-[12.5px] italic text-[var(--s-ink-3)]">Nothing here.</p>
+                    ) : (
+                      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                        {items.map((client) => (
+                          <Card
+                            key={client.id}
+                            client={client}
+                            today={today}
+                            stages={stages}
+                            fields={fields}
+                            next={nextAfter(client.stageId)}
+                            members={members}
+                            meId={meId}
+                            draggable={!inFlight[client.id]}
+                            seesAll={seesAll}
+                          />
+                        ))}
+                      </ul>
+                    )}
+
+                    {!group.label && (counts?.count ?? 0) > loaded ? (
+                      <div className="flex flex-col gap-1 px-1">
+                        <button type="button" disabled={loading === stage.id} onClick={() => showMore(stage.id, loaded)} className={quiet}>
+                          {loading === stage.id ? 'Loading…' : `Show ${Math.min(50, (counts?.count ?? 0) - loaded)} more`}
+                        </button>
+                        <Link href={listHref({ stage: stage.id })} className="text-center text-[12px] text-[var(--s-ink-3)]">
+                          All {(counts?.count ?? 0).toLocaleString('en-IN')} as a list
+                        </Link>
+                      </div>
+                    ) : null}
+                  </DropColumn>
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </DragBoard>
 
-      {closed.length > 0 ? (
+      {closedCount > 0 ? (
         <details>
           <summary className="mb-3 cursor-pointer select-none text-[13.5px] font-medium text-[var(--s-ink-2)]">
-            Finished and gone ({closed.length})
+            Finished and gone ({closedCount.toLocaleString('en-IN')})
           </summary>
           <ul className="m-0 grid list-none grid-cols-1 gap-2 p-0 md:grid-cols-2 xl:grid-cols-3">
             {closed.map((c) => (
@@ -1204,83 +1028,22 @@ export function Board({
                 <Link href={`/studio/clients/${c.id}`} className="text-[14px] font-medium text-[var(--s-ink)] no-underline hover:underline">
                   {c.name}
                 </Link>
-                <span className="s-label">{SOURCE_LABELS[c.source]}</span>
+                <span className="s-label">{c.leadSourceName ?? SOURCE_LABELS[c.source]}</span>
                 <span className="ml-auto flex items-center gap-2">
                   <StageTag name={c.stageName} colour={c.stageColour} />
-                  {c.stageKind === 'LOST' && c.lostReason ? (
-                    <span className="text-[12.5px] text-[var(--s-ink-3)]">
-                      {LOST_LABELS[c.lostReason]}
-                    </span>
-                  ) : null}
+                  {c.stageKind === 'LOST' && c.lostReason ? <span className="text-[12.5px] text-[var(--s-ink-3)]">{LOST_LABELS[c.lostReason]}</span> : null}
                 </span>
               </li>
             ))}
           </ul>
+          {closedCount > closed.length ? (
+            <p className="m-0 mt-3 text-[13px]">
+              <Link href={listHref({ kind: 'closed' })} className="text-[var(--s-accent)]">
+                See all {closedCount.toLocaleString('en-IN')} in the list
+              </Link>
+            </p>
+          ) : null}
         </details>
-      ) : null}
-    </div>
-  );
-}
-
-/**
- * Give every lead the filters show to one person (owner and PM, Studio OS
- * Phase 1): filter the board to the Facebook leads in Enquiry, then hand
- * them over in one go. Asks first.
- */
-function GiveShown({ ids, members }: { ids: string[]; members: { id: string; name: string }[] }) {
-  const [to, setTo] = useState('');
-  const [sure, setSure] = useState(false);
-  const [busy, start] = useTransition();
-  const [said, setSaid] = useState<string | null>(null);
-  const [bad, setBad] = useState(false);
-  if (ids.length === 0) return null;
-  return (
-    <div className="s-card flex flex-wrap items-center gap-2 px-4 py-3 text-[13.5px]">
-      <span>Give the {ids.length} shown to</span>
-      <select
-        value={to}
-        onChange={(e) => {
-          setTo(e.target.value);
-          setSure(false);
-        }}
-        className={`${input} py-1.5`}
-        aria-label="Give these leads to"
-      >
-        <option value="">pick a person…</option>
-        {members.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.name}
-          </option>
-        ))}
-      </select>
-      {to ? (
-        sure ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() =>
-              start(async () => {
-                const r = await assignAction(ids, to);
-                const failed = 'ok' in r && !r.ok;
-                setBad(failed);
-                setSaid(failed && 'error' in r ? r.error : `Done. ${ids.length} lead${ids.length === 1 ? '' : 's'} assigned; they have been told.`);
-                setSure(false);
-              })
-            }
-            className={primary}
-          >
-            {busy ? 'Assigning…' : `Yes, give all ${ids.length}`}
-          </button>
-        ) : (
-          <button type="button" onClick={() => setSure(true)} className={quiet}>
-            Assign
-          </button>
-        )
-      ) : null}
-      {said ? (
-        <span role="status" className={bad ? 'text-[var(--s-bad)]' : 'text-[var(--s-good)]'}>
-          {said}
-        </span>
       ) : null}
     </div>
   );

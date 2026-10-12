@@ -363,3 +363,39 @@ function customOf(row: string[], mapping: readonly string[]): { custom?: Record<
   });
   return Object.keys(custom).length > 0 ? { custom } : {};
 }
+
+// ── Sending a big file in pieces (leads at scale, 12 Oct 2026) ─────────
+
+/** One cell, quoted when it has to be (RFC 4180). */
+function csvCell(cell: string): string {
+  return /[",\r\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell;
+}
+
+/** Rows back to CSV text. `parseCsv(toCsv(rows))` gives the rows again. */
+export function toCsv(rows: readonly (readonly string[])[]): string {
+  return rows.map((r) => r.map(csvCell).join(',')).join('\n');
+}
+
+/**
+ * A parsed file as CSV pieces of at most `size` data rows, each starting
+ * with the header row, and each under `maxChars` (a piece too long is cut
+ * smaller). The server parses and plans every piece again, as it does a
+ * whole file, so a piece is never trusted more than a file would be.
+ */
+export function csvChunks(rows: readonly (readonly string[])[], size = 1000, maxChars = 800_000): string[] {
+  const [header, ...body] = rows;
+  if (!header) return [];
+  const out: string[] = [];
+  let i = 0;
+  while (i < body.length) {
+    let n = Math.min(size, body.length - i);
+    let text = toCsv([header, ...body.slice(i, i + n)]);
+    while (text.length > maxChars && n > 1) {
+      n = Math.ceil(n / 2);
+      text = toCsv([header, ...body.slice(i, i + n)]);
+    }
+    out.push(text);
+    i += n;
+  }
+  return out;
+}

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search } from './Search';
 
 /**
@@ -32,11 +32,13 @@ import { Search } from './Search';
 
 type IconName =
   | 'home' | 'quote' | 'calendar' | 'products' | 'listing'
-  | 'clients' | 'projects' | 'vendors' | 'settings' | 'today';
+  | 'clients' | 'projects' | 'vendors' | 'settings' | 'today' | 'chart';
 
 const PATHS: Record<IconName, string> = {
   // A sun over a list line: what needs doing today.
   today: 'M12 3.2v2.2M5.8 5.8l1.5 1.5M18.2 5.8l-1.5 1.5M3.2 12h2.2M18.6 12h2.2M8.4 12a3.6 3.6 0 0 1 7.2 0M4.4 16h15.2M7.4 19.6h9.2',
+  // Three bars rising: the numbers.
+  chart: 'M4 20h16M7 16.5v-5M12 16.5V7M17 16.5v-8',
   home: 'M3.4 11.2 12 4.2l8.6 7M6 12.6v7.2M18 12.6v7.2M7.6 15.2a5 5 0 0 1 8.8 0',
   quote: 'M6.4 3.4h8.2l4 4v13.2H6.4zM14.2 3.6v4.2h4.2M9.2 13h6M9.2 16.4h4',
   calendar: 'M4.2 5.8h15.6v14H4.2zM4.2 10h15.6M8.6 3.6v4M15.4 3.6v4',
@@ -47,6 +49,9 @@ const PATHS: Record<IconName, string> = {
   vendors: 'M12 3.2l8 4.2v9.2L12 20.8 4 16.6V7.4zM4 7.4l8 4.2 8-4.2M12 11.6v9.2',
   settings: 'M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4zM19.4 12a7.4 7.4 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7.4 7.4 0 0 0-2-1.2l-.3-2.5h-3.9l-.3 2.5a7.4 7.4 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5a7.4 7.4 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-1a7.4 7.4 0 0 0 2 1.2l.3 2.5h3.9l.3-2.5a7.4 7.4 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5c.06-.4.1-.8.1-1.2z',
 };
+
+/** Where the folded / open rail is remembered, per browser. */
+const RAIL_KEY = 'studio.rail.collapsed';
 
 function Icon({ name }: { name: IconName }) {
   return (
@@ -131,16 +136,20 @@ function Section({
   activeHref,
   pathname,
   onNavigate,
+  collapsed = false,
 }: {
   item: NavItem;
   activeHref: string | undefined;
   pathname: string;
   onNavigate: () => void;
+  /** The rail is an icon strip (laptop only): labels become tooltips, sub-tabs hide. */
+  collapsed?: boolean;
 }) {
   const children = item.children?.filter((c) => c.ready) ?? [];
   const inSection = pathname === item.href || pathname.startsWith(item.href + '/');
   const [pinned, setPinned] = useState<boolean | null>(null);
   const expanded = children.length > 0 && (pinned ?? inSection);
+  const hide = collapsed ? 'lg:hidden' : '';
 
   /* The parent lights up for its own page, and stays lit — more quietly —
      while you are on a child. Going fully dark on /studio/clients/pool would
@@ -155,7 +164,9 @@ function Section({
           href={item.href}
           onClick={onNavigate}
           aria-current={exact ? 'page' : undefined}
-          className={`flex min-w-0 flex-1 items-center gap-3 rounded-[9px] px-2.5 py-2 text-[14.5px] no-underline transition-colors ${
+          title={collapsed ? (item.count ? `${item.label} (${item.count})` : item.label) : undefined}
+          aria-label={collapsed ? (item.count ? `${item.label}, ${item.count}` : item.label) : undefined}
+          className={`relative flex min-w-0 flex-1 items-center gap-3 rounded-[9px] px-2.5 py-2 text-[14.5px] no-underline transition-colors ${collapsed ? 'lg:justify-center lg:px-0' : ''} ${
             exact
               ? 'bg-[var(--s-rail-active)] font-medium text-[var(--s-ink)] [&>svg]:text-[var(--s-accent)]'
               : inSection
@@ -164,12 +175,13 @@ function Section({
           }`}
         >
           <Icon name={item.icon} />
-          <span className="truncate">{item.label}</span>
+          <span className={`truncate ${hide}`}>{item.label}</span>
           {item.count ? (
-            <span className="s-num ml-auto rounded-full bg-[var(--s-accent)] px-1.5 py-px text-[11px] font-semibold text-white">
+            <span className={`s-num ml-auto rounded-full bg-[var(--s-accent)] px-1.5 py-px text-[11px] font-semibold text-white ${hide}`}>
               {item.count}
             </span>
           ) : null}
+          {item.count && collapsed ? <span aria-hidden className="absolute right-1.5 top-1.5 hidden h-2 w-2 rounded-full bg-[var(--s-accent)] lg:block" /> : null}
         </Link>
 
         {children.length > 0 ? (
@@ -178,7 +190,7 @@ function Section({
             onClick={() => setPinned(!expanded)}
             aria-expanded={expanded}
             aria-controls={panelId}
-            className="grid h-8 w-7 flex-none place-items-center rounded-[7px] text-[var(--s-ink-3)] transition-colors hover:bg-[var(--s-rail-active)]/60 hover:text-[var(--s-ink)]"
+            className={`grid h-8 w-7 flex-none place-items-center rounded-[7px] text-[var(--s-ink-3)] transition-colors hover:bg-[var(--s-rail-active)]/60 hover:text-[var(--s-ink)] ${hide}`}
           >
             <span className="sr-only">
               {expanded ? `Hide ${item.label} tabs` : `Show ${item.label} tabs`}
@@ -209,7 +221,7 @@ function Section({
           /* Indented to the parent's label, not its icon, so the sub-tabs read
              as belonging to the word rather than floating in the gutter. The
              rule down the left is what makes the group one object. */
-          className="ml-[19px] flex flex-col gap-0.5 border-l border-[var(--s-rule)] pl-2.5"
+          className={`ml-[19px] flex flex-col gap-0.5 border-l border-[var(--s-rule)] pl-2.5 ${hide}`}
         >
           {children.map((child) => (
             <Link
@@ -257,6 +269,32 @@ export function StudioShell({
   const [open, setOpen] = useState(false);
 
   /**
+   * The rail folds to an icon strip on a laptop (leads at scale, 12 Oct
+   * 2026), for a wide leads list or calendar, and stays how it was left in
+   * this browser. Read after the first paint, so the server's markup and
+   * the browser's agree; storage can throw (private windows), so it is
+   * tried, never trusted. The phone drawer is unchanged.
+   */
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(RAIL_KEY) === '1') setCollapsed(true);
+    } catch {
+      /* No storage: the rail opens expanded. */
+    }
+  }, []);
+  const toggleRail = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    try {
+      window.localStorage.setItem(RAIL_KEY, next ? '1' : '0');
+    } catch {
+      /* Not remembered this time; it still folds. */
+    }
+  };
+  const hide = collapsed ? 'lg:hidden' : '';
+
+  /**
    * Longest match wins, so `/studio/quotations/abc` lights Quotations rather
    * than Dashboard. A plain `startsWith` against `/studio` would light every
    * row on every page.
@@ -271,26 +309,40 @@ export function StudioShell({
     <div className="studio-app oi-studio-shell flex min-h-dvh">
       {/* ── Rail ── */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-[236px] flex-none flex-col border-r border-[var(--s-rule)] bg-[var(--s-rail)] transition-transform lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-[236px] flex-none flex-col border-r border-[var(--s-rule)] bg-[var(--s-rail)] transition-[transform,width] lg:static lg:translate-x-0 ${collapsed ? 'lg:w-[64px]' : ''} ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex items-center gap-2.5 px-5 pb-5 pt-5">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--s-accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <div className={`flex items-center gap-2.5 px-5 pb-5 pt-5 ${collapsed ? 'lg:flex-col lg:px-2' : ''}`}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--s-accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none">
             <path d="M3.4 11.2 12 4.2l8.6 7M6 12.6v7.2M18 12.6v7.2M7.6 15.2a5 5 0 0 1 8.8 0" />
           </svg>
-          <span className="truncate text-[15px] font-semibold tracking-tight">{studioName}</span>
+          <span className={`truncate text-[15px] font-semibold tracking-tight ${hide}`}>{studioName}</span>
+          <button
+            type="button"
+            onClick={toggleRail}
+            aria-label={collapsed ? 'Open the menu' : 'Fold the menu to icons'}
+            aria-expanded={!collapsed}
+            title={collapsed ? 'Open the menu' : 'Fold the menu'}
+            className={`ml-auto hidden h-7 w-7 flex-none place-items-center rounded-[7px] text-[var(--s-ink-3)] hover:bg-[var(--s-rail-active)]/60 hover:text-[var(--s-ink)] lg:grid ${collapsed ? 'lg:ml-0' : ''}`}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={collapsed ? 'rotate-180' : ''}>
+              <path d="M10 3.5 5.5 8l4.5 4.5" />
+            </svg>
+          </button>
         </div>
 
         {/* Above the nav, because finding one person is more often what
-            somebody wants than going to a section. */}
-        <Search />
+            somebody wants than going to a section. Folded, the rail drops it. */}
+        <div className={hide}>
+          <Search />
+        </div>
 
-        <nav className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 pb-4">
+        <nav className={`flex flex-1 flex-col gap-5 overflow-y-auto px-3 pb-4 ${collapsed ? 'lg:px-2' : ''}`}>
           {groups.map((group, gi) => (
             <div key={group.label ?? gi} className="flex flex-col gap-0.5">
               {group.label ? (
-                <p className="s-label m-0 mb-1.5 px-2.5">{group.label}</p>
+                <p className={`s-label m-0 mb-1.5 px-2.5 ${hide}`}>{group.label}</p>
               ) : null}
               {group.items.map((item) =>
                 item.ready ? (
@@ -300,17 +352,18 @@ export function StudioShell({
                     activeHref={activeHref}
                     pathname={pathname}
                     onNavigate={() => setOpen(false)}
+                    collapsed={collapsed}
                   />
                 ) : (
                   <span
                     key={item.href}
                     title={`${item.label} — coming soon`}
                     aria-disabled="true"
-                    className="flex cursor-default items-center gap-3 rounded-[9px] px-2.5 py-2 text-[14.5px] text-[var(--s-ink-3)] opacity-45"
+                    className={`flex cursor-default items-center gap-3 rounded-[9px] px-2.5 py-2 text-[14.5px] text-[var(--s-ink-3)] opacity-45 ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}
                   >
                     <Icon name={item.icon} />
-                    <span className="truncate">{item.label}</span>
-                    <span className="s-label ml-auto normal-case tracking-normal">soon</span>
+                    <span className={`truncate ${hide}`}>{item.label}</span>
+                    <span className={`s-label ml-auto normal-case tracking-normal ${hide}`}>soon</span>
                   </span>
                 ),
               )}
@@ -318,7 +371,7 @@ export function StudioShell({
           ))}
         </nav>
 
-        <div className="border-t border-[var(--s-rule)] px-3 py-3">
+        <div className={`border-t border-[var(--s-rule)] px-3 py-3 ${hide}`}>
           {publicHref ? (
             <a
               href={publicHref}

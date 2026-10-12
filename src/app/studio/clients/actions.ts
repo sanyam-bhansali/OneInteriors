@@ -8,12 +8,14 @@ import {
   logContact,
   binClients,
   removeDemoLead,
+  markLost,
   restoreClients,
   eraseClients,
   type ClientSourceName,
   type LostReasonName,
 } from '@/modules/studio-practice/clients';
 import { isCallOutcome } from '@/modules/studio-practice/event-copy';
+import { parseMeeting } from '@/modules/studio-sales/lead-rules';
 import { mergeClients } from '@/modules/studio-practice/merge';
 import { answerIntroduction, type IntroAnswer } from '@/modules/studio/introduction';
 
@@ -153,13 +155,16 @@ export async function logContactAction(
      page passes them; the card does not. */
   outcome?: string,
   note?: string | null,
+  /** When to call next, if the person picked (IST day and time). */
+  when?: { day: string; time: string } | null,
 ): Promise<State> {
   /* Validated against the list rather than cast. An outcome arriving from a
      form is a string, and an unrecognised one would be written verbatim into
      a permanent record that nothing can edit afterwards. */
   const checked = outcome && isCallOutcome(outcome) ? outcome : undefined;
 
-  const result = await logContact(id, checked, note ?? null);
+  const dueAt = when && typeof when.day === 'string' && typeof when.time === 'string' ? parseMeeting(when.day, when.time || '15:30') : null;
+  const result = await logContact(id, checked, note ?? null, dueAt);
   if (!result.ok) return result;
   refresh();
   revalidatePath(`/studio/clients/${id}`);
@@ -253,4 +258,17 @@ export async function answerIntroductionAction(
     revalidatePath('/studio');
   }
   return result;
+}
+
+/**
+ * Mark lost with a reason, into the studio's first lost column — the
+ * "Wrong number" call outcome offers it (AxLeads, 12 Oct 2026). The
+ * person decides; nothing marks a lead lost by itself.
+ */
+export async function markLostAction(id: string, reason: string): Promise<State> {
+  const result = await markLost(String(id ?? ''), String(reason ?? ''));
+  if (!result.ok) return result;
+  refresh();
+  revalidatePath(`/studio/clients/${id}`);
+  return { ok: true };
 }

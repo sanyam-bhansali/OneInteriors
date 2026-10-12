@@ -59,12 +59,29 @@ export const TODAY_HOME = '/studio/today';
 export const PAYMENTS_HOME = '/studio/payments';
 export const TEAM_PATH = '/studio/settings/team';
 export const PAYMENT_STAGES_PATH = '/studio/settings/payments';
+/** Studio OS Phase 2: a designer's home, and the owner's and PM's designers' workload. */
+export const DESIGN_HOME = '/studio/design';
+export const DESIGN_STEPS_PATH = '/studio/settings/design';
 
 /** Where a member lands after signing in, and where the layout sends them back to. */
 export function homeFor(role: StudioRoleName): string {
   if (role === 'SUPERVISOR') return SITE_HOME;
   if (role === 'ACCOUNTS') return PAYMENTS_HOME;
+  if (role === 'DESIGNER') return DESIGN_HOME;
   return TODAY_HOME;
+}
+
+/**
+ * A designer (Phase 2) opens their design page and one project's workspace
+ * (`/studio/projects/<id>`, its tabs and nothing under it). Not the projects
+ * list, not starting a project, not a new decision: the module layer
+ * (`memberOnProject`) still decides which project, by the team row the
+ * designer pick writes.
+ */
+function designerMayOpen(path: string): boolean {
+  if (under(path, DESIGN_HOME)) return true;
+  const m = path.match(/^\/studio\/projects\/([^/?#]+)\/?$/);
+  return Boolean(m && m[1] !== 'start');
 }
 
 /** Who gets the office frame (the rail and search): the office roles, and sales. */
@@ -72,10 +89,10 @@ export function usesOfficeShell(member: MemberRole): boolean {
   return usesOffice(member) || (member.status === 'ACTIVE' && member.role === 'SALES');
 }
 
-/** What a salesperson may open: Today, the board and a lead, quotations. */
-const SALES_OPEN = [TODAY_HOME, '/studio/clients', '/studio/quotations'];
+/** What a salesperson may open: Today, the board and a lead, quotations; the dashboard and calendar (leads at scale); the pool, to claim from (owner, 12 Oct 2026). */
+const SALES_OPEN = [TODAY_HOME, '/studio/clients', '/studio/quotations', '/studio/dashboard', '/studio/calendar'];
 /** Inside the leads section, the owner's and PM's screens. */
-const SALES_CLOSED = ['/studio/clients/pool', '/studio/clients/import', '/studio/clients/bin', '/studio/clients/analytics'];
+const SALES_CLOSED = ['/studio/clients/import', '/studio/clients/bin', '/studio/clients/analytics', '/studio/calendar/appointments'];
 
 function under(path: string, prefix: string): boolean {
   return path === prefix || path.startsWith(`${prefix}/`);
@@ -92,8 +109,10 @@ export function mayOpen(member: MemberRole, path: string): boolean {
   if (member.role === 'SUPERVISOR') return under(path, SITE_HOME);
   if (member.role === 'ACCOUNTS') return under(path, PAYMENTS_HOME);
   if (member.role === 'SALES') return SALES_OPEN.some((p) => under(path, p)) && !SALES_CLOSED.some((p) => under(path, p));
+  if (member.role === 'DESIGNER') return designerMayOpen(path);
   if (under(path, TEAM_PATH)) return can(member, 'team.manage');
   if (under(path, PAYMENT_STAGES_PATH)) return can(member, 'payments.template');
+  if (under(path, DESIGN_STEPS_PATH)) return can(member, 'design.template');
   if (under(path, '/studio/vendors')) return can(member, 'vendor.rates');
   return usesOffice(member);
 }

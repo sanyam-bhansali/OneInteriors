@@ -20,7 +20,7 @@ import 'server-only';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { currentMember, type StudioMemberRef } from './access';
-import { can, leadsVisibleTo, quotesVisibleTo, type StudioAction } from './roles';
+import { can, leadsVisibleTo, poolVisibleTo, quotesVisibleTo, type StudioAction } from './roles';
 
 export interface LeadScope {
   member: StudioMemberRef;
@@ -29,6 +29,14 @@ export interface LeadScope {
   seesAll: boolean;
   /** Add to every `studioClient` where (with `deletedAt: null`). */
   leads: Prisma.StudioClientWhereInput;
+  /**
+   * The pool this person may list and claim from (leads at scale, owner 12 Oct
+   * 2026): unassigned leads in their studio. Reading the pool is a list to
+   * claim from; writes still go through `leads` (their own) after a claim.
+   */
+  pool: Prisma.StudioClientWhereInput;
+  /** May take pool leads for themselves (owner, PM, sales). */
+  mayClaim: boolean;
   /** Add to every `studioQuote` where. */
   quotes: Prisma.StudioQuoteWhereInput;
 }
@@ -42,6 +50,8 @@ export async function myLeadScope(): Promise<LeadScope | null> {
     studioId: member.studioId,
     seesAll: member.role !== 'SALES',
     leads: leadsVisibleTo(member),
+    pool: poolVisibleTo(member),
+    mayClaim: can(member, 'lead.claim'),
     quotes: quotesVisibleTo(member),
   };
 }

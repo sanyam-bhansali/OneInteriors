@@ -6,10 +6,11 @@ import {
   parseCsv,
   guessMapping,
   planImport,
+  csvChunks,
   COLUMN_LABELS,
   type ColumnKey,
 } from '@/modules/studio-practice/csv';
-import { importCsvAction, type ImportState } from './actions';
+import { importCheckAction, importCsvAction, type ImportState } from './actions';
 import { SOURCE_LABELS, type ClientSourceName } from '@/modules/studio-practice/vocabulary';
 
 /** Lives here rather than in `actions.ts`, which exports only its action. */
@@ -69,6 +70,46 @@ export function Import({
   const [state, setState] = useState<ImportState>(IMPORT_IDLE);
   const [pending, start] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
+  /* Leads at scale: a big file goes in pieces of 1,000 rows, one after
+     another, with progress; the dry run says how many are already here. */
+  const [progress, setProgress] = useState<{ done: number; of: number } | null>(null);
+  const [already, setAlready] = useState<number | null>(null);
+  const [checking, startCheck] = useTransition();
+
+  function checkExisting(phones: string[]) {
+    startCheck(async () => {
+      let n = 0;
+      for (let i = 0; i < phones.length; i += 5000) n += (await importCheckAction(phones.slice(i, i + 5000))).already;
+      setAlready(n);
+    });
+  }
+
+  async function addAll(own: string | null, src: string, total: number) {
+    const pieces = csvChunks(rows, 1000);
+    let written = 0;
+    setProgress({ done: 0, of: total });
+    for (let i = 0; i < pieces.length; i += 1) {
+      const r = await importCsvAction(pieces[i]!, mapping, src, own);
+      if (!('ok' in r) || !r.ok) {
+        setProgress(null);
+        const why = 'error' in r ? r.error : 'Something went wrong.';
+        return setState({
+          ok: false,
+          error: `${why} Stopped after ${written.toLocaleString('en-IN')} added (piece ${i + 1} of ${pieces.length}). Importing the same file again is safe — anyone already added is skipped by phone number.`,
+        });
+      }
+      written += r.written;
+      setProgress({ done: Math.min(total, (i + 1) * 1000), of: total });
+    }
+    setProgress(null);
+    setState({
+      ok: true,
+      written,
+      alreadyHere: Math.max(0, total - written),
+      skippedNoName: plan?.skippedNoName ?? 0,
+      duplicatesInFile: plan?.duplicatesInFile ?? 0,
+    });
+  }
 
   const rows = useMemo(() => (text ? parseCsv(text) : []), [text]);
   const headers = rows[0] ?? [];
@@ -89,12 +130,13 @@ export function Import({
     setFileName(name);
     setText(raw);
     setMapping(guessMapping(parsed[0] ?? []));
+    setAlready(null);
     setState(IMPORT_IDLE);
   }
 
   async function onFile(file: File) {
-    if (file.size > 900_000) {
-      setReadError('That file is larger than we can take in one go. Split it in half.');
+    if (file.size > 25_000_000) {
+      setReadError('That file is over 25 MB. Split it into two files and import each.');
       return;
     }
     load(await file.text(), file.name);
@@ -168,7 +210,8 @@ export function Import({
         <p className="m-0 max-w-[60ch] text-[14.5px] leading-relaxed text-[var(--s-ink-2)]">
           A CSV out of Excel, Google Sheets, or whatever you are using now. Nothing is written
           until you have seen exactly what it is going to do — you get to change every column
-          first, and nothing gets merged over the top of a client you already have.
+          first, and nothing gets merged over the top of a client you already have. CSV only: in
+          Excel, use File, Save As, CSV. Big files are fine — 26,000 rows go in pieces of 1,000.
         </p>
 
         <div className="mt-5 flex flex-col gap-3">
@@ -327,6 +370,29 @@ export function Import({
               Anyone already on your list with the same number is left alone — nothing is merged
               over the top of work you have already done.
             </li>
+            <li>
+              {already === null ? (
+                <button
+                  type="button"
+                  disabled={checking}
+                  onClick={() => checkExisting(plan.rows.map((r) => r.phone).filter((p): p is string => p !== null))}
+                  className="text-[var(--s-accent)] underline"
+                >
+                  {checking ? 'Checking your list…' : 'Check how many are already on your list'}
+                </button>
+              ) : (
+                <>
+                  <span className="s-num font-medium">{already.toLocaleString('en-IN')}</span> already on your list (left alone) ·{' '}
+                  <span className="s-num font-medium">{Math.max(0, plan.rows.length - already).toLocaleString('en-IN')}</span> new.
+                </>
+              )}
+            </li>
+            {plan.rows.length > 1000 ? (
+              <li>
+                A big file goes in pieces of 1,000 rows. Keep this page open until it says done; if it stops, importing the
+                same file again is safe.
+              </li>
+            ) : null}
           </ul>
 
           {/* Loud, and separate from the counts above, because it is the one
@@ -416,12 +482,16 @@ export function Import({
               onClick={() =>
                 start(async () => {
                   const own = source.startsWith('own:') ? source.slice(4) : null;
-                  setState(await importCsvAction(text, mapping, own ? 'OTHER' : source, own));
+                  await addAll(own, own ? 'OTHER' : source, plan.rows.length);
                 })
               }
               className={primary}
             >
-              {pending ? 'Adding…' : `Add ${plan.rows.length}`}
+              {pending
+                ? progress
+                  ? `Adding… ${progress.done.toLocaleString('en-IN')} of ${progress.of.toLocaleString('en-IN')}`
+                  : 'Adding…'
+                : `Add ${plan.rows.length.toLocaleString('en-IN')}`}
             </button>
             <button type="button" onClick={startOver} disabled={pending} className={quiet}>
               Use a different file

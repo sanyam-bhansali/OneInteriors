@@ -16,7 +16,6 @@ import {
   attachLeadFile,
   editLeadDetails,
   newQuoteForLead,
-  readRoomsOn,
   removeLeadFile,
   setLeadMeeting,
   type EditResult,
@@ -94,13 +93,6 @@ export async function removeFileAction(clientId: string, fileId: string): Promis
   if (!r.ok) return r;
   refreshLead(clientId);
   return { ok: true, message: 'File removed.' };
-}
-
-export async function readRoomsAction(clientId: string, fileId: string): Promise<Done> {
-  const r = await readRoomsOn(String(fileId));
-  if (!r.ok) return r;
-  refreshLead(clientId);
-  return { ok: true, message: `Read ${r.rooms} rooms: ${r.summary}. Your next quotation starts from them.` };
 }
 
 /** "New quotation" on the lead: made, filled from the lead, and opened. */

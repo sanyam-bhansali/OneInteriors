@@ -14,8 +14,8 @@ import { StandingBanner } from './StandingBanner';
 import { currentStudio, onboardingProgress, firstIncomplete } from '@/modules/studio/onboarding';
 import { visibility } from '@/modules/studio/dashboard';
 import { myAppointments, formatSlot, upcoming, KIND_LABELS } from '@/modules/studio/introduction';
-import { myClients, BOARD_KINDS } from '@/modules/studio-practice/clients';
-import { colourOf, QUIET_AFTER_DAYS } from '@/modules/studio-practice/vocabulary';
+import { dueSnapshot } from '@/modules/studio-sales/leads-list';
+import { colourOf } from '@/modules/studio-practice/vocabulary';
 import { myProjects } from '@/modules/studio-practice/projects';
 import { myVendors } from '@/modules/studio-practice/vendors';
 import { myQuotes } from '@/modules/studio-quote/quotes';
@@ -82,8 +82,10 @@ export default async function StudioHome() {
     return <Setup studio={studio} />;
   }
 
-  const [clients, projects, vendors, quotes, briefs, appointments] = await Promise.all([
-    myClients(),
+  /* Counted in SQL, with the first six due rows only (leads at scale:
+     reading the board's 400 rows stopped every count at 400). */
+  const [snap, projects, vendors, quotes, briefs, appointments] = await Promise.all([
+    dueSnapshot(6),
     myProjects(),
     myVendors(),
     myQuotes(),
@@ -91,41 +93,27 @@ export default async function StudioHome() {
     myAppointments(),
   ]);
 
-  const today = new Date();
-  today.setHours(23, 59, 59, 999);
-
-  const due = clients.filter(
-    (c) => !c.isDemo && BOARD_KINDS.includes(c.stageKind) && c.nextActionOn !== null && c.nextActionOn <= today,
-  );
+  const dueCount = snap.due;
+  const dueRows = snap.first;
   const owed = vendors.reduce((sum, v) => sum + Math.max(0, v.balancePaise), 0);
   const drafts = quotes.filter((q) => q.status === 'DRAFT');
   const next = upcoming(appointments).slice(0, 3);
   const liveProjects = projects.filter((p) => p.stage !== 'CLOSED');
 
   /**
-   * Open clients nobody has spoken to in a week — or ever.
-   *
-   * This is the number the follow-up date cannot give you. A client with no
+   * Open clients nobody has spoken to in a week — or ever. A client with no
    * `nextActionOn` never appears on an overdue list no matter how long they
-   * are ignored, so the busiest-looking board can be one where nothing is
-   * moving. An imported list starts here in its entirety, which is the point:
-   * two hundred rows that nobody has begun are exactly what a studio needs
-   * shown back to them on day two.
+   * are ignored, so this is the number the follow-up date cannot give you.
    */
-  const open = clients.filter((c) => !c.isDemo && BOARD_KINDS.includes(c.stageKind));
-  const quietLine = Date.now() - QUIET_AFTER_DAYS * 86_400_000;
-  const quietClients = open.filter(
-    (c) => c.lastContactedAt === null || c.lastContactedAt.getTime() < quietLine,
-  );
-  const pool = open.filter((c) => c.assignedToId === null);
+  const quietCount = snap.quiet;
+  const poolCount = snap.pool;
 
   const quiet =
-    due.length === 0 &&
+    dueCount === 0 &&
     owed === 0 &&
     drafts.length === 0 &&
     next.length === 0 &&
-    quietClients.length === 0;
-
+    quietCount === 0;
   /* Where they stand, and anything we have told them that they have not read.
      Both sit above the dashboard rather than inside it: a studio arriving to
      find out whether they were approved should not have to look for it. */
@@ -168,11 +156,11 @@ export default async function StudioHome() {
           {/* ── Four figures, and each one is a link to the thing it counts ── */}
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Stat
-              href="/studio/clients"
+              href="/studio/clients?view=list&due=due&sort=followup"
               label="Waiting on you"
-              value={String(due.length)}
-              note={due.length === 0 ? 'No follow-ups due' : 'clients due a call'}
-              urgent={due.length > 0}
+              value={String(dueCount)}
+              note={dueCount === 0 ? 'No follow-ups due' : 'clients due a call'}
+              urgent={dueCount > 0}
             />
             <Stat
               href="/studio/vendors"
@@ -200,23 +188,23 @@ export default async function StudioHome() {
               Deliberately a banner and not a fifth figure. It is not a number
               somebody checks every morning; it is a thing that goes wrong
               slowly and needs saying out loud when it does. */}
-          {quietClients.length > 0 ? (
+          {quietCount > 0 ? (
             <div className="s-card flex flex-wrap items-center gap-x-5 gap-y-2 border-l-[3px] !border-l-[var(--s-accent)] px-4 py-3">
               <p className="m-0 max-w-[62ch] text-[14px] leading-relaxed">
-                <span className="s-num font-semibold">{quietClients.length}</span>{' '}
-                {quietClients.length === 1 ? 'client has' : 'clients have'} had no contact for over
+                <span className="s-num font-semibold">{quietCount}</span>{' '}
+                {quietCount === 1 ? 'client has' : 'clients have'} had no contact for over
                 a week
-                {pool.length > 0 ? (
+                {poolCount > 0 ? (
                   <>
                     , and{' '}
-                    <span className="s-num font-semibold">{pool.length}</span>{' '}
-                    {pool.length === 1 ? 'has' : 'have'} nobody working on them
+                    <span className="s-num font-semibold">{poolCount}</span>{' '}
+                    {poolCount === 1 ? 'has' : 'have'} nobody working on them
                   </>
                 ) : null}
                 . These never show up as overdue, because nobody set a date.
               </p>
               <Link
-                href="/studio/clients"
+                href="/studio/clients?view=list&kind=open&sort=contacted"
                 className="ml-auto whitespace-nowrap s-btn-ghost no-underline"
               >
                 Go through them
@@ -234,14 +222,14 @@ export default async function StudioHome() {
                 </Link>
               </div>
 
-              {due.length === 0 ? (
+              {dueCount === 0 ? (
                 <p className="m-0 px-4 py-4 text-[13.5px] italic text-[var(--s-ink-3)]">
                   Nobody is overdue a call. A client with no follow-up date never appears here —
                   setting one is what makes this list worth reading.
                 </p>
               ) : (
                 <ul className="m-0 flex list-none flex-col p-0">
-                  {due.slice(0, 6).map((c) => (
+                  {dueRows.map((c) => (
                     <li
                       key={c.id}
                       className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-[var(--s-rule-soft)] px-4 py-2.5 last:border-b-0"

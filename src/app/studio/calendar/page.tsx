@@ -1,220 +1,90 @@
-import { isLive } from '@/modules/studio/features';
-import { ComingSoon } from '../ComingSoon';
 import type { Metadata } from 'next';
-import { Container, Pill } from '@/components/ui';
-import {
-  myAppointments,
-  groupByDay,
-  formatSlot,
-  hasPassed,
-  needsOutcome,
-  upcoming,
-  KIND_LABELS,
-  STATUS_LABELS,
-  type StudioAppointment,
-} from '@/modules/studio/introduction';
-import { PUNE_LOCALITIES, propertyLabel } from '@/modules/brief/types';
-import { AppointmentActions } from './AppointmentActions';
-import { ProposeTime } from './ProposeTime';
+import Link from 'next/link';
+import { PageHead, PageBody } from '../StudioShell';
+import { myCalendar } from '@/modules/studio-sales/calendar';
+import { calendarWindow, itemsByDay, parseDay, parseView, shiftDay, windowTitle } from '@/modules/studio-sales/calendar-rules';
+import { istDay } from '@/modules/project/working-days';
+import { taskPeople } from '@/modules/studio-sales/tasks';
+import { CalendarBody, NewTask, PersonPicker } from './CalendarView';
 
-export const metadata: Metadata = {
-  title: 'Calendar',
-  robots: { index: false, follow: false },
-};
-
+export const metadata: Metadata = { title: 'Calendar', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
 
 /**
- * The studio's meetings and site visits.
- *
- * ## Why this page is agenda-first rather than a month grid
- *
- * A studio owner opens this on a phone between sites. A month grid at 360px is
- * decoration — twenty-eight boxes too small to read, and the one thing they
- * actually came for (what is next, and where) pushed below the fold. So the
- * agenda is the page, on every width.
- *
- * ## The rule that makes this page safe
- *
- * Customer names and phone numbers are redacted in `myAppointments()` at the
- * module boundary, not here — see `introduction-access.ts`. This component
- * cannot leak a contact detail by forgetting to branch, because by the time the
- * data reaches it the field is already null. What this page does is explain the
- * absence, which is the part a component should own.
+ * The studio calendar (leads at scale, 12 Oct 2026): follow-ups, meetings
+ * and tasks by day, week or month — and, for owner and PM, One Interiors
+ * visits. Click one to open the lead; move it to another day or time in
+ * place. Owner and PM see everyone or one person; a salesperson their own.
+ * Nothing here moves by itself.
  */
-export default async function CalendarPage() {
-  /* Not in the pilot. The rail already stops linking here; this stops a
-     bookmark or a typed URL reaching a screen we are not standing behind
-     yet. Flip the flag in modules/studio/features.ts to ship it. */
-  if (!isLive('calendar')) return <ComingSoon feature="calendar" />;
-
-  const all = await myAppointments();
-
-  const next = upcoming(all);
-  const outstanding = needsOutcome(all);
-  const past = all
-    .filter((a) => !next.includes(a) && !outstanding.includes(a))
-    .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime())
-    .slice(0, 20);
-
-  return (
-    <main className="py-10">
-      <Container size="default">
-        <p className="label m-0 mb-2">Calendar</p>
-        <h1 className="h1 mb-3">
-          {next.length === 0
-            ? 'Nothing booked.'
-            : `${next.length} meeting${next.length === 1 ? '' : 's'} coming up.`}
-        </h1>
-        <p className="m-0 mb-10 max-w-[62ch] text-[16px] leading-relaxed text-[var(--color-ink-2)]">
-          Meetings and site visits with customers who chose you. These appear once an expert has
-          been on the call and the customer has picked you — there is no way to book one before
-          that, which is what stops you being one of four studios someone is auditioning.
-        </p>
-
-        {outstanding.length > 0 ? (
-          <section className="mb-10">
-            <h2 className="m-0 mb-1 font-[family-name:var(--font-display)] text-[22px] leading-tight">
-              Did these happen?
-            </h2>
-            <p className="m-0 mb-4 max-w-[58ch] text-[14.5px] leading-relaxed text-[var(--color-ink-3)]">
-              The time has passed and nobody has said how it went. We do not assume — a missed
-              appointment has too many innocent explanations for us to guess at one.
-            </p>
-            <ul className="m-0 flex list-none flex-col gap-3 p-0">
-              {outstanding.map((a) => (
-                <AppointmentCard key={a.id} appointment={a} highlight />
-              ))}
-            </ul>
-          </section>
-        ) : null}
-
-        <section className="mb-12">
-          <h2 className="m-0 mb-4 font-[family-name:var(--font-display)] text-[22px] leading-tight">
-            Coming up
-          </h2>
-
-          {next.length === 0 ? (
-            <p className="m-0 rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-5 py-6 text-[15px] italic leading-relaxed text-[var(--color-ink-3)]">
-              Nothing yet. This fills up after expert calls — if it has been quiet for a while, the
-              answer is usually earlier than this page: how many briefs you are appearing in, which
-              your home page shows.
-            </p>
-          ) : (
-            groupByDay(next).map((day) => (
-              <div key={day.key} className="mb-7">
-                <p className="label m-0 mb-2.5">{day.label}</p>
-                <ul className="m-0 flex list-none flex-col gap-3 p-0">
-                  {day.items.map((a) => (
-                    <AppointmentCard key={a.id} appointment={a} />
-                  ))}
-                </ul>
-              </div>
-            ))
-          )}
-        </section>
-
-        {past.length > 0 ? (
-          <section>
-            <h2 className="m-0 mb-4 font-[family-name:var(--font-display)] text-[22px] leading-tight">
-              Earlier
-            </h2>
-            <ul className="m-0 flex list-none flex-col gap-2 p-0">
-              {past.map((a) => (
-                <li
-                  key={a.id}
-                  className="flex flex-wrap items-baseline justify-between gap-x-5 gap-y-1 border-b border-[var(--color-rule-soft)] py-3"
-                >
-                  <span className="text-[14.5px] text-[var(--color-ink-2)]">
-                    {formatSlot(a.startsAt)} · {KIND_LABELS[a.kind]}
-                  </span>
-                  <span className="flex items-center gap-3">
-                    {a.noShowBy ? (
-                      <span className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.09em] text-[var(--color-atrisk)]">
-                        {a.noShowBy === 'STUDIO' ? 'You did not attend' : 'Customer did not attend'}
-                      </span>
-                    ) : null}
-                    <Pill tone={a.status === 'COMPLETED' ? 'ontrack' : 'neutral'}>
-                      {STATUS_LABELS[a.status]}
-                    </Pill>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-      </Container>
-    </main>
-  );
-}
-
-function AppointmentCard({
-  appointment,
-  highlight = false,
-}: {
-  appointment: StudioAppointment;
-  highlight?: boolean;
-}) {
-  const locality =
-    PUNE_LOCALITIES.find((l) => l.slug === appointment.locality)?.label ?? appointment.locality;
-  const property = propertyLabel(appointment.propertyType);
+export default async function CalendarPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  const sp = await searchParams;
+  const now = new Date();
+  const view = parseView(sp.view);
+  const day = parseDay(sp.day, now);
+  const [cal, people] = await Promise.all([myCalendar(view, day, sp.who ?? null, now), taskPeople()]);
+  if (!cal) {
+    return (
+      <PageBody>
+        <p className="m-0 text-[15px] text-[var(--s-ink-2)]">The calendar is for the people who work leads. Ask your studio owner if you should see it.</p>
+      </PageBody>
+    );
+  }
+  const w = calendarWindow(view, day);
+  const href = (over: Record<string, string | null>) => {
+    const p = new URLSearchParams();
+    const merged = { view, day, who: cal.who ?? '', ...over };
+    for (const [k, v] of Object.entries(merged)) if (v) p.set(k, v);
+    return `/studio/calendar?${p.toString()}`;
+  };
+  const today = istDay(now);
+  const tab = 'px-3 py-1.5 no-underline';
 
   return (
-    <li
-      className={`rounded-[14px] border bg-[var(--color-paper-2)] p-5 ${
-        highlight ? 'border-[var(--color-brass)]' : 'border-[var(--color-rule)]'
-      }`}
-    >
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-5 gap-y-1">
-        <span className="font-[family-name:var(--font-display)] text-[19px] leading-tight text-[var(--color-ink)]">
-          {formatSlot(appointment.startsAt)}
-        </span>
-        <Pill tone={appointment.status === 'CONFIRMED' ? 'ontrack' : 'neutral'}>
-          {STATUS_LABELS[appointment.status]}
-        </Pill>
-      </div>
-
-      <p className="m-0 mb-3 text-[14.5px] text-[var(--color-ink-2)]">
-        {[KIND_LABELS[appointment.kind], property, locality, appointment.location]
-          .filter(Boolean)
-          .join(' · ')}
-      </p>
-
-      {/* The contact block. `customerName` and `customerPhone` are already null
-          unless the release rule allowed them — this only explains why. */}
-      {appointment.contact.visible ? (
-        <p className="m-0 text-[15px] text-[var(--color-ink)]">
-          {appointment.customerName ?? 'Customer'}
-          {appointment.customerPhone ? (
-            <>
-              {' · '}
-              <a
-                href={`tel:${appointment.customerPhone}`}
-                className="font-[family-name:var(--font-mono)] text-[14px] text-[var(--color-petrol)]"
-              >
-                {appointment.customerPhone}
-              </a>
-            </>
-          ) : null}
-        </p>
-      ) : (
-        <p className="m-0 max-w-[58ch] rounded-[8px] bg-[var(--color-paper-3)] px-4 py-3 text-[13.5px] leading-relaxed text-[var(--color-ink-2)]">
-          {appointment.contact.message}
-        </p>
-      )}
-
-      <AppointmentActions
-        id={appointment.id}
-        status={appointment.status}
-        passed={hasPassed(appointment)}
+    <>
+      <PageHead
+        title="Calendar"
+        sub={cal.seesAll ? (cal.who ? `${people.find((p) => p.id === cal.who)?.name ?? 'One person'}'s` : 'Everyone') : 'Your follow-ups, meetings and tasks'}
+        action={<NewTask people={people} defaultDay={day === today || view !== 'day' ? today : day} seesAll={cal.seesAll} meId={cal.meId} />}
       />
+      <PageBody>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center gap-1">
+              <Link href={href({ day: shiftDay(view, day, -1) })} className="s-btn-ghost no-underline" aria-label="Earlier">
+                ←
+              </Link>
+              <Link href={href({ day: today })} className="s-btn-ghost no-underline">
+                Today
+              </Link>
+              <Link href={href({ day: shiftDay(view, day, 1) })} className="s-btn-ghost no-underline" aria-label="Later">
+                →
+              </Link>
+            </div>
+            <h2 className="m-0 text-[16px] font-semibold">{windowTitle(w)}</h2>
+            <div role="group" aria-label="Day, week or month" className="ml-auto flex overflow-hidden rounded-[8px] border border-[var(--s-rule)] text-[13px] font-medium">
+              {(['day', 'week', 'month'] as const).map((v) => (
+                <Link key={v} href={href({ view: v })} aria-current={view === v ? 'page' : undefined} className={`${tab} ${view === v ? 'bg-[var(--s-accent)] text-white' : 'text-[var(--s-ink)] hover:bg-[var(--s-rail-active)]'}`}>
+                  {v === 'day' ? 'Day' : v === 'week' ? 'Week' : 'Month'}
+                </Link>
+              ))}
+            </div>
+            {cal.seesAll ? <PersonPicker people={people} who={cal.who} base={{ view, day }} /> : null}
+          </div>
 
-      {/* Offered where it is actually needed: a slot that does not work, or one
-          that has lapsed unconfirmed. Not on a confirmed future meeting, where
-          the useful action is to keep it. */}
-      {appointment.status === 'PROPOSED' || hasPassed(appointment) ? (
-        <ProposeTime introductionId={appointment.introductionId} />
-      ) : null}
-    </li>
+          {cal.missedBefore > 0 && w.start.getTime() <= now.getTime() ? (
+            <p className="m-0 text-[13.5px]">
+              <Link href={`/studio/clients?view=list&due=missed&sort=followup${cal.who ? `&owner=${cal.who}` : ''}`} className="font-medium text-[var(--s-bad)]">
+                {cal.missedBefore.toLocaleString('en-IN')} follow-up{cal.missedBefore === 1 ? '' : 's'} missed before this
+              </Link>{' '}
+              <span className="text-[var(--s-ink-3)]">— open the list to call them or move them.</span>
+            </p>
+          ) : null}
+          {cal.capped ? <p className="m-0 text-[13px] text-[var(--s-ink-3)]">Showing the first 500 of each kind. Pick one person or a shorter view to see all.</p> : null}
+
+          <CalendarBody view={view} days={w.days} month={day.slice(0, 7)} today={today} byDay={Object.fromEntries(itemsByDay(cal.items, w.days))} callCounts={cal.followupCounts} people={people} seesAll={cal.seesAll} dayHref={Object.fromEntries(w.days.map((d) => [d, href({ view: 'day', day: d })]))} />
+        </div>
+      </PageBody>
+    </>
   );
 }

@@ -49,14 +49,24 @@
  * every lead. Assigning, merging, deleting, importing and the pool are owner
  * and PM only. Recording a booking is accounts, owner and PM; the payment
  * stages template is the owner's.
+ *
+ * ## Design (Studio OS Phase 2)
+ *
+ * docs/studio-os/PHASE-2-DESIGN.md adds DESIGNER: the projects they are the
+ * designer on (a `StudioProjectMember` row, written with
+ * `HomeProject.designerId`), read, files, and the design work itself
+ * (`design.work`: design steps, drawings, mood board, site visits,
+ * measurements). No payments, no leads. Picking the designer is
+ * `design.assign` (owner, PM on the project); the studio's design steps are
+ * the owner's (`design.template`); the designers' workload is owner and PM.
  */
 
 import type { Prisma } from '@prisma/client';
 
-export type StudioRoleName = 'OWNER' | 'PM' | 'SUPERVISOR' | 'ACCOUNTS' | 'SALES';
+export type StudioRoleName = 'OWNER' | 'PM' | 'SUPERVISOR' | 'ACCOUNTS' | 'SALES' | 'DESIGNER';
 export type StudioMemberStatusName = 'INVITED' | 'ACTIVE' | 'SUSPENDED';
 
-export const STUDIO_ROLES: readonly StudioRoleName[] = ['OWNER', 'PM', 'SUPERVISOR', 'ACCOUNTS', 'SALES'];
+export const STUDIO_ROLES: readonly StudioRoleName[] = ['OWNER', 'PM', 'SUPERVISOR', 'ACCOUNTS', 'SALES', 'DESIGNER'];
 
 /** One per row of the brief's table, plus reading a project and its payments. */
 export type StudioAction =
@@ -106,6 +116,8 @@ export type StudioAction =
   | 'lead.import'
   /** See the pool: leads nobody has. */
   | 'lead.pool'
+  /** Take a lead nobody has (the pool) for yourself. SALES too (owner, 12 Oct 2026, after AxLeads); only ever an unassigned lead — the write checks. */
+  | 'lead.claim'
   /** Write and send a lead's quotations. SALES: own leads only. */
   | 'quote.write'
   /** Mark a quotation revision as the sales final. SALES: own leads only. */
@@ -115,7 +127,15 @@ export type StudioAction =
   /** Refund a booking within the refund days (the owner may also later). */
   | 'booking.refund'
   /** Set the studio's payment stages (Settings, Payment stages). */
-  | 'payments.template';
+  | 'payments.template'
+  /** Design work on a project: tick design steps, drawings, mood board, site visits, measurements (Phase 2). */
+  | 'design.work'
+  /** Pick or change a project's designer, close the design (Phase 2). */
+  | 'design.assign'
+  /** Set the studio's design steps (Settings, Design steps). */
+  | 'design.template'
+  /** See every designer's design projects and load (Phase 2). */
+  | 'design.workload';
 
 export const STUDIO_ACTIONS: readonly StudioAction[] = [
   'team.manage',
@@ -141,11 +161,16 @@ export const STUDIO_ACTIONS: readonly StudioAction[] = [
   'lead.delete',
   'lead.import',
   'lead.pool',
+  'lead.claim',
   'quote.write',
   'quote.salesFinal',
   'booking.record',
   'booking.refund',
   'payments.template',
+  'design.work',
+  'design.assign',
+  'design.template',
+  'design.workload',
 ];
 
 /** Everything a PM does with leads and sales: all of it, across the studio. */
@@ -158,6 +183,7 @@ const PM_SALES: readonly StudioAction[] = [
   'lead.delete',
   'lead.import',
   'lead.pool',
+  'lead.claim',
   'quote.write',
   'quote.salesFinal',
   'booking.record',
@@ -166,7 +192,7 @@ const PM_SALES: readonly StudioAction[] = [
 
 /** What each role may do. The owner is not listed: the owner may do everything. */
 const GRANTS: Record<Exclude<StudioRoleName, 'OWNER'>, readonly StudioAction[]> = {
-  SALES: ['lead.read', 'lead.edit', 'lead.add', 'quote.write', 'quote.salesFinal'],
+  SALES: ['lead.read', 'lead.edit', 'lead.add', 'lead.claim', 'quote.write', 'quote.salesFinal'],
   PM: [
     ...PM_SALES,
     'project.create',
@@ -181,9 +207,14 @@ const GRANTS: Record<Exclude<StudioRoleName, 'OWNER'>, readonly StudioAction[]> 
     'project.read',
     'crew.manage',
     'calendar.edit',
+    'design.work',
+    'design.assign',
+    'design.workload',
   ],
   SUPERVISOR: ['update.post', 'checklist.tick', 'snag.fix', 'project.read'],
   ACCOUNTS: ['payment.read', 'payment.record', 'booking.record', 'booking.refund'],
+  /* Studio OS Phase 2: only the projects they are the designer on; no money. */
+  DESIGNER: ['project.read', 'document.upload', 'design.work'],
 };
 
 /** Lead actions a salesperson may take only on a lead assigned to them. */
@@ -201,6 +232,8 @@ const NEEDS_ASSIGNMENT: ReadonlySet<StudioAction> = new Set<StudioAction>([
   'payment.record',
   'document.upload',
   'project.read',
+  'design.work',
+  'design.assign',
 ]);
 
 /** Accounts works across every project, so assignment never applies to it. */
@@ -239,6 +272,18 @@ export function leadsVisibleTo(member: MemberRole & { id: string; studioId: stri
   if (!can(member, 'lead.read', { assigned: true })) return { studioId: member.studioId, id: { in: [] } };
   if (member.role === 'SALES') return { studioId: member.studioId, assignedToId: member.id };
   return { studioId: member.studioId };
+}
+
+/**
+ * The pool a member may see and claim from (owner, 12 Oct 2026): leads
+ * nobody has, in their own studio. Owner, PM and sales; nobody else. A
+ * salesperson sees the pool as a list to claim from — never a colleague's
+ * lead, and not the pool lead's own page until they have claimed it
+ * (`leadsVisibleTo` stays their own leads only).
+ */
+export function poolVisibleTo(member: MemberRole & { id: string; studioId: string }): Prisma.StudioClientWhereInput {
+  if (!can(member, 'lead.claim')) return { studioId: member.studioId, id: { in: [] } };
+  return { studioId: member.studioId, assignedToId: null };
 }
 
 /**

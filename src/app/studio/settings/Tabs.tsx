@@ -23,12 +23,15 @@ const TABS = [
 /** The payment stages for the studio's own sales are the owner's (`payments.template`). */
 const PAYMENTS_TAB = { href: '/studio/settings/payments', label: 'Payment stages' };
 
+/** Studio OS Phase 2: the studio's design steps are the owner's too (`design.template`). */
+const DESIGN_TAB = { href: '/studio/settings/design', label: 'Design steps' };
+
 /** Team is the owner's alone (`team.manage`), so the tab is only drawn for them. */
 const TEAM_TAB = { href: '/studio/settings/team', label: 'Team' };
 
 export function SettingsTabs({ team = false }: { team?: boolean }) {
   const pathname = usePathname();
-  const tabs = team ? [...TABS, PAYMENTS_TAB, TEAM_TAB] : TABS;
+  const tabs = team ? [...TABS, PAYMENTS_TAB, DESIGN_TAB, TEAM_TAB] : TABS;
 
   return (
     <nav className="flex gap-1 overflow-x-auto">

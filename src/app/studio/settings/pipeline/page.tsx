@@ -3,6 +3,7 @@ import { PageBody } from '../../StudioShell';
 import { myStages } from '@/modules/studio-practice/stages';
 import { STAGE_KIND_LABELS, STAGE_KIND_NOTES } from '@/modules/studio-practice/vocabulary';
 import { PipelineEditor } from './PipelineEditor';
+import { HauspirePreset } from './HauspirePreset';
 
 export const metadata: Metadata = {
   title: 'Pipeline',
@@ -59,6 +60,7 @@ export default async function PipelinePage() {
         </dl>
       </div>
 
+      <HauspirePreset stages={stages.map((s) => ({ id: s.id, name: s.name, kind: s.kind, isIntake: s.isIntake, sortOrder: s.sortOrder }))} />
       <PipelineEditor stages={stages} />
     </PageBody>
   );

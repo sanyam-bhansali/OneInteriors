@@ -62,7 +62,7 @@ export interface TodayBooking {
   amountPaise: number | null;
 }
 
-export type SectionId = 'calls' | 'meetings' | 'floor-plans' | 'quotes' | 'bookings' | 'pool' | 'never-called';
+export type SectionId = 'calls' | 'tasks' | 'meetings' | 'floor-plans' | 'quotes' | 'bookings' | 'pool' | 'never-called';
 
 export interface TodayRow {
   key: string;
@@ -70,8 +70,11 @@ export interface TodayRow {
   title: string;
   detail: string;
   late: boolean;
-  /** The one button. `assign` draws the assign control instead of a link. */
-  action: { label: string; href: string; kind: 'link' | 'call' | 'assign' };
+  /**
+   * The one button. `assign` draws the assign control instead of a link;
+   * `task` draws "Done" for the task `taskId` (leads at scale).
+   */
+  action: { label: string; href: string; kind: 'link' | 'call' | 'assign' | 'task' | 'claim'; taskId?: string; leadId?: string };
 }
 
 export interface TodaySection {
@@ -80,18 +83,51 @@ export interface TodaySection {
   rows: TodayRow[];
   /** Rows left off the screen. */
   more: number;
+  /** Where "see them all" goes: the leads list filtered to this section (leads at scale). */
+  seeAll?: string;
+}
+
+/** A task due today or late (leads at scale, `StudioTask`). */
+export interface TodayTask {
+  id: string;
+  title: string;
+  dueAt: Date;
+  leadId: string | null;
+  leadName: string | null;
+  assignedToName: string | null;
 }
 
 export interface TodayInput {
   leads: readonly TodayLead[];
   quotes: readonly TodayQuote[];
   bookings: readonly TodayBooking[];
+  /** Open tasks due today or before. */
+  tasks?: readonly TodayTask[];
   now: Date;
+  /** Salesperson who may claim: adds the pool, to claim from (owner, 12 Oct 2026). */
+  showPool?: boolean;
   /** Owner or PM: adds the pool and the never-called sections. */
   seesAll: boolean;
   /** Rows per section on screen. */
   limit?: number;
+  /**
+   * How many there really are, per section, counted in SQL (leads at
+   * scale): the reads fetch only the first rows of each section, so "and N
+   * more" comes from here when it is given.
+   */
+  totals?: Partial<Record<SectionId, number>>;
 }
+
+/** The leads list (or calendar) for each section's "see them all". */
+export const SEE_ALL: Partial<Record<SectionId, string>> = {
+  calls: '/studio/clients?view=list&due=due&sort=followup',
+  tasks: '/studio/calendar?view=day',
+  meetings: '/studio/calendar?view=day',
+  quotes: '/studio/quotations',
+  bookings: '/studio/clients?view=list&booked=7d',
+  pool: '/studio/clients?view=list&owner=pool&kind=open&sort=oldest',
+  'never-called': '/studio/clients?view=list&never=1&owner=anyone&sort=oldest',
+};
 
 const DAY = 86_400_000;
 
@@ -118,16 +154,22 @@ function lateBy(due: Date, start: Date): number {
   return Math.ceil((start.getTime() - due.getTime()) / DAY);
 }
 
-function section(id: SectionId, title: string, rows: TodayRow[], limit: number): TodaySection {
-  return { id, title, rows: rows.slice(0, limit), more: Math.max(0, rows.length - limit) };
+function section(id: SectionId, title: string, rows: TodayRow[], limit: number, totals?: Partial<Record<SectionId, number>>): TodaySection {
+  const shown = rows.slice(0, limit);
+  const total = Math.max(rows.length, totals?.[id] ?? 0);
+  return { id, title, rows: shown, more: Math.max(0, total - shown.length), ...(SEE_ALL[id] ? { seeAll: SEE_ALL[id] } : {}) };
 }
 
 export function buildToday(input: TodayInput): TodaySection[] {
   const { now, seesAll } = input;
   const limit = input.limit ?? 25;
   const { start, end } = istDayBounds(now);
-  const leads = input.leads.filter((l) => !l.isDemo);
+  /* A salesperson's list is their own leads; pool leads come in only for
+     the pool section, to claim (owner, 12 Oct 2026). */
+  const all = input.leads.filter((l) => !l.isDemo);
+  const leads = seesAll ? all : all.filter((l) => l.assignedToId !== null);
   const open = leads.filter((l) => OPEN_KINDS.includes(l.stageKind));
+  const openPool = all.filter((l) => OPEN_KINDS.includes(l.stageKind) && l.assignedToId === null && !l.booked);
 
   const calls: TodayRow[] = open
     .filter((l) => l.nextActionOn !== null && l.nextActionOn <= end)
@@ -198,25 +240,55 @@ export function buildToday(input: TodayInput): TodaySection[] {
       action: { label: 'Open', href: leadHref(b.clientId), kind: 'link' as const },
     }));
 
+  const tasks: TodayRow[] = (input.tasks ?? [])
+    .filter((t) => t.dueAt <= end)
+    .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime())
+    .map((t) => {
+      const late = t.dueAt < start;
+      const days = late ? lateBy(t.dueAt, start) : 0;
+      return {
+        key: `task:${t.id}`,
+        leadId: t.leadId,
+        title: t.title,
+        detail: [t.leadName, late ? (days <= 1 ? 'due yesterday' : `${days} days late`) : 'due today', seesAll ? t.assignedToName : null].filter(Boolean).join(' · '),
+        late,
+        action: { label: 'Done', href: t.leadId ? leadHref(t.leadId) : '/studio/calendar?view=day', kind: 'task' as const, taskId: t.id },
+      };
+    });
+
+  const totals = input.totals;
   const sections = [
-    section('calls', 'Calls due', calls, limit),
-    section('meetings', 'Meetings today', meetings, limit),
-    section('floor-plans', 'Floor plans not in yet', floorPlans, limit),
-    section('quotes', 'Quotes sent and waiting', quotes, limit),
-    section('bookings', 'Bookings this week', bookings, limit),
+    section('calls', 'Calls due', calls, limit, totals),
+    section('tasks', 'Tasks due', tasks, limit, totals),
+    section('meetings', 'Meetings today', meetings, limit, totals),
+    section('floor-plans', 'Floor plans not in yet', floorPlans, limit, totals),
+    section('quotes', 'Quotes sent and waiting', quotes, limit, totals),
+    section('bookings', 'Bookings this week', bookings, limit, totals),
   ];
 
+  /* A salesperson sees the pool to claim from (owner, 12 Oct 2026): the
+     lead's name and a Claim button; its page opens once it is theirs. */
+  if (!seesAll && input.showPool) {
+    const pool: TodayRow[] = openPool.map((l) => ({
+      key: `pool:${l.id}`,
+      leadId: null,
+      title: l.name,
+      detail: 'In the pool · nobody has this lead yet',
+      late: false,
+      action: { label: 'Claim', href: SEE_ALL.pool!, kind: 'claim' as const, leadId: l.id },
+    }));
+    sections.push(section('pool', 'In the pool — claim one', pool, limit, totals));
+  }
+
   if (seesAll) {
-    const pool: TodayRow[] = open
-      .filter((l) => l.assignedToId === null && !l.booked)
-      .map((l) => ({
-        key: `pool:${l.id}`,
-        leadId: l.id,
-        title: l.name,
-        detail: 'Nobody has this lead yet',
-        late: false,
-        action: { label: 'Assign', href: leadHref(l.id), kind: 'assign' as const },
-      }));
+    const pool: TodayRow[] = openPool.map((l) => ({
+      key: `pool:${l.id}`,
+      leadId: l.id,
+      title: l.name,
+      detail: 'Nobody has this lead yet',
+      late: false,
+      action: { label: 'Assign', href: leadHref(l.id), kind: 'assign' as const },
+    }));
     const neverCalled: TodayRow[] = open
       .filter((l) => l.stageKind === 'OPEN' && l.lastContactedAt === null && l.assignedToId !== null && !l.booked)
       .map((l) => ({
@@ -227,7 +299,7 @@ export function buildToday(input: TodayInput): TodaySection[] {
         late: true,
         action: { label: 'Open', href: leadHref(l.id), kind: 'link' as const },
       }));
-    sections.push(section('pool', 'Leads to assign', pool, limit), section('never-called', 'Nobody has called', neverCalled, limit));
+    sections.push(section('pool', 'Leads to assign', pool, limit, totals), section('never-called', 'Nobody has called', neverCalled, limit, totals));
   }
 
   return sections;

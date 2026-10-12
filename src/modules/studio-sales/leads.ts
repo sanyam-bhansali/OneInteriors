@@ -23,8 +23,8 @@ import { actingMember, leadInScope, mayOnLead, myLeadScope, type LeadScope } fro
 import { can } from '@/modules/studio/roles';
 import { applyConfiguration, createQuote } from '@/modules/studio-quote/quotes';
 import { isConfigName } from '@/modules/studio-quote/configure';
-import { canReadPlans, readFloorPlan, readablePlanType } from '@/modules/floorplan/read';
-import { leadFileExists, leadUploadTicket, readLeadFile, removeLeadFiles, signedLeadFileLinks } from '@/modules/storage/lead-files';
+import { canReadPlans } from '@/modules/floorplan/read';
+import { leadFileExists, leadUploadTicket, removeLeadFiles, signedLeadFileLinks } from '@/modules/storage/lead-files';
 import {
   budgetText,
   checkLeadFile,
@@ -399,42 +399,10 @@ export async function removeLeadFile(fileId: string): Promise<LeadResult> {
   return { ok: true };
 }
 
-/**
- * "Read rooms": the floor-plan reader, on a file somebody chose. Optional
- * and never automatic. The rooms it finds fill the next quotation's room
- * list (studio-quote/quotes.ts reads the newest read floor plan).
- */
-export async function readRoomsOn(fileId: string): Promise<{ ok: true; rooms: number; summary: string } | { ok: false; error: string }> {
-  const scope = await myLeadScope();
-  if (!scope) return { ok: false, error: 'Sign in as your studio first.' };
-  const studioId = scope.studioId;
-  if (!canReadPlans()) return { ok: false, error: 'The floor-plan reader is not switched on for this deployment.' };
-  const file = await prisma.studioClientFile.findFirst({
-    where: { id: String(fileId ?? ''), studioId, client: { ...scope.leads, studioId, deletedAt: null } },
-    select: { id: true, storagePath: true, contentType: true, clientId: true, client: { select: { assignedToId: true } } },
-  });
-  if (!file) return { ok: false, error: 'That file is not on one of your leads.' };
-  if (!mayOnLead(scope, 'lead.edit', file.client)) return { ok: false, error: NOT_ROLE };
-  if (!readablePlanType(file.contentType)) return { ok: false, error: 'The reader takes a PDF, JPG, PNG or WebP plan.' };
-  const bytes = await readLeadFile(file.storagePath);
-  if (!bytes) return { ok: false, error: 'We could not open the stored file. Try again.' };
-  const result = await readFloorPlan(Buffer.from(bytes).toString('base64'), file.contentType);
-  if (!result.ok) return { ok: false, error: 'The reader could not make out the rooms on this plan. Enter them in the quotation instead.' };
-  const r = result.reading;
-  const reading = {
-    rooms: r.rooms.map((x) => ({ name: x.name, code: x.code, widthMm: x.widthMm, depthMm: x.depthMm })),
-    kitchenRunMm: r.kitchenRunMm,
-    bathrooms: r.bathrooms,
-    hasStudy: r.hasStudy,
-    areaSource: r.carpetAreaSource,
-    bedrooms: r.bedrooms,
-    carpetAreaSqft: r.carpetAreaSqft,
-  };
-  await prisma.studioClientFile.updateMany({ where: { id: file.id, studioId }, data: { kind: 'FLOOR_PLAN', reading } });
-  const summary = `${r.bedrooms} bedroom${r.bedrooms === 1 ? '' : 's'}, ${r.bathrooms} bathroom${r.bathrooms === 1 ? '' : 's'}${r.carpetAreaSqft ? `, about ${r.carpetAreaSqft} sq ft` : ''}`;
-  await record({ studioId, clientId: file.clientId, kind: 'FILE', summary: `Rooms read from the floor plan: ${summary}` });
-  return { ok: true, rooms: r.rooms.length, summary };
-}
+/* "Read rooms" lives in studio-quote/from-plan.ts (`buildFromPlan`, mode
+   'read'), through floorplan/plan-reads.ts `readPlanOnce`: the hash cache,
+   the daily cap and the one-read-at-a-time claim. The direct, uncapped read
+   that was here is gone (12 Oct 2026), so no path pays for a plan twice. */
 
 // ── A new quotation, from the lead ─────────────────────────────
 

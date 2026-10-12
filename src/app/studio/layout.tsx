@@ -355,7 +355,12 @@ function navFor(context: ShellContext | null, member: MemberRole | null): NavGro
       items: [
         /* Studio OS Phase 1: what needs doing today, first. */
         { icon: 'today', href: TODAY_HOME, label: 'Today', ready: true },
-        { icon: 'home', href: '/studio', label: 'Dashboard', ready: true },
+        /* Leads at scale (12 Oct 2026): the sales numbers, and the calendar of
+           follow-ups, meetings and tasks (with One Interiors visits in it). */
+        { icon: 'chart', href: '/studio/dashboard', label: 'Dashboard', ready: true },
+        { icon: 'calendar', href: '/studio/calendar', label: 'Calendar', ready: true, count: context?.toConfirm },
+        /* The studio's morning overview (what was the Dashboard): inbox, owed to trades, live sites. */
+        { icon: 'home', href: '/studio', label: 'Overview', ready: true },
       ],
     },
     {
@@ -407,7 +412,8 @@ function navFor(context: ShellContext | null, member: MemberRole | null): NavGro
         },
         /* The customer projects this person runs (studio workspace Phase 1).
            Owners see all; a PM only the ones they are on. */
-        { icon: 'projects', href: '/studio/projects', label: 'Projects', ready: true },
+        /* Studio OS Phase 2: the designers' page (owner, PM). */
+        { icon: 'projects', href: '/studio/projects', label: 'Projects', ready: true, children: [{ href: '/studio/design', label: 'Design', ready: true }] },
         /* Vendor rates are the owner's alone (roles.ts `vendor.rates`). */
         ...(owner ? [{ icon: 'vendors' as const, href: '/studio/vendors', label: 'Vendors', ready: isLive('vendors') }] : []),
       ],
@@ -420,13 +426,7 @@ function navFor(context: ShellContext | null, member: MemberRole | null): NavGro
     groups.push({
       label: 'From us',
       items: [
-        {
-          icon: 'calendar',
-          href: '/studio/calendar',
-          label: 'Calendar',
-          ready: isLive('calendar'),
-          count: context?.toConfirm,
-        },
+        /* Calendar moved to the top of the rail (leads at scale); One Interiors visits are in it. */
         { icon: 'listing', href: '/studio/listing', label: 'Your listing', ready: isLive('listing') },
         // Updates for homes introduced through us — the customer sees them (queue item 22).
         { icon: 'projects', href: '/studio/updates', label: 'Client projects', ready: true },
@@ -448,11 +448,24 @@ function navFor(context: ShellContext | null, member: MemberRole | null): NavGro
 /** A salesperson's rail: Today, their leads, their quotations. Nothing they cannot open. */
 function salesNav(): NavGroup[] {
   return [
-    { items: [{ icon: 'today', href: TODAY_HOME, label: 'Today', ready: true }] },
+    {
+      items: [
+        { icon: 'today', href: TODAY_HOME, label: 'Today', ready: true },
+        { icon: 'chart', href: '/studio/dashboard', label: 'Dashboard', ready: true },
+        { icon: 'calendar', href: '/studio/calendar', label: 'Calendar', ready: true },
+      ],
+    },
     {
       label: 'Your work',
       items: [
-        { icon: 'clients', href: '/studio/clients', label: 'My leads', ready: true },
+        {
+          icon: 'clients',
+          href: '/studio/clients',
+          label: 'My leads',
+          ready: true,
+          /* The pool, to claim from (owner, 12 Oct 2026). */
+          children: [{ href: '/studio/clients/pool', label: 'Pool', ready: true }],
+        },
         { icon: 'quote', href: '/studio/quotations', label: 'Quotations', ready: true },
       ],
     },

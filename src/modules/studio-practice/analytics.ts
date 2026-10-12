@@ -33,6 +33,8 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { myStudioId } from '@/modules/studio-quote/store';
 import { LIVE } from './demo-lead';
+import { istDay } from '@/modules/project/working-days';
+import { istDayStart } from '@/modules/studio-sales/ist-range';
 import { fromDb, type Paise } from '@/lib/money';
 
 export interface SourceCount {
@@ -277,7 +279,7 @@ export async function boardCounts(): Promise<BoardCounts> {
 
     const [overdue, pooled, quiet] = await Promise.all([
       prisma.studioClient.count({
-        where: { studioId, ...LIVE, stageId: { in: openIds }, nextActionOn: { lt: now } },
+        where: { studioId, ...LIVE, stageId: { in: openIds }, nextActionOn: { lt: istDayStart(istDay(now)) } },
       }),
       prisma.studioClient.count({
         where: { studioId, ...LIVE, stageId: { in: openIds }, assignedToId: null },
@@ -287,10 +289,10 @@ export async function boardCounts(): Promise<BoardCounts> {
           studioId,
           ...LIVE,
           stageId: { in: openIds },
-          /* Never contacted counts as quiet, and is the loudest version of
-             it — `lastContactedAt` is written only by logContact, so this
-             measures conversations rather than keystrokes. */
-          OR: [{ lastContactedAt: null }, { lastContactedAt: { lt: quietBefore } }],
+          /* Leads at scale: "gone quiet" is spoken to before and nothing for
+             seven days — the same as the list's filter it links to
+             (studio-sales/lead-filters.ts). Never-called is its own filter. */
+          lastContactedAt: { lt: quietBefore },
         },
       }),
     ]);

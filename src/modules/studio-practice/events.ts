@@ -44,6 +44,8 @@ export interface EventRow {
   kind: EventKindName;
   actor: 'MEMBER' | 'SYSTEM';
   byName: string | null;
+  /** Who wrote it (their membership), for "edit your own note". */
+  byId?: string | null;
   summary: string;
   meta: Record<string, unknown> | null;
   createdAt: Date;
@@ -195,6 +197,7 @@ export async function timelineFor(clientId: string): Promise<EventRow[]> {
         kind: true,
         actor: true,
         byName: true,
+        byId: true,
         summary: true,
         meta: true,
         createdAt: true,
@@ -206,6 +209,7 @@ export async function timelineFor(clientId: string): Promise<EventRow[]> {
       kind: r.kind as EventKindName,
       actor: r.actor as 'MEMBER' | 'SYSTEM',
       byName: r.byName,
+      byId: r.byId,
       summary: r.summary,
       meta: (r.meta ?? null) as Record<string, unknown> | null,
       createdAt: r.createdAt,
@@ -247,6 +251,7 @@ export async function recentActivity(limit = 40): Promise<(EventRow & {
         kind: true,
         actor: true,
         byName: true,
+        byId: true,
         summary: true,
         meta: true,
         createdAt: true,
@@ -260,6 +265,7 @@ export async function recentActivity(limit = 40): Promise<(EventRow & {
       kind: r.kind as EventKindName,
       actor: r.actor as 'MEMBER' | 'SYSTEM',
       byName: r.byName,
+      byId: r.byId,
       summary: r.summary,
       meta: (r.meta ?? null) as Record<string, unknown> | null,
       createdAt: r.createdAt,

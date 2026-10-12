@@ -4,6 +4,9 @@ import Link from 'next/link';
 import { useState } from 'react';
 import type { TodayRow, TodaySection } from '@/modules/studio-sales/today-rules';
 import { assignLeadsAction } from '../sales-actions';
+import { setTaskDoneAction } from '../tasks-actions';
+import { bulkClaimAction } from '../clients/list-actions';
+import type { Done } from '../sales-types';
 import { Said, useAct, inputClass, primaryClass, quietClass } from '../SalesUi';
 
 /**
@@ -32,7 +35,7 @@ export function TodayList({ sections, members, meId }: { sections: TodaySection[
           {s.more > 0 ? (
             <p className="m-0 border-t border-[var(--s-rule-soft)] px-4 py-2.5 text-[13px] text-[var(--s-ink-3)]">
               And {s.more} more.{' '}
-              <Link href={s.id === 'pool' ? '/studio/clients/pool' : '/studio/clients'} className="text-[var(--s-accent)]">
+              <Link href={s.seeAll ?? '/studio/clients'} className="text-[var(--s-accent)]">
                 See them all
               </Link>
             </p>
@@ -58,6 +61,10 @@ function Row({ row, members, meId }: { row: TodayRow; members: { id: string; nam
       </div>
       {row.action.kind === 'assign' && row.leadId ? (
         <AssignOne leadId={row.leadId} members={members} meId={meId} />
+      ) : row.action.kind === 'task' && row.action.taskId ? (
+        <ActOnce label="Done" busy="Saving…" act={() => setTaskDoneAction(row.action.taskId!, true, row.leadId)} />
+      ) : row.action.kind === 'claim' && row.action.leadId ? (
+        <ActOnce label="Claim" busy="Claiming…" act={() => bulkClaimAction({ ids: [row.action.leadId!] })} />
       ) : (
         <Link href={row.action.href} className={row.action.kind === 'call' ? primaryClass : quietClass}>
           {row.action.label}
@@ -120,6 +127,19 @@ function AssignAll({ ids, members }: { ids: string[]; members: { id: string; nam
           )
         ) : null}
       </div>
+      <Said result={result} />
+    </div>
+  );
+}
+
+/** One button that does one thing (tick a task done, claim a pool lead). */
+function ActOnce({ label, busy, act }: { label: string; busy: string; act: () => Promise<Done> }) {
+  const { pending, result, run } = useAct();
+  return (
+    <div className="flex flex-col items-end">
+      <button type="button" disabled={pending} onClick={() => run(act)} className={primaryClass}>
+        {pending ? busy : label}
+      </button>
       <Said result={result} />
     </div>
   );

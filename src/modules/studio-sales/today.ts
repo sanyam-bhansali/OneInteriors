@@ -11,40 +11,79 @@ import { prisma } from '@/lib/prisma';
 import { fromDb } from '@/lib/money';
 import { resolveSiteUrl } from '@/lib/site';
 import { sendNotice } from '@/modules/auth/email';
-import { leadsVisibleTo, quotesVisibleTo, type MemberRole } from '@/modules/studio/roles';
+import { can, leadsVisibleTo, poolVisibleTo, quotesVisibleTo, type MemberRole } from '@/modules/studio/roles';
 import { myLeadScope } from '@/modules/studio/lead-scope';
-import { buildToday, todayEmail, type TodayBooking, type TodayLead, type TodayQuote, type TodaySection } from './today-rules';
+import { buildToday, istDayBounds, todayEmail, type SectionId, type TodayBooking, type TodayLead, type TodayQuote, type TodaySection, type TodayTask } from './today-rules';
+import { LIVE } from '@/modules/studio-practice/demo-lead';
+import { openTasksDue } from './tasks';
 
 interface Who extends MemberRole {
   id: string;
   studioId: string;
 }
 
-/** Everything `buildToday` needs for one member. */
-async function todayInput(who: Who, now: Date): Promise<{ leads: TodayLead[]; quotes: TodayQuote[]; bookings: TodayBooking[] }> {
+/** Rows fetched per section; "and N more" comes from the SQL counts. */
+const SECTION_TAKE = 25;
+
+const LEAD_SELECT = {
+  id: true,
+  name: true,
+  phone: true,
+  assignedToId: true,
+  assignedTo: { select: { user: { select: { name: true, email: true } } } },
+  stage: { select: { kind: true } },
+  nextAction: true,
+  nextActionOn: true,
+  lastContactedAt: true,
+  meetingAt: true,
+  meetingNote: true,
+  bookedAt: true,
+  bookedIntroductionId: true,
+  _count: { select: { quotes: true, files: { where: { kind: 'FLOOR_PLAN' as const } } } },
+} as const;
+
+/**
+ * Everything `buildToday` needs for one member — each section read on its
+ * own, first rows only, with its true size counted in SQL (leads at scale:
+ * at 26,000 leads, "the 600 most recently touched" missed most of them).
+ */
+async function todayInput(
+  who: Who,
+  now: Date,
+): Promise<{ leads: TodayLead[]; quotes: TodayQuote[]; bookings: TodayBooking[]; tasks: TodayTask[]; showPool: boolean; totals: Partial<Record<SectionId, number>> }> {
   const studioId = who.studioId;
-  const [leadRows, quoteRows] = await Promise.all([
-    prisma.studioClient.findMany({
-      where: { ...leadsVisibleTo(who), studioId, deletedAt: null, isDemo: false, stage: { kind: { in: ['OPEN', 'WON'] } } },
-      orderBy: { updatedAt: 'desc' },
-      take: 600,
-      select: {
-        id: true,
-        name: true,
-        phone: true,
-        assignedToId: true,
-        assignedTo: { select: { user: { select: { name: true, email: true } } } },
-        stage: { select: { kind: true } },
-        nextAction: true,
-        nextActionOn: true,
-        lastContactedAt: true,
-        meetingAt: true,
-        meetingNote: true,
-        bookedAt: true,
-        bookedIntroductionId: true,
-        _count: { select: { quotes: true, files: { where: { kind: 'FLOOR_PLAN' } } } },
-      },
-    }),
+  const seesAll = who.role !== 'SALES';
+  const { start, end } = istDayBounds(now);
+  const base = { ...leadsVisibleTo(who), studioId, deletedAt: null, isDemo: false };
+  const open = { ...base, stage: { kind: { in: ['OPEN' as const, 'WON' as const] } } };
+  const calls = { ...open, nextActionOn: { lte: end } };
+  const plans = {
+    ...base,
+    stage: { kind: 'OPEN' as const },
+    lastContactedAt: { not: null },
+    bookedIntroductionId: null,
+    quotes: { none: {} },
+    files: { none: { kind: 'FLOOR_PLAN' as const } },
+  };
+  /* The pool: owner and PM assign from it; a salesperson claims from it (owner, 12 Oct 2026). */
+  const pool = { ...poolVisibleTo(who), studioId, deletedAt: null, isDemo: false, stage: { kind: { in: ['OPEN' as const, 'WON' as const] } }, bookedIntroductionId: null };
+  const showPool = can(who, 'lead.claim') || seesAll;
+  const never = { ...base, stage: { kind: 'OPEN' as const }, lastContactedAt: null, assignedToId: { not: null }, bookedIntroductionId: null };
+  const weekAgo = new Date(now.getTime() - 8 * 86_400_000);
+  const noRows = Promise.resolve([]);
+  const zero = Promise.resolve(0);
+
+  const [callRows, meetRows, planRows, poolRows, neverRows, bookRows, callN, planN, poolN, neverN, quoteRows, taskRead] = await Promise.all([
+    prisma.studioClient.findMany({ where: calls, orderBy: [{ nextActionOn: 'asc' }, { id: 'asc' }], take: SECTION_TAKE, select: LEAD_SELECT }),
+    prisma.studioClient.findMany({ where: { ...base, meetingAt: { gte: start, lte: end } }, orderBy: { meetingAt: 'asc' }, take: 50, select: LEAD_SELECT }),
+    prisma.studioClient.findMany({ where: plans, orderBy: [{ lastContactedAt: 'asc' }, { id: 'asc' }], take: SECTION_TAKE, select: LEAD_SELECT }),
+    showPool ? prisma.studioClient.findMany({ where: pool, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: SECTION_TAKE, select: LEAD_SELECT }) : noRows,
+    seesAll ? prisma.studioClient.findMany({ where: never, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: SECTION_TAKE, select: LEAD_SELECT }) : noRows,
+    prisma.studioClient.findMany({ where: { ...base, bookedAt: { gte: weekAgo }, bookedIntroductionId: { not: null } }, orderBy: { bookedAt: 'desc' }, take: 50, select: LEAD_SELECT }),
+    prisma.studioClient.count({ where: { ...LIVE, ...calls } }),
+    prisma.studioClient.count({ where: { ...LIVE, ...plans } }),
+    showPool ? prisma.studioClient.count({ where: { ...LIVE, ...pool } }) : zero,
+    seesAll ? prisma.studioClient.count({ where: { ...LIVE, ...never } }) : zero,
     prisma.studioQuote.findMany({
       where: { ...quotesVisibleTo(who), studioId, status: 'ISSUED', revisions: { some: {} } },
       orderBy: { updatedAt: 'desc' },
@@ -60,9 +99,13 @@ async function todayInput(who: Who, now: Date): Promise<{ leads: TodayLead[]; qu
         revisions: { orderBy: { n: 'desc' }, take: 1, select: { n: true, sentAt: true } },
       },
     }),
+    openTasksDue(who, end, SECTION_TAKE),
   ]);
-  const weekAgo = new Date(now.getTime() - 8 * 86_400_000);
-  const booked = leadRows.filter((l) => l.bookedAt && l.bookedAt >= weekAgo && l.bookedIntroductionId);
+
+  const byId = new Map<string, (typeof callRows)[number]>();
+  for (const l of [...callRows, ...meetRows, ...planRows, ...poolRows, ...neverRows, ...bookRows]) byId.set(l.id, l);
+  const leadRows = [...byId.values()];
+  const booked = bookRows.filter((l) => l.bookedAt && l.bookedIntroductionId);
   const advances = booked.length
     ? await prisma.homeProject.findMany({
         where: { introductionId: { in: booked.map((b) => b.bookedIntroductionId!) }, introduction: { studioId } },
@@ -72,6 +115,9 @@ async function todayInput(who: Who, now: Date): Promise<{ leads: TodayLead[]; qu
   const advanceBy = new Map(advances.map((a) => [a.introductionId, a.payments.reduce((n, p) => n + fromDb(p.amountPaise), 0)]));
 
   return {
+    showPool: showPool && !seesAll,
+    totals: { calls: callN, 'floor-plans': planN, pool: poolN, 'never-called': neverN, tasks: taskRead.total },
+    tasks: taskRead.rows.map((t) => ({ id: t.id, title: t.title, dueAt: t.dueAt, leadId: t.leadId, leadName: t.leadName, assignedToName: t.assignedToName })),
     leads: leadRows.map((l) => ({
       id: l.id,
       name: l.name,

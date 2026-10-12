@@ -1,4 +1,6 @@
+import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
+import { DESIGN_HOME } from '@/modules/studio/surfaces';
 import { getLang } from '@/modules/i18n/server';
 import type { StudioMemberRef } from '@/modules/studio/access';
 import { ROLE_NAMES } from '@/modules/studio/team-rules';
@@ -37,6 +39,12 @@ export async function RoleFrame({
           </p>
         </div>
         <div className="flex items-center gap-4">
+          {/* Studio OS Phase 2: a designer's one way home from a project. */}
+          {member.role === 'DESIGNER' ? (
+            <Link href={DESIGN_HOME} className="text-[13.5px] font-medium text-[var(--s-accent)] no-underline hover:underline">
+              My design work
+            </Link>
+          ) : null}
           {site ? <LangSwitch value={lang} /> : null}
           {signOut}
         </div>

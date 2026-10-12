@@ -46,7 +46,7 @@ describe('mayOpen and homeFor', () => {
     for (const p of ['/studio/today', '/studio/clients', '/studio/clients/c1', '/studio/quotations', '/studio/quotations/q1', '/studio/quotations/q1/compare']) {
       expect(mayOpen(m('SALES'), p), p).toBe(true);
     }
-    for (const p of ['/studio', '/studio/clients/pool', '/studio/clients/import', '/studio/clients/bin', '/studio/clients/analytics', '/studio/products', '/studio/settings', '/studio/projects', '/studio/payments', '/studio/site', '/studio/vendors', '/studio/todayx']) {
+    for (const p of ['/studio', '/studio/clients/import', '/studio/clients/bin', '/studio/clients/analytics', '/studio/products', '/studio/settings', '/studio/projects', '/studio/payments', '/studio/site', '/studio/vendors', '/studio/todayx']) {
       expect(mayOpen(m('SALES'), p), p).toBe(false);
     }
     expect(homeFor('SALES')).toBe('/studio/today');

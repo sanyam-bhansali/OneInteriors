@@ -656,6 +656,13 @@ model Studio {
   /// quotation's sales final, so a later change never rewrites a booked one.
   paymentTemplate Json?
 
+  /// Studio OS Phase 2 (docs/studio-os/PHASE-2-DESIGN.md): the studio's
+  /// design steps, set in Settings, Design steps (owner). Checked by
+  /// modules/studio-design/template.ts; null or a stored value that fails
+  /// the checks reads as Hauspire's default. Copied onto each new project's
+  /// DESIGN stage, so a later change never rewrites a running one.
+  designTemplate Json?
+
   /// The matching profile: work mix (modular / carpentry / both), scopes and
   /// minimums, civil capability, home types, city-wide and societies,
   /// capacity, earliest start, durations, how they work, materials,
@@ -772,6 +779,8 @@ model Studio {
   studioClientFiles  StudioClientFile[]
   studioLeadSources  StudioLeadSource[]
   quoteRevisions     StudioQuoteRevision[]
+  /// Leads at scale (12 Oct 2026): calendar tasks.
+  studioTasks        StudioTask[]
 
   /// Studio workspace Phase 2: the saved crew faces site mode taps, and the
   /// days off that are not reminder days.
@@ -857,6 +866,13 @@ model StudioMember {
   clientFiles    StudioClientFile[]
   quoteRevisions StudioQuoteRevision[]
 
+  /// Studio OS Phase 2: the projects they are the designer on.
+  designing HomeProject[] @relation("ProjectDesigner")
+
+  /// Leads at scale: calendar tasks given to them, and ones they wrote.
+  tasksAssigned StudioTask[] @relation("TaskAssignee")
+  tasksCreated  StudioTask[] @relation("TaskCreator")
+
   @@index([studioId])
   @@index([invitedById])
   @@map("studio_members")
@@ -872,6 +888,9 @@ enum StudioRole {
   /// Studio OS Phase 1: a salesperson. Sees only the leads assigned to them,
   /// those leads' quotations and files; nothing of projects or payments.
   SALES
+  /// Studio OS Phase 2: a designer. Works the design phase of the projects
+  /// they are the designer on (HomeProject.designerId); sees no money.
+  DESIGNER
 }
 
 /// A seat is a member who has signed in at least once and is not suspended.
@@ -1565,6 +1584,22 @@ model HomeProject {
   /// (project/own-project.ts).
   invites HomeProjectInvite[]
 
+  /// Studio OS Phase 2 — design (docs/studio-os/PHASE-2-DESIGN.md). The
+  /// designer (also on the team, so access.ts lets them in), the mood board
+  /// shared with its message to the client, the design final and when design
+  /// closed, with a frozen "what changed vs the sales final" for the client.
+  designerId         String?
+  designer           StudioMember? @relation("ProjectDesigner", fields: [designerId], references: [id], onDelete: SetNull)
+  moodBoardSharedAt  DateTime?
+  moodBoardNote      String?
+  designFinalQuoteId String?
+  designClosedAt     DateTime?
+  designChanges      Json?
+  siteVisits         HomeSiteVisit[]
+  measurements       HomeMeasurement[]
+  designReviews      HomeDesignReview[]
+  stepDelays         HomeStepDelay[]
+
   @@map("home_projects")
 }
 
@@ -1702,6 +1737,20 @@ model HomeChecklistItem {
   /// clears it; the photo stays in the log (append-only).
   donePhotoId   String?              @unique
   donePhoto     HomeSiteLogPhoto?    @relation("ChecklistDonePhoto", fields: [donePhotoId], references: [id], onDelete: SetNull)
+
+  /// Studio OS Phase 2, design steps (modules/studio-design/template.ts):
+  /// who does it (DESIGNER | SALES | ACCOUNTS | PM | CLIENT), whether ticking
+  /// needs a file (filed in the locker, doneDocumentId), the payment stage
+  /// (index into paymentPhases) that must be recorded before it opens, and
+  /// its days after the previous step. doneNote is the team's sentence: it
+  /// never crosses to the customer.
+  responsible    String?
+  needsDocument  Boolean @default(false)
+  gatePayment    Int?
+  gapDays        Int?
+  doneNote       String? @db.Text
+  doneDocumentId String?
+  delays         HomeStepDelay[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2076,6 +2125,12 @@ model HomeDocument {
 
   /// Payments this document is the receipt for (Phase 5).
   receiptFor HomeProjectPayment[]
+
+  /// Studio OS Phase 2: a design drawing (LAYOUT_2D | FURNITURE | RENDER_3D |
+  /// WORKING | SITE_PHOTO) and the room it is for; the client's answers.
+  designKind String?
+  room       String?
+  reviews    HomeDesignReview[]
 
   createdAt DateTime  @default(now())
   /// Soft delete: a removed document stops showing and stays for the record.
@@ -3359,6 +3414,8 @@ enum LostReason {
   NO_RESPONSE
   NOT_SERIOUS
   POSTPONED
+  /// AxLeads (12 Oct 2026): the "Wrong number" call outcome offers it.
+  WRONG_NUMBER
   OTHER
 }
 
@@ -3471,6 +3528,10 @@ model StudioClient {
   /// The column it was in when booked, so a refunded booking goes back there.
   preBookingStageId    String?
 
+  /// Free tags a person puts on a lead (the AxLeads look, 12 Oct 2026):
+  /// at most 20, compared without case (studio-sales/tag-rules.ts).
+  tags String[] @default([])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -3478,6 +3539,7 @@ model StudioClient {
   projects StudioProject[]
   events   StudioClientEvent[]
   files    StudioClientFile[]
+  tasks    StudioTask[]
 
   /// Where this row went when somebody merged it into another.
   ///
@@ -3505,7 +3567,58 @@ model StudioClient {
   @@index([studioId, meetingAt])
   @@index([deletedAt])
   @@index([leadSourceId])
+  /// Leads at scale (12 Oct 2026, 20261012120000_studio_leads_scale): one
+  /// index per list sort and dashboard filter, so 30,000 leads stay quick.
+  @@index([studioId, createdAt])
+  @@index([studioId, nextActionOn])
+  @@index([studioId, lastContactedAt])
+  @@index([studioId, phone])
+  @@index([studioId, name])
+  @@index([studioId, assignedToId, nextActionOn])
+  @@index([studioId, bookedAt])
+  /// The AxLeads look (20261012160000_studio_leads_tags): "Last active" sort, and tags.
+  @@index([studioId, updatedAt])
+  @@index([tags], type: Gin)
+  @@index([stageId])
   @@map("studio_clients")
+}
+
+/// A to-do on the studio calendar (leads at scale, 12 Oct 2026): "Send the
+/// revised kitchen", "Call the builder's office". Somebody writes it, it is
+/// given to one person, it may hang off a lead, and it is ticked done.
+/// Nothing creates one by itself — the owner's rule: easy, not automatic.
+/// A salesperson sees and changes only the tasks given to them
+/// (studio-sales/task-rules.ts).
+model StudioTask {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  title String
+  /// When it is due. Always a time; the calendar places it there.
+  dueAt DateTime
+
+  /// The lead it is about, if any. Cascade: erasing a lead from the bin
+  /// takes its to-dos with it.
+  leadId String?
+  lead   StudioClient? @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  /// Whose it is. SetNull when they leave, so the task stays for the owner.
+  assignedToId String?
+  assignedTo   StudioMember? @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  doneAt DateTime?
+
+  createdById String?
+  createdBy   StudioMember? @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([studioId, dueAt])
+  @@index([studioId, assignedToId, dueAt])
+  @@index([leadId, dueAt])
+  @@index([createdById])
+  @@map("studio_tasks")
 }
 
 /// What a lead file is. The floor plan is what the salesperson waits for;
@@ -4597,4 +4710,105 @@ model StudioQuotePlan {
 
   @@index([studioId])
   @@map("studio_quote_plans")
+}
+
+// ── Studio OS Phase 2: design (docs/studio-os/PHASE-2-DESIGN.md) ─────────
+
+enum SiteVisitStatus {
+  BOOKED
+  DONE
+  CANCELLED
+}
+
+/// A site visit the designer books (measurement, a visit with the carpenter).
+/// The customer sees the day, time, what it is for and its status; `note`
+/// stays with the team.
+model HomeSiteVisit {
+  id        String          @id @default(cuid())
+  projectId String
+  project   HomeProject     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  at        DateTime
+  purpose   String
+  status    SiteVisitStatus @default(BOOKED)
+  /// Internal: NEVER crosses.
+  note      String?         @db.Text
+  byId      String
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([projectId, at])
+  @@map("home_site_visits")
+}
+
+/// One room's measurements, in millimetres (typed in feet). A simple list
+/// the designer keeps up to date; the customer sees it.
+model HomeMeasurement {
+  id          String      @id @default(cuid())
+  projectId   String
+  project     HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  room        String
+  lengthMm    Int?
+  widthMm     Int?
+  heightMm    Int?
+  note        String?
+  sortOrder   Int         @default(0)
+  updatedById String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([projectId, sortOrder])
+  @@map("home_measurements")
+}
+
+enum DesignVerdict {
+  APPROVED
+  CHANGES
+}
+
+/// The customer's answer to a shared drawing: approved, or changes asked
+/// with a comment. Append-only (project/append-only.ts): a new answer is a
+/// new row; the latest on the newest version is the drawing's state.
+model HomeDesignReview {
+  id         String        @id @default(cuid())
+  projectId  String
+  project    HomeProject   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documentId String
+  document   HomeDocument  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  verdict    DesignVerdict
+  comment    String?       @db.Text
+  byUserId   String
+  at         DateTime      @default(now())
+
+  @@index([projectId, at])
+  @@index([documentId])
+  @@map("home_design_reviews")
+}
+
+enum DelaySide {
+  CLIENT
+  STUDIO
+}
+
+/// A design step's planned day moved, and why (client side or studio side).
+/// Append-only: the step's `plannedOn` holds today's day, these rows the
+/// history. The customer sees the new day and the reason in plain words,
+/// never `note`.
+model HomeStepDelay {
+  id        String            @id @default(cuid())
+  projectId String
+  project   HomeProject       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stepId    String
+  step      HomeChecklistItem @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  fromDate  DateTime          @db.Date
+  toDate    DateTime          @db.Date
+  side      DelaySide
+  reason    String
+  /// Internal: NEVER crosses.
+  note      String?           @db.Text
+  byId      String
+  at        DateTime          @default(now())
+
+  @@index([projectId, at])
+  @@index([stepId])
+  @@map("home_step_delays")
 }

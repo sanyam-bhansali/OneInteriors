@@ -26,6 +26,7 @@ export const ROLE_NAMES: Record<StudioRoleName, string> = {
   SUPERVISOR: 'Site supervisor',
   ACCOUNTS: 'Accounts',
   SALES: 'Sales',
+  DESIGNER: 'Designer',
 };
 
 /** The one-line explanation on each role card, in the order the card list shows them. */
@@ -33,11 +34,12 @@ export const ROLE_LINES: Record<StudioRoleName, string> = {
   PM: 'Runs the plan, decisions and snags for the projects you pick. Sees no vendor rates and cannot change the team.',
   SUPERVISOR: 'Phone only. Posts the daily update, ticks the checklist and fixes snags on the sites you pick. Nothing else.',
   ACCOUNTS: 'Records payments and receipts across all projects, and the booking advance. Sees nothing else.',
-  SALES: 'Works the leads you give them: calls, floor plans, quotations, the sales final. Sees only their own leads.',
+  SALES: 'Works the leads you give them: calls, floor plans, quotations, the sales final. Sees their own leads and the pool, and claims leads from it; never a colleague’s.',
+  DESIGNER: 'Runs the design of the projects you make them the designer on: steps, drawings, mood board, site visits. Sees no money.',
   OWNER: 'Everything, including the team, prices and margins.',
 };
 
-export const ROLE_ORDER: readonly StudioRoleName[] = ['SALES', 'PM', 'SUPERVISOR', 'ACCOUNTS', 'OWNER'];
+export const ROLE_ORDER: readonly StudioRoleName[] = ['SALES', 'DESIGNER', 'PM', 'SUPERVISOR', 'ACCOUNTS', 'OWNER'];
 
 const ACTION_LABELS: Record<StudioAction, string> = {
   'team.manage': 'Add and remove people',
@@ -63,11 +65,16 @@ const ACTION_LABELS: Record<StudioAction, string> = {
   'lead.delete': 'Delete leads',
   'lead.import': 'Import a list of leads',
   'lead.pool': 'See leads nobody has',
+  'lead.claim': 'Claim a lead from the pool',
   'quote.write': 'Write and send quotations',
   'quote.salesFinal': 'Mark the sales final',
   'booking.record': 'Record the booking advance',
   'booking.refund': 'Refund a booking',
   'payments.template': 'Set the payment stages',
+  'design.work': 'Design steps, drawings and site visits',
+  'design.assign': 'Pick the designer, close the design',
+  'design.template': 'Set the design steps',
+  'design.workload': "See designers' workload",
 };
 
 /**

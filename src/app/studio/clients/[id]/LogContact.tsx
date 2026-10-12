@@ -7,7 +7,8 @@ import {
   ago,
   type CallOutcomeId,
 } from '@/modules/studio-practice/event-copy';
-import { logContactAction } from '../actions';
+import { logContactAction, markLostAction } from '../actions';
+import { CallWhen, callWhen, type CallWhenValue } from '../../CallWhen';
 
 /**
  * "I have just spoken to them."
@@ -43,18 +44,65 @@ export function LogContact({
   const [note, setNote] = useState('');
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  /* AxLeads (12 Oct 2026): the person may choose when to call next instead
+     of the outcome's own time; and after "Wrong number", mark it lost. */
+  const [when, setWhen] = useState<CallWhenValue | null>(null);
+  const [askLost, setAskLost] = useState(false);
 
   function log(outcome: CallOutcomeId) {
     setError(null);
     start(async () => {
-      const result = await logContactAction(clientId, outcome, note.trim() || null);
+      const result = await logContactAction(clientId, outcome, note.trim() || null, when ? { day: when.day, time: when.time } : null);
       if ('error' in result) {
         setError(result.error);
       } else {
         setNote('');
+        setWhen(null);
+        if (outcome === 'wrong_number') setAskLost(true);
+        else setOpen(false);
+      }
+    });
+  }
+
+  function markLost() {
+    setError(null);
+    start(async () => {
+      const result = await markLostAction(clientId, 'WRONG_NUMBER');
+      if ('error' in result) setError(result.error);
+      else {
+        setAskLost(false);
         setOpen(false);
       }
     });
+  }
+
+  if (askLost) {
+    return (
+      <div className="rounded-[12px] border border-[var(--s-rule)] px-4 py-3.5 text-[14px]">
+        <p className="m-0 font-medium">Logged: wrong number. Mark this lead lost — wrong number?</p>
+        <p className="m-0 mt-1 text-[13px] text-[var(--s-ink-2)]">Only if there is no other way to reach them. You can move it back any time.</p>
+        <div className="mt-3 flex gap-2">
+          <button type="button" disabled={pending} onClick={markLost} className="s-btn">
+            {pending ? 'Marking…' : 'Mark lost — wrong number'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAskLost(false);
+              setOpen(false);
+            }}
+            className="rounded-full border border-[var(--s-rule)] px-3 py-1.5 text-[13px]"
+          >
+            Keep it open
+          </button>
+        </div>
+        {error ? (
+          <p role="alert" className="m-0 mt-3 text-[13px] text-[var(--s-bad)]">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    );
   }
 
   if (!open) {
@@ -128,9 +176,25 @@ export function LogContact({
       {/* Said once, in words, rather than only in a tooltip nobody hovers on
           a phone. */}
       <p className="m-0 mt-2.5 text-[12px] leading-relaxed text-[var(--s-ink-3)]">
-        Whichever you pick sets what to do next and when — except &ldquo;Not
-        interested&rdquo;, which clears the follow-up rather than inventing one.
+        Whichever you pick sets what to do next and when — Busy tries again in two hours, Switched off
+        tomorrow afternoon, Voicemail at 4 pm — except &ldquo;Not interested&rdquo; and &ldquo;Wrong
+        number&rdquo;, which clear the follow-up rather than inventing one.
       </p>
+
+      <div className="mt-3">
+        {when ? (
+          <>
+            <CallWhen value={when} onChange={setWhen} label="Call next (instead of the outcome's time)" />
+            <button type="button" onClick={() => setWhen(null)} className="mt-1.5 text-[12.5px] text-[var(--s-ink-2)] underline">
+              Use the outcome&rsquo;s time
+            </button>
+          </>
+        ) : (
+          <button type="button" onClick={() => setWhen(callWhen('tomorrow'))} className="text-[12.5px] text-[var(--s-accent)] underline">
+            Choose when to call next
+          </button>
+        )}
+      </div>
 
       {error ? (
         <p role="alert" className="m-0 mt-3 text-[13px] text-[var(--s-bad)]">

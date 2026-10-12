@@ -11,6 +11,7 @@ import 'server-only';
 
 import { DEMO_LEAD, LISTED, LIVE } from './demo-lead';
 import { prisma } from '@/lib/prisma';
+import type { Prisma } from '@prisma/client';
 import { fromDb, type Paise } from '@/lib/money';
 import { myStudioId } from '@/modules/studio-quote/store';
 import { myLeadScope } from '@/modules/studio/lead-scope';
@@ -32,9 +33,10 @@ export { parseCsv, guessMapping, planImport, COLUMN_LABELS } from './csv';
 export { SOURCE_LABELS, LOST_LABELS, BOARD_KINDS, CLOSED_KINDS, BIN_DAYS } from './vocabulary';
 export type { ClientSourceName, LostReasonName, StageKindName } from './vocabulary';
 
-import { BOARD_KINDS, BIN_DAYS } from './vocabulary';
+import { BOARD_KINDS, BIN_DAYS, LOST_LABELS as LOST_LABELS_FOR_CHECK } from './vocabulary';
 import type { ClientSourceName, LostReasonName, StageKindName } from './vocabulary';
 import { record, recordMany } from './events';
+import { istDay } from '@/modules/project/working-days';
 import { displayName } from './team';
 import {
   assignedSummary,
@@ -77,6 +79,8 @@ export interface ClientRow {
   /** Whatever the studio defined in Settings → Fields, keyed by the field key. */
   fields: FieldValues;
   updatedAt: Date;
+  /** When it came in (the list's "Added" column, and its newest-first page). */
+  createdAt: Date;
   /** The sample we put on an empty board. Listed, never counted — demo-lead.ts. */
   isDemo: boolean;
   /** Studio OS Phase 1: what they said they would spend. */
@@ -128,19 +132,55 @@ export async function myClients(): Promise<ClientRow[]> {
        owner. */
     if (scope?.seesAll) await seedDemoLead(studioId);
 
+    // `LISTED`, not `LIVE`: the board shows the sample, the counts do not.
+    // `deletedAt: null` on every read of this table, without exception.
+    // A deleted client reappearing on the board is worse than one that
+    // never deleted — see the note on the column in schema.prisma.
+    return await clientRows(
+      studioId,
+      { ...scope?.leads, studioId, ...LISTED },
+      [{ nextActionOn: { sort: 'asc', nulls: 'last' } }, { updatedAt: 'desc' }],
+      400,
+    );
+  } catch (error) {
+    console.error('[studio-practice] myClients failed', error);
+    return [];
+  }
+}
+
+/**
+ * Put the sample on an empty board (once, ever) — for the board read in
+ * `studio-sales/leads-list.ts`, which pages the board in SQL.
+ */
+export async function seedSampleIfEmpty(): Promise<void> {
+  const scope = await myLeadScope();
+  if (scope?.seesAll) await seedDemoLead(scope.studioId);
+}
+
+/**
+ * Board / list rows for a `where` the caller has already scoped (leads at
+ * scale: `studio-sales/leads-list.ts` passes its filters and page). The
+ * studio id is required again so the quoted totals are read under the same
+ * tenant.
+ */
+export async function clientRows(
+  studioId: string,
+  where: Prisma.StudioClientWhereInput,
+  orderBy: Prisma.StudioClientOrderByWithRelationInput[],
+  take: number,
+  skip = 0,
+): Promise<ClientRow[]> {
+  {
     const rows = await prisma.studioClient.findMany({
-      // `LISTED`, not `LIVE`: the board shows the sample, the counts do not.
-      // `deletedAt: null` on every read of this table, without exception.
-      // A deleted client reappearing on the board is worse than one that
-      // never deleted — see the note on the column in schema.prisma.
-      where: { ...scope?.leads, studioId, ...LISTED },
-      orderBy: [{ nextActionOn: { sort: 'asc', nulls: 'last' } }, { updatedAt: 'desc' }],
+      where: { AND: [where, { studioId, deletedAt: null }] },
+      orderBy,
       include: {
         stage: { select: { id: true, name: true, kind: true, colour: true } },
         assignedTo: { select: { id: true, user: { select: { name: true, email: true } } } },
         leadSource: { select: { name: true } },
       },
-      take: 400,
+      take: Math.min(Math.max(1, take), 400),
+      skip: Math.max(0, skip),
     });
 
     /**
@@ -194,12 +234,10 @@ export async function myClients(): Promise<ClientRow[]> {
         lastContactedAt: row.lastContactedAt,
         fields: readValues(row.fields),
         updatedAt: row.updatedAt,
+        createdAt: row.createdAt,
         ...salesColumns(row),
       };
     });
-  } catch (error) {
-    console.error('[studio-practice] myClients failed', error);
-    return [];
   }
 }
 
@@ -611,6 +649,19 @@ export async function updateClient(input: UpdateClientInput): Promise<Result> {
   }
 }
 
+/**
+ * Mark one lead lost, with a reason, into the studio's first lost column
+ * (AxLeads, 12 Oct 2026: the "Wrong number" outcome offers it). The same
+ * path as moving the card, so the timeline line and the cleared follow-up
+ * are the same.
+ */
+export async function markLost(id: string, reason: string): Promise<Result> {
+  if (!Object.prototype.hasOwnProperty.call(LOST_LABELS_FOR_CHECK, reason)) return { ok: false, error: 'Pick a reason.' };
+  const lost = (await myStages()).find((s) => s.kind === 'LOST');
+  if (!lost) return { ok: false, error: 'Your pipeline has no lost column. Settings → Pipeline.' };
+  return updateClient({ id, stageId: lost.id, lostReason: reason as LostReasonName });
+}
+
 /** Who is waiting on this studio today. For the dashboard. */
 export async function clientsDueCount(): Promise<number> {
   const studioId = await myStudioId();
@@ -748,6 +799,8 @@ export async function logContact(
    */
   outcome?: CallOutcomeId,
   note?: string | null,
+  /** When to call next, if the person chose (leads at scale, AxLeads). */
+  dueAt?: Date | null,
 ): Promise<Result> {
   const scope = await myLeadScope();
   const studioId = scope?.studioId ?? null;
@@ -772,7 +825,10 @@ export async function logContact(
      */
     const implied = outcome ? OUTCOME_FOLLOWUP[outcome] : null;
     const followup = implied && implied !== 'clear' ? implied : null;
-    const due = outcome ? followupDue(outcome, now) : null;
+    /* The person may pick the time instead (AxLeads: Later today / Tomorrow /
+       a date and time) — only when the outcome sets a follow-up at all, and
+       never in the past. */
+    const due = outcome ? (followup && dueAt && dueAt.getTime() > now.getTime() ? dueAt : followupDue(outcome, now)) : null;
 
     const { count } = await prisma.studioClient.updateMany({
       where: { ...scope?.leads, id, studioId, deletedAt: null },
@@ -821,18 +877,16 @@ export async function logContact(
  * A date on a task nobody has to decode. Within the week the weekday is what
  * people actually plan by; beyond it, the date is.
  */
-function dueWord(due: Date, now: Date): string {
-  const days = Math.round((due.getTime() - startOfDay(now).getTime()) / 86_400_000);
+/**
+ * "today", "tomorrow", a weekday or a date, counted in India calendar days:
+ * a call two hours away is today, not tomorrow, on a server that runs in UTC.
+ */
+export function dueWord(due: Date, now: Date): string {
+  const days = Math.round((Date.parse(`${istDay(due)}T00:00:00Z`) - Date.parse(`${istDay(now)}T00:00:00Z`)) / 86_400_000);
   if (days <= 0) return 'today';
   if (days === 1) return 'tomorrow';
-  if (days < 7) return due.toLocaleDateString('en-IN', { weekday: 'long' });
-  return due.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-}
-
-function startOfDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
+  if (days < 7) return due.toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' });
+  return due.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
 }
 
 /**
@@ -1014,6 +1068,31 @@ export async function myBin(): Promise<BinnedRow[]> {
 
 // ── Import, and search ─────────────────────────────────────────
 
+/**
+ * The import's dry run (leads at scale): how many of these phone numbers
+ * are already on the studio's list, bin included — the same rule the write
+ * uses. Read a thousand at a time; nothing is written.
+ */
+export async function countExistingPhones(phones: string[]): Promise<number> {
+  const studioId = await myStudioId();
+  if (!studioId) return 0;
+  const unique = [...new Set(phones.filter((p) => typeof p === 'string' && /^\d{10}$/.test(p)))].slice(0, 60_000);
+  let found = 0;
+  try {
+    for (let i = 0; i < unique.length; i += 1000) {
+      const rows = await prisma.studioClient.findMany({
+        where: { studioId, phone: { in: unique.slice(i, i + 1000) } },
+        select: { phone: true },
+        distinct: ['phone'],
+      });
+      found += rows.length;
+    }
+  } catch (error) {
+    console.error('[studio-practice] countExistingPhones failed', error);
+  }
+  return found;
+}
+
 export interface ImportResult {
   ok: true;
   written: number;
@@ -1064,67 +1143,62 @@ export async function importClients(
   try {
     // Deleted rows count as present. Importing a list that re-creates somebody
     // the studio deleted last week would undo that decision without saying so.
-    const phones = rows.map((r) => r.phone).filter((p): p is string => p !== null);
-    const existing =
-      phones.length > 0
-        ? await prisma.studioClient.findMany({
-            where: { studioId, phone: { in: phones } },
-            select: { phone: true },
-          })
-        : [];
+    // Read in batches of a thousand numbers (leads at scale): a 26,000-row
+    // file arrives as many calls, and one `IN` of thousands is slow.
+    const phones = [...new Set(rows.map((r) => r.phone).filter((p): p is string => p !== null))];
+    const here = new Set<string>();
+    for (let i = 0; i < phones.length; i += 1000) {
+      const batch = phones.slice(i, i + 1000);
+      const existing = await prisma.studioClient.findMany({
+        where: { studioId, phone: { in: batch } },
+        select: { phone: true },
+      });
+      for (const e of existing) if (e.phone) here.add(e.phone);
+    }
 
-    const here = new Set(existing.map((e) => e.phone));
     const fresh = rows.filter((r) => !r.phone || !here.has(r.phone));
 
     if (fresh.length === 0) {
       return { ok: true, written: 0, alreadyHere: rows.length };
     }
 
-    /* Stamped before the write, so the read-back that gives each imported
-       row its first timeline line can find exactly this batch. A second
-       earlier than the createMany, which is the safe direction: catching a
-       row from an overlapping import would give it a duplicate CREATED line,
-       and missing one would give it none. */
-    const startedAt = new Date();
     const fields = await myFields();
     const ownSource = leadSourceId
       ? await prisma.studioLeadSource.findFirst({ where: { id: leadSourceId, studioId }, select: { id: true } })
       : null;
 
-    const result = await prisma.studioClient.createMany({
-      data: fresh.map((r) => ({
-        studioId,
-        stageId,
-        name: r.name,
-        phone: r.phone,
-        email: r.email,
-        society: r.society,
-        locality: r.locality,
-        config: r.config,
-        notes: r.notes,
-        source: ownSource ? 'OTHER' : source === 'ONE_INTERIORS' ? 'OTHER' : source,
-        leadSourceId: ownSource?.id ?? null,
-        sourceNote: IMPORT_NOTE,
-        // The studio's own fields, where a column was mapped to one; a value that
-        // does not fit its field (a word in a number) is left out, not guessed.
-        fields: r.custom ? cleanValues(fields, r.custom).values : {},
-        // Unassigned on purpose. See the note above.
-        assignedToId: null,
-      })),
-      skipDuplicates: true,
-    });
-
-    /* `createMany` does not return ids, so the rows have to be read back to
-       give each one its own first line. Bounded by the same batch that was
-       just written, and worth the query: an imported lead with a blank
-       history looks like a lead nobody ever did anything about. */
-    if (result.count > 0) {
-      const written = await prisma.studioClient.findMany({
-        where: { studioId, sourceNote: IMPORT_NOTE, createdAt: { gte: startedAt } },
+    /* Written 500 at a time, each batch handing back its ids so every
+       imported lead gets its first timeline line — an imported lead with a
+       blank history looks like a lead nobody ever did anything about. */
+    let written = 0;
+    for (let i = 0; i < fresh.length; i += 500) {
+      const batch = fresh.slice(i, i + 500);
+      const made = await prisma.studioClient.createManyAndReturn({
+        data: batch.map((r) => ({
+          studioId,
+          stageId,
+          name: r.name,
+          phone: r.phone,
+          email: r.email,
+          society: r.society,
+          locality: r.locality,
+          config: r.config,
+          notes: r.notes,
+          source: ownSource ? 'OTHER' : source === 'ONE_INTERIORS' ? 'OTHER' : source,
+          leadSourceId: ownSource?.id ?? null,
+          sourceNote: IMPORT_NOTE,
+          // The studio's own fields, where a column was mapped to one; a value that
+          // does not fit its field (a word in a number) is left out, not guessed.
+          fields: r.custom ? cleanValues(fields, r.custom).values : {},
+          // Unassigned on purpose. See the note above.
+          assignedToId: null,
+        })),
+        skipDuplicates: true,
         select: { id: true },
       });
+      written += made.length;
       await recordMany(
-        written.map((w) => ({
+        made.map((w) => ({
           studioId,
           clientId: w.id,
           kind: 'CREATED' as const,
@@ -1133,7 +1207,7 @@ export async function importClients(
       );
     }
 
-    return { ok: true, written: result.count, alreadyHere: rows.length - result.count };
+    return { ok: true, written, alreadyHere: rows.length - written };
   } catch (error) {
     return saveFailed('importClients', error);
   }
@@ -1221,6 +1295,7 @@ export async function clientById(id: string): Promise<ClientRow | null> {
       lastContactedAt: row.lastContactedAt,
       fields: readValues(row.fields),
       updatedAt: row.updatedAt,
+      createdAt: row.createdAt,
       ...salesColumns(row),
     };
   } catch (error) {

@@ -110,7 +110,7 @@ export async function teamView(now = new Date()): Promise<TeamView | null> {
 
   const sites = projects.map((p) => ({ id: p.id, label: siteLabel(p.introduction.brief) }));
   const labels = new Map(sites.map((s) => [s.id, s.label]));
-  const order: Record<StudioRoleName, number> = { OWNER: 0, PM: 1, SALES: 2, SUPERVISOR: 3, ACCOUNTS: 4 };
+  const order: Record<StudioRoleName, number> = { OWNER: 0, PM: 1, SALES: 2, DESIGNER: 3, SUPERVISOR: 4, ACCOUNTS: 5 };
 
   const people = members
     .map((m) => ({

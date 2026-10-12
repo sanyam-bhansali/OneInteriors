@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { importClients } from '@/modules/studio-practice/clients';
+import { countExistingPhones, importClients } from '@/modules/studio-practice/clients';
 import { parseCsv, planImport, type ColumnKey } from '@/modules/studio-practice/csv';
 import { setFormActive } from '@/modules/studio-practice/capture';
 import { isCustomColumn } from '@/modules/studio-sales/intake-rules';
@@ -112,4 +112,14 @@ export async function setFormActiveAction(active: boolean): Promise<{ ok: boolea
   const result = await setFormActive(active);
   if (result.ok) revalidatePath('/studio/clients/import');
   return result;
+}
+
+/**
+ * The dry run (leads at scale): how many of the file's numbers are already
+ * on your list. Read only; owner and PM (the module finds no studio for
+ * anyone else). Sent in pieces of up to 5,000 numbers.
+ */
+export async function importCheckAction(phones: string[]): Promise<{ already: number }> {
+  if (!Array.isArray(phones)) return { already: 0 };
+  return { already: await countExistingPhones(phones.slice(0, 5000).filter((p) => typeof p === 'string')) };
 }

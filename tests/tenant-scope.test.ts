@@ -75,6 +75,7 @@ const ANCHORS = [
   'briefId',
   'member.id',
   'ownedQuote(',
+  'writableQuote(', // quotes.ts: ownedQuote plus the live-project check
   'myStudioId(',
   'currentStudio(',
   'myMembership(',

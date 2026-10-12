@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { PageHead, PageBody } from '../../StudioShell';
+import { PageBody } from '../../StudioShell';
 import { timelineFor } from '@/modules/studio-practice/events';
 import { marketplaceContextFor } from '@/modules/studio-practice/marketplace-context';
 import { duplicatesOf } from '@/modules/studio-practice/merge';
@@ -11,13 +10,22 @@ import { can } from '@/modules/studio/roles';
 import { leadPage } from '@/modules/studio-sales/leads';
 import { bookingDraft } from '@/modules/studio-sales/booking';
 import { telLink, whatsappLink } from '@/modules/studio-sales/lead-rules';
+import { myStages } from '@/modules/studio-practice/stages';
+import { myFields } from '@/modules/studio-practice/fields';
+import { SOURCE_LABELS } from '@/modules/studio-practice/vocabulary';
+import { leadTags, studioTags } from '@/modules/studio-sales/lead-extras';
+import { taskPeople, tasksForLead } from '@/modules/studio-sales/tasks';
 import { Timeline } from './Timeline';
 import { BriefPanel } from './BriefPanel';
 import { Duplicates } from './Duplicates';
 import { LogContact } from './LogContact';
 import { FinalQuote } from './FinalQuote';
 import { IntroAnswer } from './IntroAnswer';
-import { AssignBox, BookingBox, ContactBar, Details, FilesBox, MeetingBox, NextStepButton, NoteBox, QuotesBox } from './SalesPanels';
+import { AssignBox, BookingBox, Details, FilesBox, MeetingBox, NextStepButton, QuotesBox } from './SalesPanels';
+import { LeadTasks } from './LeadTasks';
+import { NextCall } from './NextCall';
+import { Attribution, FollowUpPanel, LeadHeader, LeadTabs, NotesPanel, TagsPanel } from './AxLead';
+import { CustomFieldsPanel } from './CustomFieldsPanel';
 
 export const metadata: Metadata = {
   title: 'Lead',
@@ -27,14 +35,20 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 /**
- * One lead, and everything that has happened to it — the place the
- * salesperson lives (Studio OS Phase 1, docs/studio-os/PHASE-1-SALES.md §2).
+ * One lead, laid out as AxLeads' lead page is (12 Oct 2026), around the
+ * Studio OS Phase 1 sales flow.
  *
- * The header says who it is, how to reach them (tap to call; "Open
- * WhatsApp" opens the salesperson's own WhatsApp — we send nothing) and the
- * one next step. Below: the call log and a note, the floor plan and files,
- * the quotations with their revisions and sales final, the booking, and the
- * history. The facts and the meeting sit beside it.
+ * The header: the source chip and tags; WhatsApp (opens the person's own
+ * WhatsApp — we send nothing), Log call, Note, Tag, + Action (schedule a
+ * call, send a quotation, schedule a site visit); the name and phone; the
+ * stage dropdown and the owner; Converted (the booking, when a sales final
+ * waits for it) and delete (owner and PM).
+ *
+ * Left: tabs — the Timeline (with the call log), Floor plan & quotations
+ * (files, quotations with their revisions and sales final, the booking:
+ * Phase 1's panels, unchanged), Tasks — then the internal notes. Right: the
+ * lead's details and the studio's own fields, the follow-up, tags,
+ * attribution, the meeting, who has it.
  *
  * Opens for anyone who may see this lead: owner and PM, any lead; a
  * salesperson, their own (studio/lead-scope.ts). Anyone else gets a 404.
@@ -48,95 +62,121 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   const member = await currentMember();
   const seesAll = page.may.assign;
 
-  const [events, brief, dupes, intro, draft] = await Promise.all([
+  const [events, brief, dupes, intro, draft, tasks, taskWho, stages, fields, tags, vocab] = await Promise.all([
     timelineFor(id),
     client.fromMarketplace ? marketplaceContextFor(id) : Promise.resolve(null),
     seesAll ? duplicatesOf(id) : Promise.resolve([]),
     client.fromMarketplace ? introStateForClient(id) : Promise.resolve(null),
     page.bookableQuoteId && page.may.book ? bookingDraft(member, page.bookableQuoteId) : Promise.resolve(null),
+    tasksForLead(id),
+    taskPeople(),
+    myStages(),
+    myFields(),
+    leadTags(id),
+    studioTags(),
   ]);
 
   const tel = telLink(client.phone);
   const fromOneInteriors = client.source === 'ONE_INTERIORS' || client.fromMarketplace;
   const seesProject = member !== null && can(member, 'project.read', { assigned: true });
+  const sourceText = client.leadSourceName ?? SOURCE_LABELS[client.source];
+  const sourceKey = client.leadSourceId ? 'OTHER' : client.source;
+  const notes = events.filter((e) => e.kind === 'NOTE').map((e) => ({ id: e.id, text: e.summary, by: e.byName, byId: e.byId ?? null, at: e.createdAt }));
+  const mayDelete = member !== null && can(member, 'lead.delete') && !client.isDemo;
+  const mayWork = page.may.edit && !client.isDemo;
+  const openTasks = tasks.filter((t) => !t.doneAt).length;
 
   return (
-    <>
-      <PageHead
-        title={client.name}
-        sub={
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="rounded-full px-2 py-px text-[12px] font-medium" style={{ background: 'var(--s-rail-active)' }}>
-              {client.stageName}
-            </span>
-            {client.isDemo ? <span className="s-tag s-tag-demo">Sample</span> : null}
-            {client.phone ? <span className="s-num">{client.phone}</span> : <span>No phone yet</span>}
-          </span>
-        }
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-            <Link href="/studio/clients" className="s-btn-ghost no-underline">
-              Back to the board
-            </Link>
-            <NextStepButton
-              step={page.next}
-              clientId={client.id}
-              phone={tel}
-              quoteId={page.nextQuoteId}
-              projectId={seesProject ? (page.booking?.projectId ?? null) : null}
-              mayBook={page.may.book}
-            />
-          </div>
-        }
-      />
+    <PageBody>
+      <div className="mx-auto flex max-w-[1100px] flex-col gap-4">
+        <LeadHeader
+          lead={{
+            id: client.id,
+            name: client.name,
+            phone: client.phone,
+            email: client.email,
+            society: client.society,
+            locality: client.locality,
+            city: null,
+            source: sourceKey,
+            sourceLabel: sourceText,
+            stageId: client.stageId,
+            stageName: client.stageName,
+            stageColour: client.stageColour,
+            ownerName: client.assignedToName,
+            tags,
+            booked: client.bookedIntroductionId !== null,
+          }}
+          tel={tel}
+          whatsapp={whatsappLink(client.phone)}
+          stages={stages.map((s) => ({ id: s.id, name: s.name, colour: s.colour, kind: s.kind }))}
+          may={{ edit: mayWork, quote: page.may.quote, delete: mayDelete }}
+          canBook={page.may.book && page.bookableQuoteId !== null}
+        />
+        {client.isDemo ? <p className="m-0 text-[13px] text-[var(--s-ink-3)]">This is the sample lead. Try anything on it; it is never counted.</p> : null}
 
-      <PageBody>
-        <div className="mb-5">
-          <ContactBar
-            tel={tel}
-            whatsapp={whatsappLink(client.phone)}
-            budget={page.budgetText}
-            meeting={page.meetingText}
-            source={page.sourceText}
-            owner={client.assignedToName}
+        {/* Phase 1's next step stays one tap away. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <NextStepButton
+            step={page.next}
+            clientId={client.id}
+            phone={tel}
+            quoteId={page.nextQuoteId}
+            projectId={seesProject ? (page.booking?.projectId ?? null) : null}
+            mayBook={page.may.book}
           />
+          <span className="text-[12.5px] text-[var(--s-ink-3)]">{[page.budgetText, page.meetingText].filter(Boolean).join(' · ')}</span>
         </div>
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
-          <div className="order-2 flex min-w-0 flex-col gap-5 lg:order-1">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="flex min-w-0 flex-col gap-4">
             {dupes.length > 0 ? <Duplicates clientId={client.id} clientName={client.name} candidates={dupes} /> : null}
             {intro ? <IntroAnswer state={intro} /> : null}
             {brief ? <BriefPanel ctx={brief} /> : null}
             {client.fromMarketplace && page.may.quote ? <FinalQuote clientId={client.id} /> : null}
 
-            {page.may.edit ? (
-              <div id="contact" className="scroll-mt-20">
-                <LogContact clientId={client.id} lastContactedAt={client.lastContactedAt} />
-              </div>
-            ) : null}
-            {page.may.edit ? <NoteBox clientId={client.id} /> : null}
-
-            <FilesBox clientId={client.id} files={page.files} may={page.may.edit} mayReadRooms={page.may.readRooms} />
-            <QuotesBox clientId={client.id} quotes={page.quotes} mayQuote={page.may.quote} fromOneInteriors={fromOneInteriors} />
-            <BookingBox
-              clientId={client.id}
-              booking={page.booking}
-              draft={draft}
-              mayRefund={page.may.refund}
-              isOwner={member?.role === 'OWNER'}
-              seesProject={seesProject}
+            <LeadTabs
+              tabs={[
+                {
+                  key: 'timeline',
+                  label: 'Timeline',
+                  content: (
+                    <div className="flex flex-col gap-4">
+                      {page.may.edit ? (
+                        <div id="contact" className="scroll-mt-20">
+                          <LogContact clientId={client.id} lastContactedAt={client.lastContactedAt} />
+                        </div>
+                      ) : null}
+                      <Timeline rows={events} />
+                    </div>
+                  ),
+                },
+                {
+                  key: 'sales',
+                  label: 'Floor plan & quotations',
+                  content: (
+                    <div className="flex flex-col gap-4">
+                      <FilesBox clientId={client.id} files={page.files} may={page.may.edit} mayReadRooms={page.may.readRooms} />
+                      <QuotesBox clientId={client.id} quotes={page.quotes} mayQuote={page.may.quote} fromOneInteriors={fromOneInteriors} />
+                      <BookingBox clientId={client.id} booking={page.booking} draft={draft} mayRefund={page.may.refund} isOwner={member?.role === 'OWNER'} seesProject={seesProject} />
+                    </div>
+                  ),
+                },
+                {
+                  key: 'tasks',
+                  label: openTasks ? `Tasks (${openTasks})` : 'Tasks',
+                  content: <LeadTasks leadId={client.id} tasks={tasks} people={taskWho} seesAll={seesAll} meId={member?.id ?? null} may={page.may.edit} />,
+                },
+              ]}
             />
 
-            <div>
-              <h2 className="m-0 mb-4 text-[15.5px] font-semibold">History</h2>
-              <Timeline rows={events} />
-            </div>
+            <NotesPanel leadId={client.id} notes={notes} meId={member?.id ?? null} seesAll={seesAll} may={mayWork} />
           </div>
 
-          <aside className="order-1 flex flex-col gap-5 lg:order-2">
+          <aside className="flex flex-col gap-4">
             <Details
               clientId={client.id}
-              may={page.may.edit && !client.isDemo}
+              may={mayWork}
               fromOneInteriors={client.source === 'ONE_INTERIORS'}
               sources={page.sources}
               v={{
@@ -152,7 +192,19 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
                 locality: client.locality,
               }}
             />
-            <MeetingBox clientId={client.id} at={client.meetingAt ? client.meetingAt.toISOString() : null} note={client.meetingNote} may={page.may.edit} />
+            <CustomFieldsPanel
+              leadId={client.id}
+              fields={fields.map((f) => ({ key: f.key, label: f.label, type: f.type, options: f.options }))}
+              values={Object.fromEntries(Object.entries(client.fields).map(([k, v]) => [k, String(v ?? '')]))}
+              may={mayWork}
+            />
+            <FollowUpPanel leadId={client.id} action={client.nextAction} on={client.nextActionOn} createdAt={client.createdAt} may={mayWork} />
+            <NextCall leadId={client.id} action={client.nextAction} on={client.nextActionOn} may={mayWork} />
+            <TagsPanel leadId={client.id} tags={tags} vocab={vocab} may={mayWork} />
+            <Attribution source={sourceKey} sourceLabel={sourceText} note={client.sourceNote} />
+            <div id="meeting" className="scroll-mt-20">
+              <MeetingBox clientId={client.id} at={client.meetingAt ? client.meetingAt.toISOString() : null} note={client.meetingNote} may={page.may.edit} />
+            </div>
             {page.may.assign && page.members.length > 0 ? <AssignBox clientId={client.id} assignedToId={client.assignedToId} members={page.members} /> : null}
             {client.notes ? (
               <section className="rounded-[12px] border border-[var(--s-rule)] px-4 py-3.5">
@@ -162,7 +214,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             ) : null}
           </aside>
         </div>
-      </PageBody>
-    </>
+      </div>
+    </PageBody>
   );
 }
