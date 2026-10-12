@@ -54,11 +54,11 @@ describe('what the studio is told', () => {
 
   it('hedges a rate card built from too few quotations', () => {
     const message = studioMessage(
-      summary({ state: 'FILED', quotationCount: 30 }),
+      summary({ state: 'FILED', quotationCount: MIN_QUOTATIONS_FOR_RATES - 3 }),
       MIN_QUOTATIONS_FOR_RATES,
     );
     expect(message).toContain('starting point');
-    expect(message).toContain('30');
+    expect(message).toContain(String(MIN_QUOTATIONS_FOR_RATES - 3));
   });
 
   it('does not hedge one built from enough', () => {

@@ -61,9 +61,9 @@ export const HOME_DICT = {
   // ── what we do ──
   'ov.label': { en: 'What we do', hi: 'हम क्या करते हैं', mr: 'आम्ही काय करतो' },
   'ov.text': {
-    en: 'We check Pune’s interior studios fifteen ways, read fifty of each one’s own quotations, and turn your brief into quotes you can compare line by line — before you ring anyone.',
-    hi: 'हम पुणे के इंटीरियर स्टूडियो को पंद्रह तरह से जाँचते हैं, हर एक के अपने पचास कोटेशन पढ़ते हैं, और आपके ब्रीफ़ को ऐसे कोटेशन में बदलते हैं जिन्हें आप लाइन-दर-लाइन मिला सकें — किसी को फ़ोन करने से पहले।',
-    mr: 'आम्ही पुण्यातले इंटिरियर स्टुडिओ पंधरा प्रकारे तपासतो, प्रत्येकाची स्वतःची पन्नास कोटेशन्स वाचतो, आणि तुमच्या ब्रीफचे रूपांतर अशा कोटेशन्समध्ये करतो ज्यांची तुम्ही ओळीनुसार तुलना करू शकता — कोणालाही फोन करण्याआधी.',
+    en: 'We check Pune’s interior studios fifteen ways, read at least twenty-five of each one’s own quotations, and turn your brief into quotes you can compare line by line — before you ring anyone.',
+    hi: 'हम पुणे के इंटीरियर स्टूडियो को पंद्रह तरह से जाँचते हैं, हर एक के अपने कम से कम पच्चीस कोटेशन पढ़ते हैं, और आपके ब्रीफ़ को ऐसे कोटेशन में बदलते हैं जिन्हें आप लाइन-दर-लाइन मिला सकें — किसी को फ़ोन करने से पहले।',
+    mr: 'आम्ही पुण्यातले इंटिरियर स्टुडिओ पंधरा प्रकारे तपासतो, प्रत्येकाची स्वतःची किमान पंचवीस कोटेशन्स वाचतो, आणि तुमच्या ब्रीफचे रूपांतर अशा कोटेशन्समध्ये करतो ज्यांची तुम्ही ओळीनुसार तुलना करू शकता — कोणालाही फोन करण्याआधी.',
   },
 
   // ── live price ──
@@ -475,9 +475,9 @@ export const HOME_DICT = {
   },
   'faq.seconds.q': { en: 'How can a quote be ready in seconds?', hi: 'कोटेशन सेकंडों में कैसे तैयार हो सकता है?', mr: 'कोटेशन काही सेकंदांत कसे तयार होऊ शकते?' },
   'faq.seconds.a': {
-    en: 'No studio is phoned. Every listed studio’s rates are read from at least fifty of its own past quotations. Our system applies them to your brief and writes the quote line by line — their pricing, not our estimate. The studio confirms or revises it after a site visit.',
-    hi: 'किसी स्टूडियो को फ़ोन नहीं किया जाता। हर लिस्टेड स्टूडियो के रेट उसके अपने कम से कम पचास पुराने कोटेशन से लिए जाते हैं। हमारा सिस्टम उन्हें आपके ब्रीफ़ पर लगाकर लाइन-दर-लाइन कोटेशन बनाता है — उनकी कीमतें, हमारा अंदाज़ा नहीं। साइट विज़िट के बाद स्टूडियो इसे पक्का करता है या बदलता है।',
-    mr: 'कोणत्याही स्टुडिओला फोन केला जात नाही. प्रत्येक लिस्टेड स्टुडिओचे दर त्याच्याच किमान पन्नास जुन्या कोटेशन्समधून घेतले जातात. आमची सिस्टम ते तुमच्या ब्रीफवर लावून ओळीनुसार कोटेशन तयार करते — त्यांच्या किमती, आमचा अंदाज नाही. साइट भेटीनंतर स्टुडिओ ते पक्के करतो किंवा बदलतो.',
+    en: 'No studio is phoned. Every listed studio’s rates are read from at least twenty-five of its own past quotations. Our system applies them to your brief and writes the quote line by line — their pricing, not our estimate. The studio confirms or revises it after a site visit.',
+    hi: 'किसी स्टूडियो को फ़ोन नहीं किया जाता। हर लिस्टेड स्टूडियो के रेट उसके अपने कम से कम पच्चीस पुराने कोटेशन से लिए जाते हैं। हमारा सिस्टम उन्हें आपके ब्रीफ़ पर लगाकर लाइन-दर-लाइन कोटेशन बनाता है — उनकी कीमतें, हमारा अंदाज़ा नहीं। साइट विज़िट के बाद स्टूडियो इसे पक्का करता है या बदलता है।',
+    mr: 'कोणत्याही स्टुडिओला फोन केला जात नाही. प्रत्येक लिस्टेड स्टुडिओचे दर त्याच्याच किमान पंचवीस जुन्या कोटेशन्समधून घेतले जातात. आमची सिस्टम ते तुमच्या ब्रीफवर लावून ओळीनुसार कोटेशन तयार करते — त्यांच्या किमती, आमचा अंदाज नाही. साइट भेटीनंतर स्टुडिओ ते पक्के करतो किंवा बदलतो.',
   },
   'faq.rank.q': { en: 'Can a studio pay to rank higher?', hi: 'क्या कोई स्टूडियो पैसे देकर ऊपर आ सकता है?', mr: 'स्टुडिओ पैसे देऊन वर येऊ शकतो का?' },
   'faq.rank.a': {

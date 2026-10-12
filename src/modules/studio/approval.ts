@@ -3,7 +3,7 @@
  * 30 Sep 2026.
  *
  * Rates are mandatory, and they come from the studio's own quotations: a
- * studio is approved only once at least `MIN_QUOTATIONS_FOR_RATES` (50) of
+ * studio is approved only once at least `MIN_QUOTATIONS_FOR_RATES` (25) of
  * its quotations have been read, ops has approved the rates derived from
  * them (LIVE `StudioFiledRate`s), and its product master has been filled from
  * those rates. Rates typed into the form never qualify on their own — every

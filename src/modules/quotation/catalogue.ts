@@ -512,14 +512,13 @@ export const MODULAR_DISCOUNT_BPS = 1000; // 10% off MO — median of 934 quotat
 /**
  * How many of a studio's own quotations we read before we will price for them.
  *
- * A rate taken from a handful of quotes is one designer's mood. Fifty is what
- * every studio is asked for (50–60, up to 100), and it is enough for a median
- * to mean something — provided the count is also checked per item, which
- * `MIN_QUOTATIONS_PER_ITEM` does. It was a hundred; almost no Pune studio has
- * a hundred findable quotations, and the per-item floor is what makes fifty
- * safe, not the archive total.
+ * A rate taken from a handful of quotes is one designer's mood. Twenty-five is
+ * the minimum (owner, 12 Oct 2026; it was fifty, and a hundred before that):
+ * studios are still asked for as many as they have, and the count is also
+ * checked per item (`MIN_QUOTATIONS_PER_ITEM`), which is what keeps a median
+ * honest, not the archive total.
  */
-export const MIN_QUOTATIONS_FOR_RATES = 50;
+export const MIN_QUOTATIONS_FOR_RATES = 25;
 
 /**
  * How many quotations must price an item before that rate can go live.

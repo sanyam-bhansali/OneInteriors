@@ -190,7 +190,7 @@ export async function setStudioStatus(
       });
 
       /* The owner's rule (30 Sep 2026): nobody is listed until at least
-         fifty of their own quotations have been read into approved rates and
+         MIN_QUOTATIONS_FOR_RATES (25) of their own quotations have been read into approved rates and
          a product master. Checked here, inside the transaction, so it is the
          same data the approval commits. Only on the way IN — re-saving an
          active studio is not a new approval. */
