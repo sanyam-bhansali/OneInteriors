@@ -16,6 +16,8 @@ export const SITE_WORDS = {
   'hello': { en: 'Hello, {name}', hi: 'नमस्ते, {name}', mr: 'नमस्कार, {name}' },
   'helloNoName': { en: 'Hello', hi: 'नमस्ते', mr: 'नमस्कार' },
   'today.h1': { en: 'My sites today', hi: 'आज मेरी साइट', mr: 'आज माझ्या साइट' },
+  'today.who': { en: '{studio} · Site supervisor', hi: '{studio} · साइट सुपरवाइज़र', mr: '{studio} · साइट सुपरवायझर' },
+  'crews.h': { en: 'Crews on your sites', hi: 'आपकी साइट पर टीम', mr: 'तुमच्या साइटवर टीम' },
   'today.count1': { en: '{date} · 1 site', hi: '{date} · 1 साइट', mr: '{date} · 1 साइट' },
   'today.count': { en: '{date} · {n} sites', hi: '{date} · {n} साइट', mr: '{date} · {n} साइट' },
   'today.none': {

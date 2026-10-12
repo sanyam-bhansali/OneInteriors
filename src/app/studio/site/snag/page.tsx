@@ -25,62 +25,69 @@ export default async function SiteSnagsPage() {
   const card = (s: SiteSnag) => {
     const line =
       s.state === 'reopened'
-        ? { text: t('reopened', { name: s.customerFirst }), tone: 'var(--s-bad)' }
+        ? { text: t('reopened', { name: s.customerFirst }), tone: 'var(--bad)' }
         : s.overdue && s.fixBy
-          ? { text: t('late', { date: day(s.fixBy) }), tone: 'var(--s-bad)' }
+          ? { text: t('late', { date: day(s.fixBy) }), tone: 'var(--bad)' }
           : s.fixBy
-            ? { text: t('fixBy', { date: day(s.fixBy) }), tone: 'var(--s-accent)' }
-            : { text: t('noDate'), tone: 'var(--s-ink-3)' };
+            ? { text: t('fixBy', { date: day(s.fixBy) }), tone: 'var(--warn)' }
+            : { text: t('noDate'), tone: 'var(--muted)' };
     return (
       <li key={s.id}>
-        <Link
-          href={`/studio/site/snag/${s.id}`}
-          className="s-card flex min-h-[96px] items-center gap-4 p-4 text-[var(--s-ink)] no-underline active:scale-[0.99]"
-        >
+        <Link href={`/studio/site/snag/${s.id}`} className="st-snag">
           {s.before[0] ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={s.before[0]} alt="" className="h-[72px] w-[72px] flex-none rounded-[12px] object-cover" />
+            <img src={s.before[0]} alt="" />
           ) : (
-            <span aria-hidden="true" className="h-[72px] w-[72px] flex-none rounded-[12px] bg-[var(--s-surface-2)]" />
+            <span aria-hidden="true" className="ph" />
           )}
-          <span className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="text-[17px] font-semibold leading-snug">{s.title}</span>
-            <span className="text-[14px] text-[var(--s-ink-2)]">{[s.room, s.home].filter(Boolean).join(' · ')}</span>
-            <span className="text-[14px] font-medium" style={{ color: line.tone }}>
-              {line.text}
-            </span>
+          <span style={{ display: 'flex', flex: 1, minWidth: 0, flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 17, fontWeight: 600, lineHeight: 1.3 }}>{s.title}</span>
+            <span className="st-line">{[s.room, s.home].filter(Boolean).join(' · ')}</span>
+            <span style={{ fontSize: 14, fontWeight: 500, color: line.tone }}>{line.text}</span>
           </span>
-          <span aria-hidden="true" className="text-[24px] text-[var(--s-ink-3)]">
-            ›
-          </span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: 'var(--muted)', flexShrink: 0 }}>
+            <path d="m9 6 6 6-6 6" />
+          </svg>
         </Link>
       </li>
     );
   };
 
+  const head = (label: string, n: number) => (
+    <h2 className="st-label" style={{ margin: '4px 4px 0', fontSize: 13, fontWeight: 600 }}>
+      {label} · {n}
+    </h2>
+  );
+
   return (
-    <div className="flex flex-col gap-5 px-5 py-6">
-      <div>
-        <h1 className="m-0 text-[28px] font-medium tracking-[-0.02em]">{t('list.h1')}</h1>
-        <p className="m-0 mt-1 text-[15px] text-[var(--s-ink-2)]">{t('list.sub')}</p>
+    <>
+      <div className="st-head">
+        <div style={{ minWidth: 0 }}>
+          <span className="who">{t('list.sub')}</span>
+          <h1>{t('list.h1')}</h1>
+        </div>
       </div>
-      {snags.length === 0 ? <p className="s-card m-0 p-5 text-[16px] text-[var(--s-ink-2)]">{t('list.none')}</p> : null}
-      {mine.length ? (
-        <section className="flex flex-col gap-2.5" aria-label={t('list.mine')}>
-          <h2 className="m-0 text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--s-ink-3)]">
-            {t('list.mine')} · {mine.length}
-          </h2>
-          <ul className="m-0 flex list-none flex-col gap-2.5 p-0">{mine.map(card)}</ul>
-        </section>
-      ) : null}
-      {others.length ? (
-        <section className="flex flex-col gap-2.5" aria-label={t('list.others')}>
-          <h2 className="m-0 text-[13px] font-semibold uppercase tracking-[0.06em] text-[var(--s-ink-3)]">
-            {t('list.others')} · {others.length}
-          </h2>
-          <ul className="m-0 flex list-none flex-col gap-2.5 p-0">{others.map(card)}</ul>
-        </section>
-      ) : null}
-    </div>
+      <div className="st-page">
+        {snags.length === 0 ? (
+          <div className="st-card">
+            <p className="st-line" style={{ margin: 0, fontSize: 16 }}>
+              {t('list.none')}
+            </p>
+          </div>
+        ) : null}
+        {mine.length ? (
+          <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }} aria-label={t('list.mine')}>
+            {head(t('list.mine'), mine.length)}
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>{mine.map(card)}</ul>
+          </section>
+        ) : null}
+        {others.length ? (
+          <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }} aria-label={t('list.others')}>
+            {head(t('list.others'), others.length)}
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>{others.map(card)}</ul>
+          </section>
+        ) : null}
+      </div>
+    </>
   );
 }

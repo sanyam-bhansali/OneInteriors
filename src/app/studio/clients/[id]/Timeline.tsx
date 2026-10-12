@@ -26,47 +26,30 @@ import { ago, KIND_LABELS, toneFor } from '@/modules/studio-practice/event-copy'
 export function Timeline({ rows }: { rows: EventRow[] }) {
   if (rows.length === 0) {
     return (
-      <p className="m-0 text-[13.5px] text-[var(--s-ink-3)]">
+      <p className="cl-sub">
         Nothing recorded yet. Logging a call or moving this along will show up here.
       </p>
     );
   }
 
   return (
-    <ol className="m-0 flex list-none flex-col p-0">
-      {rows.map((e, i) => (
-        <li key={e.id} className="relative flex gap-3 pb-4 last:pb-0">
-          {/* The rail, drawn per-row rather than as one absolute element, so
-              it stops at the last entry instead of trailing into nothing. */}
-          {i < rows.length - 1 ? (
-            <span
-              aria-hidden="true"
-              className="absolute left-[5px] top-4 bottom-0 w-px bg-[var(--s-rule)]"
-            />
-          ) : null}
-
-          <span
-            aria-hidden="true"
-            className={`relative z-10 mt-1.5 h-[11px] w-[11px] flex-none rounded-full border-2 border-[var(--s-surface)] ${dot(
-              toneFor(e.kind),
-            )}`}
-          />
-
-          <div className="min-w-0 flex-1">
-            <p className="m-0 text-[13.5px] leading-snug text-[var(--s-ink)]">{e.summary}</p>
-            <p className="m-0 mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px] text-[var(--s-ink-3)]">
-              <span className="s-label normal-case tracking-normal">{KIND_LABELS[e.kind]}</span>
-              <span aria-hidden="true">·</span>
-              {/* The exact moment lives in the title, for the once a month
-                  somebody needs it. Relative on the face, because a timeline
-                  is read as a sequence and a date makes you do arithmetic. */}
+    <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column' }}>
+      {rows.map((e) => (
+        <li key={e.id} className="ev">
+          <span aria-hidden="true" className="evi" style={glyphTone(toneFor(e.kind))}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d={glyph(toneFor(e.kind))} />
+            </svg>
+          </span>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ margin: 0, fontWeight: 600 }}>{e.summary}</p>
+            <p className="muted sm" style={{ margin: '2px 0 0' }}>
+              {KIND_LABELS[e.kind]} ·{' '}
+              {/* The exact moment lives in the title; relative on the face, because a timeline is read as a sequence. */}
               <time dateTime={e.createdAt.toISOString()} title={e.createdAt.toLocaleString('en-IN')}>
                 {ago(e.createdAt)}
-              </time>
-              {/* "One Interiors" rather than a blank, so the studio can always
-                  tell which half of their own history they did. */}
-              <span aria-hidden="true">·</span>
-              <span>{e.actor === 'SYSTEM' ? 'One Interiors' : (e.byName ?? 'Someone')}</span>
+              </time>{' '}
+              · {e.actor === 'SYSTEM' ? 'One Interiors' : (e.byName ?? 'Someone')}
             </p>
           </div>
         </li>
@@ -75,8 +58,15 @@ export function Timeline({ rows }: { rows: EventRow[] }) {
   );
 }
 
-function dot(tone: string): string {
-  if (tone === 'good') return 'bg-[var(--s-good)]';
-  if (tone === 'accent') return 'bg-[var(--s-accent)]';
-  return 'bg-[var(--s-ink-3)]';
+/** The row's mark: a tick for good news, an arrow for a step forward, a dot otherwise. */
+function glyph(tone: string): string {
+  if (tone === 'good') return 'm5 12 5 5 9-10';
+  if (tone === 'accent') return 'M7 17 17 7M9 7h8v8';
+  return 'M12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z';
+}
+
+function glyphTone(tone: string): React.CSSProperties | undefined {
+  if (tone === 'good') return { background: 'var(--good-bg)', color: 'var(--good)' };
+  if (tone === 'accent') return { background: 'var(--acc-soft)', color: 'var(--acc-ink)' };
+  return undefined;
 }

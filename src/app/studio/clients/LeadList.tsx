@@ -7,7 +7,7 @@ import type { ClientRow } from '@/modules/studio-practice/clients';
 import { SOURCE_LABELS, LOST_LABELS, colourOf, type LostReasonName } from '@/modules/studio-practice/vocabulary';
 import { BULK_LABELS, SELECT_FIRST, type BulkAction } from '@/modules/studio-sales/bulk-rules';
 import { PAGE_SIZE } from '@/modules/studio-sales/lead-filters';
-import { Said, useAct, inputClass, primaryClass, quietClass } from '../SalesUi';
+import { Said, useAct, quietClass } from '../SalesUi';
 import {
   bulkAssignAction,
   bulkBinAction,
@@ -257,8 +257,8 @@ export function LeadList({
 export function ClaimOne({ id }: { id: string }) {
   const { pending, result, run } = useAct();
   return (
-    <div className="flex flex-col items-end">
-      <button type="button" disabled={pending} onClick={() => run(() => bulkClaimAction({ ids: [id] }))} className={primaryClass}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+      <button type="button" disabled={pending} onClick={() => run(() => bulkClaimAction({ ids: [id] }))} className="btn pri sm">
         {pending ? 'Claiming…' : 'Claim'}
       </button>
       <Said result={result} />
@@ -339,12 +339,12 @@ export function BulkBar({
   };
 
   return (
-    <div className="s-card flex flex-col gap-3 border-l-[3px] !border-l-[var(--s-accent)] px-4 py-3 text-[13.5px]">
-      <div className="flex flex-wrap items-center gap-2.5">
-        <span className="font-medium">
-          <span className="s-num">{n}</span> selected{matching ? ' (everything the filters show)' : ''}
+    <div className="card cl-bulk" style={{ padding: 14, gap: 12 }}>
+      <div className="hstack">
+        <span style={{ fontWeight: 600 }}>
+          <span className="mono">{n}</span> selected{matching ? ' (everything the filters show)' : ''}
         </span>
-        <select aria-label="What to do with them" value={action} onChange={(e) => { setAction(e.target.value as BulkAction); setSure(false); }} className={`${inputClass} w-auto py-1.5`}>
+        <select aria-label="What to do with them" value={action} onChange={(e) => { setAction(e.target.value as BulkAction); setSure(false); }} className="fld sm">
           <option value="">Do what…</option>
           {actions.map((a) => (
             <option key={a} value={a}>
@@ -354,7 +354,7 @@ export function BulkBar({
         </select>
 
         {action === 'assign' ? (
-          <select aria-label="Give them to" value={to} onChange={(e) => { setTo(e.target.value); setSure(false); }} className={`${inputClass} w-auto py-1.5`}>
+          <select aria-label="Give them to" value={to} onChange={(e) => { setTo(e.target.value); setSure(false); }} className="fld sm">
             <option value="">pick a person…</option>
             {people.map((p) => (
               <option key={p.id} value={p.id}>
@@ -367,7 +367,7 @@ export function BulkBar({
 
         {action === 'move' ? (
           <>
-            <select aria-label="Move to" value={stage} onChange={(e) => { setStage(e.target.value); setSure(false); }} className={`${inputClass} w-auto py-1.5`}>
+            <select aria-label="Move to" value={stage} onChange={(e) => { setStage(e.target.value); setSure(false); }} className="fld sm">
               <option value="">pick a column…</option>
               {stages.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -376,7 +376,7 @@ export function BulkBar({
               ))}
             </select>
             {lostStage ? (
-              <select aria-label="Why lost" value={reason} onChange={(e) => setReason(e.target.value)} className={`${inputClass} w-auto py-1.5`}>
+              <select aria-label="Why lost" value={reason} onChange={(e) => setReason(e.target.value)} className="fld sm">
                 <option value="">why lost…</option>
                 {(Object.keys(LOST_LABELS) as LostReasonName[]).map((k) => (
                   <option key={k} value={k}>
@@ -390,18 +390,18 @@ export function BulkBar({
 
         {action === 'followup' ? (
           <>
-            <input type="date" aria-label="Follow-up day" value={day} onChange={(e) => setDay(e.target.value)} className={`${inputClass} w-auto py-1.5`} />
-            <input type="time" aria-label="Time (optional)" value={time} onChange={(e) => setTime(e.target.value)} className={`${inputClass} w-auto py-1.5`} />
-            <input type="text" aria-label="What to do (optional)" placeholder="What to do (optional)" value={what} onChange={(e) => setWhat(e.target.value)} className={`${inputClass} w-[14rem] py-1.5`} />
+            <input type="date" aria-label="Follow-up day" value={day} onChange={(e) => setDay(e.target.value)} className="fld sm" />
+            <input type="time" aria-label="Time (optional)" value={time} onChange={(e) => setTime(e.target.value)} className="fld sm" />
+            <input type="text" aria-label="What to do (optional)" placeholder="What to do (optional)" value={what} onChange={(e) => setWhat(e.target.value)} className="fld sm" style={{ width: '14rem' }} />
           </>
         ) : null}
       </div>
 
       {action === 'split' ? (
-        <fieldset className="m-0 flex flex-wrap gap-x-4 gap-y-1.5 border-0 p-0">
-          <legend className="s-label mb-1.5">Share them out evenly, taking turns, between:</legend>
+        <fieldset className="hstack" style={{ margin: 0, border: 0, padding: 0, gap: 14 }}>
+          <legend className="lbl" style={{ marginBottom: 6 }}>Share them out evenly, taking turns, between:</legend>
           {people.map((p) => (
-            <label key={p.id} className="flex items-center gap-1.5">
+            <label key={p.id} className="hstack" style={{ gap: 6 }}>
               <input
                 type="checkbox"
                 checked={split.includes(p.id)}
@@ -414,24 +414,24 @@ export function BulkBar({
             </label>
           ))}
           {split.length >= 2 ? (
-            <span className="text-[var(--s-ink-2)]">About {Math.ceil(count / split.length).toLocaleString('en-IN')} each.</span>
+            <span className="muted">About {Math.ceil(count / split.length).toLocaleString('en-IN')} each.</span>
           ) : null}
         </fieldset>
       ) : null}
 
       {action && ready ? (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="hstack" style={{ gap: 8 }}>
           {sure || count === 1 || action === 'claim' ? (
-            <button type="button" disabled={pending} onClick={go} className={primaryClass}>
+            <button type="button" disabled={pending} onClick={go} className="btn pri sm">
               {pending ? 'Working…' : `Yes — ${verb[action]}`}
             </button>
           ) : (
-            <button type="button" onClick={() => setSure(true)} className={action === 'bin' ? `${quietClass} text-[var(--s-bad)]` : quietClass}>
+            <button type="button" onClick={() => setSure(true)} className={action === 'bin' ? 'btn sec sm bad-b' : 'btn sec sm'}>
               {verb[action]}
             </button>
           )}
-          {action === 'bin' ? <span className="text-[var(--s-ink-3)]">Into the bin for 30 days; ones with quotations or a booking are left alone.</span> : null}
-          {action === 'assign' || action === 'split' ? <span className="text-[var(--s-ink-3)]">Each person is told.</span> : null}
+          {action === 'bin' ? <span className="muted sm">Into the bin for 30 days; ones with quotations or a booking are left alone.</span> : null}
+          {action === 'assign' || action === 'split' ? <span className="muted sm">Each person is told.</span> : null}
         </div>
       ) : null}
       <Said result={result} />

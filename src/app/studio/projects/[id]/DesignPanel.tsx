@@ -33,7 +33,7 @@ import {
  * "sees this" mark; the team's notes sit in "Only your team".
  */
 
-const muted = 'text-[12.5px] text-[var(--s-ink-3)]';
+const muted = 'text-[12.5px] text-[var(--muted)]';
 const h2 = 'm-0 text-[16px] font-semibold';
 const small = 'text-[12.5px]';
 
@@ -60,7 +60,7 @@ function useRun() {
 function Message({ m }: { m: { ok: boolean; text: string } | null }) {
   if (!m) return null;
   return (
-    <p role={m.ok ? 'status' : 'alert'} className={`m-0 ${small} ${m.ok ? 'text-[var(--s-good)]' : 'text-[var(--s-bad)]'}`}>
+    <p role={m.ok ? 'status' : 'alert'} className={`m-0 ${small} ${m.ok ? 'text-[var(--good)]' : 'text-[var(--bad)]'}`}>
       {m.text}
     </p>
   );
@@ -86,15 +86,15 @@ function Overview({ tab }: { tab: DesignTab }) {
   const [pick, setPick] = useState(tab.designer?.id ?? '');
   const next = tab.next;
   return (
-    <section aria-label="Design" className="s-card flex flex-col gap-3 p-5">
+    <section aria-label="Design" className="card flex flex-col gap-3 p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 className={h2}>
-          Design {tab.pct !== null ? <span className="s-num font-[family-name:var(--font-mono)] text-[var(--s-accent)]">{tab.pct}%</span> : null}
+          Design {tab.pct !== null ? <span className="mono acc-t">{tab.pct}%</span> : null}
         </h2>
         <CustomerSees name={tab.customerFirst} />
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-[var(--s-rule)]" role="progressbar" aria-label={`Design ${tab.pct ?? 0}% done`} aria-valuenow={tab.pct ?? 0} aria-valuemin={0} aria-valuemax={100}>
-        <div className="h-full rounded-full bg-[var(--s-accent)]" style={{ width: `${tab.pct ?? 0}%` }} />
+      <div className="h-2 overflow-hidden rounded-full bg-[var(--fill2)]" role="progressbar" aria-label={`Design ${tab.pct ?? 0}% done`} aria-valuenow={tab.pct ?? 0} aria-valuemin={0} aria-valuemax={100}>
+        <div className="h-full rounded-full bg-[var(--acc)]" style={{ width: `${tab.pct ?? 0}%` }} />
       </div>
       {tab.stage ? (
         <p className={`m-0 ${muted}`}>
@@ -108,14 +108,14 @@ function Overview({ tab }: { tab: DesignTab }) {
         <p className="m-0 text-[14.5px]">
           <span className="font-semibold">Next: {next.label}</span>
           {next.plannedOn ? ` · ${dayWords(next.plannedOn)}` : ''}
-          {next.lockedBy ? <span className="ml-1 text-[var(--s-warn)]"> · opens when the {next.lockedBy} is recorded</span> : null}
+          {next.lockedBy ? <span className="ml-1 text-[var(--warn)]"> · opens when the {next.lockedBy} is recorded</span> : null}
         </p>
       ) : null}
       {tab.overrunDays > 0 ? (
-        <p className="m-0 rounded-[10px] bg-[var(--s-warn-wash)] p-3 text-[13.5px] text-[var(--s-warn)]">
+        <p className="m-0 rounded-[10px] bg-[var(--warn-bg)] p-3 text-[13.5px] text-[var(--warn)]">
           Design now ends {tab.overrunDays} day{tab.overrunDays === 1 ? '' : 's'} after the plan&rsquo;s date.{' '}
           {tab.canEditPlan ? (
-            <Link href={`/studio/projects/${tab.projectId}`} className="text-[var(--s-accent)]">
+            <Link href={`/studio/projects/${tab.projectId}`} className="acc-t">
               Move the plan&rsquo;s dates
             </Link>
           ) : (
@@ -124,18 +124,18 @@ function Overview({ tab }: { tab: DesignTab }) {
         </p>
       ) : null}
       {tab.legacySteps && tab.canEditPlan ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-[10px] bg-[var(--s-surface-2)] p-3">
+        <div className="flex flex-wrap items-center gap-2 rounded-[10px] bg-[var(--fill)] p-3">
           <span className="text-[13.5px]">This project started before design steps. Give it your studio&rsquo;s design steps?</span>
-          <button type="button" className="s-btn min-h-[36px] px-3 text-[13.5px]" disabled={pending} onClick={() => run(() => applyDesignStepsAction(tab.projectId))}>
+          <button type="button" className="btn pri sm" disabled={pending} onClick={() => run(() => applyDesignStepsAction(tab.projectId))}>
             Use our design steps
           </button>
         </div>
       ) : null}
-      <div className="flex flex-wrap items-center gap-2 border-t border-[var(--s-rule)] pt-3">
+      <div className="flex flex-wrap items-center gap-2 border-t border-[var(--fill2)] pt-3">
         <span className="text-[13.5px] font-semibold">Designer</span>
         {tab.canAssign ? (
           <>
-            <select className="s-input min-h-[36px] max-w-[240px]" value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Designer">
+            <select className="fld min-h-[36px] max-w-[240px]" value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Designer">
               <option value="">Nobody yet</option>
               {tab.designers.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -144,7 +144,7 @@ function Overview({ tab }: { tab: DesignTab }) {
                 </option>
               ))}
             </select>
-            <button type="button" className="s-btn min-h-[36px] px-3 text-[13.5px]" disabled={pending || pick === (tab.designer?.id ?? '')} onClick={() => run(() => assignDesignerAction(tab.projectId, pick))}>
+            <button type="button" className="btn pri sm" disabled={pending || pick === (tab.designer?.id ?? '')} onClick={() => run(() => assignDesignerAction(tab.projectId, pick))}>
               Save
             </button>
             {tab.designers.every((d) => d.role !== 'DESIGNER') ? <span className={muted}>Add designers in Settings, Team.</span> : null}
@@ -167,18 +167,18 @@ function Steps({ tab }: { tab: DesignTab }) {
   if (tab.steps.length === 0) return null;
   const stars = tab.steps.filter((s) => s.inScope && s.milestone).length;
   return (
-    <section aria-label="Design steps" className="s-card flex flex-col gap-2 p-5">
+    <section aria-label="Design steps" className="card flex flex-col gap-2 p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 className={h2}>Design steps</h2>
         <CustomerSees name={tab.customerFirst} />
       </div>
       <p className={`m-0 ${muted}`}>
-        <span className="font-medium text-[var(--s-accent)]">★ {STAR_HINT}</span> {tab.customerFirst} sees the design&rsquo;s % from every step. Each % is the step&rsquo;s share of the design. A locked step opens when its payment is recorded by accounts.
+        <span className="font-medium acc-t">★ {STAR_HINT}</span> {tab.customerFirst} sees the design&rsquo;s % from every step. Each % is the step&rsquo;s share of the design. A locked step opens when its payment is recorded by accounts.
       </p>
       <MilestoneCount n={stars} />
       <ul className="m-0 flex list-none flex-col gap-1 p-0">
         {tab.steps.map((st) => (
-          <li key={st.id} className="flex items-start gap-1.5 rounded-[8px] px-1.5 py-2 hover:bg-[var(--s-surface-2)]">
+          <li key={st.id} className="flex items-start gap-1.5 rounded-[8px] px-1.5 py-2 hover:bg-[var(--fill)]">
             <StarToggle
               projectId={tab.projectId}
               stepId={st.id}
@@ -221,17 +221,17 @@ function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onO
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
       <span
         aria-hidden="true"
-        className="inline-flex h-5 w-5 flex-none items-center justify-center rounded-[6px] border text-[12px] font-bold"
-        style={st.done ? { background: 'var(--s-accent)', borderColor: 'var(--s-accent)', color: '#fff' } : { borderColor: 'var(--s-ink-3)', background: 'var(--s-surface)' }}
+        className="oi-box"
+        style={st.done ? { background: 'var(--good-s)' } : { boxShadow: 'inset 0 0 0 1.5px var(--ring)' }}
       >
         {st.done ? '✓' : st.lockedBy ? '🔒' : ''}
       </span>
       <span className="min-w-0 flex-1 basis-[240px]">
-        <span className={`block text-[14px] ${st.done || !st.inScope ? 'text-[var(--s-ink-3)]' : ''}`}>
+        <span className={`block text-[14px] ${st.done || !st.inScope ? 'text-[var(--muted)]' : ''}`}>
           {st.label}
           <span className="sr-only">{st.done ? ' (done)' : st.lockedBy ? ' (locked)' : ' (open)'}</span>
         </span>
-        <span className={`block ${muted} ${st.lateDays && !st.done ? '!text-[var(--s-bad)]' : ''}`}>
+        <span className={`block ${muted} ${st.lateDays && !st.done ? '!text-[var(--bad)]' : ''}`}>
           {meta}
           {st.responsibleLabel ? ` · ${st.responsibleLabel}` : ''}
           {st.needsDocument ? ' · needs its file' : ''}
@@ -248,7 +248,7 @@ function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onO
             {st.doneFile ? (
               <>
                 {st.doneNote ? ' · ' : ''}
-                <a href={st.doneFile.url} target="_blank" rel="noreferrer" className="text-[var(--s-accent)]">
+                <a href={st.doneFile.url} target="_blank" rel="noreferrer" className="acc-t">
                   {st.doneFile.title}
                 </a>
               </>
@@ -256,22 +256,22 @@ function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onO
           </span>
         ) : null}
       </span>
-      <span className="s-num w-[48px] flex-none text-right font-[family-name:var(--font-mono)] text-[13px] text-[var(--s-ink-2)]" title="Its share of the design">
+      <span className="tabular-nums w-[48px] flex-none text-right mono text-[13px] text-[var(--text2)]" title="Its share of the design">
         {st.inScope ? `${st.sharePct}%` : '—'}
       </span>
       <span className="flex flex-none flex-wrap items-center gap-1.5">
         {tab.canWork && st.inScope && !st.done ? (
-          <button type="button" className="s-btn min-h-[36px] px-3 text-[13.5px]" disabled={Boolean(st.lockedBy)} onClick={() => onOpen('tick')} title={st.lockedBy ? `Opens when the ${st.lockedBy} is recorded` : undefined}>
+          <button type="button" className="btn pri sm" disabled={Boolean(st.lockedBy)} onClick={() => onOpen('tick')} title={st.lockedBy ? `Opens when the ${st.lockedBy} is recorded` : undefined}>
             Tick
           </button>
         ) : null}
         {tab.canWork && st.inScope && !st.done && st.plannedOn ? (
-          <button type="button" className="s-btn-ghost min-h-[36px] px-3 text-[13px]" onClick={() => onOpen('move')}>
+          <button type="button" className="btn ghost sm" onClick={() => onOpen('move')}>
             Running late
           </button>
         ) : null}
         {tab.canEditPlan ? (
-          <button type="button" className="s-btn-ghost min-h-[36px] px-3 text-[13px]" onClick={() => onOpen('edit')} aria-label={`Edit ${st.label}`}>
+          <button type="button" className="btn ghost sm" onClick={() => onOpen('edit')} aria-label={`Edit ${st.label}`}>
             Edit
           </button>
         ) : null}
@@ -284,7 +284,7 @@ function TickForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
   const { pending, message, run } = useRun();
   return (
     <form
-      className="mt-2 flex flex-col gap-2 rounded-[10px] border border-[var(--s-rule)] p-3"
+      className="mt-2 flex flex-col gap-2 rounded-[14px] bg-[var(--soft)] p-3"
       onSubmit={(e) => {
         e.preventDefault();
         const data = new FormData(e.currentTarget);
@@ -303,14 +303,14 @@ function TickForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
       <OnlyYourTeam>
         <label className="flex flex-col gap-1 text-[13px]">
           What was done (optional)
-          <textarea name="note" rows={2} maxLength={500} className="s-input" />
+          <textarea name="note" rows={2} maxLength={500} className="fld" />
         </label>
       </OnlyYourTeam>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="submit" className="s-btn min-h-[36px] px-3 text-[13.5px]" disabled={pending}>
+        <button type="submit" className="btn pri sm" disabled={pending}>
           Tick {st.label}
         </button>
-        <button type="button" className="s-btn-ghost min-h-[36px] px-3 text-[13px]" onClick={onDone}>
+        <button type="button" className="btn ghost sm" onClick={onDone}>
           Cancel
         </button>
       </div>
@@ -326,7 +326,7 @@ function MoveForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
   const [note, setNote] = useState('');
   return (
     <form
-      className="mt-2 flex flex-col gap-2 rounded-[10px] border border-[var(--s-rule)] p-3"
+      className="mt-2 flex flex-col gap-2 rounded-[14px] bg-[var(--soft)] p-3"
       onSubmit={(e) => {
         e.preventDefault();
         run(() => moveDesignStepAction({ projectId: tab.projectId, stepId: st.id, to, reason, note }), onDone);
@@ -335,11 +335,11 @@ function MoveForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
       <div className="flex flex-wrap gap-2">
         <label className="flex flex-col gap-1 text-[13px]">
           New day
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="s-input" required />
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="fld" required />
         </label>
         <label className="flex flex-col gap-1 text-[13px]">
           Why
-          <select value={reason} onChange={(e) => setReason(e.target.value)} className="s-input" required>
+          <select value={reason} onChange={(e) => setReason(e.target.value)} className="fld" required>
             <option value="">Pick one</option>
             <optgroup label="Client side">
               {Object.entries(CLIENT_REASONS).map(([k, v]) => (
@@ -361,15 +361,15 @@ function MoveForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
       <OnlyYourTeam>
         <label className="flex flex-col gap-1 text-[13px]">
           Note (optional)
-          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} className="s-input" />
+          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} className="fld" />
         </label>
       </OnlyYourTeam>
       <p className={`m-0 ${muted}`}>The open steps after this one move by the same days. {tab.customerFirst} sees the new day and the reason, never the note.</p>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="submit" className="s-btn min-h-[36px] px-3 text-[13.5px]" disabled={pending}>
+        <button type="submit" className="btn pri sm" disabled={pending}>
           Move
         </button>
-        <button type="button" className="s-btn-ghost min-h-[36px] px-3 text-[13px]" onClick={onDone}>
+        <button type="button" className="btn ghost sm" onClick={onDone}>
           Cancel
         </button>
       </div>
@@ -383,10 +383,10 @@ function EditForm({ tab, st, busy, onSave }: { tab: DesignTab; st: DesignStepVie
   const [needsDocument, setNeedsDocument] = useState(st.needsDocument);
   const [gate, setGate] = useState(st.gatePayment === null ? '' : String(st.gatePayment));
   return (
-    <div className="mt-2 flex flex-wrap items-end gap-2 rounded-[10px] border border-[var(--s-rule)] p-3">
+    <div className="mt-2 flex flex-wrap items-end gap-2 rounded-[14px] bg-[var(--soft)] p-3">
       <label className="flex flex-col gap-1 text-[13px]">
         Who does it
-        <select value={responsible} onChange={(e) => setResponsible(e.target.value)} className="s-input">
+        <select value={responsible} onChange={(e) => setResponsible(e.target.value)} className="fld">
           <option value="">Not set</option>
           {RESPONSIBLES.map((r) => (
             <option key={r} value={r}>
@@ -397,7 +397,7 @@ function EditForm({ tab, st, busy, onSave }: { tab: DesignTab; st: DesignStepVie
       </label>
       <label className="flex flex-col gap-1 text-[13px]">
         Opens when this payment is recorded
-        <select value={gate} onChange={(e) => setGate(e.target.value)} className="s-input">
+        <select value={gate} onChange={(e) => setGate(e.target.value)} className="fld">
           <option value="">No payment needed</option>
           {tab.payments.map((p) => (
             <option key={p.index} value={String(p.index)}>
@@ -409,7 +409,7 @@ function EditForm({ tab, st, busy, onSave }: { tab: DesignTab; st: DesignStepVie
       <label className="flex min-h-[36px] items-center gap-2 text-[13px]">
         <input type="checkbox" checked={needsDocument} onChange={(e) => setNeedsDocument(e.target.checked)} /> Needs its file to tick
       </label>
-      <button type="button" className="s-btn min-h-[36px] px-3 text-[13.5px]" disabled={busy} onClick={() => onSave({ responsible, needsDocument, gatePayment: gate })}>
+      <button type="button" className="btn pri sm" disabled={busy} onClick={() => onSave({ responsible, needsDocument, gatePayment: gate })}>
         Save
       </button>
       <span className={muted}>Rename, weight or scope it in the Plan tab.</span>
@@ -429,7 +429,7 @@ function VisitAndSizes({ tab }: { tab: DesignTab }) {
   const [rows, setRows] = useState(tab.measurements.length ? tab.measurements.map((m) => ({ ...m, note: m.note ?? '' })) : [blank]);
   const set = (i: number, k: keyof typeof blank, v: string) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
   return (
-    <section aria-label="Site visit and measurements" className="s-card flex flex-col gap-3 p-5">
+    <section aria-label="Site visit and measurements" className="card flex flex-col gap-3 p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 className={h2}>Site visit and measurements</h2>
         <CustomerSees name={tab.customerFirst} />
@@ -438,17 +438,17 @@ function VisitAndSizes({ tab }: { tab: DesignTab }) {
         <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
           {tab.visits.map((v) => (
             <li key={v.id} className="flex flex-wrap items-center gap-2 text-[14px]">
-              <span className={v.status === 'CANCELLED' ? 'text-[var(--s-ink-3)] line-through' : ''}>
+              <span className={v.status === 'CANCELLED' ? 'text-[var(--muted)] line-through' : ''}>
                 {v.purpose} · {whenWords(v.at)}
               </span>
               <span className={muted}>{v.status === 'DONE' ? 'Done' : v.status === 'CANCELLED' ? 'Cancelled' : 'Booked'}</span>
               {v.note ? <span className={muted}>· Team note: {v.note}</span> : null}
               {tab.canWork && v.status === 'BOOKED' ? (
                 <>
-                  <button type="button" className="s-btn-ghost min-h-[32px] px-2.5 text-[13px]" disabled={pending} onClick={() => run(() => setVisitStatusAction(tab.projectId, v.id, 'DONE'))}>
+                  <button type="button" className="btn ghost sm" disabled={pending} onClick={() => run(() => setVisitStatusAction(tab.projectId, v.id, 'DONE'))}>
                     Done
                   </button>
-                  <button type="button" className="s-btn-ghost min-h-[32px] px-2.5 text-[13px]" disabled={pending} onClick={() => run(() => setVisitStatusAction(tab.projectId, v.id, 'CANCELLED'))}>
+                  <button type="button" className="btn ghost sm" disabled={pending} onClick={() => run(() => setVisitStatusAction(tab.projectId, v.id, 'CANCELLED'))}>
                     Cancel
                   </button>
                 </>
@@ -469,44 +469,44 @@ function VisitAndSizes({ tab }: { tab: DesignTab }) {
         >
           <label className="flex flex-col gap-1 text-[13px]">
             Day
-            <input type="date" value={day} onChange={(e) => setDay(e.target.value)} className="s-input" required />
+            <input type="date" value={day} onChange={(e) => setDay(e.target.value)} className="fld" required />
           </label>
           <label className="flex flex-col gap-1 text-[13px]">
             Time
-            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="s-input" required />
+            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="fld" required />
           </label>
           <label className="flex flex-col gap-1 text-[13px]">
             For
-            <input value={purpose} onChange={(e) => setPurpose(e.target.value)} maxLength={80} className="s-input" required />
+            <input value={purpose} onChange={(e) => setPurpose(e.target.value)} maxLength={80} className="fld" required />
           </label>
           <label className="flex flex-col gap-1 text-[13px]">
             Team note
-            <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} className="s-input" />
+            <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} className="fld" />
           </label>
-          <button type="submit" className="s-btn min-h-[40px] px-3 text-[13.5px]" disabled={pending}>
+          <button type="submit" className="btn pri sm" disabled={pending}>
             Book the visit
           </button>
         </form>
       ) : null}
-      <div className="border-t border-[var(--s-rule)] pt-3">
+      <div className="border-t border-[var(--fill2)] pt-3">
         <p className="m-0 mb-2 text-[13.5px] font-semibold">Rooms, in feet (like 10.5 or 10&apos;6&quot;)</p>
         <div className="flex flex-col gap-1.5">
           {rows.map((r, i) => (
             <div key={i} className="grid grid-cols-2 gap-1.5 sm:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_minmax(0,2fr)]">
-              <input aria-label={`Room ${i + 1}`} placeholder="Room" value={r.room} onChange={(e) => set(i, 'room', e.target.value)} className="s-input" disabled={!tab.canWork} />
-              <input aria-label={`Length ${i + 1}`} placeholder="Length" value={r.length} onChange={(e) => set(i, 'length', e.target.value)} className="s-input" disabled={!tab.canWork} />
-              <input aria-label={`Width ${i + 1}`} placeholder="Width" value={r.width} onChange={(e) => set(i, 'width', e.target.value)} className="s-input" disabled={!tab.canWork} />
-              <input aria-label={`Height ${i + 1}`} placeholder="Height" value={r.height} onChange={(e) => set(i, 'height', e.target.value)} className="s-input" disabled={!tab.canWork} />
-              <input aria-label={`Note ${i + 1}`} placeholder="Note (team only)" value={r.note} onChange={(e) => set(i, 'note', e.target.value)} className="s-input" disabled={!tab.canWork} />
+              <input aria-label={`Room ${i + 1}`} placeholder="Room" value={r.room} onChange={(e) => set(i, 'room', e.target.value)} className="fld" disabled={!tab.canWork} />
+              <input aria-label={`Length ${i + 1}`} placeholder="Length" value={r.length} onChange={(e) => set(i, 'length', e.target.value)} className="fld" disabled={!tab.canWork} />
+              <input aria-label={`Width ${i + 1}`} placeholder="Width" value={r.width} onChange={(e) => set(i, 'width', e.target.value)} className="fld" disabled={!tab.canWork} />
+              <input aria-label={`Height ${i + 1}`} placeholder="Height" value={r.height} onChange={(e) => set(i, 'height', e.target.value)} className="fld" disabled={!tab.canWork} />
+              <input aria-label={`Note ${i + 1}`} placeholder="Note (team only)" value={r.note} onChange={(e) => set(i, 'note', e.target.value)} className="fld" disabled={!tab.canWork} />
             </div>
           ))}
         </div>
         {tab.canWork ? (
           <div className="mt-2 flex flex-wrap gap-2">
-            <button type="button" className="s-btn-ghost min-h-[36px] px-3 text-[13px]" onClick={() => setRows((rs) => [...rs, blank])}>
+            <button type="button" className="btn ghost sm" onClick={() => setRows((rs) => [...rs, blank])}>
               + Add a room
             </button>
-            <button type="button" className="s-btn min-h-[36px] px-3 text-[13.5px]" disabled={pending} onClick={() => run(() => saveMeasurementsAction(tab.projectId, rows))}>
+            <button type="button" className="btn pri sm" disabled={pending} onClick={() => run(() => saveMeasurementsAction(tab.projectId, rows))}>
               Save the sizes
             </button>
           </div>
@@ -528,7 +528,7 @@ function MoodBoard({ tab }: { tab: DesignTab }) {
   const [picked, setPicked] = useState<string[]>([]);
   const pieces = mb.roomOptions.find((r) => r.key === room)?.pieces ?? [];
   return (
-    <section aria-label="Mood board" className="s-card flex flex-col gap-3 p-5">
+    <section aria-label="Mood board" className="card flex flex-col gap-3 p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 className={h2}>Mood board</h2>
         <CustomerSees name={tab.customerFirst} />
@@ -540,9 +540,9 @@ function MoodBoard({ tab }: { tab: DesignTab }) {
         <div className="flex flex-wrap items-end gap-2">
           <label className="flex min-w-[240px] flex-1 flex-col gap-1 text-[13px]">
             Message to {tab.customerFirst}
-            <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} className="s-input" placeholder="Pick two looks you like for the living room" />
+            <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} className="fld" placeholder="Pick two looks you like for the living room" />
           </label>
-          <button type="button" className="s-btn min-h-[40px] px-3 text-[13.5px]" disabled={pending} onClick={() => run(() => shareMoodBoardAction(tab.projectId, note))}>
+          <button type="button" className="btn pri sm" disabled={pending} onClick={() => run(() => shareMoodBoardAction(tab.projectId, note))}>
             {mb.sharedOn ? 'Share again' : 'Share the mood board'}
           </button>
         </div>
@@ -550,7 +550,7 @@ function MoodBoard({ tab }: { tab: DesignTab }) {
       {mb.rooms.length ? (
         <ul className="m-0 grid list-none gap-2 p-0 sm:grid-cols-2">
           {mb.rooms.map((r) => (
-            <li key={r.roomKey} className="rounded-[10px] bg-[var(--s-surface-2)] p-3 text-[13.5px]">
+            <li key={r.roomKey} className="rounded-[10px] bg-[var(--fill)] p-3 text-[13.5px]">
               <p className="m-0 font-semibold">
                 {r.label}
                 {r.styleLabel ? <span className={`ml-1 ${muted}`}>· {r.styleLabel}</span> : null}
@@ -558,7 +558,7 @@ function MoodBoard({ tab }: { tab: DesignTab }) {
               {r.choice ? <p className="m-0">Chose: {r.choice}</p> : null}
               {r.board.length ? <p className="m-0">{r.board.map((b) => b.label).join(' · ')}</p> : null}
               {r.note ? <p className={`m-0 ${muted}`}>&ldquo;{r.note}&rdquo;</p> : null}
-              {r.budgetFlag ? <p className="m-0 text-[12.5px] text-[var(--s-warn)]">{r.budgetFlag}</p> : null}
+              {r.budgetFlag ? <p className="m-0 text-[12.5px] text-[var(--warn)]">{r.budgetFlag}</p> : null}
             </li>
           ))}
         </ul>
@@ -566,10 +566,10 @@ function MoodBoard({ tab }: { tab: DesignTab }) {
         <p className={`m-0 ${muted}`}>Nothing picked yet.</p>
       )}
       {tab.canWork ? (
-        <details className="rounded-[10px] border border-[var(--s-rule)] p-3">
+        <details className="rounded-[14px] bg-[var(--soft)] p-3">
           <summary className="cursor-pointer text-[13.5px] font-semibold">Add pieces to a room for {tab.customerFirst}</summary>
           <div className="mt-2 flex flex-col gap-2">
-            <select value={room} onChange={(e) => { setRoom(e.target.value); setPicked([]); }} className="s-input max-w-[260px]" aria-label="Room">
+            <select value={room} onChange={(e) => { setRoom(e.target.value); setPicked([]); }} className="fld max-w-[260px]" aria-label="Room">
               {mb.roomOptions.map((r) => (
                 <option key={r.key} value={r.key}>
                   {r.label}
@@ -578,13 +578,13 @@ function MoodBoard({ tab }: { tab: DesignTab }) {
             </select>
             <div className="flex max-h-[220px] flex-wrap gap-1.5 overflow-auto">
               {pieces.map((p) => (
-                <label key={p.slug} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--s-rule)] px-2.5 py-1 text-[13px]">
+                <label key={p.slug} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--fill2)] px-2.5 py-1 text-[13px]">
                   <input type="checkbox" checked={picked.includes(p.slug)} onChange={(e) => setPicked((xs) => (e.target.checked ? [...xs, p.slug] : xs.filter((x) => x !== p.slug)))} />
                   {p.label}
                 </label>
               ))}
             </div>
-            <button type="button" className="s-btn self-start min-h-[36px] px-3 text-[13.5px]" disabled={pending || picked.length === 0} onClick={() => run(() => addMoodBoardPiecesAction(tab.projectId, room, picked), () => setPicked([]))}>
+            <button type="button" className="btn pri sm self-start min-h-[36px] px-3 text-[13.5px]" disabled={pending || picked.length === 0} onClick={() => run(() => addMoodBoardPiecesAction(tab.projectId, room, picked), () => setPicked([]))}>
               Add {picked.length || ''} to the board
             </button>
           </div>
@@ -598,11 +598,11 @@ function MoodBoard({ tab }: { tab: DesignTab }) {
 // ── Drawings ──────────────────────────────────────────────────
 
 const STATE_WORDS: Record<DrawingView['state'], { text: string; tone: string }> = {
-  draft: { text: 'Draft · only your team', tone: 'var(--s-ink-3)' },
-  waiting: { text: 'Waiting for the client', tone: 'var(--s-warn)' },
-  approved: { text: 'Approved', tone: 'var(--s-good)' },
-  changes: { text: 'Changes asked', tone: 'var(--s-bad)' },
-  shared: { text: 'Shared', tone: 'var(--s-accent)' },
+  draft: { text: 'Draft · only your team', tone: 'var(--muted)' },
+  waiting: { text: 'Waiting for the client', tone: 'var(--warn)' },
+  approved: { text: 'Approved', tone: 'var(--good)' },
+  changes: { text: 'Changes asked', tone: 'var(--bad)' },
+  shared: { text: 'Shared', tone: 'var(--acc)' },
 };
 
 function Drawings({ tab }: { tab: DesignTab }) {
@@ -610,7 +610,7 @@ function Drawings({ tab }: { tab: DesignTab }) {
   const [replacing, setReplacing] = useState<DrawingView | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   return (
-    <section aria-label="Drawings and 3D" className="s-card flex flex-col gap-3 p-5">
+    <section aria-label="Drawings and 3D" className="card flex flex-col gap-3 p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 className={h2}>Drawings and 3D</h2>
         <CustomerSees name={tab.customerFirst} />
@@ -620,9 +620,9 @@ function Drawings({ tab }: { tab: DesignTab }) {
         {tab.drawings.map((d) => {
           const s = STATE_WORDS[d.state];
           return (
-            <li key={d.id} className="flex flex-col gap-1 border-t border-[var(--s-rule)] pt-2 text-[14px]">
+            <li key={d.id} className="flex flex-col gap-1 border-t border-[var(--fill2)] pt-2 text-[14px]">
               <div className="flex flex-wrap items-center gap-2">
-                <a href={d.url || undefined} target="_blank" rel="noreferrer" className="font-semibold text-[var(--s-ink)]">
+                <a href={d.url || undefined} target="_blank" rel="noreferrer" className="font-semibold text-[var(--ink)]">
                   {d.title}
                 </a>
                 <span className={muted}>
@@ -646,7 +646,7 @@ function Drawings({ tab }: { tab: DesignTab }) {
                   <span className={muted}>Remind {tab.customerFirst} yourself (we send nothing):</span>
                   <button
                     type="button"
-                    className="text-[12.5px] text-[var(--s-accent)] underline"
+                    className="text-[12.5px] acc-t underline"
                     onClick={() => {
                       void navigator.clipboard?.writeText(d.reminder!).then(() => setCopied(d.id));
                     }}
@@ -658,11 +658,11 @@ function Drawings({ tab }: { tab: DesignTab }) {
               {tab.canWork ? (
                 <span className="flex flex-wrap gap-2">
                   {d.state === 'draft' ? (
-                    <button type="button" className="s-btn-ghost min-h-[32px] px-2.5 text-[13px]" disabled={pending} onClick={() => run(() => shareDrawingAction(tab.projectId, d.id))}>
+                    <button type="button" className="btn ghost sm" disabled={pending} onClick={() => run(() => shareDrawingAction(tab.projectId, d.id))}>
                       Share with {tab.customerFirst}
                     </button>
                   ) : null}
-                  <button type="button" className="s-btn-ghost min-h-[32px] px-2.5 text-[13px]" onClick={() => setReplacing(d)}>
+                  <button type="button" className="btn ghost sm" onClick={() => setReplacing(d)}>
                     Upload R{d.version + 1}
                   </button>
                 </span>
@@ -683,7 +683,7 @@ function UploadDrawing({ tab, replacing, onDone }: { tab: DesignTab; replacing: 
   return (
     <form
       key={replacing?.id ?? 'new'}
-      className="flex flex-col gap-2 rounded-[10px] border border-[var(--s-rule)] p-3"
+      className="flex flex-col gap-2 rounded-[14px] bg-[var(--soft)] p-3"
       onSubmit={(e) => {
         e.preventDefault();
         const form = e.currentTarget;
@@ -701,7 +701,7 @@ function UploadDrawing({ tab, replacing, onDone }: { tab: DesignTab; replacing: 
         <div className="flex flex-wrap gap-2">
           <label className="flex flex-col gap-1 text-[13px]">
             What it is
-            <select name="kind" value={kind} onChange={(e) => setKind(e.target.value as DesignKind)} className="s-input">
+            <select name="kind" value={kind} onChange={(e) => setKind(e.target.value as DesignKind)} className="fld">
               {Object.entries(DESIGN_KINDS).map(([k, v]) => (
                 <option key={k} value={k}>
                   {v}
@@ -711,11 +711,11 @@ function UploadDrawing({ tab, replacing, onDone }: { tab: DesignTab; replacing: 
           </label>
           <label className="flex flex-col gap-1 text-[13px]">
             Room
-            <input name="room" maxLength={60} className="s-input" placeholder="Living room" />
+            <input name="room" maxLength={60} className="fld" placeholder="Living room" />
           </label>
           <label className="flex flex-col gap-1 text-[13px]">
             Name (optional)
-            <input name="title" maxLength={100} className="s-input" />
+            <input name="title" maxLength={100} className="fld" />
           </label>
         </div>
       ) : null}
@@ -725,11 +725,11 @@ function UploadDrawing({ tab, replacing, onDone }: { tab: DesignTab; replacing: 
         {replacing || ['LAYOUT_2D', 'FURNITURE', 'RENDER_3D'].includes(kind) ? `Share with ${tab.customerFirst} for approval (one notice)` : `Share with ${tab.customerFirst}`}
       </label>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="submit" className="s-btn min-h-[36px] px-3 text-[13.5px]" disabled={pending}>
+        <button type="submit" className="btn pri sm" disabled={pending}>
           Upload
         </button>
         {replacing ? (
-          <button type="button" className="s-btn-ghost min-h-[36px] px-3 text-[13px]" onClick={onDone}>
+          <button type="button" className="btn ghost sm" onClick={onDone}>
             Cancel
           </button>
         ) : null}
@@ -745,7 +745,7 @@ function DesignFinal({ tab }: { tab: DesignTab }) {
   const { pending, message, run } = useRun();
   const f = tab.final;
   return (
-    <section aria-label="Design final" className="s-card flex flex-col gap-3 p-5">
+    <section aria-label="Design final" className="card flex flex-col gap-3 p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 className={h2}>Design final</h2>
         <CustomerSees name={tab.customerFirst} />
@@ -756,18 +756,18 @@ function DesignFinal({ tab }: { tab: DesignTab }) {
       ) : f.signed ? (
         <p className="m-0 text-[14px]">
           Sales final:{' '}
-          <Link href={`/studio/quotations/${f.signed.id}`} className="text-[var(--s-accent)]">
+          <Link href={`/studio/quotations/${f.signed.id}`} className="acc-t">
             {f.signed.number}
           </Link>
           {f.designFinal ? (
             <>
               {' '}
               · Design Final:{' '}
-              <Link href={`/studio/quotations/${f.designFinal.id}`} className="text-[var(--s-accent)]">
+              <Link href={`/studio/quotations/${f.designFinal.id}`} className="acc-t">
                 {f.designFinal.number}
               </Link>{' '}
               <span className={muted}>({f.designFinal.status === 'DRAFT' ? 'draft' : f.designFinal.status === 'ISSUED' ? 'sent' : f.designFinal.status.toLowerCase()})</span> ·{' '}
-              <Link href={`/studio/quotations/${f.designFinal.id}/compare`} className="text-[var(--s-accent)]">
+              <Link href={`/studio/quotations/${f.designFinal.id}/compare`} className="acc-t">
                 Compare with the sales final
               </Link>
             </>
@@ -778,7 +778,7 @@ function DesignFinal({ tab }: { tab: DesignTab }) {
       )}
       {f.closedOn ? (
         <div className="flex flex-col gap-1 text-[14px]">
-          <p className="m-0 font-semibold text-[var(--s-good)]">Design closed {dayWords(f.closedOn)}.</p>
+          <p className="m-0 font-semibold text-[var(--good)]">Design closed {dayWords(f.closedOn)}.</p>
           {f.changes ? (
             <p className="m-0">
               {tab.customerFirst} sees {f.changes.lines.length} change{f.changes.lines.length === 1 ? '' : 's'}: {formatINR(f.changes.salesTotalPaise)} → {formatINR(f.changes.designTotalPaise)}.
@@ -788,13 +788,13 @@ function DesignFinal({ tab }: { tab: DesignTab }) {
       ) : f.seesQuotes && tab.canAssign && f.signed ? (
         <div className="flex flex-wrap items-center gap-2">
           {!f.designFinal ? (
-            <button type="button" className="s-btn min-h-[40px] px-3 text-[13.5px]" disabled={pending} onClick={() => run(() => makeDesignFinalAction(tab.projectId))}>
+            <button type="button" className="btn pri sm" disabled={pending} onClick={() => run(() => makeDesignFinalAction(tab.projectId))}>
               Make Design Final
             </button>
           ) : (
             <button
               type="button"
-              className="s-btn min-h-[40px] px-3 text-[13.5px]"
+              className="btn pri sm"
               disabled={pending}
               onClick={() => {
                 if (window.confirm(`Close the design on ${f.designFinal!.number}? ${tab.customerFirst} sees what changed against the sales final.`)) run(() => closeDesignAction(tab.projectId));

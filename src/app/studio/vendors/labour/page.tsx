@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { PageHead, PageBody } from '../../StudioShell';
 import { formatINR } from '@/lib/money';
 import { labourOverview } from '@/modules/studio-crews/store';
-import { CrewsNav } from '../CrewsNav';
+import '../../office-ui.css';
+import '../vendors.css';
 
 export const metadata: Metadata = { title: 'Labour vs contract', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -22,62 +22,95 @@ export default async function LabourPage() {
   const data = await labourOverview();
   if (!data) {
     return (
-      <PageBody>
-        <p className="m-0 text-[15px] text-[var(--s-ink-2)]">Labour against the contract is the studio owner&apos;s.</p>
-      </PageBody>
+      <main className="content ox-page">
+        <p className="ox-note">Labour against the contract is the studio owner&apos;s.</p>
+      </main>
     );
   }
   const low = data.rows.filter((r) => r.warn).length;
   return (
-    <>
-      <PageHead title="Labour vs contract" sub={`Margin after crews, lowest first. Target ${data.targetPct}% of the contract${low ? ` · ${low} below it` : ''}. Material is not counted.`} />
-      <CrewsNav at="labour" />
-      <PageBody>
-        {data.rows.length === 0 ? (
-          <p className="s-card m-0 p-5 text-[14px] text-[var(--s-ink-2)]">No project has work orders yet.</p>
-        ) : (
-          <div className="s-card overflow-x-auto">
-            <table className="w-full min-w-[860px] border-collapse text-[13.5px]">
+    <main className="content ox-page">
+      <div className="phead">
+        <div>
+          <h1>Labour vs contract</h1>
+          <p className="muted">
+            Margin after crews, lowest first. Target {data.targetPct}% of the contract{low ? ` · ${low} below it` : ''}. Material is not counted.
+          </p>
+        </div>
+        {low ? (
+          <span className="chip bad">
+            <span className="dot" />
+            {low} below {data.targetPct}%
+          </span>
+        ) : null}
+      </div>
+      {data.rows.length === 0 ? (
+        <div className="empty">
+          <b>No project has work orders yet.</b>
+        </div>
+      ) : (
+        <section className="card flush" aria-label="Labour by project">
+          <div className="tscroll">
+            <table className="tbl" style={{ minWidth: 860 }}>
               <thead>
-                <tr className="text-left">
-                  {['Project', 'Contract', 'Expected', 'Committed', 'Paid', 'Margin', ''].map((h, i) => (
-                    <th key={i} className={`s-label px-3 py-2.5 font-normal ${i > 0 && i < 6 ? 'text-right' : ''}`}>
+                <tr>
+                  <th scope="col">Project</th>
+                  {['Contract', 'Expected', 'Committed', 'Paid', 'Margin'].map((h) => (
+                    <th key={h} scope="col" style={{ textAlign: 'right' }}>
                       {h}
                     </th>
                   ))}
+                  <th scope="col">
+                    <span className="sr-only">Warning</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {data.rows.map((r) => (
-                  <tr key={r.projectId} className="border-t border-[var(--s-rule)]">
-                    <td className="px-3 py-2.5">
-                      <Link href={`/studio/projects/${r.projectId}?tab=crews`} className="text-[var(--s-ink)] no-underline hover:text-[var(--s-accent)]">
+                  <tr key={r.projectId}>
+                    <td>
+                      <Link href={`/studio/projects/${r.projectId}?tab=crews`} style={{ fontWeight: 600 }}>
                         {r.projectName}
                       </Link>
-                      <span className="block text-[12px] text-[var(--s-ink-3)]">
+                      <div className="muted sm">
                         {r.orders} work order{r.orders === 1 ? '' : 's'}
                         {r.pendingLines ? ` · +${r.pendingLines} to price` : ''}
                         {r.extrasPaise ? ` · extras ${formatINR(r.extrasPaise)}` : ''}
-                      </span>
+                      </div>
                     </td>
-                    <td className="s-num px-3 py-2.5 text-right font-[family-name:var(--font-mono)]">{r.contractPaise === null ? '—' : formatINR(r.contractPaise)}</td>
-                    <td className="s-num px-3 py-2.5 text-right font-[family-name:var(--font-mono)]">{formatINR(r.expectedPaise)}</td>
-                    <td className="s-num px-3 py-2.5 text-right font-[family-name:var(--font-mono)]">{formatINR(r.committedPaise)}</td>
-                    <td className="s-num px-3 py-2.5 text-right font-[family-name:var(--font-mono)]">{formatINR(r.paidPaise)}</td>
-                    <td className="s-num px-3 py-2.5 text-right font-[family-name:var(--font-mono)] font-semibold" style={r.warn ? { color: 'var(--s-bad)' } : undefined}>
+                    <td className="mono" style={{ textAlign: 'right' }}>
+                      {r.contractPaise === null ? '—' : formatINR(r.contractPaise)}
+                    </td>
+                    <td className="mono" style={{ textAlign: 'right' }}>
+                      {formatINR(r.expectedPaise)}
+                    </td>
+                    <td className="mono" style={{ textAlign: 'right' }}>
+                      {formatINR(r.committedPaise)}
+                    </td>
+                    <td className="mono" style={{ textAlign: 'right' }}>
+                      {formatINR(r.paidPaise)}
+                    </td>
+                    <td className={`mono${r.warn ? ' bad-t' : ''}`} style={{ textAlign: 'right', fontWeight: 600 }}>
                       {r.marginPaise === null ? '—' : formatINR(r.marginPaise)}
-                      <span className="block text-[12px] font-normal">{pct(r.marginBp)}</span>
+                      <div className="sm" style={{ fontWeight: 400 }}>
+                        {pct(r.marginBp)}
+                      </div>
                     </td>
-                    <td className="px-3 py-2.5 text-[12.5px]" style={{ color: 'var(--s-bad)' }}>
-                      {r.warn ? `Below ${data.targetPct}%` : ''}
+                    <td>
+                      {r.warn ? (
+                        <span className="chip bad">
+                          <span className="dot" />
+                          Below {data.targetPct}%
+                        </span>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        )}
-      </PageBody>
-    </>
+        </section>
+      )}
+    </main>
   );
 }

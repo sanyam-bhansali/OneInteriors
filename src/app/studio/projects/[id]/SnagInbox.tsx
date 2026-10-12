@@ -34,7 +34,7 @@ export interface InboxSnag {
 type Assignee = { id: string; name: string; role: string };
 
 const ROLE: Record<string, string> = { OWNER: 'Owner', PM: 'Project manager', SUPERVISOR: 'Site supervisor' };
-const muted = 'text-[12.5px] text-[var(--s-ink-3)]';
+const muted = 'text-[12.5px] text-[var(--muted)]';
 const lockIcon = (
   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <rect x="4" y="10" width="16" height="11" rx="2" />
@@ -69,7 +69,7 @@ export function SnagInbox(props: {
           <AddSnags projectId={props.projectId} customerFirst={customerFirst} onDone={() => setAdding(false)} />
         ) : (
           <div>
-            <button type="button" className="s-btn-ghost" onClick={() => setAdding(true)}>
+            <button type="button" className="btn ghost sm" onClick={() => setAdding(true)}>
               Add snags · handover walk-through
             </button>
           </div>
@@ -84,8 +84,8 @@ export function SnagInbox(props: {
             if (list.length === 0 && !lane.empty) return null;
             return (
               <section key={lane.key} aria-label={lane.title} className="flex flex-col gap-2">
-                <h3 className="m-0 text-[12px] font-semibold uppercase tracking-[0.06em] text-[var(--s-ink-3)]">
-                  {lane.title} <span className="font-[family-name:var(--font-mono)]">{list.length}</span>
+                <h3 className="m-0 text-[12px] font-semibold uppercase tracking-[0.06em] text-[var(--muted)]">
+                  {lane.title} <span className="mono">{list.length}</span>
                 </h3>
                 {list.length === 0 ? <p className={`m-0 ${muted}`}>{lane.empty}</p> : null}
                 <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -104,19 +104,19 @@ export function SnagInbox(props: {
             type="button"
             onClick={() => setShowClosed((v) => !v)}
             aria-expanded={showClosed}
-            className="self-start text-[12px] font-semibold uppercase tracking-[0.06em] text-[var(--s-ink-3)] hover:text-[var(--s-ink)]"
+            className="self-start text-[12px] font-semibold uppercase tracking-[0.06em] text-[var(--muted)] hover:text-[var(--ink)]"
           >
-            Closed <span className="font-[family-name:var(--font-mono)]">{closed.length}</span> {showClosed ? '▾' : '▸'}
+            Closed <span className="mono">{closed.length}</span> {showClosed ? '▾' : '▸'}
           </button>
           {showClosed ? (
             <ul className="m-0 flex list-none flex-col p-0">
               {closed.map((s) => (
-                <li key={s.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-t border-[var(--s-rule)] py-2.5 text-[13.5px]">
+                <li key={s.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-t border-[var(--fill2)] py-2.5 text-[13.5px]">
                   <span>
                     {s.title}
                     <span className={`block ${muted}`}>{[s.room, s.raisedLine].filter(Boolean).join(' · ')}</span>
                   </span>
-                  <span className="text-right text-[12.5px] text-[var(--s-good)]">
+                  <span className="text-right text-[12.5px] text-[var(--good)]">
                     {s.closedBy === 'auto' ? 'Closed after 7 days' : `Closed · ${customerFirst} confirmed`}
                     {s.closedLabel ? <span className={`block ${muted}`}>{s.closedLabel}</span> : null}
                   </span>
@@ -152,7 +152,7 @@ function SnagCard({
   const [mode, setMode] = useState<'view' | 'accept' | 'dispute'>('view');
   const status = statusLine(s, customerFirst);
   return (
-    <li className="rounded-[12px] border border-[var(--s-rule)] bg-[var(--s-surface)] p-3.5">
+    <li className="rounded-[12px] border border-[var(--fill2)] bg-[var(--paper)] p-3.5">
       <div className="flex gap-3">
         {s.before ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -166,15 +166,15 @@ function SnagCard({
             </span>
           </div>
           <p className={`m-0 mt-0.5 ${muted}`}>{[s.room, s.raisedLine].filter(Boolean).join(' · ')}</p>
-          {s.raisedNote ? <p className="m-0 mt-1.5 text-[13.5px] text-[var(--s-ink-2)]">“{s.raisedNote}”</p> : null}
+          {s.raisedNote ? <p className="m-0 mt-1.5 text-[13.5px] text-[var(--text2)]">“{s.raisedNote}”</p> : null}
           {s.state === 'reopened' ? (
-            <p className="m-0 mt-1.5 text-[13.5px]" style={{ color: 'var(--s-bad)' }}>
+            <p className="m-0 mt-1.5 text-[13.5px]" style={{ color: 'var(--bad)' }}>
               {customerFirst} says it is not fixed{s.notFixedReason ? `: “${s.notFixedReason}”` : '.'}
             </p>
           ) : null}
-          {s.disputeReason ? <p className="m-0 mt-1.5 text-[13.5px] text-[var(--s-ink-2)]">Your reason, which {customerFirst} reads: “{s.disputeReason}”</p> : null}
+          {s.disputeReason ? <p className="m-0 mt-1.5 text-[13.5px] text-[var(--text2)]">Your reason, which {customerFirst} reads: “{s.disputeReason}”</p> : null}
           {s.internalNote && s.lane !== 'closed' ? (
-            <p className="m-0 mt-1.5 inline-flex items-start gap-1.5 rounded-[6px] bg-[var(--s-surface-2)] px-2 py-1 text-[12.5px] text-[var(--s-ink-2)]">
+            <p className="m-0 mt-1.5 inline-flex items-start gap-1.5 rounded-[6px] bg-[var(--fill)] px-2 py-1 text-[12.5px] text-[var(--text2)]">
               <span className="mt-[3px]">{lockIcon}</span>
               <span>
                 Only your team: {s.internalNote}
@@ -198,22 +198,22 @@ function SnagCard({
       {mode === 'view' && s.lane !== 'waiting-customer' ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {canAccept && (s.state === 'raised' || s.state === 'reopened' || s.state === 'disputed') ? (
-            <button type="button" className="s-btn" onClick={() => setMode('accept')}>
+            <button type="button" className="btn pri sm" onClick={() => setMode('accept')}>
               Accept · set fix-by
             </button>
           ) : null}
           {canAccept && s.state === 'accepted' ? (
-            <button type="button" className="s-btn-ghost" onClick={() => setMode('accept')}>
+            <button type="button" className="btn ghost sm" onClick={() => setMode('accept')}>
               Change date or person
             </button>
           ) : null}
           {canAccept && (s.state === 'raised' || s.state === 'reopened' || s.state === 'accepted') ? (
-            <button type="button" className="s-btn-ghost" onClick={() => setMode('dispute')}>
+            <button type="button" className="btn ghost sm" onClick={() => setMode('dispute')}>
               Not a defect…
             </button>
           ) : null}
           {canFix && s.state !== 'disputed' ? (
-            <Link href={`/studio/site/snag/${s.id}`} className="s-btn-ghost no-underline">
+            <Link href={`/studio/site/snag/${s.id}`} className="btn ghost sm no-underline">
               Mark fixed (after photo)
             </Link>
           ) : null}
@@ -231,19 +231,19 @@ function SnagCard({
 function statusLine(s: InboxSnag, customerFirst: string): { text: string; tone: string } {
   switch (s.state) {
     case 'raised':
-      return { text: 'New · not answered yet', tone: 'var(--s-warn)' };
+      return { text: 'New · not answered yet', tone: 'var(--warn)' };
     case 'reopened':
-      return { text: `Not fixed, says ${customerFirst}${s.reopenCount > 1 ? ` (${s.reopenCount}×)` : ''}`, tone: 'var(--s-bad)' };
+      return { text: `Not fixed, says ${customerFirst}${s.reopenCount > 1 ? ` (${s.reopenCount}×)` : ''}`, tone: 'var(--bad)' };
     case 'accepted':
       return s.overdue
-        ? { text: `Late · was due ${s.fixByLabel}${s.assigneeName ? ` · ${s.assigneeName}` : ''}`, tone: 'var(--s-bad)' }
-        : { text: `Fix by ${s.fixByLabel ?? '—'}${s.assigneeName ? ` · ${s.assigneeName}` : ''}`, tone: 'var(--s-accent)' };
+        ? { text: `Late · was due ${s.fixByLabel}${s.assigneeName ? ` · ${s.assigneeName}` : ''}`, tone: 'var(--bad)' }
+        : { text: `Fix by ${s.fixByLabel ?? '—'}${s.assigneeName ? ` · ${s.assigneeName}` : ''}`, tone: 'var(--acc)' };
     case 'disputed':
-      return { text: `Disputed · ${customerFirst} can agree, or our team looks at it`, tone: 'var(--s-ink-2)' };
+      return { text: `Disputed · ${customerFirst} can agree, or our team looks at it`, tone: 'var(--text2)' };
     case 'fixed':
-      return { text: `Fixed · waiting for ${customerFirst}`, tone: 'var(--s-good)' };
+      return { text: `Fixed · waiting for ${customerFirst}`, tone: 'var(--good)' };
     case 'closed':
-      return { text: 'Closed', tone: 'var(--s-good)' };
+      return { text: 'Closed', tone: 'var(--good)' };
   }
 }
 
@@ -254,9 +254,9 @@ function Photo({ src, caption }: { src: string | null; caption: string }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt={caption} className="aspect-[4/3] w-full rounded-[8px] object-cover" />
       ) : (
-        <div className="flex aspect-[4/3] w-full items-center justify-center rounded-[8px] bg-[var(--s-surface-2)] text-[12px] text-[var(--s-ink-3)]">No photo</div>
+        <div className="flex aspect-[4/3] w-full items-center justify-center rounded-[8px] bg-[var(--fill)] text-[12px] text-[var(--muted)]">No photo</div>
       )}
-      <figcaption className="text-[12px] text-[var(--s-ink-3)]">{caption}</figcaption>
+      <figcaption className="text-[12px] text-[var(--muted)]">{caption}</figcaption>
     </figure>
   );
 }
@@ -290,10 +290,10 @@ function AcceptForm({
       else setError(r.error);
     });
   return (
-    <div className="mt-3 flex flex-col gap-3 rounded-[10px] bg-[var(--s-surface-2)] p-3">
+    <div className="mt-3 flex flex-col gap-3 rounded-[10px] bg-[var(--fill)] p-3">
       <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
-        <legend className="mb-1.5 text-[12.5px] font-semibold text-[var(--s-ink-2)]">
-          Fix by <span className="font-normal text-[var(--s-accent)]">· {customerFirst} sees this</span>
+        <legend className="mb-1.5 text-[12.5px] font-semibold text-[var(--text2)]">
+          Fix by <span className="font-normal acc-t">· {customerFirst} sees this</span>
         </legend>
         <div className="flex flex-wrap items-center gap-2">
           {quickDays.map((q) => (
@@ -303,16 +303,16 @@ function AcceptForm({
               aria-pressed={day === q.day}
               onClick={() => setDay(q.day)}
               className="min-h-[36px] rounded-full border px-3 text-[13px]"
-              style={day === q.day ? { background: 'var(--s-accent)', borderColor: 'var(--s-accent)', color: '#fff' } : { borderColor: 'var(--s-rule)' }}
+              style={day === q.day ? { background: 'var(--ink)', borderColor: 'var(--ink)', color: 'var(--paper)' } : { borderColor: 'var(--fill2)' }}
             >
               {q.label}
             </button>
           ))}
-          <input type="date" aria-label="Fix-by date" className="s-input max-w-[170px]" min={today} value={day} onChange={(e) => setDay(e.target.value)} />
+          <input type="date" aria-label="Fix-by date" className="fld max-w-[170px]" min={today} value={day} onChange={(e) => setDay(e.target.value)} />
         </div>
       </fieldset>
       <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
-        <legend className="mb-1.5 text-[12.5px] font-semibold text-[var(--s-ink-2)]">Who fixes it · only your team</legend>
+        <legend className="mb-1.5 text-[12.5px] font-semibold text-[var(--text2)]">Who fixes it · only your team</legend>
         {assignees.length === 0 ? (
           <p className={`m-0 ${muted}`}>Nobody on this project yet. Add a supervisor to it from Settings, Team.</p>
         ) : (
@@ -324,7 +324,7 @@ function AcceptForm({
                 aria-pressed={who === a.id}
                 onClick={() => setWho(a.id)}
                 className="min-h-[36px] rounded-full border px-3 text-left text-[13px]"
-                style={who === a.id ? { background: 'var(--s-accent)', borderColor: 'var(--s-accent)', color: '#fff' } : { borderColor: 'var(--s-rule)' }}
+                style={who === a.id ? { background: 'var(--ink)', borderColor: 'var(--ink)', color: 'var(--paper)' } : { borderColor: 'var(--fill2)' }}
               >
                 {a.name} <span className="opacity-75">· {ROLE[a.role] ?? a.role}</span>
               </button>
@@ -333,21 +333,21 @@ function AcceptForm({
         )}
       </fieldset>
       <label className="flex flex-col gap-1.5">
-        <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[var(--s-ink-2)]">
+        <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[var(--text2)]">
           {lockIcon} Note for them · only your team (optional)
         </span>
-        <input className="s-input" maxLength={300} value={note} placeholder="Add a 3-inch filler strip, laminate to match the shutters." onChange={(e) => setNote(e.target.value)} />
+        <input className="fld" maxLength={300} value={note} placeholder="Add a 3-inch filler strip, laminate to match the shutters." onChange={(e) => setNote(e.target.value)} />
       </label>
       {error ? (
-        <p role="alert" className="m-0 text-[13px] text-[var(--s-bad)]">
+        <p role="alert" className="m-0 text-[13px] text-[var(--bad)]">
           {error}
         </p>
       ) : null}
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="s-btn" disabled={pending || !day || !who} onClick={save}>
+        <button type="button" className="btn pri sm" disabled={pending || !day || !who} onClick={save}>
           {pending ? 'Saving…' : `Accept · tell ${customerFirst}`}
         </button>
-        <button type="button" className="s-btn-ghost" onClick={onClose}>
+        <button type="button" className="btn ghost sm" onClick={onClose}>
           Cancel
         </button>
       </div>
@@ -367,13 +367,13 @@ function DisputeForm({ snag, projectId, customerFirst, onClose }: { snag: InboxS
       else setError(r.error);
     });
   return (
-    <div className="mt-3 flex flex-col gap-2 rounded-[10px] bg-[var(--s-surface-2)] p-3">
+    <div className="mt-3 flex flex-col gap-2 rounded-[10px] bg-[var(--fill)] p-3">
       <label className="flex flex-col gap-1.5">
-        <span className="text-[12.5px] font-semibold text-[var(--s-ink-2)]">
-          Why it is not a defect <span className="font-normal text-[var(--s-accent)]">· {customerFirst} reads this</span>
+        <span className="text-[12.5px] font-semibold text-[var(--text2)]">
+          Why it is not a defect <span className="font-normal acc-t">· {customerFirst} reads this</span>
         </span>
         <textarea
-          className="s-input min-h-[72px]"
+          className="fld min-h-[72px]"
           maxLength={300}
           value={reason}
           placeholder="Natural stone has veins like this; it was in the sample you picked on 12 Sep."
@@ -382,15 +382,15 @@ function DisputeForm({ snag, projectId, customerFirst, onClose }: { snag: InboxS
       </label>
       <p className={`m-0 ${muted}`}>The snag stays open. {customerFirst} can agree and close it; if not, our team looks at it with you.</p>
       {error ? (
-        <p role="alert" className="m-0 text-[13px] text-[var(--s-bad)]">
+        <p role="alert" className="m-0 text-[13px] text-[var(--bad)]">
           {error}
         </p>
       ) : null}
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="s-btn" disabled={pending || reason.trim().length < 3} onClick={send}>
+        <button type="button" className="btn pri sm" disabled={pending || reason.trim().length < 3} onClick={send}>
           {pending ? 'Sending…' : `Send to ${customerFirst}`}
         </button>
-        <button type="button" className="s-btn-ghost" onClick={onClose}>
+        <button type="button" className="btn ghost sm" onClick={onClose}>
           Cancel
         </button>
       </div>
@@ -417,7 +417,7 @@ function AddSnags({ projectId, customerFirst, onDone }: { projectId: string; cus
       } else setMessage({ ok: false, text: r.error });
     });
   return (
-    <div className="flex flex-col gap-2 rounded-[12px] border border-[var(--s-rule)] bg-[var(--s-surface-2)] p-3.5">
+    <div className="flex flex-col gap-2 rounded-[12px] border border-[var(--fill2)] bg-[var(--fill)] p-3.5">
       <p className="m-0 text-[14px] font-semibold">Handover walk-through</p>
       <p className={`m-0 ${muted}`}>
         Walk the flat with {customerFirst} and add everything here, one line each. {customerFirst} sees the list in the app. Accept each one after, with a date and who fixes it.
@@ -426,7 +426,7 @@ function AddSnags({ projectId, customerFirst, onDone }: { projectId: string; cus
         {rows.map((r, i) => (
           <div key={r.key} className="grid grid-cols-[minmax(0,1fr)_150px] gap-2">
             <input
-              className="s-input"
+              className="fld"
               aria-label={`Snag ${i + 1}: what is wrong`}
               placeholder={i === 0 ? 'Shutter rubbing at the top' : 'What is wrong'}
               maxLength={120}
@@ -436,23 +436,23 @@ function AddSnags({ projectId, customerFirst, onDone }: { projectId: string; cus
                 if (e.key === 'Enter' && i === rows.length - 1 && r.title.trim()) setRows((rs) => [...rs, blank()]);
               }}
             />
-            <input className="s-input" aria-label={`Snag ${i + 1}: room`} placeholder="Room" maxLength={40} value={r.room} onChange={(e) => set(r.key, { room: e.target.value })} />
+            <input className="fld" aria-label={`Snag ${i + 1}: room`} placeholder="Room" maxLength={40} value={r.room} onChange={(e) => set(r.key, { room: e.target.value })} />
           </div>
         ))}
       </div>
-      <button type="button" className="self-start text-[13px] text-[var(--s-accent)]" onClick={() => setRows((rs) => [...rs, blank()])}>
+      <button type="button" className="self-start text-[13px] acc-t" onClick={() => setRows((rs) => [...rs, blank()])}>
         + Another line
       </button>
       {message ? (
-        <p role="status" className={`m-0 text-[13px] ${message.ok ? 'text-[var(--s-good)]' : 'text-[var(--s-bad)]'}`}>
+        <p role="status" className={`m-0 text-[13px] ${message.ok ? 'text-[var(--good)]' : 'text-[var(--bad)]'}`}>
           {message.text}
         </p>
       ) : null}
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="s-btn" disabled={pending || filled === 0} onClick={save}>
+        <button type="button" className="btn pri sm" disabled={pending || filled === 0} onClick={save}>
           {pending ? 'Adding…' : filled > 0 ? `Add ${filled} snag${filled === 1 ? '' : 's'}` : 'Add snags'}
         </button>
-        <button type="button" className="s-btn-ghost" onClick={onDone}>
+        <button type="button" className="btn ghost sm" onClick={onDone}>
           Done
         </button>
       </div>

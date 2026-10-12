@@ -23,8 +23,7 @@ import type { State } from '../../form-state';
  * to be lost rather than discovering it in week five.
  */
 
-const quiet =
-  'rounded-[8px] border border-[var(--s-rule)] px-3 py-1.5 text-[13px] font-medium hover:border-[var(--s-ink-3)] disabled:opacity-40';
+const quiet = 'btn sec sm';
 
 function Row({ row }: { row: BinnedRow }) {
   const [busy, start] = useTransition();
@@ -41,14 +40,14 @@ function Row({ row }: { row: BinnedRow }) {
   const soon = row.daysLeft <= 3;
 
   return (
-    <li className="s-card flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-      <div className="min-w-0">
-        <p className="m-0 truncate text-[14.5px] font-medium">{row.name}</p>
-        {row.phone ? <span className="s-num text-[12.5px] text-[var(--s-ink-3)]">{row.phone}</span> : null}
+    <li className="card" style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: '8px 16px', padding: '14px 18px' }}>
+      <div style={{ minWidth: 0 }}>
+        <p style={{ margin: 0, fontWeight: 600, fontSize: 15 }}>{row.name}</p>
+        {row.phone ? <span className="mono muted sm">{row.phone}</span> : null}
       </div>
 
       <span
-        className={`text-[12.5px] ${soon ? 'font-medium text-[var(--s-accent)]' : 'text-[var(--s-ink-3)]'}`}
+        className={`chip xs ${soon ? 'warn' : ''}`}
       >
         {row.daysLeft === 0
           ? 'Erasing now'
@@ -57,7 +56,7 @@ function Row({ row }: { row: BinnedRow }) {
         {row.erasesOn.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
       </span>
 
-      <div className="ml-auto flex flex-wrap items-center gap-2">
+      <div className="hstack" style={{ marginLeft: 'auto', gap: 8 }}>
         <button type="button" disabled={busy} onClick={() => run(restoreAction)} className={quiet}>
           {busy ? 'Working…' : 'Restore'}
         </button>
@@ -68,7 +67,7 @@ function Row({ row }: { row: BinnedRow }) {
               type="button"
               disabled={busy}
               onClick={() => run(eraseAction)}
-              className={`${quiet} !border-[var(--s-bad)] !text-[var(--s-bad)]`}
+              className="btn sec sm bad-b"
             >
               Yes, forever
             </button>
@@ -80,7 +79,7 @@ function Row({ row }: { row: BinnedRow }) {
           <button
             type="button"
             onClick={() => setAsking(true)}
-            className="text-[12.5px] text-[var(--s-ink-3)] underline hover:text-[var(--s-bad)]"
+            className="btn ghost xs"
           >
             Delete forever
           </button>
@@ -88,7 +87,7 @@ function Row({ row }: { row: BinnedRow }) {
       </div>
 
       {error ? (
-        <p role="alert" className="m-0 w-full text-[12.5px] text-[var(--s-bad)]">{error}</p>
+        <p role="alert" className="cl-err" style={{ width: '100%' }}>{error}</p>
       ) : null}
     </li>
   );
@@ -97,9 +96,9 @@ function Row({ row }: { row: BinnedRow }) {
 export function BinList({ rows }: { rows: BinnedRow[] }) {
   if (rows.length === 0) {
     return (
-      <div className="s-card p-8">
-        <p className="m-0 mb-2 text-[15.5px] font-semibold">Nothing deleted.</p>
-        <p className="m-0 max-w-[58ch] text-[14.5px] leading-relaxed text-[var(--s-ink-2)]">
+      <div className="empty">
+        <b>Nothing deleted.</b>
+        <p className="muted" style={{ margin: 0, maxWidth: '58ch', lineHeight: 1.5 }}>
           When you delete a client they wait here for {BIN_DAYS} days before they go for good, so a
           delete is never the end of it.
         </p>
@@ -108,7 +107,7 @@ export function BinList({ rows }: { rows: BinnedRow[] }) {
   }
 
   return (
-    <ul className="m-0 flex list-none flex-col gap-2 p-0">
+    <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
       {rows.map((row) => (
         <Row key={row.id} row={row} />
       ))}

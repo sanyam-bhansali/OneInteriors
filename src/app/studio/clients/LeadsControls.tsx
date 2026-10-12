@@ -71,13 +71,30 @@ export function ViewToggle({ query, view, sort }: { query: string; view: 'list' 
   const go = useGo(view, sort);
   const f = parseLeadFilters(new URLSearchParams(query));
   return (
-    <div role="group" aria-label="List or board" className="flex overflow-hidden rounded-[9px] border border-[var(--s-rule)] bg-[var(--s-surface)] text-[13px] font-medium">
-      {(['list', 'board'] as const).map((v) => (
-        <button key={v} type="button" aria-pressed={view === v} onClick={() => go(f, { view: v })} className={`flex items-center gap-1.5 px-3 py-1.5 ${view === v ? 'bg-[var(--s-accent)] text-white' : 'hover:bg-[var(--s-rail-active)]'}`}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <path d={v === 'list' ? 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01' : 'M4 4h5v16H4zM10 4h5v10h-5zM16 4h4v7h-4z'} />
-          </svg>
+    <div className="tabs" role="tablist" aria-label="Board or list">
+      {(['board', 'list'] as const).map((v) => (
+        <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => go(f, { view: v })}>
           {v === 'list' ? 'List' : 'Board'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Where they came from, as the design's tabs: one source at a time (the panel picks several). */
+const SOURCE_TABS: ClientSourceName[] = ['ONE_INTERIORS', 'WALK_IN', 'REFERRAL', 'INSTAGRAM'];
+export function SourceTabs({ query, view, sort }: { query: string; view: 'list' | 'board'; sort: SortKey }) {
+  const go = useGo(view, sort);
+  const f = parseLeadFilters(new URLSearchParams(query));
+  const one = f.source?.length === 1 ? f.source[0] : null;
+  return (
+    <div className="tabs" role="tablist" aria-label="Where they came from">
+      <button type="button" role="tab" aria-selected={!f.source?.length} onClick={() => go(without(f, 'source'))}>
+        All
+      </button>
+      {SOURCE_TABS.map((k) => (
+        <button key={k} type="button" role="tab" aria-selected={one === k} onClick={() => go({ ...f, source: [k] })}>
+          {SOURCE_LABELS[k]}
         </button>
       ))}
     </div>
@@ -96,7 +113,7 @@ export function KpiCards({ kpis, query, view, sort }: { kpis: Kpis; query: strin
   // Distinct leads (an overdue call AND an overdue task is one lead), the same rule the list filters by.
   const needs = kpis.needs;
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+    <div className="cl-kpis">
       <Stat label="Total leads" value={kpis.total} note={kpis.newToday ? `+${kpis.newToday.toLocaleString('en-IN')} today` : 'all time'} noteTone="good" />
       <Stat label="Pending" value={kpis.pending} note="untouched — nothing done" noteTone={kpis.pending > 0 ? 'warn' : undefined} icon="M4 13h4l2 3h4l2-3h4M4 13l2-8h12l2 8v6H4z" iconTone={kpis.pending > 0 ? 'warn' : undefined} active={f.kpi === 'pending'} onClick={() => toggle('pending')} />
       <Stat label="Callbacks" value={kpis.callbacks} note={kpis.overdue > 0 ? `${kpis.overdue.toLocaleString('en-IN')} overdue` : 'calls scheduled'} noteTone={kpis.overdue > 0 ? 'bad' : undefined} icon="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4" iconTone="violet" active={f.kpi === 'callbacks'} onClick={() => toggle('callbacks')} />
@@ -108,35 +125,36 @@ export function KpiCards({ kpis, query, view, sort }: { kpis: Kpis; query: strin
 }
 
 const TONE: Record<string, string> = {
-  good: 'text-[var(--s-good)]',
-  warn: 'text-[var(--s-warn)]',
-  bad: 'text-[var(--s-bad)]',
-  violet: 'text-[#6a3f90]',
-  accent: 'text-[var(--s-accent)]',
+  good: 'var(--good)',
+  warn: 'var(--warn)',
+  bad: 'var(--bad)',
+  violet: 'var(--acc)',
+  accent: 'var(--acc)',
 };
 
 function Stat({ label, value, note, noteTone, icon, iconTone, active, onClick }: { label: string; value: number; note: string; noteTone?: string; icon?: string; iconTone?: string; active?: boolean; onClick?: () => void }) {
   const body = (
     <>
-      <div className="flex items-center justify-between">
-        <span className="text-[12px] font-medium text-[var(--s-ink-3)]">{label}</span>
+      <span className="l">
+        {label}
         {icon ? (
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={iconTone ? TONE[iconTone] : 'text-[var(--s-ink-3)]'}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ color: iconTone ? TONE[iconTone] : 'var(--muted)' }}>
             <path d={icon} />
           </svg>
         ) : null}
-      </div>
-      <div className="s-num mt-1 text-[26px] font-semibold tracking-tight">{value.toLocaleString('en-IN')}</div>
-      <div className={`text-[12px] font-semibold ${noteTone ? TONE[noteTone] : 'text-[var(--s-ink-3)]'}`}>{note}</div>
+      </span>
+      <span className="v">{value.toLocaleString('en-IN')}</span>
+      <span className="s" style={noteTone ? { color: TONE[noteTone], fontWeight: 500 } : undefined}>
+        {note}
+      </span>
     </>
   );
-  const cls = `s-card px-[18px] py-4 text-left ${active ? 'border-[var(--s-accent)] shadow-[0_0_0_1px_var(--s-accent)]' : ''}`;
   return onClick ? (
-    <button type="button" aria-pressed={active} onClick={onClick} className={`${cls} cursor-pointer transition-colors hover:border-[var(--s-ink-3)]`}>
+    <button type="button" aria-pressed={active} onClick={onClick} className="cl-stat">
       {body}
     </button>
   ) : (
-    <div className={cls}>{body}</div>
+    <div className="cl-stat">{body}</div>
   );
 }
 
@@ -164,6 +182,7 @@ export function Toolbar({
   base,
   keep,
   pool = false,
+  lead,
 }: {
   query: string;
   view: 'list' | 'board';
@@ -180,6 +199,8 @@ export function Toolbar({
   keep?: Record<string, string>;
   /** The pool: Stage, Source, Tags and your fields only; no Today, sort or saved views. */
   pool?: boolean;
+  /** Shown first on the toolbar's row (the leads page's Board/List and source tabs). */
+  lead?: React.ReactNode;
 }) {
   const go = useGo(view, sort, base, keep);
   const f = parseLeadFilters(new URLSearchParams(query));
@@ -214,8 +235,9 @@ export function Toolbar({
   };
 
   return (
-    <div className="relative">
-      <div className="flex flex-wrap items-center gap-2">
+    <div style={{ position: 'relative' }}>
+      <div className="hstack">
+        {lead}
         <button type="button" onClick={openPanel} aria-expanded={open} className={(panelCount > 0 && !defaultOn) || open ? btnPrimary : btnOutline}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
             <path d="M4 5h16l-6 7.5V19l-4 1v-7.5z" />
@@ -226,9 +248,9 @@ export function Toolbar({
         {views
           .filter((v) => v.isDefault && v.id === activeView?.id)
           .map((v) => (
-            <span key={v.id} className="inline-flex items-center gap-1 rounded-full border border-[var(--s-accent)] px-2.5 py-1 text-[12.5px] font-medium text-[var(--s-accent)]">
+            <span key={v.id} className="cl-vchip on">
               ★ {v.name}
-              <button type="button" aria-label="Remove this filter" onClick={() => go({}, { sort: 'newest' })} className="px-1">
+              <button type="button" aria-label="Remove this filter" onClick={() => go({}, { sort: 'newest' })} className="x">
                 ×
               </button>
             </span>
@@ -238,7 +260,7 @@ export function Toolbar({
             × Clear
           </button>
         ) : null}
-        <span className="flex-1" />
+        <span style={{ flex: 1 }} />
         {pool ? null : (
         <>
         <button type="button" aria-pressed={f.kpi === 'today'} onClick={() => go(f.kpi === 'today' ? without(f, 'kpi') : { ...f, kpi: 'today' })} title="Due today — calls and tasks due today, and new leads nobody has touched (overdue ones are in Needs action)" className={f.kpi === 'today' ? btnPrimary : btnOutline}>
@@ -254,9 +276,10 @@ export function Toolbar({
 
       {open ? (
         <>
-          <div className="fixed inset-0 z-40 bg-black/15 backdrop-blur-[1px]" onClick={() => setOpen(false)} aria-hidden />
-          <div className="s-card relative z-50 mt-2 bg-[var(--s-surface-2)] p-2.5">
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="cl-scrim" onClick={() => setOpen(false)} aria-hidden />
+          <div className="cl-panel">
+            <span className="lbl">Filters</span>
+            <div className="hstack" style={{ gap: 8 }}>
               <MultiSelect label="Stage" allLabel="All stages" values={draft.stage ?? []} options={stages.map((s) => ({ value: s.id, label: s.name, colour: s.colour }))} onChange={(v) => setDraft((d) => (v.length ? { ...d, stage: v } : without(d, 'stage')))} />
               <MultiSelect
                 label="Source"
@@ -286,27 +309,28 @@ export function Toolbar({
               ) : null}
             </div>
 
-            <div className={`mt-3 border-t border-[var(--s-rule)] pt-2.5 ${pool ? 'hidden' : ''}`}>
-              <div className="flex flex-wrap items-center gap-1.5">
+            <div style={{ display: pool ? 'none' : 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--fill2)', paddingTop: 12 }}>
+              <span className="lbl">Saved views</span>
+              <div className="hstack" style={{ gap: 6 }}>
                 {views.map((v) => {
                   const on = v.id === activeView?.id;
                   return (
-                    <span key={v.id} className={`inline-flex items-center gap-1 rounded-full border py-0.5 pl-2.5 pr-1 text-[12.5px] ${on || v.isDefault ? 'border-[var(--s-accent)]' : 'border-[var(--s-rule)]'} ${on ? 'bg-[var(--s-accent-wash)] font-semibold text-[var(--s-accent)]' : 'bg-[var(--s-surface)]'}`}>
+                    <span key={v.id} className={`cl-vchip ${on ? 'on' : ''}`}>
                       <button type="button" onClick={() => (on ? go({}, { sort: 'newest' }) : applyView(v))} title={on ? 'Remove this filter' : 'Apply this filter'}>
-                        {v.isDefault ? <span className="text-[var(--s-accent)]">★ </span> : null}
+                        {v.isDefault ? <span className="acc-t">★ </span> : null}
                         {v.name}
                       </button>
-                      <button type="button" disabled={pending} onClick={() => run(() => setDefaultViewAction(v.isDefault ? null : v.id))} title={v.isDefault ? 'Unset default' : 'Set as default view'} className={`px-1 ${v.isDefault ? 'text-[var(--s-accent)]' : 'text-[var(--s-ink-3)]'}`}>
+                      <button type="button" disabled={pending} onClick={() => run(() => setDefaultViewAction(v.isDefault ? null : v.id))} title={v.isDefault ? 'Unset default' : 'Set as default view'} className={v.isDefault ? 'acc-t' : 'x'}>
                         {v.isDefault ? '★' : '☆'}
                       </button>
-                      <button type="button" disabled={pending} onClick={() => run(() => deleteViewAction(v.id))} title="Delete filter" aria-label={`Delete ${v.name}`} className="px-1 text-[var(--s-ink-3)]">
+                      <button type="button" disabled={pending} onClick={() => run(() => deleteViewAction(v.id))} title="Delete filter" aria-label={`Delete ${v.name}`} className="x">
                         ×
                       </button>
                     </span>
                   );
                 })}
                 {views.length < MAX_VIEWS ? (
-                  <span className="flex items-center gap-2">
+                  <span className="hstack" style={{ gap: 8 }}>
                     <input
                       value={name}
                       maxLength={40}
@@ -315,7 +339,7 @@ export function Toolbar({
                         if (e.key === 'Enter' && name.trim()) run(() => saveViewAction(name.trim(), { query: [leadFiltersToQuery(draft), sort !== 'newest' ? `sort=${sort}` : ''].filter(Boolean).join('&'), view }));
                       }}
                       placeholder="Save current view as…"
-                      className="h-[30px] w-[170px] rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-2.5 text-[12.5px]"
+                      className="fld sm" style={{ width: 190 }}
                     />
                     <button
                       type="button"
@@ -332,10 +356,10 @@ export function Toolbar({
                   </span>
                 ) : null}
               </div>
-              {error ? <p className="m-0 mt-2 text-[12.5px] text-[var(--s-bad)]">{error}</p> : null}
+              {error ? <p className="cl-err">{error}</p> : null}
             </div>
 
-            <div className="mt-4 flex items-center justify-end gap-2">
+            <div className="hstack" style={{ justifyContent: 'flex-end', gap: 8 }}>
               <button type="button" onClick={() => setDraft({ ...(f.owner ? { owner: f.owner } : {}), ...(f.q ? { q: f.q } : {}) })} className={btnGhost}>
                 × Clear all
               </button>

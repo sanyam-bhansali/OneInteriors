@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
+import { LineIcon } from '../ui/icons';
 import { formatINRCompact } from '@/lib/money';
 // Values from the PURE module. `clients.ts` carries `server-only`, and a label
 // map is a value rather than a type — importing it from there pulls Prisma into
@@ -35,12 +36,10 @@ import { DragBoard, DragHandle, DropColumn, useCardDrag } from './Dnd';
 
 
 
-const input =
-  'rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[14px] text-[var(--s-ink)] placeholder:text-[var(--s-ink-3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]';
-const primary =
-  'rounded-[8px] bg-[var(--s-accent)] px-4 py-2 text-[14px] font-medium text-white hover:bg-[var(--s-accent-deep)] disabled:opacity-40';
-const quiet =
-  'rounded-[8px] border border-[var(--s-rule)] px-3 py-1.5 text-[13px] font-medium hover:border-[var(--s-ink-3)] disabled:opacity-40';
+/* The design's field and buttons (studio-ui.css, clients.css). */
+const input = 'fld';
+const primary = 'btn pri';
+const quiet = 'btn sec sm';
 
 function overdue(date: Date | null, today: Date): boolean {
   return date !== null && date <= today;
@@ -116,7 +115,7 @@ function CustomFields({
     <div className="flex flex-wrap gap-3">
       {fields.map((f) => (
         <label key={f.id} className="flex min-w-[9rem] flex-1 flex-col gap-1.5">
-          <span className="s-label">{f.label}</span>
+          <span className="lbl">{f.label}</span>
           {f.type === 'SELECT' ? (
             <select name={`custom.${f.key}`} defaultValue={values?.[f.key] ?? ''} className={input}>
               <option value="">—</option>
@@ -130,7 +129,7 @@ function CustomFields({
               defaultValue={values?.[f.key] ?? ''}
               type={f.type === 'DATE' ? 'date' : 'text'}
               inputMode={f.type === 'NUMBER' ? 'decimal' : undefined}
-              className={`${input} ${f.type === 'NUMBER' ? 's-num text-right' : ''}`}
+              className={`${input} ${f.type === 'NUMBER' ? 'mono text-right' : ''}`}
             />
           )}
         </label>
@@ -578,45 +577,47 @@ function AddClient({ label, fields, sources = [] }: { label: string; fields: Fie
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)} className={primary}>
-        {label}
+        {label.startsWith('+ ') ? (
+          <>
+            <LineIcon name="plus" size={17} />
+            {label.slice(2)}
+          </>
+        ) : (
+          label
+        )}
       </button>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/25 p-4 sm:items-center">
-      <button
-        type="button"
-        aria-label="Cancel"
-        onClick={() => setOpen(false)}
-        className="fixed inset-0 -z-10 cursor-default"
-      />
-      <form action={action} className="s-card relative flex w-[min(30rem,100%)] flex-col gap-3 p-5 shadow-xl">
-        <p className="m-0 text-[15px] font-semibold">Add a client</p>
+    <div className="overlay" style={{ overflowY: 'auto', padding: '48px 16px' }}>
+      <button type="button" aria-label="Cancel" onClick={() => setOpen(false)} className="scrim" />
+      <form action={action} className="cl-sheet" style={{ width: 'min(32rem, 100%)', padding: 20, gap: 14, maxHeight: 'none', overflow: 'visible' }}>
+        <p style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Add a client</p>
 
         <label className="flex flex-col gap-1.5">
-          <span className="s-label">Name</span>
+          <span className="lbl">Name</span>
           <input name="name" required autoFocus placeholder="Mrs Kothari" className={input} />
         </label>
 
         <div className="flex flex-wrap gap-3">
           <label className="flex flex-1 flex-col gap-1.5">
-            <span className="s-label">Phone</span>
+            <span className="lbl">Phone</span>
             <input name="phone" inputMode="tel" className={input} />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="s-label">Config</span>
-            <input name="config" placeholder="3 BHK" className={`${input} w-[6.5rem]`} />
+            <span className="lbl">Config</span>
+            <input name="config" placeholder="3 BHK" className={input} style={{ width: '6.5rem' }} />
           </label>
         </div>
 
         <div className="flex flex-wrap gap-3">
           <label className="flex flex-1 flex-col gap-1.5">
-            <span className="s-label">Society or area</span>
+            <span className="lbl">Society or area</span>
             <input name="society" placeholder="Kalyani Nagar" className={input} />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="s-label">Where from</span>
+            <span className="lbl">Where from</span>
             <select name="source" defaultValue="WALK_IN" className={input}>
               {(Object.keys(SOURCE_LABELS) as ClientSourceName[])
                 // Ours is not a choice anyone makes by hand — a One Interiors
@@ -639,16 +640,16 @@ function AddClient({ label, fields, sources = [] }: { label: string; fields: Fie
 
         <div className="flex flex-wrap gap-3">
           <label className="flex flex-1 flex-col gap-1.5">
-            <span className="s-label">Next thing to do</span>
+            <span className="lbl">Next thing to do</span>
             <input name="nextAction" placeholder="Call back with a rough number" className={input} />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="s-label">On</span>
+            <span className="lbl">On</span>
             <input type="date" name="nextActionOn" className={input} />
           </label>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="hstack">
           <button type="submit" disabled={pending} className={primary}>
             {pending ? 'Adding…' : 'Add'}
           </button>
@@ -659,7 +660,7 @@ function AddClient({ label, fields, sources = [] }: { label: string; fields: Fie
 
         {'ok' in state && !state.ok ? (
           <div role="alert" className="flex flex-col gap-2">
-            <p className="m-0 text-[12.5px] text-[var(--s-bad)]">{state.error}</p>
+            <p className="cl-err">{state.error}</p>
 
             {/* The override, beside the reason and only after it.
                 A "add anyway" checkbox sitting on the form before anybody has
@@ -740,7 +741,7 @@ export function AddClientButton({ fields, sources }: { fields: FieldRow[]; sourc
 
 /** "+ Add lead" in the leads header (the AxLeads look). */
 export function AddLeadButton({ fields, sources }: { fields: FieldRow[]; sources?: { id: string; name: string }[] }) {
-  return <AddClient label="+ Add lead" fields={fields} sources={sources} />;
+  return <AddClient label="+ Add a client" fields={fields} sources={sources} />;
 }
 
 /** The same form, reached from the empty state. See the note on `AddClient`. */

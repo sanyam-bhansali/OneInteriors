@@ -53,7 +53,7 @@ import {
 
 type Toast = { ok: boolean; text: string } | null;
 
-const muted = 'text-[12.5px] text-[var(--s-ink-3)]';
+const muted = 'text-[12.5px] text-[var(--muted)]';
 const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
 
 export function PlanTab({ plan, customer }: { plan: StudioPlan; customer: string }) {
@@ -71,16 +71,18 @@ export function PlanTab({ plan, customer }: { plan: StudioPlan; customer: string
     <section aria-label="Plan" className="flex flex-col gap-4">
       <Overall plan={plan} customer={customer} onMove={plan.canEdit ? () => setMoving(current?.id ?? plan.stages[0]!.id) : null} />
 
-      <div className="s-card p-5">
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="m-0 text-[16px] font-semibold">Stages</h2>
+      <div className="card flush">
+        <div className="chead">
+          <div className="flex flex-col gap-[3px]">
+            <h2>Plan</h2>
+            <span className="muted sm">
+              Hauspire&rsquo;s steps, each worth a share of the project. A stage finishes when its last step in scope is ticked, each with its photo.
+            </span>
+          </div>
           {/* The client sees the stages and only the starred steps; the rest stays with the team. */}
-          <span className="text-[11.5px] font-medium text-[var(--s-accent)]">{customer} sees the stages and ★ steps only</span>
+          <span className="sees">{customer} sees the stages and ★ steps only</span>
         </div>
-        <p className={`m-0 mt-1 ${muted}`}>
-          Hauspire&rsquo;s steps, each worth a share of the project. A stage finishes when its last step in scope is ticked, each with its photo.
-        </p>
-        <div className="mt-4 hidden grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1.4fr)] gap-3 px-1 pb-2 text-[12px] font-semibold text-[var(--s-ink-3)] md:grid">
+        <div className="oi-prow oi-prow-h">
           <span>Stage</span>
           <span>Planned</span>
           <span>Actual or forecast</span>
@@ -102,7 +104,7 @@ export function PlanTab({ plan, customer }: { plan: StudioPlan; customer: string
           <p
             role="status"
             className="pointer-events-auto m-0 max-w-[560px] rounded-[12px] px-4 py-3 text-[14px] font-medium shadow-lg"
-            style={toast.ok ? { background: 'var(--s-accent-deep)', color: '#fff' } : { background: 'var(--s-bad-wash)', color: 'var(--s-bad)', border: '1px solid var(--s-bad)' }}
+            style={toast.ok ? { background: 'var(--ink)', color: 'var(--paper)' } : { background: 'var(--bad-bg)', color: 'var(--bad)', border: '1px solid var(--bad)' }}
           >
             {toast.text}
           </p>
@@ -120,11 +122,11 @@ function Overall({ plan, customer, onMove }: { plan: StudioPlan; customer: strin
   const stageLine = c ? `${c.name} · ${c.status === 'late' ? `${days(c.lateDays)} late` : 'on track'}` : 'Handed over';
   const overallLine = o.lateDays > 0 ? `Overall · ${days(o.lateDays)} late` : o.earlyDays > 0 ? `Overall · ${days(o.earlyDays)} early` : 'Overall · on time';
   return (
-    <div className="s-card flex flex-wrap items-center justify-between gap-4 p-5">
+    <div className="card oi-overall">
       <div className="flex w-full flex-col gap-1.5">
         <div className="flex items-baseline justify-between gap-3">
-          <span className="text-[13px] font-semibold text-[var(--s-ink-2)]">Project done</span>
-          <span className="s-num font-[family-name:var(--font-mono)] text-[22px] font-semibold">{plan.progressPct}%</span>
+          <span className="lbl">Project done</span>
+          <span className="mono text-[22px] font-semibold">{plan.progressPct}%</span>
         </div>
         <Bar pct={plan.progressPct} label={`Project ${plan.progressPct}% done`} />
         <span className={muted}>From the steps ticked, each by its share. {customer} sees this percentage go up as steps are ticked.</span>
@@ -136,11 +138,11 @@ function Overall({ plan, customer, onMove }: { plan: StudioPlan; customer: strin
           <Chip tone={o.studioDays > 0 ? 'bad' : o.lateDays > 0 ? 'warn' : 'good'}>{overallLine}</Chip>
         </div>
         {o.plannedHandover && o.forecastHandover ? (
-          <p className="m-0 mt-1 text-[13.5px] text-[var(--s-ink-2)]">
-            Handover planned <b className="s-num font-[family-name:var(--font-mono)] font-medium">{dayWords(o.plannedHandover)}</b>
+          <p className="m-0 mt-1 text-[13.5px] text-[var(--text2)]">
+            Handover planned <b className="mono font-medium">{dayWords(o.plannedHandover)}</b>
             {o.forecastHandover !== o.plannedHandover ? (
               <>
-                , {o.handedOver ? 'done' : 'now expected'} <b className="s-num font-[family-name:var(--font-mono)] font-medium">{dayWords(o.forecastHandover)}</b>
+                , {o.handedOver ? 'done' : 'now expected'} <b className="mono font-medium">{dayWords(o.forecastHandover)}</b>
               </>
             ) : null}
             .
@@ -157,7 +159,7 @@ function Overall({ plan, customer, onMove }: { plan: StudioPlan; customer: strin
         )}
       </div>
       {onMove ? (
-        <button type="button" className="s-btn min-h-[44px]" onClick={onMove}>
+        <button type="button" className="btn ghost" onClick={onMove}>
           Move a date
         </button>
       ) : null}
@@ -166,14 +168,9 @@ function Overall({ plan, customer, onMove }: { plan: StudioPlan; customer: strin
 }
 
 function Chip({ tone, children }: { tone: 'good' | 'warn' | 'bad'; children: React.ReactNode }) {
-  const style =
-    tone === 'good'
-      ? { background: 'var(--s-good-wash)', color: 'var(--s-good)' }
-      : tone === 'warn'
-        ? { background: 'var(--s-warn-wash)', color: 'var(--s-warn)' }
-        : { background: 'var(--s-bad-wash)', color: 'var(--s-bad)' };
   return (
-    <span className="inline-flex min-h-[30px] items-center rounded-full px-3 text-[14px] font-semibold" style={style}>
+    <span className={`chip ${tone}`}>
+      <span className="dot" />
       {children}
     </span>
   );
@@ -185,21 +182,21 @@ function Chip({ tone, children }: { tone: 'good' | 'warn' | 'bad'; children: Rea
 function customerLine(s: PlanStageView): { text: string; tone: string } {
   if (s.status === 'done') {
     const when = `Done ${dayWords(s.actualEnd!)}`;
-    if (s.lateDays > 0) return { text: `${when} · ${days(s.lateDays)} late`, tone: 'var(--s-bad)' };
-    if (s.earlyDays > 0) return { text: `${when} · ${days(s.earlyDays)} early`, tone: 'var(--s-good)' };
-    return { text: `${when} · on time`, tone: 'var(--s-good)' };
+    if (s.lateDays > 0) return { text: `${when} · ${days(s.lateDays)} late`, tone: 'var(--bad)' };
+    if (s.earlyDays > 0) return { text: `${when} · ${days(s.earlyDays)} early`, tone: 'var(--good)' };
+    return { text: `${when} · on time`, tone: 'var(--good)' };
   }
-  if (s.status === 'late') return { text: `Now · ${days(s.lateDays)} late, was due ${dayWords(s.plannedEnd)}`, tone: 'var(--s-bad)' };
-  if (s.status === 'on-track') return { text: `Now · on track, due ${dayWords(s.plannedEnd)}`, tone: 'var(--s-accent)' };
-  return { text: s.state === 'next' ? 'Next' : 'Later', tone: 'var(--s-ink-3)' };
+  if (s.status === 'late') return { text: `Now · ${days(s.lateDays)} late, was due ${dayWords(s.plannedEnd)}`, tone: 'var(--bad)' };
+  if (s.status === 'on-track') return { text: `Now · on track, due ${dayWords(s.plannedEnd)}`, tone: 'var(--good)' };
+  return { text: s.state === 'next' ? 'Next' : 'Later', tone: 'var(--muted)' };
 }
 
 /** A thin progress bar: only ever goes up. */
 function Bar({ pct, label }: { pct: number; label: string }) {
   const v = Math.max(0, Math.min(100, pct));
   return (
-    <span role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={v} className="block h-2 w-full overflow-hidden rounded-full bg-[var(--s-surface-2)]">
-      <span className="block h-full rounded-full" style={{ width: `${v}%`, background: v >= 100 ? 'var(--s-good)' : 'var(--s-accent)' }} />
+    <span role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={v} className="pbar block w-full">
+      <i style={{ width: `${v}%`, background: v >= 100 ? 'var(--good-s)' : 'var(--ink)' }} />
     </span>
   );
 }
@@ -231,16 +228,16 @@ function StageRow({
   };
 
   return (
-    <li className="border-t border-[var(--s-rule)] py-3.5">
-      <div className="grid gap-x-3 gap-y-1.5 md:grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1.4fr)] md:items-baseline">
+    <li className={`oi-stage${s.state === 'now' ? ' now' : ''}`}>
+      <div className="oi-prow">
         <div className="min-w-0">
           {renaming ? (
             <Rename plan={plan} stage={s} onDone={(r) => { setRenaming(false); if (r) say(r); }} />
           ) : (
             <span className="inline-flex flex-wrap items-baseline gap-x-2">
-              <span className="text-[15px] font-semibold">{s.name}</span>
+              <span className="text-[14.5px] font-semibold">{s.name}</span>
               {plan.canEdit ? (
-                <button type="button" onClick={() => setRenaming(true)} className="text-[12.5px] text-[var(--s-ink-3)] underline-offset-2 hover:text-[var(--s-accent)] hover:underline" aria-label={`Rename ${s.name}`}>
+                <button type="button" onClick={() => setRenaming(true)} className="text-[12.5px] text-[var(--muted)] underline-offset-2 hover:text-[var(--acc)] hover:underline" aria-label={`Rename ${s.name}`}>
                   Rename
                 </button>
               ) : null}
@@ -250,7 +247,7 @@ function StageRow({
             <span className="w-[120px] flex-none">
               <Bar pct={pct} label={`${s.name}: ${pct}% done`} />
             </span>
-            <span className="s-num font-[family-name:var(--font-mono)] text-[13px] font-semibold">{pct}%</span>
+            <span className="mono text-[13px] font-semibold">{pct}%</span>
           </span>
           <span className={`block ${muted}`}>
             {s.completion.total ? `${s.completion.done} of ${s.completion.total} steps ticked` : 'No step in scope'} · {s.sharePct}% of the project · {s.photos} photo
@@ -262,12 +259,12 @@ function StageRow({
             </span>
           ) : null}
         </div>
-        <span className="s-num font-[family-name:var(--font-mono)] text-[13px] text-[var(--s-ink-2)]">
+        <span className="mono text-[13px] text-[var(--text2)]">
           <span className="md:hidden">Planned </span>
           {dayWords(s.plannedStart)} – {dayWords(s.plannedEnd)}
           {s.originalEnd !== s.plannedEnd ? <span className={`block ${muted}`}>first {dayWords(s.originalEnd)}</span> : null}
         </span>
-        <span className="s-num font-[family-name:var(--font-mono)] text-[13px] text-[var(--s-ink-2)]">
+        <span className="mono text-[13px] text-[var(--text2)]">
           <span className="md:hidden">{s.actualEnd ? 'Done ' : 'Forecast '}</span>
           {s.actualEnd ? dayWords(s.actualEnd) : dayWords(s.forecastEnd)}
           {!s.actualEnd ? <span className={`block ${muted}`}>forecast</span> : null}
@@ -285,28 +282,28 @@ function StageRow({
         </span>
       </div>
 
-      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+      <div className="oi-stage-acts">
         {hasSteps ? (
-          <button type="button" className="s-btn-ghost min-h-[40px]" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+          <button type="button" className="btn ghost sm" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
             {open ? 'Hide steps' : s.completion.open ? `Show steps (${s.completion.open} to do)` : 'Show steps'}
           </button>
         ) : null}
         {plan.canEdit && s.state !== 'done' ? (
-          <button type="button" className="s-btn-ghost min-h-[40px]" onClick={onMove}>
+          <button type="button" className="btn ghost sm" onClick={onMove}>
             Move a date
           </button>
         ) : null}
         {plan.canTick && s.state !== 'done' && (s.completion.total === 0 || s.completion.complete) ? (
           s.gate.ok ? (
-            <button type="button" className="s-btn min-h-[40px]" disabled={pending} onClick={() => mark(true)}>
+            <button type="button" className="btn pri sm" disabled={pending} onClick={() => mark(true)}>
               {pending ? 'Saving…' : 'Mark done'}
             </button>
           ) : (
-            <span className="text-[13px] text-[var(--s-warn)]">{gateWords(s.gate)}</span>
+            <span className="text-[13px] text-[var(--warn)]">{gateWords(s.gate)}</span>
           )
         ) : null}
         {plan.canTick && s.state === 'done' ? (
-          <button type="button" className="s-btn-ghost min-h-[40px]" disabled={pending} onClick={() => mark(false)}>
+          <button type="button" className="btn ghost sm" disabled={pending} onClick={() => mark(false)}>
             Reopen
           </button>
         ) : null}
@@ -339,12 +336,12 @@ function Rename({ plan, stage, onDone }: { plan: StudioPlan; stage: PlanStageVie
         maxLength={40}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => e.key === 'Escape' && onDone(null)}
-        className="min-h-[40px] w-[220px] rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 text-[14.5px]"
+        className="min-h-[40px] w-[220px] rounded-[8px] border border-[var(--fill2)] bg-[var(--paper)] px-3 text-[14.5px]"
       />
-      <button type="submit" className="s-btn min-h-[40px]" disabled={pending}>
+      <button type="submit" className="btn pri sm" disabled={pending}>
         {pending ? 'Saving…' : 'Save'}
       </button>
-      <button type="button" className="s-btn-ghost min-h-[40px]" onClick={() => onDone(null)}>
+      <button type="button" className="btn ghost sm" onClick={() => onDone(null)}>
         Cancel
       </button>
     </form>
@@ -353,7 +350,7 @@ function Rename({ plan, stage, onDone }: { plan: StudioPlan; stage: PlanStageVie
 
 // ── The steps ──────────────────────────────────────────────────
 
-const field = 'min-h-[40px] rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 text-[14.5px]';
+const field = 'min-h-[40px] rounded-[8px] border border-[var(--fill2)] bg-[var(--paper)] px-3 text-[14.5px]';
 
 /**
  * A stage's steps, group by group. One obvious action per step: "Tick with
@@ -375,24 +372,24 @@ function Steps({ plan, stage, customer, say }: { plan: StudioPlan; stage: PlanSt
   };
 
   return (
-    <div className="mt-3 flex flex-col gap-3">
+    <div className="oi-steps">
       <p className={`m-0 ${muted}`}>
-        <span className="font-medium text-[var(--s-accent)]">★ {STAR_HINT}</span> {customer} sees each stage&rsquo;s % from every step, and only the starred ones by name.{' '}
+        <span className="sees">★ {STAR_HINT}</span> {customer} sees each stage&rsquo;s % from every step, and only the starred ones by name.{' '}
         A step is ticked with a photo and a sentence: both go into today&rsquo;s site log. Each % is the step&rsquo;s share of the whole project.
         {plan.canEdit ? ` Weights in scope add up to ${plan.weightTotalPct}%; every share is worked out again so the project always totals 100%.` : ''}
       </p>
       {design ? (
         <p className={`m-0 ${muted}`}>
           Design steps are ticked on the{' '}
-          <Link href={`/studio/projects/${plan.projectId}?tab=design`} className="text-[var(--s-accent)]">
+          <Link href={`/studio/projects/${plan.projectId}?tab=design`} className="acc-t">
             Design tab
           </Link>
           , with their files and payment gates.
         </p>
       ) : null}
       {stage.groups.map((g) => (
-        <div key={g.group} className="rounded-[10px] bg-[var(--s-surface-2)] p-3">
-          <p className="m-0 mb-1.5 text-[12.5px] font-semibold text-[var(--s-ink-2)]">{g.group}</p>
+        <div key={g.group} className="flex flex-col">
+          <p className="m-0 py-1.5 text-[13px] font-semibold text-[var(--muted)]">{g.group}</p>
           <ul className="m-0 flex list-none flex-col gap-1 p-0">
             {g.steps.map((st) =>
               editing === st.id ? (
@@ -416,7 +413,7 @@ function Steps({ plan, stage, customer, say }: { plan: StudioPlan; stage: PlanSt
             adding === g.group ? (
               <AddStep plan={plan} stageId={stage.id} group={g.group} onDone={(r) => { setAdding(null); if (r) say(r); }} />
             ) : (
-              <button type="button" onClick={() => setAdding(g.group)} className="mt-1.5 min-h-[36px] text-[13px] text-[var(--s-accent)] underline-offset-2 hover:underline">
+              <button type="button" onClick={() => setAdding(g.group)} className="btn ghost sm mt-1.5 self-start">
                 + Add a step to {g.group}
               </button>
             )
@@ -456,42 +453,38 @@ function StepRow({
         ? `Planned ${dayWords(st.plannedOn)}`
         : 'Open';
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[8px] px-1.5 py-1.5 hover:bg-[var(--s-surface)]">
+    <li className="oi-ci">
       <StarToggle projectId={plan.projectId} stepId={st.id} label={st.label} starred={st.milestone} canEdit={plan.canEdit} say={say} />
       <span
         aria-hidden="true"
-        className="inline-flex h-5 w-5 flex-none items-center justify-center rounded-[6px] border text-[12px] font-bold"
-        style={
-          st.done
-            ? { background: 'var(--s-accent)', borderColor: 'var(--s-accent)', color: '#fff' }
-            : { borderColor: st.inScope ? 'var(--s-ink-3)' : 'var(--s-rule)', background: 'var(--s-surface)', borderStyle: st.inScope ? 'solid' : 'dashed' }
-        }
+        className="oi-box"
+        style={st.done ? { background: 'var(--good-s)' } : { boxShadow: `inset 0 0 0 1.5px ${st.inScope ? 'var(--ring)' : 'var(--line)'}`, opacity: st.inScope ? 1 : 0.6 }}
       >
         {st.done ? '✓' : ''}
       </span>
       <span className="min-w-0 flex-1 basis-[220px]">
-        <span className={`block text-[14px] ${st.done || !st.inScope ? 'text-[var(--s-ink-3)]' : ''} ${!st.inScope ? 'line-through' : ''}`}>
+        <span className={`block text-[14px] ${st.done || !st.inScope ? 'text-[var(--muted)]' : ''} ${!st.inScope ? 'line-through' : ''}`}>
           {st.label}
           <span className="sr-only">{st.done ? ' (done)' : st.inScope ? ' (open)' : ' (not in scope)'}</span>
         </span>
         <span className={`block ${muted}`}>{meta}</span>
       </span>
-      <span className="s-num w-[52px] flex-none text-right font-[family-name:var(--font-mono)] text-[13px] text-[var(--s-ink-2)]" title="Its share of the whole project">
+      <span className="tabular-nums w-[52px] flex-none text-right mono text-[13px] text-[var(--text2)]" title="Its share of the whole project">
         {st.inScope ? `${st.effectivePct}%` : '—'}
       </span>
       <span className="flex flex-none flex-wrap items-center gap-1.5">
         {!st.done && st.inScope && onTick ? (
-          <button type="button" className="s-btn min-h-[36px] px-3 text-[13.5px]" disabled={busy} onClick={onTick}>
+          <button type="button" className="btn sec sm" disabled={busy} onClick={onTick}>
             Tick with a photo
           </button>
         ) : null}
         {st.done && onUntick ? (
-          <button type="button" className="s-btn-ghost min-h-[36px] px-3 text-[13px]" disabled={busy} onClick={onUntick}>
+          <button type="button" className="btn ghost sm" disabled={busy} onClick={onUntick}>
             Untick
           </button>
         ) : null}
         {onEdit ? (
-          <button type="button" className="s-btn-ghost min-h-[36px] px-3 text-[13px]" disabled={busy} onClick={onEdit} aria-label={`Edit ${st.label}`}>
+          <button type="button" className="btn ghost sm" disabled={busy} onClick={onEdit} aria-label={`Edit ${st.label}`}>
             Edit
           </button>
         ) : null}
@@ -539,7 +532,7 @@ function StepEditor({ plan, step, customer, onDone }: { plan: StudioPlan; step: 
   };
 
   return (
-    <li className="rounded-[10px] border border-[var(--s-accent)] bg-[var(--s-surface)] p-3">
+    <li className="rounded-[10px] border border-[var(--acc)] bg-[var(--paper)] p-3">
       <form
         className="flex flex-col gap-3"
         onSubmit={(e) => {
@@ -547,39 +540,39 @@ function StepEditor({ plan, step, customer, onDone }: { plan: StudioPlan; step: 
           save();
         }}
       >
-        <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-[var(--s-ink-2)]">
+        <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-[var(--text2)]">
           Step name{step.milestone ? ` (starred: ${customer} sees this)` : ''}
-          <input value={label} maxLength={120} autoFocus onChange={(e) => setLabel(e.target.value)} className={`${field} font-normal text-[var(--s-ink)]`} />
+          <input value={label} maxLength={120} autoFocus onChange={(e) => setLabel(e.target.value)} className={`${field} font-normal text-[var(--ink)]`} />
         </label>
-        <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-[var(--s-ink-2)]">
+        <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-[var(--text2)]">
           Weight, % of the project
           <span className="flex flex-wrap items-center gap-2 font-normal">
-            <input value={weight} inputMode="decimal" onChange={(e) => setWeight(e.target.value)} className={`${field} w-[90px] text-[var(--s-ink)]`} aria-invalid={typed === null} />
+            <input value={weight} inputMode="decimal" onChange={(e) => setWeight(e.target.value)} className={`${field} w-[90px] text-[var(--ink)]`} aria-invalid={typed === null} />
             <span className={muted}>
               {typed === null ? 'Type a number from 0 to 100, like 4 or 0.5.' : `Counts for ${step.effectivePct}% now. In-scope weights add up to ${plan.weightTotalPct}%; shares are worked out so the project totals 100%.`}
             </span>
           </span>
         </label>
         <label className="flex min-h-[40px] cursor-pointer items-center gap-2.5 text-[14px]">
-          <input type="checkbox" checked={inScope} disabled={step.done && step.inScope} onChange={(e) => setInScope(e.target.checked)} className="h-5 w-5 accent-[var(--s-accent)]" />
+          <input type="checkbox" checked={inScope} disabled={step.done && step.inScope} onChange={(e) => setInScope(e.target.checked)} className="h-5 w-5 accent-[var(--acc)]" />
           In scope for this home
           {step.done && step.inScope ? <span className={muted}>· ticked, so it stays in scope (untick it first)</span> : null}
         </label>
         {!inScope && step.inScope ? <p className={`m-0 ${muted}`}>Not in scope: its weight is shared across the other steps{step.milestone ? `, and ${customer} stops seeing it` : ''}.</p> : null}
         {error ? (
-          <p role="alert" className="m-0 text-[13.5px] font-medium text-[var(--s-bad)]">
+          <p role="alert" className="m-0 text-[13.5px] font-medium text-[var(--bad)]">
             {error}
           </p>
         ) : null}
         <div className="flex flex-wrap items-center gap-2">
-          <button type="submit" className="s-btn min-h-[40px]" disabled={pending}>
+          <button type="submit" className="btn pri sm" disabled={pending}>
             {pending ? 'Saving…' : 'Save'}
           </button>
-          <button type="button" className="s-btn-ghost min-h-[40px]" disabled={pending} onClick={() => onDone(null)}>
+          <button type="button" className="btn ghost sm" disabled={pending} onClick={() => onDone(null)}>
             Cancel
           </button>
           {!step.done ? (
-            <button type="button" className="ml-auto min-h-[40px] px-2 text-[13px] text-[var(--s-bad)] underline-offset-2 hover:underline" disabled={pending} onClick={remove}>
+            <button type="button" className="ml-auto min-h-[40px] px-2 text-[13px] text-[var(--bad)] underline-offset-2 hover:underline" disabled={pending} onClick={remove}>
               Remove step
             </button>
           ) : null}
@@ -602,7 +595,7 @@ function AddStep({ plan, stageId, group, onDone }: { plan: StudioPlan; stageId: 
     });
   return (
     <form
-      className="mt-2 flex flex-col gap-2 rounded-[10px] border border-[var(--s-accent)] bg-[var(--s-surface)] p-3"
+      className="mt-2 flex flex-col gap-2 rounded-[10px] border border-[var(--acc)] bg-[var(--paper)] p-3"
       onSubmit={(e) => {
         e.preventDefault();
         save();
@@ -610,25 +603,25 @@ function AddStep({ plan, stageId, group, onDone }: { plan: StudioPlan; stageId: 
     >
       <p className="m-0 text-[13px] font-semibold">New step in {group}</p>
       <div className="flex flex-wrap items-end gap-2">
-        <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-[12.5px] text-[var(--s-ink-2)]">
+        <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-[12.5px] text-[var(--text2)]">
           Name
-          <input value={label} maxLength={120} autoFocus onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Kitchen backsplash tiles fixed" className={`${field} text-[var(--s-ink)]`} />
+          <input value={label} maxLength={120} autoFocus onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Kitchen backsplash tiles fixed" className={`${field} text-[var(--ink)]`} />
         </label>
-        <label className="flex flex-col gap-1 text-[12.5px] text-[var(--s-ink-2)]">
+        <label className="flex flex-col gap-1 text-[12.5px] text-[var(--text2)]">
           Weight, %
-          <input value={weight} inputMode="decimal" onChange={(e) => setWeight(e.target.value)} className={`${field} w-[90px] text-[var(--s-ink)]`} />
+          <input value={weight} inputMode="decimal" onChange={(e) => setWeight(e.target.value)} className={`${field} w-[90px] text-[var(--ink)]`} />
         </label>
       </div>
       {error ? (
-        <p role="alert" className="m-0 text-[13.5px] font-medium text-[var(--s-bad)]">
+        <p role="alert" className="m-0 text-[13.5px] font-medium text-[var(--bad)]">
           {error}
         </p>
       ) : null}
       <div className="flex gap-2">
-        <button type="submit" className="s-btn min-h-[40px]" disabled={pending}>
+        <button type="submit" className="btn pri sm" disabled={pending}>
           {pending ? 'Adding…' : 'Add step'}
         </button>
-        <button type="button" className="s-btn-ghost min-h-[40px]" disabled={pending} onClick={() => onDone(null)}>
+        <button type="button" className="btn ghost sm" disabled={pending} onClick={() => onDone(null)}>
           Cancel
         </button>
       </div>
@@ -741,7 +734,7 @@ function TickDialog({ plan, step, customer, onClose, say }: { plan: StudioPlan; 
     }
   };
 
-  const label = 'mb-1.5 block text-[13px] font-semibold text-[var(--s-ink-2)]';
+  const label = 'mb-1.5 block text-[13px] font-semibold text-[var(--text2)]';
   return (
     <dialog
       ref={ref}
@@ -750,7 +743,7 @@ function TickDialog({ plan, step, customer, onClose, say }: { plan: StudioPlan; 
         if (busy !== 'posting') close();
       }}
       aria-labelledby="tick-title"
-      className="m-auto w-[min(560px,calc(100vw-24px))] max-h-[calc(100vh-24px)] overflow-y-auto rounded-[16px] border border-[var(--s-rule)] bg-[var(--s-surface)] p-0 text-[var(--s-ink)] shadow-2xl backdrop:bg-black/40"
+      className="m-auto w-[min(560px,calc(100vw-24px))] max-h-[calc(100vh-24px)] overflow-y-auto rounded-[16px] border bg-[var(--paper)] p-0 text-[var(--ink)] shadow-2xl backdrop:bg-[rgba(var(--sh),0.38)]"
     >
       <div className="flex flex-col gap-5 p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">
@@ -762,7 +755,7 @@ function TickDialog({ plan, step, customer, onClose, say }: { plan: StudioPlan; 
               {step.label} · {step.effectivePct}% of the project
             </p>
           </div>
-          <button type="button" onClick={close} disabled={busy === 'posting'} className="s-btn-ghost min-h-[40px]" aria-label="Close without ticking">
+          <button type="button" onClick={close} disabled={busy === 'posting'} className="btn ghost sm" aria-label="Close without ticking">
             Close
           </button>
         </div>
@@ -772,13 +765,13 @@ function TickDialog({ plan, step, customer, onClose, say }: { plan: StudioPlan; 
           {photo ? (
             <div className="flex items-start gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={photo.url} alt={`Photo for ${step.label}`} className="h-[120px] w-[160px] flex-none rounded-[10px] bg-[var(--s-surface-2)] object-cover" />
-              <button type="button" className="s-btn-ghost min-h-[40px]" disabled={busy !== null} onClick={() => input.current?.click()}>
+              <img src={photo.url} alt={`Photo for ${step.label}`} className="h-[120px] w-[160px] flex-none rounded-[10px] bg-[var(--fill)] object-cover" />
+              <button type="button" className="btn ghost sm" disabled={busy !== null} onClick={() => input.current?.click()}>
                 Change photo
               </button>
             </div>
           ) : (
-            <button type="button" className="s-btn min-h-[48px] px-5" disabled={busy !== null} onClick={() => input.current?.click()}>
+            <button type="button" className="btn pri lg" disabled={busy !== null} onClick={() => input.current?.click()}>
               {busy === 'photo' ? 'Getting the photo ready…' : 'Choose a photo'}
             </button>
           )}
@@ -796,33 +789,33 @@ function TickDialog({ plan, step, customer, onClose, say }: { plan: StudioPlan; 
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="e.g. POP framing is up in the living room and both bedrooms."
-            className="w-full resize-y rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[14.5px]"
+            className="w-full resize-y rounded-[8px] border border-[var(--fill2)] bg-[var(--paper)] px-3 py-2 text-[14.5px]"
           />
           <span className={muted}>{300 - text.length} characters left</span>
         </div>
 
-        <div className="flex flex-col gap-2 rounded-[12px] p-4 text-white" style={{ background: 'var(--s-accent-deep)' }}>
-          <p className="m-0 text-[12px] font-semibold uppercase tracking-[0.06em] text-white/70">{customer} will read, in the site feed</p>
+        <div className="oi-sees flex flex-col gap-2 p-4">
+          <p className="m-0 text-[12px] font-semibold uppercase tracking-[0.06em] oi-im">{customer} will read, in the site feed</p>
           {photo ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={photo.url} alt="" className="max-h-[180px] w-full rounded-[8px] object-cover" />
           ) : null}
           <p className="m-0 text-[15.5px] font-semibold leading-snug">{doneLabel(step.label)}</p>
-          <p className="m-0 text-[15px] leading-snug text-white/90">{sentence || 'Your sentence shows here.'}</p>
-          <p className="m-0 text-[12.5px] text-white/70">Today, with the time you post it · from gallery</p>
+          <p className="m-0 text-[15px] leading-snug">{sentence || 'Your sentence shows here.'}</p>
+          <p className="m-0 text-[12.5px] oi-im">Today, with the time you post it · from gallery</p>
         </div>
 
         {error ? (
-          <p role="alert" className="m-0 text-[14px] font-medium text-[var(--s-bad)]">
+          <p role="alert" className="m-0 text-[14px] font-medium text-[var(--bad)]">
             {error}
           </p>
         ) : null}
 
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="s-btn min-h-[48px] px-6 text-[15px]" disabled={busy !== null} onClick={() => void post()}>
+          <button type="button" className="btn pri lg" disabled={busy !== null} onClick={() => void post()}>
             {busy === 'posting' ? 'Posting…' : 'Tick and post'}
           </button>
-          <button type="button" className="s-btn-ghost min-h-[48px]" disabled={busy === 'posting'} onClick={close}>
+          <button type="button" className="btn ghost lg" disabled={busy === 'posting'} onClick={close}>
             Cancel
           </button>
         </div>
@@ -835,16 +828,16 @@ function TickDialog({ plan, step, customer, onClose, say }: { plan: StudioPlan; 
 
 function Moves({ plan, customer }: { plan: StudioPlan; customer: string }) {
   return (
-    <div className="s-card p-5">
+    <div className="card p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="m-0 text-[16px] font-semibold">Moved dates</h2>
+        <h2 className="m-0 text-[17px] font-semibold">Moved dates</h2>
         <CustomerSees name={customer} />
       </div>
       <p className={`m-0 mt-1 ${muted}`}>Kept for good: a move is never edited or deleted. Move it again to change it.</p>
       <ul className="m-0 mt-3 flex list-none flex-col p-0">
         {plan.moves.map((m) => (
-          <li key={m.at} className="grid gap-1 border-t border-[var(--s-rule)] py-3 text-[14px] sm:grid-cols-[110px_minmax(0,1fr)] sm:gap-3">
-            <span className="s-num font-[family-name:var(--font-mono)] text-[12.5px] text-[var(--s-ink-3)]">{dayWords(istDay(new Date(m.at)))}</span>
+          <li key={m.at} className="grid gap-1 border-t border-[var(--fill2)] py-3 text-[14px] sm:grid-cols-[110px_minmax(0,1fr)] sm:gap-3">
+            <span className="mono text-[12.5px] text-[var(--muted)]">{dayWords(istDay(new Date(m.at)))}</span>
             <span className="flex flex-col gap-1.5">
               <span>
                 {m.words}
@@ -852,7 +845,7 @@ function Moves({ plan, customer }: { plan: StudioPlan; customer: string }) {
               </span>
               {m.note ? (
                 <OnlyYourTeam>
-                  <span className="text-[13px] text-[var(--s-ink-2)]">{m.note}</span>
+                  <span className="text-[13px] text-[var(--text2)]">{m.note}</span>
                 </OnlyYourTeam>
               ) : null}
             </span>
@@ -979,7 +972,7 @@ function MoveDialog({
       }
     });
 
-  const label = 'mb-1.5 block text-[13px] font-semibold text-[var(--s-ink-2)]';
+  const label = 'mb-1.5 block text-[13px] font-semibold text-[var(--text2)]';
   return (
     <dialog
       ref={ref}
@@ -988,14 +981,14 @@ function MoveDialog({
         close();
       }}
       aria-labelledby="move-title"
-      className="m-auto w-[min(640px,calc(100vw-24px))] max-h-[calc(100vh-24px)] overflow-y-auto rounded-[16px] border border-[var(--s-rule)] bg-[var(--s-surface)] p-0 text-[var(--s-ink)] shadow-2xl backdrop:bg-black/40"
+      className="m-auto w-[min(640px,calc(100vw-24px))] max-h-[calc(100vh-24px)] overflow-y-auto rounded-[16px] border bg-[var(--paper)] p-0 text-[var(--ink)] shadow-2xl backdrop:bg-[rgba(var(--sh),0.38)]"
     >
       <div className="flex flex-col gap-5 p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <h2 id="move-title" className="m-0 text-[19px] font-semibold">
             Move a date
           </h2>
-          <button type="button" onClick={close} className="s-btn-ghost min-h-[40px]" aria-label="Close without moving">
+          <button type="button" onClick={close} className="btn ghost sm" aria-label="Close without moving">
             Close
           </button>
         </div>
@@ -1010,10 +1003,10 @@ function MoveDialog({
             <Preview customer={customer} sentence={preview.sentence} overall={preview.overall} />
             <p className={`m-0 ${muted}`}>{customer}&rsquo;s app changes straight away. The old date stays in the history; nothing is overwritten.</p>
             <div className="flex flex-wrap gap-2">
-              <button type="button" className="s-btn min-h-[48px] px-6 text-[15px]" disabled={pending} onClick={save} autoFocus>
+              <button type="button" className="btn pri lg" disabled={pending} onClick={save} autoFocus>
                 {pending ? 'Moving…' : 'Yes, move it'}
               </button>
-              <button type="button" className="s-btn-ghost min-h-[48px]" disabled={pending} onClick={() => setConfirming(false)}>
+              <button type="button" className="btn ghost lg" disabled={pending} onClick={() => setConfirming(false)}>
                 Go back
               </button>
             </div>
@@ -1029,7 +1022,7 @@ function MoveDialog({
                   id="move-stage"
                   value={stageId}
                   onChange={(e) => pickStage(e.target.value)}
-                  className="min-h-[44px] w-full rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 text-[15px]"
+                  className="min-h-[44px] w-full rounded-[8px] border border-[var(--fill2)] bg-[var(--paper)] px-3 text-[15px]"
                 >
                   {open.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -1048,7 +1041,7 @@ function MoveDialog({
                       aria-pressed={field === f}
                       onClick={() => pickField(f)}
                       className="min-h-[44px] flex-1 rounded-[8px] border px-3 text-[14.5px] font-medium"
-                      style={field === f ? { borderColor: 'var(--s-accent)', background: 'var(--s-accent-wash)', color: 'var(--s-accent)' } : { borderColor: 'var(--s-rule)' }}
+                      style={field === f ? { borderColor: 'var(--acc)', background: 'var(--acc-soft)', color: 'var(--acc)' } : { borderColor: 'var(--fill2)' }}
                     >
                       {f === 'PLANNED_END' ? (stage.kind === 'HANDOVER' ? 'Handover day' : 'Ends') : 'Starts'}
                     </button>
@@ -1060,7 +1053,7 @@ function MoveDialog({
             <div>
               <label htmlFor="move-to" className={label}>
                 New date{' '}
-                <span className="font-normal text-[var(--s-ink-3)]">
+                <span className="font-normal text-[var(--muted)]">
                   (now {dayWords(field === 'PLANNED_START' ? stage.plannedStart : stage.plannedEnd)}
                   {shift !== 0 ? `, ${shift > 0 ? `${days(shift)} later` : `${days(-shift)} earlier`}` : ''})
                 </span>
@@ -1073,7 +1066,7 @@ function MoveDialog({
                   setTo(e.target.value);
                   setError(null);
                 }}
-                className="min-h-[44px] w-full rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 text-[15px] sm:w-[240px]"
+                className="min-h-[44px] w-full rounded-[8px] border border-[var(--fill2)] bg-[var(--paper)] px-3 text-[15px] sm:w-[240px]"
               />
             </div>
 
@@ -1093,10 +1086,10 @@ function MoveDialog({
                         setError(null);
                       }}
                       className="flex min-h-[56px] flex-col items-start justify-center rounded-[10px] border px-3 py-2 text-left"
-                      style={on ? { borderColor: 'var(--s-accent)', background: 'var(--s-accent-wash)', boxShadow: 'inset 0 0 0 1px var(--s-accent)' } : { borderColor: 'var(--s-rule)' }}
+                      style={on ? { borderColor: 'var(--acc)', background: 'var(--acc-soft)', boxShadow: 'inset 0 0 0 1px var(--acc)' } : { borderColor: 'var(--fill2)' }}
                     >
                       <span className="text-[14.5px] font-semibold">{c.label}</span>
-                      <span className="text-[12.5px] text-[var(--s-ink-3)]">{c.help}</span>
+                      <span className="text-[12.5px] text-[var(--muted)]">{c.help}</span>
                     </button>
                   );
                 })}
@@ -1110,7 +1103,7 @@ function MoveDialog({
                     id="move-decision"
                     value={decisionId}
                     onChange={(e) => setDecisionId(e.target.value)}
-                    className="min-h-[44px] w-full rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 text-[15px]"
+                    className="min-h-[44px] w-full rounded-[8px] border border-[var(--fill2)] bg-[var(--paper)] px-3 text-[15px]"
                   >
                     {waiting.map((d) => (
                       <option key={d.id} value={d.id}>
@@ -1124,7 +1117,7 @@ function MoveDialog({
 
             {field === 'PLANNED_END' && open.findIndex((s) => s.id === stageId) < open.length - 1 ? (
               <label className="flex min-h-[44px] cursor-pointer items-center gap-3 text-[14.5px]">
-                <input type="checkbox" checked={shiftLater} onChange={(e) => setShiftLater(e.target.checked)} className="h-5 w-5 accent-[var(--s-accent)]" />
+                <input type="checkbox" checked={shiftLater} onChange={(e) => setShiftLater(e.target.checked)} className="h-5 w-5 accent-[var(--acc)]" />
                 Move the later stages by the same number of days
               </label>
             ) : null}
@@ -1140,29 +1133,29 @@ function MoveDialog({
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="e.g. Laminate batch held at the depot. Never shown to the customer."
-                className="w-full resize-y rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[13.5px]"
+                className="w-full resize-y rounded-[8px] border border-[var(--fill2)] bg-[var(--paper)] px-3 py-2 text-[13.5px]"
               />
             </OnlyYourTeam>
 
             {preview ? (
               <Preview customer={customer} sentence={preview.sentence} overall={preview.overall} />
             ) : (
-              <p className={`m-0 rounded-[10px] border border-dashed border-[var(--s-rule)] p-3 ${muted}`}>
+              <p className={`m-0 rounded-[10px] border border-dashed border-[var(--fill2)] p-3 ${muted}`}>
                 {result.ok ? `Pick why it is moving to see exactly what ${customer} will read.` : result.error}
               </p>
             )}
 
             {error ? (
-              <p role="alert" className="m-0 text-[14px] font-medium text-[var(--s-bad)]">
+              <p role="alert" className="m-0 text-[14px] font-medium text-[var(--bad)]">
                 {error}
               </p>
             ) : null}
 
             <div className="flex flex-wrap gap-2">
-              <button type="button" className="s-btn min-h-[48px] px-6 text-[15px]" onClick={review}>
+              <button type="button" className="btn pri lg" onClick={review}>
                 Review the move
               </button>
-              <button type="button" className="s-btn-ghost min-h-[48px]" onClick={close}>
+              <button type="button" className="btn ghost lg" onClick={close}>
                 Cancel
               </button>
             </div>
@@ -1176,10 +1169,10 @@ function MoveDialog({
 function Preview({ customer, sentence, overall }: { customer: string; sentence: string; overall: ReturnType<typeof overallDelay> }) {
   const line = overall.lateDays > 0 ? `Overall · ${days(overall.lateDays)} late` : overall.earlyDays > 0 ? `Overall · ${days(overall.earlyDays)} early` : 'Overall · on time';
   return (
-    <div className="flex flex-col gap-2 rounded-[12px] p-4 text-white" style={{ background: 'var(--s-accent-deep)' }}>
-      <p className="m-0 text-[12px] font-semibold uppercase tracking-[0.06em] text-white/70">{customer} will read</p>
+    <div className="oi-sees flex flex-col gap-2 p-4">
+      <p className="m-0 text-[12px] font-semibold uppercase tracking-[0.06em] oi-im">{customer} will read</p>
       <p className="m-0 text-[15.5px] leading-snug">{sentence}</p>
-      <p className="m-0 text-[13.5px] text-white/80">
+      <p className="m-0 text-[13.5px] oi-im">
         {line}
         {overall.customerDays > 0 ?  ` · ${days(overall.customerDays)} from ${customer}'s side, labelled as such` : ''}
       </p>

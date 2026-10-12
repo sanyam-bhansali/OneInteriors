@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useActionState } from 'react';
 import { confirmRatesAction } from './products/actions';
 import type { State } from './form-state';
+import './office-ui.css';
 
 /**
  * Where a studio's rates are, and the one thing to do about it.
@@ -28,33 +29,37 @@ export function RatesGateCard({
   const [state, confirm, pending] = useActionState<State | null>(confirmRatesAction, null);
 
   return (
-    <div
-      className={`s-card mb-6 border-l-[3px] p-5 ${
-        gate === 'TO_CHECK' ? '!border-l-[var(--s-good)]' : '!border-l-[var(--s-warn)]'
-      }`}
-    >
-      <p className="m-0 mb-2 text-[14.5px] font-semibold">{title}</p>
-      <p className="m-0 max-w-[68ch] text-[14px] leading-relaxed text-[var(--s-ink-2)]">{body}</p>
+    <div className="card" style={{ boxShadow: `inset 3px 0 0 ${gate === 'TO_CHECK' ? 'var(--good-s)' : 'var(--warn-s)'}`, marginBottom: 4 }}>
+      <div className="chead">
+        <h2>{title}</h2>
+        <span className={gate === 'TO_CHECK' ? 'chip good' : 'chip warn'}>
+          <span className="dot" />
+          {gate === 'TO_CHECK' ? 'Ready to check' : 'With One Interiors'}
+        </span>
+      </div>
+      <p className="muted" style={{ margin: 0, maxWidth: '68ch', fontSize: 14, lineHeight: 1.5 }}>
+        {body}
+      </p>
 
       {gate === 'TO_CHECK' ? (
         where === 'products' ? (
-          <form action={confirm} className="mt-4 flex flex-wrap items-center gap-3">
-            <button type="submit" disabled={pending} className="s-btn s-btn-primary">
+          <form action={confirm} className="hstack">
+            <button type="submit" disabled={pending} className="btn pri">
               {pending ? 'Confirming…' : 'These rates are right — open the builder'}
             </button>
-            <span className="text-[13px] text-[var(--s-ink-3)]">
-              You can still change any figure afterwards.
-            </span>
+            <span className="muted sm">You can still change any figure afterwards.</span>
           </form>
         ) : (
-          <Link href="/studio/products" className="s-btn s-btn-primary mt-4 inline-flex">
-            Check your rates
-          </Link>
+          <div>
+            <Link href="/studio/products" className="btn pri">
+              Check your rates
+            </Link>
+          </div>
         )
       ) : null}
 
       {state && 'error' in state ? (
-        <p role="alert" className="m-0 mt-3 text-[13.5px] text-[var(--s-bad)]">
+        <p role="alert" className="ox-err">
           {state.error}
         </p>
       ) : null}

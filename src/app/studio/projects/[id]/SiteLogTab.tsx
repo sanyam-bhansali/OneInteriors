@@ -17,7 +17,7 @@ import { CustomerSees, OnlyYourTeam } from '../marks';
  * site mode's job (/studio/site/post/…).
  */
 
-const muted = 'text-[12.5px] text-[var(--s-ink-3)]';
+const muted = 'text-[12.5px] text-[var(--muted)]';
 const LANG: Record<string, string> = { en: 'English', hi: 'Hindi', mr: 'Marathi' };
 const dayOf = (day: string) => shortDay(new Date(`${day}T12:00:00Z`));
 
@@ -38,12 +38,12 @@ export async function SiteLogTab({ projectId, customer, now, legacy }: { project
   );
 
   return (
-    <section aria-label="Site log" className="s-card p-5">
+    <section aria-label="Site log" className="card p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="m-0 text-[16px] font-semibold">
+        <h2 className="m-0 text-[17px] font-semibold">
           Site log{' '}
           {log.score.pct !== null ? (
-            <span className="s-num font-[family-name:var(--font-mono)] text-[13px] font-normal text-[var(--s-ink-3)]">
+            <span className="mono text-[13px] font-normal text-[var(--muted)]">
               · posted {log.score.posted} of {log.score.due} working days ({log.score.pct}%), last 30 days
             </span>
           ) : null}
@@ -53,7 +53,7 @@ export async function SiteLogTab({ projectId, customer, now, legacy }: { project
       <p className={`m-0 mt-1 ${muted}`}>
         Posted from site mode on the phone, one post a day; anything added later shows beside it.{' '}
         {log.canPost ? (
-          <Link href={`/studio/site/post/${projectId}`} className="text-[var(--s-accent)]">
+          <Link href={`/studio/site/post/${projectId}`} className="acc-t">
             Post today&rsquo;s update
           </Link>
         ) : null}
@@ -61,34 +61,34 @@ export async function SiteLogTab({ projectId, customer, now, legacy }: { project
 
       <ol className="m-0 mt-4 flex list-none flex-col p-0">
         {rows.map(({ day, d }) => (
-          <li key={day} className="grid gap-3 border-t border-[var(--s-rule)] py-4 sm:grid-cols-[110px_minmax(0,1fr)]">
-            <span className="font-[family-name:var(--font-mono)] text-[12.5px] text-[var(--s-ink-3)]">{dayOf(day)}</span>
+          <li key={day} className="grid gap-3 border-t border-[var(--fill2)] py-4 sm:grid-cols-[110px_minmax(0,1fr)]">
+            <span className="mono text-[12.5px] text-[var(--muted)]">{dayOf(day)}</span>
             <div className="flex min-w-0 flex-col gap-3">
               {d?.original ? <Entry log={d.original} customer={customer} /> : null}
               {!d?.original && missed.has(day) ? (
-                <p className="m-0 text-[14px] font-medium text-[var(--s-warn)]">
+                <p className="m-0 text-[14px] font-medium text-[var(--warn)]">
                   Nothing posted. {customer} sees &ldquo;No update from the studio&rdquo; for this day.
                 </p>
               ) : null}
               {d?.corrections.map((c) => (
-                <div key={c.id} className="border-l-2 border-[var(--s-accent)] pl-3">
-                  <p className="m-0 mb-1.5 text-[12px] font-semibold uppercase tracking-[0.05em] text-[var(--s-accent)]">Added at {clock(c.postedAt)}</p>
+                <div key={c.id} className="border-l-2 border-[var(--acc)] pl-3">
+                  <p className="m-0 mb-1.5 text-[12px] font-semibold uppercase tracking-[0.05em] acc-t">Added at {clock(c.postedAt)}</p>
                   <Entry log={c} customer={customer} />
                 </div>
               ))}
             </div>
           </li>
         ))}
-        {rows.length === 0 ? <li className={`border-t border-[var(--s-rule)] py-3 ${muted}`}>Nothing posted from site in the last 30 days.</li> : null}
+        {rows.length === 0 ? <li className={`border-t border-[var(--fill2)] py-3 ${muted}`}>Nothing posted from site in the last 30 days.</li> : null}
       </ol>
 
       {legacy.length ? (
-        <details className="mt-4 border-t border-[var(--s-rule)] pt-3">
-          <summary className="cursor-pointer text-[13.5px] font-medium text-[var(--s-ink-2)]">Earlier notes ({legacy.length}) · from before site mode</summary>
+        <details className="mt-4 border-t border-[var(--fill2)] pt-3">
+          <summary className="cursor-pointer text-[13.5px] font-medium text-[var(--text2)]">Earlier notes ({legacy.length}) · from before site mode</summary>
           <ul className="m-0 mt-2 flex list-none flex-col p-0">
             {legacy.map((u) => (
-              <li key={u.id} className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 border-t border-[var(--s-rule)] py-2.5 text-[14px]">
-                <span className="font-[family-name:var(--font-mono)] text-[12.5px] text-[var(--s-ink-3)]">{shortDay(u.at)}</span>
+              <li key={u.id} className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 border-t border-[var(--fill2)] py-2.5 text-[14px]">
+                <span className="mono text-[12.5px] text-[var(--muted)]">{shortDay(u.at)}</span>
                 <span>
                   {u.note}
                   <span className={`block ${muted}`}>
@@ -121,7 +121,7 @@ function Entry({ log: l, customer }: { log: OfficeLog; customer: string }) {
       {l.kind === 'NOBODY' || l.reason ? (
         <p className="m-0 text-[14.5px]">
           <span className="font-medium">Nobody on site: {l.reason ? REASON_WORDS_STUDIO[l.reason] : 'no reason'}.</span>{' '}
-          <span className="text-[var(--s-ink-2)]">{l.reason && !countsAgainstStudio(l.reason) ? 'Not counted against you.' : 'Counts in the studio delay.'}</span>
+          <span className="text-[var(--text2)]">{l.reason && !countsAgainstStudio(l.reason) ? 'Not counted against you.' : 'Counts in the studio delay.'}</span>
         </p>
       ) : null}
       {l.photos.length ? (
@@ -130,12 +130,12 @@ function Entry({ log: l, customer }: { log: OfficeLog; customer: string }) {
             <li key={i} className="flex flex-col gap-1">
               {p.url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={p.url} alt={`Site photo ${i + 1}`} className="aspect-[4/3] w-full rounded-[8px] bg-[var(--s-surface-2)] object-cover" />
+                <img src={p.url} alt={`Site photo ${i + 1}`} className="aspect-[4/3] w-full rounded-[8px] bg-[var(--fill)] object-cover" />
               ) : (
-                <span className="flex aspect-[4/3] w-full items-center justify-center rounded-[8px] bg-[var(--s-surface-2)] text-[12px] text-[var(--s-ink-3)]">Photo {i + 1}</span>
+                <span className="flex aspect-[4/3] w-full items-center justify-center rounded-[8px] bg-[var(--fill)] text-[12px] text-[var(--muted)]">Photo {i + 1}</span>
               )}
-              {p.step ? <span className="text-[13px] font-semibold text-[var(--s-good)]">{p.step}</span> : null}
-              <span className="text-[13.5px] leading-snug">{p.customerText ?? <span className="text-[var(--s-ink-3)]">No sentence</span>}</span>
+              {p.step ? <span className="text-[13px] font-semibold text-[var(--good)]">{p.step}</span> : null}
+              <span className="text-[13.5px] leading-snug">{p.customerText ?? <span className="text-[var(--muted)]">No sentence</span>}</span>
               <span className={muted}>
                 {clock(p.takenAt)}
                 {p.fromGallery ? ' · from gallery' : ''}
@@ -146,12 +146,12 @@ function Entry({ log: l, customer }: { log: OfficeLog; customer: string }) {
       ) : null}
       {l.voice?.customerText ? <p className="m-0 text-[14.5px]">{l.voice.customerText}</p> : null}
       {l.crew.length ? (
-        <p className="m-0 text-[13.5px] text-[var(--s-ink-2)]">
+        <p className="m-0 text-[13.5px] text-[var(--text2)]">
           On site: {l.crew.map((c) => `${c.name} (${c.role.toLowerCase()}${c.arrivedAt ? `, from ${clock(c.arrivedAt)}` : ''})`).join(', ')}
         </p>
       ) : null}
       {l.ticked.length ? (
-        <p className="m-0 text-[13.5px] text-[var(--s-ink-2)]">Ticked off: {l.ticked.map((t) => t.label).join(', ')}</p>
+        <p className="m-0 text-[13.5px] text-[var(--text2)]">Ticked off: {l.ticked.map((t) => t.label).join(', ')}</p>
       ) : null}
       {said.length ? (
         <OnlyYourTeam title={`Only your team · what was said (${customer} never hears or reads this)`}>

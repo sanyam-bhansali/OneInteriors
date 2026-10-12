@@ -11,7 +11,7 @@ export function TeamNotes({ projectId, initial, canEdit, max }: { projectId: str
   const [pending, start] = useTransition();
 
   if (!canEdit) {
-    return <p className="m-0 whitespace-pre-wrap text-[13.5px] leading-relaxed text-[var(--s-ink-2)]">{initial || 'No notes yet.'}</p>;
+    return <p className="m-0 whitespace-pre-wrap text-[13.5px] leading-relaxed text-[var(--text2)]">{initial || 'No notes yet.'}</p>;
   }
 
   const save = () =>
@@ -36,14 +36,14 @@ export function TeamNotes({ projectId, initial, canEdit, max }: { projectId: str
           setMessage(null);
         }}
         placeholder="Anything the site team should know: access, timings, who to call."
-        className="w-full resize-y rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[13.5px] leading-relaxed"
+        className="w-full resize-y rounded-[8px] border border-[var(--fill2)] bg-[var(--paper)] px-3 py-2 text-[13.5px] leading-relaxed"
       />
       <div className="flex items-center gap-3">
-        <button type="button" className="s-btn-ghost" onClick={save} disabled={pending || text.trim() === saved.trim()}>
+        <button type="button" className="btn ghost sm" onClick={save} disabled={pending || text.trim() === saved.trim()}>
           {pending ? 'Saving…' : 'Save notes'}
         </button>
         {message ? (
-          <span role="status" className={`text-[12.5px] ${message.ok ? 'text-[var(--s-good)]' : 'text-[var(--s-bad)]'}`}>
+          <span role="status" className={`text-[12.5px] ${message.ok ? 'text-[var(--good)]' : 'text-[var(--bad)]'}`}>
             {message.text}
           </span>
         ) : null}

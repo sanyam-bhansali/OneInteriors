@@ -16,7 +16,7 @@ export function PoolSearch({ query, q }: { query: string; q: string }) {
         else p.delete('q');
         router.push(`/studio/clients/pool?${p.toString()}`);
       }}
-      className="ml-auto"
+      style={{ marginLeft: 'auto' }}
     >
       <input
         type="search"
@@ -24,7 +24,7 @@ export function PoolSearch({ query, q }: { query: string; q: string }) {
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Search name, area…"
-        className="h-[32px] w-[220px] rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 text-[13px]"
+        className="fld sm" style={{ width: 240, background: 'var(--paper)' }}
       />
     </form>
   );

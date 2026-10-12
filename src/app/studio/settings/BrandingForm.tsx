@@ -7,10 +7,8 @@ import type { BrandingRow } from '@/modules/studio-quote/store';
 import { saveBrandingAction } from './actions';
 import { IDLE } from '../form-state';
 
-const input =
-  'w-full rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[14.5px] text-[var(--s-ink)] placeholder:text-[var(--s-ink-3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]';
-const primary =
-  'rounded-[8px] bg-[var(--s-accent)] px-5 py-2.5 text-[14.5px] font-medium text-white hover:bg-[var(--s-accent-deep)] disabled:opacity-40';
+const input = 'fld';
+const primary = 'btn pri';
 
 function Field({
   label,
@@ -33,12 +31,11 @@ function Field({
   suffix?: string;
   mono?: boolean;
 }) {
-  const w =
-    width === 'xs' ? 'w-[8rem]' : width === 'sm' ? 'max-w-[16rem]' : width === 'md' ? 'max-w-[26rem]' : '';
+  const w: React.CSSProperties = width === 'xs' ? { width: '8rem' } : width === 'sm' ? { maxWidth: '16rem' } : width === 'md' ? { maxWidth: '26rem' } : {};
 
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="s-label">
+      <span className="lbl">
         {label}
         {required ? '' : ' — optional'}
       </span>
@@ -48,11 +45,12 @@ function Field({
           defaultValue={defaultValue ?? ''}
           placeholder={placeholder}
           required={required}
-          className={`${input} ${w} ${mono ? 'font-[family-name:var(--font-mono)]' : ''}`}
+          className={`${input}${mono ? ' mono' : ''}`}
+          style={w}
         />
-        {suffix ? <span className="text-[13.5px] text-[var(--s-ink-3)]">{suffix}</span> : null}
+        {suffix ? <span className="text-[13.5px] muted">{suffix}</span> : null}
       </span>
-      {hint ? <span className="text-[12.5px] leading-snug text-[var(--s-ink-3)]">{hint}</span> : null}
+      {hint ? <span className="text-[12.5px] leading-snug muted">{hint}</span> : null}
     </label>
   );
 }
@@ -67,10 +65,10 @@ function Block({
   children: React.ReactNode;
 }) {
   return (
-    <section className="s-card p-5">
+    <section className="card p-5">
       <h2 className="m-0 text-[15.5px] font-semibold">{title}</h2>
       {note ? (
-        <p className="m-0 mb-4 mt-1 max-w-[64ch] text-[13.5px] leading-relaxed text-[var(--s-ink-3)]">
+        <p className="m-0 mb-4 mt-1 max-w-[64ch] text-[13.5px] leading-relaxed muted">
           {note}
         </p>
       ) : (
@@ -94,12 +92,12 @@ function Block({
 function Fact({ label, value, mono }: { label: string; value: string | null; mono?: boolean }) {
   return (
     <div>
-      <dt className="s-label m-0">{label}</dt>
-      <dd className={`m-0 text-[14px] text-[var(--s-ink,#1c1b19)] ${mono ? 's-num' : ''}`}>
+      <dt className="lbl m-0">{label}</dt>
+      <dd className={`m-0 text-[14px] ${mono ? 'mono' : ''}`}>
         {value && value.length > 0 ? (
           value
         ) : (
-          <span className="text-[var(--s-ink-3,#6a655c)]">Not given</span>
+          <span className="muted">Not given</span>
         )}
       </dd>
     </div>
@@ -126,19 +124,19 @@ export function BrandingForm({ branding }: { branding: BrandingRow | null }) {
         * is the name a client pays, and it should not be editable in a
         * settings page without the check that goes with it.
         */}
-      <section className="rounded-[14px] border border-[var(--s-line,#dbd5cb)] bg-[var(--s-surface-2,#f0ede7)] p-6">
+      <section className="card">
         <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h2 className="m-0 text-[16px] font-semibold text-[var(--s-ink,#1c1b19)]">
+          <h2 className="m-0 text-[16px] font-semibold">
             Who the quotation comes from
           </h2>
           <Link
             href="/studio/onboarding/registration"
-            className="text-[13px] font-medium text-[var(--s-accent)] underline underline-offset-4"
+            className="text-[13px] font-medium acc-t underline underline-offset-4"
           >
             Change in your registration
           </Link>
         </div>
-        <p className="m-0 mb-4 max-w-[62ch] text-[13.5px] leading-relaxed text-[var(--s-ink-2,#56524b)]">
+        <p className="m-0 mb-4 max-w-[62ch] text-[13.5px] leading-relaxed muted">
           From what you gave us during onboarding — the same details we check against the GST and
           company records. We do not ask for them twice, because two copies of an address end up
           disagreeing and only one of them is the one we verified.
@@ -156,7 +154,7 @@ export function BrandingForm({ branding }: { branding: BrandingRow | null }) {
             <Fact label="GSTIN" value={branding.gstin} mono />
           </dl>
         ) : (
-          <p className="m-0 text-[13.5px] leading-relaxed text-[var(--s-ink-2,#56524b)]">
+          <p className="m-0 text-[13.5px] leading-relaxed muted">
             Nothing yet — finish the registration step and it appears here, and on every quotation
             you send.
           </p>
@@ -176,7 +174,7 @@ export function BrandingForm({ branding }: { branding: BrandingRow | null }) {
         note="Both of these are blank until you write them, and they stay blank if you would rather. We will not put our sentences on a quotation with your name on it."
       >
         <label className="flex flex-col gap-1.5">
-          <span className="s-label">Opening note — optional</span>
+          <span className="lbl">Opening note — optional</span>
           <textarea
             name="welcomeNote"
             rows={4}
@@ -186,7 +184,7 @@ export function BrandingForm({ branding }: { branding: BrandingRow | null }) {
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="s-label">Terms and conditions — optional</span>
+          <span className="lbl">Terms and conditions — optional</span>
           <textarea
             name="terms"
             rows={8}
@@ -237,7 +235,7 @@ export function BrandingForm({ branding }: { branding: BrandingRow | null }) {
             name="gstOn"
             value="yes"
             defaultChecked={(branding?.gstBps ?? 0) > 0}
-            className="h-[16px] w-[16px] accent-[var(--s-accent)]"
+            className="h-[16px] w-[16px]"
           />
           Add GST at 18% to new quotations
         </label>
@@ -248,7 +246,7 @@ export function BrandingForm({ branding }: { branding: BrandingRow | null }) {
           width="xs"
           suffix="days — printed as “valid until”"
         />
-        <p className="m-0 max-w-[64ch] text-[13px] leading-relaxed text-[var(--s-ink-3)]">
+        <p className="m-0 max-w-[64ch] text-[13px] leading-relaxed muted">
           The discount applies to modular work only — factory units carry the margin that can be
           given away, site labour does not. Discounting the whole quotation is how a studio wins a
           job and loses money on it.
@@ -273,10 +271,10 @@ export function BrandingForm({ branding }: { branding: BrandingRow | null }) {
           {pending ? 'Saving…' : 'Save'}
         </button>
         {'ok' in state && state.ok ? (
-          <span className="text-[13.5px] text-[var(--s-good)]">Saved.</span>
+          <span className="text-[13.5px] good-t">Saved.</span>
         ) : null}
         {'ok' in state && !state.ok ? (
-          <span role="alert" className="text-[13.5px] text-[var(--s-bad)]">
+          <span role="alert" className="text-[13.5px] bad-t">
             {state.error}
           </span>
         ) : null}

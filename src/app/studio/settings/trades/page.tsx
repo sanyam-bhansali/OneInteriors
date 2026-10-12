@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { PageBody } from '../../StudioShell';
 import { crewSettingsPage } from '@/modules/studio-crews/store';
 import { TradesForm } from './TradesForm';
 
@@ -15,14 +14,14 @@ export const dynamic = 'force-dynamic';
 export default async function TradesSettingsPage() {
   const data = await crewSettingsPage();
   return (
-    <PageBody>
+    <>
       <div className="max-w-[60rem]">
         {!data ? (
-          <p className="m-0 text-[14.5px] text-[var(--s-ink-2)]">Only the studio owner sets the trades and crew settings.</p>
+          <p className="m-0 text-[14.5px] muted">Only the studio owner sets the trades and crew settings.</p>
         ) : (
           <TradesForm initial={data.settings} inUse={data.inUse} paymentLabels={data.paymentLabels} />
         )}
       </div>
-    </PageBody>
+    </>
   );
 }

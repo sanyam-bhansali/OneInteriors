@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { PageBody } from '../StudioShell';
 import { myBranding, myTier } from '@/modules/studio-quote/store';
 import { logoUploadEnabled, signedLogoUrl } from '@/modules/storage/studio-logo';
 import { BrandingForm } from './BrandingForm';
@@ -40,13 +39,13 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <PageBody>
+      <>
         {!branding ? (
-          <div className="s-card mb-6 border-l-[3px] !border-l-[var(--s-accent)] p-5">
+          <div className="card mb-6 border-l-[3px] !border-l-[var(--s-accent)] p-5">
             <p className="m-0 mb-2 text-[14.5px] font-semibold">
               Your quotations go out under your name, not ours.
             </p>
-            <p className="m-0 max-w-[68ch] text-[14px] leading-relaxed text-[var(--s-ink-2)]">
+            <p className="m-0 max-w-[68ch] text-[14px] leading-relaxed muted">
               Nothing below is filled in yet, and nothing has a default we invented. A quotation
               with a client&rsquo;s name on it is a document you are answerable for, so the words
               on it should be yours — including the ones you would rather leave off.
@@ -68,7 +67,7 @@ export default async function SettingsPage() {
             hideRequested={branding?.hideOurMark ?? false}
           />
         </div>
-      </PageBody>
+      </>
     </>
   );
 }

@@ -29,7 +29,7 @@ export function TradesForm({ initial, inUse, paymentLabels }: { initial: CrewSet
   const [gates, setGates] = useState(initial.execGates);
   const [tplOpen, setTplOpen] = useState<string | null>(null);
   const keyed = trades.filter((t) => t.key) as { key: string; label: string; active: boolean }[];
-  const section = 's-card flex flex-col gap-3 p-5';
+  const section = 'card';
 
   return (
     <form
@@ -58,7 +58,7 @@ export function TradesForm({ initial, inUse, paymentLabels }: { initial: CrewSet
           {trades.map((t, i) => (
             <li key={t.key ?? `new-${i}`} className="flex flex-wrap items-center gap-2">
               <input
-                className="s-input w-[240px]"
+                className="fld w-[240px] fit"
                 aria-label="Trade name"
                 value={t.label}
                 onChange={(e) => setTrades(trades.map((x, k) => (k === i ? { ...x, label: e.target.value } : x)))}
@@ -68,7 +68,7 @@ export function TradesForm({ initial, inUse, paymentLabels }: { initial: CrewSet
                 Shown
               </label>
               {!t.key || !inUse.includes(t.key) ? (
-                <button type="button" className="text-[12.5px] text-[var(--s-ink-3)] hover:text-[var(--s-bad)]" onClick={() => setTrades(trades.filter((_, k) => k !== i))}>
+                <button type="button" className="text-[12.5px] muted hover:text-[var(--s-bad)]" onClick={() => setTrades(trades.filter((_, k) => k !== i))}>
                   Remove
                 </button>
               ) : (
@@ -78,7 +78,7 @@ export function TradesForm({ initial, inUse, paymentLabels }: { initial: CrewSet
           ))}
         </ul>
         <div>
-          <button type="button" className="s-btn-ghost" onClick={() => setTrades([...trades, { key: undefined, label: '', active: true }])}>
+          <button type="button" className="btn ghost sm" onClick={() => setTrades([...trades, { key: undefined, label: '', active: true }])}>
             Add a trade
           </button>
         </div>
@@ -97,27 +97,27 @@ export function TradesForm({ initial, inUse, paymentLabels }: { initial: CrewSet
         <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
           {routes.map((x, i) => (
             <li key={i} className="flex flex-wrap items-center gap-2">
-              <select className="s-input w-auto" aria-label="Match" value={x.match} onChange={(e) => setRoutes(routes.map((y, k) => (k === i ? { ...y, match: e.target.value as 'exact' | 'keyword' } : y)))}>
+              <select className="fld w-auto fit" aria-label="Match" value={x.match} onChange={(e) => setRoutes(routes.map((y, k) => (k === i ? { ...y, match: e.target.value as 'exact' | 'keyword' } : y)))}>
                 <option value="exact">Product is</option>
                 <option value="keyword">Name contains</option>
               </select>
-              <input className="s-input w-[240px]" aria-label="Product or word" value={x.text} onChange={(e) => setRoutes(routes.map((y, k) => (k === i ? { ...y, text: e.target.value } : y)))} />
+              <input className="fld w-[240px] fit" aria-label="Product or word" value={x.text} onChange={(e) => setRoutes(routes.map((y, k) => (k === i ? { ...y, text: e.target.value } : y)))} />
               <span className={muted}>goes to</span>
-              <select className="s-input w-auto" aria-label="Trade" value={x.trade} onChange={(e) => setRoutes(routes.map((y, k) => (k === i ? { ...y, trade: e.target.value } : y)))}>
+              <select className="fld w-auto fit" aria-label="Trade" value={x.trade} onChange={(e) => setRoutes(routes.map((y, k) => (k === i ? { ...y, trade: e.target.value } : y)))}>
                 {keyed.map((t) => (
                   <option key={t.key} value={t.key}>
                     {t.label}
                   </option>
                 ))}
               </select>
-              <button type="button" className="text-[12.5px] text-[var(--s-ink-3)] hover:text-[var(--s-bad)]" onClick={() => setRoutes(routes.filter((_, k) => k !== i))}>
+              <button type="button" className="text-[12.5px] muted hover:text-[var(--s-bad)]" onClick={() => setRoutes(routes.filter((_, k) => k !== i))}>
                 Remove
               </button>
             </li>
           ))}
         </ul>
         <div>
-          <button type="button" className="s-btn-ghost" onClick={() => setRoutes([...routes, { match: 'exact', text: '', trade: keyed[0]?.key ?? 'carpentry' }])}>
+          <button type="button" className="btn ghost sm" onClick={() => setRoutes([...routes, { match: 'exact', text: '', trade: keyed[0]?.key ?? 'carpentry' }])}>
             Add a routing row
           </button>
         </div>
@@ -128,7 +128,7 @@ export function TradesForm({ initial, inUse, paymentLabels }: { initial: CrewSet
         <p className={`m-0 ${muted}`}>Copied onto a new crew&apos;s card for their trades, once. Changing a template never changes a crew&apos;s card. Only ₹150 per sq ft installation is Hauspire&apos;s real rate; fill in yours.</p>
         <div className="flex flex-wrap gap-1.5">
           {keyed.map((t) => (
-            <button key={t.key} type="button" className={tplOpen === t.key ? 's-btn' : 's-btn-ghost'} onClick={() => setTplOpen(tplOpen === t.key ? null : t.key)}>
+            <button key={t.key} type="button" className={tplOpen === t.key ? 'btn pri sm' : 'btn ghost sm'} onClick={() => setTplOpen(tplOpen === t.key ? null : t.key)}>
               {t.label} · {(templates[t.key] ?? []).length}
             </button>
           ))}
@@ -139,23 +139,23 @@ export function TradesForm({ initial, inUse, paymentLabels }: { initial: CrewSet
               const set = (v: Partial<typeof x>) => setTemplates({ ...templates, [tplOpen]: (templates[tplOpen] ?? []).map((y, k) => (k === i ? { ...y, ...v } : y)) });
               return (
                 <div key={i} className="flex flex-wrap items-center gap-2">
-                  <input className="s-input w-[230px]" aria-label="Item" value={x.item} onChange={(e) => set({ item: e.target.value })} />
-                  <select className="s-input w-auto" aria-label="Unit" value={x.unit} onChange={(e) => set({ unit: e.target.value as CrewUnitName })}>
+                  <input className="fld w-[230px] fit" aria-label="Item" value={x.item} onChange={(e) => set({ item: e.target.value })} />
+                  <select className="fld w-auto fit" aria-label="Unit" value={x.unit} onChange={(e) => set({ unit: e.target.value as CrewUnitName })}>
                     {CREW_UNITS.map((u) => (
                       <option key={u} value={u}>
                         per {CREW_UNIT_LABEL[u]}
                       </option>
                     ))}
                   </select>
-                  <input className="s-input w-[110px]" inputMode="decimal" aria-label="Rate in rupees" placeholder="₹ (blank)" value={x.rateRupees} onChange={(e) => set({ rateRupees: e.target.value })} />
-                  <button type="button" className="text-[12.5px] text-[var(--s-ink-3)] hover:text-[var(--s-bad)]" onClick={() => setTemplates({ ...templates, [tplOpen]: (templates[tplOpen] ?? []).filter((_, k) => k !== i) })}>
+                  <input className="fld w-[110px] fit" inputMode="decimal" aria-label="Rate in rupees" placeholder="₹ (blank)" value={x.rateRupees} onChange={(e) => set({ rateRupees: e.target.value })} />
+                  <button type="button" className="text-[12.5px] muted hover:text-[var(--s-bad)]" onClick={() => setTemplates({ ...templates, [tplOpen]: (templates[tplOpen] ?? []).filter((_, k) => k !== i) })}>
                     Remove
                   </button>
                 </div>
               );
             })}
             <div>
-              <button type="button" className="s-btn-ghost" onClick={() => setTemplates({ ...templates, [tplOpen]: [...(templates[tplOpen] ?? []), { item: '', unit: 'SQFT', rateRupees: '' }] })}>
+              <button type="button" className="btn ghost sm" onClick={() => setTemplates({ ...templates, [tplOpen]: [...(templates[tplOpen] ?? []), { item: '', unit: 'SQFT', rateRupees: '' }] })}>
                 Add an item
               </button>
             </div>
@@ -167,23 +167,23 @@ export function TradesForm({ initial, inUse, paymentLabels }: { initial: CrewSet
         <h2 className="m-0 text-[16px] font-semibold">Numbers</h2>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
-            <span className="s-label">Pay crews within (days)</span>
-            <input className="s-input w-[120px]" inputMode="numeric" value={dueDays} onChange={(e) => setDueDays(e.target.value)} />
+            <span className="lbl">Pay crews within (days)</span>
+            <input className="fld w-[120px] fit" inputMode="numeric" value={dueDays} onChange={(e) => setDueDays(e.target.value)} />
             <span className={muted}>A new work order&apos;s &ldquo;pay by&rdquo; date. Hauspire: 45.</span>
           </label>
           <label className="flex flex-col gap-1">
-            <span className="s-label">Labour margin target (%)</span>
-            <input className="s-input w-[120px]" inputMode="numeric" value={target} onChange={(e) => setTarget(e.target.value)} />
+            <span className="lbl">Labour margin target (%)</span>
+            <input className="fld w-[120px] fit" inputMode="numeric" value={target} onChange={(e) => setTarget(e.target.value)} />
             <span className={muted}>You are warned when a project&apos;s contract less its crews falls below this share. Only you see it.</span>
           </label>
           <label className="flex flex-col gap-1">
-            <span className="s-label">Installation-only rate (₹ per sq ft)</span>
-            <input className="s-input w-[120px]" inputMode="decimal" value={install} onChange={(e) => setInstall(e.target.value)} />
+            <span className="lbl">Installation-only rate (₹ per sq ft)</span>
+            <input className="fld w-[120px] fit" inputMode="decimal" value={install} onChange={(e) => setInstall(e.target.value)} />
             <span className={muted}>For a carpentry line marked installation only, when the crew&apos;s card has no rate. Hauspire: ₹150.</span>
           </label>
           <label className="flex flex-col gap-1">
-            <span className="s-label">Advance limit (₹)</span>
-            <input className="s-input w-[140px]" inputMode="decimal" value={advance} onChange={(e) => setAdvance(e.target.value)} />
+            <span className="lbl">Advance limit (₹)</span>
+            <input className="fld w-[140px] fit" inputMode="decimal" value={advance} onChange={(e) => setAdvance(e.target.value)} />
             <span className={muted}>How far an advance may run ahead of a work order&apos;s bill. 0 means no advances.</span>
           </label>
         </div>
@@ -198,10 +198,10 @@ export function TradesForm({ initial, inUse, paymentLabels }: { initial: CrewSet
         <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
           {gates.map((g, i) => (
             <li key={i} className="flex flex-wrap items-center gap-2">
-              <input className="s-input w-[240px]" aria-label="Step words" value={g.step} onChange={(e) => setGates(gates.map((x, k) => (k === i ? { ...x, step: e.target.value } : x)))} />
+              <input className="fld w-[240px] fit" aria-label="Step words" value={g.step} onChange={(e) => setGates(gates.map((x, k) => (k === i ? { ...x, step: e.target.value } : x)))} />
               <span className={muted}>waits for</span>
-              <input className="s-input w-[220px]" aria-label="Payment words" list="payment-stage-labels" value={g.payment} onChange={(e) => setGates(gates.map((x, k) => (k === i ? { ...x, payment: e.target.value } : x)))} />
-              <button type="button" className="text-[12.5px] text-[var(--s-ink-3)] hover:text-[var(--s-bad)]" onClick={() => setGates(gates.filter((_, k) => k !== i))}>
+              <input className="fld w-[220px] fit" aria-label="Payment words" list="payment-stage-labels" value={g.payment} onChange={(e) => setGates(gates.map((x, k) => (k === i ? { ...x, payment: e.target.value } : x)))} />
+              <button type="button" className="text-[12.5px] muted hover:text-[var(--s-bad)]" onClick={() => setGates(gates.filter((_, k) => k !== i))}>
                 Remove
               </button>
             </li>
@@ -213,14 +213,14 @@ export function TradesForm({ initial, inUse, paymentLabels }: { initial: CrewSet
           ))}
         </datalist>
         <div>
-          <button type="button" className="s-btn-ghost" onClick={() => setGates([...gates, { step: '', payment: '' }])}>
+          <button type="button" className="btn ghost sm" onClick={() => setGates([...gates, { step: '', payment: '' }])}>
             Add a lock
           </button>
         </div>
       </section>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" className="s-btn" disabled={r.pending}>
+        <button type="submit" className="btn pri sm" disabled={r.pending}>
           Save
         </button>
         <Message m={r.message} />

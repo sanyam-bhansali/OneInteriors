@@ -7,13 +7,7 @@ import { createQuoteAction } from './actions';
 import { searchAction } from '../search-actions';
 import type { FoundClient } from '@/modules/studio-practice/clients';
 import { IDLE } from '../form-state';
-
-const input =
-  'rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[14.5px] text-[var(--s-ink)] placeholder:text-[var(--s-ink-3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]';
-const primary =
-  'rounded-[8px] bg-[var(--s-accent)] px-5 py-2.5 text-[14.5px] font-medium text-white hover:bg-[var(--s-accent-deep)] disabled:opacity-40';
-const quiet =
-  'rounded-[8px] border border-[var(--s-rule)] px-4 py-2.5 text-[14px] font-medium hover:border-[var(--s-ink-3)] disabled:opacity-40';
+import { LineIcon } from '../ui/icons';
 
 /**
  * Starting a quotation — which means building one.
@@ -88,55 +82,58 @@ export function StartQuote({
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className={primary}>
-        + Write a quotation
+      <button type="button" onClick={() => setOpen(true)} className="btn pri">
+        <LineIcon name="plus" size={17} />
+        New quotation
       </button>
     );
   }
 
   return (
-    <form action={action} className="s-card flex flex-col gap-4 p-6">
+    <form action={action} className="card qform" style={{ flex: '1 1 100%' }}>
       {/* The hidden pair that turns "create" into "create and build". A
           checkbox would post nothing when unticked, which is exactly the
           value we need to send. */}
       <input type="hidden" name="build" value={build ? 'yes' : 'no'} />
 
-      <div>
-        <h2 className="m-0 mb-1 text-[16px] font-semibold">Write a quotation</h2>
-        <p className="m-0 max-w-[64ch] text-[14px] leading-relaxed text-[var(--s-ink-2)]">
-          Tell us the flat and we build it — a wardrobe in each bedroom, a vanity in each
-          bathroom, the kitchen sized to its run, everything at your own rates. You correct it
-          rather than type it.
-        </p>
+      <div className="chead">
+        <div>
+          <h2>New quotation</h2>
+          <p className="muted sm" style={{ margin: '4px 0 0', maxWidth: '64ch', lineHeight: 1.5 }}>
+            Tell us the flat and we build it — a wardrobe in each bedroom, a vanity in each bathroom, the kitchen sized to its
+            run, everything at your own rates. You correct it rather than type it.
+          </p>
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-4">
+      <div className="qrow">
         <input type="hidden" name="clientId" value={lead?.id ?? ''} />
         <input type="hidden" name="addLead" value={!lead && (addLead || leadRequired) ? 'yes' : 'no'} />
-        <div className="relative flex min-w-[14rem] flex-1 flex-col gap-1.5">
-          <label className="flex flex-col gap-1.5">
-            <span className="s-label">Who is it for — a lead&apos;s name or phone, or someone new</span>
-            <input
-              name="clientName"
-              required
-              autoFocus
-              autoComplete="off"
-              value={name}
-              onChange={(e) => void look(e.target.value)}
-              placeholder="Mrs Kothari"
-              className={input}
-            />
+        <div className="qfield" style={{ flex: '1 1 16rem', position: 'relative' }}>
+          <label htmlFor="nq-name" className="lbl">
+            Who is it for — a lead&apos;s name or phone, or someone new
           </label>
+          <input
+            id="nq-name"
+            name="clientName"
+            required
+            autoFocus
+            autoComplete="off"
+            value={name}
+            onChange={(e) => void look(e.target.value)}
+            placeholder="Mrs Kothari"
+            className="fld"
+          />
           {lead ? (
-            <p className="m-0 text-[12.5px] text-[var(--s-good)]">
+            <p className="qok">
               For the lead {lead.name}
               {lead.phone ? ` · ${lead.phone}` : ''}.{' '}
-              <button type="button" onClick={() => setLead(null)} className="text-[var(--s-ink-3)] underline">
+              <button type="button" onClick={() => setLead(null)} className="linkbtn" style={{ textDecoration: 'underline' }}>
                 Not them
               </button>
             </p>
           ) : found.length > 0 ? (
-            <ul className="s-card m-0 flex list-none flex-col p-1 shadow-md">
+            <ul className="pick qfound">
               {found.map((f) => (
                 <li key={f.id}>
                   <button
@@ -148,12 +145,9 @@ export function StartQuote({
                       setSociety(f.society ?? '');
                       setFound([]);
                     }}
-                    className="flex w-full flex-wrap items-baseline gap-x-2 rounded-[8px] px-2.5 py-1.5 text-left text-[13.5px] hover:bg-[var(--s-surface-2)]"
                   >
-                    <span className="font-medium">{f.name}</span>
-                    <span className="text-[12px] text-[var(--s-ink-3)]">
-                      {[f.phone, f.society, f.stageName].filter(Boolean).join(' · ')}
-                    </span>
+                    <span style={{ fontWeight: 600 }}>{f.name}</span>
+                    <span className="muted sm">{[f.phone, f.society, f.stageName].filter(Boolean).join(' · ')}</span>
                   </button>
                 </li>
               ))}
@@ -161,32 +155,27 @@ export function StartQuote({
           ) : null}
         </div>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="s-label">Phone{leadRequired ? '' : ' — optional'}</span>
-          <input name="clientPhone" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={`${input} w-[10rem]`} />
+        <label className="qfield" style={{ flex: '0 1 11rem' }}>
+          <span className="lbl">Phone{leadRequired ? '' : ' — optional'}</span>
+          <input name="clientPhone" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="fld" />
         </label>
 
-        <label className="flex min-w-[12rem] flex-1 flex-col gap-1.5">
-          <span className="s-label">Society or address — optional</span>
-          <input name="society" value={society} onChange={(e) => setSociety(e.target.value)} placeholder="Kalyani Nagar" className={input} />
+        <label className="qfield" style={{ flex: '1 1 12rem' }}>
+          <span className="lbl">Society or address — optional</span>
+          <input name="society" value={society} onChange={(e) => setSociety(e.target.value)} placeholder="Kalyani Nagar" className="fld" />
         </label>
         {!lead && !leadRequired ? (
-          <label className="flex basis-full items-center gap-2 text-[13.5px]">
-            <input type="checkbox" checked={addLead} onChange={(e) => setAddLead(e.target.checked)} className="h-[16px] w-[16px] accent-[var(--s-accent)]" />
+          <label className="qcheck" style={{ flexBasis: '100%', minHeight: 0 }}>
+            <input type="checkbox" checked={addLead} onChange={(e) => setAddLead(e.target.checked)} />
             Also add them to my leads (their quotations then show on the lead)
           </label>
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-end gap-4 border-t border-[var(--s-rule-soft)] pt-4">
-        <label className="flex flex-col gap-1.5">
-          <span className="s-label">Configuration</span>
-          <select
-            name="config"
-            value={config}
-            onChange={(e) => setConfig(e.target.value as ConfigName)}
-            className={`${input} w-[7.5rem]`}
-          >
+      <div className="qrow">
+        <label className="qfield" style={{ width: '8rem' }}>
+          <span className="lbl">Configuration</span>
+          <select name="config" value={config} onChange={(e) => setConfig(e.target.value as ConfigName)} className="fld">
             {CONFIGS.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -195,87 +184,50 @@ export function StartQuote({
           </select>
         </label>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="s-label">Kitchen run mm</span>
-          <input
-            name="kitchenRunMm"
-            inputMode="numeric"
-            placeholder={String(standardRunFor(config))}
-            className={`${input} s-num w-[8rem] text-right`}
-          />
+        <label className="qfield" style={{ width: '8.5rem' }}>
+          <span className="lbl">Kitchen run mm</span>
+          <input name="kitchenRunMm" inputMode="numeric" placeholder={String(standardRunFor(config))} className="fld num" />
         </label>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="s-label">Bathrooms</span>
-          <input
-            name="bathrooms"
-            inputMode="numeric"
-            defaultValue="2"
-            className={`${input} s-num w-[5.5rem] text-right`}
-          />
+        <label className="qfield" style={{ width: '6rem' }}>
+          <span className="lbl">Bathrooms</span>
+          <input name="bathrooms" inputMode="numeric" defaultValue="2" className="fld num" />
         </label>
 
-        <label className="flex items-center gap-2 py-2.5 text-[14px]">
-          <input
-            type="checkbox"
-            name="study"
-            value="yes"
-            className="h-[16px] w-[16px] accent-[var(--s-accent)]"
-          />
+        <label className="qcheck">
+          <input type="checkbox" name="study" value="yes" />
           Study or office
         </label>
 
-        <label className="flex items-center gap-2 py-2.5 text-[14px]">
-          <input
-            type="checkbox"
-            name="balcony"
-            value="yes"
-            defaultChecked
-            className="h-[16px] w-[16px] accent-[var(--s-accent)]"
-          />
+        <label className="qcheck">
+          <input type="checkbox" name="balcony" value="yes" defaultChecked />
           Dry balcony
         </label>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="s-label">Carpet sq ft — optional</span>
-          <input
-            name="carpetSqft"
-            inputMode="numeric"
-            placeholder="1150"
-            className={`${input} s-num w-[7.5rem] text-right`}
-          />
+        <label className="qfield" style={{ width: '8.5rem' }}>
+          <span className="lbl">Carpet sq ft — optional</span>
+          <input name="carpetSqft" inputMode="numeric" placeholder="1150" className="fld num" />
         </label>
       </div>
 
-      <p className="m-0 text-[12.5px] leading-relaxed text-[var(--s-ink-3)]">
-        Leave the kitchen run blank and a {config} is assumed at{' '}
-        <span className="s-num">{standardRunFor(config)}</span>mm — it is the one measurement that
-        moves the total, so it is worth taking. Every size and rate is editable afterwards.
+      <p className="muted sm" style={{ margin: 0, lineHeight: 1.5 }}>
+        Leave the kitchen run blank and a {config} is assumed at <span className="mono">{standardRunFor(config)}</span>mm — it is
+        the one measurement that moves the total, so it is worth taking. Every size and rate is editable afterwards.
       </p>
 
-      <div className="flex flex-wrap items-center gap-3 border-t border-[var(--s-rule-soft)] pt-4">
-        <button
-          type="submit"
-          disabled={pending}
-          onClick={() => setBuild(true)}
-          className={primary}
-        >
+      <div className="hstack" style={{ paddingTop: 14, borderTop: '1px solid var(--fill2)' }}>
+        <button type="submit" disabled={pending} onClick={() => setBuild(true)} className="btn pri">
           {pending ? 'Building…' : `Build the ${config}`}
         </button>
 
         {/* Same form, same submit. The flag decides, so there is no second
             code path to keep in step with the first. */}
-        <button
-          type="submit"
-          disabled={pending}
-          onClick={() => setBuild(false)}
-          className={quiet}
-        >
+        <button type="submit" disabled={pending} onClick={() => setBuild(false)} className="btn sec">
           Start it blank
         </button>
 
         {compact ? (
-          <button type="button" onClick={() => setOpen(false)} className={quiet}>
+          <button type="button" onClick={() => setOpen(false)} className="btn ghost">
             Cancel
           </button>
         ) : null}
@@ -284,7 +236,7 @@ export function StartQuote({
       <Readiness priced={priced} standard={standard} total={total} />
 
       {'ok' in state && !state.ok ? (
-        <p role="alert" className="m-0 text-[13px] text-[var(--s-bad)]">
+        <p role="alert" className="qerr">
           {state.error}
         </p>
       ) : null}
@@ -312,25 +264,26 @@ function Readiness({
 
   if (standard === 0) {
     return (
-      <p className="m-0 rounded-[10px] bg-[var(--s-warn-wash,#f5e9cf)] px-4 py-3 text-[13px] leading-relaxed text-[var(--s-ink)]">
-        Nothing in your product list is marked <strong>standard</strong> yet, so a build has
-        nothing to put on the page.{' '}
-        <Link href="/studio/products" className="font-medium text-[var(--s-accent)]">
-          Tick what you fit on nearly every job
-        </Link>{' '}
-        — about twenty-five ticks, once, and every quotation after this one builds itself.
+      <p className="qnote warn">
+        <span>
+          Nothing in your product list is marked <strong>standard</strong> yet, so a build has nothing to put on the page.{' '}
+          <Link href="/studio/products" className="acc-t" style={{ fontWeight: 600 }}>
+            Tick what you fit on nearly every job
+          </Link>{' '}
+          — about twenty-five ticks, once, and every quotation after this one builds itself.
+        </span>
       </p>
     );
   }
 
   return (
-    <p className="m-0 text-[12.5px] leading-relaxed text-[var(--s-ink-3)]">
-      <span className="s-num">{standard}</span> of your {total} products are marked standard and{' '}
-      <span className="s-num">{priced}</span> are priced.{' '}
+    <p className="muted sm" style={{ margin: 0, lineHeight: 1.5 }}>
+      <span className="mono">{standard}</span> of your {total} products are marked standard and <span className="mono">{priced}</span>{' '}
+      are priced.{' '}
       {priced < total ? (
         <>
           Anything without a rate lands at zero and is flagged —{' '}
-          <Link href="/studio/products" className="text-[var(--s-accent)]">
+          <Link href="/studio/products" className="acc-t">
             price them
           </Link>
           .

@@ -100,13 +100,13 @@ export function PoolTable({
   };
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-[15px] font-semibold">
-          <span className="s-num">{total.toLocaleString('en-IN')}</span> {showingAll ? 'leads' : 'unassigned'}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+      <div className="hstack">
+        <span style={{ fontSize: 15, fontWeight: 600 }}>
+          <span className="mono">{total.toLocaleString('en-IN')}</span> {showingAll ? 'leads' : 'unassigned'}
         </span>
         {seesAll ? (
-          <label className="flex items-center gap-2 text-[13px]" title="Include leads that already have an owner">
+          <label className="hstack sm" style={{ gap: 6 }} title="Include leads that already have an owner">
             <input
               type="checkbox"
               checked={showingAll}
@@ -137,18 +137,18 @@ export function PoolTable({
       </div>
 
       {group ? (
-        <div className="s-card flex flex-wrap gap-2 p-3">
+        <div className="card" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 12 }}>
           {group.values.map((v) => (
             <button key={v.value} type="button" onClick={() => pickGroupValue(v.value)} className={btnOutline} title={`Show only these, then select and give them out`}>
               {v.value === NOT_SET ? `No ${group.label.toLowerCase()}` : v.value}
-              <span className="s-num text-[var(--s-ink-3)]">{v.n.toLocaleString('en-IN')}</span>
+              <span className="mono muted">{v.n.toLocaleString('en-IN')}</span>
             </button>
           ))}
         </div>
       ) : null}
 
       {said && selected === 0 ? (
-        <p role="status" className="m-0 text-[13.5px] text-[var(--s-good)]">
+        <p role="status" className="cl-ok">
           {said}
         </p>
       ) : null}
@@ -167,11 +167,11 @@ export function PoolTable({
         />
       ) : null}
 
-      <div className="s-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[44rem] border-collapse text-[13.5px]">
+      <section className="card flush" style={{ overflow: 'hidden' }}>
+        <div className="tscroll" style={{ minHeight: 280 }}>
+          <table className="tbl cl-tbl cl-pooltbl">
             <thead>
-              <tr className="text-left">
+              <tr>
                 {poolActions.length > 0 ? (
                   <th scope="col" className={TH} style={{ width: 36 }}>
                     <input
@@ -196,7 +196,7 @@ export function PoolTable({
               {rows.map((l) => {
                 const ticked = matching !== false || picked.has(l.id);
                 return (
-                  <tr key={l.id} className={`h-[52px] border-t border-[var(--s-rule)] hover:bg-[var(--s-surface-2)] ${ticked ? 'bg-[var(--s-accent-wash)]' : ''}`}>
+                  <tr key={l.id} className={ticked ? 'pick' : ''}>
                     {poolActions.length > 0 ? (
                       <td className={TD}>
                         <input
@@ -216,25 +216,27 @@ export function PoolTable({
                       </td>
                     ) : null}
                     <td className={TD}>
-                      <div className="flex items-center gap-2.5">
+                      <div className="hstack" style={{ gap: 10, flexWrap: 'nowrap' }}>
                         <Avatar name={l.name} />
-                        <div className="min-w-0">
+                        <div style={{ minWidth: 0 }}>
                           {seesAll ? (
-                            <Link href={`/studio/clients/${l.id}`} className="font-semibold text-[var(--s-ink)] no-underline hover:underline">
+                            <Link href={`/studio/clients/${l.id}`} style={{ fontWeight: 600 }}>
                               {l.name}
                             </Link>
                           ) : (
-                            <span className="font-semibold">{l.name}</span>
+                            <span style={{ fontWeight: 600 }}>{l.name}</span>
                           )}
-                          <div className="text-[12px] text-[var(--s-ink-3)]">{[l.society, l.locality, l.city].filter(Boolean).join(', ') || '—'}</div>
+                          <div className="sub">{[l.society, l.locality, l.city].filter(Boolean).join(', ') || '—'}</div>
                         </div>
                       </div>
                     </td>
                     <td className={TD}>
                       <StageBadge name={l.stageName} colour={l.stageColour} />
                     </td>
-                    <td className={`${TD} text-[12.5px]`}>{sourceLabel(l)}</td>
-                    <td className={`${TD} text-[12.5px] text-[var(--s-ink-3)]`}>{now ? relTime(l.createdAt, now) : ''}</td>
+                    <td className={TD}>
+                      <span className={`chip xs ${l.source === 'ONE_INTERIORS' ? 'oi' : ''}`}>{sourceLabel(l)}</span>
+                    </td>
+                    <td className={`${TD} sub`}>{now ? relTime(l.createdAt, now) : ''}</td>
                     <td className={TD}>{seesAll ? <AssignRow id={l.id} people={people} current={l.assignedToName} /> : <ClaimOne id={l.id} />}</td>
                   </tr>
                 );
@@ -242,22 +244,23 @@ export function PoolTable({
             </tbody>
           </table>
         </div>
-        {rows.length === 0 ? <p className="m-0 px-4 py-8 text-center text-[13.5px]">{showingAll ? 'No leads here.' : 'Nothing in the pool — every lead has an owner.'}</p> : null}
-      </div>
+        {rows.length === 0 ? <p className="muted" style={{ margin: 0, padding: '32px 16px', textAlign: 'center' }}>{showingAll ? 'No leads here.' : 'Nothing in the pool — every lead has an owner.'}</p> : null}
+      </section>
       {next ? <div ref={sentinel} style={{ height: 1 }} aria-hidden /> : null}
-      {loading ? <p className="m-0 text-[12px] text-[var(--s-ink-3)]">Loading…</p> : null}
+      {loading ? <p className="cl-foot">Loading…</p> : null}
     </div>
   );
 }
 
-const TH = 'whitespace-nowrap border-b border-[var(--s-rule)] bg-[var(--s-surface)] px-3.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--s-ink-3)]';
-const TD = 'px-3.5 py-2 align-middle';
+/* The design's table (tbl) draws the cells. */
+const TH = '';
+const TD = '';
 
 /** Owner and PM: give this lead to someone, in one choice. */
 function AssignRow({ id, people, current }: { id: string; people: { id: string; name: string }[]; current: string | null }) {
   const { pending, result, run } = useAct();
   return (
-    <div className="flex flex-col">
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
       <SelectMenu
         value=""
         label={pending ? 'Assigning…' : (current ?? 'Assign to…')}

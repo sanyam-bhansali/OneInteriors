@@ -9,7 +9,7 @@ import { DraftActions, MaterialCode, UploadDocument } from './LockerClient';
  * materials from the quote with their product codes once ordered.
  */
 
-const muted = 'text-[12.5px] text-[var(--s-ink-3)]';
+const muted = 'text-[12.5px] text-[var(--muted)]';
 
 export async function LockerCard({ projectId, customer }: { projectId: string; customer: string }) {
   const locker = await studioLocker(projectId);
@@ -28,12 +28,12 @@ export async function LockerCard({ projectId, customer }: { projectId: string; c
   const ordered = locker.materials.filter((m) => m.ordered).length;
 
   return (
-    <section className="s-card flex flex-col gap-3 p-4" aria-label="Home locker">
+    <section className="sidecard" aria-label="Home locker">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="m-0 text-[15px] font-semibold">Home locker</h2>
+        <h2 className="t m-0">Home locker</h2>
         <CustomerSees name={customer} />
       </div>
-      <p className={`m-0 ${muted}`}>
+      <p className="m-0 text-[14px] leading-[1.45] text-[var(--muted)]">
         {summary}. {customer} can open {locker.sharedCount}
         {locker.drafts ? `; ${locker.drafts} draft${locker.drafts === 1 ? '' : 's'} only your team can see` : ''}.
       </p>
@@ -41,17 +41,17 @@ export async function LockerCard({ projectId, customer }: { projectId: string; c
       {locker.docs.length ? (
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
           {locker.docs.map((d) => (
-            <li key={d.id} className="flex flex-col gap-0.5 border-t border-[var(--s-rule)] pt-2 text-[13.5px]">
+            <li key={d.id} className="flex flex-col gap-0.5 border-t border-[var(--fill2)] pt-2 text-[13.5px]">
               <span>
                 {d.url ? (
-                  <a href={d.url} target="_blank" rel="noreferrer" className="text-[var(--s-ink)] underline decoration-[var(--s-rule)]">
+                  <a href={d.url} target="_blank" rel="noreferrer" className="underline decoration-[var(--line)]">
                     {d.title}
                   </a>
                 ) : (
                   d.title
                 )}
-                {d.version > 1 ? <span className="ml-1.5 rounded-full bg-[var(--s-tag)] px-1.5 text-[11.5px] text-[var(--s-tag-ink)]">v{d.version}</span> : null}
-                {!d.shared ? <span className="ml-1.5 rounded-full bg-[var(--s-warn-wash)] px-1.5 text-[11.5px] text-[var(--s-warn)]">Draft · only your team</span> : null}
+                {d.version > 1 ? <span className="chip ml-1.5">v{d.version}</span> : null}
+                {!d.shared ? <span className="chip warn ml-1.5">Draft · only your team</span> : null}
               </span>
               <span className={muted}>
                 {d.kindLabel} · {d.meta}
@@ -74,14 +74,14 @@ export async function LockerCard({ projectId, customer }: { projectId: string; c
       {locker.canUpload ? <UploadDocument projectId={projectId} customer={customer} /> : null}
 
       {locker.materials.length ? (
-        <details className="border-t border-[var(--s-rule)] pt-2">
+        <details className="border-t border-[var(--fill2)] pt-2">
           <summary className="cursor-pointer text-[13.5px] font-medium">
             What the home is made of <span className={muted}>· {ordered} of {locker.materials.length} ordered</span>
           </summary>
           <p className={`m-0 mt-1 ${muted}`}>Add the product code when you order: {customer} keeps it for spares and repairs.</p>
           <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0">
             {locker.materials.map((m) => (
-              <li key={m.id} className="flex flex-col gap-1 border-t border-[var(--s-rule-soft)] pt-2 text-[13px]">
+              <li key={m.id} className="flex flex-col gap-1 border-t border-[var(--soft)] pt-2 text-[13px]">
                 <span>
                   <span className="font-medium">{m.item}</span> <span className={muted}>· {m.room}</span>
                   {m.spec ? <span className={`block ${muted}`}>{m.spec}</span> : null}

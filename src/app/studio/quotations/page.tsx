@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { PageHead, PageBody } from '../StudioShell';
 import { GuidePanel } from '../GuidePanel';
 import { guideContext } from '@/modules/studio/guide-store';
 import { formatINR } from '@/lib/money';
@@ -9,6 +8,8 @@ import { myProducts } from '@/modules/studio-quote/store';
 import { StartQuote } from './NewQuote';
 import { RatesGateCard } from '../RatesGateCard';
 import { myRatesGate, RATES_GATE_COPY } from '@/modules/studio-quote/rates-gate';
+import { LineIcon } from '../ui/icons';
+import './quotes.css';
 
 export const metadata: Metadata = {
   title: 'Quotations',
@@ -17,171 +18,252 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic';
 
+/** The status chip's tone (StudioQuotes: warn for waiting, good for won, bad for lost). */
 const TONE: Record<QuoteStatusName, string> = {
-  DRAFT: '!bg-[var(--s-surface-2)] !text-[var(--s-ink-3)]',
-  ISSUED: '!bg-[var(--s-warn-wash)] !text-[var(--s-warn)]',
-  ACCEPTED: '!bg-[var(--s-good-wash)] !text-[var(--s-good)]',
-  DECLINED: '!bg-[var(--s-bad-wash)] !text-[var(--s-bad)]',
+  DRAFT: '',
+  ISSUED: 'warn',
+  ACCEPTED: 'good',
+  DECLINED: 'bad',
 };
 
+/** What the row's button does, in the design's place for "Nudge" and "Revise". */
+const ACTION: Record<QuoteStatusName, { label: string; cls: string }> = {
+  DRAFT: { label: 'Continue', cls: 'acc' },
+  ISSUED: { label: 'Revise', cls: 'ghost' },
+  ACCEPTED: { label: 'Open', cls: 'ghost' },
+  DECLINED: { label: 'Open', cls: 'ghost' },
+};
+
+const TABS: { key: 'ALL' | QuoteStatusName; name: string }[] = [
+  { key: 'ALL', name: 'All' },
+  { key: 'DRAFT', name: 'Drafts' },
+  { key: 'ISSUED', name: 'Sent' },
+  { key: 'ACCEPTED', name: 'Won' },
+  { key: 'DECLINED', name: 'Lost' },
+];
+
+const day = (d: Date) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
+
 /**
- * Every quotation a studio has written.
+ * Every quotation a studio has written (StudioQuotes in the owner's UI
+ * handoff; the Sales, Designer and PM versions are the same page, scoped by
+ * `myQuotes` to what this person may see).
  *
  * Sorted by what they touched last, not by value — the one they were working on
- * this morning is the one they came back for. Value ordering is for a report,
- * and this is a work surface.
+ * this morning is the one they came back for. A client's quotations stay
+ * together, newest first. The status tabs and the search are links (GET), so a
+ * filtered list is a link a studio can keep.
  */
-export default async function QuotationsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  const search = String((await searchParams).q ?? '').trim().slice(0, 80);
+export default async function QuotationsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string }> }) {
+  const sp = await searchParams;
+  const search = String(sp.q ?? '').trim().slice(0, 80);
+  const status = TABS.some((t) => t.key === sp.status) ? (sp.status as 'ALL' | QuoteStatusName) : 'ALL';
   const [quotes, products, gate, quoting] = await Promise.all([myQuotes(search), myProducts(), myRatesGate(), mayQuote()]);
   // A salesperson's quotation is always for a lead (Studio OS Phase 1).
   const leadRequired = quoting?.seesAll === false;
-  const folders = byClient(quotes);
 
   /* Shut until the studio has confirmed the rates filled from its own
      quotations — rates-gate.ts. createQuote refuses as well; this is the
      page saying why, instead of a builder that fails on submit. */
   if (gate !== 'OPEN') {
     return (
-      <>
-        <PageHead title="Quotations" sub="Opens once your rates are confirmed." />
-        <PageBody>
-          <RatesGateCard gate={gate} {...RATES_GATE_COPY[gate]} where="elsewhere" />
-        </PageBody>
-      </>
+      <main className="content qpage">
+        <div className="phead">
+          <div>
+            <h1>Quotations</h1>
+            <p className="muted qsub">Opens once your rates are confirmed.</p>
+          </div>
+        </div>
+        <RatesGateCard gate={gate} {...RATES_GATE_COPY[gate]} where="elsewhere" />
+      </main>
     );
   }
 
   const priced = products.filter((p) => p.ratePaise > 0).length;
   const standard = products.filter((p) => p.inStandardBuild).length;
 
-  /* Branding is no longer read here, and the button is no longer gated on it.
-     `myBranding()` seeds the row from the registration step, so a studio who
-     has onboarded has one; the genuine remaining case — quoting before
-     registering — is refused by `createQuote` server-side, with a sentence
-     naming the step to finish. A page that hides its only control because a
-     prerequisite MIGHT be missing is a page with nothing on it. */
+  /* Branding is not read here, and the button is not gated on it: quoting
+     before registering is refused by `createQuote` server-side, with a
+     sentence naming the step to finish. */
 
   /* Every step is derived from the studio's own rows — there is no way to
      mark one done without having done it. See modules/studio/guide.ts. */
   const { state, facts } = await guideContext();
   const dismissed = state.dismissed.includes('quotations');
 
+  const count = (key: 'ALL' | QuoteStatusName) => (key === 'ALL' ? quotes.length : quotes.filter((q) => q.status === key).length);
+  const shown = status === 'ALL' ? quotes : quotes.filter((q) => q.status === status);
+  const folders = byClient(shown);
+  const drafts = count('DRAFT');
+  const tabHref = (key: string) => {
+    const p = new URLSearchParams();
+    if (search) p.set('q', search);
+    if (key !== 'ALL') p.set('status', key);
+    const s = p.toString();
+    return s ? `/studio/quotations?${s}` : '/studio/quotations';
+  };
+  const empty = quotes.length === 0 && !search;
+
   return (
-    <>
-      <PageHead
-        title="Quotations"
-        sub={
-          quotes.length === 0 && !search
-            ? 'Tell it about the flat and it writes the first draft.'
-            : `${quotes.length} · ${quotes.filter((q) => q.status === 'DRAFT').length} still in draft`
-        }
-        action={
-          quotes.length > 0 ? (
-            <StartQuote priced={priced} standard={standard} total={products.length} compact leadRequired={leadRequired} />
-          ) : null
-        }
-      />
+    <main className="content qpage">
+      <div className="phead">
+        <div>
+          <h1>Quotations</h1>
+          <p className="muted qsub">
+            {empty
+              ? 'Tell it about the flat and it writes the first draft, from your own rates.'
+              : 'Every quote is built from your own rates, line by line, room by room.'}
+          </p>
+        </div>
+        {!empty ? <StartQuote priced={priced} standard={standard} total={products.length} compact leadRequired={leadRequired} /> : null}
+      </div>
 
-      <PageBody>
-        {/* The two prerequisites used to be a blocker card: a wall telling
-            somebody to go to two other screens and come back. They are now
-            steps one and two of the walkthrough, which is the same
-            information arranged as a way forward rather than a refusal.
-            `blocked` still governs whether the New button renders, and
-            createQuote() still enforces branding server-side. */}
+      {/* The walkthrough: steps one and two are the prerequisites, said as a
+          way forward rather than a blocker. createQuote() still enforces
+          branding server-side. */}
+      <div className="qguide">
         <GuidePanel guide="quotations" facts={facts} dismissed={dismissed} />
+      </div>
 
-        {/* The empty state IS the builder.
-            It used to be a paragraph explaining that quotations live here,
-            with the only way to make one hidden behind a button that removed
-            itself whenever the catalogue was unpriced — so the first screen
-            of the feature was a description of a filing cabinet with no
-            drawer. Now the first screen writes a quotation. */}
-        {quotes.length === 0 && !search ? (
-          <div className="flex flex-col gap-4">
-            <StartQuote priced={priced} standard={standard} total={products.length} leadRequired={leadRequired} />
-
-            <p className="m-0 max-w-[68ch] px-1 text-[13.5px] leading-relaxed text-[var(--s-ink-3)]">
-              Yours, on your letterhead, for your own clients as much as the ones we introduce. We
-              never see what you charge on one and we take nothing from a project that did not come
-              through us.
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-4">
+      {/* The empty state IS the builder: the first screen writes a quotation. */}
+      {empty ? (
+        <>
+          <StartQuote priced={priced} standard={standard} total={products.length} leadRequired={leadRequired} />
+          <p className="muted sm" style={{ margin: 0, maxWidth: '68ch', lineHeight: 1.55 }}>
+            Yours, on your letterhead, for your own clients as much as the ones we introduce. We never see what you charge on one
+            and we take nothing from a project that did not come through us.
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="hstack" style={{ justifyContent: 'space-between' }}>
+            <nav className="tabs" aria-label="Quotation status">
+              {TABS.map((t) => (
+                <Link key={t.key} href={tabHref(t.key)} aria-current={status === t.key ? 'page' : undefined}>
+                  {t.name} <span className="n">{count(t.key)}</span>
+                </Link>
+              ))}
+            </nav>
             {/* GET, so a search is a link a studio can keep. */}
-            <form className="flex flex-wrap items-center gap-2" role="search">
+            <form className="qsearch" role="search">
+              {status !== 'ALL' ? <input type="hidden" name="status" value={status} /> : null}
               <input
                 name="q"
                 defaultValue={search}
-                placeholder="Search client, quotation number, phone or society"
+                placeholder="Client, quotation number, phone or society"
                 aria-label="Search quotations"
-                className="min-w-0 flex-1 rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[14px]"
+                className="fld"
               />
-              <button type="submit" className="s-btn-ghost">
-                Search
+              <button type="submit" className="btn sec sm" aria-label="Search">
+                <LineIcon name="search" size={16} />
               </button>
               {search ? (
-                <Link href="/studio/quotations" className="text-[13px] text-[var(--s-ink-3)]">
+                <Link href={tabHref(status)} className="sm muted">
                   Clear
                 </Link>
               ) : null}
             </form>
-
-            {folders.length === 0 ? (
-              <p className="m-0 text-[14px] text-[var(--s-ink-3)]">No quotation matches “{search}”.</p>
-            ) : null}
-
-            {/* One folder per client, newest first; their versions inside. */}
-            {folders.map((folder) => (
-              <section key={folder.key} className="s-card overflow-hidden">
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 bg-[var(--s-surface-2)] px-4 py-2.5">
-                  <span className="text-[15px] font-semibold">{folder.name}</span>
-                  {folder.quotes[0]!.clientPhone ? (
-                    <span className="s-num text-[12.5px] text-[var(--s-ink-3)]">{folder.quotes[0]!.clientPhone}</span>
-                  ) : null}
-                  {folder.quotes.some((q) => q.fromMarketplace) ? (
-                    <span className="s-tag !bg-[var(--s-accent-wash)] !text-[var(--s-accent-deep)]">One Interiors</span>
-                  ) : null}
-                  <span className="ml-auto text-[12.5px] text-[var(--s-ink-3)]">
-                    {folder.quotes.length} {folder.quotes.length === 1 ? 'quotation' : 'quotations'}
-                  </span>
-                </div>
-                <ul className="m-0 flex list-none flex-col p-0">
-                  {folder.quotes.map((q) => (
-                    <li key={q.id} className="border-t border-[var(--s-rule-soft)] first:border-t-0">
-                      <Link
-                        href={`/studio/quotations/${q.id}`}
-                        className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 no-underline hover:bg-[var(--s-rail-active)]"
-                      >
-                        <span className="s-num text-[13.5px] font-medium">{q.number}</span>
-                        <span className="s-tag">{STAGE_LABELS[q.stage]}</span>
-                        <span className={`s-tag ${TONE[q.status]}`}>{STATUS_LABELS[q.status]}</span>
-                        {q.config ? <span className="text-[13px] text-[var(--s-ink-3)]">{q.config}</span> : null}
-                        {q.society ? <span className="text-[13px] text-[var(--s-ink-3)]">· {q.society}</span> : null}
-                        <span className="ml-auto text-[12.5px] text-[var(--s-ink-3)]">
-                          {q.lineCount === 0 ? 'No lines yet' : `${q.lineCount} lines`}
-                        </span>
-                        <span className="s-num w-[7.5rem] text-right text-[15px] font-semibold">
-                          {q.totalPaise > 0 ? formatINR(q.totalPaise) : '—'}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
           </div>
-        )}
-      </PageBody>
-    </>
+
+          {drafts > 0 && status === 'ALL' ? (
+            <span className="muted sm" style={{ marginTop: -8 }}>
+              <b className="warn-t">
+                {drafts} {drafts === 1 ? 'quotation is' : 'quotations are'} still in draft.
+              </b>{' '}
+              A client sees nothing until you send it.
+            </span>
+          ) : null}
+
+          {folders.length === 0 ? (
+            <div className="empty">
+              <b>{search ? `No quotation matches “${search}”.` : 'Nothing here.'}</b>
+              <span className="muted sm">
+                {search ? 'Try a client’s name, a phone number or a quotation number.' : 'No quotation has this status yet.'}
+              </span>
+            </div>
+          ) : (
+            <section className="card flush">
+              <div className="tscroll">
+                <table className="tbl qtbl" style={{ minWidth: 960 }}>
+                  <thead>
+                    <tr>
+                      <th scope="col">Quote</th>
+                      <th scope="col">Client and home</th>
+                      <th scope="col" style={{ textAlign: 'right' }}>
+                        Total
+                      </th>
+                      <th scope="col">Where it is</th>
+                      <th scope="col">Lines</th>
+                      <th scope="col">
+                        <span className="sr-only">Action</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  {/* One group per client, newest first; their versions inside. */}
+                  {folders.map((folder) => (
+                    <tbody key={folder.key}>
+                      {folder.quotes.map((q, i) => {
+                        const act = ACTION[q.status];
+                        const href = `/studio/quotations/${q.id}`;
+                        return (
+                          <tr key={q.id}>
+                            <td>
+                              <Link href={href} className="mono">
+                                {q.number}
+                              </Link>
+                              <div className="muted sm">Updated {day(q.updatedAt)}</div>
+                            </td>
+                            <td>
+                              {i === 0 ? (
+                                <>
+                                  <Link href={href} style={{ fontWeight: 600 }}>
+                                    {q.clientName}
+                                  </Link>
+                                  <div className="muted sm">
+                                    {[q.society, q.config].filter(Boolean).join(', ') || q.clientPhone || '—'}
+                                  </div>
+                                </>
+                              ) : (
+                                <span className="qsame">Another quotation for {q.clientName.split(/\s+/)[0]}</span>
+                              )}
+                            </td>
+                            <td className="mono" style={{ textAlign: 'right', fontWeight: 500 }}>
+                              {q.totalPaise > 0 ? formatINR(q.totalPaise) : '—'}
+                            </td>
+                            <td>
+                              <span className="hstack" style={{ gap: 6 }}>
+                                <span className={`chip ${TONE[q.status]}`}>
+                                  <span className="dot" />
+                                  {STATUS_LABELS[q.status]}
+                                </span>
+                                <span className="chip">{STAGE_LABELS[q.stage]}</span>
+                                {q.fromMarketplace ? <span className="chip oi">One Interiors</span> : null}
+                              </span>
+                            </td>
+                            <td className={q.lineCount === 0 ? 'warn-t' : ''}>{q.lineCount === 0 ? 'No lines yet' : `${q.lineCount} lines`}</td>
+                            <td style={{ textAlign: 'right' }}>
+                              <Link href={href} className={`btn ${act.cls} sm`}>
+                                {act.label}
+                              </Link>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  ))}
+                </table>
+              </div>
+            </section>
+          )}
+        </>
+      )}
+    </main>
   );
 }
 
 /**
  * Quotations grouped by client: the client record when there is one, else the
- * name and phone as typed. Folders keep the order of their newest quotation.
+ * name and phone as typed. Groups keep the order of their newest quotation.
  */
 function byClient(quotes: QuoteSummary[]): { key: string; name: string; quotes: QuoteSummary[] }[] {
   const folders = new Map<string, { key: string; name: string; quotes: QuoteSummary[] }>();

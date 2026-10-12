@@ -7,8 +7,10 @@ import type { RevisionSummary, RoomTotal } from '@/modules/studio-quote/revision
 import type { QuoteRow } from '@/modules/studio-quote/quotes';
 import type { PricedLine } from './QuoteLines';
 
+const signed = (paise: number) => (paise < 0 ? `−${formatINR(Math.abs(paise))}` : formatINR(paise));
+
 /**
- * The money, and where it is going.
+ * The money (StudioQuoteBuilder's Total card), and the save beside it.
  *
  * Sticky beside the lines, because the total is the number being watched.
  * Everything here is derived from the lines on screen rather than from the
@@ -18,87 +20,78 @@ import type { PricedLine } from './QuoteLines';
 export function TotalsPanel({
   quote,
   totals,
-  rooms,
+  lineCount,
+  children,
 }: {
   quote: QuoteRow;
   totals: QuoteTotals;
-  rooms: RoomTotal[];
+  lineCount: number;
+  /** The save button and its state, under the total. */
+  children?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4">
-      <div className="s-card overflow-hidden">
-        <div className="bg-[var(--s-surface-2)] px-4 py-2.5">
-          <h2 className="m-0 text-[14.5px] font-semibold">The total</h2>
-        </div>
-
-        <dl className="m-0 flex flex-col gap-2 px-4 py-4 text-[13.5px]">
-          <Row label="Modular" value={totals.modularPaise} />
-          <Row label="On-site" value={totals.onsitePaise} />
-          <Row label={`Professional fee · ${quote.feeBps / 100}%`} value={totals.feePaise} />
-          <div className="my-1 border-t border-[var(--s-rule-soft)]" />
-          <Row label="Sub-total" value={totals.subTotalPaise} bold />
-          {totals.discountPaise > 0 ? (
-            <Row
-              label={`Discount · ${quote.discountBps / 100}% on modular`}
-              value={-totals.discountPaise}
-            />
-          ) : null}
-          {totals.onSpotPaise > 0 ? (
-            <Row label={quote.onSpotLabel ?? 'Additional discount'} value={-totals.onSpotPaise} />
-          ) : null}
-          {totals.gstPaise > 0 ? (
-            <>
-              <div className="my-1 border-t border-[var(--s-rule-soft)]" />
-              <Row label="Before GST" value={totals.beforeTaxPaise} />
-              <Row label={`GST · ${quote.gstBps / 100}%`} value={totals.gstPaise} />
-            </>
-          ) : null}
-        </dl>
-
-        <div className="flex items-baseline justify-between gap-3 border-t border-[var(--s-rule)] bg-[var(--s-accent-wash)] px-4 py-3">
-          <span className="text-[14px] font-semibold">What the client pays</span>
-          <span className="s-num text-[18px] font-semibold">{formatINR(totals.totalPaise)}</span>
-        </div>
+    <aside className="card" aria-label="Quote total">
+      <div className="chead">
+        <h2>Total</h2>
+        <span className="muted sm mono">
+          {lineCount} {lineCount === 1 ? 'line' : 'lines'}
+        </span>
       </div>
 
-      {rooms.length > 1 ? <RoomBreakdown rooms={rooms} /> : null}
+      <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <Row label="Modular" value={totals.modularPaise} />
+        <Row label="On-site" value={totals.onsitePaise} />
+        <Row label={`Professional fee, ${quote.feeBps / 100}%`} value={totals.feePaise} />
+        <Row label="Sub-total" value={totals.subTotalPaise} strong />
+        {totals.discountPaise > 0 ? <Row label={`Discount, ${quote.discountBps / 100}% on modular`} value={-totals.discountPaise} /> : null}
+        {totals.onSpotPaise > 0 ? <Row label={quote.onSpotLabel ?? 'Additional discount'} value={-totals.onSpotPaise} /> : null}
+        {totals.gstPaise > 0 ? (
+          <>
+            <Row label="Before GST" value={totals.beforeTaxPaise} />
+            <Row label={`GST, ${quote.gstBps / 100}%`} value={totals.gstPaise} />
+          </>
+        ) : null}
+        <div className="sumrow total">
+          <dt style={{ margin: 0 }}>
+            <b>What the client pays</b>
+          </dt>
+          <dd style={{ margin: 0 }}>
+            <b className="mono">{formatINR(totals.totalPaise)}</b>
+          </dd>
+        </div>
+      </dl>
 
       {totals.stages.length > 0 ? (
-        <div className="s-card overflow-hidden">
-          <div className="bg-[var(--s-surface-2)] px-4 py-2.5">
-            <h2 className="m-0 text-[14.5px] font-semibold">Payment schedule</h2>
-          </div>
-          <ul className="m-0 flex list-none flex-col p-0">
-            {totals.stages.map((s) => (
-              <li
-                key={s.label}
-                className="flex items-baseline justify-between gap-3 border-b border-[var(--s-rule-soft)] px-4 py-2.5 last:border-b-0"
-              >
-                <span className="text-[13.5px]">
-                  {s.label}
-                  {s.pct ? <span className="ml-1.5 text-[var(--s-ink-3)]">{s.pct}%</span> : null}
-                </span>
-                <span className="s-num text-[13.5px] font-medium">{formatINR(s.amountPaise)}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="m-0 border-t border-[var(--s-rule-soft)] px-4 py-2.5 text-[12px] leading-snug text-[var(--s-ink-3)]">
+        <div className="qstages">
+          <span className="lbl">Payment stages</span>
+          {totals.stages.map((s) => (
+            <div key={s.label} className="sumrow sm">
+              <span>
+                {s.label}
+                {s.pct ? `, ${s.pct}%` : ''}
+              </span>
+              <span className="mono">{formatINR(s.amountPaise)}</span>
+            </div>
+          ))}
+          <span className="muted sm" style={{ lineHeight: 1.45 }}>
             These add up to the total exactly.{' '}
-            {quote.phases?.length
-              ? 'Your own payment schedule, from your registration.'
-              : 'Set your own schedule and the defaults for new quotations in '}
-            {quote.phases?.length ? null : (
+            {quote.phases?.length ? (
+              'Your own payment schedule, from your registration.'
+            ) : (
               <>
-                <Link href="/studio/settings" className="text-[var(--s-accent)]">
+                Set your own schedule and the defaults for new quotations in{' '}
+                <Link href="/studio/settings" className="acc-t">
                   Settings
                 </Link>
                 .
               </>
             )}
-          </p>
+          </span>
         </div>
       ) : null}
-    </div>
+
+      {children}
+    </aside>
   );
 }
 
@@ -106,52 +99,46 @@ export function TotalsPanel({
  * Where the money is going, by room.
  *
  * Bars rather than a pie: the question is "what is the kitchen costing me"
- * against a known total, which a length answers and an angle does not. It
- * exists for one conversation — the client wants the number down and nobody
- * can say where from — and for that, order matters more than precision.
+ * against a known total, which a length answers and an angle does not.
  */
-function RoomBreakdown({ rooms }: { rooms: RoomTotal[] }) {
+export function RoomBreakdown({ rooms }: { rooms: RoomTotal[] }) {
+  if (rooms.length < 2) return null;
   const top = rooms[0]!.paise;
 
   return (
-    <div className="s-card overflow-hidden">
-      <div className="bg-[var(--s-surface-2)] px-4 py-2.5">
-        <h2 className="m-0 text-[14.5px] font-semibold">Where it is going</h2>
+    <section className="card" aria-label="Where it is going">
+      <div className="chead">
+        <h2>Where it is going</h2>
       </div>
-      <ul className="m-0 flex list-none flex-col gap-2.5 p-4">
+      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
         {rooms.map((room) => (
           <li key={room.room}>
-            <div className="mb-1 flex items-baseline justify-between gap-2">
-              <span className="truncate text-[13px]">{room.room}</span>
-              <span className="s-num flex-none text-[12.5px] text-[var(--s-ink-2)]">
-                {formatINR(room.paise)}
-                <span className="ml-1.5 text-[var(--s-ink-3)]">
-                  {(room.shareBps / 100).toFixed(0)}%
-                </span>
+            <div className="sumrow sm" style={{ marginBottom: 4 }}>
+              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{room.room}</span>
+              <span className="mono" style={{ flex: 'none' }}>
+                {formatINR(room.paise)} <span className="muted">{(room.shareBps / 100).toFixed(0)}%</span>
               </span>
             </div>
-            <div className="h-[5px] overflow-hidden rounded-full bg-[var(--s-surface-2)]">
-              <div
-                className="h-full rounded-full bg-[var(--s-accent)]"
-                /* Against the biggest room, not against the total. Shares of a
-                   forty-line quotation are all small, and a chart where every
-                   bar is a sliver compares nothing. */
-                style={{ width: `${Math.max(2, Math.round((room.paise / top) * 100))}%` }}
-              />
+            <div className="qbar">
+              {/* Against the biggest room, not against the total: shares of a
+                  forty-line quotation are all small. */}
+              <i style={{ width: `${Math.max(2, Math.round((room.paise / top) * 100))}%` }} />
             </div>
           </li>
         ))}
       </ul>
-    </div>
+    </section>
   );
 }
 
-function Row({ label, value, bold = false }: { label: string; value: number; bold?: boolean }) {
+function Row({ label, value, strong = false }: { label: string; value: number; strong?: boolean }) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className={`m-0 ${bold ? 'font-semibold' : 'text-[var(--s-ink-2)]'}`}>{label}</dt>
-      <dd className={`s-num m-0 ${bold ? 'font-semibold' : ''}`}>
-        {value < 0 ? `− ${formatINR(Math.abs(value))}` : formatINR(value)}
+    <div className="sumrow">
+      <dt className={strong ? '' : 'muted'} style={{ margin: 0, fontWeight: strong ? 600 : undefined }}>
+        {label}
+      </dt>
+      <dd className="mono" style={{ margin: 0, fontWeight: strong ? 600 : undefined }}>
+        {signed(value)}
       </dd>
     </div>
   );
@@ -160,16 +147,10 @@ function Row({ label, value, bold = false }: { label: string; value: number; bol
 /**
  * The document, as the client will read it.
  *
- * ## Why this is here and not only on the print page
- *
- * Because "what does this look like to them" is a question asked while
- * editing, not after. A preview two pages away is a preview nobody opens until
- * the end, which is when a studio discovers that a room they named "BR2" is
- * printed on a document going to a homeowner.
- *
- * It is a preview and says so: the printed copy carries the full terms, the
- * payment schedule and the signature block. Reproducing those here would be a
- * second copy of the document to keep in step with the first.
+ * Here and not only on the print page, because "what does this look like to
+ * them" is a question asked while editing, not after. It is a preview and
+ * says so: the printed copy carries the full terms, the payment schedule and
+ * the signature block. The studio's own accent colour draws its rules.
  */
 export function DocumentPreview({
   quote,
@@ -201,73 +182,68 @@ export function DocumentPreview({
 }) {
   if (!branding) {
     return (
-      <div className="s-card p-5">
-        <p className="m-0 mb-1.5 text-[14.5px] font-semibold">
-          Your studio details are not filled in yet.
-        </p>
-        <p className="m-0 max-w-[62ch] text-[14px] leading-relaxed text-[var(--s-ink-2)]">
-          A quotation carries your registered name, your address and your GSTIN — a document
-          without them is one a client cannot act on.{' '}
-          <Link href="/studio/settings" className="font-medium text-[var(--s-accent)]">
+      <div className="empty">
+        <b>Your studio details are not filled in yet.</b>
+        <span className="muted sm" style={{ maxWidth: '62ch', lineHeight: 1.5 }}>
+          A quotation carries your registered name, your address and your GSTIN — a document without them is one a client cannot
+          act on.{' '}
+          <Link href="/studio/settings" className="acc-t" style={{ fontWeight: 600 }}>
             Add them in Settings
           </Link>{' '}
           and this preview fills in.
-        </p>
+        </span>
       </div>
     );
   }
 
   /* Validated at the point of use. `accentHex` is studio-supplied and this is
      interpolated into a style, where React does not escape. A rejected value
-     falls back to the app accent rather than to nothing. */
-  const accent = /^#[0-9a-fA-F]{6}$/.test(branding.accentHex) ? branding.accentHex : '#a44f2e';
+     falls back to the studio accent rather than to nothing. */
+  const accent = /^#[0-9a-fA-F]{6}$/.test(branding.accentHex) ? branding.accentHex : 'var(--acc)';
 
   return (
-    <article className="s-card overflow-hidden bg-white p-0 text-[#1c1b19]">
-      <header
-        className="flex flex-wrap items-start justify-between gap-4 border-b-[3px] px-7 py-6"
-        style={{ borderColor: accent }}
-      >
-        <div className="min-w-0">
+    <article className="qdoc" aria-label="What the client sees">
+      <header className="qdoc-sec hstack" style={{ justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: `3px solid ${accent}`, paddingTop: 24, paddingBottom: 20 }}>
+        <div style={{ minWidth: 0 }}>
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="" className="mb-2 max-h-[46px] max-w-[190px] object-contain" />
+            <img src={logoUrl} alt="" style={{ marginBottom: 8, maxHeight: 46, maxWidth: 190, objectFit: 'contain' }} />
           ) : null}
-          <p className="m-0 text-[17px] font-semibold">{branding.legalName}</p>
-          <p className="m-0 mt-0.5 text-[12.5px] leading-relaxed text-[#56524b]">
+          <p style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>{branding.legalName}</p>
+          <p className="muted sm" style={{ margin: '2px 0 0', lineHeight: 1.5 }}>
             {[branding.addressLine, branding.city, branding.pincode].filter(Boolean).join(', ')}
           </p>
-          <p className="m-0 text-[12.5px] text-[#56524b]">
+          <p className="muted sm" style={{ margin: 0 }}>
             {[branding.phone, branding.email].filter(Boolean).join(' · ')}
           </p>
           {branding.gstin ? (
-            <p className="s-num m-0 mt-0.5 text-[12px] text-[#6a655c]">GSTIN {branding.gstin}</p>
+            <p className="mono muted" style={{ margin: '2px 0 0', fontSize: 12 }}>
+              GSTIN {branding.gstin}
+            </p>
           ) : null}
         </div>
 
-        <div className="text-right">
-          <p className="m-0 text-[12px] uppercase tracking-[.16em] text-[#6a655c]">Quotation</p>
-          <p className="s-num m-0 text-[16px] font-semibold">{quote.number}</p>
-          <p className="m-0 mt-1 text-[12.5px] text-[#56524b]">
-            {new Date(quote.quoteDate).toLocaleDateString('en-IN', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            })}
+        <div style={{ textAlign: 'right' }}>
+          <p className="qdoc-k">Quotation</p>
+          <p className="mono" style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
+            {quote.number}
+          </p>
+          <p className="muted sm" style={{ margin: '4px 0 0' }}>
+            {new Date(quote.quoteDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
       </header>
 
-      <div className="border-b border-[#e5e1d9] px-7 py-4">
-        <p className="m-0 text-[12px] uppercase tracking-[.16em] text-[#6a655c]">For</p>
-        <p className="m-0 text-[15px] font-semibold">{quote.clientName}</p>
-        <p className="m-0 text-[13px] text-[#56524b]">
+      <div className="qdoc-sec">
+        <p className="qdoc-k">For</p>
+        <p style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>{quote.clientName}</p>
+        <p className="muted sm" style={{ margin: 0 }}>
           {[quote.society, quote.locality, quote.config].filter(Boolean).join(' · ')}
         </p>
       </div>
 
       {lines.length === 0 ? (
-        <p className="m-0 px-7 py-8 text-[13.5px] italic text-[#6a655c]">
+        <p className="muted qdoc-sec" style={{ margin: 0, fontStyle: 'italic' }}>
           Nothing on this quotation yet.
         </p>
       ) : (
@@ -276,32 +252,30 @@ export function DocumentPreview({
           if (inRoom.length === 0) return null;
 
           return (
-            <section key={room} className="px-7 py-4">
-              <div className="mb-2 flex items-baseline justify-between gap-3 border-b border-[#e5e1d9] pb-1.5">
-                <h3 className="m-0 text-[13.5px] font-semibold uppercase tracking-[.1em]">
-                  {room}
-                </h3>
-                <span className="s-num text-[13px] font-medium">
+            <section key={room} className="qdoc-sec" style={{ borderBottom: 0 }}>
+              <div className="sumrow" style={{ alignItems: 'baseline', paddingBottom: 6, marginBottom: 6, borderBottom: '1px solid var(--fill2)' }}>
+                <h3 style={{ margin: 0, fontSize: 13.5, fontWeight: 600, letterSpacing: '.1em', textTransform: 'uppercase' }}>{room}</h3>
+                <span className="mono sm" style={{ fontWeight: 500 }}>
                   {formatINR(inRoom.reduce((a, l) => a + l.amountPaise, 0))}
                 </span>
               </div>
 
-              <table className="w-full border-collapse text-[12.5px]">
+              <table>
                 <tbody>
                   {inRoom.map((line) => (
-                    <tr key={line.key} className="align-top">
-                      <td className="py-1.5 pr-3">
-                        <span className="text-[13px]">{line.product}</span>
+                    <tr key={line.key}>
+                      <td>
+                        <span>{line.product}</span>
                         {line.details ? (
-                          <span className="block text-[11.5px] leading-snug text-[#6a655c]">
+                          <span className="muted" style={{ display: 'block', fontSize: 12, lineHeight: 1.35 }}>
                             {line.details}
                           </span>
                         ) : null}
                       </td>
-                      <td className="s-num whitespace-nowrap py-1.5 pr-3 text-right text-[#56524b]">
+                      <td className="mono muted" style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
                         {measure(line)}
                       </td>
-                      <td className="s-num whitespace-nowrap py-1.5 text-right font-medium">
+                      <td className="mono" style={{ whiteSpace: 'nowrap', textAlign: 'right', fontWeight: 500 }}>
                         {line.amountPaise > 0 ? formatINR(line.amountPaise) : '—'}
                       </td>
                     </tr>
@@ -313,38 +287,37 @@ export function DocumentPreview({
         })
       )}
 
-      <div className="border-t border-[#e5e1d9] px-7 py-5">
-        <dl className="m-0 ml-auto flex max-w-[22rem] flex-col gap-1.5 text-[13px]">
+      <div className="qdoc-sec" style={{ borderTop: '1px solid var(--fill2)', paddingTop: 20, paddingBottom: 20 }}>
+        <dl style={{ margin: '0 0 0 auto', maxWidth: '22rem', display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
           <DocRow label="Modular" value={totals.modularPaise} />
           <DocRow label="On-site" value={totals.onsitePaise} />
           <DocRow label={`Professional fee · ${quote.feeBps / 100}%`} value={totals.feePaise} />
-          {totals.discountPaise > 0 ? (
-            <DocRow label="Discount" value={-totals.discountPaise} />
-          ) : null}
-          {totals.onSpotPaise > 0 ? (
-            <DocRow label={quote.onSpotLabel ?? 'Additional discount'} value={-totals.onSpotPaise} />
-          ) : null}
+          {totals.discountPaise > 0 ? <DocRow label="Discount" value={-totals.discountPaise} /> : null}
+          {totals.onSpotPaise > 0 ? <DocRow label={quote.onSpotLabel ?? 'Additional discount'} value={-totals.onSpotPaise} /> : null}
           {totals.gstPaise > 0 ? (
             <>
               <DocRow label="Before GST" value={totals.beforeTaxPaise} />
               <DocRow label={`GST · ${quote.gstBps / 100}%`} value={totals.gstPaise} />
             </>
           ) : null}
-          <div className="mt-1 flex items-baseline justify-between gap-3 border-t-2 pt-2" style={{ borderColor: accent }}>
-            <dt className="m-0 text-[14px] font-semibold">Total</dt>
-            <dd className="s-num m-0 text-[16px] font-semibold">{formatINR(totals.totalPaise)}</dd>
+          <div className="sumrow" style={{ alignItems: 'baseline', marginTop: 4, paddingTop: 8, borderTop: `2px solid ${accent}` }}>
+            <dt style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Total</dt>
+            <dd className="mono" style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
+              {formatINR(totals.totalPaise)}
+            </dd>
           </div>
         </dl>
       </div>
 
-      <footer className="border-t border-[#e5e1d9] px-7 py-4">
-        <p className="m-0 text-[11.5px] leading-relaxed text-[#6a655c]">
-          A preview. The printed copy carries your terms, the payment schedule and the signature
-          block.
+      <footer className="qdoc-sec" style={{ borderBottom: 0 }}>
+        <p className="muted" style={{ margin: 0, fontSize: 12, lineHeight: 1.5 }}>
+          A preview. The printed copy carries your terms, the payment schedule and the signature block.
         </p>
         {/* Below the GSTIN, never in the terms and never beside their name. */}
         {showMark ? (
-          <p className="m-0 mt-1 text-[11px] italic text-[#8a8378]">{markText}</p>
+          <p className="muted" style={{ margin: '4px 0 0', fontSize: 11, fontStyle: 'italic' }}>
+            {markText}
+          </p>
         ) : null}
       </footer>
     </article>
@@ -366,9 +339,11 @@ function measure(line: PricedLine): string {
 
 function DocRow({ label, value }: { label: string; value: number }) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="m-0 text-[#56524b]">{label}</dt>
-      <dd className="s-num m-0">
+    <div className="sumrow" style={{ fontSize: 13 }}>
+      <dt className="muted" style={{ margin: 0 }}>
+        {label}
+      </dt>
+      <dd className="mono" style={{ margin: 0 }}>
         {value < 0 ? `− ${formatINR(Math.abs(value))}` : formatINR(value)}
       </dd>
     </div>
@@ -378,53 +353,36 @@ function DocRow({ label, value }: { label: string; value: number }) {
 /**
  * What moved since the client was sent this.
  *
- * ## Why the headline is the count and not the money
- *
- * Two changes that cancel out leave the total where it was, and a screen
- * reading "no change" while the client can see their wardrobe has gone is
- * worse than no screen at all. So the count leads and the figure follows.
+ * The count leads and the figure follows: two changes that cancel out leave
+ * the total where it was, and a screen reading "no change" while the client
+ * can see their wardrobe has gone is worse than no screen at all.
  */
-export function ChangesPanel({
-  summary,
-  issuedOn,
-}: {
-  summary: RevisionSummary;
-  issuedOn: Date | null;
-}) {
-  const sent = issuedOn
-    ? new Date(issuedOn).toLocaleDateString('en-IN', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      })
-    : null;
+export function ChangesPanel({ summary, issuedOn }: { summary: RevisionSummary; issuedOn: Date | null }) {
+  const sent = issuedOn ? new Date(issuedOn).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : null;
 
   const moved = summary.changes.filter((c) => c.kind !== 'UNCHANGED');
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="s-card p-5">
-        <h2 className="m-0 mb-1 text-[15px] font-semibold">
-          {summary.identical
-            ? 'Nothing has changed since you sent it.'
-            : `${moved.length} ${moved.length === 1 ? 'line has' : 'lines have'} changed since you sent it.`}
-        </h2>
-        <p className="m-0 max-w-[64ch] text-[13.5px] leading-relaxed text-[var(--s-ink-2)]">
-          Compared against the copy the client received{sent ? ` on ${sent}` : ''} — not against
-          your last save. Drafts you revised before sending are not changes as far as they are
-          concerned.
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <section className="card">
+        <div className="chead">
+          <h2>
+            {summary.identical
+              ? 'Nothing has changed since you sent it.'
+              : `${moved.length} ${moved.length === 1 ? 'line has' : 'lines have'} changed since you sent it.`}
+          </h2>
+        </div>
+        <p className="muted" style={{ margin: 0, maxWidth: '64ch', lineHeight: 1.5 }}>
+          Compared against the copy the client received{sent ? ` on ${sent}` : ''} — not against your last save. Drafts you revised
+          before sending are not changes as far as they are concerned.
         </p>
 
         {summary.identical ? null : (
-          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px]">
+          <div className="hstack">
             {summary.addedCount > 0 ? <Pill kind="ADDED">{summary.addedCount} added</Pill> : null}
-            {summary.removedCount > 0 ? (
-              <Pill kind="REMOVED">{summary.removedCount} removed</Pill>
-            ) : null}
-            {summary.repricedCount > 0 ? (
-              <Pill kind="REPRICED">{summary.repricedCount} repriced</Pill>
-            ) : null}
-            <span className="s-num font-semibold">
+            {summary.removedCount > 0 ? <Pill kind="REMOVED">{summary.removedCount} removed</Pill> : null}
+            {summary.repricedCount > 0 ? <Pill kind="REPRICED">{summary.repricedCount} repriced</Pill> : null}
+            <span className="mono" style={{ fontWeight: 600 }}>
               {summary.deltaPaise === 0
                 ? 'Total unchanged'
                 : summary.deltaPaise > 0
@@ -433,55 +391,59 @@ export function ChangesPanel({
             </span>
           </div>
         )}
-      </div>
+      </section>
 
       {moved.length > 0 ? (
-        <ul className="s-card m-0 flex list-none flex-col p-0">
-          {moved.map((change) => (
-            <li
-              key={`${change.room}|${change.product}|${change.kind}`}
-              className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-[var(--s-rule-soft)] px-4 py-3 last:border-b-0"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block text-[14px] font-medium">{change.product}</span>
-                <span className="s-label">{change.room}</span>
-              </span>
-
-              <Pill kind={change.kind}>
-                {change.kind === 'ADDED' ? 'New' : change.kind === 'REMOVED' ? 'Removed' : 'Repriced'}
-              </Pill>
-
-              <span className="s-num whitespace-nowrap text-[13.5px]">
-                {change.kind === 'REPRICED' ? (
-                  <>
-                    <span className="text-[var(--s-ink-3)] line-through">
-                      {formatINR(change.wasPaise)}
-                    </span>{' '}
-                    {formatINR(change.nowPaise)}
-                  </>
-                ) : change.kind === 'ADDED' ? (
-                  formatINR(change.nowPaise)
-                ) : (
-                  <span className="text-[var(--s-ink-3)] line-through">
-                    {formatINR(change.wasPaise)}
-                  </span>
-                )}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <section className="card flush">
+          <div className="tscroll">
+            <table className="tbl" style={{ minWidth: 560 }}>
+              <thead>
+                <tr>
+                  <th scope="col">Item</th>
+                  <th scope="col">Change</th>
+                  <th scope="col" style={{ textAlign: 'right' }}>
+                    Amount
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {moved.map((change) => (
+                  <tr key={`${change.room}|${change.product}|${change.kind}`}>
+                    <td>
+                      <b style={{ fontWeight: 600 }}>{change.product}</b>
+                      <div className="muted sm">{change.room}</div>
+                    </td>
+                    <td>
+                      <Pill kind={change.kind}>{change.kind === 'ADDED' ? 'New' : change.kind === 'REMOVED' ? 'Removed' : 'Repriced'}</Pill>
+                    </td>
+                    <td className="mono" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      {change.kind === 'REPRICED' ? (
+                        <>
+                          <span className="muted" style={{ textDecoration: 'line-through' }}>
+                            {formatINR(change.wasPaise)}
+                          </span>{' '}
+                          {formatINR(change.nowPaise)}
+                        </>
+                      ) : change.kind === 'ADDED' ? (
+                        formatINR(change.nowPaise)
+                      ) : (
+                        <span className="muted" style={{ textDecoration: 'line-through' }}>
+                          {formatINR(change.wasPaise)}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       ) : null}
     </div>
   );
 }
 
 function Pill({ kind, children }: { kind: string; children: React.ReactNode }) {
-  const tone =
-    kind === 'ADDED'
-      ? '!bg-[var(--s-good-wash,#e5eee1)] !text-[var(--s-good,#4a6a4f)]'
-      : kind === 'REMOVED'
-        ? '!bg-[var(--s-warn-wash,#f5e9cf)] !text-[var(--s-warn,#8d6412)]'
-        : '!bg-[var(--s-accent-wash)] !text-[var(--s-accent-deep)]';
-
-  return <span className={`s-tag flex-none ${tone}`}>{children}</span>;
+  const tone = kind === 'ADDED' ? 'good' : kind === 'REMOVED' ? 'warn' : 'oi';
+  return <span className={`chip ${tone}`}>{children}</span>;
 }

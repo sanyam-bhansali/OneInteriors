@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react';
 import { dismissAnnouncementAction } from './standing-actions';
+import './office-ui.css';
 
 /**
  * Where the studio stands, at the top of their own software.
@@ -37,9 +38,9 @@ export function StandingBanner({
 
   if (approval) {
     return (
-      <div className="oi-approved mx-auto mb-5 flex max-w-[72rem] flex-wrap items-start gap-4 rounded-[14px] border border-[var(--s-good,#4a6a4f)]/30 bg-[var(--s-good-wash,#e5eee1)] px-5 py-4">
-        <span className="mt-0.5 grid h-8 w-8 flex-none place-items-center rounded-full bg-[var(--s-good,#4a6a4f)] text-white">
-          <svg viewBox="0 0 16 16" aria-hidden="true" className="h-4 w-4">
+      <div className="oi-approved cheer" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <span style={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--good-s)', color: 'var(--paper)', flex: 'none' }}>
+          <svg viewBox="0 0 16 16" aria-hidden="true" width="16" height="16">
             <path
               d="M3.5 8.5 L6.5 11.5 L12.5 5"
               fill="none"
@@ -51,23 +52,17 @@ export function StandingBanner({
           </svg>
         </span>
 
-        <div className="min-w-0 flex-1">
-          <p className="m-0 text-[16px] font-semibold text-[var(--s-ink,#1c1b19)]">
-            You are on the roster.
-          </p>
-          <p className="m-0 mt-0.5 max-w-[68ch] text-[14px] leading-relaxed text-[var(--s-ink-2,#56524b)]">
+        <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+          <b style={{ display: 'block', fontSize: 16 }}>You are on the roster.</b>
+          <p className="sm" style={{ margin: '2px 0 0', maxWidth: '68ch', color: 'var(--text2)' }}>
             Verified and listed. Customers can find you now, and briefs will start arriving —
             you will get a call from us about the agreement before the first one does.
           </p>
         </div>
 
-        <form action={dismiss} className="flex-none">
+        <form action={dismiss} style={{ flex: 'none' }}>
           <input type="hidden" name="id" value={approval.id} />
-          <button
-            type="submit"
-            disabled={pending}
-            className="rounded-full border border-[var(--s-good,#4a6a4f)]/40 px-4 py-1.5 text-[13px] font-medium text-[var(--s-ink,#1c1b19)] disabled:opacity-50"
-          >
+          <button type="submit" disabled={pending} className="btn sec sm">
             {pending ? '…' : 'Thanks'}
           </button>
         </form>
@@ -80,9 +75,9 @@ export function StandingBanner({
   if (standing !== 'WITH_US') return null;
 
   return (
-    <div className="mx-auto mb-5 flex max-w-[72rem] flex-wrap items-baseline gap-x-3 gap-y-1 rounded-[12px] bg-[var(--s-surface-2,#f0ede7)] px-5 py-3">
-      <span className="text-[13.5px] font-medium text-[var(--s-ink,#1c1b19)]">{label}</span>
-      <span className="min-w-0 flex-1 text-[13px] leading-relaxed text-[var(--s-ink-2,#56524b)]">
+    <div className="hstack" style={{ alignItems: 'baseline', padding: '12px 16px', borderRadius: 14, background: 'var(--info-bg)', color: 'var(--info)' }}>
+      <b style={{ fontSize: 14, fontWeight: 600 }}>{label}</b>
+      <span className="sm" style={{ flex: '1 1 240px', minWidth: 0 }}>
         {detail}
       </span>
     </div>

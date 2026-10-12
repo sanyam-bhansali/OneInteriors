@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { PageHead, PageBody } from '../StudioShell';
 import { formatINR } from '@/lib/money';
 import { paymentsDesk } from '@/modules/project/payments-flow';
 import { PaymentsBody } from '../projects/[id]/PaymentsTab';
@@ -8,6 +7,9 @@ import { bookingDraft, bookingsToRecord, recentBookings } from '@/modules/studio
 import { currentMember } from '@/modules/studio/access';
 import { Bookings } from './Bookings';
 import { CrewToday } from '../vendors/CrewToday';
+import '../office-ui.css';
+import '../vendors/vendors.css';
+import './payments.css';
 
 export const metadata: Metadata = { title: 'Payments', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -39,49 +41,59 @@ export default async function PaymentsDeskPage() {
   const disputed = projects.filter((p) => weight(p) === 0).length;
 
   return (
-    <>
-      <PageHead
-        title="Payments"
-        sub="Every project’s payment stages. Record money the day it arrives, with the receipt; the customer confirms it in the app, and it files in their locker."
-      />
-      <PageBody>
-        <div className="mb-6 empty:mb-0">
+    <main className="content ox-page">
+      <div className="phead">
+        <div>
+          <h1>Payments</h1>
+          <p className="muted" style={{ maxWidth: '72ch' }}>
+            Every project&rsquo;s payment stages. Record money the day it arrives, with the receipt; the customer confirms it in the app, and it files in their locker.
+          </p>
+        </div>
+      </div>
+
+      {projects.length > 0 ? (
+        <section className="card" aria-label="Money across projects">
+          <div className="money">
+            <div className="vd-due">
+              <span className="sm">Still to come in</span>
+              <b className="mono">{formatINR(owed)}</b>
+              <span className="sm">
+                across {projects.length} project{projects.length === 1 ? '' : 's'}
+              </span>
+            </div>
+            <div>
+              <span className="muted sm">Recorded, waiting for the customer to confirm</span>
+              <b className="mono">{formatINR(waiting)}</b>
+            </div>
+            <div style={disputed ? { background: 'var(--bad-bg)' } : undefined}>
+              <span className={disputed ? 'sm bad-t' : 'muted sm'}>Customer says not paid</span>
+              <b className={disputed ? 'bad-t' : undefined}>{disputed ? `${disputed} project${disputed === 1 ? '' : 's'}` : 'None'}</b>
+              {disputed ? <span className="sm bad-t">One Interiors is looking into it and will call you.</span> : null}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      <div className="cols">
+        <div className="colmain">
           <Bookings waiting={toBook} drafts={drafts} recent={recent} isOwner={member?.role === 'OWNER'} />
-        </div>
-        {/* Studio OS Phase 3: crews whose work is done or due, with what is owed. */}
-        <div className="mb-6 empty:mb-0">
-          <CrewToday />
-        </div>
-        {projects.length === 0 ? (
-          <p className="m-0 text-[15px] text-[var(--s-ink-2)]">No projects yet. A project appears here once a client signs with your studio.</p>
-        ) : (
-          <div className="flex flex-col gap-5">
-            <dl className="m-0 grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <div className="s-card p-4">
-                <dt className="text-[12.5px] font-semibold text-[var(--s-ink-2)]">Still to come in</dt>
-                <dd className="s-num m-0 mt-1 font-[family-name:var(--font-mono)] text-[18px] font-semibold">{formatINR(owed)}</dd>
-              </div>
-              <div className="s-card p-4">
-                <dt className="text-[12.5px] font-semibold text-[var(--s-ink-2)]">Recorded, waiting for the customer to confirm</dt>
-                <dd className="s-num m-0 mt-1 font-[family-name:var(--font-mono)] text-[18px] font-semibold">{formatINR(waiting)}</dd>
-              </div>
-              <div className="s-card p-4">
-                <dt className="text-[12.5px] font-semibold text-[var(--s-ink-2)]">Customer says not paid</dt>
-                <dd className="m-0 mt-1 text-[18px] font-semibold" style={{ color: disputed ? 'var(--s-bad)' : undefined }}>
-                  {disputed ? `${disputed} project${disputed === 1 ? '' : 's'}` : 'None'}
-                </dd>
-                {disputed ? <dd className="m-0 text-[12.5px] text-[var(--s-ink-3)]">One Interiors is looking into it and will call you.</dd> : null}
-              </div>
-            </dl>
-            <ul className="m-0 flex list-none flex-col gap-4 p-0">
+
+          {projects.length === 0 ? (
+            <div className="empty">
+              <b>No projects yet</b>
+              <span className="muted sm">A project appears here once a client signs with your studio.</span>
+            </div>
+          ) : (
+            <ul className="pay-list">
               {sorted.map((p) => (
-                <li key={p.id} className="s-card p-5">
-                  <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-                    <p className="m-0 text-[16px] font-semibold">
-                      {p.label} <span className="text-[14px] font-normal text-[var(--s-ink-3)]">· {p.customer}</span>
-                    </p>
+                <li key={p.id} className="card">
+                  <div className="chead">
+                    <div>
+                      <h2>{p.label}</h2>
+                      <span className="muted sm">{p.customer}</span>
+                    </div>
                     {p.canOpen ? (
-                      <Link href={`/studio/projects/${p.id}?tab=payments`} className="text-[13px] text-[var(--s-accent)]">
+                      <Link href={`/studio/projects/${p.id}?tab=payments`} className="btn ghost sm">
                         Open the project
                       </Link>
                     ) : null}
@@ -89,14 +101,24 @@ export default async function PaymentsDeskPage() {
                   {p.payments ? (
                     <PaymentsBody data={p.payments} customer={p.customer.split(/\s+/)[0] ?? p.customer} />
                   ) : (
-                    <p className="m-0 text-[14px] text-[var(--s-ink-3)]">No payment stages were signed in the app for this project.</p>
+                    <p className="muted sm" style={{ margin: 0 }}>
+                      No payment stages were signed in the app for this project.
+                    </p>
                   )}
                 </li>
               ))}
             </ul>
+          )}
+        </div>
+        <div className="colside">
+          {/* Studio OS Phase 3: crews whose work is done or due, with what is owed. */}
+          <CrewToday />
+          <div className="empty">
+            <b>One way to record money</b>
+            <span className="muted sm">The same control as each project&rsquo;s Payments tab. A customer&rsquo;s &ldquo;not paid&rdquo; comes first on this list.</span>
           </div>
-        )}
-      </PageBody>
-    </>
+        </div>
+      </div>
+    </main>
   );
 }

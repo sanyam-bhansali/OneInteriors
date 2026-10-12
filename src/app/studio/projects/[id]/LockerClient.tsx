@@ -11,7 +11,7 @@ import { materialCodeAction, removeDraftAction, shareDocumentAction, uploadDocum
  * code once ordered.
  */
 
-const field = 's-input w-full';
+const field = 'fld w-full';
 const small = 'text-[12.5px]';
 
 function useRun() {
@@ -30,7 +30,7 @@ function useRun() {
 function Message({ m }: { m: { ok: boolean; text: string } | null }) {
   if (!m) return null;
   return (
-    <span role={m.ok ? 'status' : 'alert'} className={`${small} ${m.ok ? 'text-[var(--s-good)]' : 'text-[var(--s-bad)]'}`}>
+    <span role={m.ok ? 'status' : 'alert'} className={`${small} ${m.ok ? 'text-[var(--good)]' : 'text-[var(--bad)]'}`}>
       {m.text}
     </span>
   );
@@ -44,7 +44,7 @@ export function UploadDocument({ projectId, customer, replaces }: { projectId: s
   if (!open) {
     return (
       <span className="flex flex-col gap-1">
-        <button type="button" className={replaces ? `${small} self-start text-[var(--s-accent)] underline` : 's-btn-ghost self-start'} onClick={() => setOpen(true)}>
+        <button type="button" className={replaces ? `${small} self-start acc-t underline` : 'btn ghost sm self-start'} onClick={() => setOpen(true)}>
           {replaces ? 'Upload a new version' : 'Upload drawings'}
         </button>
         <Message m={message} />
@@ -53,7 +53,7 @@ export function UploadDocument({ projectId, customer, replaces }: { projectId: s
   }
   return (
     <form
-      className="flex flex-col gap-2 rounded-[10px] border border-[var(--s-rule)] p-3"
+      className="flex flex-col gap-2 rounded-[14px] bg-[var(--soft)] p-3"
       onSubmit={(e) => {
         e.preventDefault();
         const form = e.currentTarget;
@@ -72,7 +72,7 @@ export function UploadDocument({ projectId, customer, replaces }: { projectId: s
       }}
     >
       {replaces ? (
-        <p className={`m-0 ${small} text-[var(--s-ink-2)]`}>New version of {replaces.title}. The one before stays in the record.</p>
+        <p className={`m-0 ${small} text-[var(--text2)]`}>New version of {replaces.title}. The one before stays in the record.</p>
       ) : (
         <>
           <select name="kind" defaultValue="DRAWINGS" className={field} aria-label="Kind of document">
@@ -88,16 +88,16 @@ export function UploadDocument({ projectId, customer, replaces }: { projectId: s
         </>
       )}
       <input type="file" name="file" required accept="application/pdf,image/jpeg,image/png,image/webp" className={small} aria-label="The file" />
-      <label className={`flex items-center gap-2 ${small} text-[var(--s-ink-2)]`}>
+      <label className={`flex items-center gap-2 ${small} text-[var(--text2)]`}>
         <input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} />
         Share with {customer} now
       </label>
-      {!share ? <p className={`m-0 ${small} text-[var(--s-ink-3)]`}>A draft stays with your team until you share it.</p> : <p className={`m-0 ${small} text-[var(--s-ink-3)]`}>Once shared it cannot be removed, only replaced by a new version.</p>}
+      {!share ? <p className={`m-0 ${small} text-[var(--muted)]`}>A draft stays with your team until you share it.</p> : <p className={`m-0 ${small} text-[var(--muted)]`}>Once shared it cannot be removed, only replaced by a new version.</p>}
       <div className="flex gap-2">
-        <button type="submit" className="s-btn" disabled={pending}>
+        <button type="submit" className="btn pri sm" disabled={pending}>
           {pending ? 'Uploading…' : share ? 'Upload and share' : 'Upload as draft'}
         </button>
-        <button type="button" className="s-btn-ghost" onClick={() => setOpen(false)}>
+        <button type="button" className="btn ghost sm" onClick={() => setOpen(false)}>
           Cancel
         </button>
       </div>
@@ -111,10 +111,10 @@ export function DraftActions({ projectId, documentId, customer }: { projectId: s
   const { pending, message, run } = useRun();
   return (
     <span className="flex flex-wrap items-center gap-2">
-      <button type="button" className={`${small} text-[var(--s-accent)] underline`} disabled={pending} onClick={() => run(() => shareDocumentAction(projectId, documentId), `Shared. ${customer} can open it now.`)}>
+      <button type="button" className={`${small} acc-t underline`} disabled={pending} onClick={() => run(() => shareDocumentAction(projectId, documentId), `Shared. ${customer} can open it now.`)}>
         Share with {customer}
       </button>
-      <button type="button" className={`${small} text-[var(--s-ink-3)] underline`} disabled={pending} onClick={() => run(() => removeDraftAction(projectId, documentId), 'Draft removed.')}>
+      <button type="button" className={`${small} text-[var(--muted)] underline`} disabled={pending} onClick={() => run(() => removeDraftAction(projectId, documentId), 'Draft removed.')}>
         Remove draft
       </button>
       <Message m={message} />
@@ -131,13 +131,13 @@ export function MaterialCode({ projectId, materialId, code, ordered }: { project
   return (
     <span className="flex flex-col gap-1">
       <span className="flex flex-wrap items-center gap-2">
-        <input className="s-input w-[10rem]" value={value} maxLength={60} onChange={(e) => setValue(e.target.value)} placeholder="Product code" aria-label="Product code" />
-        <label className={`flex items-center gap-1.5 ${small} text-[var(--s-ink-2)]`}>
+        <input className="fld w-[10rem]" value={value} maxLength={60} onChange={(e) => setValue(e.target.value)} placeholder="Product code" aria-label="Product code" />
+        <label className={`flex items-center gap-1.5 ${small} text-[var(--text2)]`}>
           <input type="checkbox" checked={isOrdered} onChange={(e) => setOrdered(e.target.checked)} />
           Ordered
         </label>
         {dirty ? (
-          <button type="button" className="s-btn-ghost" disabled={pending} onClick={() => run(() => materialCodeAction(projectId, materialId, value, isOrdered || value.trim() !== ''), 'Saved.')}>
+          <button type="button" className="btn ghost sm" disabled={pending} onClick={() => run(() => materialCodeAction(projectId, materialId, value, isOrdered || value.trim() !== ''), 'Saved.')}>
             Save
           </button>
         ) : null}

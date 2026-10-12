@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { PageBody } from '../../StudioShell';
+import '../clients.css';
 import { timelineFor } from '@/modules/studio-practice/events';
 import { marketplaceContextFor } from '@/modules/studio-practice/marketplace-context';
 import { duplicatesOf } from '@/modules/studio-practice/merge';
@@ -86,135 +86,160 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   const mayWork = page.may.edit && !client.isDemo;
   const openTasks = tasks.filter((t) => !t.doneAt).length;
 
+  /* The journey strip (the design's .jour): the studio's own columns in order, lost ones aside. */
+  const open = stages.filter((s) => s.kind !== 'LOST');
+  const here = open.findIndex((s) => s.id === client.stageId);
+  /* A studio may have twenty columns; the strip shows the milestones around
+     this client: the first, the one before, this one, the next, and won. */
+  const won = open.findIndex((s) => s.kind === 'WON');
+  const picks = open.length <= 6 ? open.map((_, i) => i) : [...new Set([0, here - 1, here, here + 1, won].filter((i) => i >= 0 && i < open.length))].sort((a, b) => a - b);
+  const journey = picks.map((i) => open[i]!);
+  const at = picks.indexOf(here);
+
   return (
-    <PageBody>
-      <div className="mx-auto flex max-w-[1100px] flex-col gap-4">
-        <LeadHeader
-          lead={{
-            id: client.id,
-            name: client.name,
-            phone: client.phone,
-            email: client.email,
-            society: client.society,
-            locality: client.locality,
-            city: null,
-            source: sourceKey,
-            sourceLabel: sourceText,
-            stageId: client.stageId,
-            stageName: client.stageName,
-            stageColour: client.stageColour,
-            ownerName: client.assignedToName,
-            tags,
-            booked: client.bookedIntroductionId !== null,
-          }}
-          tel={tel}
-          whatsapp={whatsappLink(client.phone)}
-          stages={stages.map((s) => ({ id: s.id, name: s.name, colour: s.colour, kind: s.kind }))}
-          may={{ edit: mayWork, quote: page.may.quote, delete: mayDelete }}
-          canBook={page.may.book && page.bookableQuoteId !== null}
-        />
-        {client.isDemo ? <p className="m-0 text-[13px] text-[var(--s-ink-3)]">This is the sample lead. Try anything on it; it is never counted.</p> : null}
+    <main className="content cl-page" style={{ maxWidth: 1440 }}>
+      <LeadHeader
+        lead={{
+          id: client.id,
+          name: client.name,
+          phone: client.phone,
+          email: client.email,
+          society: client.society,
+          locality: client.locality,
+          city: null,
+          source: sourceKey,
+          sourceLabel: sourceText,
+          stageId: client.stageId,
+          stageName: client.stageName,
+          stageColour: client.stageColour,
+          ownerName: client.assignedToName,
+          tags,
+          booked: client.bookedIntroductionId !== null,
+        }}
+        tel={tel}
+        whatsapp={whatsappLink(client.phone)}
+        stages={stages.map((s) => ({ id: s.id, name: s.name, colour: s.colour, kind: s.kind }))}
+        may={{ edit: mayWork, quote: page.may.quote, delete: mayDelete }}
+        canBook={page.may.book && page.bookableQuoteId !== null}
+      />
+      {client.isDemo ? <p className="cl-sub">This is the sample lead. Try anything on it; it is never counted.</p> : null}
 
-        {/* Phase 1's next step stays one tap away. */}
-        <div className="flex flex-wrap items-center gap-2">
-          <NextStepButton
-            step={page.next}
-            clientId={client.id}
-            phone={tel}
-            quoteId={page.nextQuoteId}
-            projectId={seesProject ? (page.booking?.projectId ?? null) : null}
-            mayBook={page.may.book}
-          />
-          <span className="text-[12.5px] text-[var(--s-ink-3)]">{[page.budgetText, page.meetingText].filter(Boolean).join(' · ')}</span>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="flex min-w-0 flex-col gap-4">
-            {dupes.length > 0 ? <Duplicates clientId={client.id} clientName={client.name} candidates={dupes} /> : null}
-            {intro ? <IntroAnswer state={intro} /> : null}
-            {brief ? <BriefPanel ctx={brief} /> : null}
-            {client.fromMarketplace && page.may.quote ? <FinalQuote clientId={client.id} /> : null}
-
-            <LeadTabs
-              tabs={[
-                {
-                  key: 'timeline',
-                  label: 'Timeline',
-                  content: (
-                    <div className="flex flex-col gap-4">
-                      {page.may.edit ? (
-                        <div id="contact" className="scroll-mt-20">
-                          <LogContact clientId={client.id} lastContactedAt={client.lastContactedAt} />
-                        </div>
-                      ) : null}
-                      <Timeline rows={events} />
-                    </div>
-                  ),
-                },
-                {
-                  key: 'sales',
-                  label: 'Floor plan & quotations',
-                  content: (
-                    <div className="flex flex-col gap-4">
-                      <FilesBox clientId={client.id} files={page.files} may={page.may.edit} mayReadRooms={page.may.readRooms} />
-                      <QuotesBox clientId={client.id} quotes={page.quotes} mayQuote={page.may.quote} fromOneInteriors={fromOneInteriors} />
-                      <BookingBox clientId={client.id} booking={page.booking} draft={draft} mayRefund={page.may.refund} isOwner={member?.role === 'OWNER'} seesProject={seesProject} />
-                    </div>
-                  ),
-                },
-                {
-                  key: 'tasks',
-                  label: openTasks ? `Tasks (${openTasks})` : 'Tasks',
-                  content: <LeadTasks leadId={client.id} tasks={tasks} people={taskWho} seesAll={seesAll} meId={member?.id ?? null} may={page.may.edit} />,
-                },
-              ]}
-            />
-
-            <NotesPanel leadId={client.id} notes={notes} meId={member?.id ?? null} seesAll={seesAll} may={mayWork} />
+      {journey.length > 1 ? (
+        <section className="card" aria-label="Where this client is">
+          <div className="jour" style={{ gridTemplateColumns: `repeat(${Math.min(journey.length, 8)}, minmax(0, 1fr))` }}>
+            {journey.map((s, i) => (
+              <div key={s.id} className={at >= 0 && i < at ? 'done' : i === at ? 'on' : ''}>
+                <i />
+                <span>{s.name}</span>
+              </div>
+            ))}
           </div>
+        </section>
+      ) : null}
 
-          <aside className="flex flex-col gap-4">
-            <Details
-              clientId={client.id}
-              may={mayWork}
-              fromOneInteriors={client.source === 'ONE_INTERIORS'}
-              sources={page.sources}
-              v={{
-                name: client.name,
-                phone: client.phone ?? '',
-                email: client.email ?? '',
-                society: client.society ?? '',
-                config: client.config ?? '',
-                budgetPaise: client.budgetPaise,
-                source: client.source,
-                leadSourceId: client.leadSourceId,
-                carpetSqft: client.carpetSqft,
-                locality: client.locality,
-              }}
-            />
-            <CustomFieldsPanel
-              leadId={client.id}
-              fields={fields.map((f) => ({ key: f.key, label: f.label, type: f.type, options: f.options }))}
-              values={Object.fromEntries(Object.entries(client.fields).map(([k, v]) => [k, String(v ?? '')]))}
-              may={mayWork}
-            />
-            <FollowUpPanel leadId={client.id} action={client.nextAction} on={client.nextActionOn} createdAt={client.createdAt} may={mayWork} />
-            <NextCall leadId={client.id} action={client.nextAction} on={client.nextActionOn} may={mayWork} />
-            <TagsPanel leadId={client.id} tags={tags} vocab={vocab} may={mayWork} />
-            <Attribution source={sourceKey} sourceLabel={sourceText} note={client.sourceNote} />
-            <div id="meeting" className="scroll-mt-20">
-              <MeetingBox clientId={client.id} at={client.meetingAt ? client.meetingAt.toISOString() : null} note={client.meetingNote} may={page.may.edit} />
+      <div className="cols">
+        <div className="colmain">
+          {/* The next call, and Phase 1's next step one tap away. */}
+          <NextCall leadId={client.id} action={client.nextAction} on={client.nextActionOn} may={mayWork}>
+            <div className="hstack">
+              <NextStepButton
+                step={page.next}
+                clientId={client.id}
+                phone={tel}
+                quoteId={page.nextQuoteId}
+                projectId={seesProject ? (page.booking?.projectId ?? null) : null}
+                mayBook={page.may.book}
+              />
+              <span className="muted sm">{[page.budgetText, page.meetingText].filter(Boolean).join(' · ')}</span>
             </div>
-            {page.may.assign && page.members.length > 0 ? <AssignBox clientId={client.id} assignedToId={client.assignedToId} members={page.members} /> : null}
-            {client.notes ? (
-              <section className="rounded-[12px] border border-[var(--s-rule)] px-4 py-3.5">
-                <h2 className="s-label m-0 mb-2 text-[var(--s-ink-3)]">Notes from when it came in</h2>
-                <p className="m-0 whitespace-pre-wrap text-[13.5px] leading-relaxed">{client.notes}</p>
-              </section>
-            ) : null}
-          </aside>
+          </NextCall>
+
+          {dupes.length > 0 ? <Duplicates clientId={client.id} clientName={client.name} candidates={dupes} /> : null}
+          {intro ? <IntroAnswer state={intro} /> : null}
+          {brief ? <BriefPanel ctx={brief} /> : null}
+          {client.fromMarketplace && page.may.quote ? <FinalQuote clientId={client.id} /> : null}
+
+          <LeadTabs
+            tabs={[
+              {
+                key: 'timeline',
+                label: 'Timeline',
+                content: (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    {page.may.edit ? (
+                      <div id="contact" style={{ scrollMarginTop: 80 }}>
+                        <LogContact clientId={client.id} lastContactedAt={client.lastContactedAt} />
+                      </div>
+                    ) : null}
+                    <section className="card">
+                      <h2 className="h">What happened</h2>
+                      <Timeline rows={events} />
+                    </section>
+                  </div>
+                ),
+              },
+              {
+                key: 'sales',
+                label: 'Floor plan & quotations',
+                content: (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    <FilesBox clientId={client.id} files={page.files} may={page.may.edit} mayReadRooms={page.may.readRooms} />
+                    <QuotesBox clientId={client.id} quotes={page.quotes} mayQuote={page.may.quote} fromOneInteriors={fromOneInteriors} />
+                    <BookingBox clientId={client.id} booking={page.booking} draft={draft} mayRefund={page.may.refund} isOwner={member?.role === 'OWNER'} seesProject={seesProject} />
+                  </div>
+                ),
+              },
+              {
+                key: 'tasks',
+                label: openTasks ? `Tasks (${openTasks})` : 'Tasks',
+                content: <LeadTasks leadId={client.id} tasks={tasks} people={taskWho} seesAll={seesAll} meId={member?.id ?? null} may={page.may.edit} />,
+              },
+            ]}
+          />
+
+          <NotesPanel leadId={client.id} notes={notes} meId={member?.id ?? null} seesAll={seesAll} may={mayWork} />
         </div>
+
+        <aside className="colside" style={{ flexBasis: 340 }}>
+          <Details
+            clientId={client.id}
+            may={mayWork}
+            fromOneInteriors={client.source === 'ONE_INTERIORS'}
+            sources={page.sources}
+            v={{
+              name: client.name,
+              phone: client.phone ?? '',
+              email: client.email ?? '',
+              society: client.society ?? '',
+              config: client.config ?? '',
+              budgetPaise: client.budgetPaise,
+              source: client.source,
+              leadSourceId: client.leadSourceId,
+              carpetSqft: client.carpetSqft,
+              locality: client.locality,
+            }}
+          />
+          <CustomFieldsPanel
+            leadId={client.id}
+            fields={fields.map((f) => ({ key: f.key, label: f.label, type: f.type, options: f.options }))}
+            values={Object.fromEntries(Object.entries(client.fields).map(([k, v]) => [k, String(v ?? '')]))}
+            may={mayWork}
+          />
+          <FollowUpPanel leadId={client.id} action={client.nextAction} on={client.nextActionOn} createdAt={client.createdAt} may={mayWork} />
+          <TagsPanel leadId={client.id} tags={tags} vocab={vocab} may={mayWork} />
+          <Attribution source={sourceKey} sourceLabel={sourceText} note={client.sourceNote} />
+          <div id="meeting" style={{ scrollMarginTop: 80 }}>
+            <MeetingBox clientId={client.id} at={client.meetingAt ? client.meetingAt.toISOString() : null} note={client.meetingNote} may={page.may.edit} />
+          </div>
+          {page.may.assign && page.members.length > 0 ? <AssignBox clientId={client.id} assignedToId={client.assignedToId} members={page.members} /> : null}
+          {client.notes ? (
+            <section className="card">
+              <h2 className="h">Notes from when it came in</h2>
+              <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{client.notes}</p>
+            </section>
+          ) : null}
+        </aside>
       </div>
-    </PageBody>
+    </main>
   );
 }

@@ -9,51 +9,37 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { colourOf } from '@/modules/studio-practice/vocabulary';
-import { avatarColour, initials } from '@/modules/studio-sales/lead-view';
+import { initials } from '@/modules/studio-sales/lead-view';
 
-export const btn = 'inline-flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 text-[13px] font-medium transition-colors disabled:opacity-40';
-export const btnOutline = `${btn} border-[var(--s-rule)] bg-[var(--s-surface)] text-[var(--s-ink)] hover:border-[var(--s-ink-3)]`;
-export const btnPrimary = `${btn} border-[var(--s-accent)] bg-[var(--s-accent)] text-white hover:bg-[var(--s-accent-deep)]`;
-export const btnGhost = `${btn} border-transparent text-[var(--s-ink-2)] hover:bg-[var(--s-rail-active)]`;
+/* The design's buttons (studio-ui.css): pill buttons, small on toolbars. */
+export const btn = 'btn sm';
+export const btnOutline = 'btn sec sm';
+export const btnPrimary = 'btn pri sm';
+export const btnGhost = 'btn ghost sm';
 
+/** The design's avatar: initials on the soft avatar colour. */
 export function Avatar({ name, size = 28 }: { name: string | null; size?: number }) {
   const ini = initials(name);
-  if (!ini) {
-    return (
-      <span aria-hidden className="grid flex-none place-items-center rounded-full border border-dashed border-[var(--s-ink-3)] bg-[var(--s-surface-2)] text-[var(--s-ink-3)]" style={{ width: size, height: size, fontSize: size * 0.4 }}>
-        ?
-      </span>
-    );
-  }
   return (
-    <span aria-hidden className="grid flex-none place-items-center rounded-full font-bold text-white" style={{ width: size, height: size, fontSize: size * 0.39, background: avatarColour(name ?? '') }}>
-      {ini}
+    <span aria-hidden className="av" style={{ width: size, height: size, fontSize: Math.round(size * 0.42), ...(ini ? {} : { background: 'var(--fill)', color: 'var(--muted)' }) }}>
+      {ini ?? '?'}
     </span>
   );
 }
 
-const PILL = 'inline-flex items-center whitespace-nowrap rounded-full border px-[7px] py-[3px] text-[10.5px] font-semibold leading-none';
-
 /** "Today" — arrived today. */
-export const PillToday = () => <span className={`${PILL} border-[var(--s-accent)]/35 bg-[var(--s-accent-wash)] uppercase text-[var(--s-accent)]`}>Today</span>;
+export const PillToday = () => <span className="chip xs oi">Today</span>;
 /** "18d cold". */
-export const PillCold = ({ label }: { label: string }) => <span className={`${PILL} border-[var(--s-warn)]/35 bg-[var(--s-warn-wash)] text-[var(--s-warn)]`}>{label}</span>;
+export const PillCold = ({ label }: { label: string }) => <span className="chip xs warn">{label}</span>;
 /** The next-call badge, coloured by urgency. */
 export function PillDue({ bucket, label }: { bucket: string; label: string }) {
-  const tone =
-    bucket === 'overdue'
-      ? 'border-[var(--s-bad)]/35 bg-[var(--s-bad-wash)] text-[var(--s-bad)]'
-      : bucket === 'today'
-        ? 'border-[var(--s-warn)]/35 bg-[var(--s-warn-wash)] text-[var(--s-warn)]'
-        : 'border-[var(--s-rule)] bg-[var(--s-surface-2)] text-[var(--s-ink-2)]';
-  return <span className={`${PILL} ${tone}`}>{label}</span>;
+  return <span className={`chip xs ${bucket === 'overdue' ? 'bad' : bucket === 'today' ? 'warn' : ''}`}>{label}</span>;
 }
 /** "#tag". */
 export function PillTag({ tag }: { tag: string }) {
   return (
-    <span title={tag} className="inline-block max-w-[108px] truncate rounded-full border border-[#7a4fa0]/30 bg-[#7a4fa0]/10 px-2 py-[2px] text-[10.5px] font-semibold leading-[1.35] text-[#6a3f90]">
-      <span className="opacity-55">#</span>
-      {tag}
+    <span title={tag} className="chip xs tag">
+      #{tag}
     </span>
   );
 }
@@ -64,20 +50,19 @@ export function TagChips({ tags, max = 2 }: { tags: string[]; max?: number }) {
       {tags.slice(0, max).map((t) => (
         <PillTag key={t} tag={t} />
       ))}
-      {tags.length > max ? <span className="text-[10.5px] font-semibold text-[var(--s-ink-3)]">+{tags.length - max}</span> : null}
+      {tags.length > max ? <span className="muted" style={{ fontSize: 12 }}>+{tags.length - max}</span> : null}
     </>
   );
 }
 
-/** A column's colour dot. */
-export const Dot = ({ colour }: { colour: string }) => <span aria-hidden className="inline-block h-2 w-2 flex-none rounded-full" style={{ background: colourOf(colour).dot }} />;
+/** A column's colour dot (the studio's own stage colour). */
+export const Dot = ({ colour }: { colour: string }) => <span aria-hidden className="stdot" style={{ background: colourOf(colour).dot }} />;
 
-/** The stage as a coloured chip. */
+/** The stage as a chip with its colour dot. */
 export function StageBadge({ name, colour }: { name: string; colour: string }) {
-  const c = colourOf(colour);
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-[12px] font-medium" style={{ background: c.wash, color: c.ink }}>
-      <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: c.dot }} />
+    <span className="chip xs">
+      <Dot colour={colour} />
       {name}
     </span>
   );
@@ -98,7 +83,7 @@ const SOURCE_GLYPH: Record<string, string> = {
 /** The source as one glyph, its name on hover (AxLeads' mini source chip). */
 export function SourceIcon({ source, label }: { source: string; label: string }) {
   return (
-    <span title={label} aria-label={label} className="inline-grid h-[18px] w-[18px] flex-none place-items-center rounded-[5px] bg-[var(--s-surface-2)] text-[var(--s-ink-2)]">
+    <span title={label} aria-label={label} className="chip xs" style={{ padding: 0, width: 22, justifyContent: 'center' }}>
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d={SOURCE_GLYPH[source] ?? SOURCE_GLYPH.OTHER} />
       </svg>
@@ -137,16 +122,16 @@ export function SelectMenu({ value, options, onChange, label, icon, active }: { 
   const ref = useDismiss<HTMLDivElement>(open, () => setOpen(false));
   const cur = options.find((o) => o.value === value);
   return (
-    <div ref={ref} className="relative inline-flex">
+    <div ref={ref} className="cl-pop">
       <button type="button" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={active ? btnPrimary : btnOutline}>
         {icon}
         {label ?? cur?.label}
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden className="opacity-60">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden style={{ opacity: 0.6 }}>
           <path d="M4 6l4 4 4-4" />
         </svg>
       </button>
       {open ? (
-        <ul role="listbox" className="absolute left-0 top-full z-50 mt-1 max-h-[22rem] min-w-[12rem] list-none overflow-y-auto rounded-[10px] border border-[var(--s-rule)] bg-[var(--s-surface)] p-1 shadow-[var(--s-lift)]">
+        <ul role="listbox" className="cl-menu">
           {options.map((o) => (
             <li key={o.value}>
               <button
@@ -157,11 +142,11 @@ export function SelectMenu({ value, options, onChange, label, icon, active }: { 
                   onChange(o.value);
                   setOpen(false);
                 }}
-                className="flex w-full items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-left text-[13px] hover:bg-[var(--s-rail-active)]"
+                className="cl-mi"
               >
                 {o.colour ? <Dot colour={o.colour} /> : null}
-                <span className="truncate">{o.label}</span>
-                {o.value === value ? <span className="ml-auto text-[var(--s-accent)]">✓</span> : null}
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.label}</span>
+                {o.value === value ? <span className="ok">✓</span> : null}
               </button>
             </li>
           ))}
@@ -178,28 +163,28 @@ export function MultiSelect({ label, values, options, onChange, allLabel }: { la
   const on = new Set(values);
   const shown = values.length === 0 ? label : values.length === 1 ? (options.find((o) => o.value === values[0])?.label ?? label).replace(/ \([\d,]+\)$/, '') : `${label} · ${values.length}`;
   return (
-    <div ref={ref} className="relative inline-flex">
+    <div ref={ref} className="cl-pop">
       <button type="button" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={values.length ? btnPrimary : btnOutline}>
         {shown}
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden className="opacity-60">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden style={{ opacity: 0.6 }}>
           <path d="M4 6l4 4 4-4" />
         </svg>
       </button>
       {open ? (
-        <div role="listbox" aria-multiselectable className="absolute left-0 top-full z-50 mt-1 max-h-[22rem] min-w-[14rem] overflow-y-auto rounded-[10px] border border-[var(--s-rule)] bg-[var(--s-surface)] p-1 shadow-[var(--s-lift)]">
-          <button type="button" onClick={() => onChange([])} className="flex w-full items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-left text-[13px] hover:bg-[var(--s-rail-active)]">
+        <div role="listbox" aria-multiselectable className="cl-menu" style={{ minWidth: 224 }}>
+          <button type="button" onClick={() => onChange([])} className="cl-mi">
             {allLabel}
-            {values.length === 0 ? <span className="ml-auto text-[var(--s-accent)]">✓</span> : null}
+            {values.length === 0 ? <span className="ok">✓</span> : null}
           </button>
           {options.map((o) => (
-            <label key={o.value} className="flex cursor-pointer items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-[13px] hover:bg-[var(--s-rail-active)]">
+            <label key={o.value} className="cl-mi">
               <input
                 type="checkbox"
                 checked={on.has(o.value)}
                 onChange={(e) => onChange(e.target.checked ? [...values, o.value] : values.filter((v) => v !== o.value))}
               />
               {o.colour ? <Dot colour={o.colour} /> : null}
-              <span className="truncate">{o.label}</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.label}</span>
             </label>
           ))}
         </div>
@@ -216,8 +201,9 @@ export function Modal({ onClose, children, width = 'min(560px, 94vw)', labelledB
     return () => document.removeEventListener('keydown', h);
   }, [onClose]);
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 p-4 pt-[12vh]" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-labelledby={labelledBy} onClick={(e) => e.stopPropagation()} className="flex max-h-[80dvh] flex-col overflow-hidden rounded-[16px] bg-[var(--s-surface)] shadow-[var(--s-lift)]" style={{ width }}>
+    <div className="overlay" style={{ paddingTop: '12vh' }}>
+      <button type="button" className="scrim" aria-label="Close" onClick={onClose} />
+      <div role="dialog" aria-modal="true" aria-labelledby={labelledBy} className="cl-sheet" style={{ width, maxWidth: '100%' }}>
         {children}
       </div>
     </div>

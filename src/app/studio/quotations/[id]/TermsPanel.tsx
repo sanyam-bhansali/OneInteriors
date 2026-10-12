@@ -15,9 +15,6 @@ export interface TermsDraft {
   quoteDate: string;
 }
 
-const field =
-  'rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-2.5 py-2 text-[13.5px] outline-none focus:border-[var(--s-accent)]';
-
 /**
  * The deal on this quotation: fee, modular discount, GST, a named flat
  * discount, the booking advance and the date it carries.
@@ -39,51 +36,51 @@ export function TermsPanel({
   const named = (DISCOUNT_NAMES as readonly string[]).includes(terms.onSpotLabel);
 
   return (
-    <section className="s-card p-4">
-      <h2 className="s-label m-0 mb-3">Terms on this quotation</h2>
+    <section className="card" aria-label="Terms on this quotation">
+      <div className="chead">
+        <h2>Terms on this quotation</h2>
+      </div>
 
-      <div className="flex flex-col gap-3">
-        <label className="flex items-center gap-2 text-[13.5px]">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <label className="qcheck" style={{ minHeight: 30 }}>
           <input
             type="checkbox"
             checked={terms.feeOn}
             onChange={(e) => onChange({ feeOn: e.target.checked })}
-            className="h-[16px] w-[16px] accent-[var(--s-accent)]"
           />
           Professional fee, 7%
         </label>
 
-        <div className="flex gap-3">
-          <label className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="s-label">Modular discount %</span>
+        <div className="hstack" style={{ gap: 12 }}>
+          <label className="qfield" style={{ flex: 1 }}>
+            <span className="lbl">Modular discount %</span>
             <input
               value={terms.discountPct}
               onChange={(e) => onChange({ discountPct: e.target.value })}
               inputMode="decimal"
-              className={`${field} s-num w-full text-right`}
+              className="fld num"
             />
           </label>
         </div>
 
-        <label className="flex items-center gap-2 text-[13.5px]">
+        <label className="qcheck" style={{ minHeight: 30 }}>
           <input
             type="checkbox"
             checked={terms.gstOn}
             onChange={(e) => onChange({ gstOn: e.target.checked })}
-            className="h-[16px] w-[16px] accent-[var(--s-accent)]"
           />
           GST at 18%, after discounts
         </label>
 
-        <div className="flex flex-col gap-1">
-          <span className="s-label">Flat discount</span>
-          <div className="flex gap-2">
+        <div className="qfield">
+          <span className="lbl">Flat discount</span>
+          <div className="hstack" style={{ gap: 8, flexWrap: 'nowrap' }}>
             <select
               value={named ? terms.onSpotLabel : terms.onSpotLabel ? 'other' : ''}
               onChange={(e) =>
                 onChange({ onSpotLabel: e.target.value === 'other' ? 'Special discount' : e.target.value })
               }
-              className={`${field} min-w-0 flex-1`}
+              className="fld" style={{ flex: 1, minWidth: 0 }}
             >
               <option value="">None</option>
               {DISCOUNT_NAMES.map((n) => (
@@ -99,7 +96,7 @@ export function TermsPanel({
               inputMode="numeric"
               placeholder="₹"
               aria-label="Discount amount in rupees"
-              className={`${field} s-num w-[6.5rem] text-right`}
+              className="fld num" style={{ width: '7rem', flex: 'none' }}
             />
           </div>
           {terms.onSpotLabel && !named ? (
@@ -108,30 +105,30 @@ export function TermsPanel({
               onChange={(e) => onChange({ onSpotLabel: e.target.value })}
               maxLength={60}
               aria-label="Name of the discount"
-              className={`${field} mt-1`}
+              className="fld" style={{ marginTop: 4 }}
             />
           ) : null}
         </div>
 
-        <div className="flex gap-3">
+        <div className="hstack" style={{ gap: 12, flexWrap: 'nowrap' }}>
           {ownSchedule ? null : (
-            <label className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className="s-label">Booking ₹</span>
+            <label className="qfield" style={{ flex: 1 }}>
+              <span className="lbl">Booking ₹</span>
               <input
                 value={terms.advanceRupees}
                 onChange={(e) => onChange({ advanceRupees: e.target.value })}
                 inputMode="numeric"
-                className={`${field} s-num w-full text-right`}
+                className="fld num"
               />
             </label>
           )}
-          <label className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="s-label">Date</span>
+          <label className="qfield" style={{ flex: 1 }}>
+            <span className="lbl">Date</span>
             <input
               type="date"
               value={terms.quoteDate}
               onChange={(e) => onChange({ quoteDate: e.target.value })}
-              className={`${field} w-full`}
+              className="fld"
             />
           </label>
         </div>

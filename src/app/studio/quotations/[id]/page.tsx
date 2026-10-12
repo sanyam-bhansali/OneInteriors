@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { PageHead, PageBody } from '../../StudioShell';
 import { getQuote, STAGE_LABELS, STATUS_LABELS } from '@/modules/studio-quote/quotes';
 import { myProducts, myBranding, myTier } from '@/modules/studio-quote/store';
 import { showsOurMark, MARK_TEXT } from '@/modules/studio-quote/mark';
@@ -14,6 +13,8 @@ import { quoteSalesView } from '@/modules/studio-sales/revisions';
 import { can } from '@/modules/studio/roles';
 import { Revisions } from './Revisions';
 import { planReaderFor } from '@/modules/studio-quote/from-plan';
+import { LineIcon } from '../../ui/icons';
+import '../quotes.css';
 
 export const metadata: Metadata = {
   title: 'Quotation',
@@ -61,25 +62,35 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   const mayAddProducts = member !== null && (member.role === 'OWNER' || member.role === 'PM');
   const mayBook = member !== null && can(member, 'booking.record');
 
+  const TONE = { DRAFT: '', ISSUED: 'warn', ACCEPTED: 'good', DECLINED: 'bad' } as const;
+
   return (
-    <>
-      <PageHead
-        title={quote.clientName}
-        sub={
-          <span className="flex flex-wrap items-center gap-2">
-            <span className="s-num">{quote.number}</span>
-            {quote.clientId ? (
-              <Link href={`/studio/clients/${quote.clientId}`} className="text-[var(--s-accent)]">
-                · open the lead
-              </Link>
-            ) : null}
-            {quote.config ? <span>· {quote.config}</span> : null}
-            {quote.society ? <span>· {quote.society}</span> : null}
-            <span className="text-[var(--s-ink-3)]">· {STATUS_LABELS[quote.status]}</span>
-            <span className="s-tag">{STAGE_LABELS[quote.stage]}</span>
+    <main className="content qpage">
+      {/* StudioQuoteBuilder's heading: back to the list, the number and the
+          client, the flat, where it is; the actions on the right. */}
+      <div className="phead">
+        <div style={{ minWidth: 0 }}>
+          <Link href="/studio/quotations" className="sm muted qback">
+            <LineIcon name="back" size={15} />
+            Quotations
+          </Link>
+          <h1 style={{ marginTop: 4 }}>
+            <span className="mono" style={{ letterSpacing: '-.02em' }}>
+              {quote.number}
+            </span>{' '}
+            · {quote.clientName}
+          </h1>
+          <div className="hstack muted sm qmeta">
+            {[quote.society, quote.config].filter(Boolean).length > 0 ? <span>{[quote.society, quote.config].filter(Boolean).join(', ')}</span> : null}
+            <span className={`chip ${TONE[quote.status]}`}>
+              <span className="dot" />
+              {STATUS_LABELS[quote.status]}
+            </span>
+            <span className="chip">{STAGE_LABELS[quote.stage]}</span>
+            {quote.fromMarketplace ? <span className="chip oi">One Interiors</span> : null}
             {quote.issuedOn ? (
-              <span className="text-[var(--s-ink-3)]">
-                · sent{' '}
+              <span>
+                Sent{' '}
                 {quote.issuedOn.toLocaleDateString('en-IN', {
                   day: 'numeric',
                   month: 'short',
@@ -87,55 +98,53 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
                 })}
               </span>
             ) : null}
-            {quote.fromMarketplace ? (
-              <span className="s-tag !bg-[var(--s-accent-wash)] !text-[var(--s-accent-deep)]">
-                One Interiors
-              </span>
+            {quote.clientId ? (
+              <Link href={`/studio/clients/${quote.clientId}`} className="acc-t" style={{ fontWeight: 600 }}>
+                Open the lead
+              </Link>
             ) : null}
-          </span>
-        }
-        action={
-          <StatusBar
-            quoteId={quote.id}
-            status={quote.status}
-            canPrint={quote.lines.length > 0}
-            stage={quote.stage}
-            basedOnId={quote.basedOnId}
-            deletable={quote.status === 'DRAFT' && !quote.issuedOn && !quote.fromMarketplace}
-          />
-        }
-      />
+          </div>
+        </div>
+        <StatusBar
+          quoteId={quote.id}
+          status={quote.status}
+          canPrint={quote.lines.length > 0}
+          stage={quote.stage}
+          basedOnId={quote.basedOnId}
+          deletable={quote.status === 'DRAFT' && !quote.issuedOn && !quote.fromMarketplace}
+          clientFirstName={quote.clientName.split(/\s+/)[0] ?? ''}
+        />
+      </div>
 
-      <PageBody>
-        {/* Keyed on the revision count so the compare and sales-final pickers start on the newest revision after a send. */}
-        {sales ? <Revisions key={sales.revisions.length} view={sales} leadHref={quote.clientId ? `/studio/clients/${quote.clientId}` : null} mayBook={mayBook} /> : null}
-        {project.projectId ? (
-          <p className="s-card mb-4 border-l-[3px] !border-l-[var(--s-good)] px-4 py-3 text-[13.5px] leading-relaxed">
-            A project is running on this quotation.{' '}
-            <Link href={`/studio/projects/${project.projectId}`} className="font-medium text-[var(--s-accent)]">
-              Open the project
-            </Link>
-          </p>
-        ) : project.canStart && !quote.clientId ? (
-          // A quotation on a lead is booked from its sales final (Record booking), so only unlinked ones keep the older "Start project".
-          <p className="s-card mb-4 flex flex-wrap items-center gap-3 border-l-[3px] !border-l-[var(--s-accent)] px-4 py-3 text-[13.5px] leading-relaxed">
-            <span>Has {quote.clientName.split(/\s+/)[0]} accepted this quotation? Start the project from it.</span>
-            <Link
-              href={`/studio/projects/start?quote=${quote.id}`}
-              className="rounded-[8px] bg-[var(--s-accent)] px-3.5 py-1.5 text-[13.5px] font-medium text-white no-underline hover:bg-[var(--s-accent-deep)]"
-            >
-              Start project
-            </Link>
-          </p>
-        ) : null}
-        {!branding ? (
-          <p className="s-card mb-4 border-l-[3px] !border-l-[var(--s-accent)] px-4 py-3 text-[13.5px] leading-relaxed">
-            <Link href="/studio/settings" className="font-medium text-[var(--s-accent)]">
+      {project.projectId ? (
+        <div className="qnote good">
+          <p>A project is running on this quotation.</p>
+          <Link href={`/studio/projects/${project.projectId}`} className="btn sec sm">
+            Open the project
+          </Link>
+        </div>
+      ) : project.canStart && !quote.clientId ? (
+        // A quotation on a lead is booked from its sales final (Record booking), so only unlinked ones keep the older "Start project".
+        <div className="qnote">
+          <p>Has {quote.clientName.split(/\s+/)[0]} accepted this quotation? Start the project from it.</p>
+          <Link href={`/studio/projects/start?quote=${quote.id}`} className="btn acc sm">
+            Start project
+          </Link>
+        </div>
+      ) : null}
+      {!branding ? (
+        <div className="qnote warn">
+          <p>
+            <Link href="/studio/settings" className="acc-t" style={{ fontWeight: 600 }}>
               Add your studio details
             </Link>{' '}
             before you send this — the document needs your registered name on it.
           </p>
-        ) : null}
+        </div>
+      ) : null}
+
+      {/* Keyed on the revision count so the compare and sales-final pickers start on the newest revision after a send. */}
+      {sales ? <Revisions key={sales.revisions.length} view={sales} leadHref={quote.clientId ? `/studio/clients/${quote.clientId}` : null} mayBook={mayBook} /> : null}
 
         <QuoteBuilder
           quote={quote}
@@ -163,7 +172,6 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           planReader={planReader}
           mayAddProducts={mayAddProducts}
         />
-      </PageBody>
-    </>
+    </main>
   );
 }

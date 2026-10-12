@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Said, useAct, quietClass } from '../../SalesUi';
+import { Said, useAct } from '../../SalesUi';
 import { TaskForm } from '../../calendar/CalendarView';
 import { setTaskDoneAction } from '../../tasks-actions';
 
@@ -49,11 +49,11 @@ export function LeadTasks({
   const today = istParts(new Date()).day;
 
   return (
-    <section id="tasks" className="scroll-mt-20 rounded-[12px] border border-[var(--s-rule)] px-4 py-3.5">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="s-label m-0 text-[var(--s-ink-3)]">Tasks</h2>
+    <section id="tasks" className="card" style={{ scrollMarginTop: 80 }}>
+      <div className="chead">
+        <h2>Tasks</h2>
         {may && !adding ? (
-          <button type="button" onClick={() => setAdding(true)} className="text-[13px] text-[var(--s-accent)] underline">
+          <button type="button" onClick={() => setAdding(true)} className="btn ghost sm">
             + Add a task
           </button>
         ) : null}
@@ -61,31 +61,31 @@ export function LeadTasks({
       {adding ? (
         <TaskForm people={people} seesAll={seesAll} meId={meId} task={{ id: null, title: '', day: today, time: '', assignedToId: meId, leadId }} onClose={() => setAdding(false)} />
       ) : null}
-      {tasks.length === 0 && !adding ? <p className="m-0 mt-2 text-[13px] text-[var(--s-ink-3)]">Nothing to do on this lead yet. Tasks show on the calendar and on Today.</p> : null}
-      <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0">
+      {tasks.length === 0 && !adding ? <p className="cl-sub">Nothing to do on this lead yet. Tasks show on the calendar and on Today.</p> : null}
+      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
         {tasks.map((t) => {
           const late = !t.doneAt && new Date(t.dueAt).getTime() < now;
           return (
-            <li key={t.id} className="text-[13.5px]">
-              <div className="flex items-start gap-2">
+            <li key={t.id}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                 <input
                   type="checkbox"
-                  className="mt-1"
+                  style={{ marginTop: 3 }}
                   aria-label={t.doneAt ? `Open "${t.title}" again` : `Mark "${t.title}" done`}
                   checked={t.doneAt !== null}
                   disabled={pending}
                   onChange={(e) => run(() => setTaskDoneAction(t.id, e.target.checked, leadId))}
                 />
-                <div className="min-w-0 flex-1">
-                  <span className={t.doneAt ? 'line-through opacity-60' : 'font-medium'}>{t.title}</span>
-                  <span className={`block text-[12.5px] ${late ? 'font-medium text-[var(--s-bad)]' : 'text-[var(--s-ink-3)]'}`} suppressHydrationWarning>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <span style={t.doneAt ? { textDecoration: 'line-through', opacity: 0.6 } : { fontWeight: 600 }}>{t.title}</span>
+                  <span className={`sm ${late ? 'bad-t' : 'muted'}`} style={{ display: 'block' }} suppressHydrationWarning>
                     {when(t.dueAt)}
                     {late ? ' · late' : ''}
                     {seesAll && t.assignedToName ? ` · ${t.assignedToName}` : ''}
                   </span>
                 </div>
                 {editing !== t.id ? (
-                  <button type="button" onClick={() => setEditing(t.id)} className={`${quietClass} px-2 py-0.5 text-[12px]`}>
+                  <button type="button" onClick={() => setEditing(t.id)} className="btn ghost xs">
                     Edit
                   </button>
                 ) : null}

@@ -14,8 +14,7 @@ import { resendInviteAction } from '../start/actions';
 type Lang = 'en' | 'hi' | 'mr';
 const LANG_NAMES: Record<Lang, string> = { en: 'English', hi: 'हिन्दी', mr: 'मराठी' };
 
-const quiet =
-  'rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-1.5 text-[13px] font-medium hover:border-[var(--s-ink-3)] disabled:opacity-40';
+const quiet = 'btn ghost sm';
 
 export function InviteBanner({
   projectId,
@@ -61,14 +60,14 @@ export function InviteBanner({
   return (
     <section
       aria-label="Invite to the app"
-      className="s-card mb-5 flex flex-col gap-3 p-4"
-      style={{ boxShadow: `inset 4px 0 0 ${joined ? 'var(--s-good)' : 'var(--s-accent)'}, var(--s-lift)` }}
+      className="card"
+      style={{ boxShadow: `inset 4px 0 0 ${joined ? 'var(--good)' : 'var(--acc)'}` }}
     >
       <div>
         <p className="m-0 text-[15.5px] font-semibold">
           {joined ? `${customer} has joined the app.` : justStarted ? 'Project started. Now invite your client.' : `${customer} has not opened the app yet.`}
         </p>
-        <p className="m-0 mt-0.5 text-[13.5px] text-[var(--s-ink-2)]">
+        <p className="m-0 mt-0.5 text-[13.5px] text-[var(--text2)]">
           {joined
             ? 'Everything your team records here shows in their app.'
             : `${sent} They sign in with their own mobile number and see this project.`}
@@ -78,17 +77,17 @@ export function InviteBanner({
       {!joined ? (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <code className="min-w-0 break-all rounded-[6px] bg-[var(--s-rail)] px-2.5 py-1.5 text-[13px]">{link}</code>
+            <code className="min-w-0 break-all rounded-[10px] bg-[var(--fill)] mono px-2.5 py-1.5 text-[13px]">{link}</code>
             <button type="button" onClick={() => copy('link')} className={quiet}>
               {copied === 'link' ? 'Copied' : 'Copy link'}
             </button>
-            <span className="text-[12.5px] text-[var(--s-ink-3)]">
-              Code <span className="s-num font-[family-name:var(--font-mono)]">{code}</span>
+            <span className="text-[12.5px] text-[var(--muted)]">
+              Code <span className="mono">{code}</span>
             </span>
           </div>
 
           <div>
-            <div role="tablist" aria-label="Message language" className="mb-1.5 flex gap-1">
+            <div role="tablist" aria-label="Message language" className="tabs mb-2">
               {(Object.keys(LANG_NAMES) as Lang[]).map((l) => (
                 <button
                   key={l}
@@ -96,13 +95,12 @@ export function InviteBanner({
                   role="tab"
                   aria-selected={l === lang}
                   onClick={() => setLang(l)}
-                  className={`rounded-full px-2.5 py-0.5 text-[12.5px] ${l === lang ? 'bg-[var(--s-accent-wash)] font-semibold text-[var(--s-accent-deep)]' : 'text-[var(--s-ink-2)]'}`}
                 >
                   {LANG_NAMES[l]}
                 </button>
               ))}
             </div>
-            <p className="m-0 rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] p-3 text-[13.5px] leading-relaxed">{messages[lang]}</p>
+            <p className="m-0 rounded-[12px] bg-[var(--soft)] p-3 text-[13.5px] leading-relaxed">{messages[lang]}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               <button type="button" onClick={() => copy('message')} className={quiet}>
                 {copied === 'message' ? 'Copied' : 'Copy message'}
@@ -128,7 +126,7 @@ export function InviteBanner({
         </>
       ) : null}
       {error ? (
-        <p role="alert" className="m-0 text-[13px] text-[var(--s-bad)]">
+        <p role="alert" className="m-0 text-[13px] text-[var(--bad)]">
           {error}
         </p>
       ) : null}

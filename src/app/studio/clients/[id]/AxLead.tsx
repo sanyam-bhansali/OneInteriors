@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation';
 import { CALL_OUTCOMES, type CallOutcomeId } from '@/modules/studio-practice/event-copy';
 import { suggestTags } from '@/modules/studio-sales/tag-rules';
 import { dayLabel, dueBadge } from '@/modules/studio-sales/lead-view';
-import { Avatar, Dot, Modal, PillDue, PillTag, SourceIcon, StageBadge, btnGhost, btnOutline, btnPrimary, useDismiss } from '../ax-ui';
+import { initials } from '@/modules/studio-sales/lead-view';
+import { LineIcon } from '../../ui/icons';
+import { Dot, Modal, PillDue, PillTag, SourceIcon, btnGhost, btnOutline, btnPrimary, useDismiss } from '../ax-ui';
 import { LostReasonDialog } from '../AxBoard';
 import { binAction, logContactAction, markLostAction } from '../actions';
 import { addTagsAction, deleteNoteAction, editNoteAction, followUpDoneAction, moveLeadAction, removeTagAction } from '../list-actions';
@@ -14,7 +16,7 @@ import { addNoteAction, newQuoteForLeadAction } from '../../sales-actions';
 import { Said, useAct } from '../../SalesUi';
 
 const icon = (d: string, cls = '') => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={cls}>
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={cls}>
     <path d={d} />
   </svg>
 );
@@ -97,130 +99,72 @@ export function LeadHeader({
     act(() => moveLeadAction(lead.id, to, null), `Moved to ${stages.find((s) => s.id === to)?.name ?? 'that column'}`);
   };
 
+  const home = [lead.society, lead.locality, lead.city].filter(Boolean).join(', ');
   return (
-    <div className="flex flex-col gap-3">
-      <Link href="/studio/clients" onClick={(e) => {
-        if (window.history.length > 1) {
-          e.preventDefault();
-          router.back();
-        }
-      }} className="inline-flex w-fit items-center gap-1 text-[13px] text-[var(--s-ink-3)] no-underline hover:text-[var(--s-ink)]">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <Link
+        href="/studio/clients"
+        onClick={(e) => {
+          if (window.history.length > 1) {
+            e.preventDefault();
+            router.back();
+          }
+        }}
+        className="cl-back"
+      >
         {icon('M15 18l-6-6 6-6')}
-        Leads
+        Clients
       </Link>
 
-      <div className="s-card px-5 py-[18px]">
-        <div className="mb-3.5 flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--s-rule)] px-2.5 py-1 text-[12px] font-medium">
-            <SourceIcon source={lead.source} label={lead.sourceLabel} />
-            {lead.sourceLabel}
-          </span>
-          {lead.tags.slice(0, 4).map((t) => (
-            <PillTag key={t} tag={t} />
-          ))}
-          {lead.tags.length > 4 ? <span className="text-[12px] text-[var(--s-ink-3)]" title={lead.tags.slice(4).join(', ')}>+{lead.tags.length - 4}</span> : null}
-          {may.edit ? (
-            <div className="ml-auto flex flex-wrap items-center gap-2">
-              {whatsapp ? (
-                <a href={whatsapp} target="_blank" rel="noopener noreferrer" className={btnOutline} title={`Opens your own WhatsApp chat with ${lead.name}. We send nothing.`}>
-                  {icon('M3 21l1.6-4.7A8.5 8.5 0 1 1 8 19.6z', 'text-[var(--s-good)]')}
-                  WhatsApp
+      <div className="cl-lhead">
+        <span className="av big" aria-hidden>
+          {initials(lead.name) ?? '?'}
+        </span>
+        <div className="who">
+          <h1>{lead.name}</h1>
+          <div className="hstack muted" style={{ gap: 8 }}>
+            {lead.phone ? (
+              tel ? (
+                <a href={tel} className="mono" style={{ color: 'var(--text2)' }} title="Call">
+                  {lead.phone}
                 </a>
-              ) : null}
-              <Menu label="Log call" iconPath="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" disabled={pending}>
-                {(close) =>
-                  CALL_OUTCOMES.map((o) => (
-                    <MenuItem
-                      key={o.id}
-                      onClick={() => {
-                        close();
-                        logCall(o.id);
-                      }}
-                    >
-                      {o.label}
-                    </MenuItem>
-                  ))
-                }
-              </Menu>
-              <button type="button" onClick={() => goTo('notes', 'note-input')} className={btnOutline} title="Add internal note">
-                {icon('M5 4h14v12l-4 4H5zM15 20v-4h4M8 9h8M8 13h5')}
-                Note
-              </button>
-              <button type="button" onClick={() => goTo('tags', 'tag-input')} className={btnOutline} title="Add a tag">
-                {icon('M20 12l-8 8-8-8V4h8zM8 8h.01')}
-                Tag
-              </button>
-              <Menu label="Action" iconPath="M12 5v14M5 12h14" primary disabled={pending}>
-                {(close) => (
-                  <>
-                    <MenuItem
-                      onClick={() => {
-                        close();
-                        window.location.hash = 'schedule-call';
-                        goTo('next');
-                      }}
-                    >
-                      Schedule a call
-                    </MenuItem>
-                    {may.quote ? (
-                      <MenuItem
-                        onClick={() => {
-                          close();
-                          act(() => newQuoteForLeadAction(lead.id), 'Quotation started');
-                        }}
-                      >
-                        Send quotation
-                      </MenuItem>
-                    ) : null}
-                    <MenuItem
-                      onClick={() => {
-                        close();
-                        goTo('meeting');
-                      }}
-                    >
-                      Schedule site visit
-                    </MenuItem>
-                  </>
-                )}
-              </Menu>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="flex items-start gap-3">
-          <Avatar name={lead.name} size={44} />
-          <div className="min-w-0 flex-1">
-            <h1 className="m-0 text-[19px] font-bold tracking-tight">{lead.name}</h1>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-[var(--s-ink-3)]">
-              {lead.phone ? (
-                tel ? (
-                  <a href={tel} className="s-num inline-flex items-center gap-1.5 text-[var(--s-ink-2)] no-underline hover:underline" title="Call">
-                    {icon('M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2')}
-                    {lead.phone}
-                  </a>
-                ) : (
-                  <span className="s-num">{lead.phone}</span>
-                )
               ) : (
-                <span className="text-[var(--s-warn)]">No phone captured yet</span>
-              )}
-              {lead.email ? <span>{lead.email}</span> : null}
-              {lead.society || lead.locality || lead.city ? <span>{[lead.society, lead.locality, lead.city].filter(Boolean).join(', ')}</span> : null}
-            </div>
+                <span className="mono">{lead.phone}</span>
+              )
+            ) : (
+              <span className="warn-t">No phone captured yet</span>
+            )}
+            {lead.email ? <span>· {lead.email}</span> : null}
+            {home ? <span>· {home}</span> : null}
+            <span className={`chip xs ${lead.source === 'ONE_INTERIORS' ? 'oi' : ''}`}>
+              <SourceIcon source={lead.source} label={lead.sourceLabel} />
+              {lead.sourceLabel}
+            </span>
+            {lead.tags.slice(0, 4).map((t) => (
+              <PillTag key={t} tag={t} />
+            ))}
+            {lead.tags.length > 4 ? (
+              <span className="sm" title={lead.tags.slice(4).join(', ')}>
+                +{lead.tags.length - 4}
+              </span>
+            ) : null}
           </div>
         </div>
-
-        <div className="mt-3.5 flex flex-wrap items-center gap-2">
+        <div className="acts">
+          {tel ? (
+            <a href={tel} className="btn sec">
+              <LineIcon name="phone" size={16} />
+              Call
+            </a>
+          ) : null}
+          {whatsapp ? (
+            <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="btn sec" title={`Opens your own WhatsApp chat with ${lead.name}. We send nothing.`}>
+              <LineIcon name="chat" size={16} />
+              WhatsApp
+            </a>
+          ) : null}
           {may.edit ? (
-            <Menu
-              label={
-                <span className="inline-flex items-center gap-1.5">
-                  <StageBadge name={lead.stageName} colour={lead.stageColour} />
-                </span>
-              }
-              plain
-              disabled={pending}
-            >
+            <Menu label={lead.stageName} stage disabled={pending}>
               {(close) =>
                 stages.map((s) => (
                   <MenuItem
@@ -232,55 +176,118 @@ export function LeadHeader({
                   >
                     <Dot colour={s.colour} />
                     {s.name}
-                    {s.id === lead.stageId ? <span className="ml-auto text-[var(--s-accent)]">✓</span> : null}
+                    {s.id === lead.stageId ? <span className="ok">✓</span> : null}
                   </MenuItem>
                 ))
               }
             </Menu>
           ) : (
-            <StageBadge name={lead.stageName} colour={lead.stageColour} />
+            <span className="btn" style={{ background: 'var(--acc-soft)', color: 'var(--acc-ink)', fontWeight: 600, cursor: 'default' }}>
+              {lead.stageName}
+            </span>
           )}
-          <span className={`inline-flex items-center gap-1.5 rounded-full border border-[var(--s-rule)] px-2.5 py-1 text-[12px] ${lead.ownerName ? '' : 'text-[var(--s-warn)]'}`} title={may.delete ? 'Change the owner in the panel on the right' : undefined}>
-            {icon('M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c0-4 3.6-6 8-6s8 2 8 6')}
-            {lead.ownerName ?? 'Unassigned'}
-          </span>
-          <div className="ml-auto flex items-center gap-2">
-            {lead.booked ? (
-              <span className={`${btnOutline} border-[var(--s-good)]/40 text-[var(--s-good)]`}>{icon('M5 12.5l4.5 4.5L19 7.5')}Converted</span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => (canBook ? goTo('booking') : setExplain((x) => !x))}
-                className={`${btnOutline} border-[var(--s-good)]/40 text-[var(--s-good)]`}
-              >
-                {icon('M5 12.5l4.5 4.5L19 7.5')}
-                Converted
-              </button>
-            )}
-            {may.delete ? (
-              sure ? (
-                <button type="button" disabled={pending} onClick={() => act(() => binAction([lead.id]), 'Deleted', () => router.push('/studio/clients'))} className={`${btnOutline} text-[var(--s-bad)]`}>
-                  Yes, delete
-                </button>
-              ) : (
-                <button type="button" onClick={() => setSure(true)} className={btnGhost} title="Delete lead" aria-label="Delete lead">
-                  {icon('M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3')}
-                </button>
-              )
-            ) : null}
-          </div>
         </div>
-        {explain ? (
-          <p className="m-0 mt-3 rounded-[10px] bg-[var(--s-surface-2)] px-3 py-2 text-[13px] text-[var(--s-ink-2)]">
-            Converted means the booking advance is recorded. Mark a quotation&rsquo;s sales final first; then Record booking appears below and turns this lead into a project.
-          </p>
+      </div>
+
+      <div className="hstack" style={{ gap: 8 }}>
+        {may.edit ? (
+          <>
+            <Menu label="Log call" iconPath="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" disabled={pending} left>
+              {(close) =>
+                CALL_OUTCOMES.map((o) => (
+                  <MenuItem
+                    key={o.id}
+                    onClick={() => {
+                      close();
+                      logCall(o.id);
+                    }}
+                  >
+                    {o.label}
+                  </MenuItem>
+                ))
+              }
+            </Menu>
+            <button type="button" onClick={() => goTo('notes', 'note-input')} className={btnOutline} title="Add internal note">
+              {icon('M5 4h14v12l-4 4H5zM15 20v-4h4M8 9h8M8 13h5')}
+              Note
+            </button>
+            <button type="button" onClick={() => goTo('tags', 'tag-input')} className={btnOutline} title="Add a tag">
+              {icon('M20 12l-8 8-8-8V4h8zM8 8h.01')}
+              Tag
+            </button>
+            <Menu label="Action" iconPath="M12 5v14M5 12h14" primary disabled={pending} left>
+              {(close) => (
+                <>
+                  <MenuItem
+                    onClick={() => {
+                      close();
+                      window.location.hash = 'schedule-call';
+                      goTo('next');
+                    }}
+                  >
+                    Schedule a call
+                  </MenuItem>
+                  {may.quote ? (
+                    <MenuItem
+                      onClick={() => {
+                        close();
+                        act(() => newQuoteForLeadAction(lead.id), 'Quotation started');
+                      }}
+                    >
+                      Send quotation
+                    </MenuItem>
+                  ) : null}
+                  <MenuItem
+                    onClick={() => {
+                      close();
+                      goTo('meeting');
+                    }}
+                  >
+                    Schedule site visit
+                  </MenuItem>
+                </>
+              )}
+            </Menu>
+          </>
         ) : null}
-        {said ? (
-          <p role={said.ok ? 'status' : 'alert'} className={`m-0 mt-2 text-[13px] ${said.ok ? 'text-[var(--s-good)]' : 'text-[var(--s-bad)]'}`}>
-            {said.text}
-          </p>
+        <span className={`chip ${lead.ownerName ? '' : 'warn'}`} title={may.delete ? 'Change the owner in the panel on the right' : undefined}>
+          {icon('M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c0-4 3.6-6 8-6s8 2 8 6')}
+          {lead.ownerName ?? 'Unassigned'}
+        </span>
+        <span style={{ flex: 1 }} />
+        {lead.booked ? (
+          <span className="chip good">
+            {icon('M5 12.5l4.5 4.5L19 7.5')}
+            Converted
+          </span>
+        ) : (
+          <button type="button" onClick={() => (canBook ? goTo('booking') : setExplain((x) => !x))} className="btn sm" style={{ background: 'var(--good-bg)', color: 'var(--good)' }}>
+            {icon('M5 12.5l4.5 4.5L19 7.5')}
+            Converted
+          </button>
+        )}
+        {may.delete ? (
+          sure ? (
+            <button type="button" disabled={pending} onClick={() => act(() => binAction([lead.id]), 'Deleted', () => router.push('/studio/clients'))} className="btn sec sm bad-b">
+              Yes, delete
+            </button>
+          ) : (
+            <button type="button" onClick={() => setSure(true)} className={btnGhost} title="Delete lead" aria-label="Delete lead">
+              {icon('M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3')}
+            </button>
+          )
         ) : null}
       </div>
+      {explain ? (
+        <p className="sm" style={{ margin: 0, padding: '10px 14px', borderRadius: 12, background: 'var(--soft)', color: 'var(--text2)' }}>
+          Converted means the booking advance is recorded. Mark a quotation&rsquo;s sales final first; then Record booking appears below and turns this lead into a project.
+        </p>
+      ) : null}
+      {said ? (
+        <p role={said.ok ? 'status' : 'alert'} className={said.ok ? 'cl-ok' : 'cl-err'}>
+          {said.text}
+        </p>
+      ) : null}
 
       {lostTo ? (
         <LostReasonDialog
@@ -295,12 +302,12 @@ export function LeadHeader({
       ) : null}
       {askWrong ? (
         <Modal onClose={() => setAskWrong(false)} width="min(420px, 92vw)" labelledBy="wrong-title">
-          <div className="px-5 py-4">
-            <h2 id="wrong-title" className="m-0 text-[16px] font-semibold">
+          <div className="sb">
+            <h2 id="wrong-title" style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>
               Wrong number. Mark {lead.name} lost?
             </h2>
-            <p className="m-0 mt-1 text-[13px] text-[var(--s-ink-2)]">Only if there is no other way to reach them. You can move it back any time.</p>
-            <div className="mt-4 flex justify-end gap-2">
+            <p className="cl-sub">Only if there is no other way to reach them. You can move it back any time.</p>
+            <div className="hstack" style={{ justifyContent: 'flex-end' }}>
               <button type="button" onClick={() => setAskWrong(false)} className={btnOutline}>
                 Keep it open
               </button>
@@ -315,20 +322,28 @@ export function LeadHeader({
   );
 }
 
-function Menu({ label, iconPath, children, primary, plain, disabled }: { label: React.ReactNode; iconPath?: string; children: (close: () => void) => React.ReactNode; primary?: boolean; plain?: boolean; disabled?: boolean }) {
+function Menu({ label, iconPath, children, primary, stage, left, disabled }: { label: React.ReactNode; iconPath?: string; children: (close: () => void) => React.ReactNode; primary?: boolean; stage?: boolean; left?: boolean; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useDismiss<HTMLDivElement>(open, () => setOpen(false));
   return (
-    <div ref={ref} className="relative inline-flex">
-      <button type="button" disabled={disabled} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={plain ? 'inline-flex items-center gap-1' : primary ? btnPrimary : btnOutline}>
+    <div ref={ref} className="cl-pop">
+      <button
+        type="button"
+        disabled={disabled}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className={stage ? 'btn' : primary ? btnPrimary : btnOutline}
+        style={stage ? { background: 'var(--acc-soft)', color: 'var(--acc-ink)', fontWeight: 600 } : undefined}
+      >
         {iconPath ? icon(iconPath) : null}
         {label}
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden className="opacity-60">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden style={{ opacity: 0.6 }}>
           <path d="M4 6l4 4 4-4" />
         </svg>
       </button>
       {open ? (
-        <div role="menu" className="absolute right-0 top-full z-50 mt-1 max-h-[22rem] min-w-[13rem] overflow-y-auto rounded-[10px] border border-[var(--s-rule)] bg-[var(--s-surface)] p-1 shadow-[var(--s-lift)]">
+        <div role="menu" className={`cl-menu ${left ? '' : 'r'}`} style={{ minWidth: 208 }}>
           {children(() => setOpen(false))}
         </div>
       ) : null}
@@ -338,13 +353,13 @@ function Menu({ label, iconPath, children, primary, plain, disabled }: { label: 
 
 function MenuItem({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
   return (
-    <button type="button" role="menuitem" onClick={onClick} className="flex w-full items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-left text-[13px] hover:bg-[var(--s-rail-active)]">
+    <button type="button" role="menuitem" onClick={onClick} className="cl-mi">
       {children}
     </button>
   );
 }
 
-/** Left column tabs (AxLeads: Timeline …). The panels are rendered on the server. */
+/** Left column tabs (Timeline, Floor plan and quotations, Tasks), the design's tabs. The panels are rendered on the server. */
 export function LeadTabs({ tabs }: { tabs: { key: string; label: string; content: React.ReactNode }[] }) {
   const [tab, setTab] = useState(tabs[0]?.key ?? '');
   useEffect(() => {
@@ -353,10 +368,10 @@ export function LeadTabs({ tabs }: { tabs: { key: string; label: string; content
     if (owner) setTab(owner.key);
   }, [tabs]);
   return (
-    <div>
-      <div role="tablist" className="mb-4 inline-flex rounded-[10px] border border-[var(--s-rule)] bg-[var(--s-surface)] p-1 text-[13px] font-medium">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+      <div role="tablist" className="tabs">
         {tabs.map((t) => (
-          <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)} className={`rounded-[7px] px-3 py-1.5 ${tab === t.key ? 'bg-[var(--s-accent)] text-white' : 'hover:bg-[var(--s-rail-active)]'}`}>
+          <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}>
             {t.label}
           </button>
         ))}
@@ -377,18 +392,18 @@ export function NotesPanel({ leadId, notes, meId, seesAll, may }: { leadId: stri
   const [draft, setDraft] = useState('');
   const { pending, result, run } = useAct();
   return (
-    <section id="notes" className="s-card mt-4 scroll-mt-20 p-4">
-      <h2 className="m-0 mb-3 text-[14.5px] font-semibold">Internal notes</h2>
-      {notes.length === 0 ? <p className="m-0 mb-3 text-[13px] text-[var(--s-ink-3)]">No notes yet.</p> : null}
-      <ul className="m-0 mb-3 flex list-none flex-col gap-2.5 p-0">
+    <section id="notes" className="card" style={{ scrollMarginTop: 80 }}>
+      <h2 className="h">Internal notes</h2>
+      {notes.length === 0 ? <p className="cl-sub">No notes yet.</p> : null}
+      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
         {notes.map((n) => {
           const mine = seesAll || (meId !== null && n.byId === meId);
           return (
-            <li key={n.id} className="rounded-[10px] bg-[var(--s-surface-2)] px-3 py-2.5 text-[13.5px]">
+            <li key={n.id} style={{ borderRadius: 12, background: 'var(--soft)', padding: '10px 12px' }}>
               {editing === n.id ? (
-                <div className="flex flex-col gap-2">
-                  <textarea rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} className="w-full resize-y rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-2.5 py-1.5" />
-                  <div className="flex gap-2">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <textarea rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} className="fld" />
+                  <div className="hstack" style={{ gap: 8 }}>
                     <button type="button" disabled={pending || !draft.trim()} onClick={() => run(() => editNoteAction(leadId, n.id, draft), (r) => r.ok && setEditing(null))} className={btnPrimary}>
                       Save
                     </button>
@@ -399,17 +414,17 @@ export function NotesPanel({ leadId, notes, meId, seesAll, may }: { leadId: stri
                 </div>
               ) : (
                 <>
-                  <p className="m-0 whitespace-pre-wrap">{n.text}</p>
-                  <div className="mt-1 flex items-center gap-2 text-[12px] text-[var(--s-ink-3)]">
+                  <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{n.text}</p>
+                  <div className="hstack muted" style={{ gap: 8, marginTop: 4, fontSize: 12.5 }}>
                     <span>
                       {n.by ?? 'Someone'} · {dayLabel(n.at)}
                     </span>
                     {may && mine ? (
                       <>
-                        <button type="button" onClick={() => { setEditing(n.id); setDraft(n.text); }} className="ml-auto underline">
+                        <button type="button" onClick={() => { setEditing(n.id); setDraft(n.text); }} className="btn xs" style={{ marginLeft: 'auto', background: 'transparent' }}>
                           Edit
                         </button>
-                        <button type="button" disabled={pending} onClick={() => run(() => deleteNoteAction(leadId, n.id))} className="underline text-[var(--s-bad)]">
+                        <button type="button" disabled={pending} onClick={() => run(() => deleteNoteAction(leadId, n.id))} className="btn xs bad-b" style={{ background: 'transparent' }}>
                           Delete
                         </button>
                       </>
@@ -422,8 +437,8 @@ export function NotesPanel({ leadId, notes, meId, seesAll, may }: { leadId: stri
         })}
       </ul>
       {may ? (
-        <div className="flex flex-col gap-2">
-          <textarea id="note-input" rows={2} value={text} onChange={(e) => setText(e.target.value)} placeholder="Add internal note" className="w-full resize-y rounded-[9px] border border-[var(--s-rule)] px-3 py-2 text-[13.5px]" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <textarea id="note-input" rows={2} value={text} onChange={(e) => setText(e.target.value)} placeholder="Add internal note" className="fld" />
           <div>
             <button type="button" disabled={pending || !text.trim()} onClick={() => run(() => addNoteAction(leadId, text.trim()), (r) => r.ok && setText(''))} className={btnPrimary}>
               Add internal note
@@ -444,21 +459,21 @@ export function FollowUpPanel({ leadId, action, on, createdAt, may }: { leadId: 
   const due = now && on ? dueBadge(on, now) : null;
   const when = on ? new Date(on).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' }).replace(',', ' ·') : null;
   return (
-    <section className="s-card p-4">
-      <h2 className="s-label m-0 mb-2">Follow-up</h2>
+    <section className="card">
+      <h2 className="h">Follow-up</h2>
       {on ? (
-        <label className="flex items-start gap-2 text-[13.5px]">
-          <input type="checkbox" disabled={!may || pending} onChange={() => run(() => followUpDoneAction(leadId))} className="mt-1" aria-label="Mark the follow-up done" />
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          <input type="checkbox" disabled={!may || pending} onChange={() => run(() => followUpDoneAction(leadId))} style={{ marginTop: 3 }} aria-label="Mark the follow-up done" />
           <span>
-            Next call: <span className="font-medium">{when}</span>
-            {action ? <span className="block text-[12.5px] text-[var(--s-ink-3)]">{action}</span> : null}
+            Next call: <span style={{ fontWeight: 600 }}>{when}</span>
+            {action ? <span className="muted sm" style={{ display: 'block' }}>{action}</span> : null}
           </span>
-          {due ? <span className="ml-auto"><PillDue bucket={due.bucket} label={due.label} /></span> : null}
+          {due ? <span style={{ marginLeft: 'auto' }}><PillDue bucket={due.bucket} label={due.label} /></span> : null}
         </label>
       ) : (
-        <p className="m-0 text-[13px] text-[var(--s-ink-3)]">No call scheduled.</p>
+        <p className="cl-sub">No call scheduled.</p>
       )}
-      <p className="m-0 mt-2 text-[12px] text-[var(--s-ink-3)]">Created {dayLabel(createdAt)}</p>
+      <p className="cl-sub">Created {dayLabel(createdAt)}</p>
       <Said result={result} />
     </section>
   );
@@ -471,15 +486,15 @@ export function TagsPanel({ leadId, tags, vocab, may }: { leadId: string; tags: 
   const suggestions = text ? suggestTags(vocab, text, tags, 6) : [];
   const add = (t: string) => run(() => addTagsAction(leadId, [t]), (r) => r.ok && setText(''));
   return (
-    <section id="tags" className="s-card scroll-mt-20 p-4">
-      <h2 className="s-label m-0 mb-2">Tags</h2>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {tags.length === 0 ? <span className="text-[13px] text-[var(--s-ink-3)]">No tags.</span> : null}
+    <section id="tags" className="card" style={{ scrollMarginTop: 80 }}>
+      <h2 className="h">Tags</h2>
+      <div className="hstack" style={{ gap: 6 }}>
+        {tags.length === 0 ? <span className="cl-sub">No tags.</span> : null}
         {tags.map((t) => (
-          <span key={t} className="inline-flex items-center gap-1 rounded-[7px] border border-[#7a4fa0]/30 bg-[#7a4fa0]/10 px-2 py-0.5 text-[12px] font-semibold text-[#6a3f90]">
+          <span key={t} className='chip tag' style={{ maxWidth: 'none' }}>
             #{t}
             {may ? (
-              <button type="button" aria-label={`Remove tag ${t}`} disabled={pending} onClick={() => run(() => removeTagAction(leadId, t))} className="opacity-70 hover:opacity-100">
+              <button type="button" aria-label={`Remove tag ${t}`} disabled={pending} onClick={() => run(() => removeTagAction(leadId, t))} style={{ border: 0, background: 'transparent', cursor: 'pointer', color: 'inherit', padding: 0 }}>
                 ×
               </button>
             ) : null}
@@ -488,17 +503,17 @@ export function TagsPanel({ leadId, tags, vocab, may }: { leadId: string; tags: 
       </div>
       {may ? (
         <form
-          className="relative mt-2"
+          style={{ position: 'relative' }}
           onSubmit={(e) => {
             e.preventDefault();
             if (text.trim()) add(text);
           }}
         >
-          <input id="tag-input" value={text} onChange={(e) => setText(e.target.value)} placeholder="Add a tag" maxLength={40} className="h-[32px] w-full rounded-[8px] border border-[var(--s-rule)] px-2.5 text-[13px]" />
+          <input id="tag-input" value={text} onChange={(e) => setText(e.target.value)} placeholder="Add a tag" maxLength={40} className="fld sm" style={{ width: '100%' }} />
           {suggestions.length > 0 ? (
-            <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-[9px] border border-[var(--s-rule)] bg-[var(--s-surface)] p-1 shadow-[var(--s-lift)]">
+            <div className="cl-menu" style={{ right: 0 }}>
               {suggestions.map((s) => (
-                <button key={s} type="button" onClick={() => add(s)} className="block w-full rounded-[6px] px-2 py-1 text-left text-[13px] hover:bg-[var(--s-rail-active)]">
+                <button key={s} type="button" onClick={() => add(s)} className="cl-mi">
                   #{s}
                 </button>
               ))}
@@ -514,13 +529,13 @@ export function TagsPanel({ leadId, tags, vocab, may }: { leadId: string; tags: 
 /** Attribution (AxLeads): where the lead came from. */
 export function Attribution({ source, sourceLabel, note }: { source: string; sourceLabel: string; note: string | null }) {
   return (
-    <section className="s-card p-4">
-      <h2 className="s-label m-0 mb-2">Attribution</h2>
-      <div className="flex items-center gap-2 text-[13.5px]">
+    <section className="card">
+      <h2 className="h">Where they came from</h2>
+      <div className="hstack" style={{ gap: 8 }}>
         <SourceIcon source={source} label={sourceLabel} />
         <span>Source: {sourceLabel}</span>
       </div>
-      {note ? <p className="m-0 mt-1 text-[12.5px] text-[var(--s-ink-3)]">{note}</p> : null}
+      {note ? <p className="cl-sub">{note}</p> : null}
     </section>
   );
 }

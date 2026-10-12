@@ -1,12 +1,12 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { PageHead, PageBody } from '../../../StudioShell';
 import { formatINR } from '@/lib/money';
 import { quotesToCompare, STAGE_LABELS, totalsFor, type QuoteRow } from '@/modules/studio-quote/quotes';
 import { compareToIssued, type ChangeKind } from '@/modules/studio-quote/revision';
 import { PrintButton } from '../print/PrintButton';
 import { revisionPair } from '@/modules/studio-sales/revisions';
 import { comparable, revisionLabel, type RevisionTotals } from '@/modules/studio-sales/revision-rules';
+import '../../quotes.css';
 
 export const metadata: Metadata = {
   title: 'Compare quotations',
@@ -16,9 +16,9 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 const KIND: Record<Exclude<ChangeKind, 'UNCHANGED'>, { label: string; tone: string }> = {
-  ADDED: { label: 'New', tone: '!bg-[var(--s-good-wash)] !text-[var(--s-good)]' },
-  REMOVED: { label: 'Removed', tone: '!bg-[var(--s-bad-wash)] !text-[var(--s-bad)]' },
-  REPRICED: { label: 'Changed', tone: '!bg-[var(--s-warn-wash)] !text-[var(--s-warn)]' },
+  ADDED: { label: 'New', tone: 'good' },
+  REMOVED: { label: 'Removed', tone: 'bad' },
+  REPRICED: { label: 'Changed', tone: 'warn' },
 };
 
 const lineList = (q: QuoteRow) => q.lines.map((l) => ({ room: l.room, product: l.product, amountPaise: l.amountPaise }));
@@ -89,80 +89,94 @@ export default async function ComparePage({
   ];
 
   return (
-    <>
-      <PageHead
-        title={title}
-        sub={
-          <span className="s-num">
+    <main className="content qpage">
+      <div className="phead">
+        <div style={{ minWidth: 0 }}>
+          <h1>{title}</h1>
+          <p className="muted qsub mono">
             {left} → {right}
-          </span>
-        }
-        action={<PrintButton filename={`${title} ${left} vs ${right}`} />}
-      />
-      <PageBody>
-        <div className="flex flex-col gap-5">
-          <section className="s-card overflow-hidden">
-            <table className="w-full border-collapse text-[14px]">
-              <thead>
-                <tr className="bg-[var(--s-surface-2)] text-left">
-                  <th className="px-4 py-2.5 font-medium" />
-                  <th className="px-4 py-2.5 text-right font-medium">{left}</th>
-                  <th className="px-4 py-2.5 text-right font-medium">{right}</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Difference</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(([label, a, b]) => (
-                  <tr key={label} className={`border-t border-[var(--s-rule-soft)] ${label === 'Total' ? 'font-semibold' : ''}`}>
-                    <td className="px-4 py-2.5">{label}</td>
-                    <td className="s-num px-4 py-2.5 text-right">{money(a)}</td>
-                    <td className="s-num px-4 py-2.5 text-right">{money(b)}</td>
-                    <td className="s-num px-4 py-2.5 text-right">
-                      {b - a === 0 ? '—' : `${b - a > 0 ? '+' : '−'} ${formatINR(Math.abs(b - a))}`}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-
-          <p className="m-0 text-[14px] text-[var(--s-ink-2)]">
-            {summary.identical
-              ? 'No line has changed.'
-              : `${summary.addedCount} new, ${summary.repricedCount} changed, ${summary.removedCount} removed.`}
           </p>
+        </div>
+        <PrintButton filename={`${title} ${left} vs ${right}`} />
+      </div>
 
-          {rooms.map((room) => (
-            <section key={room} className="s-card overflow-hidden">
-              <h2 className="m-0 bg-[var(--s-accent)] px-4 py-2 text-[13.5px] font-semibold uppercase tracking-[0.06em] text-white">
-                {room}
-              </h2>
-              <ul className="m-0 flex list-none flex-col p-0">
+      <section className="card flush">
+        <div className="tscroll">
+          <table className="tbl" style={{ minWidth: 560 }}>
+            <thead>
+              <tr>
+                <th scope="col">
+                  <span className="sr-only">Figure</span>
+                </th>
+                <th scope="col" style={{ textAlign: 'right' }}>
+                  {left}
+                </th>
+                <th scope="col" style={{ textAlign: 'right' }}>
+                  {right}
+                </th>
+                <th scope="col" style={{ textAlign: 'right' }}>
+                  Difference
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(([label, a, b]) => (
+                <tr key={label} style={label === 'Total' ? { fontWeight: 600 } : undefined}>
+                  <td>{label}</td>
+                  <td className="mono" style={{ textAlign: 'right' }}>
+                    {money(a)}
+                  </td>
+                  <td className="mono" style={{ textAlign: 'right' }}>
+                    {money(b)}
+                  </td>
+                  <td className="mono" style={{ textAlign: 'right' }}>
+                    {b - a === 0 ? '—' : `${b - a > 0 ? '+' : '−'} ${formatINR(Math.abs(b - a))}`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <p className="muted" style={{ margin: 0 }}>
+        {summary.identical
+          ? 'No line has changed.'
+          : `${summary.addedCount} new, ${summary.repricedCount} changed, ${summary.removedCount} removed.`}
+      </p>
+
+      {rooms.map((room) => (
+        <section key={room} className="card flush">
+          <div className="chead">
+            <h2>{room}</h2>
+          </div>
+          <div className="tscroll">
+            <table className="tbl" style={{ minWidth: 560 }}>
+              <tbody>
                 {moved
                   .filter((c) => c.room === room)
                   .map((c) => {
                     const k = KIND[c.kind as Exclude<ChangeKind, 'UNCHANGED'>];
                     return (
-                      <li
-                        key={`${c.room}|${c.product}`}
-                        className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-[var(--s-rule-soft)] px-4 py-2.5 last:border-b-0"
-                      >
-                        <span className={`s-tag flex-none ${k.tone}`}>{k.label}</span>
-                        <span className="min-w-0 flex-1 text-[14px]">{c.product}</span>
-                        <span className="s-num text-[13.5px] text-[var(--s-ink-3)]">
+                      <tr key={`${c.room}|${c.product}`}>
+                        <td style={{ width: 110 }}>
+                          <span className={`chip ${k.tone}`}>{k.label}</span>
+                        </td>
+                        <td>{c.product}</td>
+                        <td className="mono muted" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                           {c.wasPaise > 0 ? formatINR(c.wasPaise) : '—'} → {c.nowPaise > 0 ? formatINR(c.nowPaise) : '—'}
-                        </span>
-                        <span className="s-num w-[7.5rem] text-right text-[13.5px] font-medium">
+                        </td>
+                        <td className="mono" style={{ textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 500, width: 140 }}>
                           {c.deltaPaise > 0 ? '+' : '−'} {formatINR(Math.abs(c.deltaPaise))}
-                        </span>
-                      </li>
+                        </td>
+                      </tr>
                     );
                   })}
-              </ul>
-            </section>
-          ))}
-        </div>
-      </PageBody>
-    </>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ))}
+    </main>
   );
 }

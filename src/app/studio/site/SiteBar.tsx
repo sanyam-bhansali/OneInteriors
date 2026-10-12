@@ -24,21 +24,11 @@ export function SiteBar({ lang }: { lang: Lang }) {
   ];
   return (
     <>
-      <div aria-hidden="true" className="h-[76px]" />
-      <nav
-        aria-label="Site mode"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--s-rule)] bg-[var(--s-surface)] pb-[env(safe-area-inset-bottom)]"
-      >
-        <div className="mx-auto grid max-w-[560px] grid-cols-3">
+      <div aria-hidden="true" style={{ height: 84 }} />
+      <nav aria-label="Site mode" className="st-bar">
+        <div>
           {tabs.map((tab) => (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              aria-current={tab.on ? 'page' : undefined}
-              className={`flex min-h-[60px] flex-col items-center justify-center gap-1 text-[13px] no-underline ${
-                tab.on ? 'font-semibold text-[var(--s-accent)]' : 'font-medium text-[var(--s-ink-2)]'
-              }`}
-            >
+            <Link key={tab.href} href={tab.href} aria-current={tab.on ? 'page' : undefined} className="st-tab">
               {tab.icon}
               {tab.label}
             </Link>

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { formatINR } from '@/lib/money';
 import { crewToday } from '@/modules/studio-crews/store';
+import '../office-ui.css';
 
 const day = (iso: string | null) => (iso ? new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : null);
 
@@ -13,20 +14,25 @@ const day = (iso: string | null) => (iso ? new Date(`${iso}T00:00:00Z`).toLocale
 export async function CrewToday() {
   const t = await crewToday();
   if (!t || (t.toMeasure.length === 0 && t.toMarkDone.length === 0 && t.toPay.length === 0)) return null;
-  const li = 'flex flex-wrap items-baseline justify-between gap-2 border-t border-[var(--s-rule)] py-2 text-[13.5px] first:border-t-0';
+  const li = 'ox-crow';
   return (
-    <section className="s-card flex flex-col gap-3 p-5" aria-label="Crews">
-      <h2 className="m-0 text-[15.5px] font-semibold">Crews</h2>
+    <section className="card" aria-labelledby="h-crews-today" style={{ gap: 10 }}>
+      <div className="chead">
+        <h2 id="h-crews-today">Crews</h2>
+        <Link href="/studio/vendors/pay" className="sm acc-t" style={{ fontWeight: 600 }}>
+          Pay crews
+        </Link>
+      </div>
       {t.toMarkDone.length ? (
         <div>
-          <p className="s-label m-0 mb-1">Mark the work done</p>
-          <ul className="m-0 list-none p-0">
+          <span className="lbl">Mark the work done</span>
+          <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
             {t.toMarkDone.map((x) => (
               <li key={`${x.projectId}-${x.number}`} className={li}>
                 <span>
-                  {x.crewName} · WO-{x.number} · {x.projectName} <span className="text-[12.5px] text-[var(--s-ink-3)]">· its steps are all ticked</span>
+                  {x.crewName} · <span className="mono">WO-{x.number}</span> · {x.projectName} <span className="muted sm">· its steps are all ticked</span>
                 </span>
-                <Link href={`/studio/projects/${x.projectId}?tab=crews`} className="text-[13px] text-[var(--s-accent)]">
+                <Link href={`/studio/projects/${x.projectId}?tab=crews`} className="btn ghost sm">
                   Open
                 </Link>
               </li>
@@ -36,14 +42,14 @@ export async function CrewToday() {
       ) : null}
       {t.toMeasure.length ? (
         <div>
-          <p className="s-label m-0 mb-1">Lines to measure</p>
-          <ul className="m-0 list-none p-0">
+          <span className="lbl">Lines to measure</span>
+          <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
             {t.toMeasure.map((x) => (
               <li key={x.projectId} className={li}>
                 <span>
                   {x.projectName} · {x.lines} line{x.lines === 1 ? '' : 's'} with no quantity
                 </span>
-                <Link href={`/studio/projects/${x.projectId}?tab=crews`} className="text-[13px] text-[var(--s-accent)]">
+                <Link href={`/studio/projects/${x.projectId}?tab=crews`} className="btn ghost sm">
                   Enter quantities
                 </Link>
               </li>
@@ -53,17 +59,19 @@ export async function CrewToday() {
       ) : null}
       {t.toPay.length ? (
         <div>
-          <p className="s-label m-0 mb-1">Crews to pay</p>
-          <ul className="m-0 list-none p-0">
+          <span className="lbl">Crews to pay</span>
+          <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
             {t.toPay.slice(0, 12).map((x) => (
               <li key={x.id} className={li}>
                 <span>
                   {x.crewName} · {x.projectName}{' '}
-                  <span className="text-[12.5px] text-[var(--s-ink-3)]">· {x.workDone ? 'work done' : `due ${day(x.dueOn)}`}</span>
+                  <span className="muted sm">· {x.workDone ? 'work done' : `due ${day(x.dueOn)}`}</span>
                 </span>
-                <span className="flex items-center gap-3">
-                  <span className="s-num font-[family-name:var(--font-mono)] font-semibold">{formatINR(x.balancePaise)}</span>
-                  <Link href={`/studio/vendors/orders/${x.id}`} className="text-[13px] text-[var(--s-accent)]">
+                <span className="hstack" style={{ gap: 10, flexWrap: 'nowrap' }}>
+                  <b className="mono" style={{ fontWeight: 600 }}>
+                    {formatINR(x.balancePaise)}
+                  </b>
+                  <Link href={`/studio/vendors/orders/${x.id}`} className="btn pri sm">
                     Pay
                   </Link>
                 </span>

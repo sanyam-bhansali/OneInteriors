@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { PageBody } from '../StudioShell';
+import { mayOpen } from '@/modules/studio/surfaces';
+import { LineIcon } from '../ui/icons';
+import './clients.css';
 import { myStages } from '@/modules/studio-practice/stages';
 import { myFields } from '@/modules/studio-practice/fields';
 import { myViews } from '@/modules/studio-practice/saved-views';
@@ -15,7 +17,7 @@ import { taskPeople } from '@/modules/studio-sales/tasks';
 import { AddLeadButton } from './Board';
 import { AxBoard } from './AxBoard';
 import { AxList } from './AxList';
-import { KpiCards, OwnerPicker, Toolbar, ViewToggle } from './LeadsControls';
+import { KpiCards, OwnerPicker, SourceTabs, Toolbar, ViewToggle } from './LeadsControls';
 import { StaleReview } from './StaleReview';
 
 export const metadata: Metadata = {
@@ -46,9 +48,12 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   const scope = await myLeadScope();
   if (!scope) {
     return (
-      <PageBody>
-        <p className="m-0 text-[15px] text-[var(--s-ink-2)]">Leads are for the people who work them. Ask your studio owner if you should see them.</p>
-      </PageBody>
+      <main className="content cl-page">
+        <div className="empty">
+          <b>Clients are for the people who work them.</b>
+          <span className="muted">Ask your studio owner if you should see them.</span>
+        </div>
+      </main>
     );
   }
 
@@ -87,78 +92,97 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   const stageList = stages.map((s) => ({ id: s.id, name: s.name, colour: s.colour, kind: s.kind }));
   const boardStages = boardColumnPlan(stageList, filters.stage).shown;
 
+  const mayImport = mayOpen(scope.member, '/studio/clients/import');
+  const title = poolView ? 'The pool' : seesAll ? 'Clients' : 'My leads';
+  const sub = poolView
+    ? 'Leads nobody has yet. Claim one and it is yours.'
+    : seesAll
+      ? 'Everyone who has ever called, walked in or come from us, in one list. They stay yours.'
+      : 'Only the leads assigned to you. Call, WhatsApp and log the outcome from any card.';
+
   return (
-    <PageBody>
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="m-0 text-[22px] font-semibold tracking-tight">{poolView ? 'The pool' : seesAll ? 'Leads' : 'My leads'}</h1>
-            {seesAll ? <OwnerPicker query={query} view={view} sort={sort} members={members} meId={scope.member.id} /> : null}
-            {!seesAll ? (
-              <Link href={poolView ? '/studio/clients' : '/studio/clients/pool'} className="text-[13px] text-[var(--s-accent)]">
-                {poolView ? '← My leads' : 'The pool — claim leads'}
-              </Link>
-            ) : null}
-          </div>
-          <div className="flex items-center gap-2">
-            {!poolView ? <ViewToggle query={listQuery} view={view} sort={sort} /> : null}
-            <AddLeadButton fields={fields} sources={sources} />
-          </div>
+    <main className="content cl-page">
+      <div className="phead">
+        <div>
+          <h1>
+            {title} <span className="mono n">{(view === 'list' ? listTotal : total).toLocaleString('en-IN')}</span>
+          </h1>
+          <p className="muted">{sub}</p>
         </div>
-
-        {!poolView && kpis.stale > 0 ? <StaleReview count={kpis.stale} query={query} /> : null}
-
-        <KpiCards kpis={kpis} query={query} view={view} sort={sort} />
-
-        <Toolbar
-          query={query}
-          view={view}
-          sort={sort}
-          kpis={kpis}
-          stages={stageList}
-          sources={sources.map((s) => ({ id: s.id, name: s.name }))}
-          tags={facets.tags}
-          groups={groupFields.map((g) => ({ key: g.key, label: g.label, values: facets.groups[g.key] ?? [] }))}
-          views={views}
-        />
-
-        {list ? (
-          <AxList
-            rows={list.rows}
-            next={list.next}
-            total={listTotal}
-            query={listQuery}
-            stages={stageList}
-            fields={fields.map((f) => ({ key: f.key, label: f.label }))}
-            actions={bulkActionsFor(scope.member)}
-            people={people}
-            seesAll={seesAll}
-            poolView={poolView}
-          />
-        ) : null}
-
-        {columns ? (
-          <AxBoard
-            stages={boardStages}
-            counts={counts}
-            initial={columns}
-            query={query}
-            showOwner={seesAll && (!filters.owner || filters.owner === 'anyone')}
-            meId={scope.member.id}
-            mayMove={!poolView}
-          />
-        ) : null}
-
-        {seesAll ? (
-          <p className="m-0 mt-4 text-[13px] text-[var(--s-ink-3)]">
-            <Link href="/studio/clients/bin" className="underline">
-              Deleted leads
-            </Link>{' '}
-            · Board cards load {VIEW_PAGE} at a time per column.
-          </p>
-        ) : null}
+        <div className="hstack">
+          {seesAll ? <OwnerPicker query={query} view={view} sort={sort} members={members} meId={scope.member.id} /> : null}
+          {!seesAll ? (
+            <Link href={poolView ? '/studio/clients' : '/studio/clients/pool'} className="btn sec">
+              {poolView ? 'Back to my leads' : 'The pool, claim leads'}
+            </Link>
+          ) : null}
+          {mayImport ? (
+            <Link href="/studio/clients/import" className="btn sec">
+              <LineIcon name="upload" size={17} />
+              Import CSV
+            </Link>
+          ) : null}
+          <AddLeadButton fields={fields} sources={sources} />
+        </div>
       </div>
-    </PageBody>
+
+      {!poolView && kpis.stale > 0 ? <StaleReview count={kpis.stale} query={query} /> : null}
+
+      <KpiCards kpis={kpis} query={query} view={view} sort={sort} />
+
+      <Toolbar
+        query={query}
+        view={view}
+        sort={sort}
+        kpis={kpis}
+        stages={stageList}
+        sources={sources.map((s) => ({ id: s.id, name: s.name }))}
+        tags={facets.tags}
+        groups={groupFields.map((g) => ({ key: g.key, label: g.label, values: facets.groups[g.key] ?? [] }))}
+        views={views}
+        lead={
+          poolView ? null : (
+            <>
+              <ViewToggle query={listQuery} view={view} sort={sort} />
+              <SourceTabs query={query} view={view} sort={sort} />
+            </>
+          )
+        }
+      />
+
+      {list ? (
+        <AxList
+          rows={list.rows}
+          next={list.next}
+          total={listTotal}
+          query={listQuery}
+          stages={stageList}
+          fields={fields.map((f) => ({ key: f.key, label: f.label }))}
+          actions={bulkActionsFor(scope.member)}
+          people={people}
+          seesAll={seesAll}
+          poolView={poolView}
+        />
+      ) : null}
+
+      {columns ? (
+        <AxBoard
+          stages={boardStages}
+          counts={counts}
+          initial={columns}
+          query={query}
+          showOwner={seesAll && (!filters.owner || filters.owner === 'anyone')}
+          meId={scope.member.id}
+          mayMove={!poolView}
+        />
+      ) : null}
+
+      {seesAll ? (
+        <p className="cl-foot">
+          Stages are yours to rename in Settings. <Link href="/studio/clients/bin">Deleted clients</Link> · Board cards load {VIEW_PAGE} at a time per column.
+        </p>
+      ) : null}
+    </main>
   );
 }
 

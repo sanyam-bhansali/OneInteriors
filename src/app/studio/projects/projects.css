@@ -1,0 +1,411 @@
+/* Projects app (owner's UI handoff, 12 Oct 2026): StudioProjects,
+   StudioProject, StudioDecision and their designer / PM versions. Only the
+   classes these screens add on top of studio-ui.css; tokens only, every rule
+   under .oi-studio. Imported by the projects, design and updates pages. */
+
+/* ── The list: needs attention today and the stage board ─────────────── */
+.oi-studio .attn {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+}
+.oi-studio .attn a {
+  background: var(--paper);
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.oi-studio .attn a:hover {
+  color: var(--ink);
+}
+.oi-studio .board {
+  display: grid;
+  grid-template-columns: repeat(var(--lanes, 5), minmax(230px, 1fr));
+  gap: 14px;
+  overflow-x: auto;
+  align-items: start;
+  padding-bottom: 4px;
+}
+.oi-studio .colh {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.oi-studio .colh .mono {
+  margin-left: auto;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.oi-studio .lane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 16px;
+  background: var(--fill2);
+  min-height: 200px;
+}
+.oi-studio .pcard {
+  background: var(--paper);
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 1px 0 var(--line);
+}
+.oi-studio .pcard:hover {
+  box-shadow: 0 0 0 1.5px var(--acc);
+  color: var(--ink);
+}
+.oi-studio .pbar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--fill2);
+  overflow: hidden;
+}
+.oi-studio .pbar i {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+  border-radius: 3px;
+}
+
+/* ── The workspace: head, pill tabs, side cards ──────────────────────── */
+.oi-studio .wshead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+.oi-studio .wshead h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+.oi-studio .back {
+  font-size: 14px;
+  color: var(--muted);
+}
+.oi-studio .back:hover {
+  color: var(--acc);
+}
+.oi-studio .wsbtn {
+  min-height: 44px;
+  padding: 0 18px;
+  font-size: 14.5px;
+}
+.oi-studio .wsbtn.paper {
+  background: var(--paper);
+  color: var(--ink);
+}
+.oi-studio .ptabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.oi-studio .ptabs a {
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: 14.5px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  white-space: nowrap;
+}
+.oi-studio .ptabs a[aria-selected='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+.oi-studio .ptabs a .mono {
+  font-size: 13px;
+  opacity: 0.75;
+}
+.oi-studio .wscols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-start;
+}
+.oi-studio .wsmain {
+  flex: 999 1 520px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.oi-studio .wsside {
+  flex: 1 1 300px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* The dark "What {client} sees right now" card (and the tick / move previews). */
+.oi-studio .oi-sees {
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 20px;
+}
+.oi-studio .oi-sees .oi-im,
+.oi-studio .oi-im {
+  color: var(--inv-muted);
+}
+.oi-studio .seescard {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.oi-studio .seescard .ttl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--inv-acc);
+}
+.oi-studio .seescard .ipill {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--inv-2);
+  font-size: 13px;
+  font-weight: 500;
+}
+.oi-studio .seescard .sect {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--inv-3);
+}
+.oi-studio .seescard .sect > .k {
+  font-size: 13px;
+  color: var(--inv-muted);
+}
+.oi-studio .seescard .sect > .v {
+  font-size: 15px;
+  line-height: 1.4;
+}
+.oi-studio .seescard .stg {
+  display: grid;
+  grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr));
+  gap: 4px;
+}
+.oi-studio .seescard .stg span {
+  height: 6px;
+  border-radius: 3px;
+}
+
+/* The grey "Only your team" box. */
+.oi-studio .teambox {
+  background: var(--fill);
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.oi-studio .sidecard {
+  background: var(--paper);
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.oi-studio .sidecard .t {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* ── The plan card: stage rows and steps ─────────────────────────────── */
+.oi-studio .oi-overall {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+.oi-studio .oi-prow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 12px;
+  font-size: 14px;
+  align-items: start;
+}
+.oi-studio .oi-prow-h {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 4px 16px 8px;
+}
+.oi-studio .oi-stage {
+  border-top: 1px solid var(--fill2);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.oi-studio .oi-stage.now {
+  background: var(--soft);
+}
+.oi-studio .oi-stage-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.oi-studio .oi-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.oi-studio .oi-ci {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-height: 36px;
+  font-size: 14px;
+  padding: 2px 4px;
+  border-radius: 10px;
+}
+.oi-studio .oi-ci:hover {
+  background: var(--paper);
+}
+.oi-studio .oi-box {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--paper);
+}
+@media (max-width: 767px) {
+  .oi-studio .oi-prow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .oi-studio .oi-prow-h {
+    display: none;
+  }
+}
+
+/* ── Fields in the projects app: the design's soft field ─────────────── */
+.oi-studio .oi-proj input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+.oi-studio .oi-proj select,
+.oi-studio .oi-proj textarea {
+  background: var(--fill);
+  border: 0;
+  border-radius: 10px;
+  color: var(--ink);
+}
+.oi-studio .oi-proj textarea {
+  padding: 10px 12px;
+  line-height: 1.45;
+}
+.oi-studio .oi-proj textarea.fld {
+  min-height: 84px;
+}
+.oi-studio .oi-proj input[type='checkbox'],
+.oi-studio .oi-proj input[type='radio'] {
+  accent-color: var(--acc);
+}
+.oi-studio .oi-proj dialog {
+  border: 0;
+  border-radius: 20px;
+}
+.oi-studio .oi-proj details > summary {
+  cursor: pointer;
+}
+
+.oi-studio .oi-proj .teambox textarea,
+.oi-studio .oi-proj .teambox .optcard input {
+  background: var(--paper);
+}
+
+/* The client's phone preview on a new decision (follows the theme). */
+.oi-studio .phonecard {
+  background: var(--paper);
+  border-radius: 24px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.oi-studio .phonecard .opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.oi-studio .optcard {
+  border-radius: 16px;
+  background: var(--fill);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.oi-studio .optcard .fld,
+.oi-studio .oi-proj .optcard input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='color']) {
+  background: var(--paper);
+}
+
+@media (max-width: 760px) {
+  .oi-studio .content.oi-proj {
+    padding: 18px 16px 40px;
+  }
+  .oi-studio .wshead h1 {
+    font-size: 26px;
+  }
+  .oi-studio .ptabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+}
+
+.oi-studio .oi-proj input[type='date'],
+.oi-studio .oi-proj input[type='time'] {
+  max-width: 220px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+.oi-studio .optgrid {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+}
+@media (max-width: 560px) {
+  .oi-studio .optgrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.oi-studio .oi-proj .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}

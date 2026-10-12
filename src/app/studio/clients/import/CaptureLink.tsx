@@ -65,39 +65,38 @@ export function CaptureLink({ slug, active }: { slug: string; active: boolean })
   }
 
   return (
-    <section className="mb-7 rounded-[12px] border border-[var(--s-rule)] px-4 py-4">
-      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className="m-0 text-[15px] font-semibold">Your enquiry link</h2>
+    <section className="card" style={{ maxWidth: '46rem' }}>
+      <div className="chead">
+        <h2>Your enquiry link</h2>
         <button
           type="button"
           onClick={toggle}
           disabled={pending}
           aria-pressed={on}
-          className="text-[13px] text-[var(--s-ink-3)] underline underline-offset-4 hover:text-[var(--s-ink)] disabled:opacity-50"
+          className="btn ghost sm"
         >
           {on ? 'Turn it off' : 'Turn it on'}
         </button>
       </div>
 
-      <p className="m-0 mb-3 max-w-[62ch] text-[13px] leading-relaxed text-[var(--s-ink-3)]">
+      <p className="muted sm" style={{ margin: 0, maxWidth: '62ch', lineHeight: 1.5 }}>
         Put this in your Instagram bio or on your own site. Anyone who fills it in lands on your
         board, in the pool, with a callback due the same day.
       </p>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="hstack" style={{ gap: 8 }}>
         <input
           readOnly
           value={url}
           onFocus={(e) => e.currentTarget.select()}
           aria-label="Your enquiry link"
-          className={`min-w-0 flex-1 rounded-[8px] border border-[var(--s-rule)] bg-transparent px-3 py-2 font-[family-name:var(--font-mono)] text-[13px] ${
-            on ? '' : 'opacity-50'
-          }`}
+          className="fld mono"
+          style={{ flex: 1, minWidth: 0, width: 'auto', opacity: on ? 1 : 0.5 }}
         />
         <button
           type="button"
           onClick={copy}
-          className="s-btn-ghost"
+          className="btn sec sm"
         >
           {copied ? 'Copied' : 'Copy'}
         </button>
@@ -105,14 +104,14 @@ export function CaptureLink({ slug, active }: { slug: string; active: boolean })
           href={url}
           target="_blank"
           rel="noreferrer"
-          className="rounded-[8px] px-3 py-2 text-[13px] font-medium text-[var(--s-ink-3)] no-underline hover:text-[var(--s-ink)]"
+          className="btn ghost sm"
         >
           Preview
         </a>
       </div>
 
       {!on ? (
-        <p className="m-0 mt-2.5 text-[12.5px] text-[var(--s-ink-3)]">
+        <p className="muted sm" style={{ margin: 0 }}>
           Switched off — the page tells visitors you have paused it rather than showing an error.
         </p>
       ) : null}

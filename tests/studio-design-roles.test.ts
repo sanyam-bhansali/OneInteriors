@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { can, projectsVisibleTo, needsAssignment } from '@/modules/studio/roles';
-import { DESIGN_HOME, homeFor, mayOpen, usesOffice, usesOfficeShell } from '@/modules/studio/surfaces';
+import { STUDIO_HOME, homeFor, mayOpen, usesOffice, usesOfficeShell } from '@/modules/studio/surfaces';
 import { roleCan, ROLE_NAMES } from '@/modules/studio/team-rules';
 
 /**
@@ -38,8 +38,8 @@ describe('what a designer may do', () => {
 });
 
 describe('where a designer works', () => {
-  it('lands on their design page, in the plain frame, not the office', () => {
-    expect(homeFor('DESIGNER')).toBe(DESIGN_HOME);
+  it('lands on the studio home (UI handoff), not in the office', () => {
+    expect(homeFor('DESIGNER')).toBe(STUDIO_HOME);
     expect(usesOffice(designer)).toBe(false);
     expect(usesOfficeShell(designer)).toBe(false);
   });

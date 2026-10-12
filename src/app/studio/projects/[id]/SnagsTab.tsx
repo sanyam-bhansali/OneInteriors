@@ -55,12 +55,12 @@ export async function SnagsTab({ projectId, now }: { projectId: string; now: Dat
   });
 
   return (
-    <section aria-label="Snags" className="s-card p-5">
+    <section aria-label="Snags" className="card p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="m-0 text-[16px] font-semibold">Snags</h2>
+        <h2 className="m-0 text-[17px] font-semibold">Snags</h2>
         <CustomerSees name={data.customerFirst} />
       </div>
-      <p className="m-0 mt-1 text-[12.5px] text-[var(--s-ink-3)]">
+      <p className="m-0 mt-1 text-[12.5px] text-[var(--muted)]">
         A snag closes only when {data.customerFirst} confirms the fix, or by itself 7 days after it. The last payment waits until every snag is closed.
       </p>
       <SnagInbox

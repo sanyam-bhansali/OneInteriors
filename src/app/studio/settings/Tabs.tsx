@@ -11,6 +11,9 @@ import { usePathname } from 'next/navigation';
  * made at unrelated times: branding is set once before the first quotation,
  * the pipeline gets edited in the first week and then rarely, fields get added
  * whenever a studio realises they keep writing the same thing in the notes.
+ *
+ * Drawn as the design's pill tabs (StudioTeam), with the page's own heading
+ * ("Settings" over the tab's name) under them.
  */
 const TABS = [
   { href: '/studio/settings', label: 'Your details' },
@@ -32,29 +35,36 @@ const CREWS_TAB = { href: '/studio/settings/trades', label: 'Crews and trades' }
 /** Team is the owner's alone (`team.manage`), so the tab is only drawn for them. */
 const TEAM_TAB = { href: '/studio/settings/team', label: 'Team' };
 
+const ALL = [...TABS, PAYMENTS_TAB, DESIGN_TAB, CREWS_TAB, TEAM_TAB];
+
 export function SettingsTabs({ team = false }: { team?: boolean }) {
   const pathname = usePathname();
-  const tabs = team ? [...TABS, PAYMENTS_TAB, DESIGN_TAB, CREWS_TAB, TEAM_TAB] : TABS;
+  const tabs = team ? [TEAM_TAB, ...TABS, PAYMENTS_TAB, DESIGN_TAB, CREWS_TAB] : TABS;
 
   return (
-    <nav className="flex gap-1 overflow-x-auto">
+    <nav className="tabs st-tabs" aria-label="Settings">
       {tabs.map((tab) => {
         const active = pathname === tab.href;
         return (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            aria-current={active ? 'page' : undefined}
-            className={`-mb-px flex-none border-b-2 px-3 py-2.5 text-[14px] no-underline transition-colors ${
-              active
-                ? 'border-[var(--s-accent)] font-medium text-[var(--s-ink)]'
-                : 'border-transparent text-[var(--s-ink-2)] hover:text-[var(--s-ink)]'
-            }`}
-          >
+          <Link key={tab.href} href={tab.href} aria-current={active ? 'page' : undefined}>
             {tab.label}
           </Link>
         );
       })}
     </nav>
+  );
+}
+
+/** "Settings" over the open tab's name, as the design's Team page has it. */
+export function SettingsTitle() {
+  const pathname = usePathname();
+  const tab = ALL.find((t) => t.href === pathname);
+  return (
+    <div className="phead">
+      <div>
+        <span className="eyebrow">Settings</span>
+        <h1>{tab?.label ?? 'Settings'}</h1>
+      </div>
+    </div>
   );
 }

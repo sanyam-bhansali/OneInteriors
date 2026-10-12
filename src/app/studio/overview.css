@@ -1,0 +1,14 @@
+/* The studio overview (/studio, the Today app's Overview tab), in the
+   owner's handoff (StudioHome). Uses today/today.css for the stat tiles and
+   the One Interiors card; these are its own rows and banner. Scoped to
+   .oi-studio; tokens only. */
+.oi-studio .ov-banner{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 16px;border-radius:14px;background:var(--acc-soft);color:var(--acc-ink);font-size:14px}
+.oi-studio .ov-row{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"who call" "next call";gap:2px 12px;align-items:center;padding:12px 4px;border-top:1px solid var(--soft)}
+.oi-studio .ov-row:first-child{border-top:0}
+.oi-studio .ov-row > .hstack{grid-area:who}
+.oi-studio .ov-row > .muted{grid-area:next}
+.oi-studio .ov-row > .ov-call{grid-area:call}
+@media (max-width:760px){
+  .oi-studio .ov-row{grid-template-columns:minmax(0,1fr);grid-template-areas:"who" "next" "call"}
+  .oi-studio .ov-row > .ov-call{justify-self:start;margin-top:6px}
+}

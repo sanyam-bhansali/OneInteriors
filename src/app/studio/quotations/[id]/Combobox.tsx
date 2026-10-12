@@ -157,10 +157,10 @@ export function Combobox({
   }
 
   return (
-    <div ref={box} className="relative flex flex-col gap-1">
-      <span className="s-label">{label}</span>
+    <div ref={box} className="qfield" style={{ position: 'relative' }}>
+      <span className="lbl">{label}</span>
 
-      <div className="relative">
+      <div style={{ position: 'relative' }}>
         <input
           value={text}
           role="combobox"
@@ -181,14 +181,16 @@ export function Combobox({
             setActive(0);
           }}
           onKeyDown={onKey}
-          className="w-full rounded-[7px] border border-[var(--s-rule)] bg-[var(--s-surface)] py-1.5 pl-2.5 pr-8 text-[13.5px] text-[var(--s-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]"
+          className="fld"
+          style={{ paddingRight: 34 }}
         />
         <ChevronDown
           size={15}
           strokeWidth={2}
           absoluteStrokeWidth
           aria-hidden
-          className={`pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--s-ink-3)] transition-transform ${open ? 'rotate-180' : ''}`}
+          className="muted"
+          style={{ position: 'absolute', right: 12, top: '50%', pointerEvents: 'none', transition: 'transform .2s', transform: `translateY(-50%)${open ? ' rotate(180deg)' : ''}` }}
         />
       </div>
 
@@ -196,7 +198,7 @@ export function Combobox({
         <ul
           id={listId}
           role="listbox"
-          className="s-card absolute left-0 right-0 top-full z-30 m-0 mt-1 flex max-h-[15rem] list-none flex-col overflow-y-auto p-1 shadow-lg"
+          className="pick float"
         >
           {matches.map((o, i) => (
             <li key={o.value} id={`${listId}-${i}`} role="option" aria-selected={o.value === value}>
@@ -207,22 +209,19 @@ export function Combobox({
                 onMouseDown={(e) => e.preventDefault()}
                 onMouseEnter={() => setActive(i)}
                 onClick={() => commit(i)}
-                className={`flex w-full items-baseline justify-between gap-3 rounded-[6px] px-2.5 py-1.5 text-left text-[13px] ${
-                  i === active ? 'bg-[var(--s-accent-wash)]' : ''
-                }`}
+                data-active={i === active}
+                style={{ display: 'flex', alignItems: 'baseline' }}
               >
-                <span className="min-w-0 flex-1 truncate">{o.label}</span>
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{o.label}</span>
                 {o.hint ? (
                   <span
-                    className={`s-num flex-none text-[11.5px] ${
-                      o.hintWarns ? 'text-[var(--s-warn)]' : 'text-[var(--s-ink-3)]'
-                    }`}
+                    className={`mono sm ${o.hintWarns ? 'warn-t' : 'muted'}`}
                   >
                     {o.hint}
                   </span>
                 ) : null}
                 {o.value === value ? (
-                  <Check size={13} strokeWidth={2.5} absoluteStrokeWidth className="flex-none text-[var(--s-accent)]" />
+                  <Check size={13} strokeWidth={2.5} absoluteStrokeWidth className="acc-t" />
                 ) : null}
               </button>
             </li>
@@ -235,12 +234,11 @@ export function Combobox({
                 onMouseDown={(e) => e.preventDefault()}
                 onMouseEnter={() => setActive(matches.length)}
                 onClick={() => commit(matches.length)}
-                className={`flex w-full items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-left text-[13px] ${
-                  active === matches.length ? 'bg-[var(--s-accent-wash)]' : ''
-                }`}
+                data-active={active === matches.length}
+                style={{ display: 'flex', alignItems: 'center' }}
               >
-                <Plus size={13} strokeWidth={2.5} absoluteStrokeWidth className="flex-none text-[var(--s-accent)]" />
-                <span className="min-w-0 truncate">
+                <Plus size={13} strokeWidth={2.5} absoluteStrokeWidth className="acc-t" />
+                <span style={{ minWidth: 0 }}>
                   {customHint ? customHint(typed) : `Use “${typed}”`}
                 </span>
               </button>
@@ -248,7 +246,7 @@ export function Combobox({
           ) : null}
 
           {rowCount === 0 ? (
-            <li className="px-2.5 py-2 text-[12.5px] leading-relaxed text-[var(--s-ink-3)]">
+            <li className="muted sm" style={{ padding: '10px 14px', lineHeight: 1.5 }}>
               {emptyNote ?? 'Nothing matches that.'}
             </li>
           ) : null}

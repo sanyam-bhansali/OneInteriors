@@ -36,17 +36,17 @@ export function PrintButton({ filename }: { filename: string }) {
       <button
         type="button"
         onClick={print}
-        className="rounded-[8px] bg-[#c0613c] px-4 py-2 text-[14px] font-medium text-white hover:bg-[#a44f2e]"
+        className="btn pri"
       >
         Print or save as PDF
       </button>
       <Link
         href="."
-        className="rounded-[8px] border border-[#d3d5c2] px-3.5 py-2 text-[13.5px] font-medium text-[#16181a] no-underline hover:border-[#838775]"
+        className="btn sec"
       >
         ← Back to the builder
       </Link>
-      <span className="text-[12.5px] text-[#5d6266]">
+      <span className="muted sm">
         In the print dialog choose &ldquo;Save as PDF&rdquo;. Nothing of ours appears on the page.
       </span>
     </div>

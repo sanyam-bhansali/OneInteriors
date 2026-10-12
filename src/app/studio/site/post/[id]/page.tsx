@@ -22,9 +22,9 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
   if (!r.ok) {
     if (r.error === 'not_yours' || r.error === 'gone') notFound();
     return (
-      <div className="flex flex-col gap-4 px-4 py-6">
-        <p className="s-card m-0 p-5 text-[16px] text-[var(--s-ink-2)]">{errorWords(t, r.error)}</p>
-        <Link href="/studio/site" className="text-[16px] text-[var(--s-accent)]">
+      <div className="st-page">
+        <p className="st-card st-line" style={{ margin: 0, fontSize: 16 }}>{errorWords(t, r.error)}</p>
+        <Link href="/studio/site" className="st-fill">
           {t('post.back')}
         </Link>
       </div>

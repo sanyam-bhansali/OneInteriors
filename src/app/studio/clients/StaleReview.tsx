@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LOST_LABELS, QUIET_AFTER_DAYS, type LostReasonName } from '@/modules/studio-practice/vocabulary';
-import { inputClass, primaryClass, quietClass } from '../SalesUi';
+import { LineIcon } from '../ui/icons';
 import { bulkMarkLostAction, bulkSnoozeAction, staleLeadsAction } from './list-actions';
 import { staleReviewQuery } from '@/modules/studio-sales/lead-filters';
 
@@ -106,32 +106,34 @@ export function StaleReview({ count, query }: { count: number; /** The page's fi
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 rounded-[12px] border border-[var(--s-warn)]/35 bg-[var(--s-warn-wash)] px-3.5 py-2.5 text-[13px]">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden className="flex-none text-[var(--s-warn)]">
-          <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2" />
-        </svg>
-        <span className="min-w-0 flex-1">
-          <b className="s-num">{count.toLocaleString('en-IN')}</b> {count === 1 ? 'lead needs' : 'leads need'} attention — no contact in {QUIET_AFTER_DAYS}+ days.
+      <div className="banner" role="status">
+        <LineIcon name="warn" size={19} />
+        <span style={{ flex: 1, minWidth: 220 }}>
+          <b>
+            {count.toLocaleString('en-IN')} {count === 1 ? "client hasn't" : "clients haven't"} heard from you in {QUIET_AFTER_DAYS} days.
+          </b>{' '}
+          Review them to follow up, snooze or close.
         </span>
-        <button type="button" className={quietClass} onClick={openReview}>
-          Review
+        <button type="button" className="btn sm" style={{ background: 'var(--warn)', color: 'var(--paper)' }} onClick={openReview}>
+          Show them
         </button>
       </div>
 
       {nudge && !open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 p-4 pt-[22vh]" onClick={dismissNudge}>
-          <div role="dialog" aria-modal="true" aria-labelledby="nudge-title" onClick={(e) => e.stopPropagation()} className="w-[min(420px,92vw)] rounded-[16px] bg-[var(--s-surface)] p-6 text-center shadow-[var(--s-lift)]">
-            <div className="mx-auto mb-3.5 grid h-12 w-12 place-items-center rounded-full bg-[var(--s-warn-wash)] text-[var(--s-warn)]">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2" />
-              </svg>
-            </div>
-            <h2 id="nudge-title" className="m-0 mb-1.5 text-[17px] font-bold">
-              {count.toLocaleString('en-IN')} leads need attention
+        <div className="overlay" style={{ paddingTop: '22vh' }}>
+          <button type="button" className="scrim" aria-label="Close, ask again tomorrow" onClick={dismissNudge} />
+          <div role="dialog" aria-modal="true" aria-labelledby="nudge-title" className="cl-sheet" style={{ width: 'min(420px, 100%)', textAlign: 'center', alignItems: 'center', padding: 24, gap: 10 }}>
+            <span className="evi" style={{ width: 48, height: 48, background: 'var(--warn-bg)', color: 'var(--warn)' }}>
+              <LineIcon name="warn" size={22} />
+            </span>
+            <h2 id="nudge-title" style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>
+              {count.toLocaleString('en-IN')} {count === 1 ? 'client needs' : 'clients need'} you
             </h2>
-            <p className="m-0 mb-5 text-[13.5px] text-[var(--s-ink-2)]">These leads have had no contact in {QUIET_AFTER_DAYS}+ days. Review them to follow up, snooze, or close.</p>
-            <div className="flex justify-center gap-2">
-              <button type="button" onClick={dismissNudge} className={quietClass}>
+            <p className="muted" style={{ margin: 0 }}>
+              No contact in {QUIET_AFTER_DAYS}+ days. Review them to follow up, snooze or close.
+            </p>
+            <div className="hstack" style={{ justifyContent: 'center', marginTop: 6 }}>
+              <button type="button" onClick={dismissNudge} className="btn sec">
                 Later
               </button>
               <button
@@ -140,7 +142,7 @@ export function StaleReview({ count, query }: { count: number; /** The page's fi
                   dismissNudge();
                   openReview();
                 }}
-                className={primaryClass}
+                className="btn pri"
               >
                 Review now
               </button>
@@ -150,19 +152,23 @@ export function StaleReview({ count, query }: { count: number; /** The page's fi
       ) : null}
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-labelledby="stale-title">
-          <div className="flex max-h-[88dvh] w-full max-w-[44rem] flex-col rounded-[16px] bg-[var(--s-surface)] shadow-[var(--s-lift)]">
-            <div className="flex items-baseline justify-between gap-3 border-b border-[var(--s-rule)] px-5 py-4">
-              <h2 id="stale-title" className="m-0 text-[16px] font-semibold">
-                Review stale leads <span className="text-[13px] font-normal text-[var(--s-ink-3)]">{total.toLocaleString('en-IN')} · no contact in {QUIET_AFTER_DAYS}+ days</span>
+        <div className="overlay" style={{ alignItems: 'center', padding: 16 }}>
+          <button type="button" className="scrim" aria-label="Close" onClick={() => setOpen(false)} />
+          <div className="cl-sheet" role="dialog" aria-modal="true" aria-labelledby="stale-title" style={{ maxWidth: 720 }}>
+            <div className="sh">
+              <h2 id="stale-title">
+                Clients gone quiet{' '}
+                <span className="muted sm" style={{ fontWeight: 400 }}>
+                  {total.toLocaleString('en-IN')} · no contact in {QUIET_AFTER_DAYS}+ days
+                </span>
               </h2>
-              <button type="button" onClick={() => setOpen(false)} className="text-[13px] text-[var(--s-ink-2)] underline">
+              <button type="button" onClick={() => setOpen(false)} className="btn ghost sm">
                 Close
               </button>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 px-5 py-2.5 text-[13px]">
-              <label className="flex items-center gap-1.5">
+            <div className="hstack sm" style={{ padding: '10px 18px', gap: 8 }}>
+              <label className="hstack" style={{ gap: 6 }}>
                 <input
                   type="checkbox"
                   checked={all}
@@ -173,15 +179,15 @@ export function StaleReview({ count, query }: { count: number; /** The page's fi
                 />
                 Select all {total.toLocaleString('en-IN')}
               </label>
-              <span className="text-[var(--s-ink-3)]">· {selected.toLocaleString('en-IN')} selected</span>
-              <Link href={`/studio/clients?view=list&${reviewQuery}`} className="ml-auto text-[var(--s-accent)]" onClick={() => setOpen(false)}>
+              <span className="muted">· {selected.toLocaleString('en-IN')} selected</span>
+              <Link href={`/studio/clients?view=list&${reviewQuery}`} className="cl-link" style={{ marginLeft: 'auto' }} onClick={() => setOpen(false)}>
                 Open as a list
               </Link>
             </div>
 
-            <ul className="m-0 flex min-h-0 flex-1 list-none flex-col overflow-y-auto border-y border-[var(--s-rule-soft)] p-0">
+            <ul className="cl-rows" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 18px', borderTop: '1px solid var(--fill2)', borderBottom: '1px solid var(--fill2)' }}>
               {rows.map((r) => (
-                <li key={r.id} className="flex items-center gap-3 border-b border-[var(--s-rule-soft)] px-5 py-2 text-[13.5px] last:border-b-0">
+                <li key={r.id}>
                   <input
                     type="checkbox"
                     aria-label={`Include ${r.name}`}
@@ -194,28 +200,28 @@ export function StaleReview({ count, query }: { count: number; /** The page's fi
                       setPicked(p);
                     }}
                   />
-                  <Link href={`/studio/clients/${r.id}`} className="min-w-0 flex-1 truncate font-medium text-[var(--s-ink)] no-underline hover:underline">
+                  <Link href={`/studio/clients/${r.id}`} style={{ flex: 1, minWidth: 0, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {r.name}
                   </Link>
-                  <span className="text-[12.5px] text-[var(--s-ink-3)]">{r.lastContactedAt ? `last spoke ${fmt(r.lastContactedAt)}` : `never called · added ${fmt(r.createdAt)}`}</span>
-                  {r.assignedToName ? <span className="hidden text-[12.5px] text-[var(--s-ink-2)] sm:inline">{r.assignedToName}</span> : null}
+                  <span className="muted sm">{r.lastContactedAt ? `last spoke ${fmt(r.lastContactedAt)}` : `never called · added ${fmt(r.createdAt)}`}</span>
+                  {r.assignedToName ? <span className="sm hidden sm:inline">{r.assignedToName}</span> : null}
                 </li>
               ))}
-              {loading ? <li className="px-5 py-3 text-[13px] text-[var(--s-ink-3)]">Loading…</li> : null}
+              {loading ? <li className="muted sm">Loading…</li> : null}
               {!loading && next ? (
-                <li className="px-5 py-2.5">
-                  <button type="button" onClick={() => void load(next)} className={quietClass}>
+                <li>
+                  <button type="button" onClick={() => void load(next)} className="btn ghost sm">
                     Show 50 more
                   </button>
                 </li>
               ) : null}
             </ul>
 
-            <div className="flex flex-wrap items-center gap-2 px-5 py-4">
-              <button type="button" disabled={working !== null || selected === 0} onClick={() => void act('snooze')} className={primaryClass}>
-                Snooze {QUIET_AFTER_DAYS}d
+            <div className="sf">
+              <button type="button" disabled={working !== null || selected === 0} onClick={() => void act('snooze')} className="btn pri sm">
+                Snooze {QUIET_AFTER_DAYS} days
               </button>
-              <select aria-label="Why were they lost" value={reason} onChange={(e) => setReason(e.target.value)} className={`${inputClass} w-auto py-1.5`}>
+              <select aria-label="Why were they lost" value={reason} onChange={(e) => setReason(e.target.value)} className="fld sm">
                 <option value="">Lost because…</option>
                 {(Object.keys(LOST_LABELS) as LostReasonName[]).map((k) => (
                   <option key={k} value={k}>
@@ -223,12 +229,12 @@ export function StaleReview({ count, query }: { count: number; /** The page's fi
                   </option>
                 ))}
               </select>
-              <button type="button" disabled={working !== null || selected === 0 || !reason} onClick={() => void act('lost')} className={`${quietClass} text-[var(--s-bad)]`}>
-                Mark Lost ({selected.toLocaleString('en-IN')})
+              <button type="button" disabled={working !== null || selected === 0 || !reason} onClick={() => void act('lost')} className="btn sec sm bad-b">
+                Mark lost ({selected.toLocaleString('en-IN')})
               </button>
-              {working ? <span className="text-[13px] text-[var(--s-ink-2)]">{working}</span> : null}
+              {working ? <span className="sm muted">{working}</span> : null}
               {said ? (
-                <span role={said.ok ? 'status' : 'alert'} className={`text-[13px] ${said.ok ? 'text-[var(--s-good)]' : 'text-[var(--s-bad)]'}`}>
+                <span role={said.ok ? 'status' : 'alert'} className={said.ok ? 'cl-ok' : 'cl-err'}>
                   {said.text}
                 </span>
               ) : null}

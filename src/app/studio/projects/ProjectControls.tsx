@@ -11,11 +11,11 @@ import { addProjectAction, setStageAction } from './actions';
 import { IDLE } from '../form-state';
 
 const input =
-  'rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[14px] text-[var(--s-ink)] placeholder:text-[var(--s-ink-3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]';
+  'rounded-[8px] border border-[var(--fill2)] bg-[var(--paper)] px-3 py-2 text-[14px] text-[var(--ink)] placeholder:text-[var(--muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--acc)]';
 const primary =
-  'rounded-[8px] bg-[var(--s-accent)] px-4 py-2 text-[14px] font-medium text-white hover:bg-[var(--s-accent-deep)] disabled:opacity-40';
+  'rounded-[8px] bg-[var(--acc)] px-4 py-2 text-[14px] font-medium text-white hover:bg-[var(--acc-h)] disabled:opacity-40';
 const quiet =
-  'rounded-[8px] border border-[var(--s-rule)] px-3 py-1.5 text-[13px] font-medium hover:border-[var(--s-ink-3)] disabled:opacity-40';
+  'rounded-[8px] border border-[var(--fill2)] px-3 py-1.5 text-[13px] font-medium hover:border-[var(--muted)] disabled:opacity-40';
 
 /**
  * Starting a project.
@@ -42,11 +42,11 @@ export function NewProject({ clients }: { clients: { id: string; name: string }[
 
   return (
     <div className="relative">
-      <form action={action} className="s-card absolute right-0 top-full z-20 mt-2 flex w-[min(27rem,calc(100vw-2rem))] flex-col gap-3 p-5 shadow-lg">
+      <form action={action} className="card absolute right-0 top-full z-20 mt-2 flex w-[min(27rem,calc(100vw-2rem))] flex-col gap-3 p-5 shadow-lg">
         <p className="m-0 text-[15px] font-semibold">New project</p>
 
         <label className="flex flex-col gap-1.5">
-          <span className="s-label">Client</span>
+          <span className="lbl">Client</span>
           <select name="clientId" required className={input}>
             {clients.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
@@ -55,22 +55,22 @@ export function NewProject({ clients }: { clients: { id: string; name: string }[
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="s-label">Project name — optional</span>
+          <span className="lbl">Project name — optional</span>
           <input name="name" placeholder="Kothari Residence" className={input} />
         </label>
 
         <div className="flex flex-wrap gap-3">
           <label className="flex flex-1 flex-col gap-1.5">
-            <span className="s-label">Contract ₹ — optional</span>
-            <input name="contract" inputMode="decimal" placeholder="1850000" className={`${input} s-num text-right`} />
+            <span className="lbl">Contract ₹ — optional</span>
+            <input name="contract" inputMode="decimal" placeholder="1850000" className={`${input} tabular-nums text-right`} />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="s-label">Target date</span>
+            <span className="lbl">Target date</span>
             <input type="date" name="targetDate" className={input} />
           </label>
         </div>
 
-        <p className="m-0 text-[12.5px] leading-snug text-[var(--s-ink-3)]">
+        <p className="m-0 text-[12.5px] leading-snug text-[var(--muted)]">
           The contract figure is frozen here. Every later number is measured against it, so editing
           a quotation afterwards will not move it.
         </p>
@@ -85,7 +85,7 @@ export function NewProject({ clients }: { clients: { id: string; name: string }[
         </div>
 
         {'ok' in state && !state.ok ? (
-          <p role="alert" className="m-0 text-[12.5px] text-[var(--s-bad)]">{state.error}</p>
+          <p role="alert" className="m-0 text-[12.5px] text-[var(--bad)]">{state.error}</p>
         ) : null}
       </form>
     </div>
@@ -116,7 +116,7 @@ export function StageMover({ projectId, stage }: { projectId: string; stage: Pro
       >
         → {PROJECT_STAGE_LABELS[next]}
       </button>
-      {error ? <span className="text-[12.5px] text-[var(--s-bad)]">{error}</span> : null}
+      {error ? <span className="text-[12.5px] text-[var(--bad)]">{error}</span> : null}
     </>
   );
 }

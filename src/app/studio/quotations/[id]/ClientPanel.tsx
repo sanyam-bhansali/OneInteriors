@@ -4,9 +4,6 @@ import { useState, useTransition } from 'react';
 import type { QuoteRow } from '@/modules/studio-quote/quotes';
 import { saveClientAction } from '../actions';
 
-const field =
-  'rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-2.5 py-2 text-[13.5px] outline-none focus:border-[var(--s-accent)]';
-
 /**
  * Who the quotation is for. Read as a line; "Edit" opens the fields, with
  * their own save — correcting a client's name is not part of pricing the job.
@@ -45,40 +42,40 @@ export function ClientPanel({ quote }: { quote: QuoteRow }) {
   }
 
   return (
-    <section className="s-card p-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="s-label m-0">For</h2>
-        <button type="button" onClick={() => setOpen(!open)} className="text-[12.5px] text-[var(--s-accent)]">
+    <section className="card" aria-label="Who it is for">
+      <div className="chead">
+        <h2>For</h2>
+        <button type="button" onClick={() => setOpen(!open)} className="btn ghost sm">
           {open ? 'Close' : 'Edit'}
         </button>
       </div>
       {open ? (
-        <div className="mt-3 flex flex-col gap-2.5">
-          <input value={f.clientName} onChange={set('clientName')} placeholder="Name" aria-label="Client name" className={field} />
-          <div className="flex gap-2">
-            <input value={f.clientPhone} onChange={set('clientPhone')} placeholder="Phone" aria-label="Phone" inputMode="tel" className={`${field} min-w-0 flex-1`} />
-            <input value={f.config} onChange={set('config')} placeholder="3 BHK" aria-label="Configuration" className={`${field} w-[5.5rem]`} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <input value={f.clientName} onChange={set('clientName')} placeholder="Name" aria-label="Client name" className="fld" />
+          <div className="hstack" style={{ gap: 8, flexWrap: 'nowrap' }}>
+            <input value={f.clientPhone} onChange={set('clientPhone')} placeholder="Phone" aria-label="Phone" inputMode="tel" className="fld" style={{ flex: 1, minWidth: 0 }} />
+            <input value={f.config} onChange={set('config')} placeholder="3 BHK" aria-label="Configuration" className="fld" style={{ width: '6rem', flex: 'none' }} />
           </div>
-          <input value={f.clientEmail} onChange={set('clientEmail')} placeholder="Email" aria-label="Email" inputMode="email" className={field} />
-          <input value={f.society} onChange={set('society')} placeholder="Society, flat number" aria-label="Society" className={field} />
-          <div className="flex gap-2">
-            <input value={f.locality} onChange={set('locality')} placeholder="Area" aria-label="Area" className={`${field} min-w-0 flex-1`} />
-            <input value={f.carpet} onChange={set('carpet')} placeholder="sq ft" aria-label="Carpet sq ft" inputMode="numeric" className={`${field} s-num w-[5.5rem] text-right`} />
+          <input value={f.clientEmail} onChange={set('clientEmail')} placeholder="Email" aria-label="Email" inputMode="email" className="fld" />
+          <input value={f.society} onChange={set('society')} placeholder="Society, flat number" aria-label="Society" className="fld" />
+          <div className="hstack" style={{ gap: 8, flexWrap: 'nowrap' }}>
+            <input value={f.locality} onChange={set('locality')} placeholder="Area" aria-label="Area" className="fld" style={{ flex: 1, minWidth: 0 }} />
+            <input value={f.carpet} onChange={set('carpet')} placeholder="sq ft" aria-label="Carpet sq ft" inputMode="numeric" className="fld num" style={{ width: '6rem', flex: 'none' }} />
           </div>
           <button
             type="button"
             disabled={pending}
             onClick={save}
-            className="rounded-[8px] bg-[var(--s-accent)] px-4 py-2 text-[13.5px] font-medium text-white disabled:opacity-40"
+            className="btn pri"
           >
             {pending ? 'Saving…' : 'Save details'}
           </button>
-          {error ? <p className="m-0 text-[12.5px] text-[var(--s-bad)]">{error}</p> : null}
+          {error ? <p className="qerr">{error}</p> : null}
         </div>
       ) : (
-        <p className="m-0 mt-1 text-[13.5px] leading-snug">
-          <span className="font-medium">{quote.clientName}</span>
-          <span className="block text-[12.5px] text-[var(--s-ink-3)]">
+        <p style={{ margin: 0, lineHeight: 1.4 }}>
+          <b style={{ fontWeight: 600 }}>{quote.clientName}</b>
+          <span className="muted sm" style={{ display: 'block' }}>
             {[quote.clientPhone, quote.society, quote.locality, quote.config].filter(Boolean).join(' · ') || 'No details yet'}
           </span>
         </p>

@@ -188,10 +188,15 @@ export function FixSnag({ snag, words: w, lang }: { snag: FixSnagView; words: W;
             : fill(w.hintReady, { name });
 
   const afterSrc = photo?.preview ?? (sent ? snag.after : null);
-  const chip = 'inline-flex min-h-[32px] items-center rounded-full px-3 text-[14px] font-medium';
+  const micIcon = (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+    </svg>
+  );
 
   return (
-    <div className="flex min-h-[calc(100dvh-60px)] flex-col">
+    <div style={{ display: 'flex', minHeight: '100dvh', flexDirection: 'column' }}>
       <input
         ref={camera}
         type="file"
@@ -214,213 +219,165 @@ export function FixSnag({ snag, words: w, lang }: { snag: FixSnagView; words: W;
         }}
       />
 
-      <div className="flex items-start gap-2 px-4 pt-4">
-        <Link href="/studio/site/snag" aria-label={w.back} className="inline-flex h-12 w-12 flex-none items-center justify-center rounded-full text-[var(--s-ink)] no-underline">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <div className="st-backhead">
+        <Link href="/studio/site/snag" aria-label={w.back}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="m15 18-6-6 6-6" />
           </svg>
         </Link>
-        <div className="min-w-0 pt-1">
-          <p className="m-0 text-[13.5px] text-[var(--s-ink-3)]">{fill(w.snagOf, { home: snag.home })}</p>
-          <h1 className="m-0 mt-0.5 text-[24px] font-semibold leading-tight tracking-[-0.01em]">{snag.title}</h1>
+        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span className="sub">{fill(w.snagOf, { home: snag.home })}</span>
+          <h1>{snag.title}</h1>
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-4 px-5 pb-6 pt-4">
-        <div className="flex flex-wrap gap-2">
-          {snag.fixByLabel ? (
-            <span
-              className={chip}
-              style={snag.overdue ? { background: 'var(--s-bad-wash)', color: 'var(--s-bad)' } : { background: 'var(--s-accent-wash)', color: 'var(--s-accent)' }}
-            >
-              {fill(snag.overdue ? w.late : w.fixBy, { date: snag.fixByLabel })}
-            </span>
-          ) : null}
-          {snag.room ? <span className={`${chip} bg-[var(--s-surface-2)] text-[var(--s-ink-2)]`}>{snag.room}</span> : null}
-          {snag.mine ? (
-            <span className={`${chip} bg-[var(--s-surface-2)] text-[var(--s-ink-2)]`}>{w.assignedYou}</span>
-          ) : snag.assigneeName ? (
-            <span className={`${chip} bg-[var(--s-surface-2)] text-[var(--s-ink-2)]`}>{fill(w.assignedTo, { who: snag.assigneeName })}</span>
-          ) : null}
-        </div>
-
-        {snag.raisedNote || snag.raisedBy === 'customer' ? (
-          <div className="s-card p-4">
-            <p className="m-0 text-[13px] text-[var(--s-ink-3)]">
-              {snag.raisedBy === 'customer' ? fill(w.wrote, { name, date: snag.raisedOn }) : fill(w.teamWrote, { date: snag.raisedOn })}
-            </p>
-            <p className="m-0 mt-1 text-[16px] leading-relaxed">“{snag.raisedNote || snag.title}”</p>
-          </div>
-        ) : null}
-
-        {snag.state === 'reopened' && snag.notFixedReason ? (
-          <div className="rounded-[12px] p-4" style={{ background: 'var(--s-bad-wash)' }}>
-            <p className="m-0 text-[15px] font-medium" style={{ color: 'var(--s-bad)' }}>
-              {fill(w.reopened, { name })}
-            </p>
-            <p className="m-0 mt-1 text-[15px] leading-relaxed">“{snag.notFixedReason}”</p>
-          </div>
-        ) : null}
-
-        {snag.internalNote ? (
-          <div className="rounded-[12px] border border-[var(--s-rule)] bg-[var(--s-surface-2)] p-4">
-            <p className="m-0 inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--s-ink-2)]">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <rect x="4" y="10" width="16" height="11" rx="2" />
-                <path d="M8 10V7a4 4 0 0 1 8 0v3" />
-              </svg>
-              {w.noteFor}
-            </p>
-            <p className="m-0 mt-1 text-[16px] leading-relaxed">{snag.internalNote}</p>
-          </div>
-        ) : null}
-
-        {/* Before and after, side by side: the customer sees the same pair. */}
-        <div className="grid grid-cols-2 gap-3">
-          <figure className="m-0 flex flex-col gap-1.5">
-            {snag.before ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={snag.before} alt={snag.title} className="aspect-[3/4] w-full rounded-[14px] object-cover" />
-            ) : (
-              <div className="flex aspect-[3/4] w-full items-center justify-center rounded-[14px] bg-[var(--s-surface-2)] text-[14px] text-[var(--s-ink-3)]">{w.noBefore}</div>
-            )}
-            <figcaption className="text-[13px] text-[var(--s-ink-3)]">{snag.raisedBy === 'customer' ? fill(w.before, { name }) : w.beforeTeam}</figcaption>
-          </figure>
-          <figure className="m-0 flex flex-col gap-1.5">
-            {afterSrc ? (
-              <div className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={afterSrc} alt="" className="aspect-[3/4] w-full rounded-[14px] object-cover" />
-                {photo?.status === 'saving' ? (
-                  <span role="status" className="absolute inset-x-2 bottom-2 rounded-full bg-black/65 px-2 py-1 text-center text-[12.5px] text-white">
-                    {w.saving}
-                  </span>
-                ) : null}
-                {photo?.status === 'failed' ? (
-                  <button
-                    type="button"
-                    onClick={() => void savePhoto(photo)}
-                    className="absolute inset-x-2 bottom-2 min-h-[44px] rounded-[10px] px-2 text-[13px] font-medium text-white"
-                    style={{ background: 'var(--s-bad)' }}
-                  >
-                    {w.saveFailed}
-                  </button>
-                ) : null}
-              </div>
-            ) : (
-              <button
-                type="button"
-                disabled={!snag.canFix || sent}
-                onClick={() => camera.current?.click()}
-                className="flex aspect-[3/4] w-full flex-col items-center justify-center gap-2 rounded-[14px] border-2 border-dashed px-3 text-center text-[16px] font-semibold disabled:opacity-50"
-                style={{ borderColor: 'var(--s-accent)', color: 'var(--s-accent)', background: 'var(--s-accent-wash)' }}
-              >
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z" />
-                  <circle cx="12" cy="13" r="3.5" />
-                </svg>
-                {w.takeAfter}
-              </button>
-            )}
-            <figcaption className="text-[13px] text-[var(--s-ink-3)]">
-              {w.after}
-              {photo?.fromGallery ? ` · ${w.fromGallery}` : ''}
-            </figcaption>
-          </figure>
-        </div>
-
-        {!photo && !sent && snag.canFix ? (
-          <button type="button" onClick={() => gallery.current?.click()} className="min-h-[44px] self-start text-[14px] text-[var(--s-ink-2)] underline underline-offset-2">
-            {w.gallery}
-          </button>
-        ) : null}
-        {photo && !sent ? (
-          <button type="button" onClick={() => camera.current?.click()} className="min-h-[44px] self-start text-[14px] text-[var(--s-ink-2)] underline underline-offset-2">
-            {w.retake}
-          </button>
-        ) : null}
-
-        {/* Step 2: once the after photo is there. Optional; never typing. */}
-        {photo && !sent ? (
-          <div className="flex flex-col gap-2">
-            {voice.status === 'done' ? (
-              <div className="s-card flex flex-col gap-2 p-4">
-                <p className="m-0 text-[14px] text-[var(--s-ink-3)]">“{voice.heard.transcript}”</p>
-                <p className="m-0 text-[17px] font-medium leading-snug">{voice.heard.customerText}</p>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[13px] text-[var(--s-ink-3)]">
-                    {fill(w.reads, { name })} · {LANG_NAME[voice.heard.customerLang] ?? voice.heard.customerLang}
-                  </span>
-                  <button type="button" onClick={mic} className="min-h-[44px] rounded-full px-4 text-[15px] font-medium text-[var(--s-accent)]" style={{ background: 'var(--s-accent-wash)' }}>
-                    {w.redo}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={mic}
-                disabled={voice.status === 'hearing'}
-                aria-pressed={voice.status === 'recording'}
-                className="flex min-h-[64px] w-full items-center justify-center gap-3 rounded-full px-5 text-[17px] font-semibold disabled:opacity-60"
-                style={
-                  voice.status === 'recording'
-                    ? { background: 'var(--s-bad)', color: '#fff' }
-                    : { background: 'var(--s-surface)', color: 'var(--s-ink)', boxShadow: 'inset 0 0 0 2px var(--s-accent)' }
-                }
-              >
-                <span aria-hidden="true" className="inline-flex h-9 w-9 items-center justify-center rounded-full" style={{ background: voice.status === 'recording' ? 'rgba(255,255,255,.2)' : 'var(--s-accent)', color: '#fff' }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="9" y="3" width="6" height="11" rx="3" />
-                    <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-                  </svg>
-                </span>
-                {voice.status === 'recording' ? w.listening : voice.status === 'hearing' ? w.hearing : w.say}
-              </button>
-            )}
-            {voice.status === 'off' ? <p className="m-0 text-[14px] text-[var(--s-ink-2)]">{fill(w.speechOff, { name })}</p> : null}
-            {voice.status === 'blocked' ? <p className="m-0 text-[14px] text-[var(--s-ink-2)]">{w.micBlocked}</p> : null}
-            {voice.status === 'failed' ? (
-              <p className="m-0 text-[14px]" style={{ color: 'var(--s-bad)' }}>
-                {voice.message}
-              </p>
+      <div className="st-page" style={{ flex: 1, paddingTop: 8, gap: 12 }}>
+        <div className="st-sec">
+          <div className="st-pills">
+            {snag.fixByLabel ? <span className={`st-pill ${snag.overdue ? 'bad' : 'warn'}`}>{fill(snag.overdue ? w.late : w.fixBy, { date: snag.fixByLabel })}</span> : null}
+            {snag.room ? <span className="st-pill">{snag.room}</span> : null}
+            {snag.mine ? (
+              <span className="st-pill">{w.assignedYou}</span>
+            ) : snag.assigneeName ? (
+              <span className="st-pill">{fill(w.assignedTo, { who: snag.assigneeName })}</span>
             ) : null}
           </div>
-        ) : null}
+
+          {snag.raisedNote || snag.raisedBy === 'customer' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span className="st-label">{snag.raisedBy === 'customer' ? fill(w.wrote, { name, date: snag.raisedOn }) : fill(w.teamWrote, { date: snag.raisedOn })}</span>
+              <p style={{ margin: 0, fontSize: 15, lineHeight: 1.45 }}>&ldquo;{snag.raisedNote || snag.title}&rdquo;</p>
+            </div>
+          ) : null}
+
+          {snag.state === 'reopened' && snag.notFixedReason ? (
+            <div className="st-bad">
+              <p style={{ fontSize: 15, fontWeight: 600 }}>{fill(w.reopened, { name })}</p>
+              <p style={{ marginTop: 4, fontSize: 15, lineHeight: 1.45, color: 'var(--ink)' }}>&ldquo;{snag.notFixedReason}&rdquo;</p>
+            </div>
+          ) : null}
+
+          {snag.internalNote ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span className="st-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="4" y="10" width="16" height="11" rx="2" />
+                  <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                </svg>
+                {w.noteFor}
+              </span>
+              <p style={{ margin: 0, fontSize: 15, lineHeight: 1.45 }}>{snag.internalNote}</p>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Before and after, side by side: the customer sees the same pair. */}
+        <div className="st-sec">
+          <div className="st-figs">
+            <figure>
+              {snag.before ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={snag.before} alt={snag.title} />
+              ) : (
+                <div className="ph" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: 'var(--muted)' }}>
+                  {w.noBefore}
+                </div>
+              )}
+              <figcaption>{snag.raisedBy === 'customer' ? fill(w.before, { name }) : w.beforeTeam}</figcaption>
+            </figure>
+            <figure>
+              {afterSrc ? (
+                <div style={{ position: 'relative' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={afterSrc} alt="" />
+                  {photo?.status === 'saving' ? (
+                    <span role="status" className="st-over">
+                      {w.saving}
+                    </span>
+                  ) : null}
+                  {photo?.status === 'failed' ? (
+                    <button type="button" onClick={() => void savePhoto(photo)} className="st-over bad">
+                      {w.saveFailed}
+                    </button>
+                  ) : null}
+                </div>
+              ) : (
+                <button type="button" disabled={!snag.canFix || sent} onClick={() => camera.current?.click()} className="st-take">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="ai">
+                    <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z" />
+                    <circle className="a-flash" cx="12" cy="13" r="3.5" />
+                  </svg>
+                  {w.takeAfter}
+                </button>
+              )}
+              <figcaption>
+                {w.after}
+                {photo?.fromGallery ? ` · ${w.fromGallery}` : ''}
+              </figcaption>
+            </figure>
+          </div>
+
+          {!photo && !sent && snag.canFix ? (
+            <button type="button" onClick={() => gallery.current?.click()} className="st-link" style={{ alignSelf: 'flex-start' }}>
+              {w.gallery}
+            </button>
+          ) : null}
+          {photo && !sent ? (
+            <button type="button" onClick={() => camera.current?.click()} className="st-link" style={{ alignSelf: 'flex-start' }}>
+              {w.retake}
+            </button>
+          ) : null}
+
+          {/* Step 2: once the after photo is there. Optional; never typing. */}
+          {photo && !sent ? (
+            <div className="st-said-box" style={{ gap: 8 }}>
+              {voice.status === 'done' ? (
+                <>
+                  <span className="st-heard">&ldquo;{voice.heard.transcript}&rdquo;</span>
+                  <span className="st-said">{voice.heard.customerText}</span>
+                  <div className="st-meta">
+                    <span className="mono">
+                      {fill(w.reads, { name })} · {LANG_NAME[voice.heard.customerLang] ?? voice.heard.customerLang}
+                    </span>
+                    <button type="button" onClick={mic} className="st-redo">
+                      {w.redo}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <button type="button" onClick={mic} disabled={voice.status === 'hearing'} aria-pressed={voice.status === 'recording'} className={`st-mic${voice.status === 'recording' ? ' rec' : ''}`}>
+                  <span aria-hidden="true">{micIcon}</span>
+                  {voice.status === 'recording' ? w.listening : voice.status === 'hearing' ? w.hearing : w.say}
+                </button>
+              )}
+              {voice.status === 'off' ? <span className="st-line">{fill(w.speechOff, { name })}</span> : null}
+              {voice.status === 'blocked' ? <span className="st-line">{w.micBlocked}</span> : null}
+              {voice.status === 'failed' ? <span className="st-bad-t" style={{ fontSize: 14 }}>{voice.message}</span> : null}
+            </div>
+          ) : null}
+        </div>
 
         {sent ? (
-          <div role="status" className="rounded-[14px] p-4" style={{ background: 'var(--s-good-wash)' }}>
-            <p className="m-0 text-[17px] font-semibold" style={{ color: 'var(--s-good)' }}>
-              {fill(w.sentTitle, { name })}
-            </p>
-            <p className="m-0 mt-1 text-[15px] leading-relaxed text-[var(--s-ink-2)]">{fill(w.sentBody, { name })}</p>
-            {snag.fixSentence && !photo ? <p className="m-0 mt-2 text-[15px]">“{snag.fixSentence}”</p> : null}
+          <div role="status" className="st-ok">
+            <b>{fill(w.sentTitle, { name })}</b>
+            <p>{fill(w.sentBody, { name })}</p>
+            {snag.fixSentence && !photo ? <p style={{ color: 'var(--ink)' }}>&ldquo;{snag.fixSentence}&rdquo;</p> : null}
           </div>
         ) : null}
       </div>
 
       {/* The one next step, always in reach of a thumb. */}
-      <div className="sticky bottom-0 border-t border-[var(--s-rule)] bg-[var(--s-ground)] px-5 pb-[max(16px,env(safe-area-inset-bottom))] pt-3">
+      <div className="st-bottom">
         {sent ? (
-          <Link
-            href="/studio/site/snag"
-            className="flex min-h-[60px] w-full items-center justify-center rounded-full text-[17px] font-semibold no-underline"
-            style={{ background: 'var(--s-accent)', color: '#fff' }}
-          >
+          <Link href="/studio/site/snag" className="st-big pill">
             {w.allSnags}
           </Link>
         ) : (
-          <button
-            type="button"
-            onClick={() => void markFixed()}
-            aria-disabled={!ready || sending}
-            className="flex min-h-[60px] w-full items-center justify-center rounded-full text-[18px] font-semibold"
-            style={ready && !sending ? { background: 'var(--s-ink)', color: '#fff' } : { background: '#C9CABB', color: '#4F5147' }}
-          >
+          <button type="button" onClick={() => void markFixed()} aria-disabled={!ready || sending} className="st-big pill">
             {sending ? w.sending : w.markFixed}
           </button>
         )}
-        <p role="status" aria-live="polite" className="m-0 mt-2 text-center text-[14px]" style={{ color: error ? 'var(--s-bad)' : 'var(--s-ink-2)' }}>
+        <p role="status" aria-live="polite" className="hint" style={{ margin: 0, color: error ? 'var(--bad)' : undefined }}>
           {error ?? (sent && snag.state === 'fixed' && !photo ? fill(w.waiting, { name }) : hint)}
         </p>
       </div>

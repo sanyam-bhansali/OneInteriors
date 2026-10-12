@@ -1,0 +1,135 @@
+/* Product master (StudioRates in the owner's UI handoff). Only what the
+   shared classes in studio-ui.css do not draw; scoped to the studio frame,
+   tokens only. */
+
+.oi-studio .ppage {
+  max-width: 1600px;
+}
+.oi-studio .psub {
+  margin: 6px 0 0;
+}
+@media (max-width: 760px) {
+  .oi-studio .ppage.content {
+    padding: 16px 16px 48px;
+    gap: 16px;
+  }
+  .oi-studio .ppage .phead h1 {
+    font-size: 26px;
+  }
+  .oi-studio .ppage .ptabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+}
+.oi-studio .ptabs button {
+  white-space: nowrap;
+}
+
+/* The notes over the list. */
+.oi-studio .pnote {
+  box-shadow: inset 3px 0 0 var(--acc);
+}
+.oi-studio .pnote.warn {
+  box-shadow: inset 3px 0 0 var(--warn-s);
+}
+
+/* The table. */
+.oi-studio .ptbl tr.off td {
+  opacity: 0.55;
+}
+.oi-studio .ptbl tr.pedit td {
+  background: var(--soft);
+}
+.oi-studio .ptbl tr.pedit:hover td {
+  background: var(--soft);
+}
+.oi-studio .prate {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.oi-studio .pnum {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  text-align: right;
+}
+.oi-studio .pcheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--text2);
+  cursor: pointer;
+}
+.oi-studio .pcheck input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--acc);
+}
+.oi-studio .perr {
+  font-size: 13px;
+  color: var(--bad);
+}
+
+/* Forms: adding an item, editing one. */
+.oi-studio .prow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-end;
+}
+.oi-studio .pfield {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.oi-studio select.fld,
+.oi-studio textarea.fld {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.oi-studio .pset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.oi-studio .pset legend {
+  padding: 0;
+  margin-bottom: 8px;
+}
+.oi-studio .ppick {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--fill);
+  color: var(--text2);
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.oi-studio .ppick:has(:checked),
+.oi-studio .ppick[aria-pressed='true'] {
+  background: var(--acc-soft);
+  color: var(--acc-ink);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--acc);
+}
+.oi-studio .peditor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 6px 0;
+}
+
+/* Keeps the head's screen-reader labels inside the scroller (no sideways page scroll on a phone). */
+.oi-studio .ppage .tscroll {
+  position: relative;
+}

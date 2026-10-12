@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
-import { PageHead, PageBody } from '../StudioShell';
 import { myProducts } from '@/modules/studio-quote/store';
 import { ProductTable } from './ProductTable';
 import { RatesGateCard } from '../RatesGateCard';
 import { myRatesGate, RATES_GATE_COPY } from '@/modules/studio-quote/rates-gate';
+import './products.css';
 
 export const metadata: Metadata = {
   title: 'Product master',
@@ -13,32 +13,22 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 /**
- * The studio's own catalogue.
+ * The studio's own catalogue (StudioRates in the owner's UI handoff).
  *
- * ## What this is not
+ * ## One price list
  *
- * It is not `/studio/rates`. That page holds six broad category rates we use to
- * produce an INDICATIVE quote on a customer's comparison screen — our number,
- * for making two studios comparable. This is the studio's own price list, in
- * their own product names, that their own quotations are built from and that we
- * never see the output of.
- *
- * Two price lists sounds like one too many and is not: ours has to be six
- * comparable buckets or the comparison is meaningless, and theirs has to be
- * thirty-eight specific products or the quotation is useless. Collapsing them
- * would break one or the other.
+ * This is the studio's own price list, in their own product names, that
+ * their own quotations are built from — and, since 10 Oct 2026, the first
+ * quote One Interiors shows a customer for them. `/studio/rates` (the old
+ * six-category rate card) sends here.
  *
  * ## Why every rate arrives blank
  *
- * `/studio/rates` promises, in these words: *"We do not set your prices.
- * Nothing here is pre-filled, there is no suggested figure, and we will never
- * nudge you toward one."* A starter catalogue with plausible Pune rates in it
- * would break that on the first screen of the software — and break it in the
- * worst way, because a studio in a hurry would accept them and we would have
- * quietly priced a business we also take a commission from.
- *
- * So what ships is the shape: names, units, work codes and the sizes that
- * recur. The numbers are theirs.
+ * We promised: *"We do not set your prices. Nothing here is pre-filled, there
+ * is no suggested figure, and we will never nudge you toward one."* A starter
+ * catalogue with plausible Pune rates in it would break that on the first
+ * screen of the software. So what ships is the shape: names, units, work
+ * codes and the sizes that recur. The numbers are theirs.
  */
 export default async function ProductsPage() {
   const [products, gate] = await Promise.all([myProducts(), myRatesGate()]);
@@ -46,76 +36,79 @@ export default async function ProductsPage() {
   const blank = products.length - priced;
   const standard = products.filter((p) => p.inStandardBuild).length;
 
-  return (
+  const notes = (
     <>
-      <PageHead
-        title="Product master"
-        sub={
-          products.length === 0
-            ? 'Nothing here yet.'
-            : blank === 0
-              ? `${products.length} products, all priced.`
-              : `${priced} of ${products.length} priced · ${blank} still need a rate`
-        }
-      />
+      {gate !== 'OPEN' ? <RatesGateCard gate={gate} {...RATES_GATE_COPY[gate]} where="products" /> : null}
 
-      <PageBody>
-        {gate !== 'OPEN' ? (
-          <RatesGateCard gate={gate} {...RATES_GATE_COPY[gate]} where="products" />
-        ) : null}
-
-        {blank > 0 && gate === 'OPEN' ? (
-          <div className="s-card mb-6 border-l-[3px] !border-l-[var(--s-warn)] p-5">
-            <p className="m-0 mb-2 text-[14.5px] font-semibold">These are your prices, not ours.</p>
-            <p className="m-0 max-w-[68ch] text-[14px] leading-relaxed text-[var(--s-ink-2)]">
-              We have given you the shape of a catalogue — what the line is called, how it is
-              measured, and whether it is factory or site work. Every rate is blank on purpose: we
-              told you we would never suggest a figure, and a default you accept in a hurry is a
-              price we set. A product with no rate still lands on a quotation when you build one —
-              at zero, flagged — because a line you can see is unfinished is better than one that
-              silently went missing.
-            </p>
+      {blank > 0 && gate === 'OPEN' ? (
+        <section className="card pnote warn">
+          <div className="chead">
+            <h2>These are your prices, not ours.</h2>
+            <span className="chip warn">
+              <span className="dot" />
+              {blank} still need a rate
+            </span>
           </div>
-        ) : null}
+          <p className="muted" style={{ margin: 0, maxWidth: '72ch', lineHeight: 1.55 }}>
+            We have given you the shape of a catalogue — what the line is called, how it is measured, and whether it is factory or
+            site work. Every rate is blank on purpose: we told you we would never suggest a figure, and a default you accept in a
+            hurry is a price we set. A product with no rate still lands on a quotation when you build one — at zero, flagged —
+            because a line you can see is unfinished is better than one that silently went missing.
+          </p>
+        </section>
+      ) : null}
 
-        {/* The highest-leverage control in the studio software, and one
-            nobody would find on their own: a catalogue with nothing ticked
-            makes "Build the 3 BHK" produce an empty quotation. Said once, at
-            the top, and only while it is still true. */}
-        {products.length > 0 && standard === 0 ? (
-          <div className="s-card mb-6 border-l-[3px] !border-l-[var(--s-accent)] p-5">
-            <p className="m-0 mb-2 text-[14.5px] font-semibold">
-              Tick what you fit as standard.
-            </p>
-            <p className="m-0 max-w-[68ch] text-[14px] leading-relaxed text-[var(--s-ink-2)]">
-              Most of a quotation is the same twenty-five lines every time — base and wall
-              cabinets, a wardrobe in each bedroom, a vanity in each bathroom, false ceiling,
-              painting. Tick those here and the quotation builder assembles a whole 3 BHK in one
-              press, sized and priced from this list, for you to correct rather than type. It is
-              a different question from whether you sell something: a walk-in wardrobe is priced,
-              active, and not standard.
-            </p>
+      {/* The highest-leverage control in the studio software, and one
+          nobody would find on their own: a catalogue with nothing ticked
+          makes "Build the 3 BHK" produce an empty quotation. Said once, at
+          the top, and only while it is still true. */}
+      {products.length > 0 && standard === 0 ? (
+        <section className="card pnote">
+          <div className="chead">
+            <h2>Tick what you fit as standard.</h2>
           </div>
-        ) : null}
-
-        {products.length === 0 ? (
-          <div className="s-card p-8 text-center">
-            <p className="m-0 text-[15px] text-[var(--s-ink-3)]">
-              Your catalogue could not be loaded. If this persists, tell us — it is ours to fix.
-            </p>
-          </div>
-        ) : (
-          <ProductTable products={products} />
-        )}
-
-        <p className="m-0 mt-8 max-w-[68ch] text-[13.5px] leading-relaxed text-[var(--s-ink-3)]">
-          Nobody sees these rates but you. Not other studios, and never a customer: what a
-          customer sees is the quote they come to for their home, never a rate per sq ft. This is
-          your one price list — your own quotations are built from it, and so is the first quote
-          One Interiors shows a customer for you. Change a rate here and the next quote of each
-          kind follows it; quotations already written keep their figures.
-        </p>
-      </PageBody>
+          <p className="muted" style={{ margin: 0, maxWidth: '72ch', lineHeight: 1.55 }}>
+            Most of a quotation is the same twenty-five lines every time — base and wall cabinets, a wardrobe in each bedroom, a
+            vanity in each bathroom, false ceiling, painting. Tick those here and the quotation builder assembles a whole 3 BHK in
+            one press, sized and priced from this list, for you to correct rather than type. It is a different question from
+            whether you sell something: a walk-in wardrobe is priced, active, and not standard.
+          </p>
+        </section>
+      ) : null}
     </>
+  );
+
+  return (
+    <main className="content ppage">
+      {products.length === 0 ? (
+        <>
+          <div className="phead">
+            <div>
+              <h1>Product master</h1>
+              <p className="muted psub">Your items and your rates. We never fill in or suggest a price.</p>
+            </div>
+          </div>
+          {notes}
+          <div className="empty">
+            <b>Your catalogue could not be loaded.</b>
+            <span className="muted sm">If this persists, tell us — it is ours to fix.</span>
+          </div>
+        </>
+      ) : (
+        <ProductTable
+          products={products}
+          summary={blank === 0 ? `${products.length} products, all priced` : `${priced} of ${products.length} priced`}
+          allPriced={blank === 0}
+          notes={notes}
+        />
+      )}
+
+      <p className="muted sm" style={{ margin: 0, maxWidth: '78ch', lineHeight: 1.55 }}>
+        Changing a rate here never changes a quotation already sent. Each quote keeps the rates it was made with. Nobody sees these
+        rates but you — not other studios, and never a customer: what a customer sees is the quote they come to for their home,
+        never a rate per sq ft. This is your one price list: your own quotations are built from it, and so is the first quote One
+        Interiors shows a customer for you.
+      </p>
+    </main>
   );
 }

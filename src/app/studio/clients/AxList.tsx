@@ -142,30 +142,30 @@ export function AxList({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
       {shownActions.length > 0 && total > 0 ? (
-        <div className="flex flex-wrap items-center gap-2 text-[13px]">
-          <span className="text-[var(--s-ink-2)]">Select:</span>
-          <button type="button" className={btnOutline} onClick={() => { setMatching(false); setPicked(new Set(rows.map((r) => r.id))); }}>
+        <div className="hstack sm" style={{ gap: 6 }}>
+          <span className="muted">Select:</span>
+          <button type="button" className="btn ghost xs" onClick={() => { setMatching(false); setPicked(new Set(rows.map((r) => r.id))); }}>
             Loaded ({rows.length.toLocaleString('en-IN')})
           </button>
           {SELECT_FIRST.filter((n) => n < total).map((n) => (
-            <button key={n} type="button" className={btnOutline} onClick={() => setMatching(n)}>
+            <button key={n} type="button" className="btn ghost xs" onClick={() => setMatching(n)}>
               First {n.toLocaleString('en-IN')}
             </button>
           ))}
-          <button type="button" className={btnOutline} onClick={() => setMatching(null)}>
+          <button type="button" className="btn ghost xs" onClick={() => setMatching(null)}>
             All {total.toLocaleString('en-IN')}
           </button>
           {selected > 0 ? (
-            <button type="button" className="text-[var(--s-ink-2)] underline" onClick={clear}>
+            <button type="button" className="btn xs" style={{ background: 'transparent', color: 'var(--muted)' }} onClick={clear}>
               Clear
             </button>
           ) : null}
         </div>
       ) : null}
       {said && selected === 0 ? (
-        <p role="status" className="m-0 text-[13.5px] text-[var(--s-good)]">
+        <p role="status" className="cl-ok">
           {said}
         </p>
       ) : null}
@@ -184,16 +184,16 @@ export function AxList({
         />
       ) : null}
       {error ? (
-        <p role="alert" className="m-0 text-[13px] text-[var(--s-bad)]">
+        <p role="alert" className="cl-err">
           {error}
         </p>
       ) : null}
 
-      <div className="s-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[64rem] border-collapse text-[13.5px]">
+      <section className="card flush" style={{ overflow: 'hidden' }}>
+        <div className="tscroll">
+          <table className="tbl cl-tbl" style={{ minWidth: 1024 }}>
             <thead>
-              <tr className="text-left">
+              <tr>
                 {shownActions.length > 0 ? (
                   <th scope="col" className={TH} style={{ width: 36 }}>
                     <input
@@ -207,7 +207,7 @@ export function AxList({
                     />
                   </th>
                 ) : null}
-                <th scope="col" className={`${TH} pl-[18px]`}>
+                <th scope="col" className={TH}>
                   Lead
                 </th>
                 <th scope="col" className={TH}>
@@ -223,7 +223,7 @@ export function AxList({
                   Budget
                 </th>
                 {cols.map((c, i) => (
-                  <th key={i} scope="col" className={`${TH} text-center`} style={c === 'notes' ? { width: 170 } : undefined}>
+                  <th key={i} scope="col" className={TH} style={c === 'notes' ? { width: 170 } : undefined}>
                     <ColumnPicker value={c} choices={choices} onChange={(v) => pickCol(i, v)} />
                   </th>
                 ))}
@@ -242,7 +242,7 @@ export function AxList({
                   <tr
                     key={l.id}
                     onClick={open}
-                    className={`group h-[57px] border-t border-[var(--s-rule)] ${poolView ? '' : 'cursor-pointer'} hover:bg-[var(--s-surface-2)] ${ticked ? 'bg-[var(--s-accent-wash)]' : ''} ${fresh ? 'shadow-[inset_3px_0_0_var(--s-accent)]' : ''}`}
+                    className={`${poolView ? '' : 'go'} ${ticked ? 'pick' : ''} ${fresh ? 'fresh' : ''}`}
                   >
                     {shownActions.length > 0 ? (
                       <td className={TD} onClick={(e) => e.stopPropagation()}>
@@ -262,15 +262,15 @@ export function AxList({
                         />
                       </td>
                     ) : null}
-                    <td className={`${TD} pl-[18px]`}>
-                      <div className="flex items-center gap-3">
+                    <td className={TD}>
+                      <div className="hstack" style={{ gap: 12, flexWrap: 'nowrap' }}>
                         <Avatar name={l.name} />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
+                        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          <div className="hstack" style={{ gap: 6 }}>
                             {poolView ? (
-                              <span className="text-[13.5px] font-semibold">{l.name}</span>
+                              <span style={{ fontWeight: 600 }}>{l.name}</span>
                             ) : (
-                              <Link href={href} onClick={(e) => e.stopPropagation()} className="text-[13.5px] font-semibold text-[var(--s-ink)] no-underline hover:underline">
+                              <Link href={href} onClick={(e) => e.stopPropagation()} style={{ fontWeight: 600 }}>
                                 {l.name}
                               </Link>
                             )}
@@ -278,9 +278,9 @@ export function AxList({
                             {cold ? <PillCold label={cold} /> : null}
                             {due ? <PillDue bucket={due.bucket} label={due.label} /> : null}
                           </div>
-                          <div className="flex items-center gap-2 text-[12px] text-[var(--s-ink-3)]">
+                          <div className="hstack sub" style={{ gap: 6 }}>
                             {/* A pool lead's phone stays with the server until it is claimed (claimableView). */}
-                            {poolView ? null : l.phone ? <span className="s-num">{l.phone}</span> : <span className="text-[var(--s-warn)]">no phone yet</span>}
+                            {poolView ? null : l.phone ? <span className="mono">{l.phone}</span> : <span className="warn-t">no phone yet</span>}
                             <TagChips tags={l.tags} />
                           </div>
                         </div>
@@ -300,18 +300,18 @@ export function AxList({
                         />
                       )}
                     </td>
-                    <td className={`${TD} text-[12px] text-[var(--s-ink-3)]`}>{dayLabel(l.createdAt)}</td>
+                    <td className={`${TD} sub`}>{dayLabel(l.createdAt)}</td>
                     <td className={TD}>
-                      <div className="text-[13px] font-medium">{bhk(l.config) ?? '—'}</div>
-                      <div className="text-[12px] text-[var(--s-ink-3)]">{[l.society, l.locality].filter(Boolean).join(' · ') || '—'}</div>
+                      <div style={{ fontWeight: 500 }}>{bhk(l.config) ?? '—'}</div>
+                      <div className="sub">{[l.society, l.locality].filter(Boolean).join(' · ') || '—'}</div>
                     </td>
-                    <td className={`${TD} s-num whitespace-nowrap font-semibold`}>{inr(l.budgetPaise) ?? <span className="text-[var(--s-ink-3)]">—</span>}</td>
+                    <td className={`${TD} mono`} style={{ whiteSpace: 'nowrap' }}>{inr(l.budgetPaise) ?? <span className="muted">—</span>}</td>
                     {cols.map((c, i) => (
-                      <td key={i} className={`${TD} text-[12px] text-[var(--s-ink-3)]`} style={c === 'notes' ? { width: 170, maxWidth: 170 } : undefined} onClick={c === 'notes' ? (e) => e.stopPropagation() : undefined}>
+                      <td key={i} className={`${TD} sub`} style={c === 'notes' ? { width: 170, maxWidth: 170 } : undefined} onClick={c === 'notes' ? (e) => e.stopPropagation() : undefined}>
                         {c === 'notes' ? (
-                          <div className="flex min-w-0 items-center gap-2">
+                          <div className="hstack" style={{ gap: 6, flexWrap: 'nowrap', minWidth: 0 }}>
                             {!poolView ? (
-                              <button type="button" title="Add note" aria-label={`Add a note to ${l.name}`} onClick={() => setNoteFor(l)} className="flex-none rounded-[6px] p-1 opacity-60 hover:bg-[var(--s-rail-active)] hover:opacity-100">
+                              <button type="button" title="Add note" aria-label={`Add a note to ${l.name}`} onClick={() => setNoteFor(l)} className="cl-iconbtn">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                                   <path d="M5 4h14v12l-4 4H5zM15 20v-4h4M8 9h8M8 13h5" />
                                 </svg>
@@ -319,22 +319,22 @@ export function AxList({
                             ) : null}
                             {l.noteCount > 0 ? (
                               <>
-                                <span className="min-w-0 truncate" title={l.latestNote ?? undefined}>
+                                <span title={l.latestNote ?? undefined} style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   {l.latestNote}
                                 </span>
-                                {l.noteCount > 1 ? <span className="flex-none rounded-full border border-[var(--s-rule)] bg-[var(--s-surface-2)] px-1.5 text-[11px] font-semibold">+{l.noteCount - 1}</span> : null}
+                                {l.noteCount > 1 ? <span className="chip xs">+{l.noteCount - 1}</span> : null}
                               </>
                             ) : (
-                              <span className="opacity-50">—</span>
+                              <span className="muted">—</span>
                             )}
                           </div>
                         ) : (
-                          (now ? columnValue(l, c, now) : null) ?? <span className="opacity-50">—</span>
+                          (now ? columnValue(l, c, now) : null) ?? <span className="muted">—</span>
                         )}
                       </td>
                     ))}
                     {poolView ? (
-                      <td className={`${TD} text-right`} onClick={(e) => e.stopPropagation()}>
+                      <td className={TD} style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
                         <ClaimOne id={l.id} />
                       </td>
                     ) : null}
@@ -345,14 +345,14 @@ export function AxList({
           </table>
         </div>
         {rows.length === 0 ? (
-          <div className="px-4 py-10 text-center">
-            <p className="m-0 font-semibold">{poolView ? 'Nothing in the pool — every lead has an owner.' : 'No leads match these filters'}</p>
-            {!poolView ? <p className="m-0 mt-1 text-[13px] text-[var(--s-ink-3)]">Try clearing a filter or widening the search.</p> : null}
+          <div className="empty" style={{ margin: 18, alignItems: 'center' }}>
+            <p style={{ margin: 0, fontWeight: 600 }}>{poolView ? 'Nothing in the pool — every lead has an owner.' : 'No leads match these filters'}</p>
+            {!poolView ? <p className="muted sm" style={{ margin: 0 }}>Try clearing a filter or widening the search.</p> : null}
           </div>
         ) : null}
-      </div>
+      </section>
       {next ? <div ref={sentinel} style={{ height: 1 }} aria-hidden /> : null}
-      <p className="m-0 pl-0.5 text-[12px] text-[var(--s-ink-3)]">{loading ? 'Loading…' : `${total.toLocaleString('en-IN')} ${total === 1 ? 'lead' : 'leads'}`}</p>
+      <p className="cl-foot">{loading ? 'Loading…' : `${total.toLocaleString('en-IN')} ${total === 1 ? 'lead' : 'leads'}`}</p>
 
       {noteFor ? <QuickNote lead={noteFor} onClose={() => setNoteFor(null)} onSaved={(text) => setRows((rs) => rs.map((r) => (r.id === noteFor.id ? { ...r, latestNote: text, noteCount: r.noteCount + 1 } : r)))} /> : null}
       {lostFor ? (
@@ -370,23 +370,24 @@ export function AxList({
   );
 }
 
-const TH = 'sticky top-0 z-[1] whitespace-nowrap border-b border-[var(--s-rule)] bg-[var(--s-surface)] px-3.5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--s-ink-3)]';
-const TD = 'px-3.5 py-2 align-middle';
+/* The design's table (tbl) draws the cells; these stay as hooks. */
+const TH = '';
+const TD = '';
 
 /** The Stage cell: the badge, and a menu of every column with its dot. */
 function StagePicker({ lead, stages, onMove }: { lead: LeadView; stages: { id: string; name: string; colour: string }[]; onMove: (stageId: string) => void }) {
   const [open, setOpen] = useState(false);
   const ref = useDismiss<HTMLDivElement>(open, () => setOpen(false));
   return (
-    <div ref={ref} className="relative inline-flex">
-      <button type="button" title="Change stage" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1">
+    <div ref={ref} className="cl-pop">
+      <button type="button" title="Change stage" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((o) => !o)} style={{ border: 0, background: 'transparent', padding: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         <StageBadge name={lead.stageName} colour={lead.stageColour} />
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden className="opacity-50">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden style={{ opacity: 0.5 }}>
           <path d="M4 6l4 4 4-4" />
         </svg>
       </button>
       {open ? (
-        <ul role="listbox" className="absolute left-0 top-full z-50 mt-1 max-h-[22rem] w-[220px] list-none overflow-y-auto rounded-[10px] border border-[var(--s-rule)] bg-[var(--s-surface)] p-1 shadow-[var(--s-lift)]">
+        <ul role="listbox" className="cl-menu" style={{ width: 220 }}>
           {stages.map((s) => (
             <li key={s.id}>
               <button
@@ -397,11 +398,11 @@ function StagePicker({ lead, stages, onMove }: { lead: LeadView; stages: { id: s
                   setOpen(false);
                   if (s.id !== lead.stageId) onMove(s.id);
                 }}
-                className="flex w-full items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-left text-[13px] hover:bg-[var(--s-rail-active)]"
+                className="cl-mi"
               >
                 <Dot colour={s.colour} />
-                <span className="truncate">{s.name}</span>
-                {s.id === lead.stageId ? <span className="ml-auto text-[var(--s-accent)]">✓</span> : null}
+                <span>{s.name}</span>
+                {s.id === lead.stageId ? <span className="ok">✓</span> : null}
               </button>
             </li>
           ))}
@@ -416,15 +417,15 @@ function ColumnPicker({ value, choices, onChange }: { value: string; choices: { 
   const [open, setOpen] = useState(false);
   const ref = useDismiss<HTMLDivElement>(open, () => setOpen(false));
   return (
-    <div ref={ref} className="relative inline-flex normal-case">
-      <button type="button" title="Choose field" onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.04em]">
+    <div ref={ref} className="cl-pop">
+      <button type="button" title="Choose field" onClick={() => setOpen((o) => !o)} style={{ border: 0, background: 'transparent', padding: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, font: 'inherit', color: 'inherit' }}>
         {choices.find((c) => c.value === value)?.label ?? 'Field'}
-        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden className="opacity-60">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden style={{ opacity: 0.6 }}>
           <path d="M4 6l4 4 4-4" />
         </svg>
       </button>
       {open ? (
-        <ul className="absolute right-0 top-full z-50 mt-1 max-h-[20rem] w-[200px] list-none overflow-y-auto rounded-[10px] border border-[var(--s-rule)] bg-[var(--s-surface)] p-1 text-left shadow-[var(--s-lift)]">
+        <ul className="cl-menu r" style={{ width: 200 }}>
           {choices.map((c) => (
             <li key={c.value}>
               <button
@@ -433,10 +434,10 @@ function ColumnPicker({ value, choices, onChange }: { value: string; choices: { 
                   onChange(c.value);
                   setOpen(false);
                 }}
-                className="flex w-full items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-[13px] font-normal tracking-normal text-[var(--s-ink)] hover:bg-[var(--s-rail-active)]"
+                className="cl-mi"
               >
                 {c.label}
-                {c.value === value ? <span className="ml-auto text-[var(--s-accent)]">✓</span> : null}
+                {c.value === value ? <span className="ok">✓</span> : null}
               </button>
             </li>
           ))}
@@ -453,13 +454,13 @@ function QuickNote({ lead, onClose, onSaved }: { lead: LeadView; onClose: () => 
   const [error, setError] = useState<string | null>(null);
   return (
     <Modal onClose={onClose} width="min(460px, 94vw)" labelledBy="quick-note">
-      <div className="flex flex-col gap-3 px-5 py-4">
-        <h2 id="quick-note" className="m-0 text-[16px] font-semibold">
+      <div className="sb">
+        <h2 id="quick-note" style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>
           Note on {lead.name}
         </h2>
-        <textarea autoFocus rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder="Add internal note" className="w-full resize-y rounded-[9px] border border-[var(--s-rule)] px-3 py-2 text-[13.5px]" />
-        {error ? <p className="m-0 text-[13px] text-[var(--s-bad)]">{error}</p> : null}
-        <div className="flex justify-end gap-2">
+        <textarea autoFocus rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder="Add internal note" className="fld" />
+        {error ? <p className="cl-err">{error}</p> : null}
+        <div className="hstack" style={{ justifyContent: 'flex-end' }}>
           <button type="button" onClick={onClose} className={btnOutline}>
             Cancel
           </button>

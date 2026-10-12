@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { PageHead, PageBody } from '../StudioShell';
 import { myToday } from '@/modules/studio-sales/today';
 import { todayCount } from '@/modules/studio-sales/today-rules';
 import { currentStudio } from '@/modules/studio/onboarding';
@@ -11,6 +10,8 @@ import { myInboxFor } from '@/modules/studio-sales/inbox';
 import { Inbox } from '../Inbox';
 import { TodayList } from './TodayList';
 import { CrewToday } from '../vendors/CrewToday';
+import '../office-ui.css';
+import './today.css';
 
 export const metadata: Metadata = { title: 'Today', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,8 @@ export const dynamic = 'force-dynamic';
  * salesperson land. What needs doing, each with its one button — calls due,
  * meetings, floor plans not in yet, quotes waiting, bookings; for the owner
  * and PMs also the leads to assign and the ones nobody has called.
+ * The look is the owner's handoff (StudioHome, "Office · Today"): the list
+ * with its progress ring, and the side cards (new for you, crews).
  */
 export default async function TodayPage() {
   const member = await currentMember();
@@ -31,43 +34,66 @@ export default async function TodayPage() {
   const [today, inbox] = await Promise.all([myToday(), myInboxFor(member?.userId ?? null)]);
   if (!today) {
     return (
-      <PageBody>
-        <p className="m-0 text-[15px] text-[var(--s-ink-2)]">Today is for the people who work leads. Ask your studio owner if you should see it.</p>
-      </PageBody>
+      <main className="content ox-page">
+        <p className="ox-note">Today is for the people who work leads. Ask your studio owner if you should see it.</p>
+      </main>
     );
   }
   const count = todayCount(today.sections);
   const now = new Date();
   const dateLine = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' });
+  const hour = Number(now.toLocaleString('en-GB', { hour: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' }));
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
   return (
-    <>
-      <PageHead
-        title="Today"
-        sub={count === 0 ? `${dateLine} · nothing waiting on you` : `${dateLine} · ${count} thing${count === 1 ? '' : 's'} to do`}
-        action={
-          <Link href="/studio/clients" className="s-btn-ghost no-underline">
+    <main className="content ox-page">
+      <div className="phead">
+        <div>
+          <span className="eyebrow">{dateLine}</span>
+          <h1>{greeting}</h1>
+          <p className="muted" style={{ fontSize: 15 }}>
+            {count === 0 ? 'Nothing waiting on you today.' : `${count.toLocaleString('en-IN')} thing${count === 1 ? '' : 's'} to do today.`}
+          </p>
+        </div>
+        <div className="hstack">
+          <Link href="/studio/calendar" className="btn sec">
+            Calendar
+          </Link>
+          <Link href="/studio/clients" className="btn sec">
             {today.seesAll ? 'All leads' : 'My leads'}
           </Link>
-        }
-      />
-      <PageBody>
-        <div className="flex max-w-[56rem] flex-col gap-5">
-          {inbox.length > 0 ? <Inbox items={inbox} /> : null}
-          {/* Studio OS Phase 3: lines to measure, work to mark done, crews to pay. */}
-          <CrewToday />
+        </div>
+      </div>
+      <div className="cols">
+        <div className="colmain">
           {count === 0 ? (
-            <div className="s-card p-6">
-              <p className="m-0 text-[15.5px] font-semibold">All clear.</p>
-              <p className="m-0 mt-1 text-[14px] leading-relaxed text-[var(--s-ink-2)]">
-                No calls due, no meetings today, nothing waiting. Give a lead a follow-up date and it shows here on the day.
-              </p>
-            </div>
+            <section className="card" aria-labelledby="h-clear">
+              <div className="cheer" role="status">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="m5 12 5 5 9-10" />
+                </svg>
+                <span style={{ display: 'flex', flexDirection: 'column' }}>
+                  <b id="h-clear">All clear.</b>
+                  <span className="sm">No calls due, no meetings today, nothing waiting. Give a lead a follow-up date and it shows here on the day.</span>
+                </span>
+              </div>
+            </section>
           ) : (
             <TodayList sections={today.sections} members={today.members} meId={today.meId} />
           )}
         </div>
-      </PageBody>
-    </>
+        <div className="colside">
+          {inbox.length > 0 ? <Inbox items={inbox} /> : null}
+          {/* Studio OS Phase 3: lines to measure, work to mark done, crews to pay. */}
+          <CrewToday />
+          {inbox.length === 0 ? (
+            <div className="empty">
+              <b>Nothing new for you</b>
+              <span className="muted sm">New clients, signatures and customer choices show here until you open them.</span>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </main>
   );
 }

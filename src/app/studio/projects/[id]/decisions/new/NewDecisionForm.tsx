@@ -7,6 +7,7 @@ import { formatINR } from '@/lib/money';
 import { parseRupees } from '@/modules/project/payment-ledger';
 import { CustomerSees, OnlyYourTeam } from '../../../marks';
 import { createDecisionAction } from './actions';
+import { LineIcon } from '../../../../ui/icons';
 
 /**
  * The New decision form and, beside it, the customer's screen as it will
@@ -27,9 +28,9 @@ const blank = (): Option => ({ label: '', detail: '', delta: '', cost: '', swatc
 
 const MAX_OPTIONS = 3;
 
-const field = 's-input w-full';
-const label = 'text-[13.5px] font-semibold text-[var(--s-ink-2)]';
-const hint = 'm-0 text-[12.5px] text-[var(--s-ink-3)]';
+const field = 'fld w-full';
+const label = 'lbl';
+const hint = 'm-0 text-[12.5px] text-[var(--muted)]';
 
 /** "+₹14,000", "−₹2,500", "Included" — what the customer reads next to an option. */
 function priceWords(raw: string): { text: string; tone: 'add' | 'less' | 'same' | 'bad' } {
@@ -133,15 +134,16 @@ export function NewDecisionForm({
     });
 
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+    <div className="wscols">
       <form
-        className="s-card flex min-w-0 flex-col gap-5 p-5"
+        className="wsmain"
         onSubmit={(e) => {
           e.preventDefault();
           if (!sent && problems.length === 0) submit();
         }}
       >
-        <div className="flex flex-col gap-1.5">
+        <section aria-label="The question" className="card">
+        <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <label htmlFor="d-line" className={label}>
               Quote line it changes
@@ -199,16 +201,19 @@ export function NewDecisionForm({
           </div>
         </div>
 
+        </section>
+
+        <section aria-labelledby="h-opts" className="card">
         <fieldset className="m-0 flex flex-col gap-3 border-0 p-0">
           <legend className="mb-1 flex w-full flex-wrap items-baseline justify-between gap-2 p-0">
-            <span className={label}>Options</span>
+            <h2 id="h-opts" className="m-0 text-[17px] font-semibold">Options</h2>
             <span className={hint}>Prices include GST. Leave blank or 0 for as quoted; a minus takes money off.</span>
           </legend>
           {options.map((o, i) => {
             const price = priceWords(o.delta);
             return (
-              <div key={i} className="grid gap-3 rounded-[12px] border border-[var(--s-rule)] p-3 sm:grid-cols-[88px_minmax(0,1fr)]">
-                <label className="relative flex h-[88px] w-[88px] cursor-pointer items-center justify-center overflow-hidden rounded-[10px] border border-dashed border-[var(--s-rule)] bg-[var(--s-surface-2)] text-center text-[12px] text-[var(--s-ink-3)]">
+              <div key={i} className="optcard optgrid">
+                <label className="relative flex h-[96px] w-[96px] cursor-pointer items-center justify-center overflow-hidden rounded-[12px] bg-[var(--paper)] text-center text-[12px] text-[var(--muted)]" style={{ boxShadow: 'inset 0 0 0 1px var(--line)' }}>
                   {o.preview ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={o.preview} alt="" className="absolute inset-0 h-full w-full object-cover" />
@@ -249,13 +254,13 @@ export function NewDecisionForm({
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <div className="flex flex-col gap-1">
-                      <span className="flex items-baseline justify-between gap-2 text-[12.5px] font-semibold text-[var(--s-ink-2)]">
-                        Price change <CustomerSees name={customer} />
+                      <span className="flex items-baseline justify-between gap-2">
+                        <span className="sees">Price change</span> <CustomerSees name={customer} />
                       </span>
                       <div className="flex items-center gap-2">
-                        <span className="text-[14px] text-[var(--s-ink-3)]">₹</span>
+                        <span className="text-[14px] text-[var(--muted)]">₹</span>
                         <input
-                          className={`${field} s-num font-[family-name:var(--font-mono)]`}
+                          className={`${field} mono`}
                           inputMode="decimal"
                           value={o.delta}
                           onChange={(e) => set(i, { delta: e.target.value })}
@@ -265,14 +270,14 @@ export function NewDecisionForm({
                           disabled={sent}
                         />
                       </div>
-                      <span className={`text-[12.5px] ${price.tone === 'bad' ? 'text-[var(--s-bad)]' : 'text-[var(--s-ink-3)]'}`}>{customer} reads: {price.text}</span>
+                      <span className={`text-[12.5px] ${price.tone === 'bad' ? 'text-[var(--bad)]' : 'text-[var(--muted)]'}`}>{customer} reads: {price.text}</span>
                     </div>
-                    <div className="rounded-[10px] bg-[var(--s-surface-2)] p-2">
-                      <span className="text-[12.5px] font-semibold text-[var(--s-ink-2)]">Your cost · only your team</span>
-                      <div className="mt-1 flex items-center gap-2">
-                        <span className="text-[14px] text-[var(--s-ink-3)]">₹</span>
+                    <div className="flex flex-col gap-1">
+                      <span className="team">Your cost · only your team</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[14px] text-[var(--muted)]">₹</span>
                         <input
-                          className={`${field} s-num font-[family-name:var(--font-mono)]`}
+                          className={`${field} mono`}
                           inputMode="decimal"
                           value={o.cost}
                           onChange={(e) => set(i, { cost: e.target.value })}
@@ -284,7 +289,7 @@ export function NewDecisionForm({
                       </div>
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-3 text-[12.5px] text-[var(--s-ink-2)]">
+                  <div className="flex flex-wrap items-center gap-3 text-[12.5px] text-[var(--text2)]">
                     <label className="flex items-center gap-1.5">
                       <input type="checkbox" checked={o.useSwatch} onChange={(e) => set(i, { useSwatch: e.target.checked })} disabled={sent} />
                       It is a colour
@@ -293,7 +298,7 @@ export function NewDecisionForm({
                       <input type="color" value={o.swatch} onChange={(e) => set(i, { swatch: e.target.value })} aria-label={`Option ${i + 1} colour`} disabled={sent} />
                     ) : null}
                     {options.length > 2 ? (
-                      <button type="button" className="ml-auto text-[12.5px] text-[var(--s-ink-3)] underline" onClick={() => setOptions((all) => all.filter((_, j) => j !== i))} disabled={sent}>
+                      <button type="button" className="ml-auto text-[12.5px] text-[var(--muted)] underline" onClick={() => setOptions((all) => all.filter((_, j) => j !== i))} disabled={sent}>
                         Remove this option
                       </button>
                     ) : null}
@@ -303,29 +308,30 @@ export function NewDecisionForm({
             );
           })}
           {options.length < MAX_OPTIONS && !sent ? (
-            <button type="button" className="s-btn-ghost self-start" onClick={() => setOptions((all) => [...all, blank()])}>
+            <button type="button" className="btn ghost sm self-start" onClick={() => setOptions((all) => [...all, blank()])}>
               + Add an option
             </button>
           ) : null}
         </fieldset>
+        </section>
 
-        <div className="flex flex-col gap-2 border-t border-[var(--s-rule)] pt-4">
+        <div className="flex flex-col gap-2">
           {sent ? (
             <div role="status" className="flex flex-col gap-2">
-              <span className="inline-flex items-center gap-2 self-start rounded-full bg-[var(--s-good-wash)] px-4 py-2 text-[14px] font-semibold text-[var(--s-good)]">
+              <span className="inline-flex items-center gap-2 self-start rounded-full bg-[var(--good-bg)] px-4 py-2 text-[14px] font-semibold text-[var(--good)]">
                 ✓ Sent to {customer}
               </span>
-              <p className="m-0 text-[13.5px] text-[var(--s-ink-2)]">
+              <p className="m-0 text-[13.5px] text-[var(--text2)]">
                 It is on {customer}&rsquo;s phone now. You will be told the moment {customer} picks; the quote, the final payment and the locker update by
                 themselves.
               </p>
               <div className="flex flex-wrap gap-2">
-                <Link href={`/studio/projects/${projectId}`} className="s-btn no-underline">
+                <Link href={`/studio/projects/${projectId}`} className="btn pri sm">
                   Back to the project
                 </Link>
                 <button
                   type="button"
-                  className="s-btn-ghost"
+                  className="btn ghost sm"
                   onClick={() => {
                     setSent(false);
                     setTitle('');
@@ -340,7 +346,7 @@ export function NewDecisionForm({
             </div>
           ) : (
             <>
-              <button type="submit" className="s-btn self-start" disabled={pending || problems.length > 0}>
+              <button type="submit" className="btn pri lg self-start" disabled={pending || problems.length > 0}>
                 {pending ? 'Sending…' : `Send to ${customer}`}
               </button>
               <p className={hint}>
@@ -349,7 +355,7 @@ export function NewDecisionForm({
                   : `${customer} gets it on the phone app, with a reminder two days before ${dueWords}.`}
               </p>
               {error ? (
-                <p role="alert" className="m-0 text-[13.5px] text-[var(--s-bad)]">
+                <p role="alert" className="m-0 text-[13.5px] text-[var(--bad)]">
                   {error}
                 </p>
               ) : null}
@@ -358,54 +364,52 @@ export function NewDecisionForm({
         </div>
       </form>
 
-      <aside className="lg:sticky lg:top-4" aria-label={`What ${customer} will see`}>
-        <p className="m-0 mb-2 inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[var(--s-ink-2)]">What {customer} will see</p>
-        <div className="overflow-hidden rounded-[28px] border-[6px] border-[var(--s-ink)] bg-[#fbfbf6] shadow-[var(--s-lift-2)]">
-          <div className="bg-[#0b0b0b] px-5 pb-4 pt-5 text-white">
-            <p className="m-0 text-[11.5px] font-medium uppercase tracking-[0.07em] text-[#f5c3a9]">Your decision, due {dueWords}</p>
-          </div>
-          <div className="flex flex-col gap-3 px-5 py-4">
-            <p className="m-0 text-[22px] font-medium leading-tight tracking-tight text-[#0b0b0b]">{title.trim() || 'What needs deciding'}</p>
-            <p className="m-0 text-[13.5px] leading-relaxed text-[#4a4a4a]">{why.trim() || 'What happens if the decision comes late.'}</p>
-            <ul className="m-0 flex list-none flex-col p-0">
-              {(filled.length ? filled : options).map((o, i) => {
-                const price = priceWords(o.delta);
-                return (
-                  <li key={i} className="flex items-center gap-3 border-t border-[#e6e4dd] py-2.5">
-                    <span className="relative h-[46px] w-[38px] flex-none overflow-hidden rounded-[8px] border border-black/10" style={{ background: o.useSwatch ? o.swatch : '#ecebe5' }}>
-                      {o.preview ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={o.preview} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                      ) : null}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[14.5px] font-semibold text-[#0b0b0b]">{o.label.trim() || `Option ${i + 1}`}</span>
-                      {o.detail.trim() ? <span className="block truncate text-[12px] text-[#4a4a4a]">{o.detail}</span> : null}
-                    </span>
-                    <span
-                      className="font-[family-name:var(--font-mono)] text-[12.5px]"
-                      style={{ color: price.tone === 'same' || price.tone === 'less' ? '#2f6b42' : price.tone === 'bad' ? '#9e4035' : '#0b0b0b' }}
-                    >
-                      {price.tone === 'same' ? 'included' : price.text}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-            <p className="m-0 text-[12.5px] text-[#4a4a4a]">
-              {voters}
-              {customer}&rsquo;s choice decides.
-            </p>
-            <span className="mt-1 block rounded-full bg-[#0b0b0b] py-3 text-center text-[14px] font-semibold text-white" aria-hidden="true">
-              Confirm {(filled[0]?.label.trim() || 'an option').replace(/^./, (c) => c.toLowerCase())}
-            </span>
-          </div>
+      <aside className="wsside" aria-label={`What ${customer} will see`}>
+        <span className="sees" style={{ fontSize: 13 }}>
+          <LineIcon name="eye" size={15} />
+          What {customer} will see
+        </span>
+        <div className="phonecard">
+          <span className="text-[13px] font-medium text-[var(--muted)]">Your decision, due {dueWords}</span>
+          <span className="text-[26px] font-medium leading-[1.05] tracking-[-0.035em]">{title.trim() || 'What needs deciding'}</span>
+          <span className="text-[14px] leading-[1.45] text-[var(--muted)]">{why.trim() || 'What happens if the decision comes late.'}</span>
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {(filled.length ? filled : options).map((o, i) => {
+              const price = priceWords(o.delta);
+              return (
+                <li key={i} className="opt">
+                  <span
+                    className="relative h-9 w-9 flex-none overflow-hidden rounded-[10px]"
+                    style={{ background: o.useSwatch ? o.swatch : 'var(--fill)', boxShadow: 'inset 0 0 0 1px var(--line)' }}
+                    aria-hidden="true"
+                  >
+                    {o.preview ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={o.preview} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                    ) : null}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14.5px] font-medium">{o.label.trim() || `Option ${i + 1}`}</span>
+                    {o.detail.trim() ? <span className="block truncate text-[12px] text-[var(--muted)]">{o.detail}</span> : null}
+                  </span>
+                  <span className="mono text-[13px]" style={{ color: price.tone === 'same' ? 'var(--muted)' : price.tone === 'less' ? 'var(--good)' : 'var(--bad-s)' }}>
+                    {price.tone === 'same' ? 'included' : price.text}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          <span className="text-[13px] text-[var(--muted)]">
+            {voters}
+            {customer}&rsquo;s choice decides.
+          </span>
+          <span className="btn pri" aria-hidden="true">
+            Confirm {(filled[0]?.label.trim() || 'an option').replace(/^./, (c) => c.toLowerCase())}
+          </span>
         </div>
-        <div className="mt-3">
-          <OnlyYourTeam>
-            <p className="m-0 text-[12.5px] text-[var(--s-ink-2)]">Your cost per option never leaves this screen. {customer} sees only the price change.</p>
-          </OnlyYourTeam>
-        </div>
+        <OnlyYourTeam>
+          <p className="m-0 text-[13px] text-[var(--text2)]">Your cost per option never leaves this screen. {customer} sees only the price change.</p>
+        </OnlyYourTeam>
       </aside>
     </div>
   );

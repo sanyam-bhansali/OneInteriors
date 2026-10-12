@@ -25,10 +25,8 @@ import {
 } from './actions';
 import { IDLE, type State } from '../../form-state';
 
-const input =
-  'rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[14px] text-[var(--s-ink)] placeholder:text-[var(--s-ink-3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]';
-const primary =
-  'rounded-[8px] bg-[var(--s-accent)] px-4 py-2 text-[14px] font-medium text-white hover:bg-[var(--s-accent-deep)] disabled:opacity-40';
+const input = 'fld fit';
+const primary = 'btn pri';
 const KINDS = Object.keys(STAGE_KIND_LABELS) as StageKindName[];
 
 /** The eight swatches. A token each, never a free picker — see `vocabulary.ts`. */
@@ -100,7 +98,7 @@ function StageLine({ stage, canMoveUp, canMoveDown }: {
             aria-label="Move up"
             disabled={!canMoveUp || pending}
             onClick={() => run(() => moveStageAction(stage.id, 'up'))}
-            className="px-1 text-[11px] leading-tight text-[var(--s-ink-3)] hover:text-[var(--s-ink)] disabled:opacity-25"
+            className="px-1 text-[11px] leading-tight muted hover:text-[var(--s-ink)] disabled:opacity-25"
           >
             ▲
           </button>
@@ -109,7 +107,7 @@ function StageLine({ stage, canMoveUp, canMoveDown }: {
             aria-label="Move down"
             disabled={!canMoveDown || pending}
             onClick={() => run(() => moveStageAction(stage.id, 'down'))}
-            className="px-1 text-[11px] leading-tight text-[var(--s-ink-3)] hover:text-[var(--s-ink)] disabled:opacity-25"
+            className="px-1 text-[11px] leading-tight muted hover:text-[var(--s-ink)] disabled:opacity-25"
           >
             ▼
           </button>
@@ -150,7 +148,7 @@ function StageLine({ stage, canMoveUp, canMoveDown }: {
         />
 
         {stage.isIntake ? (
-          <span className="s-tag flex-none !bg-[var(--s-accent-wash)] !text-[var(--s-accent-deep)]">
+          <span className="chip flex-none !bg-[var(--s-accent-wash)] !text-[var(--s-accent-deep)]">
             Intake
           </span>
         ) : (
@@ -163,27 +161,27 @@ function StageLine({ stage, canMoveUp, canMoveDown }: {
                 ? 'New clients land here'
                 : 'New clients have to land in a column that is still in play'
             }
-            className="flex-none text-[12.5px] text-[var(--s-ink-3)] underline-offset-2 hover:text-[var(--s-ink)] hover:underline disabled:no-underline disabled:opacity-40"
+            className="flex-none text-[12.5px] muted underline-offset-2 hover:text-[var(--s-ink)] hover:underline disabled:no-underline disabled:opacity-40"
           >
             Make intake
           </button>
         )}
 
-        <span className="s-num s-label flex-none">{stage.clientCount}</span>
+        <span className="mono lbl flex-none">{stage.clientCount}</span>
 
         <button
           type="button"
           aria-label={`Delete ${stage.name}`}
           disabled={pending || stage.isIntake}
           onClick={() => run(() => removeStageAction(stage.id))}
-          className="flex-none px-1 text-[15px] leading-none text-[var(--s-ink-3)] hover:text-[var(--s-bad)] disabled:opacity-25"
+          className="flex-none px-1 text-[15px] leading-none muted hover:text-[var(--s-bad)] disabled:opacity-25"
         >
           ×
         </button>
       </div>
 
       {error ? (
-        <p role="alert" className="m-0 pl-9 text-[12.5px] text-[var(--s-bad)]">{error}</p>
+        <p role="alert" className="m-0 pl-9 text-[12.5px] bad-t">{error}</p>
       ) : null}
     </li>
   );
@@ -202,12 +200,12 @@ function NewStage() {
   return (
     <form key={key} action={action} className="flex flex-wrap items-end gap-3 pt-4">
       <label className="flex min-w-[12rem] flex-1 flex-col gap-1.5">
-        <span className="s-label">Another column</span>
+        <span className="lbl">Another column</span>
         <input name="name" required placeholder="Site measurement done" className={input} />
       </label>
 
       <label className="flex flex-none flex-col gap-1.5">
-        <span className="s-label">Means</span>
+        <span className="lbl">Means</span>
         <select name="kind" defaultValue="OPEN" className={input}>
           {KINDS.map((k) => (
             <option key={k} value={k}>{STAGE_KIND_LABELS[k]}</option>
@@ -216,7 +214,7 @@ function NewStage() {
       </label>
 
       <div className="flex flex-none flex-col gap-1.5">
-        <span className="s-label">Colour</span>
+        <span className="lbl">Colour</span>
         <input type="hidden" name="colour" value={colour} />
         <div className="py-1.5">
           <Swatches value={colour} onPick={setColour} />
@@ -228,7 +226,7 @@ function NewStage() {
       </button>
 
       {'ok' in state && !state.ok ? (
-        <p role="alert" className="m-0 w-full text-[12.5px] text-[var(--s-bad)]">{state.error}</p>
+        <p role="alert" className="m-0 w-full text-[12.5px] bad-t">{state.error}</p>
       ) : null}
     </form>
   );
@@ -236,10 +234,10 @@ function NewStage() {
 
 export function PipelineEditor({ stages }: { stages: StageRow[] }) {
   return (
-    <div className="s-card p-5">
+    <div className="card p-5">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="m-0 text-[15.5px] font-semibold">Your columns</h2>
-        <p className="m-0 text-[13px] text-[var(--s-ink-3)]">
+        <p className="m-0 text-[13px] muted">
           In the order work moves. Drag is coming; the arrows work now.
         </p>
       </div>

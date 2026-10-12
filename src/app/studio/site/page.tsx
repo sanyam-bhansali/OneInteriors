@@ -7,18 +7,20 @@ import { SiteCards } from './SiteCards';
 import { siteWords } from './words';
 import { EyeIcon } from './icons';
 import { crewsOnMySites } from '@/modules/studio-crews/store';
+import { LangSeg } from '../home/HomeBits';
+import { ThemeToggle } from '../ui/theme';
 
 export const metadata: Metadata = { title: 'My sites today', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
 
 /**
- * Site mode · My sites today (studio workspace Phase 2, design
- * studio/SiteToday.dc.html, in the studio's deep-green palette). One card
+ * Site mode · My sites today (the owner's UI handoff, SiteToday). One card
  * per site this member may post to — `mySitesToday` reads through
  * `projectsVisibleTo`, so an unassigned site never appears — with today's
  * state (not posted / posted at a time / nobody on site, and anything still
  * waiting to send from this phone), the big **Post today's update** button,
- * **Nobody on site**, and the snag count. In the language picked at sign-in.
+ * **Nobody on site**, and the snag count. In the language picked at sign-in;
+ * the header carries the theme and the language.
  */
 export default async function SiteTodayPage() {
   const now = new Date();
@@ -30,39 +32,54 @@ export default async function SiteTodayPage() {
   const cards = data?.cards ?? [];
 
   return (
-    <div className="flex flex-col gap-5 px-4 pb-6 pt-5">
-      <div>
-        <p className="m-0 text-[15px] text-[var(--s-ink-2)]">{first ? t('hello', { name: first }) : t('helloNoName')}</p>
-        <h1 className="m-0 mt-1 text-[28px] font-semibold tracking-[-0.02em]">{t('today.h1')}</h1>
-        <p className="m-0 mt-1 font-[family-name:var(--font-mono)] text-[13px] text-[var(--s-ink-3)]">
-          {cards.length === 1 ? t('today.count1', { date }) : t('today.count', { date, n: cards.length })}
-        </p>
+    <>
+      <div className="st-head">
+        <div style={{ minWidth: 0 }}>
+          <span className="who">{t('today.who', { studio: data?.studio ?? 'Your studio' })}</span>
+          <h1>{first ? t('hello', { name: first }) : t('helloNoName')}</h1>
+        </div>
+        <div className="st-ctl">
+          <ThemeToggle className="thbtn st-thb" />
+        </div>
       </div>
+      <div className="st-page">
+        <div className="hstack" style={{ justifyContent: 'space-between' }}>
+          <span className="st-date">{cards.length === 1 ? t('today.count1', { date }) : t('today.count', { date, n: cards.length })}</span>
+          <span className="st-ctl">
+            <LangSeg value={lang} />
+          </span>
+        </div>
 
-      {cards.length === 0 ? (
-        <p className="s-card m-0 p-5 text-[16px] leading-relaxed text-[var(--s-ink-2)]">{t('today.none')}</p>
-      ) : (
-        <SiteCards cards={cards} lang={lang} today={istDay(now)} />
-      )}
+        {cards.length === 0 ? (
+          <div className="st-card">
+            <p className="st-line" style={{ margin: 0, fontSize: 16, lineHeight: 1.5 }}>
+              {t('today.none')}
+            </p>
+          </div>
+        ) : (
+          <SiteCards cards={cards} lang={lang} today={istDay(now)} />
+        )}
 
-      {/* Studio OS Phase 3: which crew is on which of these jobs. Names only, never money. */}
-      {crews.length ? (
-        <section className="s-card flex flex-col gap-2 p-4" aria-label="Crews on your sites">
-          {crews.map((c) => (
-            <div key={c.projectId}>
-              <p className="m-0 text-[14px] font-semibold">{c.projectName}</p>
-              <p className="m-0 text-[14px] text-[var(--s-ink-2)]">{c.crews.map((x) => `${x.name} (${x.trades})`).join(' · ')}</p>
-            </div>
-          ))}
-        </section>
-      ) : null}
+        {/* Studio OS Phase 3: which crew is on which of these jobs. Names only, never money. */}
+        {crews.length ? (
+          <section className="st-card" aria-label={t('crews.h')} style={{ gap: 10 }}>
+            <span className="st-label">{t('crews.h')}</span>
+            {crews.map((c) => (
+              <div key={c.projectId}>
+                <p style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>{c.projectName}</p>
+                <p className="st-line" style={{ margin: 0 }}>
+                  {c.crews.map((x) => `${x.name} (${x.trades})`).join(' · ')}
+                </p>
+              </div>
+            ))}
+          </section>
+        ) : null}
 
-      <div className="flex items-start gap-2.5 rounded-[14px] bg-[var(--s-surface-2)] p-4">
-        <span className="mt-0.5 text-[var(--s-ink-2)]">
+        <div className="st-note">
           <EyeIcon />
-        </span>
-        <p className="m-0 text-[14px] leading-relaxed text-[var(--s-ink-2)]">{t('today.note')}</p>
+          <p style={{ margin: 0 }}>{t('today.note')}</p>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

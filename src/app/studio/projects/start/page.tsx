@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { PageBody } from '../../StudioShell';
 import { can, currentMember } from '@/modules/studio/access';
 import { istToday, startableQuotes } from '@/modules/project/own-project';
 import { StartProjectForm } from './StartProjectForm';
+import '../projects.css';
 
 export const metadata: Metadata = { title: 'Start a project', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -22,26 +22,25 @@ export default async function StartProjectPage({ searchParams }: { searchParams:
   const quotes = allowed ? await startableQuotes(member) : [];
 
   return (
-    <>
-      <div className="border-b border-[var(--s-rule)] bg-[var(--s-rail)]/50 px-5 py-4 sm:px-7">
-        <Link href="/studio/projects" className="text-[13px] text-[var(--s-ink-3)] no-underline hover:text-[var(--s-accent)]">
+    <div className="content oi-proj">
+      <div className="flex flex-col gap-2">
+        <Link href="/studio/projects" className="back">
           ← Projects
         </Link>
-        <h1 className="m-0 mt-1 text-[22px] font-semibold tracking-tight">Start a project</h1>
-        <p className="m-0 mt-1 max-w-[64ch] text-[14px] text-[var(--s-ink-2)]">
+        <h1 className="m-0 text-[32px] font-medium leading-[1.1] tracking-[-0.035em]">Start a project</h1>
+        <span className="max-w-[64ch] text-[15px] text-[var(--muted)]">
           For a client of your own who has accepted your quotation. The plan, the room checklists, the payment stages and the materials
           come from the quotation, and your client follows it in the One Interiors app.
-        </p>
+        </span>
       </div>
-      <PageBody>
         {!allowed ? (
-          <p className="m-0 text-[15px] text-[var(--s-ink-2)]">Only your studio owner or a project manager can start a project.</p>
+          <p className="m-0 text-[15px] text-[var(--text2)]">Only your studio owner or a project manager can start a project.</p>
         ) : quotes.length === 0 ? (
-          <div className="s-card max-w-[640px] p-6">
-            <p className="m-0 mb-2 text-[15.5px] font-semibold">No accepted quotation to start from yet.</p>
-            <p className="m-0 text-[14.5px] leading-relaxed text-[var(--s-ink-2)]">
+          <div className="empty max-w-[640px]">
+            <b>No accepted quotation to start from yet.</b>
+            <p className="m-0 text-[14.5px] leading-relaxed text-[var(--text2)]">
               A project starts from a quotation you have sent or that the client has accepted. Open it in{' '}
-              <Link href="/studio/quotations" className="text-[var(--s-accent)]">
+              <Link href="/studio/quotations" className="acc-t">
                 Quotations
               </Link>{' '}
               and mark it as sent or won, then come back here.
@@ -54,7 +53,6 @@ export default async function StartProjectPage({ searchParams }: { searchParams:
             today={istToday()}
           />
         )}
-      </PageBody>
-    </>
+    </div>
   );
 }

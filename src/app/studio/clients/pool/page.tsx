@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { PageBody } from '../../StudioShell';
+import { LineIcon } from '../../ui/icons';
+import '../clients.css';
 import { myStages } from '@/modules/studio-practice/stages';
 import { myFields } from '@/modules/studio-practice/fields';
 import { myLeadScope } from '@/modules/studio/lead-scope';
@@ -32,9 +33,11 @@ export default async function PoolPage({ searchParams }: { searchParams: Promise
   const scope = await myLeadScope();
   if (!scope) {
     return (
-      <PageBody>
-        <p className="m-0 text-[15px] text-[var(--s-ink-2)]">The pool is for the people who work leads.</p>
-      </PageBody>
+      <main className="content cl-page">
+        <div className="empty">
+          <b>The pool is for the people who work leads.</b>
+        </div>
+      </main>
     );
   }
   const showingAll = scope.seesAll && one('all') === '1';
@@ -53,21 +56,23 @@ export default async function PoolPage({ searchParams }: { searchParams: Promise
   const listQuery = [query, 'sort=newest', showingAll ? 'all=1' : '', groupKey ? `group=${groupKey}` : ''].filter(Boolean).join('&');
 
   return (
-    <PageBody>
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+    <main className="content cl-page">
+        <div className="phead">
           <div>
-            <h1 className="m-0 text-[22px] font-semibold tracking-tight">Pool</h1>
-            <p className="m-0 mt-0.5 text-[13.5px] text-[var(--s-ink-3)]">{scope.seesAll ? 'Unassigned leads — nobody is working these yet.' : 'Leads nobody has yet. Claim the ones you will work.'}</p>
+            <h1>
+              The pool <span className="mono n">{total.toLocaleString('en-IN')}</span>
+            </h1>
+            <p className="muted">{scope.seesAll ? 'Unassigned leads — nobody is working these yet.' : 'Leads nobody has yet. Claim the ones you will work.'}</p>
           </div>
           {scope.seesAll ? (
-            <Link href="/studio/clients/import" className="s-btn no-underline">
+            <Link href="/studio/clients/import" className="btn sec">
+              <LineIcon name="upload" size={17} />
               Import CSV
             </Link>
           ) : null}
         </div>
 
-        <div className="flex flex-wrap items-start gap-3">
+        <div className="hstack" style={{ alignItems: 'flex-start' }}>
           <Toolbar
             query={query}
             view="list"
@@ -98,7 +103,6 @@ export default async function PoolPage({ searchParams }: { searchParams: Promise
           groupKey={groupKey}
           stages={stages.map((s) => ({ id: s.id, name: s.name, kind: s.kind }))}
         />
-      </div>
-    </PageBody>
+    </main>
   );
 }

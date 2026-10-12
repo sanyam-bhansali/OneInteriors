@@ -33,7 +33,7 @@ export function StarToggle({
       <path d="M12 3.2l2.6 5.5 6 .8-4.4 4.1 1.1 5.9L12 16.6l-5.3 2.9 1.1-5.9-4.4-4.1 6-.8z" />
     </svg>
   );
-  const tone = starred ? 'text-[var(--s-accent)]' : 'text-[var(--s-ink-3)]';
+  const tone = starred ? 'acc-t' : 'muted';
   if (!canEdit) {
     return (
       <span className={`inline-flex h-9 w-9 flex-none items-center justify-center ${tone}`} title={title}>
@@ -50,7 +50,7 @@ export function StarToggle({
       title={title}
       disabled={pending}
       onClick={() => start(async () => say(await starStepAction(projectId, stepId, !starred)))}
-      className={`inline-flex h-9 w-9 flex-none items-center justify-center rounded-[8px] hover:bg-[var(--s-surface-2)] disabled:opacity-50 ${tone}`}
+      className={`inline-flex h-9 w-9 flex-none items-center justify-center rounded-[8px] hover:bg-[var(--fill)] disabled:opacity-50 ${tone}`}
     >
       {glyph}
     </button>
@@ -62,8 +62,8 @@ export function MilestoneCount({ n }: { n: number }) {
   const warn = milestoneWarning(n);
   return (
     <span className="inline-flex flex-wrap items-baseline gap-x-2 text-[12.5px]">
-      <span className="font-medium text-[var(--s-accent)]">★ {milestonesShown(n)}</span>
-      {warn ? <span className="text-[var(--s-warn)]">{warn}</span> : null}
+      <span className="font-medium acc-t">★ {milestonesShown(n)}</span>
+      {warn ? <span className="text-[var(--warn)]">{warn}</span> : null}
     </span>
   );
 }

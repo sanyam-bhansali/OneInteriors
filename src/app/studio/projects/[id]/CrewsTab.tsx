@@ -10,8 +10,8 @@ export async function CrewsTab({ projectId, now }: { projectId: string; now: Dat
   const r = await projectCrews(projectId, now);
   if (!r.ok) {
     return (
-      <section className="s-card p-5">
-        <p className="m-0 text-[15px] text-[var(--s-ink-2)]">{r.error}</p>
+      <section className="card p-5">
+        <p className="m-0 text-[15px] text-[var(--text2)]">{r.error}</p>
       </section>
     );
   }

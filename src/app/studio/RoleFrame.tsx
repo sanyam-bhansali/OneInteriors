@@ -1,16 +1,16 @@
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { CREWS_HOME, DESIGN_HOME, PAYMENTS_HOME } from '@/modules/studio/surfaces';
-import { getLang } from '@/modules/i18n/server';
 import type { StudioMemberRef } from '@/modules/studio/access';
 import { ROLE_NAMES } from '@/modules/studio/team-rules';
-import { LangSwitch } from './LangSwitch';
 
 /**
  * The frame for a studio team member who does not work in the office: a site
  * supervisor (site mode, phone first, in their language) or accounts (the
  * payments desk). No office rail, no client search — there is nothing behind
  * them for these roles, and showing it would be a sign on a locked door.
+ * (The layout uses it for the supervisor; the other branch is kept for any
+ * member the layout sends here without the app frame.)
  */
 export async function RoleFrame({
   member,
@@ -23,11 +23,18 @@ export async function RoleFrame({
   signOut: React.ReactNode;
   children: React.ReactNode;
 }) {
+  /* A site supervisor: site mode's own phone frame (SiteToday, SiteUpdate,
+     SiteSnag in the owner's UI handoff). No header bar: each screen draws
+     its own top (studio and role, greeting, theme and language on Today; a
+     back arrow on the full-screen tasks), and sign out is on Me. */
+  if (member.role === 'SUPERVISOR') {
+    void signOut;
+    return <div className="st-frame">{children}</div>;
+  }
+
   const studio = await prisma.studio
     .findUnique({ where: { id: member.studioId }, select: { tradeName: true } })
     .catch(() => null);
-  const site = member.role === 'SUPERVISOR';
-  const lang = site ? await getLang() : 'en';
 
   return (
     <div className="studio-app min-h-dvh bg-[var(--s-ground)] text-[var(--s-ink)]">
@@ -59,11 +66,10 @@ export async function RoleFrame({
               </Link>
             </nav>
           ) : null}
-          {site ? <LangSwitch value={lang} /> : null}
           {signOut}
         </div>
       </header>
-      <main className={site ? 'mx-auto w-full max-w-[560px]' : 'min-w-0'}>{children}</main>
+      <main className="min-w-0">{children}</main>
     </div>
   );
 }

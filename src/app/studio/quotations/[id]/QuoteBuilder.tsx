@@ -15,7 +15,7 @@ import {
   type AddSize,
   type EditableLine,
 } from './QuoteLines';
-import { TotalsPanel, DocumentPreview, ChangesPanel } from './QuotePanels';
+import { TotalsPanel, RoomBreakdown, DocumentPreview, ChangesPanel } from './QuotePanels';
 import { TermsPanel, pctToBps, rupeesToPaiseText, type TermsDraft } from './TermsPanel';
 import { ClientPanel } from './ClientPanel';
 import { FloorPlanView } from '@/components/floorplan/FloorPlanView';
@@ -83,6 +83,7 @@ export function QuoteBuilder({
   const [saving, startSave] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<'lines' | 'document' | 'changes'>('lines');
+  const [picked, setPicked] = useState<string | null>(null);
   const [terms, setTerms] = useState<TermsDraft>(() => termsDraftOf(quote));
   const savedTerms = useRef(JSON.stringify(termsDraftOf(quote)));
 
@@ -362,74 +363,26 @@ export function QuoteBuilder({
     });
   }
 
+  /* The room on screen (StudioQuoteBuilder: rooms down the left, one room's
+     lines in the middle). A room that went away — renamed, or its last line
+     removed — falls back to the first; NEW_ROOM is the add box on its own. */
+  const shownRoom = picked === NEW_ROOM ? NEW_ROOM : picked !== null && roomOrder.includes(picked) ? picked : (roomOrder[0] ?? NEW_ROOM);
+  const roomTotal = (room: string) => priced.filter((l) => l.room === room).reduce((a, l) => a + l.amountPaise, 0);
+  const roomCount = (room: string) => lines.filter((l) => l.room === room).length;
+  const addHere = (room: string, product: ProductRow, size: AddSize) => {
+    add(room, product, size);
+    setPicked(room);
+  };
+
+  const flat = <ConfigurePanel quote={quote} hasLines={lines.length > 0} planReader={planReader} />;
+
   return (
-    /**
-     * Controls on the left, the document on the right.
-     *
-     * The shape of the builder this module is descended from, and it is the
-     * right one: everything that CHANGES the quotation sits in one rail — the
-     * flat, the line being added, the save — and the whole of the main area is
-     * the quotation itself. The previous layout scattered the controls through
-     * the rooms and put the money in a sidebar, which meant the thing being
-     * read and the thing being operated were interleaved.
-     */
-    <div className="grid gap-5 lg:grid-cols-[21rem_minmax(0,1fr)]">
-      <aside className="flex flex-col gap-4 lg:sticky lg:top-5 lg:max-h-[calc(100dvh-2.5rem)] lg:self-start lg:overflow-y-auto">
-        <ClientPanel quote={quote} />
-        <ConfigurePanel quote={quote} hasLines={lines.length > 0} planReader={planReader} />
-        {quote.planRooms.length > 0 ? (
-          <section className="s-card p-4">
-            <h2 className="s-label m-0 mb-2">Their floor plan</h2>
-            <FloorPlanView rooms={quote.planRooms} />
-          </section>
-        ) : null}
-        <AddLinePanel
-          rooms={roomOrder}
-          products={products}
-          quoteConfig={quote.config}
-          baths={quote.bathrooms}
-          onAdd={add}
-        />
-        <TermsPanel
-          terms={terms}
-          onChange={(patch) => setTerms((t) => ({ ...t, ...patch }))}
-          ownSchedule={(quote.phases?.length ?? 0) > 0}
-        />
-
-        {/* In the rail, beside everything that made it dirty. */}
-        <div className="s-card p-4">
-          <div className="mb-2 flex items-baseline justify-between gap-3">
-            <span className="s-label">What the client pays</span>
-            <span className="s-num text-[17px] font-semibold">
-              {formatINR(totals.totalPaise)}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={save}
-            disabled={saving || !dirty}
-            className="w-full rounded-[8px] bg-[var(--s-ink)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--s-surface)] disabled:opacity-30"
-          >
-            {saving ? 'Saving…' : dirty ? 'Save the quotation' : 'Saved'}
-          </button>
-          {error ? (
-            <p role="alert" className="m-0 mt-2 text-[12.5px] text-[var(--s-bad)]">
-              {error}
-            </p>
-          ) : null}
-          <p className="m-0 mt-2 text-[12px] leading-snug text-[var(--s-ink-3)]">
-            {dirty
-              ? 'Unsaved. Figures on screen are live; the stored copy is not.'
-              : 'Everything on screen is stored.'}
-          </p>
-        </div>
-      </aside>
-
-      <div className="min-w-0">
-        <div className="mb-4 flex flex-wrap items-center gap-2">
+    <>
+      <div className="hstack" style={{ justifyContent: 'space-between' }}>
+        <div className="tabs" role="tablist" aria-label="Quotation view">
           <Tab on={tab === 'lines'} onClick={() => setTab('lines')}>
             Quotation
-            {lines.length > 0 ? <Count n={lines.length} /> : null}
+            {lines.length > 0 ? <span className="n">{lines.length}</span> : null}
           </Tab>
           <Tab on={tab === 'document'} onClick={() => setTab('document')}>
             What the client sees
@@ -437,45 +390,81 @@ export function QuoteBuilder({
           {revision ? (
             <Tab on={tab === 'changes'} onClick={() => setTab('changes')}>
               Changes
-              {revision.identical ? null : (
-                <Count n={revision.addedCount + revision.removedCount + revision.repricedCount} />
-              )}
+              {revision.identical ? null : <span className="n">{revision.addedCount + revision.removedCount + revision.repricedCount}</span>}
             </Tab>
           ) : null}
         </div>
+        <span className={`sm ${saving ? 'muted' : dirty ? 'warn-t' : 'good-t'}`} style={{ fontWeight: 600 }} role="status">
+          {saving ? 'Saving…' : dirty ? 'Unsaved changes' : 'Saved'}
+        </span>
+      </div>
 
-        {tab === 'lines' ? (
-          <div className="flex flex-col gap-4">
+      {tab === 'lines' ? (
+        <div className="qb">
+          <nav className="rooms" aria-label="Rooms">
+            {roomOrder.map((room) => (
+              <button key={room} type="button" className="room" aria-current={shownRoom === room} onClick={() => setPicked(room)}>
+                <b>{room}</b>
+                <span className="muted sm mono">
+                  {roomCount(room)} {roomCount(room) === 1 ? 'line' : 'lines'} · {formatINR(roomTotal(room))}
+                </span>
+              </button>
+            ))}
+            <button type="button" className="room add" aria-current={shownRoom === NEW_ROOM} onClick={() => setPicked(NEW_ROOM)}>
+              <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1 }}>
+                +
+              </span>
+              <b>Add a room</b>
+            </button>
+          </nav>
+
+          <div className="qmid">
             {unpriced > 0 ? (
-              <p className="s-card m-0 border-l-[3px] !border-l-[var(--s-warn)] px-4 py-3 text-[13.5px] leading-relaxed text-[var(--s-ink-2)]">
-                {unpriced} {unpriced === 1 ? 'line has' : 'lines have'} no figure yet — a
-                measurement or a rate is missing. They count as zero in the total, which is
-                almost certainly not what you want to send.
+              <p className="qnote warn">
+                {unpriced} {unpriced === 1 ? 'line has' : 'lines have'} no figure yet — a measurement or a rate is missing. They count as
+                zero in the total, which is almost certainly not what you want to send.
               </p>
             ) : null}
 
             {lines.length === 0 ? (
-              <div className="s-card p-6">
-                <p className="m-0 mb-1.5 text-[15px] font-semibold">Nothing on it yet.</p>
-                <p className="m-0 max-w-[62ch] text-[14px] leading-relaxed text-[var(--s-ink-2)]">
-                  Build the standard quotation for this flat from the panel on the left, or add
-                  lines one at a time. Either way the sizes and rates come from your own product
-                  list as a starting point and every one of them is editable here — changing a
-                  line never changes your catalogue, and changing your catalogue never changes a
-                  quotation you have already sent.
-                </p>
-              </div>
+              <>
+                <div className="empty">
+                  <b>Nothing on it yet.</b>
+                  <span className="muted sm" style={{ maxWidth: '62ch', lineHeight: 1.5 }}>
+                    Build the standard quotation for this flat below, or add lines one at a time. Either way the sizes and rates come
+                    from your own product list as a starting point and every one of them is editable here — changing a line never
+                    changes your catalogue, and changing your catalogue never changes a quotation you have already sent.
+                  </span>
+                </div>
+                {flat}
+              </>
             ) : null}
 
-            {roomOrder.map((room, i) => (
+            {shownRoom === NEW_ROOM ? (
+              <section className="card flush" aria-label="Add a room">
+                <div className="chead">
+                  <h2>{lines.length === 0 ? 'Add the first line' : 'A new room'}</h2>
+                  <span className="muted sm">Type the room&rsquo;s name in Room and pick its first item.</span>
+                </div>
+                <AddLinePanel
+                  key={NEW_ROOM}
+                  rooms={roomOrder}
+                  products={products}
+                  quoteConfig={quote.config}
+                  baths={quote.bathrooms}
+                  onAdd={addHere}
+                  defaultRoom=""
+                />
+              </section>
+            ) : (
               <RoomSection
-                key={room}
-                room={room}
+                key={shownRoom}
+                room={shownRoom}
                 onMoveRoom={moveRoom}
-                firstRoom={i === 0}
-                lastRoom={i === roomOrder.length - 1}
+                firstRoom={roomOrder.indexOf(shownRoom) === 0}
+                lastRoom={roomOrder.indexOf(shownRoom) === roomOrder.length - 1}
                 mayAddProducts={mayAddProducts}
-                lines={priced.filter((l) => l.room === room)}
+                lines={priced.filter((l) => l.room === shownRoom)}
                 onUpdate={update}
                 onRemove={remove}
                 onDuplicate={duplicate}
@@ -483,72 +472,95 @@ export function QuoteBuilder({
                 products={products}
                 onSwap={swap}
                 onReorder={reorder}
-                onRenameRoom={renameRoom}
-              />
-            ))}
+                onRenameRoom={(from, to) => {
+                  renameRoom(from, to);
+                  setPicked(to);
+                }}
+              >
+                <AddLinePanel
+                  key={shownRoom}
+                  rooms={roomOrder}
+                  products={products}
+                  quoteConfig={quote.config}
+                  baths={quote.bathrooms}
+                  onAdd={addHere}
+                  defaultRoom={shownRoom}
+                />
+              </RoomSection>
+            )}
 
-            {lines.length > 0 ? (
-              <TotalsPanel quote={live} totals={totals} rooms={rooms} />
+            {quote.planRooms.length > 0 ? (
+              <section className="card" aria-label="Their floor plan">
+                <div className="chead">
+                  <h2>Their floor plan</h2>
+                </div>
+                <FloorPlanView rooms={quote.planRooms} />
+              </section>
             ) : null}
           </div>
-        ) : null}
 
-        {tab === 'document' ? (
-          <DocumentPreview
-            quote={live}
-            lines={priced}
-            rooms={roomOrder}
-            totals={totals}
-            branding={branding}
-            showMark={showMark}
-            markText={markText}
-            logoUrl={logoUrl}
-          />
-        ) : null}
+          <div className="qside">
+            <TotalsPanel quote={live} totals={totals} lineCount={lines.length}>
+              {/* Beside the figure everything on screen moves. */}
+              <button type="button" onClick={save} disabled={saving || !dirty} className="btn pri" style={!dirty && !saving ? { opacity: 0.45 } : undefined}>
+                {saving ? 'Saving…' : dirty ? 'Save the quotation' : 'Saved'}
+              </button>
+              {error ? (
+                <p role="alert" className="qerr">
+                  {error}
+                </p>
+              ) : null}
+              <span className="muted sm">
+                {dirty ? 'Unsaved. Figures on screen are live; the stored copy is not.' : 'Everything on screen is stored.'}
+              </span>
+            </TotalsPanel>
+            <TermsPanel
+              terms={terms}
+              onChange={(patch) => setTerms((t) => ({ ...t, ...patch }))}
+              ownSchedule={(quote.phases?.length ?? 0) > 0}
+            />
+            <RoomBreakdown rooms={rooms} />
+            <ClientPanel quote={quote} />
+            {lines.length > 0 ? flat : null}
+          </div>
+        </div>
+      ) : null}
 
-        {tab === 'changes' && revision ? (
-          <ChangesPanel summary={revision} issuedOn={quote.issuedOn} />
-        ) : null}
-      </div>
-    </div>
+      {tab === 'document' ? (
+        <DocumentPreview
+          quote={live}
+          lines={priced}
+          rooms={roomOrder}
+          totals={totals}
+          branding={branding}
+          showMark={showMark}
+          markText={markText}
+          logoUrl={logoUrl}
+        />
+      ) : null}
+
+      {tab === 'changes' && revision ? <ChangesPanel summary={revision} issuedOn={quote.issuedOn} /> : null}
+    </>
   );
 }
 
 /*
  * `AddRoom` used to live here: a text box under the last room that created
  * one by seeding it with an arbitrary product, because a room with no lines
- * cannot exist when rooms are derived from the lines. `AddLinePanel` asks for
- * the room and the product together, which is the same act without the
- * invented seed line. Recoverable from git history.
+ * cannot exist when rooms are derived from the lines. "Add a room" now opens
+ * the add box with an empty room, which is the same act without the invented
+ * seed line.
  */
 
-function Tab({
-  on,
-  onClick,
-  children,
-}: {
-  on: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
+/** The add box on its own, for a room that does not exist yet. */
+const NEW_ROOM = '\u0000new-room';
+
+function Tab({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={on}
-      className={`inline-flex items-center gap-2 rounded-[9px] px-3.5 py-2 text-[13.5px] font-medium ${
-        on
-          ? 'bg-[var(--s-ink)] text-[var(--s-surface)]'
-          : 'border border-[var(--s-rule)] text-[var(--s-ink-2)] hover:border-[var(--s-ink-3)]'
-      }`}
-    >
+    <button type="button" role="tab" onClick={onClick} aria-selected={on}>
       {children}
     </button>
   );
-}
-
-function Count({ n }: { n: number }) {
-  return <span className="s-num text-[11.5px] opacity-70">{n}</span>;
 }
 
 /**

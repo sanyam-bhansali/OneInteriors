@@ -30,12 +30,12 @@ export interface PriceRowView {
  */
 export function PriceRows({ rows, kind }: { rows: PriceRowView[]; kind: 'price' | 'qty' }) {
   return (
-    <div className="s-card overflow-x-auto">
-      <table className="w-full min-w-[760px] border-collapse text-[13.5px]">
+    <div className="tscroll">
+      <table className="tbl vd-lines" style={{ minWidth: 760 }}>
         <thead>
-          <tr className="text-left">
+          <tr>
             {['Project · crew', 'Line', 'Client ₹', 'Crew item', kind === 'price' ? 'Rate or agreed amount' : 'Quantity'].map((h) => (
-              <th key={h} className="s-label px-3 py-2.5 font-normal">
+              <th key={h} scope="col">
                 {h}
               </th>
             ))}
@@ -58,54 +58,63 @@ function Row({ r, kind }: { r: PriceRowView; kind: 'price' | 'qty' }) {
   const [agreed, setAgreed] = useState('');
   const [qty, setQty] = useState('');
   if (gone) return null;
-  const td = 'border-t border-[var(--s-rule)] px-3 py-2.5 align-top';
   return (
     <tr>
-      <td className={td}>
-        <Link href={`/studio/vendors/orders/${r.workOrderId}`} className="text-[var(--s-ink)] no-underline hover:text-[var(--s-accent)]">
+      <td>
+        <Link href={`/studio/vendors/orders/${r.workOrderId}`} style={{ fontWeight: 600 }}>
           {r.projectName}
         </Link>
-        <span className={`block ${muted}`}>{r.crewName}</span>
+        <span className={muted} style={{ display: 'block' }}>
+          {r.crewName}
+        </span>
       </td>
-      <td className={td}>
+      <td>
         {r.product}
-        {r.isExtra ? <span className="s-tag ml-1.5">Extra</span> : null}
-        <span className={`block ${muted}`}>
+        {r.isExtra ? (
+          <span className="chip" style={{ marginLeft: 6 }}>
+            Extra
+          </span>
+        ) : null}
+        <span className={muted} style={{ display: 'block' }}>
           {r.room} · {r.tradeLabel}
           {r.size ? ` · ${r.size}` : ''}
         </span>
       </td>
-      <td className={`${td} s-num`}>{r.isExtra ? <span className={muted}>not quoted</span> : rupees(r.quotedAmountPaise)}</td>
-      <td className={td}>
+      <td className="mono">{r.isExtra ? <span className={muted}>not quoted</span> : rupees(r.quotedAmountPaise)}</td>
+      <td>
         {r.item}
-        <span className={`block ${muted}`}>{r.ratePaise !== null ? `${rupees(r.ratePaise)}/${CREW_UNIT_SHORT[r.unit]}` : `per ${CREW_UNIT_SHORT[r.unit]}`}</span>
+        <span className={muted} style={{ display: 'block' }}>
+          {r.ratePaise !== null ? `${rupees(r.ratePaise)}/${CREW_UNIT_SHORT[r.unit]}` : `per ${CREW_UNIT_SHORT[r.unit]}`}
+        </span>
       </td>
-      <td className={td}>
+      <td>
         {kind === 'qty' ? (
           <form
-            className="flex items-center gap-1.5"
+            className="hstack"
+            style={{ gap: 6 }}
             onSubmit={(e) => {
               e.preventDefault();
               run.run(() => setLineQtyAction(r.projectId, r.lineId, { estimate: qty }), () => setGone(true));
             }}
           >
-            <input className="s-input s-num w-[90px]" inputMode="decimal" aria-label={`Quantity for ${r.product}`} placeholder={CREW_UNIT_SHORT[r.unit]} value={qty} onChange={(e) => setQty(e.target.value)} />
-            <button type="submit" className="s-btn-ghost" disabled={run.pending || !qty}>
+            <input className="fld sm fit num" size={7} inputMode="decimal" aria-label={`Quantity for ${r.product}`} placeholder={CREW_UNIT_SHORT[r.unit]} value={qty} onChange={(e) => setQty(e.target.value)} />
+            <button type="submit" className="btn pri sm" disabled={run.pending || !qty}>
               Save
             </button>
           </form>
         ) : (
           <form
-            className="flex flex-wrap items-center gap-1.5"
+            className="hstack"
+            style={{ gap: 6 }}
             onSubmit={(e) => {
               e.preventDefault();
               run.run(() => setLinePriceAction(r.projectId, r.lineId, agreed ? { agreedRupees: agreed } : { rateRupees: rate }), () => setGone(true));
             }}
           >
-            <input className="s-input s-num w-[90px]" inputMode="decimal" aria-label={`Rate for ${r.product}`} placeholder={`₹/${CREW_UNIT_SHORT[r.unit]}`} value={rate} onChange={(e) => setRate(e.target.value)} />
+            <input className="fld sm fit num" size={7} inputMode="decimal" aria-label={`Rate for ${r.product}`} placeholder={`₹/${CREW_UNIT_SHORT[r.unit]}`} value={rate} onChange={(e) => setRate(e.target.value)} />
             <span className={muted}>or</span>
-            <input className="s-input s-num w-[100px]" inputMode="decimal" aria-label={`Agreed amount for ${r.product}`} placeholder="Agreed ₹" value={agreed} onChange={(e) => setAgreed(e.target.value)} />
-            <button type="submit" className="s-btn-ghost" disabled={run.pending || (!rate && !agreed)}>
+            <input className="fld sm fit num" size={8} inputMode="decimal" aria-label={`Agreed amount for ${r.product}`} placeholder="Agreed ₹" value={agreed} onChange={(e) => setAgreed(e.target.value)} />
+            <button type="submit" className="btn pri sm" disabled={run.pending || (!rate && !agreed)}>
               Save
             </button>
           </form>

@@ -48,10 +48,10 @@ export function DesignStepsForm({ initial, custom }: { initial: DesignTemplateSt
     });
   return (
     <div className="flex flex-col gap-3">
-      <div className="s-card overflow-x-auto p-0">
+      <div className="card overflow-x-auto p-0">
         <table className="w-full min-w-[760px] border-collapse text-[13.5px]">
           <thead>
-            <tr className="text-left text-[12px] text-[var(--s-ink-3)]">
+            <tr className="text-left text-[12px] muted">
               <th className="px-2 py-2 font-medium" title="Starred steps are what the client sees">
                 ★ Client sees
               </th>
@@ -73,14 +73,14 @@ export function DesignStepsForm({ initial, custom }: { initial: DesignTemplateSt
                     type="checkbox"
                     checked={r.milestone}
                     onChange={(e) => set(i, { milestone: e.target.checked })}
-                    className="h-4 w-4 accent-[var(--s-accent)]"
+                    className="h-4 w-4"
                   />
                 </td>
                 <td className="px-3 py-1.5">
-                  <input aria-label={`Step ${i + 1} name`} value={r.label} onChange={(e) => set(i, { label: e.target.value })} maxLength={120} className="s-input w-full" />
+                  <input aria-label={`Step ${i + 1} name`} value={r.label} onChange={(e) => set(i, { label: e.target.value })} maxLength={120} className="fld w-full" />
                 </td>
                 <td className="px-2 py-1.5">
-                  <select aria-label={`Step ${i + 1} who`} value={r.responsible} onChange={(e) => set(i, { responsible: e.target.value })} className="s-input">
+                  <select aria-label={`Step ${i + 1} who`} value={r.responsible} onChange={(e) => set(i, { responsible: e.target.value })} className="fld">
                     {RESPONSIBLES.map((x) => (
                       <option key={x} value={x}>
                         {RESPONSIBLE_LABEL[x]}
@@ -89,25 +89,25 @@ export function DesignStepsForm({ initial, custom }: { initial: DesignTemplateSt
                   </select>
                 </td>
                 <td className="px-2 py-1.5">
-                  <input aria-label={`Step ${i + 1} days`} type="number" min={0} max={30} value={r.days} onChange={(e) => set(i, { days: e.target.value })} className="s-input w-[70px]" />
+                  <input aria-label={`Step ${i + 1} days`} type="number" min={0} max={30} value={r.days} onChange={(e) => set(i, { days: e.target.value })} className="fld w-[70px] fit" />
                 </td>
                 <td className="px-2 py-1.5">
-                  <input aria-label={`Step ${i + 1} payment`} value={r.gate} onChange={(e) => set(i, { gate: e.target.value })} maxLength={40} placeholder="e.g. design advance" className="s-input w-[160px]" />
+                  <input aria-label={`Step ${i + 1} payment`} value={r.gate} onChange={(e) => set(i, { gate: e.target.value })} maxLength={40} placeholder="e.g. design advance" className="fld w-[160px] fit" />
                 </td>
                 <td className="px-2 py-1.5 text-center">
                   <input aria-label={`Step ${i + 1} needs its file`} type="checkbox" checked={r.needsDocument} onChange={(e) => set(i, { needsDocument: e.target.checked })} />
                 </td>
                 <td className="px-2 py-1.5">
-                  <input aria-label={`Step ${i + 1} weight`} type="number" min={1} max={10} value={r.weight} onChange={(e) => set(i, { weight: e.target.value })} className="s-input w-[60px]" />
+                  <input aria-label={`Step ${i + 1} weight`} type="number" min={1} max={10} value={r.weight} onChange={(e) => set(i, { weight: e.target.value })} className="fld w-[60px] fit" />
                 </td>
                 <td className="whitespace-nowrap px-2 py-1.5">
-                  <button type="button" className="s-btn-ghost min-h-[32px] px-2 text-[13px]" onClick={() => move(i, -1)} aria-label={`Move step ${i + 1} up`}>
+                  <button type="button" className="btn ghost sm min-h-[32px] px-2 text-[13px]" onClick={() => move(i, -1)} aria-label={`Move step ${i + 1} up`}>
                     ↑
                   </button>
-                  <button type="button" className="s-btn-ghost min-h-[32px] px-2 text-[13px]" onClick={() => move(i, 1)} aria-label={`Move step ${i + 1} down`}>
+                  <button type="button" className="btn ghost sm min-h-[32px] px-2 text-[13px]" onClick={() => move(i, 1)} aria-label={`Move step ${i + 1} down`}>
                     ↓
                   </button>
-                  <button type="button" className="s-btn-ghost min-h-[32px] px-2 text-[13px]" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} aria-label={`Remove step ${i + 1}`}>
+                  <button type="button" className="btn ghost sm min-h-[32px] px-2 text-[13px]" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} aria-label={`Remove step ${i + 1}`}>
                     Remove
                   </button>
                 </td>
@@ -116,21 +116,21 @@ export function DesignStepsForm({ initial, custom }: { initial: DesignTemplateSt
           </tbody>
         </table>
       </div>
-      <p className="m-0 text-[12.5px] text-[var(--s-ink-3)]">
+      <p className="m-0 text-[12.5px] muted">
         {rows.length} steps · {total} days for a 2 BHK · ★ {stars} shown to the client{warn ? ` (${warn})` : ''}. Starred steps are what the client sees; the rest are for your team. The payment is matched by name to each project&apos;s payment stages (&ldquo;design advance&rdquo; matches
         &ldquo;Design advance 5%&rdquo;).
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className="s-btn-ghost min-h-[40px]" onClick={() => setRows((rs) => [...rs, { label: '', responsible: 'DESIGNER', days: '1', gate: '', needsDocument: false, weight: '1', milestone: false }])}>
+        <button type="button" className="btn ghost sm min-h-[40px]" onClick={() => setRows((rs) => [...rs, { label: '', responsible: 'DESIGNER', days: '1', gate: '', needsDocument: false, weight: '1', milestone: false }])}>
           + Add a step
         </button>
-        <button type="button" className="s-btn min-h-[40px]" disabled={pending} onClick={save}>
+        <button type="button" className="btn pri sm min-h-[40px]" disabled={pending} onClick={save}>
           Save the design steps
         </button>
         {custom ? (
           <button
             type="button"
-            className="s-btn-ghost min-h-[40px]"
+            className="btn ghost sm min-h-[40px]"
             disabled={pending}
             onClick={() =>
               start(async () => {
@@ -144,7 +144,7 @@ export function DesignStepsForm({ initial, custom }: { initial: DesignTemplateSt
         ) : null}
       </div>
       {message ? (
-        <p role={message.ok ? 'status' : 'alert'} className={`m-0 text-[13px] ${message.ok ? 'text-[var(--s-good)]' : 'text-[var(--s-bad)]'}`}>
+        <p role={message.ok ? 'status' : 'alert'} className={`m-0 text-[13px] ${message.ok ? 'good-t' : 'bad-t'}`}>
           {message.text}
         </p>
       ) : null}

@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { PageBody } from '../../StudioShell';
 import { myPaymentTemplate } from '@/modules/studio-sales/settings';
 import { currentMember } from '@/modules/studio/access';
 import { can } from '@/modules/studio/roles';
@@ -18,13 +17,13 @@ export default async function PaymentStagesPage() {
   const member = await currentMember();
   const template = member && can(member, 'payments.template') ? await myPaymentTemplate() : null;
   return (
-    <PageBody>
+    <>
       <div className="max-w-[52rem]">
         {!template ? (
-          <p className="m-0 text-[14.5px] text-[var(--s-ink-2)]">Only the studio owner sets the payment stages.</p>
+          <p className="m-0 text-[14.5px] muted">Only the studio owner sets the payment stages.</p>
         ) : (
           <>
-            <p className="m-0 mb-4 max-w-[64ch] text-[14px] leading-relaxed text-[var(--s-ink-2)]">
+            <p className="m-0 mb-4 max-w-[64ch] text-[14px] leading-relaxed muted">
               How your clients pay you, stage by stage. When a salesperson marks a quotation&apos;s sales final, these are filled in (they can change
               them for that one client), and the booking copies them onto the project.
               {template.isDefault ? ' These are Hauspire’s six until you save your own.' : ''}
@@ -33,6 +32,6 @@ export default async function PaymentStagesPage() {
           </>
         )}
       </div>
-    </PageBody>
+    </>
   );
 }

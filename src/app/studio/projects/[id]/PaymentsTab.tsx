@@ -14,37 +14,37 @@ import { CorrectPayment, DueDate, RecordPayment } from './PaymentsClient';
  * Also the body of the accounts landing (/studio/payments).
  */
 
-const muted = 'text-[12.5px] text-[var(--s-ink-3)]';
-const mono = 's-num font-[family-name:var(--font-mono)]';
+const muted = 'text-[12.5px] text-[var(--muted)]';
+const mono = 'mono';
 const shortDay = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
 
 function stageStatus(s: LedgerStage, customer: string, dueOn: string | null): { text: string; tone: string } {
   switch (s.state) {
     case 'paid':
-      return { text: `Paid${s.paidOn ? ` · ${shortDay(s.paidOn)}` : ''}`, tone: 'var(--s-good)' };
+      return { text: `Paid${s.paidOn ? ` · ${shortDay(s.paidOn)}` : ''}`, tone: 'var(--good)' };
     case 'waiting':
-      return { text: `Recorded · waiting for ${customer} to confirm`, tone: 'var(--s-warn)' };
+      return { text: `Recorded · waiting for ${customer} to confirm`, tone: 'var(--warn)' };
     case 'part':
-      return { text: `${formatINR(s.paidPaise + s.waitingPaise)} of ${formatINR(s.amountPaise)} recorded`, tone: 'var(--s-warn)' };
+      return { text: `${formatINR(s.paidPaise + s.waitingPaise)} of ${formatINR(s.amountPaise)} recorded`, tone: 'var(--warn)' };
     case 'due':
-      return { text: dueOn ? `Due ${shortDay(dueOn)}` : 'Next', tone: 'var(--s-ink)' };
+      return { text: dueOn ? `Due ${shortDay(dueOn)}` : 'Next', tone: 'var(--ink)' };
     default:
-      return { text: dueOn ? `Due ${shortDay(dueOn)}` : 'Not due yet', tone: 'var(--s-ink-3)' };
+      return { text: dueOn ? `Due ${shortDay(dueOn)}` : 'Not due yet', tone: 'var(--muted)' };
   }
 }
 
 function rowStatus(r: StudioPaymentRow, customer: string): { text: string; tone: string } {
   switch (r.status) {
     case 'confirmed':
-      return { text: `${customer} confirmed`, tone: 'var(--s-good)' };
+      return { text: `${customer} confirmed`, tone: 'var(--good)' };
     case 'earlier':
-      return { text: 'Recorded before confirmations started · counts as paid', tone: 'var(--s-ink-2)' };
+      return { text: 'Recorded before confirmations started · counts as paid', tone: 'var(--text2)' };
     case 'waiting':
-      return { text: `Waiting for ${customer} to confirm`, tone: 'var(--s-warn)' };
+      return { text: `Waiting for ${customer} to confirm`, tone: 'var(--warn)' };
     case 'disputed':
-      return { text: `${customer} says this was not paid · One Interiors is looking into it`, tone: 'var(--s-bad)' };
+      return { text: `${customer} says this was not paid · One Interiors is looking into it`, tone: 'var(--bad)' };
     default:
-      return { text: 'Corrected by a later entry', tone: 'var(--s-ink-3)' };
+      return { text: 'Corrected by a later entry', tone: 'var(--muted)' };
   }
 }
 
@@ -61,8 +61,8 @@ export function PaymentsBody({ data, customer }: { data: StudioPayments; custome
     <div className="flex flex-col gap-5">
       <dl className="m-0 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {tiles.map((t) => (
-          <div key={t.label} className="rounded-[10px] bg-[var(--s-surface-2)] p-3">
-            <dt className="text-[12px] font-semibold text-[var(--s-ink-2)]">{t.label}</dt>
+          <div key={t.label} className="rounded-[10px] bg-[var(--fill)] p-3">
+            <dt className="text-[12px] font-semibold text-[var(--text2)]">{t.label}</dt>
             <dd className={`m-0 mt-1 text-[16px] font-semibold ${mono}`}>{formatINR(t.value)}</dd>
             <dd className={`m-0 ${muted}`}>{t.sub}</dd>
           </div>
@@ -72,7 +72,7 @@ export function PaymentsBody({ data, customer }: { data: StudioPayments; custome
       <div className="overflow-x-auto">
         <table className="w-full min-w-[560px] border-collapse text-left text-[14px]">
           <thead>
-            <tr className="text-[12px] text-[var(--s-ink-3)]">
+            <tr className="text-[12px] text-[var(--muted)]">
               <th className="py-2 pr-3 font-semibold">Stage</th>
               <th className="py-2 pr-3 text-right font-semibold">Amount</th>
               <th className="py-2 font-semibold">Status</th>
@@ -82,7 +82,7 @@ export function PaymentsBody({ data, customer }: { data: StudioPayments; custome
             {l.stages.map((s) => {
               const st = stageStatus(s, customer, data.dueOn[s.index] ?? null);
               return (
-                <tr key={s.index} className="border-t border-[var(--s-rule)] align-top">
+                <tr key={s.index} className="border-t border-[var(--fill2)] align-top">
                   <td className="py-3 pr-3">
                     <span className="font-medium">{s.label}</span>
                     {s.pct !== null ? <span className={`block ${muted}`}>{s.pct}% as signed</span> : null}
@@ -130,8 +130,8 @@ export function PaymentsBody({ data, customer }: { data: StudioPayments; custome
             {[...data.rows].reverse().map((r) => {
               const st = rowStatus(r, customer);
               return (
-                <li key={r.id} className="grid gap-x-4 gap-y-1 border-t border-[var(--s-rule)] py-3 text-[14px] sm:grid-cols-[minmax(0,1fr)_auto]">
-                  <span className={r.status === 'replaced' ? 'text-[var(--s-ink-3)] line-through' : undefined}>
+                <li key={r.id} className="grid gap-x-4 gap-y-1 border-t border-[var(--fill2)] py-3 text-[14px] sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <span className={r.status === 'replaced' ? 'text-[var(--muted)] line-through' : undefined}>
                     <span className={mono}>{formatINR(r.amountPaise)}</span> · {r.stageLabel}
                     <span className={`block ${muted}`} style={{ textDecoration: 'none' }}>
                       {shortDay(r.receivedOn)}
@@ -139,7 +139,7 @@ export function PaymentsBody({ data, customer }: { data: StudioPayments; custome
                       {r.receiptUrl ? (
                         <>
                           {' · '}
-                          <a href={r.receiptUrl} target="_blank" rel="noreferrer" className="text-[var(--s-accent)]">
+                          <a href={r.receiptUrl} target="_blank" rel="noreferrer" className="acc-t">
                             receipt in locker
                           </a>
                         </>
@@ -170,12 +170,12 @@ export function PaymentsBody({ data, customer }: { data: StudioPayments; custome
 export async function PaymentsTab({ projectId, customer }: { projectId: string; customer: string }) {
   const data = await studioPayments(projectId);
   return (
-    <section aria-label="Payments" className="s-card p-5">
+    <section aria-label="Payments" className="card p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="m-0 text-[16px] font-semibold">
+        <h2 className="m-0 text-[17px] font-semibold">
           Payments{' '}
           {data ? (
-            <span className={`${mono} text-[13px] font-normal text-[var(--s-ink-3)]`}>
+            <span className={`${mono} text-[13px] font-normal text-[var(--muted)]`}>
               {formatINR(data.ledger.paidPaise)} of {formatINR(data.ledger.totalPaise)} paid
             </span>
           ) : null}

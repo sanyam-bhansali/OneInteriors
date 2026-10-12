@@ -33,14 +33,14 @@ export function IntroAnswer({ state }: { state: IntroState }) {
 
   if (answer === 'accepted') {
     return (
-      <p className="m-0 rounded-[12px] border border-[var(--s-rule)] px-4 py-3 text-[13.5px] text-[var(--s-ink-2)]">
+      <p className="card" style={{ margin: 0, color: 'var(--text2)' }}>
         You accepted this introduction. Call them, then log the call below.
       </p>
     );
   }
   if (answer === 'declined') {
     return (
-      <p className="m-0 rounded-[12px] border border-[var(--s-rule)] px-4 py-3 text-[13.5px] text-[var(--s-ink-2)]">
+      <p className="card" style={{ margin: 0, color: 'var(--text2)' }}>
         You declined{state.declineReason ? `: “${state.declineReason}”` : ''}. One Interiors will place them with
         another studio.
       </p>
@@ -48,42 +48,42 @@ export function IntroAnswer({ state }: { state: IntroState }) {
   }
 
   return (
-    <section className="rounded-[12px] border-[1.5px] border-[var(--s-accent)] px-4 py-3.5">
-      <h2 className="m-0 mb-1 text-[15px] font-semibold">New from One Interiors — will you take them?</h2>
-      <p className="m-0 mb-3 text-[13.5px] leading-[1.5] text-[var(--s-ink-2)]">
+    <section className="card cl-next">
+      <h2 className="h">New from One Interiors — will you take them?</h2>
+      <p style={{ margin: 0, lineHeight: 1.5, color: 'var(--text2)' }}>
         Accept and call them within a day. If you are full or it is not your kind of job, decline and we place them
         with someone else.
       </p>
       {declining ? (
-        <div className="flex flex-col gap-2">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <input
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             maxLength={300}
             placeholder="Why — e.g. fully booked until March"
             aria-label="Why you are declining"
-            className="rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[14px]"
+            className="fld"
           />
-          <div className="flex gap-2">
-            <button type="button" disabled={pending} onClick={() => send('decline')} className="s-btn">
+          <div className="hstack" style={{ gap: 8 }}>
+            <button type="button" disabled={pending} onClick={() => send('decline')} className="btn pri sm">
               {pending ? 'Sending…' : 'Decline'}
             </button>
-            <button type="button" onClick={() => setDeclining(false)} className="s-btn-ghost">
+            <button type="button" onClick={() => setDeclining(false)} className="btn sec sm">
               Back
             </button>
           </div>
         </div>
       ) : (
-        <div className="flex gap-2">
-          <button type="button" disabled={pending} onClick={() => send('accept')} className="s-btn">
+        <div className="hstack" style={{ gap: 8 }}>
+          <button type="button" disabled={pending} onClick={() => send('accept')} className="btn pri sm">
             {pending ? 'Saving…' : 'Accept'}
           </button>
-          <button type="button" onClick={() => setDeclining(true)} className="s-btn-ghost">
+          <button type="button" onClick={() => setDeclining(true)} className="btn sec sm">
             Decline
           </button>
         </div>
       )}
-      {error ? <p className="m-0 mt-2 text-[13px] text-[var(--s-bad,#a6461f)]">{error}</p> : null}
+      {error ? <p className="cl-err">{error}</p> : null}
     </section>
   );
 }

@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { PageHead, PageBody } from '../StudioShell';
+import { LineIcon } from '../ui/icons';
 import { myCalendar } from '@/modules/studio-sales/calendar';
 import { calendarWindow, itemsByDay, parseDay, parseView, shiftDay, windowTitle } from '@/modules/studio-sales/calendar-rules';
 import { istDay } from '@/modules/project/working-days';
 import { taskPeople } from '@/modules/studio-sales/tasks';
-import { CalendarBody, NewTask, PersonPicker } from './CalendarView';
+import { CalendarBody, Legend, NewTask, PersonPicker } from './CalendarView';
+import '../office-ui.css';
+import './calendar.css';
 
 export const metadata: Metadata = { title: 'Calendar', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -25,9 +27,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const [cal, people] = await Promise.all([myCalendar(view, day, sp.who ?? null, now), taskPeople()]);
   if (!cal) {
     return (
-      <PageBody>
-        <p className="m-0 text-[15px] text-[var(--s-ink-2)]">The calendar is for the people who work leads. Ask your studio owner if you should see it.</p>
-      </PageBody>
+      <main className="content ox-page">
+        <p className="ox-note">The calendar is for the people who work leads. Ask your studio owner if you should see it.</p>
+      </main>
     );
   }
   const w = calendarWindow(view, day);
@@ -38,53 +40,60 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     return `/studio/calendar?${p.toString()}`;
   };
   const today = istDay(now);
-  const tab = 'px-3 py-1.5 no-underline';
+
+  const whose = cal.seesAll ? (cal.who ? `${people.find((p) => p.id === cal.who)?.name ?? 'One person'}'s` : 'everyone') : 'yours';
 
   return (
-    <>
-      <PageHead
-        title="Calendar"
-        sub={cal.seesAll ? (cal.who ? `${people.find((p) => p.id === cal.who)?.name ?? 'One person'}'s` : 'Everyone') : 'Your follow-ups, meetings and tasks'}
-        action={<NewTask people={people} defaultDay={day === today || view !== 'day' ? today : day} seesAll={cal.seesAll} meId={cal.meId} />}
-      />
-      <PageBody>
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="flex items-center gap-1">
-              <Link href={href({ day: shiftDay(view, day, -1) })} className="s-btn-ghost no-underline" aria-label="Earlier">
-                ←
-              </Link>
-              <Link href={href({ day: today })} className="s-btn-ghost no-underline">
-                Today
-              </Link>
-              <Link href={href({ day: shiftDay(view, day, 1) })} className="s-btn-ghost no-underline" aria-label="Later">
-                →
-              </Link>
-            </div>
-            <h2 className="m-0 text-[16px] font-semibold">{windowTitle(w)}</h2>
-            <div role="group" aria-label="Day, week or month" className="ml-auto flex overflow-hidden rounded-[8px] border border-[var(--s-rule)] text-[13px] font-medium">
-              {(['day', 'week', 'month'] as const).map((v) => (
-                <Link key={v} href={href({ view: v })} aria-current={view === v ? 'page' : undefined} className={`${tab} ${view === v ? 'bg-[var(--s-accent)] text-white' : 'text-[var(--s-ink)] hover:bg-[var(--s-rail-active)]'}`}>
-                  {v === 'day' ? 'Day' : v === 'week' ? 'Week' : 'Month'}
-                </Link>
-              ))}
-            </div>
-            {cal.seesAll ? <PersonPicker people={people} who={cal.who} base={{ view, day }} /> : null}
-          </div>
-
-          {cal.missedBefore > 0 && w.start.getTime() <= now.getTime() ? (
-            <p className="m-0 text-[13.5px]">
-              <Link href={`/studio/clients?view=list&due=missed&sort=followup${cal.who ? `&owner=${cal.who}` : ''}`} className="font-medium text-[var(--s-bad)]">
-                {cal.missedBefore.toLocaleString('en-IN')} follow-up{cal.missedBefore === 1 ? '' : 's'} missed before this
-              </Link>{' '}
-              <span className="text-[var(--s-ink-3)]">— open the list to call them or move them.</span>
-            </p>
-          ) : null}
-          {cal.capped ? <p className="m-0 text-[13px] text-[var(--s-ink-3)]">Showing the first 500 of each kind. Pick one person or a shorter view to see all.</p> : null}
-
-          <CalendarBody view={view} days={w.days} month={day.slice(0, 7)} today={today} byDay={Object.fromEntries(itemsByDay(cal.items, w.days))} callCounts={cal.followupCounts} people={people} seesAll={cal.seesAll} dayHref={Object.fromEntries(w.days.map((d) => [d, href({ view: 'day', day: d })]))} />
+    <main className="content ox-page">
+      <div className="phead">
+        <div>
+          <h1>Calendar</h1>
+          <p className="muted">
+            {cal.seesAll ? 'Meetings, follow-ups and tasks for the whole team.' : 'Your follow-ups, meetings and tasks.'} One Interiors visits land here by themselves.
+          </p>
         </div>
-      </PageBody>
-    </>
+        <NewTask people={people} defaultDay={day === today || view !== 'day' ? today : day} seesAll={cal.seesAll} meId={cal.meId} />
+      </div>
+
+      <div className="cal-bar">
+        <div className="cal-nav">
+          <Link href={href({ day: shiftDay(view, day, -1) })} className="btn ghost sm" aria-label="Earlier">
+            <LineIcon name="back" size={16} />
+          </Link>
+          <Link href={href({ day: today })} className="btn ghost sm">
+            Today
+          </Link>
+          <Link href={href({ day: shiftDay(view, day, 1) })} className="btn ghost sm" aria-label="Later">
+            <LineIcon name="arrow" size={16} />
+          </Link>
+        </div>
+        <h2>{windowTitle(w)}</h2>
+        <nav className="tabs cal-views" aria-label="Day, week or month">
+          {(['day', 'week', 'month'] as const).map((v) => (
+            <Link key={v} href={href({ view: v })} aria-current={view === v ? 'page' : undefined}>
+              {v === 'day' ? 'Day' : v === 'week' ? 'Week' : 'Month'}
+            </Link>
+          ))}
+        </nav>
+        {cal.seesAll ? <PersonPicker people={people} who={cal.who} base={{ view, day }} /> : null}
+      </div>
+
+      <div className="hstack" style={{ gap: 8 }}>
+        <Legend />
+        <span className="muted sm">· {windowTitle(w)} · {whose}</span>
+      </div>
+
+      {cal.missedBefore > 0 && w.start.getTime() <= now.getTime() ? (
+        <p className="sm" style={{ margin: 0 }}>
+          <Link href={`/studio/clients?view=list&due=missed&sort=followup${cal.who ? `&owner=${cal.who}` : ''}`} className="bad-t" style={{ fontWeight: 600 }}>
+            {cal.missedBefore.toLocaleString('en-IN')} follow-up{cal.missedBefore === 1 ? '' : 's'} missed before this
+          </Link>{' '}
+          <span className="muted">— open the list to call them or move them.</span>
+        </p>
+      ) : null}
+      {cal.capped ? <p className="muted sm" style={{ margin: 0 }}>Showing the first 500 of each kind. Pick one person or a shorter view to see all.</p> : null}
+
+      <CalendarBody view={view} days={w.days} month={day.slice(0, 7)} today={today} byDay={Object.fromEntries(itemsByDay(cal.items, w.days))} callCounts={cal.followupCounts} people={people} seesAll={cal.seesAll} dayHref={Object.fromEntries(w.days.map((d) => [d, href({ view: 'day', day: d })]))} />
+    </main>
   );
 }

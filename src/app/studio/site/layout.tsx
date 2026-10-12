@@ -1,5 +1,6 @@
 import { getLang } from '@/modules/i18n/server';
 import { SiteBar } from './SiteBar';
+import './site.css';
 
 /**
  * Site mode's frame: the screens, and the Today · Snags · Me bar under

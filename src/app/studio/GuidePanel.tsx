@@ -35,26 +35,6 @@ import {
 } from '@/modules/studio/guide';
 import { dismissGuideAction } from './guide-actions';
 
-function Tick({ done }: { done: boolean }) {
-  return (
-    <span
-      aria-hidden
-      className="mt-[3px] flex h-[19px] w-[19px] flex-none items-center justify-center rounded-full border text-[11px] font-bold"
-      style={
-        done
-          ? {
-              borderColor: 'var(--color-ontrack)',
-              background: 'var(--color-ontrack)',
-              color: '#fff',
-            }
-          : { borderColor: 'var(--s-rule)', color: 'transparent' }
-      }
-    >
-      ✓
-    </span>
-  );
-}
-
 export function GuidePanel({
   guide,
   facts,
@@ -83,12 +63,8 @@ export function GuidePanel({
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => toggle(true)}
-        className="mb-5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-[10px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-4 text-[13.5px] font-medium text-[var(--s-ink-2)] hover:text-[var(--s-ink)]"
-      >
-        <span className="font-[family-name:var(--font-mono)] text-[11px] tracking-[0.08em]">
+      <button type="button" onClick={() => toggle(true)} className="btn sec" style={{ alignSelf: 'flex-start', marginBottom: 4 }}>
+        <span className="mono sm">
           {done}/{def.steps.length}
         </span>
         Show me how this works
@@ -99,76 +75,70 @@ export function GuidePanel({
   const nextId = progress.find((p) => !p.done)?.stepId ?? null;
 
   return (
-    <section
-      aria-label={def.title}
-      className="mb-6 rounded-[14px] border border-[var(--s-rule)] bg-[var(--s-surface)] p-6"
-    >
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
-        <div className="min-w-0">
-          <p className="label m-0 mb-2">
-            {finished ? 'All done' : `Step ${done + 1} of ${def.steps.length}`}
-          </p>
-          <h2 className="m-0 text-[19px] font-semibold leading-tight text-[var(--s-ink)]">
-            {finished ? def.done : def.title}
-          </h2>
+    <section aria-label={def.title} className="card" style={{ marginBottom: 4 }}>
+      <div className="chead" style={{ alignItems: 'flex-start' }}>
+        <div>
+          <span className="eyebrow">{finished ? 'All done' : `Step ${done + 1} of ${def.steps.length}`}</span>
+          <h2>{finished ? def.done : def.title}</h2>
         </div>
-        <button
-          type="button"
-          onClick={() => toggle(false)}
-          className="min-h-11 cursor-pointer border-0 bg-transparent px-1 text-[13px] text-[var(--s-ink-3)] underline hover:text-[var(--s-ink)]"
-        >
+        <button type="button" onClick={() => toggle(false)} className="btn ghost sm">
           {finished ? 'Hide this' : 'Skip'}
         </button>
       </div>
 
       {!finished ? (
-        <p className="m-0 mb-5 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--s-ink-2)]">
+        <p className="muted" style={{ margin: 0, maxWidth: '62ch', fontSize: 14.5, lineHeight: 1.5 }}>
           {def.intro}
         </p>
       ) : null}
 
-      <ol className="m-0 flex list-none flex-col gap-0 p-0">
-        {def.steps.map((step) => {
+      <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {def.steps.map((step, i) => {
           const isDone = progress.find((p) => p.stepId === step.id)?.done ?? false;
           const isNext = step.id === nextId;
 
           return (
             <li
               key={step.id}
-              className="flex items-start gap-3 border-t border-[var(--s-rule)] py-3.5 first:border-t-0 first:pt-0"
-              style={{ opacity: isDone ? 0.62 : 1 }}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '36px minmax(0,1fr) auto',
+                gap: 14,
+                alignItems: 'center',
+                padding: 16,
+                borderRadius: 16,
+                background: 'var(--soft)',
+                boxShadow: isNext ? 'inset 0 0 0 2px var(--acc)' : undefined,
+              }}
             >
-              <Tick done={isDone} />
-              <div className="min-w-0 flex-1">
-                <p
-                  className="m-0 text-[14.5px] leading-snug text-[var(--s-ink)]"
-                  style={{
-                    fontWeight: isNext ? 600 : 500,
-                    textDecoration: isDone ? 'line-through' : undefined,
-                  }}
-                >
-                  {step.title}
-                </p>
-                {!isDone ? (
-                  <p className="m-0 mt-1 max-w-[58ch] text-[13.5px] leading-snug text-[var(--s-ink-2)]">
-                    {step.why}
-                  </p>
-                ) : null}
+              <span
+                aria-hidden
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 600,
+                  background: isDone ? 'var(--good-s)' : isNext ? 'var(--acc)' : 'var(--fill2)',
+                  color: isDone || isNext ? 'var(--paper)' : 'var(--ink)',
+                }}
+              >
+                {isDone ? '✓' : i + 1}
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <b style={{ fontSize: 15, fontWeight: isNext ? 600 : 500, textDecoration: isDone ? 'line-through' : undefined, color: isDone ? 'var(--muted)' : undefined }}>{step.title}</b>
+                {!isDone ? <div className="muted sm">{step.why}</div> : null}
               </div>
 
               {!isDone && step.href ? (
-                <Link
-                  href={step.href}
-                  className="inline-flex min-h-11 flex-none items-center rounded-[10px] px-4 text-[13.5px] font-medium no-underline"
-                  style={
-                    isNext
-                      ? { background: 'var(--s-ink)', color: 'var(--s-surface)' }
-                      : { border: '1px solid var(--s-rule)', color: 'var(--s-ink)' }
-                  }
-                >
+                <Link href={step.href} className={isNext ? 'btn acc sm' : 'btn ghost sm'}>
                   {step.cta ?? 'Open'}
                 </Link>
-              ) : null}
+              ) : (
+                <span />
+              )}
             </li>
           );
         })}

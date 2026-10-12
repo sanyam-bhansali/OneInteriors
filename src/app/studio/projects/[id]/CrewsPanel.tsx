@@ -25,7 +25,7 @@ export function CrewsPanel({ tab }: { tab: ProjectCrews }) {
       <div className="flex flex-col gap-5">
         {tab.labour ? <Labour tab={tab} /> : null}
         {tab.locks.length ? (
-          <p className="m-0 rounded-[10px] bg-[var(--s-surface-2)] px-3 py-2 text-[13px] text-[var(--s-ink-2)]">
+          <p className="m-0 rounded-[10px] bg-[var(--fill)] px-3 py-2 text-[13px] text-[var(--text2)]">
             Waiting for the client&apos;s payment: {tab.locks.map((l) => `${l.label} (opens when the ${l.payment} is recorded)`).join(' · ')}.
           </p>
         ) : null}
@@ -34,7 +34,7 @@ export function CrewsPanel({ tab }: { tab: ProjectCrews }) {
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className={h2}>Work orders</h2>
             {tab.seesMoney ? (
-              <Link href="/studio/vendors/pay" className="text-[13px] text-[var(--s-accent)]">
+              <Link href="/studio/vendors/pay" className="text-[13px] acc-t">
                 Pay these →
               </Link>
             ) : null}
@@ -53,7 +53,7 @@ export function CrewsPanel({ tab }: { tab: ProjectCrews }) {
           )}
           {settled.length ? (
             <details>
-              <summary className="cursor-pointer text-[13.5px] text-[var(--s-ink-2)]">
+              <summary className="cursor-pointer text-[13.5px] text-[var(--text2)]">
                 {settled.length} settled work order{settled.length === 1 ? '' : 's'}
               </summary>
               <ul className="m-0 mt-2 flex flex-col gap-2 p-0">
@@ -65,7 +65,7 @@ export function CrewsPanel({ tab }: { tab: ProjectCrews }) {
           ) : null}
           {archived.length ? (
             <details>
-              <summary className="cursor-pointer text-[13.5px] text-[var(--s-ink-3)]">Archived ({archived.length})</summary>
+              <summary className="cursor-pointer text-[13.5px] text-[var(--muted)]">Archived ({archived.length})</summary>
               <ul className="m-0 mt-2 flex flex-col gap-2 p-0">
                 {archived.map((o) => (
                   <WorkOrderCard key={o.id} order={o} projectId={tab.projectId} canBuild={tab.canBuild} seesMoney={tab.seesMoney} canPay={tab.canPay} />
@@ -85,12 +85,12 @@ function Labour({ tab }: { tab: ProjectCrews }) {
   const l = tab.labour!;
   const fig = (label: string, v: string) => (
     <div className="flex flex-col">
-      <span className="s-label">{label}</span>
-      <span className="s-num font-[family-name:var(--font-mono)] text-[15px] font-semibold">{v}</span>
+      <span className="lbl">{label}</span>
+      <span className="mono text-[15px] font-semibold">{v}</span>
     </div>
   );
   return (
-    <section className="s-card flex flex-col gap-2 p-4">
+    <section className="card flex flex-col gap-2 p-4">
       <div className="flex flex-wrap gap-x-7 gap-y-2">
         {fig('Contract', l.contractPaise === null ? '—' : formatINR(l.contractPaise))}
         {fig('Crews expected', formatINR(l.expectedPaise))}
@@ -98,7 +98,7 @@ function Labour({ tab }: { tab: ProjectCrews }) {
         {fig('Paid', formatINR(l.paidPaise))}
         {fig('Labour margin', l.marginPaise === null ? '—' : `${formatINR(l.marginPaise)} · ${((l.marginBp ?? 0) / 100).toFixed(1)}%`)}
       </div>
-      {l.warn ? <p className="m-0 text-[13px] text-[var(--s-bad)]">The labour margin is below your target. Only you see this.</p> : <p className={`m-0 ${muted}`}>Only you see this. Material is not counted.</p>}
+      {l.warn ? <p className="m-0 text-[13px] text-[var(--bad)]">The labour margin is below your target. Only you see this.</p> : <p className={`m-0 ${muted}`}>Only you see this. Material is not counted.</p>}
     </section>
   );
 }
@@ -116,7 +116,7 @@ function Builder({ tab }: { tab: ProjectCrews }) {
   const total = tab.plan.reduce((s, t) => s + t.lines.length, 0);
   if (total === 0)
     return (
-      <section className="s-card p-4">
+      <section className="card p-4">
         <h2 className={h2}>From the {tab.source!.kind === 'DESIGN_FINAL' ? 'design final' : 'sales final'}</h2>
         <p className={`m-0 mt-1 ${muted}`}>Every line of quotation {tab.source!.number} is on a work order.</p>
       </section>
@@ -128,7 +128,7 @@ function Builder({ tab }: { tab: ProjectCrews }) {
     setTicked(next);
   };
   return (
-    <section className="s-card flex flex-col gap-4 p-4">
+    <section className="card flex flex-col gap-4 p-4">
       <div>
         <h2 className={h2}>
           Still to order from the {tab.source!.kind === 'DESIGN_FINAL' ? 'design final' : 'sales final'} ({tab.source!.number})
@@ -139,14 +139,14 @@ function Builder({ tab }: { tab: ProjectCrews }) {
         </p>
       </div>
       {tab.plan.map((t) => (
-        <div key={t.trade} className="flex flex-col gap-2 border-t border-[var(--s-rule)] pt-3">
+        <div key={t.trade} className="flex flex-col gap-2 border-t border-[var(--fill2)] pt-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="m-0 text-[14.5px] font-semibold">
               {t.label} <span className={muted}>· {t.lines.length}</span>
             </p>
             <label className="flex items-center gap-2 text-[13px]">
               Crew
-              <select className="s-input w-auto" value={crewFor[t.trade] ?? ''} onChange={(e) => setCrewFor({ ...crewFor, [t.trade]: e.target.value })}>
+              <select className="fld w-auto" value={crewFor[t.trade] ?? ''} onChange={(e) => setCrewFor({ ...crewFor, [t.trade]: e.target.value })}>
                 <option value="">Skip this trade for now</option>
                 {t.crews.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -174,10 +174,10 @@ function Builder({ tab }: { tab: ProjectCrews }) {
                   <span className="min-w-0">
                     <span className="font-medium">{l.product}</span> <span className={muted}>· {l.room}</span>
                     {l.size ? <span className={muted}> · {l.size}</span> : null}
-                    {l.qty ? <span className={muted}> · {l.qty}</span> : <span className="text-[12px] text-[var(--s-warn)]"> · needs a quantity</span>}
+                    {l.qty ? <span className={muted}> · {l.qty}</span> : <span className="text-[12px] text-[var(--warn)]"> · needs a quantity</span>}
                   </span>
                   {l.guessed ? (
-                    <span className="s-tag" title="Nothing in the routing named this product; it went to carpentry by its work code. Set it under Settings, Crews and trades.">
+                    <span className="chip" title="Nothing in the routing named this product; it went to carpentry by its work code. Set it under Settings, Crews and trades.">
                       Trade guessed
                     </span>
                   ) : null}
@@ -189,7 +189,7 @@ function Builder({ tab }: { tab: ProjectCrews }) {
                         key={m}
                         type="button"
                         onClick={() => setModes({ ...modes, [l.id]: m })}
-                        className={`rounded-[6px] border px-1.5 py-0.5 text-[11.5px] ${modes[l.id] === m ? 'border-[var(--s-accent)] bg-[var(--s-accent-wash)] text-[var(--s-accent)]' : 'border-[var(--s-rule)] text-[var(--s-ink-3)]'}`}
+                        className={`rounded-[6px] border px-1.5 py-0.5 text-[11.5px] ${modes[l.id] === m ? 'border-[var(--acc)] bg-[var(--acc-soft)] acc-t' : 'border-[var(--fill2)] text-[var(--muted)]'}`}
                       >
                         {m === 'INSTALL' ? 'Installation only' : 'Full carpentry'}
                       </button>
@@ -201,14 +201,14 @@ function Builder({ tab }: { tab: ProjectCrews }) {
           </ul>
         </div>
       ))}
-      <div className="flex flex-wrap items-end gap-3 border-t border-[var(--s-rule)] pt-3">
+      <div className="flex flex-wrap items-end gap-3 border-t border-[var(--fill2)] pt-3">
         <label className="flex flex-col gap-1">
-          <span className="s-label">Crews paid by</span>
-          <input type="date" className="s-input w-auto" value={due} onChange={(e) => setDue(e.target.value)} />
+          <span className="lbl">Crews paid by</span>
+          <input type="date" className="fld w-auto" value={due} onChange={(e) => setDue(e.target.value)} />
         </label>
         <button
           type="button"
-          className="s-btn"
+          className="btn pri sm"
           disabled={r.pending}
           onClick={() =>
             r.run(() =>

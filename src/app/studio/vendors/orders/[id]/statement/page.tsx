@@ -6,6 +6,8 @@ import { statementOf } from '@/modules/studio-crews/store';
 import { qtyWords } from '@/modules/studio-crews/money';
 import { CREW_UNIT_SHORT } from '@/modules/studio-crews/trades';
 import { PrintButton } from './PrintButton';
+import '../../../../office-ui.css';
+import '../../../vendors.css';
 
 export const metadata: Metadata = { title: 'Statement of account', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -28,35 +30,39 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
   const m = o.money!;
   const rooms = [...new Set(o.lines.map((l) => l.room))];
   const pending = o.needPrice + o.needQty;
-  const th = 'border-b border-[#ccc] px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-[#555]';
-  const td = 'border-b border-[#eee] px-2 py-1.5 align-top';
+  const th = '';
+  const td = '';
   return (
-    <div className="px-5 py-6 sm:px-7">
-      {/* Print only the statement, not the studio's rail around it. */}
+    <main className="content ox-page">
+      {/* Print only the statement, not the studio's frame around it. */}
       <style>{`@media print { body * { visibility: hidden !important; } .crew-statement, .crew-statement * { visibility: visible !important; } .crew-statement { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none !important; border: 0 !important; } .no-print { display: none !important; } }`}</style>
-      <div className="no-print mb-4 flex flex-wrap items-center gap-2">
-        <Link href={`/studio/vendors/orders/${o.id}`} className="s-btn-ghost no-underline">
+      <div className="no-print hstack">
+        <Link href={`/studio/vendors/orders/${o.id}`} className="btn ghost">
           ← Back to the work order
         </Link>
         <PrintButton />
-        <span className="text-[12.5px] text-[var(--s-ink-3)]">Use &ldquo;Save as PDF&rdquo; to send it from your WhatsApp.</span>
+        <span className="muted sm">Use &ldquo;Save as PDF&rdquo; to send it from your WhatsApp.</span>
       </div>
-      <article className="crew-statement mx-auto max-w-[820px] bg-white p-8 text-[13px] text-[#1a1a1a] shadow-sm" style={{ border: '1px solid #e5e5e5' }}>
-        <header className="flex flex-wrap items-start justify-between gap-4 border-b border-[#ccc] pb-4">
+      <article className="crew-statement">
+        <header className="st-h" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
           <div>
-            <p className="m-0 text-[18px] font-semibold">{s.studio.name}</p>
-            {s.studio.address ? <p className="m-0 text-[12px] text-[#555]">{s.studio.address}</p> : null}
-            <p className="m-0 mt-1 text-[13px] font-medium">Statement of account</p>
+            <p style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{s.studio.name}</p>
+            {s.studio.address ? (
+              <p className="muted" style={{ margin: 0, fontSize: 12 }}>
+                {s.studio.address}
+              </p>
+            ) : null}
+            <p style={{ margin: '4px 0 0', fontSize: 13, fontWeight: 500 }}>Statement of account</p>
           </div>
-          <div className="text-right text-[12px] text-[#555]">
+          <div className="muted" style={{ textAlign: 'right', fontSize: 12 }}>
             <p className="m-0">Reference {s.reference}</p>
             <p className="m-0">Generated {day(s.generatedOn)}</p>
             {o.dueOn ? <p className="m-0">Pay by {day(o.dueOn)}</p> : null}
           </div>
         </header>
-        <section className="grid gap-4 border-b border-[#ccc] py-4 sm:grid-cols-2">
+        <section className="st-h vd-grid2" style={{ paddingTop: 16, gap: 16 }}>
           <div>
-            <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#555]">Crew</p>
+            <p className="st-cap">Crew</p>
             <p className="m-0 font-semibold">{s.crew.name}</p>
             <p className="m-0">{o.trades.map((t) => t.label).join(', ')}</p>
             {s.crew.phone ? <p className="m-0">{s.crew.phone}</p> : null}
@@ -65,18 +71,24 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
             {s.crew.kind === 'PERMANENT' ? <p className="m-0">Aadhaar {s.crew.aadhaar}</p> : null}
           </div>
           <div>
-            <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#555]">Site</p>
+            <p className="st-cap">Site</p>
             <p className="m-0 font-semibold">{o.projectName}</p>
             <p className="m-0">Work order WO-{o.number}</p>
           </div>
         </section>
-        <table className="mt-4 w-full border-collapse">
+        <table style={{ width: '100%', marginTop: 16, borderCollapse: 'collapse' }}>
           <thead>
             <tr>
               <th className={th}>Work</th>
-              <th className={`${th} text-right`}>Rate</th>
-              <th className={`${th} text-right`}>Qty</th>
-              <th className={`${th} text-right`}>Amount</th>
+              <th className={th} style={{ textAlign: 'right' }}>
+                Rate
+              </th>
+              <th className={th} style={{ textAlign: 'right' }}>
+                Qty
+              </th>
+              <th className={th} style={{ textAlign: 'right' }}>
+                Amount
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -85,33 +97,47 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
             ))}
           </tbody>
         </table>
-        {pending ? <p className="m-0 mt-3 text-[12px] text-[#7e5910]">{pending} line{pending === 1 ? ' is' : 's are'} still to be priced. This statement is provisional until they are.</p> : null}
-        <table className="ml-auto mt-4 border-collapse text-[13px]">
+        {pending ? (
+          <p className="warn-t" style={{ margin: '12px 0 0', fontSize: 12 }}>
+            {pending} line{pending === 1 ? ' is' : 's are'} still to be priced. This statement is provisional until they are.
+          </p>
+        ) : null}
+        <table className="st-tot" style={{ marginLeft: 'auto', marginTop: 16, borderCollapse: 'collapse' }}>
           <tbody>
             <tr>
-              <td className="px-2 py-1">Total billed</td>
-              <td className="px-2 py-1 text-right font-mono">{formatINR(m.billPaise)}</td>
+              <td>Total billed</td>
+              <td className="mono" style={{ textAlign: 'right' }}>
+                {formatINR(m.billPaise)}
+              </td>
             </tr>
             {m.extrasPaise > 0 ? (
               <tr>
-                <td className="px-2 py-1 text-[#555]">of which extra work</td>
-                <td className="px-2 py-1 text-right font-mono text-[#555]">{formatINR(m.extrasPaise)}</td>
+                <td className="muted">of which extra work</td>
+                <td className="mono muted" style={{ textAlign: 'right' }}>
+                  {formatINR(m.extrasPaise)}
+                </td>
               </tr>
             ) : null}
             <tr>
-              <td className="px-2 py-1">Paid to date</td>
-              <td className="px-2 py-1 text-right font-mono">− {formatINR(m.paidPaise)}</td>
+              <td>Paid to date</td>
+              <td className="mono" style={{ textAlign: 'right' }}>
+                − {formatINR(m.paidPaise)}
+              </td>
             </tr>
-            <tr>
-              <td className="border-t border-[#1a1a1a] px-2 py-1.5 font-semibold">{m.balancePaise < 0 ? 'Advance to recover' : 'Balance due'}</td>
-              <td className="border-t border-[#1a1a1a] px-2 py-1.5 text-right font-mono font-semibold">{formatINR(Math.abs(m.balancePaise))}</td>
+            <tr className="st-last">
+              <td>{m.balancePaise < 0 ? 'Advance to recover' : 'Balance due'}</td>
+              <td className="mono" style={{ textAlign: 'right' }}>
+                {formatINR(Math.abs(m.balancePaise))}
+              </td>
             </tr>
           </tbody>
         </table>
         {o.payments && o.payments.length ? (
           <>
-            <p className="m-0 mt-6 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#555]">Payments</p>
-            <table className="mt-1 w-full border-collapse">
+            <p className="st-cap" style={{ marginTop: 24 }}>
+              Payments
+            </p>
+            <table style={{ width: '100%', marginTop: 4, borderCollapse: 'collapse' }}>
               <tbody>
                 {o.payments.map((p) => (
                   <tr key={p.id}>
@@ -121,18 +147,20 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
                       {p.reference ? ` · ${p.reference}` : ''}
                     </td>
                     <td className={td}>{p.mode}</td>
-                    <td className={`${td} text-right font-mono`}>{formatINR(p.amountPaise)}</td>
+                    <td className={`${td} mono`} style={{ textAlign: 'right' }}>
+                      {formatINR(p.amountPaise)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </>
         ) : null}
-        <p className="m-0 mt-6 text-[11.5px] text-[#555]">
+        <p className="muted" style={{ margin: '24px 0 0', fontSize: 11.5 }}>
           A statement of account, not an invoice: {s.studio.name} pays for the work above. Please raise any disagreement before accepting the next payment.
         </p>
       </article>
-    </div>
+    </main>
   );
 }
 
@@ -140,7 +168,7 @@ function RoomBlock({ room, lines, td }: { room: string; lines: NonNullable<Await
   return (
     <>
       <tr>
-        <td colSpan={4} className="px-2 pb-1 pt-3 text-[12px] font-semibold">
+        <td colSpan={4} style={{ paddingTop: 12, fontSize: 12, fontWeight: 600, borderBottom: 0 }}>
           {room}
         </td>
       </tr>
@@ -151,11 +179,19 @@ function RoomBlock({ room, lines, td }: { room: string; lines: NonNullable<Await
             <td className={td}>
               {l.product}
               {l.isExtra ? ' (extra)' : ''}
-              <span className="block text-[11.5px] text-[#666]">{l.item}</span>
+              <span className="muted" style={{ display: 'block', fontSize: 11.5 }}>
+                {l.item}
+              </span>
             </td>
-            <td className={`${td} text-right font-mono`}>{l.agreedPaise !== null ? 'agreed' : l.ratePaise !== null ? `${formatINR(l.ratePaise)}/${CREW_UNIT_SHORT[l.unit]}` : '—'}</td>
-            <td className={`${td} text-right font-mono`}>{l.agreedPaise !== null ? '' : q === null ? '—' : qtyWords(q)}</td>
-            <td className={`${td} text-right font-mono`}>{l.pending ? 'to price' : formatINR(l.amountPaise ?? 0)}</td>
+            <td className={`${td} mono`} style={{ textAlign: 'right' }}>
+              {l.agreedPaise !== null ? 'agreed' : l.ratePaise !== null ? `${formatINR(l.ratePaise)}/${CREW_UNIT_SHORT[l.unit]}` : '—'}
+            </td>
+            <td className={`${td} mono`} style={{ textAlign: 'right' }}>
+              {l.agreedPaise !== null ? '' : q === null ? '—' : qtyWords(q)}
+            </td>
+            <td className={`${td} mono`} style={{ textAlign: 'right' }}>
+              {l.pending ? 'to price' : formatINR(l.amountPaise ?? 0)}
+            </td>
           </tr>
         );
       })}

@@ -26,12 +26,18 @@ import {
   removeFileAction,
   setMeetingAction,
 } from '../../sales-actions';
-import { Said, useAct, inputClass, primaryClass, quietClass } from '../../SalesUi';
+import { Said, useAct } from '../../SalesUi';
+
+/* The design's field and buttons (studio-ui.css). */
+const inputClass = 'fld';
+const primaryClass = 'btn pri sm';
+const quietClass = 'btn sec sm';
 import { buildFromPlanAction, planJobsAction } from '../../quotations/actions';
 import type { PlanJobView } from '@/modules/studio-quote/from-plan-rules';
 
-const box = 'rounded-[12px] border border-[var(--s-rule)] px-4 py-3.5';
-const h2 = 'm-0 mb-2 text-[15px] font-semibold';
+const box = 'card';
+const h2 = 'h';
+const h2Style: React.CSSProperties = { margin: 0, fontSize: 17, fontWeight: 600, letterSpacing: '-.01em' };
 
 // ── The next step ──────────────────────────────────────────────
 
@@ -98,7 +104,7 @@ export function NextStepButton({
           {step.label}
         </a>
       ) : (
-        <span className="text-[13.5px] text-[var(--s-ink-2)]">Waiting for accounts to record the booking</span>
+        <span className="muted sm">Waiting for accounts to record the booking</span>
       );
       break;
     case 'booked':
@@ -107,12 +113,12 @@ export function NextStepButton({
           {step.label}
         </Link>
       ) : (
-        <span className="s-tag !bg-[var(--s-good-wash)] !text-[var(--s-good)]">Booked</span>
+        <span className="chip good">Booked</span>
       );
       break;
   }
   return (
-    <div className="flex flex-col items-end">
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
       {control}
       <Said result={result} />
     </div>
@@ -134,10 +140,10 @@ export function ContactBar({ tel, whatsapp, budget, meeting, source, owner }: { 
           Open WhatsApp
         </a>
       ) : null}
-      <span className="s-tag">{source}</span>
-      <span className="s-tag">{owner ? `With ${owner}` : 'In the pool'}</span>
-      {budget ? <span className="s-tag">Budget {budget}</span> : null}
-      {meeting ? <span className="s-tag !bg-[var(--s-accent-wash)] !text-[var(--s-accent-deep)]">Meeting {meeting}</span> : null}
+      <span className="chip">{source}</span>
+      <span className="chip">{owner ? `With ${owner}` : 'In the pool'}</span>
+      {budget ? <span className="chip">Budget {budget}</span> : null}
+      {meeting ? <span className="chip oi">Meeting {meeting}</span> : null}
     </div>
   );
 }
@@ -206,19 +212,19 @@ export function Details({ clientId, v, sources, may, fromOneInteriors }: { clien
   if (!editing) {
     return (
       <section className={box}>
-        <div className="mb-2 flex items-baseline justify-between gap-3">
-          <h2 className="s-label m-0 text-[var(--s-ink-3)]">Details</h2>
+        <div className="chead">
+          <h2 style={h2Style}>Details</h2>
           {may ? (
-            <button type="button" onClick={() => { setEditing(true); setResult(null); }} className="text-[13px] text-[var(--s-accent)]">
+            <button type="button" onClick={() => { setEditing(true); setResult(null); }} className="btn ghost sm">
               Edit
             </button>
           ) : null}
         </div>
-        <dl className="m-0 flex flex-col gap-2">
+        <dl className="kv">
           {rows.map(([label, value]) => (
-            <div key={label} className="flex items-baseline justify-between gap-3">
-              <dt className="flex-none text-[12.5px] text-[var(--s-ink-3)]">{label}</dt>
-              <dd className="m-0 min-w-0 text-right text-[13.5px]">{value ?? <span className="text-[var(--s-ink-3)]">—</span>}</dd>
+            <div key={label} style={{ display: 'contents' }}>
+              <dt>{label}</dt>
+              <dd>{value ?? <span className="muted">—</span>}</dd>
             </div>
           ))}
         </dl>
@@ -230,14 +236,14 @@ export function Details({ clientId, v, sources, may, fromOneInteriors }: { clien
   const sourceValue = v.leadSourceId ? `own:${v.leadSourceId}` : v.source;
   return (
     <section className={box}>
-      <h2 className={h2}>Edit details</h2>
+      <h2 className={h2} style={h2Style}>Edit details</h2>
       <form
         ref={form}
         onSubmit={(e) => {
           e.preventDefault();
           save(false);
         }}
-        className="flex flex-col gap-2.5"
+        style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
       >
         <Field label="Name">
           <input name="name" defaultValue={v.name} required className={inputClass} />
@@ -261,7 +267,7 @@ export function Details({ clientId, v, sources, may, fromOneInteriors }: { clien
           {fromOneInteriors ? (
             <>
               <input type="hidden" name="source" value="ONE_INTERIORS" />
-              <span className="text-[13.5px]">One Interiors</span>
+              <span>One Interiors</span>
             </>
           ) : (
             <select name="source" defaultValue={sourceValue} className={inputClass}>
@@ -280,7 +286,7 @@ export function Details({ clientId, v, sources, may, fromOneInteriors }: { clien
             </select>
           )}
         </Field>
-        <div className="mt-1 flex flex-wrap items-center gap-2">
+        <div className="hstack" style={{ gap: 8 }}>
           <button type="submit" disabled={pending} className={primaryClass}>
             {pending ? 'Saving…' : 'Save'}
           </button>
@@ -289,8 +295,8 @@ export function Details({ clientId, v, sources, may, fromOneInteriors }: { clien
           </button>
         </div>
         {askDup ? (
-          <div role="alert" className="flex flex-col gap-2 text-[13px]">
-            <p className="m-0 text-[var(--s-bad)]">{askDup}</p>
+          <div role="alert" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <p className="cl-err">{askDup}</p>
             <button type="button" disabled={pending} onClick={() => save(true)} className={quietClass}>
               Different person — save anyway
             </button>
@@ -305,8 +311,8 @@ export function Details({ clientId, v, sources, may, fromOneInteriors }: { clien
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="flex flex-col gap-1">
-      <span className="s-label">{label}</span>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span className="lbl">{label}</span>
       {children}
     </label>
   );
@@ -319,15 +325,15 @@ export function NoteBox({ clientId }: { clientId: string }) {
   const { pending, result, run } = useAct();
   return (
     <section className={box}>
-      <h2 className={h2}>Add a note</h2>
+      <h2 className={h2} style={h2Style}>Add a note</h2>
       <textarea
         value={note}
         onChange={(e) => setNote(e.target.value)}
         rows={2}
         placeholder="What was said, what they want, anything worth remembering"
-        className={`${inputClass} resize-y`}
+        className="fld"
       />
-      <div className="mt-2">
+      <div>
         <button type="button" disabled={pending || note.trim().length === 0} onClick={() => run(() => addNoteAction(clientId, note), (r) => r.ok && setNote(''))} className={quietClass}>
           {pending ? 'Saving…' : 'Add to the history'}
         </button>
@@ -348,18 +354,18 @@ export function MeetingBox({ clientId, at, note, may }: { clientId: string; at: 
   if (!may) return null;
   return (
     <section className={box}>
-      <h2 className={h2}>Meeting</h2>
-      <div className="flex flex-wrap gap-2">
-        <input type="date" aria-label="Meeting day" value={day} onChange={(e) => setDay(e.target.value)} className={`${inputClass} w-auto`} />
-        <input type="time" aria-label="Meeting time" value={time} onChange={(e) => setTime(e.target.value)} className={`${inputClass} w-auto`} />
+      <h2 className={h2} style={h2Style}>Meeting</h2>
+      <div className="hstack" style={{ gap: 8 }}>
+        <input type="date" aria-label="Meeting day" value={day} onChange={(e) => setDay(e.target.value)} className="fld" style={{ width: 'auto' }} />
+        <input type="time" aria-label="Meeting time" value={time} onChange={(e) => setTime(e.target.value)} className="fld" style={{ width: 'auto' }} />
       </div>
-      <input value={words} onChange={(e) => setWords(e.target.value)} placeholder="Office meeting, site visit…" className={`${inputClass} mt-2`} />
-      <div className="mt-2 flex flex-wrap gap-2">
+      <input value={words} onChange={(e) => setWords(e.target.value)} placeholder="Office meeting, site visit…" className="fld" />
+      <div className="hstack" style={{ gap: 8 }}>
         <button type="button" disabled={pending || !day} onClick={() => run(() => setMeetingAction(clientId, day, time, words))} className={quietClass}>
           {pending ? 'Saving…' : 'Save meeting'}
         </button>
         {at ? (
-          <button type="button" disabled={pending} onClick={() => run(() => setMeetingAction(clientId, '', '', ''), (r) => r.ok && setDay(''))} className="text-[13px] text-[var(--s-ink-3)] hover:text-[var(--s-ink)]">
+          <button type="button" disabled={pending} onClick={() => run(() => setMeetingAction(clientId, '', '', ''), (r) => r.ok && setDay(''))} className="btn ghost sm">
             Clear
           </button>
         ) : null}
@@ -376,9 +382,9 @@ export function AssignBox({ clientId, assignedToId, members }: { clientId: strin
   const { pending, result, run } = useAct();
   return (
     <section className={box}>
-      <h2 className={h2}>Who has this lead</h2>
-      <div className="flex flex-wrap gap-2">
-        <select aria-label="Give this lead to" value={to} onChange={(e) => setTo(e.target.value)} className={`${inputClass} w-auto min-w-[10rem]`}>
+      <h2 className={h2} style={h2Style}>Who has this lead</h2>
+      <div className="hstack" style={{ gap: 8 }}>
+        <select aria-label="Give this lead to" value={to} onChange={(e) => setTo(e.target.value)} className="fld" style={{ width: 'auto', minWidth: '10rem' }}>
           <option value="">Nobody (the pool)</option>
           {members.map((m) => (
             <option key={m.id} value={m.id}>
@@ -490,8 +496,8 @@ export function FilesBox({ clientId, files, may, mayReadRooms }: { clientId: str
   }
 
   return (
-    <section id="files" className={`${box} scroll-mt-20`}>
-      <h2 className={h2}>Floor plan and files</h2>
+    <section id="files" className={box} style={{ scrollMarginTop: 80 }}>
+      <h2 className={h2} style={h2Style}>Floor plan and files</h2>
       {may ? (
         <div
           onDragOver={(e) => {
@@ -505,23 +511,23 @@ export function FilesBox({ clientId, files, may, mayReadRooms }: { clientId: str
             const f = e.dataTransfer.files?.[0];
             if (f) void upload(f);
           }}
-          className={`flex flex-col gap-2.5 rounded-[10px] border border-dashed px-4 py-4 ${over ? 'border-[var(--s-accent)] bg-[var(--s-accent-wash)]' : 'border-[var(--s-rule)]'}`}
+          style={{ display: 'flex', flexDirection: 'column', gap: 10, borderRadius: 14, padding: 16, background: over ? 'var(--acc-soft)' : 'var(--soft)', boxShadow: `inset 0 0 0 1.5px ${over ? 'var(--acc)' : 'var(--fillh)'}` }}
         >
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[13px] text-[var(--s-ink-2)]">This is a</span>
-            <select aria-label="What the file is" value={kind} onChange={(e) => setKind(e.target.value as 'FLOOR_PLAN' | 'OTHER')} className={`${inputClass} w-auto py-1.5 text-[13px]`}>
+          <div className="hstack" style={{ gap: 8 }}>
+            <span className="sm">This is a</span>
+            <select aria-label="What the file is" value={kind} onChange={(e) => setKind(e.target.value as 'FLOOR_PLAN' | 'OTHER')} className="fld" style={{ width: 'auto', minHeight: 34 }}>
               <option value="FLOOR_PLAN">Floor plan</option>
               <option value="OTHER">Other file</option>
             </select>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="hstack">
             <button type="button" disabled={busy || act.pending || building !== null} onClick={() => picker.current?.click()} className={primaryClass}>
               {busy || act.pending ? 'Attaching…' : 'Choose a file'}
             </button>
-            <span className="text-[12.5px] text-[var(--s-ink-3)]">or drag it here · PDF or photo, up to 15 MB</span>
+            <span className="muted sm">or drag it here · PDF or photo, up to 15 MB</span>
           </div>
           {kind === 'FLOOR_PLAN' ? (
-            <p className="m-0 text-[12.5px] leading-relaxed text-[var(--s-ink-3)]">
+            <p className="muted sm" style={{ margin: 0, lineHeight: 1.5 }}>
               {plans && !plans.canRead
                 ? "Floor-plan reading isn't switched on yet, so the first quotation is built from the lead's BHK."
                 : 'The plan is read and the first quotation is built from it: rooms, sizes, kitchen run, bathrooms and false ceilings. You check it and send it.'}
@@ -541,25 +547,25 @@ export function FilesBox({ clientId, files, may, mayReadRooms }: { clientId: str
       ) : null}
       <Said result={said ?? act.result} />
       {building ? (
-        <p role="status" className="m-0 mt-2 flex items-center gap-2 text-[13px] text-[var(--s-ink-2)]">
-          <span aria-hidden className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[var(--s-accent)] border-t-transparent" />
+        <p role="status" className="hstack sm" style={{ margin: 0, gap: 8 }}>
+          <span aria-hidden className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[var(--acc)] border-t-transparent" />
           {building}
         </p>
       ) : null}
       {built ? (
-        <div className="mt-2">
+        <div>
           <Said result={built.ok ? { ok: true, message: built.message } : { ok: false, error: built.error ?? built.message ?? '' }} />
           {built.quoteId ? (
-            <Link href={`/studio/quotations/${built.quoteId}`} className={`${quietClass} mt-1.5 inline-block`}>
+            <Link href={`/studio/quotations/${built.quoteId}`} className={quietClass}>
               Open the quotation
             </Link>
           ) : null}
         </div>
       ) : null}
       {files.length === 0 ? (
-        <p className="m-0 mt-3 text-[13.5px] text-[var(--s-ink-3)]">Nothing attached yet. Ask for the floor plan on WhatsApp, then attach it here.</p>
+        <p className="muted" style={{ margin: 0 }}>Nothing attached yet. Ask for the floor plan on WhatsApp, then attach it here.</p>
       ) : (
-        <ul className="m-0 mt-3 flex list-none flex-col gap-2 p-0">
+        <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {files.map((f) => (
             <FileRow
               key={f.id}
@@ -580,11 +586,11 @@ export function FilesBox({ clientId, files, may, mayReadRooms }: { clientId: str
 }
 
 const JOB_TONE: Record<PlanJobView['status'], string> = {
-  READING: 'text-[var(--s-ink-2)]',
-  BUILT: 'text-[var(--s-good)]',
-  READ: 'text-[var(--s-good)]',
-  FALLBACK: 'text-[var(--s-warn)]',
-  FAILED: 'text-[var(--s-bad)]',
+  READING: 'muted',
+  BUILT: 'good-t',
+  READ: 'good-t',
+  FALLBACK: 'warn-t',
+  FAILED: 'bad-t',
 };
 
 function FileRow({
@@ -611,61 +617,61 @@ function FileRow({
   const readable = READABLE.includes(f.contentType);
   const plan = f.kind === 'FLOOR_PLAN';
   return (
-    <li className="flex flex-col gap-1 rounded-[10px] bg-[var(--s-surface-2)] px-3 py-2.5">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="s-tag">{plan ? 'Floor plan' : 'File'}</span>
+    <li style={{ display: 'flex', flexDirection: 'column', gap: 6, borderRadius: 12, background: 'var(--soft)', padding: '10px 12px' }}>
+      <div className="hstack" style={{ gap: 10 }}>
+        <span className="chip">{plan ? 'Floor plan' : 'File'}</span>
         {f.url ? (
-          <a href={f.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-[var(--s-accent)]">
+          <a href={f.url} target="_blank" rel="noreferrer" className="acc-t" style={{ flex: 1, minWidth: 0, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {f.name}
           </a>
         ) : (
-          <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{f.name}</span>
+          <span style={{ flex: 1, minWidth: 0, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
         )}
-        <span className="text-[12px] text-[var(--s-ink-3)]">
+        <span className="muted sm">
           {fileSize(f.bytes)} · {new Date(f.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
           {f.uploadedByName ? ` · ${f.uploadedByName}` : ''}
         </span>
       </div>
       {job && job.message ? (
-        <p className={`m-0 text-[12.5px] leading-relaxed ${JOB_TONE[job.status]}`}>
+        <p className={`sm ${JOB_TONE[job.status]}`} style={{ margin: 0, lineHeight: 1.5 }}>
           {job.message}{' '}
           {job.quoteId && job.quoteNumber ? (
-            <Link href={`/studio/quotations/${job.quoteId}`} className="font-medium text-[var(--s-accent)]">
+            <Link href={`/studio/quotations/${job.quoteId}`} className="acc-t" style={{ fontWeight: 600 }}>
               Open {job.quoteNumber}
             </Link>
           ) : null}
         </p>
       ) : null}
       {may ? (
-        <div className="flex flex-wrap items-center gap-3 text-[12.5px]">
-          {f.roomsRead !== null ? <span className="text-[var(--s-good)]">{f.roomsRead} rooms read</span> : null}
+        <div className="hstack sm" style={{ gap: 12 }}>
+          {f.roomsRead !== null ? <span className="good-t">{f.roomsRead} rooms read</span> : null}
           {plan && (readable || !canRead) ? (
             <button
               type="button"
               disabled={building || pending}
               onClick={() => onBuild('manual')}
-              className="font-medium text-[var(--s-accent)] disabled:opacity-40"
+              className="btn ghost xs"
               title={canRead ? 'Reads the plan (once — a plan read before is not read again) and makes a new draft quotation from it' : "Floor-plan reading isn't switched on yet: builds a draft from the lead's BHK"}
             >
               {job?.status === 'FAILED' ? 'Try again: build a quotation from this plan' : 'Build a quotation from this plan'}
             </button>
           ) : null}
           {mayReadRooms && canRead && readable && f.roomsRead === null ? (
-            <button type="button" disabled={building || pending} onClick={() => onBuild('read')} className="text-[var(--s-accent)] disabled:opacity-40" title="Reads the rooms only: the next quotation starts from them">
+            <button type="button" disabled={building || pending} onClick={() => onBuild('read')} className="btn ghost xs" title="Reads the rooms only: the next quotation starts from them">
               Read rooms
             </button>
           ) : null}
           {sure ? (
             <>
-              <button type="button" disabled={pending} onClick={() => run(() => removeFileAction(clientId, f.id))} className="text-[var(--s-bad)]">
+              <button type="button" disabled={pending} onClick={() => run(() => removeFileAction(clientId, f.id))} className="btn ghost xs bad-b">
                 Yes, remove it
               </button>
-              <button type="button" onClick={() => setSure(false)} className="text-[var(--s-ink-3)]">
+              <button type="button" onClick={() => setSure(false)} className="btn ghost xs">
                 Keep
               </button>
             </>
           ) : (
-            <button type="button" onClick={() => setSure(true)} className="text-[var(--s-ink-3)] hover:text-[var(--s-bad)]">
+            <button type="button" onClick={() => setSure(true)} className="btn ghost xs">
               Remove
             </button>
           )}
@@ -681,9 +687,9 @@ function FileRow({
 export function QuotesBox({ clientId, quotes, mayQuote, fromOneInteriors }: { clientId: string; quotes: LeadQuoteView[]; mayQuote: boolean; fromOneInteriors: boolean }) {
   const { pending, result, run } = useAct();
   return (
-    <section id="quotes" className={`${box} scroll-mt-20`}>
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="m-0 text-[15px] font-semibold">Quotations</h2>
+    <section id="quotes" className={box} style={{ scrollMarginTop: 80 }}>
+      <div className="chead">
+        <h2 style={h2Style}>Quotations</h2>
         {mayQuote && !fromOneInteriors ? (
           <button type="button" disabled={pending} onClick={() => run(() => newQuoteForLeadAction(clientId))} className={quietClass}>
             {pending ? 'Starting…' : '+ New quotation'}
@@ -692,21 +698,21 @@ export function QuotesBox({ clientId, quotes, mayQuote, fromOneInteriors }: { cl
       </div>
       <Said result={result} />
       {quotes.length === 0 ? (
-        <p className="m-0 text-[13.5px] text-[var(--s-ink-3)]">No quotation yet. It starts filled in from this lead.</p>
+        <p className="muted" style={{ margin: 0 }}>No quotation yet. It starts filled in from this lead.</p>
       ) : (
-        <ul className="m-0 flex list-none flex-col gap-2 p-0">
+        <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {quotes.map((q) => (
-            <li key={q.id} className="rounded-[10px] bg-[var(--s-surface-2)] px-3 py-2.5">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <Link href={`/studio/quotations/${q.id}`} className="s-num text-[14px] font-medium text-[var(--s-accent)]">
+            <li key={q.id} style={{ borderRadius: 12, background: 'var(--soft)', padding: '10px 12px' }}>
+              <div className="hstack" style={{ gap: 10 }}>
+                <Link href={`/studio/quotations/${q.id}`} className="mono acc-t" style={{ fontWeight: 600 }}>
                   {q.number}
                 </Link>
-                <span className="text-[12.5px] text-[var(--s-ink-3)]">{q.status === 'DRAFT' ? 'Draft, not sent' : q.status === 'ISSUED' ? 'Sent' : q.status === 'ACCEPTED' ? 'Won' : 'Lost'}</span>
-                {q.salesFinal ? <span className="s-tag !bg-[var(--s-good-wash)] !text-[var(--s-good)]">Sales final {q.salesFinal}</span> : null}
-                {q.totalPaise !== null ? <span className="s-num ml-auto text-[13px] font-semibold">{formatINR(q.totalPaise)}</span> : null}
+                <span className="muted sm">{q.status === 'DRAFT' ? 'Draft, not sent' : q.status === 'ISSUED' ? 'Sent' : q.status === 'ACCEPTED' ? 'Won' : 'Lost'}</span>
+                {q.salesFinal ? <span className="chip good">Sales final {q.salesFinal}</span> : null}
+                {q.totalPaise !== null ? <span className="mono" style={{ marginLeft: 'auto', fontWeight: 600 }}>{formatINR(q.totalPaise)}</span> : null}
               </div>
               {q.revisions.length > 0 ? (
-                <p className="m-0 mt-1 text-[12.5px] text-[var(--s-ink-2)]">
+                <p className="sm" style={{ margin: '4px 0 0', color: 'var(--text2)' }}>
                   {q.revisions.map((r) => `${r.label}${r.isSalesFinal ? ' (sales final)' : ''} sent ${new Date(r.sentAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`).join(' · ')}
                 </p>
               ) : null}
@@ -737,23 +743,23 @@ export function BookingBox({
 }) {
   if (booking && !booking.cancelled) {
     return (
-      <section id="booking" className={`${box} scroll-mt-20 border-l-[3px] !border-l-[var(--s-good)]`}>
-        <h2 className={h2}>Booked</h2>
-        <p className="m-0 text-[13.5px] leading-relaxed">
+      <section id="booking" className={box} style={{ scrollMarginTop: 80, boxShadow: 'inset 3px 0 0 var(--good)' }}>
+        <h2 className={h2} style={h2Style}>Booked</h2>
+        <p style={{ margin: 0, lineHeight: 1.5 }}>
           {formatINR(booking.advancePaise)} received, booked {new Date(booking.bookedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}. The client has the app.
         </p>
         {booking.payments.length > 0 ? (
-          <ol className="m-0 mt-2 flex list-none flex-col gap-1 p-0 text-[13px]">
+          <ol className="sm" style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
             {booking.payments.map((p, i) => (
-              <li key={i} className="flex justify-between gap-3">
+              <li key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                 <span>{p.label}</span>
-                <span className="s-num">{formatINR(p.amountPaise)}</span>
+                <span className="mono">{formatINR(p.amountPaise)}</span>
               </li>
             ))}
           </ol>
         ) : null}
         {seesProject ? (
-          <Link href={`/studio/projects/${booking.projectId}`} className={`${quietClass} mt-3 inline-block`}>
+          <Link href={`/studio/projects/${booking.projectId}`} className={quietClass} style={{ alignSelf: 'flex-start' }}>
             Open the project
           </Link>
         ) : null}
@@ -775,21 +781,21 @@ function RecordBooking({ draft, cancelledBefore }: { draft: BookingDraft; cancel
   const [email, setEmail] = useState(draft.customer.email);
   const { pending, result, run } = useAct();
   return (
-    <section id="booking" className={`${box} scroll-mt-20 border-l-[3px] !border-l-[var(--s-accent)]`}>
-      <h2 className={h2}>Record booking</h2>
-      <p className="m-0 mb-3 text-[13px] leading-relaxed text-[var(--s-ink-2)]">
+    <section id="booking" className={box} style={{ scrollMarginTop: 80, boxShadow: 'inset 3px 0 0 var(--acc)' }}>
+      <h2 className={h2} style={h2Style}>Record booking</h2>
+      <p className="sm" style={{ margin: 0, lineHeight: 1.5, color: 'var(--text2)' }}>
         On {draft.revision} of {draft.number} ({formatINR(draft.totalPaise)}), the sales final. Refundable for {draft.refundDays} days. This opens the project, records the
         payment and invites the client to the app by SMS or email.{cancelledBefore ? ' An earlier booking on this lead was refunded.' : ''}
       </p>
       {draft.blocked ? (
-        <p role="alert" className="m-0 text-[13px] text-[var(--s-bad)]">
+        <p role="alert" className="sm bad-t" style={{ margin: 0 }}>
           {draft.blocked}
         </p>
       ) : (
-        <div className="flex flex-col gap-2.5">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             <Field label="Amount received (₹)">
-              <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="numeric" className={`${inputClass} s-num`} />
+              <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="numeric" className="fld mono" />
             </Field>
             <Field label="Day it arrived">
               <input type="date" value={day} max={draft.today} onChange={(e) => setDay(e.target.value)} className={inputClass} />
@@ -843,22 +849,22 @@ export function Refund({ clientId, booking, isOwner }: { clientId: string; booki
   const { pending, result, run } = useAct();
   const late = booking.daysLeft < 0;
   if (late && !isOwner) {
-    return <p className="m-0 mt-3 text-[12.5px] text-[var(--s-ink-3)]">The {booking.refundDays}-day refund window has passed. Only the owner can refund it now.</p>;
+    return <p className="muted sm" style={{ margin: 0 }}>The {booking.refundDays}-day refund window has passed. Only the owner can refund it now.</p>;
   }
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="mt-3 block text-[13px] text-[var(--s-ink-3)] underline hover:text-[var(--s-bad)]">
+      <button type="button" onClick={() => setOpen(true)} className="btn ghost xs" style={{ alignSelf: 'flex-start' }}>
         Refund booking{late ? '' : ` (${Math.max(0, booking.daysLeft)} day${booking.daysLeft === 1 ? '' : 's'} left)`}
       </button>
     );
   }
   return (
-    <div className="mt-3 flex flex-col gap-2 border-t border-[var(--s-rule-soft)] pt-3">
-      <p className="m-0 text-[13px] leading-relaxed text-[var(--s-ink-2)]">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--soft)', paddingTop: 12 }}>
+      <p className="sm" style={{ margin: 0, lineHeight: 1.5, color: 'var(--text2)' }}>
         The refund is recorded against the payment, the project is marked cancelled (kept, not deleted) and the lead goes back to its column.
       </p>
       <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why (optional)" className={inputClass} />
-      <div className="flex flex-wrap gap-2">
+      <div className="hstack" style={{ gap: 8 }}>
         <button
           type="button"
           disabled={pending}
@@ -872,7 +878,7 @@ export function Refund({ clientId, booking, isOwner }: { clientId: string; booki
               return r.ok ? { ok: true, message: 'Refunded. The project is cancelled and the lead is back in its column.' } : r;
             })
           }
-          className={`${quietClass} !border-[var(--s-bad)] !text-[var(--s-bad)]`}
+          className={quietClass} style={{ color: 'var(--bad)' }}
         >
           {pending ? 'Refunding…' : askLate ? 'Refund anyway' : 'Yes, refund the booking'}
         </button>

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { COMING_SOON, type StudioFeature } from '@/modules/studio/features';
-import { PageHead, PageBody } from './StudioShell';
+import './office-ui.css';
 
 /**
  * What a gated route renders instead of the real screen.
@@ -27,36 +27,33 @@ export function ComingSoon({ feature }: { feature: keyof typeof COMING_SOON }) {
   const copy = COMING_SOON[feature];
 
   return (
-    <>
-      <PageHead title={copy.title} sub="Not in this release." />
-      <PageBody>
-        <div className="max-w-[46rem] rounded-[14px] border border-[var(--s-rule)] bg-[var(--s-surface)] p-7">
-          <p className="label m-0 mb-3">What it will do</p>
-          <p className="m-0 mb-5 text-[15.5px] leading-relaxed text-[var(--s-ink)]">{copy.what}</p>
-
-          {copy.meanwhile ? (
-            <p className="m-0 mb-6 border-l-2 border-[var(--s-rule)] pl-4 text-[14.5px] leading-relaxed text-[var(--s-ink-2)]">
-              {copy.meanwhile}
-            </p>
-          ) : null}
-
-          <div className="flex flex-wrap items-center gap-3 border-t border-[var(--s-rule)] pt-6">
-            <Link
-              href="/studio/clients"
-              className="inline-flex min-h-11 items-center rounded-[10px] bg-[var(--s-ink)] px-5 text-[14.5px] font-medium text-[var(--s-surface)] no-underline"
-            >
-              Go to your leads
-            </Link>
-            <Link
-              href="/studio"
-              className="inline-flex min-h-11 items-center rounded-[10px] border border-[var(--s-rule)] px-5 text-[14.5px] font-medium text-[var(--s-ink)] no-underline"
-            >
-              Dashboard
-            </Link>
-          </div>
+    <main className="content ox-page">
+      <div className="phead">
+        <div>
+          <h1>{copy.title}</h1>
+          <p className="muted">Not in this release.</p>
         </div>
-      </PageBody>
-    </>
+      </div>
+      <section className="card" style={{ maxWidth: '46rem' }}>
+        <span className="eyebrow">What it will do</span>
+        <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.5 }}>{copy.what}</p>
+        {copy.meanwhile ? (
+          <div className="empty">
+            <span className="muted" style={{ fontSize: 14.5, lineHeight: 1.5 }}>
+              {copy.meanwhile}
+            </span>
+          </div>
+        ) : null}
+        <div className="hstack">
+          <Link href="/studio/clients" className="btn pri">
+            Go to your leads
+          </Link>
+          <Link href="/studio" className="btn sec">
+            Overview
+          </Link>
+        </div>
+      </section>
+    </main>
   );
 }
 

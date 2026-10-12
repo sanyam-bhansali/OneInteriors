@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { PageBody } from '../../../StudioShell';
 import { workOrderPage } from '@/modules/studio-crews/store';
 import { WorkOrderCard } from '../../crews-ui';
+import '../../../office-ui.css';
+import '../../vendors.css';
 
 export const metadata: Metadata = { title: 'Work order', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -19,21 +20,21 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
   if (!data) notFound();
   const o = data.order;
   return (
-    <>
-      <div className="border-b border-[var(--s-rule)] bg-[var(--s-rail)]/50 px-5 py-4 sm:px-7">
-        <Link href="/studio/vendors/pay" className="text-[13px] text-[var(--s-ink-3)] no-underline hover:text-[var(--s-accent)]">
-          ← Pay these
-        </Link>
-        <h1 className="m-0 mt-1 text-[22px] font-semibold tracking-tight">
-          WO-{o.number} · {o.crewName}
-        </h1>
-        <p className="m-0 mt-1 text-[13.5px] text-[var(--s-ink-2)]">{o.projectName}</p>
+    <main className="content ox-page">
+      <div className="phead">
+        <div>
+          <Link href="/studio/vendors/pay" className="vd-back">
+            ← Pay crews
+          </Link>
+          <h1 style={{ marginTop: 4 }}>
+            <span className="mono">WO-{o.number}</span> · {o.crewName}
+          </h1>
+          <p className="muted">{o.projectName}</p>
+        </div>
       </div>
-      <PageBody>
-        <ul className="m-0 flex max-w-[64rem] flex-col p-0">
-          <WorkOrderCard order={o} projectId={o.projectId} canBuild={data.canBuild} seesMoney={data.seesMoney} canPay={data.canPay} advanceLimitPaise={data.advanceLimitPaise} payee={data.payee} open />
-        </ul>
-      </PageBody>
-    </>
+      <ul className="vd-orders">
+        <WorkOrderCard order={o} projectId={o.projectId} canBuild={data.canBuild} seesMoney={data.seesMoney} canPay={data.canPay} advanceLimitPaise={data.advanceLimitPaise} payee={data.payee} open />
+      </ul>
+    </main>
   );
 }

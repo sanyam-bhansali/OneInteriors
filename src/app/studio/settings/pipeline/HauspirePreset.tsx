@@ -15,21 +15,21 @@ export function HauspirePreset({ stages }: { stages: ExistingStage[] }) {
   const [said, setSaid] = useState<{ ok: boolean; text: string } | null>(null);
   const plan = planPreset(stages);
   return (
-    <div className="s-card mb-5 p-5">
+    <div className="card mb-5 p-5">
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="m-0 text-[14.5px] font-semibold">Use the Hauspire pipeline</p>
-          <p className="m-0 mt-1 text-[13px] leading-relaxed text-[var(--s-ink-2)]">{HAUSPIRE_PIPELINE.map((s) => s.name).join(' → ')}</p>
+          <p className="m-0 mt-1 text-[13px] leading-relaxed muted">{HAUSPIRE_PIPELINE.map((s) => s.name).join(' → ')}</p>
         </div>
         {!asking ? (
-          <button type="button" onClick={() => setAsking(true)} className="s-btn-ghost">
+          <button type="button" onClick={() => setAsking(true)} className="btn ghost sm">
             Use it
           </button>
         ) : null}
       </div>
       {asking ? (
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[13.5px]">
-          <span className="text-[var(--s-ink-2)]">{presetSummary(plan)}</span>
+          <span className="muted">{presetSummary(plan)}</span>
           <button
             type="button"
             disabled={pending}
@@ -40,7 +40,7 @@ export function HauspirePreset({ stages }: { stages: ExistingStage[] }) {
                 setAsking(false);
               })
             }
-            className="s-btn"
+            className="btn pri sm"
           >
             {pending ? 'Applying…' : 'Yes, apply it'}
           </button>
@@ -50,7 +50,7 @@ export function HauspirePreset({ stages }: { stages: ExistingStage[] }) {
         </div>
       ) : null}
       {said ? (
-        <p role={said.ok ? 'status' : 'alert'} className={`m-0 mt-2 text-[13px] ${said.ok ? 'text-[var(--s-good)]' : 'text-[var(--s-bad)]'}`}>
+        <p role={said.ok ? 'status' : 'alert'} className={`m-0 mt-2 text-[13px] ${said.ok ? 'good-t' : 'bad-t'}`}>
           {said.text}
         </p>
       ) : null}

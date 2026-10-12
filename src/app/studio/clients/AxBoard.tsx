@@ -4,8 +4,12 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LOST_LABELS, type LostReasonName } from '@/modules/studio-practice/vocabulary';
-import { cardFacts, coldLabel, dueBadge, isNewToday, sourceLabel, type LeadView } from '@/modules/studio-sales/lead-view';
-import { Avatar, Dot, Modal, PillCold, PillDue, PillToday, SourceIcon, TagChips, btnOutline, btnPrimary } from './ax-ui';
+import { colourOf } from '@/modules/studio-practice/vocabulary';
+import { bhk, coldLabel, dueBadge, inr, isNewToday, relTime, sourceLabel, type LeadView } from '@/modules/studio-sales/lead-view';
+import { telLink, whatsappLink } from '@/modules/studio-sales/lead-rules';
+import { initials } from '@/modules/studio-sales/lead-view';
+import { LineIcon } from '../ui/icons';
+import { Modal, PillCold, PillDue, PillToday, TagChips } from './ax-ui';
 import { columnPageAction, moveLeadAction } from './list-actions';
 
 export interface BoardStage {
@@ -150,23 +154,26 @@ export function AxBoard({
   }
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
       {error ? (
-        <p role="alert" className="m-0 mb-2 text-[13px] text-[var(--s-bad)]">
+        <p role="alert" className="cl-err">
           {error}
         </p>
       ) : null}
-      <div ref={topRef} onScroll={() => mirror(topRef.current, boardRef.current)} className="mb-2 overflow-x-auto" aria-hidden>
+      <div ref={topRef} onScroll={() => mirror(topRef.current, boardRef.current)} className="cl-topscroll" aria-hidden>
         <div style={{ width: scrollW, height: 1 }} />
       </div>
-      <div ref={boardRef} onScroll={() => mirror(boardRef.current, topRef.current)} className="flex items-start gap-3 overflow-x-auto pb-2">
+      <div ref={boardRef} onScroll={() => mirror(boardRef.current, topRef.current)} className="board" role="list" aria-label="Clients by stage">
         {stages.map((s) => {
           const col = cols[s.id] ?? { rows: [], next: null };
           const isOver = over === s.id;
+          const n = counts[s.id] ?? 0;
+          const left = n - col.rows.length;
           return (
             <section
               key={s.id}
-              aria-label={`${s.name}, ${counts[s.id] ?? 0} leads`}
+              role="listitem"
+              aria-label={`${s.name}, ${n} leads`}
               onDragOver={(e) => {
                 if (!mayMove || !drag) return;
                 e.preventDefault();
@@ -174,33 +181,34 @@ export function AxBoard({
               }}
               onDragLeave={() => setOver((o) => (o === s.id ? null : o))}
               onDrop={() => drop(s.id)}
-              className={`flex min-h-[200px] w-[264px] flex-none flex-col gap-2.5 rounded-[14px] border p-2.5 transition-colors ${isOver ? 'border-[var(--s-accent)] bg-[var(--s-accent-wash)]' : 'border-[var(--s-rule)] bg-[var(--s-surface-2)]'}`}
             >
-              <div className="flex items-center gap-2 px-1 py-0.5">
-                <Dot colour={s.colour} />
-                <span className="truncate text-[12.5px] font-semibold">{s.name}</span>
-                <span className="s-num ml-auto rounded-full bg-[var(--s-surface)] px-2 py-px text-[11.5px] font-semibold text-[var(--s-ink-2)]">{(counts[s.id] ?? 0).toLocaleString('en-IN')}</span>
+              <div className="colh">
+                <i style={{ background: colourOf(s.colour).dot }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                <span className="mono">{n.toLocaleString('en-IN')}</span>
               </div>
-              {col.rows.map((l) => (
-                <Card
-                  key={l.id}
-                  lead={l}
-                  now={now}
-                  showOwner={showOwner}
-                  ownerName={l.assignedToId && l.assignedToId === meId ? 'Mine' : l.assignedToName}
-                  draggable={mayMove}
-                  dragging={drag?.lead.id === l.id}
-                  onDragStart={() => setDrag({ lead: l, from: s.id })}
-                  onDragEnd={() => setDrag(null)}
-                />
-              ))}
-              {col.lazy && (counts[s.id] ?? 0) > 0 ? (
-                <button type="button" disabled={opening === s.id} onClick={() => void openColumn(s.id)} className={`${btnOutline} justify-center`}>
-                  {opening === s.id ? 'Loading…' : `Show ${(counts[s.id] ?? 0).toLocaleString('en-IN')} ${(counts[s.id] ?? 0) === 1 ? 'lead' : 'leads'}`}
-                </button>
-              ) : null}
-              {col.rows.length === 0 && !(col.lazy && (counts[s.id] ?? 0) > 0) ? <div className="rounded-[10px] border border-dashed border-[var(--s-rule)] py-[18px] text-center text-[12px] text-[var(--s-ink-3)]">Drop here</div> : null}
-              {col.next && loading ? <div className="py-1.5 text-center text-[11.5px] text-[var(--s-ink-3)]">Loading…</div> : null}
+              <div className={`lane ${isOver ? 'over' : ''}`}>
+                {col.rows.map((l) => (
+                  <Card
+                    key={l.id}
+                    lead={l}
+                    now={now}
+                    showOwner={showOwner}
+                    ownerName={l.assignedToId && l.assignedToId === meId ? 'Mine' : l.assignedToName}
+                    draggable={mayMove}
+                    dragging={drag?.lead.id === l.id}
+                    onDragStart={() => setDrag({ lead: l, from: s.id })}
+                    onDragEnd={() => setDrag(null)}
+                  />
+                ))}
+                {col.lazy && n > 0 ? (
+                  <button type="button" disabled={opening === s.id} onClick={() => void openColumn(s.id)} className="btn ghost sm" style={{ background: 'transparent' }}>
+                    {opening === s.id ? 'Loading…' : `Show ${n.toLocaleString('en-IN')} ${n === 1 ? 'client' : 'clients'}`}
+                  </button>
+                ) : null}
+                {col.rows.length === 0 && !(col.lazy && n > 0) ? <div className="drop">Drop here</div> : null}
+                {!col.lazy && col.next && left > 0 ? <div className="lmore">{loading ? 'Loading…' : `+ ${left.toLocaleString('en-IN')} more`}</div> : null}
+              </div>
             </section>
           );
         })}
@@ -222,7 +230,12 @@ export function AxBoard({
   );
 }
 
-/** One card: avatar, name, the pills, tags, then source · "2BHK · ₹15L" · owner. */
+/**
+ * One card, as the design draws it: name and where they live, the source and
+ * budget chips (with Today, cold, due and tags), the next step, then when they
+ * were last spoken to, Call and WhatsApp, and whose it is. The whole card
+ * opens the lead; it drags to another column.
+ */
 function Card({
   lead,
   now,
@@ -242,13 +255,19 @@ function Card({
   onDragStart: () => void;
   onDragEnd: () => void;
 }) {
+  const router = useRouter();
+  const href = `/studio/clients/${lead.id}`;
   const fresh = now ? isNewToday(lead.createdAt, now) : false;
   const cold = fresh || !now ? null : coldLabel(lead, now);
   const due = lead.flags.closed || !now ? null : dueBadge(lead.nextActionOn, now);
-  const facts = cardFacts(lead);
+  const home = [lead.locality ?? lead.society ?? lead.city, bhk(lead.config)].filter(Boolean).join(', ');
+  const budget = inr(lead.budgetPaise);
+  const tel = telLink(lead.phone);
+  const wa = whatsappLink(lead.phone);
+  const last = !now ? '' : lead.lastContactedAt ? `Last contact ${relTime(lead.lastContactedAt, now)}` : 'Not contacted yet';
   return (
-    <Link
-      href={`/studio/clients/${lead.id}`}
+    <div
+      className={`ccard ${dragging ? 'dragging' : ''}`}
       draggable={draggable}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = 'move';
@@ -256,31 +275,57 @@ function Card({
         onDragStart();
       }}
       onDragEnd={onDragEnd}
-      className={`block rounded-[12px] border bg-[var(--s-surface)] p-[11px] text-[var(--s-ink)] no-underline shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${draggable ? 'cursor-grab' : ''} ${dragging ? 'opacity-40' : ''} ${fresh ? 'border-l-[3px] border-[var(--s-rule)] border-l-[var(--s-accent)]' : 'border-[var(--s-rule)]'}`}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest('a,button')) return;
+        router.push(href);
+      }}
     >
-      <div className="mb-2 flex items-center gap-2">
-        <Avatar name={lead.name} />
-        <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold">{lead.name}</span>
+      <Link href={href} className="nm" draggable={false}>
+        <b>{lead.name}</b>
+        {home ? <span className="muted sm">{home}</span> : null}
+      </Link>
+      <div className="hstack" style={{ gap: 6 }}>
+        <span className={`chip xs ${lead.source === 'ONE_INTERIORS' ? 'oi' : ''}`}>{sourceLabel(lead)}</span>
+        {budget ? <span className="chip xs">{budget}</span> : null}
         {fresh ? <PillToday /> : null}
         {cold ? <PillCold label={cold} /> : null}
         {due ? <PillDue bucket={due.bucket} label={due.label} /> : null}
+        <TagChips tags={lead.tags} max={2} />
       </div>
-      {lead.tags.length > 0 ? (
-        <div className="mb-2 flex flex-wrap items-center gap-1.5">
-          <TagChips tags={lead.tags} max={3} />
-        </div>
+      {lead.nextAction ? (
+        <span className="sm" style={{ color: due?.bucket === 'overdue' ? 'var(--bad)' : 'var(--ink)' }}>
+          {lead.nextAction}
+        </span>
       ) : null}
-      <div className="flex items-center gap-2 text-[12px] text-[var(--s-ink-3)]">
-        <SourceIcon source={lead.source} label={sourceLabel(lead)} />
-        {facts ? <span className="min-w-0 truncate">{facts}</span> : null}
-        {showOwner ? (
-          <>
-            <span className="flex-1" />
-            {ownerName ? <span className="whitespace-nowrap">{ownerName}</span> : <span className="whitespace-nowrap text-[var(--s-warn)]">Unassigned</span>}
-          </>
-        ) : null}
+      <div className="hstack" style={{ justifyContent: 'space-between', gap: 8, flexWrap: 'nowrap' }}>
+        <span className="sm" style={{ color: cold ? 'var(--bad)' : 'var(--muted)', fontWeight: cold ? 600 : 400, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {last}
+        </span>
+        <div className="cact">
+          {tel ? (
+            <a href={tel} aria-label={`Call ${lead.name}`} draggable={false}>
+              <LineIcon name="phone" size={15} />
+            </a>
+          ) : null}
+          {wa ? (
+            <a href={wa} target="_blank" rel="noreferrer" aria-label={`WhatsApp ${lead.name}`} draggable={false}>
+              <LineIcon name="chat" size={15} />
+            </a>
+          ) : null}
+          {showOwner ? (
+            ownerName ? (
+              <span className="av" title={ownerName}>
+                {ownerName === 'Mine' ? 'Me' : initials(ownerName)}
+              </span>
+            ) : (
+              <span className="av" title="Unassigned, in the pool" style={{ background: 'var(--warn-bg)', color: 'var(--warn)' }}>
+                ?
+              </span>
+            )
+          ) : null}
+        </div>
       </div>
-    </Link>
+    </div>
   );
 }
 
@@ -288,20 +333,20 @@ function Card({
 export function LostReasonDialog({ name, onClose, onPick }: { name: string; onClose: () => void; onPick: (reason: LostReasonName) => void }) {
   return (
     <Modal onClose={onClose} width="min(420px, 92vw)" labelledBy="lost-title">
-      <div className="px-5 py-4">
-        <h2 id="lost-title" className="m-0 text-[16px] font-semibold">
+      <div className="sb">
+        <h2 id="lost-title" style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>
           Why was {name} lost?
         </h2>
-        <p className="m-0 mt-1 text-[13px] text-[var(--s-ink-2)]">One word is enough; the dashboard counts it.</p>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <p className="cl-sub">One word is enough; the dashboard counts it.</p>
+        <div className="quick">
           {(Object.keys(LOST_LABELS) as LostReasonName[]).map((k) => (
-            <button key={k} type="button" onClick={() => onPick(k)} className={btnOutline}>
+            <button key={k} type="button" onClick={() => onPick(k)} >
               {LOST_LABELS[k]}
             </button>
           ))}
         </div>
-        <div className="mt-4 flex justify-end">
-          <button type="button" onClick={onClose} className={btnPrimary}>
+        <div className="hstack" style={{ justifyContent: 'flex-end' }}>
+          <button type="button" onClick={onClose} className="btn sec sm">
             Cancel
           </button>
         </div>

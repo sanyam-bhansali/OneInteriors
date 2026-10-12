@@ -1,0 +1,657 @@
+/* Quotations, the quote builder and compare (StudioQuotes, StudioQuoteBuilder
+   in the owner's UI handoff, and the Sales/Designer/PM versions of both).
+   Only what the shared classes in studio-ui.css do not already draw; every
+   rule scoped to the studio frame, tokens only. */
+
+/* ── Page ─────────────────────────────────────────────────── */
+.oi-studio .qpage {
+  max-width: 1600px;
+}
+@media (max-width: 760px) {
+  .oi-studio .qpage.content {
+    padding: 16px 16px 48px;
+    gap: 16px;
+  }
+  .oi-studio .qpage .phead h1 {
+    font-size: 26px;
+  }
+  .oi-studio .qpage .phead > .hstack {
+    width: 100%;
+  }
+}
+.oi-studio .qback {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.oi-studio .qsub {
+  margin: 6px 0 0;
+}
+.oi-studio .qmeta {
+  margin-top: 6px;
+  gap: 6px 8px;
+}
+
+/* Status tabs that are links (a search or a filter is a link a studio keeps). */
+.oi-studio .tabs a {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text2);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.oi-studio .tabs a[aria-current='page'] {
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(var(--sh), 0.12);
+}
+@media (max-width: 760px) {
+  .oi-studio .qpage .tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+  .oi-studio .qpage .tabs button {
+    white-space: nowrap;
+  }
+}
+
+.oi-studio .qsearch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 380px;
+  min-width: 0;
+}
+.oi-studio .qsearch .fld {
+  min-height: 38px;
+}
+@media (max-width: 760px) {
+  .oi-studio .qsearch {
+    flex: 1 1 100%;
+  }
+}
+
+/* A note across the page: a project is running, studio details missing. */
+.oi-studio .qnote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--paper);
+  font-size: 14px;
+  line-height: 1.45;
+  box-shadow: inset 3px 0 0 var(--acc);
+}
+.oi-studio .qnote.good {
+  box-shadow: inset 3px 0 0 var(--good-s);
+}
+.oi-studio .qnote.warn {
+  box-shadow: inset 3px 0 0 var(--warn-s);
+}
+.oi-studio .qnote p {
+  margin: 0;
+}
+
+/* The list's table. */
+.oi-studio .qtbl a.mono {
+  font-weight: 600;
+}
+.oi-studio .qtbl .qsame {
+  color: var(--muted);
+  font-size: 13px;
+}
+@media (max-width: 760px) {
+  .oi-studio .qtbl {
+    min-width: 720px !important;
+  }
+}
+
+/* ── Start a quotation ────────────────────────────────────── */
+.oi-studio .qform .qrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-end;
+}
+.oi-studio .qform .qrow + .qrow {
+  padding-top: 14px;
+  border-top: 1px solid var(--fill2);
+}
+.oi-studio .qfield {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.oi-studio .qcheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.oi-studio .qcheck input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--acc);
+}
+.oi-studio .fld.num {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  text-align: right;
+}
+.oi-studio select.fld,
+.oi-studio textarea.fld {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.oi-studio textarea.fld {
+  min-height: 64px;
+  resize: vertical;
+  line-height: 1.4;
+}
+.oi-studio .qfound {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.oi-studio .qerr {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bad);
+}
+.oi-studio .qok {
+  margin: 0;
+  font-size: 13px;
+  color: var(--good);
+}
+
+/* ── The builder ──────────────────────────────────────────── */
+.oi-studio .qb {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .oi-studio .qb {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.oi-studio .qside {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.oi-studio .qmid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* Rooms down the left; a row of chips on a phone. */
+.oi-studio .rooms {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 16px;
+  background: var(--paper);
+}
+.oi-studio .room {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.oi-studio .room:hover {
+  background: var(--fill);
+}
+.oi-studio .room[aria-current='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+.oi-studio .room[aria-current='true'] .muted {
+  color: var(--inv-muted);
+}
+.oi-studio .room b {
+  font-weight: 600;
+  font-size: 14px;
+}
+.oi-studio .room.add {
+  color: var(--acc);
+}
+.oi-studio .room.add:hover {
+  color: var(--acc);
+}
+@media (max-width: 1100px) {
+  .oi-studio .rooms {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+  .oi-studio .room {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
+
+/* A room's own heading: its name is the rename box. */
+.oi-studio .roomname {
+  flex: 1 1 200px;
+  min-width: 0;
+  margin: 0;
+}
+.oi-studio .roomname input {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 8px;
+  margin-left: -8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.oi-studio .roomname input:hover {
+  background: var(--soft);
+}
+.oi-studio .roomname input:focus {
+  background: var(--fill);
+}
+
+/* Lines. */
+.oi-studio .qline td {
+  vertical-align: top;
+}
+.oi-studio .qline.over td {
+  background: var(--acc-soft);
+}
+.oi-studio .qline td.qh {
+  padding-right: 4px;
+  padding-left: 10px;
+  width: 44px;
+}
+.oi-studio .qline .qitem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 220px;
+}
+.oi-studio .qline .qtools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.oi-studio .cellin {
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 8px;
+  margin-left: -8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+}
+.oi-studio .cellin:hover {
+  background: var(--soft);
+}
+.oi-studio .cellin:focus {
+  background: var(--fill);
+}
+.oi-studio .cellin.name {
+  font-weight: 600;
+}
+.oi-studio .cellin.spec {
+  font-size: 13px;
+  color: var(--muted);
+  resize: vertical;
+  line-height: 1.35;
+  min-height: 26px;
+}
+.oi-studio .cellin.num {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  text-align: right;
+  margin-left: 0;
+}
+.oi-studio .cellin.num.strong {
+  font-weight: 600;
+}
+.oi-studio .cellsel {
+  min-height: 26px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--fill);
+  color: var(--text2);
+  font-size: 12.5px;
+  cursor: pointer;
+  max-width: 180px;
+}
+.oi-studio .step {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: var(--fill);
+}
+.oi-studio .step button {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 999px;
+  color: var(--ink);
+}
+.oi-studio .step button:hover {
+  background: var(--fillh);
+}
+.oi-studio .step input {
+  width: 52px;
+  min-height: 30px;
+  border: 0;
+  background: transparent;
+  text-align: center;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.oi-studio .qsize {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.oi-studio .qsize .cellin.num {
+  width: 72px;
+  background: var(--fill);
+  text-align: center;
+}
+.oi-studio .qline .qrate {
+  width: 110px;
+}
+.oi-studio .qline .qamt {
+  width: 130px;
+}
+.oi-studio .qline .struck {
+  display: block;
+  text-decoration: line-through;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+.oi-studio .qicons {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.oi-studio .qico {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+}
+.oi-studio .qico:hover {
+  background: var(--fill);
+  color: var(--ink);
+}
+.oi-studio .qico.bad:hover {
+  color: var(--bad);
+}
+.oi-studio .qico:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.oi-studio .qgrip {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--muted);
+}
+.oi-studio .qgrip > span:first-child {
+  cursor: grab;
+}
+.oi-studio .qline .qmove {
+  display: flex;
+  flex-direction: column;
+}
+.oi-studio .qline .qmove .qico {
+  width: 22px;
+  height: 18px;
+}
+.oi-studio .qfoot td {
+  background: var(--soft);
+  font-weight: 600;
+}
+
+/* Add a line, under the lines. */
+.oi-studio .qadd {
+  padding: 14px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--fill2);
+}
+.oi-studio .qadd .qrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+.oi-studio .qadd .qrow > * {
+  flex: 1 1 200px;
+}
+.oi-studio .qadd .qrow > .qfield.narrow {
+  flex: 0 1 120px;
+}
+
+/* The search lists (Combobox and the lead finder). */
+.oi-studio .pick {
+  border-radius: 14px;
+  background: var(--soft);
+  box-shadow: inset 0 0 0 1px var(--fillh);
+  overflow: hidden;
+}
+.oi-studio .pick button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: baseline;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  border-top: 1px solid var(--fill2);
+  font-size: 14px;
+}
+.oi-studio .pick li:first-child button {
+  border-top: 0;
+}
+.oi-studio .pick button:hover,
+.oi-studio .pick button[data-active='true'] {
+  background: var(--fill);
+}
+.oi-studio .pick.float {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 30;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 16rem;
+  overflow-y: auto;
+  background: var(--paper);
+  box-shadow: 0 18px 40px -12px rgba(var(--sh), 0.35), 0 0 0 1px var(--line);
+}
+
+/* The total. */
+.oi-studio .sumrow {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 14px;
+}
+.oi-studio .sumrow.total {
+  padding-top: 10px;
+  border-top: 1px solid var(--fill2);
+  font-size: 16px;
+  align-items: baseline;
+}
+.oi-studio .sumrow.total b.mono {
+  font-size: 22px;
+  font-weight: 500;
+}
+.oi-studio .qstages {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+}
+.oi-studio .qbar {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--fill);
+  overflow: hidden;
+}
+.oi-studio .qbar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--acc);
+}
+
+/* Revisions. */
+.oi-studio .revrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--soft);
+  font-size: 14px;
+}
+.oi-studio .revlist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.oi-studio .qsplit {
+  padding-top: 14px;
+  border-top: 1px solid var(--fill2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* The document preview: the client's paper, in the studio's own accent. */
+.oi-studio .qdoc {
+  background: var(--paper);
+  border-radius: 18px;
+  overflow: hidden;
+  color: var(--ink);
+}
+.oi-studio .qdoc .qdoc-sec {
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--fill2);
+}
+.oi-studio .qdoc .qdoc-k {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.oi-studio .qdoc table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.oi-studio .qdoc td {
+  padding: 6px 12px 6px 0;
+  vertical-align: top;
+}
+.oi-studio .qdoc td:last-child {
+  padding-right: 0;
+}
+
+/* The walkthrough panel keeps its own margins elsewhere; the page gap spaces it here. */
+.oi-studio .qguide:empty {
+  display: none;
+}
+.oi-studio .qguide > * {
+  margin-bottom: 0 !important;
+}
+
+/* Line rows: compact cells, the size on one line, the tools beside each other. */
+.oi-studio .qline td {
+  padding: 10px 10px;
+}
+.oi-studio .qline .qitem {
+  min-width: 240px;
+}
+.oi-studio .qline .qtools {
+  flex-wrap: wrap;
+}
+.oi-studio .qline .cellsel {
+  width: auto;
+  flex: none;
+}
+.oi-studio .qline .cellin.spec {
+  resize: none;
+}
+.oi-studio .qsize {
+  min-width: 170px;
+}
+.oi-studio .qsize .cellin.num {
+  width: 62px;
+  padding: 4px 4px;
+}
+.oi-studio .qsize > span:last-child {
+  flex-basis: 100%;
+}
+.oi-studio .qline .cellsel {
+  max-width: 132px;
+}
+
+/* The screen-reader labels in table heads are absolutely placed; keep them inside the scroller so a phone page never scrolls sideways. */
+.oi-studio .qpage .tscroll {
+  position: relative;
+}

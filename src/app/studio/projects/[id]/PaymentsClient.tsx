@@ -18,8 +18,8 @@ export interface RecorderStage {
   openPaise: number;
 }
 
-const field = 's-input w-full';
-const lbl = 'text-[13px] font-semibold text-[var(--s-ink-2)]';
+const field = 'fld w-full';
+const lbl = 'text-[13px] font-semibold text-[var(--text2)]';
 
 const rupeesText = (paise: number) => formatINR(paise, { symbol: false, paise: paise % 100 !== 0 });
 
@@ -49,7 +49,7 @@ export function RecordPayment({
   const [pending, start] = useTransition();
 
   if (open.length === 0) {
-    return <p className="m-0 text-[13.5px] text-[var(--s-ink-3)]">Every stage is recorded in full.</p>;
+    return <p className="m-0 text-[13.5px] text-[var(--muted)]">Every stage is recorded in full.</p>;
   }
 
   const current = stages.find((s) => s.index === stage) ?? null;
@@ -61,7 +61,7 @@ export function RecordPayment({
       <div className="flex flex-col gap-2">
         <button
           type="button"
-          className="s-btn self-start"
+          className="btn pri sm self-start"
           onClick={() => {
             // The figures may have moved since this page loaded (a payment just saved): start from what is open now.
             if (first) {
@@ -75,7 +75,7 @@ export function RecordPayment({
           Mark a payment received
         </button>
         {message ? (
-          <p role="status" className={`m-0 text-[13px] ${message.ok ? 'text-[var(--s-good)]' : 'text-[var(--s-bad)]'}`}>
+          <p role="status" className={`m-0 text-[13px] ${message.ok ? 'text-[var(--good)]' : 'text-[var(--bad)]'}`}>
             {message.text}
           </p>
         ) : null}
@@ -106,7 +106,7 @@ export function RecordPayment({
 
   return (
     <form
-      className="flex flex-col gap-4 rounded-[12px] border border-[var(--s-rule)] bg-[var(--s-surface)] p-4"
+      className="flex flex-col gap-4 rounded-[12px] border border-[var(--fill2)] bg-[var(--paper)] p-4"
       onSubmit={(e) => {
         e.preventDefault();
         save();
@@ -134,9 +134,9 @@ export function RecordPayment({
         <label className="flex flex-col gap-1.5">
           <span className={lbl}>Amount received</span>
           <span className="flex items-center gap-2">
-            <span className="text-[14px] text-[var(--s-ink-3)]">₹</span>
+            <span className="text-[14px] text-[var(--muted)]">₹</span>
             <input
-              className={`${field} s-num font-[family-name:var(--font-mono)]`}
+              className={`${field} mono`}
               inputMode="decimal"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
@@ -147,7 +147,7 @@ export function RecordPayment({
               aria-describedby="pay-amount-hint"
             />
           </span>
-          <span id="pay-amount-hint" className={`text-[12.5px] ${over ? 'text-[var(--s-bad)]' : 'text-[var(--s-ink-3)]'}`}>
+          <span id="pay-amount-hint" className={`text-[12.5px] ${over ? 'text-[var(--bad)]' : 'text-[var(--muted)]'}`}>
             {over
               ? `${formatINR(over)} more than the ${formatINR(current!.openPaise)} open on ${current!.label}. Record the extra against the next payment.`
               : paise !== null && current && paise < current.openPaise
@@ -177,8 +177,8 @@ export function RecordPayment({
                 className="min-h-[40px] rounded-full border px-4 text-[13.5px]"
                 style={
                   mode === m
-                    ? { background: 'var(--s-accent)', borderColor: 'var(--s-accent)', color: '#fff' }
-                    : { background: 'var(--s-surface)', borderColor: 'var(--s-rule)', color: 'var(--s-ink)' }
+                    ? { background: 'var(--ink)', borderColor: 'var(--ink)', color: 'var(--paper)' }
+                    : { background: 'var(--fill)', borderColor: 'transparent', color: 'var(--ink)' }
                 }
               >
                 {MODE_LABEL[m]}
@@ -193,25 +193,25 @@ export function RecordPayment({
         <input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="text-[13px]" onChange={(e) => setReceipt(e.target.files?.[0] ?? null)} />
       </label>
 
-      <div className="rounded-[10px] bg-[var(--s-surface-2)] p-3">
+      <div className="rounded-[10px] bg-[var(--fill)] p-3">
         <label className="flex flex-col gap-1.5">
-          <span className="text-[12.5px] font-semibold text-[var(--s-ink-2)]">Note · only your team</span>
+          <span className="text-[12.5px] font-semibold text-[var(--text2)]">Note · only your team</span>
           <input className={field} value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="UTR, cheque number, who paid" />
         </label>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <button type="submit" className="s-btn" disabled={pending || stage === null || !paise || over > 0 || !mode || !day}>
+        <button type="submit" className="btn pri sm" disabled={pending || stage === null || !paise || over > 0 || !mode || !day}>
           {pending ? 'Saving…' : paise ? `Record ${formatINR(paise)} received` : 'Record received'}
         </button>
-        <button type="button" className="s-btn-ghost" onClick={() => setShow(false)}>
+        <button type="button" className="btn ghost sm" onClick={() => setShow(false)}>
           Cancel
         </button>
-        {!mode ? <span className="text-[12.5px] text-[var(--s-ink-3)]">Pick how it was paid.</span> : null}
+        {!mode ? <span className="text-[12.5px] text-[var(--muted)]">Pick how it was paid.</span> : null}
       </div>
-      <p className="m-0 text-[12.5px] text-[var(--s-ink-3)]">It counts as paid once {customer} confirms it in the app. Entries are never edited; a mistake is corrected with a new entry.</p>
+      <p className="m-0 text-[12.5px] text-[var(--muted)]">It counts as paid once {customer} confirms it in the app. Entries are never edited; a mistake is corrected with a new entry.</p>
       {message && !message.ok ? (
-        <p role="alert" className="m-0 text-[13px] text-[var(--s-bad)]">
+        <p role="alert" className="m-0 text-[13px] text-[var(--bad)]">
           {message.text}
         </p>
       ) : null}
@@ -234,25 +234,25 @@ export function CorrectPayment({ projectId, paymentId, amountPaise }: { projectI
     });
   if (!open) {
     return (
-      <button type="button" className="text-[12.5px] text-[var(--s-ink-3)] underline hover:text-[var(--s-accent)]" onClick={() => setOpen(true)}>
+      <button type="button" className="text-[12.5px] text-[var(--muted)] underline hover:text-[var(--acc)]" onClick={() => setOpen(true)}>
         Correct
       </button>
     );
   }
   return (
     <span className="flex flex-wrap items-center gap-2">
-      <span className="text-[13px] text-[var(--s-ink-3)]">₹</span>
-      <input className="s-input w-[9rem] s-num font-[family-name:var(--font-mono)]" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="Corrected amount, in rupees" />
-      <button type="button" className="s-btn-ghost" disabled={pending} onClick={() => run(amount)}>
+      <span className="text-[13px] text-[var(--muted)]">₹</span>
+      <input className="fld w-[9rem] mono" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="Corrected amount, in rupees" />
+      <button type="button" className="btn ghost sm" disabled={pending} onClick={() => run(amount)}>
         Save
       </button>
-      <button type="button" className="s-btn-ghost" disabled={pending} onClick={() => run('0')}>
+      <button type="button" className="btn ghost sm" disabled={pending} onClick={() => run('0')}>
         Recorded by mistake
       </button>
-      <button type="button" className="text-[12.5px] text-[var(--s-ink-3)] underline" onClick={() => setOpen(false)}>
+      <button type="button" className="text-[12.5px] text-[var(--muted)] underline" onClick={() => setOpen(false)}>
         Cancel
       </button>
-      {error ? <span role="alert" className="basis-full text-[12.5px] text-[var(--s-bad)]">{error}</span> : null}
+      {error ? <span role="alert" className="basis-full text-[12.5px] text-[var(--bad)]">{error}</span> : null}
     </span>
   );
 }
@@ -266,7 +266,7 @@ export function DueDate({ projectId, index, value, label }: { projectId: string;
     <span className="flex flex-col gap-1">
       <input
         type="date"
-        className="s-input w-[11rem]"
+        className="fld w-[11rem]"
         defaultValue={value ?? ''}
         disabled={pending}
         aria-label={`When ${label} is due`}
@@ -282,11 +282,11 @@ export function DueDate({ projectId, index, value, label }: { projectId: string;
         }}
       />
       {error ? (
-        <span role="alert" className="text-[12.5px] text-[var(--s-bad)]">
+        <span role="alert" className="text-[12.5px] text-[var(--bad)]">
           {error}
         </span>
       ) : saved ? (
-        <span role="status" className="text-[12.5px] text-[var(--s-good)]">
+        <span role="status" className="text-[12.5px] text-[var(--good)]">
           Saved. The customer is reminded two days before.
         </span>
       ) : null}

@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { PageBody } from '../../StudioShell';
 import { crewList } from '@/modules/project/site-log-crew';
 import { OnlyYourTeam } from '../../projects/marks';
 import { AddCrew, CrewToggle } from './CrewControls';
@@ -17,25 +16,25 @@ export default async function CrewPage() {
   const crew = await crewList();
   if (!crew) {
     return (
-      <PageBody>
-        <p className="m-0 text-[15px] text-[var(--s-ink-2)]">Only the studio owner or a project manager manages the crew list.</p>
-      </PageBody>
+      <>
+        <p className="m-0 text-[15px] muted">Only the studio owner or a project manager manages the crew list.</p>
+      </>
     );
   }
   const on = crew.filter((c) => c.active);
   const off = crew.filter((c) => !c.active);
-  const th = 'whitespace-nowrap px-4 py-3 text-left text-[12.5px] font-semibold text-[var(--s-ink-3)]';
-  const td = 'border-t border-[var(--s-rule)] px-4 py-3 align-middle text-[14px]';
+  const th = 'lbl';
+  const td = '';
   return (
-    <PageBody>
-      <p className="m-0 mb-5 max-w-[70ch] text-[14px] leading-relaxed text-[var(--s-ink-2)]">
+    <>
+      <p className="m-0 mb-5 max-w-[70ch] text-[14px] leading-relaxed muted">
         Your carpenters, helpers and other trades. Supervisors tap them on the phone when they post the day&rsquo;s update; the customer sees
         &ldquo;Ramesh, carpenter, from 9 am&rdquo;. Supervisors can also add someone for a single day from the site.
       </p>
       <div className="flex flex-wrap items-start gap-5">
-        <section aria-labelledby="h-crew" className="s-card min-w-0 flex-[999_1_520px]">
+        <section aria-labelledby="h-crew" className="card min-w-0 flex-[999_1_520px]">
           <h2 id="h-crew" className="m-0 px-4 pb-1 pt-4 text-[16px] font-semibold">
-            Crew <span className="font-[family-name:var(--font-mono)] text-[13px] font-normal text-[var(--s-ink-3)]">{on.length}</span>
+            Crew <span className="mono text-[13px] font-normal muted">{on.length}</span>
           </h2>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[560px] border-collapse">
@@ -50,11 +49,11 @@ export default async function CrewPage() {
               </thead>
               <tbody>
                 {[...on, ...off].map((c) => (
-                  <tr key={c.id} className={c.active ? undefined : 'text-[var(--s-ink-3)]'}>
+                  <tr key={c.id} className={c.active ? undefined : 'muted'}>
                     <td className={`${td} font-medium`}>{c.name}</td>
                     <td className={td}>{c.role}</td>
-                    <td className={`${td} font-[family-name:var(--font-mono)] text-[13px]`}>{c.phone ?? '—'}</td>
-                    <td className={`${td} font-[family-name:var(--font-mono)] text-[13px]`}>{c.recentDays}</td>
+                    <td className={`${td} mono text-[13px]`}>{c.phone ?? '—'}</td>
+                    <td className={`${td} mono text-[13px]`}>{c.recentDays}</td>
                     <td className={`${td} text-right`}>
                       <CrewToggle id={c.id} active={c.active} />
                     </td>
@@ -62,7 +61,7 @@ export default async function CrewPage() {
                 ))}
                 {crew.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className={`${td} text-[var(--s-ink-3)]`}>
+                    <td colSpan={5} className={`${td} muted`}>
                       Nobody yet. Add the people who work on your sites.
                     </td>
                   </tr>
@@ -74,12 +73,12 @@ export default async function CrewPage() {
         <aside className="flex min-w-[280px] flex-[1_1_300px] flex-col gap-4">
           <AddCrew />
           <OnlyYourTeam>
-            <p className="m-0 text-[13px] leading-relaxed text-[var(--s-ink-2)]">
+            <p className="m-0 text-[13px] leading-relaxed muted">
               Phone numbers stay with your team. The customer&rsquo;s app shows first names and work only.
             </p>
           </OnlyYourTeam>
         </aside>
       </div>
-    </PageBody>
+    </>
   );
 }

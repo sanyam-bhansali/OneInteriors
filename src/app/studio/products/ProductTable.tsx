@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState, useTransition } from 'react';
+import { Fragment, useActionState, useState, useTransition } from 'react';
 import { paiseToRupees } from '@/lib/money';
 import { ROOM_CATEGORIES } from '@/modules/studio-quote/starter-catalogue';
 import { UNIT_LABELS, WORK_CODE_LABELS, type QuoteUnitName, type WorkCodeName } from '@/modules/studio-quote/pricing';
@@ -8,13 +8,7 @@ import type { ProductRow } from '@/modules/studio-quote/store';
 import { saveRateAction, addProductAction, toggleStandardAction } from './actions';
 import { IDLE } from '../form-state';
 import { ProductEditor } from './ProductEditor';
-
-const input =
-  'rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[14px] text-[var(--s-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]';
-const primary =
-  'rounded-[8px] bg-[var(--s-accent)] px-4 py-2 text-[14px] font-medium text-white hover:bg-[var(--s-accent-deep)] disabled:opacity-40';
-const quiet =
-  'rounded-[8px] border border-[var(--s-rule)] px-3.5 py-2 text-[14px] font-medium hover:border-[var(--s-ink-3)] disabled:opacity-40';
+import { LineIcon } from '../ui/icons';
 
 /**
  * A rate, edited in place.
@@ -29,28 +23,25 @@ function RateCell({ product }: { product: ProductRow }) {
   const [state, action, pending] = useActionState(saveRateAction, IDLE);
 
   return (
-    <form action={action} className="flex items-center gap-2">
+    <form action={action} className="prate">
       <input type="hidden" name="id" value={product.id} />
-      <span className="text-[13px] text-[var(--s-ink-3)]">₹</span>
+      <span className="muted sm">₹</span>
       <input
         name="rate"
         inputMode="decimal"
         defaultValue={product.ratePaise > 0 ? String(paiseToRupees(product.ratePaise)) : ''}
         placeholder="—"
         aria-label={`Rate for ${product.name}`}
-        className={`${input} s-num w-[6.5rem] text-right`}
+        className="fld pnum" style={{ width: 130, minHeight: 36 }}
       />
-      <span className="w-[4.5rem] text-[12.5px] text-[var(--s-ink-3)]">
-        {product.unit === 'UNIT' ? 'each' : `/ ${UNIT_LABELS[product.unit].toLowerCase()}`}
-      </span>
-      <button type="submit" disabled={pending} className={`${quiet} !px-2.5 !py-1.5 !text-[12.5px]`}>
+      <button type="submit" disabled={pending} className="btn sec sm">
         {pending ? '…' : 'Save'}
       </button>
       {'ok' in state && state.ok ? (
-        <span className="text-[12.5px] text-[var(--s-good)]">Saved</span>
+        <span className="good-t sm">Saved</span>
       ) : null}
       {'ok' in state && !state.ok ? (
-        <span className="text-[12.5px] text-[var(--s-bad)]">{state.error}</span>
+        <span className="perr">{state.error}</span>
       ) : null}
     </form>
   );
@@ -82,7 +73,7 @@ function StandardCell({ product }: { product: ProductRow }) {
   const [failed, setFailed] = useState(false);
 
   return (
-    <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-[var(--s-ink-2)]">
+    <label className="pcheck">
       <input
         type="checkbox"
         checked={on}
@@ -102,73 +93,109 @@ function StandardCell({ product }: { product: ProductRow }) {
             }
           });
         }}
-        className="h-[15px] w-[15px] accent-[var(--s-accent)]"
       />
       Standard
-      {failed ? <span className="text-[var(--s-bad)]">not saved</span> : null}
+      {failed ? <span className="bad-t">not saved</span> : null}
     </label>
   );
 }
 
-export function ProductTable({ products }: { products: ProductRow[] }) {
+export function ProductTable({
+  products,
+  summary,
+  allPriced,
+  notes,
+}: {
+  products: ProductRow[];
+  /** "31 of 75 priced", for the chip beside the tabs. */
+  summary: string;
+  allPriced: boolean;
+  /** The page's notes (the rates gate, blank rates, nothing standard), under the heading. */
+  notes?: React.ReactNode;
+}) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [addState, addAction, addPending] = useActionState(addProductAction, IDLE);
 
   const grouped = ROOM_CATEGORIES.map((room) => ({
-    room,
+    room: room as string,
     items: products.filter((p) => p.rooms.includes(room)),
   })).filter((g) => g.items.length > 0);
 
   // A product a studio added with no room lands nowhere above, and a row that
   // exists but is invisible is worse than no row.
   const loose = products.filter((p) => !ROOM_CATEGORIES.some((r) => p.rooms.includes(r)));
-  if (loose.length > 0) grouped.push({ room: 'Everything else' as never, items: loose });
+  if (loose.length > 0) grouped.push({ room: 'Everything else', items: loose });
+
+  /* One room's products at a time (StudioRates: a tab per category), and
+     All for the whole list. */
+  const [tab, setTab] = useState<string>(grouped[0]?.room ?? ALL);
+  const shown = tab === ALL ? products : (grouped.find((g) => g.room === tab)?.items ?? []);
+  const standardShown = shown.filter((p) => p.inStandardBuild).length;
+  const pricedShown = shown.filter((p) => p.ratePaise > 0).length;
 
   return (
-    <div className="flex flex-col gap-6">
+    <>
+      <div className="phead">
+        <div>
+          <h1>Product master</h1>
+          <p className="muted psub">Your items and your rates. We never fill in or suggest a price.</p>
+        </div>
+        <div className="hstack">
+          <button type="button" onClick={() => setAdding(true)} className="btn pri">
+            <LineIcon name="plus" size={17} />
+            Add an item
+          </button>
+        </div>
+      </div>
+
+      {notes}
+
       {adding ? (
-        <form action={addAction} className="s-card flex flex-col gap-4 p-5">
-          <p className="m-0 text-[15px] font-semibold">Add a product</p>
+        <form action={addAction} className="card">
+          <div className="chead">
+            <h2>Add an item</h2>
+          </div>
 
-          <div className="flex flex-wrap gap-4">
-            <label className="flex flex-col gap-1.5">
-              <span className="s-label">Name</span>
-              <input name="name" required placeholder="Sliding wardrobe" className={`${input} w-[18rem]`} />
+          <div className="prow">
+            <label className="pfield" style={{ flex: '1 1 18rem' }}>
+              <span className="lbl">Name</span>
+              <input name="name" required placeholder="Sliding wardrobe" className="fld" />
             </label>
 
-            <label className="flex flex-col gap-1.5">
-              <span className="s-label">Measured by</span>
-              <select name="unit" defaultValue="AREA" className={input}>
+            <label className="pfield">
+              <span className="lbl">Measured by</span>
+              <select name="unit" defaultValue="AREA" className="fld">
                 {(Object.keys(UNIT_LABELS) as QuoteUnitName[]).map((u) => (
-                  <option key={u} value={u}>{UNIT_LABELS[u]}</option>
+                  <option key={u} value={u}>
+                    {UNIT_LABELS[u]}
+                  </option>
                 ))}
               </select>
             </label>
 
-            <label className="flex flex-col gap-1.5">
-              <span className="s-label">Work</span>
-              <select name="code" defaultValue="MODULAR" className={input}>
+            <label className="pfield">
+              <span className="lbl">Work</span>
+              <select name="code" defaultValue="MODULAR" className="fld">
                 {(Object.keys(WORK_CODE_LABELS) as WorkCodeName[]).map((c) => (
-                  <option key={c} value={c}>{WORK_CODE_LABELS[c]}</option>
+                  <option key={c} value={c}>
+                    {WORK_CODE_LABELS[c]}
+                  </option>
                 ))}
               </select>
             </label>
 
-            <label className="flex flex-col gap-1.5">
-              <span className="s-label">Rate (₹)</span>
-              <input name="rate" inputMode="decimal" placeholder="0" className={`${input} s-num w-[7rem] text-right`} />
+            <label className="pfield" style={{ width: '8rem' }}>
+              <span className="lbl">Rate (₹)</span>
+              <input name="rate" inputMode="decimal" placeholder="0" className="fld pnum" />
             </label>
           </div>
 
-          <fieldset className="m-0 border-0 p-0">
-            <legend className="s-label mb-2 p-0">Rooms it belongs in</legend>
-            <div className="flex flex-wrap gap-2">
+          <fieldset className="pset">
+            <legend className="lbl">Rooms it belongs in</legend>
+            <div className="hstack" style={{ gap: 8 }}>
               {ROOM_CATEGORIES.map((r) => (
-                <label
-                  key={r}
-                  className="cursor-pointer rounded-full border border-[var(--s-rule)] px-3 py-1.5 text-[13px] text-[var(--s-ink-2)] has-[:checked]:border-[var(--s-accent)] has-[:checked]:bg-[var(--s-accent-wash)] has-[:checked]:text-[var(--s-ink)]"
-                >
+                <label key={r} className="ppick">
                   <input type="checkbox" name="rooms" value={r} className="sr-only" />
                   {r}
                 </label>
@@ -176,84 +203,110 @@ export function ProductTable({ products }: { products: ProductRow[] }) {
             </div>
           </fieldset>
 
-          <label className="flex flex-col gap-1.5">
-            <span className="s-label">What it includes — optional</span>
-            <input name="details" placeholder="Carcass, shutters, hardware and installation." className={input} />
+          <label className="pfield">
+            <span className="lbl">What it includes — optional</span>
+            <input name="details" placeholder="Carcass, shutters, hardware and installation." className="fld" />
           </label>
 
-          <div className="flex items-center gap-3">
-            <button type="submit" disabled={addPending} className={primary}>
+          <div className="hstack">
+            <button type="submit" disabled={addPending} className="btn pri">
               {addPending ? 'Adding…' : 'Add product'}
             </button>
-            <button type="button" onClick={() => setAdding(false)} className={quiet}>
+            <button type="button" onClick={() => setAdding(false)} className="btn ghost">
               Cancel
             </button>
-            {'ok' in addState && !addState.ok ? (
-              <span className="text-[13px] text-[var(--s-bad)]">{addState.error}</span>
-            ) : null}
+            {'ok' in addState && !addState.ok ? <span className="perr">{addState.error}</span> : null}
           </div>
         </form>
-      ) : (
-        <div>
-          <button type="button" onClick={() => setAdding(true)} className={quiet}>
-            + Add a product
+      ) : null}
+
+      <div className="hstack" style={{ justifyContent: 'space-between' }}>
+        <div className="tabs ptabs" role="tablist" aria-label="Room">
+          {grouped.map((g) => (
+            <button key={g.room} type="button" role="tab" aria-selected={tab === g.room} onClick={() => setTab(g.room)}>
+              {g.room} <span className="n">{g.items.length}</span>
+            </button>
+          ))}
+          <button type="button" role="tab" aria-selected={tab === ALL} onClick={() => setTab(ALL)}>
+            All <span className="n">{products.length}</span>
           </button>
         </div>
-      )}
+        <span className={`chip ${allPriced ? 'good' : 'warn'}`}>
+          <span className="dot" />
+          {summary}
+        </span>
+      </div>
 
-      {grouped.map((group) => (
-        <section key={group.room} className="s-card overflow-hidden">
-          <div className="flex items-baseline justify-between gap-4 border-b border-[var(--s-rule)] bg-[var(--s-surface-2)] px-5 py-3">
-            <h2 className="m-0 text-[15px] font-semibold">{group.room}</h2>
-            <span className="s-label">
-              {group.items.filter((p) => p.ratePaise > 0).length} of {group.items.length} priced ·{' '}
-              {group.items.filter((p) => p.inStandardBuild).length} standard
-            </span>
-          </div>
-
-          <ul className="m-0 flex list-none flex-col p-0">
-            {group.items.map((p) => (
-              <li
-                key={p.id}
-                className={`flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-[var(--s-rule-soft)] px-5 py-3 last:border-b-0 ${
-                  p.isActive ? '' : 'opacity-55'
-                }`}
-              >
-                <div className="min-w-[14rem] flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[14.5px] font-medium">{p.name}</span>
-                    <span className="s-tag">{WORK_CODE_LABELS[p.code]}</span>
-                    {p.ratePaise === 0 ? (
-                      <span className="s-tag !bg-[var(--s-warn-wash)] !text-[var(--s-warn)]">
-                        No rate
-                      </span>
-                    ) : null}
-                    {p.isActive ? null : <span className="s-tag">Switched off</span>}
-                    {p.rules?.bhk ? <span className="s-tag">{p.rules.bhk.replace(/(\d)/, '$1 ')} only</span> : null}
-                    {p.rules?.perBath ? <span className="s-tag">per bathroom</span> : null}
-                  </div>
-                  {p.details ? (
-                    <p className="m-0 mt-0.5 max-w-[60ch] text-[13px] leading-snug text-[var(--s-ink-3)]">
-                      {p.details}
-                    </p>
+      <section className="card flush">
+        <div className="chead">
+          <h2>{tab === ALL ? 'Every product' : tab}</h2>
+          <span className="muted sm">
+            {pricedShown} of {shown.length} priced · {standardShown} standard
+          </span>
+        </div>
+        <div className="tscroll">
+          <table className="tbl ptbl" style={{ minWidth: 980 }}>
+            <thead>
+              <tr>
+                <th scope="col">Item</th>
+                <th scope="col">Work</th>
+                <th scope="col">Unit</th>
+                <th scope="col">In the standard build</th>
+                <th scope="col" style={{ textAlign: 'right' }}>
+                  Your rate
+                </th>
+                <th scope="col">
+                  <span className="sr-only">Edit</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((p) => (
+                <Fragment key={p.id}>
+                  <tr className={p.isActive ? '' : 'off'}>
+                    <td>
+                      <div className="hstack" style={{ gap: 6 }}>
+                        <b style={{ fontWeight: 600 }}>{p.name}</b>
+                        {p.ratePaise === 0 ? <span className="chip warn">No rate</span> : null}
+                        {p.isActive ? null : <span className="chip">Switched off</span>}
+                        {p.rules?.bhk ? <span className="chip">{p.rules.bhk.replace(/(\d)/, '$1 ')} only</span> : null}
+                        {p.rules?.perBath ? <span className="chip">per bathroom</span> : null}
+                      </div>
+                      {p.details ? (
+                        <div className="muted sm" style={{ maxWidth: '60ch', marginTop: 2, lineHeight: 1.4 }}>
+                          {p.details}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="muted">{WORK_CODE_LABELS[p.code]}</td>
+                    <td>{p.unit === 'UNIT' ? 'each' : UNIT_LABELS[p.unit].toLowerCase()}</td>
+                    <td>
+                      <StandardCell product={p} />
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <RateCell product={p} />
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button type="button" onClick={() => setEditing(editing === p.id ? null : p.id)} className="btn ghost sm">
+                        {editing === p.id ? 'Close' : 'Edit'}
+                      </button>
+                    </td>
+                  </tr>
+                  {editing === p.id ? (
+                    <tr className="pedit">
+                      <td colSpan={6}>
+                        <ProductEditor product={p} onClose={() => setEditing(null)} />
+                      </td>
+                    </tr>
                   ) : null}
-                </div>
-
-                <StandardCell product={p} />
-                <RateCell product={p} />
-                <button
-                  type="button"
-                  onClick={() => setEditing(editing === p.id ? null : p.id)}
-                  className={`${quiet} !px-2.5 !py-1.5 !text-[12.5px]`}
-                >
-                  {editing === p.id ? 'Close' : 'Edit'}
-                </button>
-                {editing === p.id ? <ProductEditor product={p} onClose={() => setEditing(null)} /> : null}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-    </div>
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </>
   );
 }
+
+const ALL = '\u0000all';

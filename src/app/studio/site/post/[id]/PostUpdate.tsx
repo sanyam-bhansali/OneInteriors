@@ -308,6 +308,8 @@ export function PostUpdate({ context: c, lang }: { context: PostContext; lang: L
 
   const langName = t(`lang.${c.customerLang}`);
   const time = (iso: string) => new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+  const locale = lang === 'en' ? 'en-IN' : `${lang}-IN`;
+  const dateLine = new Date().toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
   /* The steps, in plan order, under "Stage · Group" headings. */
   const groups: { head: string; items: PostContext['items'] }[] = [];
   for (const it of openItems) {
@@ -318,57 +320,51 @@ export function PostUpdate({ context: c, lang }: { context: PostContext; lang: L
   }
 
   return (
-    <div className="flex flex-col">
-      <div className="flex items-center gap-2 px-2 pt-2">
-        <Link href="/studio/site" aria-label={t('post.back')} className="flex h-12 w-12 items-center justify-center rounded-full text-[var(--s-ink)]">
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
+      <div className="st-backhead">
+        <Link href="/studio/site" aria-label={t('post.back')}>
           <BackIcon />
         </Link>
-        <div className="min-w-0">
-          <h1 className="m-0 text-[22px] font-semibold tracking-tight">{t('post.h1')}</h1>
-          <p className="m-0 truncate text-[14px] text-[var(--s-ink-2)]">{c.home}</p>
+        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <h1>{t('post.h1')}</h1>
+          <span className="sub">
+            {c.home} · {dateLine}
+          </span>
         </div>
       </div>
 
-      <div className="flex flex-col gap-7 px-4 pb-32 pt-4">
+      <div className="st-page" style={{ flex: 1, paddingTop: 8, gap: 12 }}>
         {c.today ? (
-          <p className="m-0 rounded-[14px] bg-[var(--s-accent-wash)] p-3.5 text-[14.5px] leading-relaxed text-[var(--s-accent-deep)]">
-            {t('post.adding', { time: new Date(c.today.postedAt).toLocaleTimeString(lang === 'en' ? 'en-IN' : `${lang}-IN`, { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' }), customer: c.customerFirst })}
+          <p className="st-info">
+            {t('post.adding', { time: new Date(c.today.postedAt).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' }), customer: c.customerFirst })}
           </p>
         ) : null}
 
         {/* 1 · Photos */}
-        <section aria-labelledby="h-photos" className="flex flex-col gap-3">
-          <div>
-            <h2 id="h-photos" className="m-0 text-[18px] font-semibold">
-              {t('s1.h')}
-            </h2>
-            <p className="m-0 mt-0.5 text-[14px] text-[var(--s-ink-2)]">{t('s1.sub')}</p>
+        <section aria-labelledby="h-photos" className="st-sec">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <h2 id="h-photos">{t('s1.h')}</h2>
+            <span className="hint">{t('s1.sub')}</span>
           </div>
 
           {generalShots.map((s, i) => (
-            <div key={s.key} className="s-card overflow-hidden">
+            <div key={s.key} className="st-photo">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={s.url} alt={t('photo.n', { n: i + 1 })} className="block aspect-[4/3] w-full bg-[var(--s-surface-2)] object-cover" />
-              <div className="flex flex-col gap-3 p-3.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-[family-name:var(--font-mono)] text-[12.5px] text-[var(--s-ink-3)]">
-                    {t('photo.n', { n: i + 1 })} · {time(s.takenAt)}
+              <img src={s.url} alt={t('photo.n', { n: i + 1 })} />
+              <div className="body">
+                <div className="st-meta" style={{ justifyContent: 'space-between' }}>
+                  <span className="room">
+                    {s.room ?? t('photo.n', { n: i + 1 })} · <span className="mono">{time(s.takenAt)}</span>
                   </span>
-                  <button type="button" onClick={() => removeShot(s.key)} className="min-h-[44px] px-2 text-[14px] text-[var(--s-ink-2)] underline">
+                  <button type="button" onClick={() => removeShot(s.key)} className="st-link" style={{ minHeight: 32, fontSize: 13 }}>
                     {t('photo.remove')}
                   </button>
                 </div>
-                {s.fromGallery ? <span className="self-start rounded-full bg-[var(--s-warn-wash)] px-2.5 py-1 text-[12.5px] text-[var(--s-warn)]">{t('photo.galleryTag')}</span> : null}
+                {s.fromGallery ? <span className="st-warn">{t('photo.galleryTag')}</span> : null}
                 {c.rooms.length ? (
-                  <div role="group" aria-label={t('photo.room')} className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+                  <div role="group" aria-label={t('photo.room')} className="st-scroll">
                     {c.rooms.map((room) => (
-                      <button
-                        key={room}
-                        type="button"
-                        aria-pressed={s.room === room}
-                        onClick={() => setRoom(s.key, s.room === room ? null : room)}
-                        className={`min-h-[40px] flex-none rounded-full px-3.5 text-[14px] ${s.room === room ? 'bg-[var(--s-ink)] text-white' : 'bg-[var(--s-surface-2)] text-[var(--s-ink)]'}`}
-                      >
+                      <button key={room} type="button" aria-pressed={s.room === room} onClick={() => setRoom(s.key, s.room === room ? null : room)} className="st-chip sm" style={{ minHeight: 34, fontSize: 13, background: s.room === room ? undefined : 'var(--paper)' }}>
                         {room}
                       </button>
                     ))}
@@ -380,59 +376,44 @@ export function PostUpdate({ context: c, lang }: { context: PostContext; lang: L
           ))}
 
           {removed ? (
-            <div role="status" className="flex items-center justify-between gap-3 rounded-[12px] bg-[var(--s-ink)] px-4 py-2 text-white">
-              <span className="text-[14.5px]">{t('photo.removed')}</span>
+            <div role="status" className="st-toast">
+              <span>{t('photo.removed')}</span>
               <button
                 type="button"
                 onClick={() => {
                   setShots((list) => [...list.filter((s) => !removed.shot.stepId || s.stepId !== removed.shot.stepId), removed.shot]);
                   setRemoved(null);
                 }}
-                className="min-h-[44px] px-2 text-[15px] font-semibold underline"
               >
                 {t('undo')}
               </button>
             </div>
           ) : null}
 
-          {generalShots.length === 0 ? <p className="m-0 text-[14px] text-[var(--s-ink-3)]">{t('photo.corner')}</p> : null}
-          <div className="grid grid-cols-[1fr_auto] gap-2.5">
-            <button
-              type="button"
-              onClick={() => pickPhoto(null, 'camera')}
-              disabled={busyPhoto !== null || shots.length >= MAX_SHOTS}
-              className="flex min-h-[64px] items-center justify-center gap-2.5 rounded-[14px] bg-[var(--s-accent)] px-4 text-[17px] font-semibold text-white disabled:opacity-50"
-            >
-              <CameraIcon />
+          {generalShots.length === 0 ? <span className="hint">{t('photo.corner')}</span> : null}
+          <div className="st-two" style={{ gap: 8 }}>
+            <button type="button" onClick={() => pickPhoto(null, 'camera')} disabled={busyPhoto !== null || shots.length >= MAX_SHOTS} className="st-big" style={{ minHeight: 52, fontSize: 15, borderRadius: 14 }}>
+              <CameraIcon size={20} />
               {busyPhoto === OTHER ? t('photo.working') : generalShots.length === 0 ? t('photo.first') : t('photo.another')}
             </button>
-            <button
-              type="button"
-              onClick={() => pickPhoto(null, 'gallery')}
-              disabled={busyPhoto !== null || shots.length >= MAX_SHOTS}
-              className="flex min-h-[64px] flex-col items-center justify-center gap-0.5 rounded-[14px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 text-[13px] text-[var(--s-ink-2)] disabled:opacity-50"
-            >
-              <GalleryIcon />
+            <button type="button" onClick={() => pickPhoto(null, 'gallery')} disabled={busyPhoto !== null || shots.length >= MAX_SHOTS} className="st-fill">
+              <GalleryIcon size={20} />
               {t('photo.gallery')}
             </button>
           </div>
-          {photoError ? <p className="m-0 text-[14px] text-[var(--s-bad)]">{t('photo.bad')}</p> : null}
-          <input ref={cameraInput} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => void addFiles(e.target.files, false).then(() => (e.target.value = ''))} />
-          <input ref={galleryInput} type="file" accept="image/*" multiple className="hidden" onChange={(e) => void addFiles(e.target.files, true).then(() => (e.target.value = ''))} />
+          {photoError ? <p className="st-bad-t" style={{ margin: 0, fontSize: 14 }}>{t('photo.bad')}</p> : null}
+          <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden onChange={(e) => void addFiles(e.target.files, false).then(() => (e.target.value = ''))} />
+          <input ref={galleryInput} type="file" accept="image/*" multiple hidden onChange={(e) => void addFiles(e.target.files, true).then(() => (e.target.value = ''))} />
 
-          <div className="s-card p-3.5">
-            <Mic spoken={other} recording={recordingKey === OTHER} blocked={recordingKey !== null && recordingKey !== OTHER} onTap={() => tapMic(OTHER)} label={t('mic.other')} t={t} c={c} quiet />
-          </div>
-          {recorder.state.status === 'denied' || recorder.state.status === 'unsupported' ? <p className="m-0 text-[14px] text-[var(--s-bad)]">{t('mic.denied')}</p> : null}
+          <Mic spoken={other} recording={recordingKey === OTHER} blocked={recordingKey !== null && recordingKey !== OTHER} onTap={() => tapMic(OTHER)} label={t('mic.other')} t={t} c={c} quiet />
+          {recorder.state.status === 'denied' || recorder.state.status === 'unsupported' ? <p className="st-bad-t" style={{ margin: 0, fontSize: 14 }}>{t('mic.denied')}</p> : null}
         </section>
 
         {/* 2 · Crew */}
-        <section aria-labelledby="h-crew" className="flex flex-col gap-3">
-          <h2 id="h-crew" className="m-0 text-[18px] font-semibold">
-            {t('s2.h')}
-          </h2>
-          {c.crew.length === 0 && newcomers.length === 0 ? <p className="m-0 text-[14px] text-[var(--s-ink-3)]">{t('crew.none')}</p> : null}
-          <div role="group" aria-labelledby="h-crew" className="flex flex-wrap gap-2">
+        <section aria-labelledby="h-crew" className="st-sec">
+          <h2 id="h-crew">{t('s2.h')}</h2>
+          {c.crew.length === 0 && newcomers.length === 0 ? <span className="hint">{t('crew.none')}</span> : null}
+          <div role="group" aria-labelledby="h-crew" className="st-chips">
             {c.crew.map((m) => {
               const on = crew.has(m.id);
               return (
@@ -448,7 +429,7 @@ export function PostUpdate({ context: c, lang }: { context: PostContext; lang: L
                       return next;
                     })
                   }
-                  className={`flex min-h-[56px] items-center gap-2 rounded-full px-4 text-[15.5px] ${on ? 'bg-[var(--s-ink)] text-white' : 'bg-[var(--s-surface-2)] text-[var(--s-ink)]'}`}
+                  className="st-chip"
                 >
                   {on ? <CheckIcon /> : null}
                   {m.name} · {m.role}
@@ -456,32 +437,21 @@ export function PostUpdate({ context: c, lang }: { context: PostContext; lang: L
               );
             })}
             {newcomers.map((n, i) => (
-              <button
-                key={`new-${i}`}
-                type="button"
-                aria-pressed
-                onClick={() => setNewcomers((list) => list.filter((_, j) => j !== i))}
-                className="flex min-h-[56px] items-center gap-2 rounded-full bg-[var(--s-ink)] px-4 text-[15.5px] text-white"
-              >
+              <button key={`new-${i}`} type="button" aria-pressed onClick={() => setNewcomers((list) => list.filter((_, j) => j !== i))} className="st-chip">
                 <CheckIcon />
                 {n.name} · {t(`role.${n.role as (typeof CREW_ROLES)[number]}`)}
               </button>
             ))}
+            <AddCrew t={t} canSave={c.canSaveCrew} onAdd={(n) => setNewcomers((list) => [...list, n])} />
           </div>
-          <AddCrew t={t} canSave={c.canSaveCrew} onAdd={(n) => setNewcomers((list) => [...list, n])} />
           {crew.size + newcomers.length > 0 ? (
-            <div className="flex flex-col gap-2">
-              <p className="m-0 text-[14px] text-[var(--s-ink-2)]">{t('crew.since')}</p>
-              <div role="radiogroup" aria-label={t('crew.since')} className="flex flex-wrap gap-2">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <span className="hint" style={{ fontSize: 14 }}>
+                {t('crew.since')}
+              </span>
+              <div role="radiogroup" aria-label={t('crew.since')} className="st-chips">
                 {SINCE.map((hhmm) => (
-                  <button
-                    key={hhmm}
-                    type="button"
-                    role="radio"
-                    aria-checked={since === hhmm}
-                    onClick={() => setSince(since === hhmm ? null : hhmm)}
-                    className={`min-h-[48px] min-w-[64px] rounded-full px-3 font-[family-name:var(--font-mono)] text-[14.5px] ${since === hhmm ? 'bg-[var(--s-accent)] text-white' : 'bg-[var(--s-surface-2)] text-[var(--s-ink)]'}`}
-                  >
+                  <button key={hhmm} type="button" role="radio" aria-checked={since === hhmm} onClick={() => setSince(since === hhmm ? null : hhmm)} className="st-chip sm mono">
                     {Number(hhmm.slice(0, 2)) > 12 ? `${Number(hhmm.slice(0, 2)) - 12} pm` : `${Number(hhmm.slice(0, 2))} ${hhmm === '12:00' ? 'pm' : 'am'}`}
                   </button>
                 ))}
@@ -491,41 +461,31 @@ export function PostUpdate({ context: c, lang }: { context: PostContext; lang: L
         </section>
 
         {/* 3 · What got done: each ticked step gets its own photo and sentence */}
-        <section aria-labelledby="h-done" className="flex flex-col gap-2.5">
-          <div>
-            <h2 id="h-done" className="m-0 text-[18px] font-semibold">
-              {t('s3.h')}
-            </h2>
-            {openItems.length && c.canTick ? <p className="m-0 mt-0.5 text-[14px] text-[var(--s-ink-2)]">{t('s3.sub')}</p> : null}
+        <section aria-labelledby="h-done" className="st-sec" style={{ gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <h2 id="h-done">{t('s3.h')}</h2>
+            {openItems.length && c.canTick ? <span className="hint">{t('s3.sub')}</span> : null}
           </div>
-          {openItems.length === 0 ? <p className="m-0 text-[14px] text-[var(--s-ink-3)]">{t('s3.none')}</p> : null}
+          {openItems.length === 0 ? <span className="hint">{t('s3.none')}</span> : null}
           {c.canTick
             ? groups.map((g) => (
-                <div key={g.head} className="flex flex-col gap-2">
-                  <p className="m-0 mt-1 text-[13px] font-semibold uppercase tracking-[0.04em] text-[var(--s-ink-3)]">{g.head}</p>
+                <div key={g.head} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <span className="st-group">{g.head}</span>
                   {g.items.map((item) => {
                     const on = isOn(item.id);
                     const fromVoice = on && !(item.id in manual) && suggested.has(item.id);
                     const shot = on ? stepShot(item.id) : null;
                     return (
-                      <div key={item.id} className={`flex flex-col gap-3 rounded-[14px] ${on ? 'bg-[var(--s-good-wash)] p-2' : ''}`}>
-                        <button
-                          type="button"
-                          role="checkbox"
-                          aria-checked={on}
-                          onClick={() => setManual((m) => ({ ...m, [item.id]: !on }))}
-                          className={`flex min-h-[64px] items-center gap-3.5 rounded-[14px] px-4 py-3 text-left ${on ? '' : 'bg-[var(--s-surface-2)]'}`}
-                        >
-                          <span
-                            aria-hidden="true"
-                            className="flex h-8 w-8 flex-none items-center justify-center rounded-[8px] border-2 text-white"
-                            style={on ? { background: 'var(--s-good)', borderColor: 'var(--s-good)' } : { borderColor: 'var(--s-ink-3)' }}
-                          >
-                            {on ? <CheckIcon /> : null}
+                      <div key={item.id} className={`st-step${on ? ' on' : ''}`}>
+                        <button type="button" role="checkbox" aria-checked={on} onClick={() => setManual((m) => ({ ...m, [item.id]: !on }))} className="st-tick">
+                          <span aria-hidden="true" className="box">
+                            {on ? <CheckIcon size={16} /> : null}
                           </span>
-                          <span className="flex min-w-0 flex-col">
-                            <span className="text-[16px] font-medium leading-snug">{item.label}</span>
-                            {fromVoice ? <span className="text-[13.5px] font-medium text-[var(--s-good)]">{t('tick.voice')}</span> : null}
+                          <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+                            <span style={{ fontSize: 15, fontWeight: 500 }}>{item.label}</span>
+                            {fromVoice ? (
+                              <span style={{ fontSize: 13, color: 'var(--good)' }}>{t('tick.voice')}</span>
+                            ) : null}
                           </span>
                         </button>
                         {on ? (
@@ -551,22 +511,22 @@ export function PostUpdate({ context: c, lang }: { context: PostContext; lang: L
               ))
             : null}
           {doneItems.length ? (
-            <p className="m-0 text-[13.5px] text-[var(--s-ink-3)]">
+            <span className="hint">
               {t('tick.earlier')}: {doneItems.length}
-            </p>
+            </span>
           ) : null}
         </section>
 
         {/* 4 · Preview */}
-        <section aria-labelledby="h-reads" className="flex flex-col gap-2 rounded-[14px] p-4 text-white" style={{ background: 'var(--s-accent-deep)' }}>
-          <span id="h-reads" className="inline-flex items-center gap-1.5 text-[14px] font-semibold">
-            <EyeIcon />
+        <section aria-labelledby="h-reads" className="st-sec" style={{ gap: 8 }}>
+          <span id="h-reads" className="st-reads">
+            <EyeIcon size={15} />
             {t('s4.h', { customer: c.customerFirst, lang: langName })}
           </span>
           {sentences.length || onItems.length ? (
-            <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
               {sentences.map((s, i) => (
-                <li key={`s-${i}`} className="text-[16px] leading-relaxed">
+                <li key={`s-${i}`} style={{ fontSize: 15, lineHeight: 1.45 }}>
                   {s}
                 </li>
               ))}
@@ -574,46 +534,41 @@ export function PostUpdate({ context: c, lang }: { context: PostContext; lang: L
                 const shot = stepShot(item.id);
                 const said = shot ? sentenceOf(shot) : '';
                 return (
-                  <li key={item.id} className="flex flex-col gap-0.5">
-                    <span className="text-[15px] font-semibold">
+                  <li key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ fontSize: 15, fontWeight: 600 }}>
                       {t('step.done', { step: item.label })}
-                      {shot ? <span className="font-normal text-white/70"> · {time(shot.takenAt)}</span> : null}
+                      {shot ? <span className="st-line" style={{ fontWeight: 400 }}> · {time(shot.takenAt)}</span> : null}
                     </span>
-                    <span className={`text-[15.5px] leading-relaxed ${said ? '' : 'text-white/70'}`}>{said || (shot?.spoken.status === 'offline' ? t('mic.offline') : t('step.need1'))}</span>
+                    <span style={{ fontSize: 15, lineHeight: 1.45, color: said ? undefined : 'var(--muted)' }}>{said || (shot?.spoken.status === 'offline' ? t('mic.offline') : t('step.need1'))}</span>
                   </li>
                 );
               })}
             </ul>
           ) : (
-            <p className="m-0 text-[15px] leading-relaxed text-white/75">{t('s4.empty')}</p>
+            <p className="st-line" style={{ margin: 0, fontSize: 15 }}>
+              {t('s4.empty')}
+            </p>
           )}
-          <span className="text-[13px] text-white/70">{t('s4.note')}</span>
+          <span className="hint">{t('s4.note')}</span>
         </section>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--s-rule)] bg-[var(--s-surface)] px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3">
-        <div className="mx-auto flex max-w-[528px] items-center gap-2.5">
-          {countdown !== null ? (
-            <>
-              <span role="status" className="flex min-h-[60px] flex-1 items-center justify-center rounded-[14px] bg-[var(--s-accent-wash)] text-[16px] font-semibold text-[var(--s-accent-deep)]">
-                {t('post.posting', { s: countdown })}
-              </span>
-              <button type="button" onClick={() => setCountdown(null)} className="min-h-[60px] rounded-[14px] border-2 border-[var(--s-ink)] px-5 text-[16px] font-semibold">
-                {t('undo')}
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              disabled={!canPost}
-              onClick={() => setCountdown(UNDO_MS / 1000)}
-              className="flex min-h-[60px] flex-1 items-center justify-center gap-2 rounded-[14px] bg-[var(--s-accent)] px-3 text-[17px] font-semibold text-white disabled:opacity-40"
-            >
-              {!online ? <CloudIcon /> : null}
-              {missing.length ? t('step.need', { n: missing.length }) : !hasSomething ? t('post.needPhoto') : t('post.btn')}
+      <div className="st-bottom">
+        {countdown !== null ? (
+          <div className="row">
+            <span role="status" className="st-info" style={{ flex: 1, minHeight: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>
+              {t('post.posting', { s: countdown })}
+            </span>
+            <button type="button" onClick={() => setCountdown(null)} className="st-fill" style={{ minHeight: 60, padding: '0 20px' }}>
+              {t('undo')}
             </button>
-          )}
-        </div>
+          </div>
+        ) : (
+          <button type="button" disabled={!canPost} onClick={() => setCountdown(UNDO_MS / 1000)} className="st-big pill">
+            {!online ? <CloudIcon /> : null}
+            {missing.length ? t('step.need', { n: missing.length }) : !hasSomething ? t('post.needPhoto') : t('post.btn')}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -651,25 +606,17 @@ function StepSlot({
 }) {
   if (!shot) {
     return (
-      <div className="flex flex-col gap-2 px-2 pb-2">
-        <p className="m-0 text-[14px] text-[var(--s-ink-2)]">{t('step.photo')}</p>
-        <div className="grid grid-cols-[1fr_auto] gap-2">
-          <button
-            type="button"
-            onClick={onCamera}
-            disabled={busy || blocked}
-            className="flex min-h-[56px] items-center justify-center gap-2 rounded-[12px] bg-[var(--s-accent)] px-3 text-[16px] font-semibold text-white disabled:opacity-50"
-          >
-            <CameraIcon />
+      <div className="st-slot">
+        <span className="hint" style={{ fontSize: 14, color: 'var(--text2)' }}>
+          {t('step.photo')}
+        </span>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
+          <button type="button" onClick={onCamera} disabled={busy || blocked} className="st-big" style={{ minHeight: 52, fontSize: 15, borderRadius: 14 }}>
+            <CameraIcon size={20} />
             {busy ? t('photo.working') : t('step.take')}
           </button>
-          <button
-            type="button"
-            onClick={onGallery}
-            disabled={busy || blocked}
-            className="flex min-h-[56px] flex-col items-center justify-center rounded-[12px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 text-[13px] text-[var(--s-ink-2)] disabled:opacity-50"
-          >
-            <GalleryIcon />
+          <button type="button" onClick={onGallery} disabled={busy || blocked} className="st-fill">
+            <GalleryIcon size={20} />
             {t('photo.gallery')}
           </button>
         </div>
@@ -678,32 +625,25 @@ function StepSlot({
   }
   const value = shot.typed ?? shot.spoken.customerText ?? '';
   return (
-    <div className="s-card flex flex-col gap-3 overflow-hidden p-3">
-      <div className="flex items-start gap-3">
+    <div className="st-slot">
+      <div className="st-photo" style={{ background: 'transparent', padding: 0 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={shot.url} alt="" className="h-[96px] w-[128px] flex-none rounded-[10px] bg-[var(--s-surface-2)] object-cover" />
-        <div className="flex min-w-0 flex-col gap-1.5">
-          {shot.fromGallery ? <span className="self-start rounded-full bg-[var(--s-warn-wash)] px-2.5 py-1 text-[12px] text-[var(--s-warn)]">{t('photo.galleryTag')}</span> : null}
-          <div className="flex flex-wrap gap-1">
-            <button type="button" onClick={onCamera} disabled={busy || blocked} className="min-h-[44px] px-2 text-[14px] text-[var(--s-ink-2)] underline disabled:opacity-50">
+        <img src={shot.url} alt="" />
+        <div className="body">
+          {shot.fromGallery ? <span className="st-warn">{t('photo.galleryTag')}</span> : null}
+          <div className="st-meta">
+            <button type="button" onClick={onCamera} disabled={busy || blocked} className="st-redo" style={{ background: 'var(--fill)' }}>
               {t('step.retake')}
             </button>
-            <button type="button" onClick={onRemove} className="min-h-[44px] px-2 text-[14px] text-[var(--s-ink-2)] underline">
+            <button type="button" onClick={onRemove} className="st-redo" style={{ background: 'var(--fill)' }}>
               {t('photo.remove')}
             </button>
           </div>
         </div>
       </div>
-      <label className="flex flex-col gap-1.5 text-[14px] font-medium text-[var(--s-ink-2)]">
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 14, fontWeight: 500, color: 'var(--muted)' }}>
         {t('step.sentence', { customer: c.customerFirst })}
-        <textarea
-          rows={2}
-          maxLength={300}
-          value={value}
-          onChange={(e) => onTyped(e.target.value)}
-          placeholder={t('step.sentencePh')}
-          className="min-h-[64px] rounded-[12px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[16px] font-normal text-[var(--s-ink)]"
-        />
+        <textarea rows={2} maxLength={300} value={value} onChange={(e) => onTyped(e.target.value)} placeholder={t('step.sentencePh')} className="st-textarea" />
       </label>
       <Mic spoken={shot.spoken} recording={recordingKey === shot.key} blocked={recordingKey !== null && recordingKey !== shot.key} onTap={onMic} label={t('step.say')} t={t} c={c} quiet />
     </div>
@@ -732,53 +672,47 @@ function Mic({
 }) {
   if (recording) {
     return (
-      <button type="button" onClick={onTap} className="flex min-h-[60px] items-center justify-center gap-2.5 rounded-[14px] bg-[var(--s-bad)] px-4 text-[16px] font-semibold text-white">
-        <StopIcon />
+      <button type="button" onClick={onTap} className={`st-mic rec${quiet ? ' wide' : ''}`}>
+        <span aria-hidden="true">
+          <StopIcon size={16} />
+        </span>
         {t('mic.stop')}
       </button>
     );
   }
   if (s.status === 'none') {
-    return (
-      <button
-        type="button"
-        onClick={onTap}
-        disabled={blocked}
-        className={`flex min-h-[60px] items-center justify-center gap-2.5 rounded-[14px] px-4 text-[16px] font-semibold disabled:opacity-40 ${
-          quiet ? 'border border-[var(--s-rule)] bg-[var(--s-surface)] text-[var(--s-ink)]' : 'bg-[var(--s-accent-wash)] text-[var(--s-accent-deep)]'
-        }`}
-      >
-        <MicIcon />
+    return quiet ? (
+      <button type="button" onClick={onTap} disabled={blocked} className="st-fill">
+        <MicIcon size={18} />
+        {label}
+      </button>
+    ) : (
+      <button type="button" onClick={onTap} disabled={blocked} className="st-mic">
+        <span aria-hidden="true">
+          <MicIcon size={16} />
+        </span>
         {label}
       </button>
     );
   }
   return (
-    <div className="flex flex-col gap-2 rounded-[12px] bg-[var(--s-surface-2)] p-3">
-      {quiet ? <span className="text-[13px] font-semibold text-[var(--s-ink-2)]">{label}</span> : null}
-      {s.status === 'working' ? <p className="m-0 text-[15px] text-[var(--s-ink-2)]">{t('mic.working')}</p> : null}
-      {s.status === 'offline' ? <p className="m-0 text-[14.5px] text-[var(--s-ink-2)]">{t('mic.offline')}</p> : null}
-      {s.status === 'off' || s.status === 'error' ? <p className="m-0 text-[14.5px] text-[var(--s-ink-2)]">{t('mic.off')}</p> : null}
+    <div className="st-said-box" style={quiet ? undefined : { padding: 0, background: 'transparent' }}>
+      {quiet ? <span className="st-label">{label}</span> : null}
+      {s.status === 'working' ? <span className="st-heard">{t('mic.working')}</span> : null}
+      {s.status === 'offline' ? <span className="st-heard">{t('mic.offline')}</span> : null}
+      {s.status === 'off' || s.status === 'error' ? <span className="st-heard">{t('mic.off')}</span> : null}
       {s.status === 'done' ? (
         <>
-          <p className="m-0 text-[13px] text-[var(--s-ink-3)]">
-            {t('mic.heard')}
-            {s.sample ? ` · ${t('mic.sample')}` : ''}
-          </p>
-          <p className="m-0 text-[15px] italic text-[var(--s-ink-2)]">“{s.transcript}”</p>
-          <p className="m-0 mt-1 text-[13px] text-[var(--s-ink-3)]">{t('mic.reads', { customer: c.customerFirst })}</p>
-          <p className="m-0 text-[16px] font-medium leading-snug">{s.customerText}</p>
+          <span className="st-heard">
+            &ldquo;{s.transcript}&rdquo;{s.sample ? ` · ${t('mic.sample')}` : ''}
+          </span>
+          <span className="st-hint">{t('mic.reads', { customer: c.customerFirst })}</span>
+          <span className="st-said">{s.customerText}</span>
         </>
       ) : null}
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-[family-name:var(--font-mono)] text-[12.5px] text-[var(--s-ink-3)]">{s.seconds ? `0:${String(s.seconds).padStart(2, '0')}` : ''}</span>
-        <button
-          type="button"
-          onClick={onTap}
-          disabled={blocked || s.status === 'working'}
-          className="flex min-h-[48px] items-center gap-1.5 rounded-full border border-[var(--s-rule)] bg-[var(--s-surface)] px-4 text-[15px] font-medium disabled:opacity-40"
-        >
-          <MicIcon size={18} />
+      <div className="st-meta">
+        <span className="mono">{s.seconds ? `0:${String(s.seconds).padStart(2, '0')}` : ''}</span>
+        <button type="button" onClick={onTap} disabled={blocked || s.status === 'working'} className="st-redo">
           {t('mic.redo')}
         </button>
       </div>
@@ -794,38 +728,31 @@ function AddCrew({ t, canSave, onAdd }: { t: SiteT; canSave: boolean; onAdd: (n:
   const [keep, setKeep] = useState(true);
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="min-h-[52px] self-start rounded-full border border-dashed border-[var(--s-ink-3)] px-4 text-[15px] text-[var(--s-ink)]">
+      <button type="button" onClick={() => setOpen(true)} className="st-chip add">
         {t('crew.add')}
       </button>
     );
   }
   return (
-    <div className="flex flex-col gap-2.5 rounded-[14px] bg-[var(--s-surface-2)] p-3.5">
-      <label className="flex flex-col gap-1 text-[14px] text-[var(--s-ink-2)]">
+    <div className="st-said-box" style={{ width: '100%', gap: 10 }}>
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 14, color: 'var(--muted)' }}>
         {t('crew.name')}
-        <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} autoComplete="off" className="min-h-[52px] rounded-[12px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 text-[17px] text-[var(--s-ink)]" />
+        <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} autoComplete="off" className="st-input" />
       </label>
-      <div role="radiogroup" aria-label={t('crew.role')} className="flex flex-wrap gap-2">
+      <div role="radiogroup" aria-label={t('crew.role')} className="st-chips">
         {CREW_ROLES.map((r) => (
-          <button
-            key={r}
-            type="button"
-            role="radio"
-            aria-checked={role === r}
-            onClick={() => setRole(r)}
-            className={`min-h-[48px] rounded-full px-3.5 text-[15px] ${role === r ? 'bg-[var(--s-ink)] text-white' : 'bg-[var(--s-surface)] text-[var(--s-ink)]'}`}
-          >
+          <button key={r} type="button" role="radio" aria-checked={role === r} onClick={() => setRole(r)} className="st-chip sm" style={role === r ? undefined : { background: 'var(--paper)' }}>
             {t(`role.${r}`)}
           </button>
         ))}
       </div>
       {canSave ? (
-        <label className="flex min-h-[44px] items-center gap-2.5 text-[15px]">
-          <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} className="h-6 w-6" />
+        <label style={{ display: 'flex', minHeight: 44, alignItems: 'center', gap: 10, fontSize: 15 }}>
+          <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} style={{ width: 24, height: 24, accentColor: 'var(--acc)' }} />
           {t('crew.keep')}
         </label>
       ) : null}
-      <div className="grid grid-cols-[1fr_auto] gap-2">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
         <button
           type="button"
           disabled={name.trim().length < 2}
@@ -834,11 +761,12 @@ function AddCrew({ t, canSave, onAdd }: { t: SiteT; canSave: boolean; onAdd: (n:
             setName('');
             setOpen(false);
           }}
-          className="min-h-[52px] rounded-[12px] bg-[var(--s-accent)] text-[16px] font-semibold text-white disabled:opacity-40"
+          className="st-big"
+          style={{ minHeight: 52, fontSize: 16, borderRadius: 14 }}
         >
           {t('crew.save')}
         </button>
-        <button type="button" onClick={() => setOpen(false)} className="min-h-[52px] px-4 text-[15px] text-[var(--s-ink-2)]">
+        <button type="button" onClick={() => setOpen(false)} className="st-link">
           {t('cancel')}
         </button>
       </div>
@@ -854,13 +782,13 @@ function Posted({ clientRef, c, t, local }: { clientRef: string; c: PostContext;
   const failed = p?.status === 'failed';
   const r = p?.result;
   return (
-    <div className="flex flex-col gap-5 px-4 py-8">
-      <span aria-hidden="true" className="flex h-16 w-16 items-center justify-center rounded-full text-white" style={{ background: sent ? 'var(--s-good)' : failed ? 'var(--s-bad)' : 'var(--s-warn)' }}>
+    <div className="st-page" style={{ padding: '40px 20px', gap: 22 }}>
+      <span aria-hidden="true" className="st-done-mark" style={{ background: sent ? 'var(--good-s)' : failed ? 'var(--bad-s)' : 'var(--warn-s)' }}>
         {sent ? <CheckIcon size={30} /> : <CloudIcon size={30} />}
       </span>
-      <div role="status">
-        <h2 className="m-0 text-[24px] font-semibold tracking-tight">{sent ? t('done.sent.h', { customer: c.customerFirst }) : t('done.saved.h')}</h2>
-        <p className="m-0 mt-1.5 text-[16px] leading-relaxed text-[var(--s-ink-2)]">
+      <div role="status" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <h2 className="st-h2big">{sent ? t('done.sent.h', { customer: c.customerFirst }) : t('done.saved.h')}</h2>
+        <p className="st-line" style={{ margin: 0, fontSize: 16, lineHeight: 1.5 }}>
           {failed
             ? t('queue.failed', { error: errorWords(t, p?.error ?? undefined) })
             : sent
@@ -868,12 +796,12 @@ function Posted({ clientRef, c, t, local }: { clientRef: string; c: PostContext;
               : `${p?.status === 'sending' ? t('queue.sending') : t('queue.waiting')}. ${t('done.saved.p', { customer: c.customerFirst })}`}
         </p>
       </div>
-      <div className="s-card flex flex-col gap-1 p-4">
-        <span className="text-[14px] font-semibold">{t('done.where', { customer: c.customerFirst })}</span>
-        <span className="text-[14px] text-[var(--s-ink-2)]">{t('done.where2')}</span>
-        <span className="mt-2 text-[13.5px] text-[var(--s-ink-3)]">{t('done.fix')}</span>
+      <div className="st-sec" style={{ gap: 10 }}>
+        <span style={{ fontSize: 14, fontWeight: 600 }}>{t('done.where', { customer: c.customerFirst })}</span>
+        <span style={{ fontSize: 15 }}>{t('done.where2')}</span>
+        <span className="hint">{t('done.fix')}</span>
       </div>
-      <Link href="/studio/site" className="flex min-h-[60px] items-center justify-center rounded-[14px] bg-[var(--s-accent)] text-[17px] font-semibold text-white no-underline">
+      <Link href="/studio/site" className="st-big pill">
         {t('post.back')}
       </Link>
     </div>
