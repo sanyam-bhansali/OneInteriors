@@ -42,7 +42,7 @@ export const TEMPLATE_MILESTONES: Readonly<Record<PlanKind, readonly string[]>> 
   CIVIL: ['POP, civil, fabrication and electrical work started', 'POP sheets'],
   CARPENTRY: ['Materials delivered from the factory', 'Carcass complete with hardware', 'Shutters delivered'],
   FINISH: ['Painting started', 'Painting complete'],
-  HANDOVER: ['Snags listed', 'Handover'],
+  HANDOVER: ['Snags listed', 'Provisional handover'],
 };
 
 /** The sheet's first day: where every offset counts from. */
@@ -115,7 +115,8 @@ export const STEP_TEMPLATE: readonly TemplateStep[] = [
   step('HANDOVER', PREP, 'Site inspection by the designer', 1, '2026-10-28'),
   step('HANDOVER', HAND, 'Final inspection with the client', 1, '2026-10-30'),
   step('HANDOVER', HAND, 'Final snags closed', 1, '2026-11-01'),
-  step('HANDOVER', HAND, 'Handover', 2, SHEET_HANDOVER),
+  // The provisional handover (owner, 13 Oct 2026): its tick moves the project to the project closure (lifecycle-rules.ts). Hauspire's "Handover", renamed; same weight.
+  step('HANDOVER', HAND, 'Provisional handover', 2, SHEET_HANDOVER),
 ];
 
 /** The template's steps of one stage kind, in order. */

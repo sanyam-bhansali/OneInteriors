@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { formatINR } from '@/lib/money';
 import { paymentsDesk } from '@/modules/project/payments-flow';
+import { finalPayments } from '@/modules/project/closure';
 import { PaymentsBody } from '../projects/[id]/PaymentsTab';
 import { bookingDraft, bookingsToRecord, recentBookings } from '@/modules/studio-sales/booking';
 import { currentMember } from '@/modules/studio/access';
@@ -28,9 +29,12 @@ export default async function PaymentsDeskPage() {
   const [projects, member, toBook, recent] = await Promise.all([paymentsDesk(), currentMember(), bookingsToRecord(), recentBookings()]);
   /* Studio OS Phase 1: the booking advance is recorded here too, on the
      sales final, with the same form as the lead page. */
+  /* The project lifecycle — TO BE SPECIFIED (owner): the accounts flow for the closure's final payment. For now it shows here, first, and is recorded with the same payment recording. */
+  const finals = await finalPayments(projects.map((p) => p.id));
   const drafts = Object.fromEntries(await Promise.all(toBook.map(async (w) => [w.quoteId, await bookingDraft(member, w.quoteId)] as const)));
   const weight = (p: (typeof projects)[number]) => {
     const rows = p.payments?.rows ?? [];
+    if (finals.has(p.id) && (p.payments?.ledger.balancePaise ?? 0) > 0) return -1;
     if (rows.some((r) => r.status === 'disputed')) return 0;
     if (rows.some((r) => r.status === 'waiting')) return 1;
     return (p.payments?.ledger.balancePaise ?? 0) > 0 ? 2 : 3;
@@ -98,6 +102,15 @@ export default async function PaymentsDeskPage() {
                       </Link>
                     ) : null}
                   </div>
+                  {finals.has(p.id) ? (
+                    <div className="banner" role="status" data-testid="final-payment" style={{ background: (p.payments?.ledger.balancePaise ?? 0) > 0 ? 'var(--warn-bg)' : 'var(--good-bg)', color: (p.payments?.ledger.balancePaise ?? 0) > 0 ? 'var(--warn)' : 'var(--good)', padding: '10px 14px', borderRadius: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      <b>Final payment from closure: {formatINR(finals.get(p.id)!.finalDuePaise)}</b>
+                      <span className="sm">
+                        Closed out {finals.get(p.id)!.closedOn}.{' '}
+                        {(p.payments?.ledger.balancePaise ?? 0) > 0 ? `${formatINR(p.payments!.ledger.balancePaise)} still to record, on the last stage below.` : 'Recorded in full.'}
+                      </span>
+                    </div>
+                  ) : null}
                   {p.payments ? (
                     <PaymentsBody data={p.payments} customer={p.customer.split(/\s+/)[0] ?? p.customer} />
                   ) : (

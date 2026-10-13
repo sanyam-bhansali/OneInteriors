@@ -1014,3 +1014,77 @@ describe('Studio OS Phase 2: the design card (studio-design/customer-view.ts) ne
     expect(closed.changes).toEqual({ salesTotalPaise: 100, designTotalPaise: 150, lines: [{ kind: 'ADDED', room: 'Living', product: 'TV unit', wasPaise: 0, nowPaise: 50 }] });
   });
 });
+
+describe('the project lifecycle (portal/lifecycle-view.ts) never leaks the team’s side', () => {
+  const now = D('2026-10-11T00:00:00Z');
+  const LIFE_SECRET = {
+    closureNote: 'CLOSURE-NOTE-we undercharged',
+    closureLine: 'CLOSURE-LINE-SECRET',
+    signedBy: 'u-signed-by-SECRET',
+    crewMoney: 'CREW-MONEY-777',
+  };
+  const base = leakyRow() as unknown as Record<string, unknown>;
+  const row = {
+    ...base,
+    phase: 'SNAGS',
+    warrantyEndsOn: null,
+    provisionalHandoverAt: D('2026-10-01T00:00:00Z'),
+    closedOutAt: D('2026-10-05T00:00:00Z'),
+    handoverSignedById: LIFE_SECRET.signedBy,
+    closures: [{ id: 'c1', version: 1, final: true, note: LIFE_SECRET.closureNote, totalPaise: BigInt(777), lines: [{ description: LIFE_SECRET.closureLine, note: LIFE_SECRET.closureNote }] }],
+    workOrders: [{ id: 'wo1', lines: [{ item: 'Carcass', ratePaise: BigInt(77700), agreedPaise: LIFE_SECRET.crewMoney }] }],
+    // Every snag closed: the client may sign off.
+    snags: [],
+    stages: [
+      {
+        id: 'st-d',
+        kind: 'DESIGN',
+        name: 'Design',
+        plannedStart: D('2026-08-01T00:00:00Z'),
+        plannedEnd: D('2026-08-20T00:00:00Z'),
+        actualEnd: D('2026-08-20T00:00:00Z'),
+        items: [{ id: 'd1', room: 'Design', label: 'Design closure SECRET-UNSTARRED', doneAt: null, weightBp: 200, inScope: true, plannedOn: null, responsible: 'DESIGNER', gatePayment: null, customerMilestone: false }],
+      },
+      {
+        id: 'st-h',
+        kind: 'HANDOVER',
+        name: 'Handover',
+        plannedStart: D('2026-09-20T00:00:00Z'),
+        plannedEnd: D('2026-10-01T00:00:00Z'),
+        actualEnd: D('2026-10-01T00:00:00Z'),
+        items: [{ id: 'h1', room: 'Handover', label: 'Provisional handover', doneAt: D('2026-10-01T06:00:00Z'), weightBp: 9800, inScope: true, plannedOn: null, responsible: null, gatePayment: null, customerMilestone: true }],
+      },
+    ],
+  } as unknown as CustomerProjectRow;
+  const out = toCustomerProject(row, SECRET.customerId, now);
+  const json = JSON.stringify(out);
+
+  it('says where the project is and lets the owner sign off once every snag is closed', () => {
+    expect(out.lifecycle).toMatchObject({ phase: 'snags', current: { kind: 'snags' }, next: { kind: 'sign_off' }, canSignOff: true, openSnags: 0 });
+    expect(out.lifecycle.blocker?.kind).toBe('sign_off');
+  });
+
+  it('never carries the closure, who signed off, crew money or an unstarred step', () => {
+    for (const v of Object.values(LIFE_SECRET)) expect(json).not.toContain(v);
+    expect(json).not.toContain('SECRET-UNSTARRED');
+    const keys = keysOf(out);
+    for (const k of ['closures', 'handoverSignedById', 'closedOutAt', 'provisionalHandoverAt', 'workOrders', 'finalDuePaise', 'extrasPaise']) expect(keys.has(k), k).toBe(false);
+  });
+
+  it('selects none of the lifecycle’s internal columns', () => {
+    const selected = keysOf(CUSTOMER_PROJECT_SELECT);
+    for (const k of ['closures', 'handoverSignedById', 'workOrders', 'teamNotes']) expect(selected.has(k), k).toBe(false);
+    expect(selected.has('phase')).toBe(true);
+    expect(selected.has('warrantyEndsOn')).toBe(true);
+  });
+
+  it('family see the phase but cannot sign off', () => {
+    const fam = toCustomerProject(row, SECRET.familyUserId, now);
+    expect(fam.lifecycle.canSignOff).toBe(false);
+  });
+
+  it('reads a warranty that has ended as closed, with its end day', () => {
+    const w = toCustomerProject({ ...(row as unknown as Record<string, unknown>), phase: 'WARRANTY', warrantyEndsOn: D('2026-10-10T00:00:00Z') } as unknown as CustomerProjectRow, SECRET.customerId, now);
+    expect(w.lifecycle).toMatchObject({ phase: 'closed', warrantyEndsOn: '2026-10-10', canSignOff: false, next: null });
+  });
+});

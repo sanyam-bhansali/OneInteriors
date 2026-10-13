@@ -108,6 +108,7 @@ const PROJECT: CustomerProject = {
   siteMissedDays: [],
   // Studio OS Phase 2: the design card.
   design: null,
+  lifecycle: { phase: 'execution', current: { kind: 'stage', label: 'Factory production' }, next: { kind: 'closure', label: null }, blocker: null, studioDoing: 'site', openSnags: 0, warrantyEndsOn: null, canSignOff: false },
 };
 
 describe('what the clients may send', () => {

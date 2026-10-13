@@ -330,6 +330,17 @@ export const SAMPLE_PROJECT: Project = {
       ],
     },
   },
+  // The project lifecycle: on site, carpentry under way, and the sample customer has a decision to make.
+  lifecycle: {
+    phase: 'execution',
+    current: { kind: 'stage', label: 'Carpentry' },
+    next: { kind: 'stage', label: 'Finishing' },
+    blocker: { kind: 'decide', label: 'Kitchen shutter finish', amountPaise: null, count: null },
+    studioDoing: 'site',
+    openSnags: 1,
+    warrantyEndsOn: null,
+    canSignOff: false,
+  },
   decisions: [
     {
       id: 'd1',

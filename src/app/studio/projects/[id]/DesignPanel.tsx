@@ -751,7 +751,7 @@ function DesignFinal({ tab }: { tab: DesignTab }) {
         <CustomerSees name={tab.customerFirst} />
       </div>
       {!f.seesQuotes ? (
-        // A designer sees no money: the quotations are the owner's and the project manager's.
+        // Only a member who sees no money lands here (a designer sees it since the lifecycle, 13 Oct 2026).
         <p className={`m-0 ${muted}`}>The sales final and the Design Final are kept by the owner and the project manager.</p>
       ) : f.signed ? (
         <p className="m-0 text-[14px]">
@@ -778,32 +778,41 @@ function DesignFinal({ tab }: { tab: DesignTab }) {
       )}
       {f.closedOn ? (
         <div className="flex flex-col gap-1 text-[14px]">
-          <p className="m-0 font-semibold text-[var(--good)]">Design closed {dayWords(f.closedOn)}.</p>
+          <p className="m-0 font-semibold text-[var(--good)]">Design signed off {dayWords(f.closedOn)}. The project is in execution.</p>
           {f.changes ? (
             <p className="m-0">
               {tab.customerFirst} sees {f.changes.lines.length} change{f.changes.lines.length === 1 ? '' : 's'}: {formatINR(f.changes.salesTotalPaise)} → {formatINR(f.changes.designTotalPaise)}.
             </p>
           ) : null}
         </div>
-      ) : f.seesQuotes && tab.canAssign && f.signed ? (
+      ) : f.seesQuotes && (tab.canAssign || tab.canClose) && f.signed ? (
         <div className="flex flex-wrap items-center gap-2">
           {!f.designFinal ? (
-            <button type="button" className="btn pri sm" disabled={pending} onClick={() => run(() => makeDesignFinalAction(tab.projectId))}>
-              Make Design Final
-            </button>
+            tab.canAssign ? (
+              <button type="button" className="btn pri sm" disabled={pending} onClick={() => run(() => makeDesignFinalAction(tab.projectId))}>
+                Make Design Final
+              </button>
+            ) : null
           ) : (
             <button
               type="button"
               className="btn pri sm"
               disabled={pending}
               onClick={() => {
-                if (window.confirm(`Close the design on ${f.designFinal!.number}? ${tab.customerFirst} sees what changed against the sales final.`)) run(() => closeDesignAction(tab.projectId));
+                if (window.confirm(`Sign off the design on ${f.designFinal!.number}? The project moves to execution, and ${tab.customerFirst} sees what changed against the sales final.`)) run(() => closeDesignAction(tab.projectId));
               }}
+              hidden={!tab.canClose}
             >
-              Close the design
+              Design sign-off
             </button>
           )}
-          <span className={muted}>{!f.designFinal ? 'A copy of the sales final for the changes the design made.' : 'Send the Design Final first, then close.'}</span>
+          <span className={muted}>
+            {!f.designFinal
+              ? tab.canAssign
+                ? 'A copy of the sales final for the changes the design made.'
+                : 'The owner or project manager makes the Design Final from the sales final.'
+              : 'Send the Design Final first, then sign off. The project then moves to execution.'}
+          </span>
         </div>
       ) : null}
       <Message m={message} />

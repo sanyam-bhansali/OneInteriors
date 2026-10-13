@@ -72,7 +72,7 @@ const ACTION_LABELS: Record<StudioAction, string> = {
   'booking.refund': 'Refund a booking',
   'payments.template': 'Set the payment stages',
   'design.work': 'Design steps, drawings and site visits',
-  'design.assign': 'Pick the designer, close the design',
+  'design.assign': 'Pick the designer',
   'design.template': 'Set the design steps',
   'design.workload': "See designers' workload",
   'crew.list': 'See the crews, to pick one',
@@ -82,6 +82,8 @@ const ACTION_LABELS: Record<StudioAction, string> = {
   'workorder.build': 'Make work orders, enter quantities, mark work done',
   'workorder.money': 'Crew rates, bills and balances',
   'crew.pay': 'Pay crews',
+  'design.close': 'Sign off the design',
+  'project.closure': 'Project closure (final payment)',
 };
 
 /**

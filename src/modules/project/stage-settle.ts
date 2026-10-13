@@ -17,6 +17,7 @@
 import type { Prisma } from '@prisma/client';
 import { KIND_TRACKER_KEYS, PLAN_KINDS, type PlanKind } from '@/modules/portal/tracker';
 import { recordEvent, type ProjectActor } from './events';
+import { syncProvisionalHandover } from './lifecycle';
 import { settleStage } from './project-rules';
 import { shiftDesignStepDay, shiftStepDay } from './step-rules';
 import { dayFromDb, dayToDb } from './working-days';
@@ -128,5 +129,7 @@ export async function settleStageAfterTicks(db: Db, projectId: string, stageId: 
   const items = countedSteps(stage.items).map((i) => ({ done: i.doneAt !== null }));
   const outcome = settleStage({ items, photos, done: stage.actualEnd !== null });
   if (outcome !== 'keep') await writeDone(db, projectId, stage, outcome === 'mark-done', actor, now);
+  // The project lifecycle: the provisional handover step moves the project to the closure (and back, on an untick).
+  if (stage.kind === 'HANDOVER') await syncProvisionalHandover(db, projectId, stage.id, actor, now);
   return outcome;
 }

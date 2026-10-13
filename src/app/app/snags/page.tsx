@@ -71,7 +71,7 @@ export default function AppSnags() {
           .map((s) => ({
             key: s.id,
             title: s.title,
-            where: [s.room, `raised ${dayLabel(s.raisedAt)}`].filter(Boolean).join(', '),
+            where: [s.warranty ? 'Warranty' : null, s.room, `raised ${dayLabel(s.raisedAt)}`].filter(Boolean).join(', '),
             status: s.progress?.state === 'reopened' ? 'You said not fixed · with the studio' : s.progress?.state === 'fixed' ? 'Fixed · waiting for the owner' : (s.line ?? 'With the studio'),
             img: s.photos[0] ?? null,
             urgent: Boolean(s.line?.startsWith('Fix by')),
@@ -81,7 +81,7 @@ export default function AppSnags() {
           .map((s) => ({
             key: s.id,
             title: s.title,
-            where: [s.room, `raised ${dayLabel(s.raisedAt)}`].filter(Boolean).join(', '),
+            where: [s.warranty ? 'Warranty' : null, s.room, `raised ${dayLabel(s.raisedAt)}`].filter(Boolean).join(', '),
             status: [s.line, s.fixedNote, s.progress?.closedBy === 'auto' ? 'closed after 7 days' : s.progress?.closedBy === 'you' ? 'you confirmed' : null].filter(Boolean).join(' · '),
             img: s.fixedPhotos[0] ?? s.photos[0] ?? null,
             urgent: false,

@@ -231,6 +231,7 @@ function SnagRow({ snag: s, i, t }: { snag: Snag; i: number; t: T }) {
       {img ? <Image source={{ uri: img }} style={styles.thumb} contentFit="cover" accessibilityLabel={t('snags.photoOf', { title: s.title })} /> : <View style={[styles.thumb, { backgroundColor: color.soft }]} />}
       <View style={{ flex: 1, gap: 4 }}>
         <Text style={styles.snagTitle}>{s.title}</Text>
+        {s.warranty ? <Text style={[styles.mono, { color: color.accentInk }]}>{t('life.warrantySnag')}</Text> : null}
         <Text style={styles.mono}>{raised}</Text>
         <Text style={[styles.mono, { color: status.tone }]}>{status.text}</Text>
       </View>

@@ -33,6 +33,7 @@ import { can, needsAssignment } from '@/modules/studio/roles';
 import { recordEvent, type ProjectActor } from '@/modules/project/events';
 import { canSupersede } from '@/modules/project/locker-rules';
 import { settleStageAfterTicks } from '@/modules/project/stage-settle';
+import { applyPhaseEvent } from '@/modules/project/lifecycle';
 import { dayFromDb, dayToDb, istDay, istTime } from '@/modules/project/working-days';
 import { readSignedStages } from '@/modules/portal/payments';
 import { designStepsFor } from '@/modules/portal/quote-to-plan';
@@ -40,7 +41,7 @@ import { ROOM_KEYS, type RoomKey } from '@/modules/prepare/rooms';
 import { elementBySlug } from '@/modules/prepare/catalogue';
 import { seedBoard } from '@/modules/prepare/board';
 import type { BudgetTier, StyleTag } from '@/modules/brief/types';
-import { copyQuote, quotesToCompare, totalsFor } from '@/modules/studio-quote/quotes';
+import { copyQuote, quotesToCompareInStudio, totalsFor } from '@/modules/studio-quote/quotes';
 import { compareToIssued } from '@/modules/studio-quote/revision';
 import {
   applyRefusal,
@@ -605,14 +606,16 @@ export async function makeDesignFinal(projectId: string): Promise<DesignResult> 
  * built against). Ticking the design steps stays the team's job.
  */
 export async function closeDesign(projectId: string, now = new Date()): Promise<DesignResult> {
-  const check = await memberOnProject(projectId, 'design.assign');
+  // Design sign-off (owner, 13 Oct 2026): owner, and the PM or designer on the project.
+  const check = await memberOnProject(projectId, 'design.close');
   if (!check.ok) return check;
   const { p, df } = await designFinalOf(projectId, check.member.studioId);
   if (!p) return { ok: false, error: 'That project is not one of yours.' };
   if (p.designClosedAt) return { ok: true, message: 'Design is closed already.' };
   if (!df) return { ok: false, error: 'Make the Design Final first.' };
   if (df.status === 'DRAFT') return { ok: false, error: `Send ${df.number} to the client first (mark it sent), then close the design.` };
-  const cmp = await quotesToCompare(df.id);
+  // design.close was checked on this project above; read the two quotations in the studio (a designer writes none).
+  const cmp = await quotesToCompareInStudio(df.id, check.member.studioId);
   if (!cmp) return { ok: false, error: 'We could not read the two quotations to compare. Open the Design Final and try again.' };
   const changes = compareToIssued(
     cmp.base.lines.map((l) => ({ room: l.room, product: l.product, amountPaise: l.amountPaise })),
@@ -634,9 +637,11 @@ export async function closeDesign(projectId: string, now = new Date()): Promise<
       data: { designClosedAt: now, designFinalQuoteId: df.id, designChanges: summary as unknown as Prisma.InputJsonValue },
     });
     await recordEvent(tx, { projectId, type: 'design.closed', actor, refId: df.id, payload: { lines: summary.lines.length } });
+    // The project lifecycle: design sign-off moves the project to execution.
+    await applyPhaseEvent(tx, projectId, { kind: 'design.signed_off' }, actor, now);
   });
   if (facts) tell(facts.introduction.brief.userId, facts.introduction.studio.tradeName, 'Your design is final. See what changed against your first quotation.');
-  return { ok: true, message: `Design closed on ${df.number}. The client sees what changed against the sales final.` };
+  return { ok: true, message: `Design signed off on ${df.number}. The project moves to execution; the client sees what changed against the sales final.` };
 }
 
 // ── The studio's design steps (Settings) ──────────────────────

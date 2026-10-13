@@ -32,7 +32,7 @@ describe('the default stars', () => {
       'Painting started',
       'Painting complete',
       'Snags listed',
-      'Handover',
+      'Provisional handover',
     ]);
   });
 
@@ -45,7 +45,8 @@ describe('the default stars', () => {
     const sql = readFileSync(join(__dirname, '..', 'prisma/migrations/20261012170000_customer_milestones/migration.sql'), 'utf8');
     const pairs = [...sql.matchAll(/\('([A-Z]+)', '([^']+)'\)/g)].map((m) => `${m[1]}|${m[2]}`).sort();
     const expected = [
-      ...PLAN_KINDS.flatMap((k) => TEMPLATE_MILESTONES[k].map((l) => `${k}|${l}`)),
+      // The lifecycle migration (20261013120000) renamed Hauspire's "Handover" step to "Provisional handover"; this backfill ran before, under the old name.
+      ...PLAN_KINDS.flatMap((k) => TEMPLATE_MILESTONES[k].map((l) => `${k}|${l === 'Provisional handover' ? 'Handover' : l}`)),
       ...DESIGN_MILESTONES.map((l) => `DESIGN|${l}`),
     ].sort();
     expect(pairs).toEqual(expected);

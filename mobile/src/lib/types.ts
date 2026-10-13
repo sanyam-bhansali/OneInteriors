@@ -63,6 +63,8 @@ export interface Snag {
   fixedPhotos: string[];
   /** Phase 4: where the snag is, from its events (the server's portal/snag-view.ts). Older servers omit it. */
   progress?: SnagProgress;
+  /** Raised during the warranty (project lifecycle). Older servers omit it. */
+  warranty?: boolean;
 }
 
 /**
@@ -164,6 +166,25 @@ export interface Project {
   siteMissedDays?: string[];
   /** Studio OS Phase 2: the design phase (studio-design/customer-view.ts). Older servers omit it; null with no design stage. */
   design?: Design | null;
+  /** The project lifecycle (portal/lifecycle-view.ts): the current step, the next, and what unlocks it. Older servers omit it. */
+  lifecycle?: Lifecycle;
+}
+
+export interface LifecycleStep {
+  kind: 'design' | 'stage' | 'design_done' | 'closure' | 'snags' | 'sign_off' | 'warranty' | 'closed';
+  label: string | null;
+}
+
+export interface Lifecycle {
+  phase: 'design' | 'execution' | 'closure' | 'snags' | 'warranty' | 'closed';
+  current: LifecycleStep;
+  next: LifecycleStep | null;
+  /** What you must do to unlock the next step; null = nothing needed from you. */
+  blocker: { kind: 'pay' | 'confirm_payment' | 'answer_drawing' | 'your_step' | 'decide' | 'confirm_snag' | 'sign_off'; label: string | null; amountPaise: number | null; count: number | null } | null;
+  studioDoing: 'design' | 'site' | 'closure' | 'snags' | 'warranty' | 'closed';
+  openSnags: number;
+  warrantyEndsOn: string | null;
+  canSignOff: boolean;
 }
 
 /** A design step as the customer sees it: never the team's note or who ticked it. */

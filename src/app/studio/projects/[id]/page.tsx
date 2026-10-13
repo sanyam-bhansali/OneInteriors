@@ -24,6 +24,10 @@ import { SITE_HOME, mayOpen } from '@/modules/studio/surfaces';
 import { CrewsTab as CrewsSection } from './CrewsTab';
 import { can as roleCan } from '@/modules/studio/roles';
 import { LineIcon } from '../../ui/icons';
+/* The project lifecycle (docs/studio-os/PROJECT-LIFECYCLE.md): the phase and the closure. */
+import { projectPhaseFor } from '@/modules/studio/lifecycle-store';
+import { closureFor } from '@/modules/project/closure';
+import { ClosurePanel } from './ClosurePanel';
 import '../projects.css';
 
 export const metadata: Metadata = { title: 'Project', robots: { index: false, follow: false } };
@@ -35,7 +39,10 @@ export const dynamic = 'force-dynamic';
  * same screen for the designer and the PM, scoped below by role).
  *
  * - Pill tabs: Plan, Design, Site log, Snags, Payments (only for those who
- *   see money), Crews (never a designer).
+ *   see money), Crews (those who read work orders; a designer too since the
+ *   lifecycle), Closure (from the provisional handover, for those who see money).
+ * - The phase chip (project lifecycle): Design, Execution, Project closure,
+ *   Snags, Warranty until …, Closed.
  * - The dark card is the customer projection itself
  *   (portal/customer-project.ts), so it shows what the app shows: the stages
  *   and only the starred steps.
@@ -51,6 +58,8 @@ const TABS = [
   { key: 'snags', label: 'Snags' },
   { key: 'payments', label: 'Payments' },
   { key: 'crews', label: 'Crews' },
+  /* The project lifecycle (owner, 13 Oct 2026): the closure, from the provisional handover on, for those who see the money. */
+  { key: 'closure', label: 'Closure' },
 ] as const;
 type Tab = (typeof TABS)[number]['key'];
 
@@ -76,10 +85,11 @@ export default async function ProjectWorkspacePage({
   }
   const w = r.workspace;
   const money = w.contractPaise !== null;
-  const [viewer, decisions] = await Promise.all([currentMember(), studioDecisions(w.id, now)]);
-  // Studio OS Phase 3: Crews for those who see work orders (owner, PM, accounts), never a designer.
+  const [viewer, decisions, life, closure] = await Promise.all([currentMember(), studioDecisions(w.id, now), projectPhaseFor(w.id, now), closureFor(w.id, now)]);
+  const closureOpen = closure !== null && life !== null && life.phase !== 'DESIGN' && life.phase !== 'EXECUTION';
+  // Studio OS Phase 3: Crews for those who see work orders (owner, PM, accounts; a designer on their project since the lifecycle).
   const crews = viewer === null || roleCan(viewer, 'workorder.read', { assigned: true });
-  const tabs = TABS.filter((t) => (t.key !== 'payments' || money) && (t.key !== 'crews' || crews));
+  const tabs = TABS.filter((t) => (t.key !== 'payments' || money) && (t.key !== 'crews' || crews) && (t.key !== 'closure' || closureOpen));
   // A designer (Studio OS Phase 2) opens on the Design tab.
   const fallback: Tab = viewer?.role === 'DESIGNER' ? 'design' : 'plan';
   const tab: Tab = tabs.some((t) => t.key === rawTab) ? (rawTab as Tab) : fallback;
@@ -90,6 +100,7 @@ export default async function ProjectWorkspacePage({
     snags: `${w.work?.snags.filter((s) => s.status === 'OPEN').length ?? 0} open`,
     payments: w.work?.money ? `${w.work.money.stages.length}` : null,
     crews: null,
+    closure: life?.phase === 'CLOSURE' ? 'to do' : null,
   };
   const siteMode = viewer !== null && mayOpen(viewer, SITE_HOME);
   const appLine = w.appConnected
@@ -126,6 +137,12 @@ export default async function ProjectWorkspacePage({
               {w.plan === 'assured' ? 'Assured' : w.assuredRequested ? 'Basic · asked for Assured' : 'Basic'}
             </span>
             <span className={`chip ${w.appConnected ? 'good' : ''}`}>{appLine}</span>
+            {life ? (
+              <span className={`chip ${life.phase === 'CLOSURE' ? 'warn' : life.phase === 'WARRANTY' ? 'good' : life.phase === 'SNAGS' ? 'bad' : 'ink'}`} data-testid="phase-chip">
+                {life.label}
+                {life.phase === 'WARRANTY' && life.warrantyEndsOn ? ` until ${shortDay(new Date(`${life.warrantyEndsOn}T00:00:00Z`))}` : ''}
+              </span>
+            ) : null}
           </div>
         </div>
         <div className="flex flex-wrap gap-2.5">
@@ -174,6 +191,7 @@ export default async function ProjectWorkspacePage({
           {tab === 'snags' ? <SnagsPanel projectId={w.id} now={now} /> : null}
           {tab === 'payments' ? <PaymentsPanel projectId={w.id} customer={w.customerFirst} /> : null}
           {tab === 'crews' ? <CrewsSection projectId={w.id} now={now} /> : null}
+          {tab === 'closure' && closure ? <ClosurePanel view={closure} customer={w.customerFirst} /> : null}
         </div>
         <aside className="wsside" aria-label={`What ${w.customerFirst} sees`}>
           <CustomerPanel w={w} now={now} />

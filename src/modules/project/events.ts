@@ -108,6 +108,11 @@ export const PROJECT_EVENT_TYPES = [
   'crew.status',
   'crew.paid',
   'crew.corrected',
+  // The project lifecycle (docs/studio-os/PROJECT-LIFECYCLE.md): the phase moved, the closure saved and fixed, the client's handover sign-off.
+  'phase.changed',
+  'closure.saved',
+  'closure.fixed',
+  'handover.signed',
 ] as const;
 
 export type ProjectEventType = (typeof PROJECT_EVENT_TYPES)[number];

@@ -20,7 +20,9 @@ import { HomeSearch, LangSeg, Splash } from './HomeBits';
 import { SalesCalls, YourList, type ListRow } from './HomeSections';
 import { mySitesToday, type SiteCard } from '@/modules/project/site-log';
 import { crewsOnMySites } from '@/modules/studio-crews/store';
-import { designWorkload, type DesignWorkload } from '@/modules/studio-design/store';
+import { closuresRemainingFor, lifecycleBoard } from '@/modules/studio/lifecycle-store';
+import { remainingLine } from '@/modules/project/lifecycle-rules';
+import { asLifeTab, LifecycleTabs } from '../design/LifecycleTabs';
 import { siteWords } from '../site/words';
 import './home.css';
 
@@ -35,7 +37,7 @@ export const dynamic = 'force-dynamic';
  * already asked the door (`mayOpen`); the counts come from `myToday`, which
  * is scoped to what this person may see (a salesperson's own leads only).
  */
-export default async function StudioHomePage() {
+export default async function StudioHomePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const [user, member] = await Promise.all([getCurrentUser(), currentMember()]);
   if (member?.role === 'SUPERVISOR') redirect(SITE_HOME);
 
@@ -50,7 +52,7 @@ export default async function StudioHomePage() {
      this member may see (mySitesToday reads through projectsVisibleTo),
      crews only for roles that may read work orders (crewsOnMySites returns
      nothing to a designer), a designer's own design steps. */
-  const [studio, today, lang, sites, crews, design] = await Promise.all([
+  const [studio, today, lang, sites, crews, board, closures, { tab: rawTab }] = await Promise.all([
     member
       ? prisma.studio.findUnique({ where: { id: member.studioId }, select: { tradeName: true, status: true } }).catch(() => null)
       : Promise.resolve(null),
@@ -58,7 +60,11 @@ export default async function StudioHomePage() {
     getLang(),
     member && ['OWNER', 'PM', 'DESIGNER'].includes(member.role) ? mySitesToday().catch(() => null) : Promise.resolve(null),
     member?.role === 'PM' ? crewsOnMySites().catch(() => []) : Promise.resolve([]),
-    member?.role === 'DESIGNER' ? designWorkload().catch(() => null) : Promise.resolve(null),
+    /* The project lifecycle (owner, 13 Oct 2026): a designer's home is My Design / My Execution / My Snags. */
+    member?.role === 'DESIGNER' ? lifecycleBoard().catch(() => null) : Promise.resolve(null),
+    /* The owner's (and a PM's) "N project closures remaining". */
+    member && ['OWNER', 'PM'].includes(member.role) ? closuresRemainingFor().catch(() => null) : Promise.resolve(null),
+    searchParams,
   ]);
 
   const name = studio?.tradeName ?? 'Your studio';
@@ -78,7 +84,6 @@ export default async function StudioHomePage() {
   const cards = sites?.cards ?? [];
   const calls = sections.find((x) => x.id === 'calls');
   const list = listFrom(sections);
-  const designList = designRows(design);
   const phoneName = firstName ? `Hi, ${firstName}` : 'Hi';
 
   return (
@@ -211,6 +216,22 @@ export default async function StudioHomePage() {
           </div>
         </section>
 
+        {closures && closures.count > 0 ? (
+          <section className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--warn-bg)', color: 'var(--warn)' }} aria-label="Project closures remaining" data-testid="closures-remaining">
+            <b style={{ fontSize: 15 }}>{remainingLine(closures.count).replace('You have', role === 'OWNER' ? 'The studio has' : 'You have')}</b>
+            <span className="sm">Past provisional handover and not closed out: the final payment is not fixed yet.</span>
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {closures.projects.slice(0, 6).map((c) => (
+                <li key={c.id}>
+                  <Link href={`/studio/projects/${c.id}?tab=closure`} style={{ color: 'var(--ink)', fontWeight: 600 }}>
+                    {c.client} · {c.flat}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         {role === 'SALES' && calls ? <SalesCalls calls={calls.rows} more={calls.more} /> : null}
 
         {role === 'PM' ? (
@@ -223,12 +244,8 @@ export default async function StudioHomePage() {
           </>
         ) : null}
 
-        {role === 'DESIGNER' ? (
-          <div className="dgrid">
-            <ProjectsToday cards={cards} />
-            <YourList rows={designList.rows} more={designList.more} moreHref="/studio/design" title="Your design steps" />
-          </div>
-        ) : null}
+        {role === 'DESIGNER' && board ? <LifecycleTabs board={board} tab={asLifeTab(rawTab)} base="/studio/home" mine /> : null}
+        {role === 'DESIGNER' ? <ProjectsToday cards={cards} /> : null}
 
         <PoweredBy style={{ paddingTop: 24 }} />
       </main>
@@ -495,20 +512,4 @@ function listFrom(sections: readonly TodaySection[]): { rows: ListRow[]; more: n
   return { rows, more: Math.max(0, total - rows.length) };
 }
 
-/** A designer's next design step on each project, late and due first. */
-function designRows(w: DesignWorkload | null): { rows: ListRow[]; more: number } {
-  const projects = (w?.designers.flatMap((d) => d.projects) ?? []).filter((p) => p.next);
-  projects.sort((a, b) => b.late - a.late || b.due - a.due);
-  const dayWords = (iso: string) =>
-    new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).replace(',', '');
-  const rows = projects.slice(0, 5).map((p) => ({
-    key: `design:${p.id}:${p.next!.label}`,
-    title: p.next!.label,
-    ctx: [p.home, p.next!.lockedBy ? `waits for ${p.next!.lockedBy}` : p.next!.plannedOn ? `planned ${dayWords(p.next!.plannedOn)}` : null, p.late ? `${p.late} late` : null]
-      .filter(Boolean)
-      .join(' · '),
-    href: `/studio/projects/${p.id}`,
-    action: 'Open',
-  }));
-  return { rows, more: Math.max(0, projects.length - rows.length) };
-}
+

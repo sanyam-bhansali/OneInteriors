@@ -92,9 +92,16 @@ describe('the PM sees quantities only', () => {
     expect(can(m('ACCOUNTS'), 'vendor.rates')).toBe(false);
     expect(can(m('SUPERVISOR'), 'workorder.read', { assigned: true })).toBe(true);
     expect(can(m('SUPERVISOR'), 'workorder.money', { assigned: true })).toBe(false);
-    for (const r of ['SALES', 'DESIGNER'] as const) {
-      for (const a of ['crew.list', 'crew.edit', 'workorder.read', 'workorder.build', 'workorder.money', 'crew.pay'] as const) expect(can(m(r), a, { assigned: true })).toBe(false);
+    for (const a of ['crew.list', 'crew.edit', 'workorder.read', 'workorder.build', 'workorder.money', 'crew.pay'] as const) expect(can(m('SALES'), a, { assigned: true })).toBe(false);
+    // Lifecycle (owner, 13 Oct 2026): a designer sees the crews' money on the projects they design, read only.
+    for (const a of ['workorder.read', 'workorder.money'] as const) {
+      expect(can(m('DESIGNER'), a, { assigned: true }), a).toBe(true);
+      expect(can(m('DESIGNER'), a, { assigned: false }), a).toBe(false);
     }
+    for (const a of ['crew.list', 'crew.edit', 'workorder.build', 'crew.pay'] as const) expect(can(m('DESIGNER'), a, { assigned: true }), a).toBe(false);
+    // Owner and accounts keep the money studio-wide; the PM still never has it.
+    expect(can(m('OWNER'), 'workorder.money')).toBe(true);
+    expect(can(m('ACCOUNTS'), 'workorder.money')).toBe(true);
   });
   it('screens: accounts opens the crews but not the owner’s labour page; the PM opens neither', () => {
     const m = (role: StudioRoleName) => ({ role, status: 'ACTIVE' as const });

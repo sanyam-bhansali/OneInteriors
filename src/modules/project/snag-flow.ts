@@ -42,7 +42,9 @@ import { storeSitePhoto } from '@/modules/storage/site-photos';
 import { notify, notifyStudio } from '@/modules/notify/service';
 import { checkSnag, SNAG_LIMITS } from '@/modules/portal/snags';
 import { dedupeKey, recordEvent, recordEventOnce, SNAG_EVENT_TYPE, type ProjectActor } from './events';
-import { addDays, isDay, istDay } from './working-days';
+import { addDays, dayFromDb, isDay, istDay } from './working-days';
+import { applyPhaseEvent } from './lifecycle';
+import { effectivePhase, isPhase } from './lifecycle-rules';
 import { asSpeechLang, listen } from '@/modules/speech';
 import { ownsPath } from './site-log-rules';
 import { readVoice, unstoredAllowed } from './site-log-storage';
@@ -68,6 +70,7 @@ export const SNAG_ERRORS = {
   raced: 'Someone just changed this snag. Refresh to see the latest.',
   needsAfter: 'Take the after photo first. The customer sees it beside theirs.',
   needsPhoto: 'Add a photo of the problem.',
+  warrantyOver: 'Your warranty has ended, so new snags cannot be raised here. Call your studio.',
   fixBy: 'Pick the date it will be fixed by.',
   fixByPast: 'The fix-by date cannot be in the past.',
   fixByFar: 'Pick a date within the next four months.',
@@ -251,7 +254,7 @@ async function storePhotos(projectId: string, photos: File[]): Promise<{ ok: tru
 /** A new snag and its RAISED event, in one transaction. */
 async function createSnag(
   tx: Prisma.TransactionClient,
-  input: { projectId: string; title: string; room: string | null; note: string | null; photoPaths: string[]; raisedById: string; byStudio: boolean; actor: ProjectActor; walkThrough?: boolean },
+  input: { projectId: string; title: string; room: string | null; note: string | null; photoPaths: string[]; raisedById: string; byStudio: boolean; actor: ProjectActor; walkThrough?: boolean; warranty?: boolean },
 ): Promise<string> {
   const snag = await tx.homeSnag.create({
     data: {
@@ -263,6 +266,7 @@ async function createSnag(
       raisedById: input.raisedById,
       raisedByStudio: input.byStudio,
       status: 'OPEN',
+      warranty: input.warranty === true,
     },
     select: { id: true },
   });
@@ -275,7 +279,7 @@ async function createSnag(
     type: 'snag.raised',
     actor: input.actor,
     refId: snag.id,
-    payload: { photos: input.photoPaths.length, byStudio: input.byStudio, ...(input.walkThrough ? { walkThrough: true } : {}) },
+    payload: { photos: input.photoPaths.length, byStudio: input.byStudio, ...(input.walkThrough ? { walkThrough: true } : {}), ...(input.warranty ? { warranty: true } : {}) },
   });
   return snag.id;
 }
@@ -294,16 +298,19 @@ export async function raiseSnagAsCustomer(
 ): Promise<SnagResult> {
   const project = await prisma.homeProject.findUnique({
     where: { id: projectId },
-    select: { introduction: { select: { studioId: true, brief: { select: { userId: true } } } } },
+    select: { phase: true, warrantyEndsOn: true, introduction: { select: { studioId: true, brief: { select: { userId: true } } } } },
   });
   if (!project || project.introduction.brief.userId !== userId) return { ok: false, error: 'That project is not yours.' };
+  /* The project lifecycle (owner, 13 Oct 2026): after the handover sign-off a snag is a warranty snag; after the warranty, none. */
+  const phase = isPhase(project.phase) ? effectivePhase(project.phase, project.warrantyEndsOn ? dayFromDb(project.warrantyEndsOn) : null, new Date()) : 'DESIGN';
+  if (phase === 'CLOSED') return { ok: false, error: SNAG_ERRORS.warrantyOver };
   const check = checkSnag(input);
   if (!check.ok) return check;
   if (!photos.some((f) => f && f.size > 0)) return { ok: false, error: SNAG_ERRORS.needsPhoto };
   const stored = await storePhotos(projectId, photos);
   if (!stored.ok) return stored;
   const id = await prisma.$transaction((tx) =>
-    createSnag(tx, { projectId, ...check.value, photoPaths: stored.paths, raisedById: userId, byStudio: false, actor: { type: 'CUSTOMER', id: userId } }),
+    createSnag(tx, { projectId, ...check.value, photoPaths: stored.paths, raisedById: userId, byStudio: false, actor: { type: 'CUSTOMER', id: userId }, warranty: phase === 'WARRANTY' }),
   );
   void notifyStudio(project.introduction.studioId, { kind: 'snag-raised', snagId: id, title: check.value.title, room: check.value.room });
   return { ok: true, id };
@@ -641,6 +648,41 @@ export async function snagEventsOn(projectId: string): Promise<SnagEventLike[][]
     take: 500,
   });
   return snags.map((s) => [...eventsOrLegacy(s.events, s)]);
+}
+
+// ── The client signs off the handover (project lifecycle) ─────
+
+/**
+ * The client (the owner of the brief) signs off the handover once every
+ * snag is closed (owner, 13 Oct 2026: the client signs off, not the
+ * designer). Moves the project to WARRANTY, with its end day from the
+ * studio's warranty months (lifecycle.ts), in one transaction with the
+ * event. A fix still waiting for the client's confirmation counts as open.
+ */
+export async function signOffHandover(userId: string, projectId: string, now = new Date()): Promise<{ ok: true; warrantyEndsOn: string } | { ok: false; error: string }> {
+  const project = await prisma.homeProject.findUnique({
+    where: { id: projectId },
+    select: { cancelledAt: true, introduction: { select: { studioId: true, brief: { select: { userId: true } } } } },
+  });
+  if (!project || project.cancelledAt) return { ok: false, error: 'That project is not yours.' };
+  if (project.introduction.brief.userId !== userId) return { ok: false, error: SNAG_ERRORS.ownerOnly };
+  const actor: ProjectActor = { type: 'CUSTOMER', id: userId };
+  const r = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "home_projects" WHERE "id" = ${projectId} FOR UPDATE`;
+    const snags = await tx.homeSnag.findMany({
+      where: { projectId },
+      select: { createdAt: true, status: true, fixBy: true, fixedAt: true, events: { select: EVENT_FOR_RULES } },
+      take: 500,
+    });
+    const openSnags = openSnagCount(snags.map((s) => [...eventsOrLegacy(s.events, s)]), now);
+    const m = await applyPhaseEvent(tx, projectId, { kind: 'handover.signed', openSnags }, actor, now);
+    if (!m.ok) return m;
+    await recordEvent(tx, { projectId, type: 'handover.signed', actor, at: now, payload: { openSnags } });
+    const p = await tx.homeProject.findUnique({ where: { id: projectId }, select: { warrantyEndsOn: true } });
+    return { ok: true as const, warrantyEndsOn: p?.warrantyEndsOn ? dayFromDb(p.warrantyEndsOn) : istDay(now) };
+  });
+  // No notice: the studio sees it on the project and the designer's My Snags (phase WARRANTY).
+  return r;
 }
 
 /** Open snags on a project now (fixes waiting for the customer count as open). */

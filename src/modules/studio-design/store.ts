@@ -11,7 +11,7 @@ import 'server-only';
  *   projects they are the designer on (their team row). What the tab may DO
  *   is said by `canWork` (`design.work`), `canAssign` (`design.assign`) and
  *   `canEditPlan` (`plan.edit`).
- * - no money crosses to a designer: a payment gate says which payment and
+ * - money: since the lifecycle (owner, 13 Oct 2026) a designer sees it on their projects; a payment gate says which payment and
  *   whether it is recorded, never an amount.
  * - the designers' page: owner and PM see every designer
  *   (`design.workload`); a designer sees their own projects.
@@ -157,7 +157,7 @@ export interface DesignTab {
   measurements: { room: string; length: string; width: string; height: string; note: string | null }[];
   drawings: DrawingView[];
   final: {
-    /** False for a member who sees no money (a designer): the quotations, their links and the totals stay out (null below). */
+    /** False for a member who sees no money: the quotations, their links and the totals stay out (null below). */
     seesQuotes: boolean;
     signed: { id: string; number: string } | null;
     designFinal: { id: string; number: string; status: string } | null;
@@ -166,6 +166,8 @@ export interface DesignTab {
   };
   canWork: boolean;
   canAssign: boolean;
+  /** Sign off the design (close it): owner, and the PM or designer on the project. */
+  canClose: boolean;
   canEditPlan: boolean;
 }
 
@@ -318,7 +320,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
   });
 
   const canAssign = may('design.assign');
-  // No money crosses to a designer: the quotations (numbers, links) and the frozen totals go only to those who see payments or write quotes.
+  // The quotations (numbers, links) and the frozen totals go to those who see payments or write quotes — a designer too since the lifecycle (owner, 13 Oct 2026: designers see money on their projects).
   const seesQuotes = may('payment.read') || may('quote.write');
   const [designers, signed, designFinal, rooms] = await Promise.all([
     canAssign
@@ -379,6 +381,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       },
       canWork: may('design.work'),
       canAssign,
+      canClose: may('design.close'),
       canEditPlan: may('plan.edit'),
     },
   };

@@ -82,6 +82,8 @@ export const api = {
   /** Studio OS Phase 2: approve a shared drawing, or ask for changes with what to change. Owner only. */
   answerDrawing: (documentId: string, verdict: 'APPROVED' | 'CHANGES', comment: string) =>
     call<{ id: string }>('POST', `/design/${encodeURIComponent(documentId)}/answer`, { verdict, comment }),
+  /** The project lifecycle: the owner signs off the handover once every snag is closed; the warranty starts. */
+  signOffHandover: (projectId: string) => call<{ warrantyEndsOn: string }>('POST', `/project/${encodeURIComponent(projectId)}/handover`, {}),
   registerDevice: (token: string, platform: 'ios' | 'android') => call<object>('POST', '/devices', { token, platform }),
   removeDevice: (token: string) => call<object>('DELETE', '/devices', { token }),
   notifications: () => call<{ unread: number; notifications: Notice[] }>('GET', '/notifications'),

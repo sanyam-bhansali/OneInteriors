@@ -93,6 +93,9 @@ import {
 } from './money-locker-view';
 import type { CustomerChoice } from '@/modules/project/decision-rules';
 import { CUSTOMER_DESIGN_SELECT, toCustomerDesign, type CustomerDesign } from '@/modules/studio-design/customer-view';
+import { effectivePhase, isPhase } from '@/modules/project/lifecycle-rules';
+import { dayFromDb, istDay } from '@/modules/project/working-days';
+import { customerLifecycle, type CustomerLifecycle } from './lifecycle-view';
 
 export interface CustomerDecision {
   id: string;
@@ -127,6 +130,8 @@ export interface CustomerSnag {
   fixedPhotos: string[];
   /* Phase 4 — snags (portal/snag-view.ts). From the snag's events: the state, fix-by, the fix sentence, Confirm / Not fixed. */
   progress: CustomerSnagProgress;
+  /** Raised during the warranty (project lifecycle). */
+  warranty: boolean;
 }
 
 export interface CustomerDocument {
@@ -180,6 +185,8 @@ export interface CustomerProject {
   siteMissedDays: string[];
   /* Studio OS Phase 2 — design (studio-design/customer-view.ts): % done, the starred milestones, the next one and the payment that opens the next step, mood board, visits, measurements, drawings to approve, what changed at closing. Null with no DESIGN stage. */
   design: CustomerDesign | null;
+  /* The project lifecycle (portal/lifecycle-view.ts): the current step, the next, and what the customer must do to unlock it. */
+  lifecycle: CustomerLifecycle;
 }
 
 export const UPDATES_SHOWN = 30;
@@ -220,6 +227,9 @@ export const CUSTOMER_PROJECT_SELECT = {
     select: { stageId: true, field: true, fromDate: true, toDate: true, reason: true, decisionId: true, at: true },
   },
   plan: true,
+  /* The project lifecycle: the phase and the warranty's end. Never who signed off (handoverSignedById) or the closure's lines and notes. */
+  phase: true,
+  warrantyEndsOn: true,
   contractPaise: true,
   paymentPhases: true,
   paidPhases: true,
@@ -281,6 +291,7 @@ export const CUSTOMER_PROJECT_SELECT = {
       fixedAt: true,
       fixedNote: true,
       fixedPhotoPaths: true,
+      warranty: true,
       /* Phase 4: the snag's events (portal/snag-view.ts names the columns; never the internal note, voice, transcript or assignee). */
       events: { orderBy: { at: 'asc' }, select: CUSTOMER_SNAG_EVENT_SELECT },
     },
@@ -328,9 +339,45 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
   const stages = projectStages(p, now);
   const ledgerOf = customerLedger(p);
   const tracked = customerTracker({ stages: p.stages, dateChanges: p.dateChanges, studio: p.introduction.studio }, stages, now);
+  const owner = p.introduction.brief.userId === userId;
+  const snags: CustomerSnag[] = p.snags.map((s, i) => ({
+    id: s.id,
+    title: s.title,
+    room: s.room,
+    note: s.note,
+    status: s.status === 'FIXED' ? 'FIXED' : 'OPEN',
+    line: snagLine(s),
+    raisedAt: s.createdAt.toISOString(),
+    raisedByStudio: s.raisedByStudio,
+    photos: links.snagPhotos[i] ?? [],
+    fixedNote: s.fixedNote,
+    fixedPhotos: links.fixedPhotos[i] ?? [],
+    progress: customerSnagProgress(s, owner, now),
+    warranty: s.warranty === true,
+  }));
+  const payments = customerPayments(ledgerOf, p.paidPhases, owner, new Set(p.documents.map((d) => d.id)));
+  const design = toCustomerDesign(
+    (p.stages ?? []).find((s) => s.kind === 'DESIGN') ?? null,
+    p,
+    p.documents ?? [],
+    ledgerOf ? ledgerOf.stages.map((s) => ({ index: s.index, label: s.label, state: s.state })) : null,
+  );
+  const warrantyEndsOn = p.warrantyEndsOn ? dayFromDb(p.warrantyEndsOn) : null;
+  const decisions = p.decisions.map((d) => ({ title: d.title, state: decisionState(d, now) }));
+  const lifecycle = customerLifecycle({
+    phase: isPhase(p.phase) ? effectivePhase(p.phase, warrantyEndsOn, now) : 'DESIGN',
+    role: owner ? 'owner' : 'family',
+    today: istDay(now),
+    warrantyEndsOn,
+    design,
+    tracker: tracked.tracker,
+    payments,
+    snags,
+    decisions,
+  });
   return {
     id: p.id,
-    role: p.introduction.brief.userId === userId ? 'owner' : 'family',
+    role: owner ? 'owner' : 'family',
     plan: planName(p.plan),
     studio: p.introduction.studio.tradeName,
     startOn: p.startOn.toISOString(),
@@ -362,20 +409,7 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
       choices: customerChoices(d.choices, links.choicePhotos?.[i]),
       pickedOptionId: d.pickedOptionId ?? null,
     })),
-    snags: p.snags.map((s, i) => ({
-      id: s.id,
-      title: s.title,
-      room: s.room,
-      note: s.note,
-      status: s.status === 'FIXED' ? 'FIXED' : 'OPEN',
-      line: snagLine(s),
-      raisedAt: s.createdAt.toISOString(),
-      raisedByStudio: s.raisedByStudio,
-      photos: links.snagPhotos[i] ?? [],
-      fixedNote: s.fixedNote,
-      fixedPhotos: links.fixedPhotos[i] ?? [],
-      progress: customerSnagProgress(s, p.introduction.brief.userId === userId, now),
-    })),
+    snags,
     documents: visibleDocIndexes(p.documents).map((i) => {
       const d = p.documents[i]!;
       return {
@@ -393,15 +427,11 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
 
     overallLateDays: tracked.overallLateDays,
     stageStatus: tracked.stageStatus,
-    payments: customerPayments(ledgerOf, p.paidPhases, p.introduction.brief.userId === userId, new Set(p.documents.map((d) => d.id))),
+    payments,
     materials: customerMaterials(p.materials),
     siteLogs: siteDays(p.siteLogs ?? [], links.siteLogPhotos),
     siteMissedDays: siteMissedDays({ ...p, studio: p.introduction.studio, siteLogs: p.siteLogs ?? [] }, now),
-    design: toCustomerDesign(
-      (p.stages ?? []).find((s) => s.kind === 'DESIGN') ?? null,
-      p,
-      p.documents ?? [],
-      ledgerOf ? ledgerOf.stages.map((s) => ({ index: s.index, label: s.label, state: s.state })) : null,
-    ),
+    design,
+    lifecycle,
   };
 }

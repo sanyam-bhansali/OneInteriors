@@ -26,13 +26,13 @@ const TABLE: Record<StudioAction, Record<StudioRoleName, Cell>> = {
   'team.manage': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
   'project.create': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
   'plan.edit': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
-  'update.post': { OWNER: 'Y', PM: 'A', SUPERVISOR: 'A', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
-  'checklist.tick': { OWNER: 'Y', PM: 'A', SUPERVISOR: 'A', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
+  'update.post': { OWNER: 'Y', PM: 'A', SUPERVISOR: 'A', ACCOUNTS: '-', SALES: '-', DESIGNER: 'A' },
+  'checklist.tick': { OWNER: 'Y', PM: 'A', SUPERVISOR: 'A', ACCOUNTS: '-', SALES: '-', DESIGNER: 'A' },
   'decision.create': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
   'snag.accept': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
   'snag.fix': { OWNER: 'Y', PM: 'A', SUPERVISOR: 'A', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
   'payment.record': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: 'Y', SALES: '-', DESIGNER: '-' },
-  'payment.read': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: 'Y', SALES: '-', DESIGNER: '-' },
+  'payment.read': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: 'Y', SALES: '-', DESIGNER: 'A' },
   'document.upload': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: 'A' },
   'vendor.rates': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
   'project.read': { OWNER: 'Y', PM: 'A', SUPERVISOR: 'A', ACCOUNTS: '-', SALES: '-', DESIGNER: 'A' },
@@ -63,10 +63,15 @@ const TABLE: Record<StudioAction, Record<StudioRoleName, Cell>> = {
   'crew.list': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: 'Y', SALES: '-', DESIGNER: '-' },
   'crew.edit': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: 'Y', SALES: '-', DESIGNER: '-' },
   'crew.settings': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
-  'workorder.read': { OWNER: 'Y', PM: 'A', SUPERVISOR: 'A', ACCOUNTS: 'Y', SALES: '-', DESIGNER: '-' },
+  'workorder.read': { OWNER: 'Y', PM: 'A', SUPERVISOR: 'A', ACCOUNTS: 'Y', SALES: '-', DESIGNER: 'A' },
   'workorder.build': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
-  'workorder.money': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: 'Y', SALES: '-', DESIGNER: '-' },
+  'workorder.money': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: 'Y', SALES: '-', DESIGNER: 'A' },
   'crew.pay': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: 'Y', SALES: '-', DESIGNER: '-' },
+  // The project lifecycle (owner, 13 Oct 2026): designers see money everywhere on the projects they design
+  // (payment.read, workorder.read/money above, read only), tick execution steps (update.post, checklist.tick),
+  // sign off the design and do the project closure. The PM still never sees crew money.
+  'design.close': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: 'A' },
+  'project.closure': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: 'A' },
 };
 
 const active = (role: StudioRoleName) => ({ role, status: 'ACTIVE' as const });

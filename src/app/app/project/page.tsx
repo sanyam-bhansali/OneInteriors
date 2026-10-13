@@ -12,6 +12,7 @@ import { dayLabel, daysLate, pickDecision, shortDate } from '@/modules/app/proje
 import { formatINR, formatINRCompact } from '@/lib/money';
 import { DesignCard } from './DesignCard';
 import { PaymentEntries } from './PaymentEntries';
+import { LifecycleCard } from './LifecycleCard';
 
 const MONO = { margin: '4px 0 0', font: '400 13px var(--mono)', color: 'var(--ink-2)' } as const;
 
@@ -154,6 +155,9 @@ function RealProject({ project, reload }: { project: MyProject; reload: () => vo
             <b>{handover ? shortDate(handover.targetOn) : '—'}</b>
           </div>
         </div>
+
+        {/* The project lifecycle: current step, next step, and what unlocks it (or nothing needed). */}
+        <LifecycleCard project={project} onChanged={reload} />
 
         <div className="oa-list">
           <Link href="/app/snags" className="oa-row" style={{ textDecoration: 'none' }}>

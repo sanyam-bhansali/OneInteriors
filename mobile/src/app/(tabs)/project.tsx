@@ -13,6 +13,7 @@ import { useProject } from '../../lib/project';
 import { color, font } from '../../lib/theme';
 import { PaymentEntries } from '../../components/project/payment-entries';
 import { DesignCard } from '../../components/project/design';
+import { LifecycleCard } from '../../components/project/lifecycle';
 import type { Decision, Money, Payments as PaymentsData, Project as ProjectData, Stage, Tracker, TrackerStage } from '../../lib/types';
 
 /**
@@ -108,6 +109,9 @@ export default function Project() {
             <Text style={styles.note}>{t('project.progress.body', { studio: p.studio })}</Text>
           </Card>
         ) : null}
+
+        {/* The project lifecycle: where it is, what is next, and what unlocks it. */}
+        {p.lifecycle ? <LifecycleCard projectId={p.id} life={p.lifecycle} studio={p.studio} onChanged={() => void refresh()} t={t} /> : null}
 
         {/* Studio OS Phase 2: the design phase, while it runs and once it closes with what changed. */}
         {p.design && (typeof p.design.pct === 'number' || p.design.steps.length > 0) && (!p.design.done || p.design.changes) ? (

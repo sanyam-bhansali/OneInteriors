@@ -216,12 +216,28 @@ export async function getQuote(id: string): Promise<QuoteRow | null> {
   const qs = await quoteScope();
   const studioId = qs?.studioId ?? null;
   if (!studioId) return null;
+  return loadQuote(id, studioId, qs?.where ?? {});
+}
 
+/**
+ * The comparison for design sign-off (project lifecycle, owner 13 Oct 2026):
+ * for a caller that has ALREADY checked the member's right on the project
+ * these quotations belong to (`design.close`), so a designer, who writes no
+ * quotations, can sign off. Studio-scoped like every read here.
+ */
+export async function quotesToCompareInStudio(currentId: string, studioId: string): Promise<QuoteComparison | null> {
+  const current = await loadQuote(currentId, studioId, {});
+  if (!current?.basedOnId) return null;
+  const base = await loadQuote(current.basedOnId, studioId, {});
+  return base ? { base, current } : null;
+}
+
+async function loadQuote(id: string, studioId: string, scope: Prisma.StudioQuoteWhereInput): Promise<QuoteRow | null> {
   try {
     // Scoped by studioId as well as id. A quotation id in a URL is not proof
     // of anything, and this is a client's name and phone number.
     const row = await prisma.studioQuote.findFirst({
-      where: { ...qs?.where, id, studioId },
+      where: { ...scope, id, studioId },
       include: { lines: { orderBy: { sortOrder: 'asc' } }, studio: { select: { paymentPhases: true } } },
     });
     const planRooms = row ? await planRoomsOfBrief(row.briefId, row.clientId, studioId, row.id) : [];

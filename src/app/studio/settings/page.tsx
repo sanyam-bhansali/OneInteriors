@@ -3,6 +3,8 @@ import { myBranding, myTier } from '@/modules/studio-quote/store';
 import { logoUploadEnabled, signedLogoUrl } from '@/modules/storage/studio-logo';
 import { BrandingForm } from './BrandingForm';
 import { LogoAndMark } from './LogoAndMark';
+import { WarrantyForm } from './WarrantyForm';
+import { myWarranty } from '@/modules/studio/warranty';
 
 export const metadata: Metadata = {
   title: 'Settings',
@@ -32,9 +34,10 @@ export default async function SettingsPage() {
 
   /* In parallel: neither depends on the other, and the signed URL is a round
      trip to storage that should not sit behind a subscription lookup. */
-  const [logoUrl, tier] = await Promise.all([
+  const [logoUrl, tier, warranty] = await Promise.all([
     signedLogoUrl(branding?.logoPath ?? null),
     myTier(),
+    myWarranty().catch(() => null),
   ]);
 
   return (
@@ -67,6 +70,8 @@ export default async function SettingsPage() {
             hideRequested={branding?.hideOurMark ?? false}
           />
         </div>
+        {/* The project lifecycle (owner, 13 Oct 2026): months of warranty after the client signs off the handover. */}
+        {warranty ? <WarrantyForm months={warranty.months} canEdit={warranty.canEdit} /> : null}
       </>
     </>
   );

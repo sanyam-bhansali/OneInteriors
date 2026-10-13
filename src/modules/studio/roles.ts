@@ -56,7 +56,7 @@
  * designer on (a `StudioProjectMember` row, written with
  * `HomeProject.designerId`), read, files, and the design work itself
  * (`design.work`: design steps, drawings, mood board, site visits,
- * measurements). No payments, no leads. Picking the designer is
+ * measurements). No leads. Picking the designer is
  * `design.assign` (owner, PM on the project); the studio's design steps are
  * the owner's (`design.template`); the designers' workload is owner and PM.
  *
@@ -70,6 +70,24 @@
  * `stripMoney`). A supervisor sees which crew is on which of their jobs
  * (`workorder.read`). Trades and routing are the owner's (`crew.settings`);
  * labour cost against the contract stays `vendor.rates` (owner).
+ *
+ * ## The project lifecycle (owner, 13 Oct 2026)
+ *
+ * docs/studio-os/PROJECT-LIFECYCLE.md. **Designers see money everywhere on
+ * the projects they design** (this reverses the 12 Oct "designer sees no
+ * money" rule): the project's payments (`payment.read`), quotation money,
+ * the project closure and the crews' money on that project
+ * (`workorder.read` + `workorder.money`, read only: crew writes stay
+ * `workorder.build`, which a designer does not have). Still only projects
+ * they are the designer on (their team row): `workorder.money` now needs the
+ * assignment like every project action — owner and accounts are studio-wide,
+ * so nothing changes for them, and a PM still never has it (quantities only).
+ * The designer and the supervisor both tick execution steps
+ * (`checklist.tick` + `update.post`: each tick needs a photo and a sentence
+ * in the site log). Signing off the design is `design.close` (owner; PM and
+ * designer on the project); the project closure — the final payment — is
+ * `project.closure` (owner; PM and designer on the project). The client's
+ * handover sign-off is the customer's own act, not a studio one.
  */
 
 import type { Prisma } from '@prisma/client';
@@ -160,7 +178,11 @@ export type StudioAction =
   /** Phase 3: see and set rates, agreed amounts, bills, balances and payments on work orders. */
   | 'workorder.money'
   /** Phase 3: record a payment to a crew, or correct one. */
-  | 'crew.pay';
+  | 'crew.pay'
+  /** Lifecycle: sign off the design (close it), which moves the project to execution. */
+  | 'design.close'
+  /** Lifecycle: work out and fix the project closure (the final payment). */
+  | 'project.closure';
 
 export const STUDIO_ACTIONS: readonly StudioAction[] = [
   'team.manage',
@@ -203,6 +225,8 @@ export const STUDIO_ACTIONS: readonly StudioAction[] = [
   'workorder.build',
   'workorder.money',
   'crew.pay',
+  'design.close',
+  'project.closure',
 ];
 
 /** Everything a PM does with leads and sales: all of it, across the studio. */
@@ -242,6 +266,8 @@ const GRANTS: Record<Exclude<StudioRoleName, 'OWNER'>, readonly StudioAction[]> 
     'design.work',
     'design.assign',
     'design.workload',
+    'design.close',
+    'project.closure',
     /* Phase 3: quantities only — never `workorder.money` or `crew.pay`. */
     'crew.list',
     'workorder.read',
@@ -249,8 +275,8 @@ const GRANTS: Record<Exclude<StudioRoleName, 'OWNER'>, readonly StudioAction[]> 
   ],
   SUPERVISOR: ['update.post', 'checklist.tick', 'snag.fix', 'project.read', 'workorder.read'],
   ACCOUNTS: ['payment.read', 'payment.record', 'booking.record', 'booking.refund', 'crew.list', 'crew.edit', 'workorder.read', 'workorder.money', 'crew.pay'],
-  /* Studio OS Phase 2: only the projects they are the designer on; no money. */
-  DESIGNER: ['project.read', 'document.upload', 'design.work'],
+  /* Studio OS Phase 2: only the projects they are the designer on. Lifecycle (owner, 13 Oct 2026): money everywhere on those projects, execution ticks, design sign-off, the closure. */
+  DESIGNER: ['project.read', 'document.upload', 'design.work', 'design.close', 'payment.read', 'update.post', 'checklist.tick', 'workorder.read', 'workorder.money', 'project.closure'],
 };
 
 /** Lead actions a salesperson may take only on a lead assigned to them. */
@@ -272,6 +298,10 @@ const NEEDS_ASSIGNMENT: ReadonlySet<StudioAction> = new Set<StudioAction>([
   'design.assign',
   'workorder.read',
   'workorder.build',
+  /* Lifecycle: a designer sees crew money only on their own projects. Owner and accounts are studio-wide, so unchanged. */
+  'workorder.money',
+  'design.close',
+  'project.closure',
 ]);
 
 /** Accounts works across every project, so assignment never applies to it. */

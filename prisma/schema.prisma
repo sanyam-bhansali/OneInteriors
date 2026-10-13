@@ -672,6 +672,11 @@ model Studio {
   /// Hauspire's defaults.
   crewSettings Json?
 
+  /// The project lifecycle (owner, 13 Oct 2026; docs/studio-os/PROJECT-
+  /// LIFECYCLE.md): how long the warranty runs after the client signs off
+  /// the handover, in months. Settings, Warranty (owner). Hauspire 12.
+  warrantyMonths Int @default(12)
+
   /// The matching profile: work mix (modular / carpentry / both), scopes and
   /// minimums, civil capability, home types, city-wide and societies,
   /// capacity, earliest start, durations, how they work, materials,
@@ -1623,7 +1628,89 @@ model HomeProject {
   /// customer projection.
   workOrders HomeWorkOrder[]
 
+  /// The project lifecycle (owner, 13 Oct 2026; docs/studio-os/PROJECT-
+  /// LIFECYCLE.md). Moved only through project/lifecycle-rules.ts, inside
+  /// the transaction that records the event: design sign-off
+  /// (designClosedAt) -> EXECUTION; the provisional handover step ticked ->
+  /// CLOSURE; the closure fixed -> SNAGS; the client signs off the handover
+  /// with no open snag -> WARRANTY; past warrantyEndsOn it reads as CLOSED.
+  phase                 ProjectPhase @default(DESIGN)
+  phaseAt               DateTime?
+  provisionalHandoverAt DateTime?
+  closedOutAt           DateTime?
+  handoverSignedAt      DateTime?
+  /// The customer (User id) who signed off. Never sent to anyone.
+  handoverSignedById    String?
+  warrantyEndsOn        DateTime?    @db.Date
+  closures              HomeProjectClosure[]
+
   @@map("home_projects")
+}
+
+/// Where a project is in its life (owner, 13 Oct 2026). CLOSED is also
+/// read, not only stored: a WARRANTY project past warrantyEndsOn is closed.
+enum ProjectPhase {
+  DESIGN
+  EXECUTION
+  CLOSURE
+  SNAGS
+  WARRANTY
+  CLOSED
+}
+
+/// The project closure (owner, 13 Oct 2026): the detailed final account.
+/// Append-only (project/append-only.ts): every save is a new version; the
+/// row with `final` set fixes the final payment and is never followed by
+/// another. Money in integer paise; GST as the quotation charges it (last,
+/// at the quotation's rate, on the net extra work).
+model HomeProjectClosure {
+  id              String      @id @default(cuid())
+  projectId       String
+  project         HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  version         Int
+  /// The contract the closure starts from: the design final's total, else the signed total (GST included).
+  contractPaise   BigInt
+  /// Changes agreed on the client's decisions (HomeQuoteChange), GST included.
+  changesPaise    BigInt      @default(0)
+  extrasPaise     BigInt      @default(0)
+  deductionsPaise BigInt      @default(0)
+  gstBps          Int         @default(0)
+  gstPaise        BigInt      @default(0)
+  totalPaise      BigInt
+  /// Payments recorded and counted when this version was saved.
+  paidPaise       BigInt
+  finalDuePaise   BigInt
+  note            String?     @db.Text
+  /// Set on the version that closed the project out (fixes the final payment).
+  final           Boolean     @default(false)
+  createdById     String?
+  createdAt       DateTime    @default(now())
+  lines           HomeProjectClosureLine[]
+
+  @@unique([projectId, version])
+  @@index([projectId, final])
+  @@map("home_project_closures")
+}
+
+/// A line of a closure version: extra work done for the client, or a
+/// deduction / credit. Append-only with its version.
+model HomeProjectClosureLine {
+  id          String             @id @default(cuid())
+  closureId   String
+  closure     HomeProjectClosure @relation(fields: [closureId], references: [id], onDelete: Cascade)
+  /// "EXTRA" | "DEDUCTION".
+  kind        String
+  description String
+  /// Quantity in thousandths (1.5 = 1500); null with a lump amount.
+  qtyMilli    Int?
+  ratePaise   BigInt?
+  /// Before GST, always positive; the kind says which way it goes.
+  amountPaise BigInt
+  note        String?
+  sortOrder   Int                @default(0)
+
+  @@index([closureId])
+  @@map("home_project_closure_lines")
 }
 
 /// The invite a studio sends its OWN client to follow their project in the
@@ -2051,6 +2138,10 @@ model HomeSnag {
   /// crosses to the customer ("who on the crew caused it" stays inside).
   assigneeId String?
   assignee   StudioMember? @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  /// Raised by the client during the warranty (owner, 13 Oct 2026): a
+  /// warranty snag in the designer's My Snags.
+  warranty Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
