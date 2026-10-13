@@ -48,6 +48,7 @@ import {
   stageSummary,
   type CallOutcomeId,
 } from './event-copy';
+import { reactionLine, type CallReactionId } from './call-log';
 
 export interface ClientRow {
   id: string;
@@ -801,6 +802,8 @@ export async function logContact(
   note?: string | null,
   /** When to call next, if the person chose (leads at scale, AxLeads). */
   dueAt?: Date | null,
+  /** A picked-up call's reactions and length (AxLeads' Log call sheet, 13 Oct 2026). */
+  picked?: { reactions: CallReactionId[]; minutes: number | null } | null,
 ): Promise<Result> {
   const scope = await myLeadScope();
   const studioId = scope?.studioId ?? null;
@@ -856,18 +859,51 @@ export async function logContact(
       /* The task is named in the same line as the call, so the timeline reads
          as cause and effect rather than two entries a second apart. */
       summary:
-        contactSummary(outcome ?? 'spoke', note) +
+        pickedSummary(outcome ?? 'spoke', note, picked) +
         (followup && due
           ? ` · ${followup.action} by ${dueWord(due, now)}`
           : implied === 'clear'
             ? ' · follow-up cleared'
             : ''),
-      meta: outcome ? { outcome, nextAction: followup?.action ?? null } : undefined,
+      meta: outcome
+        ? {
+            outcome,
+            nextAction: followup?.action ?? null,
+            ...(picked ? { pickedUp: true, reactions: picked.reactions, minutes: picked.minutes } : {}),
+          }
+        : undefined,
     });
 
     return { ok: true };
   } catch (error) {
     return saveFailed('logContact', error);
+  }
+}
+
+/** The timeline line: "Spoke to them · Interested, Wants a site visit · 6 min — the note". */
+function pickedSummary(outcome: CallOutcomeId, note: string | null | undefined, picked: { reactions: CallReactionId[]; minutes: number | null } | null | undefined): string {
+  if (!picked) return contactSummary(outcome, note);
+  const line = reactionLine(picked.reactions, picked.minutes);
+  const base = contactSummary(outcome, null);
+  const tidy = note?.trim();
+  return `${base}${line ? ` · ${line}` : ''}${tidy ? ` — ${tidy}` : ''}`;
+}
+
+/**
+ * How many calls have been logged on this lead (the Log call sheet's
+ * "attempt N"). Read through the same lead scope as the lead itself, so a
+ * salesperson can only count calls on a lead they may open; 0 otherwise.
+ */
+export async function callAttempts(id: string): Promise<number> {
+  const scope = await myLeadScope();
+  const studioId = scope?.studioId ?? null;
+  if (!studioId) return 0;
+  try {
+    const lead = await prisma.studioClient.findFirst({ where: { ...scope?.leads, id, studioId }, select: { id: true } });
+    if (!lead) return 0;
+    return await prisma.studioClientEvent.count({ where: { studioId, clientId: id, kind: 'CONTACTED' } });
+  } catch {
+    return 0;
   }
 }
 

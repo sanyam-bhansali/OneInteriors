@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import '../clients.css';
 import { timelineFor } from '@/modules/studio-practice/events';
+import { callAttempts } from '@/modules/studio-practice/clients';
 import { marketplaceContextFor } from '@/modules/studio-practice/marketplace-context';
 import { duplicatesOf } from '@/modules/studio-practice/merge';
 import { introStateForClient } from '@/modules/studio/introduction';
@@ -62,7 +63,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   const member = await currentMember();
   const seesAll = page.may.assign;
 
-  const [events, brief, dupes, intro, draft, tasks, taskWho, stages, fields, tags, vocab] = await Promise.all([
+  const [events, brief, dupes, intro, draft, tasks, taskWho, stages, fields, tags, vocab, previousCalls] = await Promise.all([
     timelineFor(id),
     client.fromMarketplace ? marketplaceContextFor(id) : Promise.resolve(null),
     seesAll ? duplicatesOf(id) : Promise.resolve([]),
@@ -74,6 +75,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
     myFields(),
     leadTags(id),
     studioTags(),
+    callAttempts(id),
   ]);
 
   const tel = telLink(client.phone);
@@ -121,6 +123,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         stages={stages.map((s) => ({ id: s.id, name: s.name, colour: s.colour, kind: s.kind }))}
         may={{ edit: mayWork, quote: page.may.quote, delete: mayDelete }}
         canBook={page.may.book && page.bookableQuoteId !== null}
+        previousCalls={previousCalls}
       />
       {client.isDemo ? <p className="cl-sub">This is the sample lead. Try anything on it; it is never counted.</p> : null}
 

@@ -3,7 +3,9 @@
 import Link from 'next/link';
 import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { CALL_OUTCOMES, type CallOutcomeId } from '@/modules/studio-practice/event-copy';
+import { type CallOutcomeId } from '@/modules/studio-practice/event-copy';
+import { CALL_MENU } from '@/modules/studio-practice/call-log';
+import { PickedUpSheet } from './PickedUpSheet';
 import { suggestTags } from '@/modules/studio-sales/tag-rules';
 import { dayLabel, dueBadge } from '@/modules/studio-sales/lead-view';
 import { initials } from '@/modules/studio-sales/lead-view';
@@ -59,6 +61,7 @@ export function LeadHeader({
   stages,
   may,
   canBook,
+  previousCalls = 0,
 }: {
   lead: HeaderLead;
   tel: string | null;
@@ -67,6 +70,8 @@ export function LeadHeader({
   may: { edit: boolean; quote: boolean; delete: boolean };
   /** A sales final waits for its booking advance (Record booking is on this page). */
   canBook: boolean;
+  /** Calls already logged on this lead: the Picked up sheet's "attempt N". */
+  previousCalls?: number;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -75,6 +80,8 @@ export function LeadHeader({
   const [askWrong, setAskWrong] = useState(false);
   const [explain, setExplain] = useState(false);
   const [sure, setSure] = useState(false);
+  /* Log call → Picked up (AxLeads, 13 Oct 2026). */
+  const [pickedUp, setPickedUp] = useState(false);
 
   const act = (fn: () => Promise<object | undefined>, okText: string, after?: () => void) =>
     start(async () => {
@@ -193,19 +200,26 @@ export function LeadHeader({
         {may.edit ? (
           <>
             <Menu label="Log call" iconPath="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" disabled={pending} left>
-              {(close) =>
-                CALL_OUTCOMES.map((o) => (
-                  <MenuItem
-                    key={o.id}
-                    onClick={() => {
-                      close();
-                      logCall(o.id);
-                    }}
-                  >
-                    {o.label}
-                  </MenuItem>
-                ))
-              }
+              {(close) => (
+                <>
+                  <span className="cl-menuhead">Call outcome</span>
+                  {CALL_MENU.map((o) => (
+                    <MenuItem
+                      key={o.id}
+                      onClick={() => {
+                        close();
+                        if (o.id === 'picked_up') setPickedUp(true);
+                        else logCall(o.id as CallOutcomeId);
+                      }}
+                    >
+                      <span className={o.id === 'picked_up' ? 'good-t' : o.id === 'wrong_number' ? 'bad-t' : 'warn-t'} aria-hidden>
+                        {o.id === 'picked_up' ? '✓' : o.id === 'wrong_number' ? '⚠' : o.id === 'voicemail' ? '◌' : '☎'}
+                      </span>{' '}
+                      {o.label}
+                    </MenuItem>
+                  ))}
+                </>
+              )}
             </Menu>
             <button type="button" onClick={() => goTo('notes', 'note-input')} className={btnOutline} title="Add internal note">
               {icon('M5 4h14v12l-4 4H5zM15 20v-4h4M8 9h8M8 13h5')}
@@ -298,6 +312,15 @@ export function LeadHeader({
             setLostTo(null);
             act(() => moveLeadAction(lead.id, to, reason), 'Marked lost');
           }}
+        />
+      ) : null}
+      {pickedUp ? (
+        <PickedUpSheet
+          lead={{ id: lead.id, name: lead.name, phone: lead.phone, stageId: lead.stageId }}
+          stages={stages}
+          previousCalls={previousCalls}
+          onClose={() => setPickedUp(false)}
+          onLogged={() => setSaid({ ok: true, text: 'Call logged' })}
         />
       ) : null}
       {askWrong ? (
