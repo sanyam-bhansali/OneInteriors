@@ -15,6 +15,8 @@ export type ProjectEvent =
   | { kind: 'decision-made'; decisionId: string; title: string; choice: string; extraPaise: number }
   | { kind: 'snag-raised'; snagId: string; title: string; room: string | null }
   | { kind: 'snag-fixed'; snagId: string; title: string }
+  // Project lifecycle (owner, 13 Oct 2026): the client signed off the handover in the app; warranty starts.
+  | { kind: 'handover-signed'; projectId: string; client: string; home: string; warrantyLabel: string }
   // Studio workspace Phase 2: a working day with no site update by 21:00 IST (to the office, and to ops on Assured).
   | { kind: 'site-missed'; projectId: string; home: string; studio: string; days: number; toOps: boolean }
   // Studio workspace Phase 4: the rest of a snag's life.
@@ -47,7 +49,7 @@ export type ProjectEvent =
   | { kind: 'lead-new'; clientId: string; name: string; source: string; again: boolean };
 
 /** Events a studio also gets by email: it works from a laptop, not our app. */
-export const EMAILED_TO_STUDIO: ProjectEvent['kind'][] = ['introduced', 'quote-signed', 'decision-made', 'snag-raised', 'lead-new'];
+export const EMAILED_TO_STUDIO: ProjectEvent['kind'][] = ['introduced', 'quote-signed', 'decision-made', 'snag-raised', 'lead-new', 'handover-signed'];
 
 export interface Message {
   title: string;
@@ -96,6 +98,13 @@ export function messageFor(e: ProjectEvent): Message {
         title: 'New snag raised',
         body: clip(e.room ? `${e.title} · ${e.room}` : e.title, 160),
         url: '/studio/updates',
+      };
+    case 'handover-signed':
+      return {
+        template: 'handover.signed',
+        title: 'Handover signed off',
+        body: clip(`${e.client} signed off ${e.home}. Warranty runs to ${e.warrantyLabel}.`, 160),
+        url: `/studio/projects/${e.projectId}`,
       };
     case 'snag-fixed':
       return {

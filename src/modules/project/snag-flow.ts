@@ -40,6 +40,7 @@ import { memberOnProject } from '@/modules/studio/access';
 import type { StudioAction } from '@/modules/studio/roles';
 import { storeSitePhoto } from '@/modules/storage/site-photos';
 import { notify, notifyStudio } from '@/modules/notify/service';
+import { siteLabel } from '@/modules/studio/team-rules';
 import { checkSnag, SNAG_LIMITS } from '@/modules/portal/snags';
 import { dedupeKey, recordEvent, recordEventOnce, SNAG_EVENT_TYPE, type ProjectActor } from './events';
 import { addDays, dayFromDb, isDay, istDay } from './working-days';
@@ -662,7 +663,16 @@ export async function snagEventsOn(projectId: string): Promise<SnagEventLike[][]
 export async function signOffHandover(userId: string, projectId: string, now = new Date()): Promise<{ ok: true; warrantyEndsOn: string } | { ok: false; error: string }> {
   const project = await prisma.homeProject.findUnique({
     where: { id: projectId },
-    select: { cancelledAt: true, introduction: { select: { studioId: true, brief: { select: { userId: true } } } } },
+    select: {
+      cancelledAt: true,
+      designer: { select: { userId: true, role: true, status: true } },
+      introduction: {
+        select: {
+          studioId: true,
+          brief: { select: { userId: true, society: true, locality: true, propertyType: true, user: { select: { name: true } } } },
+        },
+      },
+    },
   });
   if (!project || project.cancelledAt) return { ok: false, error: 'That project is not yours.' };
   if (project.introduction.brief.userId !== userId) return { ok: false, error: SNAG_ERRORS.ownerOnly };
@@ -681,7 +691,22 @@ export async function signOffHandover(userId: string, projectId: string, now = n
     const p = await tx.homeProject.findUnique({ where: { id: projectId }, select: { warrantyEndsOn: true } });
     return { ok: true as const, warrantyEndsOn: p?.warrantyEndsOn ? dayFromDb(p.warrantyEndsOn) : istDay(now) };
   });
-  // No notice: the studio sees it on the project and the designer's My Snags (phase WARRANTY).
+  /* Tell the studio (owner, 13 Oct 2026): the office (owners, project
+     managers) in the app and by email, and the project's designer in the app
+     when they are not already in the office list. */
+  if (r.ok) {
+    const brief = project.introduction.brief;
+    const event = {
+      kind: 'handover-signed' as const,
+      projectId,
+      client: brief.user?.name?.trim() || 'The client',
+      home: siteLabel(brief),
+      warrantyLabel: new Date(`${r.warrantyEndsOn}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }),
+    };
+    void notifyStudio(project.introduction.studioId, event);
+    const d = project.designer;
+    if (d && d.status === 'ACTIVE' && d.role === 'DESIGNER') void notify(d.userId, event, { email: false });
+  }
   return r;
 }
 
