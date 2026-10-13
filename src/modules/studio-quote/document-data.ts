@@ -14,7 +14,7 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 import { quotingStudioId } from '@/modules/studio/lead-scope';
-import { signedBrandPageUrls, signedLogoUrl } from '@/modules/storage/studio-logo';
+import { signedBrandPageUrls, signedQuoteLogoUrl } from '@/modules/storage/studio-logo';
 import { readStages, templateOrDefault, type PaymentStage } from '@/modules/studio-sales/payment-template';
 import { myBranding, myStudioProfile, myTier, type BrandingRow } from './store';
 import { showsOurMark, MARK_TEXT } from './mark';
@@ -42,7 +42,7 @@ export async function quoteDocContext(quote: Pick<QuoteRow, 'id' | 'phases' | 't
           .findFirst({ where: { id: quote.id, studioId }, select: { salesFinalSchedule: true, studio: { select: { paymentTemplate: true } } } })
           .catch(() => null)
       : Promise.resolve(null),
-    signedLogoUrl(branding?.logoPath ?? null),
+    signedQuoteLogoUrl(branding?.logoPath ?? null, studioId),
     signedBrandPageUrls(branding?.brandPages ?? [], studioId),
   ]);
 

@@ -4,7 +4,8 @@ import type { Metadata } from 'next';
 import { getQuote, STAGE_LABELS, STATUS_LABELS } from '@/modules/studio-quote/quotes';
 import { myProducts, myBranding, myTier } from '@/modules/studio-quote/store';
 import { showsOurMark, MARK_TEXT } from '@/modules/studio-quote/mark';
-import { signedLogoUrl } from '@/modules/storage/studio-logo';
+import { signedQuoteLogoUrl } from '@/modules/storage/studio-logo';
+import { quotingStudioId } from '@/modules/studio/lead-scope';
 import { QuoteBuilder } from './QuoteBuilder';
 import { StatusBar } from './StatusBar';
 import { currentMember } from '@/modules/studio/access';
@@ -51,7 +52,8 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
 
   const member = await currentMember();
   const [logoUrl, project, sales, planReader, docCtx] = await Promise.all([
-    signedLogoUrl(branding?.logoPath ?? null),
+    /* The studio's logo for anyone who may quote for it, sales included (owner, 13 Oct 2026). */
+    quotingStudioId().then((sid) => signedQuoteLogoUrl(branding?.logoPath ?? null, sid)),
     // A project running on this quotation, or whether one can start from it (own client, sent or won).
     projectForQuote(member, quote.id),
     // Revisions sent and the sales final (Studio OS Phase 1).

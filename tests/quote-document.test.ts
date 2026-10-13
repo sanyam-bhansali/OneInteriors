@@ -114,3 +114,13 @@ describe('the quotation document', () => {
     expect(coverFacts(null)).toEqual([]);
   });
 });
+
+import { signedQuoteLogoUrl } from '@/modules/storage/studio-logo';
+
+describe('the quotation logo for anyone quoting for the studio (sales included)', () => {
+  it('never signs another studio’s logo or a missing one', async () => {
+    expect(await signedQuoteLogoUrl('studio_other/logo.png', 'st-a')).toBeNull();
+    expect(await signedQuoteLogoUrl(null, 'st-a')).toBeNull();
+    expect(await signedQuoteLogoUrl('studio_st-a/logo.png', null)).toBeNull();
+  });
+});

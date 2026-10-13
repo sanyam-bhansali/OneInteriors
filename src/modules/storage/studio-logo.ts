@@ -149,6 +149,18 @@ export async function signedLogoUrl(path: string | null): Promise<string | null>
 }
 
 /**
+ * The studio's logo for its quotation (screen and PDF), for anyone who may
+ * quote for that studio, a salesperson included (owner, 13 Oct 2026: sales
+ * PDFs carry the logo too). Like the brand pages: the caller passes the
+ * studio its quotation query was scoped to, and only that studio's own
+ * folder is signed, so no other studio's logo can be read through it.
+ */
+export async function signedQuoteLogoUrl(path: string | null, studioId: string | null): Promise<string | null> {
+  if (!path || !studioId || !path.startsWith(`studio_${studioId}/`)) return null;
+  return signPath(path);
+}
+
+/**
  * Short links to a studio's brand pages, for the quotation PDF.
  *
  * Checked against the studio the quotation belongs to (the caller passes the
