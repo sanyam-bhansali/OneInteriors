@@ -314,3 +314,10 @@ html[data-splash='seen'] .oi-studio .splash {
     height: 38px !important;
   }
 }
+
+/* The dev strip about the customer roster's verification gate means nothing
+   inside the studio software (owner, 13 Oct 2026). It still shows on every
+   customer page, where it matters. */
+body:has(.oi-studio) .roster-gate {
+  display: none;
+}
