@@ -73,9 +73,10 @@ export async function quoteDocContext(quote: Pick<QuoteRow, 'id' | 'phases' | 't
     brandPages,
     schedule,
     spec: branding?.materialSpec ?? [],
-    /* A quotation keeps the terms it was made with; a draft made before the
-       studio wrote any picks up today's. */
-    terms: quote.terms ?? (quote.status === 'DRAFT' ? (branding?.terms ?? null) : null),
+    /* A quotation keeps the terms it was made with. One saved without any
+       (made before the studio wrote its terms) prints the studio's current
+       terms, so every PDF ends with a Terms & Conditions page (owner, 13 Oct 2026). */
+    terms: quote.terms?.trim() ? quote.terms : (branding?.terms ?? null),
     validDays: branding?.validityDays ?? 30,
     showMark: showsOurMark({ tier, hideRequested: branding?.hideOurMark ?? false }),
     markText: MARK_TEXT,
