@@ -26,14 +26,6 @@ const TONE: Record<QuoteStatusName, string> = {
   DECLINED: 'bad',
 };
 
-/** What the row's button does, in the design's place for "Nudge" and "Revise". */
-const ACTION: Record<QuoteStatusName, { label: string; cls: string }> = {
-  DRAFT: { label: 'Continue', cls: 'acc' },
-  ISSUED: { label: 'Revise', cls: 'ghost' },
-  ACCEPTED: { label: 'Open', cls: 'ghost' },
-  DECLINED: { label: 'Open', cls: 'ghost' },
-};
-
 const TABS: { key: 'ALL' | QuoteStatusName; name: string }[] = [
   { key: 'ALL', name: 'All' },
   { key: 'DRAFT', name: 'Drafts' },
@@ -42,7 +34,6 @@ const TABS: { key: 'ALL' | QuoteStatusName; name: string }[] = [
   { key: 'DECLINED', name: 'Lost' },
 ];
 
-const day = (d: Date) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
 
 /**
  * Every quotation a studio has written (StudioQuotes in the owner's UI
@@ -54,7 +45,7 @@ const day = (d: Date) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric
  * together, newest first. The status tabs and the search are links (GET), so a
  * filtered list is a link a studio can keep.
  */
-export default async function QuotationsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string }> }) {
+export default async function QuotationsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; new?: string }> }) {
   const sp = await searchParams;
   const search = String(sp.q ?? '').trim().slice(0, 80);
   const status = TABS.some((t) => t.key === sp.status) ? (sp.status as 'ALL' | QuoteStatusName) : 'ALL';
@@ -104,36 +95,44 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
   };
   const empty = quotes.length === 0 && !search;
 
+  const building = sp.new === '1' || empty;
+
   return (
-    <main className="content qpage">
-      <div className="phead">
-        <div>
-          <h1>Quotations</h1>
-          <p className="muted qsub">
-            {empty
-              ? 'Tell it about the flat and it writes the first draft, from your own rates.'
-              : 'Every quote is built from your own rates, line by line, room by room.'}
-          </p>
-        </div>
-        {!empty ? <StartQuote priced={priced} standard={standard} total={products.length} compact leadRequired={leadRequired} /> : null}
+    <main className="content qpage hhome">
+      {/* Hauspire's home: Welcome, the two ways in, the recent quotations. */}
+      <div>
+        <h1>Welcome</h1>
+        <p className="muted qsub">Auto-build a first quotation from a floor plan, or open the full builder.</p>
       </div>
 
-      {/* The walkthrough: steps one and two are the prerequisites, said as a
-          way forward rather than a blocker. createQuote() still enforces
-          branding server-side. */}
+      <div className="hcards">
+        <Link href="/studio/quotations/first" className="hcard">
+          <b>⚡ First Quote</b>
+          <span className="muted">Pick a plan / config, confirm the kitchen run, and get a full draft on your product master rates.</span>
+        </Link>
+        <Link href={building && !empty ? '/studio/quotations' : '/studio/quotations?new=1#new'} className="hcard">
+          <b>🧱 Full Builder</b>
+          <span className="muted">Add rooms and products by hand, edit dimensions, and fine-tune every line.</span>
+        </Link>
+      </div>
+
+      {building ? (
+        <div id="new" style={{ scrollMarginTop: 80 }}>
+          <StartQuote priced={priced} standard={standard} total={products.length} leadRequired={leadRequired} />
+        </div>
+      ) : null}
+
+      {/* The walkthrough: steps one and two are the prerequisites. createQuote() still enforces branding server-side. */}
       <div className="qguide">
         <GuidePanel guide="quotations" facts={facts} dismissed={dismissed} />
       </div>
 
-      {/* The empty state IS the builder: the first screen writes a quotation. */}
+      <h2 className="hsec">Your recent quotations</h2>
       {empty ? (
-        <>
-          <StartQuote priced={priced} standard={standard} total={products.length} leadRequired={leadRequired} />
-          <p className="muted sm" style={{ margin: 0, maxWidth: '68ch', lineHeight: 1.55 }}>
-            Yours, on your letterhead, for your own clients as much as the ones we introduce. We never see what you charge on one
-            and we take nothing from a project that did not come through us.
-          </p>
-        </>
+        <p className="muted sm" style={{ margin: 0, maxWidth: '68ch', lineHeight: 1.55 }}>
+          None yet — build one to get started. Yours, on your letterhead, for your own clients as much as the ones we introduce. We never see what you
+          charge on one and we take nothing from a project that did not come through us.
+        </p>
       ) : (
         <>
           <div className="hstack" style={{ justifyContent: 'space-between' }}>
@@ -147,13 +146,7 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
             {/* GET, so a search is a link a studio can keep. */}
             <form className="qsearch" role="search">
               {status !== 'ALL' ? <input type="hidden" name="status" value={status} /> : null}
-              <input
-                name="q"
-                defaultValue={search}
-                placeholder="Client, quotation number, phone or society"
-                aria-label="Search quotations"
-                className="fld"
-              />
+              <input name="q" defaultValue={search} placeholder="Client, quotation number, phone or society" aria-label="Search quotations" className="fld" />
               <button type="submit" className="btn sec sm" aria-label="Search">
                 <LineIcon name="search" size={16} />
               </button>
@@ -177,89 +170,66 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
           {folders.length === 0 ? (
             <div className="empty">
               <b>{search ? `No quotation matches “${search}”.` : 'Nothing here.'}</b>
-              <span className="muted sm">
-                {search ? 'Try a client’s name, a phone number or a quotation number.' : 'No quotation has this status yet.'}
-              </span>
+              <span className="muted sm">{search ? 'Try a client’s name, a phone number or a quotation number.' : 'No quotation has this status yet.'}</span>
             </div>
           ) : (
-            <section className="card flush">
-              <div className="tscroll">
-                <table className="tbl qtbl" style={{ minWidth: 960 }}>
-                  <thead>
-                    <tr>
-                      <th scope="col">Quote</th>
-                      <th scope="col">Client and home</th>
-                      <th scope="col" style={{ textAlign: 'right' }}>
-                        Total
-                      </th>
-                      <th scope="col">Where it is</th>
-                      <th scope="col">Lines</th>
-                      <th scope="col">
-                        <span className="sr-only">Action</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  {/* One group per client, newest first; their versions inside. */}
-                  {folders.map((folder) => (
-                    <tbody key={folder.key}>
-                      {folder.quotes.map((q, i) => {
-                        const act = ACTION[q.status];
-                        const href = `/studio/quotations/${q.id}`;
-                        return (
-                          <tr key={q.id}>
-                            <td>
-                              <Link href={href} className="mono">
-                                {q.number}
-                              </Link>
-                              <div className="muted sm">Updated {day(q.updatedAt)}</div>
-                            </td>
-                            <td>
-                              {i === 0 ? (
-                                <>
-                                  <Link href={href} style={{ fontWeight: 600 }}>
-                                    {q.clientName}
-                                  </Link>
-                                  <div className="muted sm">
-                                    {[q.society, q.config].filter(Boolean).join(', ') || q.clientPhone || '—'}
-                                  </div>
-                                </>
-                              ) : (
-                                <span className="qsame">Another quotation for {q.clientName.split(/\s+/)[0]}</span>
-                              )}
-                            </td>
-                            <td className="mono" style={{ textAlign: 'right', fontWeight: 500 }}>
-                              {q.totalPaise > 0 ? formatINR(q.totalPaise) : '—'}
-                            </td>
-                            <td>
-                              <span className="hstack" style={{ gap: 6 }}>
-                                <span className={`chip ${TONE[q.status]}`}>
-                                  <span className="dot" />
-                                  {STATUS_LABELS[q.status]}
-                                </span>
-                                <span className="chip">{STAGE_LABELS[q.stage]}</span>
-                                {q.fromMarketplace ? <span className="chip oi">One Interiors</span> : null}
-                              </span>
-                            </td>
-                            <td className={q.lineCount === 0 ? 'warn-t' : ''}>{q.lineCount === 0 ? 'No lines yet' : `${q.lineCount} lines`}</td>
-                            <td style={{ textAlign: 'right' }}>
-                              <Link href={href} className={`btn ${act.cls} sm`}>
-                                {act.label}
-                              </Link>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  ))}
-                </table>
-              </div>
-            </section>
+            <div className="tscroll">
+              <table className="htable hrecent">
+                <thead>
+                  <tr className="hhead">
+                    <th scope="col">Client</th>
+                    <th scope="col">Config</th>
+                    <th scope="col" className="r">
+                      TPV
+                    </th>
+                    <th scope="col">Date</th>
+                    <th scope="col">
+                      <span className="sr-only">Open</span>
+                    </th>
+                  </tr>
+                </thead>
+                {/* One group per client, newest first; their versions inside. */}
+                {folders.map((folder) => (
+                  <tbody key={folder.key}>
+                    {folder.quotes.map((q, i) => {
+                      const href = `/studio/quotations/${q.id}`;
+                      return (
+                        <tr key={q.id}>
+                          <td>
+                            <Link href={href} style={{ fontWeight: 600 }}>
+                              {i === 0 ? q.clientName : `↳ another for ${q.clientName.split(/\s+/)[0]}`}
+                            </Link>
+                            <div className="hstack muted sm" style={{ gap: 6, marginTop: 2 }}>
+                              <span className="mono">{q.number}</span>
+                              <span className={`chip hchip ${TONE[q.status]}`}>{STATUS_LABELS[q.status]}</span>
+                              <span className="chip hchip">{STAGE_LABELS[q.stage]}</span>
+                              {q.fromMarketplace ? <span className="chip hchip oi">One Interiors</span> : null}
+                              {q.lineCount === 0 ? <span className="warn-t">No lines yet</span> : null}
+                            </div>
+                          </td>
+                          <td>{q.config ?? '—'}</td>
+                          <td className="r mono">{q.totalPaise > 0 ? formatINR(q.totalPaise) : '—'}</td>
+                          <td className="mono">{isoDate(q.updatedAt)}</td>
+                          <td className="r">
+                            <Link href={href} className="hmini">
+                              {q.status === 'DRAFT' ? 'Continue →' : 'Revise →'}
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                ))}
+              </table>
+            </div>
           )}
         </>
       )}
     </main>
   );
 }
+
+const isoDate = (d: Date) => new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
 /**
  * Quotations grouped by client: the client record when there is one, else the

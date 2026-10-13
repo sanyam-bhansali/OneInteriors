@@ -4778,6 +4778,36 @@ model StudioQuotePlan {
   @@map("studio_quote_plans")
 }
 
+/// A product somebody proposed from the quotation builder that is not in the
+/// product master yet (Hauspire's "Propose a NEW product"): a salesperson's
+/// waits here until the owner or a project manager approves it (it is then
+/// added to the product master) or rejects it. Migration
+/// 20261013100000_studio_product_proposals. Plain id columns, no relations.
+model StudioProductProposal {
+  id           String         @id @default(cuid())
+  studioId     String
+  name         String
+  code         StudioWorkCode @default(ONSITE)
+  unit         QuoteUnit      @default(UNIT)
+  /// Per sq ft, per rft or per unit, depending on `unit`. Paise.
+  ratePaise    BigInt
+  details      String?        @db.Text
+  /// The room category it was proposed in ("Kitchen", "Bedroom", …).
+  room         String?
+  /// The quotation it was proposed on, and who proposed it (member ids).
+  quoteId      String?
+  proposedById String?
+  proposedBy   String?
+  /// PENDING | APPROVED | REJECTED
+  state        String         @default("PENDING")
+  createdAt    DateTime       @default(now())
+  reviewedAt   DateTime?
+  reviewedById String?
+
+  @@index([studioId, state])
+  @@map("studio_product_proposals")
+}
+
 // ── Studio OS Phase 2: design (docs/studio-os/PHASE-2-DESIGN.md) ─────────
 
 enum SiteVisitStatus {

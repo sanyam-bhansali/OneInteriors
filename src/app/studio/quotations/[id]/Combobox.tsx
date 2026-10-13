@@ -61,6 +61,7 @@ export function Combobox({
   customHint,
   emptyNote,
   autoFocus,
+  compact = false,
 }: {
   label: string;
   /** The current value, or '' for none. */
@@ -75,6 +76,8 @@ export function Combobox({
   /** Shown when the filter matches nothing and custom values are not allowed. */
   emptyNote?: string;
   autoFocus?: boolean;
+  /** A table cell or the narrow builder panel: the label is for screen readers only, the box is small. */
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -157,8 +160,8 @@ export function Combobox({
   }
 
   return (
-    <div ref={box} className="qfield" style={{ position: 'relative' }}>
-      <span className="lbl">{label}</span>
+    <div ref={box} className={compact ? 'qfield cmb' : 'qfield'} style={{ position: 'relative' }}>
+      <span className={compact ? 'sr-only' : 'lbl'}>{label}</span>
 
       <div style={{ position: 'relative' }}>
         <input
@@ -181,8 +184,9 @@ export function Combobox({
             setActive(0);
           }}
           onKeyDown={onKey}
+          aria-label={compact ? label : undefined}
           className="fld"
-          style={{ paddingRight: 34 }}
+          style={{ paddingRight: compact ? 24 : 34 }}
         />
         <ChevronDown
           size={15}
@@ -190,7 +194,7 @@ export function Combobox({
           absoluteStrokeWidth
           aria-hidden
           className="muted"
-          style={{ position: 'absolute', right: 12, top: '50%', pointerEvents: 'none', transition: 'transform .2s', transform: `translateY(-50%)${open ? ' rotate(180deg)' : ''}` }}
+          style={{ position: 'absolute', right: compact ? 6 : 12, top: '50%', pointerEvents: 'none', transition: 'transform .2s', transform: `translateY(-50%)${open ? ' rotate(180deg)' : ''}` }}
         />
       </div>
 

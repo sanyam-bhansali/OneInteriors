@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { myProducts } from '@/modules/studio-quote/store';
 import { ProductTable } from './ProductTable';
+import { Proposals } from './Proposals';
+import { pendingProposals } from '@/modules/studio-quote/proposals';
 import { RatesGateCard } from '../RatesGateCard';
 import { myRatesGate, RATES_GATE_COPY } from '@/modules/studio-quote/rates-gate';
 import './products.css';
@@ -31,13 +33,27 @@ export const dynamic = 'force-dynamic';
  * codes and the sizes that recur. The numbers are theirs.
  */
 export default async function ProductsPage() {
-  const [products, gate] = await Promise.all([myProducts(), myRatesGate()]);
+  const [products, gate, proposals] = await Promise.all([myProducts(), myRatesGate(), pendingProposals()]);
   const priced = products.filter((p) => p.ratePaise > 0).length;
   const blank = products.length - priced;
   const standard = products.filter((p) => p.inStandardBuild).length;
 
   const notes = (
     <>
+      {/* Lines proposed from the quotation builder, for the owner or a PM to decide. */}
+      <Proposals
+        rows={proposals.map((p) => ({
+          id: p.id,
+          name: p.name,
+          code: p.code,
+          unit: p.unit,
+          ratePaise: p.ratePaise,
+          details: p.details,
+          room: p.room,
+          proposedBy: p.proposedBy,
+          createdOn: p.createdAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' }),
+        }))}
+      />
       {gate !== 'OPEN' ? <RatesGateCard gate={gate} {...RATES_GATE_COPY[gate]} where="products" /> : null}
 
       {blank > 0 && gate === 'OPEN' ? (

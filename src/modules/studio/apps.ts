@@ -66,7 +66,7 @@ export const APPS: readonly StudioApp[] = [
   },
   {
     key: 'quotes', name: 'Quotations', href: '/studio/quotations', icon: 'file', bg: 'var(--info-bg)', fg: 'var(--info)',
-    tabs: [T('All quotations', '/studio/quotations')],
+    tabs: [T('All quotations', '/studio/quotations'), T('First quote', '/studio/quotations/first')],
     owns: ['/studio/quotations'],
   },
   {

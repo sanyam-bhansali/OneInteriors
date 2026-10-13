@@ -13,6 +13,7 @@ import {
 } from '@/modules/studio-quote/store';
 import type { QuoteUnitName, WorkCodeName } from '@/modules/studio-quote/pricing';
 import { confirmMyRates } from '@/modules/studio-quote/rates-gate';
+import { approveProposal, rejectProposal, type ProposalResult } from '@/modules/studio-quote/proposals';
 
 /**
  * The product master's writes.
@@ -108,4 +109,20 @@ export async function confirmRatesAction(_prev: State | null): Promise<State> {
     revalidatePath('/studio', 'layout');
   }
   return result;
+}
+
+/** A proposed product (from the quotation builder): approve adds it to the product master. Owner and PM only, checked in the store. */
+export async function approveProposalAction(id: string): Promise<ProposalResult> {
+  const r = await approveProposal(String(id ?? ''));
+  if (!r.ok) return r;
+  revalidatePath('/studio/products');
+  revalidatePath('/studio/quotations');
+  return { ok: true, message: r.message };
+}
+
+export async function rejectProposalAction(id: string): Promise<ProposalResult> {
+  const r = await rejectProposal(String(id ?? ''));
+  if (!r.ok) return r;
+  revalidatePath('/studio/products');
+  return { ok: true, message: r.message };
 }

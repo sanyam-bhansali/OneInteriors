@@ -64,11 +64,21 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
 
   const TONE = { DRAFT: '', ISSUED: 'warn', ACCEPTED: 'good', DECLINED: 'bad' } as const;
 
+  /* Booked: a live project runs on it, and the server refuses writes (write-rules.ts). */
+  const locked = Boolean(sales?.projectId ?? project.projectId);
+  const lastRev = sales?.revisions[sales.revisions.length - 1] ?? null;
+  /* The printable Original vs Final: the Sales Final for a Design Final, else the last two revisions sent. */
+  const finalHref = quote.basedOnId
+    ? `/studio/quotations/${quote.id}/compare`
+    : sales && sales.revisions.length >= 2
+      ? `/studio/quotations/${quote.id}/compare?a=${sales.revisions[sales.revisions.length - 2]!.n}&b=${lastRev!.n}`
+      : null;
+
   return (
-    <main className="content qpage">
-      {/* StudioQuoteBuilder's heading: back to the list, the number and the
-          client, the flat, where it is; the actions on the right. */}
-      <div className="phead">
+    <main className="hpage qpage">
+      {/* The quotation's own strip: back to the list, the number and the
+          client, where it is, and what can happen to it next. */}
+      <div className="phead hphead">
         <div style={{ minWidth: 0 }}>
           <Link href="/studio/quotations" className="sm muted qback">
             <LineIcon name="back" size={15} />
@@ -81,7 +91,6 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
             · {quote.clientName}
           </h1>
           <div className="hstack muted sm qmeta">
-            {[quote.society, quote.config].filter(Boolean).length > 0 ? <span>{[quote.society, quote.config].filter(Boolean).join(', ')}</span> : null}
             <span className={`chip ${TONE[quote.status]}`}>
               <span className="dot" />
               {STATUS_LABELS[quote.status]}
@@ -98,11 +107,6 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
                 })}
               </span>
             ) : null}
-            {quote.clientId ? (
-              <Link href={`/studio/clients/${quote.clientId}`} className="acc-t" style={{ fontWeight: 600 }}>
-                Open the lead
-              </Link>
-            ) : null}
           </div>
         </div>
         <StatusBar
@@ -117,7 +121,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
       </div>
 
       {project.projectId ? (
-        <div className="qnote good">
+        <div className="qnote good hnoteline">
           <p>A project is running on this quotation.</p>
           <Link href={`/studio/projects/${project.projectId}`} className="btn sec sm">
             Open the project
@@ -125,7 +129,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
         </div>
       ) : project.canStart && !quote.clientId ? (
         // A quotation on a lead is booked from its sales final (Record booking), so only unlinked ones keep the older "Start project".
-        <div className="qnote">
+        <div className="qnote hnoteline">
           <p>Has {quote.clientName.split(/\s+/)[0]} accepted this quotation? Start the project from it.</p>
           <Link href={`/studio/projects/start?quote=${quote.id}`} className="btn acc sm">
             Start project
@@ -133,7 +137,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
         </div>
       ) : null}
       {!branding ? (
-        <div className="qnote warn">
+        <div className="qnote warn hnoteline">
           <p>
             <Link href="/studio/settings" className="acc-t" style={{ fontWeight: 600 }}>
               Add your studio details
@@ -142,9 +146,6 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           </p>
         </div>
       ) : null}
-
-      {/* Keyed on the revision count so the compare and sales-final pickers start on the newest revision after a send. */}
-      {sales ? <Revisions key={sales.revisions.length} view={sales} leadHref={quote.clientId ? `/studio/clients/${quote.clientId}` : null} mayBook={mayBook} /> : null}
 
         <QuoteBuilder
           quote={quote}
@@ -171,6 +172,13 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           logoUrl={logoUrl}
           planReader={planReader}
           mayAddProducts={mayAddProducts}
+          locked={locked}
+          sentLabel={lastRev ? lastRev.label : null}
+          finalHref={finalHref}
+          extras={
+            /* Keyed on the revision count so the compare and sales-final pickers start on the newest revision after a send. */
+            sales ? <Revisions key={sales.revisions.length} view={sales} leadHref={quote.clientId ? `/studio/clients/${quote.clientId}` : null} mayBook={mayBook} /> : null
+          }
         />
     </main>
   );

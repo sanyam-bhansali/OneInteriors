@@ -35,8 +35,12 @@ import { standardKitchenRunMm } from '@/modules/quotation/first-quote';
 import type { PlanRoomSize } from '@/modules/brief/types';
 import { planRoomFor, wardrobeWidthMm } from '@/modules/floorplan/sizing';
 
-/** The configurations that cover essentially every flat in Pune. */
-export const CONFIGS = ['1 BHK', '2 BHK', '3 BHK', '4 BHK'] as const;
+/**
+ * The configurations that cover essentially every flat in Pune, and the
+ * villa (Hauspire's builder offers it): a villa is built like a 4 BHK with a
+ * study, and its flat-size products are the 4 BHK ones.
+ */
+export const CONFIGS = ['1 BHK', '2 BHK', '3 BHK', '4 BHK', 'Villa'] as const;
 export type ConfigName = (typeof CONFIGS)[number];
 
 export function isConfigName(value: string | null | undefined): value is ConfigName {
@@ -68,7 +72,13 @@ const BEDROOMS: Record<ConfigName, string[]> = {
   '2 BHK': ['Master bedroom', 'Second bedroom'],
   '3 BHK': ['Master bedroom', 'Kids bedroom', 'Guest bedroom'],
   '4 BHK': ['Master bedroom', 'Kids bedroom', 'Guest bedroom', 'Parents bedroom'],
+  Villa: ['Master bedroom', 'Kids bedroom', 'Guest bedroom', 'Parents bedroom'],
 };
+
+/** The bedroom count a configuration stands for: its digit, and 4 for a villa. */
+export function bhkNumber(config: ConfigName): number {
+  return config === 'Villa' ? 4 : Number(config.charAt(0));
+}
 
 export function bedroomCount(config: ConfigName): number {
   return BEDROOMS[config].length;
@@ -86,7 +96,7 @@ export function bedroomCount(config: ConfigName): number {
  * is safe: this module is read by the browser.
  */
 export function standardRunFor(config: ConfigName): number {
-  return standardKitchenRunMm(Number(config.charAt(0)));
+  return standardKitchenRunMm(bhkNumber(config));
 }
 
 export interface HomeConfig {
@@ -152,7 +162,8 @@ export function roomsFor(home: HomeConfig): PlannedRoom[] {
 
   rooms.push({ name: 'Living and dining', category: 'Living' });
 
-  if (home.study) rooms.push({ name: 'Study', category: 'Study' });
+  /* A villa always has its study (Hauspire's applyConfig). */
+  if (home.study || home.config === 'Villa') rooms.push({ name: 'Study', category: 'Study' });
 
   /* Numbered only when there is more than one. "Bathroom 1" on a flat with
      one bathroom is a form talking to itself. */
@@ -297,7 +308,7 @@ export function bhkOfProduct(product: Pick<CatalogueProduct, 'name' | 'rules'>):
 /** Does this product belong in this flat at all? (`bhk`, `balcony`). */
 function fitsHome(product: CatalogueProduct, home: HomeConfig): boolean {
   const bhk = bhkOfProduct(product);
-  if (bhk !== null && bhk !== Number(home.config.charAt(0))) return false;
+  if (bhk !== null && bhk !== bhkNumber(home.config)) return false;
   if (product.rules?.balcony && home.balcony === false) return false;
   return true;
 }

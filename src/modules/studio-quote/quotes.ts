@@ -1225,3 +1225,15 @@ export async function clearQuoteLines(quoteId: string): Promise<ActionResult> {
     return { ok: false, error: 'That did not save.' };
   }
 }
+
+/** The studio's payment schedule, for a quotation not made yet (the First quote page's preview). */
+export async function myStudioPhases(): Promise<PaymentPhase[] | null> {
+  const qs = await quoteScope();
+  if (!qs) return null;
+  try {
+    const row = await prisma.studio.findUnique({ where: { id: qs.studioId }, select: { paymentPhases: true } });
+    return readPhases(row?.paymentPhases);
+  } catch {
+    return null;
+  }
+}

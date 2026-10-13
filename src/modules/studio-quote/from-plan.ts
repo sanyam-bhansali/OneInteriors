@@ -26,7 +26,8 @@ import { readLeadFile } from '@/modules/storage/lead-files';
 import { canReadPlans } from '@/modules/floorplan/read';
 import { checkPlanFile, planReadMessage, STALE_READ_MS } from '@/modules/floorplan/plan-cache';
 import { readPlanOnce } from '@/modules/floorplan/plan-reads';
-import { applyConfiguration, createQuote } from './quotes';
+import { applyConfiguration, createQuote, saveQuoteLines, saveQuoteTerms, type SaveLineInput } from './quotes';
+import { isConfigName } from './configure';
 import { readRoomsRefusal } from './write-rules';
 import {
   fileReadingOf,
@@ -314,4 +315,156 @@ export async function planReaderFor(clientId: string | null): Promise<{ canRead:
     .count({ where: { studioId: scope.studioId, clientId, kind: 'FLOOR_PLAN', client: { ...scope.leads, deletedAt: null } } })
     .catch(() => 0);
   return { canRead, leadHasPlan: n > 0 };
+}
+
+// ── The First quote page (Hauspire's First Quote layout, 13 Oct 2026) ──────
+
+export interface LeadPlan {
+  id: string;
+  name: string;
+  /** Read before: its rooms are known and reading it again costs nothing. */
+  read: boolean;
+}
+
+/** A lead's floor plans, newest first, for "1 · Floor plan". Empty when the lead is not theirs. */
+export async function leadPlans(clientId: string): Promise<LeadPlan[]> {
+  const scope = await myLeadScope();
+  if (!scope) return [];
+  const lead = await leadInScope(scope, clientId);
+  if (!lead) return [];
+  const rows = await prisma.studioClientFile.findMany({
+    where: { studioId: scope.studioId, clientId: lead.id, kind: 'FLOOR_PLAN' },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, name: true, reading: true },
+    take: 10,
+  });
+  return rows.map((r) => ({ id: r.id, name: r.name, read: r.reading !== null }));
+}
+
+export type LeadPlanRead =
+  | { ok: true; fileId: string; reading: StoredFileReading; summary: string }
+  | { ok: false; error: string };
+
+/**
+ * Read one of a lead's floor plans for the First quote page: once (the read
+ * is cached by the file's content), kept on the lead file, and handed back so
+ * "4 · Detected from plan — confirm" can be filled in. Nothing is built here;
+ * the page builds from what the person confirms.
+ */
+export async function readLeadPlan(clientId: string, ref: { fileId?: string; storagePath?: string }): Promise<LeadPlanRead> {
+  const scope = await myLeadScope();
+  if (!scope) return { ok: false, error: 'Sign in as your studio first.' };
+  const studioId = scope.studioId;
+  const lead = await leadInScope(scope, clientId);
+  if (!lead) return { ok: false, error: NOT_YOURS };
+  if (!mayOnLead(scope, 'quote.write', lead) && !mayOnLead(scope, 'lead.edit', lead)) return { ok: false, error: NOT_ROLE };
+  const fileId = typeof ref.fileId === 'string' && ref.fileId.length <= 64 ? ref.fileId : null;
+  const path = typeof ref.storagePath === 'string' && ref.storagePath.length <= 300 ? ref.storagePath : null;
+  if (!fileId && !path) return { ok: false, error: 'Which file?' };
+  const file = await prisma.studioClientFile.findFirst({
+    where: { studioId, clientId: lead.id, ...(fileId ? { id: fileId } : { storagePath: path! }) },
+    select: { id: true, kind: true, storagePath: true, contentType: true, bytes: true, clientId: true },
+  });
+  if (!file) return { ok: false, error: 'That file is not on this lead.' };
+  const read = await readFile(studioId, file);
+  if (!read.ok) return { ok: false, error: planReadMessage(read.reason) };
+  return { ok: true, fileId: file.id, reading: read.stored, summary: readingSummary(read.stored) };
+}
+
+export interface FirstQuoteInput {
+  clientId: string;
+  config: string;
+  kitchenRunMm: number | null;
+  bathrooms: number;
+  /** Location, as typed. */
+  locality: string;
+  /** YYYY-MM-DD. */
+  quoteDate: string | null;
+  /** The lead's floor plan the lines were sized from, when one was read. */
+  fileId: string | null;
+  /** The quotation as built and edited on the page. Cleaned and priced again on the server. */
+  lines: SaveLineInput[];
+  onSpotPaise: number;
+  onSpotLabel: string | null;
+}
+
+/**
+ * The First quote page's "Revise in Full Builder": a DRAFT quotation for the
+ * lead, through the ordinary `createQuote` (scope, rates gate, branding, the
+ * studio's terms), its lines saved by `saveQuoteLines` (which prices every
+ * line again — nothing from the browser is trusted as a figure), the plan it
+ * was read from attached, and the date and flat discount set.
+ */
+export async function saveFirstQuote(input: FirstQuoteInput): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const scope = await myLeadScope();
+  if (!scope) return { ok: false, error: 'Sign in as your studio first.' };
+  const studioId = scope.studioId;
+  const found = await leadInScope(scope, String(input?.clientId ?? ''));
+  if (!found) return { ok: false, error: NOT_YOURS };
+  if (!mayOnLead(scope, 'quote.write', found)) return { ok: false, error: NOT_ROLE };
+  const lead = await prisma.studioClient.findFirst({
+    where: { ...scope.leads, id: found.id, studioId, deletedAt: null },
+    select: { id: true, name: true, phone: true, email: true, society: true, carpetSqft: true, introductionId: true, source: true },
+  });
+  if (!lead) return { ok: false, error: NOT_YOURS };
+  if (lead.introductionId !== null || lead.source === 'ONE_INTERIORS') {
+    return { ok: false, error: 'This client came through One Interiors: their quotation is the final quote on the lead page.' };
+  }
+  if (!Array.isArray(input.lines) || input.lines.length === 0) return { ok: false, error: 'Build the first quotation before revising it.' };
+
+  const config = isConfigName(input.config) ? input.config : undefined;
+  const created = await createQuote({
+    clientName: lead.name,
+    clientPhone: lead.phone ?? undefined,
+    society: lead.society ?? undefined,
+    config,
+    carpetSqft: lead.carpetSqft ?? undefined,
+    clientId: lead.id,
+  });
+  if (!created.ok) return created;
+
+  const run = Number(input.kitchenRunMm);
+  const baths = Number(input.bathrooms);
+  await prisma.studioQuote.updateMany({
+    where: { id: created.id, studioId },
+    data: {
+      kitchenRunMm: Number.isInteger(run) && run > 0 && run < 100_000 ? run : null,
+      bathrooms: Number.isInteger(baths) && baths >= 0 && baths <= 12 ? baths : null,
+      locality: String(input.locality ?? '').trim().slice(0, 80) || null,
+      clientEmail: lead.email,
+    },
+  });
+
+  const fileId = typeof input.fileId === 'string' && input.fileId.length <= 64 ? input.fileId : null;
+  if (fileId) {
+    const file = await prisma.studioClientFile.findFirst({ where: { id: fileId, studioId, clientId: lead.id, kind: 'FLOOR_PLAN' }, select: { id: true, reading: true } });
+    if (file?.reading) {
+      await prisma.studioQuotePlan.upsert({
+        where: { quoteId: created.id },
+        create: { quoteId: created.id, studioId, fileId: file.id },
+        update: { fileId: file.id },
+      });
+    }
+  }
+
+  const saved = await saveQuoteLines(created.id, input.lines);
+  if (!saved.ok) return { ok: false, error: `The quotation was started, but its lines did not save: ${saved.error}` };
+
+  const row = await prisma.studioQuote.findFirst({
+    where: { id: created.id, studioId },
+    select: { feeBps: true, discountBps: true, gstBps: true, bookingAdvancePaise: true },
+  });
+  if (row) {
+    const onSpot = Number(input.onSpotPaise);
+    await saveQuoteTerms(created.id, {
+      feeBps: row.feeBps,
+      discountBps: row.discountBps,
+      gstOn: row.gstBps > 0,
+      onSpotPaise: Number.isInteger(onSpot) && onSpot > 0 ? onSpot : 0,
+      onSpotLabel: typeof input.onSpotLabel === 'string' ? input.onSpotLabel : null,
+      bookingAdvancePaise: Number(row.bookingAdvancePaise),
+      quoteDate: typeof input.quoteDate === 'string' ? input.quoteDate : null,
+    });
+  }
+  return { ok: true, id: created.id };
 }
