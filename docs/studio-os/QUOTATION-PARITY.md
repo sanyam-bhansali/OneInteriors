@@ -73,12 +73,12 @@ every studio** (on or off per quotation), the **modular discount is per studio**
 
 | # | Feature | Hauspire | Ours | Status |
 |---|---|---|---|---|
-| 49 | Cover and About pages | branded images | The studio's profile photos and "About" | have |
+| 49 | Cover and About pages | branded images | Up to 3 full-page brand images per studio (Settings → Brand pages), else a cover drawn from the studio's details (`doc/QuotationDocument`) | **have** · 13 Oct |
 | 50 | Header: client, number, mobile, date, location, configuration | header grid | Quotation box + "Prepared for" (mobile line added) | **have** · mobile built 12 Oct |
 | 51 | Room tables with S.No. | yes | # column added | **have** · built 12 Oct |
-| 52 | Summary by room with a donut | `RoomDonut` | Room summary with bars and % | have (bars, not a donut) |
+| 52 | Summary by room with a donut | `RoomDonut` | Summary By Room table beside a donut and legend, in the studio's colour | **have** · 13 Oct |
 | 53 | Material specification | fixed list | Per studio (Settings) | have |
-| 54 | Terms and conditions, editable | `/terms` | Settings + per quotation | have |
+| 54 | Terms and conditions, editable | `/terms` | Quotations → Terms (the one copy, `StudioBranding.terms`), printed with headings and bullets under a running header | **have** · 13 Oct |
 | 55 | Client-friendly PDF filename | `quoteFilename` | `PrintButton filename` | have |
 
 ## Lists, products, settings, other modules

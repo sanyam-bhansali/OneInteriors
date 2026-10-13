@@ -13,6 +13,7 @@ import { quoteSalesView } from '@/modules/studio-sales/revisions';
 import { can } from '@/modules/studio/roles';
 import { Revisions } from './Revisions';
 import { planReaderFor } from '@/modules/studio-quote/from-plan';
+import { quoteDocContext } from '@/modules/studio-quote/document-data';
 import { LineIcon } from '../../ui/icons';
 import '../quotes.css';
 
@@ -49,7 +50,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   if (!quote) notFound();
 
   const member = await currentMember();
-  const [logoUrl, project, sales, planReader] = await Promise.all([
+  const [logoUrl, project, sales, planReader, docCtx] = await Promise.all([
     signedLogoUrl(branding?.logoPath ?? null),
     // A project running on this quotation, or whether one can start from it (own client, sent or won).
     projectForQuote(member, quote.id),
@@ -57,6 +58,8 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
     quoteSalesView(quote.id),
     // Floor plan → first quotation: "Read rooms" on this draft (12 Oct 2026).
     planReaderFor(quote.clientId),
+    // The PDF preview tab: brand pages, payment stages, material specification, terms (13 Oct 2026).
+    quoteDocContext(quote),
   ]);
   /* Owner and PM may add a typed line to the product list; a salesperson asks. */
   const mayAddProducts = member !== null && (member.role === 'OWNER' || member.role === 'PM');
@@ -175,6 +178,14 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           locked={locked}
           sentLabel={lastRev ? lastRev.label : null}
           finalHref={finalHref}
+          doc={{
+            studio: docCtx.studio,
+            brandPages: docCtx.brandPages,
+            schedule: docCtx.schedule,
+            spec: docCtx.spec,
+            terms: docCtx.terms,
+            validDays: docCtx.validDays,
+          }}
           extras={
             /* Keyed on the revision count so the compare and sales-final pickers start on the newest revision after a send. */
             sales ? <Revisions key={sales.revisions.length} view={sales} leadHref={quote.clientId ? `/studio/clients/${quote.clientId}` : null} mayBook={mayBook} /> : null

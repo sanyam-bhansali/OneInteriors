@@ -110,7 +110,7 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
           <b>⚡ First Quote</b>
           <span className="muted">Pick a plan / config, confirm the kitchen run, and get a full draft on your product master rates.</span>
         </Link>
-        <Link href={building && !empty ? '/studio/quotations' : '/studio/quotations?new=1#new'} className="hcard">
+        <Link href="/studio/quotations/builder" className="hcard">
           <b>🧱 Full Builder</b>
           <span className="muted">Add rooms and products by hand, edit dimensions, and fine-tune every line.</span>
         </Link>

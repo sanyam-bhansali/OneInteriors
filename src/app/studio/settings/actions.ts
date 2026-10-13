@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { rupeesToPaise } from '@/lib/money';
 import { saveBranding, parseMaterialSpec } from '@/modules/studio-quote/store';
 import { revalidateRoster } from '@/modules/studio/roster-cache';
-import { replaceLogo, clearLogo, setHideOurMark } from '@/modules/studio-quote/store';
+import { replaceLogo, clearLogo, setHideOurMark, addBrandPage, removeBrandPage, moveBrandPage } from '@/modules/studio-quote/store';
 
 // `State` and `IDLE` live in studio/form-state.ts. A 'use server'
 // file may only export async functions — and Turbopack rejects even a
@@ -46,7 +46,9 @@ export async function saveBrandingAction(_prev: State, form: FormData): Promise<
     email: str('email'),
     website: str('website'),
     welcomeNote: str('welcomeNote'),
-    terms: str('terms'),
+    /* The terms moved to Quotations → Terms (13 Oct 2026); a form without the field leaves them alone. */
+    ...(form.has('terms') ? { terms: str('terms') } : {}),
+    ...(form.has('accentHex') ? { accentHex: str('accentHex') } : {}),
     feeBps,
     discountBps,
     bookingAdvancePaise: rupeesToPaise(advance),
@@ -121,5 +123,29 @@ export async function setMarkAction(
   if (!result.ok) return { status: 'error', error: result.error };
 
   revalidatePath('/studio', 'layout');
+  return { status: 'saved' };
+}
+
+// ── Brand pages (Quotation PDF, owner 13 Oct 2026) ─────────────
+
+/** Add one full-page brand image; its own form, like the logo. */
+export async function uploadBrandPageAction(_prev: BrandAssetState, form: FormData): Promise<BrandAssetState> {
+  const file = form.get('page');
+  if (!(file instanceof File) || file.size === 0) return { status: 'error', error: 'Choose an image first.' };
+  const result = await addBrandPage(file);
+  if (!result.ok) return { status: 'error', error: result.error };
+  revalidatePath('/studio/settings');
+  revalidatePath('/studio/quotations');
+  return { status: 'saved' };
+}
+
+/** Remove or move one brand page: op is remove, up or down; index is its position. */
+export async function brandPageAction(_prev: BrandAssetState, form: FormData): Promise<BrandAssetState> {
+  const index = Number(form.get('index'));
+  const op = String(form.get('op') ?? '');
+  const result = op === 'remove' ? await removeBrandPage(index) : op === 'up' || op === 'down' ? await moveBrandPage(index, op === 'up' ? -1 : 1) : { ok: false as const, error: 'Something went wrong. Reload and try again.' };
+  if (!result.ok) return { status: 'error', error: result.error };
+  revalidatePath('/studio/settings');
+  revalidatePath('/studio/quotations');
   return { status: 'saved' };
 }

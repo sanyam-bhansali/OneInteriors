@@ -183,17 +183,33 @@ export function BrandingForm({ branding }: { branding: BrandingRow | null }) {
             className={input}
           />
         </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="lbl">Terms and conditions — optional</span>
-          <textarea
-            name="terms"
-            rows={8}
-            defaultValue={branding?.terms ?? ''}
-            placeholder={
-              'Payment schedule, what is included and excluded, timelines, what happens on a delay.\n\nThese are your commitments to your client. We do not supply a template, because a template would commit you to terms we wrote.'
-            }
-            className={input}
+        <p className="m-0 text-[13.5px] leading-relaxed">
+          <span className="lbl">Terms and conditions</span>
+          <br />
+          <span className="muted">
+            {branding?.terms ? 'Written. ' : 'Not written yet. '}
+            They are edited in one place, on{' '}
+            <Link href="/studio/quotations/terms" className="acc-t" style={{ fontWeight: 600 }}>
+              Quotations → Terms
+            </Link>
+            , and every new quotation copies them.
+          </span>
+        </p>
+      </Block>
+
+      <Block
+        title="Quotation PDF colour"
+        note="The room bands, the table headings and the totals on your quotation PDF are drawn in this colour. Pick your brand's main colour; a dark one prints best."
+      >
+        <label className="flex items-center gap-3">
+          <input
+            type="color"
+            name="accentHex"
+            defaultValue={/^#[0-9a-fA-F]{6}$/.test(branding?.accentHex ?? '') ? branding!.accentHex : '#1F5C4D'}
+            className="h-[36px] w-[56px] cursor-pointer rounded-[8px] border-0 bg-transparent p-0"
+            aria-label="Quotation PDF colour"
           />
+          <span className="mono text-[13px] muted">{branding?.accentHex ?? '#1F5C4D'}</span>
         </label>
       </Block>
 
@@ -255,13 +271,13 @@ export function BrandingForm({ branding }: { branding: BrandingRow | null }) {
 
       <Block
         title="Material specification"
-        note="Printed on every quotation, so a client can see the brands behind the price. One per line: what it is, a colon, then your brand and grade."
+        note="Printed on every quotation, so a client can see the brands behind the price. One per line: the material, a colon, the brand, a | and the specification. Without a | the whole line after the colon is the specification."
       >
         <textarea
           name="materialSpec"
           rows={7}
-          defaultValue={(branding?.materialSpec ?? []).map((r) => `${r.item}: ${r.spec}`).join('\n')}
-          placeholder={'Plywood: Century BWP 710, 18 mm\nLaminate: Merino 1 mm\nHardware: Hettich soft-close\nPaint: Asian Paints Royale'}
+          defaultValue={(branding?.materialSpec ?? []).map((r) => (r.brand ? `${r.item}: ${r.brand} | ${r.spec}` : `${r.item}: ${r.spec}`)).join('\n')}
+          placeholder={'Plywood: Century | BWP 710, 18 mm\nLaminate: Merino | 1 mm, matt\nHardware: Hettich | Soft close\nPaint: Asian Paints | Putty, primer and paint'}
           className={input}
         />
       </Block>

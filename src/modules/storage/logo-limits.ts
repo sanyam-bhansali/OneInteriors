@@ -30,3 +30,12 @@ export const LOGO_TYPES: Record<string, string> = {
 };
 
 export const ACCEPTED_LOGO = 'PNG, JPG or WebP';
+
+/**
+ * A brand page: a full A4/Letter page the studio designed (their cover, "Why
+ * choose us", their partners' logos), printed before the quotation. A page
+ * at print resolution is a few megabytes, so it gets more room than a logo;
+ * the same three formats, for the same reason.
+ */
+export const MAX_BRAND_PAGE_BYTES = 6 * 1024 * 1024;
+export const MAX_BRAND_PAGE_MB = MAX_BRAND_PAGE_BYTES / 1024 / 1024;

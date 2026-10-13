@@ -66,8 +66,18 @@ export const APPS: readonly StudioApp[] = [
   },
   {
     key: 'quotes', name: 'Quotations', href: '/studio/quotations', icon: 'file', bg: 'var(--info-bg)', fg: 'var(--info)',
-    tabs: [T('All quotations', '/studio/quotations'), T('First quote', '/studio/quotations/first')],
-    owns: ['/studio/quotations'],
+    /* Hauspire's top bar (owner, 13 Oct 2026): First Quote, Full Builder, My
+       Quotations, Products, Terms (Electrical and Elec Rates left out by the
+       owner). Products is the product master, so the header stays on
+       Quotations there; the Product master tile still opens it. */
+    tabs: [
+      T('First Quote', '/studio/quotations/first'),
+      T('Full Builder', '/studio/quotations/builder'),
+      T('My Quotations', '/studio/quotations'),
+      T('Products', '/studio/products'),
+      T('Terms', '/studio/quotations/terms'),
+    ],
+    owns: ['/studio/quotations', '/studio/products'],
   },
   {
     key: 'projects', name: 'Projects', href: '/studio/projects', icon: 'layers', bg: 'var(--good-bg)', fg: 'var(--good)',
@@ -108,7 +118,8 @@ export const APPS: readonly StudioApp[] = [
   {
     key: 'rates', name: 'Product master', href: '/studio/products', icon: 'box', bg: 'var(--fill)', fg: 'var(--text2)',
     tabs: [T('Products', '/studio/products'), T('Rate card', '/studio/rates')],
-    owns: ['/studio/products', '/studio/rates'],
+    /* The products page itself is a Quotations tab (13 Oct 2026); this app owns the rate card. */
+    owns: ['/studio/rates'],
   },
   {
     key: 'team', name: 'Team', href: TEAM_PATH, icon: 'gear', bg: 'var(--fill)', fg: 'var(--text2)',
@@ -169,7 +180,10 @@ export function appForPath(path: string, apps: readonly StudioApp[] = APPS): Stu
   if (path === '/studio' || path === '/studio/') return apps.find((a) => a.key === 'today') ?? null;
   let best: { app: StudioApp; len: number } | null = null;
   for (const app of apps) {
-    for (const p of [...app.owns, app.href]) {
+    /* What each app OWNS, not its entry page: the Product master opens
+       `/studio/products`, which belongs to Quotations (13 Oct 2026). Every
+       app owns its own entry otherwise. */
+    for (const p of app.owns) {
       if (under(path, p) && (!best || p.length > best.len)) best = { app, len: p.length };
     }
   }

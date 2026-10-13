@@ -18,11 +18,12 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
-import { storeLogo, removeLogo } from '@/modules/storage/studio-logo';
+import { storeLogo, removeLogo, storeBrandPage } from '@/modules/storage/studio-logo';
 import { fromDb, toDb, type Paise } from '@/lib/money';
 import { starterRowsFor } from './starter-catalogue';
 import { FEE_BPS, type QuoteUnitName, type WorkCodeName } from './pricing';
 import { readRules, type ProductRules } from './configure';
+import { BRAND_PAGES_MAX } from './document';
 import { Prisma } from '@prisma/client';
 
 /**
@@ -395,10 +396,14 @@ export interface BrandingRow {
   materialSpec: MaterialSpecRow[];
   /** Days a quotation holds its prices. */
   validityDays: number;
+  /** Storage paths of the studio's full-page brand images, printed before the quotation (at most three). */
+  brandPages: string[];
 }
 
 export interface MaterialSpecRow {
   item: string;
+  /** Printed in its own column (the owner's sample PDF, 13 Oct 2026). Older rows have none. */
+  brand?: string;
   spec: string;
 }
 
@@ -408,14 +413,17 @@ export function readMaterialSpec(raw: unknown): MaterialSpecRow[] {
   return raw.flatMap((r) => {
     const o = (r ?? {}) as Record<string, unknown>;
     const item = typeof o.item === 'string' ? o.item.trim().slice(0, 60) : '';
+    const brand = typeof o.brand === 'string' ? o.brand.trim().slice(0, 80) : '';
     const spec = typeof o.spec === 'string' ? o.spec.trim().slice(0, 200) : '';
-    return item && spec ? [{ item, spec }] : [];
+    return item && spec ? [brand ? { item, brand, spec } : { item, spec }] : [];
   }).slice(0, 40);
 }
 
 /**
  * "Plywood: Century BWP 710, 18 mm" per line → rows. How a studio writes its
- * spec sheet; a line without a colon is skipped rather than guessed at.
+ * spec sheet; a line without a colon is skipped rather than guessed at. A
+ * "|" after the colon splits the brand from the specification
+ * ("Plywood: CENTURY | BWP Grade"), for the PDF's Brand column.
  */
 export function parseMaterialSpec(text: string): MaterialSpecRow[] {
   return readMaterialSpec(
@@ -423,10 +431,20 @@ export function parseMaterialSpec(text: string): MaterialSpecRow[] {
       .split(/\r?\n/)
       .map((line) => {
         const at = line.indexOf(':');
-        return at > 0 ? { item: line.slice(0, at), spec: line.slice(at + 1) } : null;
+        if (at <= 0) return null;
+        const rest = line.slice(at + 1);
+        const bar = rest.indexOf('|');
+        return bar >= 0
+          ? { item: line.slice(0, at), brand: rest.slice(0, bar), spec: rest.slice(bar + 1) }
+          : { item: line.slice(0, at), spec: rest };
       })
       .filter(Boolean),
   );
+}
+
+/** A row as Settings writes it back into its text box. */
+export function materialSpecLine(r: MaterialSpecRow): string {
+  return r.brand ? `${r.item}: ${r.brand} | ${r.spec}` : `${r.item}: ${r.spec}`;
 }
 
 /**
@@ -496,6 +514,7 @@ export async function myBranding(): Promise<BrandingRow | null> {
       gstBps: row.gstBps,
       materialSpec: readMaterialSpec(row.materialSpec),
       validityDays: row.validityDays,
+      brandPages: (row.brandPages ?? []).slice(0, BRAND_PAGES_MAX),
     };
   } catch (error) {
     console.error('[studio-quote] myBranding failed', error);
@@ -514,7 +533,10 @@ export interface BrandingInput {
   email?: string;
   website?: string;
   welcomeNote?: string;
+  /** Absent leaves them as they are (they are edited on Quotations → Terms). */
   terms?: string;
+  /** The document's colour, a six-digit hex. Absent or malformed leaves it as it is. */
+  accentHex?: string;
   feeBps: number;
   discountBps: number;
   bookingAdvancePaise: Paise;
@@ -558,7 +580,8 @@ export async function saveBranding(input: BrandingInput): Promise<SaveResult> {
     email: input.email?.trim() || null,
     website: input.website?.trim() || null,
     welcomeNote: input.welcomeNote?.trim() || null,
-    terms: input.terms?.trim() || null,
+    ...(input.terms !== undefined ? { terms: input.terms.trim() || null } : {}),
+    ...(input.accentHex !== undefined && /^#[0-9a-fA-F]{6}$/.test(input.accentHex.trim()) ? { accentHex: input.accentHex.trim().toUpperCase() } : {}),
     // 7% for every studio (owner, 12 Oct 2026); the setting no longer moves it.
     feeBps: FEE_BPS,
     discountBps: input.discountBps,
@@ -645,6 +668,87 @@ export async function clearLogo(): Promise<SaveResult> {
   await prisma.studioBranding.update({ where: { studioId }, data: { logoPath: null } });
   await removeLogo(existing.logoPath);
   return { ok: true };
+}
+
+// ── Brand pages and terms (Quotation PDF, owner 13 Oct 2026) ────
+
+/**
+ * Add a full-page brand image to the end of the studio's brand pages (at
+ * most three), printed before every quotation. Same rights as the logo: the
+ * owner or a project manager (`myStudioId`). Stored first, then the row.
+ */
+export async function addBrandPage(file: File): Promise<SaveResult> {
+  const studioId = await myStudioId();
+  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+
+  const existing = await prisma.studioBranding.findUnique({ where: { studioId }, select: { brandPages: true } });
+  if (!existing) return { ok: false, error: 'Fill in your studio details first — the brand pages go with them.' };
+  if ((existing.brandPages ?? []).length >= BRAND_PAGES_MAX) {
+    return { ok: false, error: `At most ${BRAND_PAGES_MAX} brand pages. Remove one first.` };
+  }
+
+  const stored = await storeBrandPage(studioId, file);
+  if (!stored.ok) return { ok: false, error: stored.error };
+
+  await prisma.studioBranding.update({ where: { studioId }, data: { brandPages: { push: stored.path } } });
+  return { ok: true };
+}
+
+/** Remove one brand page (by its position). The row first, the stored file after. */
+export async function removeBrandPage(index: number): Promise<SaveResult> {
+  const studioId = await myStudioId();
+  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+
+  const existing = await prisma.studioBranding.findUnique({ where: { studioId }, select: { brandPages: true } });
+  const pages = existing?.brandPages ?? [];
+  if (!Number.isInteger(index) || index < 0 || index >= pages.length) return { ok: true };
+
+  const gone = pages[index]!;
+  await prisma.studioBranding.update({ where: { studioId }, data: { brandPages: pages.filter((_, i) => i !== index) } });
+  await removeLogo(gone);
+  return { ok: true };
+}
+
+/** Move a brand page one place earlier (-1) or later (1). */
+export async function moveBrandPage(index: number, by: -1 | 1): Promise<SaveResult> {
+  const studioId = await myStudioId();
+  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+
+  const existing = await prisma.studioBranding.findUnique({ where: { studioId }, select: { brandPages: true } });
+  const pages = [...(existing?.brandPages ?? [])];
+  const j = index + by;
+  if (!Number.isInteger(index) || index < 0 || j < 0 || j >= pages.length) return { ok: true };
+  [pages[index], pages[j]] = [pages[j]!, pages[index]!];
+  await prisma.studioBranding.update({ where: { studioId }, data: { brandPages: pages } });
+  return { ok: true };
+}
+
+/** Terms are at most this long: about eight printed pages. */
+export const TERMS_MAX = 20_000;
+
+/**
+ * The studio's default terms and conditions (Quotations → Terms), the same
+ * field Settings kept: every new quotation copies it. Owner or project
+ * manager (`myStudioId`), as every other branding field.
+ */
+export async function saveTerms(text: string): Promise<SaveResult> {
+  const studioId = await myStudioId();
+  if (!studioId) return { ok: false, error: 'Only the studio owner or a project manager changes the terms.' };
+  const terms = String(text ?? '').replace(/\r/g, '').trim();
+  if (terms.length > TERMS_MAX) return { ok: false, error: `At most ${TERMS_MAX.toLocaleString('en-IN')} characters.` };
+
+  try {
+    const existing =
+      (await prisma.studioBranding.findUnique({ where: { studioId }, select: { studioId: true } })) ?? (await seedBrandingFrom(studioId));
+    if (!existing) {
+      return { ok: false, error: 'Finish your registration first — a quotation has to carry the name we checked you against.' };
+    }
+    await prisma.studioBranding.update({ where: { studioId }, data: { terms: terms || null } });
+    return { ok: true };
+  } catch (error) {
+    console.error('[studio-quote] saveTerms failed', error);
+    return { ok: false, error: 'That did not save.' };
+  }
 }
 
 /**

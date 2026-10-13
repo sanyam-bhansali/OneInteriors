@@ -53,20 +53,24 @@ export const REFUND_DAYS_MAX = 30;
 /** The default refund window on the booking advance. */
 export const DEFAULT_REFUND_DAYS = 3;
 
-/** Hauspire's six (owner, 12 Oct 2026). Any studio starts here and changes it. */
+/**
+ * Hauspire's six (owner, 12 Oct 2026). Any studio starts here and changes it.
+ * Each note is the stage's End Deliverable, worded as the owner's sample PDF
+ * prints it (13 Oct 2026).
+ */
 export const HAUSPIRE_TEMPLATE: readonly PaymentStage[] = [
   {
     label: 'Booking advance',
-    note: 'Designer assigned; mood board, 2D layout, furniture layout',
+    note: 'Your dedicated designer is assigned. You receive your Mood Board, 2D Layout and Furniture Layout.',
     kind: 'FIXED',
     amountPaise: 2_500_000,
     refundDays: DEFAULT_REFUND_DAYS,
   },
-  { label: 'Design advance', note: '2D revisions, first 3D, final renders, final quotation', kind: 'PCT', pct: 5 },
-  { label: 'Design closure', note: 'Design locked; detailed technical drawings', kind: 'PCT', pct: 10 },
-  { label: 'Material procurement', note: 'Materials bought and sent to the factory; on-site work starts', kind: 'PCT', pct: 40 },
-  { label: 'Material dispatch', note: 'Furniture delivered and installed; décor ordered', kind: 'PCT', pct: 40 },
-  { label: 'Project handover', note: 'Snags resolved; home handed over', kind: 'PCT', pct: 5 },
+  { label: 'Design advance', note: 'Your design comes to life: 2D drawing revisions, first 3D design, final 3D renders and your Final Quotation.', kind: 'PCT', pct: 5 },
+  { label: 'Design closure', note: 'Your design is locked. You receive the detailed technical drawings our factory and site team build from.', kind: 'PCT', pct: 10 },
+  { label: 'Material procurement', note: 'All materials for your home are purchased and sent to our factory for manufacturing. All on-site work begins at your home, such as false ceiling, electrical and civil work.', kind: 'PCT', pct: 40 },
+  { label: 'Material dispatch', note: 'Your furniture is delivered to your home and carpentry installation begins. Décor items, glass and finishing materials are ordered.', kind: 'PCT', pct: 40 },
+  { label: 'Project handover', note: 'Once this payment is received, we resolve the final snag list and hand over your home, ready to move in.', kind: 'PCT', pct: 5 },
 ];
 
 /** A percent in basis points, so 12.5 + 87.5 is exactly 100. */
@@ -80,7 +84,7 @@ export function checkStages(stages: readonly PaymentStage[]): string | null {
     const label = s.label.trim();
     if (!label) return 'Every stage needs a name.';
     if (label.length > LABEL_MAX) return `Stage names are at most ${LABEL_MAX} characters.`;
-    if (s.note.trim().length > NOTE_MAX) return `"What the client gets" is at most ${NOTE_MAX} characters.`;
+    if (s.note.trim().length > NOTE_MAX) return `The end deliverable is at most ${NOTE_MAX} characters.`;
     if (s.kind === 'FIXED') {
       const a = s.amountPaise;
       if (typeof a !== 'number' || !Number.isInteger(a) || a <= 0 || a >= 1e11) return `${label}: enter an amount in rupees.`;

@@ -3,6 +3,7 @@ import { myBranding, myTier } from '@/modules/studio-quote/store';
 import { logoUploadEnabled, signedLogoUrl } from '@/modules/storage/studio-logo';
 import { BrandingForm } from './BrandingForm';
 import { LogoAndMark } from './LogoAndMark';
+import { BrandPages } from './BrandPages';
 import { WarrantyForm } from './WarrantyForm';
 import { myWarranty } from '@/modules/studio/warranty';
 
@@ -34,10 +35,11 @@ export default async function SettingsPage() {
 
   /* In parallel: neither depends on the other, and the signed URL is a round
      trip to storage that should not sit behind a subscription lookup. */
-  const [logoUrl, tier, warranty] = await Promise.all([
+  const [logoUrl, tier, warranty, brandPageUrls] = await Promise.all([
     signedLogoUrl(branding?.logoPath ?? null),
     myTier(),
     myWarranty().catch(() => null),
+    Promise.all((branding?.brandPages ?? []).map((p) => signedLogoUrl(p))),
   ]);
 
   return (
@@ -69,6 +71,10 @@ export default async function SettingsPage() {
             tier={tier}
             hideRequested={branding?.hideOurMark ?? false}
           />
+        </div>
+        {/* The quotation PDF's opening pages (owner, 13 Oct 2026). */}
+        <div className="mt-6 max-w-[52rem]">
+          <BrandPages pages={brandPageUrls.map((url) => ({ url }))} hasBranding={branding !== null} uploadEnabled={logoUploadEnabled()} />
         </div>
         {/* The project lifecycle (owner, 13 Oct 2026): months of warranty after the client signs off the handover. */}
         {warranty ? <WarrantyForm months={warranty.months} canEdit={warranty.canEdit} /> : null}

@@ -96,7 +96,14 @@ export function usesOfficeShell(member: MemberRole): boolean {
 /** What a salesperson may open: Today, the board and a lead, quotations; the dashboard and calendar (leads at scale); the pool, to claim from (owner, 12 Oct 2026). */
 const SALES_OPEN = [TODAY_HOME, '/studio/clients', '/studio/quotations', '/studio/dashboard', '/studio/calendar'];
 /** Inside the leads section, the owner's and PM's screens. */
-const SALES_CLOSED = ['/studio/clients/import', '/studio/clients/bin', '/studio/clients/analytics', '/studio/calendar/appointments'];
+const SALES_CLOSED = [
+  '/studio/clients/import',
+  '/studio/clients/bin',
+  '/studio/clients/analytics',
+  '/studio/calendar/appointments',
+  /* The studio's terms (Quotations → Terms): only the owner and a project manager change them (13 Oct 2026). */
+  '/studio/quotations/terms',
+];
 
 function under(path: string, prefix: string): boolean {
   return path === prefix || path.startsWith(`${prefix}/`);

@@ -63,6 +63,27 @@ describe('studio apps (UI handoff 12 Oct 2026)', () => {
     expect(appsFor({ role: 'OWNER', status: 'SUSPENDED' })).toEqual([]);
   });
 
+  it("Quotations carries Hauspire's top bar: First Quote, Full Builder, My Quotations, Products, Terms (13 Oct 2026)", () => {
+    const tabs = (role: StudioRoleName) => appsFor(m(role)).find((a) => a.key === 'quotes')?.tabs.map((t) => t.label);
+    expect(tabs('OWNER')).toEqual(['First Quote', 'Full Builder', 'My Quotations', 'Products', 'Terms']);
+    expect(tabs('PM')).toEqual(['First Quote', 'Full Builder', 'My Quotations', 'Products', 'Terms']);
+    /* A salesperson opens neither the product master nor the studio's terms. */
+    expect(tabs('SALES')).toEqual(['First Quote', 'Full Builder', 'My Quotations']);
+    expect(mayOpen(m('SALES'), '/studio/quotations/terms')).toBe(false);
+    expect(mayOpen(m('SALES'), '/studio/quotations/builder')).toBe(true);
+  });
+
+  it('the product master page sits under Quotations, and its own tile still opens it', () => {
+    const quotes = appForPath('/studio/products')!;
+    expect(quotes.key).toBe('quotes');
+    expect(tabForPath('/studio/products', quotes.tabs)?.label).toBe('Products');
+    expect(appForPath('/studio/rates')?.key).toBe('rates');
+    expect(appsFor(m('OWNER')).find((a) => a.key === 'rates')?.href).toBe('/studio/products');
+    expect(tabForPath('/studio/quotations/terms', quotes.tabs)?.label).toBe('Terms');
+    expect(tabForPath('/studio/quotations/builder', quotes.tabs)?.label).toBe('Full Builder');
+    expect(tabForPath('/studio/quotations/abc', quotes.tabs)?.label).toBe('My Quotations');
+  });
+
   it('finds the app and tab a path belongs to', () => {
     expect(appForPath('/studio/calendar/appointments')?.key).toBe('calendar');
     expect(appForPath('/studio/dashboard')?.key).toBe('clients');

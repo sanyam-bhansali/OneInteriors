@@ -1,7 +1,10 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { formatINR } from '@/lib/money';
-import { quotesToCompare, STAGE_LABELS, totalsFor, type QuoteRow } from '@/modules/studio-quote/quotes';
+import { getQuote, quotesToCompare, STAGE_LABELS, totalsFor, type QuoteRow } from '@/modules/studio-quote/quotes';
+import { quoteDocContext } from '@/modules/studio-quote/document-data';
+import { docHead, quoteFileName } from '@/modules/studio-quote/document';
+import { DocFrame, DocOpening } from '../../doc/QuotationDocument';
 import { compareToIssued, type ChangeKind } from '@/modules/studio-quote/revision';
 import { PrintButton } from '../print/PrintButton';
 import { revisionPair } from '@/modules/studio-sales/revisions';
@@ -88,70 +91,111 @@ export default async function ComparePage({
     ['Total', was.totalPaise, now.totalPaise],
   ];
 
-  return (
-    <main className="content qpage">
-      <div className="phead">
-        <div style={{ minWidth: 0 }}>
-          <h1>{title}</h1>
-          <p className="muted qsub mono">
-            {left} → {right}
-          </p>
-        </div>
-        <PrintButton filename={`${title} ${left} vs ${right}`} />
-      </div>
+  /* The same opening pages and styling as the quotation PDF (owner, 13 Oct
+     2026): the studio's brand pages, or the drawn cover, then this page's
+     own content, Original against Revised. */
+  const current = await getQuote(id);
+  const ctx = current ? await quoteDocContext(current) : null;
+  const head = current ? docHead(current, ctx?.branding?.city ?? null) : null;
+  const studioName = ctx?.studio?.tradeName || ctx?.branding?.legalName || '';
 
-      <section className="card flush">
-        <div className="tscroll">
-          <table className="tbl" style={{ minWidth: 560 }}>
+  return (
+    <>
+      <PrintButton
+        filename={current ? quoteFileName(current.clientName, studioName, `${current.number} ${left} vs ${right}`, current.quoteDate, true) : `${title} ${left} vs ${right}`}
+      />
+      <DocFrame accentHex={ctx?.studio?.accentHex ?? null}>
+        {head ? <DocOpening studio={ctx?.studio ?? null} brandPages={ctx?.brandPages ?? []} head={head} final /> : null}
+
+        <section className="qd-sheet qd-quote" aria-label="Original vs Revised">
+          {head ? (
+            <div className="qd-head">
+              <div>
+                <p className="qd-field">
+                  <b>Client Name:</b> <span>{head.clientName}</span>
+                </p>
+                <p className="qd-field">
+                  <b>Client Mobile:</b> <span>{head.clientPhone ?? ''}</span>
+                </p>
+                <p className="qd-field">
+                  <b>Configuration:</b> <span>{head.config ?? ''}</span>
+                </p>
+              </div>
+              <div>
+                <p className="qd-field">
+                  <b>Quotation No:</b> <span>{head.number}</span>
+                </p>
+                <p className="qd-field">
+                  <b>Compared:</b> <span>{title}</span>
+                </p>
+                <p className="qd-field">
+                  <b>Location:</b> <span>{head.location ?? ''}</span>
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          <table className="qd-tbl qd-keep">
+            <colgroup>
+              <col style={{ width: '34%' }} />
+              <col />
+              <col />
+              <col />
+            </colgroup>
             <thead>
-              <tr>
-                <th scope="col">
-                  <span className="sr-only">Figure</span>
+              <tr className="qd-band">
+                <th colSpan={4}>
+                  Final (Original vs Revised) · {left} → {right}
                 </th>
-                <th scope="col" style={{ textAlign: 'right' }}>
-                  {left}
-                </th>
-                <th scope="col" style={{ textAlign: 'right' }}>
-                  {right}
-                </th>
-                <th scope="col" style={{ textAlign: 'right' }}>
-                  Difference
-                </th>
+              </tr>
+              <tr className="qd-cols">
+                <th style={{ width: '34%' }}>Figure</th>
+                <th className="r">{left}</th>
+                <th className="r">{right}</th>
+                <th className="r">Difference</th>
               </tr>
             </thead>
             <tbody>
               {rows.map(([label, a, b]) => (
-                <tr key={label} style={label === 'Total' ? { fontWeight: 600 } : undefined}>
+                <tr key={label} className={label === 'Total' ? 'qd-sub' : undefined}>
                   <td>{label}</td>
-                  <td className="mono" style={{ textAlign: 'right' }}>
-                    {money(a)}
-                  </td>
-                  <td className="mono" style={{ textAlign: 'right' }}>
-                    {money(b)}
-                  </td>
-                  <td className="mono" style={{ textAlign: 'right' }}>
-                    {b - a === 0 ? '—' : `${b - a > 0 ? '+' : '−'} ${formatINR(Math.abs(b - a))}`}
-                  </td>
+                  <td className="r">{money(a)}</td>
+                  <td className="r">{money(b)}</td>
+                  <td className="r">{b - a === 0 ? '—' : `${b - a > 0 ? '+' : '−'} ${formatINR(Math.abs(b - a))}`}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-      </section>
 
-      <p className="muted" style={{ margin: 0 }}>
-        {summary.identical
-          ? 'No line has changed.'
-          : `${summary.addedCount} new, ${summary.repricedCount} changed, ${summary.removedCount} removed.`}
-      </p>
+          <p className="qd-note">
+            {summary.identical
+              ? 'No line has changed.'
+              : `${summary.addedCount} new, ${summary.repricedCount} changed, ${summary.removedCount} removed.`}
+          </p>
 
-      {rooms.map((room) => (
-        <section key={room} className="card flush">
-          <div className="chead">
-            <h2>{room}</h2>
-          </div>
-          <div className="tscroll">
-            <table className="tbl" style={{ minWidth: 560 }}>
+          {rooms.map((room) => (
+            <table key={room} className="qd-tbl qd-room">
+              <colgroup>
+                <col style={{ width: '14%' }} />
+                <col />
+                <col style={{ width: '30%' }} />
+                <col style={{ width: '18%' }} />
+              </colgroup>
+              <thead>
+                <tr className="qd-band">
+                  <th colSpan={4}>{room}</th>
+                </tr>
+                <tr className="qd-cols">
+                  <th style={{ width: '14%' }}>Change</th>
+                  <th>Product</th>
+                  <th className="r" style={{ width: '30%' }}>
+                    {left} → {right} (₹)
+                  </th>
+                  <th className="r" style={{ width: '18%' }}>
+                    Difference (₹)
+                  </th>
+                </tr>
+              </thead>
               <tbody>
                 {moved
                   .filter((c) => c.room === room)
@@ -159,24 +203,32 @@ export default async function ComparePage({
                     const k = KIND[c.kind as Exclude<ChangeKind, 'UNCHANGED'>];
                     return (
                       <tr key={`${c.room}|${c.product}`}>
-                        <td style={{ width: 110 }}>
-                          <span className={`chip ${k.tone}`}>{k.label}</span>
+                        <td className={k.tone === 'good' ? 'qd-disc' : k.tone === 'bad' ? 'qd-soft' : 'qd-product'}>{k.label}</td>
+                        <td className="qd-product">{c.product}</td>
+                        <td className="r">
+                          {c.wasPaise > 0 ? formatINR(c.wasPaise, { symbol: false }) : '—'} → {c.nowPaise > 0 ? formatINR(c.nowPaise, { symbol: false }) : '—'}
                         </td>
-                        <td>{c.product}</td>
-                        <td className="mono muted" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          {c.wasPaise > 0 ? formatINR(c.wasPaise) : '—'} → {c.nowPaise > 0 ? formatINR(c.nowPaise) : '—'}
-                        </td>
-                        <td className="mono" style={{ textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 500, width: 140 }}>
-                          {c.deltaPaise > 0 ? '+' : '−'} {formatINR(Math.abs(c.deltaPaise))}
+                        <td className="r">
+                          {c.deltaPaise > 0 ? '+' : '−'} {formatINR(Math.abs(c.deltaPaise), { symbol: false })}
                         </td>
                       </tr>
                     );
                   })}
               </tbody>
             </table>
-          </div>
+          ))}
+
+          {ctx?.studio ? (
+            <footer className="qd-foot">
+              <p>
+                {ctx.studio.name}
+                {ctx.studio.gstin ? ` · GSTIN ${ctx.studio.gstin}` : ''}
+              </p>
+              {ctx.showMark ? <p className="qd-mark">{ctx.markText}</p> : null}
+            </footer>
+          ) : null}
         </section>
-      ))}
-    </main>
+      </DocFrame>
+    </>
   );
 }

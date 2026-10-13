@@ -91,7 +91,7 @@ export function PaymentStagesEditor({
             </div>
             <div className="mt-2 flex flex-wrap items-end gap-2 pl-7">
               <label className="flex min-w-[12rem] flex-1 flex-col gap-1">
-                <span className="s-label">What the client gets in this stage</span>
+                <span className="s-label">End deliverable: what the client receives once this stage is complete (printed on the quotation)</span>
                 <input value={s.note} onChange={(e) => set(i, { note: e.target.value })} className={inputClass} />
               </label>
               {i === 0 ? (

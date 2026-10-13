@@ -14,7 +14,7 @@ const STAGE_LABELS = { SALES: 'Sales Final', DESIGN: 'Design Final' } as const;
 import type { ProductRow } from '@/modules/studio-quote/store';
 import { addLineToProductsAction, copyQuoteAction, proposeProductAction, saveClientAction, saveLinesAction } from '../actions';
 import { ConfigurePanel, type AddSize, type EditableLine } from './QuoteLines';
-import { DocumentPreview } from './QuotePanels';
+import { DocumentPreview, type DocPreviewStatics } from './QuotePanels';
 import { pctToBps, rupeesToPaiseText, type TermsDraft } from './TermsPanel';
 import { QuoteTable } from './QuoteTable';
 import { TotalsTable } from './HTotals';
@@ -57,6 +57,7 @@ export function QuoteBuilder({
   sentLabel = null,
   finalHref = null,
   extras,
+  doc = null,
 }: {
   quote: QuoteRow;
   products: ProductRow[];
@@ -83,6 +84,8 @@ export function QuoteBuilder({
   finalHref?: string | null;
   /** Revisions and the sales final, under the work area. */
   extras?: React.ReactNode;
+  /** The PDF's brand pages, stages, specification and terms (server, `quoteDocContext`). */
+  doc?: DocPreviewStatics | null;
 }) {
   const [lines, setLines] = useState<EditableLine[]>(() => quote.lines.map(toEditable));
   const [terms, setTerms] = useState<TermsDraft>(() => termsDraftOf(quote));
@@ -747,6 +750,7 @@ export function QuoteBuilder({
             showMark={showMark}
             markText={markText}
             logoUrl={logoUrl}
+            doc={doc}
           />
         )}
 

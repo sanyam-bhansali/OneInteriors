@@ -3120,6 +3120,12 @@ model StudioBranding {
   /// How many days a quotation holds its prices. Printed as "valid until".
   validityDays Int @default(30)
 
+  /// Storage paths (the logo bucket, studio_<id>/brand/…) of up to three
+  /// full-page images the studio designed — its cover, "Why choose us", its
+  /// partners — printed before every quotation (owner, 13 Oct 2026). Empty:
+  /// the PDF draws a cover from the studio's details.
+  brandPages String[] @default([])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

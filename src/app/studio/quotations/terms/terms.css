@@ -1,0 +1,12 @@
+/* Quotations → Terms (terms/page.tsx): the editor beside the printed preview. */
+.oi-studio .qterms-bar { gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.oi-studio .qterms-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.oi-studio .qterms-edit { display: flex; flex-direction: column; gap: 10px; }
+.oi-studio textarea.fld.qterms-text { height: 62vh; min-height: 62vh; resize: vertical; font-size: 12.5px; line-height: 1.6; width: 100%; }
+.oi-studio .qterms-preview { overflow: hidden; }
+.oi-studio .qterms-preview .qd { max-height: 72vh; overflow: auto; }
+.oi-studio .qterms-preview .qd-sheet { width: auto; min-height: 0; box-shadow: none; margin: 0; padding: 18px 20px; }
+@media (max-width: 900px) {
+  .oi-studio .qterms-grid { grid-template-columns: minmax(0, 1fr); }
+  .oi-studio textarea.fld.qterms-text { height: 44vh; min-height: 40vh; }
+}

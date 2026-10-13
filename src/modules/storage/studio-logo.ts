@@ -26,7 +26,7 @@ import 'server-only';
 import { supabaseConfig } from '@/lib/env';
 import { getCurrentUser, hasRole } from '@/modules/auth/session';
 import { myStudioId } from '@/modules/studio/tenancy';
-import { MAX_LOGO_BYTES, MAX_LOGO_MB, LOGO_TYPES, ACCEPTED_LOGO } from './logo-limits';
+import { MAX_LOGO_BYTES, MAX_LOGO_MB, LOGO_TYPES, ACCEPTED_LOGO, MAX_BRAND_PAGE_BYTES, MAX_BRAND_PAGE_MB } from './logo-limits';
 
 const BUCKET = 'studio-logos';
 const SIGNED_URL_SECONDS = 300;
@@ -52,10 +52,30 @@ export function logoUploadEnabled(): boolean {
 export type LogoResult = { ok: true; path: string } | { ok: false; error: string };
 
 export async function storeLogo(studioId: string, file: File): Promise<LogoResult> {
+  return storeImage(studioId, file, '', MAX_BYTES, `Over ${MAX_LOGO_MB} MB. A logo that large is usually a photograph, and it prints as a blur.`, 'Logo upload');
+}
+
+/**
+ * A full-page brand image (Settings → Quotation PDF → Brand pages), in the
+ * same private bucket as the logo, under the studio's `brand/` folder, so the
+ * same signed-link rule covers it.
+ */
+export async function storeBrandPage(studioId: string, file: File): Promise<LogoResult> {
+  return storeImage(
+    studioId,
+    file,
+    'brand/',
+    MAX_BRAND_PAGE_BYTES,
+    `Over ${MAX_BRAND_PAGE_MB} MB. Export the page as a JPG at print size (about 1240 × 1754 pixels for A4) and it will be well under.`,
+    'Uploading brand pages',
+  );
+}
+
+async function storeImage(studioId: string, file: File, folder: '' | 'brand/', maxBytes: number, tooBig: string, what: string): Promise<LogoResult> {
   const config = supabaseConfig();
   const key = secretKey();
   if (!config || !key) {
-    return { ok: false, error: 'Logo upload is not switched on for this deployment yet.' };
+    return { ok: false, error: `${what} is not switched on for this deployment yet.` };
   }
 
   const extension = ALLOWED.get(file.type);
@@ -66,17 +86,12 @@ export async function storeLogo(studioId: string, file: File): Promise<LogoResul
     };
   }
   if (file.size === 0) return { ok: false, error: 'That file is empty.' };
-  if (file.size > MAX_BYTES) {
-    return {
-      ok: false,
-      error: `Over ${MAX_LOGO_MB} MB. A logo that large is usually a photograph, and it prints as a blur.`,
-    };
-  }
+  if (file.size > maxBytes) return { ok: false, error: tooBig };
 
   /* A fresh name every time. The old object is removed by the caller after
      the row is updated — never before, or a failed write leaves a studio with
      a document that cannot find its logo. */
-  const path = `studio_${studioId}/${crypto.randomUUID()}.${extension}`;
+  const path = `studio_${studioId}/${folder}${crypto.randomUUID()}.${extension}`;
 
   try {
     const response = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, {
@@ -130,7 +145,30 @@ export async function signedLogoUrl(path: string | null): Promise<string | null>
        over. */
     if (!studioId || !path.startsWith(`studio_${studioId}/`)) return null;
   }
+  return signPath(path);
+}
 
+/**
+ * Short links to a studio's brand pages, for the quotation PDF.
+ *
+ * Checked against the studio the quotation belongs to (the caller passes the
+ * studio its quotation query was scoped to, so a salesperson printing their
+ * own client's quotation gets their studio's pages), and only inside that
+ * studio's `brand/` folder: a path anywhere else is not signed. In order;
+ * a page that cannot be signed is left out rather than printed broken.
+ */
+export async function signedBrandPageUrls(paths: readonly string[], studioId: string | null): Promise<string[]> {
+  if (!studioId || paths.length === 0) return [];
+  const mine = paths.filter((p) => p.startsWith(`studio_${studioId}/brand/`));
+  const urls = await Promise.all(mine.map((p) => signPath(p)));
+  return urls.filter((u): u is string => Boolean(u));
+}
+
+/** A short signed link to an object in this bucket. The caller has already checked whose it is. */
+async function signPath(path: string): Promise<string | null> {
+  const config = supabaseConfig();
+  const key = secretKey();
+  if (!config || !key) return null;
   try {
     const response = await fetch(
       `${config.url}/storage/v1/object/sign/${BUCKET}/${encodeURI(path)}`,
