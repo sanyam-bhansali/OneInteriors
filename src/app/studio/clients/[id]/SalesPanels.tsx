@@ -65,8 +65,8 @@ export function NextStepButton({
           {step.label}
         </a>
       ) : (
-        <a href="#contact" className={primaryClass}>
-          Log a contact
+        <a href="#log-call" className={primaryClass}>
+          Log a call
         </a>
       );
       break;

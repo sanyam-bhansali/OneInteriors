@@ -19,7 +19,6 @@ import { taskPeople, tasksForLead } from '@/modules/studio-sales/tasks';
 import { Timeline } from './Timeline';
 import { BriefPanel } from './BriefPanel';
 import { Duplicates } from './Duplicates';
-import { LogContact } from './LogContact';
 import { FinalQuote } from './FinalQuote';
 import { IntroAnswer } from './IntroAnswer';
 import { AssignBox, BookingBox, Details, FilesBox, MeetingBox, NextStepButton, QuotesBox } from './SalesPanels';
@@ -169,11 +168,6 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
                 label: 'Timeline',
                 content: (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                    {page.may.edit ? (
-                      <div id="contact" style={{ scrollMarginTop: 80 }}>
-                        <LogContact clientId={client.id} lastContactedAt={client.lastContactedAt} />
-                      </div>
-                    ) : null}
                     <section className="card">
                       <h2 className="h">What happened</h2>
                       <Timeline rows={events} />
