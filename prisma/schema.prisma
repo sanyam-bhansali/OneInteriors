@@ -677,6 +677,18 @@ model Studio {
   /// the handover, in months. Settings, Warranty (owner). Hauspire 12.
   warrantyMonths Int @default(12)
 
+  /// The per-studio pilot switch (owner, 14 Oct 2026): the full Studio OS
+  /// (projects, design, site mode, the payments desk, crews, team) is open
+  /// only for pilot studios; every other studio gets Leads, Quotations, the
+  /// product master, their settings, Today and Calendar. Set by ops on the
+  /// studio's page (audited). Read through modules/studio/pilot.ts.
+  fullSoftware Boolean @default(false)
+
+  /// The owner's "Set up your studio" answers (modules/studio/setup-quiz.ts):
+  /// { v, status: done | skipped, at, answers }. Null = never asked, so the
+  /// owner sees the quiz on their first sign-in after the software opens.
+  setupQuiz Json?
+
   /// The matching profile: work mix (modular / carpentry / both), scopes and
   /// minimums, civil capability, home types, city-wide and societies,
   /// capacity, earliest start, durations, how they work, materials,

@@ -18,7 +18,7 @@ import { fromDb, toDb, type Paise } from '@/lib/money';
 import { myBranding } from './store';
 import {
   computeTotals,
-  FEE_BPS,
+  feeBpsOf,
   GST_BPS,
   keptFeeBps,
   lineAmount,
@@ -463,8 +463,9 @@ export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
             : {}),
         // Snapshotted at creation. Changing the defaults in Settings later must
         // never rewrite a quotation already sent to a client. The fee is 7%
-        // for every studio (owner, 12 Oct 2026), whatever an older setting says.
-        feeBps: FEE_BPS,
+        // for every studio (owner, 12 Oct 2026), whatever an older setting says;
+        // the studio only decides whether it starts on (14 Oct 2026).
+        feeBps: feeBpsOf(branding.feeBps > 0),
         discountBps: branding.discountBps,
         bookingAdvancePaise: toDb(branding.bookingAdvancePaise),
         gstBps: branding.gstBps,

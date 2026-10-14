@@ -14,7 +14,9 @@ import { headers } from 'next/headers';
 import { PATH_HEADER, STUDIO_SIGN_IN } from '@/lib/host';
 import { memberFor } from '@/modules/studio/access';
 import { can, type MemberRole } from '@/modules/studio/roles';
-import { TEAM_PATH, TODAY_HOME, homeFor, mayOpen, usesOfficeShell } from '@/modules/studio/surfaces';
+import { TEAM_PATH, TODAY_HOME, usesOfficeShell } from '@/modules/studio/surfaces';
+import { doorFor, type PilotArea } from '@/modules/studio/pilot';
+import { ComingSoon } from './ComingSoon';
 import { RoleFrame } from './RoleFrame';
 import { APPS, appsFor } from '@/modules/studio/apps';
 import { StudioFrame } from './ui/StudioFrame';
@@ -95,15 +97,44 @@ export default async function StudioLayout({ children }: { children: React.React
    * No membership (an ops account, a studio account not yet linked, or
    * fixtures mode with no database) keeps today's behaviour below.
    */
-  const member = hasDatabase() ? await memberFor(user.id).catch(() => null) : null;
+  /* A failed lookup is NOT "no membership". Treating it as one drew every
+     app for a salesperson whenever the database read failed (seen with a
+     stale client after a schema change), so it fails closed: a short
+     "try again" screen, never a menu the person is not meant to have. */
+  let member: Awaited<ReturnType<typeof memberFor>> = null;
+  if (hasDatabase()) {
+    try {
+      member = await memberFor(user.id);
+    } catch (error) {
+      console.error('[studio] membership lookup failed', error instanceof Error ? error.name : 'unknown');
+      return (
+        <Themed>
+          <main className="content" style={{ maxWidth: 560, margin: '10vh auto' }}>
+            <div className="card">
+              <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>We could not open your studio just now.</h1>
+              <p className="muted" style={{ margin: 0 }}>Nothing is lost. Refresh the page in a minute; if it keeps happening, tell us.</p>
+            </div>
+          </main>
+        </Themed>
+      );
+    }
+  }
+  /* A screen closed only by the studio's pilot switch (studio/pilot.ts): an
+     owner or a salesperson who types its address sees its "coming soon" in
+     the frame instead of the screen; the gated sections' own layouts
+     (PilotGate) say the same on every navigation into them. */
+  let soon: PilotArea | null = null;
   if (member) {
     if (member.status !== 'ACTIVE') return <Themed><NotActive suspended={member.status === 'SUSPENDED'} /></Themed>;
     const path = (await headers()).get(PATH_HEADER);
     /* No header (middleware did not run) means no redirect: redirecting on a
        guess could loop. The module layer still holds. */
-    if (path && !mayOpen(member, path)) redirect(homeFor(member.role));
-    /* A site supervisor: site mode on the phone, nothing of the office. */
-    if (member.role === 'SUPERVISOR') {
+    const door = path ? doorFor(member, path) : null;
+    if (door?.kind === 'home') redirect(door.to);
+    if (door?.kind === 'soon') soon = door.area;
+    /* A site supervisor: site mode on the phone, nothing of the office.
+       Without the full software site mode is closed; their home says so. */
+    if (member.role === 'SUPERVISOR' && member.fullSoftware !== false) {
       return (
         <Themed>
           <RoleFrame
@@ -134,7 +165,7 @@ export default async function StudioLayout({ children }: { children: React.React
           publicHref={context?.live ? `/studios/${context.slug}` : null}
           signOut={<SignOutButton />}
         >
-          {children}
+          {soon ? <ComingSoon area={soon} /> : children}
         </StudioShell>
       </Themed>
     );
@@ -158,7 +189,7 @@ export default async function StudioLayout({ children }: { children: React.React
         userName={user.name}
         signOut={signOutAction}
       >
-        {children}
+        {soon ? <ComingSoon area={soon} /> : children}
       </StudioFrame>
     </Themed>
   );

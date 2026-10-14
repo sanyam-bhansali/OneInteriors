@@ -36,7 +36,7 @@
  */
 
 import type { Prisma } from '@prisma/client';
-import { can, type MemberRole, type StudioRoleName } from './roles';
+import { can, FULL_SOFTWARE_ROLES, type MemberRole, type StudioRoleName } from './roles';
 
 /** The roles that work in the office. */
 export const OFFICE_ROLES: readonly StudioRoleName[] = ['OWNER', 'PM'];
@@ -68,9 +68,48 @@ export const DESIGN_STEPS_PATH = '/studio/settings/design';
 export const CREWS_HOME = '/studio/vendors';
 export const LABOUR_PATH = '/studio/vendors/labour';
 export const CREW_SETTINGS_PATH = '/studio/settings/trades';
+/** Settings → Crew: the faces site mode taps (`crew.manage`). */
+export const SITE_CREW_PATH = '/studio/settings/crew';
+/** The owner's "Set up your studio" quiz (studio/setup-quiz.ts). Owner only. */
+export const SETUP_PATH = '/studio/setup';
 
-/** Where a member lands after signing in, and where the layout sends them back to. */
-export function homeFor(role: StudioRoleName): string {
+/**
+ * The screens only a studio with the full software opens (owner, 14 Oct
+ * 2026; studio/pilot.ts says which "coming soon" each one shows). Everything
+ * else (leads, quotations, the product master, the remaining settings,
+ * Today, Calendar, the overview and setup) stays open to every studio.
+ */
+export const FULL_SOFTWARE_PATHS: readonly string[] = [
+  '/studio/projects',
+  '/studio/updates',
+  DESIGN_HOME,
+  DESIGN_STEPS_PATH,
+  SITE_HOME,
+  SITE_CREW_PATH,
+  PAYMENTS_HOME,
+  CREWS_HOME,
+  CREW_SETTINGS_PATH,
+  TEAM_PATH,
+  '/studio/listing',
+];
+
+/** Whether a role only makes sense with the full software (designer, PM, supervisor, accounts). */
+export function needsFullSoftware(role: StudioRoleName): boolean {
+  return FULL_SOFTWARE_ROLES.includes(role);
+}
+
+/** Whether a path is one of the full software's screens. */
+export function isFullSoftwarePath(path: string): boolean {
+  return FULL_SOFTWARE_PATHS.some((p) => under(path, p));
+}
+
+/**
+ * Where a member lands after signing in, and where the layout sends them back
+ * to. In a studio without the full software everyone's is the home (site mode
+ * is closed there, so a supervisor's home says the software is not on yet).
+ */
+export function homeFor(role: StudioRoleName, fullSoftware?: boolean): string {
+  if (fullSoftware === false) return STUDIO_HOME;
   if (role === 'SUPERVISOR') return SITE_HOME;
   return STUDIO_HOME;
 }
@@ -117,6 +156,15 @@ function under(path: string, prefix: string): boolean {
  */
 export function mayOpen(member: MemberRole, path: string): boolean {
   if (member.status !== 'ACTIVE') return false;
+  /* The pilot switch (owner, 14 Oct 2026): a studio without the full
+     software opens only the home to the roles that need it, and none of its
+     screens to anyone. Explicitly false only: undefined is "not known here". */
+  if (member.fullSoftware === false) {
+    if (needsFullSoftware(member.role)) return path === STUDIO_HOME;
+    if (isFullSoftwarePath(path)) return false;
+  }
+  /* The setup quiz sets the studio's settings up: the owner's alone. */
+  if (under(path, SETUP_PATH)) return member.role === 'OWNER';
   if (member.role === 'SUPERVISOR') return under(path, SITE_HOME);
   /* Every other role's home: the launcher, which shows only the apps below. */
   if (path === STUDIO_HOME) return true;

@@ -37,9 +37,13 @@ const TEAM_TAB = { href: '/studio/settings/team', label: 'Team' };
 
 const ALL = [...TABS, PAYMENTS_TAB, DESIGN_TAB, CREWS_TAB, TEAM_TAB];
 
-export function SettingsTabs({ team = false }: { team?: boolean }) {
+export function SettingsTabs({ team = false, allowed }: { team?: boolean; allowed?: readonly string[] }) {
   const pathname = usePathname();
-  const tabs = team ? [TEAM_TAB, ...TABS, PAYMENTS_TAB, DESIGN_TAB, CREWS_TAB] : TABS;
+  const tabs = allowed
+    ? [TEAM_TAB, ...TABS, PAYMENTS_TAB, DESIGN_TAB, CREWS_TAB].filter((t) => allowed.includes(t.href))
+    : team
+      ? [TEAM_TAB, ...TABS, PAYMENTS_TAB, DESIGN_TAB, CREWS_TAB]
+      : TABS;
 
   return (
     <nav className="tabs st-tabs" aria-label="Settings">

@@ -222,9 +222,9 @@ export function BrandingForm({ branding }: { branding: BrandingRow | null }) {
             label="Professional fee"
             name="feePct"
             required
-            defaultValue="7"
+            defaultValue={branding && branding.feeBps === 0 ? '0' : '7'}
             width="xs"
-            suffix="% of the work value — 7% for every studio, switched on or off per quotation"
+            suffix="% of the work value — 7% for every studio, switched on or off per quotation (0 starts new ones with it off)"
           />
           <Field
             label="Your modular discount"

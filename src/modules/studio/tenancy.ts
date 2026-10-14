@@ -51,8 +51,11 @@ export async function myStudioId(): Promise<string | null> {
        suspended finds no studio in any office module (studio/surfaces.ts). */
     const member = await prisma.studioMember.findUnique({
       where: { userId: user.id, ...OFFICE_MEMBER },
-      select: { studioId: true },
+      select: { studioId: true, role: true, studio: { select: { fullSoftware: true } } },
     });
+    /* The pilot switch (studio/pilot.ts): a project manager's office is the
+       full software's, so in a studio without it they find no studio. */
+    if (member && member.role === 'PM' && member.studio?.fullSoftware === false) return null;
     return member?.studioId ?? null;
   } catch {
     return null;

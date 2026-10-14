@@ -34,11 +34,18 @@ export interface StudioMemberRef extends MemberRole {
   userId: string;
 }
 
-const MEMBER_SELECT = { id: true, studioId: true, userId: true, role: true, status: true } as const;
+const MEMBER_SELECT = { id: true, studioId: true, userId: true, role: true, status: true, studio: { select: { fullSoftware: true } } } as const;
 
-/** The membership of this user, or null when they belong to no studio. `userId` is unique: one person, one studio. */
+/**
+ * The membership of this user, or null when they belong to no studio. `userId` is unique: one person, one studio.
+ * Carries the studio's pilot switch (`fullSoftware`), so `can()` and `mayOpen` narrow a studio without the full software (studio/pilot.ts).
+ */
 export async function memberFor(userId: string): Promise<StudioMemberRef | null> {
-  return prisma.studioMember.findUnique({ where: { userId }, select: MEMBER_SELECT });
+  const row = await prisma.studioMember.findUnique({ where: { userId }, select: MEMBER_SELECT });
+  if (!row) return null;
+  const { studio, ...member } = row;
+  /* The relation is required; a test double without it narrows nothing. */
+  return studio ? { ...member, fullSoftware: studio.fullSoftware === true } : member;
 }
 
 /**

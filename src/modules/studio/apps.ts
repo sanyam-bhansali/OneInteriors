@@ -172,6 +172,19 @@ export function appsFor(member: MemberRole): StudioApp[] {
 }
 
 /**
+ * The apps this member would have with the full software but does not
+ * because their studio is not a pilot (owner, 14 Oct 2026): the owner's home
+ * shows them greyed as "Coming soon", never as links. Empty for every studio
+ * on the full software, and for the roles that need it (their home says so).
+ */
+export function comingSoonApps(member: MemberRole): StudioApp[] {
+  if (member.status !== 'ACTIVE' || member.fullSoftware !== false || member.role !== 'OWNER') return [];
+  const open = new Set(appsFor(member).map((a) => a.key));
+  const full = new Set(appsFor({ ...member, fullSoftware: true }).map((a) => a.key));
+  return APPS.filter((a) => full.has(a.key) && !open.has(a.key));
+}
+
+/**
  * The app a path belongs to, or null (the home, sign-in). Longest prefix wins,
  * so `/studio/calendar/appointments` is Calendar and `/studio` alone is nothing.
  */

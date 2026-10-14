@@ -3,8 +3,12 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/modules/auth/session';
 import { currentMember } from '@/modules/studio/access';
-import { appsFor, APPS, type AppKey, type StudioApp } from '@/modules/studio/apps';
-import { SITE_HOME } from '@/modules/studio/surfaces';
+import { appsFor, comingSoonApps, APPS, type AppKey, type StudioApp } from '@/modules/studio/apps';
+import { waitingForFullSoftware } from '@/modules/studio/pilot';
+import { quizPrompt } from '@/modules/studio/setup-quiz';
+import { crmIsOpen } from '@/modules/studio/standing';
+import { hasSubmittedForReview } from '@/modules/studio/submitted';
+import { SETUP_PATH, SITE_HOME } from '@/modules/studio/surfaces';
 import { myToday } from '@/modules/studio-sales/today';
 import type { SectionId, TodaySection } from '@/modules/studio-sales/today-rules';
 import { prisma } from '@/lib/prisma';
@@ -25,6 +29,7 @@ import { remainingLine } from '@/modules/project/lifecycle-rules';
 import { asLifeTab, LifecycleTabs } from '../design/LifecycleTabs';
 import { siteWords } from '../site/words';
 import './home.css';
+import '../setup/setup.css';
 
 export const metadata: Metadata = { title: 'Studio home', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -39,7 +44,11 @@ export const dynamic = 'force-dynamic';
  */
 export default async function StudioHomePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const [user, member] = await Promise.all([getCurrentUser(), currentMember()]);
-  if (member?.role === 'SUPERVISOR') redirect(SITE_HOME);
+  /* Without the full software site mode is closed, so a supervisor stays here and is told why. */
+  if (member?.role === 'SUPERVISOR' && member.fullSoftware !== false) redirect(SITE_HOME);
+  /* The pilot switch (studio/pilot.ts): a designer, project manager,
+     supervisor or accounts member of a studio without the full software. */
+  if (member && waitingForFullSoftware(member)) return <NotSwitchedOn name={user?.name ?? null} />;
 
   /* The person's own home (profile menu): their tile order, hidden tiles and
      the "Right now" strip. Only ever a subset of `appsFor`. */
@@ -54,7 +63,7 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
      nothing to a designer), a designer's own design steps. */
   const [studio, today, lang, sites, crews, board, closures, { tab: rawTab }] = await Promise.all([
     member
-      ? prisma.studio.findUnique({ where: { id: member.studioId }, select: { tradeName: true, status: true } }).catch(() => null)
+      ? prisma.studio.findUnique({ where: { id: member.studioId }, select: { tradeName: true, status: true, onboardingSteps: true, setupQuiz: true } }).catch(() => null)
       : Promise.resolve(null),
     member && ['OWNER', 'PM', 'SALES'].includes(member.role) ? myToday() : Promise.resolve(null),
     getLang(),
@@ -66,6 +75,14 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
     member && ['OWNER', 'PM'].includes(member.role) ? closuresRemainingFor().catch(() => null) : Promise.resolve(null),
     searchParams,
   ]);
+
+  /* "Set up your studio" (owner, 14 Oct 2026): on the owner's first visit
+     after the software opens, the quiz; skipped, a small card stays here. */
+  const open = studio ? crmIsOpen({ status: studio.status, submittedForReview: hasSubmittedForReview(studio.onboardingSteps) }) : false;
+  const prompt = member?.role === 'OWNER' && member.status === 'ACTIVE' && open ? quizPrompt(studio?.setupQuiz ?? null) : null;
+  if (prompt === 'quiz') redirect(SETUP_PATH);
+  /* Apps their studio does not have yet: greyed "Coming soon" tiles, owner only. */
+  const soon = member ? comingSoonApps(member) : [];
 
   const name = studio?.tradeName ?? 'Your studio';
   const firstName = (user?.name ?? '').trim().split(/\s+/)[0] || null;
@@ -152,7 +169,17 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
                 </Link>
               );
             })}
+            {soon.map((a) => (
+              <div key={a.key} className="ph-app soon" aria-disabled="true">
+                <span className="tico">
+                  <AppIcon name={a.icon} />
+                </span>
+                {a.name}
+                <span className="muted sm">Soon</span>
+              </div>
+            ))}
           </div>
+          {prompt === 'card' ? <SetupCard /> : null}
           {strip.length > 0 ? (
             <section className="card ph-card" aria-label="Right now">
               <b>Right now</b>
@@ -213,8 +240,19 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
                 </Link>
               );
             })}
+            {soon.map((a) => (
+              <div key={a.key} className="tile soon" aria-disabled="true" data-testid="soon-tile">
+                <span className="tico">
+                  <AppIcon name={a.icon} />
+                </span>
+                <b>{a.name}</b>
+                <span className="tsub">Coming soon</span>
+              </div>
+            ))}
           </div>
         </section>
+
+        {prompt === 'card' ? <SetupCard /> : null}
 
         {closures && closures.count > 0 ? (
           <section className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--warn-bg)', color: 'var(--warn)' }} aria-label="Project closures remaining" data-testid="closures-remaining">
@@ -249,6 +287,51 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
 
         <PoweredBy style={{ paddingTop: 24 }} />
       </main>
+    </div>
+  );
+}
+
+/** The quiz skipped: a small way back to it on the owner's home. */
+function SetupCard() {
+  return (
+    <section className="card sq-setcard" aria-label="Set up your studio" data-testid="setup-card">
+      <span>
+        <b>Set up your studio</b>
+        <span className="muted sm" style={{ display: 'block' }}>
+          Twelve quick questions set your lead sources, pipeline, payment stages and quotation defaults.
+        </span>
+      </span>
+      <Link href={SETUP_PATH} className="btn pri sm">
+        Start
+      </Link>
+    </section>
+  );
+}
+
+/**
+ * A designer, project manager, supervisor or accounts member of a studio
+ * whose full software is not switched on (owner, 14 Oct 2026): nothing of the
+ * studio, just the plain reason and a way out.
+ */
+function NotSwitchedOn({ name }: { name: string | null }) {
+  const first = (name ?? '').trim().split(/\s+/)[0] || null;
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--ground)', color: 'var(--ink)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px' }}>
+      <section className="card" style={{ maxWidth: 520, width: '100%', padding: 24 }} data-testid="not-switched-on">
+        <span className="eyebrow">{first ? `Hi, ${first}` : 'Hello'}</span>
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 500, letterSpacing: '-.03em' }}>Your studio’s full software isn’t switched on yet.</h1>
+        <p className="muted" style={{ margin: 0, lineHeight: 1.5 }}>
+          Projects, design, site updates, payments and crews open when One Interiors switches on the full studio software for your studio. Until then there is nothing here for your role. Your studio owner will tell you when it is on.
+        </p>
+        <div className="hstack">
+          <ThemeToggle />
+          <form action={signOutAction}>
+            <button type="submit" className="btn sec sm">
+              Sign out
+            </button>
+          </form>
+        </div>
+      </section>
     </div>
   );
 }

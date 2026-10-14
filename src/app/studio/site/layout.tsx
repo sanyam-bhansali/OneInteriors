@@ -1,5 +1,6 @@
 import { getLang } from '@/modules/i18n/server';
 import { SiteBar } from './SiteBar';
+import { PilotGate } from '../PilotGate';
 import './site.css';
 
 /**
@@ -11,9 +12,9 @@ import './site.css';
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
   const lang = await getLang();
   return (
-    <>
+    <PilotGate area="site">
       {children}
       <SiteBar lang={lang} />
-    </>
+    </PilotGate>
   );
 }

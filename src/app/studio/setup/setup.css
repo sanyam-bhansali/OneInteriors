@@ -1,0 +1,27 @@
+/* "Set up your studio" (owner, 14 Oct 2026). Tokens only; scoped to the studio frame. */
+.oi-studio .sq-page{max-width:640px;width:100%;margin:0 auto}
+.oi-studio .sq-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.oi-studio .sq-dots{display:flex;gap:6px;margin:0;padding:0;list-style:none}
+.oi-studio .sq-dots li{flex:1;height:6px;border-radius:999px;background:var(--fill)}
+.oi-studio .sq-dots li.past{background:var(--acc-soft)}
+.oi-studio .sq-dots li.now{background:var(--acc)}
+.oi-studio .sq-card{padding:24px;gap:16px}
+.oi-studio .sq-q{margin:0;font-size:24px;font-weight:500;letter-spacing:-.03em;line-height:1.2}
+.oi-studio .sq-stack{display:flex;flex-direction:column;gap:12px}
+.oi-studio .sq-opts{display:flex;flex-direction:column;gap:8px}
+.oi-studio .sq-opt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--paper);color:var(--ink);font-size:14.5px;cursor:pointer}
+.oi-studio .sq-opt:hover{background:var(--fillh)}
+.oi-studio .sq-opt[aria-checked="true"]{border-color:var(--acc);background:var(--acc-soft);color:var(--acc-ink)}
+.oi-studio .sq-chips{display:flex;flex-wrap:wrap;gap:8px}
+.oi-studio .sq-chip{min-height:36px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:var(--paper);color:var(--ink);font-size:14px;cursor:pointer}
+.oi-studio .sq-chip[aria-pressed="true"]{border-color:var(--acc);background:var(--acc-soft);color:var(--acc-ink)}
+.oi-studio .sq-counts{display:flex;flex-direction:column;gap:6px}
+.oi-studio .sq-count{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)}
+.oi-studio .sq-nav{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding-top:4px}
+.oi-studio .sq-changes,.oi-studio .sq-done{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+.oi-studio .sq-changes label{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+.oi-studio .sq-changes input{margin-top:3px;width:16px;height:16px;flex:none}
+.oi-studio .sq-changes label > span{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.oi-studio .sq-kept{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:12px;background:var(--fill)}
+.oi-studio .sq-setcard{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+@media (max-width:600px){.oi-studio .sq-card{padding:18px}.oi-studio .sq-q{font-size:21px}}

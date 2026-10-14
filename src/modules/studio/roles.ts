@@ -310,7 +310,56 @@ const STUDIO_WIDE_ROLES: ReadonlySet<StudioRoleName> = new Set(['OWNER', 'ACCOUN
 export interface MemberRole {
   role: StudioRoleName;
   status: StudioMemberStatusName;
+  /**
+   * The studio's pilot switch (`Studio.fullSoftware`, owner 14 Oct 2026;
+   * studio/pilot.ts). `memberFor` always sets it. Left out (a pure test, a
+   * caller that has no studio row) nothing is narrowed; explicitly `false`
+   * closes the full-software roles and actions below.
+   */
+  fullSoftware?: boolean;
 }
+
+/**
+ * The roles that only make sense with the full software (owner, 14 Oct
+ * 2026): in a studio without it they can do nothing, and their home says so.
+ */
+export const FULL_SOFTWARE_ROLES: readonly StudioRoleName[] = ['PM', 'DESIGNER', 'SUPERVISOR', 'ACCOUNTS'];
+
+/**
+ * What a studio without the full software cannot do, whoever asks (the
+ * owner included): projects, site, design, the payments desk, crews and the
+ * team. Leads, quotations, booking a sales final, the payment stages
+ * template and the calendar stay.
+ */
+export const FULL_SOFTWARE_ACTIONS: ReadonlySet<StudioAction> = new Set<StudioAction>([
+  'team.manage',
+  'project.create',
+  'plan.edit',
+  'update.post',
+  'checklist.tick',
+  'decision.create',
+  'snag.accept',
+  'snag.fix',
+  'payment.record',
+  'payment.read',
+  'document.upload',
+  'vendor.rates',
+  'project.read',
+  'crew.manage',
+  'design.work',
+  'design.assign',
+  'design.template',
+  'design.workload',
+  'crew.list',
+  'crew.edit',
+  'crew.settings',
+  'workorder.read',
+  'workorder.build',
+  'workorder.money',
+  'crew.pay',
+  'design.close',
+  'project.closure',
+]);
 
 /**
  * Whether this member may take this action.
@@ -322,6 +371,8 @@ export interface MemberRole {
  */
 export function can(member: MemberRole, action: StudioAction, ctx: { assigned?: boolean } = {}): boolean {
   if (member.status !== 'ACTIVE') return false;
+  /* The pilot switch (studio/pilot.ts): checked before the owner's "everything". */
+  if (member.fullSoftware === false && (FULL_SOFTWARE_ROLES.includes(member.role) || FULL_SOFTWARE_ACTIONS.has(action))) return false;
   if (member.role === 'OWNER') return true;
   if (!GRANTS[member.role]?.includes(action)) return false;
   // A lead action: only a salesperson is limited, to their own leads.

@@ -349,6 +349,36 @@ export async function setHiddenAsTest(
   }
 }
 
+// ── The pilot switch ───────────────────────────────────────────
+
+/**
+ * Switch a studio's full Studio OS on or off (owner, 14 Oct 2026;
+ * modules/studio/pilot.ts). Ops only, audited like every other change ops
+ * makes to a studio. Off keeps every record: projects, crews and the team
+ * stay in the database and come back when it is switched on again.
+ */
+export async function setFullSoftware(studioId: string, on: boolean): Promise<RecordResult> {
+  const actor = await requireRole('OPS');
+  try {
+    await prisma.$transaction(async (tx) => {
+      const before = await tx.studio.findUniqueOrThrow({ where: { id: studioId }, select: { fullSoftware: true, tradeName: true } });
+      if (before.fullSoftware === on) return;
+      await tx.studio.update({ where: { id: studioId }, data: { fullSoftware: on } });
+      await writeAudit(tx, actor, on ? 'studio.full_software_on' : 'studio.full_software_off', 'Studio', studioId, { fullSoftware: before.fullSoftware }, { fullSoftware: on, tradeName: before.tradeName });
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Could not change this.' };
+  }
+}
+
+/** Whether a studio has the full software (the ops page reads it). */
+export async function fullSoftwareOf(studioId: string): Promise<boolean> {
+  await requireRole('OPS');
+  const row = await prisma.studio.findUnique({ where: { id: studioId }, select: { fullSoftware: true } });
+  return row?.fullSoftware === true;
+}
+
 // ── GSTIN ──────────────────────────────────────────────────────
 
 /**

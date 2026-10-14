@@ -21,7 +21,7 @@ import { prisma } from '@/lib/prisma';
 import { storeLogo, removeLogo, storeBrandPage } from '@/modules/storage/studio-logo';
 import { fromDb, toDb, type Paise } from '@/lib/money';
 import { starterRowsFor } from './starter-catalogue';
-import { FEE_BPS, type QuoteUnitName, type WorkCodeName } from './pricing';
+import { feeBpsOf, type QuoteUnitName, type WorkCodeName } from './pricing';
 import { readRules, type ProductRules } from './configure';
 import { BRAND_PAGES_MAX } from './document';
 import { Prisma } from '@prisma/client';
@@ -582,8 +582,10 @@ export async function saveBranding(input: BrandingInput): Promise<SaveResult> {
     welcomeNote: input.welcomeNote?.trim() || null,
     ...(input.terms !== undefined ? { terms: input.terms.trim() || null } : {}),
     ...(input.accentHex !== undefined && /^#[0-9a-fA-F]{6}$/.test(input.accentHex.trim()) ? { accentHex: input.accentHex.trim().toUpperCase() } : {}),
-    // 7% for every studio (owner, 12 Oct 2026); the setting no longer moves it.
-    feeBps: FEE_BPS,
+    // 7% for every studio (owner, 12 Oct 2026); the setting no longer moves
+    // it. Whether a new quotation starts with it on is the studio's (0 = off,
+    // owner 14 Oct 2026: the setup quiz asks).
+    feeBps: feeBpsOf(input.feeBps > 0),
     discountBps: input.discountBps,
     bookingAdvancePaise: toDb(Math.max(0, input.bookingAdvancePaise)),
     ...(input.gstBps !== undefined ? { gstBps: input.gstBps > 0 ? 1800 : 0 } : {}),

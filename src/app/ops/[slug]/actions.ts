@@ -12,6 +12,7 @@ import {
   setGstin,
   setStudioStatus,
   setHiddenAsTest,
+  setFullSoftware,
   setCuratedDiscount,
   confirmBand,
   type RecordResult,
@@ -141,6 +142,17 @@ export async function setHiddenAsTestAction(
       revalidatePath(`/studios/${slug}`);
     }
   }
+  return result;
+}
+
+/** The pilot switch: the studio's full Studio OS on or off (record.ts setFullSoftware). */
+export async function setFullSoftwareAction(
+  _prev: RecordResult | null,
+  formData: FormData,
+): Promise<RecordResult> {
+  const slug = String(formData.get('slug') ?? '');
+  const result = await setFullSoftware(String(formData.get('studioId') ?? ''), formData.get('on') === '1');
+  if (result.ok && slug) revalidatePath(`/ops/${slug}`);
   return result;
 }
 

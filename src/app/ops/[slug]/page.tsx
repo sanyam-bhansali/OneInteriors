@@ -16,13 +16,14 @@ import { BandControl } from './BandControl';
 import { proposeBand } from '@/modules/studio/band';
 import { liveRatesFor } from '@/modules/quotation/filed-rate-store';
 import { HideControl } from './HideControl';
+import { FullSoftwareControl } from './FullSoftwareControl';
 import { ArchiveReview } from './ArchiveReview';
 import { DraftReview } from './DraftReview';
 import { pendingDraftRun } from '@/modules/studio-quote/product-drafts';
 import { archivesForStudio } from '@/modules/studio/quotation-archive-store';
 import { ratesForReview } from '@/modules/quotation/filed-rate-store';
 import type { ArchiveRow } from './ArchiveReview';
-import { studioAuditTrail } from '@/modules/verification/record';
+import { studioAuditTrail, fullSoftwareOf } from '@/modules/verification/record';
 import { approvalBlockers } from '@/modules/studio/approval';
 import { approvalFactsFor } from '@/modules/studio/approval-store';
 
@@ -52,6 +53,7 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
   const trail = await studioAuditTrail(studio.id, 20);
   const blockers = approvalBlockers(await approvalFactsFor(studio.id));
   const draftRun = await pendingDraftRun(studio.id);
+  const fullSoftware = await fullSoftwareOf(studio.id);
 
   return (
     <>
@@ -302,6 +304,11 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
                     hiddenAt={studio.hiddenAsTestAt ?? null}
                     tradeName={studio.tradeName}
                   />
+                </div>
+
+                {/* The per-studio pilot switch (owner, 14 Oct 2026). */}
+                <div className="mt-4">
+                  <FullSoftwareControl studioId={studio.id} slug={studio.slug} on={fullSoftware} />
                 </div>
               </div>
 

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { COMING_SOON, type StudioFeature } from '@/modules/studio/features';
+import { PILOT_SOON, type PilotArea } from '@/modules/studio/pilot';
 import './office-ui.css';
 
 /**
@@ -23,15 +24,17 @@ import './office-ui.css';
  *
  * Nothing here is an apology. The feature is not late; it is not in the pilot.
  */
-export function ComingSoon({ feature }: { feature: keyof typeof COMING_SOON }) {
-  const copy = COMING_SOON[feature];
+export function ComingSoon(props: { feature: keyof typeof COMING_SOON } | { area: PilotArea }) {
+  /* `area`: closed for this studio by the pilot switch (studio/pilot.ts), not for everyone. */
+  const copy = 'area' in props ? PILOT_SOON[props.area] : COMING_SOON[props.feature];
+  const pilot = 'area' in props;
 
   return (
     <main className="content ox-page">
       <div className="phead">
         <div>
           <h1>{copy.title}</h1>
-          <p className="muted">Not in this release.</p>
+          <p className="muted">{pilot ? 'Coming soon to your studio.' : 'Not in this release.'}</p>
         </div>
       </div>
       <section className="card" style={{ maxWidth: '46rem' }}>
@@ -48,8 +51,8 @@ export function ComingSoon({ feature }: { feature: keyof typeof COMING_SOON }) {
           <Link href="/studio/clients" className="btn pri">
             Go to your leads
           </Link>
-          <Link href="/studio" className="btn sec">
-            Overview
+          <Link href="/studio/home" className="btn sec">
+            Home
           </Link>
         </div>
       </section>

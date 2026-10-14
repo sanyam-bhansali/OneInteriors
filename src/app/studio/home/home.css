@@ -185,3 +185,8 @@
 .oi-studio .ph-card .trow {
   min-height: 34px;
 }
+
+/* Apps the studio does not have yet (the pilot switch, 14 Oct 2026): greyed, not links. */
+.oi-studio .tile.soon,.oi-studio .ph-app.soon{opacity:.5;cursor:default;pointer-events:none}
+.oi-studio .tile.soon .tico,.oi-studio .ph-app.soon .tico{background:var(--fill);color:var(--muted)}
+.oi-studio .tile.soon:hover{transform:none;box-shadow:none}

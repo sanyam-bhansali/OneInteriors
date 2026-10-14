@@ -6,6 +6,9 @@ import { LogoAndMark } from './LogoAndMark';
 import { BrandPages } from './BrandPages';
 import { WarrantyForm } from './WarrantyForm';
 import { myWarranty } from '@/modules/studio/warranty';
+import Link from 'next/link';
+import { currentMember } from '@/modules/studio/access';
+import { SETUP_PATH } from '@/modules/studio/surfaces';
 
 export const metadata: Metadata = {
   title: 'Settings',
@@ -35,12 +38,15 @@ export default async function SettingsPage() {
 
   /* In parallel: neither depends on the other, and the signed URL is a round
      trip to storage that should not sit behind a subscription lookup. */
-  const [logoUrl, tier, warranty, brandPageUrls] = await Promise.all([
+  const [logoUrl, tier, warranty, brandPageUrls, member] = await Promise.all([
     signedLogoUrl(branding?.logoPath ?? null),
     myTier(),
     myWarranty().catch(() => null),
     Promise.all((branding?.brandPages ?? []).map((p) => signedLogoUrl(p))),
+    currentMember(),
   ]);
+  /* The warranty follows the handover sign-off: a full-software setting (studio/pilot.ts). */
+  const full = member?.fullSoftware !== false;
 
   return (
     <>
@@ -77,7 +83,21 @@ export default async function SettingsPage() {
           <BrandPages pages={brandPageUrls.map((url) => ({ url }))} hasBranding={branding !== null} uploadEnabled={logoUploadEnabled()} />
         </div>
         {/* The project lifecycle (owner, 13 Oct 2026): months of warranty after the client signs off the handover. */}
-        {warranty ? <WarrantyForm months={warranty.months} canEdit={warranty.canEdit} /> : null}
+        {warranty && full ? <WarrantyForm months={warranty.months} canEdit={warranty.canEdit} /> : null}
+        {/* The owner's setup quiz, again (owner, 14 Oct 2026). */}
+        {member?.role === 'OWNER' ? (
+          <div className="card mt-6 max-w-[52rem]" data-testid="setup-again">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span>
+                <b>Set up your studio again</b>
+                <span className="muted block text-[13.5px]">Answer the twelve setup questions again; you see every change before it is saved.</span>
+              </span>
+              <Link href={SETUP_PATH} className="btn sec sm">
+                Set up your studio again
+              </Link>
+            </div>
+          </div>
+        ) : null}
       </>
     </>
   );
