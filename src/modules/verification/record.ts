@@ -190,7 +190,7 @@ export async function setStudioStatus(
       });
 
       /* The owner's rule (30 Sep 2026): nobody is listed until at least
-         fifty of their own quotations have been read into approved rates and
+         MIN_QUOTATIONS_FOR_RATES (25) of their own quotations have been read into approved rates and
          a product master. Checked here, inside the transaction, so it is the
          same data the approval commits. Only on the way IN — re-saving an
          active studio is not a new approval. */
@@ -347,6 +347,36 @@ export async function setHiddenAsTest(
       error: err instanceof Error ? err.message : 'Could not change this.',
     };
   }
+}
+
+// ── The pilot switch ───────────────────────────────────────────
+
+/**
+ * Switch a studio's full Studio OS on or off (owner, 14 Oct 2026;
+ * modules/studio/pilot.ts). Ops only, audited like every other change ops
+ * makes to a studio. Off keeps every record: projects, crews and the team
+ * stay in the database and come back when it is switched on again.
+ */
+export async function setFullSoftware(studioId: string, on: boolean): Promise<RecordResult> {
+  const actor = await requireRole('OPS');
+  try {
+    await prisma.$transaction(async (tx) => {
+      const before = await tx.studio.findUniqueOrThrow({ where: { id: studioId }, select: { fullSoftware: true, tradeName: true } });
+      if (before.fullSoftware === on) return;
+      await tx.studio.update({ where: { id: studioId }, data: { fullSoftware: on } });
+      await writeAudit(tx, actor, on ? 'studio.full_software_on' : 'studio.full_software_off', 'Studio', studioId, { fullSoftware: before.fullSoftware }, { fullSoftware: on, tradeName: before.tradeName });
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Could not change this.' };
+  }
+}
+
+/** Whether a studio has the full software (the ops page reads it). */
+export async function fullSoftwareOf(studioId: string): Promise<boolean> {
+  await requireRole('OPS');
+  const row = await prisma.studio.findUnique({ where: { id: studioId }, select: { fullSoftware: true } });
+  return row?.fullSoftware === true;
 }
 
 // ── GSTIN ──────────────────────────────────────────────────────

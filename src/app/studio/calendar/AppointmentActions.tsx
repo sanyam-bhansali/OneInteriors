@@ -35,7 +35,7 @@ export function AppointmentActions({
   if (status === 'COMPLETED' || status === 'NO_SHOW' || status === 'CANCELLED') return null;
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2">
+    <div className="hstack" style={{ gap: 8 }}>
       {/* Confirming a slot that has already been and gone is not a useful
           offer — the only sensible moves on a lapsed proposal are cancelling it
           or asking us for a new time. */}
@@ -46,7 +46,7 @@ export function AppointmentActions({
       ) : null}
 
       {status === 'PROPOSED' && passed ? (
-        <span className="text-[13px] text-[var(--color-ink-3)]">
+        <span className="muted sm">
           This time has passed without being confirmed.
         </span>
       ) : null}
@@ -67,13 +67,13 @@ export function AppointmentActions({
           marketplace earns a reputation for being unfair. It goes through a
           person. */}
       {status === 'CONFIRMED' && passed ? (
-        <span className="text-[13px] text-[var(--color-ink-3)]">
+        <span className="muted sm">
           Nobody came? Tell us — we record that one, so both sides are heard.
         </span>
       ) : null}
 
       {error ? (
-        <span role="alert" className="text-[13px] text-[var(--color-atrisk)]">
+        <span role="alert" className="ox-err">
           {error}
         </span>
       ) : null}
@@ -97,11 +97,7 @@ function Button({
       type="button"
       onClick={onClick}
       disabled={pending}
-      className={`rounded-full px-4 py-1.5 text-[13px] disabled:opacity-40 ${
-        primary
-          ? 'bg-[var(--color-petrol)] text-[var(--color-paper)] hover:bg-[var(--color-petrol-deep)]'
-          : 'border border-[var(--color-rule)] text-[var(--color-ink-2)] hover:text-[var(--color-ink)]'
-      }`}
+      className={primary ? 'btn pri sm' : 'btn ghost sm'}
     >
       {children}
     </button>

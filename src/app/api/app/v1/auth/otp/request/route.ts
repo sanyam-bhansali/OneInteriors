@@ -2,7 +2,7 @@ import { requestOtp } from '@/modules/auth/otp';
 import { requestOtpMessage, SIGN_IN_UNAVAILABLE } from '@/modules/auth/otp-messages';
 import { clientIp, fail, gate, json, readJson, str } from '@/modules/app-api/http';
 
-/** POST /api/app/v1/auth/otp/request — { phone, name } → a WhatsApp code. */
+/** POST /api/app/v1/auth/otp/request — { phone, name? } → a WhatsApp code. A returning customer signs in with the number alone. */
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
 
   const body = (await readJson(req)) as Record<string, unknown> | null;
   try {
-    const result = await requestOtp(str(body?.phone, 20), str(body?.name, 80), { ip: clientIp(req) });
+    const result = await requestOtp(str(body?.phone, 20), str(body?.name, 80), { ip: clientIp(req), nameOptional: true });
     if (!result.ok) return fail(400, requestOtpMessage(result.reason));
     // `devCode` exists only off production or with the pre-launch escape hatch
     // on — the same rule as the website's sign-in (modules/auth/otp.ts).

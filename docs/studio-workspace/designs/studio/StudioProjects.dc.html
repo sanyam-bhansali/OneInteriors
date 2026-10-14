@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Studio projects</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1F2119}a:hover{color:#A8502F}
+a:focus-visible,button:focus-visible{outline:2px solid #A8502F;outline-offset:2px}
+button{font-family:inherit}
+.rl{display:flex;align-items:center;min-height:40px;padding:0 12px;border-radius:10px;font-size:14.5px;font-weight:500;text-decoration:none;color:#1F2119}
+.rl:hover{background:#DFE0D2;color:#1F2119}
+.rl[aria-current="page"]{background:#FBFBF6;color:#1F2119;font-weight:600;box-shadow:inset 3px 0 0 #A8502F}
+.rh{padding:16px 12px 6px;font-size:13px;font-weight:600;color:#4F5147}
+th{font-size:13px;font-weight:600;color:#4F5147;text-align:left;padding:12px 14px;white-space:nowrap}
+td{font-size:14px;padding:14px;border-top:1px solid #E4E5D8;vertical-align:top}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-wrap: wrap; background: #DFE0D2; color: #1F2119; font-family: 'Geist', sans-serif">
+
+  <nav aria-label="Studio" style="flex: 0 0 232px; box-sizing: border-box; background: #ECEDDF; padding: 20px 12px; display: flex; flex-direction: column; gap: 2px">
+    <div style="display: flex; flex-direction: column; gap: 2px; padding: 0 12px 14px">
+      <span style="font-size: 16px; font-weight: 600; letter-spacing: -0.02em">Teakline Studio</span>
+      <span style="font-size: 13px; color: #4F5147">One Interiors Studio</span>
+    </div>
+    <a href="StudioProjects.dc.html" class="rl">Dashboard</a>
+    <span class="rh">Your work</span>
+    <a href="StudioProjects.dc.html" class="rl">Quotations</a>
+    <a href="StudioProjects.dc.html" class="rl">Product master</a>
+    <a href="StudioProjects.dc.html" class="rl">Clients</a>
+    <a href="StudioProjects.dc.html" class="rl" aria-current="page">Projects</a>
+    <a href="StudioProjects.dc.html" class="rl">Vendors</a>
+    <span class="rh">From us</span>
+    <a href="StudioProjects.dc.html" class="rl">Calendar</a>
+    <a href="StudioProjects.dc.html" class="rl">Your listing</a>
+    <span class="rh">Settings</span>
+    <a href="StudioTeam.dc.html" class="rl">Team</a>
+    <a href="StudioProjects.dc.html" class="rl">Pipeline and fields</a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 28px 32px 40px; display: flex; flex-direction: column; gap: 24px">
+
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 14px; color: #4F5147">Thu 8 Oct · Vikram, owner</span>
+        <h1 style="margin: 0; font-size: 34px; font-weight: 500; letter-spacing: -0.035em">Projects</h1>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px">
+        <button type="button" style="min-height: 44px; padding: 0 18px; border: 0; border-radius: 999px; background: #FBFBF6; color: #1F2119; font-size: 14.5px; font-weight: 500; cursor: pointer">Start a project for your own client</button>
+        <button type="button" style="min-height: 44px; padding: 0 18px; border: 0; border-radius: 999px; background: #1F2119; color: #FBFBF6; font-size: 14.5px; font-weight: 500; cursor: pointer">New project from a signed quote</button>
+      </div>
+    </div>
+
+    <section aria-labelledby="h-attn" style="display: flex; flex-direction: column; gap: 12px">
+      <h2 id="h-attn" style="margin: 0; font-size: 17px; font-weight: 600">Needs attention today</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px">
+        <a href="StudioProject.dc.html" style="background: #FBFBF6; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 8px; text-decoration: none; box-shadow: inset 4px 0 0 #8A5A00">
+          <span style="font-size: 13px; font-weight: 600; color: #6B4600">No update yet today</span>
+          <span style="font-size: 16px; font-weight: 600">Flat 1204, Baner</span>
+          <span style="font-size: 14px; color: #4F5147; line-height: 1.4">Ramesh is the supervisor. He gets a reminder at 6 pm; if nothing is posted, Priya sees "no update" at 9 pm.</span>
+        </a>
+        <a href="StudioProject.dc.html" style="background: #FBFBF6; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 8px; text-decoration: none; box-shadow: inset 4px 0 0 #A33A26">
+          <span style="font-size: 13px; font-weight: 600; color: #A33A26">Snag past its fix-by date</span>
+          <span style="font-size: 16px; font-weight: 600">Flat 1103, Kharadi</span>
+          <span style="font-size: 14px; color: #4F5147; line-height: 1.4">Bathroom door not closing flush. Was due Wed 7 Oct. Mrs Nair sees it as overdue.</span>
+        </a>
+        <a href="StudioProject.dc.html" style="background: #FBFBF6; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 8px; text-decoration: none; box-shadow: inset 4px 0 0 #A8502F">
+          <span style="font-size: 13px; font-weight: 600; color: #A8502F">Payment to record</span>
+          <span style="font-size: 16px; font-weight: 600">Flat 404, Wakad</span>
+          <span style="font-size: 14px; color: #4F5147; line-height: 1.4">Booking payment of ₹4,80,000 due at signing. Mark it received and attach the receipt.</span>
+        </a>
+        <a href="StudioProject.dc.html" style="background: #FBFBF6; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 8px; text-decoration: none; box-shadow: inset 4px 0 0 #8E9081">
+          <span style="font-size: 13px; font-weight: 600; color: #4F5147">Waiting on the customer</span>
+          <span style="font-size: 16px; font-weight: 600">Flat 1204, Baner</span>
+          <span style="font-size: 14px; color: #4F5147; line-height: 1.4">Priya hasn't picked a shutter finish. Due Fri 16 Oct. A delay from this is not counted against you.</span>
+        </a>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-live" style="background: #FBFBF6; border-radius: 18px; display: flex; flex-direction: column">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px 6px">
+        <h2 id="h-live" style="margin: 0; font-size: 17px; font-weight: 600">Live projects <span style="font-family: 'Geist Mono', monospace; font-size: 14px; font-weight: 400; color: #4F5147">6</span></h2>
+        <span style="font-size: 13px; color: #4F5147">Each row has a customer app behind it. What your team records in a project shows there.</span>
+      </div>
+      <div style="overflow-x: auto">
+        <table style="width: 100%; min-width: 980px; border-collapse: collapse">
+          <thead>
+            <tr><th scope="col">Home and customer</th><th scope="col">Stage</th><th scope="col">Today on site</th><th scope="col">Overall</th><th scope="col">Snags</th><th scope="col">Waiting on customer</th><th scope="col">Next payment</th><th scope="col">Plan</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><a href="StudioProject.dc.html" style="font-weight: 600; text-decoration: none">Flat 1204, Ivy Towers, Baner</a><div style="font-size: 13px; color: #4F5147; margin-top: 3px">Priya · PM Neha · Ramesh</div></td>
+              <td>Carpentry<div style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #4F5147; margin-top: 3px">day 18 of 30</div></td>
+              <td><span style="color: #6B4600; font-weight: 500">Not posted yet</span></td>
+              <td><span style="color: #A33A26; font-weight: 500">4 days late</span></td>
+              <td>2 open<div style="font-size: 13px; color: #4F5147; margin-top: 3px">1 due Sat</div></td>
+              <td>Shutter finish, due Fri</td>
+              <td style="font-family: 'Geist Mono', monospace">₹7,36,000<div style="font-family: 'Geist', sans-serif; font-size: 13px; color: #4F5147; margin-top: 3px">when finishing starts</div></td>
+              <td>Self-managed</td>
+            </tr>
+            <tr>
+              <td><span style="font-weight: 600">Flat 602, Rohan Leher, Balewadi</span><div style="font-size: 13px; color: #4F5147; margin-top: 3px">Mr Joshi · PM Neha · Ramesh</div></td>
+              <td>Finish<div style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #4F5147; margin-top: 3px">day 4 of 26</div></td>
+              <td><span style="color: #245535; font-weight: 500">Posted 10:12 am</span></td>
+              <td><span style="color: #245535; font-weight: 500">On track</span></td>
+              <td>None</td>
+              <td>None</td>
+              <td style="font-family: 'Geist Mono', monospace">₹3,12,000<div style="font-family: 'Geist', sans-serif; font-size: 13px; color: #4F5147; margin-top: 3px">at handover</div></td>
+              <td>Assured</td>
+            </tr>
+            <tr>
+              <td><span style="font-weight: 600">Flat 1103, Eon Homes, Kharadi</span><div style="font-size: 13px; color: #4F5147; margin-top: 3px">Mrs Nair · PM Vikram · Santosh</div></td>
+              <td>Civil<div style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #4F5147; margin-top: 3px">day 9 of 14</div></td>
+              <td>Nobody on site<div style="font-size: 13px; color: #4F5147; margin-top: 3px">waiting for tiles</div></td>
+              <td><span style="color: #A33A26; font-weight: 500">2 days late</span></td>
+              <td><span style="color: #A33A26; font-weight: 500">1 overdue</span></td>
+              <td>None</td>
+              <td style="font-family: 'Geist Mono', monospace">₹6,20,000<div style="font-family: 'Geist', sans-serif; font-size: 13px; color: #4F5147; margin-top: 3px">when finishing starts</div></td>
+              <td>Self-managed</td>
+            </tr>
+            <tr>
+              <td><span style="font-weight: 600">Flat 404, Kohinoor, Wakad</span><div style="font-size: 13px; color: #4F5147; margin-top: 3px">Mr Patil · PM Vikram</div></td>
+              <td>Design<div style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #4F5147; margin-top: 3px">day 3 of 21</div></td>
+              <td>No site work yet</td>
+              <td><span style="color: #245535; font-weight: 500">On track</span></td>
+              <td>None</td>
+              <td>Kitchen layout, due Mon</td>
+              <td style="font-family: 'Geist Mono', monospace">₹4,80,000<div style="font-family: 'Geist', sans-serif; font-size: 13px; color: #A8502F; margin-top: 3px">due now, record it</div></td>
+              <td>Self-managed</td>
+            </tr>
+            <tr>
+              <td><span style="font-weight: 600">Kitchen, Parijat, Aundh</span><div style="font-size: 13px; color: #4F5147; margin-top: 3px">Mrs Shah · your own client, no app yet</div></td>
+              <td>Carpentry<div style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #4F5147; margin-top: 3px">day 6 of 12</div></td>
+              <td><span style="color: #245535; font-weight: 500">Posted 9:05 am</span></td>
+              <td>1 day late</td>
+              <td>None</td>
+              <td>None</td>
+              <td style="font-family: 'Geist Mono', monospace">₹1,40,000<div style="font-family: 'Geist', sans-serif; font-size: 13px; color: #4F5147; margin-top: 3px">at handover</div></td>
+              <td><button type="button" style="min-height: 34px; padding: 0 12px; border: 0; border-radius: 999px; background: #ECEDDF; color: #1F2119; font-size: 13px; font-weight: 500; cursor: pointer">Invite to app</button></td>
+            </tr>
+            <tr>
+              <td><span style="font-weight: 600">Flat 902, Megapolis, Hinjewadi</span><div style="font-size: 13px; color: #4F5147; margin-top: 3px">Mr Deshmukh · PM Neha · Santosh</div></td>
+              <td>Handover<div style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #4F5147; margin-top: 3px">walk-through Sat</div></td>
+              <td><span style="color: #245535; font-weight: 500">Posted 11:40 am</span></td>
+              <td><span style="color: #245535; font-weight: 500">On track</span></td>
+              <td>3 open</td>
+              <td>None</td>
+              <td style="font-family: 'Geist Mono', monospace">₹2,64,000<div style="font-family: 'Geist', sans-serif; font-size: 13px; color: #4F5147; margin-top: 3px">once snags close</div></td>
+              <td>Self-managed</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

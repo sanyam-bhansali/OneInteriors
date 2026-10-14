@@ -31,7 +31,7 @@ export function RosterGateBanner() {
   if (!showUnverifiedStudios()) return null;
 
   return (
-    <div className="bg-[var(--color-terracotta)] py-1.5 text-center">
+    <div className="roster-gate bg-[var(--color-terracotta)] py-1.5 text-center">
       <p className="m-0 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-paper)]">
         Dev · verification gate off · unverified studios are visible
       </p>

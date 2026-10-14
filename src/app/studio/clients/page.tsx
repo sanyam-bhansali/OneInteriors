@@ -1,137 +1,205 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { PageHead, PageBody } from '../StudioShell';
-import { GuidePanel } from '../GuidePanel';
-import { guideContext } from '@/modules/studio/guide-store';
-import { myClients, BOARD_KINDS } from '@/modules/studio-practice/clients';
+import { redirect } from 'next/navigation';
+import { mayOpen } from '@/modules/studio/surfaces';
+import { LineIcon } from '../ui/icons';
+import './clients.css';
 import { myStages } from '@/modules/studio-practice/stages';
 import { myFields } from '@/modules/studio-practice/fields';
-import { assignableMembers, myMembershipId } from '@/modules/studio-practice/team';
 import { myViews } from '@/modules/studio-practice/saved-views';
-import { boardCounts } from '@/modules/studio-practice/analytics';
-import { NeedsAttention } from './NeedsAttention';
-import { Board, AddClientButton, AddFirstClientButton } from './Board';
+import { myLeadScope } from '@/modules/studio/lead-scope';
+import { myLeadSources } from '@/modules/studio-sales/settings';
+import { boardPages, leadKpis, stageCounts, tagAndGroupFacets, viewPage, VIEW_PAGE } from '@/modules/studio-sales/leads-list';
+import { boardColumnPlan } from '@/modules/studio-sales/lead-view';
+import { leadFiltersToQuery, parseCursor, parseLeadFilters, parseSort } from '@/modules/studio-sales/lead-filters';
+import { bulkActionsFor } from '@/modules/studio-sales/bulk-rules';
+import { taskPeople } from '@/modules/studio-sales/tasks';
+import { AddLeadButton } from './Board';
+import { AxBoard } from './AxBoard';
+import { AxList } from './AxList';
+import { KpiCards, OwnerPicker, SourceTabs, Toolbar, ViewToggle } from './LeadsControls';
+import { StaleReview } from './StaleReview';
 
 export const metadata: Metadata = {
-  title: 'Clients',
+  title: 'Leads',
   robots: { index: false, follow: false },
 };
 
 export const dynamic = 'force-dynamic';
 
-const importLink =
-  's-btn-ghost no-underline';
-
 /**
- * Everyone who might become work, and everyone who already is.
+ * The Leads tab, laid out as AxLeads' is (owner, 12 Oct 2026), top to bottom:
  *
- * ## One inbox
+ * 1. "Leads" (a salesperson: "My leads") and, for owner and PM, whose leads —
+ *    All, My leads, each person; on the right List | Board and + Add lead.
+ * 2. "N leads need attention — no contact in 7+ days. Review", and once a
+ *    day a popup offering the same.
+ * 3. Six KPI cards; four of them are filters.
+ * 4. Filters ▾ (the panel, with saved views), then Today (n) and the sort.
+ * 5. The board (every column, lazy cards) or the list (infinite scroll).
  *
- * Walk-ins, referrals, Instagram messages and the customers we introduce all
- * land in the same place. Two lists — ours over here, yours over there — is the
- * thing that makes a studio keep using WhatsApp, because WhatsApp at least has
- * everybody in it.
- *
- * ## Ordered by who is waiting
- *
- * The list sorts on the follow-up date, soonest first, nulls last. A studio
- * opens this to find out who is owed a call today, not to browse — and a client
- * with no date sits at the bottom, which is a quiet argument for setting one.
+ * Everything is in the URL and counted in SQL; nothing loads every lead
+ * (26,000 at Hauspire). A salesperson sees their own leads, and the pool to
+ * claim from — never a colleague's.
  */
-export default async function ClientsPage() {
-  const [clients, stages, fields, members, meId, views, counts] = await Promise.all([
-    myClients(),
-    myStages(),
-    myFields(),
-    assignableMembers(),
-    myMembershipId(),
-    myViews(),
-    /* Three counts in SQL, not derived from the 400 rows above — a derived
-       "overdue" would silently stop counting at 400 and read as an
-       improvement. */
-    boardCounts(),
+export default async function ClientsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const sp = await searchParams;
+  const one = (k: string) => (Array.isArray(sp[k]) ? sp[k]![0] : (sp[k] as string | undefined));
+  const scope = await myLeadScope();
+  if (!scope) {
+    return (
+      <main className="content cl-page">
+        <div className="empty">
+          <b>Clients are for the people who work them.</b>
+          <span className="muted">Ask your studio owner if you should see them.</span>
+        </div>
+      </main>
+    );
+  }
+
+  const views = await myViews();
+  /* A fresh visit opens the starred view, as AxLeads does. Any parameter at
+     all (even just the view) means the person chose what to see. */
+  const starred = views.find((v) => v.isDefault);
+  if (Object.keys(sp).length === 0 && starred && (starred.filters.query || starred.filters.view)) {
+    const p = new URLSearchParams(starred.filters.query ?? '');
+    p.set('view', starred.filters.view ?? 'board');
+    redirect(`/studio/clients?${p.toString()}`);
+  }
+
+  const seesAll = scope.seesAll;
+  const filters = parseLeadFilters(sp);
+  const sort = parseSort(one('sort'));
+  const poolView = !seesAll && filters.owner === 'pool';
+  const asked = one('view');
+  const view: 'list' | 'board' = poolView ? 'list' : asked === 'list' ? 'list' : 'board';
+  const query = leadFiltersToQuery(filters);
+  const listQuery = [query, sort !== 'newest' ? `sort=${sort}` : ''].filter(Boolean).join('&');
+  const now = new Date();
+
+  const [stages, fields, sources, people, kpis] = await Promise.all([myStages(), myFields(), myLeadSources(), taskPeople(), leadKpis(scope, filters, now)]);
+  const groupFields = fields.filter((f) => f.groupBy);
+  const [facets, counts, list, columns] = await Promise.all([
+    tagAndGroupFacets(scope, filters, groupFields.map((f) => f.key)),
+    stageCounts(scope, filters, now),
+    view === 'list' ? viewPage(scope, filters, sort, parseCursor(one('after')), now) : Promise.resolve(null),
+    // The board: the stage filter picks the columns; open ones load, won/finished/lost wait until opened.
+    view === 'board' ? boardPages(scope, filters, stages, now) : Promise.resolve(null),
   ]);
+  const total = kpis.total;
+  const listTotal = view === 'list' ? (filters.kpi ? await countFor(kpis, filters.kpi) : total) : total;
+  const members = seesAll ? people : [];
+  const stageList = stages.map((s) => ({ id: s.id, name: s.name, colour: s.colour, kind: s.kind }));
+  const boardStages = boardColumnPlan(stageList, filters.stage).shown;
 
-  const today = new Date();
-  today.setHours(23, 59, 59, 999);
-
-  const open = clients.filter((c) => BOARD_KINDS.includes(c.stageKind));
-  const due = open.filter((c) => c.nextActionOn !== null && c.nextActionOn <= today).length;
-
-  const { state, facts } = await guideContext();
-  const dismissed = state.dismissed.includes('leads');
+  const mayImport = mayOpen(scope.member, '/studio/clients/import');
+  const title = poolView ? 'The pool' : seesAll ? 'Clients' : 'My leads';
+  const sub = poolView
+    ? 'Leads nobody has yet. Claim one and it is yours.'
+    : seesAll
+      ? 'Everyone who has ever called, walked in or come from us, in one list. They stay yours.'
+      : 'Only the leads assigned to you. Call, WhatsApp and log the outcome from any card.';
 
   return (
-    <>
-      <PageHead
-        title={due > 0 ? `${due} waiting on you` : 'Clients'}
-        sub={
-          clients.length === 0
-            ? 'Nothing here yet.'
-            : `${open.length} open · ${clients.length} in total`
-        }
-        action={
-          <>
-            <Link href="/studio/clients/import" className={importLink}>
-              Import a list
+    <main className="content cl-page">
+      <div className="phead">
+        <div>
+          <h1>
+            {title} <span className="mono n">{(view === 'list' ? listTotal : total).toLocaleString('en-IN')}</span>
+          </h1>
+          <p className="muted">{sub}</p>
+        </div>
+        <div className="hstack">
+          {seesAll ? <OwnerPicker query={query} view={view} sort={sort} members={members} meId={scope.member.id} /> : null}
+          {!seesAll ? (
+            <Link href={poolView ? '/studio/clients' : '/studio/clients/pool'} className="btn sec">
+              {poolView ? 'Back to my leads' : 'The pool, claim leads'}
             </Link>
-            <AddClientButton fields={fields} />
-          </>
+          ) : null}
+          {mayImport ? (
+            <Link href="/studio/clients/import" className="btn sec">
+              <LineIcon name="upload" size={17} />
+              Import CSV
+            </Link>
+          ) : null}
+          <AddLeadButton fields={fields} sources={sources} />
+        </div>
+      </div>
+
+      {!poolView && kpis.stale > 0 ? <StaleReview count={kpis.stale} query={query} /> : null}
+
+      <KpiCards kpis={kpis} query={query} view={view} sort={sort} />
+
+      <Toolbar
+        query={query}
+        view={view}
+        sort={sort}
+        kpis={kpis}
+        stages={stageList}
+        sources={sources.map((s) => ({ id: s.id, name: s.name }))}
+        tags={facets.tags}
+        groups={groupFields.map((g) => ({ key: g.key, label: g.label, values: facets.groups[g.key] ?? [] }))}
+        views={views}
+        lead={
+          poolView ? null : (
+            <>
+              <ViewToggle query={listQuery} view={view} sort={sort} />
+              <SourceTabs query={query} view={view} sort={sort} />
+            </>
+          )
         }
       />
 
-      <PageBody>
-        {/* Above everything, and gone entirely when there is nothing wrong. */}
-        <div className="mb-5 empty:mb-0">
-          <NeedsAttention counts={counts} />
-        </div>
+      {list ? (
+        <AxList
+          rows={list.rows}
+          next={list.next}
+          total={listTotal}
+          query={listQuery}
+          stages={stageList}
+          fields={fields.map((f) => ({ key: f.key, label: f.label }))}
+          actions={bulkActionsFor(scope.member)}
+          people={people}
+          seesAll={seesAll}
+          poolView={poolView}
+        />
+      ) : null}
 
-        <GuidePanel guide="leads" facts={facts} dismissed={dismissed} />
+      {columns ? (
+        <AxBoard
+          stages={boardStages}
+          counts={counts}
+          initial={columns}
+          query={query}
+          showOwner={seesAll && (!filters.owner || filters.owner === 'anyone')}
+          meId={scope.member.id}
+          mayMove={!poolView}
+        />
+      ) : null}
 
-        {clients.length === 0 ? (
-          <div className="s-card p-8">
-            <p className="m-0 mb-2 text-[15.5px] font-semibold">
-              Everyone who might become work lives here.
-            </p>
-            <p className="m-0 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--s-ink-2)]">
-              Your walk-ins and referrals as much as the customers we introduce — one list, because
-              two is what makes people go back to WhatsApp. Add the last person who called, and put
-              a date on the next thing you owe them. That date is the only reason this screen is
-              worth opening twice.
-            </p>
-            {/* A door in the body as well as the header. An empty page whose
-                only way forward is one button in a corner has no way forward
-                at all if that button is ever out of reach. */}
-            <p className="m-0 mt-3 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--s-ink-2)]">
-              If you already keep this in a spreadsheet, bring it across instead of typing it
-              again — you get to check every column before anything is saved.
-            </p>
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              <AddFirstClientButton fields={fields} />
-              <Link href="/studio/clients/import" className={importLink}>
-                Import a list
-              </Link>
-            </div>
-          </div>
-        ) : (
-          <Board
-            clients={clients}
-            stages={stages}
-            fields={fields}
-            members={members}
-            meId={meId}
-            views={views}
-          />
-        )}
-
-        {/* Quiet, and at the bottom. A bin people can find when they need it
-            and never notice otherwise. */}
-        <p className="mt-8 mb-0 text-[13px] text-[var(--s-ink-3)]">
-          <Link href="/studio/clients/bin" className="underline">
-            Deleted clients
-          </Link>
+      {seesAll ? (
+        <p className="cl-foot">
+          Stages are yours to rename in Settings. <Link href="/studio/clients/bin">Deleted clients</Link> · Board cards load {VIEW_PAGE} at a time per column.
         </p>
-      </PageBody>
-    </>
+      ) : null}
+    </main>
   );
+}
+
+/** The list's total under a card filter is that card's own count (the cards ignore their own filter). */
+async function countFor(k: Awaited<ReturnType<typeof leadKpis>>, kpi: string): Promise<number> {
+  switch (kpi) {
+    case 'today':
+      return k.today;
+    case 'pending':
+      return k.pending;
+    case 'callbacks':
+      return k.callbacks;
+    case 'tasks':
+      return k.tasks;
+    case 'needs':
+      return k.needs;
+    default:
+      return k.total;
+  }
 }

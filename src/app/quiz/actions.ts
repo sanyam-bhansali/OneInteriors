@@ -28,7 +28,7 @@ import type { FloorPlanReading } from '@/modules/floorplan/reading';
 import { floorPlanUploadEnabled, uploadFloorPlan } from '@/modules/storage/floor-plan';
 import { record } from '@/modules/analytics/record';
 import { recordConsent, type ConsentDecision } from '@/modules/consent/record';
-import { QUIZ_PURPOSES, isBlocking, type ConsentPurpose } from '@/modules/consent/policy';
+import { CONTACT_CONSENT_SOURCE, QUIZ_PURPOSES, contactConsent, isBlocking, type ConsentPurpose } from '@/modules/consent/policy';
 import type { Brief } from '@/modules/brief/types';
 import type { EventName, EventProps } from '@/modules/analytics/events';
 
@@ -136,14 +136,8 @@ export async function submitContactAction(
     };
   }
 
-  await recordConsent(
-    [
-      { purpose: 'DATA_PROCESSING', granted: true },
-      // Recorded either way: "they said no" and "we never asked" are different.
-      { purpose: 'MARKETING_WHATSAPP', granted: check.value.whatsappUpdates },
-    ],
-    'quiz_contact_step',
-  );
+  // The same decisions the phone app's sign-in records (consent/policy.ts).
+  await recordConsent(contactConsent(check.value.whatsappUpdates), CONTACT_CONSENT_SOURCE);
 
   const saved = await saveContact(brief, check.value);
   await record('quiz.contact.saved');

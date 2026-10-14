@@ -19,6 +19,12 @@ import {
 } from '@/modules/studio-quote/quotes';
 import { isConfigName, type HomeConfig } from '@/modules/studio-quote/configure';
 import { finalQuoteForClient } from '@/modules/studio-quote/final';
+import { buildFromPlan, leadPlans, planJobsFor, readLeadPlan, readRoomsForQuote, saveFirstQuote, type FirstQuoteInput, type LeadPlan, type LeadPlanRead } from '@/modules/studio-quote/from-plan';
+import { proposeProduct } from '@/modules/studio-quote/proposals';
+import type { PlanJobStatus, PlanJobView } from '@/modules/studio-quote/from-plan-rules';
+import { addProduct } from '@/modules/studio-quote/store';
+import { rupeesToPaise } from '@/lib/money';
+import { addClient } from '@/modules/studio-practice/clients';
 
 // `State` and `IDLE` live in studio/form-state.ts. A 'use server'
 // file may only export async functions — and Turbopack rejects even a
@@ -60,12 +66,35 @@ export async function createQuoteAction(_prev: State, form: FormData): Promise<S
   const carpet = Number(str(form, 'carpetSqft'));
   const config = str(form, 'config');
 
+  /* The lead it is for (Studio OS Phase 1): one picked on the screen, or —
+     when "add them to my leads" is ticked — a new one made now. A phone
+     already on a lead is refused with the name, so the person picks that
+     lead instead of making a second. */
+  let clientId = str(form, 'clientId') || undefined;
+  if (!clientId && str(form, 'addLead') === 'yes') {
+    const added = await addClient({
+      name: str(form, 'clientName'),
+      phone: str(form, 'clientPhone'),
+      society: str(form, 'society'),
+      config,
+      source: 'OTHER',
+    });
+    if (!added.ok) {
+      if ('duplicate' in added) {
+        return { ok: false, error: `${added.duplicate.name} already has that number. Search for them in "Who is it for" and pick them.` };
+      }
+      return added;
+    }
+    clientId = added.id;
+  }
+
   const result = await createQuote({
     clientName: str(form, 'clientName'),
     clientPhone: str(form, 'clientPhone'),
     society: str(form, 'society'),
     config,
     carpetSqft: Number.isFinite(carpet) && carpet > 0 ? Math.round(carpet) : undefined,
+    clientId,
   });
 
   if (!result.ok) return result;
@@ -192,4 +221,147 @@ export async function finalQuoteAction(clientId: string): Promise<State> {
   if (!result.ok) return result;
   refresh(result.id);
   redirect(`/studio/quotations/${result.id}`);
+}
+
+// ── Floor plan → first quotation (12 Oct 2026) ─────────────────
+
+export type PlanBuildState =
+  | { ok: true; message: string; status: PlanJobStatus; quoteId: string | null; notes: string[] }
+  | { ok: false; error: string };
+
+/**
+ * Read a lead's floor plan and build the first quotation from it. Called by
+ * the lead page straight after a floor plan is attached (`mode: 'auto'`) and
+ * by "Build a quotation from this plan" (`'manual'`). Identifies the file by
+ * its id, or by the storage path the upload ticket gave (the attach step does
+ * not return an id); the module checks it belongs to this lead.
+ */
+export async function buildFromPlanAction(
+  clientId: string,
+  ref: { fileId?: string; path?: string },
+  mode: 'auto' | 'manual' | 'read',
+): Promise<PlanBuildState> {
+  const r = await buildFromPlan(
+    String(clientId ?? ''),
+    { fileId: typeof ref?.fileId === 'string' ? ref.fileId : undefined, storagePath: typeof ref?.path === 'string' ? ref.path : undefined },
+    mode === 'manual' || mode === 'read' ? mode : 'auto',
+  );
+  if (!r.ok) return r;
+  revalidatePath(`/studio/clients/${clientId}`);
+  revalidatePath('/studio/today');
+  if (r.quoteId) refresh(r.quoteId);
+  return { ok: true, message: r.message, status: r.status, quoteId: r.quoteId, notes: r.notes };
+}
+
+/** The last read-and-build run of each floor plan on this lead, for the lead page. */
+export async function planJobsAction(clientId: string): Promise<{ canRead: boolean; jobs: Record<string, PlanJobView> } | null> {
+  return planJobsFor(String(clientId ?? ''));
+}
+
+/** "Read rooms" on a quotation: the lead's floor plan, read once and attached. */
+export async function readRoomsForQuoteAction(quoteId: string): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const r = await readRoomsForQuote(String(quoteId ?? ''));
+  if (r.ok) refresh(quoteId);
+  return r;
+}
+
+/**
+ * A line typed onto a quotation that is not in the product list, added to it
+ * (Hauspire's "Propose a new product", without the queue: the owner and PM
+ * who can approve are the ones who can press this; a salesperson is told to
+ * ask). `addProduct` refuses anybody else.
+ */
+export async function addLineToProductsAction(input: {
+  name: string;
+  code: 'MODULAR' | 'ONSITE';
+  unit: 'AREA' | 'SQFT' | 'RFT' | 'UNIT';
+  rateRupees: number;
+  room: string;
+  details: string | null;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const unit = (['AREA', 'SQFT', 'RFT', 'UNIT'] as const).find((u) => u === input?.unit) ?? 'UNIT';
+  const code = input?.code === 'ONSITE' ? 'ONSITE' : 'MODULAR';
+  const rate = Number(input?.rateRupees);
+  if (!Number.isFinite(rate) || rate < 0 || rate >= 1e8) return { ok: false, error: 'That rate does not look right.' };
+  const room = String(input?.room ?? '');
+  const category = /kitchen/i.test(room)
+    ? 'Kitchen'
+    : /bed/i.test(room)
+      ? 'Bedroom'
+      : /living|dining|foyer/i.test(room)
+        ? 'Living'
+        : /study|office/i.test(room)
+          ? 'Study'
+          : /bath|toilet/i.test(room)
+            ? 'Bathroom'
+            : 'Whole home';
+  const r = await addProduct({
+    name: String(input?.name ?? '').slice(0, 120),
+    code,
+    unit,
+    ratePaise: rupeesToPaise(rate),
+    rooms: [category],
+    details: input?.details ? String(input.details).slice(0, 1000) : undefined,
+  });
+  if (!r.ok) return r;
+  revalidatePath('/studio/products');
+  return { ok: true };
+}
+
+/**
+ * "Propose a NEW product (not in master)" from the builder: into the queue on
+ * Products, for the owner or a project manager to approve or reject
+ * (`proposals.ts`). The line itself is already on the quotation.
+ */
+export async function proposeProductAction(
+  input: { name: string; code: string; unit: string; ratePaise: number; details: string | null; room: string | null },
+  quoteId?: string | null,
+): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const r = await proposeProduct(input, typeof quoteId === 'string' ? quoteId : null);
+  if (r.ok) revalidatePath('/studio/products');
+  return r;
+}
+
+// ── First quote (Hauspire's First Quote page, 13 Oct 2026) ──────────
+
+/** The lead's floor plans, for "1 · Floor plan" on the First quote page. */
+export async function leadPlansAction(clientId: string): Promise<LeadPlan[]> {
+  return leadPlans(String(clientId ?? ''));
+}
+
+/** Read one of the lead's floor plans (once; a plan read before is not read again) and hand back what it shows. */
+export async function readLeadPlanAction(clientId: string, ref: { fileId?: string; path?: string }): Promise<LeadPlanRead> {
+  return readLeadPlan(String(clientId ?? ''), {
+    fileId: typeof ref?.fileId === 'string' ? ref.fileId : undefined,
+    storagePath: typeof ref?.path === 'string' ? ref.path : undefined,
+  });
+}
+
+/**
+ * "Revise in Full Builder": the first quote as built on screen becomes a
+ * DRAFT quotation for the lead (a new lead first, when it is somebody new),
+ * and the builder opens on it.
+ */
+export async function saveFirstQuoteAction(input: FirstQuoteInput & { newLead?: { name: string; phone: string; society: string } | null }): Promise<State> {
+  let clientId = typeof input?.clientId === 'string' ? input.clientId : '';
+  if (!clientId && input?.newLead) {
+    const added = await addClient({
+      name: String(input.newLead.name ?? ''),
+      phone: String(input.newLead.phone ?? ''),
+      society: String(input.newLead.society ?? ''),
+      config: String(input.config ?? ''),
+      source: 'OTHER',
+    });
+    if (!added.ok) {
+      if ('duplicate' in added) return { ok: false, error: `${added.duplicate.name} already has that number. Search for them in Client name and pick them.` };
+      return added;
+    }
+    clientId = added.id;
+  }
+  if (!clientId) return { ok: false, error: 'Who is it for? Pick the lead, or type a new client’s name and mobile.' };
+  const r = await saveFirstQuote({ ...input, clientId });
+  if (!r.ok) return r;
+  refresh(r.id);
+  revalidatePath(`/studio/clients/${clientId}`);
+  redirect(`/studio/quotations/${r.id}`);
 }

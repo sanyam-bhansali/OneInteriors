@@ -20,7 +20,10 @@ import {
 
 export async function confirmAction(appointmentId: string): Promise<ActionResult> {
   const result = await setAppointmentStatus(appointmentId, 'CONFIRMED');
-  if (result.ok) revalidatePath('/studio/calendar');
+  if (result.ok) {
+    revalidatePath('/studio/calendar');
+    revalidatePath('/studio/calendar/appointments');
+  }
   return result;
 }
 
@@ -28,6 +31,7 @@ export async function completeAction(appointmentId: string): Promise<ActionResul
   const result = await setAppointmentStatus(appointmentId, 'COMPLETED');
   if (result.ok) {
     revalidatePath('/studio/calendar');
+    revalidatePath('/studio/calendar/appointments');
     revalidatePath('/studio');
   }
   return result;
@@ -37,6 +41,7 @@ export async function cancelAction(appointmentId: string): Promise<ActionResult>
   const result = await setAppointmentStatus(appointmentId, 'CANCELLED');
   if (result.ok) {
     revalidatePath('/studio/calendar');
+    revalidatePath('/studio/calendar/appointments');
     revalidatePath('/studio');
   }
   return result;
@@ -50,6 +55,9 @@ export async function proposeAction(
 ): Promise<ActionResult> {
   const startsAt = new Date(isoDateTime);
   const result = await proposeAppointment({ introductionId, kind, startsAt, location });
-  if (result.ok) revalidatePath('/studio/calendar');
+  if (result.ok) {
+    revalidatePath('/studio/calendar');
+    revalidatePath('/studio/calendar/appointments');
+  }
   return result.ok ? { ok: true } : result;
 }

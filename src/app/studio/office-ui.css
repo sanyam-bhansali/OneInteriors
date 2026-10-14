@@ -1,0 +1,157 @@
+/* Small helpers the office screens rebuilt from the owner's handoff
+   (12 Oct 2026) share: Today and the overview, Vendors (site crews), Money,
+   Calendar, Team and settings, From One Interiors. The shared design classes
+   (card, btn, fld, tbl, chip…) come from studio-ui.css; these only fill the
+   gaps our functions need (compact fields, text areas, messages, disabled
+   buttons, a plain link). Scoped to .oi-studio; tokens only. */
+
+.oi-studio .btn:disabled,
+.oi-studio .btn[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
+}
+.oi-studio .btn.xs {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 12.5px;
+}
+.oi-studio .btn.bad-b {
+  color: var(--bad);
+}
+.oi-studio a.btn {
+  text-decoration: none;
+}
+.oi-studio a.btn.pri,
+.oi-studio a.btn.pri:hover {
+  color: var(--paper);
+}
+.oi-studio a.btn.ghost:hover,
+.oi-studio a.btn.sec:hover {
+  color: var(--ink);
+}
+
+/* Fields: the design's soft field, in a compact size and at its own width. */
+.oi-studio .fld.sm {
+  min-height: 34px;
+  font-size: 13.5px;
+  padding: 0 10px;
+}
+.oi-studio .fld.fit {
+  width: auto;
+  max-width: 100%;
+}
+.oi-studio .fld.num {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  text-align: right;
+}
+.oi-studio textarea.fld {
+  padding: 10px 12px;
+  min-height: 84px;
+  resize: vertical;
+  line-height: 1.45;
+}
+.oi-studio .fld:disabled {
+  opacity: 0.6;
+}
+.oi-studio .fld.warn-b {
+  box-shadow: inset 0 0 0 1.5px var(--warn-s);
+}
+.oi-studio input[type='checkbox'],
+.oi-studio input[type='radio'] {
+  accent-color: var(--acc);
+}
+
+/* A label over its field. */
+.oi-studio .ox-f {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Saved / failed lines under a form. */
+.oi-studio .ox-ok {
+  margin: 0;
+  color: var(--good);
+  font-size: 13px;
+}
+.oi-studio .ox-err {
+  margin: 0;
+  color: var(--bad);
+  font-size: 13px;
+}
+
+/* A text link in the accent colour (the frame paints every <a> in ink). */
+.oi-studio .ox-link {
+  color: var(--acc);
+  font-weight: 500;
+}
+.oi-studio .ox-link:hover {
+  color: var(--acc-h);
+}
+.oi-studio .ox-plain {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: underline;
+}
+.oi-studio .ox-plain:hover {
+  color: var(--ink);
+}
+.oi-studio .ox-plain.bad-t {
+  color: var(--bad);
+}
+
+/* A page that is only a sentence (no access, nothing yet). */
+.oi-studio .ox-note {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text2);
+}
+
+/* Soft inset panel inside a card (a form opened in place). */
+.oi-studio .ox-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--soft);
+  box-shadow: inset 0 0 0 1px var(--fillh);
+}
+
+/* The page heading's sentence. */
+.oi-studio .ox-page .phead p.muted {
+  margin: 6px 0 0;
+}
+
+/* Phone: the content gutter and the page heading. */
+@media (max-width: 760px) {
+  .oi-studio .content.ox-page {
+    padding: 18px 16px 40px;
+    gap: 16px;
+  }
+  .oi-studio .ox-page .phead h1 {
+    font-size: 26px;
+  }
+}
+
+/* A row in a short list inside a card (Crews on Today, the inbox). */
+.oi-studio .ox-crow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--soft);
+  font-size: 14px;
+}
+.oi-studio .ox-crow:first-child {
+  border-top: 0;
+}

@@ -25,6 +25,7 @@ import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { Prisma } from '@prisma/client';
 import { getCurrentUser, hasRole, type AuthUser } from '@/modules/auth/session';
+import { OFFICE_MEMBER } from './surfaces';
 import { validateGstin } from '@/modules/verification/gstin';
 import { missingCoreRates } from '@/modules/quotation/categories';
 import { quotationsSent } from './approval';
@@ -185,7 +186,7 @@ export async function currentStudio(): Promise<StudioContext | null> {
 
 async function loadStudio(user: AuthUser): Promise<StudioContext | null> {
   const member = await prisma.studioMember.findUnique({
-    where: { userId: user.id },
+    where: { userId: user.id, ...OFFICE_MEMBER },
     include: { studio: { include: { _count: { select: { portfolio: true } } } } },
   });
   if (!member) return null;

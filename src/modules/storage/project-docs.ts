@@ -11,6 +11,8 @@ import 'server-only';
  */
 
 import { supabaseConfig } from '@/lib/env';
+import { siteUrlFor } from '@/lib/site';
+import { generatedDocLink } from '@/modules/portal/documents';
 
 const BUCKET = 'project-docs';
 /** The server-action body limit (next.config.ts) is 4 MB; the file must fit inside it. */
@@ -53,8 +55,21 @@ export async function storeProjectDoc(projectId: string, file: File): Promise<Do
   return { ok: true, path };
 }
 
-/** Signed links, in order, for paths the caller has already authorised; "" where one could not be made. */
-export async function signedDocUrls(paths: string[]): Promise<string[]> {
+/**
+ * Links, in order, for documents the caller has already authorised: a signed
+ * storage link for an uploaded file, the page for one filed at signing
+ * (portal/documents.ts `generatedDocLink`); "" where one could not be made.
+ */
+export async function signedDocUrls(keys: string[]): Promise<string[]> {
+  const origin = siteUrlFor('public');
+  const filed = keys.map((k) => generatedDocLink(k, origin));
+  const stored = keys.filter((_, i) => filed[i] === null);
+  const signed = await signedStorageUrls(stored);
+  let next = 0;
+  return filed.map((link) => link ?? signed[next++] ?? '');
+}
+
+async function signedStorageUrls(paths: string[]): Promise<string[]> {
   const config = supabaseConfig();
   const key = secretKey();
   if (!config || !key || paths.length === 0) return paths.map(() => '');

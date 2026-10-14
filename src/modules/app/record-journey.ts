@@ -11,13 +11,13 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { filedRatesFor } from '@/data/filed-rates';
 import { getCurrentUser } from '@/modules/auth/session';
-import { readAnonKey } from '@/modules/brief/repository';
+import { loadBrief, readAnonKey } from '@/modules/brief/repository';
 import { storeMatches } from '@/modules/matching/store';
 import { recordFirstQuoteForBrief } from '@/modules/quotation/journey-repository';
 import { homeShapeFor } from '@/modules/quotation/first-quote';
 import type { Brief } from '@/modules/brief/types';
-import type { AppData } from '@/app/app/data';
-import { topMatches, quotesFor } from './journey';
+import type { AppData } from './app-data';
+import { listedStudios, topMatches, quotesFor } from './journey';
 
 async function myBriefId(): Promise<string | null> {
   const user = await getCurrentUser();
@@ -30,9 +30,9 @@ async function myBriefId(): Promise<string | null> {
   return (await prisma.brief.findUnique({ where: { anonKey }, select: { id: true } }))?.id ?? null;
 }
 
-export async function recordJourney(brief: Brief, data: AppData): Promise<void> {
+export async function recordJourney(brief: Brief, data: AppData, knownBriefId?: string): Promise<void> {
   try {
-    const briefId = await myBriefId();
+    const briefId = knownBriefId ?? (await myBriefId());
     if (!briefId) return;
     const matched = topMatches(brief, data.studios, data.rates, filedRatesFor, data.allowUnverified);
     if (matched.length === 0) return;
@@ -47,4 +47,38 @@ export async function recordJourney(brief: Brief, data: AppData): Promise<void> 
   } catch (error) {
     console.error('[app] recordJourney failed', error instanceof Error ? error.name : 'unknown');
   }
+}
+
+export type SubmitResult = { ok: true; shortlisted: number } | { ok: false; status: 400 | 409; error: string };
+
+/**
+ * The phone app's "these are my studios" after verifying (POST
+ * /api/app/v1/journey/submit): keep the matches and first quotes the brief
+ * produced, exactly as the website's journey route does, and the studios
+ * they chose as their shortlist, in their order, so ops and the expert read
+ * the same quotes the customer did. Only listed studios; the expert makes
+ * every introduction, so nothing here introduces anyone.
+ */
+export async function submitJourney(slugs: string[], data: AppData): Promise<SubmitResult> {
+  const loaded = await loadBrief();
+  if (!loaded.found || !loaded.id) return { ok: false, status: 409, error: 'We do not have your brief yet. Save it and try again.' };
+  if (!loaded.brief.completedAt) return { ok: false, status: 409, error: 'Finish the questions first.' };
+  const listed = listedStudios(data);
+  const chosen = [...new Set(slugs)].map((slug) => listed.find((s) => s.slug === slug)).filter((s) => s !== undefined);
+  if (slugs.length > 0 && chosen.length === 0) return { ok: false, status: 400, error: 'Those studios are not taking work just now.' };
+
+  const briefId = loaded.id;
+  await recordJourney(loaded.brief, data, briefId);
+  const ids = chosen.map((s) => s.id);
+  await prisma.$transaction([
+    prisma.shortlist.deleteMany({ where: { briefId, studioId: { notIn: ids } } }),
+    ...ids.map((studioId, position) =>
+      prisma.shortlist.upsert({
+        where: { briefId_studioId: { briefId, studioId } },
+        create: { briefId, studioId, position },
+        update: { position },
+      }),
+    ),
+  ]);
+  return { ok: true, shortlisted: ids.length };
 }

@@ -23,8 +23,18 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
-import { myStudioId } from '@/modules/studio-quote/store';
-import { myMembershipId } from './team';
+import { myLeadScope } from '@/modules/studio/lead-scope';
+
+/**
+ * Whose views: anyone who works leads, salespeople included (the AxLeads
+ * look, 12 Oct 2026 — saved filters are everyone's tool, not the office's).
+ */
+async function me(): Promise<{ studioId: string; memberId: string } | null> {
+  const scope = await myLeadScope();
+  return scope ? { studioId: scope.studioId, memberId: scope.member.id } : null;
+}
+const myMembershipId = async () => (await me())?.memberId ?? null;
+const myStudioId = async () => (await me())?.studioId ?? null;
 import { cleanFilters, MAX_VIEWS, type ViewFilters } from './view-filters';
 
 export type { ViewFilters } from './view-filters';

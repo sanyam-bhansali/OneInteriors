@@ -12,6 +12,7 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 import { currentStudio } from './onboarding';
+import { getCurrentUser } from '@/modules/auth/session';
 
 export interface InboxItem {
   id: string;
@@ -43,11 +44,11 @@ export async function myInbox(): Promise<InboxItem[]> {
   }
 }
 
-/** Mark one read — theirs only. */
+/** Mark one read — theirs only. By the signed-in user, so a salesperson (Studio OS Phase 1) can too. */
 export async function markInboxRead(id: string): Promise<void> {
-  const context = await currentStudio();
-  if (!context) return;
+  const user = await getCurrentUser();
+  if (!user) return;
   await prisma.notification
-    .updateMany({ where: { id, userId: context.user.id, readAt: null }, data: { readAt: new Date() } })
+    .updateMany({ where: { id, userId: user.id, readAt: null }, data: { readAt: new Date() } })
     .catch(() => undefined);
 }

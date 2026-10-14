@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react';
 import { Body, Cta, Foot, Frame, Head } from '@/components/app/ui';
 import { formatINR } from '@/lib/money';
 import type { FinalQuoteView } from '@/modules/portal/choose';
+import { ASSURED_FEE_NOTE, PLAN_COPY, type PlanName } from '@/modules/portal/plans';
 import { Steps } from '../../ChooseScreen';
 import { requestSignCodeAction, signAction } from '../../actions';
 
@@ -31,6 +32,7 @@ export function SignScreen({ q, name, phone }: { q: FinalQuoteView; name: string
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [plan, setPlan] = useState<PlanName>('basic');
 
   useEffect(() => {
     if (wait <= 0) return;
@@ -52,7 +54,7 @@ export function SignScreen({ q, name, phone }: { q: FinalQuoteView; name: string
   const sign = async () => {
     setError(null);
     setBusy(true);
-    const r = await signAction({ quoteId: q.id, code, agreed });
+    const r = await signAction({ quoteId: q.id, code, agreed, plan });
     setBusy(false);
     if (!r.ok) return setError(r.error);
     setDone(true);
@@ -69,6 +71,11 @@ export function SignScreen({ q, name, phone }: { q: FinalQuoteView; name: string
             {q.studioName} has your signed quote and starts the detailed design. Your project, its stages and every site update are
             in the app from today.
           </p>
+          {plan === 'assured' ? (
+            <p style={{ margin: 0, fontSize: 15, lineHeight: 1.5, color: '#b5b3ad' }}>
+              You asked for Assured. Our team will call you. {ASSURED_FEE_NOTE}
+            </p>
+          ) : null}
         </main>
         <Foot>
           <Cta onClick={() => router.push('/app/home')} tone="light">
@@ -139,6 +146,27 @@ export function SignScreen({ q, name, phone }: { q: FinalQuoteView; name: string
             {showTerms ? <div className="oa-terms">{q.terms}</div> : null}
           </>
         ) : null}
+
+        {/* The plan (owner, 11 Oct 2026). Assured only registers interest until the fee is set; same words as the app. */}
+        <p className="oa-label">Your plan</p>
+        <div className="oa-list" role="radiogroup" aria-label="Your plan">
+          {(['basic', 'assured'] as const).map((p) => (
+            <button key={p} type="button" role="radio" aria-checked={plan === p} className="oa-row" onClick={() => setPlan(p)}>
+              <span>
+                <span className="oa-row-title">
+                  {PLAN_COPY[p].name} · {PLAN_COPY[p].price}
+                </span>
+                {PLAN_COPY[p].points.map((pt) => (
+                  <span key={pt} className="oa-row-sub">
+                    {pt}
+                  </span>
+                ))}
+              </span>
+              <span className="oa-radio" />
+            </button>
+          ))}
+        </div>
+        {plan === 'assured' ? <p className="oa-note">{ASSURED_FEE_NOTE} Your project starts on Basic until then.</p> : null}
 
         <label className="oa-row" style={{ alignItems: 'flex-start', justifyContent: 'flex-start' }}>
           <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-1 h-5 w-5 accent-[var(--accent)]" />

@@ -1,9 +1,13 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { importClients } from '@/modules/studio-practice/clients';
+import { countExistingPhones, importClients } from '@/modules/studio-practice/clients';
 import { parseCsv, planImport, type ColumnKey } from '@/modules/studio-practice/csv';
 import { setFormActive } from '@/modules/studio-practice/capture';
+import { isCustomColumn } from '@/modules/studio-sales/intake-rules';
+import { SOURCE_LABELS, type ClientSourceName } from '@/modules/studio-practice/vocabulary';
+
+const isSource = (v: unknown): v is ClientSourceName => typeof v === 'string' && v in SOURCE_LABELS;
 
 /**
  * Writing an import.
@@ -49,7 +53,13 @@ const KEYS: ColumnKey[] = [
   'name', 'phone', 'email', 'society', 'locality', 'config', 'notes', 'skip',
 ];
 
-export async function importCsvAction(text: string, mapping: string[]): Promise<ImportState> {
+/**
+ * `source` is where the list came from, chosen on the screen (it used to be
+ * asked and never passed); `leadSourceId` one of the studio's own names.
+ * A column may also be mapped to one of the studio's own fields
+ * (`custom:<key>`); values are checked against the field on write.
+ */
+export async function importCsvAction(text: string, mapping: string[], source = 'OTHER', leadSourceId: string | null = null): Promise<ImportState> {
   if (typeof text !== 'string' || text.trim().length === 0) {
     return { ok: false, error: 'No file.' };
   }
@@ -62,7 +72,9 @@ export async function importCsvAction(text: string, mapping: string[]): Promise<
 
   // Anything unrecognised becomes `skip` rather than an error: a column key
   // this build does not know is a column that should not be written.
-  const clean: ColumnKey[] = mapping.map((m) => (KEYS.includes(m as ColumnKey) ? (m as ColumnKey) : 'skip'));
+  const clean: string[] = mapping.map((m) =>
+    KEYS.includes(m as ColumnKey) || (typeof m === 'string' && isCustomColumn(m) && m.length <= 60) ? m : 'skip',
+  );
 
   if (!clean.includes('name')) {
     return { ok: false, error: 'Nothing is mapped to Name, so there is nobody to import.' };
@@ -73,7 +85,8 @@ export async function importCsvAction(text: string, mapping: string[]): Promise<
     return { ok: false, error: 'No rows have a usable name.' };
   }
 
-  const result = await importClients(plan.rows);
+  const picked = isSource(source) && source !== 'ONE_INTERIORS' ? source : 'OTHER';
+  const result = await importClients(plan.rows, picked, typeof leadSourceId === 'string' ? leadSourceId.slice(0, 64) : null);
   if (!result.ok) return result;
 
   revalidatePath('/studio/clients');
@@ -99,4 +112,14 @@ export async function setFormActiveAction(active: boolean): Promise<{ ok: boolea
   const result = await setFormActive(active);
   if (result.ok) revalidatePath('/studio/clients/import');
   return result;
+}
+
+/**
+ * The dry run (leads at scale): how many of the file's numbers are already
+ * on your list. Read only; owner and PM (the module finds no studio for
+ * anyone else). Sent in pieces of up to 5,000 numbers.
+ */
+export async function importCheckAction(phones: string[]): Promise<{ already: number }> {
+  if (!Array.isArray(phones)) return { already: 0 };
+  return { already: await countExistingPhones(phones.slice(0, 5000).filter((p) => typeof p === 'string')) };
 }

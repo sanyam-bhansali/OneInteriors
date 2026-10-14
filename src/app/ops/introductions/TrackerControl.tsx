@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { startTrackerAction, stageDoneAction, postUpdateAction } from './actions';
+import { startTrackerAction, stageDoneAction, postUpdateAction, setPlanAction } from './actions';
 import { withShrunkPhotos } from '@/lib/shrink-image';
 import { plannedStages, TRACKER_STAGES } from '@/modules/portal/tracker';
 import type { OpsIntroduction } from '@/modules/studio/introduction-ops';
@@ -54,6 +54,25 @@ export function TrackerControl({ intro }: { intro: OpsIntroduction }) {
   const planned = plannedStages(new Date(intro.project.startOn), intro.project.totalDays);
   return (
     <div className="mt-4 border-t border-[var(--color-rule)] pt-4">
+      <div className="mb-3 flex flex-wrap items-center gap-3 text-[14px]">
+        <span>
+          Plan: <b>{intro.project.plan === 'ASSURED' ? 'Assured' : 'Basic'}</b>
+          {intro.project.plan === 'BASIC' && intro.project.assuredRequestedAt ? (
+            <span className="text-[var(--color-atrisk)]">
+              {' '}
+              · asked for Assured on {new Date(intro.project.assuredRequestedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+            </span>
+          ) : null}
+        </span>
+        <button
+          type="button"
+          disabled={pending}
+          className={ghost}
+          onClick={() => run(() => setPlanAction(intro.project!.id, intro.project!.plan === 'ASSURED' ? 'BASIC' : 'ASSURED'))}
+        >
+          {intro.project.plan === 'ASSURED' ? 'Move back to Basic' : 'Switch to Assured (fee agreed)'}
+        </button>
+      </div>
       <p className="label m-0 mb-2">Project tracker — the customer sees this</p>
       <ul className="m-0 mb-3 flex list-none flex-col gap-1.5 p-0">
         {planned.map((s) => {

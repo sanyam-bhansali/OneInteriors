@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { PageHead, PageBody } from '../../StudioShell';
+import '../clients.css';
 import { leadAnalytics, type LeadAnalytics } from '@/modules/studio-practice/analytics';
 import { SOURCE_LABELS, LOST_LABELS, QUIET_AFTER_DAYS } from '@/modules/studio-practice/vocabulary';
 import { paiseToLakhs } from '@/lib/money';
@@ -49,59 +49,62 @@ export default async function LeadAnalyticsPage() {
 
   if (!data) {
     return (
-      <>
-        <PageHead title="Analytics" />
-        <PageBody>
-          <p className="m-0 text-[14px] text-[var(--s-ink-3)]">
-            We could not read your numbers just now. Nothing is lost — try again in a moment.
-          </p>
-        </PageBody>
-      </>
+      <main className="content cl-page">
+        <div className="phead">
+          <h1>Analytics</h1>
+        </div>
+        <p className="muted" style={{ margin: 0 }}>
+          We could not read your numbers just now. Nothing is lost — try again in a moment.
+        </p>
+      </main>
     );
   }
 
   if (data.total === 0) {
     return (
-      <>
-        <PageHead title="Analytics" sub="Nothing to measure yet." />
-        <PageBody>
-          <div className="rounded-[12px] border border-dashed border-[var(--s-rule)] px-6 py-12 text-center">
-            <p className="m-0 text-[15px] font-medium">No leads yet.</p>
-            <p className="m-0 mx-auto mt-1.5 max-w-[46ch] text-[13.5px] text-[var(--s-ink-3)]">
+      <main className="content cl-page">
+        <div className="phead">
+          <div>
+            <h1>Analytics</h1>
+            <p className="muted">Nothing to measure yet.</p>
+          </div>
+        </div>
+          <div className="empty">
+            <b>No leads yet.</b>
+            <p className="muted" style={{ margin: 0, maxWidth: '46ch' }}>
               Once you have a few, this page shows where they come from, which sources actually
               close, and what is going quiet.
             </p>
             <Link
               href="/studio/clients/import"
-              className="s-btn-ghost mt-5 no-underline"
+              className="btn sec"
             >
               Import a spreadsheet
             </Link>
           </div>
-        </PageBody>
-      </>
+      </main>
     );
   }
 
   return (
-    <>
-      <PageHead
-        title="Analytics"
-        sub={`${data.total.toLocaleString('en-IN')} leads all time · ${data.newThisMonth} in the last 30 days`}
-      />
-      <PageBody>
-        <div className="flex flex-col gap-7">
-          <Tiles data={data} />
-          <div className="grid grid-cols-1 gap-7 lg:grid-cols-2">
-            <Sources data={data} />
-            <div className="flex flex-col gap-7">
-              <Pipeline data={data} />
-              <LostReasons data={data} />
-            </div>
-          </div>
+    <main className="content cl-page" style={{ maxWidth: 1240 }}>
+      <div className="phead">
+        <div>
+          <h1>Analytics</h1>
+          <p className="muted">{`${data.total.toLocaleString('en-IN')} leads all time · ${data.newThisMonth} in the last 30 days`}</p>
         </div>
-      </PageBody>
-    </>
+      </div>
+      <Tiles data={data} />
+      <div className="cols">
+        <div className="colmain" style={{ flexBasis: 420 }}>
+          <Sources data={data} />
+        </div>
+        <div className="colside" style={{ flexBasis: 420 }}>
+          <Pipeline data={data} />
+          <LostReasons data={data} />
+        </div>
+      </div>
+    </main>
   );
 }
 
@@ -143,18 +146,14 @@ function Tiles({ data }: { data: LeadAnalytics }) {
   ] as const;
 
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+    <div className="cl-kpis">
       {tiles.map((t) => (
-        <Link
-          key={t.label}
-          href={t.href}
-          className="group flex flex-col rounded-[12px] border border-[var(--s-rule)] px-4 py-3.5 no-underline transition-colors hover:border-[var(--s-ink-3)]"
-        >
-          <span className="s-label m-0 text-[var(--s-ink-3)]">{t.label}</span>
-          <span className={`s-num mt-1 text-[26px] font-semibold leading-none ${toneClass(t.tone)}`}>
+        <Link key={t.label} href={t.href} className="cl-stat">
+          <span className="l">{t.label}</span>
+          <span className="v" style={toneStyle(t.tone)}>
             {'display' in t && t.display ? t.display : t.value}
           </span>
-          <span className="mt-1.5 text-[12px] leading-snug text-[var(--s-ink-3)]">{t.note}</span>
+          <span className="s">{t.note}</span>
         </Link>
       ))}
     </div>
@@ -168,11 +167,11 @@ function winNote(data: LeadAnalytics): string {
   return `${data.winRate}% of ${data.won + data.lost} closed`;
 }
 
-function toneClass(tone: string): string {
-  if (tone === 'bad') return 'text-[var(--s-bad)]';
-  if (tone === 'warn') return 'text-[var(--s-warn,#8a6220)]';
-  if (tone === 'good') return 'text-[var(--s-good)]';
-  return '';
+function toneStyle(tone: string): React.CSSProperties | undefined {
+  if (tone === 'bad') return { color: 'var(--bad)' };
+  if (tone === 'warn') return { color: 'var(--warn)' };
+  if (tone === 'good') return { color: 'var(--good)' };
+  return undefined;
 }
 
 // ── Where they come from ─────────────────────────────────────────
@@ -181,9 +180,9 @@ function Sources({ data }: { data: LeadAnalytics }) {
   const max = Math.max(...data.bySource.map((s) => s.total), 1);
 
   return (
-    <section>
-      <h2 className="m-0 mb-1 text-[15.5px] font-semibold">Where they come from</h2>
-      <p className="m-0 mb-4 max-w-[52ch] text-[13px] leading-relaxed text-[var(--s-ink-3)]">
+    <section className="card">
+      <h2 className="h">Where they come from</h2>
+      <p className="cl-sub" style={{ maxWidth: '52ch', lineHeight: 1.5 }}>
         The second number is how many closed. A source that brings plenty and closes none is
         costing you more than it looks.
       </p>
@@ -197,21 +196,21 @@ function Sources({ data }: { data: LeadAnalytics }) {
                 <span className="truncate text-[13.5px]">
                   {SOURCE_LABELS[s.source as keyof typeof SOURCE_LABELS] ?? s.source}
                 </span>
-                <span className="s-num flex-none text-[12.5px] text-[var(--s-ink-3)]">
+                <span className="mono muted sm" style={{ flex: 'none' }}>
                   {s.total} · {s.won} won{s.won > 0 ? ` (${rate}%)` : ''}
                 </span>
               </div>
               {/* The bar is the share of leads; the filled part is the share
                   that closed. One bar carrying both is why this is worth
                   drawing rather than tabulating. */}
-              <div className="h-2 overflow-hidden rounded-full bg-[var(--s-rule)]">
+              <div className="h-2 overflow-hidden rounded-full" style={{ background: 'var(--fill)' }}>
                 <div
-                  className="h-full rounded-full bg-[var(--s-accent)]/35"
-                  style={{ width: `${(s.total / max) * 100}%` }}
+                  className="h-full rounded-full"
+                  style={{ background: 'var(--line)', width: `${(s.total / max) * 100}%` }}
                 >
                   <div
-                    className="h-full rounded-full bg-[var(--s-good)]"
-                    style={{ width: `${s.total > 0 ? (s.won / s.total) * 100 : 0}%` }}
+                    className="h-full rounded-full"
+                    style={{ background: 'var(--good-s)', width: `${s.total > 0 ? (s.won / s.total) * 100 : 0}%` }}
                   />
                 </div>
               </div>
@@ -229,19 +228,19 @@ function Pipeline({ data }: { data: LeadAnalytics }) {
   const max = Math.max(...data.byStage.map((s) => s.count), 1);
 
   return (
-    <section>
-      <h2 className="m-0 mb-4 text-[15.5px] font-semibold">Your pipeline right now</h2>
+    <section className="card">
+      <h2 className="h">Your pipeline right now</h2>
       <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
         {data.byStage.map((s) => (
           <li key={s.stageId} className="flex items-center gap-3">
             <span className="w-[34%] flex-none truncate text-[13.5px]">{s.name}</span>
-            <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-[var(--s-rule)]">
+            <div className="h-2.5 flex-1 overflow-hidden rounded-full" style={{ background: 'var(--fill)' }}>
               <div
-                className="h-full rounded-full bg-[var(--s-accent)]/55"
-                style={{ width: `${(s.count / max) * 100}%` }}
+                className="h-full rounded-full"
+                style={{ background: 'var(--acc)', width: `${(s.count / max) * 100}%` }}
               />
             </div>
-            <span className="s-num w-9 flex-none text-right text-[12.5px] text-[var(--s-ink-3)]">
+            <span className="mono muted sm w-9 flex-none text-right">
               {s.count}
             </span>
           </li>
@@ -257,9 +256,9 @@ function LostReasons({ data }: { data: LeadAnalytics }) {
   if (data.lostReasons.length === 0) return null;
 
   return (
-    <section>
-      <h2 className="m-0 mb-1 text-[15.5px] font-semibold">Why they went</h2>
-      <p className="m-0 mb-3.5 max-w-[52ch] text-[13px] leading-relaxed text-[var(--s-ink-3)]">
+    <section className="card">
+      <h2 className="h">Why they went</h2>
+      <p className="cl-sub" style={{ maxWidth: '52ch', lineHeight: 1.5 }}>
         Only counts leads you gave a reason for — which is every one you marked lost, because we
         make you say.
       </p>
@@ -267,10 +266,10 @@ function LostReasons({ data }: { data: LeadAnalytics }) {
         {data.lostReasons.map((r) => (
           <li
             key={r.reason}
-            className="rounded-full border border-[var(--s-rule)] px-3 py-1 text-[13px]"
+            className="chip"
           >
             {LOST_LABELS[r.reason as keyof typeof LOST_LABELS] ?? r.reason}
-            <span className="s-num ml-1.5 text-[var(--s-ink-3)]">{r.count}</span>
+            <span className="mono muted">{r.count}</span>
           </li>
         ))}
       </ul>

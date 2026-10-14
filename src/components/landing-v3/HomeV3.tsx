@@ -172,7 +172,7 @@ const FAQ = [
   },
   {
     q: 'How can a quote be ready in seconds?',
-    a: 'No studio is phoned. Every listed studio’s rates are read from at least fifty of its own past quotations. Our system applies them to your brief and writes the quote line by line — their pricing, not our estimate. The studio confirms or revises it after a site visit.',
+    a: 'No studio is phoned. Every listed studio’s rates are read from at least twenty-five of its own past quotations. Our system applies them to your brief and writes the quote line by line — their pricing, not our estimate. The studio confirms or revises it after a site visit.',
   },
   {
     q: 'Can a studio pay to rank higher?',
@@ -466,7 +466,7 @@ export function HomeV3({ offer }: { offer: OfferState }) {
                 stood in. Each check has a named source, and every studio card shows which it has cleared.
               </p>
               <p className="muted" data-reveal="" style={{ ['--d' as string]: '120ms' }}>
-                A studio is listed only once at least fifty of its own quotations have been read, so every
+                A studio is listed only once at least twenty-five of its own quotations have been read, so every
                 price you see is its own.
               </p>
             </div>

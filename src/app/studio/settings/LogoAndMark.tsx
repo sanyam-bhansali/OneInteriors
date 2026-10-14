@@ -69,11 +69,11 @@ function Logo({
   const input = useRef<HTMLInputElement>(null);
 
   return (
-    <section className="rounded-[14px] border border-[var(--s-line,#dbd5cb)] bg-[var(--s-surface,#fff)] p-6">
-      <h2 className="m-0 mb-1 text-[16px] font-semibold text-[var(--s-ink,#1c1b19)]">
+    <section className="card">
+      <h2 className="m-0 mb-1 text-[16px] font-semibold">
         Your logo
       </h2>
-      <p className="m-0 mb-4 max-w-[62ch] text-[13.5px] leading-relaxed text-[var(--s-ink-2,#56524b)]">
+      <p className="m-0 mb-4 max-w-[62ch] text-[13.5px] leading-relaxed muted">
         Printed at the top of every quotation, above your registered name. {ACCEPTED_LOGO}, up to{' '}
         {MAX_LOGO_MB} MB.
       </p>
@@ -81,21 +81,21 @@ function Logo({
       {!hasBranding ? (
         /* The logo hangs off the branding row, so there has to be one. Said
            plainly rather than letting somebody pick a file and be refused. */
-        <p className="m-0 rounded-[10px] bg-[var(--s-surface-2,#f0ede7)] px-4 py-3 text-[13.5px] leading-relaxed text-[var(--s-ink-2,#56524b)]">
+        <p className="m-0 rounded-[10px] bg-[var(--s-surface-2)] px-4 py-3 text-[13.5px] leading-relaxed muted">
           Fill in your studio details above and save them first — the logo goes with them.
         </p>
       ) : !uploadEnabled ? (
-        <p className="m-0 rounded-[10px] bg-[var(--s-surface-2,#f0ede7)] px-4 py-3 text-[13.5px] leading-relaxed text-[var(--s-ink-2,#56524b)]">
+        <p className="m-0 rounded-[10px] bg-[var(--s-surface-2)] px-4 py-3 text-[13.5px] leading-relaxed muted">
           Uploading is not switched on here yet. Email it to us and we will put it on for you.
         </p>
       ) : (
         <div className="flex flex-wrap items-start gap-5">
-          <div className="grid h-[76px] w-[160px] flex-none place-items-center overflow-hidden rounded-[10px] border border-dashed border-[var(--s-line,#dbd5cb)] bg-[var(--s-surface-2,#f0ede7)]">
+          <div className="grid h-[76px] w-[160px] flex-none place-items-center overflow-hidden rounded-[10px] border border-dashed border-[var(--s-line)] bg-[var(--s-surface-2)]">
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={logoUrl} alt="Your logo" className="max-h-full max-w-full object-contain" />
             ) : (
-              <span className="text-[12px] text-[var(--s-ink-3,#6a655c)]">No logo yet</span>
+              <span className="text-[12px] muted">No logo yet</span>
             )}
           </div>
 
@@ -116,7 +116,7 @@ function Logo({
               />
               <label
                 htmlFor="logo-input"
-                className="inline-flex cursor-pointer items-center rounded-full border border-[var(--s-line,#dbd5cb)] px-4 py-2 text-[13.5px] font-medium text-[var(--s-ink,#1c1b19)] hover:border-[var(--s-ink-3,#6a655c)]"
+                className="inline-flex cursor-pointer items-center rounded-full border border-[var(--s-line)] px-4 py-2 text-[13.5px] font-medium hover:border-[var(--s-ink-3)]"
               >
                 {pending ? 'Uploading…' : logoUrl ? 'Replace' : 'Choose a file'}
               </label>
@@ -127,7 +127,7 @@ function Logo({
                 <button
                   type="submit"
                   disabled={clearing}
-                  className="text-[13px] text-[var(--s-ink-3,#6a655c)] underline underline-offset-4 hover:text-[var(--s-ink,#1c1b19)] disabled:opacity-50"
+                  className="text-[13px] muted underline underline-offset-4 hover: disabled:opacity-50"
                 >
                   {clearing ? 'Removing…' : 'Remove it'}
                 </button>
@@ -140,13 +140,13 @@ function Logo({
             {state.status === 'error' || clearState.status === 'error' ? (
               <p
                 role="alert"
-                className="m-0 mt-2.5 max-w-[46ch] rounded-[10px] bg-[var(--s-warn-wash,#f5e9cf)] px-3.5 py-2 text-[13px] leading-relaxed text-[var(--s-ink,#1c1b19)]"
+                className="m-0 mt-2.5 max-w-[46ch] rounded-[10px] bg-[var(--s-warn-wash)] px-3.5 py-2 text-[13px] leading-relaxed"
               >
                 {state.error ?? clearState.error}
               </p>
             ) : null}
 
-            <p className="m-0 mt-2.5 max-w-[46ch] text-[12px] leading-relaxed text-[var(--s-ink-3,#6a655c)]">
+            <p className="m-0 mt-2.5 max-w-[46ch] text-[12px] leading-relaxed muted">
               A flat image on a light background prints best. SVG is not accepted — it can carry
               scripts, and this renders on a page showing your pricing.
             </p>
@@ -161,11 +161,11 @@ function Mark({ entitled, on, note }: { entitled: boolean; on: boolean; note: st
   const [state, action, pending] = useActionState(setMarkAction, IDLE);
 
   return (
-    <section className="rounded-[14px] border border-[var(--s-line,#dbd5cb)] bg-[var(--s-surface,#fff)] p-6">
-      <h2 className="m-0 mb-1 text-[16px] font-semibold text-[var(--s-ink,#1c1b19)]">
+    <section className="card">
+      <h2 className="m-0 mb-1 text-[16px] font-semibold">
         Our line at the bottom
       </h2>
-      <p className="m-0 mb-4 max-w-[62ch] text-[13.5px] leading-relaxed text-[var(--s-ink-2,#56524b)]">
+      <p className="m-0 mb-4 max-w-[62ch] text-[13.5px] leading-relaxed muted">
         Every quotation carries one line below your GSTIN reading{' '}
         <span className="italic">&ldquo;{MARK_TEXT}&rdquo;</span>. It is never in your terms and
         never near your name — nothing on the document commits you to anything of ours.
@@ -184,18 +184,18 @@ function Mark({ entitled, on, note }: { entitled: boolean; on: boolean; note: st
             defaultChecked={on}
             onChange={(e) => e.currentTarget.form?.requestSubmit()}
             disabled={pending}
-            className="mt-0.5 h-[17px] w-[17px] flex-none accent-[var(--s-accent,#a44f2e)]"
+            className="mt-0.5 h-[17px] w-[17px] flex-none"
           />
           <span className="min-w-0">
-            <span className="block text-[14.5px] text-[var(--s-ink,#1c1b19)]">
+            <span className="block text-[14.5px]">
               Take it off my quotations
               {!entitled ? (
-                <span className="ml-2 rounded-full bg-[var(--s-warn-wash,#f5e9cf)] px-2 py-0.5 text-[11.5px] font-medium text-[var(--s-warn,#8d6412)]">
+                <span className="ml-2 rounded-full bg-[var(--s-warn-wash)] px-2 py-0.5 text-[11.5px] font-medium warn-t">
                   Premium
                 </span>
               ) : null}
             </span>
-            <span className="block text-[12.5px] leading-relaxed text-[var(--s-ink-2,#56524b)]">
+            <span className="block text-[12.5px] leading-relaxed muted">
               {note}
             </span>
           </span>
@@ -203,7 +203,7 @@ function Mark({ entitled, on, note }: { entitled: boolean; on: boolean; note: st
       </form>
 
       {state.status === 'error' ? (
-        <p role="alert" className="m-0 mt-2 text-[13px] text-[var(--s-bad,#98371f)]">
+        <p role="alert" className="m-0 mt-2 text-[13px] bad-t">
           {state.error}
         </p>
       ) : null}

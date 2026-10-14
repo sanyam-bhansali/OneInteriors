@@ -28,6 +28,7 @@ import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { Prisma, type PauseCause } from '@prisma/client';
 import { requireRole } from '@/modules/auth/session';
+import { OFFICE_MEMBER } from './surfaces';
 import { revalidateRoster } from './roster-cache';
 
 export type AllocationResult = { ok: true } | { ok: false; error: string };
@@ -204,7 +205,7 @@ export async function declareCapacity(capacityPerMonth: number | null): Promise<
   }
 
   const member = await prisma.studioMember.findUnique({
-    where: { userId: user.id },
+    where: { userId: user.id, ...OFFICE_MEMBER },
     select: { studioId: true },
   });
   if (!member) return { ok: false, error: 'This sign-in is not linked to a studio.' };

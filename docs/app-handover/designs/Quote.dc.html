@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Your quotes</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0B0B0B}
+a:focus-visible,button:focus-visible{outline:2px solid #BA5329;outline-offset:3px}
+button{font-family:inherit}
+/* motion and depth layer */
+@keyframes oiRise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes oiKen{from{transform:scale(1.12)}to{transform:scale(1)}}
+@keyframes oiGrowX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes oiPop{0%{transform:scale(.95)}60%{transform:scale(1.03)}100%{transform:scale(1)}}
+h1{animation:oiRise .8s cubic-bezier(.22,1,.36,1) both}
+h1 ~ p,h1 + span{animation:oiRise .8s cubic-bezier(.22,1,.36,1) .12s both}
+[role="radiogroup"] > *,[role="group"] > *,ol > li,fieldset > div > *,[role="tablist"] > *{animation:oiRise .7s cubic-bezier(.22,1,.36,1) both}
+[role="radiogroup"] > *:nth-child(1),[role="group"] > *:nth-child(1),ol > li:nth-child(1),fieldset > div > *:nth-child(1),[role="tablist"] > *:nth-child(1){animation-delay:0.22s}
+[role="radiogroup"] > *:nth-child(2),[role="group"] > *:nth-child(2),ol > li:nth-child(2),fieldset > div > *:nth-child(2),[role="tablist"] > *:nth-child(2){animation-delay:0.28s}
+[role="radiogroup"] > *:nth-child(3),[role="group"] > *:nth-child(3),ol > li:nth-child(3),fieldset > div > *:nth-child(3),[role="tablist"] > *:nth-child(3){animation-delay:0.34s}
+[role="radiogroup"] > *:nth-child(4),[role="group"] > *:nth-child(4),ol > li:nth-child(4),fieldset > div > *:nth-child(4),[role="tablist"] > *:nth-child(4){animation-delay:0.40s}
+[role="radiogroup"] > *:nth-child(5),[role="group"] > *:nth-child(5),ol > li:nth-child(5),fieldset > div > *:nth-child(5),[role="tablist"] > *:nth-child(5){animation-delay:0.46s}
+[role="radiogroup"] > *:nth-child(6),[role="group"] > *:nth-child(6),ol > li:nth-child(6),fieldset > div > *:nth-child(6),[role="tablist"] > *:nth-child(6){animation-delay:0.52s}
+[role="radiogroup"] > *:nth-child(7),[role="group"] > *:nth-child(7),ol > li:nth-child(7),fieldset > div > *:nth-child(7),[role="tablist"] > *:nth-child(7){animation-delay:0.58s}
+[role="radiogroup"] > *:nth-child(8),[role="group"] > *:nth-child(8),ol > li:nth-child(8),fieldset > div > *:nth-child(8),[role="tablist"] > *:nth-child(8){animation-delay:0.64s}
+[role="radiogroup"] > *:nth-child(9),[role="group"] > *:nth-child(9),ol > li:nth-child(9),fieldset > div > *:nth-child(9),[role="tablist"] > *:nth-child(9){animation-delay:0.70s}
+[role="radiogroup"] > *:nth-child(10),[role="group"] > *:nth-child(10),ol > li:nth-child(10),fieldset > div > *:nth-child(10),[role="tablist"] > *:nth-child(10){animation-delay:0.76s}
+[role="radiogroup"] > *:nth-child(11),[role="group"] > *:nth-child(11),ol > li:nth-child(11),fieldset > div > *:nth-child(11),[role="tablist"] > *:nth-child(11){animation-delay:0.82s}
+[role="radiogroup"] > *:nth-child(12),[role="group"] > *:nth-child(12),ol > li:nth-child(12),fieldset > div > *:nth-child(12),[role="tablist"] > *:nth-child(12){animation-delay:0.88s}
+[role="progressbar"] > span{transform-origin:left center;animation:oiGrowX .9s cubic-bezier(.22,1,.36,1) both}
+[role="progressbar"] > span:nth-child(1){animation-delay:0.05s}
+[role="progressbar"] > span:nth-child(2){animation-delay:0.10s}
+[role="progressbar"] > span:nth-child(3){animation-delay:0.15s}
+[role="progressbar"] > span:nth-child(4){animation-delay:0.20s}
+[role="progressbar"] > span:nth-child(5){animation-delay:0.25s}
+[role="progressbar"] > span:nth-child(6){animation-delay:0.30s}
+[role="progressbar"] > span:nth-child(7){animation-delay:0.35s}
+img[style*="inset: 0"]{animation:oiKen 18s ease-in-out both alternate infinite}
+a,button{transition:transform .28s cubic-bezier(.34,1.56,.64,1),box-shadow .28s ease,background-color .28s ease,color .28s ease}
+a:active,button:active{transform:scale(.965)}
+button[aria-pressed="true"],button[aria-checked="true"]{animation:oiPop .45s cubic-bezier(.34,1.56,.64,1)}
+a[style*="background: rgb(11, 11, 11)"][style*="border-radius: 999px"],button[style*="background: rgb(11, 11, 11)"][style*="border-radius: 999px"]{box-shadow:0 14px 30px -16px rgba(11,11,11,.45)}
+div[style*="background: rgb(11, 11, 11)"][style*="border-radius: 20px"],div[style*="background: rgb(11, 11, 11)"][style*="border-radius: 18px"],article[style*="background: rgb(11, 11, 11)"]{box-shadow:0 28px 56px -26px rgba(11,11,11,.6),inset 0 1px 0 rgba(255,255,255,.06)}
+div[style*="background: rgb(186, 83, 41)"][style*="border-radius: 20px"]{box-shadow:0 28px 56px -22px rgba(186,83,41,.65),inset 0 1px 0 rgba(255,255,255,.18)}
+img[style*="border-radius: 12px"],img[style*="border-radius: 16px"],img[style*="border-radius: 14px"]{box-shadow:0 14px 30px -18px rgba(11,11,11,.5)}
+nav a[aria-current="page"] svg{animation:oiPop .7s cubic-bezier(.34,1.56,.64,1) both}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.01ms!important}}
+[style*="overflow-y: auto"] > *{flex-shrink:0}
+
+/* website skin (one-interiors home-cb.css) */
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"],button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"],a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]{position:relative;overflow:hidden;isolation:isolate;transition:transform .45s cubic-bezier(.22,1,.36,1),color .35s}
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]::before,button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]::before,a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:#C1582E;transform:translateY(101%);border-top-left-radius:50% 40%;border-top-right-radius:50% 40%;transition:transform .55s cubic-bezier(.22,1,.36,1),border-radius .55s cubic-bezier(.22,1,.36,1)}
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]:hover::before,button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]:hover::before,a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]:hover::before{transform:none;border-radius:999px}
+a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]:hover{color:#FFFFFF!important}
+a[style*="min-height: 56px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 52px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 46px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 56px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 46px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child{width:28px;height:28px;padding:7px;box-sizing:border-box;border-radius:50%;background:#FFFFFF;color:#0B0B0B;margin-right:-12px;flex-shrink:0}
+a[style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child{background:#0B0B0B!important;color:#FFFFFF!important}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; background: #FFFFFF; color: #0B0B0B; font-family: 'Geist', sans-serif; overflow: hidden">
+
+  <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 20px 20px 0 12px">
+    <a href="Matches.dc.html" aria-label="Back to matches" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #0B0B0B">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+    </a>
+    <span style="font-size: 13px; font-weight: 500; color: #5F5F5F; letter-spacing: .07em; text-transform: uppercase">First quotes · 3 studios</span>
+  </div>
+
+  <div style="flex: 1; overflow-y: auto; padding: 14px 20px 24px; display: flex; flex-direction: column; gap: 20px">
+    <h1 style="margin: 0; font-size: 36px; font-weight: 500; letter-spacing: -0.045em; line-height: .98">A quote you can actually read.</h1>
+    <div style="display: flex; gap: 12px; align-items: flex-start; background: #F3F3F1; border-radius: 24px; padding: 14px 16px">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#BA5329" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px"><path d="M3 17 17 3l4 4L7 21z"></path><path d="m7 13 2 2M10 10l2 2M13 7l2 2"></path></svg>
+      <span style="display: flex; flex-direction: column; gap: 3px"><span style="font-size: 15px; font-weight: 600">First quote, from each studio's own rate card</span><span style="font-size: 14px; line-height: 1.45; color: #5F5F5F">Final price comes after they measure your flat. It usually moves by less than 5%. Valid till 8 Nov.</span></span>
+    </div>
+
+    <div role="tablist" aria-label="Studios" style="display: flex; gap: 8px; flex-wrap: wrap">
+      <sc-for list="{{studios}}" as="s" hint-placeholder-count="3">
+        <button type="button" role="tab" aria-selected="{{s.sel}}" onClick="{{s.pick}}" style="min-height: 42px; padding: 0 16px; border: 0; border-radius: 999px; font-size: 14.5px; font-weight: 500; cursor: pointer; background: {{s.bg}}; color: {{s.fg}}; box-shadow: inset 0 0 0 1px {{s.ring}}">{{s.name}}</button>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; flex-direction: column">
+      <sc-for list="{{lines}}" as="l" hint-placeholder-count="5">
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; padding: 14px 0; border-top: 1px solid #E6E6E3; align-items: baseline">
+          <span style="font-size: 16px; font-weight: 500; color: {{l.color}}">{{l.item}}</span>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 14.5px; color: {{l.color}}">{{l.amt}}</span>
+          <span style="grid-column: 1 / -1; font-family: 'Geist Mono', monospace; font-size: 13px; color: #5F5F5F">{{l.spec}}</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="border-radius: 20px; background: #BA5329; color: #FFFFFF; padding: 22px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 12px">
+        <span style="font-size: 20px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.1">Total for all 40 lines</span>
+        <span style="font-size: 52px; font-weight: 500; letter-spacing: -0.05em; line-height: .9; font-variant-numeric: tabular-nums">{{total}}<span style="font-size: 22px; font-weight: 500"> L</span></span>
+      </div>
+      <span style="font-family: 'Geist Mono', monospace; font-size: 13px; letter-spacing: .04em; opacity: .9">GST, labour and installation included. No hidden charges.</span>
+    </div>
+    <p style="margin: 0; font-size: 13.5px; line-height: 1.5; color: #5F5F5F">Priced from each studio's own rate card. One Interiors adds nothing on top.</p>
+    <a href="GeioHome.dc.html" style="align-self: flex-start; min-height: 44px; padding: 0 16px 0 6px; border-radius: 999px; background: #F3F3F1; color: #0B0B0B; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 10px; text-decoration: none"><span aria-hidden="true" style="width: 30px; height: 30px; border-radius: 50%; background: radial-gradient(circle at 34% 28%, #FFF6E6 0%, #F2C98A 26%, #E07A4E 56%, #BA5329 80%, #6E2A10 100%); box-shadow: 0 0 14px -2px rgba(242,201,138,.8)"></span>Not sure what a line means? Ask GEIO</a>
+  </div>
+
+  <div style="flex-shrink: 0; padding: 12px 20px 36px; border-top: 1px solid #E6E6E3">
+    <a href="Compare.dc.html" style="min-height: 56px; border-radius: 999px; background: #0B0B0B; color: #F1F0EC; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 12px; text-decoration: none">Compare all 3, row by row
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3.5 9h11M10 4.5 14.5 9 10 13.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg></a>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { picked: 'teak', disp: 0 };
+  }
+  componentDidMount() { this.roll(1840); }
+  componentWillUnmount() { cancelAnimationFrame(this.raf); }
+  roll(to) {
+    cancelAnimationFrame(this.raf);
+    const from = this.state.disp, start = performance.now(), dur = 900;
+    const step = (now) => {
+      const p = Math.min(1, (now - start) / dur);
+      this.setState({ disp: from + (to - from) * (1 - Math.pow(1 - p, 3)) });
+      if (p < 1) this.raf = requestAnimationFrame(step);
+    };
+    this.raf = requestAnimationFrame(step);
+  }
+  renderVals() {
+    const fmt = (k) => {
+      const s = String(k * 1000);
+      const last3 = s.slice(-3);
+      let rest = s.slice(0, -3);
+      const parts = [];
+      while (rest.length > 2) { parts.unshift(rest.slice(-2)); rest = rest.slice(0, -2); }
+      if (rest) parts.unshift(rest);
+      return '₹' + (parts.length ? parts.join(',') + ',' : '') + last3;
+    };
+    const items = ['Wardrobes', 'Kitchen', 'Beds & seating', 'Ceiling & lighting', '36 more lines'];
+    const data = [
+      { id: 'teak', name: 'Teakline Studio', v: [420, 385, 360, 210, 465], spec: ['84 sq ft, 18mm BWP ply, matt laminate', 'L-shape 11 ft, quartz counter', '2 beds, 1 sofa, fabric grade B', '420 sq ft, 26 fixtures', 'Electrical, painting, hardware and more'] },
+      { id: 'chitra', name: 'Chitra & Co.', v: [460, 430, 370, 220, 480], spec: ['84 sq ft, 18mm BWP ply, acrylic', 'L-shape 11 ft, quartz counter', '2 beds, 1 sofa, fabric grade A', '420 sq ft, 30 fixtures', 'Electrical, painting, hardware and more'] },
+      { id: 'maya', name: 'Maya Workshop', v: [345, 360, 340, 195, 450], spec: ['84 sq ft, 16mm MDF, matt laminate', 'L-shape 11 ft, granite counter', '2 beds, 1 sofa, fabric grade B', '420 sq ft, 22 fixtures', 'Electrical, painting, hardware and more'] }
+    ];
+    const cur = data.find((d) => d.id === this.state.picked) || data[0];
+    const sum = cur.v.reduce((a, b) => a + b, 0);
+    return {
+      studios: data.map((d) => {
+        const on = d.id === cur.id;
+        return {
+          name: d.name,
+          sel: on ? 'true' : 'false',
+          bg: on ? '#0B0B0B' : 'transparent',
+          fg: on ? '#FFFFFF' : '#0B0B0B',
+          ring: on ? '#0B0B0B' : 'rgba(11,11,11,.22)',
+          pick: () => { this.setState({ picked: d.id }); this.roll(d.v.reduce((a, b) => a + b, 0)); }
+        };
+      }),
+      lines: cur.v.map((v, i) => ({ item: items[i], spec: cur.spec[i], amt: fmt(v), color: i === 4 ? '#5F5F5F' : '#0B0B0B' })),
+      total: '₹' + (this.state.disp / 100).toFixed(1)
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+/* Team and settings (owner's handoff screen StudioTeam, 12 Oct 2026): pill
+   tabs over every settings page, cards, the seat meter, the role cards and
+   the site chips. Older settings forms keep their own layout and pick up the
+   design's card, field, button and label classes. Scoped to .oi-studio;
+   tokens only. */
+
+.oi-studio .st-tabs{max-width:100%;overflow-x:auto;flex-wrap:nowrap}
+.oi-studio .st-tabs a{min-height:36px;padding:0 14px;border-radius:999px;display:inline-flex;align-items:center;font-size:14px;font-weight:500;color:var(--text2);white-space:nowrap}
+.oi-studio .st-tabs a[aria-current="page"]{background:var(--paper);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(var(--sh),.12)}
+.oi-studio .st-page .phead h1{font-size:34px}
+.oi-studio .st-lede{margin:0;max-width:70ch;font-size:14px;line-height:1.5;color:var(--text2)}
+.oi-studio .st-note{box-shadow:inset 3px 0 0 var(--acc)}
+
+/* Older form markup inside the settings pages: labels read as the design's. */
+.oi-studio .st-page label{color:inherit}
+.oi-studio .st-page .card h2,.oi-studio .st-page .card h3{margin:0;font-size:17px;font-weight:600;letter-spacing:-.01em}
+.oi-studio .st-page textarea.fld,.oi-studio .st-page textarea{min-height:84px}
+
+/* Team: seats, people, the invite card. */
+.oi-studio .st-seats{display:flex;align-items:center;gap:12px;padding:10px 16px;border-radius:14px;background:var(--paper)}
+.oi-studio .st-seat{width:18px;height:18px;border-radius:5px;box-shadow:inset 0 0 0 1.5px var(--ring)}
+.oi-studio .st-seat.on{background:var(--ink);box-shadow:none}
+.oi-studio .st-people{flex:999 1 560px;min-width:0}
+.oi-studio .st-people .tbl td{vertical-align:top}
+.oi-studio .st-invite{flex:1 1 340px;min-width:0}
+.oi-studio .st-role{min-height:56px;padding:10px 14px;border:0;border-radius:14px;text-align:left;cursor:pointer;background:var(--fill);color:var(--ink);display:flex;flex-direction:column;gap:3px;width:100%}
+.oi-studio .st-role b{font-size:15px;font-weight:600}
+.oi-studio .st-role span{font-size:13px;line-height:1.4;color:var(--muted)}
+.oi-studio .st-role[aria-checked="true"]{background:var(--ink);color:var(--paper)}
+.oi-studio .st-role[aria-checked="true"] span{color:var(--inv-muted2)}
+.oi-studio .st-chip{min-height:40px;padding:0 12px;border:0;border-radius:999px;font-size:13.5px;font-weight:500;cursor:pointer;background:var(--fill);color:var(--ink)}
+.oi-studio .st-chip[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.oi-studio .st-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+
+@media (max-width:760px){
+  .oi-studio .st-page .phead h1{font-size:28px}
+  .oi-studio .st-grid2{grid-template-columns:minmax(0,1fr)}
+}
+.oi-studio .st-seatrow{justify-content:flex-end;gap:16px}
+@media (min-width:761px){.oi-studio .st-seatrow{margin-top:-64px}}
+@media (max-width:760px){.oi-studio .st-seatrow{justify-content:flex-start}}

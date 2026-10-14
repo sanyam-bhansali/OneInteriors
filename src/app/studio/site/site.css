@@ -1,0 +1,809 @@
+/* Site mode on the phone (the owner's UI handoff: SiteToday, SiteUpdate,
+   SiteSnag at 390 px). The screens' own classes; every rule under
+   .oi-studio, colours as tokens only, so both themes follow. Big targets:
+   a supervisor uses this outdoors with one hand. */
+
+.oi-studio .st-frame {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--ground);
+  color: var(--ink);
+}
+.oi-studio .st-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 16px 24px;
+}
+
+/* Today's header: studio · role, the greeting, theme and language */
+.oi-studio .st-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 22px 20px 0;
+}
+.oi-studio .st-head .who {
+  font-size: 14px;
+  color: var(--muted);
+}
+.oi-studio .st-head h1 {
+  margin: 4px 0 0;
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+.oi-studio .st-ctl {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.oi-studio .st-thb {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.oi-studio .st-ctl .seg button {
+  min-width: 34px;
+  padding: 0 8px;
+}
+.oi-studio .st-date {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  padding: 0 4px;
+}
+
+/* A screen's back header (post an update, fix a snag) */
+.oi-studio .st-backhead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 16px 6px 8px;
+}
+.oi-studio .st-backhead a {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+}
+.oi-studio .st-backhead h1 {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+.oi-studio .st-backhead .sub {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* Cards and sections */
+.oi-studio .st-card {
+  background: var(--paper);
+  border-radius: 20px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.oi-studio .st-sec {
+  background: var(--paper);
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.oi-studio .st-sec h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.oi-studio .st-sec .hint,
+.oi-studio .st-hint {
+  font-size: 13px;
+  color: var(--muted);
+}
+.oi-studio .st-title {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.oi-studio .st-line {
+  font-size: 14px;
+  color: var(--muted);
+}
+.oi-studio .st-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* Today on site: the coloured status line */
+.oi-studio .st-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--fill);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text2);
+}
+.oi-studio .st-status i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--muted);
+}
+.oi-studio .st-status.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.oi-studio .st-status.warn i {
+  background: var(--warn-s);
+}
+.oi-studio .st-status.good {
+  background: var(--good-bg);
+  color: var(--good);
+}
+.oi-studio .st-status.good i {
+  background: var(--good-s);
+}
+.oi-studio .st-status.bad {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+.oi-studio .st-status.bad i {
+  background: var(--bad-s);
+}
+
+/* Buttons */
+.oi-studio .st-big {
+  min-height: 60px;
+  width: 100%;
+  border: 0;
+  border-radius: 16px;
+  background: var(--ink);
+  color: var(--paper);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 16px;
+  font-size: 17px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+.oi-studio a.st-big:hover {
+  color: var(--paper);
+}
+.oi-studio .st-big.pill {
+  border-radius: 999px;
+}
+.oi-studio .st-big:disabled,
+.oi-studio .st-big[aria-disabled='true'] {
+  background: var(--fillh);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+.oi-studio .st-big.bad {
+  background: var(--bad-s);
+  color: var(--paper);
+}
+.oi-studio .st-fill {
+  min-height: 52px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--fill);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+.oi-studio a.st-fill:hover {
+  color: var(--ink);
+  background: var(--fillh);
+}
+.oi-studio .st-fill:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.oi-studio .st-fill.small {
+  min-height: 44px;
+  font-size: 14px;
+}
+.oi-studio .st-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.oi-studio .st-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--acc);
+  color: var(--paper);
+  font-size: 13px;
+}
+.oi-studio .st-link {
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--text2);
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0 6px;
+  cursor: pointer;
+}
+.oi-studio .st-redo {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.oi-studio .st-redo:disabled {
+  opacity: 0.45;
+}
+
+/* Choice chips: crew on site, reasons, rooms, times */
+.oi-studio .st-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.oi-studio .st-chip {
+  min-height: 46px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--fill);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.oi-studio .st-chip.sm {
+  min-height: 40px;
+  font-size: 14px;
+}
+.oi-studio .st-chip[aria-pressed='true'],
+.oi-studio .st-chip[aria-checked='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+.oi-studio .st-chip.add {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line2);
+}
+.oi-studio .st-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.oi-studio .st-scroll .st-chip {
+  flex: none;
+}
+
+/* The mic: an accent pill with a paper circle */
+.oi-studio .st-mic {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 16px 0 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--acc);
+  color: var(--paper);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+html[data-theme='dark'] .oi-studio .st-mic {
+  color: var(--ink);
+}
+.oi-studio .st-mic > span {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--acc);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.oi-studio .st-mic.rec {
+  background: var(--bad-s);
+}
+.oi-studio .st-mic.rec > span {
+  color: var(--bad-s);
+}
+.oi-studio .st-mic:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.oi-studio .st-mic.wide {
+  align-self: stretch;
+  justify-content: center;
+  min-height: 56px;
+}
+
+/* A photo with what was said about it */
+.oi-studio .st-photo {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+.oi-studio .st-photo img {
+  width: 76px;
+  height: 76px;
+  object-fit: cover;
+  border-radius: 10px;
+  display: block;
+  background: var(--fillh);
+}
+.oi-studio .st-photo .body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.oi-studio .st-photo .room {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.oi-studio .st-heard {
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.oi-studio .st-said {
+  font-size: 14.5px;
+  line-height: 1.35;
+  font-weight: 500;
+}
+.oi-studio .st-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.oi-studio .st-meta .mono {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.oi-studio .st-said-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--fill);
+}
+.oi-studio .st-textarea {
+  min-height: 64px;
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--line);
+  padding: 8px 12px;
+  font-size: 16px;
+  color: var(--ink);
+}
+.oi-studio .st-input {
+  min-height: 52px;
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--line);
+  padding: 0 12px;
+  font-size: 17px;
+  color: var(--ink);
+}
+
+/* What got done: tick rows */
+.oi-studio .st-tick {
+  min-height: 52px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--fill);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--ink);
+}
+.oi-studio .st-tick[aria-checked='true'] {
+  background: var(--good-bg);
+}
+.oi-studio .st-tick .box {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 1.5px var(--line2);
+  color: var(--paper);
+}
+.oi-studio .st-tick[aria-checked='true'] .box {
+  background: var(--good-s);
+  box-shadow: none;
+}
+.oi-studio .st-group {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.oi-studio .st-step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: 16px;
+}
+.oi-studio .st-step.on {
+  padding: 6px;
+  background: var(--good-bg);
+}
+.oi-studio .st-step.on .st-tick {
+  background: transparent;
+}
+.oi-studio .st-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  background: var(--paper);
+}
+
+/* The customer's preview */
+.oi-studio .st-reads {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--acc);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+html[data-theme='dark'] .oi-studio .st-reads {
+  color: var(--acc-ink);
+}
+
+/* Small notices */
+.oi-studio .st-note {
+  display: flex;
+  gap: 10px;
+  padding: 4px 6px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.oi-studio .st-note svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.oi-studio .st-info {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--acc-soft);
+  color: var(--acc-ink);
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+.oi-studio .st-warn {
+  align-self: flex-start;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-size: 12.5px;
+}
+.oi-studio .st-bad-t {
+  color: var(--bad);
+}
+.oi-studio .st-toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 6px 6px 16px;
+  border-radius: 14px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 14.5px;
+}
+.oi-studio .st-toast button {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* The bottom: the bar (Today · Snags · Me), or a screen's one big button */
+.oi-studio .st-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  background: var(--paper);
+  box-shadow: 0 -1px 0 var(--line);
+  padding: 6px 8px calc(10px + env(safe-area-inset-bottom));
+}
+.oi-studio .st-bar > div {
+  max-width: 560px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.oi-studio .st-tab {
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+.oi-studio .st-tab:hover {
+  color: var(--ink);
+}
+.oi-studio .st-tab[aria-current='page'] {
+  color: var(--acc);
+  font-weight: 600;
+}
+html[data-theme='dark'] .oi-studio .st-tab[aria-current='page'] {
+  color: var(--acc-ink);
+}
+.oi-studio .st-bottom {
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+  background: var(--ground);
+  padding: 10px 16px calc(16px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.oi-studio .st-bottom .row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.oi-studio .st-bottom .hint {
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Snags list */
+.oi-studio .st-snag {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 96px;
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--paper);
+  color: var(--ink);
+}
+.oi-studio a.st-snag:hover {
+  color: var(--ink);
+  background: var(--soft);
+}
+.oi-studio .st-snag img,
+.oi-studio .st-snag .ph {
+  width: 72px;
+  height: 72px;
+  flex: none;
+  border-radius: 12px;
+  object-fit: cover;
+  background: var(--fill);
+}
+.oi-studio .st-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.oi-studio .st-pill {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--fill);
+  font-size: 13px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+}
+.oi-studio .st-pill.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-weight: 600;
+}
+.oi-studio .st-pill.bad {
+  background: var(--bad-bg);
+  color: var(--bad);
+  font-weight: 600;
+}
+.oi-studio .st-figs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.oi-studio .st-figs figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.oi-studio .st-figs img,
+.oi-studio .st-figs .ph {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 14px;
+  display: block;
+  background: var(--fill);
+}
+.oi-studio .st-figs figcaption {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.oi-studio .st-take {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border: 0;
+  border-radius: 14px;
+  background: var(--ink);
+  color: var(--paper);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.oi-studio .st-take:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.oi-studio .st-over {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 12.5px;
+  text-align: center;
+}
+.oi-studio .st-over.bad {
+  background: var(--bad-s);
+  min-height: 44px;
+  cursor: pointer;
+}
+.oi-studio .st-ok {
+  background: var(--good-bg);
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--good);
+}
+.oi-studio .st-ok b {
+  font-size: 16px;
+}
+.oi-studio .st-ok p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.oi-studio .st-bad {
+  background: var(--bad-bg);
+  border-radius: 14px;
+  padding: 14px;
+  color: var(--bad);
+}
+.oi-studio .st-bad p {
+  margin: 0;
+}
+.oi-studio .st-done-mark {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--paper);
+}
+.oi-studio .st-h2big {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+
+@keyframes stMic {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--paper) 60%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 10px transparent;
+  }
+}
+.oi-studio .st-mic.rec > span {
+  animation: stMic 1.2s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .oi-studio .st-mic.rec > span {
+    animation: none;
+  }
+}

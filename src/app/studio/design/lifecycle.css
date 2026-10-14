@@ -1,0 +1,110 @@
+/* The project lifecycle board (My Design, My Execution, My Snags). Tokens only. */
+.oi-studio .oi-life {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.oi-studio .oi-life .remind {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.oi-studio .oi-life .remind b {
+  font-size: 15px;
+}
+.oi-studio .oi-life .remind ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.oi-studio .oi-life .remind a {
+  color: var(--ink);
+  font-weight: 600;
+}
+.oi-studio .oi-life .lgrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+.oi-studio .oi-life .lcard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.oi-studio .oi-life .lcard:hover {
+  box-shadow: 0 0 0 1.5px var(--ring);
+}
+.oi-studio .oi-life .lhead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+.oi-studio .oi-life .lhead b {
+  display: block;
+  font-size: 15.5px;
+}
+.oi-studio .oi-life .lrows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  font-size: 13.5px;
+  margin: 0;
+}
+.oi-studio .oi-life .lrows dt {
+  color: var(--muted);
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-top: 1px;
+}
+.oi-studio .oi-life .lrows dd {
+  margin: 0;
+  min-width: 0;
+}
+.oi-studio .oi-life .who {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-right: 6px;
+}
+.oi-studio .oi-life .snl {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13.5px;
+  border-top: 1px solid var(--fill2);
+  padding-top: 8px;
+}
+.oi-studio .oi-life .snl li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+@media (max-width: 640px) {
+  .oi-studio .oi-life .lgrid {
+    grid-template-columns: 1fr;
+  }
+  /* Three tabs fit on two lines at 390 px; no sideways scroll for them. */
+  .oi-studio .oi-life .ptabs {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+  .oi-studio .oi-life .ptabs a {
+    padding: 0 12px;
+  }
+}

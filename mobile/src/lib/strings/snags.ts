@@ -1,0 +1,93 @@
+import type { Entry } from './entry';
+
+/** The snags screen's words, English, Hindi and Marathi (first draft: Sanyam reviews). */
+export const snags = {
+  // Promises Assured-plan service (FLOWS.md): flagged, kept until plans are decided.
+  'snags.eyebrow': { en: 'Fixed by a date, or we chase it', hi: 'तय तारीख तक ठीक, नहीं तो हम पीछे लगेंगे', mr: 'ठरलेल्या तारखेपर्यंत दुरुस्त, नाहीतर आम्ही पाठपुरावा करू' },
+  'snags.title': { en: 'Snags', hi: 'कमियाँ', mr: 'त्रुटी' },
+  'snags.none': {
+    en: 'Once your project starts, photograph anything wrong and it goes straight to the studio.',
+    hi: 'प्रोजेक्ट शुरू होने के बाद, कुछ भी गलत दिखे तो फ़ोटो लीजिए। वह सीधे स्टूडियो तक जाएगी।',
+    mr: 'प्रोजेक्ट सुरू झाल्यावर, काहीही चुकीचे दिसले तर फोटो काढा. तो थेट स्टुडिओकडे जाईल.',
+  },
+  'snags.photograph': { en: 'Photograph a problem', hi: 'कमी की फ़ोटो लें', mr: 'त्रुटीचा फोटो काढा' },
+  'snags.library': { en: 'Choose from photos', hi: 'गैलरी से चुनें', mr: 'गॅलरीतून निवडा' },
+  'snags.permission': {
+    en: 'Allow access in your phone’s settings to add a photo.',
+    hi: 'फ़ोटो जोड़ने के लिए फ़ोन की सेटिंग में अनुमति दीजिए।',
+    mr: 'फोटो जोडण्यासाठी फोनच्या सेटिंगमध्ये परवानगी द्या.',
+  },
+  'snags.photo': { en: 'Your photo', hi: 'आपकी फ़ोटो', mr: 'तुमचा फोटो' },
+  'snags.what': { en: 'What is wrong', hi: 'क्या गलत है', mr: 'काय चुकले आहे' },
+  'snags.whatHint': { en: 'Gap between wardrobe and ceiling', hi: 'वॉर्डरोब और छत के बीच गैप', mr: 'वॉर्डरोब आणि छतामध्ये फट' },
+  'snags.where': { en: 'Where (optional)', hi: 'कहाँ (ज़रूरी नहीं)', mr: 'कुठे (गरजेचे नाही)' },
+  'snags.whereHint': { en: 'Bedroom 1', hi: 'बेडरूम 1', mr: 'बेडरूम 1' },
+  'snags.send': { en: 'Send to the studio', hi: 'स्टूडियो को भेजें', mr: 'स्टुडिओला पाठवा' },
+  'snags.sendReason': { en: 'Say what is wrong, in a few words', hi: 'कुछ शब्दों में बताइए क्या गलत है', mr: 'काय चुकले आहे ते थोडक्यात सांगा' },
+  'snags.cancel': { en: 'Cancel', hi: 'रद्द करें', mr: 'रद्द करा' },
+  'snags.sent': {
+    en: 'Sent to {studio}. You will hear when it has a fix-by date.',
+    hi: '{studio} को भेज दिया। ठीक करने की तारीख तय होते ही आपको बताया जाएगा।',
+    mr: '{studio} ला पाठवले. दुरुस्तीची तारीख ठरली की तुम्हाला कळवले जाईल.',
+  },
+
+  'snags.filter': { en: 'Filter snags', hi: 'कमियाँ छाँटें', mr: 'त्रुटी निवडा' },
+  'snags.open': { en: 'Open', hi: 'बाकी', mr: 'बाकी' },
+  'snags.fixed': { en: 'Fixed', hi: 'ठीक हुईं', mr: 'दुरुस्त' },
+  'snags.roomRaised': { en: '{room}, raised {day}', hi: '{room}, {day} को बताया', mr: '{room}, {day} रोजी नोंदवले' },
+  'snags.raised': { en: 'Raised {day}', hi: '{day} को बताया', mr: '{day} रोजी नोंदवले' },
+  'snags.fixBy': { en: 'Fix by {day}', hi: '{day} तक ठीक होगा', mr: '{day} पर्यंत दुरुस्त होईल' },
+  'snags.fixedOn': { en: 'Fixed {day}', hi: '{day} को ठीक हुआ', mr: '{day} रोजी दुरुस्त झाले' },
+  'snags.withStudio': { en: 'With the studio', hi: 'स्टूडियो के पास है', mr: 'स्टुडिओकडे आहे' },
+  'snags.emptyOpen': { en: 'Nothing open. Good.', hi: 'कुछ बाकी नहीं। बढ़िया।', mr: 'काही बाकी नाही. छान.' },
+  'snags.emptyFixed': { en: 'Nothing fixed yet.', hi: 'अभी कुछ ठीक नहीं हुआ।', mr: 'अजून काही दुरुस्त झालेले नाही.' },
+  'snags.photoOf': { en: 'Photo: {title}', hi: 'फ़ोटो: {title}', mr: 'फोटो: {title}' },
+
+  'snags.walk': { en: 'Handover walk-through, {date}', hi: 'हैंडओवर पर साथ में जाँच, {date}', mr: 'हँडओव्हरला एकत्र पाहणी, {date}' },
+  'snags.walkNoDate': { en: 'Handover walk-through', hi: 'हैंडओवर पर साथ में जाँच', mr: 'हँडओव्हरला एकत्र पाहणी' },
+  'snags.walkBody': {
+    en: 'We walk the flat with you room by room and add everything here. The last payment is due only once these are closed.',
+    hi: 'हम आपके साथ फ़्लैट का हर कमरा देखते हैं और सब कुछ यहाँ जोड़ते हैं। आख़िरी भुगतान तभी देना है जब ये सब ठीक हो जाएँ।',
+    mr: 'आम्ही तुमच्यासोबत फ्लॅटची प्रत्येक खोली पाहतो आणि सगळे इथे नोंदवतो. हे सगळे दुरुस्त झाल्यावरच शेवटचे पेमेंट द्यायचे.',
+  },
+
+  // Phase 4: the customer closes a snag — Confirm or Not fixed, before and after side by side.
+  'snags.check': { en: 'Check the fix', hi: 'मरम्मत देखिए', mr: 'दुरुस्ती तपासा' },
+  'snags.checkMany': { en: 'Check {n} fixes', hi: '{n} मरम्मत देखिए', mr: '{n} दुरुस्त्या तपासा' },
+  'snags.before': { en: 'Before · your photo', hi: 'पहले · आपकी फ़ोटो', mr: 'आधी · तुमचा फोटो' },
+  'snags.beforeStudio': { en: 'Before', hi: 'पहले', mr: 'आधी' },
+  'snags.after': { en: 'After · {day}', hi: 'बाद में · {day}', mr: 'नंतर · {day}' },
+  'snags.afterNoDay': { en: 'After', hi: 'बाद में', mr: 'नंतर' },
+  'snags.noPhoto': { en: 'No photo', hi: 'फ़ोटो नहीं', mr: 'फोटो नाही' },
+  'snags.studioSays': { en: '{studio} says', hi: '{studio} कहते हैं', mr: '{studio} म्हणतात' },
+  'snags.confirm': { en: 'Confirm, it is fixed', hi: 'हाँ, ठीक हो गया', mr: 'हो, दुरुस्त झाले' },
+  'snags.notFixed': { en: 'Not fixed', hi: 'ठीक नहीं हुआ', mr: 'दुरुस्त झाले नाही' },
+  'snags.notFixedWhat': { en: 'What is still wrong (optional)', hi: 'अभी भी क्या गलत है (ज़रूरी नहीं)', mr: 'अजून काय चुकले आहे (गरजेचे नाही)' },
+  'snags.notFixedHint': { en: 'Still a gap on the left side', hi: 'बाईं तरफ़ अभी भी गैप है', mr: 'डावीकडे अजून फट आहे' },
+  'snags.sendBack': { en: 'Send back to the studio', hi: 'स्टूडियो को वापस भेजें', mr: 'स्टुडिओकडे परत पाठवा' },
+  'snags.autoClose': {
+    en: 'If you do not answer, it closes by itself on {day}.',
+    hi: 'आप जवाब न दें तो यह {day} को अपने आप बंद हो जाएगी।',
+    mr: 'तुम्ही उत्तर दिले नाही तर {day} रोजी आपोआप बंद होईल.',
+  },
+  'snags.confirmed': { en: 'Closed. Thank you.', hi: 'बंद हो गई। धन्यवाद।', mr: 'बंद झाली. धन्यवाद.' },
+  'snags.sentBack': { en: 'Sent back to {studio}.', hi: '{studio} को वापस भेज दिया।', mr: '{studio} कडे परत पाठवले.' },
+  'snags.agree': { en: 'Agree, close it', hi: 'सहमत, बंद करें', mr: 'मान्य, बंद करा' },
+  'snags.disputeHelp': {
+    en: 'Not agreed? Leave it open and our team will look at it with you.',
+    hi: 'सहमत नहीं? इसे खुला रहने दें, हमारी टीम आपके साथ देखेगी।',
+    mr: 'मान्य नाही? हे उघडे राहू द्या, आमची टीम तुमच्यासोबत पाहील.',
+  },
+  'snags.familyWait': {
+    en: 'The studio has marked this fixed. The home owner confirms it.',
+    hi: 'स्टूडियो ने इसे ठीक बताया है। घर के मालिक पुष्टि करेंगे।',
+    mr: 'स्टुडिओने हे दुरुस्त झाले असे सांगितले आहे. घरमालक खात्री करतील.',
+  },
+  'snags.stateRaised': { en: 'With the studio', hi: 'स्टूडियो के पास है', mr: 'स्टुडिओकडे आहे' },
+  'snags.stateReopened': { en: 'You said not fixed · with the studio', hi: 'आपने कहा ठीक नहीं हुआ · स्टूडियो के पास', mr: 'तुम्ही म्हणालात दुरुस्त नाही · स्टुडिओकडे' },
+  'snags.stateDisputed': { en: 'The studio replied', hi: 'स्टूडियो ने जवाब दिया', mr: 'स्टुडिओने उत्तर दिले' },
+  'snags.stateFixed': { en: 'Fixed · waiting for the owner', hi: 'ठीक हुई · मालिक की पुष्टि बाकी', mr: 'दुरुस्त · मालकाची खात्री बाकी' },
+  'snags.closedYou': { en: 'Fixed in {n} days, you confirmed', hi: '{n} दिन में ठीक, आपने पुष्टि की', mr: '{n} दिवसांत दुरुस्त, तुम्ही खात्री केली' },
+  'snags.closedYouNoDays': { en: 'Closed, you confirmed', hi: 'बंद, आपने पुष्टि की', mr: 'बंद, तुम्ही खात्री केली' },
+  'snags.closedAuto': { en: 'Closed after 7 days without an answer', hi: '7 दिन जवाब न आने पर बंद', mr: '7 दिवस उत्तर न आल्याने बंद' },
+} satisfies Record<string, Entry>;

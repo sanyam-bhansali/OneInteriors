@@ -293,8 +293,9 @@ export async function approveApplication(id: string, note: string): Promise<Deci
 
       await tx.studioMember.upsert({
         where: { userId: user.id },
-        create: { studioId: studio.id, userId: user.id, isOwner: true },
-        update: { studioId: studio.id, isOwner: true },
+        // `role` decides permissions (studio/roles.ts); `isOwner` is kept in step until it is dropped.
+        create: { studioId: studio.id, userId: user.id, isOwner: true, role: 'OWNER', status: 'ACTIVE' },
+        update: { studioId: studio.id, isOwner: true, role: 'OWNER', status: 'ACTIVE' },
       });
 
       await tx.studioApplication.update({

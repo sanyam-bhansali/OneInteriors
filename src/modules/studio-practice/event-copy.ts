@@ -22,6 +22,7 @@
 
 import type { ClientSourceName, LostReasonName } from './vocabulary';
 import { SOURCE_LABELS, LOST_LABELS } from './vocabulary';
+import { clockAt, type CallClock } from '@/modules/studio-sales/call-schedule';
 
 export type EventKindName =
   | 'CREATED'
@@ -33,7 +34,13 @@ export type EventKindName =
   | 'LOST'
   | 'BINNED'
   | 'RESTORED'
-  | 'WITHDRAWN';
+  | 'WITHDRAWN'
+  | 'EDITED'
+  | 'FILE'
+  | 'MEETING'
+  | 'SALES_FINAL'
+  | 'BOOKED'
+  | 'REFUNDED';
 
 /**
  * How a lead got here. Not the `ClientSource` enum.
@@ -72,12 +79,19 @@ export function stageSummary(from: string | null, to: string): string {
  */
 export const CALL_OUTCOMES = [
   { id: 'no_answer', label: 'No answer', logs: 'Called — no answer' },
+  /* AxLeads (owner, 12 Oct 2026): the four other things a call to a stranger
+     produces. The id busy already means "asked us to ring back", so the
+     engaged tone is line_busy. */
+  { id: 'line_busy', label: 'Busy', logs: 'Called — line busy' },
+  { id: 'switched_off', label: 'Switched off', logs: 'Called — phone switched off' },
+  { id: 'voicemail', label: 'Voicemail', logs: 'Called — left a voicemail' },
   { id: 'spoke', label: 'Spoke to them', logs: 'Spoke to them' },
   { id: 'busy', label: 'Asked to call back', logs: 'Called — they asked us to ring back' },
   { id: 'met', label: 'Met them', logs: 'Met them' },
   { id: 'site_visit', label: 'Visited the site', logs: 'Visited the site' },
   { id: 'messaged', label: 'Messaged them', logs: 'Messaged them' },
   { id: 'not_interested', label: 'Not interested', logs: 'Spoke to them — not interested' },
+  { id: 'wrong_number', label: 'Wrong number', logs: 'Called — wrong number' },
 ] as const;
 
 export type CallOutcomeId = (typeof CALL_OUTCOMES)[number]['id'];
@@ -123,14 +137,28 @@ export function isCallOutcome(v: string): v is CallOutcomeId {
  */
 export interface Followup {
   action: string;
-  /** Hours from now. */
-  dueInHours: number;
+  /** Hours from now (then 10 am). */
+  dueInHours?: number;
+  /**
+   * Or a call clock (AxLeads, 12 Oct 2026; studio-sales/call-schedule.ts):
+   * two hours from now, later today, tomorrow 3:30 pm, today 4 pm.
+   */
+  clock?: CallClock;
 }
 
 export const OUTCOME_FOLLOWUP: Record<CallOutcomeId, Followup | 'clear' | null> = {
   /* Ringing again the same hour is harassment; three days is forgetting.
      Tomorrow is the answer nobody argues with. */
   no_answer: { action: 'Try them again', dueInHours: 24 },
+  /* The line was engaged: they are by the phone. Two hours, not tomorrow. */
+  line_busy: { action: 'Try them again', clock: 'in2h' },
+  /* Off for the day, most likely. Tomorrow afternoon. */
+  switched_off: { action: 'Try them again', clock: 'tomorrow' },
+  /* They have the message; ring once more late in the afternoon. */
+  voicemail: { action: 'Call back after the voicemail', clock: 'today-16' },
+  /* Nobody to call. Cleared; the lead page offers "Mark lost — wrong
+     number", which only the person decides. */
+  wrong_number: 'clear',
   spoke: { action: 'Follow up on that conversation', dueInHours: 72 },
   /* They named the terms. Honouring them the next working day is the whole
      of the promise. */
@@ -151,8 +179,9 @@ export const OUTCOME_FOLLOWUP: Record<CallOutcomeId, Followup | 'clear' | null> 
 export function followupDue(outcome: CallOutcomeId, now: Date = new Date()): Date | null {
   const f = OUTCOME_FOLLOWUP[outcome];
   if (!f || f === 'clear') return null;
+  if (f.clock) return clockAt(f.clock, now);
 
-  const due = new Date(now.getTime() + f.dueInHours * 60 * 60 * 1000);
+  const due = new Date(now.getTime() + (f.dueInHours ?? 24) * 60 * 60 * 1000);
   /* 10am, not the hour the call happened. A task due at 19:40 sorts into the
      evening of a day nobody is working, and the board orders on this. */
   due.setHours(10, 0, 0, 0);
@@ -195,8 +224,8 @@ export function lostSummary(reason: LostReasonName | null, note?: string | null)
 export type EventTone = 'accent' | 'good' | 'quiet';
 
 export function toneFor(kind: EventKindName): EventTone {
-  if (kind === 'QUOTED' || kind === 'CONTACTED') return 'good';
-  if (kind === 'CREATED' || kind === 'STAGE_CHANGED') return 'accent';
+  if (kind === 'QUOTED' || kind === 'CONTACTED' || kind === 'BOOKED' || kind === 'SALES_FINAL') return 'good';
+  if (kind === 'CREATED' || kind === 'STAGE_CHANGED' || kind === 'MEETING') return 'accent';
   return 'quiet';
 }
 
@@ -212,6 +241,12 @@ export const KIND_LABELS: Record<EventKindName, string> = {
   BINNED: 'Deleted',
   RESTORED: 'Restored',
   WITHDRAWN: 'Withdrawn',
+  EDITED: 'Edited',
+  FILE: 'File',
+  MEETING: 'Meeting',
+  SALES_FINAL: 'Sales final',
+  BOOKED: 'Booked',
+  REFUNDED: 'Refunded',
 };
 
 /**

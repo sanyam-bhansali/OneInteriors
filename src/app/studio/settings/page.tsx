@@ -1,9 +1,14 @@
 import type { Metadata } from 'next';
-import { PageBody } from '../StudioShell';
 import { myBranding, myTier } from '@/modules/studio-quote/store';
 import { logoUploadEnabled, signedLogoUrl } from '@/modules/storage/studio-logo';
 import { BrandingForm } from './BrandingForm';
 import { LogoAndMark } from './LogoAndMark';
+import { BrandPages } from './BrandPages';
+import { WarrantyForm } from './WarrantyForm';
+import { myWarranty } from '@/modules/studio/warranty';
+import Link from 'next/link';
+import { currentMember } from '@/modules/studio/access';
+import { SETUP_PATH } from '@/modules/studio/surfaces';
 
 export const metadata: Metadata = {
   title: 'Settings',
@@ -33,20 +38,25 @@ export default async function SettingsPage() {
 
   /* In parallel: neither depends on the other, and the signed URL is a round
      trip to storage that should not sit behind a subscription lookup. */
-  const [logoUrl, tier] = await Promise.all([
+  const [logoUrl, tier, warranty, brandPageUrls, member] = await Promise.all([
     signedLogoUrl(branding?.logoPath ?? null),
     myTier(),
+    myWarranty().catch(() => null),
+    Promise.all((branding?.brandPages ?? []).map((p) => signedLogoUrl(p))),
+    currentMember(),
   ]);
+  /* The warranty follows the handover sign-off: a full-software setting (studio/pilot.ts). */
+  const full = member?.fullSoftware !== false;
 
   return (
     <>
-      <PageBody>
+      <>
         {!branding ? (
-          <div className="s-card mb-6 border-l-[3px] !border-l-[var(--s-accent)] p-5">
+          <div className="card mb-6 border-l-[3px] !border-l-[var(--s-accent)] p-5">
             <p className="m-0 mb-2 text-[14.5px] font-semibold">
               Your quotations go out under your name, not ours.
             </p>
-            <p className="m-0 max-w-[68ch] text-[14px] leading-relaxed text-[var(--s-ink-2)]">
+            <p className="m-0 max-w-[68ch] text-[14px] leading-relaxed muted">
               Nothing below is filled in yet, and nothing has a default we invented. A quotation
               with a client&rsquo;s name on it is a document you are answerable for, so the words
               on it should be yours — including the ones you would rather leave off.
@@ -68,7 +78,27 @@ export default async function SettingsPage() {
             hideRequested={branding?.hideOurMark ?? false}
           />
         </div>
-      </PageBody>
+        {/* The quotation PDF's opening pages (owner, 13 Oct 2026). */}
+        <div className="mt-6 max-w-[52rem]">
+          <BrandPages pages={brandPageUrls.map((url) => ({ url }))} hasBranding={branding !== null} uploadEnabled={logoUploadEnabled()} />
+        </div>
+        {/* The project lifecycle (owner, 13 Oct 2026): months of warranty after the client signs off the handover. */}
+        {warranty && full ? <WarrantyForm months={warranty.months} canEdit={warranty.canEdit} /> : null}
+        {/* The owner's setup quiz, again (owner, 14 Oct 2026). */}
+        {member?.role === 'OWNER' ? (
+          <div className="card mt-6 max-w-[52rem]" data-testid="setup-again">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span>
+                <b>Set up your studio again</b>
+                <span className="muted block text-[13.5px]">Answer the twelve setup questions again; you see every change before it is saved.</span>
+              </span>
+              <Link href={SETUP_PATH} className="btn sec sm">
+                Set up your studio again
+              </Link>
+            </div>
+          </div>
+        ) : null}
+      </>
     </>
   );
 }

@@ -17,10 +17,8 @@ import {
 } from './actions';
 import { IDLE, type State } from '../../form-state';
 
-const input =
-  'rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[14px] text-[var(--s-ink)] placeholder:text-[var(--s-ink-3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]';
-const primary =
-  'rounded-[8px] bg-[var(--s-accent)] px-4 py-2 text-[14px] font-medium text-white hover:bg-[var(--s-accent-deep)] disabled:opacity-40';
+const input = 'fld fit';
+const primary = 'btn pri';
 const TYPES = Object.keys(FIELD_TYPE_LABELS) as FieldTypeName[];
 
 /** The group-by switch. A switch and not a checkbox because it takes effect at once. */
@@ -48,7 +46,7 @@ function Toggle({
       }`}
     >
       <span
-        className={`absolute top-[3px] h-4 w-4 rounded-full bg-white transition-all ${
+        className={`absolute top-[3px] h-4 w-4 rounded-full bg-[var(--paper)] transition-all ${
           on ? 'left-[19px]' : 'left-[3px]'
         }`}
       />
@@ -91,7 +89,7 @@ function FieldLine({ field }: { field: FieldRow }) {
           onChange={(next) => run(() => setGroupingAction(field.id, next))}
         />
         <span
-          className={`flex-none text-[13px] ${groupable ? 'text-[var(--s-ink-2)]' : 'text-[var(--s-ink-3)]'}`}
+          className={`flex-none text-[13px] ${groupable ? 'muted' : 'muted'}`}
           title={groupable ? undefined : 'A number field cannot group the list usefully.'}
         >
           Group by
@@ -102,7 +100,7 @@ function FieldLine({ field }: { field: FieldRow }) {
           aria-label={`Delete ${field.label}`}
           disabled={pending}
           onClick={() => run(() => removeFieldAction(field.id))}
-          className="flex-none px-1 text-[15px] leading-none text-[var(--s-ink-3)] hover:text-[var(--s-bad)] disabled:opacity-25"
+          className="flex-none px-1 text-[15px] leading-none muted hover:text-[var(--s-bad)] disabled:opacity-25"
         >
           ×
         </button>
@@ -111,13 +109,13 @@ function FieldLine({ field }: { field: FieldRow }) {
       {/* The key is shown because it is what the values are filed under, and a
           studio that renames the label should be able to see that it did not
           move. Same reasoning as AxLeads showing `carpet_area_sqft`. */}
-      <p className="m-0 text-[12.5px] text-[var(--s-ink-3)]">
+      <p className="m-0 text-[12.5px] muted">
         <code className="font-mono">{field.key}</code> · {FIELD_TYPE_LABELS[field.type]}
         {field.options.length > 0 ? ` · ${field.options.join(', ')}` : ''}
       </p>
 
       {error ? (
-        <p role="alert" className="m-0 text-[12.5px] text-[var(--s-bad)]">{error}</p>
+        <p role="alert" className="m-0 text-[12.5px] bad-t">{error}</p>
       ) : null}
     </li>
   );
@@ -141,7 +139,7 @@ function NewField() {
     <form key={key} action={action} className="flex flex-col gap-3 pt-4">
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex min-w-[12rem] flex-1 flex-col gap-1.5">
-          <span className="s-label">Another field</span>
+          <span className="lbl">Another field</span>
           <input
             name="label"
             required
@@ -153,7 +151,7 @@ function NewField() {
         </label>
 
         <label className="flex flex-none flex-col gap-1.5">
-          <span className="s-label">Kind</span>
+          <span className="lbl">Kind</span>
           <select
             name="type"
             value={type}
@@ -173,20 +171,20 @@ function NewField() {
 
       {type === 'SELECT' ? (
         <label className="flex flex-col gap-1.5">
-          <span className="s-label">The choices, separated by commas</span>
+          <span className="lbl">The choices, separated by commas</span>
           <input name="options" placeholder="1BHK, 2BHK, 3BHK, 4BHK+, Villa" className={input} />
         </label>
       ) : null}
 
       {label.trim().length > 1 ? (
-        <p className="m-0 text-[12.5px] text-[var(--s-ink-3)]">
+        <p className="m-0 text-[12.5px] muted">
           Values will be filed under <code className="font-mono">{fieldKeyFrom(label)}</code>.
           Renaming the label later will not move them.
         </p>
       ) : null}
 
       {'ok' in state && !state.ok ? (
-        <p role="alert" className="m-0 text-[12.5px] text-[var(--s-bad)]">{state.error}</p>
+        <p role="alert" className="m-0 text-[12.5px] bad-t">{state.error}</p>
       ) : null}
     </form>
   );
@@ -194,16 +192,16 @@ function NewField() {
 
 export function FieldEditor({ fields }: { fields: FieldRow[] }) {
   return (
-    <div className="s-card p-5">
+    <div className="card p-5">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="m-0 text-[15.5px] font-semibold">Your fields</h2>
-        <p className="m-0 text-[13px] text-[var(--s-ink-3)]">
+        <p className="m-0 text-[13px] muted">
           {fields.length === 0 ? 'None yet.' : `${fields.length} on every client`}
         </p>
       </div>
 
       {fields.length === 0 ? (
-        <p className="m-0 max-w-[66ch] text-[14px] leading-relaxed text-[var(--s-ink-2)]">
+        <p className="m-0 max-w-[66ch] text-[14px] leading-relaxed muted">
           Nothing here, and nothing pre-filled — a field we invented is a question we decided you
           should ask your clients. Add the thing you keep writing into the notes.
         </p>

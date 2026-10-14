@@ -3,8 +3,9 @@ import 'server-only';
 /**
  * GEIO, answered by the model (the owner's v1 screens, GEIO 1–4).
  *
- * One call per question, with the home's facts (`geio-facts.ts`), the last
- * few turns and, for a photo check, the photo. The model replies through a
+ * One call per question, with the home's facts (`geio-facts.ts`, chosen for
+ * the person asking by `customer-home.ts`), the last few turns and, for a
+ * photo check, the photo. The model replies through a
  * single tool, so the answer arrives as fields rather than prose to parse.
  *
  * What it may not do is decided here, not in the prompt alone: every rupee
@@ -14,15 +15,16 @@ import 'server-only';
  * failure, the reply is `null` and the screen falls back to its written
  * preview answers.
  *
- * Cost: Claude Haiku 4.5 by default (`GEIO_MODEL` overrides it), the rules
- * and the home's facts marked for the prompt cache, and a monthly cap
+ * Cost: Claude Haiku 4.5 by default (`GEIO_MODEL` overrides it), the tool and
+ * the rules marked for the prompt cache (the facts are per person now, so
+ * they sit after the mark), and a monthly cap
  * (`geio-budget.ts`) checked before each call and charged after it from the
  * token counts the API returns.
  */
 
 import { hasAnthropic } from '@/lib/env';
 import { figuresCheck } from '@/modules/quotation/compare-insights';
-import { geioFacts, type QuoteSource } from './geio-facts';
+import type { GeioFacts, QuoteSource } from './geio-facts';
 import { recordSpend, withinBudget } from './geio-budget';
 import { GEIO_DEFAULT_MODEL, costPaise, type Usage } from './geio-cost';
 
@@ -120,6 +122,7 @@ export async function askGeio({
   lang,
   name,
   expert,
+  facts,
 }: {
   question: string;
   history: GeioTurn[];
@@ -127,9 +130,9 @@ export async function askGeio({
   lang: GeioLang;
   name: string;
   expert: string;
+  facts: GeioFacts;
 }): Promise<GeioReply | null> {
   if (!hasAnthropic() || !(await withinBudget())) return null;
-  const facts = geioFacts(expert);
 
   const messages = [
     ...history.map((t) => ({ role: t.role, content: t.text })),
@@ -156,10 +159,15 @@ export async function askGeio({
       body: JSON.stringify({
         model: model(),
         max_tokens: MAX_TOKENS,
-        // Rules, then the home's facts. The cache mark covers the tool and both blocks — nothing per-person.
+        /* The tool and the rules, then this person's home. The cache mark sits
+           on the rules, so everything before it is shared by every customer
+           asking in that language; the facts are per person and stay after it,
+           unmarked. (Haiku 4.5 caches only a prefix of 4,096 tokens or more,
+           which the rules alone do not reach: the mark costs nothing until it
+           does, and starts paying if the rules grow or the model changes.) */
         system: [
-          { type: 'text', text: system(lang, expert) },
-          { type: 'text', text: `<home_facts>\n${facts.text}\n</home_facts>`, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: system(lang, expert), cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: `<home_facts>\n${facts.text}\n</home_facts>` },
         ],
         tools: [TOOL],
         tool_choice: { type: 'tool', name: 'reply' },

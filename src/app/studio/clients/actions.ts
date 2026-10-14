@@ -8,12 +8,15 @@ import {
   logContact,
   binClients,
   removeDemoLead,
+  markLost,
   restoreClients,
   eraseClients,
   type ClientSourceName,
   type LostReasonName,
 } from '@/modules/studio-practice/clients';
 import { isCallOutcome } from '@/modules/studio-practice/event-copy';
+import { cleanMinutes, cleanReactions, pickedUpOutcome } from '@/modules/studio-practice/call-log';
+import { parseMeeting } from '@/modules/studio-sales/lead-rules';
 import { mergeClients } from '@/modules/studio-practice/merge';
 import { answerIntroduction, type IntroAnswer } from '@/modules/studio/introduction';
 
@@ -51,7 +54,9 @@ export async function addClientAction(_prev: State, form: FormData): Promise<Sta
     phone: str(form, 'phone'),
     society: str(form, 'society'),
     config: str(form, 'config'),
-    source: (str(form, 'source') || 'OTHER') as ClientSourceName,
+    // 'own:<id>' is one of the studio's own source names (Studio OS Phase 1).
+    source: (str(form, 'source').startsWith('own:') ? 'OTHER' : str(form, 'source') || 'OTHER') as ClientSourceName,
+    leadSourceId: str(form, 'source').startsWith('own:') ? str(form, 'source').slice(4) : undefined,
     sourceNote: str(form, 'sourceNote'),
     nextAction: str(form, 'nextAction'),
     nextActionOn: str(form, 'nextActionOn'),
@@ -151,17 +156,66 @@ export async function logContactAction(
      page passes them; the card does not. */
   outcome?: string,
   note?: string | null,
+  /** When to call next, if the person picked (IST day and time). */
+  when?: { day: string; time: string } | null,
 ): Promise<State> {
   /* Validated against the list rather than cast. An outcome arriving from a
      form is a string, and an unrecognised one would be written verbatim into
      a permanent record that nothing can edit afterwards. */
   const checked = outcome && isCallOutcome(outcome) ? outcome : undefined;
 
-  const result = await logContact(id, checked, note ?? null);
+  const dueAt = when && typeof when.day === 'string' && typeof when.time === 'string' ? parseMeeting(when.day, when.time || '15:30') : null;
+  const result = await logContact(id, checked, note ?? null, dueAt);
   if (!result.ok) return result;
   refresh();
   revalidatePath(`/studio/clients/${id}`);
   return { ok: true };
+}
+
+/**
+ * A call that was picked up (AxLeads' Log call sheet, 13 Oct 2026): what
+ * they said (one-tap reactions), a note (required: a conversation with
+ * nothing written down is the record nobody can use later), how long it
+ * lasted, optionally when to call next and a stage to move them to.
+ *
+ * The reactions decide which of our outcomes is logged (`pickedUpOutcome`),
+ * so the follow-up rules stay one place. The stage move goes through the
+ * same `updateClient` as the stage dropdown, with its scope and its lost
+ * reason rule.
+ */
+export async function logPickedUpAction(
+  id: string,
+  input: { reactions?: unknown; note?: unknown; minutes?: unknown; stageId?: unknown; when?: { day: string; time: string } | null },
+): Promise<State> {
+  const note = typeof input?.note === 'string' ? input.note.trim().slice(0, 2000) : '';
+  if (!note) return { ok: false, error: 'Write a line about the call before logging it.' };
+  const reactions = cleanReactions(input.reactions);
+  const minutes = cleanMinutes(input.minutes);
+  const when = input.when && typeof input.when.day === 'string' && typeof input.when.time === 'string' ? input.when : null;
+  const dueAt = when ? parseMeeting(when.day, when.time || '15:30') : null;
+  const outcome = pickedUpOutcome(reactions);
+  const logged = await logContact(id, outcome, note, dueAt, { reactions, minutes });
+  if (!logged.ok) return logged;
+  if (typeof input.stageId === 'string' && input.stageId) {
+    const moved = await updateClient({ id, stageId: input.stageId, lostReason: lostReasonFor(reactions) });
+    if (!moved.ok) {
+      refresh();
+      revalidatePath(`/studio/clients/${id}`);
+      return { ok: false, error: `The call is logged, but the stage did not change: ${moved.error}` };
+    }
+  }
+  refresh();
+  revalidatePath(`/studio/clients/${id}`);
+  return { ok: true };
+}
+
+/** If the stage picked is a lost one, why: from what they said on the call. */
+function lostReasonFor(reactions: readonly string[]): LostReasonName {
+  if (reactions.includes('budget_low')) return 'BUDGET';
+  if (reactions.includes('possession')) return 'TIMELINE';
+  if (reactions.includes('already_done')) return 'WENT_ELSEWHERE';
+  if (reactions.includes('exploring') || reactions.includes('not_interested')) return 'NOT_SERIOUS';
+  return 'OTHER';
 }
 
 function refreshBin() {
@@ -251,4 +305,17 @@ export async function answerIntroductionAction(
     revalidatePath('/studio');
   }
   return result;
+}
+
+/**
+ * Mark lost with a reason, into the studio's first lost column — the
+ * "Wrong number" call outcome offers it (AxLeads, 12 Oct 2026). The
+ * person decides; nothing marks a lead lost by itself.
+ */
+export async function markLostAction(id: string, reason: string): Promise<State> {
+  const result = await markLost(String(id ?? ''), String(reason ?? ''));
+  if (!result.ok) return result;
+  refresh();
+  revalidatePath(`/studio/clients/${id}`);
+  return { ok: true };
 }

@@ -132,7 +132,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // var(--font-display) silently inherits the body sans instead.
     //
     // The symptom is that the serif simply never appears and nothing errors.
-    <html lang="en-IN" className={`${display.variable} ${sans.variable} ${mono.variable} ${rounded.variable} ${geist.variable} ${geistMono.variable}`}>
+    <html lang="en-IN" suppressHydrationWarning className={`${display.variable} ${sans.variable} ${mono.variable} ${rounded.variable} ${geist.variable} ${geistMono.variable}`}>
       <body>
         {/* The verification-gate warning lives HERE, not in SiteHeader.
             It was in SiteHeader, and it silently vanished on /match — the one

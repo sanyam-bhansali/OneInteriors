@@ -5,7 +5,7 @@ import { TRACKER_STAGES } from '@/modules/portal/tracker';
 import { withShrunkPhotos } from '@/lib/shrink-image';
 import { postStudioUpdateAction } from './actions';
 
-const input = 'rounded-[8px] border border-[var(--color-rule)] bg-[var(--color-paper)] px-3 py-2 text-[14px]';
+const input = 'rounded-[8px] border border-[var(--fill2)] bg-[var(--paper)] px-3 py-2 text-[14px]';
 
 /** Post what happened on site, photos first — the client sees it in their app and gets a notification. */
 export function UpdateForm({ projectId }: { projectId: string }) {
@@ -30,7 +30,7 @@ export function UpdateForm({ projectId }: { projectId: string }) {
         });
       }}
     >
-      <label className="flex basis-full flex-col gap-1 text-[12.5px] text-[var(--color-ink-2)]">
+      <label className="flex basis-full flex-col gap-1 text-[12.5px] text-[var(--text2)]">
         Site photos first — a phone opens its camera here
         <input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple className="text-[12.5px]" />
       </label>
@@ -52,11 +52,11 @@ export function UpdateForm({ projectId }: { projectId: string }) {
       <button
         type="submit"
         disabled={pending || note.trim().length < 3}
-        className="rounded-full border border-[var(--color-petrol)] px-4 py-1.5 text-[13px] text-[var(--color-petrol)] disabled:opacity-40"
+        className="btn pri sm"
       >
         {pending ? 'Posting…' : 'Post update'}
       </button>
-      {message ? <p className="m-0 basis-full text-[13px] text-[var(--color-ink-2)]">{message}</p> : null}
+      {message ? <p className="m-0 basis-full text-[13px] text-[var(--text2)]">{message}</p> : null}
     </form>
   );
 }

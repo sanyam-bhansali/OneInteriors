@@ -26,6 +26,7 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 import { myStudioId } from '@/modules/studio/tenancy';
+import { quotingStudioId } from '@/modules/studio/lead-scope';
 
 export type RatesGate =
   /** Nothing approved yet — their quotations are with us. */
@@ -46,7 +47,7 @@ export async function ratesGateFor(studioId: string): Promise<RatesGate> {
 
 /** For the signed-in studio. A read failure shuts the builder rather than opening it. */
 export async function myRatesGate(): Promise<RatesGate> {
-  const studioId = await myStudioId();
+  const studioId = await quotingStudioId();
   if (!studioId) return 'WITH_US';
   try {
     return await ratesGateFor(studioId);

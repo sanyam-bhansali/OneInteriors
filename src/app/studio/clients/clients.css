@@ -1,0 +1,180 @@
+/* The Clients / Leads app (owner's handoff screens StudioClients, StudioClient,
+   StudioSalesLeads, StudioSalesLead, 12 Oct 2026). The design's own screen
+   classes (board, colh, lane, ccard, cact, banner, jour, ev, evi, kv, quick)
+   copied from the screens' helmet CSS, plus the small pieces our AxLeads
+   functions need (KPI tiles, menus, the filter panel, the lead page's
+   panels). Every rule is scoped to .oi-studio; colours are tokens only. */
+
+/* ── From the design ─────────────────────────────────────────── */
+.oi-studio .board{display:grid;grid-auto-flow:column;grid-auto-columns:272px;gap:14px;overflow-x:auto;padding-bottom:8px;align-items:start}
+.oi-studio .colh{display:flex;align-items:center;gap:8px;padding:4px 6px 10px;font-size:14px;font-weight:600}
+.oi-studio .colh i{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.oi-studio .colh .mono{margin-left:auto;font-size:12.5px;color:var(--muted);font-weight:400}
+.oi-studio .lane{display:flex;flex-direction:column;gap:10px;padding:8px;border-radius:16px;background:var(--fill2);min-height:240px;transition:box-shadow .15s ease,background-color .15s ease}
+.oi-studio .ccard{background:var(--paper);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;box-shadow:0 1px 0 var(--line)}
+.oi-studio .ccard:hover{box-shadow:0 0 0 1.5px var(--acc)}
+.oi-studio .ccard b{font-size:14.5px;font-weight:600}
+.oi-studio .cact{display:flex;gap:6px;align-items:center}
+.oi-studio .cact a{width:32px;height:32px;border-radius:9px;background:var(--fill);display:flex;align-items:center;justify-content:center}
+.oi-studio .banner{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 16px;border-radius:14px;background:var(--warn-bg);color:var(--warn)}
+.oi-studio .jour{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.oi-studio .jour div{display:flex;flex-direction:column;gap:6px;min-width:0}
+.oi-studio .jour i{height:6px;border-radius:3px;background:var(--line)}
+.oi-studio .jour span{font-size:13px;color:var(--muted)}
+.oi-studio .jour .on i{background:var(--acc)}
+.oi-studio .jour .on span{color:var(--ink);font-weight:600}
+.oi-studio .jour .done i{background:var(--ink)}
+.oi-studio .ev{display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;padding:12px 0;border-top:1px solid var(--soft)}
+.oi-studio .ev:first-of-type{border-top:0}
+.oi-studio .evi{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--fill);color:var(--text2)}
+.oi-studio .kv{display:grid;grid-template-columns:130px minmax(0,1fr);gap:8px 12px;font-size:14px;margin:0}
+.oi-studio .kv dt{color:var(--muted)}
+.oi-studio .kv dd{margin:0;font-weight:500;min-width:0;overflow-wrap:anywhere}
+.oi-studio .quick{display:flex;flex-wrap:wrap;gap:8px}
+.oi-studio .quick button{min-height:38px;padding:0 14px;border:0;border-radius:999px;background:var(--fill);font-size:14px;font-weight:500;color:var(--ink);cursor:pointer}
+.oi-studio .quick button[aria-pressed='true']{background:var(--ink);color:var(--paper)}
+.oi-studio .quick button:disabled{opacity:.5;cursor:default}
+
+/* ── The page ────────────────────────────────────────────────── */
+.oi-studio .cl-page{max-width:1600px}
+.oi-studio .cl-page h1 .n{font-size:18px;color:var(--muted);font-weight:400;letter-spacing:0}
+.oi-studio .cl-page .phead p{margin:6px 0 0}
+.oi-studio .cl-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.oi-studio .cl-foot{font-size:13px;color:var(--muted);margin:0}
+.oi-studio .cl-foot a{text-decoration:underline;color:var(--muted)}
+.oi-studio .cl-link{color:var(--acc);font-weight:500}
+.oi-studio .cl-link:hover{color:var(--acc-h)}
+.oi-studio .btn:disabled{opacity:.45;cursor:default;transform:none;box-shadow:none}
+.oi-studio .btn.xs{min-height:28px;padding:0 10px;font-size:12.5px}
+.oi-studio .btn.bad-b{color:var(--bad)}
+.oi-studio .fld.sm{min-height:34px;width:auto;font-size:13.5px}
+.oi-studio textarea.fld{padding:10px 12px;min-height:84px;resize:vertical}
+.oi-studio .cl-err{margin:0;color:var(--bad);font-size:13px}
+.oi-studio .cl-ok{margin:0;color:var(--good);font-size:13px}
+
+/* KPI tiles: the design's soft stat, as buttons that filter. */
+.oi-studio .cl-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+.oi-studio .cl-stat{display:flex;flex-direction:column;gap:4px;padding:14px 16px;border:0;border-radius:16px;background:var(--paper);box-shadow:0 1px 0 var(--line);text-align:left;color:var(--ink);font:inherit;min-width:0}
+.oi-studio button.cl-stat{cursor:pointer;transition:transform .2s ease,box-shadow .2s ease}
+.oi-studio button.cl-stat:hover{transform:translateY(-2px)}
+.oi-studio .cl-stat[aria-pressed='true']{box-shadow:0 0 0 2px var(--acc)}
+.oi-studio .cl-stat .l{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:var(--muted);font-weight:500}
+.oi-studio .cl-stat .v{font-family:var(--font-geist-mono),ui-monospace,monospace;font-size:24px;font-weight:500;letter-spacing:-.02em}
+.oi-studio .cl-stat .s{font-size:12.5px;color:var(--muted)}
+@media (max-width:1100px){.oi-studio .cl-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:640px){.oi-studio .cl-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}}
+
+/* Menus and the filter panel. */
+.oi-studio .cl-pop{position:relative;display:inline-flex}
+.oi-studio .cl-menu{position:absolute;left:0;top:calc(100% + 6px);z-index:40;min-width:200px;max-height:22rem;overflow-y:auto;margin:0;padding:6px;list-style:none;background:var(--paper);border-radius:14px;box-shadow:0 18px 40px -12px rgba(var(--sh),.35),0 0 0 1px var(--line);display:flex;flex-direction:column;gap:1px}
+.oi-studio .cl-menu.r{left:auto;right:0}
+.oi-studio .cl-mi{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;border:0;border-radius:10px;background:transparent;text-align:left;font-size:13.5px;font-weight:400;color:var(--ink);cursor:pointer;text-transform:none;letter-spacing:0}
+.oi-studio .cl-mi:hover{background:var(--fill)}
+.oi-studio .cl-mi .ok{margin-left:auto;color:var(--acc)}
+.oi-studio .cl-panel{position:relative;z-index:30;margin-top:10px;background:var(--paper);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:12px;box-shadow:0 18px 40px -16px rgba(var(--sh),.35)}
+.oi-studio .cl-scrim{position:fixed;inset:0;z-index:20;background:rgba(var(--sh),.12)}
+.oi-studio .cl-vchip{display:inline-flex;align-items:center;gap:2px;min-height:30px;padding:0 4px 0 12px;border-radius:999px;background:var(--fill);font-size:13px}
+.oi-studio .cl-vchip.on{background:var(--acc-soft);color:var(--acc-ink);font-weight:600}
+.oi-studio .cl-vchip button{border:0;background:transparent;cursor:pointer;padding:0 6px;color:inherit;min-height:28px}
+.oi-studio .cl-vchip button.x{color:var(--muted)}
+
+/* Small chips on cards and rows. */
+.oi-studio .chip.xs{min-height:22px;padding:0 8px;font-size:12px}
+.oi-studio .chip.tag{background:var(--acc-soft);color:var(--acc-ink);max-width:120px;overflow:hidden;text-overflow:ellipsis}
+.oi-studio .stdot{width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block}
+
+/* The board. */
+.oi-studio .board{scrollbar-width:thin}
+.oi-studio .board > section{min-width:0}
+.oi-studio .lane.over{box-shadow:0 0 0 2px var(--acc);background:var(--acc-soft)}
+.oi-studio .ccard[draggable='true']{cursor:grab}
+.oi-studio .ccard.dragging{opacity:.4}
+.oi-studio .ccard.fresh{box-shadow:inset 3px 0 0 var(--acc),0 1px 0 var(--line)}
+.oi-studio .ccard .nm{display:flex;flex-direction:column;gap:3px;min-width:0}
+.oi-studio .ccard .nm b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.oi-studio .ccard .cact .av{width:28px;height:28px;font-size:12px}
+.oi-studio .lane .drop{border-radius:12px;padding:18px 0;text-align:center;font-size:13px;color:var(--muted);box-shadow:inset 0 0 0 1.5px var(--line);border:0}
+.oi-studio .lane .lmore{text-align:center;font-size:13.5px;font-weight:500;padding:8px 0;color:var(--text2)}
+.oi-studio .cl-topscroll{overflow-x:auto;height:10px;margin-bottom:-6px}
+
+/* The list. */
+.oi-studio .cl-tbl th{position:sticky;top:0;z-index:1;background:var(--paper)}
+.oi-studio .cl-tbl tbody tr.pick td{background:var(--acc-soft)}
+.oi-studio .cl-tbl tbody tr.fresh td:first-child{box-shadow:inset 3px 0 0 var(--acc)}
+.oi-studio .cl-tbl tbody tr.go{cursor:pointer}
+.oi-studio .cl-tbl td.sub,.oi-studio .cl-tbl .sub{font-size:12.5px;color:var(--muted)}
+.oi-studio .cl-tbl input[type='checkbox']{width:16px;height:16px;accent-color:var(--acc)}
+.oi-studio .cl-bulk{box-shadow:inset 3px 0 0 var(--acc)}
+.oi-studio .cl-iconbtn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:0;border-radius:8px;background:var(--fill);color:var(--text2);cursor:pointer;flex-shrink:0}
+.oi-studio .cl-iconbtn:hover{color:var(--ink);background:var(--fillh)}
+
+/* Dialogs: the design's overlay and sheet. */
+.oi-studio .cl-sheet{position:relative;z-index:1;width:100%;background:var(--paper);border-radius:18px;box-shadow:0 30px 60px -20px rgba(var(--sh),.5);display:flex;flex-direction:column;overflow:hidden;max-height:86dvh}
+.oi-studio .cl-sheet .sh{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--fill2)}
+.oi-studio .cl-sheet .sh h2{margin:0;font-size:17px;font-weight:600}
+.oi-studio .cl-sheet .sb{padding:16px 18px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;min-height:0}
+.oi-studio .cl-sheet .sf{padding:14px 18px;border-top:1px solid var(--fill2);display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.oi-studio .cl-sheet label.f{display:flex;flex-direction:column;gap:6px;min-width:0}
+.oi-studio .cl-rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.oi-studio .cl-rows > li{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--soft);font-size:14px}
+.oi-studio .cl-rows > li:first-child{border-top:0}
+
+/* ── The lead page ───────────────────────────────────────────── */
+.oi-studio .cl-back{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;color:var(--text2)}
+.oi-studio .cl-lhead{display:flex;flex-wrap:wrap;align-items:center;gap:16px}
+.oi-studio .cl-lhead .av.big{width:52px;height:52px;font-size:18px}
+.oi-studio .cl-lhead h1{margin:0;font-size:30px;font-weight:500;letter-spacing:-.035em;line-height:1.1}
+.oi-studio .cl-lhead .who{flex:1 1 220px;min-width:0;display:flex;flex-direction:column;gap:6px}
+.oi-studio .cl-lhead .acts{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.oi-studio .cl-next{box-shadow:inset 0 0 0 2px var(--acc)}
+.oi-studio .card h2,.oi-studio .card h3{margin:0}
+.oi-studio .card .h{margin:0;font-size:17px;font-weight:600;letter-spacing:-.01em}
+.oi-studio .cl-sub{margin:0;font-size:13px;color:var(--muted)}
+.oi-studio .cl-files{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.oi-studio .cl-files li{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px}
+
+/* Dashboard. */
+.oi-studio .cl-sgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.oi-studio .cl-sgrid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:1000px){.oi-studio .cl-sgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.oi-studio a.cl-stat:hover{transform:translateY(-2px);color:var(--ink)}
+.oi-studio .cl-stat.bad .v{color:var(--bad)}
+.oi-studio .cl-sec{margin:0;font-size:17px;font-weight:600;letter-spacing:-.01em}
+
+/* The pool's table: on a phone, Source and Age give way so Claim stays in view. */
+.oi-studio .cl-pooltbl{min-width:704px}
+
+/* ── Phone ───────────────────────────────────────────────────── */
+@media (max-width:760px){
+  .oi-studio .cl-page.content{padding:16px 16px 40px;gap:16px}
+  .oi-studio .cl-page .phead h1,.oi-studio .cl-lhead h1{font-size:26px}
+  .oi-studio .cl-page .phead .hstack{width:100%}
+  .oi-studio .board{grid-auto-columns:82vw}
+  .oi-studio .jour{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .oi-studio .kv{grid-template-columns:110px minmax(0,1fr)}
+  .oi-studio .cl-sheet{max-height:92dvh}
+  .oi-studio .tabs{max-width:100%;overflow-x:auto;flex-wrap:nowrap}
+  .oi-studio .tabs button{white-space:nowrap}
+  .oi-studio .cl-pooltbl{min-width:0}
+  .oi-studio .cl-pooltbl th:nth-last-child(2),.oi-studio .cl-pooltbl td:nth-last-child(2),.oi-studio .cl-pooltbl th:nth-last-child(3),.oi-studio .cl-pooltbl td:nth-last-child(3){display:none}
+  .oi-studio .cl-pooltbl td,.oi-studio .cl-pooltbl th{padding-left:10px;padding-right:10px}
+}
+
+/* Log call → Picked up (AxLeads, 13 Oct 2026) */
+.oi-studio .cl-menuhead{display:block;padding:6px 12px 4px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.oi-studio .pu{display:flex;flex-direction:column;gap:14px;padding:18px 20px;overflow-y:auto}
+.oi-studio .pu-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.oi-studio .pu-eyebrow{font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.oi-studio .pu-name{margin:0;font-size:22px;font-weight:600;letter-spacing:-.02em}
+.oi-studio .pu-who{padding:12px 14px;border-radius:12px;background:var(--soft);box-shadow:inset 0 0 0 1px var(--fill2)}
+.oi-studio .pu-sec{display:flex;flex-direction:column;gap:8px}
+.oi-studio .pu-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:14px}
+.oi-studio .pu-chips{display:flex;flex-wrap:wrap;gap:6px}
+.oi-studio .pu-chip{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px;border:0;border-radius:10px;background:var(--fill);color:var(--ink);font-size:13.5px;font-weight:500;cursor:pointer}
+.oi-studio .pu-chip:hover{background:var(--fillh)}
+.oi-studio .pu-chip[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.oi-studio .pu-chip:disabled{cursor:default;opacity:.7;box-shadow:inset 0 0 0 1px var(--line)}
+.oi-studio .pu-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.oi-studio .pu-check{display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer}
+.oi-studio .pu-check input{width:18px;height:18px;accent-color:var(--acc)}
+.oi-studio .pu-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:6px;border-top:1px solid var(--fill2)}

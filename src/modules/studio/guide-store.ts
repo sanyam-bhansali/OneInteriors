@@ -25,6 +25,7 @@ import { LIVE } from '@/modules/studio-practice/demo-lead';
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { getCurrentUser } from '@/modules/auth/session';
+import { OFFICE_MEMBER } from './surfaces';
 import {
   parseGuideState,
   EMPTY_GUIDE_STATE,
@@ -49,7 +50,7 @@ async function currentMember(): Promise<{ id: string; studioId: string; state: G
     const user = await getCurrentUser();
     if (!user) return null;
     const row = await prisma.studioMember.findUnique({
-      where: { userId: user.id },
+      where: { userId: user.id, ...OFFICE_MEMBER },
       select: { id: true, studioId: true, guideState: true },
     });
     if (!row) return null;

@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Project workspace</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1F2119}a:hover{color:#A8502F}
+a:focus-visible,button:focus-visible{outline:2px solid #A8502F;outline-offset:2px}
+button{font-family:inherit}
+.rl{display:flex;align-items:center;min-height:40px;padding:0 12px;border-radius:10px;font-size:14.5px;font-weight:500;text-decoration:none;color:#1F2119}
+.rl:hover{background:#DFE0D2;color:#1F2119}
+.rl[aria-current="page"]{background:#FBFBF6;color:#1F2119;font-weight:600;box-shadow:inset 3px 0 0 #A8502F}
+.rh{padding:16px 12px 6px;font-size:13px;font-weight:600;color:#4F5147}
+.mono{font-family:'Geist Mono',monospace}
+.chip{display:inline-flex;align-items:center;min-height:30px;padding:0 10px;border-radius:999px;background:#ECEDDF;font-size:13px;font-weight:500}
+.sees{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:#A8502F}
+.row{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr);gap:12px;padding:14px 16px;border-top:1px solid #E4E5D8;font-size:14px;align-items:start}
+.ci{display:flex;align-items:center;gap:10px;min-height:36px;font-size:14px}
+.box{flex-shrink:0;width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#FFFFFF}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-wrap: wrap; background: #DFE0D2; color: #1F2119; font-family: 'Geist', sans-serif">
+
+  <nav aria-label="Studio" style="flex: 0 0 232px; box-sizing: border-box; background: #ECEDDF; padding: 20px 12px; display: flex; flex-direction: column; gap: 2px">
+    <div style="display: flex; flex-direction: column; gap: 2px; padding: 0 12px 14px">
+      <span style="font-size: 16px; font-weight: 600; letter-spacing: -0.02em">Teakline Studio</span>
+      <span style="font-size: 13px; color: #4F5147">One Interiors Studio</span>
+    </div>
+    <a href="StudioProjects.dc.html" class="rl">Dashboard</a>
+    <span class="rh">Your work</span>
+    <a href="StudioProjects.dc.html" class="rl">Quotations</a>
+    <a href="StudioProjects.dc.html" class="rl">Product master</a>
+    <a href="StudioProjects.dc.html" class="rl">Clients</a>
+    <a href="StudioProjects.dc.html" class="rl" aria-current="page">Projects</a>
+    <a href="StudioProjects.dc.html" class="rl">Vendors</a>
+    <span class="rh">From us</span>
+    <a href="StudioProjects.dc.html" class="rl">Calendar</a>
+    <a href="StudioProjects.dc.html" class="rl">Your listing</a>
+    <span class="rh">Settings</span>
+    <a href="StudioTeam.dc.html" class="rl">Team</a>
+    <a href="StudioProjects.dc.html" class="rl">Pipeline and fields</a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 24px 32px 40px; display: flex; flex-direction: column; gap: 20px">
+
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <a href="StudioProjects.dc.html" style="font-size: 14px; color: #4F5147; text-decoration: none">← Projects</a>
+        <h1 style="margin: 0; font-size: 32px; font-weight: 500; letter-spacing: -0.035em">Flat 1204, Ivy Towers, Baner</h1>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <span class="chip">Priya · +91 98220 41736</span>
+          <span class="chip">2 BHK · Premium</span>
+          <span class="chip mono">₹18,40,000 · signed 3 Aug</span>
+          <span class="chip">Self-managed</span>
+          <span class="chip" style="background: #E3EDE2; color: #245535">Customer app connected</span>
+        </div>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px">
+        <a href="SiteToday.dc.html" style="min-height: 44px; padding: 0 18px; border-radius: 999px; background: #FBFBF6; color: #1F2119; font-size: 14.5px; font-weight: 500; display: flex; align-items: center; text-decoration: none">Open site mode</a>
+        <a href="StudioDecision.dc.html" style="min-height: 44px; padding: 0 18px; border-radius: 999px; background: #1F2119; color: #FBFBF6; font-size: 14.5px; font-weight: 500; display: flex; align-items: center; text-decoration: none">New decision for Priya</a>
+      </div>
+    </div>
+
+    <div role="tablist" aria-label="Project sections" style="display: flex; flex-wrap: wrap; gap: 6px">
+      <sc-for list="{{tabs}}" as="t" hint-placeholder-count="4">
+        <button type="button" role="tab" aria-selected="{{t.sel}}" onClick="{{t.pick}}" style="min-height: 42px; padding: 0 16px; border: 0; border-radius: 999px; font-size: 14.5px; font-weight: 500; cursor: pointer; background: {{t.bg}}; color: {{t.fg}}">{{t.name}} <span class="mono" style="font-size: 13px; opacity: .75">{{t.count}}</span></button>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+
+      <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+
+        <sc-if value="{{showPlan}}" hint-placeholder-val="{{ true }}">
+          <section aria-label="Plan" style="background: #FBFBF6; border-radius: 18px; display: flex; flex-direction: column">
+            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 16px">
+              <div style="display: flex; flex-direction: column; gap: 3px">
+                <h2 style="margin: 0; font-size: 17px; font-weight: 600">Plan</h2>
+                <span style="font-size: 13px; color: #4F5147">Made from the signed quote. Stages move when the site ticks items off.</span>
+              </div>
+              <button type="button" onClick="{{toggleMove}}" style="min-height: 40px; padding: 0 14px; border: 0; border-radius: 999px; background: #ECEDDF; color: #1F2119; font-size: 14px; font-weight: 500; cursor: pointer">Move a date</button>
+            </div>
+            <sc-if value="{{showMove}}" hint-placeholder-val="{{ false }}">
+              <div style="margin: 0 16px 14px; padding: 14px; border-radius: 14px; background: #ECEDDF; display: flex; flex-direction: column; gap: 10px">
+                <span style="font-size: 14px; font-weight: 600">Handover: 14 Dec → 18 Dec. Why?</span>
+                <div role="radiogroup" aria-label="Reason for the new date" style="display: flex; flex-wrap: wrap; gap: 8px">
+                  <sc-for list="{{reasons}}" as="r" hint-placeholder-count="5">
+                    <button type="button" role="radio" aria-checked="{{r.on}}" onClick="{{r.pick}}" style="min-height: 38px; padding: 0 12px; border: 0; border-radius: 999px; font-size: 13.5px; font-weight: 500; cursor: pointer; background: {{r.bg}}; color: {{r.fg}}">{{r.label}}</button>
+                  </sc-for>
+                </div>
+                <span class="sees"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>Priya sees: {{reasonCustomer}}</span>
+              </div>
+            </sc-if>
+            <div class="row" style="font-size: 13px; font-weight: 600; color: #4F5147; border-top: 0; padding-top: 4px; padding-bottom: 8px"><span>Stage</span><span>Planned</span><span>Actual or forecast</span><span>Priya sees</span></div>
+            <div class="row"><span style="font-weight: 600">Design</span><span class="mono">24 Aug</span><span class="mono">Done 22 Aug</span><span style="color: #245535; font-weight: 500">2 days early</span></div>
+            <div class="row"><span style="font-weight: 600">Civil and electrical</span><span class="mono">15 Sep</span><span class="mono">Done 21 Sep</span><span><span style="color: #A33A26; font-weight: 500">6 days late</span><div style="font-size: 13px; color: #4F5147; margin-top: 3px">Supplier delay: floor tiles</div></span></div>
+            <div class="row" style="background: #F4F4EC"><span style="font-weight: 600">Carpentry<div style="font-size: 13px; font-weight: 400; color: #4F5147; margin-top: 3px">day 18 of 30</div></span><span class="mono">31 Oct</span><span class="mono">31 Oct</span><span style="color: #245535; font-weight: 500">On track</span></div>
+            <div style="padding: 4px 16px 16px; background: #F4F4EC; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px">
+              <div style="display: flex; flex-direction: column">
+                <span style="font-size: 13px; font-weight: 600; color: #4F5147; padding: 6px 0">Bedroom 1</span>
+                <div class="ci"><span class="box" style="background: #2F6B42">✓</span>Wardrobe carcass<span style="font-size: 12.5px; color: #4F5147">2 Oct</span></div>
+                <div class="ci"><span class="box" style="box-shadow: inset 0 0 0 1.5px #8E9081"></span>Wardrobe frame fitted</div>
+                <div class="ci"><span class="box" style="box-shadow: inset 0 0 0 1.5px #8E9081"></span>Wardrobe shutters</div>
+              </div>
+              <div style="display: flex; flex-direction: column">
+                <span style="font-size: 13px; font-weight: 600; color: #4F5147; padding: 6px 0">Bedroom 2</span>
+                <div class="ci"><span class="box" style="background: #2F6B42">✓</span>Wardrobe carcass<span style="font-size: 12.5px; color: #4F5147">3 Oct</span></div>
+                <div class="ci"><span class="box" style="box-shadow: inset 0 0 0 1.5px #8E9081"></span>Wardrobe frame fitted</div>
+                <div class="ci"><span class="box" style="box-shadow: inset 0 0 0 1.5px #8E9081"></span>Wardrobe shutters</div>
+              </div>
+              <div style="display: flex; flex-direction: column">
+                <span style="font-size: 13px; font-weight: 600; color: #4F5147; padding: 6px 0">Kitchen</span>
+                <div class="ci"><span class="box" style="background: #2F6B42">✓</span>Carcass delivered<span style="font-size: 12.5px; color: #4F5147">5 Oct</span></div>
+                <div class="ci"><span class="box" style="box-shadow: inset 0 0 0 1.5px #8E9081"></span>Carcass levelled and fixed</div>
+                <div class="ci"><span class="box" style="background: #8A5A00">!</span>Shutters<span style="font-size: 12.5px; color: #6B4600">waiting on Priya's pick</span></div>
+                <div class="ci"><span class="box" style="box-shadow: inset 0 0 0 1.5px #8E9081"></span>Loft</div>
+              </div>
+              <div style="display: flex; flex-direction: column">
+                <span style="font-size: 13px; font-weight: 600; color: #4F5147; padding: 6px 0">Living room</span>
+                <div class="ci"><span class="box" style="box-shadow: inset 0 0 0 1.5px #8E9081"></span>TV unit</div>
+                <div class="ci"><span class="box" style="box-shadow: inset 0 0 0 1.5px #8E9081"></span>False ceiling</div>
+              </div>
+            </div>
+            <div class="row"><span style="font-weight: 600">Painting and finishing</span><span class="mono">1 Nov – 5 Dec</span><span class="mono">1 Nov – 5 Dec</span><span>₹7,36,000 due at start</span></div>
+            <div class="row"><span style="font-weight: 600">Handover</span><span class="mono">10 Dec</span><span class="mono">14 Dec</span><span><span style="color: #A33A26; font-weight: 500">Overall · 4 days late</span><div style="font-size: 13px; color: #4F5147; margin-top: 3px">₹3,68,000 once snags close</div></span></div>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{showLog}}" hint-placeholder-val="{{ false }}">
+          <section aria-label="Site log" style="background: #FBFBF6; border-radius: 18px; display: flex; flex-direction: column">
+            <div style="padding: 16px; display: flex; flex-direction: column; gap: 3px">
+              <h2 style="margin: 0; font-size: 17px; font-weight: 600">Site log</h2>
+              <span style="font-size: 13px; color: #4F5147">Posted from site mode. Entries can't be edited; a correction is added beside the original.</span>
+            </div>
+            <div class="row" style="grid-template-columns: 120px minmax(0, 1fr) 160px"><span class="mono">Thu 8 Oct</span><span style="color: #6B4600; font-weight: 500">Not posted yet. Ramesh gets a reminder at 6 pm if nothing is posted.</span><span></span></div>
+            <div class="row" style="grid-template-columns: 120px minmax(0, 1fr) 160px"><span class="mono">Wed 7 Oct</span><span>Wardrobe frames going up in both bedrooms. Kitchen carcass placed; levelling tomorrow.<div style="font-size: 13px; color: #4F5147; margin-top: 4px">4 photos · Ramesh, Sunil · from 9:30 am</div></span><span style="font-size: 13px; color: #4F5147">Posted 5:40 pm by Ramesh · Priya has seen it</span></div>
+            <div class="row" style="grid-template-columns: 120px minmax(0, 1fr) 160px"><span class="mono">Tue 6 Oct</span><span>Nobody on site<div style="font-size: 13px; color: #4F5147; margin-top: 4px">Reason: crew on another job · counts in the studio delay</div></span><span style="font-size: 13px; color: #4F5147">Posted 8:30 am by Ramesh</span></div>
+            <div class="row" style="grid-template-columns: 120px minmax(0, 1fr) 160px"><span class="mono">Mon 5 Oct</span><span>Plywood and laminate delivered. Counted against the order: 42 sheets, all present.<div style="font-size: 13px; color: #4F5147; margin-top: 4px">3 photos · Ramesh</div></span><span style="font-size: 13px; color: #4F5147">Posted 4:05 pm by Ramesh</span></div>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{showSnags}}" hint-placeholder-val="{{ false }}">
+          <section aria-label="Snags" style="background: #FBFBF6; border-radius: 18px; display: flex; flex-direction: column">
+            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 16px">
+              <div style="display: flex; flex-direction: column; gap: 3px">
+                <h2 style="margin: 0; font-size: 17px; font-weight: 600">Snags</h2>
+                <span style="font-size: 13px; color: #4F5147">A snag closes only when Priya confirms the fix, or after 7 days.</span>
+              </div>
+              <button type="button" style="min-height: 40px; padding: 0 14px; border: 0; border-radius: 999px; background: #ECEDDF; color: #1F2119; font-size: 14px; font-weight: 500; cursor: pointer">Add a snag</button>
+            </div>
+            <div class="row" style="font-size: 13px; font-weight: 600; color: #4F5147; padding-top: 4px; padding-bottom: 8px; border-top: 0"><span>Snag</span><span>Fix by</span><span>Assigned</span><span>Status</span></div>
+            <div class="row"><span style="font-weight: 600">Gap between wardrobe and ceiling<div style="font-size: 13px; font-weight: 400; color: #4F5147; margin-top: 3px">Bedroom 1 · raised by Priya, 7 Oct</div></span><span class="mono" style="color: #6B4600">Sat 10 Oct</span><span>Ramesh</span><span>Accepted · filler strip</span></div>
+            <div class="row"><span style="font-weight: 600">Scratch on kitchen side panel<div style="font-size: 13px; font-weight: 400; color: #4F5147; margin-top: 3px">Kitchen · raised by Priya, 5 Oct</div></span><span class="mono">Mon 12 Oct</span><span>Ramesh</span><span>Accepted · replacing panel</span></div>
+            <div class="row"><span style="font-weight: 600">Switchboard off-centre<div style="font-size: 13px; font-weight: 400; color: #4F5147; margin-top: 3px">Bedroom 2 · raised by Priya, 18 Sep</div></span><span class="mono">20 Sep</span><span>Imran</span><span style="color: #245535; font-weight: 500">Closed · Priya confirmed</span></div>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{showPay}}" hint-placeholder-val="{{ false }}">
+          <section aria-label="Payments" style="background: #FBFBF6; border-radius: 18px; display: flex; flex-direction: column">
+            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 16px">
+              <div style="display: flex; flex-direction: column; gap: 3px">
+                <h2 style="margin: 0; font-size: 17px; font-weight: 600">Payments <span class="mono" style="font-size: 14px; font-weight: 400; color: #4F5147">₹7,36,000 of ₹18,40,000 paid</span></h2>
+                <span style="font-size: 13px; color: #4F5147">Priya pays you directly. A payment counts once you record it and Priya confirms.</span>
+              </div>
+              <button type="button" style="min-height: 40px; padding: 0 14px; border: 0; border-radius: 999px; background: #1F2119; color: #FBFBF6; font-size: 14px; font-weight: 500; cursor: pointer">Mark a payment received</button>
+            </div>
+            <div class="row" style="font-size: 13px; font-weight: 600; color: #4F5147; padding-top: 4px; padding-bottom: 8px; border-top: 0"><span>Stage</span><span>Amount</span><span>When</span><span>Status</span></div>
+            <div class="row"><span style="font-weight: 600">At signing<div style="font-size: 13px; font-weight: 400; color: #4F5147; margin-top: 3px">Booking and design · 40%</div></span><span class="mono">₹7,36,000</span><span class="mono">Received 3 Aug · UPI</span><span style="color: #245535; font-weight: 500">Priya confirmed · receipt in locker</span></div>
+            <div class="row"><span style="font-weight: 600">When finishing starts<div style="font-size: 13px; font-weight: 400; color: #4F5147; margin-top: 3px">Painting, polish, fittings · 40%</div></span><span class="mono">₹7,36,000</span><span class="mono">About 1 Nov</span><span>Not due yet</span></div>
+            <div class="row"><span style="font-weight: 600">At handover<div style="font-size: 13px; font-weight: 400; color: #4F5147; margin-top: 3px">After every snag is closed · 20%</div></span><span class="mono">₹3,68,000</span><span class="mono">14 Dec</span><span>Locked · 2 snags open</span></div>
+          </section>
+        </sc-if>
+
+      </div>
+
+      <aside aria-label="What Priya sees" style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+        <div style="background: #1F2119; color: #FBFBF6; border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+          <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #F2B48F"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>What Priya sees right now</span>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <span style="padding: 6px 10px; border-radius: 999px; background: #2B2E24; font-size: 13px; font-weight: 500; color: #B8DDBF">Carpentry · on track</span>
+            <span style="padding: 6px 10px; border-radius: 999px; background: #2B2E24; font-size: 13px; font-weight: 500; color: #F2B8A8">Overall · 4 days late</span>
+          </div>
+          <div role="img" aria-label="Stage 3 of 5" style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px">
+            <span style="height: 6px; border-radius: 3px; background: #E3E4D6"></span>
+            <span style="height: 6px; border-radius: 3px; background: #E3E4D6"></span>
+            <span style="height: 6px; border-radius: 3px; background: #E8875C"></span>
+            <span style="height: 6px; border-radius: 3px; background: #4A4D40"></span>
+            <span style="height: 6px; border-radius: 3px; background: #4A4D40"></span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 4px; padding-top: 4px; border-top: 1px solid #3A3D31">
+            <span style="font-size: 13px; color: #C9CABB">Today on site</span>
+            <span style="font-size: 15px; line-height: 1.4">Nothing posted yet today. After 9 pm Priya sees "No update from the studio today."</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 4px; padding-top: 10px; border-top: 1px solid #3A3D31">
+            <span style="font-size: 13px; color: #C9CABB">Her decision, due Fri 16 Oct</span>
+            <span style="font-size: 15px">Kitchen shutter finish · not picked yet</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 4px; padding-top: 10px; border-top: 1px solid #3A3D31">
+            <span style="font-size: 13px; color: #C9CABB">Next payment</span>
+            <span class="mono" style="font-size: 15px">₹7,36,000 when finishing starts</span>
+          </div>
+        </div>
+
+        <div style="background: #FBFBF6; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+          <span style="font-size: 15px; font-weight: 600">Home locker</span>
+          <span style="font-size: 14px; color: #4F5147; line-height: 1.45">Agreement and final quote filed automatically. 14 drawings, 1 receipt, 11 materials from the quote.</span>
+          <button type="button" style="min-height: 40px; border: 0; border-radius: 999px; background: #ECEDDF; color: #1F2119; font-size: 14px; font-weight: 500; cursor: pointer">Upload drawings</button>
+        </div>
+
+        <div style="background: #ECEDDF; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+          <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #4F5147"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>Only your team</span>
+          <p style="margin: 0; font-size: 14px; line-height: 1.45">A parent lives with them: keep the site clean by 6 pm. Priya prefers WhatsApp after 7 pm.</p>
+        </div>
+      </aside>
+
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { tab: 'plan', move: false, reason: 'supplier' }; }
+  renderVals() {
+    const s = this.state;
+    const T = [['plan', 'Plan', '5 stages'], ['log', 'Site log', ''], ['snags', 'Snags', '2 open'], ['pay', 'Payments', '1 of 3']];
+    const R = [
+      ['supplier', 'Supplier delay', 'The studio moved handover to 18 Dec: a supplier delivered late.'],
+      ['customer', 'Customer change', 'Handover moves to 18 Dec because of a change you asked for.'],
+      ['site', 'Site condition', 'Handover moves to 18 Dec: something on site needed extra work.'],
+      ['ours', 'Our delay', 'The studio moved handover to 18 Dec: their own delay.'],
+      ['other', 'Other, with a note', 'Handover moves to 18 Dec, with the studio’s note.']
+    ];
+    const cur = R.find((r) => r[0] === s.reason) || R[0];
+    return {
+      tabs: T.map(([id, name, count]) => ({ name, count, sel: id === s.tab ? 'true' : 'false', bg: id === s.tab ? '#1F2119' : '#FBFBF6', fg: id === s.tab ? '#FBFBF6' : '#1F2119', pick: () => this.setState({ tab: id }) })),
+      showPlan: s.tab === 'plan',
+      showLog: s.tab === 'log',
+      showSnags: s.tab === 'snags',
+      showPay: s.tab === 'pay',
+      showMove: s.move,
+      toggleMove: () => this.setState({ move: !s.move }),
+      reasons: R.map(([id, label]) => ({ label, on: id === s.reason ? 'true' : 'false', bg: id === s.reason ? '#1F2119' : '#FBFBF6', fg: id === s.reason ? '#FBFBF6' : '#1F2119', pick: () => this.setState({ reason: id }) })),
+      reasonCustomer: cur[2]
+    };
+  }
+}
+</script>
+</body>
+</html>

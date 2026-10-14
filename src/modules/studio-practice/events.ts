@@ -34,6 +34,7 @@ import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
 import { myStudioId } from '@/modules/studio-quote/store';
 import { myMembershipId, displayName } from './team';
+import { actingMember, myLeadScope } from '@/modules/studio/lead-scope';
 import type { EventKindName } from './event-copy';
 
 type Db = Prisma.TransactionClient | typeof prisma;
@@ -43,6 +44,8 @@ export interface EventRow {
   kind: EventKindName;
   actor: 'MEMBER' | 'SYSTEM';
   byName: string | null;
+  /** Who wrote it (their membership), for "edit your own note". */
+  byId?: string | null;
   summary: string;
   meta: Record<string, unknown> | null;
   createdAt: Date;
@@ -174,8 +177,11 @@ export async function recordMany(
 export const TIMELINE_LIMIT = 100;
 
 export async function timelineFor(clientId: string): Promise<EventRow[]> {
-  const studioId = await myStudioId();
-  if (!studioId) return [];
+  /* The lead scope, not `myStudioId()` (Studio OS Phase 1): a salesperson
+     reads the timeline of their own leads, and only those. */
+  const scope = await myLeadScope();
+  if (!scope) return [];
+  const studioId = scope.studioId;
 
   try {
     /* Scoped by studioId as well as clientId. A client id off a form is not
@@ -183,7 +189,7 @@ export async function timelineFor(clientId: string): Promise<EventRow[]> {
        and this simply returns nothing when the id is not theirs rather than
        leaking another studio's conversation history. */
     const rows = await prisma.studioClientEvent.findMany({
-      where: { studioId, clientId },
+      where: { studioId, clientId, client: { ...scope.leads, studioId } },
       orderBy: { createdAt: 'desc' },
       take: TIMELINE_LIMIT,
       select: {
@@ -191,6 +197,7 @@ export async function timelineFor(clientId: string): Promise<EventRow[]> {
         kind: true,
         actor: true,
         byName: true,
+        byId: true,
         summary: true,
         meta: true,
         createdAt: true,
@@ -202,6 +209,7 @@ export async function timelineFor(clientId: string): Promise<EventRow[]> {
       kind: r.kind as EventKindName,
       actor: r.actor as 'MEMBER' | 'SYSTEM',
       byName: r.byName,
+      byId: r.byId,
       summary: r.summary,
       meta: (r.meta ?? null) as Record<string, unknown> | null,
       createdAt: r.createdAt,
@@ -243,6 +251,7 @@ export async function recentActivity(limit = 40): Promise<(EventRow & {
         kind: true,
         actor: true,
         byName: true,
+        byId: true,
         summary: true,
         meta: true,
         createdAt: true,
@@ -256,6 +265,7 @@ export async function recentActivity(limit = 40): Promise<(EventRow & {
       kind: r.kind as EventKindName,
       actor: r.actor as 'MEMBER' | 'SYSTEM',
       byName: r.byName,
+      byId: r.byId,
       summary: r.summary,
       meta: (r.meta ?? null) as Record<string, unknown> | null,
       createdAt: r.createdAt,
@@ -268,9 +278,17 @@ export async function recentActivity(limit = 40): Promise<(EventRow & {
   }
 }
 
-/** The signed-in member, as an event author. Null for ops, or on failure. */
+/**
+ * The signed-in member, as an event author. Null for ops, or on failure.
+ *
+ * Any active role (Studio OS Phase 1): a salesperson's call and accounts'
+ * booking are theirs, not "One Interiors". `myMembershipId()` finds only the
+ * office roles, so it is the fallback, not the first read.
+ */
 async function currentMember(): Promise<{ id: string; name: string } | null> {
   try {
+    const acting = await actingMember();
+    if (acting) return acting;
     const id = await myMembershipId();
     if (!id) return null;
 

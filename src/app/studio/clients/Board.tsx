@@ -1,6 +1,8 @@
 'use client';
 
 import { useActionState, useEffect, useMemo, useState, useTransition } from 'react';
+import Link from 'next/link';
+import { LineIcon } from '../ui/icons';
 import { formatINRCompact } from '@/lib/money';
 // Values from the PURE module. `clients.ts` carries `server-only`, and a label
 // map is a value rather than a type — importing it from there pulls Prisma into
@@ -29,17 +31,15 @@ import {
   removeDemoLeadAction,
 } from './actions';
 import { IDLE } from '../form-state';
-import { SavedViews } from './SavedViews';
+import { moreCardsAction } from './list-actions';
 import { DragBoard, DragHandle, DropColumn, useCardDrag } from './Dnd';
-import type { SavedView } from '@/modules/studio-practice/saved-views';
-import type { ViewFilters } from '@/modules/studio-practice/view-filters';
 
-const input =
-  'rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-3 py-2 text-[14px] text-[var(--s-ink)] placeholder:text-[var(--s-ink-3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--s-accent)]';
-const primary =
-  'rounded-[8px] bg-[var(--s-accent)] px-4 py-2 text-[14px] font-medium text-white hover:bg-[var(--s-accent-deep)] disabled:opacity-40';
-const quiet =
-  'rounded-[8px] border border-[var(--s-rule)] px-3 py-1.5 text-[13px] font-medium hover:border-[var(--s-ink-3)] disabled:opacity-40';
+
+
+/* The design's field and buttons (studio-ui.css, clients.css). */
+const input = 'fld';
+const primary = 'btn pri';
+const quiet = 'btn sec sm';
 
 function overdue(date: Date | null, today: Date): boolean {
   return date !== null && date <= today;
@@ -115,7 +115,7 @@ function CustomFields({
     <div className="flex flex-wrap gap-3">
       {fields.map((f) => (
         <label key={f.id} className="flex min-w-[9rem] flex-1 flex-col gap-1.5">
-          <span className="s-label">{f.label}</span>
+          <span className="lbl">{f.label}</span>
           {f.type === 'SELECT' ? (
             <select name={`custom.${f.key}`} defaultValue={values?.[f.key] ?? ''} className={input}>
               <option value="">—</option>
@@ -129,7 +129,7 @@ function CustomFields({
               defaultValue={values?.[f.key] ?? ''}
               type={f.type === 'DATE' ? 'date' : 'text'}
               inputMode={f.type === 'NUMBER' ? 'decimal' : undefined}
-              className={`${input} ${f.type === 'NUMBER' ? 's-num text-right' : ''}`}
+              className={`${input} ${f.type === 'NUMBER' ? 'mono text-right' : ''}`}
             />
           )}
         </label>
@@ -217,50 +217,6 @@ function Assign({
 }
 
 /**
- * Take the whole pool at once.
- *
- * The honest case for this button: in a two-person studio the pool after an
- * import is "everything", and sharing two hundred rows out one at a time is
- * not going to happen. One click to own the lot, then hand individual ones
- * over from the cards, is the order people actually work in.
- *
- * It asks first. Bulk assignment is easy to undo but annoying to notice.
- */
-function TakeAll({ ids, meId }: { ids: string[]; meId: string }) {
-  const [busy, start] = useTransition();
-  const [confirming, setConfirming] = useState(false);
-
-  if (!confirming) {
-    return (
-      <button type="button" onClick={() => setConfirming(true)} className={quiet}>
-        Take all {ids.length}
-      </button>
-    );
-  }
-
-  return (
-    <span className="flex items-center gap-2">
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() =>
-          start(async () => {
-            await assignAction(ids, meId);
-            setConfirming(false);
-          })
-        }
-        className={primary}
-      >
-        {busy ? 'Taking…' : `Yes, all ${ids.length}`}
-      </button>
-      <button type="button" onClick={() => setConfirming(false)} className={quiet}>
-        Cancel
-      </button>
-    </span>
-  );
-}
-
-/**
  * Delete one, with thirty days to change your mind.
  *
  * Two clicks, and the second one says the name. The message the module sends
@@ -336,7 +292,10 @@ function Card({
   members,
   meId,
   draggable,
+  seesAll,
 }: {
+  /** Owner or PM: assign and delete from the card. A salesperson does neither. */
+  seesAll: boolean;
   client: ClientRow;
   today: Date;
   stages: StageRow[];
@@ -405,7 +364,14 @@ function Card({
             />
           </span>
           <div className="min-w-0">
-            <p className="m-0 truncate text-[14.5px] font-semibold">{client.name}</p>
+            {/* The name opens the lead page (Studio OS Phase 1): calls, files, quotations, booking. */}
+            <Link
+              href={`/studio/clients/${client.id}`}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="m-0 block truncate text-[14.5px] font-semibold text-[var(--s-ink)] no-underline hover:underline"
+            >
+              {client.name}
+            </Link>
             {client.phone ? (
               <a
                 href={`tel:${client.phone}`}
@@ -434,7 +400,7 @@ function Card({
             client.fromMarketplace ? '!bg-[var(--s-accent-wash)] !text-[var(--s-accent-deep)]' : ''
           }`}
         >
-          {SOURCE_LABELS[client.source]}
+          {client.leadSourceName ?? SOURCE_LABELS[client.source]}
         </span>
         {client.config ? <span className="s-tag">{client.config}</span> : null}
         {client.society ? <span className="s-tag">{client.society}</span> : null}
@@ -474,13 +440,13 @@ function Card({
       </p>
 
       <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-[var(--s-rule-soft)] pt-2.5">
-        <Assign
+        {seesAll ? <Assign
           clientId={client.id}
           assignedToId={client.assignedToId}
           assignedToName={client.assignedToName}
           members={members}
           meId={meId}
-        />
+        /> : null}
         <button type="button" onClick={() => setOpen(!open)} className={quiet}>
           {open ? 'Close' : 'Update'}
         </button>
@@ -573,7 +539,7 @@ function Card({
           sitting next to "→ next stage" is a delete button pressed by
           accident. It is reversible for thirty days, but a card that vanishes
           mid-scroll is still alarming. */}
-      {open ? <Bin id={client.id} name={client.name} /> : null}
+      {open && seesAll ? <Bin id={client.id} name={client.name} /> : null}
     </li>
   );
 }
@@ -599,7 +565,7 @@ function Card({
  * A fixed sheet with its own backdrop cannot be clipped by anything, closes
  * itself when the row is written, and is reachable from the empty state too.
  */
-function AddClient({ label, fields }: { label: string; fields: FieldRow[] }) {
+function AddClient({ label, fields, sources = [] }: { label: string; fields: FieldRow[]; sources?: { id: string; name: string }[] }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(addClientAction, IDLE);
 
@@ -611,45 +577,47 @@ function AddClient({ label, fields }: { label: string; fields: FieldRow[] }) {
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)} className={primary}>
-        {label}
+        {label.startsWith('+ ') ? (
+          <>
+            <LineIcon name="plus" size={17} />
+            {label.slice(2)}
+          </>
+        ) : (
+          label
+        )}
       </button>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/25 p-4 sm:items-center">
-      <button
-        type="button"
-        aria-label="Cancel"
-        onClick={() => setOpen(false)}
-        className="fixed inset-0 -z-10 cursor-default"
-      />
-      <form action={action} className="s-card relative flex w-[min(30rem,100%)] flex-col gap-3 p-5 shadow-xl">
-        <p className="m-0 text-[15px] font-semibold">Add a client</p>
+    <div className="overlay" style={{ overflowY: 'auto', padding: '48px 16px' }}>
+      <button type="button" aria-label="Cancel" onClick={() => setOpen(false)} className="scrim" />
+      <form action={action} className="cl-sheet" style={{ width: 'min(32rem, 100%)', padding: 20, gap: 14, maxHeight: 'none', overflow: 'visible' }}>
+        <p style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Add a client</p>
 
         <label className="flex flex-col gap-1.5">
-          <span className="s-label">Name</span>
+          <span className="lbl">Name</span>
           <input name="name" required autoFocus placeholder="Mrs Kothari" className={input} />
         </label>
 
         <div className="flex flex-wrap gap-3">
           <label className="flex flex-1 flex-col gap-1.5">
-            <span className="s-label">Phone</span>
+            <span className="lbl">Phone</span>
             <input name="phone" inputMode="tel" className={input} />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="s-label">Config</span>
-            <input name="config" placeholder="3 BHK" className={`${input} w-[6.5rem]`} />
+            <span className="lbl">Config</span>
+            <input name="config" placeholder="3 BHK" className={input} style={{ width: '6.5rem' }} />
           </label>
         </div>
 
         <div className="flex flex-wrap gap-3">
           <label className="flex flex-1 flex-col gap-1.5">
-            <span className="s-label">Society or area</span>
+            <span className="lbl">Society or area</span>
             <input name="society" placeholder="Kalyani Nagar" className={input} />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="s-label">Where from</span>
+            <span className="lbl">Where from</span>
             <select name="source" defaultValue="WALK_IN" className={input}>
               {(Object.keys(SOURCE_LABELS) as ClientSourceName[])
                 // Ours is not a choice anyone makes by hand — a One Interiors
@@ -660,6 +628,10 @@ function AddClient({ label, fields }: { label: string; fields: FieldRow[] }) {
                 .map((s) => (
                   <option key={s} value={s}>{SOURCE_LABELS[s]}</option>
                 ))}
+              {/* The studio's own names (Settings, Lead sources). */}
+              {sources.map((o) => (
+                <option key={o.id} value={`own:${o.id}`}>{o.name}</option>
+              ))}
             </select>
           </label>
         </div>
@@ -668,16 +640,16 @@ function AddClient({ label, fields }: { label: string; fields: FieldRow[] }) {
 
         <div className="flex flex-wrap gap-3">
           <label className="flex flex-1 flex-col gap-1.5">
-            <span className="s-label">Next thing to do</span>
+            <span className="lbl">Next thing to do</span>
             <input name="nextAction" placeholder="Call back with a rough number" className={input} />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="s-label">On</span>
+            <span className="lbl">On</span>
             <input type="date" name="nextActionOn" className={input} />
           </label>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="hstack">
           <button type="submit" disabled={pending} className={primary}>
             {pending ? 'Adding…' : 'Add'}
           </button>
@@ -688,7 +660,7 @@ function AddClient({ label, fields }: { label: string; fields: FieldRow[] }) {
 
         {'ok' in state && !state.ok ? (
           <div role="alert" className="flex flex-col gap-2">
-            <p className="m-0 text-[12.5px] text-[var(--s-bad)]">{state.error}</p>
+            <p className="cl-err">{state.error}</p>
 
             {/* The override, beside the reason and only after it.
                 A "add anyway" checkbox sitting on the form before anybody has
@@ -763,13 +735,18 @@ function DemoStrip() {
   );
 }
 
-export function AddClientButton({ fields }: { fields: FieldRow[] }) {
-  return <AddClient label="+ Add a client" fields={fields} />;
+export function AddClientButton({ fields, sources }: { fields: FieldRow[]; sources?: { id: string; name: string }[] }) {
+  return <AddClient label="+ Add a client" fields={fields} sources={sources} />;
+}
+
+/** "+ Add lead" in the leads header (the AxLeads look). */
+export function AddLeadButton({ fields, sources }: { fields: FieldRow[]; sources?: { id: string; name: string }[] }) {
+  return <AddClient label="+ Add a client" fields={fields} sources={sources} />;
 }
 
 /** The same form, reached from the empty state. See the note on `AddClient`. */
-export function AddFirstClientButton({ fields }: { fields: FieldRow[] }) {
-  return <AddClient label="Add the first one" fields={fields} />;
+export function AddFirstClientButton({ fields, sources }: { fields: FieldRow[]; sources?: { id: string; name: string }[] }) {
+  return <AddClient label="Add the first one" fields={fields} sources={sources} />;
 }
 
 /**
@@ -800,8 +777,15 @@ export function Board({
   fields,
   members,
   meId,
-  views,
+  seesAll = true,
+  columns,
+  closedCount,
+  query,
+  poolCount = 0,
 }: {
+  /** Owner or PM (Studio OS Phase 1). A salesperson sees only their own leads and no pool controls. */
+  seesAll?: boolean;
+  /** The first 50 cards of each column (leads at scale), already filtered by the server. */
   clients: ClientRow[];
   stages: StageRow[];
   fields: FieldRow[];
@@ -809,8 +793,14 @@ export function Board({
   members: { id: string; name: string }[];
   /** The signed-in person's membership row, for "Take it". */
   meId: string | null;
-  /** This person's named filters. Empty until they save one. */
-  views: SavedView[];
+  /** Per column: how many leads match, and how many are due, counted in SQL. */
+  columns: { stageId: string; count: number; due: number }[];
+  /** Finished and lost leads matching the filters. */
+  closedCount: number;
+  /** The filters as a query string, for "Show more" and the list links. */
+  query: string;
+  /** Open leads nobody has (owner, PM), counted in SQL. */
+  poolCount?: number;
 }) {
   const today = useMemo(() => {
     const d = new Date();
@@ -819,31 +809,31 @@ export function Board({
   }, []);
 
   const groupable = fields.filter((f) => f.groupBy);
+  const [grouping, setGrouping] = useState('');
 
-  /* The starred view decides what the board opens with, so it seeds the
-     state rather than being applied afterwards — applying it in an effect
-     would render the unfiltered board first and then rearrange it under
-     somebody already reaching for a card. */
-  const opening = views.find((v) => v.isDefault)?.filters ?? {};
-  const [grouping, setGrouping] = useState(opening.groupBy ?? '');
+  /**
+   * Cards loaded by "Show more", per column (leads at scale). The board
+   * draws the first 50 of each column; more arrive 50 at a time, with the
+   * same filters, from the server.
+   */
+  const [extra, setExtra] = useState<Record<string, ClientRow[]>>({});
+  const [loading, setLoading] = useState<string | null>(null);
+  const [, startMore] = useTransition();
+  useEffect(() => setExtra({}), [clients]);
+  const all = useMemo(() => {
+    const seen = new Set(clients.map((c) => c.id));
+    return [...clients, ...Object.values(extra).flat().filter((c) => !seen.has(c.id))];
+  }, [clients, extra]);
+  const countOf = new Map(columns.map((c) => [c.stageId, c]));
 
-  // '' everyone · 'pool' nobody has taken it · a member id · 'quiet'
-  const [who, setWho] = useState(opening.who ?? '');
-
-  /* What the two controls above add up to, in the shape a saved view holds.
-     Empty strings are dropped so an unfiltered board compares equal to a
-     view carrying no filters at all. */
-  const currentView: ViewFilters = {
-    ...(who ? { who } : {}),
-    ...(grouping ? { groupBy: grouping } : {}),
-  };
-
-  const applyView = (f: ViewFilters) => {
-    setWho(f.who ?? '');
-    setGrouping(f.groupBy ?? '');
-  };
-
-  const nameOf = (id: string) => members.find((m) => m.id === id)?.name ?? null;
+  function showMore(stageId: string, loaded: number) {
+    setLoading(stageId);
+    startMore(async () => {
+      const more = await moreCardsAction(query, stageId, loaded);
+      setExtra((e) => ({ ...e, [stageId]: [...(e[stageId] ?? []), ...more] }));
+      setLoading(null);
+    });
+  }
 
   /**
    * Where a dragged card has been put, before the server agrees.
@@ -877,17 +867,8 @@ export function Board({
         return next;
       });
 
-      /* The override is dropped either way.
-         
-         On failure it puts the card back where it was — leaving the
-         optimistic position standing after a refusal is the worst of both,
-         because the screen says one thing and the next reload says another.
-         
-         On success it has to go too, and that is the less obvious half: the
-         server action revalidates, so `clients` arrives carrying the new
-         stage. Keeping the override would then pin the card to OUR guess
-         for as long as the page lives — including if somebody else moved it
-         somewhere different a moment later. */
+      /* The override is dropped either way: on failure it puts the card
+         back; on success the revalidated rows carry the new stage. */
       setMoved((m) => {
         const next = { ...m };
         delete next[clientId];
@@ -897,12 +878,13 @@ export function Board({
       if ('error' in result) setDragError(result.error);
     });
   }
-  const team = members.length > 1;
 
-  const board = stages.filter((s) => BOARD_KINDS.includes(s.kind));
+  const params = new URLSearchParams(query);
+  const stageFilter = params.get('stage') ?? '';
+  const board = stages.filter((s) => BOARD_KINDS.includes(s.kind)).filter((s) => !stageFilter || s.id === stageFilter);
   const closedStages = stages.filter((s) => !BOARD_KINDS.includes(s.kind));
   const closedIds = new Set(closedStages.map((s) => s.id));
-  const closed = clients.filter((c) => closedIds.has(stageOf(c)));
+  const closed = all.filter((c) => closedIds.has(stageOf(c)) && (!stageFilter || stageOf(c) === stageFilter));
 
   /** The next column along, in the studio's order. Null at the end. */
   const nextAfter = (stageId: string): StageRow | null => {
@@ -910,116 +892,46 @@ export function Board({
     return i >= 0 && i < stages.length - 1 ? (stages[i + 1] ?? null) : null;
   };
 
-  const allOpen = clients.filter((c) => !closedIds.has(stageOf(c)));
-  const pool = allOpen.filter((c) => c.assignedToId === null);
-  // Not `quiet` — that name is taken by the button class at the top of this
-  // file, and shadowing it here silently restyles every button below.
-  const quietOnes = allOpen.filter((c) => quiet7(c.lastContactedAt));
-
-  const open =
-    who === ''
-      ? allOpen
-      : who === 'pool'
-        ? pool
-        : who === 'quiet'
-          ? quietOnes
-          : allOpen.filter((c) => c.assignedToId === who);
-
-  const groups =
-    grouping.length > 0 ? groupBy(open, grouping) : [{ label: '', rows: open }];
+  const open = all.filter((c) => !closedIds.has(stageOf(c)));
+  const groups = grouping.length > 0 ? groupBy(open, grouping) : [{ label: '', rows: open }];
+  const listHref = (extraParams: Record<string, string>) => {
+    const p = new URLSearchParams(query);
+    for (const [k, v] of Object.entries(extraParams)) p.set(k, v);
+    p.set('view', 'list');
+    return `/studio/clients?${p.toString()}`;
+  };
 
   return (
     <div className="flex flex-col gap-6">
-      {/* What the sample is, said once, at the top.
-          The badge on the card says "this is not a person"; this says why it
-          is here and how to get rid of it. Above the board rather than beside
-          the card, because it is a statement about the screen rather than
-          about that lead — and a studio scanning for the exit should not have
-          to find a particular card first.
+      {all.some((c) => c.isDemo) ? <DemoStrip /> : null}
 
-          It disappears the moment the sample is removed, so nobody who has
-          cleared it is told about it again. */}
-      {clients.some((c) => c.isDemo) ? <DemoStrip /> : null}
-
-      {/* The pool is a filter on this board, not a second screen. A studio
-          that has to go somewhere else to find the clients nobody has taken
-          is a studio that never goes. */}
-      {team && pool.length > 0 ? (
+      {/* The pool is a filter on the list, not a second screen: share them
+          out there, many at a time (leads at scale). */}
+      {seesAll && members.length > 1 && poolCount > 0 && params.get('owner') !== 'pool' ? (
         <div className="s-card flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
           <p className="m-0 text-[14px]">
-            <span className="s-num font-semibold">{pool.length}</span>{' '}
-            {pool.length === 1 ? 'client has' : 'clients have'} nobody working on them.
+            <span className="s-num font-semibold">{poolCount.toLocaleString('en-IN')}</span>{' '}
+            {poolCount === 1 ? 'open lead has' : 'open leads have'} nobody working on them.
           </p>
-          <button
-            type="button"
-            onClick={() => setWho(who === 'pool' ? '' : 'pool')}
-            className={`${quiet} ml-auto`}
-          >
-            {who === 'pool' ? 'Show everyone' : 'Show me those'}
-          </button>
-          {meId ? <TakeAll ids={pool.map((c) => c.id)} meId={meId} /> : null}
+          <Link href="/studio/clients?view=list&owner=pool&kind=open&sort=oldest" className={`${quiet} ml-auto no-underline`}>
+            Share them out
+          </Link>
         </div>
       ) : null}
 
-      <SavedViews
-        views={views}
-        current={currentView}
-        onApply={applyView}
-        memberName={nameOf}
-      />
-
-      {(groupable.length > 0 || team || quietOnes.length > 0) ? (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
-          {team || quietOnes.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="s-label">Showing</span>
-              <select
-                value={who}
-                onChange={(e) => setWho(e.target.value)}
-                className={`${input} py-1.5`}
-              >
-                <option value="">Everyone ({allOpen.length})</option>
-                {quietOnes.length > 0 ? (
-                  <option value="quiet">Gone quiet ({quietOnes.length})</option>
-                ) : null}
-                {team ? <option value="pool">Nobody has taken ({pool.length})</option> : null}
-                {team
-                  ? members.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.id === meId ? `${m.name} (you)` : m.name} (
-                        {allOpen.filter((c) => c.assignedToId === m.id).length})
-                      </option>
-                    ))
-                  : null}
-              </select>
-            </div>
-          ) : null}
-
-          {groupable.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="s-label">Group by</span>
-              <select
-                value={grouping}
-                onChange={(e) => setGrouping(e.target.value)}
-                className={`${input} py-1.5`}
-              >
-                <option value="">No grouping</option>
-                {groupable.map((f) => (
-                  <option key={f.id} value={f.key}>{f.label}</option>
-                ))}
-              </select>
-            </div>
-          ) : null}
+      {groupable.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="s-label">Group by</span>
+          <select value={grouping} onChange={(e) => setGrouping(e.target.value)} className={`${input} py-1.5`}>
+            <option value="">No grouping</option>
+            {groupable.map((f) => (
+              <option key={f.id} value={f.key}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+          {grouping ? <span className="text-[12.5px] text-[var(--s-ink-3)]">Grouping the cards shown; use Show more to bring in the rest.</span> : null}
         </div>
-      ) : null}
-
-      {open.length === 0 && allOpen.length > 0 ? (
-        <p className="m-0 text-[14px] text-[var(--s-ink-2)]">
-          Nothing matches that.{' '}
-          <button type="button" onClick={() => setWho('')} className="underline">
-            Show everyone
-          </button>
-        </p>
       ) : null}
 
       {dragError ? (
@@ -1028,103 +940,110 @@ export function Board({
         </p>
       ) : null}
 
-      <DragBoard
-        onMove={moveCard}
-        labelFor={(id) => clients.find((c) => c.id === id)?.name ?? 'this lead'}
-      >
-      {groups.map((group) => (
-        <section key={group.label || 'all'} className="flex flex-col gap-2">
-          {group.label ? (
-            <h2 className="m-0 flex items-baseline gap-2 text-[15px] font-semibold">
-              {group.label}
-              <span className="s-num s-label">{group.rows.length}</span>
-            </h2>
-          ) : null}
+      <DragBoard onMove={moveCard} labelFor={(id) => all.find((c) => c.id === id)?.name ?? 'this lead'}>
+        {groups.map((group) => (
+          <section key={group.label || 'all'} className="flex flex-col gap-2">
+            {group.label ? (
+              <h2 className="m-0 flex items-baseline gap-2 text-[15px] font-semibold">
+                {group.label}
+                <span className="s-num s-label">{group.rows.length}</span>
+              </h2>
+            ) : null}
 
-          <div className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-2">
-            {board.map((stage) => {
-              const items = group.rows.filter((c) => stageOf(c) === stage.id);
-              const due = items.filter((c) => overdue(c.nextActionOn, today)).length;
-              const c = colourOf(stage.colour);
+            <div className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-2">
+              {board.map((stage) => {
+                const items = group.rows.filter((c) => stageOf(c) === stage.id);
+                const loaded = all.filter((c) => c.stageId === stage.id).length;
+                const counts = countOf.get(stage.id);
+                const total = group.label ? items.length : Math.max(counts?.count ?? 0, items.length);
+                const due = group.label ? items.filter((c) => overdue(c.nextActionOn, today)).length : (counts?.due ?? 0);
+                const c = colourOf(stage.colour);
 
-              return (
-                <DropColumn
-                  key={stage.id}
-                  /* Namespaced by group. When the board is grouped, EVERY
-                     group draws the same columns — a bare stage id would
-                     register five droppables sharing one id and dnd-kit
-                     could not tell them apart. The real stage id travels in
-                     the droppable's data. */
-                  dropId={`${group.label || 'all'}::${stage.id}`}
-                  stageId={stage.id}
-                  stageName={stage.name}
-                  className="flex w-[17.5rem] flex-none snap-start flex-col gap-2 rounded-[12px] bg-[var(--s-surface-2)] p-2.5"
-                >
-                  <div className="flex items-baseline justify-between gap-2 px-1">
-                    <h3 className="m-0 flex items-center gap-2 text-[13.5px] font-semibold">
-                      <span
-                        aria-hidden
-                        className="inline-block h-2 w-2 flex-none rounded-full"
-                        style={{ background: c.dot }}
-                      />
-                      <span className="truncate">{stage.name}</span>
-                    </h3>
-                    <span className="s-num s-label flex-none">
-                      {due > 0 ? `${due} due · ` : ''}
-                      {items.length}
-                    </span>
-                  </div>
+                return (
+                  <DropColumn
+                    key={stage.id}
+                    /* Namespaced by group: every group draws the same columns. */
+                    dropId={`${group.label || 'all'}::${stage.id}`}
+                    stageId={stage.id}
+                    stageName={stage.name}
+                    className="flex w-[17.5rem] flex-none snap-start flex-col gap-2 rounded-[12px] bg-[var(--s-surface-2)] p-2.5"
+                  >
+                    <div className="flex items-baseline justify-between gap-2 px-1">
+                      <h3 className="m-0 flex items-center gap-2 text-[13.5px] font-semibold">
+                        <span aria-hidden className="inline-block h-2 w-2 flex-none rounded-full" style={{ background: c.dot }} />
+                        <span className="truncate">{stage.name}</span>
+                      </h3>
+                      <span className="s-num s-label flex-none">
+                        {due > 0 ? `${due.toLocaleString('en-IN')} due · ` : ''}
+                        {total.toLocaleString('en-IN')}
+                      </span>
+                    </div>
 
-                  {items.length === 0 ? (
-                    <p className="m-0 px-1 py-3 text-[12.5px] italic text-[var(--s-ink-3)]">
-                      Nothing here.
-                    </p>
-                  ) : (
-                    <ul className="m-0 flex list-none flex-col gap-2 p-0">
-                      {items.map((client) => (
-                        <Card
-                          key={client.id}
-                          client={client}
-                          today={today}
-                          stages={stages}
-                          fields={fields}
-                          next={nextAfter(client.stageId)}
-                          members={members}
-                          meId={meId}
-                          draggable={!inFlight[client.id]}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                </DropColumn>
-              );
-            })}
-          </div>
-        </section>
-      ))}
+                    {items.length === 0 ? (
+                      <p className="m-0 px-1 py-3 text-[12.5px] italic text-[var(--s-ink-3)]">Nothing here.</p>
+                    ) : (
+                      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                        {items.map((client) => (
+                          <Card
+                            key={client.id}
+                            client={client}
+                            today={today}
+                            stages={stages}
+                            fields={fields}
+                            next={nextAfter(client.stageId)}
+                            members={members}
+                            meId={meId}
+                            draggable={!inFlight[client.id]}
+                            seesAll={seesAll}
+                          />
+                        ))}
+                      </ul>
+                    )}
+
+                    {!group.label && (counts?.count ?? 0) > loaded ? (
+                      <div className="flex flex-col gap-1 px-1">
+                        <button type="button" disabled={loading === stage.id} onClick={() => showMore(stage.id, loaded)} className={quiet}>
+                          {loading === stage.id ? 'Loading…' : `Show ${Math.min(50, (counts?.count ?? 0) - loaded)} more`}
+                        </button>
+                        <Link href={listHref({ stage: stage.id })} className="text-center text-[12px] text-[var(--s-ink-3)]">
+                          All {(counts?.count ?? 0).toLocaleString('en-IN')} as a list
+                        </Link>
+                      </div>
+                    ) : null}
+                  </DropColumn>
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </DragBoard>
 
-      {closed.length > 0 ? (
+      {closedCount > 0 ? (
         <details>
           <summary className="mb-3 cursor-pointer select-none text-[13.5px] font-medium text-[var(--s-ink-2)]">
-            Finished and gone ({closed.length})
+            Finished and gone ({closedCount.toLocaleString('en-IN')})
           </summary>
           <ul className="m-0 grid list-none grid-cols-1 gap-2 p-0 md:grid-cols-2 xl:grid-cols-3">
             {closed.map((c) => (
               <li key={c.id} className="s-card flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3">
-                <span className="text-[14px] font-medium">{c.name}</span>
-                <span className="s-label">{SOURCE_LABELS[c.source]}</span>
+                <Link href={`/studio/clients/${c.id}`} className="text-[14px] font-medium text-[var(--s-ink)] no-underline hover:underline">
+                  {c.name}
+                </Link>
+                <span className="s-label">{c.leadSourceName ?? SOURCE_LABELS[c.source]}</span>
                 <span className="ml-auto flex items-center gap-2">
                   <StageTag name={c.stageName} colour={c.stageColour} />
-                  {c.stageKind === 'LOST' && c.lostReason ? (
-                    <span className="text-[12.5px] text-[var(--s-ink-3)]">
-                      {LOST_LABELS[c.lostReason]}
-                    </span>
-                  ) : null}
+                  {c.stageKind === 'LOST' && c.lostReason ? <span className="text-[12.5px] text-[var(--s-ink-3)]">{LOST_LABELS[c.lostReason]}</span> : null}
                 </span>
               </li>
             ))}
           </ul>
+          {closedCount > closed.length ? (
+            <p className="m-0 mt-3 text-[13px]">
+              <Link href={listHref({ kind: 'closed' })} className="text-[var(--s-accent)]">
+                See all {closedCount.toLocaleString('en-IN')} in the list
+              </Link>
+            </p>
+          ) : null}
         </details>
       ) : null}
     </div>

@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Quiz 4: style</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0B0B0B}
+a:focus-visible,button:focus-visible{outline:2px solid #BA5329;outline-offset:3px}
+button{font-family:inherit}
+.tile{position:relative;padding:0;border:0;border-radius:12px;overflow:hidden;cursor:pointer;aspect-ratio:3/4;background:#0B0B0B;box-shadow:0 0 0 3px transparent}
+.tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.tile .lb{position:absolute;left:0;right:0;bottom:0;padding:18px 8px 7px;background:linear-gradient(180deg,rgba(11,11,11,0),rgba(11,11,11,.8));color:#FFFFFF;font-size:13.5px;font-weight:600;text-align:left}
+.tile .ck{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:11px;background:#BA5329;color:#FFFFFF;display:flex;align-items:center;justify-content:center;opacity:0}
+.tile[aria-pressed="true"]{box-shadow:0 0 0 3px #0B0B0B}
+.tile[aria-pressed="true"] .ck{opacity:1}
+/* motion and depth layer */
+@keyframes oiRise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes oiKen{from{transform:scale(1.12)}to{transform:scale(1)}}
+@keyframes oiGrowX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes oiPop{0%{transform:scale(.95)}60%{transform:scale(1.03)}100%{transform:scale(1)}}
+h1{animation:oiRise .8s cubic-bezier(.22,1,.36,1) both}
+h1 ~ p,h1 + span{animation:oiRise .8s cubic-bezier(.22,1,.36,1) .12s both}
+[role="radiogroup"] > *,[role="group"] > *,ol > li,fieldset > div > *,[role="tablist"] > *{animation:oiRise .7s cubic-bezier(.22,1,.36,1) both}
+[role="radiogroup"] > *:nth-child(1),[role="group"] > *:nth-child(1),ol > li:nth-child(1),fieldset > div > *:nth-child(1),[role="tablist"] > *:nth-child(1){animation-delay:0.22s}
+[role="radiogroup"] > *:nth-child(2),[role="group"] > *:nth-child(2),ol > li:nth-child(2),fieldset > div > *:nth-child(2),[role="tablist"] > *:nth-child(2){animation-delay:0.28s}
+[role="radiogroup"] > *:nth-child(3),[role="group"] > *:nth-child(3),ol > li:nth-child(3),fieldset > div > *:nth-child(3),[role="tablist"] > *:nth-child(3){animation-delay:0.34s}
+[role="radiogroup"] > *:nth-child(4),[role="group"] > *:nth-child(4),ol > li:nth-child(4),fieldset > div > *:nth-child(4),[role="tablist"] > *:nth-child(4){animation-delay:0.40s}
+[role="radiogroup"] > *:nth-child(5),[role="group"] > *:nth-child(5),ol > li:nth-child(5),fieldset > div > *:nth-child(5),[role="tablist"] > *:nth-child(5){animation-delay:0.46s}
+[role="radiogroup"] > *:nth-child(6),[role="group"] > *:nth-child(6),ol > li:nth-child(6),fieldset > div > *:nth-child(6),[role="tablist"] > *:nth-child(6){animation-delay:0.52s}
+[role="radiogroup"] > *:nth-child(7),[role="group"] > *:nth-child(7),ol > li:nth-child(7),fieldset > div > *:nth-child(7),[role="tablist"] > *:nth-child(7){animation-delay:0.58s}
+[role="radiogroup"] > *:nth-child(8),[role="group"] > *:nth-child(8),ol > li:nth-child(8),fieldset > div > *:nth-child(8),[role="tablist"] > *:nth-child(8){animation-delay:0.64s}
+[role="radiogroup"] > *:nth-child(9),[role="group"] > *:nth-child(9),ol > li:nth-child(9),fieldset > div > *:nth-child(9),[role="tablist"] > *:nth-child(9){animation-delay:0.70s}
+[role="radiogroup"] > *:nth-child(10),[role="group"] > *:nth-child(10),ol > li:nth-child(10),fieldset > div > *:nth-child(10),[role="tablist"] > *:nth-child(10){animation-delay:0.76s}
+[role="radiogroup"] > *:nth-child(11),[role="group"] > *:nth-child(11),ol > li:nth-child(11),fieldset > div > *:nth-child(11),[role="tablist"] > *:nth-child(11){animation-delay:0.82s}
+[role="radiogroup"] > *:nth-child(12),[role="group"] > *:nth-child(12),ol > li:nth-child(12),fieldset > div > *:nth-child(12),[role="tablist"] > *:nth-child(12){animation-delay:0.88s}
+[role="progressbar"] > span{transform-origin:left center;animation:oiGrowX .9s cubic-bezier(.22,1,.36,1) both}
+[role="progressbar"] > span:nth-child(1){animation-delay:0.05s}
+[role="progressbar"] > span:nth-child(2){animation-delay:0.10s}
+[role="progressbar"] > span:nth-child(3){animation-delay:0.15s}
+[role="progressbar"] > span:nth-child(4){animation-delay:0.20s}
+[role="progressbar"] > span:nth-child(5){animation-delay:0.25s}
+[role="progressbar"] > span:nth-child(6){animation-delay:0.30s}
+[role="progressbar"] > span:nth-child(7){animation-delay:0.35s}
+img[style*="inset: 0"]{animation:oiKen 18s ease-in-out both alternate infinite}
+a,button{transition:transform .28s cubic-bezier(.34,1.56,.64,1),box-shadow .28s ease,background-color .28s ease,color .28s ease}
+a:active,button:active{transform:scale(.965)}
+button[aria-pressed="true"],button[aria-checked="true"]{animation:oiPop .45s cubic-bezier(.34,1.56,.64,1)}
+a[style*="background: rgb(11, 11, 11)"][style*="border-radius: 999px"],button[style*="background: rgb(11, 11, 11)"][style*="border-radius: 999px"]{box-shadow:0 14px 30px -16px rgba(11,11,11,.45)}
+div[style*="background: rgb(11, 11, 11)"][style*="border-radius: 20px"],div[style*="background: rgb(11, 11, 11)"][style*="border-radius: 18px"],article[style*="background: rgb(11, 11, 11)"]{box-shadow:0 28px 56px -26px rgba(11,11,11,.6),inset 0 1px 0 rgba(255,255,255,.06)}
+div[style*="background: rgb(186, 83, 41)"][style*="border-radius: 20px"]{box-shadow:0 28px 56px -22px rgba(186,83,41,.65),inset 0 1px 0 rgba(255,255,255,.18)}
+img[style*="border-radius: 12px"],img[style*="border-radius: 16px"],img[style*="border-radius: 14px"]{box-shadow:0 14px 30px -18px rgba(11,11,11,.5)}
+nav a[aria-current="page"] svg{animation:oiPop .7s cubic-bezier(.34,1.56,.64,1) both}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.01ms!important}}
+@keyframes oiDraw{from{stroke-dashoffset:28}to{stroke-dashoffset:0}}
+.tile[aria-pressed="true"] .ck{animation:oiPop .45s cubic-bezier(.34,1.56,.64,1) both}
+.tile[aria-pressed="true"] .ck path{stroke-dasharray:28;animation:oiDraw .45s ease .08s both}
+.tile img{transition:transform .6s cubic-bezier(.22,1,.36,1)}
+.tile[aria-pressed="true"] img{transform:scale(1.06)}
+[style*="overflow-y: auto"] > *{flex-shrink:0}
+
+/* website skin (one-interiors home-cb.css) */
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"],button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"],a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]{position:relative;overflow:hidden;isolation:isolate;transition:transform .45s cubic-bezier(.22,1,.36,1),color .35s}
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]::before,button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]::before,a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:#C1582E;transform:translateY(101%);border-top-left-radius:50% 40%;border-top-right-radius:50% 40%;transition:transform .55s cubic-bezier(.22,1,.36,1),border-radius .55s cubic-bezier(.22,1,.36,1)}
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]:hover::before,button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]:hover::before,a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]:hover::before{transform:none;border-radius:999px}
+a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]:hover{color:#FFFFFF!important}
+a[style*="min-height: 56px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 52px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 46px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 56px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 46px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child{width:28px;height:28px;padding:7px;box-sizing:border-box;border-radius:50%;background:#FFFFFF;color:#0B0B0B;margin-right:-12px;flex-shrink:0}
+a[style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child{background:#0B0B0B!important;color:#FFFFFF!important}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; background: #FFFFFF; color: #0B0B0B; font-family: 'Geist', sans-serif; overflow: hidden">
+
+  <div style="flex-shrink: 0; padding: 20px 20px 0 12px; display: flex; flex-direction: column; gap: 14px">
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <a href="Q3.dc.html" aria-label="Back" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #0B0B0B">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+      </a>
+      <span style="font-size: 13px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; color: #5F5F5F">Question 4 of 7</span>
+    </div>
+    <div role="progressbar" aria-label="Question 4 of 7" aria-valuenow="4" aria-valuemin="1" aria-valuemax="7" style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; padding-left: 8px">
+      <span style="height: 3px; border-radius: 2px; background: #0B0B0B"></span><span style="height: 3px; border-radius: 2px; background: #0B0B0B"></span><span style="height: 3px; border-radius: 2px; background: #0B0B0B"></span><span style="height: 3px; border-radius: 2px; background: #0B0B0B"></span><span style="height: 3px; border-radius: 2px; background: #E6E6E3"></span><span style="height: 3px; border-radius: 2px; background: #E6E6E3"></span><span style="height: 3px; border-radius: 2px; background: #E6E6E3"></span>
+    </div>
+  </div>
+
+  <div style="flex: 1; overflow-y: auto; padding: 26px 16px 16px; display: flex; flex-direction: column; gap: 16px">
+    <div style="display: flex; flex-direction: column; gap: 8px; padding: 0 4px">
+      <h1 style="margin: 0; font-size: 36px; font-weight: 500; letter-spacing: -0.045em; line-height: .98">Which of these feel like your home?</h1>
+      <div style="display: flex; justify-content: space-between; align-items: baseline">
+        <span style="font-size: 14.5px; color: #5F5F5F">Pick two or three, on instinct.</span>
+        <span role="status" style="font-size: 13px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; color: #BA5329">{{count}} of 3</span>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px">
+      <button type="button" class="tile" aria-pressed="{{t0.pressed}}" onClick="{{t0.pick}}"><img src="/_blob/dca6c1a1ba1add69fc9f21195994aed2" alt=""><span class="lb">Warm modern</span><span class="ck" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span></button>
+      <button type="button" class="tile" aria-pressed="{{t1.pressed}}" onClick="{{t1.pick}}"><img src="/_blob/3e20272681902e8c4b71b0f1dc6887a8" alt=""><span class="lb">Scandinavian</span><span class="ck" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span></button>
+      <button type="button" class="tile" aria-pressed="{{t2.pressed}}" onClick="{{t2.pick}}"><img src="/_blob/58bb4fd3d115ea8a5154ad5b45e7048e" alt=""><span class="lb">Art Deco</span><span class="ck" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span></button>
+      <button type="button" class="tile" aria-pressed="{{t3.pressed}}" onClick="{{t3.pick}}"><img src="/_blob/2039698d81755a52a309cb4fda95c4ae" alt=""><span class="lb">Indian classic</span><span class="ck" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span></button>
+      <button type="button" class="tile" aria-pressed="{{t4.pressed}}" onClick="{{t4.pick}}"><img src="/_blob/a88c1e4210564f3afbf8b61a52f44072" alt=""><span class="lb">Minimal</span><span class="ck" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span></button>
+      <button type="button" class="tile" aria-pressed="{{t5.pressed}}" onClick="{{t5.pick}}"><img src="/_blob/54fc647dde8a495a1b5303e9b568a166" alt=""><span class="lb">Contemporary</span><span class="ck" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span></button>
+      <button type="button" class="tile" aria-pressed="{{t6.pressed}}" onClick="{{t6.pick}}"><img src="/_blob/6d5fcbb5257e9434f0e337cfdffe3f1a" alt=""><span class="lb">Luxe</span><span class="ck" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span></button>
+      <button type="button" class="tile" aria-pressed="{{t7.pressed}}" onClick="{{t7.pick}}"><img src="/_blob/213f9324629a4c4e67a9853a3c57e48d" alt=""><span class="lb">Industrial</span><span class="ck" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span></button>
+      <button type="button" class="tile" aria-pressed="{{t8.pressed}}" onClick="{{t8.pick}}"><img src="/_blob/25619cd3e8314530f96aaf60a43160a8" alt=""><span class="lb">Classic</span><span class="ck" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span></button>
+    </div>
+  </div>
+
+  <div style="flex-shrink: 0; padding: 12px 20px 36px; border-top: 1px solid #E6E6E3">
+    <a href="Q5.dc.html" style="min-height: 56px; border-radius: 999px; background: #0B0B0B; color: #FFFFFF; font-size: 16px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 12px; text-decoration: none">Next
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3.5 9h11M10 4.5 14.5 9 10 13.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg></a>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { picked: [0, 1] };
+  }
+  renderVals() {
+    const picked = this.state.picked;
+    const toggle = (i) => {
+      if (picked.indexOf(i) >= 0) this.setState({ picked: picked.filter((x) => x !== i) });
+      else if (picked.length < 3) this.setState({ picked: picked.concat([i]) });
+    };
+    const out = { count: picked.length };
+    for (let i = 0; i < 9; i++) {
+      out['t' + i] = { pressed: picked.indexOf(i) >= 0 ? 'true' : 'false', pick: () => toggle(i) };
+    }
+    return out;
+  }
+}
+</script>
+</body>
+</html>

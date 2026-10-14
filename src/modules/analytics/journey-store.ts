@@ -3,6 +3,7 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import type { JourneyCounts } from './journey';
+import { INTRODUCED_BY_US } from '@/modules/studio/introduction-source';
 
 const EMPTY: JourneyCounts = {
   started: 0,
@@ -18,7 +19,8 @@ const EMPTY: JourneyCounts = {
 /** The journey for briefs started in the last `days` days. Never throws. */
 export async function journeyCounts(days = 30): Promise<JourneyCounts> {
   if (!hasDatabase()) return EMPTY;
-  const cohort = { createdAt: { gte: new Date(Date.now() - days * 86_400_000) } };
+  /* A brief a studio made for its own client (OWN-CLIENTS.md) is not part of our funnel. */
+  const cohort = { createdAt: { gte: new Date(Date.now() - days * 86_400_000) }, madeByStudio: false };
   try {
     const [started, finished, leftNumber, matched, callBooked, callDone, introduced, signed] = await Promise.all([
       prisma.brief.count({ where: cohort }),
@@ -29,7 +31,7 @@ export async function journeyCounts(days = 30): Promise<JourneyCounts> {
         where: { ...cohort, consultations: { some: { status: { in: ['requested', 'scheduled', 'completed'] } } } },
       }),
       prisma.brief.count({ where: { ...cohort, consultations: { some: { status: 'completed' } } } }),
-      prisma.brief.count({ where: { ...cohort, introductions: { some: { withdrawnAt: null } } } }),
+      prisma.brief.count({ where: { ...cohort, introductions: { some: { withdrawnAt: null, ...INTRODUCED_BY_US } } } }),
       prisma.brief.count({ where: { ...cohort, quoteDecision: { is: { wonByStudioId: { not: null } } } } }),
     ]);
     return { started, finished, leftNumber, matched, callBooked, callDone, introduced, signed };

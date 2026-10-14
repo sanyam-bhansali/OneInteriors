@@ -9,6 +9,7 @@ import {
   moveStage,
   setIntakeStage,
   removeStage,
+  applyHauspirePipeline,
   type ColourToken,
   type StageKindName,
 } from '@/modules/studio-practice/stages';
@@ -81,6 +82,14 @@ export async function setIntakeAction(id: string): Promise<State> {
 
 export async function removeStageAction(id: string): Promise<State> {
   const result = await removeStage(id);
+  if (!result.ok) return result;
+  refresh();
+  return { ok: true };
+}
+
+/** "Use the Hauspire pipeline": adds and renames only (owner, 12 Oct 2026). */
+export async function applyHauspireAction(): Promise<State> {
+  const result = await applyHauspirePipeline();
   if (!result.ok) return result;
   refresh();
   return { ok: true };

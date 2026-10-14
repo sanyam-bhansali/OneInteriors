@@ -1,0 +1,52 @@
+/* Today and the overview (owner's handoff screen StudioHome, "Office ·
+   Today", 12 Oct 2026). The design's own classes (task, tick, tbody, ttl,
+   tctx, kind, stat, pipe, bar, intro, steprow, stepn) copied from the
+   screen's helmet CSS, plus section heads inside the list. Scoped to
+   .oi-studio; tokens only. The ring is the shared .oi-ring. */
+
+/* ── From the design ─────────────────────────────────────────── */
+.oi-studio .task{display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 4px;border-top:1px solid var(--soft)}
+.oi-studio .task:first-child{border-top:0}
+.oi-studio .task.done .ttl{text-decoration:line-through;color:var(--muted)}
+.oi-studio .task.done .tctx{color:var(--ring)}
+.oi-studio .task .tick{width:26px;height:26px;border:0;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--paper);font-size:15px;font-weight:700;background:transparent;box-shadow:inset 0 0 0 1.5px var(--ring)}
+.oi-studio .task .tick[aria-checked="true"]{background:var(--good-s);box-shadow:inset 0 0 0 1.5px var(--good-s)}
+.oi-studio .task .tick:disabled{cursor:default}
+.oi-studio .tbody{display:flex;flex-direction:column;gap:2px;min-width:0}
+.oi-studio .ttl{font-size:14.5px;font-weight:600}
+.oi-studio a.ttl:hover{color:var(--acc)}
+.oi-studio .tctx{font-size:13px;color:var(--muted)}
+.oi-studio .tctx.late{color:var(--bad);font-weight:500}
+.oi-studio .kind{font-size:12px;font-weight:600;letter-spacing:.01em;color:var(--acc-ink)}
+.oi-studio .stat{display:flex;flex-direction:column;gap:4px;padding:14px;border-radius:14px;background:var(--soft)}
+.oi-studio .stat b{font-size:24px;font-weight:500;letter-spacing:-.03em}
+.oi-studio .stat span{font-size:13px;color:var(--muted)}
+.oi-studio a.stat:hover{color:var(--ink)}
+.oi-studio .stat.hot b{color:var(--acc)}
+.oi-studio .pipe{display:grid;grid-template-columns:150px minmax(0,1fr) 34px;gap:10px;align-items:center;font-size:13.5px;min-height:30px;border-radius:8px;padding:0 6px}
+.oi-studio .pipe:hover{background:var(--soft)}
+.oi-studio .bar{height:10px;border-radius:5px;background:var(--fill2);overflow:hidden}
+.oi-studio .bar i{display:block;height:100%;border-radius:5px;background:var(--muted)}
+.oi-studio .intro{background:var(--ink);color:var(--paper);border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.oi-studio .intro .muted{color:var(--inv-muted)}
+.oi-studio .intro a:not(.btn){color:var(--inv-acc)}
+.oi-studio .steprow{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:14px;align-items:center;padding:16px;border-radius:16px;background:var(--soft)}
+.oi-studio .stepn{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;background:var(--fill2)}
+
+/* ── Our list: section heads, the assign controls ─────────────── */
+.oi-studio .td-list{display:flex;flex-direction:column}
+.oi-studio .td-sec{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 4px 4px;border-top:1px solid var(--fill2)}
+.oi-studio .td-sec:first-child{border-top:0;padding-top:4px}
+.oi-studio .td-sec h3{margin:0;font-size:13px;font-weight:600;color:var(--muted)}
+.oi-studio .td-more{margin:0;padding:8px 4px 10px 48px;font-size:13px;color:var(--muted)}
+.oi-studio .td-act{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.oi-studio .td-assign{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 4px 8px 48px;font-size:13px}
+.oi-studio .td-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+
+/* ── Phone ───────────────────────────────────────────────────── */
+@media (max-width:760px){
+  .oi-studio .task{grid-template-columns:32px minmax(0,1fr);row-gap:8px}
+  .oi-studio .task > .td-act{grid-column:2;align-items:flex-start}
+  .oi-studio .td-assign,.oi-studio .td-more{padding-left:4px}
+  .oi-studio .pipe{grid-template-columns:110px minmax(0,1fr) 30px}
+}

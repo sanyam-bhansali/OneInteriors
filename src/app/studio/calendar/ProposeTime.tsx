@@ -30,7 +30,7 @@ export function ProposeTime({ introductionId }: { introductionId: string }) {
 
   if (done) {
     return (
-      <p className="m-0 mt-3 text-[13.5px] text-[var(--color-ontrack)]">
+      <p className="ox-ok">
         Sent. We will put it to the customer and confirm — you will see it here either way.
       </p>
     );
@@ -41,7 +41,8 @@ export function ProposeTime({ introductionId }: { introductionId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-3 text-[13px] text-[var(--color-petrol)] underline underline-offset-4"
+        className="btn ghost sm"
+        style={{ alignSelf: 'flex-start' }}
       >
         Suggest a different time
       </button>
@@ -49,19 +50,19 @@ export function ProposeTime({ introductionId }: { introductionId: string }) {
   }
 
   return (
-    <div className="mt-3 rounded-[10px] border border-[var(--color-rule)] bg-[var(--color-paper)] p-4">
-      <p className="label m-0 mb-3">Suggest a time</p>
+    <div className="ox-panel">
+      <b style={{ fontSize: 14 }}>Suggest a time</b>
 
-      <div className="mb-3 grid gap-3 sm:grid-cols-3">
-        <div>
-          <label htmlFor={`kind-${introductionId}`} className="label m-0 mb-1.5 block">
+      <div className="hstack" style={{ alignItems: 'flex-end', gap: 10 }}>
+        <div className="ox-f">
+          <label htmlFor={`kind-${introductionId}`} className="lbl">
             What for
           </label>
           <select
             id={`kind-${introductionId}`}
             value={kind}
             onChange={(e) => setKind(e.target.value as AppointmentKindName)}
-            className="w-full rounded-[8px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-3 py-2.5 text-[14px]"
+            className="fld"
           >
             {(Object.keys(KIND_LABELS) as AppointmentKindName[]).map((k) => (
               <option key={k} value={k}>
@@ -71,8 +72,8 @@ export function ProposeTime({ introductionId }: { introductionId: string }) {
           </select>
         </div>
 
-        <div>
-          <label htmlFor={`when-${introductionId}`} className="label m-0 mb-1.5 block">
+        <div className="ox-f">
+          <label htmlFor={`when-${introductionId}`} className="lbl">
             When
           </label>
           <input
@@ -80,12 +81,12 @@ export function ProposeTime({ introductionId }: { introductionId: string }) {
             type="datetime-local"
             value={when}
             onChange={(e) => setWhen(e.target.value)}
-            className="w-full rounded-[8px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-3 py-2.5 text-[14px]"
+            className="fld"
           />
         </div>
 
-        <div>
-          <label htmlFor={`where-${introductionId}`} className="label m-0 mb-1.5 block">
+        <div className="ox-f">
+          <label htmlFor={`where-${introductionId}`} className="lbl">
             Where
           </label>
           <input
@@ -93,18 +94,18 @@ export function ProposeTime({ introductionId }: { introductionId: string }) {
             value={where}
             onChange={(e) => setWhere(e.target.value)}
             placeholder="The flat"
-            className="w-full rounded-[8px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-3 py-2.5 text-[14px]"
+            className="fld"
           />
         </div>
       </div>
 
       {error ? (
-        <p role="alert" className="m-0 mb-2 text-[13px] text-[var(--color-atrisk)]">
+        <p role="alert" className="ox-err">
           {error}
         </p>
       ) : null}
 
-      <div className="flex gap-2">
+      <div className="hstack" style={{ gap: 8 }}>
         <button
           type="button"
           disabled={pending || !when}
@@ -123,14 +124,14 @@ export function ProposeTime({ introductionId }: { introductionId: string }) {
               else setError(result.error);
             })
           }
-          className="rounded-full bg-[var(--color-petrol)] px-4 py-1.5 text-[13px] text-[var(--color-paper)] hover:bg-[var(--color-petrol-deep)] disabled:opacity-40"
+          className="btn pri sm"
         >
           {pending ? 'Sending…' : 'Send to us'}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="rounded-full border border-[var(--color-rule)] px-4 py-1.5 text-[13px] text-[var(--color-ink-2)]"
+          className="btn ghost sm"
         >
           Cancel
         </button>

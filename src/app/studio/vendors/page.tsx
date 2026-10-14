@@ -1,133 +1,202 @@
-import { isLive } from '@/modules/studio/features';
-import { ComingSoon } from '../ComingSoon';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { PageHead, PageBody } from '../StudioShell';
 import { formatINR } from '@/lib/money';
-import { myVendors, myWorkOrders } from '@/modules/studio-practice/vendors';
-import { myProjects } from '@/modules/studio-practice/projects';
-import { AddVendor, NewWorkOrder, WorkOrderCard, VendorList } from './VendorPanels';
+import { crewsList } from '@/modules/studio-crews/store';
+import { myWorkOrders } from '@/modules/studio-practice/vendors';
+import { AddCrew } from './CrewForms';
+import { LineIcon } from '../ui/icons';
+import '../office-ui.css';
+import './vendors.css';
 
-export const metadata: Metadata = {
-  title: 'Vendors',
-  robots: { index: false, follow: false },
-};
-
+export const metadata: Metadata = { title: 'Crews', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
 
 /**
- * What the studio owes its trades.
+ * Crews (Studio OS Phase 3, docs/studio-os/PHASE-3-EXECUTION.md §1): the site
+ * crews the studio works with — carpenters, false ceiling, painters,
+ * electricians, glass, upholstery, fabrication, civil — each with their own
+ * rate card, and what each is owed across live projects. Owner and accounts.
  *
- * ## The one question this page answers
+ * Bill, paid and balance are added up from the work-order lines and the
+ * payments on every render; nothing is stored as a total.
  *
- * *Who do I pay, and how much.* Everything is grouped by vendor rather than by
- * project, because a vendor is who rings — a carpenter working across three of
- * your sites wants one number, not three.
+ * The look is the owner's handoff (Vendors, 12 Oct 2026): the crews down the
+ * side with what each is still owed, the studio's totals, and the crews
+ * table. A crew opens on its own page (rate card, KYC, work orders, pay).
  *
- * ## Nothing here is stored as a total
- *
- * Bill, paid and balance are computed from the lines and the payments on every
- * render. A stored total and a payments table disagree eventually, and in a
- * ledger the disagreement is always found by somebody who has been paid twice.
- * See the note at the top of `ledger.ts`.
+ * The older vendor work orders (on the pre-2026 internal projects) are shown
+ * read-only at the foot, for the record.
  */
-export default async function VendorsPage() {
-  /* Not in the pilot. The rail already stops linking here; this stops a
-     bookmark or a typed URL reaching a screen we are not standing behind
-     yet. Flip the flag in modules/studio/features.ts to ship it. */
-  if (!isLive('vendors')) return <ComingSoon feature="vendors" />;
-
-  const [vendors, orders, projects] = await Promise.all([
-    myVendors(),
-    myWorkOrders(),
-    myProjects(),
-  ]);
-
-  const owed = vendors.reduce((sum, v) => sum + Math.max(0, v.balancePaise), 0);
-  const open = orders.filter((o) => !o.settled);
-  const settled = orders.filter((o) => o.settled);
-  const live = projects.filter((p) => p.stage !== 'CLOSED');
+export default async function CrewsPage() {
+  const [data, legacy] = await Promise.all([crewsList(), myWorkOrders()]);
+  if (!data) {
+    return (
+      <main className="content ox-page">
+        <p className="ox-note">Crews are kept by the studio owner and accounts.</p>
+      </main>
+    );
+  }
+  const live = data.crews.filter((c) => !c.archived);
+  const archived = data.crews.filter((c) => c.archived);
+  const owed = live.reduce((s, c) => s + Math.max(0, c.balancePaise), 0);
+  const billed = live.reduce((s, c) => s + c.billPaise, 0);
+  const gaps = live.filter((c) => c.kyc.tone === 'alert').length;
+  const tradesUsed = new Set(live.flatMap((c) => c.trades.map((t) => t.key))).size;
+  const openOrders = live.reduce((s, c) => s + c.openOrders, 0);
 
   return (
-    <>
-      <PageHead
-        title={owed > 0 ? `${formatINR(owed)} owed` : 'Vendors'}
-        sub={
-          vendors.length === 0
-            ? 'Nobody added yet.'
-            : `${vendors.length} vendor${vendors.length === 1 ? '' : 's'} · ${open.length} open work order${open.length === 1 ? '' : 's'}`
-        }
-        action={<AddVendor />}
-      />
+    <main className="content ox-page">
+      <div className="phead">
+        <div>
+          <h1>Vendors</h1>
+          <p className="muted">
+            Your site crews, carpenters to painters: what you ordered, what you paid, what&apos;s left.{' '}
+            {`${live.length} crew${live.length === 1 ? '' : 's'} · ${tradesUsed} trade${tradesUsed === 1 ? '' : 's'}${gaps ? ` · ${gaps} with KYC missing` : ''}`}
+          </p>
+        </div>
+        <div className="hstack">
+          <Link href="/studio/vendors/pay" className="btn sec">
+            Pay crews
+          </Link>
+          <AddCrew trades={data.settings.trades} />
+        </div>
+      </div>
 
-      <PageBody>
-        {vendors.length === 0 ? (
-          <div className="s-card p-8">
-            <p className="m-0 mb-2 text-[15.5px] font-semibold">
-              Your trades, and what they are owed.
-            </p>
-            <p className="m-0 max-w-[64ch] text-[14.5px] leading-relaxed text-[var(--s-ink-2)]">
-              Add a carpenter, a painter, an electrician. Raise a work order against a live
-              project, put the agreed work on it, and record payments as they go out. The balance
-              is worked out from the lines and the payments every time — nothing is stored as a
-              total, so it cannot drift.
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-7">
-            <section>
-              <h2 className="m-0 mb-3 text-[15px] font-semibold">Who is owed</h2>
-              <VendorList vendors={vendors} />
-            </section>
+      {live.length === 0 ? (
+        <div className="empty">
+          <b>Your site crews, and what each is owed.</b>
+          <span className="muted sm" style={{ maxWidth: '64ch' }}>
+            Add a carpenter, a painter, an electrician. Each keeps their own rate card: two carpenters can price the same work differently. On a booked project, the Crews tab
+            turns the final quotation into work orders and prices most lines from the crew&apos;s card by itself.
+          </span>
+        </div>
+      ) : (
+        <div className="cols">
+          <nav className="vlist vd-side" aria-label="Crews">
+            {live.map((c) => (
+              <Link key={c.id} href={`/studio/vendors/${c.id}`} className="vrow" aria-current="false">
+                <b style={{ fontWeight: 600 }}>{c.name}</b>
+                <span className="mono sm" style={{ textAlign: 'right' }}>
+                  {formatINR(Math.max(0, c.balancePaise))}
+                </span>
+                <span className="muted sm">{c.trades.map((t) => t.label).join(', ') || 'No trade yet'}</span>
+                <span className="muted sm" style={{ textAlign: 'right' }}>
+                  due
+                </span>
+              </Link>
+            ))}
+          </nav>
 
-            <section className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="m-0 text-[15px] font-semibold">
-                  Open work orders {open.length > 0 ? `(${open.length})` : ''}
-                </h2>
-                <NewWorkOrder
-                  projects={live.map((p) => ({ id: p.id, name: p.name }))}
-                  vendors={vendors.map((v) => ({ id: v.id, name: v.name, trade: v.trade }))}
-                />
+          <div className="colmain">
+            <section className="card" aria-labelledby="h-totals">
+              <div className="chead">
+                <div>
+                  <h2 id="h-totals">Across your crews</h2>
+                  <span className="muted sm">
+                    {openOrders} open work order{openOrders === 1 ? '' : 's'} on live projects
+                  </span>
+                </div>
+                <Link href="/studio/vendors/price" className="btn ghost sm">
+                  Price these
+                </Link>
               </div>
-
-              {live.length === 0 ? (
-                <p className="s-card m-0 px-4 py-3 text-[13.5px] leading-relaxed text-[var(--s-ink-2)]">
-                  A work order is raised against a project, and there are none running.{' '}
-                  <Link href="/studio/projects" className="text-[var(--s-accent)]">
-                    Start a project
-                  </Link>{' '}
-                  first — a vendor bill with no site attached is a number nobody can reconcile
-                  later.
-                </p>
-              ) : open.length === 0 ? (
-                <p className="s-card m-0 px-4 py-3 text-[13.5px] italic text-[var(--s-ink-3)]">
-                  Nothing outstanding.
-                </p>
-              ) : (
-                <ul className="m-0 flex list-none flex-col gap-3 p-0">
-                  {open.map((o) => (
-                    <WorkOrderCard key={o.id} order={o} />
-                  ))}
-                </ul>
-              )}
+              <div className="money">
+                <div>
+                  <span className="muted sm">Billed</span>
+                  <b className="mono">{formatINR(billed)}</b>
+                </div>
+                <div>
+                  <span className="muted sm">Paid</span>
+                  <b className="mono">{formatINR(Math.max(0, billed - live.reduce((s, c) => s + c.balancePaise, 0)))}</b>
+                </div>
+                <div className="vd-due">
+                  <span className="sm">Still due</span>
+                  <b className="mono">{formatINR(owed)}</b>
+                </div>
+              </div>
             </section>
 
-            {settled.length > 0 ? (
-              <details>
-                <summary className="mb-3 cursor-pointer select-none text-[13.5px] font-medium text-[var(--s-ink-2)]">
-                  Settled ({settled.length})
-                </summary>
-                <ul className="m-0 flex list-none flex-col gap-3 p-0">
-                  {settled.map((o) => (
-                    <WorkOrderCard key={o.id} order={o} />
-                  ))}
-                </ul>
-              </details>
-            ) : null}
+            <section className="card flush" aria-labelledby="h-crews">
+              <div className="chead">
+                <h2 id="h-crews">Crews</h2>
+                <span className="team">
+                  <LineIcon name="lock" size={14} />
+                  Only your team sees crew rates
+                </span>
+              </div>
+              <div className="tscroll">
+                <table className="tbl" style={{ minWidth: 760 }}>
+                  <thead>
+                    <tr>
+                      <th scope="col">Crew</th>
+                      <th scope="col">Trades</th>
+                      <th scope="col">Rate items</th>
+                      <th scope="col">Work orders</th>
+                      <th scope="col" style={{ textAlign: 'right' }}>
+                        Billed
+                      </th>
+                      <th scope="col" style={{ textAlign: 'right' }}>
+                        Balance
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {live.map((c) => (
+                      <tr key={c.id}>
+                        <td>
+                          <Link href={`/studio/vendors/${c.id}`} style={{ fontWeight: 600 }}>
+                            {c.name}
+                          </Link>
+                          <div className="muted sm mono">{[c.workingSince ? `since ${c.workingSince}` : null, c.phone].filter(Boolean).join(' · ')}</div>
+                          <div className={`vd-kyc ${c.kyc.tone === 'alert' ? 'bad-t' : c.kyc.tone === 'good' ? 'good-t' : 'muted'}`}>{c.kyc.label}</div>
+                        </td>
+                        <td>{c.trades.map((t) => t.label).join(', ')}</td>
+                        <td className="mono">{c.rateItems}</td>
+                        <td className="mono">
+                          {c.orders}
+                          {c.openOrders ? <span className="muted sm"> · {c.openOrders} open</span> : null}
+                        </td>
+                        <td className="mono" style={{ textAlign: 'right' }}>
+                          {formatINR(c.billPaise)}
+                        </td>
+                        <td className="mono" style={{ textAlign: 'right', fontWeight: 600 }}>
+                          {formatINR(c.balancePaise)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
           </div>
-        )}
-      </PageBody>
-    </>
+        </div>
+      )}
+
+      {archived.length ? (
+        <details className="vd-more">
+          <summary>Archived ({archived.length})</summary>
+          <ul>
+            {archived.map((c) => (
+              <li key={c.id}>
+                <Link href={`/studio/vendors/${c.id}`}>{c.name}</Link> <span className="muted sm">· {formatINR(c.balancePaise)} balance</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+
+      {legacy.length ? (
+        <details className="vd-more">
+          <summary>Older vendor work orders, read only ({legacy.length})</summary>
+          <ul>
+            {legacy.map((o) => (
+              <li key={o.id} className="muted">
+                {o.vendorName} · {o.projectName} · {o.trade} · billed {formatINR(o.billPaise)}, paid {formatINR(o.paidPaise)}, balance {formatINR(o.balancePaise)}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </main>
   );
 }

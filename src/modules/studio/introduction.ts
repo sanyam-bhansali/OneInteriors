@@ -21,6 +21,7 @@ import { HELD_FOR_CONSENT } from '@/modules/consent/share';
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { requireRole, getCurrentUser } from '@/modules/auth/session';
+import { OFFICE_MEMBER } from './surfaces';
 import { canSeeContact, contactState, type ContactState } from './introduction-access';
 import {
   canTransition,
@@ -35,6 +36,7 @@ import {
    of that file for why it is the one thing there that takes a studio id. */
 import { bridgeIntroduction, redactWithdrawn } from '@/modules/studio-practice/bridge';
 import { notifyOps, notifyStudio } from '@/modules/notify/service';
+import { INTRODUCED_BY_US } from '@/modules/studio/introduction-source';
 
 export type IntroResult = { ok: true; id: string; held?: string } | { ok: false; error: string };
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -261,7 +263,7 @@ export async function answerIntroduction(
   });
   if (!intro || intro.withdrawnAt) return { ok: false, error: 'That introduction is no longer open.' };
   const member = await prisma.studioMember.findFirst({
-    where: { studioId: intro.studioId, userId: user.id },
+    where: { studioId: intro.studioId, userId: user.id, ...OFFICE_MEMBER },
     select: { id: true },
   });
   if (!member) return { ok: false, error: 'That introduction is not for your studio.' };
@@ -441,7 +443,7 @@ export async function proposeAppointment(input: {
    */
   if (user.role !== 'OPS' && user.role !== 'ADMIN') {
     const member = await prisma.studioMember.findUnique({
-      where: { userId: user.id },
+      where: { userId: user.id, ...OFFICE_MEMBER },
       select: { studioId: true },
     });
     if (member?.studioId !== introduction.studioId) {
@@ -497,7 +499,7 @@ export async function setAppointmentStatus(
 
   if (actor === 'STUDIO') {
     const member = await prisma.studioMember.findUnique({
-      where: { userId: user.id },
+      where: { userId: user.id, ...OFFICE_MEMBER },
       select: { studioId: true },
     });
     if (member?.studioId !== appointment.introduction.studioId) {
@@ -600,7 +602,7 @@ export async function myAppointments(options: { from?: Date; to?: Date } = {}): 
   if (!user || !hasDatabase()) return [];
 
   const member = await prisma.studioMember.findUnique({
-    where: { userId: user.id },
+    where: { userId: user.id, ...OFFICE_MEMBER },
     select: { studioId: true },
   });
   if (!member) return [];
@@ -692,9 +694,9 @@ export async function introductionCounts(
 
   try {
     const [total, withdrawn] = await Promise.all([
-      prisma.introduction.count({ where: { studioId, introducedAt: { gte: since } } }),
+      prisma.introduction.count({ where: { studioId, introducedAt: { gte: since }, ...INTRODUCED_BY_US } }),
       prisma.introduction.count({
-        where: { studioId, introducedAt: { gte: since }, withdrawnAt: { not: null } },
+        where: { studioId, introducedAt: { gte: since }, withdrawnAt: { not: null }, ...INTRODUCED_BY_US },
       }),
     ]);
     return { total, withdrawn };

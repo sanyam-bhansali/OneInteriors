@@ -10,6 +10,22 @@ import { isLive } from '@/modules/studio/features';
 import { crmIsOpen } from '@/modules/studio/standing';
 import { StudioShell, type NavGroup } from './StudioShell';
 import { hasSubmittedForReview } from '@/modules/studio/submitted';
+import { headers } from 'next/headers';
+import { PATH_HEADER, STUDIO_SIGN_IN } from '@/lib/host';
+import { memberFor } from '@/modules/studio/access';
+import { can, type MemberRole } from '@/modules/studio/roles';
+import { TEAM_PATH, TODAY_HOME, usesOfficeShell } from '@/modules/studio/surfaces';
+import { doorFor, type PilotArea } from '@/modules/studio/pilot';
+import { ComingSoon } from './ComingSoon';
+import { RoleFrame } from './RoleFrame';
+import { APPS, appsFor } from '@/modules/studio/apps';
+import { StudioFrame } from './ui/StudioFrame';
+import { THEME_SCRIPT } from './ui/theme-script';
+import './studio-ui.css';
+import './studio-extra.css';
+import { getLang } from '@/modules/i18n/server';
+import { tx } from '@/modules/i18n/site';
+import { STUDIO_WORDS } from '@/modules/i18n/studio';
 
 /**
  * The studio surface's auth gate, and its frame.
@@ -22,7 +38,9 @@ import { hasSubmittedForReview } from '@/modules/studio/submitted';
 export default async function StudioLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
 
-  if (!user) redirect('/sign-in?next=/studio');
+  /* Signed out: the studio sign-in, by phone — which links to the email
+     sign-in for owners who use that. */
+  if (!user) redirect(STUDIO_SIGN_IN);
 
   /**
    * Signed in, but not as a studio.
@@ -44,9 +62,9 @@ export default async function StudioLayout({ children }: { children: React.React
               linked to a studio.
             </p>
             <p className="m-0 mb-8 text-[15px] leading-relaxed text-[var(--color-ink-2)]">
-              If you are a studio owner, this usually means you signed in by phone. Studio accounts
-              use the email address we approved you on — sign out and use the email form, and you
-              will land in the right place.
+              If you are a studio owner, this usually means you signed in on the customer page.
+              Sign out and use the email address we approved you on. If you work for a studio, sign
+              in at {STUDIO_SIGN_IN} with the number your studio owner added.
             </p>
             <div className="flex flex-wrap items-center gap-4">
               <form action={signOutAction}>
@@ -67,27 +85,166 @@ export default async function StudioLayout({ children }: { children: React.React
     );
   }
 
+  /**
+   * Which part of the studio this person works in (studio/surfaces.ts).
+   *
+   * A supervisor or an accounts member who opens an office screen is sent to
+   * their own; the office rail is never drawn for them. This is the door. The
+   * lock is the module layer — the office modules find no studio for them
+   * (`OFFICE_MEMBER` in `myStudioId()`) — because a layout does not re-run on
+   * every in-app navigation.
+   *
+   * No membership (an ops account, a studio account not yet linked, or
+   * fixtures mode with no database) keeps today's behaviour below.
+   */
+  /* A failed lookup is NOT "no membership". Treating it as one drew every
+     app for a salesperson whenever the database read failed (seen with a
+     stale client after a schema change), so it fails closed: a short
+     "try again" screen, never a menu the person is not meant to have. */
+  let member: Awaited<ReturnType<typeof memberFor>> = null;
+  if (hasDatabase()) {
+    try {
+      member = await memberFor(user.id);
+    } catch (error) {
+      console.error('[studio] membership lookup failed', error instanceof Error ? error.name : 'unknown');
+      return (
+        <Themed>
+          <main className="content" style={{ maxWidth: 560, margin: '10vh auto' }}>
+            <div className="card">
+              <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>We could not open your studio just now.</h1>
+              <p className="muted" style={{ margin: 0 }}>Nothing is lost. Refresh the page in a minute; if it keeps happening, tell us.</p>
+            </div>
+          </main>
+        </Themed>
+      );
+    }
+  }
+  /* A screen closed only by the studio's pilot switch (studio/pilot.ts): an
+     owner or a salesperson who types its address sees its "coming soon" in
+     the frame instead of the screen; the gated sections' own layouts
+     (PilotGate) say the same on every navigation into them. */
+  let soon: PilotArea | null = null;
+  if (member) {
+    if (member.status !== 'ACTIVE') return <Themed><NotActive suspended={member.status === 'SUSPENDED'} /></Themed>;
+    const path = (await headers()).get(PATH_HEADER);
+    /* No header (middleware did not run) means no redirect: redirecting on a
+       guess could loop. The module layer still holds. */
+    const door = path ? doorFor(member, path) : null;
+    if (door?.kind === 'home') redirect(door.to);
+    if (door?.kind === 'soon') soon = door.area;
+    /* A site supervisor: site mode on the phone, nothing of the office.
+       Without the full software site mode is closed; their home says so. */
+    if (member.role === 'SUPERVISOR' && member.fullSoftware !== false) {
+      return (
+        <Themed>
+          <RoleFrame
+            member={member}
+            name={user.name}
+            signOut={<SignOutButton label={tx(await getLang(), STUDIO_WORDS['site.signOut'])} />}
+          >
+            {children}
+          </RoleFrame>
+        </Themed>
+      );
+    }
+  }
+
   const context = await shellContext(user.id);
 
+  /* A studio still in setup keeps the setup frame: the software opens when they
+     submit (crmIsOpen), and until then Setup is the only thing in their way. */
+  const ownSoftware =
+    context !== null && crmIsOpen({ status: context.status, submittedForReview: context.submittedForReview });
+  if (!ownSoftware && (!member || member.role === 'OWNER')) {
+    return (
+      <Themed>
+        <StudioShell
+          groups={navFor(context, member)}
+          studioName={context?.tradeName ?? 'Your studio'}
+          email={user.email}
+          publicHref={context?.live ? `/studios/${context.slug}` : null}
+          signOut={<SignOutButton />}
+        >
+          {soon ? <ComingSoon area={soon} /> : children}
+        </StudioShell>
+      </Themed>
+    );
+  }
+
+  /* Everyone else: the app frame from the owner's UI handoff (12 Oct 2026).
+     No side menu; a home of app tiles and an apps menu with only this
+     member's apps (`appsFor` asks `mayOpen` for each, so a tile never points
+     at a screen the door above would bounce). No membership row (an ops
+     account looking in) sees every app, as the old rail did. */
+  const apps = member ? appsFor(member) : [...APPS];
+  const office = !member || usesOfficeShell(member);
   return (
-    <StudioShell
-      groups={navFor(context)}
-      studioName={context?.tradeName ?? 'Your studio'}
-      email={user.email}
-      publicHref={context?.live ? `/studios/${context.slug}` : null}
-      signOut={
-        <form action={signOutAction}>
-          <button
-            type="submit"
-            className="text-[12.5px] text-[var(--s-ink-3)] underline-offset-2 hover:text-[var(--s-ink)] hover:underline"
-          >
-            Sign out
-          </button>
-        </form>
-      }
-    >
+    <Themed>
+      <StudioFrame
+        apps={apps}
+        studioName={context?.tradeName ?? 'Your studio'}
+        verified={context?.live ?? false}
+        canSearchClients={office}
+        alerts={office ? (context?.toConfirm ?? 0) + (context?.clientsDue ?? 0) : 0}
+        userName={user.name}
+        signOut={signOutAction}
+      >
+        {soon ? <ComingSoon area={soon} /> : children}
+      </StudioFrame>
+    </Themed>
+  );
+}
+
+/**
+ * The studio's theme and look (studio-ui.css): light or dark from the
+ * person's choice, set on <html> before the first paint so the page never
+ * flashes the wrong one. `studio-app` keeps the older screens' tokens
+ * bridged to the new ones (studio-extra.css).
+ */
+function Themed({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="oi-studio studio-app">
+      <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       {children}
-    </StudioShell>
+    </div>
+  );
+}
+
+function SignOutButton({ label = 'Sign out' }: { label?: string }) {
+  return (
+    <form action={signOutAction}>
+      <button
+        type="submit"
+        className="text-[12.5px] text-[var(--s-ink-3)] underline-offset-2 hover:text-[var(--s-ink)] hover:underline"
+      >
+        {label}
+      </button>
+    </form>
+  );
+}
+
+/**
+ * A team member whose access is not on: invited but signed in some other way
+ * than their phone, or suspended with a session that outlived the
+ * suspension's sign-out. Nothing of the studio is shown.
+ */
+function NotActive({ suspended }: { suspended: boolean }) {
+  return (
+    <main className="studio-app flex min-h-dvh items-center justify-center bg-[var(--s-ground)] px-5 py-12">
+      <div className="max-w-md rounded-[18px] bg-[var(--s-surface)] p-6 shadow-[var(--s-lift)]">
+        <h1 className="m-0 text-[20px] font-semibold tracking-tight">
+          {suspended ? 'Your access to this studio is paused.' : 'Finish joining your studio.'}
+        </h1>
+        <p className="m-0 mt-2 text-[15px] leading-relaxed text-[var(--s-ink-2)]">
+          {suspended
+            ? 'Ask your studio owner. They can turn it back on from Settings, Team.'
+            : `Sign in at ${STUDIO_SIGN_IN} with the mobile number your studio owner added.`}
+        </p>
+        <div className="mt-5">
+          <SignOutButton />
+        </div>
+      </div>
+    </main>
   );
 }
 
@@ -234,7 +391,10 @@ async function shellContext(userId: string): Promise<ShellContext | null> {
  * builder to somebody who has not finished onboarding buries the five steps
  * that are actually in their way.
  */
-function navFor(context: ShellContext | null): NavGroup[] {
+function navFor(context: ShellContext | null, member: MemberRole | null): NavGroup[] {
+  /* No membership row (an ops account looking in, fixtures mode) keeps the
+     rail as it was. A project manager loses the two owner-only rows. */
+  const owner = member === null || can(member, 'team.manage');
   /* Their own software stays reachable unless they never finished setup.
      A pause is a marketplace state: it stops us sending briefs, and it does
      not repossess a studio's client list.
@@ -260,7 +420,18 @@ function navFor(context: ShellContext | null): NavGroup[] {
      pill and does not link — see modules/studio/features.ts for why a pill
      beside a working link was not enough. */
   const groups: NavGroup[] = [
-    { items: [{ icon: 'home', href: '/studio', label: 'Dashboard', ready: true }] },
+    {
+      items: [
+        /* Studio OS Phase 1: what needs doing today, first. */
+        { icon: 'today', href: TODAY_HOME, label: 'Today', ready: true },
+        /* Leads at scale (12 Oct 2026): the sales numbers, and the calendar of
+           follow-ups, meetings and tasks (with One Interiors visits in it). */
+        { icon: 'chart', href: '/studio/dashboard', label: 'Dashboard', ready: true },
+        { icon: 'calendar', href: '/studio/calendar', label: 'Calendar', ready: true, count: context?.toConfirm },
+        /* The studio's morning overview (what was the Dashboard): inbox, owed to trades, live sites. */
+        { icon: 'home', href: '/studio', label: 'Overview', ready: true },
+      ],
+    },
     {
       label: 'Your work',
       items: [
@@ -308,13 +479,13 @@ function navFor(context: ShellContext | null): NavGroup[] {
           // The price list every quotation is built from — was reachable only from the guide.
           children: [{ href: '/studio/products', label: 'Product master', ready: isLive('products') }],
         },
-        {
-          icon: 'projects',
-          href: '/studio/projects',
-          label: 'Project tracker',
-          ready: isLive('projects'),
-        },
-        { icon: 'vendors', href: '/studio/vendors', label: 'Vendors', ready: isLive('vendors') },
+        /* The customer projects this person runs (studio workspace Phase 1).
+           Owners see all; a PM only the ones they are on. */
+        /* Studio OS Phase 2: the designers' page (owner, PM). */
+        { icon: 'projects', href: '/studio/projects', label: 'Projects', ready: true, children: [{ href: '/studio/design', label: 'Design', ready: true }] },
+        /* Studio OS Phase 3: the site crews (the old Vendors screen, switched on). The owner's in this
+           rail; accounts reaches it from its own frame (RoleFrame), a PM works crews on a project's Crews tab. */
+        ...(owner ? [{ icon: 'vendors' as const, href: '/studio/vendors', label: 'Crews', ready: isLive('vendors') }] : []),
       ],
     },
   ];
@@ -325,13 +496,7 @@ function navFor(context: ShellContext | null): NavGroup[] {
     groups.push({
       label: 'From us',
       items: [
-        {
-          icon: 'calendar',
-          href: '/studio/calendar',
-          label: 'Calendar',
-          ready: isLive('calendar'),
-          count: context?.toConfirm,
-        },
+        /* Calendar moved to the top of the rail (leads at scale); One Interiors visits are in it. */
         { icon: 'listing', href: '/studio/listing', label: 'Your listing', ready: isLive('listing') },
         // Updates for homes introduced through us — the customer sees them (queue item 22).
         { icon: 'projects', href: '/studio/updates', label: 'Client projects', ready: true },
@@ -340,7 +505,11 @@ function navFor(context: ShellContext | null): NavGroup[] {
   }
 
   groups.push({
-    items: [{ icon: 'settings', href: '/studio/settings', label: 'Settings', ready: true }],
+    items: [
+      { icon: 'settings', href: '/studio/settings', label: 'Settings', ready: true },
+      /* Who is on the team, and which sites they see. Owner only (`team.manage`). */
+      ...(member !== null && owner ? [{ icon: 'clients' as const, href: TEAM_PATH, label: 'Team', ready: true }] : []),
+    ],
   });
 
   return groups;

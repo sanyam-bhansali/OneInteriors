@@ -1,0 +1,323 @@
+/* Studio additions on top of studio-ui.css (the generated copy of the owner's
+   design files).
+
+   ## The bridge
+
+   Every studio screen built before the 12 Oct 2026 handoff paints with the
+   `--s-*` tokens (and onboarding with the customer `--color-*` ones, which
+   globals.css already re-points at `--s-*` inside `.studio-app`). Pointing
+   those at the design's tokens gives every older screen the new palette and
+   the dark theme at once, while each app is rebuilt in the new components.
+   Higher specificity than globals.css's `.studio-app` block on purpose. */
+.oi-studio,
+.oi-studio .studio-app,
+.oi-studio.studio-app {
+  --s-ground: var(--ground);
+  --s-rail: var(--fill2);
+  --s-rail-active: var(--acc-soft);
+  --s-surface: var(--paper);
+  --s-surface-2: var(--fill);
+  --s-rule: var(--fill2);
+  --s-rule-soft: var(--soft);
+  --s-ink: var(--ink);
+  --s-ink-2: var(--text2);
+  --s-ink-3: var(--muted);
+  --s-accent: var(--acc);
+  --s-accent-bright: var(--acc);
+  --s-accent-deep: var(--acc-h);
+  --s-accent-wash: var(--acc-soft);
+  --s-tag: var(--fill);
+  --s-tag-ink: var(--text2);
+  --s-good: var(--good);
+  --s-good-wash: var(--good-bg);
+  --s-warn: var(--warn);
+  --s-warn-wash: var(--warn-bg);
+  --s-bad: var(--bad);
+  --s-bad-wash: var(--bad-bg);
+  --s-lift: 0 1px 0 var(--line);
+  --s-lift-2: 0 14px 30px -18px rgba(var(--sh), 0.45);
+  --font-sans: var(--font-geist), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-geist), system-ui, sans-serif;
+}
+html[data-theme='dark'] .oi-studio,
+html[data-theme='dark'] .oi-studio .studio-app {
+  color-scheme: dark;
+}
+
+/* Older cards: the design's cards have no border and a softer radius. */
+.oi-studio .s-card {
+  border-color: transparent;
+  border-radius: 18px;
+}
+
+/* Hard white surfaces in older markup follow the paper colour, so they do not
+   glow in the dark theme. */
+.oi-studio .bg-white {
+  background-color: var(--paper);
+}
+
+/* Inputs and selects in older markup: the design's soft field. */
+.oi-studio input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+.oi-studio select,
+.oi-studio textarea {
+  color: var(--ink);
+}
+.oi-studio input::placeholder,
+.oi-studio textarea::placeholder {
+  color: var(--muted);
+}
+
+/* ── The frame ─────────────────────────────────────────────── */
+.oi-studio .oi-frame {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.oi-studio .oi-page {
+  flex: 1;
+  min-width: 0;
+}
+.oi-studio .apphead .topr .search {
+  flex: 0 1 300px;
+  min-width: 200px;
+}
+@media (max-width: 760px) {
+  .oi-studio .apphead {
+    padding: 10px 14px;
+    gap: 10px;
+  }
+  .oi-studio .apphead .atabs {
+    order: 5;
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  .oi-studio .apphead .atabs a {
+    white-space: nowrap;
+  }
+  .oi-studio .apphead .topr .search {
+    min-width: 0;
+    flex: 0 0 42px;
+    width: 42px;
+    padding: 0;
+    justify-content: center;
+  }
+  .oi-studio .apphead .topr .search span,
+  .oi-studio .apphead .topr .search kbd {
+    display: none;
+  }
+  .oi-studio .lgrid2 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+/* The role home's header row folds on a phone. */
+@media (max-width: 760px) {
+  .oi-studio .homehead {
+    padding: 14px 16px !important;
+  }
+  .oi-studio .homehead .pwby {
+    display: none;
+  }
+  .oi-studio .homemain {
+    padding: 12px 16px 48px !important;
+  }
+  .oi-studio .homemain h1 {
+    font-size: 30px !important;
+  }
+  .oi-studio .lgrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+
+/* The search palette's results list scrolls inside the sheet. */
+.oi-studio .palette .pres {
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+}
+.oi-studio .palette .pr[aria-selected='true'] {
+  background: var(--fill);
+}
+
+/* Sign out, in the apps menu. */
+.oi-studio .linkbtn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+}
+.oi-studio .linkbtn:hover {
+  color: var(--ink);
+}
+
+/* The opening splash plays once per browser session (home/HomeBits.tsx). */
+html[data-splash='seen'] .oi-studio .splash {
+  display: none;
+}
+
+/* A wide table scrolls inside its box on a phone. The box is the containing
+   block, so absolutely placed bits inside the table (screen-reader labels,
+   menus) are clipped with it instead of stretching the whole page sideways. */
+.oi-studio .tscroll {
+  position: relative;
+  max-width: 100%;
+}
+
+/* Pill tabs never push past the screen; they wrap. */
+.oi-studio .tabs {
+  max-width: 100%;
+}
+
+/* A row of controls never makes the page wider than the screen. */
+.oi-studio .hstack {
+  max-width: 100%;
+}
+
+/* ── The profile menu (top right) ─────────────────────────── */
+.oi-studio .avbtn {
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  transition: box-shadow 0.2s ease;
+}
+.oi-studio .avbtn:hover,
+.oi-studio .avbtn[aria-expanded='true'] {
+  box-shadow: 0 0 0 3px var(--acc-soft), 0 0 0 4px var(--line);
+}
+.oi-studio .pfover {
+  justify-content: flex-end;
+  padding: 64px 24px;
+}
+.oi-studio .pfsheet {
+  position: relative;
+  z-index: 1;
+  max-width: 520px;
+  max-height: calc(100dvh - 96px);
+}
+.oi-studio .pfhead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border-bottom: 1px solid var(--fill2);
+}
+.oi-studio .pfbody {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.oi-studio .pfsec {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--fill2);
+}
+.oi-studio .pfsec h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.oi-studio .pfkv {
+  display: grid;
+  grid-template-columns: minmax(110px, auto) 1fr;
+  gap: 8px 14px;
+  margin: 0;
+}
+.oi-studio .pfkv dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+.oi-studio .pfkv dd {
+  margin: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.oi-studio .pfrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.oi-studio .pfapps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.oi-studio .pfapps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  background: var(--soft);
+}
+.oi-studio .pfapps li.off {
+  opacity: 0.55;
+}
+.oi-studio .pfmini {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  cursor: pointer;
+  border-radius: 9px;
+  font-size: 14px;
+}
+.oi-studio .pfmini:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.oi-studio .pftoggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text2);
+  cursor: pointer;
+  min-width: 72px;
+}
+.oi-studio .pftoggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--acc);
+}
+.oi-studio .pffoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--fill2);
+}
+@media (max-width: 760px) {
+  .oi-studio .pfover {
+    padding: 12px;
+    justify-content: center;
+  }
+  .oi-studio .pfsheet {
+    max-height: calc(100dvh - 24px);
+  }
+  .oi-studio .apphead .topr .avbtn {
+    width: 38px !important;
+    height: 38px !important;
+  }
+}
+
+/* The dev strip about the customer roster's verification gate means nothing
+   inside the studio software (owner, 13 Oct 2026). It still shows on every
+   customer page, where it matters. */
+body:has(.oi-studio) .roster-gate {
+  display: none;
+}

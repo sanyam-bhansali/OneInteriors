@@ -47,7 +47,8 @@ export const STUDIO_FEATURES = {
 
   /** Not in the pilot. */
   projects: false,
-  vendors: false,
+  /** Studio OS Phase 3 (12 Oct 2026): the site crews, their work orders and payments. */
+  vendors: true,
   calendar: false,
   listing: false,
 } as const;
@@ -77,8 +78,8 @@ export const COMING_SOON: Record<
       'A client marked as booked on your board already holds the figure you agreed. Nothing is lost by waiting.',
   },
   vendors: {
-    title: 'Vendors and payments',
-    what: 'Your trades, what each is owed, and every work order against a running site.',
+    title: 'Crews',
+    what: 'Your site crews, what each is owed, and every work order against a running site.',
     meanwhile: null,
   },
   calendar: {

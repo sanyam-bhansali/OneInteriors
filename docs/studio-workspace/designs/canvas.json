@@ -1,0 +1,621 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Coins.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Home Coins",
+      "w": 390,
+      "x": 0,
+      "y": 5056
+    },
+    "Compare.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Compare",
+      "w": 390,
+      "x": 6580,
+      "y": 0
+    },
+    "Decision.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Decision with a deadline",
+      "w": 390,
+      "x": 940,
+      "y": 2528
+    },
+    "DreamBoard.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Dream board",
+      "w": 390,
+      "x": 2820,
+      "y": 5056
+    },
+    "Expert.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Expert call",
+      "w": 390,
+      "x": 7050,
+      "y": 0
+    },
+    "Family.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Family access",
+      "w": 390,
+      "x": 2350,
+      "y": 5056
+    },
+    "Feed.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Site",
+      "w": 390,
+      "x": 1880,
+      "y": 2528
+    },
+    "FinalQuote.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Choose 3 Final quote",
+      "w": 390,
+      "x": 1410,
+      "y": 1264
+    },
+    "GeioChat.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "GEIO 2 Site answer",
+      "w": 390,
+      "x": 470,
+      "y": 3792
+    },
+    "GeioHome.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "GEIO 1 Welcome and voice",
+      "w": 390,
+      "x": 0,
+      "y": 3792
+    },
+    "GeioHuman.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "GEIO 4 Hand over to Meera",
+      "w": 390,
+      "x": 1410,
+      "y": 3792
+    },
+    "GeioPhoto.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "GEIO 3 Photo check",
+      "w": 390,
+      "x": 940,
+      "y": 3792
+    },
+    "Home3D.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "3D view (inside Site, full-home only)",
+      "w": 390,
+      "x": 2350,
+      "y": 2528
+    },
+    "Homes.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "One Interiors Homes",
+      "w": 390,
+      "x": 3290,
+      "y": 5056
+    },
+    "Intro.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "0 Opening",
+      "w": 390,
+      "x": 0,
+      "y": 0
+    },
+    "Locker.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Home locker (inside Me)",
+      "w": 390,
+      "x": 3290,
+      "y": 2528
+    },
+    "Main.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Home",
+      "w": 390,
+      "x": 0,
+      "y": 2528
+    },
+    "Matches.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Matches",
+      "w": 390,
+      "x": 5170,
+      "y": 0
+    },
+    "Me.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Me",
+      "w": 390,
+      "x": 2820,
+      "y": 2528
+    },
+    "Milestone.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Milestone share card",
+      "w": 390,
+      "x": 1880,
+      "y": 5056
+    },
+    "Name.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "2 Your name",
+      "w": 390,
+      "x": 940,
+      "y": 0
+    },
+    "Notifications.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Notifications",
+      "w": 390,
+      "x": 3760,
+      "y": 2528
+    },
+    "Phone.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Phone and consent",
+      "w": 390,
+      "x": 5640,
+      "y": 0
+    },
+    "Q1.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Quiz 1 Your home",
+      "w": 390,
+      "x": 1410,
+      "y": 0
+    },
+    "Q2.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Quiz 2 Scope",
+      "w": 390,
+      "x": 1880,
+      "y": 0
+    },
+    "Q3.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Quiz 3 Budget tier",
+      "w": 390,
+      "x": 2350,
+      "y": 0
+    },
+    "Q4.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Quiz 4 Style",
+      "w": 390,
+      "x": 2820,
+      "y": 0
+    },
+    "Q5.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Quiz 5 Household",
+      "w": 390,
+      "x": 3290,
+      "y": 0
+    },
+    "Q6.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Quiz 6 Priorities, ranked",
+      "w": 390,
+      "x": 3760,
+      "y": 0
+    },
+    "Q7.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Quiz 7 Involvement",
+      "w": 390,
+      "x": 4230,
+      "y": 0
+    },
+    "Quote.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Quote",
+      "w": 390,
+      "x": 6110,
+      "y": 0
+    },
+    "Refer.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Refer and society circle",
+      "w": 390,
+      "x": 470,
+      "y": 5056
+    },
+    "Sign.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Choose 4 Sign",
+      "w": 390,
+      "x": 1880,
+      "y": 1264
+    },
+    "Snags.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Snags (inside Project)",
+      "w": 390,
+      "x": 1410,
+      "y": 2528
+    },
+    "SpotMistake.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Spot the mistake (weekly)",
+      "w": 390,
+      "x": 940,
+      "y": 5056
+    },
+    "Start.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "1 Welcome",
+      "w": 390,
+      "x": 470,
+      "y": 0
+    },
+    "Studio.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Studio profile",
+      "w": 390,
+      "x": 470,
+      "y": 1264
+    },
+    "Studios.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "All studios",
+      "w": 390,
+      "x": 0,
+      "y": 1264
+    },
+    "StyleDNA.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Style DNA (after the quiz)",
+      "w": 390,
+      "x": 4700,
+      "y": 0
+    },
+    "Timelapse.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Your home's story (timelapse)",
+      "w": 390,
+      "x": 1410,
+      "y": 5056
+    },
+    "Tracker.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Project",
+      "w": 390,
+      "x": 470,
+      "y": 2528
+    },
+    "Visits.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "radius": 36,
+      "title": "Choose 2 Meet studios",
+      "w": 390,
+      "x": 940,
+      "y": 1264
+    },
+    "StudioSignIn.dc.html": {
+      "x": 0,
+      "y": 6480,
+      "w": 390,
+      "h": 844,
+      "radius": 36,
+      "is_interactive": true,
+      "title": "Studio 1 Sign in (phone)"
+    },
+    "SiteToday.dc.html": {
+      "x": 470,
+      "y": 6480,
+      "w": 390,
+      "h": 844,
+      "radius": 36,
+      "is_interactive": true,
+      "title": "Site mode 1 My sites today"
+    },
+    "SiteUpdate.dc.html": {
+      "x": 940,
+      "y": 6480,
+      "w": 390,
+      "h": 844,
+      "radius": 36,
+      "is_interactive": true,
+      "title": "Site mode 2 Post today's update"
+    },
+    "SiteSnag.dc.html": {
+      "x": 1410,
+      "y": 6480,
+      "w": 390,
+      "h": 844,
+      "radius": 36,
+      "is_interactive": true,
+      "title": "Site mode 3 Fix a snag"
+    },
+    "StudioProjects.dc.html": {
+      "x": 1880,
+      "y": 6480,
+      "w": 1440,
+      "h": 1000,
+      "expand": "fill",
+      "is_interactive": true,
+      "title": "Office 1 Projects, needs attention"
+    },
+    "StudioProject.dc.html": {
+      "x": 3400,
+      "y": 6480,
+      "w": 1440,
+      "h": 1000,
+      "expand": "fill",
+      "is_interactive": true,
+      "title": "Office 2 Project workspace"
+    },
+    "StudioDecision.dc.html": {
+      "x": 4920,
+      "y": 6480,
+      "w": 1440,
+      "h": 1000,
+      "expand": "fill",
+      "is_interactive": true,
+      "title": "Office 3 New decision"
+    },
+    "StudioTeam.dc.html": {
+      "x": 6440,
+      "y": 6480,
+      "w": 1440,
+      "h": 1000,
+      "expand": "fill",
+      "is_interactive": true,
+      "title": "Office 4 Team and roles"
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-10-08T10:05:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "arnote": {
+      "fill": "orange",
+      "maxH": 200,
+      "text": "Not designed here: 'Try it in my room' (AR). It needs the phone camera, so it comes with the real app build.",
+      "w": 340,
+      "x": 3760,
+      "y": 5616
+    },
+    "coinrules": {
+      "maxH": 520,
+      "text": "Home Coins rules\n\n• 1 coin = ₹1 with partners.\n• Earn: quiz 100 · signing 1,000 · daily site check 10 (+100 for 7 days) · decision on time 200 · real snag 50 · Spot the mistake 50 · share 25 (5 max) · family joins 100 · review 500 · referral signs 5,000 each · society circle 10,000.\n• Spend: partner furniture, decor, appliances, deep clean; later the paid plan.\n• Never on the studio's bill. No cash-out. Expire 12 months after handover. Daily limits.",
+      "w": 340,
+      "x": 3760,
+      "y": 5056
+    },
+    "geiorules": {
+      "maxH": 420,
+      "text": "How GEIO behaves\n\n• Knows the home: quiz answers, quote, tracker, site feed, payments.\n• '25 years of know-how' comes from real senior designers' rules of thumb and checklists, written into its knowledge base.\n• Never promises a price, date or discount. Those go to Meera with the context attached.\n• Every answer ends with one next step.\n• Speaks English, Hindi and Marathi.\n\nOpen it from the GEIO button in the middle of the bottom bar, or from the quote.",
+      "w": 320,
+      "x": 1880,
+      "y": 3792
+    },
+    "introrule": {
+      "fill": "orange",
+      "maxH": 200,
+      "text": "The opening video plays only on the very first launch. After that the app opens with a short logo moment, then straight to Home.",
+      "w": 390,
+      "x": 0,
+      "y": -560
+    },
+    "langnote": {
+      "maxH": 200,
+      "text": "Language: English, हिंदी or मराठी, picked on Welcome and changeable in Me. Hindi and Marathi copy here is a first draft; have a native speaker check it before launch.",
+      "w": 390,
+      "x": 470,
+      "y": -560
+    },
+    "rowchoose": {
+      "kind": "title1",
+      "maxW": 2300,
+      "text": "Choosing your studio: profiles, visits, final quote, signing",
+      "w": 240,
+      "x": 0,
+      "y": 964
+    },
+    "rowdelight": {
+      "kind": "title1",
+      "maxW": 3600,
+      "text": "Rewards and delight: coins, sharing, family, inspiration",
+      "w": 240,
+      "x": 0,
+      "y": 4756
+    },
+    "rowgeio": {
+      "kind": "title1",
+      "maxW": 1800,
+      "text": "GEIO: One Interiors Expert Guide",
+      "w": 240,
+      "x": 0,
+      "y": 3492
+    },
+    "rowtitle": {
+      "kind": "title1",
+      "maxW": 4150,
+      "text": "After signing: Home · Project · GEIO · Site · Me",
+      "w": 240,
+      "x": 0,
+      "y": 2228
+    },
+    "rowtitle2": {
+      "kind": "title1",
+      "maxW": 7440,
+      "text": "First visit: from the opening to the expert call",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "rule3d": {
+      "fill": "orange",
+      "maxH": 260,
+      "text": "3D view: full-home orders only.\n\nIt lives inside Site as a 'View in 3D' button. Kitchen & wardrobes, one-room and renovation orders never see the button.\n\nTo preview: select the Site screen, open Tweaks, switch off 'fullHome'.",
+      "w": 300,
+      "x": 4230,
+      "y": 2528
+    },
+    "rowstudio": {
+      "kind": "title1",
+      "x": 0,
+      "y": 6180,
+      "w": 240,
+      "maxW": 7880,
+      "text": "Studio side: every customer screen above is fed from these"
+    },
+    "studionote": {
+      "x": 0,
+      "y": 7444,
+      "w": 390,
+      "maxH": 420,
+      "fill": "green",
+      "text": "How the two sides connect\n\n• Post today's update → customer Site feed, Home card, Project tracker, notification.\n• Nobody on site → Site feed, running delay.\n• Fix a snag (after photo) → customer Snags; closes only when the customer confirms.\n• New decision → customer Decision screen and family vote; the pick changes the quote.\n• Mark payment received → customer Project and Locker, after the customer confirms.\n\nSite mode (phone) is for the site supervisor. Office (desktop) is for the owner and project manager. Full spec: the \"Studio project workspace — spec\" doc."
+    }
+  },
+  "order": [
+    "Intro.dc.html",
+    "Start.dc.html",
+    "Name.dc.html",
+    "Q1.dc.html",
+    "Q2.dc.html",
+    "Q3.dc.html",
+    "Q4.dc.html",
+    "Q5.dc.html",
+    "Q6.dc.html",
+    "Q7.dc.html",
+    "StyleDNA.dc.html",
+    "Matches.dc.html",
+    "Phone.dc.html",
+    "Quote.dc.html",
+    "Compare.dc.html",
+    "Expert.dc.html",
+    "Studios.dc.html",
+    "Studio.dc.html",
+    "Visits.dc.html",
+    "FinalQuote.dc.html",
+    "Sign.dc.html",
+    "Main.dc.html",
+    "Tracker.dc.html",
+    "Decision.dc.html",
+    "Snags.dc.html",
+    "Feed.dc.html",
+    "Home3D.dc.html",
+    "Me.dc.html",
+    "Locker.dc.html",
+    "Notifications.dc.html",
+    "GeioHome.dc.html",
+    "GeioChat.dc.html",
+    "GeioPhoto.dc.html",
+    "GeioHuman.dc.html",
+    "Coins.dc.html",
+    "Refer.dc.html",
+    "SpotMistake.dc.html",
+    "Timelapse.dc.html",
+    "Milestone.dc.html",
+    "Family.dc.html",
+    "DreamBoard.dc.html",
+    "Homes.dc.html",
+    "StudioSignIn.dc.html",
+    "SiteToday.dc.html",
+    "SiteUpdate.dc.html",
+    "SiteSnag.dc.html",
+    "StudioProjects.dc.html",
+    "StudioProject.dc.html",
+    "StudioDecision.dc.html",
+    "StudioTeam.dc.html"
+  ],
+  "pages": [],
+  "title": "One Interiors App — v1 screens"
+}

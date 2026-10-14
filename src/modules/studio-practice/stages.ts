@@ -30,7 +30,9 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
+import { planPreset } from './pipeline-preset';
 import { myStudioId } from '@/modules/studio-quote/store';
+import { leadStudioId } from '@/modules/studio/lead-scope';
 import {
   DEFAULT_STAGES,
   BOARD_KINDS,
@@ -74,7 +76,7 @@ export type Result = { ok: true } | { ok: false; error: string };
  * does not find it handed back on the next page load.
  */
 export async function myStages(): Promise<StageRow[]> {
-  const studioId = await myStudioId();
+  const studioId = await leadStudioId();
   if (!studioId) return [];
 
   try {
@@ -313,5 +315,39 @@ export async function removeStage(id: string): Promise<Result> {
     return { ok: true };
   } catch {
     return { ok: false, error: 'That did not save.' };
+  }
+}
+
+/**
+ * "Use the Hauspire pipeline" (owner, 12 Oct 2026): rename and add columns to
+ * match Hauspire's, in its order (`pipeline-preset.ts planPreset`). One
+ * transaction; never deletes a column. Owner and PM (Settings).
+ */
+export async function applyHauspirePipeline(): Promise<Result> {
+  const studioId = await myStudioId();
+  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+  const stages = await myStages();
+  const plan = planPreset(stages);
+  try {
+    await prisma.$transaction(async (tx) => {
+      /* Renames go through a temporary name first, so two columns swapping
+         names never trip the one-name-per-studio rule mid-way. */
+      for (const r of plan.renames) await tx.studioStage.updateMany({ where: { id: r.id, studioId }, data: { name: `__preset_${r.id}` } });
+      for (const r of plan.renames) await tx.studioStage.updateMany({ where: { id: r.id, studioId }, data: { name: r.to } });
+      const made = new Map<string, string>();
+      for (const c of plan.creates) {
+        const row = await tx.studioStage.create({ data: { studioId, name: c.name, kind: c.kind, colour: c.colour, sortOrder: 10_000 + made.size, isIntake: false }, select: { id: true } });
+        made.set(`new:${c.name}`, row.id);
+      }
+      const idOf = (slot: string) => made.get(slot) ?? slot;
+      for (const [i, slot] of plan.order.entries()) await tx.studioStage.updateMany({ where: { id: idOf(slot), studioId }, data: { sortOrder: i } });
+      const intake = idOf(plan.intake);
+      await tx.studioStage.updateMany({ where: { studioId, id: { not: intake } }, data: { isIntake: false } });
+      await tx.studioStage.updateMany({ where: { studioId, id: intake }, data: { isIntake: true, kind: 'OPEN' } });
+    });
+    return { ok: true };
+  } catch (error) {
+    console.error('[studio-practice] hauspire pipeline failed', error);
+    return { ok: false, error: 'That did not save. Nothing was changed.' };
   }
 }

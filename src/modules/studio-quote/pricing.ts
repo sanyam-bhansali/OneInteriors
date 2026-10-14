@@ -131,6 +131,29 @@ export interface QuoteTerms {
 /** The GST rate a quotation can carry. Interiors work is 18%. */
 export const GST_BPS = 1800;
 
+/**
+ * The professional fee: 7% for every studio (owner, 12 Oct 2026), on or off
+ * per quotation as in Hauspire's builder — never another percentage. The
+ * modular discount stays the studio's own.
+ */
+export const FEE_BPS = 700;
+
+/** A fee as stored: 7% when on, nothing when off. */
+export function feeBpsOf(on: boolean): number {
+  return on ? FEE_BPS : 0;
+}
+
+/**
+ * The fee a quotation keeps when its box is ticked or unticked. A quotation
+ * made before the fee was fixed at 7% keeps its own figure while the box
+ * stays on; only turning a fee on from off sets 7%. Saving a line must never
+ * reprice a quotation already sent.
+ */
+export function keptFeeBps(storedBps: number, on: boolean): number {
+  if (!on) return 0;
+  return Number.isInteger(storedBps) && storedBps > 0 ? storedBps : FEE_BPS;
+}
+
 /** Names for the flat discount, as studios write them. Free text is allowed too. */
 export const DISCOUNT_NAMES = ['On-spot discount', 'Festive offer', 'Referral discount', 'Loyalty discount', 'Negotiated discount'] as const;
 

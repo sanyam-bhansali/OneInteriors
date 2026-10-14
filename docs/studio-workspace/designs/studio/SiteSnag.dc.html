@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fix a snag</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1F2119}a:hover{color:#A8502F}
+a:focus-visible,button:focus-visible{outline:2px solid #A8502F;outline-offset:3px}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; background: #DFE0D2; color: #1F2119; font-family: 'Geist', sans-serif; overflow: hidden">
+
+  <div style="flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 16px 16px 6px 8px">
+    <a href="SiteToday.dc.html" aria-label="Back to my sites" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #1F2119"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></a>
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <span style="font-size: 14px; color: #4F5147">Snag · Flat 1204, Baner</span>
+      <h1 style="margin: 0; font-size: 21px; font-weight: 600; letter-spacing: -0.02em">Gap between wardrobe and ceiling</h1>
+    </div>
+  </div>
+
+  <div style="flex: 1; overflow-y: auto; padding: 8px 16px 16px; display: flex; flex-direction: column; gap: 12px">
+
+    <div style="background: #FBFBF6; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; flex-wrap: wrap; gap: 8px">
+        <span style="min-height: 30px; padding: 0 10px; border-radius: 999px; background: #F6EBD6; color: #6B4600; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center">Fix by Sat 10 Oct</span>
+        <span style="min-height: 30px; padding: 0 10px; border-radius: 999px; background: #ECEDDF; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center">Bedroom 1</span>
+        <span style="min-height: 30px; padding: 0 10px; border-radius: 999px; background: #ECEDDF; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center">Assigned to you by Neha</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 13px; font-weight: 500; color: #4F5147">Priya wrote, Wed 7 Oct</span>
+        <p style="margin: 0; font-size: 15px; line-height: 1.45">"There is a gap at the top of the wardrobe, I can see the wall behind it."</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 13px; font-weight: 500; color: #4F5147">Neha's note · only your team</span>
+        <p style="margin: 0; font-size: 15px; line-height: 1.45">Add a 3-inch filler strip, laminate to match the shutters.</p>
+      </div>
+    </div>
+
+    <div style="background: #FBFBF6; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+        <figure style="margin: 0; display: flex; flex-direction: column; gap: 6px">
+          <img src="/_blob/6d5fcbb5257e9434f0e337cfdffe3f1a" alt="Before: gap above the bedroom 1 wardrobe" style="width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 14px; display: block">
+          <figcaption style="font-size: 13px; font-weight: 500; color: #4F5147">Before · Priya's photo</figcaption>
+        </figure>
+        <figure style="margin: 0; display: flex; flex-direction: column; gap: 6px">
+          <sc-if value="{{hasAfter}}" hint-placeholder-val="{{ false }}">
+            <img src="/_blob/f60e3293a5cd9a3e7b83a435545cf41d" alt="After: filler strip fitted above the wardrobe" style="width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 14px; display: block">
+          </sc-if>
+          <sc-if value="{{noAfter}}" hint-placeholder-val="{{ true }}">
+            <button type="button" onClick="{{takeAfter}}" style="width: 100%; aspect-ratio: 3 / 4; border: 0; border-radius: 14px; background: #1F2119; color: #FBFBF6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 12px; font-size: 15px; font-weight: 500; cursor: pointer">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>
+              Take the after photo
+            </button>
+          </sc-if>
+          <figcaption style="font-size: 13px; font-weight: 500; color: #4F5147">After · from the same spot</figcaption>
+        </figure>
+      </div>
+      <sc-if value="{{hasAfter}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 14px; background: #ECEDDF">
+          <sc-if value="{{noVoice}}" hint-placeholder-val="{{ true }}">
+            <button type="button" onClick="{{rec}}" style="align-self: flex-start; min-height: 44px; padding: 0 16px 0 6px; border: 0; border-radius: 999px; background: #A8502F; color: #FFFFFF; display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 500; cursor: pointer">
+              <span aria-hidden="true" style="width: 32px; height: 32px; border-radius: 50%; background: #FBFBF6; color: #A8502F; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></span>
+              Say what you fixed</button>
+          </sc-if>
+          <sc-if value="{{hasVoice}}" hint-placeholder-val="{{ false }}">
+            <span style="font-size: 13.5px; line-height: 1.35; color: #4F5147">"वॉर्डरोबवर फिलर पट्टी लावली, शटरच्या रंगाची."</span>
+            <span style="font-size: 14.5px; line-height: 1.35; font-weight: 500">Filler strip fitted above the wardrobe, matching the shutters.</span>
+            <div style="display: flex; align-items: center; gap: 10px">
+              <span style="font-family: 'Geist Mono', monospace; font-size: 12.5px; color: #4F5147">0:05 · Marathi · Priya reads this in English</span>
+              <button type="button" onClick="{{rec}}" style="min-height: 32px; padding: 0 10px; border: 0; border-radius: 999px; background: #FBFBF6; color: #1F2119; font-size: 13px; font-weight: 500; cursor: pointer">Redo</button>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{sent}}" hint-placeholder-val="{{ false }}">
+      <div style="background: #E3EDE2; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 16px; font-weight: 600; color: #245535">Sent to Priya to confirm</span>
+        <span style="font-size: 14px; line-height: 1.45; color: #245535">It closes when she taps Confirm, or by itself in 7 days. If she says it is not fixed, it comes back here.</span>
+      </div>
+    </sc-if>
+  </div>
+
+  <div style="flex-shrink: 0; padding: 10px 16px 30px; display: flex; flex-direction: column; gap: 8px">
+    <button type="button" onClick="{{markFixed}}" aria-disabled="{{disabled}}" style="width: 100%; min-height: 60px; border: 0; border-radius: 999px; background: {{btnBg}}; color: {{btnFg}}; font-size: 17px; font-weight: 500; cursor: pointer">{{btnLabel}}</button>
+    <span style="text-align: center; font-size: 13px; color: #4F5147">{{hint}}</span>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { after: false, sent: false, voice: false }; }
+  renderVals() {
+    const s = this.state;
+    return {
+      hasVoice: s.voice,
+      noVoice: !s.voice,
+      rec: () => this.setState({ voice: !s.voice }),
+      hasAfter: s.after,
+      noAfter: !s.after,
+      takeAfter: () => this.setState({ after: true }),
+      sent: s.sent,
+      disabled: s.after && !s.sent ? 'false' : 'true',
+      btnBg: s.after && !s.sent ? '#1F2119' : '#C9CABB',
+      btnFg: s.after && !s.sent ? '#FBFBF6' : '#4F5147',
+      btnLabel: s.sent ? 'Marked fixed' : 'Mark fixed',
+      hint: s.sent ? 'Priya sees both photos side by side.' : (s.after ? 'Priya will see the before and after photos.' : 'Take the after photo first.'),
+      markFixed: () => { if (s.after && !s.sent) this.setState({ sent: true }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

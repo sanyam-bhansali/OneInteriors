@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
-import { PageBody } from '../../StudioShell';
 import { myStages } from '@/modules/studio-practice/stages';
 import { STAGE_KIND_LABELS, STAGE_KIND_NOTES } from '@/modules/studio-practice/vocabulary';
 import { PipelineEditor } from './PipelineEditor';
+import { HauspirePreset } from './HauspirePreset';
 
 export const metadata: Metadata = {
   title: 'Pipeline',
@@ -37,12 +37,12 @@ export default async function PipelinePage() {
   const stages = await myStages();
 
   return (
-    <PageBody>
-      <div className="s-card mb-5 border-l-[3px] !border-l-[var(--s-accent)] p-5">
+    <>
+      <div className="card mb-5 border-l-[3px] !border-l-[var(--s-accent)] p-5">
         <p className="m-0 mb-2 text-[14.5px] font-semibold">
           These are your columns. Rename them, reorder them, add as many as you work with.
         </p>
-        <p className="m-0 mb-3 max-w-[70ch] text-[14px] leading-relaxed text-[var(--s-ink-2)]">
+        <p className="m-0 mb-3 max-w-[70ch] text-[14px] leading-relaxed muted">
           The six below are only a starting point — they are what the software shipped with, not
           what we think your process should be. The one thing each column has to declare is what it{' '}
           <em>means</em>, because the rest of the software reads that rather than the name:
@@ -51,7 +51,7 @@ export default async function PipelinePage() {
           {(Object.keys(STAGE_KIND_LABELS) as (keyof typeof STAGE_KIND_LABELS)[]).map((k) => (
             <div key={k} className="flex flex-wrap items-baseline gap-x-2">
               <dt className="m-0 text-[13.5px] font-semibold">{STAGE_KIND_LABELS[k]}</dt>
-              <dd className="m-0 flex-1 text-[13px] leading-snug text-[var(--s-ink-2)]">
+              <dd className="m-0 flex-1 text-[13px] leading-snug muted">
                 {STAGE_KIND_NOTES[k]}
               </dd>
             </div>
@@ -59,7 +59,8 @@ export default async function PipelinePage() {
         </dl>
       </div>
 
+      <HauspirePreset stages={stages.map((s) => ({ id: s.id, name: s.name, kind: s.kind, isIntake: s.isIntake, sortOrder: s.sortOrder }))} />
       <PipelineEditor stages={stages} />
-    </PageBody>
+    </>
   );
 }

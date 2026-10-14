@@ -21,6 +21,7 @@ import { STYLE_LABELS } from '@/modules/brief/types';
 import { TIER } from '@/modules/quotation/tiers';
 import { GREETING, SUGGESTIONS, answerFor, partOfDay, topicOf } from '@/modules/app/geio-script';
 import type { GeioReply } from '@/modules/app/geio';
+import { GEIO_LOCKED } from '@/modules/portal/plans';
 import { askGeioAction } from './actions';
 
 type Lang = keyof typeof GREETING;
@@ -215,6 +216,10 @@ export function GeioScreen({ back, expert, startWithExpert }: { back: string; ex
       });
       if (res.ok) {
         reply = res.reply;
+        wasLive = true;
+      } else if (res.reason === 'plan') {
+        // Signed on Basic: say so plainly, never answer from the examples.
+        reply = { paragraphs: [GEIO_LOCKED], see: [], handover: null, follow: [], sources: [] };
         wasLive = true;
       } else {
         if (res.reason === 'busy') setNote('That was a lot of questions at once. Wait a few minutes, or ask your expert.');

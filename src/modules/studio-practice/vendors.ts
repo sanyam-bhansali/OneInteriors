@@ -10,11 +10,15 @@ import 'server-only';
  * a studio's cost base — the single most commercially sensitive thing in this
  * database after the product master — and nothing in this file takes a studio
  * id as an argument.
+ *
+ * And within the studio, only the owner (studio/roles.ts `vendor.rates`): a
+ * PM, supervisor or accounts member gets an empty list and a refusal, the
+ * same as somebody with no studio at all. Their margins are the owner's.
  */
 
 import { prisma } from '@/lib/prisma';
 import { fromDb, toDb, type Paise } from '@/lib/money';
-import { myStudioId } from '@/modules/studio-quote/store';
+import { studioIdFor } from '@/modules/studio/access';
 import { workOrderMoney, byVendor, canPay, type VendorPosition } from './ledger';
 import type { QuoteUnitName } from '@/modules/studio-quote/pricing';
 
@@ -22,6 +26,9 @@ export { MODE_LABELS, COMMON_TRADES } from './vocabulary';
 export type { PaymentModeName } from './vocabulary';
 
 import type { PaymentModeName } from './vocabulary';
+
+/** The session's studio id, for a member who may see vendor rates; null for everyone else. */
+const vendorStudioId = () => studioIdFor('vendor.rates');
 
 export interface VendorRow {
   id: string;
@@ -69,7 +76,7 @@ export interface WorkOrderRow {
 /** Every vendor, with their position. Most owed first — this list is read to
  *  decide who gets paid today. */
 export async function myVendors(): Promise<VendorRow[]> {
-  const studioId = await myStudioId();
+  const studioId = await vendorStudioId();
   if (!studioId) return [];
 
   try {
@@ -125,7 +132,7 @@ export async function myVendors(): Promise<VendorRow[]> {
 }
 
 export async function myWorkOrders(): Promise<WorkOrderRow[]> {
-  const studioId = await myStudioId();
+  const studioId = await vendorStudioId();
   if (!studioId) return [];
 
   try {
@@ -187,8 +194,8 @@ export async function addVendor(input: {
   trade: string;
   phone?: string;
 }): Promise<Result> {
-  const studioId = await myStudioId();
-  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+  const studioId = await vendorStudioId();
+  if (!studioId) return { ok: false, error: 'Only the studio owner sees vendors and their rates.' };
 
   const name = input.name.trim();
   const trade = input.trade.trim();
@@ -214,8 +221,8 @@ export async function addWorkOrder(input: {
   vendorId: string;
   dueOn?: string;
 }): Promise<Result> {
-  const studioId = await myStudioId();
-  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+  const studioId = await vendorStudioId();
+  if (!studioId) return { ok: false, error: 'Only the studio owner sees vendors and their rates.' };
 
   // Both have to be theirs. Ids arriving from a form prove nothing.
   const [project, vendor] = await Promise.all([
@@ -250,8 +257,8 @@ export async function addWorkOrderLine(input: {
   qty: number;
   ratePaise: Paise;
 }): Promise<Result> {
-  const studioId = await myStudioId();
-  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+  const studioId = await vendorStudioId();
+  if (!studioId) return { ok: false, error: 'Only the studio owner sees vendors and their rates.' };
 
   const order = await prisma.studioWorkOrder.findFirst({
     where: { id: input.workOrderId, studioId },
@@ -310,8 +317,8 @@ export async function recordPayment(input: {
   reference?: string;
   paidOn?: string;
 }): Promise<Result> {
-  const studioId = await myStudioId();
-  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+  const studioId = await vendorStudioId();
+  if (!studioId) return { ok: false, error: 'Only the studio owner sees vendors and their rates.' };
 
   const order = await prisma.studioWorkOrder.findFirst({
     where: { id: input.workOrderId, studioId },

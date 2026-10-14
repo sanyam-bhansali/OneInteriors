@@ -1,13 +1,22 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { PageHead, PageBody } from '../../StudioShell';
 import { getQuote, STAGE_LABELS, STATUS_LABELS } from '@/modules/studio-quote/quotes';
 import { myProducts, myBranding, myTier } from '@/modules/studio-quote/store';
 import { showsOurMark, MARK_TEXT } from '@/modules/studio-quote/mark';
-import { signedLogoUrl } from '@/modules/storage/studio-logo';
+import { signedQuoteLogoUrl } from '@/modules/storage/studio-logo';
+import { quotingStudioId } from '@/modules/studio/lead-scope';
 import { QuoteBuilder } from './QuoteBuilder';
 import { StatusBar } from './StatusBar';
+import { currentMember } from '@/modules/studio/access';
+import { projectForQuote } from '@/modules/project/own-project';
+import { quoteSalesView } from '@/modules/studio-sales/revisions';
+import { can } from '@/modules/studio/roles';
+import { Revisions } from './Revisions';
+import { planReaderFor } from '@/modules/studio-quote/from-plan';
+import { quoteDocContext } from '@/modules/studio-quote/document-data';
+import { LineIcon } from '../../ui/icons';
+import '../quotes.css';
 
 export const metadata: Metadata = {
   title: 'Quotation',
@@ -41,22 +50,61 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
 
   if (!quote) notFound();
 
-  const logoUrl = await signedLogoUrl(branding?.logoPath ?? null);
+  const member = await currentMember();
+  const [logoUrl, project, sales, planReader, docCtx] = await Promise.all([
+    /* The studio's logo for anyone who may quote for it, sales included (owner, 13 Oct 2026). */
+    quotingStudioId().then((sid) => signedQuoteLogoUrl(branding?.logoPath ?? null, sid)),
+    // A project running on this quotation, or whether one can start from it (own client, sent or won).
+    projectForQuote(member, quote.id),
+    // Revisions sent and the sales final (Studio OS Phase 1).
+    quoteSalesView(quote.id),
+    // Floor plan → first quotation: "Read rooms" on this draft (12 Oct 2026).
+    planReaderFor(quote.clientId),
+    // The PDF preview tab: brand pages, payment stages, material specification, terms (13 Oct 2026).
+    quoteDocContext(quote),
+  ]);
+  /* Owner and PM may add a typed line to the product list; a salesperson asks. */
+  const mayAddProducts = member !== null && (member.role === 'OWNER' || member.role === 'PM');
+  const mayBook = member !== null && can(member, 'booking.record');
+
+  const TONE = { DRAFT: '', ISSUED: 'warn', ACCEPTED: 'good', DECLINED: 'bad' } as const;
+
+  /* Booked: a live project runs on it, and the server refuses writes (write-rules.ts). */
+  const locked = Boolean(sales?.projectId ?? project.projectId);
+  const lastRev = sales?.revisions[sales.revisions.length - 1] ?? null;
+  /* The printable Original vs Final: the Sales Final for a Design Final, else the last two revisions sent. */
+  const finalHref = quote.basedOnId
+    ? `/studio/quotations/${quote.id}/compare`
+    : sales && sales.revisions.length >= 2
+      ? `/studio/quotations/${quote.id}/compare?a=${sales.revisions[sales.revisions.length - 2]!.n}&b=${lastRev!.n}`
+      : null;
 
   return (
-    <>
-      <PageHead
-        title={quote.clientName}
-        sub={
-          <span className="flex flex-wrap items-center gap-2">
-            <span className="s-num">{quote.number}</span>
-            {quote.config ? <span>· {quote.config}</span> : null}
-            {quote.society ? <span>· {quote.society}</span> : null}
-            <span className="text-[var(--s-ink-3)]">· {STATUS_LABELS[quote.status]}</span>
-            <span className="s-tag">{STAGE_LABELS[quote.stage]}</span>
+    <main className="hpage qpage">
+      {/* The quotation's own strip: back to the list, the number and the
+          client, where it is, and what can happen to it next. */}
+      <div className="phead hphead">
+        <div style={{ minWidth: 0 }}>
+          <Link href="/studio/quotations" className="sm muted qback">
+            <LineIcon name="back" size={15} />
+            Quotations
+          </Link>
+          <h1 style={{ marginTop: 4 }}>
+            <span className="mono" style={{ letterSpacing: '-.02em' }}>
+              {quote.number}
+            </span>{' '}
+            · {quote.clientName}
+          </h1>
+          <div className="hstack muted sm qmeta">
+            <span className={`chip ${TONE[quote.status]}`}>
+              <span className="dot" />
+              {STATUS_LABELS[quote.status]}
+            </span>
+            <span className="chip">{STAGE_LABELS[quote.stage]}</span>
+            {quote.fromMarketplace ? <span className="chip oi">One Interiors</span> : null}
             {quote.issuedOn ? (
-              <span className="text-[var(--s-ink-3)]">
-                · sent{' '}
+              <span>
+                Sent{' '}
                 {quote.issuedOn.toLocaleDateString('en-IN', {
                   day: 'numeric',
                   month: 'short',
@@ -64,34 +112,45 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
                 })}
               </span>
             ) : null}
-            {quote.fromMarketplace ? (
-              <span className="s-tag !bg-[var(--s-accent-wash)] !text-[var(--s-accent-deep)]">
-                One Interiors
-              </span>
-            ) : null}
-          </span>
-        }
-        action={
-          <StatusBar
-            quoteId={quote.id}
-            status={quote.status}
-            canPrint={quote.lines.length > 0}
-            stage={quote.stage}
-            basedOnId={quote.basedOnId}
-            deletable={quote.status === 'DRAFT' && !quote.issuedOn && !quote.fromMarketplace}
-          />
-        }
-      />
+          </div>
+        </div>
+        <StatusBar
+          quoteId={quote.id}
+          status={quote.status}
+          canPrint={quote.lines.length > 0}
+          stage={quote.stage}
+          basedOnId={quote.basedOnId}
+          deletable={quote.status === 'DRAFT' && !quote.issuedOn && !quote.fromMarketplace}
+          clientFirstName={quote.clientName.split(/\s+/)[0] ?? ''}
+        />
+      </div>
 
-      <PageBody>
-        {!branding ? (
-          <p className="s-card mb-4 border-l-[3px] !border-l-[var(--s-accent)] px-4 py-3 text-[13.5px] leading-relaxed">
-            <Link href="/studio/settings" className="font-medium text-[var(--s-accent)]">
+      {project.projectId ? (
+        <div className="qnote good hnoteline">
+          <p>A project is running on this quotation.</p>
+          <Link href={`/studio/projects/${project.projectId}`} className="btn sec sm">
+            Open the project
+          </Link>
+        </div>
+      ) : project.canStart && !quote.clientId ? (
+        // A quotation on a lead is booked from its sales final (Record booking), so only unlinked ones keep the older "Start project".
+        <div className="qnote hnoteline">
+          <p>Has {quote.clientName.split(/\s+/)[0]} accepted this quotation? Start the project from it.</p>
+          <Link href={`/studio/projects/start?quote=${quote.id}`} className="btn acc sm">
+            Start project
+          </Link>
+        </div>
+      ) : null}
+      {!branding ? (
+        <div className="qnote warn hnoteline">
+          <p>
+            <Link href="/studio/settings" className="acc-t" style={{ fontWeight: 600 }}>
               Add your studio details
             </Link>{' '}
             before you send this — the document needs your registered name on it.
           </p>
-        ) : null}
+        </div>
+      ) : null}
 
         <QuoteBuilder
           quote={quote}
@@ -116,8 +175,24 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           showMark={showsOurMark({ tier, hideRequested: branding?.hideOurMark ?? false })}
           markText={MARK_TEXT}
           logoUrl={logoUrl}
+          planReader={planReader}
+          mayAddProducts={mayAddProducts}
+          locked={locked}
+          sentLabel={lastRev ? lastRev.label : null}
+          finalHref={finalHref}
+          doc={{
+            studio: docCtx.studio,
+            brandPages: docCtx.brandPages,
+            schedule: docCtx.schedule,
+            spec: docCtx.spec,
+            terms: docCtx.terms,
+            validDays: docCtx.validDays,
+          }}
+          extras={
+            /* Keyed on the revision count so the compare and sales-final pickers start on the newest revision after a send. */
+            sales ? <Revisions key={sales.revisions.length} view={sales} leadHref={quote.clientId ? `/studio/clients/${quote.clientId}` : null} mayBook={mayBook} /> : null
+          }
         />
-      </PageBody>
-    </>
+    </main>
   );
 }

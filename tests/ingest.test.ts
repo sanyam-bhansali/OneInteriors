@@ -176,7 +176,7 @@ describe('the report', () => {
 
   it('refuses to price a studio that has filed too few quotations', () => {
     const { report } = ingestQuotations([quotation([line()])], '2026-09-18');
-    expect(report.problems.join(' ')).toMatch(/at least 50/i);
+    expect(report.problems.join(' ')).toMatch(/at least 25/i);
   });
 
   it('will not put an item live on fewer than the per-item minimum', () => {

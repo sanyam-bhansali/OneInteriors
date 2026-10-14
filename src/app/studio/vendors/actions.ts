@@ -1,96 +1,135 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { rupeesToPaise } from '@/lib/money';
 import {
-  addVendor,
-  addWorkOrder,
-  addWorkOrderLine,
-  recordPayment,
-  type PaymentModeName,
-} from '@/modules/studio-practice/vendors';
-import type { QuoteUnitName } from '@/modules/studio-quote/pricing';
-
-// `State` and `IDLE` live in studio/form-state.ts. A 'use server'
-// file may only export async functions — and Turbopack rejects even a
-// type-only re-export here, so this import is for local use and
-// callers take the type from form-state directly.
-import type { State } from '../form-state';
-
-const str = (f: FormData, k: string) => String(f.get(k) ?? '').trim();
-
-function refresh() {
-  revalidatePath('/studio/vendors');
-  revalidatePath('/studio/projects');
-  revalidatePath('/studio');
-}
-
-export async function addVendorAction(_prev: State, form: FormData): Promise<State> {
-  const result = await addVendor({
-    name: str(form, 'name'),
-    trade: str(form, 'trade'),
-    phone: str(form, 'phone'),
-  });
-  if (!result.ok) return result;
-  refresh();
-  return { ok: true };
-}
-
-export async function addWorkOrderAction(_prev: State, form: FormData): Promise<State> {
-  const result = await addWorkOrder({
-    projectId: str(form, 'projectId'),
-    vendorId: str(form, 'vendorId'),
-    dueOn: str(form, 'dueOn') || undefined,
-  });
-  if (!result.ok) return result;
-  refresh();
-  return { ok: true };
-}
-
-export async function addLineAction(_prev: State, form: FormData): Promise<State> {
-  const qty = Number(str(form, 'qty'));
-  const rate = Number(str(form, 'rate'));
-
-  if (!Number.isFinite(qty) || qty <= 0) return { ok: false, error: 'A quantity, please.' };
-  if (!Number.isFinite(rate) || rate < 0) return { ok: false, error: 'A rate, please.' };
-
-  const result = await addWorkOrderLine({
-    workOrderId: str(form, 'workOrderId'),
-    description: str(form, 'description'),
-    unit: (str(form, 'unit') || 'SQFT') as QuoteUnitName,
-    qty,
-    ratePaise: rupeesToPaise(rate),
-  });
-
-  if (!result.ok) return result;
-  refresh();
-  return { ok: true };
-}
+  addCrew,
+  addExtra,
+  archiveCrew,
+  archiveOrder,
+  buildWorkOrders,
+  correctCrewPayment,
+  deleteRate,
+  editOrder,
+  loadTemplate,
+  recordCrewPayment,
+  removeLine,
+  removeOrder,
+  saveCrewSettings,
+  saveRate,
+  setLineCarpentry,
+  setLinePrice,
+  setLineQty,
+  setOrderStatus,
+  swapCrew,
+  updateCrew,
+  uploadKycScan,
+  type BuildInput,
+  type CrewInput,
+  type CrewResult,
+} from '@/modules/studio-crews/flow';
 
 /**
- * Money going out.
- *
- * The amount is checked against the outstanding balance inside `recordPayment`,
- * which refuses anything that would take the order past its bill and says by
- * how much. Accepting it and showing a negative balance means the mistake is
- * found at reconciliation rather than at the keyboard — and by then somebody
- * has been paid twice.
+ * Studio OS Phase 3: every write about crews, work orders and payments.
+ * The checks — who may, on which project, what money a PM may never send —
+ * are in the module (modules/studio-crews/flow.ts); these clip input and
+ * refresh the screens that show the figures.
  */
-export async function payAction(_prev: State, form: FormData): Promise<State> {
-  const amount = Number(str(form, 'amount'));
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return { ok: false, error: 'How much?' };
+
+const id = (v: unknown) => String(v ?? '').slice(0, 64);
+
+function done(r: CrewResult, projectId?: string): CrewResult {
+  if (r.ok) {
+    revalidatePath('/studio/vendors', 'layout');
+    revalidatePath('/studio/today');
+    revalidatePath('/studio/payments');
+    if (projectId) revalidatePath(`/studio/projects/${projectId}`);
   }
+  return r;
+}
 
-  const result = await recordPayment({
-    workOrderId: str(form, 'workOrderId'),
-    amountPaise: rupeesToPaise(amount),
-    mode: (str(form, 'mode') || 'BANK') as PaymentModeName,
-    reference: str(form, 'reference'),
-    paidOn: str(form, 'paidOn') || undefined,
-  });
+export async function addCrewAction(input: CrewInput): Promise<CrewResult> {
+  return done(await addCrew(input));
+}
 
-  if (!result.ok) return result;
-  refresh();
-  return { ok: true };
+export async function updateCrewAction(crewId: string, input: CrewInput): Promise<CrewResult> {
+  return done(await updateCrew(id(crewId), input));
+}
+
+export async function archiveCrewAction(crewId: string, archived: boolean): Promise<CrewResult> {
+  return done(await archiveCrew(id(crewId), archived === true));
+}
+
+export async function uploadKycAction(form: FormData): Promise<CrewResult> {
+  const f = form.get('file');
+  return done(await uploadKycScan(id(form.get('crewId')), form.get('doc'), f && typeof f !== 'string' ? f : null));
+}
+
+export async function saveRateAction(crewId: string, input: { id?: string; item: string; unit: string; rateRupees: string; trade?: string }): Promise<CrewResult> {
+  return done(await saveRate(id(crewId), input));
+}
+
+export async function deleteRateAction(crewId: string, rateId: string): Promise<CrewResult> {
+  return done(await deleteRate(id(crewId), id(rateId)));
+}
+
+export async function loadTemplateAction(crewId: string, trade: string): Promise<CrewResult> {
+  return done(await loadTemplate(id(crewId), String(trade ?? '').slice(0, 40)));
+}
+
+export async function saveCrewSettingsAction(input: Parameters<typeof saveCrewSettings>[0]): Promise<CrewResult> {
+  const r = await saveCrewSettings(input);
+  if (r.ok) revalidatePath('/studio/settings/trades');
+  return done(r);
+}
+
+export async function buildWorkOrdersAction(projectId: string, input: BuildInput): Promise<CrewResult> {
+  return done(await buildWorkOrders(id(projectId), input), id(projectId));
+}
+
+export async function setLineQtyAction(projectId: string, lineId: string, input: { measured?: string; estimate?: string }): Promise<CrewResult> {
+  return done(await setLineQty(id(lineId), input), id(projectId));
+}
+
+export async function setLineCarpentryAction(projectId: string, lineId: string, mode: string): Promise<CrewResult> {
+  return done(await setLineCarpentry(id(lineId), mode), id(projectId));
+}
+
+export async function setLinePriceAction(projectId: string, lineId: string, input: { rateRupees?: string; agreedRupees?: string }): Promise<CrewResult> {
+  return done(await setLinePrice(id(lineId), input), id(projectId));
+}
+
+export async function addExtraAction(projectId: string, woId: string, input: { what: string; room?: string; unit: string; qty?: string; rateRupees?: string; agreedRupees?: string }): Promise<CrewResult> {
+  return done(await addExtra(id(woId), input), id(projectId));
+}
+
+export async function removeLineAction(projectId: string, lineId: string): Promise<CrewResult> {
+  return done(await removeLine(id(lineId)), id(projectId));
+}
+
+export async function setOrderStatusAction(projectId: string, woId: string, to: string): Promise<CrewResult> {
+  return done(await setOrderStatus(id(woId), to), id(projectId));
+}
+
+export async function editOrderAction(projectId: string, woId: string, input: { dueOn?: string; stepIds?: string[]; notes?: string }): Promise<CrewResult> {
+  return done(await editOrder(id(woId), input), id(projectId));
+}
+
+export async function swapCrewAction(projectId: string, woId: string, crewId: string): Promise<CrewResult> {
+  return done(await swapCrew(id(woId), id(crewId)), id(projectId));
+}
+
+export async function archiveOrderAction(projectId: string, woId: string, archived: boolean): Promise<CrewResult> {
+  return done(await archiveOrder(id(woId), archived === true), id(projectId));
+}
+
+export async function removeOrderAction(projectId: string, woId: string): Promise<CrewResult> {
+  return done(await removeOrder(id(woId)), id(projectId));
+}
+
+export async function recordCrewPaymentAction(projectId: string, woId: string, input: { amountRupees: string; kind?: string; mode: string; reference?: string; note?: string; paidOn?: string }): Promise<CrewResult> {
+  return done(await recordCrewPayment(id(woId), input), id(projectId));
+}
+
+export async function correctCrewPaymentAction(projectId: string, paymentId: string, note: string): Promise<CrewResult> {
+  return done(await correctCrewPayment(id(paymentId), { note }), id(projectId));
 }

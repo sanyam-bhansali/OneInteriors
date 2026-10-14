@@ -26,8 +26,10 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
 import { bearerFrom } from './bearer';
 import type { UserRole } from '@prisma/client';
+import { sessionDaysFor } from '@/modules/studio/roles';
 
 const COOKIE = 'oi_session';
+/** Everyone who is not on a studio's team. Studio members: `sessionDaysFor(role)`. */
 const SESSION_DAYS = 30;
 /** Refresh lastUsedAt at most this often, to avoid a write on every request. */
 const TOUCH_AFTER_MINUTES = 60;
@@ -73,13 +75,32 @@ export interface SessionMeta {
   bearer?: boolean;
 }
 
+/**
+ * How long a new session for this person lasts.
+ *
+ * A studio team member's length comes from their role (`sessionDaysFor`:
+ * site supervisors 90 days, everyone else 30), whichever way they signed in
+ * — phone, email link or password — so there is one rule, not one per door.
+ * Everyone else gets `SESSION_DAYS`. One indexed read, on sign-in only; if
+ * it fails, the usual 30 days rather than a failed sign-in.
+ */
+export async function sessionDaysForUser(userId: string): Promise<number> {
+  try {
+    const member = await prisma.studioMember.findUnique({ where: { userId }, select: { role: true } });
+    return member ? sessionDaysFor(member.role) : SESSION_DAYS;
+  } catch {
+    return SESSION_DAYS;
+  }
+}
+
 /** Write the session row and return its token, without touching any cookie. */
 export async function issueSession(
   userId: string,
   meta: SessionMeta = {},
 ): Promise<{ token: string; expiresAt: Date }> {
   const token = newToken();
-  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+  const days = await sessionDaysForUser(userId);
+  const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
   await prisma.session.create({
     data: {
@@ -151,11 +172,22 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   // Cheap liveness tracking without a write per request.
   const stale = Date.now() - session.lastUsedAt.getTime() > TOUCH_AFTER_MINUTES * 60_000;
   if (stale) {
+    const now = new Date();
     await prisma.session
-      .update({ where: { id: session.id }, data: { lastUsedAt: new Date() } })
+      .update({ where: { id: session.id }, data: { lastUsedAt: now } })
       .catch(() => {
         /* liveness is not worth failing a request over */
       });
+    /* "Last active" on Settings → Team, on the same hourly beat — so it
+       costs one extra write an hour per studio person, never one per
+       request. Customers have no membership, so it is skipped for them. */
+    if (session.user.role !== 'CUSTOMER') {
+      try {
+        await prisma.studioMember.updateMany({ where: { userId: session.user.id }, data: { lastSeenAt: now } });
+      } catch {
+        /* same */
+      }
+    }
   }
 
   const { user } = session;

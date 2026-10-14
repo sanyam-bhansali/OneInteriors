@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
+import Link from 'next/link';
 import type { FoundClient } from '@/modules/studio-practice/clients';
 import { searchAction } from './search-actions';
 
@@ -140,7 +141,10 @@ export function Search() {
                   key={r.id}
                   className="flex flex-col gap-0.5 border-b border-[var(--s-rule-soft)] px-2.5 py-2 last:border-b-0"
                 >
-                  <span className="text-[13.5px] font-medium">{r.name}</span>
+                  {/* Opens the lead page (Studio OS Phase 1). */}
+                  <Link href={`/studio/clients/${r.id}`} onClick={() => setOpen(false)} className="text-[13.5px] font-medium text-[var(--s-ink)] no-underline hover:underline">
+                    {r.name}
+                  </Link>
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-[var(--s-ink-3)]">
                     <span className="s-tag">{r.stageName}</span>
                     {r.assignedToName ? <span>{r.assignedToName}</span> : <span>Nobody</span>}

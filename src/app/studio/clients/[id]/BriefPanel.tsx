@@ -22,8 +22,8 @@ import type { MarketplaceContext } from '@/modules/studio-practice/marketplace-c
 export function BriefPanel({ ctx }: { ctx: MarketplaceContext }) {
   if (ctx.withdrawn) {
     return (
-      <section className="rounded-[12px] border border-[var(--s-rule)] px-4 py-3.5">
-        <p className="m-0 text-[13.5px] leading-relaxed text-[var(--s-ink-2)]">
+      <section className="card">
+        <p style={{ margin: 0, lineHeight: 1.5, color: 'var(--text2)' }}>
           This customer asked One Interiors to withdraw the introduction, so their brief is no
           longer available.
           {ctx.withdrawnReason ? ' Speak to us rather than to them.' : ''}
@@ -46,10 +46,10 @@ export function BriefPanel({ ctx }: { ctx: MarketplaceContext }) {
   const known = facts.filter((f) => f.value);
 
   return (
-    <section className="rounded-[12px] border border-[var(--s-accent)]/30 bg-[var(--s-accent)]/[0.04] px-4 py-4">
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="m-0 text-[15px] font-semibold">Their brief</h2>
-        <span className="text-[12px] text-[var(--s-ink-3)]">
+    <section className="card cl-next">
+      <div className="chead">
+        <h2>Their brief</h2>
+        <span className="muted sm">
           Answered before we introduced you ·{' '}
           {ctx.introducedAt.toLocaleDateString('en-IN', {
             day: 'numeric',
@@ -61,25 +61,25 @@ export function BriefPanel({ ctx }: { ctx: MarketplaceContext }) {
 
       <dl className="m-0 grid grid-cols-1 gap-x-8 gap-y-2.5 sm:grid-cols-2">
         {known.map((f) => (
-          <div key={f.label} className="flex flex-col">
-            <dt className="s-label text-[var(--s-ink-3)]">{f.label}</dt>
-            <dd className="m-0 text-[13.5px] leading-snug">{f.value}</dd>
+          <div key={f.label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <dt className="lbl">{f.label}</dt>
+            <dd style={{ margin: 0, fontWeight: 500 }}>{f.value}</dd>
           </div>
         ))}
       </dl>
 
       {ctx.priorities.length > 0 ? (
-        <div className="mt-3.5">
-          <p className="s-label m-0 mb-1 text-[var(--s-ink-3)]">
+        <div>
+          <p className="lbl" style={{ margin: '0 0 6px' }}>
             What matters most, in their order
           </p>
-          <ol className="m-0 flex list-none flex-wrap gap-1.5 p-0">
+          <ol className="hstack" style={{ margin: 0, padding: 0, listStyle: 'none', gap: 6 }}>
             {ctx.priorities.map((p, i) => (
               <li
                 key={p}
-                className="rounded-full border border-[var(--s-rule)] bg-[var(--s-rail)] px-2.5 py-1 text-[12.5px]"
+                className="chip"
               >
-                <span className="s-num mr-1.5 text-[var(--s-ink-3)]">{i + 1}</span>
+                <span className="mono muted">{i + 1}</span>
                 {p}
               </li>
             ))}
@@ -92,15 +92,15 @@ export function BriefPanel({ ctx }: { ctx: MarketplaceContext }) {
       ) : null}
 
       {ctx.dislikes.length > 0 ? (
-        <div className="mt-3.5">
-          <p className="s-label m-0 mb-1 text-[var(--s-ink-3)]">
+        <div>
+          <p className="lbl" style={{ margin: '0 0 6px' }}>
             Ruled out — do not present these
           </p>
-          <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
+          <ul className="hstack" style={{ margin: 0, padding: 0, listStyle: 'none', gap: 6 }}>
             {ctx.dislikes.map((d) => (
               <li
                 key={d}
-                className="rounded-full border border-[var(--s-bad)]/30 px-2.5 py-1 text-[12.5px] text-[var(--s-bad)]"
+                className="chip bad"
               >
                 {d}
               </li>
@@ -110,11 +110,11 @@ export function BriefPanel({ ctx }: { ctx: MarketplaceContext }) {
       ) : null}
 
       {ctx.appointments.length > 0 ? (
-        <div className="mt-4 border-t border-[var(--s-rule)] pt-3">
-          <p className="s-label m-0 mb-1.5 text-[var(--s-ink-3)]">Meetings arranged through us</p>
-          <ul className="m-0 flex list-none flex-col gap-1 p-0">
+        <div style={{ borderTop: '1px solid var(--fill2)', paddingTop: 12 }}>
+          <p className="lbl" style={{ margin: '0 0 6px' }}>Meetings arranged through us</p>
+          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
             {ctx.appointments.map((a, i) => (
-              <li key={i} className="text-[13px]">
+              <li key={i} className="sm">
                 {a.startsAt.toLocaleString('en-IN', {
                   weekday: 'short',
                   day: 'numeric',
@@ -122,7 +122,7 @@ export function BriefPanel({ ctx }: { ctx: MarketplaceContext }) {
                   hour: 'numeric',
                   minute: '2-digit',
                 })}
-                <span className="ml-2 text-[var(--s-ink-3)]">{a.status.toLowerCase()}</span>
+                <span className="muted" style={{ marginLeft: 8 }}>{a.status.toLowerCase()}</span>
               </li>
             ))}
           </ul>
@@ -134,13 +134,13 @@ export function BriefPanel({ ctx }: { ctx: MarketplaceContext }) {
 
 function Tags({ label, items }: { label: string; items: string[] }) {
   return (
-    <div className="mt-3.5">
-      <p className="s-label m-0 mb-1 text-[var(--s-ink-3)]">{label}</p>
-      <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
+    <div>
+      <p className="lbl" style={{ margin: '0 0 6px' }}>{label}</p>
+      <ul className="hstack" style={{ margin: 0, padding: 0, listStyle: 'none', gap: 6 }}>
         {items.map((t) => (
           <li
             key={t}
-            className="rounded-full border border-[var(--s-rule)] px-2.5 py-1 text-[12.5px]"
+            className="chip"
           >
             {t}
           </li>

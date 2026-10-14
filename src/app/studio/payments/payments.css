@@ -1,0 +1,9 @@
+/* Money: the payments desk (no screen of its own in the owner's handoff, so
+   it is built in the language of Vendors and the project's payments: the
+   money strip from vendors.css, a card per project, bookings as cards).
+   Scoped to .oi-studio; tokens only. */
+.oi-studio .pay-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:16px}
+.oi-studio .pay-wait{display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:14px;background:var(--soft)}
+.oi-studio .pay-recent{margin:0;padding:0;list-style:none;display:flex;flex-direction:column}
+.oi-studio .pay-recent li{display:flex;flex-direction:column;gap:6px;padding:12px 0;border-top:1px solid var(--soft)}
+.oi-studio .pay-recent li:first-child{border-top:0}

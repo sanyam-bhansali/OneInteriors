@@ -17,9 +17,9 @@ export function CapacityForm({ current }: { current: number | null }) {
   const [state, action, pending] = useActionState(saveCapacityAction, INITIAL);
 
   return (
-    <form action={action} className="flex flex-wrap items-end gap-3">
-      <div>
-        <label htmlFor="capacityPerMonth" className="label m-0 mb-2 block">
+    <form action={action} className="hstack" style={{ alignItems: 'flex-end' }}>
+      <div className="ox-f">
+        <label htmlFor="capacityPerMonth" className="lbl">
           Projects a month
         </label>
         <input
@@ -30,22 +30,23 @@ export function CapacityForm({ current }: { current: number | null }) {
           max={60}
           defaultValue={current ?? undefined}
           placeholder="e.g. 4"
-          className="w-[8rem] rounded-full border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-5 py-2.5 text-[15px] tabular-nums"
+          className="fld fit num"
+          style={{ width: '8rem' }}
         />
       </div>
 
       <button
         type="submit"
         disabled={pending}
-        className="rounded-full bg-[var(--color-petrol)] px-6 py-2.5 text-[15px] font-medium text-[var(--color-paper)] hover:bg-[var(--color-petrol-deep)] disabled:opacity-40"
+        className="btn pri"
       >
         {pending ? 'Saving…' : 'Save'}
       </button>
 
-      <p aria-live="polite" className="m-0 text-[13.5px] text-[var(--color-ink-2)]">
+      <p aria-live="polite" className="muted sm" style={{ margin: 0 }}>
         {state.status === 'saved' ? 'Saved.' : null}
         {state.status === 'error' ? (
-          <span className="text-[var(--color-atrisk)]">{state.error}</span>
+          <span className="bad-t">{state.error}</span>
         ) : null}
       </p>
     </form>

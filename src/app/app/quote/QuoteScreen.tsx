@@ -19,12 +19,11 @@ import { formatINR, formatINRCompact } from '@/lib/money';
 import { useAppData } from '@/components/app/useAppData';
 import { filedRatesFor } from '@/data/filed-rates';
 import { listedStudios, quotesForStudios } from '@/modules/app/journey';
+import { quoteValidTill } from '@/modules/app/journey-view';
 import { puneRanges, type LineRange } from '@/modules/app/pune-range';
 import { CATALOGUE, GST_BPS, MODULAR_DISCOUNT_BPS, PROFESSIONAL_FEE_BPS, ROOM_LABELS } from '@/modules/quotation/catalogue';
 import type { FirstQuote, QuoteLine } from '@/modules/quotation/first-quote';
 import type { AppData } from '../data';
-
-const VALID_DAYS = 30;
 
 export function QuoteScreen({ data }: { data: AppData }) {
   const { brief, quotes } = useJourney(data);
@@ -57,7 +56,7 @@ export function QuoteScreen({ data }: { data: AppData }) {
   const q = quotes[Math.min(pick, quotes.length - 1)]!;
   const rooms = q.quote.rooms.filter((r) => r.lines.length > 0);
   const firstRoom = open ?? rooms[0]?.label ?? null;
-  const validTill = new Date(new Date(brief.completedAt ?? Date.now()).getTime() + VALID_DAYS * 864e5).toLocaleDateString('en-IN', {
+  const validTill = quoteValidTill(brief.completedAt ?? null).toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'short',
   });

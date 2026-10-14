@@ -256,6 +256,13 @@ describe('security headers', () => {
     expect(config).toContain('camera=()');
     expect(config).toContain('geolocation=()');
   });
+
+  it('opens camera, microphone and location only to site mode, on our own origin', () => {
+    // Site supervisors photograph and record voice notes (studio workspace Phase 2).
+    const allow = config.match(/camera=\(self\)/g) ?? [];
+    expect(allow).toHaveLength(1);
+    expect(config).toMatch(/source: '\/studio\/site\/:path\*',\s*headers: \[\s*\{\s*key: 'Permissions-Policy',\s*value: 'camera=\(self\), microphone=\(self\), geolocation=\(self\)/);
+  });
 });
 
 describe('sample-data deployments cannot reach a database', () => {

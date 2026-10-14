@@ -1,0 +1,156 @@
+/*
+ * The quotation PDF (QuotationDocument.tsx), the owner's sample of 13 Oct 2026.
+ *
+ * Paper, not a screen: the document is white with dark ink in both themes,
+ * and the studio's own colour (--qd-acc and its shades, set inline from
+ * Settings and checked by safeAccent) draws the bands, the column headers,
+ * the rules and the sub-total tint. A4 portrait; the page margin is the
+ * global @page rule (globals.css, 14 mm × 12 mm), so a sheet on paper is
+ * 186 mm wide.
+ */
+
+.qd {
+  --qd-ink: #1b1b1b;
+  --qd-soft: #4a4a4a;
+  --qd-mute: #7a7a7a;
+  --qd-green: #1d7a3a;
+  background: #ecebe7;
+  padding: 24px 12px 64px;
+  color: var(--qd-ink);
+  font-family: var(--font-sans), 'Segoe UI', system-ui, sans-serif;
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+.qd.qd-embed { background: transparent; padding: 0; overflow-x: auto; }
+.qd * { box-sizing: border-box; }
+.qd p { margin: 0; }
+
+/* One page of paper on screen. */
+.qd-sheet {
+  width: 210mm;
+  max-width: none;
+  margin: 0 auto 18px;
+  background: #fff;
+  padding: 14mm 12mm;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .12), 0 8px 24px rgba(0, 0, 0, .06);
+}
+.qd-embed .qd-sheet { margin-left: 0; margin-right: 0; }
+
+/* ── Brand pages: the studio's own artwork, a whole page each ── */
+.qd-brand { padding: 0; height: 297mm; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.qd-brand img { display: block; width: 100%; height: 100%; object-fit: contain; }
+
+/* ── The drawn cover (no brand pages) ── */
+.qd-cover { min-height: 297mm; display: flex; flex-direction: column; padding: 16mm 14mm; position: relative; }
+.qd-cover-top { display: grid; grid-template-columns: 26mm 1fr 26mm; align-items: start; gap: 6mm; }
+.qd-stripes {
+  display: block; height: 22mm; margin-top: 8mm;
+  background: repeating-linear-gradient(to bottom, var(--qd-band) 0 1.6mm, transparent 1.6mm 3.2mm);
+}
+.qd-block { display: block; height: 36mm; background: var(--qd-band); }
+.qd-cover-logo { display: flex; justify-content: center; align-items: center; min-height: 30mm; padding-top: 8mm; }
+.qd-cover-logo img { max-height: 30mm; max-width: 90mm; object-fit: contain; }
+.qd-cover-mark { font-size: 24px; font-weight: 700; color: var(--qd-band); text-align: center; letter-spacing: .02em; }
+.qd-cover-mid { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 5mm; padding: 10mm 0; }
+.qd-cover-title { font-size: 46px; letter-spacing: .22em; font-weight: 500; color: var(--qd-band); margin-right: -.22em; }
+.qd-rule { position: relative; width: 70mm; height: 2px; background: var(--qd-line); }
+.qd-rule span { position: absolute; left: 50%; top: 50%; width: 9px; height: 9px; border-radius: 50%; background: var(--qd-line); transform: translate(-50%, -50%); }
+.qd-cover-sub { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; }
+.qd-facts { list-style: none; margin: 4mm 0 0; padding: 0; display: flex; gap: 8mm; justify-content: center; flex-wrap: wrap; }
+.qd-facts li { color: var(--qd-band); font-size: 12px; letter-spacing: .04em; padding: 2mm 4mm; border: 1px solid var(--qd-line); border-radius: 999px; }
+.qd-cover-for { margin-top: 8mm; font-size: 12px; color: var(--qd-soft); line-height: 1.7; }
+.qd-cover-for b { color: var(--qd-ink); font-size: 14px; }
+.qd-cover-foot { display: grid; grid-template-columns: 30mm 1fr; gap: 8mm; align-items: end; }
+.qd-block-low { height: 34mm; box-shadow: 4mm -4mm 0 -0.5mm #fff, 4mm -4mm 0 0 var(--qd-line); }
+.qd-cover-studio { text-align: center; padding-right: 30mm; display: flex; flex-direction: column; gap: 2.2mm; font-size: 11px; color: var(--qd-soft); }
+.qd-cover-name { font-size: 14px; letter-spacing: .12em; text-transform: uppercase; color: var(--qd-band); font-weight: 600; padding-bottom: 2mm; border-bottom: 1px solid var(--qd-line); }
+.qd-cover-contact i { font-style: normal; color: var(--qd-line); }
+.qd-cover-copy { color: var(--qd-ink); }
+
+/* ── The quotation ── */
+.qd-head { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10mm; padding-bottom: 3mm; margin-bottom: 5mm; border-bottom: 2px solid var(--qd-band); }
+.qd-field { font-size: 10.5px; line-height: 1.9; }
+.qd-field b { color: var(--qd-band); font-weight: 600; }
+.qd-welcome { margin: 0 0 5mm; font-size: 10.5px; line-height: 1.6; white-space: pre-wrap; color: var(--qd-soft); }
+.qd-empty { font-style: italic; color: var(--qd-mute); margin: 4mm 0; }
+
+.qd-tbl { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 0 0 5mm; }
+.qd-tbl th, .qd-tbl td { border: 1px solid var(--qd-line); padding: 1.6mm 1.8mm; vertical-align: top; text-align: left; overflow-wrap: anywhere; }
+.qd-tbl .r { text-align: right; font-variant-numeric: tabular-nums; }
+.qd-band th { background: var(--qd-band); color: #fff; font-weight: 700; font-size: 11px; border-color: var(--qd-band); }
+.qd-cols th { background: var(--qd-head); color: #fff; font-weight: 600; font-size: 10px; border-color: var(--qd-line); vertical-align: middle; }
+.qd-product { font-weight: 700; }
+.qd-details { font-size: 9px; color: var(--qd-soft); white-space: pre-line; }
+.qd-struck { color: var(--qd-mute); text-decoration: line-through; }
+.qd-disc { color: var(--qd-green); font-weight: 700; }
+.qd-sub td { background: var(--qd-tint); font-weight: 700; }
+.qd-bandline { background: var(--qd-band); color: #fff; font-weight: 700; font-size: 11px; padding: 1.6mm 1.8mm; margin: 0; }
+
+.qd-summary { margin-bottom: 5mm; }
+.qd-summary-grid { display: grid; grid-template-columns: minmax(0, 40fr) minmax(0, 60fr); gap: 6mm; align-items: center; padding-top: 3mm; }
+.qd-summary-grid .qd-tbl { margin: 0; }
+.qd-donut { display: flex; align-items: center; gap: 5mm; }
+.qd-donut svg { flex: none; }
+.qd-donut-k { font-size: 8px; font-weight: 700; fill: var(--qd-band); }
+.qd-donut-v { font-size: 9px; font-weight: 700; fill: var(--qd-ink); }
+.qd-legend { border-collapse: separate; border-spacing: 0 1.4mm; font-size: 9px; }
+.qd-legend td { padding: 0 2.4mm 0 0; white-space: nowrap; vertical-align: middle; }
+.qd-legend .r { text-align: right; }
+.qd-legend .qd-pct { color: var(--qd-mute); }
+.qd-swatch { display: inline-block; width: 7px; height: 7px; border-radius: 1px; }
+
+.qd-totals { width: 66%; }
+.qd-totals td { padding: 1.5mm 2mm; }
+.qd-strong td { font-weight: 700; }
+.qd-grand td { background: var(--qd-band); color: #fff; font-weight: 800; border-color: var(--qd-band); }
+
+.qd-deliv { font-size: 9.5px; color: var(--qd-soft); }
+.qd-deliv b { color: var(--qd-ink); }
+.qd-note { margin: -3.5mm 0 5mm; font-size: 9px; font-style: italic; color: var(--qd-soft); }
+.qd-soft { color: var(--qd-soft); }
+
+.qd-foot { margin-top: 6mm; padding-top: 2mm; border-top: 1px solid var(--qd-line); font-size: 9px; color: var(--qd-mute); display: flex; flex-direction: column; gap: .8mm; }
+.qd-mark { font-size: 8px; letter-spacing: .05em; color: #a0a0a0; }
+
+/* ── Terms ── */
+.qd-terms-frame { width: 100%; border-collapse: collapse; }
+.qd-terms-frame th, .qd-terms-frame td { padding: 0; text-align: left; font-weight: inherit; }
+.qd-runhead { display: flex; justify-content: space-between; align-items: center; padding-bottom: 2.5mm; margin-bottom: 4mm; border-bottom: 2px solid var(--qd-band); }
+.qd-runname { font-size: 20px; font-weight: 800; color: var(--qd-band); letter-spacing: .02em; }
+.qd-runlabel { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--qd-head); }
+.qd-termsbody { font-size: 9.5px; line-height: 1.5; color: #333; }
+.qd-termsbody h2 { font-size: 13px; color: var(--qd-band); margin: 0 0 2.5mm; font-weight: 700; }
+.qd-termsbody h3 { font-size: 11px; color: var(--qd-band); margin: 3.5mm 0 1.5mm; font-weight: 700; break-after: avoid; page-break-after: avoid; }
+.qd-termsbody p { margin: 0 0 1.2mm; }
+.qd-termsbody .qd-bullet { position: relative; padding-left: 4mm; }
+.qd-termsbody .qd-bullet::before { content: '•'; position: absolute; left: .8mm; color: var(--qd-head); }
+.qd-gap { height: .6mm; }
+
+/* Screen only: a phone sees the pages at their real size and scrolls sideways. */
+@media screen and (max-width: 840px) {
+  .qd { overflow-x: auto; }
+}
+
+@media print {
+  /* Only the paper: the studio app's header, the print strip, and the desk go. */
+  body:has(.qd) .apphead,
+  body:has(.qd) .no-print { display: none !important; }
+  body:has(.qd) .oi-page, body:has(.qd) .oi-frame { padding: 0 !important; margin: 0 !important; display: block !important; }
+  /* The studio frame's theme script is display:block under globals.css's print reset; it must not print. */
+  body:has(.qd) script { display: none !important; }
+  /* One white: the page margin and the sheet must not differ by a shade. */
+  body:has(.qd) .oi-studio, body:has(.qd) .oi-frame, body:has(.qd) .oi-page { background: #fff !important; }
+  .qd, .qd.qd-embed { background: #fff; padding: 0; overflow: visible; }
+  .qd-sheet { width: auto; margin: 0; padding: 0; box-shadow: none; }
+  /* A brand page fills the printable area of its A4 page and ends it. */
+  .qd-brand { height: 264mm; break-after: page; page-break-after: always; }
+  .qd-cover { min-height: 0; height: 264mm; padding: 4mm 6mm; break-after: page; page-break-after: always; }
+  .qd-terms { break-before: page; page-break-before: always; }
+  /* A room's band and column header repeat on the next page (thead), a
+     row never splits, and a small room stays in one piece. */
+  .qd-tbl thead { display: table-header-group; }
+  .qd-tbl tr { break-inside: avoid; page-break-inside: avoid; }
+  .qd-room, .qd-keep { break-inside: avoid; page-break-inside: avoid; }
+  .qd-bandline { break-after: avoid; page-break-after: avoid; }
+  .qd-note { break-before: avoid; }
+}

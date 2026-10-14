@@ -14,6 +14,7 @@ import { getCurrentUser } from '@/modules/auth/session';
 import { splitReasoning } from '@/modules/matching/store';
 import { checkCheckIn, checkInDue, communicationRating, type CheckInInput } from '@/modules/studio/check-in';
 import { stageOf, type Stage } from './benefits';
+import { INTRODUCED_BY_US } from '@/modules/studio/introduction-source';
 
 export interface HomeMatch {
   studioName: string;
@@ -51,7 +52,7 @@ export async function yourHome(briefId: string | null, briefDone: boolean, now =
         include: { studio: { select: { tradeName: true, slug: true } } },
       }),
       prisma.introduction.findMany({
-        where: { briefId, withdrawnAt: null },
+        where: { briefId, withdrawnAt: null, ...INTRODUCED_BY_US },
         orderBy: { introducedAt: 'desc' },
         include: {
           studio: { select: { tradeName: true, slug: true } },

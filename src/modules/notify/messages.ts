@@ -15,17 +15,41 @@ export type ProjectEvent =
   | { kind: 'decision-made'; decisionId: string; title: string; choice: string; extraPaise: number }
   | { kind: 'snag-raised'; snagId: string; title: string; room: string | null }
   | { kind: 'snag-fixed'; snagId: string; title: string }
+  // Project lifecycle (owner, 13 Oct 2026): the client signed off the handover in the app; warranty starts.
+  | { kind: 'handover-signed'; projectId: string; client: string; home: string; warrantyLabel: string }
+  // Studio workspace Phase 2: a working day with no site update by 21:00 IST (to the office, and to ops on Assured).
+  | { kind: 'site-missed'; projectId: string; home: string; studio: string; days: number; toOps: boolean }
+  // Studio workspace Phase 4: the rest of a snag's life.
+  | { kind: 'snag-accepted'; snagId: string; title: string; fixByLabel: string }
+  | { kind: 'snag-disputed'; snagId: string; title: string }
+  | { kind: 'snag-auto-closed'; snagId: string; title: string }
+  | { kind: 'snag-not-fixed'; snagId: string; projectId: string; title: string; site?: boolean }
   | { kind: 'document'; studio: string; title: string }
+  // Studio OS Phase 2: something of the design shared with the customer (a drawing to approve, the mood board, a site visit).
+  | { kind: 'design'; studio: string; title: string }
   | { kind: 'payment-due'; stage: string; amountPaise: number; studio: string; dueLabel: string }
   | { kind: 'payment-recorded'; stage: string; amountPaise: number; studio: string }
   // Between the customer and the studio, before signing.
   | { kind: 'introduced'; clientId: string | null; home: string; contactReleased: boolean }
   | { kind: 'quote-sent'; quoteId: string; studio: string; number: string }
   | { kind: 'quote-signed'; quoteId: string; client: string; number: string; totalPaise: number }
-  | { kind: 'intro-declined'; studio: string; reason: string };
+  | { kind: 'intro-declined'; studio: string; reason: string }
+  // To ops: GEIO passed a customer's question to the expert.
+  | { kind: 'geio-handover'; customer: string; home: string | null; note: string }
+  // To ops: a customer asked for the Assured plan (portal/plans.ts). Ops confirms the fee and switches it.
+  | { kind: 'assured-requested'; customer: string; studio: string; atSigning: boolean }
+  // Studio workspace Phase 5: the customer confirms a payment the studio recorded…
+  | { kind: 'payment-to-confirm'; stage: string; amountPaise: number; studio: string }
+  // …or says "I didn't pay this", which goes to our team (ops), not the studio.
+  | { kind: 'payment-disputed'; customer: string; studio: string; stage: string; amountPaise: number; note: string | null }
+  // To the studio: a decision passed its date with no pick (customer delay from here).
+  | { kind: 'decision-expired'; decisionId: string; title: string; projectId: string }
+  // Studio OS Phase 1: leads, to the studio's people (never to a customer)
+  | { kind: 'lead-assigned'; clientId: string | null; count: number; name: string; by: string | null }
+  | { kind: 'lead-new'; clientId: string; name: string; source: string; again: boolean };
 
 /** Events a studio also gets by email: it works from a laptop, not our app. */
-export const EMAILED_TO_STUDIO: ProjectEvent['kind'][] = ['introduced', 'quote-signed', 'decision-made', 'snag-raised'];
+export const EMAILED_TO_STUDIO: ProjectEvent['kind'][] = ['introduced', 'quote-signed', 'decision-made', 'snag-raised', 'lead-new', 'handover-signed'];
 
 export interface Message {
   title: string;
@@ -75,12 +99,47 @@ export function messageFor(e: ProjectEvent): Message {
         body: clip(e.room ? `${e.title} · ${e.room}` : e.title, 160),
         url: '/studio/updates',
       };
+    case 'handover-signed':
+      return {
+        template: 'handover.signed',
+        title: 'Handover signed off',
+        body: clip(`${e.client} signed off ${e.home}. Warranty runs to ${e.warrantyLabel}.`, 160),
+        url: `/studio/projects/${e.projectId}`,
+      };
     case 'snag-fixed':
       return {
         template: 'snag.fixed',
         title: 'Snag fixed',
         body: clip(e.title, 160),
         url: `/app/snags`,
+      };
+    case 'snag-accepted':
+      return {
+        template: 'snag.accepted',
+        title: `Snag accepted · fix by ${e.fixByLabel}`,
+        body: clip(e.title, 160),
+        url: '/app/snags',
+      };
+    case 'snag-disputed':
+      return {
+        template: 'snag.disputed',
+        title: 'The studio replied about a snag',
+        body: clip(`${e.title}. Read their reason in the app.`, 160),
+        url: '/app/snags',
+      };
+    case 'snag-auto-closed':
+      return {
+        template: 'snag.auto-closed',
+        title: 'Snag closed',
+        body: clip(`${e.title}. Fixed seven days ago with no answer, so it is closed. Raise it again if it is not right.`, 160),
+        url: '/app/snags',
+      };
+    case 'snag-not-fixed':
+      return {
+        template: 'snag.not-fixed',
+        title: 'Not fixed, says the customer',
+        body: clip(e.title, 160),
+        url: e.site ? `/studio/site/snag/${e.snagId}` : `/studio/projects/${e.projectId}?tab=snags`,
       };
     case 'payment-due':
       return {
@@ -129,12 +188,83 @@ export function messageFor(e: ProjectEvent): Message {
         body: clip(e.reason, 160),
         url: '/ops/introductions',
       };
+    case 'geio-handover':
+      // No customer page in ops yet; the expert works from the call queue.
+      return {
+        template: 'geio.handover',
+        title: `GEIO handed over · ${clip(e.customer, 40)}`,
+        body: clip(e.home ? `${e.home}. ${e.note}` : e.note, 160),
+        url: '/ops/consultations',
+      };
+    case 'assured-requested':
+      // The plan is switched on the project's tracker, under its introduction.
+      return {
+        template: 'plan.assured-requested',
+        title: `Assured requested · ${clip(e.customer, 40)}`,
+        body: clip(
+          `${e.customer} asked for Assured ${e.atSigning ? 'when signing' : 'after signing'} with ${e.studio}. Confirm the fee with them, then switch the plan.`,
+          160,
+        ),
+        url: '/ops/introductions',
+      };
+    case 'payment-to-confirm':
+      return {
+        template: 'payment.to-confirm',
+        title: `Did you pay ${formatINR(e.amountPaise)}? · ${e.studio}`,
+        body: clip(`${e.studio} marked ${formatINR(e.amountPaise)} for ${e.stage} as received. Confirm it, or tell us if you didn't pay it.`, 160),
+        url: '/app/project',
+      };
+    case 'payment-disputed':
+      return {
+        template: 'payment.disputed',
+        title: `Payment disputed · ${clip(e.customer, 40)}`,
+        body: clip(`${e.customer} says they did not pay ${formatINR(e.amountPaise)} for ${e.stage} (${e.studio}).${e.note ? ` “${e.note}”` : ''}`, 160),
+        url: '/ops/introductions',
+      };
+    case 'lead-assigned':
+      return {
+        template: 'lead.assigned',
+        title: e.count === 1 ? `A lead for you: ${clip(e.name, 60)}` : `${e.count} leads for you`,
+        body: clip(`${e.by ? `${e.by} gave you ` : 'You have '}${e.count === 1 ? e.name : `${e.count} leads, starting with ${e.name}`}. They are on your Today list.`, 160),
+        url: e.count === 1 && e.clientId ? `/studio/clients/${e.clientId}` : '/studio/today',
+      };
+    case 'lead-new':
+      return {
+        template: e.again ? 'lead.form-again' : 'lead.new',
+        title: e.again ? `${clip(e.name, 60)} filled in your form again` : `New lead: ${clip(e.name, 60)}`,
+        body: clip(e.again ? 'Their message is on the lead’s timeline.' : `From ${e.source}. It is in the pool: give it to someone from Today or the lead.`, 160),
+        url: `/studio/clients/${e.clientId}`,
+      };
+    case 'decision-expired':
+      return {
+        template: 'decision.expired',
+        title: 'Decision date passed',
+        body: clip(`${e.title}: not picked yet. Any delay from here is the customer's.`, 160),
+        url: `/studio/projects/${e.projectId}`,
+      };
+    case 'site-missed':
+      return {
+        template: 'site.missed',
+        title: e.toOps ? `No site update · ${clip(e.studio, 40)} (Assured)` : 'No site update today',
+        body: clip(
+          `${e.home}: nothing posted from site today${e.days > 1 ? `, ${e.days} working days in a row` : ''}. ${e.toOps ? 'Call the studio.' : 'The customer sees "No update from the studio today".'}`,
+          160,
+        ),
+        url: e.toOps ? '/ops/introductions' : `/studio/projects/${e.projectId}?tab=log`,
+      };
     case 'document':
       return {
         template: 'project.document',
         title: `New document · ${e.studio}`,
         body: clip(e.title, 160),
         url: '/app/locker',
+      };
+    case 'design':
+      return {
+        template: 'project.design',
+        title: `Your design · ${e.studio}`,
+        body: clip(e.title, 160),
+        url: '/app/project',
       };
   }
 }

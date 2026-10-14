@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>New decision</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1F2119}a:hover{color:#A8502F}
+a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #A8502F;outline-offset:2px}
+button,input,textarea{font-family:inherit}
+.rl{display:flex;align-items:center;min-height:40px;padding:0 12px;border-radius:10px;font-size:14.5px;font-weight:500;text-decoration:none;color:#1F2119}
+.rl:hover{background:#DFE0D2;color:#1F2119}
+.rl[aria-current="page"]{background:#FBFBF6;color:#1F2119;font-weight:600;box-shadow:inset 3px 0 0 #A8502F}
+.rh{padding:16px 12px 6px;font-size:13px;font-weight:600;color:#4F5147}
+.mono{font-family:'Geist Mono',monospace}
+.lbl{font-size:13.5px;font-weight:600;color:#4F5147}
+.fld{box-sizing:border-box;width:100%;min-height:46px;padding:0 14px;border:0;border-radius:12px;background:#ECEDDF;font-size:15px;color:#1F2119}
+.sees{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:#A8502F}
+.team{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:#4F5147}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-wrap: wrap; background: #DFE0D2; color: #1F2119; font-family: 'Geist', sans-serif">
+
+  <nav aria-label="Studio" style="flex: 0 0 232px; box-sizing: border-box; background: #ECEDDF; padding: 20px 12px; display: flex; flex-direction: column; gap: 2px">
+    <div style="display: flex; flex-direction: column; gap: 2px; padding: 0 12px 14px">
+      <span style="font-size: 16px; font-weight: 600; letter-spacing: -0.02em">Teakline Studio</span>
+      <span style="font-size: 13px; color: #4F5147">One Interiors Studio</span>
+    </div>
+    <a href="StudioProjects.dc.html" class="rl">Dashboard</a>
+    <span class="rh">Your work</span>
+    <a href="StudioProjects.dc.html" class="rl">Quotations</a>
+    <a href="StudioProjects.dc.html" class="rl">Product master</a>
+    <a href="StudioProjects.dc.html" class="rl">Clients</a>
+    <a href="StudioProjects.dc.html" class="rl" aria-current="page">Projects</a>
+    <a href="StudioProjects.dc.html" class="rl">Vendors</a>
+    <span class="rh">From us</span>
+    <a href="StudioProjects.dc.html" class="rl">Calendar</a>
+    <a href="StudioProjects.dc.html" class="rl">Your listing</a>
+    <span class="rh">Settings</span>
+    <a href="StudioTeam.dc.html" class="rl">Team</a>
+    <a href="StudioProjects.dc.html" class="rl">Pipeline and fields</a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 24px 32px 40px; display: flex; flex-direction: column; gap: 20px">
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <a href="StudioProject.dc.html" style="font-size: 14px; color: #4F5147; text-decoration: none">← Flat 1204, Baner</a>
+      <h1 style="margin: 0; font-size: 32px; font-weight: 500; letter-spacing: -0.035em">New decision for Priya</h1>
+      <span style="font-size: 15px; color: #4F5147">Ask once, with the options and what each costs. Her pick updates the quote, the final payment and the locker by itself.</span>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+
+      <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+
+        <section aria-label="The question" style="background: #FBFBF6; border-radius: 18px; padding: 18px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+          <div style="display: flex; flex-direction: column; gap: 8px; grid-column: 1 / -1">
+            <label for="d-title" class="lbl">What does Priya need to decide?</label>
+            <input id="d-title" class="fld" type="text" value="Kitchen shutter finish">
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <label for="d-due" class="lbl">Decide by</label>
+            <input id="d-due" class="fld mono" type="text" value="Fri 16 Oct">
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <label for="d-line" class="lbl">Quote line it changes</label>
+            <input id="d-line" class="fld" type="text" value="Line 9 · Kitchen shutters, 84 sq ft">
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; grid-column: 1 / -1">
+            <label for="d-late" class="lbl">If she decides late</label>
+            <textarea id="d-late" rows="2" style="box-sizing: border-box; width: 100%; padding: 12px 14px; border: 0; border-radius: 12px; background: #ECEDDF; font-size: 15px; line-height: 1.45; color: #1F2119; resize: vertical">Shutters are cut next week. If this waits past Friday, carpentry moves by about 3 days and so does handover.</textarea>
+            <span style="font-size: 13px; color: #4F5147">A delay caused by a late decision is marked as the customer's, not yours.</span>
+          </div>
+        </section>
+
+        <section aria-labelledby="h-opts" style="background: #FBFBF6; border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 10px">
+            <h2 id="h-opts" style="margin: 0; font-size: 17px; font-weight: 600">Options</h2>
+            <span style="font-size: 13px; color: #4F5147">Prices include GST. ₹0 means as quoted.</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px">
+            <div style="border-radius: 16px; background: #ECEDDF; padding: 12px; display: flex; flex-direction: column; gap: 10px">
+              <div role="img" aria-label="Sage matte swatch" style="height: 96px; border-radius: 12px; background: #9AA58A"></div>
+              <span style="font-size: 15px; font-weight: 600">Sage matte laminate</span>
+              <span style="font-size: 13.5px; color: #4F5147">Soft-touch, hides fingerprints</span>
+              <div style="display: flex; justify-content: space-between; align-items: center"><span class="sees">Price change</span><span class="mono" style="font-size: 15px; font-weight: 500">₹0</span></div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid #D2D3C4"><span class="team">Your cost · only your team</span><span class="mono" style="font-size: 14px">₹0</span></div>
+            </div>
+            <div style="border-radius: 16px; background: #ECEDDF; padding: 12px; display: flex; flex-direction: column; gap: 10px">
+              <div role="img" aria-label="Walnut grain swatch" style="height: 96px; border-radius: 12px; background: #6B4A32"></div>
+              <span style="font-size: 15px; font-weight: 600">Walnut grain</span>
+              <span style="font-size: 13.5px; color: #4F5147">Warm wood look, textured</span>
+              <div style="display: flex; justify-content: space-between; align-items: center"><span class="sees">Price change</span><span class="mono" style="font-size: 15px; font-weight: 500">+₹14,000</span></div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid #D2D3C4"><span class="team">Your cost · only your team</span><span class="mono" style="font-size: 14px">+₹9,800</span></div>
+            </div>
+            <div style="border-radius: 16px; background: #ECEDDF; padding: 12px; display: flex; flex-direction: column; gap: 10px">
+              <div role="img" aria-label="Off-white high gloss swatch" style="height: 96px; border-radius: 12px; background: #EFEBE2; box-shadow: inset 0 0 0 1px #D2D3C4"></div>
+              <span style="font-size: 15px; font-weight: 600">Off-white high gloss</span>
+              <span style="font-size: 13.5px; color: #4F5147">Reflects light, shows marks</span>
+              <div style="display: flex; justify-content: space-between; align-items: center"><span class="sees">Price change</span><span class="mono" style="font-size: 15px; font-weight: 500">+₹9,500</span></div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid #D2D3C4"><span class="team">Your cost · only your team</span><span class="mono" style="font-size: 14px">+₹6,200</span></div>
+            </div>
+          </div>
+          <button type="button" style="align-self: flex-start; min-height: 40px; padding: 0 14px; border: 0; border-radius: 999px; background: #ECEDDF; color: #1F2119; font-size: 14px; font-weight: 500; cursor: pointer">+ Add an option</button>
+        </section>
+
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px">
+          <button type="button" onClick="{{send}}" style="min-height: 52px; padding: 0 26px; border: 0; border-radius: 999px; background: {{sendBg}}; color: {{sendFg}}; font-size: 16px; font-weight: 500; cursor: pointer">{{sendLabel}}</button>
+          <span style="font-size: 14px; color: #4F5147">{{sendNote}}</span>
+        </div>
+      </div>
+
+      <aside aria-label="Preview of Priya's screen" style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+        <span class="sees" style="font-size: 13px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>What Priya will see</span>
+        <div style="background: #FFFFFF; border-radius: 24px; padding: 20px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 0 0 1px #D2D3C4">
+          <span style="font-size: 13px; font-weight: 500; color: #5F5F5F">Your decision, due Fri 16 Oct</span>
+          <span style="font-size: 26px; font-weight: 500; letter-spacing: -0.035em; line-height: 1.05; color: #0B0B0B">Kitchen shutter finish</span>
+          <span style="font-size: 14px; line-height: 1.45; color: #5F5F5F">Shutters are cut next week. If this waits past Friday, carpentry moves by about 3 days and so does your handover.</span>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 14px; box-shadow: inset 0 0 0 1px #E6E6E3"><span aria-hidden="true" style="width: 36px; height: 36px; border-radius: 10px; background: #9AA58A"></span><span style="flex: 1; font-size: 14.5px; font-weight: 500; color: #0B0B0B">Sage matte laminate</span><span class="mono" style="font-size: 13px; color: #5F5F5F">included</span></div>
+            <div style="display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 14px; box-shadow: inset 0 0 0 1px #E6E6E3"><span aria-hidden="true" style="width: 36px; height: 36px; border-radius: 10px; background: #6B4A32"></span><span style="flex: 1; font-size: 14.5px; font-weight: 500; color: #0B0B0B">Walnut grain</span><span class="mono" style="font-size: 13px; color: #A6461F">+₹14,000</span></div>
+            <div style="display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 14px; box-shadow: inset 0 0 0 1px #E6E6E3"><span aria-hidden="true" style="width: 36px; height: 36px; border-radius: 10px; background: #EFEBE2; box-shadow: inset 0 0 0 1px #E6E6E3"></span><span style="flex: 1; font-size: 14.5px; font-weight: 500; color: #0B0B0B">Off-white high gloss</span><span class="mono" style="font-size: 13px; color: #A6461F">+₹9,500</span></div>
+          </div>
+          <span style="font-size: 13px; color: #5F5F5F">Rahul and Aai can vote. Priya's choice decides.</span>
+        </div>
+        <span style="font-size: 13px; color: #4F5147; line-height: 1.45">Your cost per option never leaves this screen.</span>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { sent: false }; }
+  renderVals() {
+    const s = this.state.sent;
+    return {
+      send: () => this.setState({ sent: !s }),
+      sendBg: s ? '#2F6B42' : '#1F2119',
+      sendFg: '#FBFBF6',
+      sendLabel: s ? 'Sent to Priya' : 'Send to Priya',
+      sendNote: s ? 'She has a WhatsApp nudge and it is on her Home screen. You will be told the moment she picks.' : 'She gets it on her Home screen and on WhatsApp.'
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+/* Calendar (owner's handoff screens StudioCalendar, StudioSalesCalendar,
+   12 Oct 2026). The design's week heads (wh), event chips (evt with the
+   k-first / k-site / k-follow kinds) and today wash, laid over our own day,
+   week and month views, which keep their folding of busy days. Scoped to
+   .oi-studio; tokens only. */
+
+/* ── From the design ─────────────────────────────────────────── */
+.oi-studio .wh{padding:10px 8px;font-size:13px;font-weight:600;border-bottom:1px solid var(--fill2)}
+.oi-studio .wh.today{color:var(--acc)}
+.oi-studio .k-first{background:var(--acc-soft);color:var(--acc-ink);box-shadow:inset 3px 0 0 var(--acc)}
+.oi-studio .k-site{background:var(--good-bg);color:var(--good);box-shadow:inset 3px 0 0 var(--good-s)}
+.oi-studio .k-follow{background:var(--info-bg);color:var(--info);box-shadow:inset 3px 0 0 var(--info)}
+.oi-studio .k-task{background:var(--warn-bg);color:var(--warn);box-shadow:inset 3px 0 0 var(--warn-s)}
+
+/* ── The bar above the calendar ──────────────────────────────── */
+.oi-studio .cal-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.oi-studio .cal-bar h2{margin:0;font-size:17px;font-weight:600}
+.oi-studio .cal-nav{display:flex;gap:4px}
+.oi-studio .cal-views{margin-left:auto}
+.oi-studio .cal-views a{min-height:36px;padding:0 14px;border-radius:999px;display:inline-flex;align-items:center;font-size:14px;font-weight:500;color:var(--text2)}
+.oi-studio .cal-views a[aria-current="page"]{background:var(--paper);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(var(--sh),.12)}
+.oi-studio .cal-legend .chip{min-height:24px}
+
+/* ── Week: seven columns in a card ───────────────────────────── */
+.oi-studio .cal-week{display:grid;grid-template-columns:repeat(7,minmax(130px,1fr));min-width:910px}
+.oi-studio .cal-col{display:flex;flex-direction:column;gap:6px;min-width:0;padding:8px 6px 12px;border-left:1px solid var(--soft)}
+.oi-studio .cal-col:first-child{border-left:0}
+.oi-studio .cal-col.today{background:var(--today)}
+.oi-studio .cal-col > .wh{margin:-8px -6px 2px;padding:10px 12px}
+.oi-studio .cal-col > .wh a{color:inherit}
+.oi-studio .cal-empty{margin:0;padding:0 6px;font-size:12px;color:var(--muted)}
+.oi-studio .evt{display:flex;flex-direction:column;gap:1px;border-radius:10px;padding:6px 8px;font-size:12.5px;line-height:1.3;list-style:none}
+.oi-studio .evt b{font-weight:600}
+.oi-studio a.evt:hover{filter:brightness(.97)}
+.oi-studio .cal-items{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.oi-studio .cal-item{border-radius:10px;padding:6px 8px;font-size:12.5px;line-height:1.3}
+.oi-studio .cal-item a{color:inherit}
+.oi-studio .cal-item .cal-t{font-size:13px;font-weight:600}
+.oi-studio .cal-item.late .cal-time{color:var(--bad);font-weight:600}
+.oi-studio .cal-item.done .cal-t{text-decoration:line-through;opacity:.65}
+.oi-studio .cal-time{font-family:var(--font-geist-mono),ui-monospace,monospace;font-size:12px}
+.oi-studio .cal-acts{display:flex;gap:8px;margin-top:4px}
+.oi-studio .cal-acts button{border:0;background:transparent;padding:0;font-size:12px;text-decoration:underline;color:inherit;cursor:pointer;opacity:.85}
+.oi-studio .cal-form{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px}
+
+/* ── Day: one card, a row per thing ──────────────────────────── */
+.oi-studio .cal-day{max-width:52rem}
+.oi-studio .cal-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:start;padding:12px 18px;border-top:1px solid var(--soft)}
+.oi-studio .cal-row:first-child{border-top:0}
+.oi-studio .cal-row .cal-t{font-size:14.5px;font-weight:600}
+.oi-studio .cal-row.done .cal-t{text-decoration:line-through;color:var(--muted)}
+.oi-studio .cal-row .chip{min-height:22px;padding:0 8px;font-size:12px}
+.oi-studio .cal-row .cal-form,.oi-studio .cal-row .cal-task{grid-column:1 / -1}
+
+/* ── Month ───────────────────────────────────────────────────── */
+.oi-studio .cal-month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));min-width:44rem}
+.oi-studio .cal-month > .wh{border-left:1px solid var(--soft)}
+.oi-studio .cal-month > .wh:first-child{border-left:0}
+.oi-studio .cal-cell{display:flex;flex-direction:column;gap:3px;min-height:6.5rem;padding:6px;border-top:1px solid var(--soft);border-left:1px solid var(--soft);min-width:0}
+.oi-studio .cal-cell:nth-child(7n+1){border-left:0}
+.oi-studio .cal-cell.out{opacity:.45}
+.oi-studio .cal-cell.today{background:var(--today)}
+.oi-studio .cal-num{align-self:flex-start;min-width:24px;height:24px;padding:0 6px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600}
+.oi-studio .cal-cell.today .cal-num{background:var(--acc);color:var(--paper)}
+.oi-studio .cal-pill{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:6px;padding:2px 6px;font-size:11.5px}
+.oi-studio .cal-pill.late{color:var(--bad);font-weight:600}
+.oi-studio .cal-pill.done{text-decoration:line-through;opacity:.6}
+
+/* ── One Interiors visits ────────────────────────────────────── */
+.oi-studio .cal-visit{display:flex;flex-direction:column;gap:10px}
+.oi-studio .cal-visit.hl{box-shadow:inset 0 0 0 2px var(--warn-s)}
+.oi-studio .cal-dayh{margin:0;font-size:13px;font-weight:600;color:var(--muted)}
+
+@media (max-width:760px){
+  .oi-studio .cal-views{margin-left:0}
+  .oi-studio .cal-row{padding:12px 14px}
+}

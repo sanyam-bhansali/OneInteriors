@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Your home in 3D</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0B0B0B}
+a:focus-visible,button:focus-visible{outline:2px solid #BA5329;outline-offset:3px}
+button{font-family:inherit}
+.seg{min-height:40px;padding:0 16px;border:0;border-radius:999px;font-size:14px;font-weight:500;cursor:pointer;background:transparent;color:#0B0B0B}
+.seg[aria-pressed="true"]{background:#0B0B0B;color:#F1F0EC}
+.room{min-height:38px;padding:0 13px;border:0;border-radius:999px;font-size:13.5px;font-weight:500;cursor:pointer;background:transparent;color:#0B0B0B;box-shadow:inset 0 0 0 1px rgba(11,11,11,.2);display:flex;align-items:center;gap:7px}
+.room[aria-pressed="true"]{box-shadow:inset 0 0 0 2px #BA5329;color:#BA5329}
+.room i{width:8px;height:8px;border-radius:4px;display:block}
+@keyframes oibob{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.5px)}}
+.wk{animation:oibob 1.4s ease-in-out infinite}
+@keyframes oipulse{50%{transform:scale(1.8);opacity:.35}}
+.oi-now{animation:oipulse 1.6s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){.wk,.oi-now{animation:none}}
+/* motion and depth layer */
+@keyframes oiRise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes oiKen{from{transform:scale(1.12)}to{transform:scale(1)}}
+@keyframes oiGrowX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes oiPop{0%{transform:scale(.95)}60%{transform:scale(1.03)}100%{transform:scale(1)}}
+h1{animation:oiRise .8s cubic-bezier(.22,1,.36,1) both}
+h1 ~ p,h1 + span{animation:oiRise .8s cubic-bezier(.22,1,.36,1) .12s both}
+[role="radiogroup"] > *,[role="group"] > *,ol > li,fieldset > div > *,[role="tablist"] > *{animation:oiRise .7s cubic-bezier(.22,1,.36,1) both}
+[role="radiogroup"] > *:nth-child(1),[role="group"] > *:nth-child(1),ol > li:nth-child(1),fieldset > div > *:nth-child(1),[role="tablist"] > *:nth-child(1){animation-delay:0.22s}
+[role="radiogroup"] > *:nth-child(2),[role="group"] > *:nth-child(2),ol > li:nth-child(2),fieldset > div > *:nth-child(2),[role="tablist"] > *:nth-child(2){animation-delay:0.28s}
+[role="radiogroup"] > *:nth-child(3),[role="group"] > *:nth-child(3),ol > li:nth-child(3),fieldset > div > *:nth-child(3),[role="tablist"] > *:nth-child(3){animation-delay:0.34s}
+[role="radiogroup"] > *:nth-child(4),[role="group"] > *:nth-child(4),ol > li:nth-child(4),fieldset > div > *:nth-child(4),[role="tablist"] > *:nth-child(4){animation-delay:0.40s}
+[role="radiogroup"] > *:nth-child(5),[role="group"] > *:nth-child(5),ol > li:nth-child(5),fieldset > div > *:nth-child(5),[role="tablist"] > *:nth-child(5){animation-delay:0.46s}
+[role="radiogroup"] > *:nth-child(6),[role="group"] > *:nth-child(6),ol > li:nth-child(6),fieldset > div > *:nth-child(6),[role="tablist"] > *:nth-child(6){animation-delay:0.52s}
+[role="radiogroup"] > *:nth-child(7),[role="group"] > *:nth-child(7),ol > li:nth-child(7),fieldset > div > *:nth-child(7),[role="tablist"] > *:nth-child(7){animation-delay:0.58s}
+[role="radiogroup"] > *:nth-child(8),[role="group"] > *:nth-child(8),ol > li:nth-child(8),fieldset > div > *:nth-child(8),[role="tablist"] > *:nth-child(8){animation-delay:0.64s}
+[role="radiogroup"] > *:nth-child(9),[role="group"] > *:nth-child(9),ol > li:nth-child(9),fieldset > div > *:nth-child(9),[role="tablist"] > *:nth-child(9){animation-delay:0.70s}
+[role="radiogroup"] > *:nth-child(10),[role="group"] > *:nth-child(10),ol > li:nth-child(10),fieldset > div > *:nth-child(10),[role="tablist"] > *:nth-child(10){animation-delay:0.76s}
+[role="radiogroup"] > *:nth-child(11),[role="group"] > *:nth-child(11),ol > li:nth-child(11),fieldset > div > *:nth-child(11),[role="tablist"] > *:nth-child(11){animation-delay:0.82s}
+[role="radiogroup"] > *:nth-child(12),[role="group"] > *:nth-child(12),ol > li:nth-child(12),fieldset > div > *:nth-child(12),[role="tablist"] > *:nth-child(12){animation-delay:0.88s}
+[role="progressbar"] > span{transform-origin:left center;animation:oiGrowX .9s cubic-bezier(.22,1,.36,1) both}
+[role="progressbar"] > span:nth-child(1){animation-delay:0.05s}
+[role="progressbar"] > span:nth-child(2){animation-delay:0.10s}
+[role="progressbar"] > span:nth-child(3){animation-delay:0.15s}
+[role="progressbar"] > span:nth-child(4){animation-delay:0.20s}
+[role="progressbar"] > span:nth-child(5){animation-delay:0.25s}
+[role="progressbar"] > span:nth-child(6){animation-delay:0.30s}
+[role="progressbar"] > span:nth-child(7){animation-delay:0.35s}
+img[style*="inset: 0"]{animation:oiKen 18s ease-in-out both alternate infinite}
+a,button{transition:transform .28s cubic-bezier(.34,1.56,.64,1),box-shadow .28s ease,background-color .28s ease,color .28s ease}
+a:active,button:active{transform:scale(.965)}
+button[aria-pressed="true"],button[aria-checked="true"]{animation:oiPop .45s cubic-bezier(.34,1.56,.64,1)}
+a[style*="background: rgb(11, 11, 11)"][style*="border-radius: 999px"],button[style*="background: rgb(11, 11, 11)"][style*="border-radius: 999px"]{box-shadow:0 14px 30px -16px rgba(11,11,11,.45)}
+div[style*="background: rgb(11, 11, 11)"][style*="border-radius: 20px"],div[style*="background: rgb(11, 11, 11)"][style*="border-radius: 18px"],article[style*="background: rgb(11, 11, 11)"]{box-shadow:0 28px 56px -26px rgba(11,11,11,.6),inset 0 1px 0 rgba(255,255,255,.06)}
+div[style*="background: rgb(186, 83, 41)"][style*="border-radius: 20px"]{box-shadow:0 28px 56px -22px rgba(186,83,41,.65),inset 0 1px 0 rgba(255,255,255,.18)}
+img[style*="border-radius: 12px"],img[style*="border-radius: 16px"],img[style*="border-radius: 14px"]{box-shadow:0 14px 30px -18px rgba(11,11,11,.5)}
+nav a[aria-current="page"] svg{animation:oiPop .7s cubic-bezier(.34,1.56,.64,1) both}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.01ms!important}}
+@keyframes oiSway{0%,100%{transform:perspective(900px) rotateX(6deg) rotateY(-8deg)}50%{transform:perspective(900px) rotateX(6deg) rotateY(8deg)}}
+@keyframes oiHammer{from{transform:rotate(-38deg)}to{transform:rotate(14deg)}}
+svg[role="img"]{transform-origin:50% 60%;animation:oiSway 10s ease-in-out infinite}
+.arm{transform-box:fill-box;transform-origin:0% 50%;animation:oiHammer .55s ease-in-out infinite alternate}
+
+
+/* bottom bar */
+@keyframes gBreathe{50%{transform:scale(1.07)}}
+@keyframes gSpin{to{transform:rotate(360deg)}}
+.oi-tab{min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;text-decoration:none;color:#A9A7A1!important;font-size:13px;font-weight:500}
+.oi-tab[aria-current="page"]{color:#E07A4E!important;font-weight:600}
+.oi-geio{position:relative;width:52px;height:52px;margin-top:-22px;border-radius:50%;background:radial-gradient(circle at 34% 28%,#FFF6E6 0%,#F2C98A 26%,#E07A4E 56%,#BA5329 80%,#6E2A10 100%);box-shadow:0 0 0 5px #0B0B0B,0 0 26px -2px rgba(242,201,138,.75);animation:gBreathe 4.2s ease-in-out infinite}
+.oi-geio::after{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,transparent 0 28%,rgba(255,248,236,.6) 40%,transparent 54%);mix-blend-mode:screen;animation:gSpin 5.5s linear infinite}
+@media (prefers-reduced-motion: reduce){.oi-geio,.oi-geio::after{animation:none!important}}
+[style*="overflow-y: auto"] > *{flex-shrink:0}
+
+/* website skin (one-interiors home-cb.css) */
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"],button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"],a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]{position:relative;overflow:hidden;isolation:isolate;transition:transform .45s cubic-bezier(.22,1,.36,1),color .35s}
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]::before,button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]::before,a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:#C1582E;transform:translateY(101%);border-top-left-radius:50% 40%;border-top-right-radius:50% 40%;transition:transform .55s cubic-bezier(.22,1,.36,1),border-radius .55s cubic-bezier(.22,1,.36,1)}
+a[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]:hover::before,button[style*="border-radius: 999px"][style*="background: rgb(11, 11, 11)"]:hover::before,a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]:hover::before{transform:none;border-radius:999px}
+a[style*="border-radius: 999px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"]:hover{color:#FFFFFF!important}
+a[style*="min-height: 56px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 52px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 46px"][style*="background: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 56px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child,a[style*="min-height: 46px"][style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child{width:28px;height:28px;padding:7px;box-sizing:border-box;border-radius:50%;background:#FFFFFF;color:#0B0B0B;margin-right:-12px;flex-shrink:0}
+a[style*="background: rgb(255, 255, 255); color: rgb(11, 11, 11)"] > svg:last-child{background:#0B0B0B!important;color:#FFFFFF!important}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; display: flex; flex-direction: column; background: #FFFFFF; color: #0B0B0B; font-family: 'Geist', sans-serif; overflow: hidden">
+  <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 16px 0 10px">
+    <a href="Feed.dc.html" aria-label="Back to site" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #0B0B0B"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></a>
+    
+  </div>
+
+  <div style="flex: 1; overflow-y: auto; padding: 6px 20px 24px; display: flex; flex-direction: column; gap: 16px">
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <span style="align-self: flex-start; font-size: 13px; font-weight: 500; letter-spacing: 0; color: #FFFFFF; background: #BA5329; padding: 5px 10px; border-radius: 999px">Full-home orders only</span>
+      <h1 style="margin: 0; font-size: 42px; font-weight: 500; letter-spacing: -0.05em; line-height: .95">Your home in 3D</h1>
+    </div>
+
+    <div role="group" aria-label="View" style="display: flex; gap: 4px; padding: 4px; border-radius: 999px; box-shadow: inset 0 0 0 1px rgba(11,11,11,.18); align-self: flex-start">
+      <button type="button" class="seg" aria-pressed="{{todaySel}}" onClick="{{showToday}}">Today</button>
+      <button type="button" class="seg" aria-pressed="{{designSel}}" onClick="{{showDesign}}">Finished design</button>
+    </div>
+
+    <div style="position: relative; border-radius: 22px; overflow: hidden; background: radial-gradient(ellipse 80% 70% at 50% 45%, #FBFAF6, #E6E3DA)">
+      <svg viewBox="0 0 390 280" width="350" height="252" role="img" aria-label="{{svgLabel}}" style="display: block; margin: 18px auto 10px">
+        <sc-for list="{{shapes}}" as="s" hint-placeholder-count="20">
+          <polygon points="{{s.pts}}" fill="{{s.fill}}" stroke="{{s.stroke}}" stroke-width="{{s.sw}}" stroke-dasharray="{{s.dash}}" stroke-linejoin="round" opacity="{{s.op}}" onClick="{{s.tap}}" style="cursor: pointer"></polygon>
+        </sc-for>
+        <sc-for list="{{workers}}" as="w" hint-placeholder-count="3">
+          <g transform="{{w.tf}}">
+            <g class="wk">
+              <ellipse cx="0" cy="0" rx="6" ry="2.4" fill="rgba(11,11,11,.18)"></ellipse>
+              <rect x="-3.2" y="-9" width="2.6" height="9" rx="1.2" fill="#3A3F4A"></rect>
+              <rect x="0.6" y="-9" width="2.6" height="9" rx="1.2" fill="#3A3F4A"></rect>
+              <rect x="-4.6" y="-19" width="9.2" height="11" rx="3" fill="#F2A33A"></rect>
+              <rect x="-4.6" y="-14.5" width="9.2" height="1.6" fill="#FFF3D6"></rect>
+              <g class="arm"><rect x="3.5" y="-18.5" width="7" height="2.2" rx="1.1" fill="#F2A33A"></rect><rect x="9.6" y="-21.5" width="2.6" height="6.4" rx=".8" fill="#5F5F5F"></rect></g>
+              <circle cx="0" cy="-22.5" r="3.6" fill="#C08A62"></circle>
+              <path d="M-4.6 -23.5 a4.6 4.2 0 0 1 9.2 0 z" fill="#F4C431"></path>
+            </g>
+          </g>
+        </sc-for>
+      </svg>
+      <div style="position: absolute; top: 12px; left: 12px; display: flex; align-items: center; gap: 8px; padding: 6px 11px; border-radius: 999px; background: rgba(255,255,255,.85); font-family: 'Geist Mono', monospace; font-size: 13px; letter-spacing: .04em; color: #0B0B0B">
+        <sc-if value="{{isToday}}" hint-placeholder-val="{{ true }}"><span class="oi-now" style="width: 7px; height: 7px; border-radius: 4px; background: #BA5329; display: block"></span></sc-if>
+        <span>{{chip}}</span>
+      </div>
+      <sc-if value="{{isToday}}" hint-placeholder-val="{{ true }}">
+        <div style="position: absolute; bottom: 12px; right: 12px; padding: 6px 11px; border-radius: 999px; background: #0B0B0B; color: #F1F0EC; font-family: 'Geist Mono', monospace; font-size: 13px; letter-spacing: .04em">3 people on site today</div>
+      </sc-if>
+    </div>
+
+    <div style="display: flex; gap: 14px; font-family: 'Geist Mono', monospace; font-size: 13px; letter-spacing: .04em; color: #5F5F5F">
+      <span style="display: flex; align-items: center; gap: 6px"><i style="width: 10px; height: 10px; border-radius: 3px; background: #2F6B42; display: block"></i>Done</span>
+      <span style="display: flex; align-items: center; gap: 6px"><i style="width: 10px; height: 10px; border-radius: 3px; background: #BA5329; display: block"></i>In progress</span>
+      <span style="display: flex; align-items: center; gap: 6px"><i style="width: 10px; height: 10px; border-radius: 3px; border: 1.5px dashed #8D8D8D; box-sizing: border-box; display: block"></i>Next up</span>
+    </div>
+
+    <div role="group" aria-label="Rooms" style="display: flex; flex-wrap: wrap; gap: 6px">
+      <sc-for list="{{rooms}}" as="r" hint-placeholder-count="5">
+        <button type="button" class="room" aria-pressed="{{r.pressed}}" onClick="{{r.pick}}"><i style="background: {{r.dot}}"></i>{{r.name}}</button>
+      </sc-for>
+    </div>
+
+    <section style="border-top: 1px solid #E6E6E3; padding-top: 16px; display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; justify-content: space-between; align-items: baseline">
+        <h2 style="margin: 0; font-size: 24px; font-weight: 500; letter-spacing: -0.035em">{{sel.name}}</h2>
+        <span style="font-size: 13px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; color: {{sel.color}}">{{sel.status}}</span>
+      </div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #2B2B29">{{sel.note}}</p>
+      <sc-if value="{{sel.hasPhoto}}" hint-placeholder-val="{{ true }}">
+        <img src="{{sel.photo}}" alt="{{sel.photoAlt}}" style="width: 100%; height: 150px; object-fit: cover; border-radius: 14px">
+      </sc-if>
+      <sc-if value="{{sel.hasLink}}" hint-placeholder-val="{{ true }}">
+        <a href="{{sel.href}}" style="font-size: 13px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; text-decoration: none; min-height: 36px; display: flex; align-items: center; gap: 8px">{{sel.linkLabel}}
+          <svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3.5 9h11M10 4.5 14.5 9 10 13.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg></a>
+      </sc-if>
+    </section>
+
+    <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #5F5F5F">Built from Teakline's design for your flat. A room changes only when the studio logs it on site and your expert checks the photos. People appear only on days someone was actually there.</p>
+  </div>
+
+  <nav aria-label="Main" style="flex-shrink: 0; position: relative; z-index: 4; background: #0B0B0B; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; padding: 8px 4px 22px">
+    <a href="Main.dc.html" class="oi-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>Home</a>
+    <a href="Tracker.dc.html" class="oi-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h6"></path></svg>Project</a>
+    <a href="GeioHome.dc.html" class="oi-tab" aria-label="Ask GEIO"><span class="oi-geio" aria-hidden="true"></span>GEIO</a>
+    <a href="Feed.dc.html" class="oi-tab" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>Site</a>
+    <a href="Me.dc.html" class="oi-tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>Me</a>
+  </nav>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { view: 'today', room: 'kitchen' };
+  }
+  renderVals() {
+    const S = 20.8, T = 12, Z = 24, OX = 175, OY = 46;
+    const P = (x, y, z) => (OX + (x - y) * S).toFixed(1) + ',' + (OY + (x + y) * T - z * Z).toFixed(1);
+    const shade = (hex, f) => {
+      const n = parseInt(hex.slice(1), 16);
+      const c = (v) => Math.max(0, Math.min(255, Math.round(v * f)));
+      const r = c((n >> 16) & 255), g = c((n >> 8) & 255), b = c(n & 255);
+      return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    };
+    const design = this.state.view === 'design';
+    const sel = this.state.room;
+    const shapes = [];
+    const add = (pts, fill, extra) => shapes.push(Object.assign({ pts: pts.join(' '), fill: fill, stroke: 'none', sw: 0, dash: 'none', op: 1, tap: undefined }, extra || {}));
+    const box = (x0, y0, x1, y1, h, col, op) => {
+      add([P(x0, y1, 0), P(x1, y1, 0), P(x1, y1, h), P(x0, y1, h)], shade(col, 0.84), { op: op || 1 });
+      add([P(x1, y0, 0), P(x1, y1, 0), P(x1, y1, h), P(x1, y0, h)], shade(col, 0.72), { op: op || 1 });
+      add([P(x0, y0, h), P(x1, y0, h), P(x1, y1, h), P(x0, y1, h)], col, { op: op || 1 });
+    };
+    const PLY = '#D7B98E';
+    const rooms = [
+      { id: 'living', name: 'Living & dining', r: [0, 0, 6, 4], today: 'next',
+        floorD: '#D9B98C', floorT: '#ECE8DF',
+        furnD: [[0.5, 0.5, 3, 1.3, 0.5, '#CFC4B2'], [0.8, 1.7, 3.2, 3.2, 0.03, '#E8DCC8'], [1.3, 2.0, 2.5, 2.8, 0.3, '#8A5A3C'], [5.3, 0.6, 5.8, 3.4, 0.6, '#6B4A33']],
+        furnT: [],
+        statusT: 'Next up', noteT: 'Walls, floor and wiring done. The TV unit and false ceiling start next week.',
+        noteD: 'Linen sofa, oak coffee table and a walnut TV wall, as in your design.',
+        photoT: '', linkT: ['Tracker.dc.html', 'See the timeline'] },
+      { id: 'bed1', name: 'Bedroom 1', r: [6, 0, 10, 4], today: 'progress',
+        floorD: '#D9B98C', floorT: '#E6DCCB',
+        furnD: [[7, 1, 9.2, 3.2, 0.45, '#E8E2D6'], [7, 1, 7.25, 3.2, 0.95, '#8A5A3C'], [9.4, 0.3, 9.9, 3.7, 1.6, '#B98B5E']],
+        furnT: [[9.4, 0.3, 9.9, 3.7, 1.6, PLY]],
+        statusT: 'In progress', noteT: 'Wardrobe frames fitted today. Ramesh, carpenter, on site from 9:40 am.',
+        noteD: 'Queen bed with a wood headboard and a full-height wardrobe.',
+        photoT: '/_blob/f60e3293a5cd9a3e7b83a435545cf41d', linkT: ['Feed.dc.html', 'See today on site'] },
+      { id: 'kitchen', name: 'Kitchen', r: [0, 4, 3, 8], today: 'progress',
+        floorD: '#E9E2D3', floorT: '#E6DCCB',
+        furnD: [[0.2, 4.2, 0.8, 7.8, 0.7, '#9DAE97'], [0.8, 7.2, 2.8, 7.8, 0.7, '#9DAE97']],
+        furnT: [[0.2, 4.2, 0.8, 7.8, 0.7, PLY], [0.8, 7.2, 2.8, 7.8, 0.7, PLY]],
+        statusT: 'In progress', noteT: 'Carcass fixed to the wall today. Shutters wait on your finish choice, due Fri 16 Oct.',
+        noteD: 'L-shaped kitchen with sage matte shutters and a quartz counter.',
+        photoT: '/_blob/b33143fe0a531c7c056e4baf9aa000d3', linkT: ['Decision.dc.html', 'Choose the shutter finish'] },
+      { id: 'bath', name: 'Bath & utility', r: [3, 4, 6, 8], today: 'done',
+        floorD: '#D5E0E1', floorT: '#D5E0E1',
+        furnD: [[3.3, 4.3, 4.6, 5.6, 0.12, '#BFD3D6'], [5.2, 6.4, 5.8, 7.7, 0.6, '#F3F1EC'], [3.3, 7.2, 4.4, 7.8, 0.5, '#E9E6DF']],
+        furnT: [[3.3, 4.3, 4.6, 5.6, 0.12, '#BFD3D6'], [5.2, 6.4, 5.8, 7.7, 0.6, '#F3F1EC'], [3.3, 7.2, 4.4, 7.8, 0.5, '#E9E6DF']],
+        statusT: 'Done', noteT: 'Tiling and fittings finished. Checked by your expert on 21 Sep.',
+        noteD: 'Grey-blue tiles, a walk-in shower and a wall-hung vanity.',
+        photoT: '', linkT: null },
+      { id: 'bed2', name: 'Bedroom 2', r: [6, 4, 10, 8], today: 'progress',
+        floorD: '#D9B98C', floorT: '#E6DCCB',
+        furnD: [[7, 4.8, 9.2, 7, 0.45, '#E8E2D6'], [7, 4.8, 7.25, 7, 0.95, '#8A5A3C'], [9.4, 4.3, 9.9, 7.7, 1.6, '#B98B5E']],
+        furnT: [[9.4, 4.3, 9.9, 7.7, 1.6, PLY]],
+        statusT: 'In progress', noteT: 'Wardrobe frames fitted today by Ramesh’s helper.',
+        noteD: 'Second bedroom with a study corner and a full-height wardrobe.',
+        photoT: '/_blob/232d60b704bdb9bfc844c361224aed01', linkT: ['Feed.dc.html', 'See today on site'] }
+    ];
+    const order = rooms.slice().sort((a, b) => (a.r[0] + a.r[1]) - (b.r[0] + b.r[1]));
+    order.forEach((rm) => {
+      const [x0, y0, x1, y1] = rm.r;
+      const st = design ? 'done' : rm.today;
+      const isSel = rm.id === sel;
+      const pick = () => this.setState({ room: rm.id });
+      const floor = design ? rm.floorD : rm.floorT;
+      const stroke = isSel ? '#0B0B0B' : (st === 'next' ? '#9A988F' : 'rgba(11,11,11,.18)');
+      add([P(x0, y0, 0), P(x1, y0, 0), P(x1, y1, 0), P(x0, y1, 0)], floor, { stroke: stroke, sw: isSel ? 2.4 : 1, dash: st === 'next' && !isSel ? '4 3' : 'none', tap: pick });
+      const H = st === 'next' ? 0.5 : 1.2;
+      const wop = st === 'next' ? 0.55 : 1;
+      add([P(x0, y0, 0), P(x1, y0, 0), P(x1, y0, H), P(x0, y0, H)], '#EFE8DC', { stroke: 'rgba(11,11,11,.14)', sw: 0.8, op: wop, tap: pick });
+      add([P(x0, y0, 0), P(x0, y1, 0), P(x0, y1, H), P(x0, y0, H)], '#E2D9C9', { stroke: 'rgba(11,11,11,.14)', sw: 0.8, op: wop, tap: pick });
+      const furn = (design ? rm.furnD : rm.furnT).slice().sort((a, b) => (a[0] + a[1]) - (b[0] + b[1]));
+      furn.forEach((f) => box(f[0], f[1], f[2], f[3], f[4], f[5], (!design && f[5] === PLY) ? 0.92 : 1));
+    });
+    const W = (x, y) => 'translate(' + (OX + (x - y) * S).toFixed(1) + ' ' + (OY + (x + y) * T).toFixed(1) + ')';
+    const workers = design ? [] : [{ tf: W(1.9, 6.2) }, { tf: W(8.6, 2.2) }, { tf: W(8.5, 6.1) }];
+    const cur = rooms.find((r) => r.id === sel) || rooms[0];
+    const stColor = { 'Done': '#2F6B42', 'In progress': '#BA5329', 'Next up': '#5F5F5F' };
+    const dotFor = (rm) => design ? '#2F6B42' : (rm.today === 'done' ? '#2F6B42' : rm.today === 'progress' ? '#0B0B0B' : '#B9B7B1');
+    const status = design ? 'Design' : cur.statusT;
+    return {
+      shapes, workers,
+      isToday: !design,
+      todaySel: design ? 'false' : 'true',
+      designSel: design ? 'true' : 'false',
+      showToday: () => this.setState({ view: 'today' }),
+      showDesign: () => this.setState({ view: 'design' }),
+      chip: design ? 'Design view: how it will look' : 'Live from site, Thu 5:12 pm',
+      svgLabel: design ? 'Your finished flat as designed, all five rooms complete' : 'Your flat today: bath done, kitchen and both bedrooms in progress with workers, living room next',
+      rooms: rooms.map((rm) => ({ name: rm.name, dot: dotFor(rm), pressed: rm.id === sel ? 'true' : 'false', pick: () => this.setState({ room: rm.id }) })),
+      sel: {
+        name: cur.name,
+        status: status,
+        color: design ? '#2F6B42' : stColor[cur.statusT],
+        note: design ? cur.noteD : cur.noteT,
+        hasPhoto: !design && !!cur.photoT,
+        photo: cur.photoT,
+        photoAlt: cur.name + ' on site today',
+        hasLink: !design && !!cur.linkT,
+        href: cur.linkT ? cur.linkT[0] : 'Home3D.dc.html',
+        linkLabel: cur.linkT ? cur.linkT[1] : ''
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

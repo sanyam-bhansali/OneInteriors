@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { PageBody } from '../../StudioShell';
 import { myFields } from '@/modules/studio-practice/fields';
 import { FieldEditor } from './FieldEditor';
 
@@ -36,12 +35,12 @@ export default async function FieldsPage() {
   const fields = await myFields();
 
   return (
-    <PageBody>
-      <div className="s-card mb-5 border-l-[3px] !border-l-[var(--s-accent)] p-5">
+    <>
+      <div className="card mb-5 border-l-[3px] !border-l-[var(--s-accent)] p-5">
         <p className="m-0 mb-2 text-[14.5px] font-semibold">
           Whatever you keep writing in the notes probably belongs here.
         </p>
-        <p className="m-0 max-w-[70ch] text-[14px] leading-relaxed text-[var(--s-ink-2)]">
+        <p className="m-0 max-w-[70ch] text-[14px] leading-relaxed muted">
           A field added here appears on every client — on the add form, on the card, and in the
           update panel. Turn on <strong>Group by</strong> and it becomes a way to read the whole
           list: a studio working one tower at a time groups by society and sees nine buildings
@@ -50,6 +49,6 @@ export default async function FieldsPage() {
       </div>
 
       <FieldEditor fields={fields} />
-    </PageBody>
+    </>
   );
 }

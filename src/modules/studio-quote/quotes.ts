@@ -12,13 +12,15 @@ import 'server-only';
  * The money is all in `pricing.ts`, which is pure and tested.
  */
 
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { fromDb, toDb, type Paise } from '@/lib/money';
-import { myStudioId, myBranding } from './store';
+import { myBranding } from './store';
 import {
   computeTotals,
+  feeBpsOf,
   GST_BPS,
+  keptFeeBps,
   lineAmount,
   type QuoteLineInput,
   type QuoteTerms,
@@ -33,6 +35,11 @@ import { planUseFrom } from '@/modules/brief/mapping';
 import type { PlanRoomSize } from '@/modules/brief/types';
 import { readPhases, type PaymentPhase } from '@/modules/studio/payment-phases';
 import type { ComparableLine } from './revision';
+import { leadInScope, myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
+import { can } from '@/modules/studio/roles';
+import { record as recordLeadEvent } from '@/modules/studio-practice/events';
+import { issueRevision } from '@/modules/studio-sales/revisions';
+import { quoteWriteRefusal } from './write-rules';
 
 export type QuoteStatusName = 'DRAFT' | 'ISSUED' | 'ACCEPTED' | 'DECLINED';
 export type QuoteStageName = 'SALES' | 'DESIGN';
@@ -71,6 +78,8 @@ export interface QuoteRow {
   stage: QuoteStageName;
   status: QuoteStatusName;
   clientName: string;
+  /** The lead it is for (Studio OS Phase 1), when it has one. */
+  clientId: string | null;
   clientPhone: string | null;
   clientEmail: string | null;
   society: string | null;
@@ -124,7 +133,8 @@ export interface QuoteSummary {
  *  you are still thinking about. `search` matches client, number, phone or
  *  society, any part, any case. */
 export async function myQuotes(search?: string): Promise<QuoteSummary[]> {
-  const studioId = await myStudioId();
+  const qs = await quoteScope();
+  const studioId = qs?.studioId ?? null;
   if (!studioId) return [];
 
   const q = search?.trim().slice(0, 80);
@@ -132,6 +142,7 @@ export async function myQuotes(search?: string): Promise<QuoteSummary[]> {
   try {
     const rows = await prisma.studioQuote.findMany({
       where: {
+        ...qs?.where,
         studioId,
         ...(q
           ? {
@@ -202,17 +213,34 @@ function toLineInput(l: {
 }
 
 export async function getQuote(id: string): Promise<QuoteRow | null> {
-  const studioId = await myStudioId();
+  const qs = await quoteScope();
+  const studioId = qs?.studioId ?? null;
   if (!studioId) return null;
+  return loadQuote(id, studioId, qs?.where ?? {});
+}
 
+/**
+ * The comparison for design sign-off (project lifecycle, owner 13 Oct 2026):
+ * for a caller that has ALREADY checked the member's right on the project
+ * these quotations belong to (`design.close`), so a designer, who writes no
+ * quotations, can sign off. Studio-scoped like every read here.
+ */
+export async function quotesToCompareInStudio(currentId: string, studioId: string): Promise<QuoteComparison | null> {
+  const current = await loadQuote(currentId, studioId, {});
+  if (!current?.basedOnId) return null;
+  const base = await loadQuote(current.basedOnId, studioId, {});
+  return base ? { base, current } : null;
+}
+
+async function loadQuote(id: string, studioId: string, scope: Prisma.StudioQuoteWhereInput): Promise<QuoteRow | null> {
   try {
     // Scoped by studioId as well as id. A quotation id in a URL is not proof
     // of anything, and this is a client's name and phone number.
     const row = await prisma.studioQuote.findFirst({
-      where: { id, studioId },
+      where: { ...scope, id, studioId },
       include: { lines: { orderBy: { sortOrder: 'asc' } }, studio: { select: { paymentPhases: true } } },
     });
-    const planRooms = row ? await planRoomsOfBrief(row.briefId) : [];
+    const planRooms = row ? await planRoomsOfBrief(row.briefId, row.clientId, studioId, row.id) : [];
     if (!row) return null;
 
     return {
@@ -240,6 +268,7 @@ export async function getQuote(id: string): Promise<QuoteRow | null> {
       quoteDate: row.quoteDate ?? row.createdAt,
       phases: quotePhases(row.phases, row.studio.paymentPhases),
       basedOnId: row.basedOnId,
+      clientId: row.clientId,
       planRooms,
       welcomeNote: row.welcomeNote,
       terms: row.terms,
@@ -306,15 +335,26 @@ async function nextNumber(studioId: string): Promise<string> {
   const year = new Date().getFullYear();
   const prefix = `${year}-`;
 
-  const last = await prisma.studioQuote.findFirst({
+  /* Copies carry a suffix ("2026-002-D" for a Design Final), which sorts
+     after the plain numbers and does not parse as one: taking the last row
+     read "002-D" as NaN, restarted at 001 and clashed with the unique
+     number, so every new quotation failed once a copy existed. Read every
+     number this year and take the highest leading count. */
+  const rows = await prisma.studioQuote.findMany({
     where: { studioId, number: { startsWith: prefix } },
-    orderBy: { number: 'desc' },
     select: { number: true },
   });
+  return nextQuoteNumber(year, rows.map((r) => r.number));
+}
 
-  const n = last ? Number(last.number.slice(prefix.length)) : 0;
-  const next = Number.isFinite(n) ? n + 1 : 1;
-  return `${prefix}${String(next).padStart(3, '0')}`;
+/** The next "YYYY-NNN" after the highest count among `numbers`, suffixes ignored. Pure, for tests. */
+export function nextQuoteNumber(year: number, numbers: string[]): string {
+  const prefix = `${year}-`;
+  const top = numbers.reduce((max, n) => {
+    const m = /^(\d+)/.exec(n.startsWith(prefix) ? n.slice(prefix.length) : '');
+    return m ? Math.max(max, Number(m[1])) : max;
+  }, 0);
+  return `${prefix}${String(top + 1).padStart(3, '0')}`;
 }
 
 export interface NewQuoteInput {
@@ -329,11 +369,42 @@ export interface NewQuoteInput {
    * Callers must have checked the client is this studio's.
    */
   link?: { clientId: string; introductionId: string; briefId: string | null };
+  /**
+   * The studio's own lead this quotation is for (Studio OS Phase 1): set
+   * from the lead page or picked on the new-quotation screen. Checked
+   * against the signed-in person's leads here. A salesperson must give one:
+   * a quotation with no lead is not theirs to see.
+   */
+  clientId?: string;
+}
+
+/**
+ * Whose quotations the signed-in person may touch (Studio OS Phase 1):
+ * owner and PM, the studio's; a salesperson, only those of leads assigned
+ * to them. `where` goes into every quotation query here, beside `studioId`.
+ */
+async function quoteScope(): Promise<{ studioId: string; where: Prisma.StudioQuoteWhereInput; lead: LeadScope } | null> {
+  const lead = await myLeadScope();
+  if (!lead || !can(lead.member, 'quote.write', { assigned: true })) return null;
+  return { studioId: lead.studioId, where: lead.quotes, lead };
+}
+
+/** Whether the signed-in person may write quotations at all (for the pages). */
+export async function mayQuote(): Promise<{ seesAll: boolean } | null> {
+  const qs = await quoteScope();
+  return qs ? { seesAll: qs.lead.seesAll } : null;
 }
 
 export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
-  const studioId = await myStudioId();
-  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+  const qs = await quoteScope();
+  const studioId = qs?.studioId ?? null;
+  if (!qs || !studioId) return { ok: false, error: 'No studio on this account.' };
+
+  /* The lead, checked: a salesperson's own, or any of the studio's for owner and PM. */
+  const leadId = input.link?.clientId ?? input.clientId ?? null;
+  const lead = leadId ? await leadInScope(qs.lead, leadId) : null;
+  if (leadId && !lead) return { ok: false, error: 'That lead is not one of yours.' };
+  if (!lead && !qs.lead.seesAll) return { ok: false, error: 'Pick the lead this quotation is for.' };
 
   /* Shut until the studio has confirmed the rates filled from its own
      quotations — see rates-gate.ts. Enforced here as well as on the page,
@@ -387,10 +458,14 @@ export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
         carpetSqft: input.carpetSqft ?? null,
         ...(input.link
           ? { clientId: input.link.clientId, introductionId: input.link.introductionId, briefId: input.link.briefId }
-          : {}),
+          : lead
+            ? { clientId: lead.id }
+            : {}),
         // Snapshotted at creation. Changing the defaults in Settings later must
-        // never rewrite a quotation already sent to a client.
-        feeBps: branding.feeBps,
+        // never rewrite a quotation already sent to a client. The fee is 7%
+        // for every studio (owner, 12 Oct 2026), whatever an older setting says;
+        // the studio only decides whether it starts on (14 Oct 2026).
+        feeBps: feeBpsOf(branding.feeBps > 0),
         discountBps: branding.discountBps,
         bookingAdvancePaise: toDb(branding.bookingAdvancePaise),
         gstBps: branding.gstBps,
@@ -398,8 +473,20 @@ export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
         welcomeNote: branding.welcomeNote,
         terms: branding.terms,
       },
-      select: { id: true },
+      select: { id: true, number: true },
     });
+
+    /* The lead's timeline says a quotation was written, and the board's
+       "₹ quoted" reads the quotations linked to it. */
+    if (lead) {
+      await recordLeadEvent({
+        studioId,
+        clientId: lead.id,
+        kind: 'QUOTED',
+        summary: `Quotation ${quote.number} started`,
+        meta: { quoteId: quote.id },
+      });
+    }
 
     return { ok: true, id: quote.id };
   } catch (error) {
@@ -432,10 +519,12 @@ export interface QuoteTermsInput {
  * starts from; this is the deal on this one.
  */
 export async function saveQuoteTerms(quoteId: string, input: QuoteTermsInput): Promise<ActionResult> {
-  if (!(await ownedQuote(quoteId))) return { ok: false, error: 'That quotation is not yours.' };
+  const writable = await writableQuote(quoteId);
+  if (!writable.ok) return writable;
 
   const pct = (bps: number) => Number.isInteger(bps) && bps >= 0 && bps <= 5000;
-  if (!pct(input.feeBps)) return { ok: false, error: 'A professional fee between 0% and 50%, please.' };
+  /* The fee is 7% or off — any other figure from a browser is read as "on". */
+  if (!Number.isInteger(input.feeBps) || input.feeBps < 0) return { ok: false, error: 'The professional fee is 7%, on or off.' };
   if (!pct(input.discountBps)) return { ok: false, error: 'A discount between 0% and 50%, please.' };
   if (!Number.isInteger(input.onSpotPaise) || input.onSpotPaise < 0 || input.onSpotPaise >= 1e11) {
     return { ok: false, error: 'That discount is not an amount.' };
@@ -454,7 +543,10 @@ export async function saveQuoteTerms(quoteId: string, input: QuoteTermsInput): P
     await prisma.studioQuote.update({
       where: { id: quoteId },
       data: {
-        feeBps: input.feeBps,
+        /* On or off only: the quotation keeps its own fee while it stays on
+           (one made at 10% before the fee was fixed stays 10%); 7% only
+           when a fee is turned on from off. */
+        feeBps: keptFeeBps(writable.feeBps, input.feeBps > 0),
         discountBps: input.discountBps,
         gstBps: input.gstOn ? GST_BPS : 0,
         onSpotPaise: toDb(input.onSpotPaise),
@@ -528,13 +620,19 @@ export type CopyKind = { kind: 'template'; clientName: string } | { kind: 'desig
  *   can be compared line by line. The Sales Final is left exactly as sent.
  */
 export async function copyQuote(quoteId: string, copy: CopyKind): Promise<QuoteResult> {
-  const studioId = await myStudioId();
+  const qs = await quoteScope();
+  const studioId = qs?.studioId ?? null;
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
   const source = await prisma.studioQuote.findFirst({
-    where: { id: quoteId, studioId },
+    where: { ...qs?.where, id: quoteId, studioId },
     include: { lines: { orderBy: { sortOrder: 'asc' } } },
   });
   if (!source) return { ok: false, error: 'That quotation is not yours.' };
+  /* A template copy has no lead, and a salesperson sees only their leads'
+     quotations: start a new one from the lead instead. */
+  if (copy.kind === 'template' && qs?.lead.seesAll === false) {
+    return { ok: false, error: 'Start a new quotation from the lead it is for.' };
+  }
 
   const template = copy.kind === 'template';
   const clientName = template ? copy.clientName.trim().slice(0, 120) : source.clientName;
@@ -613,10 +711,11 @@ export async function copyQuote(quoteId: string, copy: CopyKind): Promise<QuoteR
  * final quote is what the customer reads in the app.
  */
 export async function deleteQuote(quoteId: string): Promise<ActionResult> {
-  const studioId = await myStudioId();
+  const qs = await quoteScope();
+  const studioId = qs?.studioId ?? null;
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
   const q = await prisma.studioQuote.findFirst({
-    where: { id: quoteId, studioId },
+    where: { ...qs?.where, id: quoteId, studioId },
     select: { status: true, issuedOn: true, introductionId: true },
   });
   if (!q) return { ok: false, error: 'That quotation is not yours.' };
@@ -646,29 +745,79 @@ export async function quotesToCompare(currentId: string, baseId?: string): Promi
   return base ? { base, current } : null;
 }
 
-/** The rooms from a brief's read floor plan; empty without one. */
-async function planRoomsOfBrief(briefId: string | null): Promise<PlanRoomSize[]> {
-  if (!briefId) return [];
-  const b = await prisma.brief.findUnique({ where: { id: briefId }, select: { floorPlanReading: true } }).catch(() => null);
-  return planUseFrom(b?.floorPlanReading)?.rooms ?? [];
+/**
+ * The client's read floor plan: their brief's; for the studio's own lead,
+ * the plan this quotation was built from or read against
+ * (`StudioQuotePlan`, floor plan → first quotation, 12 Oct 2026); else the
+ * newest read floor plan on the lead.
+ */
+async function planReadingOf(q: { briefId: string | null; clientId?: string | null; studioId?: string; quoteId?: string }): Promise<unknown> {
+  if (q.quoteId && q.studioId && q.clientId) {
+    const link = await prisma.studioQuotePlan.findFirst({ where: { quoteId: q.quoteId, studioId: q.studioId }, select: { fileId: true } }).catch(() => null);
+    if (link) {
+      const f = await prisma.studioClientFile
+        .findFirst({ where: { id: link.fileId, studioId: q.studioId, clientId: q.clientId }, select: { reading: true } })
+        .catch(() => null);
+      if (f?.reading) return f.reading;
+    }
+  }
+  if (q.briefId) {
+    const b = await prisma.brief.findUnique({ where: { id: q.briefId }, select: { floorPlanReading: true } }).catch(() => null);
+    if (b?.floorPlanReading) return b.floorPlanReading;
+  }
+  if (q.clientId && q.studioId) {
+    const f = await prisma.studioClientFile
+      .findFirst({
+        where: { studioId: q.studioId, clientId: q.clientId, kind: 'FLOOR_PLAN', reading: { not: Prisma.AnyNull } },
+        orderBy: { createdAt: 'desc' },
+        select: { reading: true },
+      })
+      .catch(() => null);
+    return f?.reading ?? null;
+  }
+  return null;
 }
 
-async function planRunOfBrief(briefId: string | null): Promise<number | null> {
-  if (!briefId) return null;
-  const b = await prisma.brief.findUnique({ where: { id: briefId }, select: { floorPlanReading: true } }).catch(() => null);
-  return planUseFrom(b?.floorPlanReading)?.kitchenRunMm ?? null;
+/** The rooms from the client's read floor plan; empty without one. */
+async function planRoomsOfBrief(briefId: string | null, clientId?: string | null, studioId?: string, quoteId?: string): Promise<PlanRoomSize[]> {
+  return planUseFrom(await planReadingOf({ briefId, clientId, studioId, quoteId }))?.rooms ?? [];
+}
+
+async function planRunOfBrief(briefId: string | null, clientId?: string | null, studioId?: string, quoteId?: string): Promise<number | null> {
+  return planUseFrom(await planReadingOf({ briefId, clientId, studioId, quoteId }))?.kitchenRunMm ?? null;
 }
 
 /** Ownership check, reused by every write below. */
 async function ownedQuote(quoteId: string): Promise<string | null> {
-  const studioId = await myStudioId();
+  const qs = await quoteScope();
+  const studioId = qs?.studioId ?? null;
   if (!studioId) return null;
 
   const row = await prisma.studioQuote.findFirst({
-    where: { id: quoteId, studioId },
+    where: { ...qs?.where, id: quoteId, studioId },
     select: { id: true },
   });
   return row?.id ?? null;
+}
+
+/**
+ * Ownership, and that the quotation may still be changed: no live
+ * (non-cancelled) project runs on it (`write-rules.ts`). Every write to
+ * lines, terms or the standard build goes through this.
+ */
+async function writableQuote(quoteId: string): Promise<{ ok: true; id: string; feeBps: number; status: string } | { ok: false; error: string }> {
+  const qs = await quoteScope();
+  const studioId = qs?.studioId ?? null;
+  if (!studioId) return { ok: false, error: 'That quotation is not yours.' };
+  const row = await prisma.studioQuote.findFirst({
+    where: { ...qs?.where, id: quoteId, studioId },
+    select: { id: true, feeBps: true, status: true },
+  });
+  if (!row) return { ok: false, error: 'That quotation is not yours.' };
+  const live = await prisma.homeProject.findFirst({ where: { signedQuoteId: row.id, cancelledAt: null }, select: { id: true } });
+  const refusal = quoteWriteRefusal({ liveProject: live !== null });
+  if (refusal) return { ok: false, error: refusal };
+  return { ok: true, id: row.id, feeBps: row.feeBps, status: row.status };
 }
 
 export async function setQuoteStatus(
@@ -676,6 +825,13 @@ export async function setQuoteStatus(
   status: QuoteStatusName,
 ): Promise<ActionResult> {
   if (!(await ownedQuote(quoteId))) return { ok: false, error: 'That quotation is not yours.' };
+
+  /* A project runs on this quotation (signed in the app, or started for the
+     studio's own client): its plan and payment stages were built from it, so
+     it stays Won. */
+  if (await prisma.homeProject.findFirst({ where: { signedQuoteId: quoteId }, select: { id: true } })) {
+    return { ok: false, error: 'A project has started from this quotation, so it stays won.' };
+  }
 
   try {
     /* Stamped ONCE, and `issuedOn === null` is the test.
@@ -729,8 +885,15 @@ export async function setQuoteStatus(
     /* Sent to a customer One Interiors introduced: tell them it is in the app.
        Every time it goes out, so a revised quotation is announced too. */
     if (status === 'ISSUED') {
-      const studioId = await myStudioId();
-      if (studioId) void tellCustomer(quoteId, studioId);
+      const qs = await quoteScope();
+      const studioId = qs?.studioId ?? null;
+      if (studioId) {
+        /* Each send is a frozen, numbered revision (Studio OS Phase 1).
+           Sending exactly what was sent last time does not make a new one,
+           so Reopen on a won quotation does not add an R. */
+        await issueRevision({ quoteId, studioId });
+        void tellCustomer(quoteId, studioId);
+      }
     }
     return { ok: true };
   } catch {
@@ -864,7 +1027,8 @@ export async function saveQuoteLines(
   quoteId: string,
   rawLines: SaveLineInput[],
 ): Promise<ActionResult> {
-  if (!(await ownedQuote(quoteId))) return { ok: false, error: 'That quotation is not yours.' };
+  const writable = await writableQuote(quoteId);
+  if (!writable.ok) return writable;
 
   if (rawLines.length > 500) {
     return { ok: false, error: 'That is more lines than a quotation can hold.' };
@@ -965,20 +1129,28 @@ export type ApplyResult =
  * asked to measure the kitchen again.
  */
 export async function applyConfiguration(input: ApplyConfigInput): Promise<ApplyResult> {
-  const studioId = await myStudioId();
+  const qs = await quoteScope();
+  const studioId = qs?.studioId ?? null;
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
-  if (!(await ownedQuote(input.quoteId))) {
-    return { ok: false, error: 'That quotation is not yours.' };
-  }
+  const writable = await writableQuote(input.quoteId);
+  if (!writable.ok) return writable;
 
   /* The plan comes from the client's brief, never from the browser. */
-  const { planRooms: _ignored, ...home } = input.home;
+  const { planRooms: _ignored, ...raw } = input.home;
+  const ceilingRate = raw.falseCeilingRatePaise;
+  const home: HomeConfig = {
+    ...raw,
+    kingMaster: raw.kingMaster !== false,
+    falseCeiling: raw.falseCeiling === true,
+    falseCeilingRatePaise:
+      typeof ceilingRate === 'number' && Number.isInteger(ceilingRate) && ceilingRate > 0 && ceilingRate < 1e8 ? ceilingRate : null,
+  };
   if (home.usePlan) {
-    const q = await prisma.studioQuote.findFirst({ where: { id: input.quoteId, studioId }, select: { briefId: true } });
-    const rooms = await planRoomsOfBrief(q?.briefId ?? null);
+    const q = await prisma.studioQuote.findFirst({ where: { id: input.quoteId, studioId }, select: { briefId: true, clientId: true } });
+    const rooms = await planRoomsOfBrief(q?.briefId ?? null, q?.clientId, studioId, input.quoteId);
     if (rooms.length > 0) {
       (home as HomeConfig).planRooms = rooms;
-      if (home.kitchenRunMm == null) home.kitchenRunMm = (await planRunOfBrief(q?.briefId ?? null)) ?? null;
+      if (home.kitchenRunMm == null) home.kitchenRunMm = (await planRunOfBrief(q?.briefId ?? null, q?.clientId, studioId, input.quoteId)) ?? null;
     }
   }
   input = { ...input, home };
@@ -1057,7 +1229,8 @@ export async function applyConfiguration(input: ApplyConfigInput): Promise<Apply
 
 /** Start again from nothing, keeping the client and the terms. */
 export async function clearQuoteLines(quoteId: string): Promise<ActionResult> {
-  if (!(await ownedQuote(quoteId))) return { ok: false, error: 'That quotation is not yours.' };
+  const writable = await writableQuote(quoteId);
+  if (!writable.ok) return writable;
 
   try {
     await prisma.$transaction([
@@ -1067,5 +1240,17 @@ export async function clearQuoteLines(quoteId: string): Promise<ActionResult> {
     return { ok: true };
   } catch {
     return { ok: false, error: 'That did not save.' };
+  }
+}
+
+/** The studio's payment schedule, for a quotation not made yet (the First quote page's preview). */
+export async function myStudioPhases(): Promise<PaymentPhase[] | null> {
+  const qs = await quoteScope();
+  if (!qs) return null;
+  try {
+    const row = await prisma.studio.findUnique({ where: { id: qs.studioId }, select: { paymentPhases: true } });
+    return readPhases(row?.paymentPhases);
+  } catch {
+    return null;
   }
 }

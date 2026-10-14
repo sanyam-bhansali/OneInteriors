@@ -206,6 +206,13 @@ export function customerLive(env: HostEnv = process.env): boolean {
   return env.CUSTOMER_LIVE?.trim() === '1';
 }
 
+/** The path being rendered, set by `middleware.ts` on every request it passes on. */
+export const PATH_HEADER = 'x-oi-path';
+
+/** The studio phone sign-in's address, and the page that serves it (see `route`). */
+export const STUDIO_SIGN_IN = '/studio/sign-in';
+export const STUDIO_SIGN_IN_PAGE = '/studio-sign-in';
+
 export type Decision =
   | { kind: 'next' }
   | { kind: 'rewrite'; to: string }
@@ -242,6 +249,15 @@ export function route(
   const audience = audienceFor(host, env);
   const live = customerLive(env);
 
+  /* The studio phone sign-in. Its address is under /studio, but it has to be
+     reachable signed out, and everything under app/studio sits inside the
+     layout that sends signed-out people away. So it is served from a page
+     outside that layout, wherever /studio itself is served. The internal
+     path answers 404 on the studio and public hosts. */
+  if (path === STUDIO_SIGN_IN && (audience === 'studio' || audience === 'all')) {
+    return { kind: 'rewrite', to: STUDIO_SIGN_IN_PAGE };
+  }
+
   if (audience === 'studio') {
     if (path === '/') return { kind: 'rewrite', to: '/studio' };
     if (under(path, ['/studio', '/apply'])) return { kind: 'next' };
@@ -256,7 +272,7 @@ export function route(
 
   if (audience === 'public') {
     // The two products live on their own hostnames now.
-    if (under(path, ['/studio', '/ops'])) return { kind: 'notFound' };
+    if (under(path, ['/studio', '/ops', STUDIO_SIGN_IN_PAGE])) return { kind: 'notFound' };
     if (!live && (isCustomerApp(path) || isPublicPage(path))) {
       return path === '/' ? { kind: 'next' } : { kind: 'redirect', to: '/' };
     }

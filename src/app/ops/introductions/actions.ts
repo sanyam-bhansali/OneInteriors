@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/modules/auth/session';
 import { recordOutcome } from '@/modules/quotation/journey-repository';
 import { postUpdate, setStageDone, startTracker } from '@/modules/portal/tracker-store';
+import { setProjectPlan } from '@/modules/portal/plan-store';
 import {
   releaseContactDetails,
   withdrawIntroduction,
@@ -178,6 +179,16 @@ export async function postUpdateAction(formData: FormData): Promise<Result> {
     String(formData.get('stage') ?? '') || null,
     formData.getAll('photos').filter((f): f is File => f instanceof File),
   );
+  revalidatePath('/ops/introductions');
+  return r.ok ? { ok: true } : { ok: false, error: r.error };
+}
+
+/**
+ * Switch the customer's plan, once they have agreed the Assured fee with us
+ * (or back to Basic). The role check and the audit row are in the module.
+ */
+export async function setPlanAction(projectId: string, plan: 'BASIC' | 'ASSURED'): Promise<Result> {
+  const r = await setProjectPlan(projectId, plan);
   revalidatePath('/ops/introductions');
   return r.ok ? { ok: true } : { ok: false, error: r.error };
 }

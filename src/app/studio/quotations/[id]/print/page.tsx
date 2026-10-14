@@ -1,15 +1,12 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { formatINR } from '@/lib/money';
 import { getQuote, totalsFor } from '@/modules/studio-quote/quotes';
-import { myBranding, myStudioProfile } from '@/modules/studio-quote/store';
-import { byRoom } from '@/modules/studio-quote/revision';
-import { UNIT_LABELS, formatQty, WORK_CODE_LABELS } from '@/modules/studio-quote/pricing';
+import { quoteDocContext } from '@/modules/studio-quote/document-data';
+import { docHead, quoteFileName } from '@/modules/studio-quote/document';
+import { roomsOfLines } from '@/modules/studio-quote/rooms';
 import { PrintButton } from './PrintButton';
 import { FloorPlanView } from '@/components/floorplan/FloorPlanView';
-import { myTier } from '@/modules/studio-quote/store';
-import { signedLogoUrl } from '@/modules/storage/studio-logo';
-import { showsOurMark, MARK_TEXT } from '@/modules/studio-quote/mark';
+import { QuotationDocument } from '../../doc/QuotationDocument';
 
 export const metadata: Metadata = {
   title: 'Quotation',
@@ -19,476 +16,75 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 /**
- * The document, as the client receives it.
+ * The document, as the client receives it — in the one format every studio
+ * uses (the owner's sample of 13 Oct 2026, `doc/QuotationDocument.tsx`): the
+ * studio's brand pages (or a cover drawn from its details), the header grid,
+ * one table per room with Amount and Discounted, the summary by room with a
+ * donut, the totals, the payment stages with their end deliverables, the
+ * material specification, and the terms on their own pages.
  *
  * ## The rule this page exists to keep
  *
  * **Nothing of ours appears on it.** Not our name, not our logo, not our words,
- * not our terms. The studio's registered name is at the top, their GSTIN and
- * address are in the footer, their opening note and their terms are the only
- * prose on the page. A quotation is a document a studio is legally answerable
- * for, and putting our sentences on it would be committing them to promises
- * they never read.
- *
- * That is the difference between white-label and "ours with their name typed
- * in", and it is why the copy fields in Settings start empty rather than with a
- * template.
+ * not our terms. The studio's registered name, their GSTIN and address, their
+ * opening note and their terms are the only prose on the page. A quotation is
+ * a document a studio is legally answerable for, and putting our sentences on
+ * it would be committing them to promises they never read.
  *
  * ## The one qualification, added deliberately
  *
- * A single attribution line now sits in the footer: "Prepared with One
- * Interiors". It does not breach the rule above, because that rule is about
- * our WORDS and our TERMS — the things that commit a studio to a promise. An
- * attribution commits them to nothing; it is a software credit, the same
- * shape as the line at the foot of a form built with Typeform.
- *
- * Three constraints keep it on the right side of the line, and they are
- * enforced by where it is rendered rather than by anybody remembering:
- * beneath their GSTIN and never in the header, never inside the terms block,
- * and never at the weight of their own name. A client must come away knowing
- * which software was used and must NOT come away wondering whether we are a
- * party to their contract — on an Indian quotation, two business names near a
- * GSTIN invites exactly that question.
- *
- * Studios on Premium can remove it. See `modules/studio-quote/mark.ts` for
- * why the wish and the entitlement are stored separately.
+ * A single attribution line sits in the footer ("Prepared with One
+ * Interiors"): beneath their GSTIN, never in the header, never inside the
+ * terms, never at the weight of their own name. Studios on Premium can remove
+ * it; see `modules/studio-quote/mark.ts`.
  *
  * ## Why print rather than a generated PDF
  *
  * The browser's own print-to-PDF, styled with `@media print`. A server-side
  * renderer means headless Chrome or LibreOffice on the deployment — neither
- * exists on Vercel's serverless runtime, and adding a worker for one feature is
- * a whole piece of infrastructure. The studio gets a real PDF, selectable and
- * sharp, from the button they already know.
- *
- * Deliberately outside the studio shell: no sidebar, no chrome, nothing that
- * would land on the paper.
+ * exists on Vercel's serverless runtime. The studio gets a real PDF,
+ * selectable and sharp, from the button they already know; the print styles
+ * hide the studio app's header so nothing but the paper prints.
  */
 export default async function PrintPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [quote, branding, tier, profile] = await Promise.all([getQuote(id), myBranding(), myTier(), myStudioProfile()]);
-
+  const quote = await getQuote(id);
   if (!quote) notFound();
 
-  /* Signed at render, valid five minutes — long enough for the browser to
-     fetch it into the page and for print-to-PDF to embed it. */
-  const logoUrl = await signedLogoUrl(branding?.logoPath ?? null);
-  const showMark = showsOurMark({ tier, hideRequested: branding?.hideOurMark ?? false });
-  /**
-   * Their colour, theirs alone — and checked before it reaches a style block.
-   *
-   * `accentHex` is studio-supplied text and this interpolates it into
-   * `<style>`, where React does NOT escape: it is raw CSS, not a text node.
-   * A value like `red; } body { display:none } .x {` would close the rule and
-   * write arbitrary CSS into a document going to their client.
-   *
-   * So it is matched against a hex colour and anything else falls back. A
-   * validator at the settings form would not be enough — this page must be
-   * safe against whatever is already in the column, including rows written
-   * before that validator existed.
-   */
-  const accent = /^#[0-9a-fA-F]{6}$/.test(branding?.accentHex?.trim() ?? '')
-    ? branding!.accentHex.trim()
-    : '#1F5C4D';
-
-  const totals = totalsFor(quote);
-  /* In the order the quotation has them. These were grouped by catalogue
-     category ("Bedroom"), which no built room is called ("Master bedroom"),
-     so most rooms never printed while the totals still counted them — found
-     11 Oct. */
-  const roomOrder = [...new Set(quote.lines.map((l) => l.room))];
-  const rooms = roomOrder.map((room) => ({ room, lines: quote.lines.filter((l) => l.room === room) }));
-  const summary = byRoom(quote.lines.map((l) => ({ room: l.room, product: l.product, amountPaise: l.amountPaise })));
-  const topRoom = Math.max(1, ...summary.map((r) => r.paise));
-
-  const longDate = (d: Date) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
-  const issued = longDate(new Date(quote.quoteDate));
-  const validDays = branding?.validityDays ?? 30;
-  const validUntil = longDate(new Date(new Date(quote.quoteDate).getTime() + validDays * 86_400_000));
-  const flat = [quote.society, quote.locality, quote.config, quote.carpetSqft ? `${quote.carpetSqft} sq ft` : null]
-    .filter(Boolean)
-    .join(' · ');
-  const spec = branding?.materialSpec ?? [];
-  const cover = profile?.photos[0] ?? null;
-  const about = profile && (profile.about || profile.photos.length > 1) ? profile : null;
+  const ctx = await quoteDocContext(quote);
+  const studioName = ctx.studio?.tradeName || ctx.branding?.legalName || '';
 
   return (
-    <div className="quote-doc">
-      <PrintButton
-        filename={`${quote.clientName} — ${branding?.legalName ?? 'Quotation'} ${quote.number}`}
-      />
-
-      {/* ── Cover ── */}
-      <article className={`sheet cover ${cover ? 'with-photo' : ''}`}>
-        <div className="cover-top">
-          {logoUrl ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={logoUrl} alt="" className="logo" />
-          ) : null}
-          <p className="cover-studio">{branding?.legalName ?? profile?.tradeName ?? 'Your studio'}</p>
-        </div>
-        {cover ? (
-          <figure className="cover-photo">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={cover.url} alt="" />
-            <figcaption>
-              {cover.caption}
-              {cover.isRender ? ' (render)' : ''}
-            </figcaption>
-          </figure>
-        ) : null}
-        <div className="cover-body">
-          <p className="label">Interior quotation</p>
-          <p className="cover-client">{quote.clientName}</p>
-          {flat ? <p className="muted">{flat}</p> : null}
-          <p className="cover-meta mono">
-            {quote.number} · {issued} · valid until {validUntil}
-          </p>
-        </div>
-      </article>
-
-      {/* ── About the studio ── */}
-      {about ? (
-        <article className="sheet about">
-          <h2>About {about.tradeName}</h2>
-          {about.about ? <p className="about-text">{about.about}</p> : null}
-          <p className="muted">
-            {[
-              about.yearsActive ? `${about.yearsActive} years in practice` : null,
-              about.teamSize ? `a team of ${about.teamSize}` : null,
-              about.localities.length ? `working in ${about.localities.slice(0, 5).map((l) => l.replace(/-/g, ' ')).join(', ')}` : null,
-            ]
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
-          {about.photos.length > 1 ? (
-            <div className="about-photos">
-              {about.photos.slice(0, 4).map((p) => (
-                <figure key={p.url}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.url} alt="" />
-                  <figcaption>
-                    {p.caption}
-                    {p.isRender ? ' (render)' : ''}
-                  </figcaption>
-                </figure>
-              ))}
+    <>
+      <PrintButton filename={quoteFileName(quote.clientName, studioName, quote.number, quote.quoteDate)} />
+      <QuotationDocument
+        studio={ctx.studio}
+        brandPages={ctx.brandPages}
+        head={docHead(quote, ctx.branding?.city ?? null)}
+        lines={quote.lines}
+        roomOrder={roomsOfLines(quote.lines)}
+        totals={totalsFor(quote)}
+        feeBps={quote.feeBps}
+        discountBps={quote.discountBps}
+        gstBps={quote.gstBps}
+        onSpotLabel={quote.onSpotLabel}
+        schedule={ctx.schedule}
+        spec={ctx.spec}
+        terms={ctx.terms}
+        welcomeNote={quote.welcomeNote}
+        showMark={ctx.showMark}
+        markText={ctx.markText}
+        validDays={ctx.validDays}
+        extra={
+          /* Their flat, from their floor plan, when their brief came with one. */
+          quote.planRooms.length > 0 ? (
+            <div className="qd-keep" style={{ marginBottom: '5mm' }}>
+              <p className="qd-bandline">Your floor plan</p>
+              <FloorPlanView rooms={quote.planRooms} printable />
             </div>
-          ) : null}
-        </article>
-      ) : null}
-
-      <article className="sheet">
-        {/* ── Letterhead ── */}
-        <header className="head">
-          <div>
-            {logoUrl ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={logoUrl} alt="" className="logo" />
-            ) : null}
-            <h1>{branding?.legalName ?? 'Your studio'}</h1>
-            <p className="muted">
-              {[branding?.addressLine, branding?.city, branding?.pincode]
-                .filter(Boolean)
-                .join(', ')}
-            </p>
-            <p className="muted">
-              {[branding?.phone, branding?.email, branding?.website].filter(Boolean).join(' · ')}
-            </p>
-            {branding?.gstin ? <p className="muted mono">GSTIN {branding.gstin}</p> : null}
-          </div>
-
-          <div className="meta">
-            <p className="label">Quotation</p>
-            <p className="mono big">{quote.number}</p>
-            <p className="muted">{issued}</p>
-            <p className="muted">Valid until {validUntil}</p>
-          </div>
-        </header>
-
-        {/* ── Who it is for ── */}
-        <section className="to">
-          <p className="label">Prepared for</p>
-          <p className="name">{quote.clientName}</p>
-          <p className="muted">{flat}</p>
-        </section>
-
-        {quote.welcomeNote ? <p className="welcome">{quote.welcomeNote}</p> : null}
-
-        {/* ── The work ── */}
-        {rooms.map((group) => (
-          <section key={group.room} className="room">
-            <h2>{group.room}</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th className="w-desc">Item</th>
-                  <th className="w-spec">Size</th>
-                  <th className="w-qty">Qty</th>
-                  <th className="w-rate">Rate</th>
-                  <th className="w-amt">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {group.lines.map((l) => (
-                  <tr key={l.id}>
-                    <td>
-                      <span className="item">{l.product}</span>
-                      {l.details ? <span className="detail">{l.details}</span> : null}
-                      <span className="code">{WORK_CODE_LABELS[l.code]}</span>
-                    </td>
-                    <td className="mono">
-                      {l.unit === 'AREA' && l.widthMm && l.heightMm
-                        ? `${l.widthMm} × ${l.heightMm} mm`
-                        : '—'}
-                    </td>
-                    <td className="mono num">
-                      {l.qtyMilli || (l.unit === 'AREA' && l.widthMm && l.heightMm)
-                        ? `${formatQty(
-                            l.unit === 'AREA' && l.widthMm && l.heightMm
-                              ? Math.round(((l.widthMm * l.heightMm) / 92_903.04) * 1000)
-                              : (l.qtyMilli ?? 0),
-                          )} ${UNIT_LABELS[l.unit].toLowerCase()}`
-                        : '—'}
-                    </td>
-                    <td className="mono num">{l.ratePaise > 0 ? formatINR(l.ratePaise) : '—'}</td>
-                    <td className="mono num strong">{formatINR(l.amountPaise)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan={4}>{group.room} total</td>
-                  <td className="mono num strong">
-                    {formatINR(group.lines.reduce((a, l) => a + l.amountPaise, 0))}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </section>
-        ))}
-
-        {/* ── Their flat, from their floor plan ── */}
-        {quote.planRooms.length > 0 ? (
-          <section className="plan">
-            <h2>Your floor plan</h2>
-            <FloorPlanView rooms={quote.planRooms} printable />
-          </section>
-        ) : null}
-
-        {/* ── Where the money goes ── */}
-        {summary.length > 1 ? (
-          <section className="summary">
-            <h2>Room summary</h2>
-            <table>
-              <tbody>
-                {summary.map((r) => (
-                  <tr key={r.room}>
-                    <td className="s-room">{r.room}</td>
-                    <td className="s-bar">
-                      <span style={{ width: `${Math.max(2, Math.round((r.paise / topRoom) * 100))}%` }} />
-                    </td>
-                    <td className="mono num">{(r.shareBps / 100).toFixed(0)}%</td>
-                    <td className="mono num strong">{formatINR(r.paise)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        ) : null}
-
-        {/* ── Money ── */}
-        <section className="totals">
-          <table>
-            <tbody>
-              <tr><td>Modular work</td><td className="mono num">{formatINR(totals.modularPaise)}</td></tr>
-              <tr><td>On-site work</td><td className="mono num">{formatINR(totals.onsitePaise)}</td></tr>
-              <tr><td>Professional fee ({quote.feeBps / 100}%)</td><td className="mono num">{formatINR(totals.feePaise)}</td></tr>
-              <tr className="rule"><td>Sub-total</td><td className="mono num strong">{formatINR(totals.subTotalPaise)}</td></tr>
-              {totals.discountPaise > 0 ? (
-                <tr><td>Discount ({quote.discountBps / 100}% on modular)</td><td className="mono num">− {formatINR(totals.discountPaise)}</td></tr>
-              ) : null}
-              {totals.onSpotPaise > 0 ? (
-                <tr><td>{quote.onSpotLabel ?? 'Additional discount'}</td><td className="mono num">− {formatINR(totals.onSpotPaise)}</td></tr>
-              ) : null}
-              {totals.gstPaise > 0 ? (
-                <>
-                  <tr className="rule"><td>Total before GST</td><td className="mono num strong">{formatINR(totals.beforeTaxPaise)}</td></tr>
-                  <tr><td>GST ({quote.gstBps / 100}%)</td><td className="mono num">{formatINR(totals.gstPaise)}</td></tr>
-                </>
-              ) : null}
-              <tr className="grand"><td>{totals.gstPaise > 0 ? 'Total, GST included' : 'Total'}</td><td className="mono num">{formatINR(totals.totalPaise)}</td></tr>
-            </tbody>
-          </table>
-        </section>
-
-        {totals.stages.length > 0 ? (
-          <section className="stages">
-            <h2>Payment schedule</h2>
-            <table>
-              <tbody>
-                {totals.stages.map((s) => (
-                  <tr key={s.label}>
-                    <td>
-                      <span className="item">{s.label}{s.pct ? ` · ${s.pct}%` : ''}</span>
-                      {s.detail ? <span className="detail">{s.detail}</span> : null}
-                    </td>
-                    <td className="mono num strong">{formatINR(s.amountPaise)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        ) : null}
-
-        {spec.length > 0 ? (
-          <section className="spec">
-            <h2>Material specification</h2>
-            <table>
-              <tbody>
-                {spec.map((r) => (
-                  <tr key={r.item}>
-                    <td className="strong">{r.item}</td>
-                    <td>{r.spec}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        ) : null}
-
-        <p className="validity muted">
-          Prices hold for {validDays} days, until {validUntil}.
-        </p>
-
-        {quote.terms ? (
-          <section className="terms">
-            <h2>Terms and conditions</h2>
-            <p>{quote.terms}</p>
-          </section>
-        ) : null}
-
-        <footer className="foot">
-          <p>
-            {branding?.legalName}
-            {branding?.gstin ? ` · GSTIN ${branding.gstin}` : ''}
-          </p>
-          <p className="muted">
-            All figures in Indian rupees. This quotation is an estimate against the scope described
-            above; any change to that scope changes the figure.
-          </p>
-
-          {/* Below their name and their GSTIN, outside the terms, at the
-              smallest weight on the page. See the note at the top of this
-              file for why this is an attribution and not our words. */}
-          {showMark ? <p className="mark">{MARK_TEXT}</p> : null}
-        </footer>
-      </article>
-
-      {/* Scoped to this page. Nothing here uses the studio-app tokens — the
-          document is a piece of paper, not a screen. */}
-      <style>{`
-        .quote-doc { background: #f3f3ef; min-height: 100dvh; padding: 24px 16px 64px; color: #16181a; }
-        .sheet {
-          max-width: 820px; margin: 0 auto; background: #fff; padding: 44px 46px;
-          font-family: var(--font-sans); font-size: 12.5px; line-height: 1.55;
-          box-shadow: 0 1px 3px rgba(0,0,0,.09);
+          ) : null
         }
-        .sheet h1 { font-family: var(--font-display); font-size: 25px; line-height: 1.15; margin: 0 0 6px; letter-spacing: -.01em; }
-        .sheet h2 { font-size: 13px; font-weight: 700; margin: 26px 0 8px; letter-spacing: .01em; }
-        .sheet p { margin: 0 0 3px; }
-        .muted { color: #5d6266; font-size: 11.5px; }
-        .mono { font-family: var(--font-mono); }
-        .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-        .strong { font-weight: 600; }
-        .label { font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: .13em; color: #7b8085; margin: 0 0 3px; }
-        /* Bounded both ways: a tall logo would push the whole letterhead
-           down the page, a wide one would collide with the quote number. */
-        .logo { max-height: 52px; max-width: 220px; width: auto; height: auto; display: block; margin: 0 0 10px; object-fit: contain; }
-        /* Their accent, used where it reads as theirs: the rule under the
-           letterhead and the total. Never on the type, which has to stay
-           legible in grayscale on somebody's office printer. */
-        .head { border-bottom: 2px solid ${accent}; }
-        .sheet h2 { color: ${accent}; }
-        .mark { margin-top: 10px; font-size: 9px; letter-spacing: .06em; color: #9aa0a4; }
-
-        .head { display: flex; justify-content: space-between; gap: 32px; align-items: flex-start;
-                border-bottom: 2px solid #16181a; padding-bottom: 16px; }
-        .meta { text-align: right; flex: none; }
-        .meta .big { font-size: 15px; font-weight: 600; margin-bottom: 3px; }
-
-        .to { margin-top: 20px; }
-        .to .name { font-size: 16px; font-weight: 600; }
-
-        .welcome { margin-top: 18px; padding: 12px 14px; background: #f7f7f3; font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
-
-        table { width: 100%; border-collapse: collapse; }
-        thead th { text-align: left; font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase;
-                   letter-spacing: .1em; color: #7b8085; font-weight: 500; padding: 5px 7px; border-bottom: 1px solid #d9dbd6; }
-        thead th.w-qty, thead th.w-rate, thead th.w-amt { text-align: right; }
-        tbody td { padding: 7px; border-bottom: 1px solid #ecedea; vertical-align: top; }
-        tfoot td { padding: 7px; font-weight: 600; border-top: 1px solid #d9dbd6; }
-        tfoot td:first-child { text-align: right; font-size: 11.5px; }
-        .item { display: block; font-weight: 500; }
-        .detail { display: block; color: #5d6266; font-size: 11px; line-height: 1.45; margin-top: 1px; }
-        .code { display: inline-block; margin-top: 3px; font-family: var(--font-mono); font-size: 9px;
-                text-transform: uppercase; letter-spacing: .09em; color: #7b8085; }
-        .w-spec { width: 108px; } .w-qty { width: 96px; } .w-rate { width: 92px; } .w-amt { width: 104px; }
-
-        .totals { margin-top: 26px; display: flex; justify-content: flex-end; }
-        .totals table { width: 330px; }
-        .totals td { padding: 5px 7px; border: 0; }
-        .totals tr.rule td { border-top: 1px solid #d9dbd6; padding-top: 8px; }
-        .totals tr.grand td { border-top: 2px solid #16181a; padding-top: 9px; font-size: 15px; font-weight: 700; }
-
-        .stages td { padding: 7px; border-bottom: 1px solid #ecedea; }
-        .terms p { white-space: pre-wrap; font-size: 11.5px; line-height: 1.6; color: #3d4144; }
-
-        .foot { margin-top: 32px; padding-top: 12px; border-top: 1px solid #d9dbd6; }
-
-        .sheet + .sheet { margin-top: 18px; }
-        .cover { display: flex; flex-direction: column; min-height: 420px; }
-        .cover.with-photo { min-height: 1000px; }
-        .cover-top { display: flex; align-items: center; gap: 14px; padding-bottom: 14px; border-bottom: 2px solid ${accent}; }
-        .cover-top .logo { margin: 0; }
-        .cover-studio { font-family: var(--font-display); font-size: 20px; font-weight: 600; }
-        .cover-photo { margin: 26px 0 0; flex: 1; display: flex; flex-direction: column; }
-        .cover-photo img { width: 100%; height: 520px; object-fit: cover; display: block; }
-        .cover-photo figcaption, .about-photos figcaption { font-size: 10.5px; color: #7b8085; margin-top: 5px; }
-        .cover-body { margin-top: auto; padding-top: 28px; }
-        .cover-client { font-family: var(--font-display); font-size: 34px; line-height: 1.1; margin: 4px 0 6px; letter-spacing: -.01em; }
-        .cover-meta { margin-top: 10px; font-size: 11.5px; color: #3d4144; }
-        .about-text { font-size: 13px; line-height: 1.7; white-space: pre-wrap; margin-bottom: 10px; }
-        .about-photos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 18px; }
-        .about-photos figure { margin: 0; }
-        .about-photos img { width: 100%; height: 220px; object-fit: cover; display: block; }
-
-        .summary td { padding: 5px 7px; border-bottom: 1px solid #ecedea; }
-        .summary .s-room { width: 34%; }
-        .summary .s-bar span { display: block; height: 8px; border-radius: 4px; background: ${accent}; }
-        .spec td { padding: 6px 7px; border-bottom: 1px solid #ecedea; }
-        .spec td:first-child { width: 30%; }
-        .validity { margin-top: 14px; }
-        .plan svg { max-height: 420px; }
-        .foot p:first-child { font-weight: 600; font-size: 11.5px; }
-
-        @media print {
-          .quote-doc { background: #fff; padding: 0; }
-          .sheet { box-shadow: none; max-width: none; padding: 0; }
-          .no-print { display: none !important; }
-          /* A room should not be split across a page break mid-table if it can
-             be helped, and a header alone at the foot of a page is worse than
-             a slightly short page. */
-          .room, .stages, .totals, .summary, .spec, .plan { break-inside: avoid; }
-          .sheet + .sheet { margin-top: 0; }
-          .cover, .about { break-after: page; min-height: 0; }
-          .cover-photo img { height: 150mm; }
-          .terms { break-before: page; }
-          h2 { break-after: avoid; }
-          tr { break-inside: avoid; }
-          @page { margin: 14mm 12mm; }
-        }
-      `}</style>
-    </div>
+      />
+    </>
   );
 }

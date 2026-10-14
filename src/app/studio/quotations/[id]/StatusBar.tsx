@@ -2,13 +2,9 @@
 
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
+import { LineIcon } from '../../ui/icons';
 import { copyQuoteAction, deleteQuoteAction, setStatusAction } from '../actions';
 import type { QuoteStageName, QuoteStatusName } from '@/modules/studio-quote/quotes';
-
-const primary =
-  'rounded-[8px] bg-[var(--s-accent)] px-4 py-2 text-[14px] font-medium text-white no-underline hover:bg-[var(--s-accent-deep)] disabled:opacity-40';
-const quiet =
-  'rounded-[8px] border border-[var(--s-rule)] px-3.5 py-2 text-[13.5px] font-medium no-underline hover:border-[var(--s-ink-3)] disabled:opacity-40';
 
 /**
  * What happens to a quotation after it is written.
@@ -28,6 +24,7 @@ export function StatusBar({
   stage,
   basedOnId,
   deletable,
+  clientFirstName = '',
 }: {
   quoteId: string;
   status: QuoteStatusName;
@@ -37,6 +34,8 @@ export function StatusBar({
   basedOnId: string | null;
   /** A draft never sent and not a customer's final quote. */
   deletable: boolean;
+  /** For the button's words: "Mark as sent to Priya". */
+  clientFirstName?: string;
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -59,34 +58,35 @@ export function StatusBar({
     });
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {error ? <span className="text-[12.5px] text-[var(--s-bad)]">{error}</span> : null}
+    <div className="hstack" style={{ justifyContent: 'flex-end', gap: 8 }}>
+      {error ? <span className="qerr">{error}</span> : null}
 
       {status === 'DRAFT' ? (
-        <button type="button" disabled={pending || !canPrint} onClick={() => set('ISSUED')} className={quiet}>
-          Mark as sent
+        <button type="button" disabled={pending || !canPrint} onClick={() => set('ISSUED')} className="btn pri" title="When you have sent it to the client; the copy they have is kept as a revision">
+          <LineIcon name="arrow" size={16} />
+          Mark as sent{clientFirstName ? ` to ${clientFirstName}` : ''}
         </button>
       ) : null}
 
       {status === 'ISSUED' ? (
         <>
-          <button type="button" disabled={pending} onClick={() => set('ACCEPTED')} className={quiet}>
+          <button type="button" disabled={pending} onClick={() => set('ACCEPTED')} className="btn sec sm">
             Won
           </button>
-          <button type="button" disabled={pending} onClick={() => set('DECLINED')} className={quiet}>
+          <button type="button" disabled={pending} onClick={() => set('DECLINED')} className="btn sec sm">
             Lost
           </button>
         </>
       ) : null}
 
       {status === 'ACCEPTED' || status === 'DECLINED' ? (
-        <button type="button" disabled={pending} onClick={() => set('ISSUED')} className={quiet}>
+        <button type="button" disabled={pending} onClick={() => set('ISSUED')} className="btn sec sm">
           Reopen
         </button>
       ) : null}
 
       {basedOnId ? (
-        <Link href={`/studio/quotations/${quoteId}/compare`} className={quiet}>
+        <Link href={`/studio/quotations/${quoteId}/compare`} className="btn sec sm">
           Compare with Sales Final
         </Link>
       ) : null}
@@ -96,7 +96,7 @@ export function StatusBar({
           type="button"
           disabled={pending}
           onClick={() => run(() => copyQuoteAction(quoteId, 'design-final'))}
-          className={quiet}
+          className="btn sec sm"
           title="A copy for after design sign-off; this Sales Final stays as sent"
         >
           Make Design Final
@@ -104,29 +104,29 @@ export function StatusBar({
       ) : null}
 
       {templating ? (
-        <span className="flex items-center gap-1.5">
+        <span className="hstack" style={{ gap: 6 }}>
           <input
             value={newClient}
             onChange={(e) => setNewClient(e.target.value)}
             placeholder="New client's name"
             aria-label="New client's name"
             autoFocus
-            className="w-[11rem] rounded-[8px] border border-[var(--s-rule)] bg-[var(--s-surface)] px-2.5 py-1.5 text-[13.5px]"
+            className="fld" style={{ width: '12rem', minHeight: 34 }}
           />
           <button
             type="button"
             disabled={pending || newClient.trim().length < 2}
             onClick={() => run(() => copyQuoteAction(quoteId, 'template', newClient))}
-            className={quiet}
+            className="btn sec sm"
           >
             Copy
           </button>
-          <button type="button" onClick={() => setTemplating(false)} className="text-[13px] text-[var(--s-ink-3)]">
+          <button type="button" onClick={() => setTemplating(false)} className="btn ghost sm">
             Cancel
           </button>
         </span>
       ) : (
-        <button type="button" disabled={pending} onClick={() => setTemplating(true)} className={quiet}>
+        <button type="button" disabled={pending} onClick={() => setTemplating(true)} className="btn sec sm">
           Use as template
         </button>
       )}
@@ -137,14 +137,15 @@ export function StatusBar({
           disabled={pending}
           onClick={() => (confirmDelete ? run(() => deleteQuoteAction(quoteId)) : setConfirmDelete(true))}
           onBlur={() => setConfirmDelete(false)}
-          className={`${quiet} ${confirmDelete ? '!border-[var(--s-bad)] !text-[var(--s-bad)]' : ''}`}
+          className={`btn sec sm ${confirmDelete ? 'bad-t' : ''}`}
         >
           {confirmDelete ? 'Delete — press again' : 'Delete draft'}
         </button>
       ) : null}
 
       {canPrint ? (
-        <Link href={`/studio/quotations/${quoteId}/print`} target="_blank" className={primary}>
+        <Link href={`/studio/quotations/${quoteId}/print`} target="_blank" className={status === 'DRAFT' ? 'btn sec' : 'btn pri'}>
+          <LineIcon name="eye" size={16} />
           Print / PDF
         </Link>
       ) : null}

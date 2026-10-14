@@ -37,9 +37,12 @@ import 'server-only';
 import { randomBytes } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
 import { AuthChannel } from '@prisma/client';
-import { showOtpOnScreen } from '@/lib/env';
+import { isProduction, showOtpOnScreen } from '@/lib/env';
 import { createSession, hashIp, hashToken, type SessionMeta } from './session';
 import { normalisePhone } from '@/modules/studio/phone';
+import type { StudioRoleName } from '@/modules/studio/roles';
+import { bucketFor, consume } from '@/modules/rate-limit/store';
+import { send as sendStudioMessage } from '@/modules/messaging/sender';
 import { sendOtp } from './whatsapp';
 import { codeFromBytes, cleanCode, cleanName, isOtpShape, isValidName } from './otp-code';
 
@@ -52,6 +55,75 @@ const RATE_WINDOW_MINUTES = 15;
 const RESEND_COOLDOWN_SECONDS = 30;
 
 /**
+ * Code requests per address per hour, across every number.
+ *
+ * The per-number limit above stops one number being flooded; it does nothing
+ * against one script walking a thousand numbers, each one a paid WhatsApp
+ * message (or SMS) and, on the studio side, a probe of who is on a team.
+ * The IP hash was stored on every challenge but never checked.
+ *
+ * Generous on purpose: Indian mobile networks put many phones behind one
+ * address (carrier-grade NAT), and a limit that a busy Jio tower trips
+ * refuses real customers. Twenty an hour is nothing to a person and a hard
+ * ceiling to a script. Keyed by the hashed address, never the raw one.
+ *
+ * It uses the shared limiter, which fails OPEN if the database is down
+ * (rate-limit/store.ts). That is safe here: a request it lets through still
+ * has to write a challenge to the same database, so an outage refuses it
+ * anyway, and the guessing limit lives on the challenge, not here.
+ */
+export const OTP_IP_LIMIT = { max: 20, windowMs: 60 * 60_000 };
+
+/** The rate-limit bucket for this address. Hashed: no raw IP is ever stored. */
+export function otpIpBucket(ip: string | null | undefined): string {
+  return bucketFor('otp-ip', hashIp(ip) ?? 'unknown');
+}
+
+/**
+ * The studio sign-in's code-on-screen shortcut: the code, when nothing
+ * delivered it AND this is not a production build. On Vercel every
+ * deployment — previews included — is a production build, so this is local
+ * development only, whatever any env var says.
+ */
+export function studioDevCode(delivered: boolean, code: string): string | undefined {
+  if (delivered || isProduction()) return undefined;
+  return code;
+}
+
+/**
+ * Who this number is on a studio's team, for the studio sign-in. Null when
+ * the number has no account, the account is gone, it is a customer's, or it
+ * belongs to nobody's team.
+ *
+ * A CUSTOMER account with a membership should not exist (Settings → Team
+ * refuses to add one), and if it ever does it is refused here too: the
+ * studio door never signs anyone in as a customer.
+ */
+async function studioMemberByPhone(
+  db: Pick<typeof prisma, 'user'>,
+  phone: string,
+): Promise<{ userId: string; memberId: string; role: StudioRoleName; status: 'INVITED' | 'ACTIVE' | 'SUSPENDED'; phoneVerified: Date | null } | null> {
+  const user = await db.user.findUnique({
+    where: { phone },
+    select: {
+      id: true,
+      role: true,
+      deletedAt: true,
+      phoneVerified: true,
+      studioMember: { select: { id: true, role: true, status: true } },
+    },
+  });
+  if (!user || user.deletedAt || user.role === 'CUSTOMER' || !user.studioMember) return null;
+  return {
+    userId: user.id,
+    memberId: user.studioMember.id,
+    role: user.studioMember.role,
+    status: user.studioMember.status,
+    phoneVerified: user.phoneVerified,
+  };
+}
+
+/**
  * Bind the code to the number it was sent to.
  *
  * Both properties matter: it makes the stored hash unique per challenge even
@@ -62,9 +134,12 @@ function challengeHash(phone: string, code: string): string {
   return hashToken(`whatsapp:${phone}:${code}`);
 }
 
+/** Refusals only the studio sign-in gives: "ask your studio owner". */
+export type StudioRefusal = 'not_member' | 'suspended';
+
 export type RequestOtpResult =
   | { ok: true; devCode?: string }
-  | { ok: false; reason: 'invalid_phone' | 'invalid_name' | 'rate_limited' | 'cooldown' };
+  | { ok: false; reason: 'invalid_phone' | 'invalid_name' | 'rate_limited' | 'cooldown' | StudioRefusal };
 
 /**
  * Issue a code.
@@ -76,11 +151,46 @@ export type RequestOtpResult =
 export async function requestOtp(
   rawPhone: string,
   rawName: string,
-  meta: { ip?: string | null } = {},
+  /**
+   * `nameOptional`: the phone app's "I already have an account" sign-in asks
+   * for the number alone (design screen #12, returning customers). A name
+   * that is given must still be valid.
+   */
+  meta: {
+    ip?: string | null;
+    nameOptional?: boolean;
+    /**
+     * The studio sign-in (/studio/sign-in). The number must belong to an
+     * invited or active member of a studio's team, or no code is sent at
+     * all; the code goes through MessageSender (studio template, SMS
+     * fallback); and the code is shown on screen in local development only.
+     *
+     * Refusing before sending does say "this number is not on a team" to
+     * whoever typed it. That is the brief's design ("ask your studio
+     * owner") and the cheaper evil: the alternative is sending paid codes
+     * to any number typed into the studio page, and a supervisor who typed
+     * one digit wrong waiting for a message that never comes. The per-IP
+     * limit below caps how fast anyone can ask.
+     */
+    studio?: boolean;
+  } = {},
 ): Promise<RequestOtpResult> {
   const phone = normalisePhone(rawPhone);
   if (!phone) return { ok: false, reason: 'invalid_phone' };
-  if (!isValidName(rawName)) return { ok: false, reason: 'invalid_name' };
+  if (!(meta.studio || (meta.nameOptional && !rawName.trim())) && !isValidName(rawName)) {
+    return { ok: false, reason: 'invalid_name' };
+  }
+
+  /* Per address first, before anything is looked up, so a refusal below
+     still counts against whoever is asking. */
+  const byIp = await consume(otpIpBucket(meta.ip), OTP_IP_LIMIT);
+  if (!byIp.allowed) return { ok: false, reason: 'rate_limited' };
+
+  if (meta.studio) {
+    const member = await studioMemberByPhone(prisma, phone);
+    if (!member) return { ok: false, reason: 'not_member' };
+    if (member.status === 'SUSPENDED') return { ok: false, reason: 'suspended' };
+  }
 
   const now = Date.now();
 
@@ -141,6 +251,15 @@ export async function requestOtp(
    * is created without a name and an expert asks on the call. A name is a
    * label, not a credential, so nothing rests on it surviving.
    */
+  if (meta.studio) {
+    const sent = await sendStudioMessage(phone, { kind: 'code', code });
+    /* Local development only — `studioDevCode` is the whole rule, pinned by
+       tests/studio-sign-in.test.ts. Deliberately NOT `showOtpOnScreen()`:
+       no flag, on any deployment, puts a studio code on the page. */
+    const devCode = studioDevCode(sent.delivered, code);
+    return devCode ? { ok: true, devCode } : { ok: true };
+  }
+
   const sent = await sendOtp(phone, code);
 
   // Local development with no WhatsApp credentials: hand the code back so
@@ -177,8 +296,21 @@ export type VerifyOtpResult =
       userId: string;
       /** Set only when `meta.bearer` asked for the token rather than a cookie. */
       token?: string;
+      /** The studio sign-in: their role on the team, for where they land. */
+      studioRole?: StudioRoleName;
     }
-  | { ok: false; reason: 'invalid_phone' | 'invalid_code' | 'expired' | 'too_many' };
+  | { ok: false; reason: 'invalid_phone' | 'invalid_code' | 'expired' | 'too_many' | StudioRefusal };
+
+export interface VerifyOtpMeta extends SessionMeta {
+  /**
+   * The studio sign-in. Signs in as the studio member who owns this number
+   * (INVITED becomes ACTIVE on this first sign-in); anyone else is refused
+   * and no account is created — the customer branch below never runs.
+   */
+  studio?: boolean;
+  /** The language they chose on the studio sign-in, as a User.locale ("hi-IN"). */
+  locale?: string;
+}
 
 /**
  * Check a code and open a session.
@@ -190,7 +322,7 @@ export async function verifyOtp(
   rawPhone: string,
   rawCode: string,
   rawName: string | null,
-  meta: SessionMeta = {},
+  meta: VerifyOtpMeta = {},
 ): Promise<VerifyOtpResult> {
   const phone = normalisePhone(rawPhone);
   if (!phone) return { ok: false, reason: 'invalid_phone' };
@@ -254,6 +386,28 @@ export async function verifyOtp(
       data: { consumedAt: new Date(), attempts: { increment: 1 } },
     });
 
+    /**
+     * The studio door. Checked again here, not only when the code was
+     * asked for: a member suspended in the ten minutes between is refused,
+     * and a code asked for on the customer page and typed on this one still
+     * has to belong to a team member. Nothing is created on this branch.
+     */
+    if (meta.studio) {
+      const member = await studioMemberByPhone(tx, phone);
+      if (!member) return { ok: false as const, reason: 'not_member' as const };
+      if (member.status === 'SUSPENDED') return { ok: false as const, reason: 'suspended' as const };
+      const now = new Date();
+      await tx.studioMember.update({
+        where: { id: member.memberId },
+        data: { lastSeenAt: now, ...(member.status === 'INVITED' ? { status: 'ACTIVE' as const } : {}) },
+      });
+      await tx.user.update({
+        where: { id: member.userId },
+        data: { phoneVerified: member.phoneVerified ?? now, ...(meta.locale ? { locale: meta.locale } : {}) },
+      });
+      return { ok: true as const, userId: member.userId, studioRole: member.role };
+    }
+
     const existing = await tx.user.findUnique({ where: { phone } });
 
     /**
@@ -296,5 +450,6 @@ export async function verifyOtp(
   if (!outcome.ok) return outcome;
 
   const token = await createSession(outcome.userId, meta);
-  return meta.bearer ? { ok: true, userId: outcome.userId, token } : { ok: true, userId: outcome.userId };
+  const studioRole = 'studioRole' in outcome ? { studioRole: outcome.studioRole } : {};
+  return meta.bearer ? { ok: true, userId: outcome.userId, token, ...studioRole } : { ok: true, userId: outcome.userId, ...studioRole };
 }

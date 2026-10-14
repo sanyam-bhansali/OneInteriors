@@ -4,7 +4,8 @@ import { customerProjects } from '@/modules/portal/project-store';
 /**
  * GET /api/app/v1/project — the signed-in customer's projects: stages,
  * payment plan, site updates (photos as short-lived signed links), decisions
- * and snags. An empty list means no project has started yet.
+ * and snags, and each project's plan (`basic` | `assured`). An empty list
+ * means no project has started yet.
  */
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

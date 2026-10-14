@@ -4,48 +4,39 @@ import Link from 'next/link';
 import { useTransition } from 'react';
 import type { InboxItem } from '@/modules/studio/inbox';
 import { markInboxReadAction } from './inbox-actions';
+import './office-ui.css';
 
 /**
  * New clients, signatures and customer choices, on the dashboard until they
  * are opened. Opening one marks it read; so does "Done" for one that needs
- * no visit.
+ * no visit. Drawn as one of the design's side cards (StudioHome).
  */
 export function Inbox({ items }: { items: InboxItem[] }) {
   const [, start] = useTransition();
   if (items.length === 0) return null;
 
   return (
-    <section className="s-card overflow-hidden">
-      <div className="flex items-baseline justify-between gap-3 bg-[var(--s-surface-2)] px-4 py-2.5">
-        <h2 className="m-0 text-[14.5px] font-semibold">For you</h2>
-        <span className="s-num text-[12.5px] text-[var(--s-ink-3)]">{items.length} new</span>
+    <section className="card" aria-labelledby="h-inbox" style={{ gap: 6 }}>
+      <div className="chead">
+        <h2 id="h-inbox">For you</h2>
+        <span className="chip oi">
+          <span className="dot" />
+          <span className="mono">{items.length}</span> new
+        </span>
       </div>
-      <ul className="m-0 flex list-none flex-col p-0">
+      <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
         {items.map((item) => (
-          <li
-            key={item.id}
-            className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-[var(--s-rule-soft)] px-4 py-3 last:border-b-0"
-          >
-            <Link
-              href={item.url}
-              onClick={() => start(() => markInboxReadAction(item.id))}
-              className="min-w-0 flex-1 text-inherit no-underline"
-            >
-              <span className="block text-[14px] font-medium">{item.title}</span>
-              {item.body ? (
-                <span className="block text-[13px] leading-snug text-[var(--s-ink-2)]">{item.body}</span>
-              ) : null}
+          <li key={item.id} className="ox-crow" style={{ alignItems: 'flex-start' }}>
+            <Link href={item.url} onClick={() => start(() => markInboxReadAction(item.id))} style={{ flex: '1 1 200px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <b style={{ fontWeight: 600 }}>{item.title}</b>
+              {item.body ? <span className="muted sm">{item.body}</span> : null}
             </Link>
-            <span className="s-num text-[12px] text-[var(--s-ink-3)]">
-              {new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+            <span className="hstack" style={{ gap: 8, flexWrap: 'nowrap' }}>
+              <span className="mono muted sm">{new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+              <button type="button" onClick={() => start(() => markInboxReadAction(item.id))} className="btn ghost xs">
+                Done
+              </button>
             </span>
-            <button
-              type="button"
-              onClick={() => start(() => markInboxReadAction(item.id))}
-              className="text-[12.5px] text-[var(--s-ink-3)] hover:text-[var(--s-ink)]"
-            >
-              Done
-            </button>
           </li>
         ))}
       </ul>

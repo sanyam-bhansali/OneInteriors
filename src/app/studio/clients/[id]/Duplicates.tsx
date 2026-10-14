@@ -51,30 +51,30 @@ export function Duplicates({
   }
 
   return (
-    <section className="rounded-[12px] border border-[var(--s-warn,#8a6220)]/35 bg-[var(--s-warn,#8a6220)]/[0.05] px-4 py-3.5">
-      <h2 className="m-0 mb-1 text-[14.5px] font-semibold">
+    <section className="card" style={{ background: 'var(--warn-bg)' }}>
+      <h2 className="h" style={{ color: 'var(--warn)' }}>
         {candidates.length === 1 ? 'Another card has' : `${candidates.length} other cards have`} this
         number
       </h2>
-      <p className="m-0 mb-3 max-w-[62ch] text-[12.5px] leading-relaxed text-[var(--s-ink-2)]">
+      <p className="sm" style={{ margin: 0, maxWidth: '62ch', lineHeight: 1.5, color: 'var(--text2)' }}>
         Merging keeps <strong>{clientName}</strong> and moves the other card&rsquo;s quotations,
         projects and notes onto it. Nothing is deleted — the other card goes to the bin with a note
         saying where it went.
       </p>
 
-      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {candidates.map((c) => (
           <li
             key={c.id}
-            className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[9px] border border-[var(--s-rule)] bg-[var(--s-rail)] px-3 py-2"
+            className="hstack" style={{ gap: 10, borderRadius: 12, background: 'var(--paper)', padding: '8px 12px' }}
           >
             <Link
               href={`/studio/clients/${c.id}`}
-              className="text-[13.5px] font-medium no-underline hover:underline"
+              style={{ fontWeight: 600 }}
             >
               {c.name}
             </Link>
-            <span className="text-[12.5px] text-[var(--s-ink-3)]">
+            <span className="muted sm">
               {[
                 c.stageName,
                 c.assignedToName ?? 'nobody on it',
@@ -87,21 +87,21 @@ export function Duplicates({
                 .join(' · ')}
             </span>
 
-            <span className="ml-auto flex items-center gap-2">
+            <span className="hstack" style={{ marginLeft: 'auto', gap: 8 }}>
               {confirming === c.id ? (
                 <>
                   <button
                     type="button"
                     disabled={pending}
                     onClick={() => merge(c.id)}
-                    className="s-btn px-2.5 py-1 text-[12.5px] disabled:opacity-50"
+                    className="btn pri xs"
                   >
                     {pending ? 'Merging…' : `Merge into ${clientName}`}
                   </button>
                   <button
                     type="button"
                     onClick={() => setConfirming(null)}
-                    className="text-[12.5px] text-[var(--s-ink-3)] hover:text-[var(--s-ink)]"
+                    className="btn ghost xs"
                   >
                     Cancel
                   </button>
@@ -110,7 +110,7 @@ export function Duplicates({
                 <button
                   type="button"
                   onClick={() => setConfirming(c.id)}
-                  className="s-btn-ghost px-2.5 py-1 text-[12.5px]"
+                  className="btn sec xs"
                 >
                   Same person
                 </button>
@@ -121,7 +121,7 @@ export function Duplicates({
       </ul>
 
       {error ? (
-        <p role="alert" className="m-0 mt-2.5 text-[12.5px] text-[var(--s-bad)]">
+        <p role="alert" className="cl-err">
           {error}
         </p>
       ) : null}

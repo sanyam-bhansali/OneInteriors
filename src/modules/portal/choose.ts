@@ -19,7 +19,7 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/modules/auth/session';
+import { getCurrentUser, type AuthUser } from '@/modules/auth/session';
 import { readPhases } from '@/modules/studio/payment-phases';
 import { readProfile } from '@/modules/studio/matching-profile';
 import { computeTotals, type QuoteUnitName, type WorkCodeName } from '@/modules/studio-quote/pricing';
@@ -27,6 +27,10 @@ import { canTransition } from '@/modules/studio/appointment-rules';
 import { durationFor } from './tracker';
 import { notifyStudio } from '@/modules/notify/service';
 import { fromDb } from '@/lib/money';
+import { tellOpsAssured } from './plan-store';
+import { createSignedProject, PLAN_TX } from './plan-write';
+import type { PlanName } from './plans';
+import { designPlanInput } from '@/modules/studio-design/plan-input';
 
 const VISIBLE_QUOTE = ['ISSUED', 'ACCEPTED'] as const;
 
@@ -60,11 +64,11 @@ async function myIntroductionIds(briefId: string): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
-async function myBriefId(): Promise<{ userId: string; briefId: string } | null> {
+async function myBriefId(): Promise<{ userId: string; user: AuthUser; briefId: string } | null> {
   const user = await getCurrentUser();
   if (!user) return null;
   const brief = await prisma.brief.findUnique({ where: { userId: user.id }, select: { id: true } });
-  return brief ? { userId: user.id, briefId: brief.id } : null;
+  return brief ? { userId: user.id, user, briefId: brief.id } : null;
 }
 
 export async function chooseView(): Promise<ChooseView | null> {
@@ -82,6 +86,7 @@ export async function chooseView(): Promise<ChooseView | null> {
       orderBy: { introducedAt: 'asc' },
       select: {
         id: true,
+        source: true,
         studio: { select: { slug: true, tradeName: true } },
         homeProject: { select: { id: true } },
         appointments: {
@@ -93,9 +98,12 @@ export async function chooseView(): Promise<ChooseView | null> {
     }),
   ]);
 
-  const quotes = intros.length
+  /* A studio's own client is not a studio One Interiors introduced: it is
+     never offered under "Meet studios", only counted as who they signed with. */
+  const introduced = intros.filter((i) => i.source === 'ONE_INTERIORS');
+  const quotes = introduced.length
     ? await prisma.studioQuote.findMany({
-        where: { introductionId: { in: intros.map((i) => i.id) }, status: { in: [...VISIBLE_QUOTE] } },
+        where: { introductionId: { in: introduced.map((i) => i.id) }, status: { in: [...VISIBLE_QUOTE] } },
         orderBy: { updatedAt: 'desc' },
         select: {
           id: true,
@@ -114,7 +122,7 @@ export async function chooseView(): Promise<ChooseView | null> {
       })
     : [];
 
-  const studios: ChooseStudio[] = intros.map((i) => {
+  const studios: ChooseStudio[] = introduced.map((i) => {
     const q = quotes.find((x) => x.introductionId === i.id);
     return {
       introductionId: i.id,
@@ -128,7 +136,7 @@ export async function chooseView(): Promise<ChooseView | null> {
         location: a.location,
       })),
       finalQuote: q
-        ? { id: q.id, totalPaise: totalOf(q).beforeTaxPaise, issuedOn: q.issuedOn?.toISOString() ?? null, accepted: q.status === 'ACCEPTED' }
+        ? { id: q.id, totalPaise: quoteTotals(q).beforeTaxPaise, issuedOn: q.issuedOn?.toISOString() ?? null, accepted: q.status === 'ACCEPTED' }
         : null,
     };
   });
@@ -140,7 +148,7 @@ export async function chooseView(): Promise<ChooseView | null> {
   };
 }
 
-type QuoteRowForTotals = {
+export type QuoteRowForTotals = {
   feeBps: number;
   discountBps: number;
   onSpotPaise: bigint;
@@ -151,7 +159,8 @@ type QuoteRowForTotals = {
   lines: { unit: string; code: string; ratePaise: bigint; amountPaise: bigint; widthMm: number | null; heightMm: number | null; qtyMilli: number | null }[];
 };
 
-function totalOf(q: QuoteRowForTotals) {
+/** A studio quote's totals and payment stages, exactly as the customer's final quote shows them. Also used by project/own-project.ts. */
+export function quoteTotals(q: QuoteRowForTotals) {
   return computeTotals(
     q.lines.map((l) => ({
       unit: l.unit as QuoteUnitName,
@@ -209,9 +218,19 @@ export async function finalQuoteView(quoteId: string, firstBeforeGst: (slug: str
   const me = await myBriefId();
   if (!me) return null;
   const mine = await myIntroductionIds(me.briefId);
+  /* A studio's own client signed outside the app: their quote carries no
+     introduction (it is the studio's own work), so it is theirs to read
+     because it is the signed quote of a project on their own brief. The
+     Locker's agreement and quotation open this page. */
+  const ownSigned = await prisma.homeProject.findFirst({
+    where: { signedQuoteId: quoteId, introduction: { briefId: me.briefId, withdrawnAt: null, source: 'STUDIO_OWN_CLIENT' } },
+    select: { introductionId: true },
+  });
   const q = await prisma.studioQuote.findFirst({
-    // Scoped to this customer's own introductions in the query itself.
-    where: { id: quoteId, status: { in: [...VISIBLE_QUOTE] }, introductionId: { in: mine } },
+    // Scoped to this customer's own introductions (or their own signed project) in the query itself.
+    where: ownSigned
+      ? { id: quoteId, status: 'ACCEPTED' }
+      : { id: quoteId, status: { in: [...VISIBLE_QUOTE] }, introductionId: { in: mine } },
     select: {
       id: true,
       number: true,
@@ -233,14 +252,15 @@ export async function finalQuoteView(quoteId: string, firstBeforeGst: (slug: str
       },
     },
   });
-  if (!q?.introductionId) return null;
+  const introductionId = ownSigned?.introductionId ?? q?.introductionId;
+  if (!q || !introductionId) return null;
   const intro = await prisma.introduction.findFirst({
-    where: { id: q.introductionId, briefId: me.briefId, withdrawnAt: null },
-    select: { brief: { select: { scope: true } } },
+    where: { id: introductionId, briefId: me.briefId, withdrawnAt: null },
+    select: { brief: { select: { scope: true } }, homeProject: { select: { totalDays: true } } },
   });
   if (!intro) return null;
 
-  const totals = totalOf(q);
+  const totals = quoteTotals(q);
   const rooms = new Map<string, FinalQuoteView['rooms'][number]>();
   for (const l of q.lines) {
     const amount = fromDb(l.amountPaise);
@@ -270,7 +290,8 @@ export async function finalQuoteView(quoteId: string, firstBeforeGst: (slug: str
     gstPaise: totals.gstPaise,
     totalPaise: totals.totalPaise,
     terms: q.terms,
-    handoverDays: durationFor(intro.brief.scope, readProfile(q.studio.matchingProfile).durationDays),
+    handoverDays:
+      ownSigned && intro.homeProject ? intro.homeProject.totalDays : durationFor(intro.brief.scope, readProfile(q.studio.matchingProfile).durationDays),
     stages,
     firstBeforeGstPaise: await firstBeforeGst(q.studio.slug).catch(() => null),
   };
@@ -318,8 +339,18 @@ export async function answerVisit(appointmentId: string, to: 'CONFIRMED' | 'CANC
  * and that they ticked the agreement. Locks the total and the payment stages
  * onto a new project, marks the quotation accepted, records the win, and
  * starts the tracker today.
+ *
+ * In the same transaction it builds the project's plan from the signed
+ * lines (quote-to-plan.ts: the five stages, each room's checklist, the
+ * materials) and files the agreement and the signed quotation in the
+ * customer's Locker (documents.ts `signedQuoteDocs`). If any of it fails,
+ * nothing is signed.
  */
-export async function signFinalQuote(view: FinalQuoteView): Promise<ChooseResult & { projectId?: string }> {
+export async function signFinalQuote(
+  view: FinalQuoteView,
+  /** Basic, or Assured — which only registers interest: the project starts on Basic and ops is told (portal/plans.ts). */
+  plan: PlanName = 'basic',
+): Promise<ChooseResult & { projectId?: string }> {
   const me = await myBriefId();
   if (!me) return { ok: false, error: 'Sign in first.' };
   if (view.accepted) return { ok: false, error: 'This quote is already signed.' };
@@ -327,7 +358,14 @@ export async function signFinalQuote(view: FinalQuoteView): Promise<ChooseResult
   const mine = await myIntroductionIds(me.briefId);
   const q = await prisma.studioQuote.findFirst({
     where: { id: view.id, status: 'ISSUED', introductionId: { in: mine } },
-    select: { id: true, introductionId: true, studioId: true, number: true, clientName: true },
+    select: {
+      id: true,
+      introductionId: true,
+      studioId: true,
+      number: true,
+      clientName: true,
+      lines: { orderBy: { sortOrder: 'asc' }, select: { id: true, room: true, product: true, details: true, code: true } },
+    },
   });
   if (!q?.introductionId) return { ok: false, error: 'This quote is no longer open for signing.' };
   const intro = await prisma.introduction.findFirst({
@@ -337,26 +375,29 @@ export async function signFinalQuote(view: FinalQuoteView): Promise<ChooseResult
   if (!intro) return { ok: false, error: 'This quote is not on your project.' };
   if (intro.homeProject) return { ok: false, error: 'You have already signed with this studio.' };
 
-  // The stages as signed, with their rupee amounts, so a later change to the
-  // studio's schedule never rewrites what this customer agreed to.
-  const stages = view.stages.map((s) => ({ label: s.label, pct: s.pct, amountPaise: s.amountPaise }));
   const now = new Date();
   const startOn = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  // Studio OS Phase 2: the studio's design steps and the flat size, for the DESIGN stage.
+  const design = await designPlanInput(q.studioId, { briefId: intro.briefId });
 
   try {
     const project = await prisma.$transaction(async (tx) => {
-      await tx.studioQuote.update({ where: { id: q.id }, data: { status: 'ACCEPTED' } });
-      const created = await tx.homeProject.create({
-        data: {
-          introductionId: intro.id,
-          startOn,
-          totalDays: view.handoverDays,
-          signedAt: now,
-          signedQuoteId: q.id,
-          contractPaise: BigInt(view.totalPaise),
-          paymentPhases: stages,
-        },
-        select: { id: true },
+      // The stages as signed, with their rupee amounts, so a later change to
+      // the studio's schedule never rewrites what this customer agreed to.
+      // Split again over the total with `splitAcross` (quote-to-plan.ts), so
+      // they sum to the contract exactly: the same figures the quote showed.
+      // The same code builds a studio's own client's project (plan-write.ts).
+      const created = await createSignedProject(tx, {
+        introductionId: intro.id,
+        quote: { id: q.id, number: q.number, lines: q.lines },
+        startOn,
+        totalDays: view.handoverDays,
+        contractPaise: view.totalPaise,
+        stages: view.stages.map((s) => ({ label: s.label, pct: s.pct, amountPaise: s.amountPaise })),
+        signedAt: now,
+        filedById: me.userId,
+        assuredRequestedAt: plan === 'assured' ? now : null,
+        design,
       });
       await tx.quoteDecision.upsert({
         where: { briefId: intro.briefId },
@@ -369,11 +410,11 @@ export async function signFinalQuote(view: FinalQuoteView): Promise<ChooseResult
           action: 'quote.signed',
           entityType: 'StudioQuote',
           entityId: q.id,
-          after: { totalPaise: view.totalPaise, projectId: created.id },
+          after: { totalPaise: view.totalPaise, projectId: created.id, plan },
         },
       });
       return created;
-    });
+    }, PLAN_TX);
     // The studio hears at once — inbox and email (notify/service.ts).
     void notifyStudio(q.studioId, {
       kind: 'quote-signed',
@@ -382,6 +423,7 @@ export async function signFinalQuote(view: FinalQuoteView): Promise<ChooseResult
       number: q.number,
       totalPaise: view.totalPaise,
     });
+    if (plan === 'assured') void tellOpsAssured(me.user, view.studioName, true);
     return { ok: true, projectId: project.id };
   } catch (error) {
     console.error('[choose] sign failed', error);

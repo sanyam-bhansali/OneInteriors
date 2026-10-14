@@ -32,13 +32,13 @@ export function StageTicks({
                   setError(r.ok ? null : (r.error ?? 'That did not save.'));
                 });
               }}
-              className="h-[15px] w-[15px] accent-[var(--s-accent)]"
+              className="h-[15px] w-[15px] accent-[var(--acc)]"
             />
             {s.label}
           </label>
         ))}
       </div>
-      {error ? <p className="m-0 text-[12.5px] text-[var(--s-bad)]">{error}</p> : null}
+      {error ? <p className="m-0 text-[12.5px] text-[var(--bad)]">{error}</p> : null}
     </div>
   );
 }

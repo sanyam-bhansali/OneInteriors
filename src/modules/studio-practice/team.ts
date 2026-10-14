@@ -101,38 +101,32 @@ export async function myTeam(): Promise<TeamSnapshot> {
       },
     });
 
-    // One pass over the open clients rather than three counts per member.
-    // With a handful of people and a few hundred clients either is instant,
-    // but the query count grows with the team and this one does not.
-    const open = await prisma.studioClient.findMany({
-      where: {
-        studioId,
-        deletedAt: null,
-        stage: { kind: { in: BOARD_KINDS } },
-      },
-      select: { assignedToId: true, nextActionOn: true, lastContactedAt: true },
-    });
-
+    /* Counted in SQL, grouped by person (leads at scale): reading every open
+       lead to tally three numbers stopped being instant at 26,000 leads. */
     const today = endOfToday();
     const quietLine = quietBefore();
-
-    const tally = new Map<string, { open: number; overdue: number; quiet: number }>();
-    let unassigned = 0;
-
-    for (const client of open) {
-      if (!client.assignedToId) {
-        unassigned += 1;
-        continue;
-      }
-
-      const row = tally.get(client.assignedToId) ?? { open: 0, overdue: 0, quiet: 0 };
-      row.open += 1;
-      if (client.nextActionOn !== null && client.nextActionOn <= today) row.overdue += 1;
+    const open = { studioId, deletedAt: null, stage: { kind: { in: BOARD_KINDS } } };
+    const [openBy, overdueBy, quietBy] = await Promise.all([
+      prisma.studioClient.groupBy({ by: ['assignedToId'], where: open, _count: { _all: true } }),
+      prisma.studioClient.groupBy({ by: ['assignedToId'], where: { ...open, nextActionOn: { lte: today } }, _count: { _all: true } }),
       // Never contacted counts as quiet. An imported list is entirely this,
       // and that is exactly the number somebody needs to see.
-      if (client.lastContactedAt === null || client.lastContactedAt < quietLine) row.quiet += 1;
-      tally.set(client.assignedToId, row);
+      prisma.studioClient.groupBy({
+        by: ['assignedToId'],
+        where: { ...open, OR: [{ lastContactedAt: null }, { lastContactedAt: { lt: quietLine } }] },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const tally = new Map<string, { open: number; overdue: number; quiet: number }>();
+    const row = (id: string) => tally.get(id) ?? tally.set(id, { open: 0, overdue: 0, quiet: 0 }).get(id)!;
+    let unassigned = 0;
+    for (const g of openBy) {
+      if (g.assignedToId) row(g.assignedToId).open = g._count._all;
+      else unassigned = g._count._all;
     }
+    for (const g of overdueBy) if (g.assignedToId) row(g.assignedToId).overdue = g._count._all;
+    for (const g of quietBy) if (g.assignedToId) row(g.assignedToId).quiet = g._count._all;
 
     return {
       unassigned,

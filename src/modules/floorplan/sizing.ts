@@ -4,9 +4,13 @@
  * Pure (CONTRIBUTING §9.5). The rules are Hauspire's Quotation Studio's, which
  * were checked against its own quotations:
  *
- * - A bedroom's wardrobe takes 55% of the room's longer wall, rounded to
+ * - A bedroom's wardrobe takes 55% of the room's SHORTER wall, rounded to
  *   50 mm and kept between 1200 and 2400 mm — a wardrobe is never the whole
  *   wall (doors, windows and the bed are on it too) and never a token one.
+ *   Shorter, as Hauspire's locked first-quote builder has it
+ *   (`buildQuote.ts wardrobeWidth`, FIRST_QUOTE_LOCKED.md) and as
+ *   docs/QUOTATION-ENGINE-INTEGRATION.md recorded; this file said "longer"
+ *   until 12 Oct 2026, which over-sized every wardrobe on a long room.
  * - A room's false ceiling is its floor area.
  * - Bedrooms are taken master first (the one the plan calls master, else the
  *   largest), then the rest largest first, which is the order the quotation
@@ -23,7 +27,7 @@ export function areaSqft(room: Pick<PlanRoomSize, 'widthMm' | 'depthMm'>): numbe
 
 /** The wardrobe width a bedroom takes. */
 export function wardrobeWidthMm(room: Pick<PlanRoomSize, 'widthMm' | 'depthMm'>): number {
-  const wall = Math.max(room.widthMm, room.depthMm);
+  const wall = Math.min(room.widthMm, room.depthMm);
   const width = Math.round((wall * 0.55) / 50) * 50;
   return Math.min(2400, Math.max(1200, width));
 }
@@ -61,6 +65,10 @@ export function planRoomFor(
     const sqft = livingSqft(rooms);
     const main = rooms.find((r) => r.code === 'LIVING') ?? rooms.find((r) => r.code === 'DINING');
     return sqft && main ? { widthMm: main.widthMm, depthMm: main.depthMm, sqft } : null;
+  }
+  if (/^kitchen/i.test(quoteRoom)) {
+    const kitchen = rooms.find((r) => r.code === 'KITCHEN');
+    return kitchen ? { widthMm: kitchen.widthMm, depthMm: kitchen.depthMm, sqft: areaSqft(kitchen) } : null;
   }
   if (/^study/i.test(quoteRoom)) {
     const study = rooms.find((r) => r.code === 'STUDY');

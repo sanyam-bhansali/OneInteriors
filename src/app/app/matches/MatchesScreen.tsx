@@ -17,6 +17,7 @@ import { Body, Cta, Foot, Frame, Head, useBrief } from '@/components/app/ui';
 import { filedRatesFor } from '@/data/filed-rates';
 import { carpetAreaFor } from '@/modules/brief/steps';
 import { lateness, listedStudios, quotesFor, topMatches } from '@/modules/app/journey';
+import { checkCount, matchReasons } from '@/modules/app/journey-view';
 import { TIER, TIERS, tierRangeFor, type Tier } from '@/modules/quotation/tiers';
 import { formatINRCompact } from '@/lib/money';
 import { useAppData } from '@/components/app/useAppData';
@@ -104,13 +105,10 @@ export function MatchesScreen({ data }: { data: AppData }) {
 
         <div className="oa-list">
           {matches.map(({ match, studio }, i) => {
-            const counted = studio.checks.filter((c) => c.result !== 'NOT_APPLICABLE');
-            const passed = counted.filter((c) => c.result === 'PASS').length;
+            const checks = checkCount(studio);
             const late = lateness(studio);
             const q = quoteOf.get(studio.slug);
-            const reasons = [match.topPriority, ...match.reasoning.filter((r) => r !== match.topPriority)]
-              .filter((r): r is string => Boolean(r))
-              .slice(0, i === 0 ? 3 : 1);
+            const reasons = matchReasons(match, i === 0 ? 3 : 1);
             return (
               <Link key={studio.id} href={`/app/studios/${studio.slug}`} className={`oa-match tap${i === 0 ? ' first' : ''}`}>
                 <div className="oa-match-top">
@@ -129,7 +127,7 @@ export function MatchesScreen({ data }: { data: AppData }) {
                 </div>
                 <div className="oa-chips mt-3">
                   <span className="oa-chip small static">
-                    {t('matches.checks', { a: passed, b: counted.length })}
+                    {t('matches.checks', { a: checks.passed, b: checks.total })}
                   </span>
                   {late ? <span className="oa-chip small static">{late}</span> : null}
                 </div>

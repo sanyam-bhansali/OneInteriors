@@ -176,9 +176,10 @@ describe('the pilot feature set', () => {
     expect(isLive('settings')).toBe(true);
   });
 
-  it('gates the four that are not in the pilot', () => {
+  it('gates the three that are not in the pilot', () => {
     expect(isLive('projects')).toBe(false);
-    expect(isLive('vendors')).toBe(false);
+    // Studio OS Phase 3 (12 Oct 2026): the Crews screen is switched on.
+    expect(isLive('vendors')).toBe(true);
     expect(isLive('calendar')).toBe(false);
     expect(isLive('listing')).toBe(false);
   });

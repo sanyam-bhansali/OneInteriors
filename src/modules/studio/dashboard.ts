@@ -21,6 +21,7 @@ import { hasDatabase } from '@/lib/env';
 import { splitReasoning, matchHistoryBegins } from '@/modules/matching/store';
 import { FACTOR_LABELS, type FactorKey } from '@/modules/matching/score';
 import { buildFunnel, diagnose, type FunnelCounts, type FunnelStep, type Diagnosis } from './dashboard-funnel';
+import { INTRODUCED_BY_US } from '@/modules/studio/introduction-source';
 
 export {
   buildFunnel,
@@ -155,7 +156,7 @@ export async function studioFunnel(
       prisma.consultation.count({
         where: { createdAt: { gte: since }, studioIds: { has: studioId } },
       }),
-      prisma.introduction.count({ where: { studioId, introducedAt: { gte: since } } }),
+      prisma.introduction.count({ where: { studioId, introducedAt: { gte: since }, ...INTRODUCED_BY_US } }),
       prisma.project.count({ where: { studioId, createdAt: { gte: since } } }),
     ]);
 
