@@ -16,7 +16,9 @@ export type StudioMessage =
   /** Site mode (Phase 2), 18:00 IST: nothing posted yet today for a site this supervisor is on. */
   | { kind: 'site-reminder'; name: string; home: string; link: string }
   /** Site mode (Phase 2), 21:00 IST: a second working day in a row with no post, to the owner. */
-  | { kind: 'site-missed'; name: string; home: string; days: number; link: string };
+  | { kind: 'site-missed'; name: string; home: string; days: number; link: string }
+  /** My work (owner, 15 Oct 2026), 08:00 IST, to someone with no email (a site supervisor): today's and missed counts. */
+  | { kind: 'my-work'; name: string; today: number; missed: number; link: string };
 
 /**
  * Env var for each kind's approved WhatsApp template. Unset means "not
@@ -33,12 +35,15 @@ export const TEMPLATE_ENV: Record<StudioMessage['kind'], string> = {
   'site-reminder': 'WHATSAPP_STUDIO_SITE_REMINDER_TEMPLATE',
   /* UTILITY, four body parameters: name, home, days, link. */
   'site-missed': 'WHATSAPP_STUDIO_SITE_MISSED_TEMPLATE',
+  /* UTILITY, four body parameters: name, today, missed, link. */
+  'my-work': 'WHATSAPP_STUDIO_MY_WORK_TEMPLATE',
 };
 
 /** The template's body parameters, in order. */
 export function templateParams(message: StudioMessage): string[] {
   if (message.kind === 'site-reminder') return [message.name, message.home, message.link];
   if (message.kind === 'site-missed') return [message.name, message.home, String(message.days), message.link];
+  if (message.kind === 'my-work') return [message.name, String(message.today), String(message.missed), message.link];
   return message.kind === 'code' ? [message.code] : [message.name, message.studioName, message.link];
 }
 
@@ -52,6 +57,9 @@ export function plainText(message: StudioMessage): string {
   }
   if (message.kind === 'site-missed') {
     return `${message.name}, ${message.home} has had no site update for ${message.days} working days. The customer can see this. ${message.link}`;
+  }
+  if (message.kind === 'my-work') {
+    return `${message.name}, today you have ${message.today} thing${message.today === 1 ? '' : 's'} to do${message.missed > 0 ? ` and ${message.missed} missed` : ''}. ${message.link}`;
   }
   if (message.kind === 'code') {
     return `${message.code} is your One Interiors Studio sign-in code. It expires in 10 minutes. Do not share it.`;

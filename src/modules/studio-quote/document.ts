@@ -84,6 +84,8 @@ export interface DocLineInput {
   heightMm: number | null;
   qtyMilli: number | null;
   amountPaise: number;
+  /** The line's note for the client, printed under its details (15 Oct 2026). */
+  note?: string | null;
 }
 
 export interface DocRow {
@@ -98,6 +100,8 @@ export interface DocRow {
   heightMm: number | null;
   amountPaise: number;
   discountedPaise: number;
+  /** The note for the client under the details; '' when none. */
+  note: string;
 }
 
 export interface DocRoom {
@@ -107,7 +111,7 @@ export interface DocRoom {
   subDiscountedPaise: number;
 }
 
-function unitsText(line: DocLineInput): string {
+export function unitsText(line: Pick<DocLineInput, 'unit' | 'qtyMilli'>): string {
   if (line.unit === 'AREA' || line.qtyMilli == null) return '';
   const q = line.qtyMilli / 1000;
   return Number.isInteger(q) ? String(q) : q.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
@@ -129,6 +133,7 @@ export function docRooms(lines: readonly DocLineInput[], roomOrder: readonly str
         heightMm: l.heightMm || null,
         amountPaise: l.amountPaise,
         discountedPaise: discountedPaise(l.amountPaise, l.code, discountBps),
+        note: l.note?.trim() ?? '',
       }));
       return {
         room,

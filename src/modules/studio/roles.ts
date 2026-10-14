@@ -182,7 +182,11 @@ export type StudioAction =
   /** Lifecycle: sign off the design (close it), which moves the project to execution. */
   | 'design.close'
   /** Lifecycle: work out and fix the project closure (the final payment). */
-  | 'project.closure';
+  | 'project.closure'
+  /** Change orders (15 Oct 2026): add extra work after design sign-off, send it to the client, release it once paid. */
+  | 'extras.write'
+  /** Ask the client to sign a quotation (sales final, design final) digitally (15 Oct 2026). */
+  | 'signoff.request';
 
 export const STUDIO_ACTIONS: readonly StudioAction[] = [
   'team.manage',
@@ -227,6 +231,8 @@ export const STUDIO_ACTIONS: readonly StudioAction[] = [
   'crew.pay',
   'design.close',
   'project.closure',
+  'extras.write',
+  'signoff.request',
 ];
 
 /** Everything a PM does with leads and sales: all of it, across the studio. */
@@ -268,6 +274,8 @@ const GRANTS: Record<Exclude<StudioRoleName, 'OWNER'>, readonly StudioAction[]> 
     'design.workload',
     'design.close',
     'project.closure',
+    'extras.write',
+    'signoff.request',
     /* Phase 3: quantities only — never `workorder.money` or `crew.pay`. */
     'crew.list',
     'workorder.read',
@@ -276,7 +284,7 @@ const GRANTS: Record<Exclude<StudioRoleName, 'OWNER'>, readonly StudioAction[]> 
   SUPERVISOR: ['update.post', 'checklist.tick', 'snag.fix', 'project.read', 'workorder.read'],
   ACCOUNTS: ['payment.read', 'payment.record', 'booking.record', 'booking.refund', 'crew.list', 'crew.edit', 'workorder.read', 'workorder.money', 'crew.pay'],
   /* Studio OS Phase 2: only the projects they are the designer on. Lifecycle (owner, 13 Oct 2026): money everywhere on those projects, execution ticks, design sign-off, the closure. */
-  DESIGNER: ['project.read', 'document.upload', 'design.work', 'design.close', 'payment.read', 'update.post', 'checklist.tick', 'workorder.read', 'workorder.money', 'project.closure'],
+  DESIGNER: ['project.read', 'document.upload', 'design.work', 'design.close', 'payment.read', 'update.post', 'checklist.tick', 'workorder.read', 'workorder.money', 'project.closure', 'extras.write', 'signoff.request'],
 };
 
 /** Lead actions a salesperson may take only on a lead assigned to them. */
@@ -302,6 +310,8 @@ const NEEDS_ASSIGNMENT: ReadonlySet<StudioAction> = new Set<StudioAction>([
   'workorder.money',
   'design.close',
   'project.closure',
+  'extras.write',
+  'signoff.request',
 ]);
 
 /** Accounts works across every project, so assignment never applies to it. */
@@ -359,6 +369,8 @@ export const FULL_SOFTWARE_ACTIONS: ReadonlySet<StudioAction> = new Set<StudioAc
   'crew.pay',
   'design.close',
   'project.closure',
+  'extras.write',
+  'signoff.request',
 ]);
 
 /**

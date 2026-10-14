@@ -82,6 +82,33 @@
 .qd-product { font-weight: 700; }
 .qd-details { font-size: 9px; color: var(--qd-soft); white-space: pre-line; }
 .qd-struck { color: var(--qd-mute); text-decoration: line-through; }
+/* A line's note for the client: a margin comment under the details. */
+.qd-linenote {
+  display: block; margin-top: 1.2mm; padding: .8mm 1.6mm; font-size: 8.5px; line-height: 1.4; font-style: italic;
+  color: var(--qd-ink); background: #fff8e1; border-left: 2px solid var(--qd-acc); border-radius: 0 1mm 1mm 0; white-space: pre-line;
+}
+.qd-linenote b { font-style: normal; color: var(--qd-band); font-weight: 700; }
+
+/* ── The Final (Original vs Revised) ── */
+.qd-final td { font-size: 9.5px; }
+.qd-final .qd-was { color: var(--qd-mute); }
+.qd-final .qd-arrow { color: var(--qd-mute); padding: 0 .8mm; }
+.qd-final .qd-now { font-weight: 700; }
+.qd-final .qd-sz { display: block; }
+.qd-final .qd-up { color: #a33a1f; font-weight: 700; }
+.qd-final .qd-down { color: var(--qd-green); font-weight: 700; }
+.qd-final .qd-same { color: var(--qd-mute); }
+.qd-final tr.qd-added td { background: #eef7f0; }
+.qd-final tr.qd-removed td { background: #f6f3f2; color: var(--qd-mute); }
+.qd-final tr.qd-removed .qd-product, .qd-final tr.qd-removed .qd-details { text-decoration: line-through; }
+.qd-final tr.qd-changed td { background: #fffaf0; }
+.qd-tag { display: inline-block; margin-top: .8mm; padding: .2mm 1.2mm; border-radius: 1mm; font-size: 7.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; text-decoration: none; }
+.qd-tag-added { background: var(--qd-green); color: #fff; }
+.qd-tag-removed { background: #8a8a8a; color: #fff; }
+.qd-tag-changed { background: #c98a1b; color: #fff; }
+.qd-detwas { display: block; margin-top: .8mm; color: var(--qd-mute); text-decoration: line-through; }
+.qd-changes { margin: 0 0 5mm; padding: 0 0 0 4.5mm; font-size: 9.5px; line-height: 1.55; }
+.qd-changes li { margin: 0 0 .6mm; }
 .qd-disc { color: var(--qd-green); font-weight: 700; }
 .qd-sub td { background: var(--qd-tint); font-weight: 700; }
 .qd-bandline { background: var(--qd-band); color: #fff; font-weight: 700; font-size: 11px; padding: 1.6mm 1.8mm; margin: 0; }

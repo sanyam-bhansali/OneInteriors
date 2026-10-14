@@ -46,6 +46,8 @@ import { dedupeKey, recordEvent, recordEventOnce, SNAG_EVENT_TYPE, type ProjectA
 import { addDays, dayFromDb, isDay, istDay } from './working-days';
 import { applyPhaseEvent } from './lifecycle';
 import { effectivePhase, isPhase } from './lifecycle-rules';
+import { mayRaiseSnag, windowDayLabel } from './snag-window';
+import { snagWindowFor } from './snag-window-store';
 import { asSpeechLang, listen } from '@/modules/speech';
 import { ownsPath } from './site-log-rules';
 import { readVoice, unstoredAllowed } from './site-log-storage';
@@ -72,6 +74,7 @@ export const SNAG_ERRORS = {
   needsAfter: 'Take the after photo first. The customer sees it beside theirs.',
   needsPhoto: 'Add a photo of the problem.',
   warrantyOver: 'Your warranty has ended, so new snags cannot be raised here. Call your studio.',
+  windowClosed: 'Your snag window closed on {day}. Sign off your handover; during the warranty you can raise it as a warranty snag.',
   fixBy: 'Pick the date it will be fixed by.',
   fixByPast: 'The fix-by date cannot be in the past.',
   fixByFar: 'Pick a date within the next four months.',
@@ -89,6 +92,9 @@ export const SNAG_ERRORS = {
   /** Seven days after a fix, the customer can no longer answer it. */
   closed: 'This snag has closed. Raise a new one if something is still wrong.',
 } as const;
+
+/** "Your snag window closed on 14 Nov 2026…" */
+export const windowClosedError = (endsOn: string): string => SNAG_ERRORS.windowClosed.replace('{day}', windowDayLabel(endsOn));
 
 const clean = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, max) : '');
 
@@ -305,6 +311,12 @@ export async function raiseSnagAsCustomer(
   /* The project lifecycle (owner, 13 Oct 2026): after the handover sign-off a snag is a warranty snag; after the warranty, none. */
   const phase = isPhase(project.phase) ? effectivePhase(project.phase, project.warrantyEndsOn ? dayFromDb(project.warrantyEndsOn) : null, new Date()) : 'DESIGN';
   if (phase === 'CLOSED') return { ok: false, error: SNAG_ERRORS.warrantyOver };
+  /* The snag window (owner, 15 Oct 2026; snag-window.ts): after the handover payment, the window's days; then raising closes until the warranty. */
+  if (phase !== 'WARRANTY') {
+    const window = await snagWindowFor(projectId);
+    const rule = mayRaiseSnag(phase, window, istDay(new Date()));
+    if (!rule.ok) return { ok: false, error: window ? windowClosedError(window.endsOn) : SNAG_ERRORS.warrantyOver };
+  }
   const check = checkSnag(input);
   if (!check.ok) return check;
   if (!photos.some((f) => f && f.size > 0)) return { ok: false, error: SNAG_ERRORS.needsPhoto };

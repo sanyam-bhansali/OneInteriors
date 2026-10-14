@@ -94,8 +94,12 @@ import {
 import type { CustomerChoice } from '@/modules/project/decision-rules';
 import { CUSTOMER_DESIGN_SELECT, toCustomerDesign, type CustomerDesign } from '@/modules/studio-design/customer-view';
 import { effectivePhase, isPhase } from '@/modules/project/lifecycle-rules';
+import { windowFromLedger } from '@/modules/project/snag-window';
 import { dayFromDb, istDay } from '@/modules/project/working-days';
 import { customerLifecycle, type CustomerLifecycle } from './lifecycle-view';
+import { toCustomerExtra, type CustomerExtra, type ChangeOrderStatusName } from '@/modules/project/change-order-rules';
+import { toCustomerSignoff, type CustomerSignoff } from '@/modules/project/signoff-rules';
+import { fromDb } from '@/lib/money';
 
 export interface CustomerDecision {
   id: string;
@@ -187,6 +191,10 @@ export interface CustomerProject {
   design: CustomerDesign | null;
   /* The project lifecycle (portal/lifecycle-view.ts): the current step, the next, and what the customer must do to unlock it. */
   lifecycle: CustomerLifecycle;
+  /* Change orders (15 Oct 2026; project/change-order-rules.ts): extra work sent to the customer, newest first. Never a draft, a cancelled one, who made it or a rate. */
+  extras: CustomerExtra[];
+  /* Digital sign-off (15 Oct 2026; project/signoff-rules.ts): quotations the studio asked them to sign, and the signed ones. Never the IP, user agent or signer's id. */
+  signoffs: CustomerSignoff[];
 }
 
 export const UPDATES_SHOWN = 30;
@@ -230,6 +238,8 @@ export const CUSTOMER_PROJECT_SELECT = {
   /* The project lifecycle: the phase and the warranty's end. Never who signed off (handoverSignedById) or the closure's lines and notes. */
   phase: true,
   warrantyEndsOn: true,
+  /* The snag window (project/snag-window.ts): the closure day only, to place the window; never sent. */
+  closedOutAt: true,
   contractPaise: true,
   paymentPhases: true,
   paidPhases: true,
@@ -242,6 +252,8 @@ export const CUSTOMER_PROJECT_SELECT = {
           paymentPhases: true,
           /* Phase 3: the studio's calendar, to count working days late. */
           workingDays: true,
+          /* The snag window's length in days (Settings, Warranty). */
+          snagWindowDays: true,
           holidays: { select: { day: true } },
         },
       },
@@ -270,7 +282,7 @@ export const CUSTOMER_PROJECT_SELECT = {
     },
   },
   /* Phase 5: money received, quote changes from decisions, materials (money-locker-view.ts names the columns). */
-  payments: { orderBy: [{ recordedAt: 'asc' }, { id: 'asc' }], select: CUSTOMER_PAYMENT_SELECT },
+  payments: { orderBy: [{ recordedAt: 'asc' }, { id: 'asc' }], select: { ...CUSTOMER_PAYMENT_SELECT, changeOrderId: true } },
   quoteChanges: { orderBy: [{ at: 'asc' }, { id: 'asc' }], select: CUSTOMER_QUOTE_CHANGE_SELECT },
   materials: { orderBy: { sortOrder: 'asc' }, select: CUSTOMER_MATERIAL_SELECT },
   /* Phase 2: the daily site log (portal/site-feed-view.ts names the columns; never the voice, transcript, note, place or crew phone). */
@@ -303,6 +315,45 @@ export const CUSTOMER_PROJECT_SELECT = {
   },
   /* Studio OS Phase 2: the design card's columns (studio-design/customer-view.ts names them). */
   ...CUSTOMER_DESIGN_SELECT,
+  /* Change orders: only those sent to the customer. Never `createdById`, `decidedById`, `releasedById`, `quoteId`, a line's rate or product id beyond saying it has a size. */
+  changeOrders: {
+    where: { status: { in: ['SENT_TO_CLIENT', 'APPROVED', 'DECLINED', 'PAID', 'RELEASED'] } },
+    orderBy: { number: 'desc' },
+    select: {
+      id: true,
+      number: true,
+      title: true,
+      reason: true,
+      status: true,
+      workPaise: true,
+      discountPaise: true,
+      gstBps: true,
+      gstPaise: true,
+      totalPaise: true,
+      sentAt: true,
+      decidedAt: true,
+      declineReason: true,
+      photoDocumentId: true,
+      lines: { orderBy: { sortOrder: 'asc' }, select: { product: true, room: true, details: true, unit: true, widthMm: true, heightMm: true, qtyMilli: true, productId: true, amountPaise: true } },
+    },
+  },
+  /* Sign-offs the studio asked for, not withdrawn. Never `signedById`, `ip`, `userAgent`, `requestedById` or the hash. */
+  signoffs: {
+    where: { withdrawnAt: null },
+    orderBy: { requestedAt: 'desc' },
+    select: {
+      id: true,
+      kind: true,
+      quoteNumber: true,
+      revisionN: true,
+      totalPaise: true,
+      requestedAt: true,
+      signedAt: true,
+      withdrawnAt: true,
+      signerName: true,
+      revision: { select: { quote: { select: { revisions: { orderBy: { n: 'desc' }, take: 1, select: { n: true } } } } } },
+    },
+  },
 } satisfies Prisma.HomeProjectSelect;
 
 export type CustomerProjectRow = Prisma.HomeProjectGetPayload<{ select: typeof CUSTOMER_PROJECT_SELECT }>;
@@ -364,6 +415,56 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
   );
   const warrantyEndsOn = p.warrantyEndsOn ? dayFromDb(p.warrantyEndsOn) : null;
   const decisions = p.decisions.map((d) => ({ title: d.title, state: decisionState(d, now) }));
+  /* Change orders: each one's payments with their ledger status (a correction or a dispute counts as the ledger says). */
+  const rowStatus = new Map((ledgerOf?.rows ?? []).map((r) => [r.id, r]));
+  const docIndex = new Map((p.documents ?? []).map((d, i) => [d.id, i]));
+  const extras = (p.changeOrders ?? [])
+    .map((c) =>
+      toCustomerExtra(
+        {
+          id: c.id,
+          number: c.number,
+          title: c.title,
+          reason: c.reason,
+          status: c.status as ChangeOrderStatusName,
+          workPaise: fromDb(c.workPaise),
+          discountPaise: fromDb(c.discountPaise),
+          gstBps: c.gstBps,
+          gstPaise: fromDb(c.gstPaise),
+          totalPaise: fromDb(c.totalPaise),
+          sentAt: c.sentAt ? istDay(c.sentAt) : null,
+          decidedAt: c.decidedAt ? istDay(c.decidedAt) : null,
+          declineReason: c.declineReason,
+          lines: c.lines.map((l) => ({ ...l, amountPaise: fromDb(l.amountPaise) })),
+          payments: (p.payments ?? [])
+            .filter((r) => r.changeOrderId === c.id)
+            .map((r) => ({ amountPaise: fromDb(r.amountPaise), status: rowStatus.get(r.id)?.status ?? 'waiting' })),
+        },
+        owner,
+        c.photoDocumentId && docIndex.has(c.photoDocumentId) ? links.docUrls[docIndex.get(c.photoDocumentId)!] || null : null,
+      ),
+    )
+    .filter((x): x is CustomerExtra => x !== null);
+  const signoffs = (p.signoffs ?? [])
+    .map((s) =>
+      toCustomerSignoff(
+        {
+          id: s.id,
+          kind: s.kind,
+          quoteNumber: s.quoteNumber,
+          revisionN: s.revisionN,
+          totalPaise: fromDb(s.totalPaise),
+          requestedOn: istDay(s.requestedAt),
+          signedOn: s.signedAt ? istDay(s.signedAt) : null,
+          signerName: s.signerName,
+          signedAt: s.signedAt,
+          withdrawnAt: s.withdrawnAt,
+        },
+        s.revision.quote.revisions[0]?.n ?? s.revisionN,
+        owner,
+      ),
+    )
+    .filter((x): x is CustomerSignoff => x !== null);
   const lifecycle = customerLifecycle({
     phase: isPhase(p.phase) ? effectivePhase(p.phase, warrantyEndsOn, now) : 'DESIGN',
     role: owner ? 'owner' : 'family',
@@ -374,6 +475,9 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
     payments,
     snags,
     decisions,
+    extras,
+    signoffs,
+    snagWindow: windowFromLedger(p.closedOutAt ? istDay(p.closedOutAt) : null, ledgerOf, p.introduction.studio.snagWindowDays),
   });
   return {
     id: p.id,
@@ -433,5 +537,7 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
     siteMissedDays: siteMissedDays({ ...p, studio: p.introduction.studio, siteLogs: p.siteLogs ?? [] }, now),
     design,
     lifecycle,
+    extras,
+    signoffs,
   };
 }

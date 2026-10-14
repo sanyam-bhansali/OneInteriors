@@ -1,14 +1,15 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { formatINR } from '@/lib/money';
-import { getQuote, quotesToCompare, STAGE_LABELS, totalsFor, type QuoteRow } from '@/modules/studio-quote/quotes';
+import { getQuote, quotesToCompare, STAGE_LABELS, totalsFor } from '@/modules/studio-quote/quotes';
 import { quoteDocContext } from '@/modules/studio-quote/document-data';
 import { docHead, quoteFileName } from '@/modules/studio-quote/document';
-import { DocFrame, DocOpening } from '../../doc/QuotationDocument';
-import { compareToIssued, type ChangeKind } from '@/modules/studio-quote/revision';
+import { DocFrame, DocOpening, LineNote } from '../../doc/QuotationDocument';
+import { changeSentence, deltaText, finalCounts, finalRooms, withKnownDetails, type FinalKind, type FinalLineInput } from '@/modules/studio-quote/final-doc';
+import { roomsOfLines } from '@/modules/studio-quote/rooms';
 import { PrintButton } from '../print/PrintButton';
 import { revisionPair } from '@/modules/studio-sales/revisions';
-import { comparable, revisionLabel, type RevisionTotals } from '@/modules/studio-sales/revision-rules';
+import { revisionLabel, type RevisionTotals } from '@/modules/studio-sales/revision-rules';
 import '../../quotes.css';
 
 export const metadata: Metadata = {
@@ -18,18 +19,17 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic';
 
-const KIND: Record<Exclude<ChangeKind, 'UNCHANGED'>, { label: string; tone: string }> = {
-  ADDED: { label: 'New', tone: 'good' },
-  REMOVED: { label: 'Removed', tone: 'bad' },
-  REPRICED: { label: 'Changed', tone: 'warn' },
-};
+const TAG: Record<FinalKind, string> = { ADDED: 'New', REMOVED: 'Removed', CHANGED: 'Changed', UNCHANGED: '' };
+const ROW_CLASS: Record<FinalKind, string | undefined> = { ADDED: 'qd-added', REMOVED: 'qd-removed', CHANGED: 'qd-changed', UNCHANGED: undefined };
 
-const lineList = (q: QuoteRow) => q.lines.map((l) => ({ room: l.room, product: l.product, amountPaise: l.amountPaise }));
+const n = (paise: number) => formatINR(paise, { symbol: false });
+const diff = (paise: number) => (paise === 0 ? '—' : `${paise > 0 ? '+' : '−'} ${formatINR(Math.abs(paise), { symbol: false })}`);
 
 /**
  * Original against revised: the Sales Final a client agreed to, and the
  * Design Final the work is built against — Hauspire's "Final (Original vs
- * Revised)". Every line that is new, changed or removed, room by room, and
+ * Revised)". Every line of both, room by room, with its work code, details,
+ * note and size before → after, what was added or removed, and
  * what it does to the total. Printable, because it is the page a client
  * signs the difference on.
  *
@@ -50,8 +50,8 @@ export default async function ComparePage({
   let title: string;
   let left: string;
   let right: string;
-  let wasLines: { room: string; product: string; amountPaise: number }[];
-  let nowLines: { room: string; product: string; amountPaise: number }[];
+  let wasLines: FinalLineInput[];
+  let nowLines: FinalLineInput[];
   let was: Pick<RevisionTotals, 'workPaise' | 'feePaise' | 'discountPaise' | 'onSpotPaise' | 'gstPaise' | 'totalPaise'>;
   let now: typeof was;
 
@@ -61,8 +61,8 @@ export default async function ComparePage({
     left = revisionLabel(revs.a.n);
     right = revisionLabel(revs.b.n);
     title = `${revs.clientName} — ${revs.number} ${left} vs ${right}`;
-    wasLines = comparable(revs.a.lines);
-    nowLines = comparable(revs.b.lines);
+    wasLines = revs.a.lines;
+    nowLines = revs.b.lines;
     was = revs.a.totals;
     now = revs.b.totals;
   } else {
@@ -72,15 +72,11 @@ export default async function ComparePage({
     left = base.number;
     right = current.number;
     title = `${current.clientName} — ${STAGE_LABELS[base.stage]} vs ${STAGE_LABELS[current.stage]}`;
-    wasLines = lineList(base);
-    nowLines = lineList(current);
+    wasLines = base.lines;
+    nowLines = current.lines;
     was = totalsFor(base);
     now = totalsFor(current);
   }
-
-  const summary = compareToIssued(wasLines, nowLines);
-  const moved = summary.changes.filter((c) => c.kind !== 'UNCHANGED');
-  const rooms = [...new Set(moved.map((c) => c.room))];
 
   const money = (paise: number) => (paise < 0 ? `− ${formatINR(-paise)}` : formatINR(paise));
   const rows: [string, number, number][] = [
@@ -97,6 +93,15 @@ export default async function ComparePage({
   const current = await getQuote(id);
   const ctx = current ? await quoteDocContext(current) : null;
   const head = current ? docHead(current, ctx?.branding?.city ?? null) : null;
+
+  /* Every line of both sides, room by room, with its work code, details,
+     note and size before → after (owner's team, 15 Oct 2026). A frozen side
+     without details shows the quotation's own for the same room and
+     product, so nothing that is known prints blank. */
+  const known = current?.lines ?? [];
+  const rooms = finalRooms(withKnownDetails(wasLines, known), withKnownDetails(nowLines, known), roomsOfLines(nowLines));
+  const counts = finalCounts(rooms);
+  const sentences = rooms.flatMap((r) => r.rows.map((row) => changeSentence(r.room, row)).filter((t): t is string => t !== null));
   const studioName = ctx?.studio?.tradeName || ctx?.branding?.legalName || '';
 
   return (
@@ -168,52 +173,102 @@ export default async function ComparePage({
           </table>
 
           <p className="qd-note">
-            {summary.identical
+            {counts.added + counts.changed + counts.removed === 0
               ? 'No line has changed.'
-              : `${summary.addedCount} new, ${summary.repricedCount} changed, ${summary.removedCount} removed.`}
+              : `${counts.added} new, ${counts.changed} changed, ${counts.removed} removed · total ${deltaText(now.totalPaise - was.totalPaise)}.`}
           </p>
 
-          {rooms.map((room) => (
-            <table key={room} className="qd-tbl qd-room">
+          {sentences.length > 0 ? (
+            <div className="qd-keep">
+              <p className="qd-bandline">What changed</p>
+              <ul className="qd-changes">
+                {sentences.map((t, i) => (
+                  <li key={i}>{t}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {rooms.map((r) => (
+            <table key={r.room} className="qd-tbl qd-room qd-final">
               <colgroup>
-                <col style={{ width: '14%' }} />
-                <col />
-                <col style={{ width: '30%' }} />
-                <col style={{ width: '18%' }} />
+                <col style={{ width: '6%' }} />
+                <col style={{ width: '15%' }} />
+                <col style={{ width: '7%' }} />
+                <col style={{ width: '23%' }} />
+                <col style={{ width: '16%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: '11%' }} />
               </colgroup>
               <thead>
                 <tr className="qd-band">
-                  <th colSpan={4}>{room}</th>
+                  <th colSpan={8}>{r.room}</th>
                 </tr>
                 <tr className="qd-cols">
-                  <th style={{ width: '14%' }}>Change</th>
+                  <th>S.No.</th>
                   <th>Product</th>
-                  <th className="r" style={{ width: '30%' }}>
-                    {left} → {right} (₹)
-                  </th>
-                  <th className="r" style={{ width: '18%' }}>
-                    Difference (₹)
-                  </th>
+                  <th>Work Code</th>
+                  <th>Details</th>
+                  <th>Size / Units</th>
+                  <th className="r">{left} (₹)</th>
+                  <th className="r">{right} (₹)</th>
+                  <th className="r">Difference (₹)</th>
                 </tr>
               </thead>
               <tbody>
-                {moved
-                  .filter((c) => c.room === room)
-                  .map((c) => {
-                    const k = KIND[c.kind as Exclude<ChangeKind, 'UNCHANGED'>];
-                    return (
-                      <tr key={`${c.room}|${c.product}`}>
-                        <td className={k.tone === 'good' ? 'qd-disc' : k.tone === 'bad' ? 'qd-soft' : 'qd-product'}>{k.label}</td>
-                        <td className="qd-product">{c.product}</td>
-                        <td className="r">
-                          {c.wasPaise > 0 ? formatINR(c.wasPaise, { symbol: false }) : '—'} → {c.nowPaise > 0 ? formatINR(c.nowPaise, { symbol: false }) : '—'}
-                        </td>
-                        <td className="r">
-                          {c.deltaPaise > 0 ? '+' : '−'} {formatINR(Math.abs(c.deltaPaise), { symbol: false })}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                {r.rows.map((row) => (
+                  <tr key={row.n} className={ROW_CLASS[row.kind]}>
+                    <td>{row.n}</td>
+                    <td className="qd-product">
+                      {row.product}
+                      {row.kind !== 'UNCHANGED' ? (
+                        <>
+                          <br />
+                          <span className={`qd-tag qd-tag-${row.kind.toLowerCase()}`}>{TAG[row.kind]}</span>
+                        </>
+                      ) : null}
+                    </td>
+                    <td>
+                      {row.codeWas ? (
+                        <>
+                          <span className="qd-was">{row.codeWas}</span>
+                          <span className="qd-arrow">→</span>
+                          <span className="qd-now">{row.code}</span>
+                        </>
+                      ) : (
+                        row.code
+                      )}
+                    </td>
+                    <td className="qd-details">
+                      {row.details}
+                      {row.detailsWas !== null ? <span className="qd-detwas">{row.detailsWas || '(no details)'}</span> : null}
+                      <LineNote text={row.note} />
+                    </td>
+                    <td>
+                      {row.kind === 'CHANGED' && row.sizeChanged ? (
+                        <>
+                          <span className="qd-was qd-sz">{row.sizeWas || '—'}</span>
+                          <span className="qd-now qd-sz">
+                            <span className="qd-arrow">→</span>
+                            {row.sizeNow || '—'}
+                          </span>
+                        </>
+                      ) : (
+                        row.sizeNow || row.sizeWas
+                      )}
+                    </td>
+                    <td className="r">{row.kind === 'ADDED' ? '—' : n(row.wasPaise)}</td>
+                    <td className="r">{row.kind === 'REMOVED' ? '—' : n(row.nowPaise)}</td>
+                    <td className={`r ${row.deltaPaise > 0 ? 'qd-up' : row.deltaPaise < 0 ? 'qd-down' : 'qd-same'}`}>{diff(row.deltaPaise)}</td>
+                  </tr>
+                ))}
+                <tr className="qd-sub">
+                  <td colSpan={5}>{r.room} (Sub-total)</td>
+                  <td className="r">{n(r.wasPaise)}</td>
+                  <td className="r">{n(r.nowPaise)}</td>
+                  <td className="r">{diff(r.deltaPaise)}</td>
+                </tr>
               </tbody>
             </table>
           ))}

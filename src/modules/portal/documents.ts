@@ -82,6 +82,11 @@ export function signedQuoteDocs(quoteId: string, quoteNumber: string): { kind: F
  * stored file, which gets a signed storage link instead.
  */
 export function generatedDocLink(storageKey: string, origin: string): string | null {
+  /* A signed copy of a quotation (project/signoff-rules.ts): the page that shows the revision and the signature. */
+  if (storageKey.startsWith('signoff:')) {
+    const id = storageKey.slice('signoff:'.length);
+    return /^[A-Za-z0-9_-]{1,64}$/.test(id) ? `${origin.replace(/\/$/, '')}/app/signoff/${id}` : null;
+  }
   if (storageKey.startsWith(DECISION_PREFIX)) {
     const decisionId = storageKey.slice(DECISION_PREFIX.length);
     return /^[A-Za-z0-9_-]{1,64}$/.test(decisionId) ? `${origin.replace(/\/$/, '')}/app/decision?id=${decisionId}` : null;

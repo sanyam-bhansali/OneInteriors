@@ -85,7 +85,7 @@ export function FirstQuote({
       locality: location,
       quoteDate,
       fileId: reading?.fileId ?? null,
-      lines: lines.map((l) => ({ room: l.room, product: l.product, code: l.code, unit: l.unit, details: l.details, widthMm: l.widthMm, heightMm: l.heightMm, qtyMilli: l.qtyMilli, ratePaise: l.ratePaise, agreedPaise: l.agreedPaise })),
+      lines: lines.map((l) => ({ room: l.room, product: l.product, code: l.code, unit: l.unit, details: l.details, widthMm: l.widthMm, heightMm: l.heightMm, qtyMilli: l.qtyMilli, ratePaise: l.ratePaise, agreedPaise: l.agreedPaise, note: l.note ?? null })),
       onSpotPaise: rupeesToPaiseText(onSpot) ?? 0,
       onSpotLabel: onSpotLabel || null,
     });

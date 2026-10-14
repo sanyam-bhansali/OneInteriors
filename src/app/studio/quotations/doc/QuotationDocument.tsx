@@ -64,6 +64,21 @@ export interface QuotationDocProps {
 
 const n = (paise: number) => formatINR(paise, { symbol: false });
 
+/**
+ * A line's note for the client, under its details like a comment in the
+ * margin of a reviewed document (owner's team, 15 Oct 2026). Nothing when
+ * the line has none.
+ */
+export function LineNote({ text }: { text: string | null | undefined }) {
+  const t = text?.trim();
+  if (!t) return null;
+  return (
+    <span className="qd-linenote">
+      <b>Note:</b> {t}
+    </span>
+  );
+}
+
 /** The coloured frame every page of the document sits in. */
 export function DocFrame({ accentHex, embedded = false, children }: { accentHex: string | null; embedded?: boolean; children: ReactNode }) {
   const c = docColours(accentHex);
@@ -227,7 +242,10 @@ export function QuotationDocument(props: QuotationDocProps) {
                   <td>{row.n}</td>
                   <td className="qd-product">{row.product}</td>
                   <td>{row.code}</td>
-                  <td className="qd-details">{row.details}</td>
+                  <td className="qd-details">
+                    {row.details}
+                    <LineNote text={row.note} />
+                  </td>
                   <td className="r">{row.units}</td>
                   <td className="r">{row.widthMm ?? ''}</td>
                   <td className="r">{row.heightMm ?? ''}</td>

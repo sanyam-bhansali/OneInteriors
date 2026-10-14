@@ -32,6 +32,8 @@ import { prisma } from '@/lib/prisma';
 import { fromDb, toDb } from '@/lib/money';
 import { memberOnProject } from '@/modules/studio/access';
 import { readDesignChanges } from '@/modules/studio-design/customer-view';
+import { approvedExtras } from './change-orders';
+import type { ChangeOrderStatusName } from './change-order-rules';
 import { recordEvent, type ProjectActor } from './events';
 import { applyPhaseEvent } from './lifecycle';
 import { checkClosureLines, closureTotals, effectivePhase, isPhase, type ClosureLineInput, type ClosureTotals, type Phase } from './lifecycle-rules';
@@ -59,7 +61,9 @@ export interface ClosureView {
   /** Where the contract figure comes from. */
   contractFrom: 'design-final' | 'signed';
   /** What the account comes to right now, before any line is added: the starting point for a new version. */
-  base: { contractPaise: number; changesPaise: number; gstBps: number; paidPaise: number; waitingPaise: number };
+  base: { contractPaise: number; changesPaise: number; changeOrdersPaise: number; gstBps: number; paidPaise: number; waitingPaise: number };
+  /** Approved change orders (extra work after sign-off): read-only here, apart from the closure's own extra lines. */
+  changeOrders: { id: string; number: number; title: string; status: ChangeOrderStatusName; totalPaise: number }[];
   /** The latest saved version; null before the first save. */
   latest: ClosureVersion | null;
   /** Every version, newest first (history). */
@@ -79,6 +83,7 @@ const VERSION_SELECT = {
   final: true,
   contractPaise: true,
   changesPaise: true,
+  changeOrdersPaise: true,
   extrasPaise: true,
   deductionsPaise: true,
   gstBps: true,
@@ -119,7 +124,7 @@ const PROJECT_SELECT = {
       disputedAt: true,
     },
   },
-  quoteChanges: { select: { deltaPaise: true, stageIndex: true, label: true } },
+  quoteChanges: { select: { deltaPaise: true, stageIndex: true, label: true, changeOrderId: true } },
 } as const satisfies Prisma.HomeProjectSelect;
 
 type ProjectRow = Prisma.HomeProjectGetPayload<{ select: typeof PROJECT_SELECT }>;
@@ -133,6 +138,7 @@ function toVersion(r: VersionRow): ClosureVersion {
     totals: {
       contractPaise: fromDb(r.contractPaise),
       changesPaise: fromDb(r.changesPaise),
+      changeOrdersPaise: fromDb(r.changeOrdersPaise),
       extrasPaise: fromDb(r.extrasPaise),
       deductionsPaise: fromDb(r.deductionsPaise),
       netPaise: fromDb(r.extrasPaise) - fromDb(r.deductionsPaise),
@@ -154,17 +160,19 @@ function toVersion(r: VersionRow): ClosureVersion {
   };
 }
 
-/** The starting figures: contract (design final, else signed), decision changes (not the closure's own), GST rate, paid. */
+/** The starting figures: contract (design final, else signed), decision changes (not the closure's own), approved change orders, GST rate, paid. */
 async function baseOf(db: Prisma.TransactionClient | typeof prisma, p: ProjectRow) {
   const design = p.designClosedAt ? readDesignChanges(p.designChanges) : null;
   const contractPaise = design ? design.designTotalPaise : p.contractPaise === null ? 0 : fromDb(p.contractPaise);
-  const changesPaise = p.quoteChanges.filter((c) => c.label !== CLOSURE_CHANGE_LABEL).reduce((a, c) => a + fromDb(c.deltaPaise), 0);
+  const changesPaise = p.quoteChanges.filter((c) => c.label !== CLOSURE_CHANGE_LABEL && !c.changeOrderId).reduce((a, c) => a + fromDb(c.deltaPaise), 0);
+  /* Change orders land on the ledger when the client approves them; counted once, here, never typed again on the closure. */
+  const changeOrdersPaise = p.quoteChanges.filter((c) => c.changeOrderId).reduce((a, c) => a + fromDb(c.deltaPaise), 0);
   const quoteId = p.designFinalQuoteId ?? p.signedQuoteId;
   const q = quoteId ? await db.studioQuote.findUnique({ where: { id: quoteId }, select: { gstBps: true } }) : null;
   const l = ledgerOf(p);
   return {
     contractFrom: (design ? 'design-final' : 'signed') as ClosureView['contractFrom'],
-    base: { contractPaise, changesPaise, gstBps: q?.gstBps ?? 0, paidPaise: l?.paidPaise ?? 0, waitingPaise: l?.waitingPaise ?? 0 },
+    base: { contractPaise, changesPaise, changeOrdersPaise, gstBps: q?.gstBps ?? 0, paidPaise: l?.paidPaise ?? 0, waitingPaise: l?.waitingPaise ?? 0 },
     ledgerTotalPaise: l?.totalPaise ?? null,
   };
 }
@@ -173,9 +181,10 @@ async function baseOf(db: Prisma.TransactionClient | typeof prisma, p: ProjectRo
 export async function closureFor(projectId: string, now = new Date()): Promise<ClosureView | null> {
   const check = await memberOnProject(projectId, 'payment.read');
   if (!check.ok) return null;
-  const [p, versions] = await Promise.all([
+  const [p, versions, changeOrders] = await Promise.all([
     prisma.homeProject.findUnique({ where: { id: projectId }, select: PROJECT_SELECT }),
     prisma.homeProjectClosure.findMany({ where: { projectId }, orderBy: { version: 'desc' }, select: VERSION_SELECT }),
+    approvedExtras(prisma, projectId),
   ]);
   if (!p || !isPhase(p.phase)) return null;
   const b = await baseOf(prisma, p);
@@ -186,6 +195,7 @@ export async function closureFor(projectId: string, now = new Date()): Promise<C
     phase,
     contractFrom: b.contractFrom,
     base: b.base,
+    changeOrders,
     latest: versions[0] ? toVersion(versions[0]) : null,
     history: versions.map((v) => ({ version: v.version, savedOn: istDay(v.createdAt), final: v.final, finalDuePaise: fromDb(v.finalDuePaise) })),
     closedOn: fixed ? istDay(fixed.createdAt) : p.closedOutAt ? istDay(p.closedOutAt) : null,
@@ -230,6 +240,7 @@ export async function saveClosure(projectId: string, raw: { lines: unknown; note
           version,
           contractPaise: toDb(totals.contractPaise),
           changesPaise: toDb(totals.changesPaise),
+          changeOrdersPaise: toDb(totals.changeOrdersPaise),
           extrasPaise: toDb(totals.extrasPaise),
           deductionsPaise: toDb(totals.deductionsPaise),
           gstBps: totals.gstBps,

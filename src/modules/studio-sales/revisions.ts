@@ -47,11 +47,15 @@ const QUOTE_FOR_REVISION = {
   studio: { select: { paymentPhases: true } },
   lines: {
     orderBy: { sortOrder: 'asc' as const },
-    select: { room: true, product: true, code: true, unit: true, details: true, widthMm: true, heightMm: true, qtyMilli: true, ratePaise: true, amountPaise: true },
+    select: { room: true, product: true, code: true, unit: true, details: true, widthMm: true, heightMm: true, qtyMilli: true, ratePaise: true, amountPaise: true, note: true },
   },
 } satisfies Prisma.StudioQuoteSelect;
 
-type QuoteForRevision = Prisma.StudioQuoteGetPayload<{ select: typeof QUOTE_FOR_REVISION }>;
+type QuoteForRevisionFull = Prisma.StudioQuoteGetPayload<{ select: typeof QUOTE_FOR_REVISION }>;
+/** The note is optional: a caller selecting lines without it (the booking check) snapshots them without notes. */
+type QuoteForRevision = Omit<QuoteForRevisionFull, 'lines'> & {
+  lines: (Omit<QuoteForRevisionFull['lines'][number], 'note'> & { note?: string | null })[];
+};
 
 /** The quotation as it stands, in the frozen shape. */
 export function snapshotOf(q: QuoteForRevision): { lines: RevisionLine[]; terms: RevisionTerms; totals: RevisionTotals } {
@@ -66,6 +70,7 @@ export function snapshotOf(q: QuoteForRevision): { lines: RevisionLine[]; terms:
     qtyMilli: l.qtyMilli,
     ratePaise: fromDb(l.ratePaise),
     amountPaise: fromDb(l.amountPaise),
+    note: l.note ?? null,
   }));
   const phases = readPhases(q.phases) ?? readPhases(q.studio.paymentPhases);
   const terms: RevisionTerms = {

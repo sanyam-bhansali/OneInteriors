@@ -52,6 +52,26 @@ export function LifecycleTabs({ board, tab, base, mine }: { board: LifecycleBoar
         </section>
       ) : null}
 
+      {/* Change orders (15 Oct 2026): extra work paid and ready to go to the factory. */}
+      {tab === 'execution' && board.execution.some((c) => c.extras.toRelease > 0) ? (
+        <section className="remind" role="status" aria-label="Extra work to release" data-testid="extras-to-release">
+          <b>
+            {board.execution.reduce((n, c) => n + c.extras.toRelease, 0)} extra work order{board.execution.reduce((n, c) => n + c.extras.toRelease, 0) === 1 ? '' : 's'} paid and ready to release
+          </b>
+          <ul>
+            {board.execution
+              .filter((c) => c.extras.toRelease > 0)
+              .map((c) => (
+                <li key={c.id}>
+                  <Link href={`/studio/projects/${c.id}?tab=extras`}>
+                    {c.client} · {c.flat}
+                  </Link>
+                </li>
+              ))}
+          </ul>
+        </section>
+      ) : null}
+
       {cards.length === 0 ? (
         <div className="empty">
           <b>{tab === 'design' ? 'Nothing in design.' : tab === 'execution' ? 'Nothing on site.' : 'No snags to close.'}</b>
@@ -105,6 +125,20 @@ function ProjectCard({ c, tab, showDesigner }: { c: BoardCard; tab: LifeTab; sho
           <>
             <dt>Next</dt>
             <dd className="muted">{c.next}</dd>
+          </>
+        ) : null}
+        {c.extras.withClient + c.extras.toPay + c.extras.toRelease > 0 ? (
+          <>
+            <dt>Extra work</dt>
+            <dd data-testid="life-card-extras">
+              {[
+                c.extras.withClient ? `${c.extras.withClient} with the client` : null,
+                c.extras.toPay ? `${c.extras.toPay} approved, to be paid` : null,
+                c.extras.toRelease ? `${c.extras.toRelease} ready to release` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </dd>
           </>
         ) : null}
         <dt>Blocking</dt>

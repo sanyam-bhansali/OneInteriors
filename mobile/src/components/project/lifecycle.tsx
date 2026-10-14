@@ -34,9 +34,13 @@ export function LifecycleCard({ projectId, life, studio, onChanged, t }: { proje
     const amount = b.amountPaise !== null ? inr(b.amountPaise) : '';
     if (b.kind === 'pay') blocker = ['snags', 'warranty'].includes(life.phase) ? t('life.block.payFinal', { amount }) : t('life.block.pay', { label: b.label ?? '', amount });
     else if (b.kind === 'confirm_snag') blocker = (b.count ?? 1) > 1 ? t('life.block.confirm_snags', { n: b.count ?? 1 }) : t('life.block.confirm_snag');
-    else blocker = t(`life.block.${b.kind}` as Parameters<T>[0], { label: b.label ?? '' });
+    else blocker = t(`life.block.${b.kind}` as Parameters<T>[0], { label: b.label ?? '', amount });
   }
   const warranty = life.warrantyEndsOn ? t(life.warrantyEndsOn >= today ? 'life.warrantyUntil' : 'life.warrantyEnded', { date: shortDate(life.warrantyEndsOn) }) : null;
+  /* The snag window (owner, 15 Oct 2026): until when snags may be raised, or that it has closed. */
+  const snagWindow = life.snagWindowEndsOn
+    ? t(life.snagWindowEndsOn >= today ? 'life.snagWindow' : 'life.snagWindowClosed', { date: shortDate(life.snagWindowEndsOn) })
+    : null;
 
   const signOff = async () => {
     setBusy(true);
@@ -82,6 +86,7 @@ export function LifecycleCard({ projectId, life, studio, onChanged, t }: { proje
         </View>
       )}
       {warranty ? <Text style={[styles.text, { color: color.ok, fontFamily: font.sansSemi }]}>{warranty}</Text> : null}
+      {snagWindow ? <Text style={styles.text}>{snagWindow}</Text> : null}
       {life.canSignOff && !done ? (
         <View style={{ gap: 8 }}>
           <Text style={styles.note}>{t('life.signoff.body')}</Text>

@@ -387,6 +387,7 @@ export function QuoteBuilder({
       qtyMilli: l.qtyMilli,
       ratePaise: l.ratePaise,
       agreedPaise: l.agreedPaise,
+      note: l.note ?? null,
     }));
     if (sentClient !== savedClient.current) {
       const carpet = Number(client.carpet);
@@ -831,6 +832,7 @@ function toEditable(line: QuoteRow['lines'][number]): EditableLine {
     heightMm: line.heightMm,
     qtyMilli: line.qtyMilli,
     ratePaise: line.ratePaise,
+    note: line.note,
     /* An agreed figure is recognised, not remembered: a stored amount that is
        not rate × quantity can only have been typed, and stays an override
        across a reload. */

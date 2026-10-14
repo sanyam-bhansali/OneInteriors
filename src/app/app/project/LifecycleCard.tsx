@@ -81,6 +81,11 @@ export function LifecycleCard({ project, onChanged }: { project: MyProject; onCh
         </div>
       )}
       {lines.warranty ? <p style={{ margin: 0, fontWeight: 600, color: 'var(--ok)' }}>{lines.warranty}</p> : null}
+      {lines.snagWindow ? (
+        <p className="oa-note" style={{ margin: 0 }} data-testid="snag-window">
+          {lines.snagWindow}
+        </p>
+      ) : null}
       {l.canSignOff ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <p className="oa-note" style={{ margin: 0 }}>

@@ -27,6 +27,8 @@ export interface RevisionLine {
   qtyMilli: number | null;
   ratePaise: number;
   amountPaise: number;
+  /** The note for the client printed under the line (15 Oct 2026). Absent on revisions kept before notes existed. */
+  note?: string | null;
 }
 
 /** The terms a revision was priced on. */
@@ -60,7 +62,9 @@ export function nextRevisionNumber(existing: readonly number[]): number {
 /** One string for "what was sent", so sending the same thing twice is seen as the same. */
 export function contentKey(lines: readonly RevisionLine[], terms: RevisionTerms): string {
   return JSON.stringify({
-    l: lines.map((l) => [l.room, l.product, l.code, l.unit, l.details ?? '', l.widthMm, l.heightMm, l.qtyMilli, l.ratePaise, l.amountPaise]),
+    /* The note prints on the client's PDF, so a changed note is a changed
+       quotation; a line without one keys as before notes existed. */
+    l: lines.map((l) => [l.room, l.product, l.code, l.unit, l.details ?? '', l.widthMm, l.heightMm, l.qtyMilli, l.ratePaise, l.amountPaise, ...(l.note ? [l.note] : [])]),
     t: [terms.feeBps, terms.discountBps, terms.onSpotPaise, terms.onSpotLabel ?? '', terms.bookingAdvancePaise, terms.gstBps, terms.phases ?? null],
   });
 }
@@ -93,6 +97,7 @@ export function readRevisionLines(raw: unknown): RevisionLine[] {
       qtyMilli: num(r.qtyMilli),
       ratePaise: num(r.ratePaise) ?? 0,
       amountPaise: amount,
+      ...(typeof r.note === 'string' && r.note.trim() ? { note: r.note } : {}),
     });
   }
   return out;

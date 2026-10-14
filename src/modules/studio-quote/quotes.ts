@@ -40,6 +40,7 @@ import { can } from '@/modules/studio/roles';
 import { record as recordLeadEvent } from '@/modules/studio-practice/events';
 import { issueRevision } from '@/modules/studio-sales/revisions';
 import { quoteWriteRefusal } from './write-rules';
+import { cleanNote } from './line-note';
 
 export type QuoteStatusName = 'DRAFT' | 'ISSUED' | 'ACCEPTED' | 'DECLINED';
 export type QuoteStageName = 'SALES' | 'DESIGN';
@@ -69,6 +70,8 @@ export interface QuoteLineRow {
   qtyMilli: number | null;
   ratePaise: Paise;
   amountPaise: Paise;
+  /** A note for the client, printed under the line's details (15 Oct 2026). */
+  note: string | null;
   sortOrder: number;
 }
 
@@ -286,6 +289,7 @@ async function loadQuote(id: string, studioId: string, scope: Prisma.StudioQuote
         qtyMilli: l.qtyMilli,
         ratePaise: fromDb(l.ratePaise),
         amountPaise: fromDb(l.amountPaise),
+        note: l.note,
         sortOrder: l.sortOrder,
       })),
     };
@@ -692,6 +696,7 @@ export async function copyQuote(quoteId: string, copy: CopyKind): Promise<QuoteR
             qtyMilli: l.qtyMilli,
             ratePaise: l.ratePaise,
             amountPaise: l.amountPaise,
+            note: l.note,
             sortOrder: l.sortOrder,
           })),
         },
@@ -958,6 +963,8 @@ export interface SaveLineInput {
   ratePaise: Paise;
   /** The agreed figure, overriding the arithmetic. Null returns the line to rate × quantity. */
   agreedPaise?: Paise | null;
+  /** A note for the client, printed under the line on the PDFs. Blank clears it. */
+  note?: string | null;
 }
 
 /** A line that survives the trip back from a browser. */
@@ -997,6 +1004,7 @@ function cleanLine(raw: SaveLineInput): SaveLineInput | null {
     qtyMilli: whole(raw.qtyMilli),
     ratePaise: money(raw.ratePaise),
     agreedPaise: raw.agreedPaise == null ? null : money(raw.agreedPaise),
+    note: cleanNote(raw.note),
   };
 }
 
@@ -1073,6 +1081,7 @@ export async function saveQuoteLines(
         qtyMilli: line.qtyMilli ?? null,
         ratePaise: toDb(line.ratePaise),
         amountPaise,
+        note: line.note ?? null,
         /* Position in the array IS the order. The builder lets lines be moved,
            and a sort key derived from anything else would fight it. */
         sortOrder: (index + 1) * 10,

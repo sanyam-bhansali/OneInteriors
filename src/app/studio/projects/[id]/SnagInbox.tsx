@@ -152,7 +152,7 @@ function SnagCard({
   const [mode, setMode] = useState<'view' | 'accept' | 'dispute'>('view');
   const status = statusLine(s, customerFirst);
   return (
-    <li className="rounded-[12px] border border-[var(--fill2)] bg-[var(--paper)] p-3.5">
+    <li id={`snag-${s.id}`} className="rounded-[12px] border border-[var(--fill2)] bg-[var(--paper)] p-3.5">
       <div className="flex gap-3">
         {s.before ? (
           // eslint-disable-next-line @next/next/no-img-element

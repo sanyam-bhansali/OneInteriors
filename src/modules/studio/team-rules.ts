@@ -84,6 +84,8 @@ const ACTION_LABELS: Record<StudioAction, string> = {
   'crew.pay': 'Pay crews',
   'design.close': 'Sign off the design',
   'project.closure': 'Project closure (final payment)',
+  'extras.write': 'Add extra work and send it to the client',
+  'signoff.request': 'Ask the client to sign a quotation',
 };
 
 /**

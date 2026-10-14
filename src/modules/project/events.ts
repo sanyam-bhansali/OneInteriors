@@ -113,6 +113,19 @@ export const PROJECT_EVENT_TYPES = [
   'closure.saved',
   'closure.fixed',
   'handover.signed',
+  // Change orders (owner, 15 Oct 2026): extra work after design sign-off, approved and paid by the client before it is released.
+  'extra.created',
+  'extra.edited',
+  'extra.sent',
+  'extra.approved',
+  'extra.declined',
+  'extra.paid',
+  'extra.released',
+  'extra.cancelled',
+  // Client digital sign-off of a quotation (owner, 15 Oct 2026).
+  'signoff.requested',
+  'signoff.signed',
+  'signoff.withdrawn',
 ] as const;
 
 export type ProjectEventType = (typeof PROJECT_EVENT_TYPES)[number];

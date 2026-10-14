@@ -22,6 +22,8 @@ import { DEFAULT_HOME_PREFS, homeTiles } from '@/modules/studio/home-prefs';
 import { ThemeToggle } from '../ui/theme';
 import { HomeSearch, LangSeg, Splash } from './HomeBits';
 import { SalesCalls, YourList, type ListRow } from './HomeSections';
+import { MyWork } from './MyWork';
+import { workFor } from '@/modules/studio/my-work';
 import { mySitesToday, type SiteCard } from '@/modules/project/site-log';
 import { crewsOnMySites } from '@/modules/studio-crews/store';
 import { closuresRemainingFor, lifecycleBoard } from '@/modules/studio/lifecycle-store';
@@ -61,7 +63,7 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
      this member may see (mySitesToday reads through projectsVisibleTo),
      crews only for roles that may read work orders (crewsOnMySites returns
      nothing to a designer), a designer's own design steps. */
-  const [studio, today, lang, sites, crews, board, closures, { tab: rawTab }] = await Promise.all([
+  const [studio, today, lang, sites, crews, board, closures, work, { tab: rawTab }] = await Promise.all([
     member
       ? prisma.studio.findUnique({ where: { id: member.studioId }, select: { tradeName: true, status: true, onboardingSteps: true, setupQuiz: true } }).catch(() => null)
       : Promise.resolve(null),
@@ -73,6 +75,8 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
     member?.role === 'DESIGNER' ? lifecycleBoard().catch(() => null) : Promise.resolve(null),
     /* The owner's (and a PM's) "N project closures remaining". */
     member && ['OWNER', 'PM'].includes(member.role) ? closuresRemainingFor().catch(() => null) : Promise.resolve(null),
+    /* My work (owner, 15 Oct 2026): Today, Next 3 days, Missed — the first thing on every home. */
+    member ? workFor(member, new Date()).then((r) => r?.work ?? null).catch(() => null) : Promise.resolve(null),
     searchParams,
   ]);
 
@@ -211,6 +215,8 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
             </div>
           ) : null}
         </div>
+
+        {work ? <MyWork work={work} /> : null}
 
         <section aria-labelledby="h-apps" className="hm-desk" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="hstack" style={{ justifyContent: 'space-between' }}>

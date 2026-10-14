@@ -84,6 +84,9 @@ export const api = {
     call<{ id: string }>('POST', `/design/${encodeURIComponent(documentId)}/answer`, { verdict, comment }),
   /** The project lifecycle: the owner signs off the handover once every snag is closed; the warranty starts. */
   signOffHandover: (projectId: string) => call<{ warrantyEndsOn: string }>('POST', `/project/${encodeURIComponent(projectId)}/handover`, {}),
+  /** Change orders (15 Oct 2026): approve extra work, or decline it with a reason. Owner only. */
+  answerExtra: (extraId: string, approve: boolean, reason?: string) =>
+    call<{ message?: string | null }>('POST', `/extras/${encodeURIComponent(extraId)}`, approve ? { approve: true } : { approve: false, reason: reason ?? '' }),
   registerDevice: (token: string, platform: 'ios' | 'android') => call<object>('POST', '/devices', { token, platform }),
   removeDevice: (token: string) => call<object>('DELETE', '/devices', { token }),
   notifications: () => call<{ unread: number; notifications: Notice[] }>('GET', '/notifications'),

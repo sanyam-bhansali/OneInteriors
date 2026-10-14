@@ -216,6 +216,14 @@ function StageRow({
 }) {
   const [open, setOpen] = useState(s.state === 'now');
   const [renaming, setRenaming] = useState(false);
+  /* My work (owner, 15 Oct 2026) links to a step as #step-<id>: open its stage and bring it into view. */
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    if (!id.startsWith('step-') || !s.groups.some((g) => g.steps.some((x) => `step-${x.id}` === id))) return;
+    setOpen(true);
+    const t = setTimeout(() => document.getElementById(id)?.scrollIntoView({ block: 'center' }), 50);
+    return () => clearTimeout(t);
+  }, [s.groups]);
   const [pending, start] = useTransition();
   const line = customerLine(s);
   const moved = s.lastMove;
@@ -453,7 +461,7 @@ function StepRow({
         ? `Planned ${dayWords(st.plannedOn)}`
         : 'Open';
   return (
-    <li className="oi-ci">
+    <li className="oi-ci" id={`step-${st.id}`}>
       <StarToggle projectId={plan.projectId} stepId={st.id} label={st.label} starred={st.milestone} canEdit={plan.canEdit} say={say} />
       <span
         aria-hidden="true"

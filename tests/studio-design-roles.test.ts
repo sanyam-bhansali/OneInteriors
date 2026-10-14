@@ -90,6 +90,8 @@ describe('the team screen', () => {
       'Crew rates, bills and balances',
       'Sign off the design',
       'Project closure (final payment)',
+      'Add extra work and send it to the client',
+      'Ask the client to sign a quotation',
     ]);
   });
 });

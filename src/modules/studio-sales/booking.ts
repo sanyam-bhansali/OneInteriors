@@ -81,7 +81,7 @@ const BOOKING_QUOTE = {
   },
   lines: {
     orderBy: { sortOrder: 'asc' as const },
-    select: { room: true, product: true, code: true, unit: true, details: true, widthMm: true, heightMm: true, qtyMilli: true, ratePaise: true, amountPaise: true },
+    select: { room: true, product: true, code: true, unit: true, details: true, widthMm: true, heightMm: true, qtyMilli: true, ratePaise: true, amountPaise: true, note: true },
   },
 } satisfies Prisma.StudioQuoteSelect;
 

@@ -52,7 +52,7 @@ export function PaymentsBody({ data, customer }: { data: StudioPayments; custome
   const l = data.ledger;
   const today = istDay(new Date());
   const tiles = [
-    { label: 'Total now', value: l.totalPaise, sub: l.changesPaise ? `${l.changesPaise > 0 ? '+' : '−'}${formatINR(Math.abs(l.changesPaise))} from decisions` : 'as signed' },
+    { label: 'Total now', value: l.totalPaise, sub: l.changesPaise ? `${l.changesPaise > 0 ? '+' : '−'}${formatINR(Math.abs(l.changesPaise))} from decisions and extra work` : 'as signed' },
     { label: 'Paid', value: l.paidPaise, sub: `confirmed by ${customer}` },
     { label: `Waiting for ${customer}`, value: l.waitingPaise, sub: 'recorded, not confirmed yet' },
     { label: 'Balance', value: l.balancePaise, sub: 'total less paid' },
@@ -82,7 +82,7 @@ export function PaymentsBody({ data, customer }: { data: StudioPayments; custome
             {l.stages.map((s) => {
               const st = stageStatus(s, customer, data.dueOn[s.index] ?? null);
               return (
-                <tr key={s.index} className="border-t border-[var(--fill2)] align-top">
+                <tr key={s.index} id={`pay-${s.index}`} className="border-t border-[var(--fill2)] align-top">
                   <td className="py-3 pr-3">
                     <span className="font-medium">{s.label}</span>
                     {s.pct !== null ? <span className={`block ${muted}`}>{s.pct}% as signed</span> : null}
@@ -91,7 +91,7 @@ export function PaymentsBody({ data, customer }: { data: StudioPayments; custome
                     {formatINR(s.amountPaise)}
                     {s.changesPaise ? (
                       <span className={`block ${muted}`}>
-                        {formatINR(s.signedPaise)} signed {s.changesPaise > 0 ? '+' : '−'} {formatINR(Math.abs(s.changesPaise))} decisions
+                        {formatINR(s.signedPaise)} signed {s.changesPaise > 0 ? '+' : '−'} {formatINR(Math.abs(s.changesPaise))} decisions and extras
                       </span>
                     ) : null}
                   </td>

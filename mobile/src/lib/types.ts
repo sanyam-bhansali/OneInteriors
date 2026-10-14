@@ -168,6 +168,46 @@ export interface Project {
   design?: Design | null;
   /** The project lifecycle (portal/lifecycle-view.ts): the current step, the next, and what unlocks it. Older servers omit it. */
   lifecycle?: Lifecycle;
+  /** Change orders (15 Oct 2026; project/change-order-rules.ts): extra work sent to you, newest first. Older servers omit it. */
+  extras?: Extra[];
+  /** Digital sign-off (15 Oct 2026; project/signoff-rules.ts): quotations the studio asked you to sign. Older servers omit it. */
+  signoffs?: Signoff[];
+}
+
+/** Extra work after design sign-off, as the customer sees it: never who made it or a rate. */
+export interface Extra {
+  id: string;
+  number: number;
+  title: string;
+  reason: string | null;
+  state: 'waiting' | 'approved' | 'declined' | 'paid' | 'released';
+  lines: { product: string; room: string | null; details: string | null; size: string | null; amountPaise: number }[];
+  workPaise: number;
+  discountPaise: number;
+  gstBps: number;
+  gstPaise: number;
+  totalPaise: number;
+  paidPaise: number;
+  duePaise: number;
+  sentOn: string | null;
+  decidedOn: string | null;
+  declineReason: string | null;
+  photoUrl: string | null;
+  canAnswer: boolean;
+}
+
+/** A quotation to sign, or signed. Read and signed on the website's /app/signoff/:id, opened inside the app. */
+export interface Signoff {
+  id: string;
+  kind: 'SALES_FINAL' | 'DESIGN_FINAL';
+  quoteNumber: string;
+  revision: number;
+  totalPaise: number;
+  state: 'waiting' | 'signed' | 'superseded';
+  requestedOn: string;
+  signedOn: string | null;
+  signerName: string | null;
+  canSign: boolean;
 }
 
 export interface LifecycleStep {
@@ -180,10 +220,19 @@ export interface Lifecycle {
   current: LifecycleStep;
   next: LifecycleStep | null;
   /** What you must do to unlock the next step; null = nothing needed from you. */
-  blocker: { kind: 'pay' | 'confirm_payment' | 'answer_drawing' | 'your_step' | 'decide' | 'confirm_snag' | 'sign_off'; label: string | null; amountPaise: number | null; count: number | null } | null;
+  blocker: {
+    kind: 'pay' | 'confirm_payment' | 'answer_drawing' | 'your_step' | 'decide' | 'confirm_snag' | 'sign_off' | 'approve_extra' | 'pay_extra' | 'sign_design_final' | 'sign_sales_final';
+    label: string | null;
+    amountPaise: number | null;
+    count: number | null;
+  } | null;
   studioDoing: 'design' | 'site' | 'closure' | 'snags' | 'warranty' | 'closed';
   openSnags: number;
   warrantyEndsOn: string | null;
+  /** The snag window's last day (owner, 15 Oct 2026); older servers leave it out. */
+  snagWindowEndsOn?: string | null;
+  /** A snag may be raised today. */
+  canRaiseSnag?: boolean;
   canSignOff: boolean;
 }
 

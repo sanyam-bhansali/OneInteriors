@@ -677,6 +677,12 @@ model Studio {
   /// the handover, in months. Settings, Warranty (owner). Hauspire 12.
   warrantyMonths Int @default(12)
 
+  /// The snag window (owner, 15 Oct 2026; project/snag-window.ts): days the
+  /// client may raise snags in the app once the handover (final) payment is
+  /// recorded after the closure. After it, raising closes until the handover
+  /// sign-off starts the warranty (warranty snags). Settings, Warranty.
+  snagWindowDays Int @default(30)
+
   /// The per-studio pilot switch (owner, 14 Oct 2026): the full Studio OS
   /// (projects, design, site mode, the payments desk, crews, team) is open
   /// only for pilot studios; every other studio gets Leads, Quotations, the
@@ -1656,6 +1662,12 @@ model HomeProject {
   warrantyEndsOn        DateTime?    @db.Date
   closures              HomeProjectClosure[]
 
+  /// Extra work after design sign-off (change orders) and the client's
+  /// digital sign-offs of quotations (owner, 15 Oct 2026;
+  /// project/change-orders.ts, project/signoffs.ts).
+  changeOrders HomeChangeOrder[]
+  signoffs     HomeQuoteSignoff[]
+
   @@map("home_projects")
 }
 
@@ -1684,6 +1696,9 @@ model HomeProjectClosure {
   contractPaise   BigInt
   /// Changes agreed on the client's decisions (HomeQuoteChange), GST included.
   changesPaise    BigInt      @default(0)
+  /// Approved change orders (extra work after sign-off), GST included; read
+  /// from the change orders, never typed on the closure.
+  changeOrdersPaise BigInt    @default(0)
   extrasPaise     BigInt      @default(0)
   deductionsPaise BigInt      @default(0)
   gstBps          Int         @default(0)
@@ -1723,6 +1738,156 @@ model HomeProjectClosureLine {
 
   @@index([closureId])
   @@map("home_project_closure_lines")
+}
+
+/// Extra work after design sign-off: a change order (owner, 15 Oct 2026;
+/// project/change-orders.ts). DRAFT -> SENT_TO_CLIENT -> APPROVED | DECLINED
+/// -> PAID -> RELEASED (to the factory / the work); a draft or a sent one can
+/// be CANCELLED by the studio. `status` is the current state; every move is a
+/// row in HomeChangeOrderEvent (append-only). Money in integer paise, priced
+/// the quotation's way (its modular discount and GST) and never changing the
+/// signed lines: approving writes one HomeQuoteChange on the final stage.
+model HomeChangeOrder {
+  id            String            @id @default(cuid())
+  projectId     String
+  project       HomeProject       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// 1, 2, 3… per project: "Extra work 3".
+  number        Int
+  title         String
+  /// Why it is needed, in the studio's words to the client. Crosses to the client.
+  reason        String?           @db.Text
+  status        ChangeOrderStatus @default(DRAFT)
+  /// The quotation it is priced from (design final, else the signed one).
+  quoteId       String?
+  /// Basis points copied from that quotation when the order is priced.
+  discountBps   Int               @default(0)
+  gstBps        Int               @default(0)
+  workPaise     BigInt            @default(0)
+  discountPaise BigInt            @default(0)
+  gstPaise      BigInt            @default(0)
+  /// What the client pays, GST included.
+  totalPaise    BigInt            @default(0)
+  /// An optional photo or drawing, filed in the locker (shared when sent).
+  photoDocumentId String?
+  createdById   String
+  sentAt        DateTime?
+  /// The client's answer (the owner of the brief).
+  decidedAt     DateTime?
+  decidedById   String?
+  /// The client's reason for declining. Crosses back to the client.
+  declineReason String?
+  paidAt        DateTime?
+  releasedAt    DateTime?
+  releasedById  String?
+  cancelledAt   DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  lines        HomeChangeOrderLine[]
+  events       HomeChangeOrderEvent[]
+  payments     HomeProjectPayment[]
+  quoteChanges HomeQuoteChange[]
+
+  @@unique([projectId, number])
+  @@index([projectId, status])
+  @@map("home_change_orders")
+}
+
+enum ChangeOrderStatus {
+  DRAFT
+  SENT_TO_CLIENT
+  APPROVED
+  DECLINED
+  PAID
+  RELEASED
+  CANCELLED
+}
+
+/// One line of a change order: from the product master (sized like the
+/// quotation builder: W x H, sq ft, rft or each, at the studio's rate) or a
+/// custom line with an amount. Before discount and GST. Replaced only while
+/// the order is a draft.
+model HomeChangeOrderLine {
+  id            String          @id @default(cuid())
+  changeOrderId String
+  changeOrder   HomeChangeOrder @relation(fields: [changeOrderId], references: [id], onDelete: Cascade)
+  /// The product it came from; null for a custom line. A snapshot either way.
+  productId     String?
+  room          String?
+  product       String
+  details       String?         @db.Text
+  code          StudioWorkCode
+  unit          QuoteUnit
+  widthMm       Int?
+  heightMm      Int?
+  /// Thousandths.
+  qtyMilli      Int?
+  ratePaise     BigInt          @default(0)
+  amountPaise   BigInt
+  sortOrder     Int             @default(0)
+
+  @@index([changeOrderId])
+  @@map("home_change_order_lines")
+}
+
+/// Every status move of a change order, append-only (project/append-only.ts).
+model HomeChangeOrderEvent {
+  id            String             @id @default(cuid())
+  changeOrderId String
+  changeOrder   HomeChangeOrder    @relation(fields: [changeOrderId], references: [id], onDelete: Cascade)
+  fromStatus    ChangeOrderStatus?
+  toStatus      ChangeOrderStatus
+  actorType     ProjectActorType
+  actorId       String?
+  /// The decline reason or the studio's line; never internal.
+  text          String?
+  at            DateTime           @default(now())
+
+  @@index([changeOrderId, at])
+  @@map("home_change_order_events")
+}
+
+/// The client's digital sign-off of a quotation revision (owner, 15 Oct
+/// 2026; project/signoffs.ts): the sales final (BOQ) or the design final.
+/// The studio asks; the client reads the revision, ticks "I have read and
+/// agree", types their full name and submits. Who, when, IP and user agent,
+/// and a SHA-256 of exactly the revision they signed. Filled once when
+/// signed, never deleted (project/append-only.ts). A newer revision needs a
+/// new sign-off; this one stays on its revision.
+model HomeQuoteSignoff {
+  id               String              @id @default(cuid())
+  projectId        String
+  project          HomeProject         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// "SALES_FINAL" | "DESIGN_FINAL".
+  kind             String
+  quoteId          String
+  revisionId       String
+  revision         StudioQuoteRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  quoteNumber      String
+  revisionN        Int
+  totalPaise       BigInt
+  /// SHA-256 (hex) of the revision's stored content when the sign-off was asked.
+  contentHash      String
+  requestedById    String
+  requestedAt      DateTime            @default(now())
+  withdrawnAt      DateTime?
+  signedAt         DateTime?
+  /// The customer (User id) who signed. Never sent to anyone.
+  signedById       String?
+  /// The full name they typed as their signature.
+  signerName       String?
+  /// The exact sentence they ticked.
+  agreedText       String?
+  /// The hash of what they were shown when they signed (equals contentHash).
+  signedHash       String?
+  ip               String?
+  userAgent        String?
+  /// The locker record of the signed copy.
+  lockerDocumentId String?
+
+  @@index([projectId, requestedAt])
+  @@index([revisionId])
+  @@map("home_quote_signoffs")
 }
 
 /// The invite a studio sends its OWN client to follow their project in the
@@ -2530,6 +2695,10 @@ model HomeProjectPayment {
   receiptDocument   HomeDocument? @relation(fields: [receiptDocumentId], references: [id], onDelete: SetNull)
   /// Internal note (UTR, who paid). NEVER crosses.
   note              String?
+  /// Money received for a change order (extra work), recorded on the stage
+  /// its price landed on. Null for an ordinary stage payment.
+  changeOrderId     String?
+  changeOrder       HomeChangeOrder? @relation(fields: [changeOrderId], references: [id], onDelete: SetNull)
 
   recordedById String
   recordedAt   DateTime @default(now())
@@ -2551,6 +2720,7 @@ model HomeProjectPayment {
   @@index([projectId, stageIndex])
   @@index([correctsId])
   @@index([receiptDocumentId])
+  @@index([changeOrderId])
   @@map("home_project_payments")
 }
 
@@ -2575,8 +2745,13 @@ model HomeQuoteChange {
   stageIndex  Int?
   byId        String?
   at          DateTime            @default(now())
+  /// The approved change order this price is (extra work after sign-off).
+  /// Kept apart from decisions so the closure shows it as its own line.
+  changeOrderId String?
+  changeOrder   HomeChangeOrder? @relation(fields: [changeOrderId], references: [id], onDelete: SetNull)
 
   @@index([projectId, at])
+  @@index([changeOrderId])
   @@index([decisionId])
   @@index([optionId])
   @@map("home_quote_changes")
@@ -3357,6 +3532,11 @@ model StudioQuoteLine {
   /// on an issued document it is a fact about that document.
   amountPaise BigInt
 
+  /// A note for the client on this line (owner's team, 15 Oct 2026): written
+  /// in the builder, printed under the line's details on the quotation PDF
+  /// and the Final PDF like a margin comment. Client-facing.
+  note String? @db.Text
+
   sortOrder Int @default(0)
 
   @@index([quoteId, sortOrder])
@@ -3396,6 +3576,9 @@ model StudioQuoteRevision {
   sentByName String?
 
   salesFinalOf StudioQuote? @relation("SalesFinal")
+
+  /// The client's digital sign-offs of this exact revision (15 Oct 2026).
+  signoffs HomeQuoteSignoff[]
 
   @@unique([quoteId, n])
   @@index([studioId, sentAt])

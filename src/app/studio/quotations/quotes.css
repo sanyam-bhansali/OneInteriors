@@ -770,6 +770,25 @@
 .oi-studio .hmini { margin-left: 8px; border: 0; border-radius: 4px; padding: 1px 6px; font-size: 11px; font-weight: 600; background: var(--paper); color: var(--acc-ink); cursor: pointer; box-shadow: inset 0 0 0 1px var(--acc); }
 .oi-studio .hmini.ghost { margin-left: 0; padding: 0 4px; }
 
+/* A line's note for the client (prints on the PDF): "+ Note", the note as a badge, its dialog. */
+.oi-studio .hnoteadd { margin-top: 3px; font-size: 10.5px; font-weight: 600; box-shadow: none; color: var(--muted); background: transparent; }
+.oi-studio .hnoteadd:hover { color: var(--acc-ink); box-shadow: inset 0 0 0 1px var(--acc); }
+.oi-studio .hlinenote {
+  display: block; width: 100%; margin-top: 4px; padding: 3px 6px; border: 0; border-left: 3px solid var(--acc); border-radius: 0 4px 4px 0;
+  background: color-mix(in srgb, #f5c84c 18%, var(--paper)); color: var(--ink); font: inherit; font-size: 10.5px; line-height: 1.35;
+  font-style: italic; text-align: left; white-space: pre-line; overflow-wrap: anywhere; cursor: pointer;
+}
+.oi-studio .hlinenote b { font-style: normal; color: var(--acc-ink); }
+.oi-studio .hlinenote.ro { cursor: default; }
+.oi-studio .hnotedlg { width: min(440px, calc(100vw - 32px)); padding: 0; border: 0; border-radius: 12px; background: var(--paper); color: var(--ink); box-shadow: 0 12px 40px rgba(0, 0, 0, .25); }
+.oi-studio .hnotedlg::backdrop { background: rgba(0, 0, 0, .35); }
+.oi-studio .hnotedlg > div { display: flex; flex-direction: column; gap: 10px; padding: 18px; }
+.oi-studio .hnotedlg-t { margin: 0; font-weight: 700; font-size: 14px; }
+.oi-studio .hnotedlg-l { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; }
+.oi-studio .hnotedlg-l textarea { font-weight: 400; font-size: 13px; resize: vertical; }
+.oi-studio .hnotedlg-h { margin: 0; font-size: 11.5px; }
+.oi-studio .hnotedlg-b { display: flex; gap: 8px; align-items: center; }
+
 .oi-studio .hdrop { display: block; padding: 12px; border-radius: 9px; border: 2px dashed var(--ring); background: var(--soft); text-align: center; font-size: 12px; color: var(--text2); cursor: pointer; }
 .oi-studio .hdrop.off { cursor: default; color: var(--muted); border-color: var(--line); }
 .oi-studio .hdrop:hover:not(.off) { background: var(--acc-soft); }

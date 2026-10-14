@@ -83,7 +83,7 @@ export default async function SettingsPage() {
           <BrandPages pages={brandPageUrls.map((url) => ({ url }))} hasBranding={branding !== null} uploadEnabled={logoUploadEnabled()} />
         </div>
         {/* The project lifecycle (owner, 13 Oct 2026): months of warranty after the client signs off the handover. */}
-        {warranty && full ? <WarrantyForm months={warranty.months} canEdit={warranty.canEdit} /> : null}
+        {warranty && full ? <WarrantyForm months={warranty.months} snagDays={warranty.snagDays} canEdit={warranty.canEdit} /> : null}
         {/* The owner's setup quiz, again (owner, 14 Oct 2026). */}
         {member?.role === 'OWNER' ? (
           <div className="card mt-6 max-w-[52rem]" data-testid="setup-again">

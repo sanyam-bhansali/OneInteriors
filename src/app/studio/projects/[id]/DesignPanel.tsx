@@ -178,7 +178,7 @@ function Steps({ tab }: { tab: DesignTab }) {
       <MilestoneCount n={stars} />
       <ul className="m-0 flex list-none flex-col gap-1 p-0">
         {tab.steps.map((st) => (
-          <li key={st.id} className="flex items-start gap-1.5 rounded-[8px] px-1.5 py-2 hover:bg-[var(--fill)]">
+          <li key={st.id} id={`step-${st.id}`} className="flex items-start gap-1.5 rounded-[8px] px-1.5 py-2 hover:bg-[var(--fill)]">
             <StarToggle
               projectId={tab.projectId}
               stepId={st.id}

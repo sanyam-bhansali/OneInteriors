@@ -26,8 +26,14 @@ import { can as roleCan } from '@/modules/studio/roles';
 import { LineIcon } from '../../ui/icons';
 /* The project lifecycle (docs/studio-os/PROJECT-LIFECYCLE.md): the phase and the closure. */
 import { projectPhaseFor } from '@/modules/studio/lifecycle-store';
+import { snagWindowFor } from '@/modules/project/snag-window-store';
 import { closureFor } from '@/modules/project/closure';
 import { ClosurePanel } from './ClosurePanel';
+/* Change orders and client sign-off (owner, 15 Oct 2026; project/change-orders.ts, project/signoffs.ts). */
+import { extrasForStudio } from '@/modules/project/change-orders';
+import { signoffsForStudio } from '@/modules/project/signoffs';
+import { ExtrasPanel } from './ExtrasPanel';
+import { SignoffCard } from './SignoffCard';
 import '../projects.css';
 
 export const metadata: Metadata = { title: 'Project', robots: { index: false, follow: false } };
@@ -60,6 +66,8 @@ const TABS = [
   { key: 'crews', label: 'Crews' },
   /* The project lifecycle (owner, 13 Oct 2026): the closure, from the provisional handover on, for those who see the money. */
   { key: 'closure', label: 'Closure' },
+  /* Change orders (owner, 15 Oct 2026): extra work after design sign-off, for those who see the money. */
+  { key: 'extras', label: 'Extra work' },
 ] as const;
 type Tab = (typeof TABS)[number]['key'];
 
@@ -85,11 +93,20 @@ export default async function ProjectWorkspacePage({
   }
   const w = r.workspace;
   const money = w.contractPaise !== null;
-  const [viewer, decisions, life, closure] = await Promise.all([currentMember(), studioDecisions(w.id, now), projectPhaseFor(w.id, now), closureFor(w.id, now)]);
+  const [viewer, decisions, life, closure, snagWin] = await Promise.all([
+    currentMember(),
+    studioDecisions(w.id, now),
+    projectPhaseFor(w.id, now),
+    closureFor(w.id, now),
+    /* The snag window (owner, 15 Oct 2026; project/snag-window.ts): from the handover payment, the studio's days. */
+    snagWindowFor(w.id).catch(() => null),
+  ]);
+  /* Change orders and sign-offs: null for those who do not see the project's money. */
+  const [extras, signoffs] = await Promise.all([extrasForStudio(w.id).catch(() => null), signoffsForStudio(w.id).catch(() => null)]);
   const closureOpen = closure !== null && life !== null && life.phase !== 'DESIGN' && life.phase !== 'EXECUTION';
   // Studio OS Phase 3: Crews for those who see work orders (owner, PM, accounts; a designer on their project since the lifecycle).
   const crews = viewer === null || roleCan(viewer, 'workorder.read', { assigned: true });
-  const tabs = TABS.filter((t) => (t.key !== 'payments' || money) && (t.key !== 'crews' || crews) && (t.key !== 'closure' || closureOpen));
+  const tabs = TABS.filter((t) => (t.key !== 'payments' || money) && (t.key !== 'crews' || crews) && (t.key !== 'closure' || closureOpen) && (t.key !== 'extras' || (extras !== null && money && (life?.phase !== 'DESIGN' || extras.extras.length > 0))));
   // A designer (Studio OS Phase 2) opens on the Design tab.
   const fallback: Tab = viewer?.role === 'DESIGNER' ? 'design' : 'plan';
   const tab: Tab = tabs.some((t) => t.key === rawTab) ? (rawTab as Tab) : fallback;
@@ -101,6 +118,7 @@ export default async function ProjectWorkspacePage({
     payments: w.work?.money ? `${w.work.money.stages.length}` : null,
     crews: null,
     closure: life?.phase === 'CLOSURE' ? 'to do' : null,
+    extras: extras ? `${extras.extras.filter((e) => e.status !== 'CANCELLED').length}` : null,
   };
   const siteMode = viewer !== null && mayOpen(viewer, SITE_HOME);
   const appLine = w.appConnected
@@ -141,6 +159,11 @@ export default async function ProjectWorkspacePage({
               <span className={`chip ${life.phase === 'CLOSURE' ? 'warn' : life.phase === 'WARRANTY' ? 'good' : life.phase === 'SNAGS' ? 'bad' : 'ink'}`} data-testid="phase-chip">
                 {life.label}
                 {life.phase === 'WARRANTY' && life.warrantyEndsOn ? ` until ${shortDay(new Date(`${life.warrantyEndsOn}T00:00:00Z`))}` : ''}
+              </span>
+            ) : null}
+            {snagWin && life && (life.phase === 'CLOSURE' || life.phase === 'SNAGS') ? (
+              <span className={`chip ${snagWin.endsOn < istDay(now) ? 'warn' : ''}`} data-testid="snag-window-chip" title="The client raises snags in the app from the handover payment for the days set in Settings, Warranty">
+                {snagWin.endsOn < istDay(now) ? `Snag window closed ${shortDay(new Date(`${snagWin.endsOn}T00:00:00Z`))}` : `Client can raise snags until ${shortDay(new Date(`${snagWin.endsOn}T00:00:00Z`))}`}
               </span>
             ) : null}
           </div>
@@ -192,10 +215,12 @@ export default async function ProjectWorkspacePage({
           {tab === 'payments' ? <PaymentsPanel projectId={w.id} customer={w.customerFirst} /> : null}
           {tab === 'crews' ? <CrewsSection projectId={w.id} now={now} /> : null}
           {tab === 'closure' && closure ? <ClosurePanel view={closure} customer={w.customerFirst} /> : null}
+          {tab === 'extras' && extras ? <ExtrasPanel data={extras} customer={w.customerFirst} /> : null}
         </div>
         <aside className="wsside" aria-label={`What ${w.customerFirst} sees`}>
           <CustomerPanel w={w} now={now} />
           {decisions ? <DecisionsCard data={decisions} customer={w.customerFirst} /> : null}
+          {signoffs ? <SignoffCard data={signoffs} customer={w.customerFirst} /> : null}
           <LockerCard projectId={w.id} customer={w.customerFirst} />
           <OnlyYourTeam>
             <TeamNotes projectId={w.id} initial={w.teamNotes} canEdit={w.canEditNotes} max={TEAM_NOTES_MAX} />

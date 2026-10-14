@@ -7,6 +7,9 @@ import { roomsOfLines } from '@/modules/studio-quote/rooms';
 import { PrintButton } from './PrintButton';
 import { FloorPlanView } from '@/components/floorplan/FloorPlanView';
 import { QuotationDocument } from '../../doc/QuotationDocument';
+/* Change orders (15 Oct 2026): the approved extra work after sign-off, as its own section. */
+import { extrasOnQuote } from '@/modules/project/change-orders';
+import { ExtrasAfterSignOff } from '../../../projects/[id]/ExtrasAfterSignOff';
 
 export const metadata: Metadata = {
   title: 'Quotation',
@@ -51,7 +54,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
   const quote = await getQuote(id);
   if (!quote) notFound();
 
-  const ctx = await quoteDocContext(quote);
+  const [ctx, extras] = await Promise.all([quoteDocContext(quote), extrasOnQuote(quote.id).catch(() => [])]);
   const studioName = ctx.studio?.tradeName || ctx.branding?.legalName || '';
 
   return (
@@ -76,13 +79,16 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
         markText={ctx.markText}
         validDays={ctx.validDays}
         extra={
-          /* Their flat, from their floor plan, when their brief came with one. */
-          quote.planRooms.length > 0 ? (
-            <div className="qd-keep" style={{ marginBottom: '5mm' }}>
-              <p className="qd-bandline">Your floor plan</p>
-              <FloorPlanView rooms={quote.planRooms} printable />
-            </div>
-          ) : null
+          <>
+            <ExtrasAfterSignOff extras={extras} />
+            {/* Their flat, from their floor plan, when their brief came with one. */}
+            {quote.planRooms.length > 0 ? (
+              <div className="qd-keep" style={{ marginBottom: '5mm' }}>
+                <p className="qd-bandline">Your floor plan</p>
+                <FloorPlanView rooms={quote.planRooms} printable />
+              </div>
+            ) : null}
+          </>
         }
       />
     </>

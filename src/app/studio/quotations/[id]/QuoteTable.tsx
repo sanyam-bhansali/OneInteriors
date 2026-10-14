@@ -8,12 +8,16 @@ import type { ProductRow } from '@/modules/studio-quote/store';
 import { addLineToProductsAction, proposeProductAction } from '../actions';
 import { Combobox, type ComboOption } from './Combobox';
 import { Num, type EditableLine, type PricedLine } from './QuoteLines';
+import { LineNoteButton } from './LineNoteButton';
 
 /**
  * The quotation, room by room, in Hauspire's table (`QuoteTable.tsx`): a dark
  * band with the room's name, a header row, one editable row per line, and the
  * room's sub-total with "+ add item" — every cell edited where it sits, the
  * amounts moving as they type.
+ *
+ * Each line can carry a note for the client under its details (“+ Note”,
+ * a dialog; it prints on the PDFs, owner's team 15 Oct 2026).
  *
  * Columns as Hauspire's: #, Product, Code, Details, Units / SqFt / RFT, W, H,
  * Amount, Discounted. Ours adds what our builder already did: the rate under
@@ -357,6 +361,7 @@ function Row({
           aria-label={`What ${line.product} includes`}
           className="hcell hdetails"
         />
+        <LineNoteButton note={line.note} product={line.product} readOnly={readOnly} onChange={(note) => onUpdate(line.key, { note })} />
       </td>
 
       <td className="r">

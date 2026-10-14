@@ -9,6 +9,9 @@ import { EyeIcon } from './icons';
 import { crewsOnMySites } from '@/modules/studio-crews/store';
 import { LangSeg } from '../home/HomeBits';
 import { ThemeToggle } from '../ui/theme';
+import { MyWork } from '../home/MyWork';
+import { currentMember } from '@/modules/studio/access';
+import { workFor } from '@/modules/studio/my-work';
 
 export const metadata: Metadata = { title: 'My sites today', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -24,7 +27,9 @@ export const dynamic = 'force-dynamic';
  */
 export default async function SiteTodayPage() {
   const now = new Date();
-  const [lang, user, data, crews] = await Promise.all([getLang(), getCurrentUser(), mySitesToday(now), crewsOnMySites()]);
+  const [lang, user, data, crews, member] = await Promise.all([getLang(), getCurrentUser(), mySitesToday(now), crewsOnMySites(), currentMember()]);
+  /* My work (owner, 15 Oct 2026): the supervisor's Today, Next 3 days and Missed, first. */
+  const work = member?.role === 'SUPERVISOR' ? await workFor(member, now).then((r) => r?.work ?? null).catch(() => null) : null;
   const t = siteWords(lang);
   const locale = lang === 'en' ? 'en-IN' : `${lang}-IN`;
   const date = now.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
@@ -49,6 +54,22 @@ export default async function SiteTodayPage() {
             <LangSeg value={lang} />
           </span>
         </div>
+
+        {work ? (
+          <MyWork
+            work={work}
+            className="st-work"
+            labels={{
+              title: t('work.title'),
+              today: t('work.today'),
+              soon: t('work.soon'),
+              missed: t('work.missed'),
+              empty: { today: t('work.emptyToday'), soon: t('work.emptySoon'), missed: t('work.emptyMissed') },
+              showMore: (n) => t('work.more', { n }),
+              notShown: (n) => t('work.notShown', { n }),
+            }}
+          />
+        ) : null}
 
         {cards.length === 0 ? (
           <div className="st-card">

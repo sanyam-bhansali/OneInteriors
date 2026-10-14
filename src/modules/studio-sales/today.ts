@@ -17,7 +17,7 @@ import { buildToday, istDayBounds, todayEmail, type SectionId, type TodayBooking
 import { LIVE } from '@/modules/studio-practice/demo-lead';
 import { openTasksDue } from './tasks';
 
-interface Who extends MemberRole {
+export interface Who extends MemberRole {
   id: string;
   studioId: string;
 }
@@ -47,7 +47,7 @@ const LEAD_SELECT = {
  * own, first rows only, with its true size counted in SQL (leads at scale:
  * at 26,000 leads, "the 600 most recently touched" missed most of them).
  */
-async function todayInput(
+export async function todayInput(
   who: Who,
   now: Date,
 ): Promise<{ leads: TodayLead[]; quotes: TodayQuote[]; bookings: TodayBooking[]; tasks: TodayTask[]; showPool: boolean; totals: Partial<Record<SectionId, number>> }> {

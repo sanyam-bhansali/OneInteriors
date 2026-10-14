@@ -72,6 +72,10 @@ const TABLE: Record<StudioAction, Record<StudioRoleName, Cell>> = {
   // sign off the design and do the project closure. The PM still never sees crew money.
   'design.close': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: 'A' },
   'project.closure': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: 'A' },
+  // Change orders and client sign-off (owner, 15 Oct 2026): owner, PM and designer on the project create and send;
+  // accounts records the payment (payment.record); sales nothing.
+  'extras.write': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: 'A' },
+  'signoff.request': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: 'A' },
 };
 
 const active = (role: StudioRoleName) => ({ role, status: 'ACTIVE' as const });

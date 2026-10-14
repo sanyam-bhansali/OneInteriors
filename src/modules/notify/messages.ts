@@ -46,7 +46,17 @@ export type ProjectEvent =
   | { kind: 'decision-expired'; decisionId: string; title: string; projectId: string }
   // Studio OS Phase 1: leads, to the studio's people (never to a customer)
   | { kind: 'lead-assigned'; clientId: string | null; count: number; name: string; by: string | null }
-  | { kind: 'lead-new'; clientId: string; name: string; source: string; again: boolean };
+  | { kind: 'lead-new'; clientId: string; name: string; source: string; again: boolean }
+  // Change orders and sign-offs (15 Oct 2026; project/change-orders.ts, project/signoffs.ts). To the customer once when sent (never WhatsApp); to the studio when answered.
+  | { kind: 'extra-work'; studio: string; title: string; totalPaise: number }
+  | { kind: 'extra-answered'; projectId: string; title: string; approved: boolean; totalPaise: number }
+  | { kind: 'signoff-requested'; studio: string; what: string }
+  | { kind: 'signoff-signed'; projectId: string; what: string; name: string }
+  // My work (owner, 15 Oct 2026; studio/my-work-rules.ts), to studio staff only: the morning digest,
+  // the evening "due tomorrow", and steps someone else completed today on their projects.
+  | { kind: 'my-work'; today: number; missed: number; soon: number; first: string }
+  | { kind: 'work-due-tomorrow'; count: number; list: string }
+  | { kind: 'work-done'; count: number; list: string };
 
 /** Events a studio also gets by email: it works from a laptop, not our app. */
 export const EMAILED_TO_STUDIO: ProjectEvent['kind'][] = ['introduced', 'quote-signed', 'decision-made', 'snag-raised', 'lead-new', 'handover-signed'];
@@ -235,6 +245,34 @@ export function messageFor(e: ProjectEvent): Message {
         body: clip(e.again ? 'Their message is on the lead’s timeline.' : `From ${e.source}. It is in the pool: give it to someone from Today or the lead.`, 160),
         url: `/studio/clients/${e.clientId}`,
       };
+    case 'extra-work':
+      return {
+        template: 'project.extra',
+        title: `Extra work to approve · ${e.studio}`,
+        body: clip(`${e.title}: ${formatINR(e.totalPaise)}. Approve or decline it in the app; nothing is made until you do.`, 160),
+        url: '/app/project',
+      };
+    case 'extra-answered':
+      return {
+        template: e.approved ? 'extra.approved' : 'extra.declined',
+        title: e.approved ? 'Extra work approved' : 'Extra work declined',
+        body: clip(e.approved ? `${e.title} (${formatINR(e.totalPaise)}): approved. Accounts records the payment, then release it.` : `${e.title}: the client declined. Their reason is on the project.`, 160),
+        url: `/studio/projects/${e.projectId}?tab=extras`,
+      };
+    case 'signoff-requested':
+      return {
+        template: 'project.signoff',
+        title: `Please read and sign · ${e.studio}`,
+        body: clip(`${e.what} is ready for your signature. Read it in the app, tick I agree and sign.`, 160),
+        url: '/app/project',
+      };
+    case 'signoff-signed':
+      return {
+        template: 'signoff.signed',
+        title: 'Signed by the client',
+        body: clip(`${e.name} signed the ${e.what}. The signed copy is in the project's locker.`, 160),
+        url: `/studio/projects/${e.projectId}`,
+      };
     case 'decision-expired':
       return {
         template: 'decision.expired',
@@ -251,6 +289,27 @@ export function messageFor(e: ProjectEvent): Message {
           160,
         ),
         url: e.toOps ? '/ops/introductions' : `/studio/projects/${e.projectId}?tab=log`,
+      };
+    case 'my-work':
+      return {
+        template: 'studio.my_work',
+        title: e.missed > 0 ? `Today: ${e.today} to do, ${e.missed} missed` : `Today: ${e.today} thing${e.today === 1 ? '' : 's'} to do`,
+        body: clip([e.first ? `First: ${e.first}.` : null, e.soon > 0 ? `${e.soon} more in the next 3 days.` : null, 'Your list is on your home.'].filter(Boolean).join(' '), 160),
+        url: '/studio/home',
+      };
+    case 'work-due-tomorrow':
+      return {
+        template: 'studio.work_due_tomorrow',
+        title: e.count === 1 ? 'Due tomorrow: 1 thing' : `Due tomorrow: ${e.count} things`,
+        body: clip(e.list, 160),
+        url: '/studio/home',
+      };
+    case 'work-done':
+      return {
+        template: 'studio.work_done',
+        title: e.count === 1 ? 'Done today on your projects' : `${e.count} steps done today on your projects`,
+        body: clip(e.list, 160),
+        url: '/studio/home',
       };
     case 'document':
       return {
