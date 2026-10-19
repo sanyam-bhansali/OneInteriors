@@ -34,7 +34,7 @@ export function ComingSoon(props: { feature: keyof typeof COMING_SOON } | { area
       <div className="phead">
         <div>
           <h1>{copy.title}</h1>
-          <p className="muted">{pilot ? 'Coming soon to your studio.' : 'Not in this release.'}</p>
+          <p className="muted">{pilot ? 'Part of the Max plan. Your studio is on Pro.' : 'Not in this release.'}</p>
         </div>
       </div>
       <section className="card" style={{ maxWidth: '46rem' }}>

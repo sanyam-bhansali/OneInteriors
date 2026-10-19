@@ -690,6 +690,13 @@ model Studio {
   /// studio's page (audited). Read through modules/studio/pilot.ts.
   fullSoftware Boolean @default(false)
 
+  /// The studio software plan (owner, 19 Oct 2026; modules/studio/software-plan.ts):
+  /// PRO for every studio (Leads, Quotations, product master, settings, Today,
+  /// Calendar), MAX for the full Studio OS (Hauspire while it is tested). The
+  /// source of truth from 19 Oct; `fullSoftware` above is kept equal to
+  /// (softwarePlan = MAX) for one release and then retired. Set by ops (audited).
+  softwarePlan StudioSoftwarePlan @default(PRO)
+
   /// The owner's "Set up your studio" answers (modules/studio/setup-quiz.ts):
   /// { v, status: done | skipped, at, answers }. Null = never asked, so the
   /// owner sees the quiz on their first sign-in after the software opens.
@@ -5398,4 +5405,11 @@ model HomeCrewPayment {
   @@index([workOrderId, paidOn])
   @@index([studioId, paidOn])
   @@map("home_crew_payments")
+}
+
+/// The studio software plans (owner, 19 Oct 2026). Pro: Leads, Quotations,
+/// the product master, settings, Today and Calendar. Max: the full Studio OS.
+enum StudioSoftwarePlan {
+  PRO
+  MAX
 }

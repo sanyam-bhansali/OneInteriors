@@ -1,4 +1,5 @@
 import 'server-only';
+import { opensFullSoftware, planOf } from './software-plan';
 
 /**
  * The studio workspace's permission check against the database: who this
@@ -34,7 +35,7 @@ export interface StudioMemberRef extends MemberRole {
   userId: string;
 }
 
-const MEMBER_SELECT = { id: true, studioId: true, userId: true, role: true, status: true, studio: { select: { fullSoftware: true } } } as const;
+const MEMBER_SELECT = { id: true, studioId: true, userId: true, role: true, status: true, studio: { select: { fullSoftware: true, softwarePlan: true } } } as const;
 
 /**
  * The membership of this user, or null when they belong to no studio. `userId` is unique: one person, one studio.
@@ -45,7 +46,7 @@ export async function memberFor(userId: string): Promise<StudioMemberRef | null>
   if (!row) return null;
   const { studio, ...member } = row;
   /* The relation is required; a test double without it narrows nothing. */
-  return studio ? { ...member, fullSoftware: studio.fullSoftware === true } : member;
+  return studio ? { ...member, fullSoftware: opensFullSoftware(planOf(studio)) } : member;
 }
 
 /**

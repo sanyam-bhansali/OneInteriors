@@ -1,4 +1,5 @@
 import 'server-only';
+import { opensFullSoftware, planOf } from './software-plan';
 
 /**
  * My work — the reads (owner, 15 Oct 2026). The lists are built by the pure
@@ -386,12 +387,12 @@ async function people() {
       userId: true,
       role: true,
       status: true,
-      studio: { select: { tradeName: true, fullSoftware: true } },
+      studio: { select: { tradeName: true, fullSoftware: true, softwarePlan: true } },
       user: { select: { email: true, name: true, phone: true } },
     },
     take: 2000,
   });
-  return rows.map((r) => ({ ...r, fullSoftware: r.studio.fullSoftware === true }));
+  return rows.map((r) => ({ ...r, fullSoftware: opensFullSoftware(planOf(r.studio)) }));
 }
 
 /** Whether this person already got this notice today (IST): each goes once a day. */

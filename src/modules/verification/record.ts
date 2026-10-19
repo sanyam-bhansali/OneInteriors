@@ -1,4 +1,5 @@
 import 'server-only';
+import { isSoftwarePlan, planOf, type SoftwarePlan } from '@/modules/studio/software-plan';
 
 /**
  * The ops write path.
@@ -349,22 +350,25 @@ export async function setHiddenAsTest(
   }
 }
 
-// ── The pilot switch ───────────────────────────────────────────
+// ── The studio software plan ───────────────────────────────────
 
 /**
- * Switch a studio's full Studio OS on or off (owner, 14 Oct 2026;
- * modules/studio/pilot.ts). Ops only, audited like every other change ops
- * makes to a studio. Off keeps every record: projects, crews and the team
- * stay in the database and come back when it is switched on again.
+ * Put a studio on Pro or Max (owner, 19 Oct 2026; studio/software-plan.ts).
+ * Ops only, audited like every other change ops makes to a studio. Writes
+ * the older `fullSoftware` switch to match, so both read the same until it
+ * is retired. Moving to Pro keeps every record: projects, crews and the team
+ * stay in the database and come back on Max.
  */
-export async function setFullSoftware(studioId: string, on: boolean): Promise<RecordResult> {
+export async function setSoftwarePlan(studioId: string, plan: SoftwarePlan): Promise<RecordResult> {
   const actor = await requireRole('OPS');
+  if (!isSoftwarePlan(plan)) return { ok: false, error: 'Choose Pro or Max.' };
   try {
     await prisma.$transaction(async (tx) => {
-      const before = await tx.studio.findUniqueOrThrow({ where: { id: studioId }, select: { fullSoftware: true, tradeName: true } });
-      if (before.fullSoftware === on) return;
-      await tx.studio.update({ where: { id: studioId }, data: { fullSoftware: on } });
-      await writeAudit(tx, actor, on ? 'studio.full_software_on' : 'studio.full_software_off', 'Studio', studioId, { fullSoftware: before.fullSoftware }, { fullSoftware: on, tradeName: before.tradeName });
+      const before = await tx.studio.findUniqueOrThrow({ where: { id: studioId }, select: { softwarePlan: true, fullSoftware: true, tradeName: true } });
+      const was = planOf(before);
+      if (was === plan && before.softwarePlan === plan && before.fullSoftware === (plan === 'MAX')) return;
+      await tx.studio.update({ where: { id: studioId }, data: { softwarePlan: plan, fullSoftware: plan === 'MAX' } });
+      await writeAudit(tx, actor, 'studio.plan_changed', 'Studio', studioId, { plan: was }, { plan, tradeName: before.tradeName });
     });
     return { ok: true };
   } catch (err) {
@@ -372,11 +376,11 @@ export async function setFullSoftware(studioId: string, on: boolean): Promise<Re
   }
 }
 
-/** Whether a studio has the full software (the ops page reads it). */
-export async function fullSoftwareOf(studioId: string): Promise<boolean> {
+/** The studio's plan (the ops page reads it). */
+export async function softwarePlanOf(studioId: string): Promise<SoftwarePlan> {
   await requireRole('OPS');
-  const row = await prisma.studio.findUnique({ where: { id: studioId }, select: { fullSoftware: true } });
-  return row?.fullSoftware === true;
+  const row = await prisma.studio.findUnique({ where: { id: studioId }, select: { softwarePlan: true, fullSoftware: true } });
+  return planOf(row);
 }
 
 // ── GSTIN ──────────────────────────────────────────────────────

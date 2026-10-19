@@ -252,7 +252,7 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
                   <AppIcon name={a.icon} />
                 </span>
                 <b>{a.name}</b>
-                <span className="tsub">Coming soon</span>
+                <span className="tsub">In the Max plan</span>
               </div>
             ))}
           </div>
@@ -325,9 +325,9 @@ function NotSwitchedOn({ name }: { name: string | null }) {
     <div style={{ minHeight: '100vh', background: 'var(--ground)', color: 'var(--ink)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px' }}>
       <section className="card" style={{ maxWidth: 520, width: '100%', padding: 24 }} data-testid="not-switched-on">
         <span className="eyebrow">{first ? `Hi, ${first}` : 'Hello'}</span>
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 500, letterSpacing: '-.03em' }}>Your studio’s full software isn’t switched on yet.</h1>
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 500, letterSpacing: '-.03em' }}>Your studio is on the Pro plan.</h1>
         <p className="muted" style={{ margin: 0, lineHeight: 1.5 }}>
-          Projects, design, site updates, payments and crews open when One Interiors switches on the full studio software for your studio. Until then there is nothing here for your role. Your studio owner will tell you when it is on.
+          Projects, design, site updates, payments and crews are part of the Max plan. On Pro there is nothing here for your role yet. Your studio owner will tell you when the studio moves to Max.
         </p>
         <div className="hstack">
           <ThemeToggle />

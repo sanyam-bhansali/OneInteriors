@@ -5,6 +5,7 @@
  */
 
 import type { Prisma } from '@prisma/client';
+import { SOFTWARE_PLANS, planOf } from './software-plan';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/modules/auth/session';
 import { currentMember } from './access';
@@ -42,6 +43,8 @@ export interface Profile {
   can: string[];
   studio: string;
   verified: boolean;
+  /** The studio software plan's name: Pro or Max (owner, 19 Oct 2026). */
+  planName: string;
   memberSince: string;
   lastActive: string | null;
   /** The sites picked for them (PM, supervisor); null when they see the whole studio. */
@@ -62,7 +65,7 @@ export async function myProfile(): Promise<Profile | null> {
       createdAt: true,
       lastSeenAt: true,
       homePrefs: true,
-      studio: { select: { tradeName: true, status: true } },
+      studio: { select: { tradeName: true, status: true, softwarePlan: true, fullSoftware: true } },
       user: { select: { name: true, phone: true, email: true, locale: true } },
       projects: {
         select: { homeProject: { select: { introduction: { select: { brief: { select: { society: true, locality: true, propertyType: true } } } } } } },
@@ -84,6 +87,7 @@ export async function myProfile(): Promise<Profile | null> {
     can: roleCan(member.role),
     studio: row.studio.tradeName,
     verified: row.studio.status === 'ACTIVE',
+    planName: SOFTWARE_PLANS[planOf(row.studio)].name,
     memberSince: row.createdAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' }),
     lastActive: lastActive(row.lastSeenAt),
     sites: SEES_PICKED.includes(member.role) ? row.projects.map((p) => siteLabel(p.homeProject.introduction?.brief ?? null)) : null,
