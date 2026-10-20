@@ -88,6 +88,8 @@ export const PROJECT_EVENT_TYPES = [
   'customer.joined',
   // Studio OS Phase 1 (docs/studio-os/PHASE-1-SALES.md): the booking advance refunded
   'project.cancelled',
+  // "Add an existing project" (docs/studio-os/BRING-IN-PROJECTS.md): a running project brought onto One Interiors
+  'project.brought_in',
   // Studio OS Phase 2 (docs/studio-os/PHASE-2-DESIGN.md): design
   'designer.assigned',
   'design.ticked',

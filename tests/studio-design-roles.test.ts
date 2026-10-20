@@ -92,6 +92,7 @@ describe('the team screen', () => {
       'Project closure (final payment)',
       'Add extra work and send it to the client',
       'Ask the client to sign a quotation',
+      'Bring a running project onto One Interiors',
     ]);
   });
 });

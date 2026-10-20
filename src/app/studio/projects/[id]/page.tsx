@@ -16,6 +16,7 @@ import { PlanTab as PlanEditor } from './PlanTab';
 import { planForStudio } from '@/modules/project/plan-edit';
 import { studioDecisions } from '@/modules/project/decision-flow';
 import { InviteBanner } from './InviteBanner';
+import { broughtInOf } from '@/modules/studio-bring-in/bring-in';
 /* Studio OS Phase 2: the design phase (modules/studio-design). */
 import { DesignTab as DesignSection } from './DesignTab';
 import { currentMember } from '@/modules/studio/access';
@@ -93,6 +94,8 @@ export default async function ProjectWorkspacePage({
   }
   const w = r.workspace;
   const money = w.contractPaise !== null;
+  const me = await currentMember();
+  const broughtIn = me ? await broughtInOf(w.id, me.studioId).catch(() => null) : null;
   const [viewer, decisions, life, closure, snagWin] = await Promise.all([
     currentMember(),
     studioDecisions(w.id, now),
@@ -194,6 +197,12 @@ export default async function ProjectWorkspacePage({
           justStarted={started === '1'}
           canResend={w.canInvite}
         />
+      ) : null}
+
+      {broughtIn ? (
+        <p className="muted sm" style={{ margin: 0 }}>
+          {broughtIn.line} on {broughtIn.on}. Steps done before that are marked &ldquo;Done before joining One Interiors&rdquo;.
+        </p>
       ) : null}
 
       <nav role="tablist" aria-label="Project sections" className="ptabs">

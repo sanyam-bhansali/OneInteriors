@@ -452,7 +452,7 @@ function StepRow({
   onUntick: (() => void) | null;
   onEdit: (() => void) | null;
 }) {
-  const how = st.hasPhoto ? 'photo in the site log' : st.backfilled ? 'done with its stage, no photo' : st.fromVoice ? 'from a voice note' : null;
+  const how = st.hasPhoto ? 'photo in the site log' : st.beforeJoining ? 'Done before joining One Interiors' : st.backfilled ? 'done with its stage, no photo' : st.fromVoice ? 'from a voice note' : null;
   const meta = !st.inScope
     ? `Not in scope · ${customer} does not see it`
     : st.done

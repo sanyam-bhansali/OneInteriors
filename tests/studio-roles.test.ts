@@ -76,6 +76,7 @@ const TABLE: Record<StudioAction, Record<StudioRoleName, Cell>> = {
   // accounts records the payment (payment.record); sales nothing.
   'extras.write': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: 'A' },
   'signoff.request': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: 'A' },
+  'project.bringIn': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: 'Y' },
 };
 
 const active = (role: StudioRoleName) => ({ role, status: 'ACTIVE' as const });

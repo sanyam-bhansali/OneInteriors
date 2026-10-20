@@ -88,6 +88,14 @@
  * designer on the project); the project closure — the final payment — is
  * `project.closure` (owner; PM and designer on the project). The client's
  * handover sign-off is the customer's own act, not a studio one.
+ *
+ * ## Bringing in running projects (owner, 20 Oct 2026)
+ *
+ * docs/studio-os/BRING-IN-PROJECTS.md: `project.bringIn` (owner, PM,
+ * designer; Max only, like every project action). The project does not exist
+ * yet, so no assignment applies; whoever brings it in is put on it. Inside
+ * that flow only, they may pick or add the client's lead and import or pick
+ * its quotation; the rest of the leads and the builder keep their own rights.
  */
 
 import type { Prisma } from '@prisma/client';
@@ -186,7 +194,9 @@ export type StudioAction =
   /** Change orders (15 Oct 2026): add extra work after design sign-off, send it to the client, release it once paid. */
   | 'extras.write'
   /** Ask the client to sign a quotation (sales final, design final) digitally (15 Oct 2026). */
-  | 'signoff.request';
+  | 'signoff.request'
+  /** Bring a running project onto One Interiors ("Add an existing project", 20 Oct 2026): its client, quotation, steps done, payments received, team. */
+  | 'project.bringIn';
 
 export const STUDIO_ACTIONS: readonly StudioAction[] = [
   'team.manage',
@@ -233,6 +243,7 @@ export const STUDIO_ACTIONS: readonly StudioAction[] = [
   'project.closure',
   'extras.write',
   'signoff.request',
+  'project.bringIn',
 ];
 
 /** Everything a PM does with leads and sales: all of it, across the studio. */
@@ -276,6 +287,7 @@ const GRANTS: Record<Exclude<StudioRoleName, 'OWNER'>, readonly StudioAction[]> 
     'project.closure',
     'extras.write',
     'signoff.request',
+    'project.bringIn',
     /* Phase 3: quantities only — never `workorder.money` or `crew.pay`. */
     'crew.list',
     'workorder.read',
@@ -284,7 +296,7 @@ const GRANTS: Record<Exclude<StudioRoleName, 'OWNER'>, readonly StudioAction[]> 
   SUPERVISOR: ['update.post', 'checklist.tick', 'snag.fix', 'project.read', 'workorder.read'],
   ACCOUNTS: ['payment.read', 'payment.record', 'booking.record', 'booking.refund', 'crew.list', 'crew.edit', 'workorder.read', 'workorder.money', 'crew.pay'],
   /* Studio OS Phase 2: only the projects they are the designer on. Lifecycle (owner, 13 Oct 2026): money everywhere on those projects, execution ticks, design sign-off, the closure. */
-  DESIGNER: ['project.read', 'document.upload', 'design.work', 'design.close', 'payment.read', 'update.post', 'checklist.tick', 'workorder.read', 'workorder.money', 'project.closure', 'extras.write', 'signoff.request'],
+  DESIGNER: ['project.read', 'document.upload', 'design.work', 'design.close', 'payment.read', 'update.post', 'checklist.tick', 'workorder.read', 'workorder.money', 'project.closure', 'extras.write', 'signoff.request', 'project.bringIn'],
 };
 
 /** Lead actions a salesperson may take only on a lead assigned to them. */
@@ -371,6 +383,7 @@ export const FULL_SOFTWARE_ACTIONS: ReadonlySet<StudioAction> = new Set<StudioAc
   'project.closure',
   'extras.write',
   'signoff.request',
+  'project.bringIn',
 ]);
 
 /**

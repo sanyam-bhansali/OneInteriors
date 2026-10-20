@@ -70,6 +70,8 @@ export const LABOUR_PATH = '/studio/vendors/labour';
 export const CREW_SETTINGS_PATH = '/studio/settings/trades';
 /** Settings → Crew: the faces site mode taps (`crew.manage`). */
 export const SITE_CREW_PATH = '/studio/settings/crew';
+/** "Add an existing project" (docs/studio-os/BRING-IN-PROJECTS.md): owner, PM and designer, Max only (under /studio/projects). */
+export const BRING_IN_PATH = '/studio/projects/bring-in';
 /** The owner's "Set up your studio" quiz (studio/setup-quiz.ts). Owner only. */
 export const SETUP_PATH = '/studio/setup';
 
@@ -122,7 +124,7 @@ export function homeFor(role: StudioRoleName, fullSoftware?: boolean): string {
  * designer pick writes.
  */
 function designerMayOpen(path: string): boolean {
-  if (under(path, DESIGN_HOME)) return true;
+  if (under(path, DESIGN_HOME) || path === BRING_IN_PATH) return true;
   const m = path.match(/^\/studio\/projects\/([^/?#]+)\/?$/);
   return Boolean(m && m[1] !== 'start');
 }

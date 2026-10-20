@@ -128,8 +128,14 @@ export interface Ledger {
   rows: LedgerRow[];
 }
 
-export const isBackfilled = (r: { id: string; recordedById?: string | null }): boolean =>
-  r.recordedById === BACKFILL_RECORDER || r.id.startsWith('hpp_');
+/**
+ * Rows that read as `earlier`: backfilled from `paidPhases`, or received
+ * before the project was brought onto One Interiors (`beforeJoining`,
+ * docs/studio-os/BRING-IN-PROJECTS.md). Both count as paid without the
+ * client's confirmation.
+ */
+export const isBackfilled = (r: { id: string; recordedById?: string | null; beforeJoining?: boolean | null }): boolean =>
+  r.beforeJoining === true || r.recordedById === BACKFILL_RECORDER || r.id.startsWith('hpp_');
 
 /** The status of each row, given every row on the project. */
 export function rowStatuses(rows: LedgerRowInput[]): LedgerRow[] {

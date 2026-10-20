@@ -242,6 +242,7 @@ function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onO
             Moved {st.moves.length === 1 ? 'once' : `${st.moves.length} times`}: last {dayWords(st.moves.at(-1)!.from)} → {dayWords(st.moves.at(-1)!.to)} ({st.moves.at(-1)!.side === 'CLIENT' ? 'client side' : 'studio side'}: {st.moves.at(-1)!.reason.toLowerCase()})
           </span>
         ) : null}
+        {st.done && st.beforeJoining ? <span className={`block ${muted}`}>Done before joining One Interiors</span> : null}
         {st.done && (st.doneNote || st.doneFile) ? (
           <span className={`block ${muted}`}>
             {st.doneNote ? `Team note: ${st.doneNote}` : ''}

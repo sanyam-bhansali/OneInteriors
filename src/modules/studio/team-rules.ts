@@ -86,6 +86,7 @@ const ACTION_LABELS: Record<StudioAction, string> = {
   'project.closure': 'Project closure (final payment)',
   'extras.write': 'Add extra work and send it to the client',
   'signoff.request': 'Ask the client to sign a quotation',
+  'project.bringIn': 'Bring a running project onto One Interiors',
 };
 
 /**

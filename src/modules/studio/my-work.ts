@@ -104,7 +104,7 @@ function projectSelect(from: string, to: string, sinceSite: string) {
     paidPhases: true,
     paymentPhases: true,
     payments: {
-      select: { id: true, stageIndex: true, amountPaise: true, receivedOn: true, mode: true, receiptDocumentId: true, correctsId: true, recordedById: true, recordedAt: true, customerConfirmedAt: true, disputedAt: true },
+      select: { id: true, stageIndex: true, amountPaise: true, receivedOn: true, mode: true, receiptDocumentId: true, correctsId: true, recordedById: true, beforeJoining: true, recordedAt: true, customerConfirmedAt: true, disputedAt: true },
     },
     quoteChanges: { select: { deltaPaise: true, stageIndex: true } },
     introduction: {

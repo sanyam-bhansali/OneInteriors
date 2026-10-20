@@ -1675,6 +1675,13 @@ model HomeProject {
   changeOrders HomeChangeOrder[]
   signoffs     HomeQuoteSignoff[]
 
+  /// Brought onto One Interiors while already running ("Add an existing
+  /// project", owner 20 Oct 2026; docs/studio-os/BRING-IN-PROJECTS.md): when,
+  /// and the source quotation's number in the studio's old quotation app
+  /// (null when the quotation was built in our builder).
+  broughtInAt   DateTime?
+  broughtInFrom String?
+
   @@map("home_projects")
 }
 
@@ -1947,11 +1954,14 @@ enum ProjectStageKind {
 /// How a step was ticked: a tap, or confirmed from a voice note — either way
 /// with its photo since the step tracker (docs/studio-workspace/STEP-TRACKER.md)
 /// — or BACKFILL: ticked by scripts/studio/steps-from-template.ts because its
-/// stage was already done, with no photo.
+/// stage was already done, with no photo — or BEFORE_JOINING: done before the
+/// project was brought onto One Interiors ("Add an existing project",
+/// docs/studio-os/BRING-IN-PROJECTS.md), with no photo.
 enum ChecklistDoneSource {
   TICK
   VOICE
   BACKFILL
+  BEFORE_JOINING
 }
 
 /// A stage of a customer's project, built from the signed quote. The studio
@@ -2713,6 +2723,11 @@ model HomeProjectPayment {
   correctsId  String?
   corrects    HomeProjectPayment?  @relation("HomeProjectPaymentCorrections", fields: [correctsId], references: [id], onDelete: SetNull)
   corrections HomeProjectPayment[] @relation("HomeProjectPaymentCorrections")
+
+  /// Received before the project was brought onto One Interiors (docs/studio-os/
+  /// BRING-IN-PROJECTS.md): reads as 'earlier' (counts as paid, no client
+  /// confirmation needed), like the rows backfilled from `paidPhases`.
+  beforeJoining Boolean @default(false)
 
   /// The customer said yes, this arrived.
   customerConfirmedAt   DateTime?
@@ -3490,12 +3505,19 @@ model StudioQuote {
   salesFinalAt         DateTime?
   salesFinalById       String?
 
+  /// Brought in from the studio's old quotation app (docs/studio-os/
+  /// BRING-IN-PROJECTS.md): "hauspire:<source row id>", unique per studio,
+  /// so importing the same quotation twice opens the one already made.
+  importedFrom String?
+  importedAt   DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   lines StudioQuoteLine[]
 
   @@unique([studioId, number])
+  @@unique([studioId, importedFrom])
   @@index([studioId, status, updatedAt])
   /// The leads board loads up to 400 clients and includes their
   /// quotes, so Postgres runs `WHERE clientId IN (400 ids)` on every

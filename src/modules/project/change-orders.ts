@@ -116,6 +116,7 @@ const PAY_SELECT = {
   receiptDocumentId: true,
   correctsId: true,
   recordedById: true,
+  beforeJoining: true,
   recordedAt: true,
   customerConfirmedAt: true,
   disputedAt: true,

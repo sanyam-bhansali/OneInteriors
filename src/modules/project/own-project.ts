@@ -85,10 +85,16 @@ const QUOTE_SELECT = {
   },
 } satisfies Prisma.StudioQuoteSelect;
 
-type QuoteRow = Prisma.StudioQuoteGetPayload<{ select: typeof QUOTE_SELECT }>;
+export type OwnQuoteRow = Prisma.StudioQuoteGetPayload<{ select: typeof QUOTE_SELECT }>;
+type QuoteRow = OwnQuoteRow;
+
+/** The quotation a project starts from, read with the given client (a transaction's, for "Add an existing project"). */
+export async function readOwnQuote(db: Pick<Prisma.TransactionClient, 'studioQuote'>, studioId: string, quoteId: string): Promise<OwnQuoteRow | null> {
+  return db.studioQuote.findFirst({ where: { id: quoteId, studioId }, select: QUOTE_SELECT });
+}
 
 /** Sign-off to handover for a whole home, the studio's own figure where it filed one. */
-const defaultDays = (q: QuoteRow) => durationFor('FULL_HOME', readProfile(q.studio.matchingProfile).durationDays);
+export const defaultDays = (q: QuoteRow) => durationFor('FULL_HOME', readProfile(q.studio.matchingProfile).durationDays);
 
 /** Today in India, "2026-10-14": the default start date on the form. */
 export function istToday(now = new Date()): string {
@@ -188,20 +194,20 @@ export type StartOwnProjectResult = { ok: true; projectId: string; introductionI
  * payment row, the lead) run inside the same transaction.
  */
 export interface StartOwnProjectOptions {
-  action?: 'project.create' | 'booking.record';
+  action?: 'project.create' | 'booking.record' | 'project.bringIn';
   contractPaise?: number;
   stages?: { label: string; pct: number | null; amountPaise: number }[];
   onCreated?: (tx: Prisma.TransactionClient, project: { id: string; introductionId: string; customerUserId: string }) => Promise<void>;
 }
 
 /** A refusal raised inside the transaction, so nothing is written. */
-class Refused extends Error {
+export class Refused extends Error {
   constructor(readonly reason: string) {
     super(reason);
   }
 }
 
-const freshCode = () => inviteCode((n) => new Uint8Array(randomBytes(n)));
+export const freshCode = () => inviteCode((n) => new Uint8Array(randomBytes(n)));
 
 /**
  * Start a project for the studio's own client from an accepted quotation
@@ -254,96 +260,25 @@ export async function startOwnProject(
   // Studio OS Phase 2: the studio's design steps and the flat size, for the DESIGN stage.
   const design = await designPlanInput(member.studioId, { propertyType: propertyTypeFrom(q.config ?? q.client?.config) });
   try {
-    const started = await prisma.$transaction(async (tx) => {
-      // The customer's account: theirs if they have one (CUSTOMER only, checked above), else made now.
-      // `phoneVerified` stays empty until they sign in with the number — that is "joined".
-      const user =
-        existing ??
-        (await tx.user.create({
-          data: { phone, name, role: 'CUSTOMER', ...(email && !emailTaken ? { email } : {}) },
-          select: { id: true, role: true, deletedAt: true, name: true, email: true },
-        }));
-      if (existing && !existing.name) await tx.user.update({ where: { id: existing.id }, data: { name } });
-
-      // Their brief: one per person. A customer who already started one keeps it; otherwise a minimal one,
-      // from the client record, kept out of One Interiors' funnel (`madeByStudio`).
-      const brief =
-        (await tx.brief.findUnique({ where: { userId: user.id }, select: { id: true } })) ??
-        (await tx.brief.create({
-          data: {
-            userId: user.id,
-            madeByStudio: true,
-            contactName: name,
-            contactPhone: phone,
-            contactEmail: email,
-            society: (q.society ?? q.client?.society)?.trim() || null,
-            locality: localitySlug(q.locality ?? q.client?.locality),
-            propertyType: propertyTypeFrom(q.config ?? q.client?.config),
-          },
-          select: { id: true },
-        }));
-
-      const prior = await tx.introduction.findUnique({ where: { briefId_studioId: { briefId: brief.id, studioId: member.studioId } }, select: { source: true } });
-      if (prior) throw new Refused(prior.source === 'ONE_INTERIORS' ? CUSTOMER_ERRORS.introduced : CUSTOMER_ERRORS.alreadyHere);
-
-      const intro = await tx.introduction.create({
-        data: {
-          briefId: brief.id,
-          studioId: member.studioId,
-          source: 'STUDIO_OWN_CLIENT',
-          introducedById: member.userId,
-          introducedAt: signedAt,
-          contactReleasedAt: signedAt,
-          studioAcceptedAt: signedAt,
-        },
-        select: { id: true },
-      });
-
-      // The same code as signing in the app: quote → Won, the project, the plan, the Locker.
-      const project = await createSignedProject(tx, {
-        introductionId: intro.id,
-        quote: { id: q.id, number: q.number, lines: q.lines },
-        startOn,
-        totalDays,
-        contractPaise: opts.contractPaise ?? totals.totalPaise,
-        stages: opts.stages ?? totals.stages.map((s) => ({ label: s.label, pct: s.pct ?? null, amountPaise: s.amountPaise })),
-        signedAt,
-        filedById: member.userId,
-        filedByStudio: true,
-        design,
-      });
-
-      // A PM sees only projects they are on; the one who started it is on it.
-      if (needsAssignment(member.role)) {
-        await tx.studioProjectMember.create({ data: { homeProjectId: project.id, memberId: member.id } });
-      }
-
-      const actor = { type: 'STUDIO' as const, id: member.userId };
-      await recordEvent(tx, {
-        projectId: project.id,
-        type: 'plan.created',
-        actor,
-        refId: q.id,
-        payload: { source: 'studio_own_client', payments: project.payments.length, totalDays },
-        at: signedAt,
-      });
-      const invite = await tx.homeProjectInvite.create({
-        data: { projectId: project.id, code, userId: user.id, phone, name, email, createdById: member.id },
-        select: { id: true },
-      });
-      await recordEvent(tx, { projectId: project.id, type: 'customer.invited', actor, refId: invite.id, at: signedAt });
-      await tx.auditLog.create({
-        data: {
-          actorId: member.userId,
-          action: 'project.started_own_client',
-          entityType: 'HomeProject',
-          entityId: project.id,
-          after: { quoteId: q.id, totalPaise: totals.totalPaise, newAccount: !existing },
-        },
-      });
-      await opts.onCreated?.(tx, { id: project.id, introductionId: intro.id, customerUserId: user.id });
-      return { projectId: project.id, introductionId: intro.id };
-    }, PLAN_TX);
+    const started = await prisma.$transaction(
+      (tx) =>
+        writeOwnProject(tx, {
+          member,
+          q,
+          customer: { name, phone, email },
+          existing,
+          emailTaken,
+          startOn,
+          totalDays,
+          contractPaise: opts.contractPaise ?? totals.totalPaise,
+          stages: opts.stages ?? totals.stages.map((s) => ({ label: s.label, pct: s.pct ?? null, amountPaise: s.amountPaise })),
+          signedAt,
+          code,
+          design,
+          onCreated: opts.onCreated,
+        }),
+      PLAN_TX,
+    );
 
     const { projectId, introductionId } = started;
     const invite = await sendOwnInvite({ projectId, code, phone, email, name, studio: q.studio.tradeName });
@@ -358,6 +293,124 @@ export async function startOwnProject(
   }
 }
 
+/** Everything `writeOwnProject` needs, checked and read before the transaction. */
+export interface OwnProjectWrite {
+  member: StudioMemberRef;
+  q: OwnQuoteRow;
+  customer: { name: string; phone: string; email: string | null };
+  existing: { id: string; role: string; deletedAt: Date | null; name: string | null; email: string | null } | null;
+  emailTaken: boolean;
+  startOn: Date;
+  totalDays: number;
+  contractPaise: number;
+  stages: { label: string; pct: number | null; amountPaise: number }[];
+  signedAt: Date;
+  code: string;
+  design: Awaited<ReturnType<typeof designPlanInput>>;
+  onCreated?: StartOwnProjectOptions['onCreated'];
+}
+
+/**
+ * The writes of starting an own-client project, inside the caller's
+ * transaction: the customer's account and brief, the own-client
+ * introduction, the project and its plan (`createSignedProject`), the member
+ * on it, the events, the invite row and the audit line, then `onCreated`.
+ * `startOwnProject` and "Add an existing project"
+ * (studio-bring-in/bring-in.ts) both call it. Throws `Refused`.
+ */
+export async function writeOwnProject(tx: Prisma.TransactionClient, w: OwnProjectWrite): Promise<{ projectId: string; introductionId: string }> {
+  const { member, q, existing, emailTaken, startOn, totalDays, signedAt, code, design } = w;
+  const { name, phone, email } = w.customer;
+  // The customer's account: theirs if they have one (CUSTOMER only, checked above), else made now.
+  // `phoneVerified` stays empty until they sign in with the number — that is "joined".
+  const user =
+    existing ??
+    (await tx.user.create({
+      data: { phone, name, role: 'CUSTOMER', ...(email && !emailTaken ? { email } : {}) },
+      select: { id: true, role: true, deletedAt: true, name: true, email: true },
+    }));
+  if (existing && !existing.name) await tx.user.update({ where: { id: existing.id }, data: { name } });
+
+  // Their brief: one per person. A customer who already started one keeps it; otherwise a minimal one,
+  // from the client record, kept out of One Interiors' funnel (`madeByStudio`).
+  const brief =
+    (await tx.brief.findUnique({ where: { userId: user.id }, select: { id: true } })) ??
+    (await tx.brief.create({
+      data: {
+        userId: user.id,
+        madeByStudio: true,
+        contactName: name,
+        contactPhone: phone,
+        contactEmail: email,
+        society: (q.society ?? q.client?.society)?.trim() || null,
+        locality: localitySlug(q.locality ?? q.client?.locality),
+        propertyType: propertyTypeFrom(q.config ?? q.client?.config),
+      },
+      select: { id: true },
+    }));
+
+  const prior = await tx.introduction.findUnique({ where: { briefId_studioId: { briefId: brief.id, studioId: member.studioId } }, select: { source: true } });
+  if (prior) throw new Refused(prior.source === 'ONE_INTERIORS' ? CUSTOMER_ERRORS.introduced : CUSTOMER_ERRORS.alreadyHere);
+
+  const intro = await tx.introduction.create({
+    data: {
+      briefId: brief.id,
+      studioId: member.studioId,
+      source: 'STUDIO_OWN_CLIENT',
+      introducedById: member.userId,
+      introducedAt: signedAt,
+      contactReleasedAt: signedAt,
+      studioAcceptedAt: signedAt,
+    },
+    select: { id: true },
+  });
+
+  // The same code as signing in the app: quote → Won, the project, the plan, the Locker.
+  const project = await createSignedProject(tx, {
+    introductionId: intro.id,
+    quote: { id: q.id, number: q.number, lines: q.lines },
+    startOn,
+    totalDays,
+    contractPaise: w.contractPaise,
+    stages: w.stages,
+    signedAt,
+    filedById: member.userId,
+    filedByStudio: true,
+    design,
+  });
+
+  // A PM sees only projects they are on; the one who started it is on it.
+  if (needsAssignment(member.role)) {
+    await tx.studioProjectMember.create({ data: { homeProjectId: project.id, memberId: member.id } });
+  }
+
+  const actor = { type: 'STUDIO' as const, id: member.userId };
+  await recordEvent(tx, {
+    projectId: project.id,
+    type: 'plan.created',
+    actor,
+    refId: q.id,
+    payload: { source: 'studio_own_client', payments: project.payments.length, totalDays },
+    at: signedAt,
+  });
+  const invite = await tx.homeProjectInvite.create({
+    data: { projectId: project.id, code, userId: user.id, phone, name, email, createdById: member.id },
+    select: { id: true },
+  });
+  await recordEvent(tx, { projectId: project.id, type: 'customer.invited', actor, refId: invite.id, at: signedAt });
+  await tx.auditLog.create({
+    data: {
+      actorId: member.userId,
+      action: 'project.started_own_client',
+      entityType: 'HomeProject',
+      entityId: project.id,
+      after: { quoteId: q.id, totalPaise: w.contractPaise, newAccount: !existing },
+    },
+  });
+  await w.onCreated?.(tx, { id: project.id, introductionId: intro.id, customerUserId: user.id });
+  return { projectId: project.id, introductionId: intro.id };
+}
+
 /** The words in every language, for one invite. */
 function messagesFor(name: string, studio: string, link: string): Record<InviteLang, string> {
   const words = { customerFirst: name.split(/\s+/)[0] || name, studio, link };
@@ -365,7 +418,7 @@ function messagesFor(name: string, studio: string, link: string): Record<InviteL
 }
 
 /** Send one invite (SMS when a provider exists, email when known) and note what took it. Never throws. */
-async function sendOwnInvite(i: { projectId: string; code: string; phone: string; email: string | null; name: string; studio: string }): Promise<OwnInvite> {
+export async function sendOwnInvite(i: { projectId: string; code: string; phone: string; email: string | null; name: string; studio: string }): Promise<OwnInvite> {
   const link = joinLink(i.code);
   const messages = messagesFor(i.name, i.studio, link);
   let sentVia: InviteChannel[] = [];
