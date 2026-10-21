@@ -54,7 +54,6 @@ const CLOSED = [
   '/studio/vendors',
   '/studio/vendors/pay',
   '/studio/vendors/labour',
-  '/studio/settings/team',
   '/studio/settings/design',
   '/studio/settings/trades',
   '/studio/settings/crew',
@@ -96,7 +95,8 @@ describe('the pilot switch: off', () => {
 
   it('a closed screen shows its "coming soon" to the owner and sales; other refusals still go home', () => {
     expect(doorFor(m('OWNER', false), '/studio/projects/p1')).toEqual({ kind: 'soon', area: 'projects' });
-    expect(doorFor(m('OWNER', false), '/studio/settings/team')).toEqual({ kind: 'soon', area: 'team' });
+    /* Pro (owner, 21 Oct 2026): the owner adds salespeople. */
+    expect(doorFor(m('OWNER', false), '/studio/settings/team')).toEqual({ kind: 'open' });
     expect(doorFor(m('OWNER', false), '/studio/vendors/pay')).toEqual({ kind: 'soon', area: 'vendors' });
     expect(doorFor(m('OWNER', false), '/studio/clients')).toEqual({ kind: 'open' });
     /* Sales never had projects: still home, not "coming soon". */
@@ -118,10 +118,10 @@ describe('the pilot switch: off', () => {
 
   it('the apps menu shows only open apps; the owner sees the rest as coming soon', () => {
     expect(appsFor(m('OWNER', false)).map((a) => a.key)).toEqual(['today', 'clients', 'quotes', 'calendar', 'rates', 'team']);
-    /* The Team app opens Settings for them (no Team tab without the full software). */
+    /* Pro (owner, 21 Oct 2026): the Team app opens the team, where the owner adds salespeople. */
     const team = appsFor(m('OWNER', false)).find((a) => a.key === 'team')!;
-    expect(team.href).toBe('/studio/settings');
-    expect(team.name).toBe('Settings');
+    expect(team.href).toBe('/studio/settings/team');
+    expect(team.name).toBe('Team');
     expect(comingSoonApps(m('OWNER', false)).map((a) => a.key)).toEqual(['projects', 'site', 'money', 'vendors', 'intros']);
     expect(comingSoonApps(m('SALES', false))).toEqual([]);
     expect(appsFor(m('SALES', false)).map((a) => a.key)).toEqual(['clients', 'quotes', 'calendar']);

@@ -8,6 +8,7 @@ import { SOFTWARE_PLANS, type SoftwarePlan } from '@/modules/studio/software-pla
 /**
  * The studio software plan (owner, 19 Oct 2026; modules/studio/software-plan.ts).
  *
+ * Pro Solo (owner, 21 Oct 2026): Pro for a one-person company, one login.
  * Pro (every studio): Leads, Quotations, the product master, settings, Today
  * and Calendar; the rest shows "coming soon". Max: the full Studio OS —
  * projects from design to warranty, site mode, the payments desk, crews, the
@@ -21,10 +22,10 @@ export function SoftwarePlanControl({ studioId, slug, plan }: { studioId: string
       <p className="label m-0 mb-1">Studio software plan</p>
       <p className="m-0 mb-3 text-[13px] leading-snug text-[var(--color-ink-2)]">
         On <b>{SOFTWARE_PLANS[plan].name}</b>: {SOFTWARE_PLANS[plan].line}{' '}
-        {plan === 'PRO' ? 'Projects, site mode, payments, crews and the team show “coming soon”.' : 'Every part of the studio software is open.'}
+        {plan === 'MAX' ? 'Every part of the studio software is open.' : plan === 'SOLO' ? 'One login, no team screen or lead pool; projects, site mode, payments and crews show “coming soon”.' : 'Projects, site mode, payments, crews and the team show “coming soon”.'}
       </p>
       <div className="flex flex-wrap gap-2">
-        {(['PRO', 'MAX'] as const).map((p) => (
+        {(['SOLO', 'PRO', 'MAX'] as const).map((p) => (
           <form key={p} action={action}>
             <input type="hidden" name="studioId" value={studioId} />
             <input type="hidden" name="slug" value={slug} />

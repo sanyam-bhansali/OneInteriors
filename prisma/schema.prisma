@@ -808,6 +808,9 @@ model Studio {
   studioClientEvents StudioClientEvent[]
   studioSavedViews   StudioSavedView[]
   studioForm         StudioForm?
+  /// Lead intake (21 Oct 2026): Meta lead ads, Google lead forms, the
+  /// studio's website and portals posting leads straight onto the board.
+  studioLeadConnections StudioLeadConnection[]
   studioStages       StudioStage[]
   studioFields       StudioField[]
   studioProjects     StudioProject[]
@@ -3881,6 +3884,13 @@ model StudioClient {
   /// at most 20, compared without case (studio-sales/tag-rules.ts).
   tags String[] @default([])
 
+  /// Where an imported lead came from, and its id there (the AxLeads import,
+  /// 21 Oct 2026: importedFrom "axleads", externalId the AxLeads lead id).
+  /// Unique per studio, so running the import again skips what it already
+  /// wrote. Null for everything made here, including CSV imports.
+  importedFrom String?
+  externalId   String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -3929,6 +3939,8 @@ model StudioClient {
   @@index([studioId, updatedAt])
   @@index([tags], type: Gin)
   @@index([stageId])
+  /// The AxLeads import (20261021110000_axleads_import): one row per lead there.
+  @@unique([studioId, importedFrom, externalId])
   @@map("studio_clients")
 }
 
@@ -4076,6 +4088,11 @@ enum ClientEventKind {
   BOOKED
   /// The booking advance refunded: the project is cancelled.
   REFUNDED
+  /// Brought over from another system (the AxLeads import, 21 Oct 2026):
+  /// the "Imported from AxLeads" line, and the old system's events that have
+  /// no kind here (WhatsApp messages, hot alerts, duplicate flags, tags).
+  /// Not NOTE, which is the notes panel, and not CONTACTED, which counts calls.
+  IMPORTED
 }
 
 /// Who did it.
@@ -4158,10 +4175,17 @@ model StudioClientEvent {
   /// display: from/to stage ids, a call outcome, a lost reason.
   meta Json?
 
+  /// The event's id in the system it was imported from ("axleads:<id>"),
+  /// unique per studio, so a second run of the import writes no line twice.
+  /// Null for everything that happened here.
+  externalId String?
+
   createdAt DateTime @default(now())
 
   /// The timeline read: one client, newest first.
   @@index([clientId, createdAt])
+  /// The AxLeads import (20261021110000_axleads_import).
+  @@unique([studioId, externalId])
   /// "What has this studio been doing", and the per-member activity read.
   @@index([studioId, createdAt])
   @@index([studioId, kind, createdAt])
@@ -4268,6 +4292,101 @@ model StudioForm {
   updatedAt DateTime @updatedAt
 
   @@map("studio_forms")
+}
+
+/// Where an automatic lead comes from (lead intake, 21 Oct 2026;
+/// docs/studio-os/LEAD-INTAKE.md).
+enum LeadConnectionKind {
+  /// The studio's own website form, posting JSON or a plain HTML form.
+  WEBSITE
+  /// A Google Ads lead form's webhook integration.
+  GOOGLE_LEAD_FORM
+  /// A portal (99acres, Housing.com), a WhatsApp tool, Zapier or Pabbly.
+  PORTAL
+  /// A Facebook Page whose lead ads (Facebook and Instagram) land here.
+  META_PAGE
+}
+
+/// One door leads come in through by themselves (lead intake, 21 Oct 2026).
+///
+/// The secret is shown to the owner once, when the door is made or given a
+/// new key, and only its SHA-256 is kept: a leaked database row cannot be
+/// used to post leads. A Meta Page has no secret of ours (Meta signs its
+/// posts with the app secret); it is found by `metaPageId`, which one studio
+/// at a time may hold.
+model StudioLeadConnection {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  kind  LeadConnectionKind
+  /// The owner's name for it ("Website", "99acres", "Kitchen campaign").
+  label String
+
+  /// Off: posts are refused (generic, Google) or ignored (Meta), and nothing lands.
+  enabled Boolean @default(true)
+
+  /// SHA-256 (hex) of the secret. Never the secret itself.
+  secretHash String
+
+  /// The Facebook Page id, for META_PAGE only. Unique when set.
+  metaPageId String? @unique
+
+  lastEventAt DateTime?
+  eventCount  Int       @default(0)
+
+  /// The member who made it (StudioMember id). Plain text, not a relation:
+  /// removing somebody from the team must not touch the studio's lead doors.
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  events StudioLeadIntakeEvent[]
+
+  @@index([studioId])
+  @@map("studio_lead_connections")
+}
+
+/// What happened to one incoming lead.
+enum LeadIntakeStatus {
+  /// Taken, being worked on (a Meta lead between the ack and the Graph fetch).
+  RECEIVED
+  /// A new lead on the board.
+  LANDED
+  /// Could not land (no page token, Graph refused, no name or number).
+  FAILED
+  /// The phone was already on the board: added to that lead's timeline instead.
+  DUPLICATE
+}
+
+/// One incoming lead, once (lead intake, 21 Oct 2026). Unique on the
+/// connection and the provider's own id, so a Meta or Google retry of the
+/// same lead can never make a second card. No payload is kept: the lead
+/// itself is the record, and a copy of a stranger's answers here would be
+/// personal data with no screen that reads it.
+model StudioLeadIntakeEvent {
+  id           String               @id @default(cuid())
+  connectionId String
+  connection   StudioLeadConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  /// The provider's id (Meta leadgen_id, Google lead_id), the caller's own
+  /// id, or `h:` and a hash of phone and minute when the caller sends none.
+  externalId String
+
+  status LeadIntakeStatus @default(RECEIVED)
+  /// The lead it landed as or on. Plain text, not a relation: erasing the
+  /// lead from the bin keeps the receipt (the link then goes nowhere).
+  clientId String?
+  /// Why it failed, in words the owner can act on. Never a token.
+  error    String?
+  /// Google's "Send test data": recorded here, not put on the board.
+  isTest   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([connectionId, externalId])
+  @@index([connectionId, createdAt])
+  @@map("studio_lead_intake_events")
 }
 
 /// One request against a rate-limited thing.
@@ -5432,6 +5551,8 @@ model HomeCrewPayment {
 /// The studio software plans (owner, 19 Oct 2026). Pro: Leads, Quotations,
 /// the product master, settings, Today and Calendar. Max: the full Studio OS.
 enum StudioSoftwarePlan {
+  /// Pro for a one-person company (owner, 21 Oct 2026): one login.
+  SOLO
   PRO
   MAX
 }

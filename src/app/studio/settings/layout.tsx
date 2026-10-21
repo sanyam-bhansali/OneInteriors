@@ -18,7 +18,7 @@ import './settings.css';
  */
 export default async function SettingsLayout({ children }: { children: React.ReactNode }) {
   const member = await currentMember();
-  const team = member !== null && can(member, 'team.manage');
+  const team = member !== null && can(member, 'team.manage') && member.solo !== true;
   /* Each tab only when the door lets this member open it: the owner-only
      tabs, and (owner, 14 Oct 2026) only what a studio without the full
      software has (studio/pilot.ts). */

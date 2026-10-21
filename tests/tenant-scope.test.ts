@@ -119,6 +119,11 @@ const ALLOWED: { file: string; model: string; why: string }[] = [
     model: 'match',
     why: 'Roster-wide "when did matching begin" — one timestamp, no studio data, and no studio to scope it to.',
   },
+  {
+    file: 'src/modules/studio-intake/intake.ts',
+    model: 'studioLeadConnection',
+    why: 'Lead intake webhooks (docs/studio-os/LEAD-INTAKE.md) have no session: the studio is found FROM the door (its id in the path, or the Facebook Page id Meta names), which is then opened only by the door key or Meta\'s signature, like capture.ts finding a studio from its public slug. The lookups select one door; the update only bumps its counters.',
+  },
 ];
 
 function walk(dir: string): string[] {

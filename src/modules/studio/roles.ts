@@ -339,6 +339,11 @@ export interface MemberRole {
    * closes the full-software roles and actions below.
    */
   fullSoftware?: boolean;
+  /**
+   * The studio is on Pro Solo (owner, 21 Oct 2026; software-plan.ts): one
+   * person, so studio/surfaces.ts closes the team screen and the lead pool.
+   */
+  solo?: boolean;
 }
 
 /**
@@ -349,12 +354,12 @@ export const FULL_SOFTWARE_ROLES: readonly StudioRoleName[] = ['PM', 'DESIGNER',
 
 /**
  * What a studio without the full software cannot do, whoever asks (the
- * owner included): projects, site, design, the payments desk, crews and the
- * team. Leads, quotations, booking a sales final, the payment stages
- * template and the calendar stay.
+ * owner included): projects, site, design, the payments desk and crews.
+ * Leads, quotations, booking a sales final, the payment stages template,
+ * the calendar and the team stay: on Pro (owner, 21 Oct 2026) the owner adds
+ * salespeople, and team-store.ts refuses the full-software roles.
  */
 export const FULL_SOFTWARE_ACTIONS: ReadonlySet<StudioAction> = new Set<StudioAction>([
-  'team.manage',
   'project.create',
   'plan.edit',
   'update.post',

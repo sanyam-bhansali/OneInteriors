@@ -38,10 +38,8 @@ import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { consume, bucketFor, waitPhrase, type Limit } from '@/modules/rate-limit/store';
 import { validate, type CaptureInput } from './capture-fields';
-import { record } from './events';
-import { DEFAULT_STAGES } from './vocabulary';
-import { formAgainSummary, formLanding } from '@/modules/studio-sales/intake-rules';
-import { notify, notifyStudio } from '@/modules/notify/service';
+import { formAgainSummary } from '@/modules/studio-sales/intake-rules';
+import { landLead } from './land';
 
 /**
  * One person, hammering. Low, because a genuine enquirer submits once.
@@ -159,124 +157,34 @@ export async function submitEnquiry(
   }
 
   try {
-    /* One person, one lead (Studio OS Phase 1): the same duplicate check as
-       adding by hand. Somebody already on the board who fills in the form
-       again gets a line on their own timeline, not a second card; whoever
-       has the lead (or the owner and PMs, for a pool lead) is told. */
-    const matches = checked.value.phone
-      ? await prisma.studioClient.findMany({
-          where: { studioId: form.studioId, phone: checked.value.phone },
-          orderBy: { createdAt: 'asc' },
-          select: { id: true, deletedAt: true, isDemo: true, name: true, assignedTo: { select: { userId: true, status: true } } },
-          take: 10,
-        })
-      : [];
-    const landing = formLanding(matches);
-    if (landing.kind === 'attach') {
-      await record({
-        studioId: form.studioId,
-        clientId: landing.id,
-        kind: 'NOTE',
-        summary: formAgainSummary(checked.value.message),
-        by: null,
-      });
-      const match = matches.find((m) => m.id === landing.id)!;
-      const event = { kind: 'lead-new' as const, clientId: landing.id, name: match.name, source: 'your enquiry form', again: true };
-      if (match.assignedTo && match.assignedTo.status === 'ACTIVE') void notify(match.assignedTo.userId, event);
-      else void notifyStudio(form.studioId, event);
-      return { status: 'ok' };
-    }
-
-    const stageId = await intakeStageFor(form.studioId);
-    if (!stageId) return { status: 'error', message: 'We could not take that just now.' };
-
-    const client = await prisma.studioClient.create({
-      data: {
-        studioId: form.studioId,
-        stageId,
+    /* One person, one lead, the pool and "Call them back" today: the same
+       landing as every lead nobody typed (land.ts). */
+    const landed = await landLead({
+      studioId: form.studioId,
+      lead: {
         name: checked.value.name,
         phone: checked.value.phone,
         email: checked.value.email,
         locality: checked.value.locality,
         config: checked.value.config,
         notes: checked.value.message,
-        /* WEBSITE, not OTHER. The whole reason ClientSource is an enum is so
-           the analytics page can say which source closes, and a form
-           submission lumped in with spreadsheet imports makes that number
-           mean nothing. */
-        source: 'WEBSITE',
-        sourceNote: 'Enquiry form',
-        /* The pool. There is no default assignee on Studio, and handing a
-           stranger's enquiry to a named person who is not expecting it is
-           worse than leaving it visible to everybody. */
-        assignedToId: null,
-        /* Arrives with work attached, like a bridged lead — a card with no
-           nextActionOn never appears on "waiting on you". Today, not
-           tomorrow: somebody who has just filled in a form is awake and
-           thinking about their kitchen right now. */
-        nextAction: 'Call them back',
-        nextActionOn: new Date(),
       },
-      select: { id: true },
+      /* WEBSITE, not OTHER. The whole reason ClientSource is an enum is so
+         the analytics page can say which source closes, and a form
+         submission lumped in with spreadsheet imports makes that number
+         mean nothing. */
+      source: 'WEBSITE',
+      sourceNote: 'Enquiry form',
+      how: 'your enquiry form',
+      createdSummary: 'Came in through your enquiry form',
+      againSummary: formAgainSummary(checked.value.message),
     });
-
-    await record({
-      studioId: form.studioId,
-      clientId: client.id,
-      kind: 'CREATED',
-      summary: 'Came in through your enquiry form',
-      by: null,
-    });
-
-    // In the pool: the owner and PMs hear about it, in the inbox and by email.
-    void notifyStudio(form.studioId, { kind: 'lead-new', clientId: client.id, name: checked.value.name, source: 'your enquiry form', again: false });
-
+    if (landed.kind === 'no-stage') return { status: 'error', message: 'We could not take that just now.' };
     return { status: 'ok' };
   } catch (error) {
     console.error('[capture] submit failed', error);
     return { status: 'error', message: 'We could not take that just now.' };
   }
-}
-
-/**
- * Where a captured enquiry lands, for a studio that is not the caller.
- *
- * Same decision and same seeding as `bridge.ts` — `isIntake`, else the first
- * column, seeding the six defaults if the studio has never opened its board.
- * Duplicated rather than shared because importing the bridge here would give
- * an unauthenticated path a reference to the one module that writes
- * `ONE_INTERIORS`, and that module's safety rests on nothing reachable
- * importing it.
- */
-async function intakeStageFor(studioId: string): Promise<string | null> {
-  const pick = (rows: { id: string; isIntake: boolean }[]) =>
-    rows.find((s) => s.isIntake)?.id ?? rows[0]?.id ?? null;
-
-  const existing = await prisma.studioStage.findMany({
-    where: { studioId },
-    orderBy: { sortOrder: 'asc' },
-    select: { id: true, isIntake: true },
-  });
-  if (existing.length > 0) return pick(existing);
-
-  await prisma.studioStage.createMany({
-    data: DEFAULT_STAGES.map((s, i) => ({
-      studioId,
-      name: s.name,
-      kind: s.kind,
-      colour: s.colour,
-      isIntake: s.isIntake,
-      sortOrder: (i + 1) * 10,
-    })),
-    skipDuplicates: true,
-  });
-
-  const seeded = await prisma.studioStage.findMany({
-    where: { studioId },
-    orderBy: { sortOrder: 'asc' },
-    select: { id: true, isIntake: true },
-  });
-  return pick(seeded);
 }
 
 // ── The studio's own side ────────────────────────────────────────

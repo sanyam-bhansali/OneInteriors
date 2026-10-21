@@ -40,7 +40,9 @@ export type EventKindName =
   | 'MEETING'
   | 'SALES_FINAL'
   | 'BOOKED'
-  | 'REFUNDED';
+  | 'REFUNDED'
+  /** Brought over from another system (the AxLeads import, 21 Oct 2026). */
+  | 'IMPORTED';
 
 /**
  * How a lead got here. Not the `ClientSource` enum.
@@ -247,6 +249,7 @@ export const KIND_LABELS: Record<EventKindName, string> = {
   SALES_FINAL: 'Sales final',
   BOOKED: 'Booked',
   REFUNDED: 'Refunded',
+  IMPORTED: 'Imported',
 };
 
 /**

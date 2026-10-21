@@ -26,6 +26,7 @@ import { revokeAllSessions } from '@/modules/auth/session';
 import { send } from '@/modules/messaging/sender';
 import { bucketFor, consume } from '@/modules/rate-limit/store';
 import { STUDIO_SIGN_IN } from '@/lib/host';
+import { FULL_SOFTWARE_ROLES } from './roles';
 import { assertCan, currentMember, StudioAccessError, type StudioMemberRef } from './access';
 import { FREE_SEATS, type StudioMemberStatusName, type StudioRoleName } from './roles';
 import {
@@ -41,6 +42,8 @@ import {
 export type TeamResult = { ok: true; message: string } | { ok: false; error: string };
 
 const NOT_ALLOWED = 'Only the studio owner can change the team.';
+const PRO_ROLES = 'On Pro you can add salespeople. Designers, project managers, supervisors and accounts come with the Max plan.';
+const SOLO_SEAT = 'Pro Solo is for one person. Ask One Interiors to move your studio to Pro to add your team.';
 
 /** The signed-in member when they may manage the team; null otherwise. */
 async function teamLead(): Promise<StudioMemberRef | null> {
@@ -176,10 +179,12 @@ export async function inviteMember(
 ): Promise<TeamResult> {
   const lead = await teamLead();
   if (!lead) return { ok: false, error: NOT_ALLOWED };
+  if (lead.solo === true) return { ok: false, error: SOLO_SEAT };
 
   const check = checkInvite(raw);
   if (!check.ok) return check;
   const { name, phone, role, sites } = check.invite;
+  if (lead.fullSoftware === false && FULL_SOFTWARE_ROLES.includes(role)) return { ok: false, error: PRO_ROLES };
 
   const siteIds = await ownSites(lead.studioId, sites);
   if (!siteIds) return { ok: false, error: 'One of those sites is not your studio’s.' };

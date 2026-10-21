@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { teamView } from '@/modules/studio/team-store';
+import { currentMember } from '@/modules/studio/access';
+import { FULL_SOFTWARE_ROLES } from '@/modules/studio/roles';
 import { ROLE_LINES, ROLE_NAMES, ROLE_ORDER, STATUS_LINES, roleCan, seatLine } from '@/modules/studio/team-rules';
 import { AddSomeone, PersonActions } from './TeamControls';
 
@@ -13,12 +15,14 @@ export const dynamic = 'force-dynamic';
  * its own.
  */
 export default async function TeamPage() {
-  const view = await teamView();
+  const [view, member] = await Promise.all([teamView(), currentMember()]);
   if (!view) {
     return <p className="ox-note">Only your studio owner manages the team.</p>;
   }
 
-  const roles = ROLE_ORDER.map((role) => ({ role, name: ROLE_NAMES[role], line: ROLE_LINES[role], can: roleCan(role) }));
+  /* On Pro (owner, 21 Oct 2026) the owner adds salespeople; the other roles come with Max. */
+  const pro = member?.fullSoftware === false;
+  const roles = ROLE_ORDER.filter((role) => !pro || !FULL_SOFTWARE_ROLES.includes(role)).map((role) => ({ role, name: ROLE_NAMES[role], line: ROLE_LINES[role], can: roleCan(role) }));
   const used = Math.min(view.seatsUsed, view.freeSeats);
 
   return (

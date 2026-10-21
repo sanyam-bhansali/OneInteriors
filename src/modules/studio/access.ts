@@ -46,7 +46,7 @@ export async function memberFor(userId: string): Promise<StudioMemberRef | null>
   if (!row) return null;
   const { studio, ...member } = row;
   /* The relation is required; a test double without it narrows nothing. */
-  return studio ? { ...member, fullSoftware: opensFullSoftware(planOf(studio)) } : member;
+  return studio ? { ...member, fullSoftware: opensFullSoftware(planOf(studio)), solo: planOf(studio) === 'SOLO' } : member;
 }
 
 /**

@@ -60,6 +60,8 @@ export const STUDIO_HOME = '/studio/home';
 export const TODAY_HOME = '/studio/today';
 export const PAYMENTS_HOME = '/studio/payments';
 export const TEAM_PATH = '/studio/settings/team';
+/** The unassigned leads (closed on Pro Solo). */
+export const POOL_PATH = '/studio/clients/pool';
 export const PAYMENT_STAGES_PATH = '/studio/settings/payments';
 /** Studio OS Phase 2: a designer's home, and the owner's and PM's designers' workload. */
 export const DESIGN_HOME = '/studio/design';
@@ -91,7 +93,6 @@ export const FULL_SOFTWARE_PATHS: readonly string[] = [
   PAYMENTS_HOME,
   CREWS_HOME,
   CREW_SETTINGS_PATH,
-  TEAM_PATH,
   '/studio/listing',
 ];
 
@@ -158,6 +159,8 @@ function under(path: string, prefix: string): boolean {
  */
 export function mayOpen(member: MemberRole, path: string): boolean {
   if (member.status !== 'ACTIVE') return false;
+  /* Pro Solo (owner, 21 Oct 2026): one person, so no team to manage and no pool to hand leads out from. */
+  if (member.solo === true && (under(path, TEAM_PATH) || under(path, POOL_PATH))) return false;
   /* The pilot switch (owner, 14 Oct 2026): a studio without the full
      software opens only the home to the roles that need it, and none of its
      screens to anyone. Explicitly false only: undefined is "not known here". */

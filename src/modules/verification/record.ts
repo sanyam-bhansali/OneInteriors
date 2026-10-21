@@ -1,5 +1,5 @@
 import 'server-only';
-import { isSoftwarePlan, planOf, type SoftwarePlan } from '@/modules/studio/software-plan';
+import { SOFTWARE_PLANS, isSoftwarePlan, planOf, seatLimit, type SoftwarePlan } from '@/modules/studio/software-plan';
 
 /**
  * The ops write path.
@@ -361,12 +361,17 @@ export async function setHiddenAsTest(
  */
 export async function setSoftwarePlan(studioId: string, plan: SoftwarePlan): Promise<RecordResult> {
   const actor = await requireRole('OPS');
-  if (!isSoftwarePlan(plan)) return { ok: false, error: 'Choose Pro or Max.' };
+  if (!isSoftwarePlan(plan)) return { ok: false, error: 'Choose Pro Solo, Pro or Max.' };
   try {
     await prisma.$transaction(async (tx) => {
       const before = await tx.studio.findUniqueOrThrow({ where: { id: studioId }, select: { softwarePlan: true, fullSoftware: true, tradeName: true } });
       const was = planOf(before);
       if (was === plan && before.softwarePlan === plan && before.fullSoftware === (plan === 'MAX')) return;
+      const limit = seatLimit(plan);
+      if (limit !== null) {
+        const people = await tx.studioMember.count({ where: { studioId } });
+        if (people > limit) throw new Error(`${SOFTWARE_PLANS[plan].name} is for one person. This studio has ${people} people on its team; remove them first, or keep it on Pro.`);
+      }
       await tx.studio.update({ where: { id: studioId }, data: { softwarePlan: plan, fullSoftware: plan === 'MAX' } });
       await writeAudit(tx, actor, 'studio.plan_changed', 'Studio', studioId, { plan: was }, { plan, tradeName: before.tradeName });
     });

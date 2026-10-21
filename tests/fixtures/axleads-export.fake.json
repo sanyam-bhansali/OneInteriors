@@ -1,0 +1,158 @@
+{
+  "format": "axleads-export",
+  "version": 1,
+  "exportedAt": "2026-10-21T06:00:00.000Z",
+  "tenant": { "id": "00000000-0000-4000-8000-000000000001", "name": "Test Studio", "slug": "test-studio", "vertical": "interiors", "plan": "PRO", "timezone": "Asia/Kolkata", "defaultAssignee": null, "createdAt": "2026-01-01T00:00:00.000Z", "deletedAt": null },
+  "members": [
+    { "id": "00000000-0000-4000-8001-000000000001", "userId": "00000000-0000-4000-8002-000000000001", "displayName": "Test Owner", "email": "studio@e2e.test", "phone": "+919900000001", "role": "OWNER", "status": "ACTIVE", "inviteAcceptedAt": "2026-01-01T00:00:00.000Z", "lastActiveAt": null, "createdAt": "2026-01-01T00:00:00.000Z", "deletedAt": null },
+    { "id": "00000000-0000-4000-8001-000000000002", "userId": "00000000-0000-4000-8002-000000000002", "displayName": "Test Agent A", "email": "agent.a@axleads.test", "phone": "919000000011", "role": "AGENT", "status": "ACTIVE", "inviteAcceptedAt": "2026-01-02T00:00:00.000Z", "lastActiveAt": null, "createdAt": "2026-01-02T00:00:00.000Z", "deletedAt": null },
+    { "id": "00000000-0000-4000-8001-000000000003", "userId": "00000000-0000-4000-8002-000000000003", "displayName": "Test Agent B", "email": "agent.b@axleads.test", "phone": null, "role": "AGENT", "status": "ACTIVE", "inviteAcceptedAt": null, "lastActiveAt": null, "createdAt": "2026-01-03T00:00:00.000Z", "deletedAt": null },
+    { "id": "00000000-0000-4000-8001-000000000004", "userId": "00000000-0000-4000-8002-000000000004", "displayName": "Test Gone", "email": "gone@axleads.test", "phone": "+919000000013", "role": "AGENT", "status": "SUSPENDED", "inviteAcceptedAt": null, "lastActiveAt": null, "createdAt": "2026-01-04T00:00:00.000Z", "deletedAt": "2026-06-01T00:00:00.000Z" }
+  ],
+  "pipelines": [{ "id": "00000000-0000-4000-8003-000000000001", "name": "Default", "isDefault": true, "createdAt": "2026-01-01T00:00:00.000Z", "deletedAt": null }],
+  "stages": [
+    { "id": "00000000-0000-4000-8004-000000000001", "pipelineId": "00000000-0000-4000-8003-000000000001", "name": "New", "position": 0, "semantic": "INTAKE", "color": null, "deletedAt": null },
+    { "id": "00000000-0000-4000-8004-000000000002", "pipelineId": "00000000-0000-4000-8003-000000000001", "name": "Calling 1", "position": 1, "semantic": "ACTIVE", "color": null, "deletedAt": null },
+    { "id": "00000000-0000-4000-8004-000000000003", "pipelineId": "00000000-0000-4000-8003-000000000001", "name": "Follow up", "position": 2, "semantic": "FOLLOWUP", "color": null, "deletedAt": null },
+    { "id": "00000000-0000-4000-8004-000000000004", "pipelineId": "00000000-0000-4000-8003-000000000001", "name": "quotation  shared", "position": 3, "semantic": "ACTIVE", "color": null, "deletedAt": null },
+    { "id": "00000000-0000-4000-8004-000000000005", "pipelineId": "00000000-0000-4000-8003-000000000001", "name": "Converted", "position": 4, "semantic": "WON", "color": null, "deletedAt": null },
+    { "id": "00000000-0000-4000-8004-000000000006", "pipelineId": "00000000-0000-4000-8003-000000000001", "name": "Junk", "position": 5, "semantic": "LOST", "color": null, "deletedAt": null },
+    { "id": "00000000-0000-4000-8004-000000000007", "pipelineId": "00000000-0000-4000-8003-000000000001", "name": "Lost", "position": 6, "semantic": "LOST", "color": null, "deletedAt": null },
+    { "id": "00000000-0000-4000-8004-000000000008", "pipelineId": "00000000-0000-4000-8003-000000000001", "name": "Mystery Stage", "position": 7, "semantic": "ACTIVE", "color": null, "deletedAt": null }
+  ],
+  "fieldDefs": [
+    { "id": "00000000-0000-4000-8005-000000000001", "key": "area_sqft", "label": "Carpet area", "type": "NUMBER", "options": [], "required": false, "scored": false, "groupable": false, "position": 0, "deletedAt": null },
+    { "id": "00000000-0000-4000-8005-000000000002", "key": "possession", "label": "Possession", "type": "SELECT", "options": ["Ready", "Under construction"], "required": false, "scored": true, "groupable": true, "position": 1, "deletedAt": null },
+    { "id": "00000000-0000-4000-8005-000000000003", "key": "visit_on", "label": "Visit date", "type": "DATE", "options": [], "required": false, "scored": false, "groupable": false, "position": 2, "deletedAt": null }
+  ],
+  "sourceConnections": [{ "id": "00000000-0000-4000-8006-000000000001", "provider": "META_PAGE", "label": "Test Page", "status": "ACTIVE", "enabled": true, "formId": null, "deletedAt": null }],
+  "hostedForms": [{ "id": "00000000-0000-4000-8007-000000000001", "slug": "test-form", "title": "Test Website Form", "deletedAt": null }],
+  "leads": [
+    {
+      "id": "00000000-0000-4000-9000-000000000001", "tenantId": "00000000-0000-4000-8000-000000000001", "contactId": "00000000-0000-4000-8008-000000000001",
+      "name": "Test Lead 1", "phone": "+919000000101", "email": "lead1@axleads.test",
+      "pipelineId": "00000000-0000-4000-8003-000000000001", "stageId": "00000000-0000-4000-8004-000000000002", "assignedTo": "00000000-0000-4000-8002-000000000002",
+      "city": "Pune", "locality": "Testnagar", "budgetMinInr": 800000, "budgetMaxInr": 1200000, "timelineText": "In 3 months", "requirements": ["Kitchen", "Wardrobes"],
+      "customFields": { "bhk": "2 BHK", "area_sqft": "950", "possession": "Ready", "society": "Test Society A", "when_do_you_want_to_start": "Next month" },
+      "tags": ["nri", "site visit sunday"], "score": 70, "scoreBreakdown": { "budget": 40, "bhk": 30 }, "isHot": true, "hotAlertedAt": "2026-03-01T05:00:00.000Z",
+      "source": "META_LEAD_AD", "sourceConnectionId": "00000000-0000-4000-8006-000000000001", "sourceDetail": { "raw": { "leadgen_id": "test-leadgen-1" }, "platform": "ig" },
+      "leadgenId": "test-leadgen-1", "gclid": null, "campaignId": "test-campaign-1", "adsetId": "test-adset-1", "adId": "test-ad-1", "formId": "test-meta-form-1", "conceptId": null, "utm": null, "referredBy": null,
+      "reactivationDay": 0, "reactivationStopped": false, "lastInboundAt": null, "nextAttemptAt": "2030-01-05T04:30:00.000Z", "nextAttemptDoneAt": null,
+      "followUps": [{ "id": "f1", "label": "Send portfolio", "doneAt": null }, { "id": "f2", "label": "Share estimate", "doneAt": "2026-03-03T00:00:00.000Z" }],
+      "lostReason": null, "lostAt": null, "possibleDuplicateOf": null,
+      "createdAt": "2026-03-01T04:00:00.000Z", "updatedAt": "2026-03-04T04:00:00.000Z", "createdBy": null, "deletedAt": null,
+      "contact": { "id": "00000000-0000-4000-8008-000000000001", "name": "Test Lead 1", "phone": "+919000000101", "email": null, "createdAt": "2026-03-01T04:00:00.000Z", "deletedAt": null },
+      "activities": [
+        { "id": "00000000-0000-4000-a000-000000000001", "kind": "LEAD_CREATED", "data": { "source": "META_LEAD_AD" }, "actorKind": "SYSTEM", "createdAt": "2026-03-01T04:00:00.000Z", "createdBy": null },
+        { "id": "00000000-0000-4000-a000-000000000002", "kind": "ASSIGNED", "data": { "from": null, "to": "00000000-0000-4000-8002-000000000002", "auto": true }, "actorKind": "SYSTEM", "createdAt": "2026-03-01T04:00:01.000Z", "createdBy": null },
+        { "id": "00000000-0000-4000-a000-000000000003", "kind": "SCORE_UPDATED", "data": { "score": 70, "isHot": true }, "actorKind": "SYSTEM", "createdAt": "2026-03-01T04:00:02.000Z", "createdBy": null },
+        { "id": "00000000-0000-4000-a000-000000000004", "kind": "CALL_LOGGED", "data": { "outcome": "picked_up", "note": "Wants a quote", "reactions": ["wants_quote", "site_visit"], "durationMin": 4 }, "actorKind": "HUMAN", "createdAt": "2026-03-02T06:00:00.000Z", "createdBy": "00000000-0000-4000-8002-000000000002" },
+        { "id": "00000000-0000-4000-a000-000000000005", "kind": "STAGE_CHANGED", "data": { "from": "00000000-0000-4000-8004-000000000001", "to": "00000000-0000-4000-8004-000000000002" }, "actorKind": "HUMAN", "createdAt": "2026-03-02T06:00:05.000Z", "createdBy": "00000000-0000-4000-8002-000000000002" },
+        { "id": "00000000-0000-4000-a000-000000000006", "kind": "NOTE", "data": { "text": "Test note: prefers evening calls" }, "actorKind": "HUMAN", "createdAt": "2026-03-03T06:00:00.000Z", "createdBy": "00000000-0000-4000-8002-000000000001" },
+        { "id": "00000000-0000-4000-a000-000000000007", "kind": "TAG_ADDED", "data": { "tag": "nri" }, "actorKind": "HUMAN", "createdAt": "2026-03-03T06:01:00.000Z", "createdBy": "00000000-0000-4000-8002-000000000002" },
+        { "id": "00000000-0000-4000-a000-000000000008", "kind": "CALL_LOGGED", "data": { "outcome": "no_answer" }, "actorKind": "HUMAN", "createdAt": "2026-03-04T04:00:00.000Z", "createdBy": "00000000-0000-4000-8002-000000000002" }
+      ],
+      "messages": []
+    },
+    {
+      "id": "00000000-0000-4000-9000-000000000002", "tenantId": "00000000-0000-4000-8000-000000000001", "contactId": null,
+      "name": "TEST LEAD TWO", "phone": "9000000102", "email": null,
+      "pipelineId": "00000000-0000-4000-8003-000000000001", "stageId": "00000000-0000-4000-8004-000000000006", "assignedTo": null,
+      "city": null, "locality": null, "budgetMinInr": null, "budgetMaxInr": null, "timelineText": null, "requirements": [],
+      "customFields": {}, "tags": [], "score": 10, "scoreBreakdown": {}, "isHot": false, "hotAlertedAt": null,
+      "source": "GOOGLE_LEAD_FORM", "sourceConnectionId": null, "sourceDetail": {}, "leadgenId": null, "gclid": "test-gclid-2", "campaignId": null, "adsetId": null, "adId": null, "formId": null, "conceptId": null, "utm": { "utm_source": "google" }, "referredBy": null,
+      "reactivationDay": 0, "reactivationStopped": true, "lastInboundAt": null, "nextAttemptAt": null, "nextAttemptDoneAt": null, "followUps": [],
+      "lostReason": "Just exploring", "lostAt": "2026-04-02T00:00:00.000Z", "possibleDuplicateOf": null,
+      "createdAt": "2026-04-01T04:00:00.000Z", "updatedAt": "2026-04-02T00:00:00.000Z", "createdBy": null, "deletedAt": null,
+      "contact": null,
+      "activities": [
+        { "id": "00000000-0000-4000-a000-000000000021", "kind": "LEAD_CREATED", "data": { "source": "GOOGLE_LEAD_FORM" }, "actorKind": "SYSTEM", "createdAt": "2026-04-01T04:00:00.000Z", "createdBy": null },
+        { "id": "00000000-0000-4000-a000-000000000022", "kind": "LOST", "data": { "reason": "Just exploring" }, "actorKind": "HUMAN", "createdAt": "2026-04-02T00:00:00.000Z", "createdBy": "00000000-0000-4000-8002-000000000001" }
+      ],
+      "messages": []
+    },
+    {
+      "id": "00000000-0000-4000-9000-000000000003", "tenantId": "00000000-0000-4000-8000-000000000001", "contactId": null,
+      "name": "Test Lead 3", "phone": "09000000101", "email": null,
+      "pipelineId": "00000000-0000-4000-8003-000000000001", "stageId": "00000000-0000-4000-8004-000000000001", "assignedTo": null,
+      "city": null, "locality": null, "budgetMinInr": null, "budgetMaxInr": null, "timelineText": null, "requirements": [],
+      "customFields": {}, "tags": [], "score": 0, "scoreBreakdown": {}, "isHot": false, "hotAlertedAt": null,
+      "source": "WHATSAPP_INBOUND", "sourceConnectionId": null, "sourceDetail": { "firstMessage": "Hi, test message" }, "leadgenId": null, "gclid": null, "campaignId": null, "adsetId": null, "adId": null, "formId": null, "conceptId": null, "utm": null, "referredBy": null,
+      "reactivationDay": 0, "reactivationStopped": false, "lastInboundAt": "2026-05-01T04:00:00.000Z", "nextAttemptAt": null, "nextAttemptDoneAt": null, "followUps": [],
+      "lostReason": null, "lostAt": null, "possibleDuplicateOf": "00000000-0000-4000-9000-000000000001",
+      "createdAt": "2026-05-01T04:00:00.000Z", "updatedAt": "2026-05-01T04:00:00.000Z", "createdBy": null, "deletedAt": null,
+      "contact": null,
+      "activities": [
+        { "id": "00000000-0000-4000-a000-000000000031", "kind": "LEAD_CREATED", "data": { "source": "WHATSAPP_INBOUND" }, "actorKind": "SYSTEM", "createdAt": "2026-05-01T04:00:00.000Z", "createdBy": null },
+        { "id": "00000000-0000-4000-a000-000000000032", "kind": "MESSAGE_IN", "data": { "text": "Hi, test message" }, "actorKind": "SYSTEM", "createdAt": "2026-05-01T04:00:00.000Z", "createdBy": null }
+      ],
+      "messages": [
+        { "id": "00000000-0000-4000-b000-000000000031", "channel": "WHATSAPP", "direction": "INBOUND", "body": "Hi, test message", "templateKey": null, "generatedBy": null, "sentStatus": null, "createdAt": "2026-05-01T04:00:00.000Z" },
+        { "id": "00000000-0000-4000-b000-000000000032", "channel": "WHATSAPP", "direction": "OUTBOUND", "body": "Thanks, test reply", "templateKey": null, "generatedBy": "rules", "sentStatus": "sent", "createdAt": "2026-05-01T04:01:00.000Z" }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-9000-000000000004", "tenantId": "00000000-0000-4000-8000-000000000001", "contactId": null,
+      "name": null, "phone": "020 4000 0000", "email": "lead4@axleads.test",
+      "pipelineId": "00000000-0000-4000-8003-000000000001", "stageId": "00000000-0000-4000-8004-000000000008", "assignedTo": "00000000-0000-4000-8002-000000000003",
+      "city": "Mumbai", "locality": null, "budgetMinInr": null, "budgetMaxInr": null, "timelineText": null, "requirements": [],
+      "customFields": { "area_sqft": "about 900" }, "tags": [], "score": 0, "scoreBreakdown": {}, "isHot": false, "hotAlertedAt": null,
+      "source": "MANUAL", "sourceConnectionId": null, "sourceDetail": {}, "leadgenId": null, "gclid": null, "campaignId": null, "adsetId": null, "adId": null, "formId": null, "conceptId": null, "utm": null, "referredBy": null,
+      "reactivationDay": 0, "reactivationStopped": false, "lastInboundAt": null, "nextAttemptAt": null, "nextAttemptDoneAt": null, "followUps": [],
+      "lostReason": null, "lostAt": null, "possibleDuplicateOf": null,
+      "createdAt": "2026-06-01T04:00:00.000Z", "updatedAt": "2026-06-10T04:00:00.000Z", "createdBy": "00000000-0000-4000-8002-000000000001", "deletedAt": "2026-06-10T04:00:00.000Z",
+      "contact": null,
+      "activities": [
+        { "id": "00000000-0000-4000-a000-000000000041", "kind": "LEAD_CREATED", "data": { "source": "MANUAL" }, "actorKind": "HUMAN", "createdAt": "2026-06-01T04:00:00.000Z", "createdBy": "00000000-0000-4000-8002-000000000001" },
+        { "id": "00000000-0000-4000-a000-000000000042", "kind": "DELETED", "data": {}, "actorKind": "HUMAN", "createdAt": "2026-06-10T04:00:00.000Z", "createdBy": "00000000-0000-4000-8002-000000000001" }
+      ],
+      "messages": []
+    },
+    {
+      "id": "00000000-0000-4000-9000-000000000005", "tenantId": "00000000-0000-4000-8000-000000000001", "contactId": null,
+      "name": "Test Lead 5", "phone": "+91 90000 00105", "email": null,
+      "pipelineId": "00000000-0000-4000-8003-000000000001", "stageId": "00000000-0000-4000-8004-000000000005", "assignedTo": "00000000-0000-4000-8002-000000000001",
+      "city": null, "locality": null, "budgetMinInr": 2500000, "budgetMaxInr": null, "timelineText": null, "requirements": [],
+      "customFields": {}, "tags": [], "score": 0, "scoreBreakdown": {}, "isHot": false, "hotAlertedAt": null,
+      "source": "REFERRAL", "sourceConnectionId": null, "sourceDetail": {}, "leadgenId": null, "gclid": null, "campaignId": null, "adsetId": null, "adId": null, "formId": null, "conceptId": null, "utm": null, "referredBy": "Test Referrer",
+      "reactivationDay": 0, "reactivationStopped": true, "lastInboundAt": null, "nextAttemptAt": null, "nextAttemptDoneAt": null, "followUps": [],
+      "lostReason": null, "lostAt": null, "possibleDuplicateOf": null,
+      "createdAt": "2026-07-01T04:00:00.000Z", "updatedAt": "2026-07-01T04:00:00.000Z", "createdBy": null, "deletedAt": null,
+      "contact": null,
+      "activities": [],
+      "messages": []
+    },
+    {
+      "id": "00000000-0000-4000-9000-000000000006", "tenantId": "00000000-0000-4000-8000-000000000001", "contactId": null,
+      "name": "Test Lead 6", "phone": "9000000106", "email": null,
+      "pipelineId": "00000000-0000-4000-8003-000000000001", "stageId": "00000000-0000-4000-8004-000000000003", "assignedTo": "00000000-0000-4000-8002-000000000004",
+      "city": null, "locality": null, "budgetMinInr": null, "budgetMaxInr": null, "timelineText": null, "requirements": [],
+      "customFields": { "visit_on": "2026-08-15" }, "tags": [], "score": 0, "scoreBreakdown": {}, "isHot": false, "hotAlertedAt": null,
+      "source": "HOSTED_FORM", "sourceConnectionId": null, "sourceDetail": { "formId": "00000000-0000-4000-8007-000000000001" }, "leadgenId": null, "gclid": null, "campaignId": null, "adsetId": null, "adId": null, "formId": null, "conceptId": null, "utm": null, "referredBy": null,
+      "reactivationDay": 0, "reactivationStopped": false, "lastInboundAt": null, "nextAttemptAt": null, "nextAttemptDoneAt": null, "followUps": [{ "id": "f9", "label": "Call after Diwali", "doneAt": null }],
+      "lostReason": null, "lostAt": null, "possibleDuplicateOf": null,
+      "createdAt": "2026-08-01T04:00:00.000Z", "updatedAt": "2026-08-01T04:00:00.000Z", "createdBy": null, "deletedAt": null,
+      "contact": null,
+      "activities": [
+        { "id": "00000000-0000-4000-a000-000000000061", "kind": "ASSIGNED", "data": { "from": null, "to": "00000000-0000-4000-8002-000000000004" }, "actorKind": "HUMAN", "createdAt": "2026-08-01T05:00:00.000Z", "createdBy": "00000000-0000-4000-8002-000000000001" }
+      ],
+      "messages": []
+    },
+    {
+      "id": "00000000-0000-4000-9000-000000000007", "tenantId": "00000000-0000-4000-8000-000000000001", "contactId": null,
+      "name": "Test Lead 7", "phone": "9000000107", "email": null,
+      "pipelineId": "00000000-0000-4000-8003-000000000001", "stageId": "00000000-0000-4000-8004-000000000007", "assignedTo": null,
+      "city": null, "locality": null, "budgetMinInr": null, "budgetMaxInr": null, "timelineText": null, "requirements": [],
+      "customFields": {}, "tags": [], "score": 0, "scoreBreakdown": {}, "isHot": false, "hotAlertedAt": null,
+      "source": "WHATSAPP_ADS", "sourceConnectionId": null, "sourceDetail": { "ad": { "source_id": "test-ad-7" } }, "leadgenId": null, "gclid": null, "campaignId": null, "adsetId": null, "adId": "test-ad-7", "formId": null, "conceptId": null, "utm": null, "referredBy": null,
+      "reactivationDay": 0, "reactivationStopped": true, "lastInboundAt": null, "nextAttemptAt": null, "nextAttemptDoneAt": null, "followUps": [],
+      "lostReason": "Budget too low", "lostAt": "2026-09-02T00:00:00.000Z", "possibleDuplicateOf": null,
+      "createdAt": "2026-09-01T04:00:00.000Z", "updatedAt": "2026-09-02T00:00:00.000Z", "createdBy": null, "deletedAt": null,
+      "contact": null,
+      "activities": [
+        { "id": "00000000-0000-4000-a000-000000000071", "kind": "LOST", "data": { "reason": "Budget too low" }, "actorKind": "HUMAN", "createdAt": "2026-09-02T00:00:00.000Z", "createdBy": "00000000-0000-4000-8002-000000000099" }
+      ],
+      "messages": []
+    }
+  ]
+}

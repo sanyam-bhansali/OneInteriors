@@ -1,6 +1,8 @@
 /**
  * The studio software plans (owner, 19 Oct 2026): **Pro** for every studio,
- * **Max** for the full Studio OS (Hauspire while it is tested). Pure;
+ * **Max** for the full Studio OS (Hauspire while it is tested), and (owner,
+ * 21 Oct 2026) **Pro Solo**: Pro for a one-person company, one login, no
+ * team screen and no lead pool (studio/surfaces.ts reads `solo`). Pure;
  * tests/studio-software-plan.test.ts pins it.
  *
  * What each plan opens is decided in one place, studio/pilot.ts (the door)
@@ -8,9 +10,14 @@
  * `fullSoftware`, which is simply "this studio is on Max".
  */
 
-export type SoftwarePlan = 'PRO' | 'MAX';
+export type SoftwarePlan = 'SOLO' | 'PRO' | 'MAX';
 
 export const SOFTWARE_PLANS: Record<SoftwarePlan, { name: string; line: string; includes: readonly string[] }> = {
+  SOLO: {
+    name: 'Pro Solo',
+    line: 'Leads and quotations, for a one-person studio.',
+    includes: ['Leads and numbers', 'Quotations, first quote and the quotation PDF', 'Product master', 'Today and Calendar', 'Settings for quoting', 'One login: yours'],
+  },
   PRO: {
     name: 'Pro',
     line: 'Leads and quotations, run like a sales team.',
@@ -32,7 +39,7 @@ export const SOFTWARE_PLANS: Record<SoftwarePlan, { name: string; line: string; 
 };
 
 export function isSoftwarePlan(v: unknown): v is SoftwarePlan {
-  return v === 'PRO' || v === 'MAX';
+  return v === 'SOLO' || v === 'PRO' || v === 'MAX';
 }
 
 /**
@@ -41,7 +48,13 @@ export function isSoftwarePlan(v: unknown): v is SoftwarePlan {
  * saying Max means Max.
  */
 export function planOf(row: { softwarePlan?: string | null; fullSoftware?: boolean | null } | null | undefined): SoftwarePlan {
-  return row?.softwarePlan === 'MAX' || row?.fullSoftware === true ? 'MAX' : 'PRO';
+  if (row?.softwarePlan === 'MAX' || row?.fullSoftware === true) return 'MAX';
+  return row?.softwarePlan === 'SOLO' ? 'SOLO' : 'PRO';
+}
+
+/** How many people a plan lets into the studio (members, invited or not). Null: no limit. */
+export function seatLimit(plan: SoftwarePlan): number | null {
+  return plan === 'SOLO' ? 1 : null;
 }
 
 /** Whether the full Studio OS is open (what roles.ts and pilot.ts call `fullSoftware`). */

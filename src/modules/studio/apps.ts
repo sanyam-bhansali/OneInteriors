@@ -151,7 +151,7 @@ function under(path: string, prefix: string): boolean {
  */
 function entryFor(app: StudioApp, member: MemberRole): string {
   if (app.key === 'projects' && member.role === 'DESIGNER') return DESIGN_HOME;
-  if (app.key === 'team' && !can(member, 'team.manage')) return '/studio/settings';
+  if (app.key === 'team' && (!can(member, 'team.manage') || member.solo === true)) return '/studio/settings';
   return app.href;
 }
 
