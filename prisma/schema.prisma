@@ -3708,6 +3708,12 @@ model StudioStage {
   /// Where a new client lands. Exactly one per studio, undeletable.
   isIntake Boolean @default(false)
 
+  /// A cold-calling column (owner, 21 Oct 2026): Hauspire's Calling 1–4.
+  /// Logging a call that was not picked up suggests the next one, pre-ticked
+  /// (studio-practice/call-step-rules.ts). Only an open column; a suggestion,
+  /// never a move by itself.
+  isCallStep Boolean @default(false)
+
   createdAt DateTime @default(now())
 
   clients StudioClient[]

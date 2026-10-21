@@ -21,6 +21,7 @@ import {
 import { Avatar, Dot, Modal, PillCold, PillDue, PillToday, StageBadge, TagChips, btnOutline, btnPrimary, useDismiss } from './ax-ui';
 import { LostReasonDialog } from './AxBoard';
 import { BulkBar, ClaimOne } from './LeadList';
+import { RowCall, type CallLogged, type CallSheetStage } from './CallLogger';
 import { moveLeadAction, viewPageAction } from './list-actions';
 import { addNoteAction } from '../sales-actions';
 
@@ -33,6 +34,10 @@ const COLUMNS_KEY = 'studio.leads.columns';
  * Notes, Last active by default, remembered in this browser. It scrolls on
  * forever ("Loading…"), fifty at a time. Tick rows or select every lead the
  * filters match for one action at a time; a salesperson in the pool claims.
+ *
+ * Each lead the member may work has Call and Log call on its row (calling
+ * steps, owner 21 Oct 2026): the same sheet as the lead page, and the row
+ * updates where it is.
  */
 export function AxList({
   rows: first,
@@ -45,18 +50,21 @@ export function AxList({
   people,
   seesAll,
   poolView,
+  meId,
 }: {
   rows: LeadView[];
   next: string | null;
   total: number;
   /** The filters and sort, as the URL has them. */
   query: string;
-  stages: { id: string; name: string; colour: string; kind: string }[];
+  stages: CallSheetStage[];
   fields: { key: string; label: string }[];
   actions: BulkAction[];
   people: { id: string; name: string }[];
   seesAll: boolean;
   poolView: boolean;
+  /** The signed-in member: a salesperson logs calls on their own leads only. */
+  meId: string;
 }) {
   const router = useRouter();
   const [rows, setRows] = useState(first);
@@ -129,6 +137,24 @@ export function AxList({
   const [noteFor, setNoteFor] = useState<LeadView | null>(null);
   const [lostFor, setLostFor] = useState<{ lead: LeadView; to: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  /** Log call may be offered on this row: the member's own lead, or any lead for owner and PM. Never the pool or the sample. */
+  const mayCall = (l: LeadView) => !poolView && !l.isDemo && (seesAll || l.assignedToId === meId);
+  /** After a call is logged from a row: the row shows it at once; the refresh brings the rest. */
+  const called = (lead: LeadView, r: CallLogged) => {
+    setRows((rs) =>
+      rs.map((x) =>
+        x.id === lead.id
+          ? {
+              ...x,
+              lastContactedAt: r.at,
+              ...(r.movedTo ? { stageId: r.movedTo.id, stageName: r.movedTo.name, stageColour: r.movedTo.colour, stageKind: r.movedTo.kind as LeadView['stageKind'] } : {}),
+            }
+          : x,
+      ),
+    );
+    setSaid(r.movedTo ? `Call logged · ${lead.name} moved to ${r.movedTo.name}` : `Call logged · ${lead.name}`);
+  };
 
   async function move(lead: LeadView, to: string, reason: string | null) {
     setError(null);
@@ -281,6 +307,7 @@ export function AxList({
                           <div className="hstack sub" style={{ gap: 6 }}>
                             {/* A pool lead's phone stays with the server until it is claimed (claimableView). */}
                             {poolView ? null : l.phone ? <span className="mono">{l.phone}</span> : <span className="warn-t">no phone yet</span>}
+                            {mayCall(l) ? <RowCall lead={{ id: l.id, name: l.name, phone: l.phone, stageId: l.stageId }} stages={stages} compact onLogged={(r) => called(l, r)} /> : null}
                             <TagChips tags={l.tags} />
                           </div>
                         </div>

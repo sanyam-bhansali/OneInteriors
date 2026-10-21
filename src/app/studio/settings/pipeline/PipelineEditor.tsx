@@ -21,6 +21,7 @@ import {
   setKindAction,
   moveStageAction,
   setIntakeAction,
+  setCallStepAction,
   removeStageAction,
 } from './actions';
 import { IDLE, type State } from '../../form-state';
@@ -166,6 +167,23 @@ function StageLine({ stage, canMoveUp, canMoveDown }: {
             Make intake
           </button>
         )}
+
+        {/* Calling steps (owner, 21 Oct 2026): a call nobody picked up
+            suggests the next one, pre-ticked. Open columns only. */}
+        {stage.kind === 'OPEN' && !stage.isIntake ? (
+          <label
+            className="flex flex-none cursor-pointer items-center gap-1.5 text-[12.5px] muted"
+            title="A call nobody picks up suggests moving the lead to the next calling step"
+          >
+            <input
+              type="checkbox"
+              checked={stage.isCallStep}
+              disabled={pending}
+              onChange={(e) => run(() => setCallStepAction(stage.id, e.target.checked))}
+            />
+            Calling step
+          </label>
+        ) : null}
 
         <span className="mono lbl flex-none">{stage.clientCount}</span>
 

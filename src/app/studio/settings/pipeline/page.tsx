@@ -59,7 +59,7 @@ export default async function PipelinePage() {
         </dl>
       </div>
 
-      <HauspirePreset stages={stages.map((s) => ({ id: s.id, name: s.name, kind: s.kind, isIntake: s.isIntake, sortOrder: s.sortOrder }))} />
+      <HauspirePreset stages={stages.map((s) => ({ id: s.id, name: s.name, kind: s.kind, isIntake: s.isIntake, sortOrder: s.sortOrder, isCallStep: s.isCallStep }))} />
       <PipelineEditor stages={stages} />
     </>
   );

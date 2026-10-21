@@ -9,8 +9,11 @@ import { currentMember } from '@/modules/studio/access';
 import { myInboxFor } from '@/modules/studio-sales/inbox';
 import { Inbox } from '../Inbox';
 import { TodayList } from './TodayList';
+import { myStages } from '@/modules/studio-practice/stages';
 import { CrewToday } from '../vendors/CrewToday';
 import '../office-ui.css';
+/* The call sheet's look (Log call on a line; calling steps, 21 Oct 2026). */
+import '../clients/clients.css';
 import './today.css';
 
 export const metadata: Metadata = { title: 'Today', robots: { index: false, follow: false } };
@@ -31,7 +34,7 @@ export default async function TodayPage() {
     const context = await currentStudio();
     if (context && !crmIsOpen({ status: context.studio.status, submittedForReview: context.studio.submittedForReview })) redirect('/studio');
   }
-  const [today, inbox] = await Promise.all([myToday(), myInboxFor(member?.userId ?? null)]);
+  const [today, inbox, stages] = await Promise.all([myToday(), myInboxFor(member?.userId ?? null), myStages()]);
   if (!today) {
     return (
       <main className="content ox-page">
@@ -79,7 +82,12 @@ export default async function TodayPage() {
               </div>
             </section>
           ) : (
-            <TodayList sections={today.sections} members={today.members} meId={today.meId} />
+            <TodayList
+              sections={today.sections}
+              members={today.members}
+              meId={today.meId}
+              stages={stages.map((s) => ({ id: s.id, name: s.name, colour: s.colour, kind: s.kind, sortOrder: s.sortOrder, isIntake: s.isIntake, isCallStep: s.isCallStep }))}
+            />
           )}
         </div>
         <div className="colside">

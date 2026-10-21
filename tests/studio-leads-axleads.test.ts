@@ -24,7 +24,9 @@ describe('when to call — quick choices in India time', () => {
     expect(laterToday(ist('2026-10-12', '15:29'))).toEqual(ist('2026-10-12', '17:30'));
     expect(laterToday(ist('2026-10-12', '15:30'))).toEqual(ist('2026-10-12', '17:30'));
     expect(laterToday(ist('2026-10-12', '15:31'))).toEqual(ist('2026-10-12', '17:31'));
-    expect(laterToday(ist('2026-10-12', '21:00'))).toEqual(ist('2026-10-12', '23:00'));
+    /* Never past calling hours (owner, 21 Oct 2026): the next working morning. */
+    expect(laterToday(ist('2026-10-12', '21:00'))).toEqual(ist('2026-10-13', '10:00'));
+    expect(clockAt('in2h', ist('2026-10-12', '22:01'))).toEqual(ist('2026-10-13', '10:00'));
   });
 
   it('tomorrow is the next working day (Mon–Sat) at 3:30 pm', () => {

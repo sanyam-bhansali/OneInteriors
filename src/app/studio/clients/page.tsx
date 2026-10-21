@@ -90,6 +90,8 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   const listTotal = view === 'list' ? (filters.kpi ? await countFor(kpis, filters.kpi) : total) : total;
   const members = seesAll ? people : [];
   const stageList = stages.map((s) => ({ id: s.id, name: s.name, colour: s.colour, kind: s.kind }));
+  /* The call sheet's suggested move reads the column order and flags (calling steps, 21 Oct 2026). */
+  const callStages = stages.map((s) => ({ id: s.id, name: s.name, colour: s.colour, kind: s.kind, sortOrder: s.sortOrder, isIntake: s.isIntake, isCallStep: s.isCallStep }));
   const boardStages = boardColumnPlan(stageList, filters.stage).shown;
 
   const mayImport = mayOpen(scope.member, '/studio/clients/import');
@@ -156,12 +158,13 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
           next={list.next}
           total={listTotal}
           query={listQuery}
-          stages={stageList}
+          stages={callStages}
           fields={fields.map((f) => ({ key: f.key, label: f.label }))}
           actions={bulkActionsFor(scope.member)}
           people={people}
           seesAll={seesAll}
           poolView={poolView}
+          meId={scope.member.id}
         />
       ) : null}
 
@@ -174,6 +177,8 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
           showOwner={seesAll && (!filters.owner || filters.owner === 'anyone')}
           meId={scope.member.id}
           mayMove={!poolView}
+          callStages={callStages}
+          seesAll={seesAll}
         />
       ) : null}
 

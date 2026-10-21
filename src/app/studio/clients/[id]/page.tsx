@@ -119,7 +119,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         }}
         tel={tel}
         whatsapp={whatsappLink(client.phone)}
-        stages={stages.map((s) => ({ id: s.id, name: s.name, colour: s.colour, kind: s.kind }))}
+        stages={stages.map((s) => ({ id: s.id, name: s.name, colour: s.colour, kind: s.kind, sortOrder: s.sortOrder, isIntake: s.isIntake, isCallStep: s.isCallStep }))}
         may={{ edit: mayWork, quote: page.may.quote, delete: mayDelete }}
         canBook={page.may.book && page.bookableQuoteId !== null}
         previousCalls={previousCalls}

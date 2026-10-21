@@ -60,6 +60,8 @@ export interface StageRow {
   colour: ColourToken;
   sortOrder: number;
   isIntake: boolean;
+  /** One of the cold-calling steps (owner, 21 Oct 2026; call-step-rules.ts). */
+  isCallStep: boolean;
   /** How many clients sit here. Drives the column count and blocks deletion. */
   clientCount: number;
 }
@@ -116,6 +118,7 @@ export async function myStages(): Promise<StageRow[]> {
       colour: r.colour as ColourToken,
       sortOrder: r.sortOrder,
       isIntake: r.isIntake,
+      isCallStep: r.isCallStep,
       clientCount: r._count.clients,
     }));
   } catch (error) {
@@ -227,7 +230,30 @@ export async function setStageKind(id: string, kind: StageKindName): Promise<Res
   if (stranded) return { ok: false, error: stranded };
 
   try {
-    await prisma.studioStage.updateMany({ where: { id, studioId }, data: { kind } });
+    /* A calling step is an open column; one that stops being open stops being a step. */
+    await prisma.studioStage.updateMany({ where: { id, studioId }, data: { kind, ...(kind !== 'OPEN' ? { isCallStep: false } : {}) } });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'That did not save.' };
+  }
+}
+
+/**
+ * Mark a column as one of the cold-calling steps, or not (owner, 21 Oct
+ * 2026). A call nobody picked up then suggests the next step, pre-ticked
+ * (call-step-rules.ts). Only an open column can be one: a lead in a won or
+ * lost column is not being cold-called.
+ */
+export async function setCallStep(id: string, on: boolean): Promise<Result> {
+  const studioId = await myStudioId();
+  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+
+  const stage = (await myStages()).find((s) => s.id === id);
+  if (!stage) return { ok: false, error: 'That column is not yours.' };
+  if (on && stage.kind !== 'OPEN') return { ok: false, error: 'Only a column still in play can be a calling step.' };
+
+  try {
+    await prisma.studioStage.updateMany({ where: { id, studioId }, data: { isCallStep: on === true } });
     return { ok: true };
   } catch {
     return { ok: false, error: 'That did not save.' };
@@ -336,7 +362,7 @@ export async function applyHauspirePipeline(): Promise<Result> {
       for (const r of plan.renames) await tx.studioStage.updateMany({ where: { id: r.id, studioId }, data: { name: r.to } });
       const made = new Map<string, string>();
       for (const c of plan.creates) {
-        const row = await tx.studioStage.create({ data: { studioId, name: c.name, kind: c.kind, colour: c.colour, sortOrder: 10_000 + made.size, isIntake: false }, select: { id: true } });
+        const row = await tx.studioStage.create({ data: { studioId, name: c.name, kind: c.kind, colour: c.colour, sortOrder: 10_000 + made.size, isIntake: false, isCallStep: c.isCallStep === true }, select: { id: true } });
         made.set(`new:${c.name}`, row.id);
       }
       /* Junk (owner, 21 Oct 2026) becomes a lost column: its leads take the
@@ -349,6 +375,10 @@ export async function applyHauspirePipeline(): Promise<Result> {
         }
       }
       const idOf = (slot: string) => made.get(slot) ?? slot;
+      /* Calling 1–4 are the calling steps (owner, 21 Oct 2026). Only set,
+         never cleared: a column of yours you marked yourself stays marked. */
+      const steps = plan.callSteps.map(idOf);
+      if (steps.length) await tx.studioStage.updateMany({ where: { studioId, id: { in: steps }, kind: 'OPEN' }, data: { isCallStep: true } });
       for (const [i, slot] of plan.order.entries()) await tx.studioStage.updateMany({ where: { id: idOf(slot), studioId }, data: { sortOrder: i } });
       const intake = idOf(plan.intake);
       await tx.studioStage.updateMany({ where: { studioId, id: { not: intake } }, data: { isIntake: false } });

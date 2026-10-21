@@ -14,7 +14,7 @@ import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
 import { fromDb, type Paise } from '@/lib/money';
 import { myStudioId } from '@/modules/studio-quote/store';
-import { myLeadScope } from '@/modules/studio/lead-scope';
+import { actingMember, myLeadScope } from '@/modules/studio/lead-scope';
 import { can } from '@/modules/studio/roles';
 import { notify } from '@/modules/notify/service';
 import { getCurrentUser } from '@/modules/auth/session';
@@ -50,6 +50,7 @@ import {
   type CallOutcomeId,
 } from './event-copy';
 import { reactionLine, type CallReactionId } from './call-log';
+import { allowedCallMoves } from './call-step-rules';
 
 export interface ClientRow {
   id: string;
@@ -805,6 +806,15 @@ export async function logContact(
   dueAt?: Date | null,
   /** A picked-up call's reactions and length (AxLeads' Log call sheet, 13 Oct 2026). */
   picked?: { reactions: CallReactionId[]; minutes: number | null } | null,
+  /**
+   * The move the call sheet suggested and the person left ticked (calling
+   * steps, owner 21 Oct 2026): "Move to Calling 2", a close after the last
+   * step, or "Don't retry". Checked here against the same rule
+   * (`call-step-rules.ts allowedCallMoves`) for where the lead is NOW, so a
+   * stale sheet or a hand-made request moves nothing. Logged and moved in
+   * one transaction: either both happen or neither.
+   */
+  opts?: { moveToStageId?: string | null },
 ): Promise<Result> {
   const scope = await myLeadScope();
   const studioId = scope?.studioId ?? null;
@@ -812,6 +822,11 @@ export async function logContact(
 
   try {
     const now = new Date();
+
+    if (opts?.moveToStageId) {
+      if (!outcome) return { ok: false, error: 'Pick what happened on the call first.' };
+      return await logContactAndMove(studioId, scope, id, outcome, note, dueAt, picked ?? null, opts.moveToStageId, now);
+    }
 
     /**
      * The outcome decides the next move, and writes it.
@@ -879,6 +894,85 @@ export async function logContact(
   } catch (error) {
     return saveFailed('logContact', error);
   }
+}
+
+/**
+ * A logged call and the stage move that came with it, together (calling
+ * steps, owner 21 Oct 2026). The lead is read under the member's scope; the
+ * move must be one the rule offers for its current column and this outcome;
+ * the update is conditional on the lead still being in that column, so two
+ * people logging the same lead at once cannot skip it two steps.
+ */
+async function logContactAndMove(
+  studioId: string,
+  scope: Awaited<ReturnType<typeof myLeadScope>>,
+  id: string,
+  outcome: CallOutcomeId,
+  note: string | null | undefined,
+  dueAt: Date | null | undefined,
+  picked: { reactions: CallReactionId[]; minutes: number | null } | null,
+  moveToStageId: string,
+  now: Date,
+): Promise<Result> {
+  const lead = await prisma.studioClient.findFirst({
+    where: { ...scope?.leads, id, studioId, deletedAt: null },
+    select: { stageId: true, stage: { select: { name: true } } },
+  });
+  if (!lead) return { ok: false, error: 'That client is not yours.' };
+
+  const stages = await myStages();
+  const allowed = allowedCallMoves(stages, lead.stageId, outcome).find((m) => m.id === moveToStageId);
+  const to = stages.find((s) => s.id === moveToStageId);
+  if (!allowed || !to) return { ok: false, error: 'That move is not offered for this lead any more. Nothing was saved; refresh and log the call again.' };
+
+  const closing = to.kind === 'LOST' || to.kind === 'DONE';
+  const implied = OUTCOME_FOLLOWUP[outcome];
+  const followup = !closing && implied && implied !== 'clear' ? implied : null;
+  const due = followup ? (dueAt && dueAt.getTime() > now.getTime() ? dueAt : followupDue(outcome, now)) : null;
+  const by = (await actingMember()) ?? undefined;
+
+  const moved = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.studioClient.updateMany({
+      where: { ...scope?.leads, id, studioId, deletedAt: null, stageId: lead.stageId },
+      data: {
+        lastContactedAt: now,
+        stageId: to.id,
+        lostReason: to.kind === 'LOST' ? allowed.lostReason : null,
+        ...(followup && due
+          ? { nextAction: followup.action, nextActionOn: due }
+          : closing || implied === 'clear'
+            ? { nextAction: null, nextActionOn: null }
+            : {}),
+      },
+    });
+    if (count === 0) return false;
+
+    await record({
+      db: tx,
+      by,
+      studioId,
+      clientId: id,
+      kind: 'CONTACTED',
+      summary: pickedSummary(outcome, note, picked) + (followup && due ? ` · ${followup.action} by ${dueWord(due, now)}` : closing || implied === 'clear' ? ' · follow-up cleared' : ''),
+      meta: {
+        outcome,
+        nextAction: followup?.action ?? null,
+        ...(picked ? { pickedUp: true, reactions: picked.reactions, minutes: picked.minutes } : {}),
+      },
+    });
+    await record({
+      db: tx,
+      by,
+      studioId,
+      clientId: id,
+      kind: to.kind === 'LOST' ? 'LOST' : 'STAGE_CHANGED',
+      summary: to.kind === 'LOST' ? lostSummary(allowed.lostReason, null) : stageSummary(lead.stage.name, to.name),
+      meta: { fromStageId: lead.stageId, toStageId: to.id, kind: to.kind, afterCall: outcome },
+    });
+    return true;
+  });
+
+  return moved ? { ok: true } : { ok: false, error: 'Someone moved this lead just now. Nothing was saved; refresh and log the call again.' };
 }
 
 /** The timeline line: "Spoke to them · Interested, Wants a site visit · 6 min — the note". */

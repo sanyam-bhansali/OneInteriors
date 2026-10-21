@@ -158,6 +158,12 @@ export async function logContactAction(
   note?: string | null,
   /** When to call next, if the person picked (IST day and time). */
   when?: { day: string; time: string } | null,
+  /**
+   * The suggested move the person left ticked (calling steps, owner 21 Oct
+   * 2026): the next calling step, Junk or Lost after the last one, or
+   * "Don't retry". The module checks it against the rule before moving.
+   */
+  moveToStageId?: string | null,
 ): Promise<State> {
   /* Validated against the list rather than cast. An outcome arriving from a
      form is a string, and an unrecognised one would be written verbatim into
@@ -165,7 +171,8 @@ export async function logContactAction(
   const checked = outcome && isCallOutcome(outcome) ? outcome : undefined;
 
   const dueAt = when && typeof when.day === 'string' && typeof when.time === 'string' ? parseMeeting(when.day, when.time || '15:30') : null;
-  const result = await logContact(id, checked, note ?? null, dueAt);
+  const move = typeof moveToStageId === 'string' && moveToStageId.length > 0 && moveToStageId.length <= 64 ? moveToStageId : null;
+  const result = await logContact(String(id ?? ''), checked, note ?? null, dueAt, null, { moveToStageId: move });
   if (!result.ok) return result;
   refresh();
   revalidatePath(`/studio/clients/${id}`);

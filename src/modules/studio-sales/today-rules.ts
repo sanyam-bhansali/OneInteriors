@@ -31,6 +31,8 @@ export interface TodayLead {
   assignedToId: string | null;
   assignedToName: string | null;
   stageKind: LeadKind;
+  /** Its column, for Log call's suggested move (calling steps, 21 Oct 2026). Left out: no Log call on the line. */
+  stageId?: string;
   nextAction: string | null;
   nextActionOn: Date | null;
   lastContactedAt: Date | null;
@@ -75,6 +77,12 @@ export interface TodayRow {
    * `task` draws "Done" for the task `taskId` (leads at scale).
    */
   action: { label: string; href: string; kind: 'link' | 'call' | 'assign' | 'task' | 'claim'; taskId?: string; leadId?: string };
+  /**
+   * Call and Log call on the line (calling steps, owner 21 Oct 2026): the
+   * calls due and, for owner and PM, the leads nobody has called. Only on
+   * leads this member works; never a pool lead.
+   */
+  call?: { leadId: string; name: string; phone: string | null; stageId: string };
 }
 
 export interface TodaySection {
@@ -160,6 +168,11 @@ function section(id: SectionId, title: string, rows: TodayRow[], limit: number, 
   return { id, title, rows: shown, more: Math.max(0, total - shown.length), ...(SEE_ALL[id] ? { seeAll: SEE_ALL[id] } : {}) };
 }
 
+/** Log call on a line, when the lead's column is known. */
+function callOn(l: TodayLead): { call?: TodayRow['call'] } {
+  return l.stageId ? { call: { leadId: l.id, name: l.name, phone: l.phone, stageId: l.stageId } } : {};
+}
+
 export function buildToday(input: TodayInput): TodaySection[] {
   const { now, seesAll } = input;
   const limit = input.limit ?? 25;
@@ -184,6 +197,7 @@ export function buildToday(input: TodayInput): TodaySection[] {
         detail: [l.nextAction ?? 'Follow up', late ? (days <= 1 ? 'due yesterday' : `${days} days late`) : 'due today'].join(' · '),
         late,
         action: l.phone ? { label: 'Call', href: `tel:${l.phone}`, kind: 'call' as const } : { label: 'Open', href: leadHref(l.id), kind: 'link' as const },
+        ...callOn(l),
       };
     });
 
@@ -298,6 +312,7 @@ export function buildToday(input: TodayInput): TodaySection[] {
         detail: `${l.assignedToName ?? 'Somebody'} has it · nobody has called yet`,
         late: true,
         action: { label: 'Open', href: leadHref(l.id), kind: 'link' as const },
+        ...callOn(l),
       }));
     sections.push(section('pool', 'Leads to assign', pool, limit, totals), section('never-called', 'Nobody has called', neverCalled, limit, totals));
   }

@@ -5,14 +5,14 @@ import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { type CallOutcomeId } from '@/modules/studio-practice/event-copy';
 import { CALL_MENU } from '@/modules/studio-practice/call-log';
-import { PickedUpSheet } from './PickedUpSheet';
+import { CallSheet } from '../CallLogger';
 import { suggestTags } from '@/modules/studio-sales/tag-rules';
 import { dayLabel, dueBadge } from '@/modules/studio-sales/lead-view';
 import { initials } from '@/modules/studio-sales/lead-view';
 import { LineIcon } from '../../ui/icons';
-import { Dot, Modal, PillDue, PillTag, SourceIcon, btnGhost, btnOutline, btnPrimary, useDismiss } from '../ax-ui';
+import { Dot, PillDue, PillTag, SourceIcon, btnGhost, btnOutline, btnPrimary, useDismiss } from '../ax-ui';
 import { LostReasonDialog } from '../AxBoard';
-import { binAction, logContactAction, markLostAction } from '../actions';
+import { binAction } from '../actions';
 import { addTagsAction, deleteNoteAction, editNoteAction, followUpDoneAction, moveLeadAction, removeTagAction } from '../list-actions';
 import { addNoteAction, newQuoteForLeadAction } from '../../sales-actions';
 import { Said, useAct } from '../../SalesUi';
@@ -66,7 +66,8 @@ export function LeadHeader({
   lead: HeaderLead;
   tel: string | null;
   whatsapp: string | null;
-  stages: { id: string; name: string; colour: string; kind: string }[];
+  /** In board order, with the flags the call sheet's suggested move reads (calling steps, 21 Oct 2026). */
+  stages: { id: string; name: string; colour: string; kind: 'OPEN' | 'WON' | 'DONE' | 'LOST'; sortOrder?: number; isIntake?: boolean; isCallStep?: boolean }[];
   may: { edit: boolean; quote: boolean; delete: boolean };
   /** A sales final waits for its booking advance (Record booking is on this page). */
   canBook: boolean;
@@ -77,11 +78,12 @@ export function LeadHeader({
   const [pending, start] = useTransition();
   const [said, setSaid] = useState<{ ok: boolean; text: string } | null>(null);
   const [lostTo, setLostTo] = useState<string | null>(null);
-  const [askWrong, setAskWrong] = useState(false);
   const [explain, setExplain] = useState(false);
   const [sure, setSure] = useState(false);
-  /* Log call → Picked up (AxLeads, 13 Oct 2026). */
-  const [pickedUp, setPickedUp] = useState(false);
+  /* Log call → the outcome's sheet (AxLeads, 13 Oct 2026; calling steps,
+     21 Oct 2026): Picked up, a missed call's retry and suggested move, or
+     wrong number. The same sheet the list, the board and Today open. */
+  const [calling, setCalling] = useState<CallOutcomeId | 'picked_up' | null>(null);
 
   const act = (fn: () => Promise<object | undefined>, okText: string, after?: () => void) =>
     start(async () => {
@@ -99,7 +101,6 @@ export function LeadHeader({
       }
     });
 
-  const logCall = (o: CallOutcomeId) => act(() => logContactAction(lead.id, o, null, null), 'Call logged', o === 'wrong_number' ? () => setAskWrong(true) : undefined);
   const moveTo = (to: string) => {
     if (to === lead.stageId) return;
     if (stages.find((s) => s.id === to)?.kind === 'LOST') return setLostTo(to);
@@ -209,8 +210,7 @@ export function LeadHeader({
                       key={o.id}
                       onClick={() => {
                         close();
-                        if (o.id === 'picked_up') setPickedUp(true);
-                        else logCall(o.id as CallOutcomeId);
+                        setCalling(o.id as CallOutcomeId | 'picked_up');
                       }}
                     >
                       <span className={o.id === 'picked_up' ? 'good-t' : o.id === 'wrong_number' ? 'bad-t' : 'warn-t'} aria-hidden>
@@ -315,32 +315,15 @@ export function LeadHeader({
           }}
         />
       ) : null}
-      {pickedUp ? (
-        <PickedUpSheet
+      {calling ? (
+        <CallSheet
           lead={{ id: lead.id, name: lead.name, phone: lead.phone, stageId: lead.stageId }}
           stages={stages}
+          outcome={calling}
           previousCalls={previousCalls}
-          onClose={() => setPickedUp(false)}
-          onLogged={() => setSaid({ ok: true, text: 'Call logged' })}
+          onClose={() => setCalling(null)}
+          onLogged={(r) => setSaid({ ok: true, text: r.movedTo ? `Call logged · moved to ${r.movedTo.name}` : 'Call logged' })}
         />
-      ) : null}
-      {askWrong ? (
-        <Modal onClose={() => setAskWrong(false)} width="min(420px, 92vw)" labelledBy="wrong-title">
-          <div className="sb">
-            <h2 id="wrong-title" style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>
-              Wrong number. Mark {lead.name} lost?
-            </h2>
-            <p className="cl-sub">Only if there is no other way to reach them. You can move it back any time.</p>
-            <div className="hstack" style={{ justifyContent: 'flex-end' }}>
-              <button type="button" onClick={() => setAskWrong(false)} className={btnOutline}>
-                Keep it open
-              </button>
-              <button type="button" onClick={() => act(() => markLostAction(lead.id, 'WRONG_NUMBER'), 'Marked lost — wrong number', () => setAskWrong(false))} className={btnPrimary}>
-                Mark lost — wrong number
-              </button>
-            </div>
-          </div>
-        </Modal>
       ) : null}
     </div>
   );
