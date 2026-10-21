@@ -31,6 +31,7 @@ export { parseCsv, guessMapping, planImport, COLUMN_LABELS } from './csv';
 // The vocabulary is pure and lives next door so client components can import
 // it without dragging Prisma into the browser bundle — CONTRIBUTING §9.5.
 export { SOURCE_LABELS, LOST_LABELS, BOARD_KINDS, CLOSED_KINDS, BIN_DAYS } from './vocabulary';
+import { mainLostStage } from './vocabulary';
 export type { ClientSourceName, LostReasonName, StageKindName } from './vocabulary';
 
 import { BOARD_KINDS, BIN_DAYS, LOST_LABELS as LOST_LABELS_FOR_CHECK } from './vocabulary';
@@ -658,7 +659,7 @@ export async function updateClient(input: UpdateClientInput): Promise<Result> {
  */
 export async function markLost(id: string, reason: string): Promise<Result> {
   if (!Object.prototype.hasOwnProperty.call(LOST_LABELS_FOR_CHECK, reason)) return { ok: false, error: 'Pick a reason.' };
-  const lost = (await myStages()).find((s) => s.kind === 'LOST');
+  const lost = mainLostStage(await myStages());
   if (!lost) return { ok: false, error: 'Your pipeline has no lost column. Settings → Pipeline.' };
   return updateClient({ id, stageId: lost.id, lostReason: reason as LostReasonName });
 }

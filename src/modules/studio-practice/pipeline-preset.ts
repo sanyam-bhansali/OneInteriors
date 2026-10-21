@@ -9,13 +9,15 @@
  * the preset's.
  */
 
-import type { ColourToken, StageKindName } from './vocabulary';
+import type { ColourToken, LostReasonName, StageKindName } from './vocabulary';
 
 export interface PresetStage {
   name: string;
   kind: StageKindName;
   colour: ColourToken;
   isIntake?: boolean;
+  /** For a lost column: the reason its leads carry when an existing column becomes it. */
+  lostReason?: LostReasonName;
 }
 
 export const HAUSPIRE_PIPELINE: readonly PresetStage[] = [
@@ -24,7 +26,9 @@ export const HAUSPIRE_PIPELINE: readonly PresetStage[] = [
   { name: 'Calling 2', kind: 'OPEN', colour: 'slate' },
   { name: 'Calling 3', kind: 'OPEN', colour: 'slate' },
   { name: 'Calling 4', kind: 'OPEN', colour: 'slate' },
-  { name: 'Junk', kind: 'OPEN', colour: 'rose' },
+  /* Lost-kind (owner, 21 Oct 2026): junk is closed, not open work. It stays
+     its own column so the board keeps junk apart from real losses. */
+  { name: 'Junk', kind: 'LOST', colour: 'rose', lostReason: 'NOT_SERIOUS' },
   { name: 'Effective Lead', kind: 'OPEN', colour: 'teal' },
   { name: 'Requirement / Floor Plan Pending', kind: 'OPEN', colour: 'amber' },
   { name: 'Quotation Pending', kind: 'OPEN', colour: 'amber' },
@@ -53,6 +57,8 @@ export interface PresetPlan {
   order: string[];
   /** The id (or `new:<name>`) to make the intake column. */
   intake: string;
+  /** Your columns whose kind the preset changes (Junk: open → lost), with the reason their leads take. */
+  kindChanges: { id: string; name: string; from: StageKindName; to: StageKindName; lostReason: LostReasonName | null }[];
 }
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -67,6 +73,7 @@ export function planPreset(existing: readonly ExistingStage[], preset: readonly 
   const sorted = [...existing].sort((a, b) => a.sortOrder - b.sortOrder);
   const used = new Set<string>();
   const renames: PresetPlan['renames'] = [];
+  const kindChanges: PresetPlan['kindChanges'] = [];
   const creates: PresetStage[] = [];
   const slots: string[] = [];
   const presetNames = new Set(preset.map((p) => norm(p.name)));
@@ -85,6 +92,8 @@ export function planPreset(existing: readonly ExistingStage[], preset: readonly 
     if (match) {
       used.add(match.id);
       slots.push(match.id);
+      /* The intake column is always open; anything else takes the preset's kind. */
+      if (!p.isIntake && match.kind !== p.kind) kindChanges.push({ id: match.id, name: p.name, from: match.kind, to: p.kind, lostReason: p.kind === 'LOST' ? (p.lostReason ?? 'OTHER') : null });
     } else {
       creates.push(p);
       slots.push(`new:${p.name}`);
@@ -94,7 +103,7 @@ export function planPreset(existing: readonly ExistingStage[], preset: readonly 
   const rest = sorted.filter((s) => !used.has(s.id)).map((s) => s.id);
   const intakePreset = preset.find((p) => p.isIntake);
   const intakeSlot = intakePreset ? slots[preset.indexOf(intakePreset)]! : (sorted.find((s) => s.isIntake)?.id ?? slots[0]!);
-  return { renames, creates, order: [...slots, ...rest], intake: intakeSlot };
+  return { renames, creates, order: [...slots, ...rest], intake: intakeSlot, kindChanges };
 }
 
 /** "Adds 12 columns, renames Enquiry to New and Booked to Converted." */
@@ -102,6 +111,7 @@ export function presetSummary(plan: PresetPlan): string {
   const bits: string[] = [];
   if (plan.creates.length) bits.push(`adds ${plan.creates.length} column${plan.creates.length === 1 ? '' : 's'}`);
   if (plan.renames.length) bits.push(`renames ${plan.renames.map((r) => `${r.from} to ${r.to}`).join(', ')}`);
+  for (const k of plan.kindChanges) bits.push(k.to === 'LOST' ? `makes ${k.name} a lost column (its leads count as lost)` : `makes ${k.name} ${k.to === 'OPEN' ? 'an open' : `a ${k.to.toLowerCase()}`} column`);
   if (!bits.length) return 'Your pipeline already matches; this only puts the columns in Hauspire’s order.';
   const s = bits.join(', and ');
   return `${s[0]!.toUpperCase()}${s.slice(1)}. Nothing is deleted; your other columns stay, after these.`;

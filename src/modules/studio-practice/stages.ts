@@ -339,6 +339,15 @@ export async function applyHauspirePipeline(): Promise<Result> {
         const row = await tx.studioStage.create({ data: { studioId, name: c.name, kind: c.kind, colour: c.colour, sortOrder: 10_000 + made.size, isIntake: false }, select: { id: true } });
         made.set(`new:${c.name}`, row.id);
       }
+      /* Junk (owner, 21 Oct 2026) becomes a lost column: its leads take the
+         preset's reason where they have none, and lose their follow-up. */
+      for (const k of plan.kindChanges) {
+        await tx.studioStage.updateMany({ where: { id: k.id, studioId }, data: { kind: k.to } });
+        if (k.to === 'LOST') {
+          await tx.studioClient.updateMany({ where: { studioId, stageId: k.id, lostReason: null }, data: { lostReason: k.lostReason ?? 'OTHER', lostNote: k.name } });
+          await tx.studioClient.updateMany({ where: { studioId, stageId: k.id }, data: { nextAction: null, nextActionOn: null } });
+        }
+      }
       const idOf = (slot: string) => made.get(slot) ?? slot;
       for (const [i, slot] of plan.order.entries()) await tx.studioStage.updateMany({ where: { id: idOf(slot), studioId }, data: { sortOrder: i } });
       const intake = idOf(plan.intake);

@@ -4,6 +4,7 @@ import { clockAt, keysetWhere, kpiRules, leadWhere, orderByFor, scopedLeadWhere,
 import { bhk, cardFacts, coldDays, coldLabel, columnChoices, columnValue, dayLabel, dueBadge, initials, inr, isNewToday, readColumns, relTime, DEFAULT_COLUMNS, type LeadView } from '@/modules/studio-sales/lead-view';
 import { addTags, MAX_TAGS, removeTag, suggestTags } from '@/modules/studio-sales/tag-rules';
 import { HAUSPIRE_PIPELINE, planPreset, presetSummary, type ExistingStage } from '@/modules/studio-practice/pipeline-preset';
+import { mainLostStage } from '@/modules/studio-practice/vocabulary';
 import { leadsVisibleTo, poolVisibleTo, type StudioRoleName } from '@/modules/studio/roles';
 
 /** The AxLeads look for the Leads tab (owner, 12 Oct 2026): docs/studio-os/LEADS-SCALE-BUILT.md. */
@@ -201,6 +202,23 @@ describe('Use the Hauspire pipeline', () => {
     expect(plan.renames).toEqual([]);
     expect(plan.creates).toEqual([]);
     expect(plan.order).toEqual(named.map((s) => s.id));
+  });
+
+  it('Junk is a lost column (owner, 21 Oct 2026): an open Junk becomes lost, its leads "not serious"', () => {
+    expect(HAUSPIRE_PIPELINE.find((p) => p.name === 'Junk')).toMatchObject({ kind: 'LOST', lostReason: 'NOT_SERIOUS' });
+    const named: ExistingStage[] = HAUSPIRE_PIPELINE.map((p, i) => ({ id: `s${i}`, name: p.name, kind: p.name === 'Junk' ? 'OPEN' : p.kind, isIntake: !!p.isIntake, sortOrder: i }));
+    const plan = planPreset(named);
+    expect(plan.kindChanges).toEqual([{ id: `s${HAUSPIRE_PIPELINE.findIndex((p) => p.name === 'Junk')}`, name: 'Junk', from: 'OPEN', to: 'LOST', lostReason: 'NOT_SERIOUS' }]);
+    expect(presetSummary(plan)).toMatch(/akes Junk a lost column/);
+    /* Applied again: nothing left to change. */
+    expect(planPreset(HAUSPIRE_PIPELINE.map((p, i) => ({ id: `s${i}`, name: p.name, kind: p.kind, isIntake: !!p.isIntake, sortOrder: i }))).kindChanges).toEqual([]);
+  });
+
+  it('"Mark lost" goes to the column called Lost, never into Junk ahead of it', () => {
+    const stages = HAUSPIRE_PIPELINE.map((p, i) => ({ id: `s${i}`, name: p.name, kind: p.kind, sortOrder: i }));
+    expect(mainLostStage(stages)?.name).toBe('Lost');
+    expect(mainLostStage([{ name: 'Dropped', kind: 'LOST' as const, sortOrder: 3 }, { name: 'Gone', kind: 'LOST' as const, sortOrder: 1 }])?.name).toBe('Gone');
+    expect(mainLostStage([{ name: 'New', kind: 'OPEN' as const }])).toBeUndefined();
   });
 
   it('matches by name in any case', () => {

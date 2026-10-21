@@ -17,6 +17,7 @@ import {
   type LeadPlan,
   type StudioContext,
   type StudioStageRef,
+  answeredAny,
 } from '@/modules/studio-import-axleads/map';
 import { HAUSPIRE_PIPELINE } from '@/modules/studio-practice/pipeline-preset';
 
@@ -104,8 +105,13 @@ describe('stages', () => {
     expect(norm(' Requirement/Floor  plan pending ')).toBe(norm('Requirement / Floor Plan Pending'));
   });
   it('a lost stage never lands in an open column of the same name', () => {
-    expect(row('Junk')).toMatchObject({ stageName: 'Lost', kind: 'LOST', how: 'meaning' });
-    expect(row('Junk').note).toMatch(/open column/);
+    const openJunk = STAGES.map((s) => (s.name === 'Junk' ? { ...s, kind: 'OPEN' as const } : s));
+    const r = mapStages(ax.stages, openJunk).find((x) => x.axName === 'Junk')!;
+    expect(r).toMatchObject({ stageName: 'Lost', kind: 'LOST', how: 'meaning' });
+    expect(r.note).toMatch(/open column/);
+  });
+  it('Junk lands in Hauspire’s Junk column, which is lost-kind (owner, 21 Oct 2026)', () => {
+    expect(row('Junk')).toMatchObject({ stageName: 'Junk', kind: 'LOST', how: 'name' });
   });
   it('an unknown stage lands in the intake column and says so', () => {
     expect(row('Mystery Stage')).toMatchObject({ stageName: 'New', how: 'intake' });
@@ -114,7 +120,7 @@ describe('stages', () => {
   it('the roles file can name the column', () => {
     const chosen = mapStages(ax.stages, STAGES, choices({ stages: { 'Mystery Stage': 'Effective Lead', Junk: 'junk' } }).stages);
     expect(chosen.find((r) => r.axName === 'Mystery Stage')).toMatchObject({ stageName: 'Effective Lead', how: 'chosen' });
-    expect(chosen.find((r) => r.axName === 'Junk')).toMatchObject({ stageName: 'Junk', kind: 'OPEN', how: 'chosen' });
+    expect(chosen.find((r) => r.axName === 'Junk')).toMatchObject({ stageName: 'Junk', kind: 'LOST', how: 'chosen' });
   });
 });
 
@@ -222,7 +228,7 @@ describe('leads', () => {
 
   it('a lost lead stays lost, with the words kept as the note', () => {
     const two = created(plan, 2);
-    expect(two.client).toMatchObject({ name: 'Test Lead Two', stageId: stageId('Lost'), lostReason: 'NOT_SERIOUS', lostNote: 'Just exploring', source: 'WEBSITE' });
+    expect(two.client).toMatchObject({ name: 'Test Lead Two', stageId: stageId('Junk'), lostReason: 'NOT_SERIOUS', lostNote: 'Just exploring', source: 'WEBSITE' });
     expect(two.events.find((e) => e.kind === 'LOST')?.summary).toBe('Marked lost — not serious. Just exploring');
     expect(created(plan, 7).client).toMatchObject({ stageId: stageId('Lost'), lostReason: 'BUDGET', lostNote: 'Budget too low', ownSource: 'WhatsApp ads' });
   });
@@ -297,16 +303,26 @@ describe('leads', () => {
     expect(p.report).toMatchObject({ already: 2, backfill: 1 });
   });
 
+  it('leaves out leads that answered a skipIfAnswered question (job applicants)', () => {
+    const c = choices({ skipIfAnswered: ['Why_Should_We_Hire_You?'] });
+    expect(c.skipIfAnswered).toEqual(['why_should_we_hire_you?']);
+    expect(answeredAny({ customFields: { 'why_should_we_hire_you?': 'I sell well' } }, c.skipIfAnswered)).toBe(true);
+    expect(answeredAny({ customFields: { 'why_should_we_hire_you?': '  ' } }, c.skipIfAnswered)).toBe(false);
+    expect(answeredAny({ customFields: { bhk: '3' } }, c.skipIfAnswered)).toBe(false);
+    expect(answeredAny({ customFields: null }, c.skipIfAnswered)).toBe(false);
+    expect(parseChoices({ skipIfAnswered: 'x' }).ok).toBe(false);
+  });
+
   it('counts and the report', () => {
     expect(plan.report).toMatchObject({ leadsInFile: 7, create: 6, mergeFile: 1, mergeExisting: 0, binned: 1, noPhone: 1, phonesNotMobile: 1 });
-    expect(plan.report.perStage).toEqual({ 'Calling 1': 1, Lost: 2, New: 2, Converted: 1 });
+    expect(plan.report.perStage).toEqual({ 'Calling 1': 1, Junk: 1, Lost: 1, New: 2, Converted: 1 });
     expect(plan.report.perAssignee).toEqual({ 'Test Agent A (new, invited)': 1, 'Pool (nobody)': 4, 'Hauspire Owner': 1 });
     expect(plan.report.eventsSkipped.scoreUpdates).toBe(1);
     expect(plan.fieldsToCreate.map((f) => f.key)).toEqual(['area_sqft', 'visit_on']);
     expect(plan.leadSourcesToCreate).toEqual(['WhatsApp ads']);
     const text = formatReport(plan.report, { tenant: 'Test Studio', studio: 'test', dryRun: true });
     expect(text).toMatch(/DRY RUN/);
-    expect(text).toMatch(/Junk \[LOST\]\s+→ Lost {2}← CHECK/);
+    expect(text).toMatch(/Junk \[LOST\]\s+→ Junk\n/);
     expect(text).toMatch(/Test Agent A .* \+ ADD as SALES, INVITED, …0011 — no invite is sent/);
     expect(text).toMatch(/Test Agent B .* no phone on AxLeads/);
     // No full phone number of a lead in the report.

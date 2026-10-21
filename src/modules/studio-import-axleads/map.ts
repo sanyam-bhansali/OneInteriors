@@ -203,6 +203,7 @@ export function parseExport(raw: unknown): { ok: true; data: AxExport } | { ok: 
  *     "members": { "<email, AxLeads user id or membership id>": { "role": "DESIGNER", "phone": "+91…", "skip": true } },
  *     "stages":  { "<AxLeads stage name>": "<studio column name>" },
  *     "binned":  "bin" | "skip",
+ *     "skipIfAnswered": ["<form question key>", …],   (e.g. a hiring form's questions)
  *     "createFields": true
  *   }
  */
@@ -211,6 +212,8 @@ export interface Choices {
   members: Record<string, { role?: StudioRoleName; phone?: string; skip?: boolean }>;
   stages: Record<string, string>;
   binned: 'bin' | 'skip';
+  /** Form questions (custom-field keys, any case) whose answer means "not a client": a job application. */
+  skipIfAnswered: string[];
   createFields: boolean;
 }
 
@@ -221,14 +224,14 @@ export interface Choices {
  */
 export const DEFAULT_ROLES: Record<AxRole, StudioRoleName> = { OWNER: 'OWNER', AGENT: 'SALES' };
 
-export const DEFAULT_CHOICES: Choices = { roles: { ...DEFAULT_ROLES }, members: {}, stages: {}, binned: 'bin', createFields: true };
+export const DEFAULT_CHOICES: Choices = { roles: { ...DEFAULT_ROLES }, members: {}, stages: {}, binned: 'bin', skipIfAnswered: [], createFields: true };
 
 const isRole = (v: unknown): v is StudioRoleName => typeof v === 'string' && (STUDIO_ROLES as readonly string[]).includes(v);
 
 export function parseChoices(raw: unknown): { ok: true; choices: Choices } | { ok: false; error: string } {
-  if (raw === undefined || raw === null) return { ok: true, choices: { ...DEFAULT_CHOICES, roles: { ...DEFAULT_ROLES } } };
+  if (raw === undefined || raw === null) return { ok: true, choices: { ...DEFAULT_CHOICES, roles: { ...DEFAULT_ROLES }, skipIfAnswered: [] } };
   if (!isObj(raw)) return { ok: false, error: 'The roles file must be a JSON object.' };
-  const choices: Choices = { roles: { ...DEFAULT_ROLES }, members: {}, stages: {}, binned: 'bin', createFields: true };
+  const choices: Choices = { roles: { ...DEFAULT_ROLES }, members: {}, stages: {}, binned: 'bin', skipIfAnswered: [], createFields: true };
   if (raw.roles !== undefined) {
     if (!isObj(raw.roles)) return { ok: false, error: '"roles" must map OWNER / AGENT to a studio role.' };
     for (const [k, v] of Object.entries(raw.roles)) {
@@ -256,6 +259,10 @@ export function parseChoices(raw: unknown): { ok: true; choices: Choices } | { o
   if (raw.binned !== undefined) {
     if (raw.binned !== 'bin' && raw.binned !== 'skip') return { ok: false, error: '"binned" must be "bin" or "skip".' };
     choices.binned = raw.binned;
+  }
+  if (raw.skipIfAnswered !== undefined) {
+    if (!Array.isArray(raw.skipIfAnswered) || raw.skipIfAnswered.some((k) => typeof k !== 'string' || !k.trim())) return { ok: false, error: '"skipIfAnswered" must be a list of form question keys.' };
+    choices.skipIfAnswered = (raw.skipIfAnswered as string[]).map((k) => k.trim().toLowerCase());
   }
   if (raw.createFields !== undefined) choices.createFields = raw.createFields === true;
   return { ok: true, choices };
@@ -375,6 +382,9 @@ export function mapStages(axStages: readonly AxStage[], studio: readonly StudioS
     const kinds = kindsFor(ax.semantic);
     const named = byName.get(norm(ax.name));
     if (named && kinds.includes(named.kind)) return row(named, 'name', null);
+    /* A studio that closes leads in a column of this name (Hauspire's Junk is
+       lost-kind here, open on AxLeads) keeps them there, as lost. */
+    if (named && named.kind === 'LOST' && ax.semantic !== 'WON') return row(named, 'name', null);
     const why = want
       ? `the roles file names "${want}", which is not a column`
       : named
@@ -645,7 +655,9 @@ export type LeadPlan =
   /** Into an earlier lead of this file (its card carries both). */
   | { action: 'merge-file'; axId: string; intoAxId: string; into: string; events: EventPlan[]; name: string; phone: string }
   | { action: 'already'; axId: string; clientId: string; backfill: PersonRef['member'] }
-  | { action: 'skip-binned'; axId: string };
+  | { action: 'skip-binned'; axId: string }
+  /** Answered a question in `skipIfAnswered`: a job applicant, not a client. */
+  | { action: 'skip-answered'; axId: string };
 
 export interface Report {
   leadsInFile: number;
@@ -656,6 +668,7 @@ export interface Report {
   backfill: number;
   binned: number;
   skippedBinned: number;
+  skippedAnswered: number;
   events: Partial<Record<EventKindName, number>>;
   eventsSkipped: { scoreUpdates: number; messageDuplicates: number };
   perStage: Record<string, number>;
@@ -765,6 +778,7 @@ export function planImport(ax: AxExport, ctx: StudioContext, choices: Choices, o
     backfill: 0,
     binned: 0,
     skippedBinned: 0,
+    skippedAnswered: 0,
     events: {},
     eventsSkipped: { scoreUpdates: 0, messageDuplicates: 0 },
     perStage: {},
@@ -803,6 +817,11 @@ export function planImport(ax: AxExport, ctx: StudioContext, choices: Choices, o
     if (lead.deletedAt && choices.binned === 'skip') {
       leads.push({ action: 'skip-binned', axId: lead.id });
       report.skippedBinned += 1;
+      continue;
+    }
+    if (answeredAny(lead, choices.skipIfAnswered)) {
+      leads.push({ action: 'skip-answered', axId: lead.id });
+      report.skippedAnswered += 1;
       continue;
     }
 
@@ -987,7 +1006,7 @@ function buildLead(lead: AxLead, b: BuildCtx): Built {
   // Stage, and lost.
   const lostHere = stage.kind === 'LOST';
   const axSaysLost = stage.semantic === 'LOST' || !!lead.lostReason;
-  const lostText = lead.lostReason?.trim() || (stage.semantic === 'LOST' && norm(stage.axName) !== norm(stage.stageName) ? stage.axName : null);
+  const lostText = lead.lostReason?.trim() || ((stage.semantic === 'LOST' && norm(stage.axName) !== norm(stage.stageName)) || (lostHere && stage.semantic !== 'LOST') ? stage.axName : null);
   const lostReason: LostReasonName | null = lostHere ? mapLostReason(lostText ?? stage.axName) : null;
   const lostNote = lostHere ? lostText : null;
   if (!lostHere && axSaysLost && lead.lostReason) extra.push(`Lost reason on AxLeads: ${lead.lostReason}`);
@@ -1281,6 +1300,7 @@ export function formatReport(r: Report, opts: { tenant: string; studio: string; 
   out.push(`  merged into a card     ${r.mergeExisting} already on the board, ${r.mergeFile} with an earlier lead in this file`);
   out.push(`  already imported       ${r.already}${r.backfill ? ` (${r.backfill} now given to their person)` : ''}`);
   if (r.skippedBinned) out.push(`  binned, skipped        ${r.skippedBinned}`);
+  if (r.skippedAnswered) out.push(`  left out (answered a skipIfAnswered question, e.g. job applicants)  ${r.skippedAnswered}`);
   out.push(`  without a phone        ${r.noPhone}${r.phonesNotMobile ? `; ${r.phonesNotMobile} phones were not mobiles (kept in the notes)` : ''}`);
   out.push('');
   out.push('New cards per column:');
@@ -1323,4 +1343,11 @@ export function formatReport(r: Report, opts: { tenant: string; studio: string; 
     if (r.merged.length > 100) out.push(`    … and ${r.merged.length - 100} more`);
   }
   return out.join('\n');
+}
+
+/** Whether this lead answered any of these form questions (custom-field keys, any case, non-empty answer). */
+export function answeredAny(lead: Pick<AxLead, 'customFields'>, keys: readonly string[]): boolean {
+  if (!keys.length || !isObj(lead.customFields)) return false;
+  const want = new Set(keys);
+  return Object.entries(lead.customFields).some(([k, v]) => want.has(k.trim().toLowerCase()) && v !== null && v !== undefined && String(v).trim() !== '');
 }

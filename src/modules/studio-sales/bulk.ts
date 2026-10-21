@@ -12,6 +12,7 @@ import 'server-only';
  * thousand, one timeline line per lead, as the one-at-a-time paths do.
  */
 
+import { mainLostStage } from '@/modules/studio-practice/vocabulary';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { notify } from '@/modules/notify/service';
@@ -359,11 +360,11 @@ export async function bulkSnooze(target: BulkTarget): Promise<BulkResult> {
   }
 }
 
-/** Mark lost, with one reason for the batch: the studio's first lost column. */
+/** Mark lost, with one reason for the batch: the studio's Lost column (vocabulary.ts mainLostStage). */
 export async function bulkMarkLost(target: BulkTarget, reason: string): Promise<BulkResult> {
   const scope = await who('move');
   if (!scope) return { ok: false, error: 'Your role does not include moving leads.' };
-  const lost = await prisma.studioStage.findFirst({ where: { studioId: scope.studioId, kind: 'LOST' }, orderBy: { sortOrder: 'asc' }, select: { id: true } });
+  const lost = mainLostStage(await prisma.studioStage.findMany({ where: { studioId: scope.studioId, kind: 'LOST' }, orderBy: { sortOrder: 'asc' }, select: { id: true, kind: true, name: true, sortOrder: true } }));
   if (!lost) return { ok: false, error: 'Your pipeline has no lost column. Settings → Pipeline.' };
   return bulkMove(target, lost.id, reason);
 }
