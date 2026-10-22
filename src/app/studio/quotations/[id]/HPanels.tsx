@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { formatINR, paiseToRupees, rupeesToPaise } from '@/lib/money';
-import { areaMilli, DISCOUNT_NAMES, QTY_SCALE, type QuoteUnitName, type WorkCodeName } from '@/modules/studio-quote/pricing';
-import type { RevisionSummary, LineChange } from '@/modules/studio-quote/revision';
+import { DISCOUNT_NAMES, lineAmount, QTY_SCALE, type QuoteUnitName, type WorkCodeName } from '@/modules/studio-quote/pricing';
+import { compareLines, sizeText, type ChangeStatus, type CompareLine } from '@/modules/studio-quote/compare-lines';
 import type { ProductRow } from '@/modules/studio-quote/store';
 import { Combobox } from './Combobox';
 import { usable, type AddSize } from './QuoteLines';
@@ -116,16 +116,8 @@ export function AddLine({
     product?.unit === 'AREA'
       ? { widthMm: w == null ? null : Math.round(w), heightMm: h == null ? null : Math.round(h), qtyMilli: null }
       : { widthMm: null, heightMm: null, qtyMilli: q == null ? null : Math.round(q * QTY_SCALE) };
-  const amount =
-    product == null
-      ? 0
-      : product.unit === 'AREA'
-        ? add.widthMm && add.heightMm
-          ? Math.round((product.ratePaise * areaMilli(add.widthMm, add.heightMm)) / QTY_SCALE)
-          : 0
-        : add.qtyMilli
-          ? Math.round((product.ratePaise * add.qtyMilli) / QTY_SCALE)
-          : 0;
+  /* The figure the line will have: `lineAmount`, the old app's rounding to the rupee. */
+  const amount = product == null ? 0 : lineAmount({ unit: product.unit, code: product.code, ratePaise: product.ratePaise, ...add });
 
   if (active.length === 0) return <p className="hhelp">Your product master is empty.</p>;
 
@@ -243,67 +235,64 @@ export function ProposeForm({
   );
 }
 
-const TAG: Record<Exclude<LineChange['kind'], 'UNCHANGED'>, { t: string; c: string }> = {
-  ADDED: { t: 'NEW', c: 'good' },
-  REMOVED: { t: 'REMOVED', c: 'bad' },
-  REPRICED: { t: 'CHANGED', c: 'warn' },
+const TAG: Record<Exclude<ChangeStatus, 'same'>, { t: string; c: string }> = {
+  added: { t: 'NEW', c: 'good' },
+  removed: { t: 'REMOVED', c: 'bad' },
+  changed: { t: 'CHANGED', c: 'warn' },
 };
 
 /**
- * Final (Original vs Revised), Hauspire's `FinalCompare`: room by room, every
- * line's original and final figure and the change. The Original is the copy
- * the client received when it was sent (R1, then each new revision); the
- * Final is what is on screen now.
+ * Final (Original vs Revised), Hauspire's `FinalCompare` row for row: room by
+ * room, each line's size (original → final), its original and final figure
+ * and the change; then the Original and Final Total Project Value and the
+ * change. As in the old app the Original is the quotation as it was opened,
+ * until "Snapshot current as Original" takes what is on screen (owner, 22
+ * Oct 2026). The copy the client was sent is compared on the printable
+ * page (revisions R1, R2…), linked here.
  */
 export function FinalCompare({
-  summary,
-  sentLabel,
+  original,
+  current,
+  wasTotalPaise,
+  nowTotalPaise,
+  onSnapshot,
   compareHref,
   compareLabel,
 }: {
-  summary: RevisionSummary | null;
-  sentLabel: string | null;
+  original: CompareLine[];
+  current: CompareLine[];
+  wasTotalPaise: number;
+  nowTotalPaise: number;
+  onSnapshot: () => void;
   compareHref: string | null;
   compareLabel: string;
 }) {
-  if (!summary) {
-    return (
-      <div className="hfinal">
-        <div className="hdochead">
-          <div className="hbig">Final Quotation — Original vs Revised</div>
-          <Legend />
-        </div>
-        <p className="muted">
-          Not sent yet. When you mark it sent, the copy the client has becomes the Original, and every change after it shows here line by line.
-        </p>
-        {compareHref ? (
-          <Link href={compareHref} className="btn sec sm">
-            {compareLabel}
-          </Link>
-        ) : null}
-      </div>
-    );
-  }
-  const rooms = [...new Set(summary.changes.map((c) => c.room))];
-  const was = summary.changes.reduce((a, c) => a + c.wasPaise, 0);
-  const now = summary.changes.reduce((a, c) => a + c.nowPaise, 0);
+  const rows = compareLines(original, current);
+  const rooms = [...new Set(rows.map((r) => r.room))];
+  const delta = nowTotalPaise - wasTotalPaise;
+  const signed = (p: number) => `${p >= 0 ? '+' : '−'}${formatINR(Math.abs(p))}`;
   return (
     <div className="hfinal">
+      <div className="hstack" style={{ gap: 8, margin: '0 0 10px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <button type="button" className="btn sec sm" onClick={onSnapshot}>
+          Snapshot current as “Original”
+        </button>
+        <span className="muted hhelp" style={{ margin: 0 }}>
+          Original = {original.length} line(s). Open a saved quote or snapshot here, then edit lines and compare.
+          {compareHref ? (
+            <>
+              {' '}
+              <Link href={compareHref} className="acc-t">
+                {compareLabel}
+              </Link>
+            </>
+          ) : null}
+        </span>
+      </div>
       <div className="hdochead">
         <div className="hbig">Final Quotation — Original vs Revised</div>
         <Legend />
       </div>
-      <p className="muted hhelp" style={{ margin: '0 0 10px' }}>
-        Original = the copy the client received{sentLabel ? ` (${sentLabel})` : ''}. Final = what is on screen now, saved or not.
-        {compareHref ? (
-          <>
-            {' '}
-            <Link href={compareHref} className="acc-t">
-              {compareLabel}
-            </Link>
-          </>
-        ) : null}
-      </p>
       {rooms.map((room) => (
         <div key={room} className="hfroom">
           <div className="hband hbandbox">{room}</div>
@@ -312,6 +301,7 @@ export function FinalCompare({
               <thead>
                 <tr className="hhead">
                   <th scope="col">Product</th>
+                  <th scope="col">Size (Orig → Final)</th>
                   <th scope="col" className="r">
                     Original (₹)
                   </th>
@@ -324,23 +314,39 @@ export function FinalCompare({
                 </tr>
               </thead>
               <tbody>
-                {summary.changes
-                  .filter((c) => c.room === room)
-                  .map((c) => {
-                    const tag = c.kind === 'UNCHANGED' ? null : TAG[c.kind];
+                {rows
+                  .filter((r) => r.room === room)
+                  .map((r, i) => {
+                    const tag = r.status === 'same' ? null : TAG[r.status];
+                    const oAmt = r.o?.amountPaise ?? null;
+                    const fAmt = r.c?.amountPaise ?? 0;
+                    const d = fAmt - (oAmt ?? 0);
+                    const os = sizeText(r.o);
+                    const fs = sizeText(r.c);
                     return (
-                      <tr key={`${c.room}|${c.product}`} className={`hf-${c.kind.toLowerCase()}`}>
+                      <tr key={`${r.room}|${r.product}|${i}`} className={`hf-${r.status}`}>
                         <td>
-                          <b className={c.kind === 'REMOVED' ? 'struck' : ''}>{c.product}</b>
+                          <b className={r.status === 'removed' ? 'struck' : ''}>{r.product}</b>
                           {tag ? <span className={`chip ${tag.c} hchip`}>{tag.t}</span> : null}
                         </td>
-                        <td className="r mono">{c.kind === 'ADDED' ? '—' : formatINR(c.wasPaise)}</td>
+                        <td>
+                          {r.status === 'changed' && os !== fs ? (
+                            <span>
+                              <span className="struck muted">{os}</span> → <b>{fs}</b>
+                            </span>
+                          ) : r.status === 'added' ? (
+                            <b>{fs}</b>
+                          ) : r.status === 'removed' ? (
+                            <span className="struck muted">{os}</span>
+                          ) : (
+                            os
+                          )}
+                        </td>
+                        <td className="r mono">{oAmt == null ? '—' : formatINR(oAmt)}</td>
                         <td className="r mono" style={{ fontWeight: 600 }}>
-                          {c.kind === 'REMOVED' ? '—' : formatINR(c.nowPaise)}
+                          {r.status === 'removed' ? '—' : formatINR(fAmt)}
                         </td>
-                        <td className={`r mono ${c.deltaPaise > 0 ? 'good-t' : c.deltaPaise < 0 ? 'bad-t' : 'muted'}`}>
-                          {c.deltaPaise === 0 ? '—' : `${c.deltaPaise > 0 ? '+' : '−'}${formatINR(Math.abs(c.deltaPaise))}`}
-                        </td>
+                        <td className={`r mono ${d > 0 ? 'good-t' : d < 0 ? 'bad-t' : 'muted'}`}>{d === 0 ? '—' : signed(d)}</td>
                       </tr>
                     );
                   })}
@@ -352,18 +358,18 @@ export function FinalCompare({
       <table className="htable htot" style={{ maxWidth: 460, marginTop: 12 }}>
         <tbody>
           <tr>
-            <th scope="row">Original, all lines</th>
-            <td className="mono">{formatINR(was)}</td>
+            <th scope="row">Original Total Project Value</th>
+            <td className="mono">{formatINR(wasTotalPaise)}</td>
           </tr>
           <tr>
-            <th scope="row">Final, all lines</th>
+            <th scope="row">Final Total Project Value</th>
             <td className="mono" style={{ fontWeight: 700 }}>
-              {formatINR(now)}
+              {formatINR(nowTotalPaise)}
             </td>
           </tr>
-          <tr className={summary.deltaPaise >= 0 ? 'good-t strong' : 'bad-t strong'}>
+          <tr className={delta >= 0 ? 'good-t strong' : 'bad-t strong'}>
             <th scope="row">Change</th>
-            <td className="mono">{`${summary.deltaPaise >= 0 ? '+' : '−'}${formatINR(Math.abs(summary.deltaPaise))}`}</td>
+            <td className="mono">{signed(delta)}</td>
           </tr>
         </tbody>
       </table>

@@ -435,6 +435,7 @@ function previewQuote(o: {
     terms: null,
     issuedOn: null,
     updatedAt: new Date(),
+    importedFrom: null,
     lines: [],
   };
 }

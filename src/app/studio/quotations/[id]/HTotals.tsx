@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { formatINR } from '@/lib/money';
-import type { QuoteTotals } from '@/modules/studio-quote/pricing';
+import { DEFAULT_DISCOUNT_NAME, type QuoteTotals } from '@/modules/studio-quote/pricing';
 
 /**
  * Hauspire's totals table (`Totals.tsx`), on our figures (`computeTotals`,
@@ -86,7 +86,7 @@ export function TotalsTable({
           </tr>
           {totals.onSpotPaise > 0 ? (
             <tr className="neg">
-              <th scope="row">{onSpotLabel || 'Additional discount'}</th>
+              <th scope="row">{onSpotLabel || DEFAULT_DISCOUNT_NAME}</th>
               <td className="mono">− {formatINR(totals.onSpotPaise)}</td>
             </tr>
           ) : null}
