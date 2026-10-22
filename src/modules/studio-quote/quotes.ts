@@ -114,6 +114,8 @@ export interface QuoteRow {
   terms: string | null;
   issuedOn: Date | null;
   updatedAt: Date;
+  /** "hauspire:<row id>" when brought in from the Hauspire quotation app (22 Oct 2026), else null. */
+  importedFrom: string | null;
   lines: QuoteLineRow[];
 }
 
@@ -278,6 +280,7 @@ async function loadQuote(id: string, studioId: string, scope: Prisma.StudioQuote
       terms: row.terms,
       issuedOn: row.issuedOn,
       updatedAt: row.updatedAt,
+      importedFrom: row.importedFrom,
       lines: row.lines.map((l) => ({
         id: l.id,
         room: l.room,
@@ -345,15 +348,32 @@ async function nextNumber(studioId: string): Promise<string> {
      read "002-D" as NaN, restarted at 001 and clashed with the unique
      number, so every new quotation failed once a copy existed. Read every
      number this year and take the highest leading count. */
+  /* Hauspire's running series (2300, 2301…) carries on once their old
+     quotations are here, so every number is read, not only this year's. */
   const rows = await prisma.studioQuote.findMany({
-    where: { studioId, number: { startsWith: prefix } },
+    where: { studioId, OR: [{ number: { startsWith: prefix } }, { number: { gte: '0', lt: 'A' } }] },
     select: { number: true },
   });
   return nextQuoteNumber(year, rows.map((r) => r.number));
 }
 
-/** The next "YYYY-NNN" after the highest count among `numbers`, suffixes ignored. Pure, for tests. */
+/** Where Hauspire's quotation app starts its plain running series (`quotesRepo.ts` `QUOTE_START`). */
+export const PLAIN_SERIES_START = 2300;
+
+/**
+ * The next number. A studio already on a plain running series of at least
+ * 2300 — Hauspire's, once its old quotations are imported (owner, 22 Oct
+ * 2026) — gets the highest plus one, as the old app's `nextQuoteNo` gives;
+ * every other studio the next "YYYY-NNN" after the highest count among
+ * `numbers`, suffixes ignored. Pure, for tests.
+ */
 export function nextQuoteNumber(year: number, numbers: string[]): string {
+  const plain = numbers
+    .map((n) => n.trim())
+    .filter((n) => /^\d+$/.test(n))
+    .map(Number)
+    .filter((n) => n >= PLAIN_SERIES_START && n < 100_000);
+  if (plain.length > 0) return String(Math.max(...plain) + 1);
   const prefix = `${year}-`;
   const top = numbers.reduce((max, n) => {
     const m = /^(\d+)/.exec(n.startsWith(prefix) ? n.slice(prefix.length) : '');

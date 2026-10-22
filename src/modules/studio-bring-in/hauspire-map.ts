@@ -12,21 +12,25 @@
  *   the agreed figure (`amountPaise`), so our arithmetic never re-prices it;
  *   the rate and quantity are kept beside it so the builder shows how it was
  *   sized.
- * - **Sizing.** The source line says how it is priced by which fields it
- *   carries: `sqft` → square feet, `rft` → running feet, width and height →
- *   W × H (mm), `qty` / `unitPrice` → each. A line with none of them is one
- *   unit at its amount.
+ * - **Sizing**, read the way the old app's own table reads a line
+ *   (`QuoteTable.tsx`, 22 Oct 2026): `sqft` present → square feet; else
+ *   `rft` → running feet; else `unitPrice` → each, `qty` (default 1) of
+ *   them; else a `rate` with width and height → W × H (mm). A line with none
+ *   of these (the old "+ add item" row, typed straight in) is an amount on
+ *   its own: no quantity, so its Units cell prints blank as it did there,
+ *   and any width or height typed on it is kept for the PDF.
  * - **Money.** The source works in rupees (rates may have decimals, e.g.
  *   ₹26.5 / sq ft); we store integer paise, rounded once here.
  * - **Terms.** `modularPct` is a fraction (0.15 = 15%; the source's default
  *   when unset) — a value above 1 is read as a percent; `onSpot` rupees;
  *   `feeOn` (default on) is our 7% fee; `gstOn` (default off) is 18%;
  *   `quoteDate` 'YYYY-MM-DD'.
- * - **Check.** Our total before GST is compared with the source's `tpv`; a
- *   difference above ₹2 (more than rounding) is reported, never hidden.
+ * - **Check.** Our total before GST is compared with the source's `tpv`. The
+ *   arithmetic is now the old app's own to the paisa (pricing.ts, pinned
+ *   against hauspire-calc.ts), so ANY difference is reported, never hidden.
  */
 
-import { computeTotals, FEE_BPS, GST_BPS, MM_PER_SQFT, QTY_SCALE, type QuoteTotals, type QuoteUnitName, type WorkCodeName } from '@/modules/studio-quote/pricing';
+import { computeTotals, FEE_BPS, GST_BPS, QTY_SCALE, type QuoteTotals, type QuoteUnitName, type WorkCodeName } from '@/modules/studio-quote/pricing';
 
 /** One line in the source's `lines` jsonb (src/lib/types.ts `QuoteLine`). */
 export interface SourceLine {
@@ -66,6 +70,11 @@ export interface SourceQuote {
   created_at?: string | null;
   lines?: unknown;
   settings?: unknown;
+  /** The full import reads every column (`select=*`); the picker only a few. */
+  mobile?: string | null;
+  kitchen_run?: number | null;
+  designer_id?: string | null;
+  revision?: number | null;
 }
 
 /** A search result: what the picker shows. */
@@ -111,8 +120,14 @@ export interface MappedQuote {
   number: string;
   stage: 'sales' | 'design';
   client: string;
+  /** The client's mobile as the old app stored it (trimmed), or null. */
+  phone: string | null;
   location: string | null;
   bhk: string | null;
+  /** The kitchen run the first quote was sized on, mm; null when not stored or 0. */
+  kitchenRunMm: number | null;
+  /** When the old app last saved it (its `created_at` is rewritten on every save). */
+  savedAt: string | null;
   lines: MappedLine[];
   terms: MappedTerms;
   totals: QuoteTotals;
@@ -125,8 +140,8 @@ export interface MappedQuote {
 }
 
 const ROOM_FALLBACK = 'Whole home';
-/** More than rounding: the fee and discount are each rounded once in rupees there and in paise here. */
-export const TPV_TOLERANCE_PAISE = 200;
+/** None: our arithmetic is the old app's to the paisa (22 Oct 2026), so any difference is a real one. */
+export const TPV_TOLERANCE_PAISE = 0;
 export const LINES_MAX = 600;
 
 const text = (v: unknown, max: number): string => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max) : '');
@@ -137,11 +152,6 @@ export function num(v: unknown): number | null {
   if (typeof v === 'string' && v.trim() !== '' && /^-?\d+(\.\d+)?$/.test(v.trim())) return Number(v.trim());
   return null;
 }
-
-const positive = (v: unknown): number | null => {
-  const n = num(v);
-  return n !== null && n > 0 ? n : null;
-};
 
 /** Rupees (maybe with decimals) to integer paise. */
 export const rupeesToPaise = (r: number): number => Math.round(r * 100);
@@ -161,13 +171,18 @@ export function mapLine(raw: SourceLine, sortOrder: number): { line: MappedLine;
   if (!product && (amount === null || amount === 0)) return null;
   const { code, known } = workCodeOf(raw.wc);
   const amountPaise = rupeesToPaise(amount ?? 0);
-  const rate = positive(raw.rate);
-  const sqft = positive(raw.sqft);
-  const rft = positive(raw.rft);
-  const width = positive(raw.width);
-  const height = positive(raw.height);
-  const qty = positive(raw.qty);
-  const unitPrice = positive(raw.unitPrice);
+  const rate = num(raw.rate);
+  const sqft = num(raw.sqft);
+  const rft = num(raw.rft);
+  const unitPrice = num(raw.unitPrice);
+  const qty = num(raw.qty);
+  /* Width and height as typed (the PDF prints them whatever the line is); W × H pricing needs both above zero. */
+  const mm = (v: unknown): number | null => {
+    const n = num(v);
+    return n !== null && n >= 0 && n < 1_000_000 ? Math.round(n) : null;
+  };
+  const width = mm(raw.width);
+  const height = mm(raw.height);
   const base = {
     room: text(raw.room, 120) || ROOM_FALLBACK,
     product: product || 'Item',
@@ -176,26 +191,20 @@ export function mapLine(raw: SourceLine, sortOrder: number): { line: MappedLine;
     amountPaise,
     sortOrder,
   };
+  const milli = (q: number) => Math.round(q * QTY_SCALE);
+  const per = (q: number) => (q > 0 ? (amount ?? 0) / q : 0);
   let line: MappedLine;
   if (sqft !== null) {
-    line = { ...base, unit: 'SQFT', widthMm: null, heightMm: null, qtyMilli: Math.round(sqft * QTY_SCALE), ratePaise: rupeesToPaise(rate ?? (amount ?? 0) / sqft) };
+    line = { ...base, unit: 'SQFT', widthMm: null, heightMm: null, qtyMilli: milli(sqft), ratePaise: rupeesToPaise(rate ?? per(sqft)) };
   } else if (rft !== null) {
-    line = { ...base, unit: 'RFT', widthMm: null, heightMm: null, qtyMilli: Math.round(rft * QTY_SCALE), ratePaise: rupeesToPaise(rate ?? (amount ?? 0) / rft) };
-  } else if (width !== null && height !== null) {
-    const area = (width * height) / MM_PER_SQFT;
-    line = {
-      ...base,
-      unit: 'AREA',
-      widthMm: Math.round(width),
-      heightMm: Math.round(height),
-      qtyMilli: null,
-      ratePaise: rupeesToPaise(rate ?? (area > 0 ? (amount ?? 0) / area : 0)),
-    };
-  } else if (qty !== null || unitPrice !== null) {
-    const q = qty ?? 1;
-    line = { ...base, unit: 'UNIT', widthMm: null, heightMm: null, qtyMilli: Math.round(q * QTY_SCALE), ratePaise: rupeesToPaise(unitPrice ?? (amount ?? 0) / q) };
+    line = { ...base, unit: 'RFT', widthMm: null, heightMm: null, qtyMilli: milli(rft), ratePaise: rupeesToPaise(rate ?? per(rft)) };
+  } else if (unitPrice !== null) {
+    line = { ...base, unit: 'UNIT', widthMm: width, heightMm: height, qtyMilli: milli(qty ?? 1), ratePaise: rupeesToPaise(unitPrice) };
+  } else if (rate !== null && rate > 0 && width && height) {
+    line = { ...base, unit: 'AREA', widthMm: width, heightMm: height, qtyMilli: null, ratePaise: rupeesToPaise(rate) };
   } else {
-    line = { ...base, unit: 'UNIT', widthMm: null, heightMm: null, qtyMilli: QTY_SCALE, ratePaise: amountPaise };
+    /* An amount on its own: no quantity (Units prints blank, as it did there), the amount kept as agreed. */
+    line = { ...base, unit: 'UNIT', widthMm: width, heightMm: height, qtyMilli: null, ratePaise: 0 };
   }
   return { line, unknownCode: !known };
 }
@@ -266,15 +275,22 @@ export function mapQuote(row: SourceQuote): MappedQuote {
   const difference = totals.beforeTaxPaise - sourceTpvPaise;
   const differencePaise = Math.abs(difference) <= TPV_TOLERANCE_PAISE ? 0 : difference;
   if (differencePaise !== 0) {
-    warnings.push(`Our total before GST differs from the quotation app's by ₹${Math.round(Math.abs(differencePaise) / 100).toLocaleString('en-IN')}. Check the lines and the discounts against what the client signed.`);
+    const abs = Math.abs(differencePaise);
+    const shown = abs % 100 === 0 ? (abs / 100).toLocaleString('en-IN') : (abs / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    warnings.push(`Our total before GST differs from the quotation app's by ₹${shown}. Check the lines and the discounts against what the client signed.`);
   }
+  const run = num(row.kitchen_run);
+  const phone = text(row.mobile, 20);
   return {
     sourceId: row.id,
     number: text(row.quote_no, 40) || row.id.slice(0, 8),
     stage: stageOf(row.stage),
     client: text(row.client_name, 120) || 'No name',
+    phone: phone || null,
     location: text(row.location, 120) || null,
     bhk: text(row.bhk, 20) || null,
+    kitchenRunMm: run !== null && run > 0 && run < 100_000 ? Math.round(run) : null,
+    savedAt: typeof row.created_at === 'string' ? row.created_at : null,
     lines,
     terms,
     totals,

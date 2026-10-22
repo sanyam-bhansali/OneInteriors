@@ -186,6 +186,30 @@ export function splitAcross(total: Paise, weights: readonly number[]): Paise[] {
 }
 
 /**
+ * Split an amount by weights the way Hauspire's quotation app splits its
+ * payment stages — each part rounded to a WHOLE RUPEE on its own
+ * (`Math.round(rupees × share)`, the old app's float arithmetic) — except
+ * the last, which takes the rest, so the parts still sum to the whole to the
+ * paisa (owner, 22 Oct 2026: stage figures as the old app prints them; the
+ * rule above, that a split never leaks, kept).
+ */
+export function splitRupees(total: Paise, weights: readonly number[]): Paise[] {
+  assertInteger(total);
+  if (weights.length === 0) throw new Error('splitRupees needs at least one weight');
+  const sum = weights.reduce((a, b) => a + b, 0);
+  if (sum <= 0) throw new Error('weights must sum to a positive number');
+  const parts: Paise[] = [];
+  let allocated = 0;
+  for (let i = 0; i < weights.length - 1; i++) {
+    const part = Math.round((total / PAISE_PER_RUPEE) * (weights[i]! / sum)) * PAISE_PER_RUPEE + 0;
+    parts.push(part);
+    allocated += part;
+  }
+  parts.push(total - allocated);
+  return parts;
+}
+
+/**
  * Standard milestone schedule for a full-home project.
  * Weights sum to 100 and splitAcross guarantees the parts sum to the contract.
  */

@@ -1,10 +1,12 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { formatINR } from '@/lib/money';
-import { getQuote, quotesToCompare, STAGE_LABELS, totalsFor } from '@/modules/studio-quote/quotes';
+import { getQuote, quotesToCompare, STAGE_LABELS, termsOf, totalsFor } from '@/modules/studio-quote/quotes';
+import { computeTotals } from '@/modules/studio-quote/pricing';
 import { quoteDocContext } from '@/modules/studio-quote/document-data';
-import { docHead, quoteFileName } from '@/modules/studio-quote/document';
-import { DocFrame, DocOpening, LineNote } from '../../doc/QuotationDocument';
+import { docHead, docRooms, quoteFileName } from '@/modules/studio-quote/document';
+import { DocFrame, DocOpening, DocSummary, LineNote, TermsSheet } from '../../doc/QuotationDocument';
+import '../../doc/quote-doc.css';
 import { changeSentence, deltaText, finalCounts, finalRooms, withKnownDetails, type FinalKind, type FinalLineInput } from '@/modules/studio-quote/final-doc';
 import { roomsOfLines } from '@/modules/studio-quote/rooms';
 import { PrintButton } from '../print/PrintButton';
@@ -273,6 +275,27 @@ export default async function ComparePage({
             </table>
           ))}
 
+          {/* The closing summary of the revised side, then the terms, as the
+              old app's Final PDF ended (`PrintFinal`: QuoteSummary of the
+              final lines, then Terms; 22 Oct 2026). Priced on this
+              quotation's own terms. */}
+          {current && ctx ? (
+            <DocSummary
+              rooms={docRooms(nowLines, roomsOfLines(nowLines), current.discountBps)}
+              studio={ctx.studio}
+              totals={computeTotals(
+                nowLines.map((l) => ({ ...l, ratePaise: 0, amountPaise: l.amountPaise })),
+                termsOf(current),
+              )}
+              feeBps={current.feeBps}
+              discountBps={current.discountBps}
+              gstBps={current.gstBps}
+              onSpotLabel={current.onSpotLabel}
+              schedule={ctx.schedule}
+              spec={ctx.spec}
+            />
+          ) : null}
+
           {ctx?.studio ? (
             <footer className="qd-foot">
               <p>
@@ -283,6 +306,7 @@ export default async function ComparePage({
             </footer>
           ) : null}
         </section>
+        {ctx?.terms?.trim() ? <TermsSheet studio={ctx.studio} terms={ctx.terms} /> : null}
       </DocFrame>
     </>
   );

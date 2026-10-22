@@ -7,6 +7,7 @@ import { roomsOfLines } from '@/modules/studio-quote/rooms';
 import { PrintButton } from './PrintButton';
 import { FloorPlanView } from '@/components/floorplan/FloorPlanView';
 import { QuotationDocument } from '../../doc/QuotationDocument';
+import '../../doc/quote-doc.css';
 /* Change orders (15 Oct 2026): the approved extra work after sign-off, as its own section. */
 import { extrasOnQuote } from '@/modules/project/change-orders';
 import { ExtrasAfterSignOff } from '../../../projects/[id]/ExtrasAfterSignOff';

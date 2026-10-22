@@ -14,7 +14,9 @@
  *
  * ## Exactly the contract
  *
- * `scheduleAmounts` splits the remainder with `splitAcross`, so the stages
+ * `scheduleAmounts` splits the remainder with `splitRupees` (each stage a
+ * whole rupee as Hauspire's app rounds it, 22 Oct 2026; `splitAcross` when
+ * the contract carries paise), so the stages
  * always add up to the contract to the paisa — the same promise the
  * project's `paymentSchedule` keeps (portal/quote-to-plan.ts), which reads
  * these amounts at booking.
@@ -27,7 +29,7 @@
  * as Hauspire's default rather than half a schedule.
  */
 
-import { splitAcross, type Paise } from '@/lib/money';
+import { splitAcross, splitRupees, type Paise } from '@/lib/money';
 
 export type StageKindName = 'FIXED' | 'PCT';
 
@@ -172,7 +174,13 @@ export function scheduleAmounts(stages: readonly PaymentStage[], contractPaise: 
   const fixed = stages.reduce((sum, s) => sum + (s.kind === 'FIXED' ? (s.amountPaise ?? 0) : 0), 0);
   if (fixed > contractPaise) return { ok: false, error: 'The fixed amounts are more than the whole contract.' };
   const pcts = stages.filter((s) => s.kind === 'PCT');
-  const parts = splitAcross(contractPaise - fixed, pcts.map((s) => bps(s.pct ?? 0)));
+  /* Whole rupees in, whole rupees out, as Hauspire's quotation app prints
+     its stages (owner, 22 Oct 2026): each percentage rounded to the rupee,
+     the last taking the rest so the stages still add up exactly. A contract
+     with paise in it keeps the paisa split. */
+  const remainder = contractPaise - fixed;
+  const split = remainder % 100 === 0 ? splitRupees : splitAcross;
+  const parts = split(remainder, pcts.map((s) => bps(s.pct ?? 0)));
   let next = 0;
   return {
     ok: true,

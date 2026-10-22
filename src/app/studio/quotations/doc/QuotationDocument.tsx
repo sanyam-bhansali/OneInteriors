@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { formatINR } from '@/lib/money';
-import type { QuoteTotals } from '@/modules/studio-quote/pricing';
+import { DEFAULT_DISCOUNT_NAME, type QuoteTotals } from '@/modules/studio-quote/pricing';
 import type { PaymentStage } from '@/modules/studio-sales/payment-template';
 import {
   STAGES_NOTE,
@@ -12,13 +12,12 @@ import {
   donutPalette,
   parseTerms,
   roomShares,
-  specHasBrands,
   type DocHead,
   type DocLineInput,
+  type DocRoom,
   type DocSpecRow,
   type DocStudio,
 } from '@/modules/studio-quote/document';
-import './quote-doc.css';
 
 export type { DocHead, DocStudio };
 
@@ -31,9 +30,25 @@ export type { DocHead, DocStudio };
  * the client builder render the very same markup; every figure is handed in
  * already computed (`computeTotals`), nothing is priced here.
  *
- * Print styles live in quote-doc.css; the studio's own colour (Settings,
- * checked by `safeAccent`) draws the bands, the sample's maroon being
- * Hauspire's.
+ * Print styles live in quote-doc.css (imported by the pages that render
+ * this, so the render script, scripts/render-quote-pdf.ts, can load this
+ * file in Node and inline the stylesheet itself); the studio's own colour
+ * (Settings, checked by `safeAccent`) draws the bands — Hauspire's maroon
+ * gives the old app's exact colours.
+ *
+ * ## Exactly the old app's PDF (owner, 22 Oct 2026)
+ *
+ * The quotation pages are Hauspire's `PrintDocument` + `QuoteSummary`
+ * element for element: the header grid, each room's band above its table
+ * (the column header repeats on a new page, the band does not), every
+ * figure printed as `Math.round(n).toLocaleString("en-IN")` (0 prints "0"),
+ * MO-01 amounts struck through with the discounted figure in green, Units
+ * only on a per-unit line, the Discount on Modular row always shown, the
+ * flat discount as "<name> (₹)", the summary by room with its donut, the
+ * totals box, the stages with their End Deliverables, the material
+ * specification with its Brand column, then the terms on their own pages.
+ * docs/studio-os/QUOTE-PARITY.md lists what is ours on top (the drawn cover
+ * when there are no brand pages, the welcome note, line notes, the footer).
  */
 
 export interface QuotationDocProps {
@@ -62,7 +77,10 @@ export interface QuotationDocProps {
   embedded?: boolean;
 }
 
-const n = (paise: number) => formatINR(paise, { symbol: false });
+/** A figure as the old PDF prints it: `Math.round(rupees).toLocaleString("en-IN")`. */
+export const n = (paise: number) => formatINR(Math.round(paise / 100) * 100 + 0, { symbol: false });
+/** The same with the rupee sign, for the grand total and the donut. */
+export const r = (paise: number) => `₹${n(paise)}`;
 
 /**
  * A line's note for the client, under its details like a comment in the
@@ -175,12 +193,6 @@ function DocCover({ studio, head, final }: { studio: DocStudio | null; head: Doc
 export function QuotationDocument(props: QuotationDocProps) {
   const { studio, head, totals } = props;
   const rooms = docRooms(props.lines, props.roomOrder, props.discountBps);
-  const shares = roomShares(rooms);
-  const palette = donutPalette(studio?.accentHex ?? null, shares.length);
-  const stages = docStages(props.schedule, totals);
-  const brands = specHasBrands(props.spec);
-  const gstOn = totals.gstPaise > 0;
-  const workTotal = rooms.reduce((a, r) => a + r.subPaise, 0);
   const validDays = props.validDays ?? 30;
   const validUntil = docDate(new Date(new Date(head.date).getTime() + validDays * 86_400_000));
 
@@ -190,241 +202,66 @@ export function QuotationDocument(props: QuotationDocProps) {
 
       <section className="qd-sheet qd-quote" aria-label="Quotation">
         <div className="qd-head">
-          <div>
-            <Field k="Client Name" v={head.clientName} />
-            <Field k="Client Mobile" v={head.clientPhone} />
-            <Field k="Flat No" v={head.flatNo} />
-            <Field k="Configuration" v={head.config} />
-          </div>
-          <div>
-            <Field k="Quotation No" v={head.number} />
-            <Field k="Date" v={docDate(head.date)} />
-            <Field k="Location" v={head.location} />
-          </div>
+          <Field k="Client Name" v={head.clientName || '—'} />
+          <Field k="Quotation No" v={head.number || 'Draft'} />
+          <Field k="Client Mobile" v={head.clientPhone} />
+          <Field k="Date" v={docDate(head.date)} />
+          <Field k="Flat No" v={head.flatNo} />
+          <Field k="Location" v={head.location} />
+          <Field k="Configuration" v={head.config} />
         </div>
 
         {props.welcomeNote ? <p className="qd-welcome">{props.welcomeNote}</p> : null}
 
         {rooms.length === 0 ? <p className="qd-empty">Nothing on this quotation yet.</p> : null}
 
-        {rooms.map((r) => (
-          <table key={r.room} className="qd-tbl qd-room">
-            <colgroup>
-              <col style={{ width: '6%' }} />
-              <col style={{ width: '15%' }} />
-              <col style={{ width: '7.5%' }} />
-              <col style={{ width: '22.5%' }} />
-              <col style={{ width: '6.5%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '11%' }} />
-              <col style={{ width: '11.5%' }} />
-            </colgroup>
-            <thead>
-              <tr className="qd-band">
-                <th colSpan={9}>{r.room}</th>
-              </tr>
-              <tr className="qd-cols">
-                <th>S.No.</th>
-                <th>Product</th>
-                <th>Work Code</th>
-                <th>Details</th>
-                <th className="r">Units</th>
-                <th className="r">Width(mm)</th>
-                <th className="r">Height(mm)</th>
-                <th className="r">Amount (₹)</th>
-                <th className="r">Discounted (₹)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {r.rows.map((row) => (
-                <tr key={row.n}>
-                  <td>{row.n}</td>
-                  <td className="qd-product">{row.product}</td>
-                  <td>{row.code}</td>
-                  <td className="qd-details">
-                    {row.details}
-                    <LineNote text={row.note} />
-                  </td>
-                  <td className="r">{row.units}</td>
-                  <td className="r">{row.widthMm ?? ''}</td>
-                  <td className="r">{row.heightMm ?? ''}</td>
-                  <td className={`r${row.modular ? ' qd-struck' : ''}`}>{row.amountPaise > 0 ? n(row.amountPaise) : '—'}</td>
-                  <td className={`r${row.modular ? ' qd-disc' : ''}`}>{row.discountedPaise > 0 ? n(row.discountedPaise) : '—'}</td>
-                </tr>
-              ))}
-              <tr className="qd-sub">
-                <td colSpan={7}>{r.room} (Sub-total)</td>
-                <td className="r">{n(r.subPaise)}</td>
-                <td className="r">{n(r.subDiscountedPaise)}</td>
-              </tr>
-            </tbody>
-          </table>
-        ))}
-
-        {rooms.length > 0 ? (
-          <div className="qd-keep qd-summary">
-            <p className="qd-bandline">Summary By Room</p>
-            <div className="qd-summary-grid">
-              <table className="qd-tbl">
-                <colgroup>
-                  <col style={{ width: '20%' }} />
-                  <col />
-                  <col style={{ width: '34%' }} />
-                </colgroup>
-                <thead>
-                  <tr className="qd-cols">
-                    <th>S.No.</th>
-                    <th>Rooms</th>
-                    <th className="r">Amount (₹)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shares.map((s, i) => (
-                    <tr key={s.room}>
-                      <td>{i + 1}</td>
-                      <td>{s.room}</td>
-                      <td className="r">{n(s.paise)}</td>
-                    </tr>
-                  ))}
-                  <tr className="qd-sub">
-                    <td colSpan={2}>Total</td>
-                    <td className="r">{n(workTotal)}</td>
-                  </tr>
-                </tbody>
-              </table>
-              <Donut shares={shares} palette={palette} total={workTotal} />
-            </div>
-          </div>
-        ) : null}
-
-        <table className="qd-tbl qd-totals qd-keep">
-          <tbody>
-            <tr>
-              <td>Sum-Total (MO-01) · Modular</td>
-              <td className="r">{n(totals.modularPaise)}</td>
-            </tr>
-            <tr>
-              <td>Sum-Total (NM-01) · Non-Modular</td>
-              <td className="r">{n(totals.onsitePaise)}</td>
-            </tr>
-            {totals.feePaise > 0 ? (
-              <tr>
-                <td>Professional fees ({props.feeBps / 100}%)</td>
-                <td className="r">{n(totals.feePaise)}</td>
-              </tr>
-            ) : null}
-            <tr className="qd-strong">
-              <td>Sub-Total</td>
-              <td className="r">{n(totals.subTotalPaise)}</td>
-            </tr>
-            {totals.discountPaise > 0 ? (
-              <tr>
-                <td>Discount on Modular ({props.discountBps / 100}%)</td>
-                <td className="r">{n(totals.discountPaise)}</td>
-              </tr>
-            ) : null}
-            {totals.onSpotPaise > 0 ? (
-              <tr>
-                <td>{props.onSpotLabel || 'Additional discount'}</td>
-                <td className="r">{n(totals.onSpotPaise)}</td>
-              </tr>
-            ) : null}
-            {gstOn ? (
-              <>
-                <tr className="qd-strong">
-                  <td>Total Project Value (before GST)</td>
-                  <td className="r">{n(totals.beforeTaxPaise)}</td>
-                </tr>
-                <tr>
-                  <td>GST ({props.gstBps / 100}%)</td>
-                  <td className="r">{n(totals.gstPaise)}</td>
-                </tr>
-                <tr className="qd-grand">
-                  <td>Grand Total (incl. GST)</td>
-                  <td className="r">{formatINR(totals.totalPaise)}</td>
-                </tr>
-              </>
-            ) : (
-              <tr className="qd-grand">
-                <td>Total Project Value</td>
-                <td className="r">{formatINR(totals.totalPaise)}</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-
-        {stages.length > 0 ? (
-          <div className="qd-keep">
-            <table className="qd-tbl qd-stages">
-              <colgroup>
-                <col style={{ width: '27%' }} />
-                <col />
-                <col style={{ width: '14%' }} />
-              </colgroup>
+        {rooms.map((room) => (
+          <div key={room.room} className="qd-roomblock">
+            <div className="qd-roomhdr">{room.room}</div>
+            <table className="qd-tbl qd-room">
               <thead>
-                <tr className="qd-band">
-                  <th colSpan={3}>Payment Stages{gstOn ? ' (incl. GST)' : ''}</th>
-                </tr>
                 <tr className="qd-cols">
-                  <th style={{ width: '27%' }}>Payment Stage</th>
-                  <th>End Deliverable</th>
-                  <th className="r" style={{ width: '13%' }}>
-                    Amount (₹)
-                  </th>
+                  <th>S.No.</th>
+                  <th>Product</th>
+                  <th>Work Code</th>
+                  <th>Details</th>
+                  <th className="r">Units</th>
+                  <th className="r">Width(mm)</th>
+                  <th className="r">Height(mm)</th>
+                  <th className="r">Amount (₹)</th>
+                  <th className="r">Discounted (₹)</th>
                 </tr>
               </thead>
               <tbody>
-                {stages.map((s, i) => (
-                  <tr key={`${i}-${s.label}`}>
-                    <td className="qd-product">{s.label}</td>
-                    <td className="qd-deliv">
-                      <Bold text={s.deliverable} />
+                {room.rows.map((row) => (
+                  <tr key={row.n}>
+                    <td>{row.n}</td>
+                    <td>
+                      <b>{row.product}</b>
                     </td>
-                    <td className="r">{n(s.amountPaise)}</td>
+                    <td>{row.code}</td>
+                    <td className="qd-details">
+                      {row.details}
+                      <LineNote text={row.note} />
+                    </td>
+                    <td className="r">{row.units}</td>
+                    <td className="r">{row.widthMm ?? ''}</td>
+                    <td className="r">{row.heightMm ?? ''}</td>
+                    <td className={`r${row.modular ? ' qd-struck' : ''}`}>{n(row.amountPaise)}</td>
+                    <td className={`r${row.modular ? ' qd-disc' : ' qd-soft'}`}>{n(row.discountedPaise)}</td>
                   </tr>
                 ))}
+                <tr className="qd-sub">
+                  <td colSpan={7}>{room.room} (Sub-total)</td>
+                  <td className="r">{n(room.subPaise)}</td>
+                  <td className="r">{n(room.subDiscountedPaise)}</td>
+                </tr>
               </tbody>
             </table>
-            <p className="qd-note">{STAGES_NOTE}</p>
           </div>
-        ) : null}
+        ))}
 
-        {props.spec.length > 0 ? (
-          <table className="qd-tbl qd-spec">
-            {brands ? (
-              <colgroup>
-                <col style={{ width: '24%' }} />
-                <col style={{ width: '28%' }} />
-                <col />
-              </colgroup>
-            ) : (
-              <colgroup>
-                <col style={{ width: '30%' }} />
-                <col />
-              </colgroup>
-            )}
-            <thead>
-              <tr className="qd-band">
-                <th colSpan={brands ? 3 : 2}>Material Specification</th>
-              </tr>
-              <tr className="qd-cols">
-                <th style={{ width: brands ? '24%' : '30%' }}>Material</th>
-                {brands ? <th style={{ width: '27%' }}>Brand</th> : null}
-                <th>Specification</th>
-              </tr>
-            </thead>
-            <tbody>
-              {props.spec.map((r) => (
-                <tr key={r.item}>
-                  <td className="qd-product">{r.item}</td>
-                  {brands ? <td>{r.brand ?? ''}</td> : null}
-                  <td className="qd-soft">{r.spec}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : null}
+        <DocSummary rooms={rooms} studio={studio} totals={totals} feeBps={props.feeBps} discountBps={props.discountBps} gstBps={props.gstBps} onSpotLabel={props.onSpotLabel} schedule={props.schedule} spec={props.spec} />
 
         {props.extra}
 
@@ -446,6 +283,166 @@ export function QuotationDocument(props: QuotationDocProps) {
 
       {props.terms?.trim() ? <TermsSheet studio={studio} terms={props.terms} /> : null}
     </DocFrame>
+  );
+}
+
+/**
+ * The closing pages of both PDFs — Hauspire's `QuoteSummary`: the summary
+ * by room with its donut, the totals box, the payment stages with their End
+ * Deliverables, and the material specification. The quotation ends with it,
+ * and so does the Final (Original vs Revised), as the old app's did.
+ */
+export function DocSummary({
+  rooms,
+  studio,
+  totals,
+  feeBps,
+  discountBps,
+  gstBps,
+  onSpotLabel,
+  schedule,
+  spec,
+}: {
+  rooms: DocRoom[];
+  studio: DocStudio | null;
+  totals: QuoteTotals;
+  feeBps: number;
+  discountBps: number;
+  gstBps: number;
+  onSpotLabel: string | null;
+  schedule: PaymentStage[] | null;
+  spec: DocSpecRow[];
+}) {
+  const shares = roomShares(rooms);
+  const palette = donutPalette(studio?.accentHex ?? null, shares.length);
+  const stages = docStages(schedule, totals);
+  const gstOn = totals.gstPaise > 0;
+  const workTotal = rooms.reduce((a, x) => a + x.subPaise, 0);
+  return (
+    <>
+      {rooms.length > 0 ? (
+        <div className="qd-keep qd-summary">
+          <div className="qd-roomhdr">Summary By Room</div>
+          <div className="qd-summary-grid">
+            <table className="qd-tbl">
+              <thead>
+                <tr className="qd-cols">
+                  <th>S.No.</th>
+                  <th>Rooms</th>
+                  <th className="r">Amount (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shares.map((s, i) => (
+                  <tr key={s.room}>
+                    <td>{i + 1}</td>
+                    <td>{s.room}</td>
+                    <td className="r">{n(s.paise)}</td>
+                  </tr>
+                ))}
+                <tr className="qd-sub">
+                  <td colSpan={2}>Total</td>
+                  <td className="r">{n(workTotal)}</td>
+                </tr>
+              </tbody>
+            </table>
+            <Donut shares={shares} palette={palette} />
+          </div>
+        </div>
+      ) : null}
+
+      <div className="qd-keep qd-totalsbox">
+        <table className="qd-tbl qd-totals">
+          <tbody>
+            <Row k="Sum-Total (MO-01)  ·  Modular" v={n(totals.modularPaise)} />
+            <Row k="Sum-Total (NM-01)  ·  Non-Modular" v={n(totals.onsitePaise)} />
+            {totals.feePaise > 0 || feeBps > 0 ? <Row k={`Professional fees (${Math.round(feeBps / 100)}%)`} v={n(totals.feePaise)} /> : null}
+            <Row k="Sub-Total" v={n(totals.subTotalPaise)} bold />
+            <Row k={`Discount on Modular (${Math.round(discountBps / 100)}%)`} v={n(totals.discountPaise)} />
+            {totals.onSpotPaise ? <Row k={`${onSpotLabel || DEFAULT_DISCOUNT_NAME} (₹)`} v={n(totals.onSpotPaise)} /> : null}
+            {gstOn ? (
+              <>
+                <Row k="Total Project Value (before GST)" v={n(totals.beforeTaxPaise)} bold />
+                <Row k={`GST (${Math.round(gstBps / 100)}%)`} v={n(totals.gstPaise)} />
+                <tr className="qd-grand">
+                  <td>Grand Total (incl. GST)</td>
+                  <td className="r">{r(totals.totalPaise)}</td>
+                </tr>
+              </>
+            ) : (
+              <tr className="qd-grand">
+                <td>Total Project Value</td>
+                <td className="r">{r(totals.totalPaise)}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {stages.length > 0 ? (
+        <div className="qd-section">
+          <div className="qd-roomhdr">Payment Stages{gstOn ? ' (incl. GST)' : ''}</div>
+          <table className="qd-tbl qd-stages">
+            <thead>
+              <tr className="qd-cols">
+                <th>Payment Stage</th>
+                <th>End Deliverable</th>
+                <th className="r">Amount (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stages.map((s, i) => (
+                <tr key={`${i}-${s.label}`}>
+                  <td>
+                    <b>{s.label}</b>
+                  </td>
+                  <td className="qd-deliv">
+                    <Bold text={s.deliverable} />
+                  </td>
+                  <td className="r">{n(s.amountPaise)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="qd-note">{STAGES_NOTE}</p>
+        </div>
+      ) : null}
+
+      {spec.length > 0 ? (
+        <div className="qd-section">
+          <div className="qd-roomhdr">Material Specification</div>
+          <table className="qd-tbl qd-spec">
+            <thead>
+              <tr className="qd-cols">
+                <th>Material</th>
+                <th>Brand</th>
+                <th>Specification</th>
+              </tr>
+            </thead>
+            <tbody>
+              {spec.map((x) => (
+                <tr key={x.item}>
+                  <td>
+                    <b>{x.item}</b>
+                  </td>
+                  <td>{x.brand ?? ''}</td>
+                  <td className="qd-specv">{x.spec}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function Row({ k, v, bold = false }: { k: string; v: string; bold?: boolean }) {
+  return (
+    <tr className={bold ? 'qd-strong' : undefined}>
+      <td>{k}</td>
+      <td className="r">{v}</td>
+    </tr>
   );
 }
 
@@ -498,7 +495,8 @@ export function TermsBody({ blocks }: { blocks: ReturnType<typeof parseTerms> })
             <Bold text={b.text} />
           </p>
         ) : (
-          <p key={i}>
+          /* Hauspire's TermsView: any other line is sub-text under the bullet above it, indented and softer. */
+          <p key={i} className="qd-termtext">
             <Bold text={b.text} />
           </p>
         ),
@@ -523,30 +521,31 @@ function Field({ k, v }: { k: string; v: string | null | undefined }) {
   );
 }
 
-/** Summary by room as a donut with its legend (Hauspire's RoomDonut). */
-function Donut({ shares, palette, total }: { shares: { room: string; paise: number; pct: number }[]; palette: string[]; total: number }) {
-  const items = shares.filter((s) => s.paise > 0);
-  const sum = items.reduce((a, s) => a + s.paise, 0) || 1;
+/** Summary by room as a donut with its legend: Hauspire's `RoomDonut`, element for element. */
+function Donut({ shares, palette }: { shares: { room: string; paise: number; pct: number }[]; palette: string[] }) {
+  const items = shares.map((s, i) => ({ ...s, colour: palette[i] ?? 'var(--qd-acc)' })).filter((s) => s.paise > 0);
+  const total = items.reduce((a, s) => a + s.paise, 0) || 1;
   const cx = 70;
   const cy = 70;
-  const r = 52;
-  const C = 2 * Math.PI * r;
+  const rad = 52;
+  const sw = 22;
+  const C = 2 * Math.PI * rad;
   let acc = 0;
   return (
     <div className="qd-donut">
-      <svg viewBox="0 0 140 140" width="132" height="132" role="img" aria-label="Share of each room">
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--qd-tint)" strokeWidth={22} />
+      <svg viewBox="0 0 140 140" width="140" height="140" role="img" aria-label="Share of each room">
+        <circle cx={cx} cy={cy} r={rad} fill="none" stroke="#efe7e0" strokeWidth={sw} />
         {items.map((s) => {
-          const len = (s.paise / sum) * C;
+          const len = (s.paise / total) * C;
           const seg = (
             <circle
               key={s.room}
               cx={cx}
               cy={cy}
-              r={r}
+              r={rad}
               fill="none"
-              stroke={palette[shares.indexOf(s)] ?? 'var(--qd-acc)'}
-              strokeWidth={22}
+              stroke={s.colour}
+              strokeWidth={sw}
               strokeDasharray={`${len} ${C - len}`}
               strokeDashoffset={-acc}
               transform={`rotate(-90 ${cx} ${cy})`}
@@ -555,23 +554,23 @@ function Donut({ shares, palette, total }: { shares: { room: string; paise: numb
           acc += len;
           return seg;
         })}
-        <text x={cx} y={cy - 3} textAnchor="middle" className="qd-donut-k">
+        <text x={cx} y={cy - 2} textAnchor="middle" className="qd-donut-k">
           TOTAL
         </text>
         <text x={cx} y={cy + 10} textAnchor="middle" className="qd-donut-v">
-          {formatINR(total)}
+          {r(total)}
         </text>
       </svg>
       <table className="qd-legend">
         <tbody>
-          {shares.map((s, i) => (
+          {items.map((s) => (
             <tr key={s.room}>
               <td>
-                <span className="qd-swatch" style={{ background: palette[i] }} />
+                <span className="qd-swatch" style={{ background: s.colour }} />
               </td>
-              <td>{s.room}</td>
-              <td className="r">{formatINR(s.paise)}</td>
-              <td className="r qd-pct">{s.pct}%</td>
+              <td className="qd-lname">{s.room}</td>
+              <td className="r qd-lval">{r(s.paise)}</td>
+              <td className="r qd-pct">{Math.round((s.paise / total) * 100)}%</td>
             </tr>
           ))}
         </tbody>

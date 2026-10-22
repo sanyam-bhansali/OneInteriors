@@ -66,7 +66,7 @@ describe('room list', () => {
 
 describe('Discounted column', () => {
   it('takes the modular discount off a modular line only', () => {
-    expect(discountedPaise(3_749_100, 'MODULAR', 1500)).toBe(3_186_735);
+    expect(discountedPaise(3_749_100, 'MODULAR', 1500)).toBe(3_186_700); // Math.round(37,491 × 0.85), to the rupee as the old app
     expect(discountedPaise(3_749_100, 'ONSITE', 1500)).toBe(3_749_100);
     expect(discountedPaise(1000, 'MODULAR', 0)).toBe(1000);
   });

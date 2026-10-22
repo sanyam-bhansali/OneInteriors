@@ -69,8 +69,8 @@ describe('a source line becomes ours', () => {
     expect(mapLine(LINES[3]!, 3)!.line).toMatchObject({ unit: 'RFT', qtyMilli: 12_000, ratePaise: 120_000, amountPaise: 1_400_000, details: null });
   });
 
-  it('a line with no sizing is one unit at its amount', () => {
-    expect(mapLine(LINES[4]!, 4)!.line).toMatchObject({ unit: 'UNIT', qtyMilli: 1000, ratePaise: 800_000, amountPaise: 800_000 });
+  it('a line with no sizing is an amount on its own: no quantity, Units blank as in the old PDF', () => {
+    expect(mapLine(LINES[4]!, 4)!.line).toMatchObject({ unit: 'UNIT', qtyMilli: null, ratePaise: 0, amountPaise: 800_000 });
   });
 
   it('an empty row is skipped; a missing room is the whole home', () => {
@@ -114,10 +114,10 @@ describe('the whole quotation', () => {
     expect(q.lines.map((l) => l.sortOrder)).toEqual([0, 1, 2, 3, 4]);
   });
 
-  it('adds up like the source app, within rounding', () => {
+  it('adds up exactly like the source app', () => {
     expect(q.totals.modularPaise).toBe(4_725_000);
     expect(q.totals.onsitePaise).toBe(3_450_000);
-    expect(Math.abs(q.totals.beforeTaxPaise - q.sourceTpvPaise)).toBeLessThanOrEqual(200);
+    expect(q.totals.beforeTaxPaise).toBe(q.sourceTpvPaise); // to the paisa, not "within rounding"
     expect(q.differencePaise).toBe(0);
     expect(q.totals.totalPaise).toBe(q.totals.beforeTaxPaise); // GST off
     expect(q.warnings).toEqual([]);
@@ -125,7 +125,7 @@ describe('the whole quotation', () => {
 
   it('GST on: added after every discount', () => {
     const g = mapQuote({ ...SALES, settings: { ...(SALES.settings as object), gstOn: true } });
-    expect(g.totals.gstPaise).toBe(Math.round(g.totals.beforeTaxPaise * 0.18));
+    expect(g.totals.gstPaise).toBe(Math.round((g.totals.beforeTaxPaise / 100) * 0.18) * 100);
   });
 
   it('a total that does not match is reported, not hidden', () => {
