@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { hasDatabase } from '@/lib/env';
 import { signoffDocument } from '@/modules/project/signoffs';
 import { QuotationDocument } from '@/app/studio/quotations/doc/QuotationDocument';
+import '@/app/studio/quotations/doc/quote-doc.css';
 import { SignoffScreen } from './SignoffScreen';
 
 export const metadata: Metadata = { title: 'Read and sign', robots: { index: false, follow: false } };

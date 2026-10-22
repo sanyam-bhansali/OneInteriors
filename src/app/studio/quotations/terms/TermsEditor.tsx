@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from 'react';
 import { parseTerms } from '@/modules/studio-quote/document';
 import { DocFrame, TermsBody } from '../doc/QuotationDocument';
+import '../doc/quote-doc.css';
 import { saveTermsAction } from './actions';
 
 const PLACEHOLDER = `## Terms & Conditions
