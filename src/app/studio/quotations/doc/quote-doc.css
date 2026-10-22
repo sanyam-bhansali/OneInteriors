@@ -194,6 +194,8 @@
 /* mb-1 flex gap-1.5, the bullet text-brand-light */
 .qd-termsbody .qd-bullet { position: relative; padding-left: calc(.375rem + .45em); }
 .qd-termsbody .qd-bullet::before { content: '•'; position: absolute; left: 0; color: var(--qd-head); }
+.qd-termsbody .qd-subbullet { margin-left: 1.1em; }
+.qd-termsbody .qd-subbullet::before { content: '◦'; }
 /* mb-1 pl-4 text-neutral-600 */
 .qd-termsbody .qd-termtext { padding-left: 1rem; color: var(--qd-soft); }
 .qd-gap { height: .5rem; }

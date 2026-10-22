@@ -235,7 +235,8 @@ const trimPct = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2).r
 export type TermsBlock =
   | { kind: 'title'; text: string }
   | { kind: 'heading'; text: string }
-  | { kind: 'bullet'; text: string }
+  /** `sub`: written indented under the bullet above ("  * Electrical fittings…"), printed indented. */
+  | { kind: 'bullet'; text: string; sub?: boolean }
   | { kind: 'text'; text: string }
   | { kind: 'gap' };
 
@@ -260,7 +261,8 @@ export function parseTerms(text: string | null | undefined): TermsBlock[] {
     }
     const b = line.match(/^[-*•–]\s+(.+)$/);
     if (b && !/^\*\*/.test(line)) {
-      out.push({ kind: 'bullet', text: b[1]! });
+      /* Two or more leading spaces: a sub-point (Hauspire's terms, 5 Sep 2026). */
+      out.push(/^\s{2,}/.test(raw) ? { kind: 'bullet', text: b[1]!, sub: true } : { kind: 'bullet', text: b[1]! });
       continue;
     }
     if (line.endsWith(':') && line.length <= 70 && !/[.;]\s/.test(line)) {

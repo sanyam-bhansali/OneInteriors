@@ -106,3 +106,15 @@ describe('quotation numbers', () => {
     expect(nextQuoteNumber(2026, ['2026-004', '17'])).toBe('2026-005');
   });
 });
+
+describe('terms sub-points (Hauspire’s terms, 5 Sep 2026)', () => {
+  it('a bullet written indented prints as a sub-point', async () => {
+    const { parseTerms } = await import('@/modules/studio-quote/document');
+    const blocks = parseTerms('* Not included:\n  * Electrical fittings, lights, fans\n* Final measurements');
+    expect(blocks).toEqual([
+      { kind: 'bullet', text: 'Not included:' },
+      { kind: 'bullet', text: 'Electrical fittings, lights, fans', sub: true },
+      { kind: 'bullet', text: 'Final measurements' },
+    ]);
+  });
+});

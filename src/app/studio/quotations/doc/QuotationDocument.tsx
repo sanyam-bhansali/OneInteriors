@@ -491,7 +491,7 @@ export function TermsBody({ blocks }: { blocks: ReturnType<typeof parseTerms> })
             <Bold text={b.text} />
           </h3>
         ) : b.kind === 'bullet' ? (
-          <p key={i} className="qd-bullet">
+          <p key={i} className={b.sub ? 'qd-bullet qd-subbullet' : 'qd-bullet'}>
             <Bold text={b.text} />
           </p>
         ) : (
