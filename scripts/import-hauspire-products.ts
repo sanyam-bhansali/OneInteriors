@@ -165,7 +165,7 @@ async function main() {
             data: { studioId: studio.id, reason: 'before importing the Hauspire quotation app’s product master', rows: ours.map((p) => ({ ...p, ratePaise: String(p.ratePaise) })) as unknown as Prisma.InputJsonValue },
           });
         }
-        const data = (r: (typeof creates)[number]) => ({ ...r, rules: r.rules ?? Prisma.DbNull, isActive: true });
+        const data = (r: (typeof creates)[number]) => ({ ...r, rules: r.rules ? (r.rules as unknown as Prisma.InputJsonValue) : Prisma.DbNull, isActive: true });
         for (const r of creates) await tx.studioProduct.create({ data: { studioId: studio.id, ...data(r) } });
         for (const u of updates) await tx.studioProduct.update({ where: { id: u.id }, data: data(u.row) });
         await tx.auditLog.create({
