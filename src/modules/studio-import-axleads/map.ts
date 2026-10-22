@@ -46,6 +46,15 @@
  *   and each history line `externalId = "axleads:<id>"`, both unique per
  *   studio. A second run skips what the first wrote; it only gives a lead in
  *   the pool to its person if that person has since been matched.
+ * - **The sales team** (owner, 22 Oct 2026): the roles file can name each
+ *   person (`name`), give a salesperson a sales role (`salesRole`, made from
+ *   another role plus permissions when the studio has no role of that name)
+ *   and a reporting line (`reportsTo`), and send the pool leads to a head's
+ *   team pool (`poolTeam`). Planned by `planSalesTeam` under the same rules as
+ *   Settings → Team (sales-team-store.ts): sales roles and reporting lines are
+ *   for SALES members only, same studio, no loops; the owner is everything and
+ *   gets neither. Anything the file asks for that cannot be done is a problem
+ *   in the report, and a real run writes nothing until the file is fixed.
  */
 
 import { normalisePhone as clientPhone, tidyName } from '@/modules/studio-practice/csv';
@@ -63,6 +72,19 @@ import { cleanValues, type FieldShape } from '@/modules/studio-practice/field-va
 import { addTags } from '@/modules/studio-sales/tag-rules';
 import { STUDIO_ROLES, type StudioRoleName } from '@/modules/studio/roles';
 import { adColumns, emptyAds, platformWord, UTM_KEYS, type AdColumns } from '@/modules/studio-intake/payloads';
+import { checkReportsTo, type ReportsToMember } from '@/modules/studio/sales-access';
+import {
+  BUILT_IN_SALES_ROLES,
+  MAX_SALES_ROLES,
+  SALES_PERMISSION_KEYS,
+  checkSalesRole,
+  permissionDef,
+  reachesAtLeast,
+  readSalesPermissions,
+  type SalesPermissionKey,
+  type SalesPermissionMap,
+  type SalesReach,
+} from '@/modules/studio/sales-permissions';
 
 export const IMPORTED_FROM = 'axleads';
 export const EXPORT_FORMAT = 'axleads-export';
@@ -210,17 +232,54 @@ export function parseExport(raw: unknown): { ok: true; data: AxExport } | { ok: 
  *     "stages":  { "<AxLeads stage name>": "<studio column name>" },
  *     "binned":  "bin" | "skip",
  *     "skipIfAnswered": ["<form question key>", …],   (e.g. a hiring form's questions)
- *     "createFields": true
+ *     "createFields": true,
+ *     "poolTeam": "<member key of a sales head>"
  *   }
+ *
+ * and, per member (owner, 22 Oct 2026): "name", "salesRole", "salesRoleFrom",
+ * "addPermissions", "reportsTo" — see `MemberChoice`.
  */
 export interface Choices {
   roles: Record<AxRole, StudioRoleName>;
-  members: Record<string, { role?: StudioRoleName; phone?: string; skip?: boolean }>;
+  members: Record<string, MemberChoice>;
   stages: Record<string, string>;
   binned: 'bin' | 'skip';
   /** Form questions (custom-field keys, any case) whose answer means "not a client": a job application. */
   skipIfAnswered: string[];
   createFields: boolean;
+  /**
+   * A member key (lowercased) of a sales head whose TEAM pool receives the
+   * leads that were unassigned on AxLeads and the leads of people skipped or
+   * gone — instead of the studio pool (owner, 22 Oct 2026). Null: the studio pool.
+   */
+  poolTeam: string | null;
+}
+
+/** A permission the roles file adds to a copied role: on, or a reach (never narrower than the copy's). */
+export interface AddedPermission {
+  key: SalesPermissionKey;
+  reach: SalesReach | null;
+}
+
+/**
+ * One person in the roles file, keyed by AxLeads email, user id or membership id.
+ *
+ *  - `name` — their name here, used when they are added (an existing login keeps its own name).
+ *  - `salesRole` — a sales role of the studio ("Admin", "Sales head", "Sales rep" or one of its own).
+ *  - `salesRoleFrom` + `addPermissions` — when the studio has no role named `salesRole`, it is made:
+ *    a copy of `salesRoleFrom` with these permissions added ("quotes.build", "leads.view:team").
+ *  - `reportsTo` — another member key in the file, or the phone of someone on the studio's team.
+ */
+export interface MemberChoice {
+  role?: StudioRoleName;
+  phone?: string;
+  skip?: boolean;
+  name?: string;
+  salesRole?: string;
+  salesRoleFrom?: string;
+  addPermissions?: AddedPermission[];
+  /** A member key (lowercased) when it has an @ or is not a phone; else an E.164 phone. */
+  reportsTo?: { key: string } | { phone: string };
 }
 
 /**
@@ -230,14 +289,29 @@ export interface Choices {
  */
 export const DEFAULT_ROLES: Record<AxRole, StudioRoleName> = { OWNER: 'OWNER', AGENT: 'SALES' };
 
-export const DEFAULT_CHOICES: Choices = { roles: { ...DEFAULT_ROLES }, members: {}, stages: {}, binned: 'bin', skipIfAnswered: [], createFields: true };
+export const DEFAULT_CHOICES: Choices = { roles: { ...DEFAULT_ROLES }, members: {}, stages: {}, binned: 'bin', skipIfAnswered: [], createFields: true, poolTeam: null };
 
 const isRole = (v: unknown): v is StudioRoleName => typeof v === 'string' && (STUDIO_ROLES as readonly string[]).includes(v);
 
+/** A role or person name as typed: trimmed, inner spacing collapsed. */
+const tidy = (s: string) => s.trim().replace(/\s+/g, ' ');
+
+/** "quotes.build" or "leads.view:team", checked against the catalogue (sales-permissions.ts). */
+function parsePermission(raw: unknown, where: string): { ok: true; p: AddedPermission } | { ok: false; error: string } {
+  if (typeof raw !== 'string' || !raw.trim()) return { ok: false, error: `${where} must be permission keys such as "quotes.build" or "leads.view:team".` };
+  const [key, reach, ...rest] = raw.trim().split(':');
+  if (rest.length || !(SALES_PERMISSION_KEYS as readonly string[]).includes(key!)) return { ok: false, error: `${where} has "${raw}", which is not a sales permission. The keys are: ${SALES_PERMISSION_KEYS.join(', ')}.` };
+  const def = permissionDef(key as SalesPermissionKey);
+  if (reach === undefined) return { ok: true, p: { key: def.key, reach: null } };
+  if (!def.reaches) return { ok: false, error: `${where} has "${raw}": ${def.key} is simply on or off, it takes no reach.` };
+  if (!(def.reaches as readonly string[]).includes(reach)) return { ok: false, error: `${where} has "${raw}": ${def.key} takes ${def.reaches.join(' / ')}.` };
+  return { ok: true, p: { key: def.key, reach: reach as SalesReach } };
+}
+
 export function parseChoices(raw: unknown): { ok: true; choices: Choices } | { ok: false; error: string } {
-  if (raw === undefined || raw === null) return { ok: true, choices: { ...DEFAULT_CHOICES, roles: { ...DEFAULT_ROLES }, skipIfAnswered: [] } };
+  if (raw === undefined || raw === null) return { ok: true, choices: { ...DEFAULT_CHOICES, roles: { ...DEFAULT_ROLES }, members: {}, stages: {}, skipIfAnswered: [] } };
   if (!isObj(raw)) return { ok: false, error: 'The roles file must be a JSON object.' };
-  const choices: Choices = { roles: { ...DEFAULT_ROLES }, members: {}, stages: {}, binned: 'bin', skipIfAnswered: [], createFields: true };
+  const choices: Choices = { roles: { ...DEFAULT_ROLES }, members: {}, stages: {}, binned: 'bin', skipIfAnswered: [], createFields: true, poolTeam: null };
   if (raw.roles !== undefined) {
     if (!isObj(raw.roles)) return { ok: false, error: '"roles" must map OWNER / AGENT to a studio role.' };
     for (const [k, v] of Object.entries(raw.roles)) {
@@ -252,8 +326,66 @@ export function parseChoices(raw: unknown): { ok: true; choices: Choices } | { o
       if (!isObj(v)) return { ok: false, error: `"members.${k}" must be an object.` };
       if (v.role !== undefined && !isRole(v.role)) return { ok: false, error: `"members.${k}.role" must be one of ${STUDIO_ROLES.join(', ')}.` };
       if (v.phone !== undefined && (typeof v.phone !== 'string' || !memberPhone(v.phone))) return { ok: false, error: `"members.${k}.phone" is not an Indian mobile number.` };
-      choices.members[k.trim().toLowerCase()] = { role: v.role as StudioRoleName | undefined, phone: v.phone as string | undefined, skip: v.skip === true };
+      const key = k.trim().toLowerCase();
+      const one: MemberChoice = { role: v.role as StudioRoleName | undefined, phone: v.phone as string | undefined, skip: v.skip === true };
+      if (v.name !== undefined) {
+        const name = typeof v.name === 'string' ? tidy(v.name) : '';
+        if (name.length < 2 || name.length > 80) return { ok: false, error: `"members.${k}.name" must be a name of 2 to 80 letters.` };
+        one.name = name;
+      }
+      if (v.salesRole !== undefined) {
+        const name = typeof v.salesRole === 'string' ? tidy(v.salesRole) : '';
+        if (name.length < 2 || name.length > 40) return { ok: false, error: `"members.${k}.salesRole" must be a role name of 2 to 40 letters.` };
+        one.salesRole = name;
+      }
+      if (v.salesRoleFrom !== undefined) {
+        if (!one.salesRole) return { ok: false, error: `"members.${k}.salesRoleFrom" needs "salesRole": the role to make.` };
+        const from = typeof v.salesRoleFrom === 'string' ? tidy(v.salesRoleFrom) : '';
+        if (from.length < 2) return { ok: false, error: `"members.${k}.salesRoleFrom" must name a sales role to copy.` };
+        one.salesRoleFrom = from;
+      }
+      if (v.addPermissions !== undefined) {
+        if (!one.salesRoleFrom) return { ok: false, error: `"members.${k}.addPermissions" needs "salesRoleFrom": the role whose permissions it adds to.` };
+        if (!Array.isArray(v.addPermissions)) return { ok: false, error: `"members.${k}.addPermissions" must be a list of permission keys.` };
+        const list: AddedPermission[] = [];
+        for (const p of v.addPermissions) {
+          const r = parsePermission(p, `"members.${k}.addPermissions"`);
+          if (!r.ok) return r;
+          list.push(r.p);
+        }
+        one.addPermissions = list;
+      }
+      if (v.reportsTo !== undefined) {
+        const to = typeof v.reportsTo === 'string' ? v.reportsTo.trim() : '';
+        if (!to) return { ok: false, error: `"members.${k}.reportsTo" must be another member's key (their email) or a team member's phone.` };
+        const phone = to.includes('@') ? null : memberPhone(to);
+        one.reportsTo = phone ? { phone } : { key: to.toLowerCase() };
+        if (!phone && to.toLowerCase() === key) return { ok: false, error: `"members.${k}.reportsTo": nobody reports to themselves.` };
+      }
+      choices.members[key] = one;
     }
+    // References inside the file, checked once every key is known.
+    for (const [k, one] of Object.entries(choices.members)) {
+      if (one.reportsTo && 'key' in one.reportsTo && !choices.members[one.reportsTo.key]) {
+        return { ok: false, error: `"members.${k}.reportsTo" is "${one.reportsTo.key}", which is neither a key in "members" nor a mobile number.` };
+      }
+    }
+    // One recipe per new role: two people naming it must not make it two ways.
+    const recipes = new Map<string, { from: string; add: string; who: string }>();
+    for (const [k, one] of Object.entries(choices.members)) {
+      if (!one.salesRole || !one.salesRoleFrom) continue;
+      const add = (one.addPermissions ?? []).map((p) => (p.reach ? `${p.key}:${p.reach}` : p.key)).sort().join(',');
+      const was = recipes.get(norm(one.salesRole));
+      if (was && (norm(was.from) !== norm(one.salesRoleFrom) || was.add !== add)) {
+        return { ok: false, error: `"${one.salesRole}" is made two different ways (members.${was.who} and members.${k}). Give the recipe once, or the same both times.` };
+      }
+      recipes.set(norm(one.salesRole), { from: one.salesRoleFrom, add, who: k });
+    }
+  }
+  if (raw.poolTeam !== undefined && raw.poolTeam !== null) {
+    const key = typeof raw.poolTeam === 'string' ? raw.poolTeam.trim().toLowerCase() : '';
+    if (!key || !choices.members[key]) return { ok: false, error: '"poolTeam" must be the key (email) of a sales head listed in "members".' };
+    choices.poolTeam = key;
   }
   if (raw.stages !== undefined) {
     if (!isObj(raw.stages)) return { ok: false, error: '"stages" must map AxLeads stage names to column names.' };
@@ -292,6 +424,17 @@ export interface StudioMemberRef {
   /** E.164, from the User. */
   phone: string | null;
   email: string | null;
+  /** Their sales role and reporting line (22 Oct 2026); absent reads as none. */
+  salesRoleId?: string | null;
+  reportsToId?: string | null;
+}
+
+/** One of the studio's sales roles (StudioSalesRole). */
+export interface SalesRoleRef {
+  id: string;
+  name: string;
+  system: string | null;
+  permissions: unknown;
 }
 
 /** A User found by an AxLeads member's phone or email. */
@@ -333,7 +476,21 @@ export interface StudioContext {
   /** Not deleted, not the sample lead. Keyed by the ten digits. */
   existingByPhone: Map<string, ExistingClient>;
   /** AxLeads lead ids this studio already holds (a card or a merge line). */
-  imported: Map<string, { clientId: string; assignedToId: string | null }>;
+  imported: Map<string, ImportedRef>;
+  /** The studio's sales roles; absent reads as none (the built-ins are then planned as missing). */
+  salesRoles?: SalesRoleRef[];
+}
+
+/** What an earlier run left for one AxLeads lead. */
+export interface ImportedRef {
+  clientId: string;
+  assignedToId: string | null;
+  /** The pool it sits in (null: the studio pool). */
+  poolTeamId?: string | null;
+  /** The card was made by the import (not a merge into a card that was already there). */
+  fromImport?: boolean;
+  /** Anything happened on the card after its import line (a call, a note, a move): it is left alone. */
+  touched?: boolean;
 }
 
 // ── Small mappings ──────────────────────────────────────────────────────
@@ -524,16 +681,25 @@ const CANONICAL_KEYS = {
 
 // ── People ──────────────────────────────────────────────────────────────
 
-export type MemberPlan =
+export type MemberPlan = (
   | { kind: 'match'; ax: AxMember; memberId: string; name: string; by: 'phone' | 'email' }
   | { kind: 'create'; ax: AxMember; name: string; phone: string; email: string | null; role: StudioRoleName; reuseUserId: string | null; emailDropped: boolean }
   | { kind: 'refused'; ax: AxMember; phone: string; reason: string }
   | { kind: 'no-phone'; ax: AxMember }
   | { kind: 'gone'; ax: AxMember }
-  | { kind: 'skip'; ax: AxMember };
+  | { kind: 'skip'; ax: AxMember }
+) & {
+  /** How the report names them: the roles file's `name`, else the AxLeads display name. */
+  label: string;
+};
 
-function overrideFor(m: AxMember, choices: Choices) {
+function overrideFor(m: AxMember, choices: Choices): MemberChoice | undefined {
   return choices.members[(m.email ?? '').trim().toLowerCase()] ?? choices.members[m.userId.toLowerCase()] ?? choices.members[m.id.toLowerCase()];
+}
+
+/** The keys a roles file may use for this AxLeads member, lowercased. */
+function keysOf(m: AxMember): string[] {
+  return [(m.email ?? '').trim().toLowerCase(), m.userId.toLowerCase(), m.id.toLowerCase()].filter(Boolean);
 }
 
 export function planMembers(axMembers: readonly AxMember[], ctx: Pick<StudioContext, 'studioId' | 'members' | 'usersByPhone' | 'usersByEmail'>, choices: Choices): MemberPlan[] {
@@ -544,8 +710,10 @@ export function planMembers(axMembers: readonly AxMember[], ctx: Pick<StudioCont
     if (seenUsers.has(m.userId)) continue;
     seenUsers.add(m.userId);
     const o = overrideFor(m, choices);
+    const axName = (m.displayName ?? '').trim().replace(/\s+/g, ' ').slice(0, 80);
+    const label = o?.name ?? (axName || m.email || 'Someone');
     if (o?.skip) {
-      out.push({ kind: 'skip', ax: m });
+      out.push({ kind: 'skip', ax: m, label });
       continue;
     }
     const phone = memberPhone(o?.phone ?? m.phone ?? '');
@@ -554,21 +722,21 @@ export function planMembers(axMembers: readonly AxMember[], ctx: Pick<StudioCont
     const byEmail = !byPhone && email ? ctx.members.find((s) => (s.email ?? '').toLowerCase() === email) : undefined;
     const found = byPhone ?? byEmail;
     if (found) {
-      out.push({ kind: 'match', ax: m, memberId: found.id, name: found.name, by: byPhone ? 'phone' : 'email' });
+      out.push({ kind: 'match', ax: m, memberId: found.id, name: found.name, by: byPhone ? 'phone' : 'email', label });
       continue;
     }
     /* Somebody who left AxLeads is history, not a hire: their name stays on
        every line they wrote, and their open leads go to the pool. */
     if (m.deletedAt || m.status === 'SUSPENDED') {
-      out.push({ kind: 'gone', ax: m });
+      out.push({ kind: 'gone', ax: m, label });
       continue;
     }
     if (!phone) {
-      out.push({ kind: 'no-phone', ax: m });
+      out.push({ kind: 'no-phone', ax: m, label });
       continue;
     }
     if (claimedPhones.has(phone)) {
-      out.push({ kind: 'refused', ax: m, phone, reason: 'Another AxLeads member in this file has the same number.' });
+      out.push({ kind: 'refused', ax: m, phone, reason: 'Another AxLeads member in this file has the same number.', label });
       continue;
     }
     // The rules of Settings → Team's "Add someone" (team-store.ts inviteMember).
@@ -580,7 +748,7 @@ export function planMembers(axMembers: readonly AxMember[], ctx: Pick<StudioCont
     else if (user?.studioId && user.studioId !== ctx.studioId) reason = 'That number is on another studio’s team.';
     else if (user?.studioId === ctx.studioId) reason = 'That number is on this team already under another account.';
     if (reason) {
-      out.push({ kind: 'refused', ax: m, phone, reason });
+      out.push({ kind: 'refused', ax: m, phone, reason, label });
       continue;
     }
     claimedPhones.add(phone);
@@ -592,12 +760,15 @@ export function planMembers(axMembers: readonly AxMember[], ctx: Pick<StudioCont
     out.push({
       kind: 'create',
       ax: m,
-      name: (m.displayName ?? '').trim().replace(/\s+/g, ' ').slice(0, 80) || email || phone,
+      /* The roles file's name first (22 Oct 2026). It names a NEW login only:
+         import.ts never writes it onto a User that already exists. */
+      name: o?.name ?? (axName || email || phone),
       phone,
       email: emailDropped ? null : email,
       role: o?.role ?? choices.roles[m.role] ?? DEFAULT_ROLES[m.role] ?? 'SALES',
       reuseUserId: user?.id ?? null,
       emailDropped,
+      label,
     });
   }
   return out;
@@ -615,6 +786,231 @@ function personIndex(plans: readonly MemberPlan[]): Map<string, PersonRef> {
     else map.set(p.ax.userId, { member: null, name: axName });
   }
   return map;
+}
+
+// ── The sales team (roles file: salesRole, reportsTo, poolTeam; 22 Oct 2026) ──
+
+export type MemberRef = NonNullable<PersonRef['member']>;
+
+/** The id a member has, or will have, in the tree checks: `new:<AxLeads user id>` until it is written. */
+export const treeId = (ref: MemberRef): string => (ref.kind === 'existing' ? ref.id : `new:${ref.axUserId}`);
+
+export type Change = 'set' | 'same' | 'changed';
+
+export interface SalesTeamLine {
+  axUserId: string;
+  /** The report's name for them. */
+  who: string;
+  member: MemberRef;
+  fixedRole: StudioRoleName;
+  salesRole: { name: string; isNew: boolean; change: Change; was: string | null } | null;
+  reportsTo: { to: MemberRef; name: string; change: Change; was: string | null } | null;
+}
+
+export interface SalesRoleToCreate {
+  name: string;
+  from: string;
+  added: SalesPermissionKey[];
+  permissions: SalesPermissionMap;
+}
+
+export interface SalesTeamPlan {
+  /** Built-in roles the studio does not have yet (it predates them); import.ts makes them first. */
+  builtInsMissing: string[];
+  rolesToCreate: SalesRoleToCreate[];
+  lines: SalesTeamLine[];
+  poolTeam: { member: MemberRef; name: string } | null;
+  /** What the file asks for that cannot be done. A real run writes nothing while there are any. */
+  problems: string[];
+  /** What the file asks for that is left out on purpose (the owner is everything; a designer has no sales role). */
+  notes: string[];
+  /** Whether the file uses sales roles at all (then the built-ins are ensured). */
+  uses: boolean;
+}
+
+/** The copy plus the additions; an addition never narrows what the copy already reaches. */
+export function derivePermissions(base: SalesPermissionMap, add: readonly AddedPermission[]): SalesPermissionMap {
+  const out: SalesPermissionMap = { ...base };
+  for (const a of add) {
+    const def = permissionDef(a.key);
+    if (!def.reaches) {
+      out[a.key] = true;
+      continue;
+    }
+    const want = a.reach ?? def.reaches[0]!;
+    const have = out[a.key];
+    out[a.key] = typeof have === 'string' && reachesAtLeast(have, want) ? have : want;
+  }
+  return readSalesPermissions(out);
+}
+
+/**
+ * What the roles file asks of the sales side, checked against the studio
+ * before anything is written (owner, 22 Oct 2026). The rules are Settings →
+ * Team's (sales-team-store.ts `setMemberSalesRole` / `setReportsTo`, and
+ * sales-access.ts `checkReportsTo` itself): only SALES members get a sales
+ * role or a reporting line, a salesperson reports to another salesperson of
+ * the same studio, nobody to themselves, no loops. The owner is everything:
+ * a sales role or a boss for them is reported and left out. Reporting lines
+ * are checked in file order against the tree as it will be, new people
+ * included under `new:` ids; import.ts checks again, against the database,
+ * in one serializable transaction when it writes.
+ *
+ * Idempotent by construction: an existing member's role or line is changed
+ * only when the file names one, and one already as asked is "same".
+ */
+export function planSalesTeam(members: readonly MemberPlan[], ctx: Pick<StudioContext, 'studioId' | 'members' | 'salesRoles'>, choices: Choices): SalesTeamPlan {
+  const problems: string[] = [];
+  const notes: string[] = [];
+  const lines: SalesTeamLine[] = [];
+  const rolesToCreate: SalesRoleToCreate[] = [];
+
+  // The roles there are, the built-ins counted even before import.ts makes them.
+  const have = (ctx.salesRoles ?? []).map((r) => ({ id: r.id as string | null, name: r.name, system: r.system, permissions: readSalesPermissions(r.permissions) }));
+  const builtInsMissing: string[] = [];
+  for (const b of BUILT_IN_SALES_ROLES) {
+    if (have.some((r) => r.system === b.system)) continue;
+    builtInsMissing.push(b.name);
+    if (!have.some((r) => norm(r.name) === norm(b.name))) have.push({ id: null, name: b.name, system: b.system, permissions: { ...b.permissions } });
+  }
+  const roleNamed = (name: string) => have.find((r) => norm(r.name) === norm(name));
+  const roleName = (id: string | null | undefined) => (id ? (ctx.salesRoles ?? []).find((r) => r.id === id)?.name ?? 'another role' : null);
+
+  const keyed = new Map<string, MemberPlan>();
+  for (const p of members) for (const k of keysOf(p.ax)) if (!keyed.has(k)) keyed.set(k, p);
+  const refOf = (p: MemberPlan): MemberRef | null => (p.kind === 'match' ? { kind: 'existing', id: p.memberId } : p.kind === 'create' ? { kind: 'new', axUserId: p.ax.userId } : null);
+  const fixedRoleOf = (p: MemberPlan): StudioRoleName | null => (p.kind === 'match' ? ctx.members.find((s) => s.id === p.memberId)?.role ?? null : p.kind === 'create' ? p.role : null);
+  const whyNot = (p: MemberPlan) =>
+    p.kind === 'skip' ? 'skipped in the roles file' : p.kind === 'gone' ? 'they left AxLeads' : p.kind === 'no-phone' ? 'no phone' : p.kind === 'refused' ? 'their number was refused' : '';
+  const nameOfRef = (ref: MemberRef): string => {
+    if (ref.kind === 'existing') return members.find((p) => p.kind === 'match' && p.memberId === ref.id)?.label ?? ctx.members.find((s) => s.id === ref.id)?.name ?? 'someone';
+    return members.find((p) => p.ax.userId === ref.axUserId)?.label ?? 'someone';
+  };
+
+  // 1. Sales roles.
+  const uses = Object.values(choices.members).some((o) => o.salesRole || o.reportsTo) || choices.poolTeam !== null;
+  const notedRole = new Set<string>();
+  for (const p of members) {
+    const o = overrideFor(p.ax, choices);
+    if (!o || (!o.salesRole && !o.reportsTo)) continue;
+    const asks = [o.salesRole && 'a sales role', o.reportsTo && 'a reporting line'].filter(Boolean).join(' and ');
+    const ref = refOf(p);
+    if (!ref) {
+      notes.push(`${p.label}: not added here (${whyNot(p)}), so ${asks} is left out.`);
+      continue;
+    }
+    const fixedRole = fixedRoleOf(p) ?? 'SALES';
+    if (fixedRole === 'OWNER') {
+      notes.push(`${p.label} is the owner: owners can do everything, so ${asks} is left out.`);
+      continue;
+    }
+    if (fixedRole !== 'SALES') {
+      notes.push(`${p.label} is ${fixedRole}: sales roles and reporting lines are for salespeople, so ${asks} is left out.`);
+      continue;
+    }
+    const line: SalesTeamLine = { axUserId: p.ax.userId, who: p.label, member: ref, fixedRole, salesRole: null, reportsTo: null };
+    lines.push(line);
+    if (!o.salesRole) continue;
+
+    let role = roleNamed(o.salesRole);
+    let isNew = false;
+    if (role && o.salesRoleFrom && !notedRole.has(norm(o.salesRole))) {
+      notedRole.add(norm(o.salesRole));
+      notes.push(`"${role.name}" is already a role here, so salesRoleFrom / addPermissions are not used (edit it on Settings → Team → Roles).`);
+    }
+    if (!role) {
+      const planned = rolesToCreate.find((r) => norm(r.name) === norm(o.salesRole!));
+      if (planned) {
+        isNew = true;
+        role = { id: null, name: planned.name, system: null, permissions: planned.permissions };
+      } else if (!o.salesRoleFrom) {
+        problems.push(`${p.label}: "${o.salesRole}" is not a sales role here. Use one there is (${have.map((r) => r.name).join(', ')}), or say which role to copy with "salesRoleFrom" (and "addPermissions").`);
+        continue;
+      } else {
+        const from = roleNamed(o.salesRoleFrom);
+        if (!from) {
+          problems.push(`${p.label}: "${o.salesRoleFrom}" (salesRoleFrom) is not a sales role here (${have.map((r) => r.name).join(', ')}).`);
+          continue;
+        }
+        const permissions = derivePermissions(from.permissions, o.addPermissions ?? []);
+        const check = checkSalesRole({ name: o.salesRole, permissions });
+        if (!check.ok) {
+          problems.push(`${p.label}: "${o.salesRole}" cannot be made: ${check.error}`);
+          continue;
+        }
+        if (have.length + rolesToCreate.length >= MAX_SALES_ROLES) {
+          problems.push(`${p.label}: "${o.salesRole}" cannot be made: ${MAX_SALES_ROLES} roles is the most.`);
+          continue;
+        }
+        const made: SalesRoleToCreate = { name: check.role.name, from: from.name, added: (o.addPermissions ?? []).map((a) => a.key), permissions: check.role.permissions };
+        rolesToCreate.push(made);
+        isNew = true;
+        role = { id: null, name: made.name, system: null, permissions: made.permissions };
+      }
+    }
+    const current = ref.kind === 'existing' ? ctx.members.find((s) => s.id === ref.id)?.salesRoleId ?? null : null;
+    const change: Change = current && role.id === current ? 'same' : current ? 'changed' : 'set';
+    line.salesRole = { name: role.name, isNew, change, was: change === 'changed' ? roleName(current) : null };
+  }
+
+  // 2. Reporting lines, in file order, against the tree as it will be.
+  const tree: ReportsToMember[] = ctx.members.map((s) => ({ id: s.id, studioId: ctx.studioId, role: s.role, reportsToId: s.reportsToId ?? null }));
+  for (const p of members) if (p.kind === 'create') tree.push({ id: `new:${p.ax.userId}`, studioId: ctx.studioId, role: p.role, reportsToId: null });
+  for (const line of lines) {
+    const p = members.find((m) => m.ax.userId === line.axUserId)!;
+    const want = overrideFor(p.ax, choices)?.reportsTo;
+    if (!want) continue;
+    let to: MemberRef | null = null;
+    let label = '';
+    if ('key' in want) {
+      const target = keyed.get(want.key);
+      if (!target) {
+        problems.push(`${line.who}: reportsTo "${want.key}" is in the roles file but is nobody in the AxLeads export.`);
+        continue;
+      }
+      to = refOf(target);
+      label = target.label;
+      if (!to) {
+        problems.push(`${line.who}: reportsTo ${target.label}, who is not added here (${whyNot(target)}).`);
+        continue;
+      }
+    } else {
+      const s = ctx.members.find((m) => m.phone === want.phone);
+      const c = members.find((m) => m.kind === 'create' && m.phone === want.phone);
+      to = s ? { kind: 'existing', id: s.id } : c ? { kind: 'new', axUserId: c.ax.userId } : null;
+      label = s ? nameOfRef({ kind: 'existing', id: s.id }) : c ? c.label : '';
+      if (!to) {
+        problems.push(`${line.who}: reportsTo …${want.phone.slice(-4)} is not anyone on this studio's team.`);
+        continue;
+      }
+    }
+    const check = checkReportsTo(treeId(line.member), treeId(to), tree);
+    if (!check.ok) {
+      problems.push(`${line.who}: cannot report to ${label}: ${check.error}`);
+      continue;
+    }
+    const me = tree.find((t) => t.id === treeId(line.member))!;
+    const current = me.reportsToId;
+    me.reportsToId = check.reportsToId;
+    const change: Change = current && current === check.reportsToId ? 'same' : current ? 'changed' : 'set';
+    const wasRef: MemberRef | null = current ? (current.startsWith('new:') ? { kind: 'new', axUserId: current.slice(4) } : { kind: 'existing', id: current }) : null;
+    line.reportsTo = { to, name: label, change, was: change === 'changed' && wasRef ? nameOfRef(wasRef) : null };
+  }
+
+  // 3. The team pool.
+  let poolTeam: SalesTeamPlan['poolTeam'] = null;
+  if (choices.poolTeam) {
+    const target = keyed.get(choices.poolTeam);
+    const ref = target ? refOf(target) : null;
+    const role = target ? fixedRoleOf(target) : null;
+    if (!target) problems.push(`poolTeam "${choices.poolTeam}" is nobody in the AxLeads export.`);
+    else if (!ref) problems.push(`poolTeam: ${target.label} is not added here (${whyNot(target)}), so there is no team pool to fill.`);
+    else if (role === 'OWNER') problems.push(`poolTeam: ${target.label} is the owner, and the owner's pool is the studio pool. Leave poolTeam out for that.`);
+    else if (role !== 'SALES') problems.push(`poolTeam: ${target.label} is ${role}; a team pool belongs to a salesperson who heads a team.`);
+    else poolTeam = { member: ref, name: target.label };
+  }
+
+  return { builtInsMissing: uses ? builtInsMissing : [], rolesToCreate, lines, poolTeam, problems, notes, uses };
 }
 
 // ── Leads ───────────────────────────────────────────────────────────────
@@ -650,6 +1046,8 @@ export interface ClientPlan {
   nextAction: string | null;
   nextActionOn: Date | null;
   assignee: PersonRef['member'];
+  /** The team pool an unassigned card sits in (roles file `poolTeam`); null: the studio pool. */
+  poolTeam: PersonRef['member'];
   lastContactedAt: Date | null;
   tags: string[];
   createdAt: Date;
@@ -664,7 +1062,8 @@ export type LeadPlan =
   | { action: 'merge-existing'; axId: string; clientId: string; into: string; fill: Partial<ClientPlan>; events: EventPlan[]; name: string; phone: string }
   /** Into an earlier lead of this file (its card carries both). */
   | { action: 'merge-file'; axId: string; intoAxId: string; into: string; events: EventPlan[]; name: string; phone: string }
-  | { action: 'already'; axId: string; clientId: string; backfill: PersonRef['member'] }
+  /** `pool`: a re-run moves the card, still unassigned and untouched since its import, into this team pool. */
+  | { action: 'already'; axId: string; clientId: string; backfill: PersonRef['member']; pool?: MemberRef | null }
   | { action: 'skip-binned'; axId: string }
   /** Answered a question in `skipIfAnswered`: a job applicant, not a client. */
   | { action: 'skip-answered'; axId: string };
@@ -695,6 +1094,13 @@ export interface Report {
   phonesNotMobile: number;
   noPhone: number;
   merged: { name: string; phone: string; into: string; where: 'board' | 'file' }[];
+  /** New cards nobody has, by the pool they land in (studio pool or a head's team pool). */
+  perPool: Record<string, number>;
+  /** Re-run, poolTeam set: cards moved to the team pool, ones left because somebody worked them, ones there already. */
+  poolMoves: number;
+  poolLeftTouched: number;
+  poolAlready: number;
+  salesTeam: SalesTeamPlan;
 }
 
 export interface FieldToCreate {
@@ -711,10 +1117,13 @@ export interface Plan {
   fieldsToCreate: FieldToCreate[];
   leadSourcesToCreate: string[];
   leads: LeadPlan[];
+  salesTeam: SalesTeamPlan;
   report: Report;
 }
 
 const POOL = 'Pool (nobody)';
+export const STUDIO_POOL = 'Studio pool';
+export const teamPoolLabel = (name: string) => `${name}’s team pool`;
 
 /** "₹12,00,000". */
 function rupees(n: number): string {
@@ -758,6 +1167,18 @@ export function planImport(ax: AxExport, ctx: StudioContext, choices: Choices, o
   const intake = [...ctx.stages].sort((a, b) => a.sortOrder - b.sortOrder).find((s) => s.isIntake) ?? ctx.stages[0]!;
   const members = planMembers(ax.members, ctx, choices);
   const people = personIndex(members);
+  const salesTeam = planSalesTeam(members, ctx, choices);
+  const poolTeam = salesTeam.poolTeam?.member ?? null;
+  /* The leads `poolTeam` takes (owner, 22 Oct 2026): nobody's on AxLeads, or
+     the person was skipped or left. A refused number or a missing phone is a
+     fix in the roles file, not a hand-over, so those stay in the studio pool. */
+  const kindOf = new Map(members.map((m) => [m.ax.userId, m.kind]));
+  const toTeamPool = (l: AxLead): boolean => {
+    if (!poolTeam) return false;
+    if (!l.assignedTo) return true;
+    const k = kindOf.get(l.assignedTo);
+    return k === undefined || k === 'gone' || k === 'skip';
+  };
 
   // Fields: the studio's own, plus the AxLeads workspace's live field definitions it does not have yet.
   const fieldsToCreate: FieldToCreate[] = [];
@@ -803,6 +1224,11 @@ export function planImport(ax: AxExport, ctx: StudioContext, choices: Choices, o
     phonesNotMobile: 0,
     noPhone: 0,
     merged: [],
+    perPool: {},
+    poolMoves: 0,
+    poolLeftTouched: 0,
+    poolAlready: 0,
+    salesTeam,
   };
   const ownSourcesUsed = new Set<string>();
   const bump = (rec: Record<string, number>, key: string) => (rec[key] = (rec[key] ?? 0) + 1);
@@ -819,7 +1245,19 @@ export function planImport(ax: AxExport, ctx: StudioContext, choices: Choices, o
     if (done) {
       const assignee = lead.assignedTo ? people.get(lead.assignedTo)?.member ?? null : null;
       const backfill = !done.assignedToId && assignee ? assignee : null;
-      leads.push({ action: 'already', axId: lead.id, clientId: done.clientId, backfill });
+      /* A re-run with poolTeam: a card this import made, still nobody's and
+         untouched since (no line after its import line), moves into the team
+         pool. Anything somebody has worked stays where they left it. */
+      let pool: MemberRef | null = null;
+      if (poolTeam && done.fromImport && !done.assignedToId && !backfill && toTeamPool(lead)) {
+        if (poolTeam.kind === 'existing' && done.poolTeamId === poolTeam.id) report.poolAlready += 1;
+        else if (done.touched) report.poolLeftTouched += 1;
+        else {
+          pool = poolTeam;
+          report.poolMoves += 1;
+        }
+      }
+      leads.push({ action: 'already', axId: lead.id, clientId: done.clientId, backfill, pool });
       report.already += 1;
       if (backfill) report.backfill += 1;
       continue;
@@ -836,6 +1274,7 @@ export function planImport(ax: AxExport, ctx: StudioContext, choices: Choices, o
     }
 
     const built = buildLead(lead, { ax, stageById, axStageName, intake, people, fields, fieldKeyOf, now: opts.now });
+    if (!built.client.assignee && toTeamPool(lead)) built.client.poolTeam = poolTeam;
     report.valuesNotFitting += built.valuesNotFitting;
     report.eventsSkipped.scoreUpdates += built.scoreUpdates;
     report.eventsSkipped.messageDuplicates += built.messageStubs;
@@ -918,13 +1357,14 @@ export function planImport(ax: AxExport, ctx: StudioContext, choices: Choices, o
     if (l.action !== 'create') continue;
     bump(report.perStage, stageName.get(l.client.stageId) ?? l.client.stageId);
     bump(report.perAssignee, memberName(l.client.assignee));
+    if (!l.client.assignee) bump(report.perPool, l.client.poolTeam && salesTeam.poolTeam ? teamPoolLabel(salesTeam.poolTeam.name) : STUDIO_POOL);
     bump(report.perSource, l.client.ownSource ?? SOURCE_LABELS[l.client.source]);
   }
 
   const have = new Set(ctx.leadSources.map((s) => s.name.toLowerCase()));
   const leadSourcesToCreate = [...ownSourcesUsed].filter((n) => !have.has(n.toLowerCase()));
   report.leadSourcesToCreate = leadSourcesToCreate;
-  return { members, stages, fieldsToCreate, leadSourcesToCreate, leads, report };
+  return { members, stages, fieldsToCreate, leadSourcesToCreate, leads, salesTeam, report };
 }
 
 function count(report: Report, events: readonly EventPlan[]) {
@@ -1090,6 +1530,7 @@ function buildLead(lead: AxLead, b: BuildCtx): Built {
       nextAction,
       nextActionOn: due,
       assignee,
+      poolTeam: null,
       lastContactedAt: lastCall,
       tags: tagsIn.tags,
       createdAt: new Date(lead.createdAt),
@@ -1383,6 +1824,13 @@ export function formatReport(r: Report, opts: { tenant: string; studio: string; 
   out.push(...table(r.perAssignee));
   out.push('New cards per source:');
   out.push(...table(r.perSource));
+  if (Object.keys(r.perPool).length || r.salesTeam.poolTeam) {
+    out.push('New cards nobody has, per pool:');
+    out.push(...table(r.perPool));
+  }
+  if (r.poolMoves || r.poolLeftTouched || r.poolAlready) {
+    out.push(`Already imported, nobody's, now for ${r.salesTeam.poolTeam ? teamPoolLabel(r.salesTeam.poolTeam.name) : 'the team pool'}: ${r.poolMoves} moved there, ${r.poolLeftTouched} left where they are (worked since the import), ${r.poolAlready} there already`);
+  }
   out.push('');
   out.push('History lines:');
   out.push(...table(r.events as Record<string, number>));
@@ -1396,16 +1844,36 @@ export function formatReport(r: Report, opts: { tenant: string; studio: string; 
   out.push('');
   out.push('People:');
   const mask = (p: string) => `…${p.slice(-4)}`;
+  const st = r.salesTeam;
+  const handOver = st.poolTeam ? teamPoolLabel(st.poolTeam.name) : 'the pool';
   for (const m of r.members) {
-    const who = `${m.ax.displayName} <${m.ax.email ?? 'no email'}> [${m.ax.role}]`;
+    const who = `${m.label} <${m.ax.email ?? 'no email'}> [${m.ax.role}]`;
     if (m.kind === 'match') out.push(`    ${pad(who, 56)} = ${m.name} (by ${m.by})`);
-    else if (m.kind === 'create') out.push(`    ${pad(who, 56)} + ADD as ${m.role}, INVITED, ${mask(m.phone)}${m.emailDropped ? ' (email is another login; added without it)' : ''} — no invite is sent`);
+    else if (m.kind === 'create') out.push(`    ${pad(who, 56)} + ADD as ${m.role}, INVITED, ${mask(m.phone)}${m.emailDropped ? ' (email is another login; added without it)' : ''}${m.reuseUserId ? ' (their existing login, which keeps its name)' : ''} — no invite is sent`);
     else if (m.kind === 'refused') out.push(`    ${pad(who, 56)} ✗ REFUSED ${mask(m.phone)}: ${m.reason} Their leads go to the pool.`);
     else if (m.kind === 'no-phone') out.push(`    ${pad(who, 56)} ✗ no phone on AxLeads — add one in the roles file ("members"), or their leads go to the pool`);
-    else if (m.kind === 'gone') out.push(`    ${pad(who, 56)} – left AxLeads; history keeps the name, leads go to the pool`);
-    else out.push(`    ${pad(who, 56)} – skipped (roles file)`);
+    else if (m.kind === 'gone') out.push(`    ${pad(who, 56)} – left AxLeads; history keeps the name, leads go to ${handOver}`);
+    else out.push(`    ${pad(who, 56)} – skipped (roles file)${st.poolTeam ? `; leads go to ${handOver}` : ''}`);
+    const line = st.lines.find((l) => l.axUserId === m.ax.userId);
+    const was = (c: Change, w: string | null) => (c === 'same' ? ' (unchanged)' : c === 'changed' ? ` (was ${w ?? 'another'})` : '');
+    if (line?.salesRole) out.push(`        sales role: ${line.salesRole.name}${line.salesRole.isNew ? ' (new role)' : ''}${was(line.salesRole.change, line.salesRole.was)}`);
+    if (line?.reportsTo) out.push(`        reports to: ${line.reportsTo.name}${was(line.reportsTo.change, line.reportsTo.was ?? 'the owner')}`);
+    const ref: MemberRef | null = m.kind === 'match' ? { kind: 'existing', id: m.memberId } : m.kind === 'create' ? { kind: 'new', axUserId: m.ax.userId } : null;
+    if (st.poolTeam && ref && treeId(ref) === treeId(st.poolTeam.member)) {
+      out.push('        team pool: gets the leads nobody had on AxLeads, and those of people skipped or gone');
+    }
   }
   out.push('');
+  if (st.builtInsMissing.length) out.push(`Sales roles this studio does not have yet, made first: ${st.builtInsMissing.join(', ')}`);
+  for (const role of st.rolesToCreate) {
+    out.push(`Sales role to make: ${role.name} — a copy of ${role.from}${role.added.length ? ` plus ${role.added.join(', ')}` : ''}`);
+  }
+  for (const n of st.notes) out.push(`Note: ${n}`);
+  if (st.problems.length) {
+    out.push(`✗ The roles file asks for ${st.problems.length === 1 ? 'something that cannot be done' : `${st.problems.length} things that cannot be done`}. Nothing is written until it is fixed:`);
+    for (const p of st.problems) out.push(`    ✗ ${p}`);
+  }
+  if (st.builtInsMissing.length || st.rolesToCreate.length || st.notes.length || st.problems.length) out.push('');
   if (r.fieldsToCreate.length) out.push(`Fields to add in Settings → Fields: ${r.fieldsToCreate.map((f) => `${f.label} (${f.type.toLowerCase()})`).join(', ')}`);
   if (r.leadSourcesToCreate.length) out.push(`Source names to add: ${r.leadSourcesToCreate.join(', ')}`);
   const unmapped = Object.entries(r.unmappedFields).sort((a, b) => b[1] - a[1]);

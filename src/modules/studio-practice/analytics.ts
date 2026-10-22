@@ -32,6 +32,7 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 import { myStudioId } from '@/modules/studio-quote/store';
+import { analyticsScope, scopeFor } from '@/modules/studio/lead-scope';
 import { LIVE } from './demo-lead';
 import { istDay } from '@/modules/project/working-days';
 import { istDayStart } from '@/modules/studio-sales/ist-range';
@@ -79,8 +80,15 @@ export interface LeadAnalytics {
 const DAY = 86_400_000;
 
 export async function leadAnalytics(): Promise<LeadAnalytics | null> {
-  const studioId = await myStudioId();
-  if (!studioId) return null;
+  /* Sales roles and teams (owner, 22 Oct 2026): `lead.analytics` (owner, PM,
+     a sales role with "See the numbers"), counted in its reach — a head's
+     numbers are their team's only (lead-scope.ts `analyticsScope`). Was
+     `myStudioId()`. */
+  const seen = await scopeFor('lead.analytics');
+  if (!seen) return null;
+  const scope = analyticsScope(seen);
+  const studioId = scope.studioId;
+  const fence = scope.leads;
 
   try {
     const now = new Date();
@@ -120,13 +128,13 @@ export async function leadAnalytics(): Promise<LeadAnalytics | null> {
       lostReasonRaw,
       wonValue,
     ] = await Promise.all([
-      prisma.studioClient.count({ where: { studioId, ...LIVE } }),
-      prisma.studioClient.count({ where: { studioId, ...LIVE, stageId: { in: openIds } } }),
+      prisma.studioClient.count({ where: { studioId, ...LIVE, AND: [fence] } }),
+      prisma.studioClient.count({ where: { studioId, ...LIVE, AND: [fence], stageId: { in: openIds } } }),
       prisma.studioClient.count({
-        where: { studioId, ...LIVE, assignedToId: null, stageId: { in: openIds } },
+        where: { studioId, ...LIVE, AND: [fence], assignedToId: null, stageId: { in: openIds } },
       }),
       prisma.studioClient.count({
-        where: { studioId, ...LIVE, stageId: { in: openIds }, nextActionOn: { lt: now } },
+        where: { studioId, ...LIVE, AND: [fence], stageId: { in: openIds }, nextActionOn: { lt: now } },
       }),
       /* "Quiet" is contact, not activity. `lastContactedAt` is written only
          by logContact — never by an edit — so this measures conversations,
@@ -136,35 +144,36 @@ export async function leadAnalytics(): Promise<LeadAnalytics | null> {
         where: {
           studioId,
           ...LIVE,
+          AND: [fence],
           stageId: { in: openIds },
           OR: [{ lastContactedAt: null }, { lastContactedAt: { lt: quietBefore } }],
         },
       }),
-      prisma.studioClient.count({ where: { studioId, ...LIVE, stageId: { in: wonIds } } }),
-      prisma.studioClient.count({ where: { studioId, ...LIVE, stageId: { in: lostIds } } }),
+      prisma.studioClient.count({ where: { studioId, ...LIVE, AND: [fence], stageId: { in: wonIds } } }),
+      prisma.studioClient.count({ where: { studioId, ...LIVE, AND: [fence], stageId: { in: lostIds } } }),
       prisma.studioClient.count({
-        where: { studioId, ...LIVE, createdAt: { gte: monthAgo } },
+        where: { studioId, ...LIVE, AND: [fence], createdAt: { gte: monthAgo } },
       }),
       prisma.studioClient.groupBy({
         by: ['stageId'],
-        where: { studioId, ...LIVE },
+        where: { studioId, ...LIVE, AND: [fence] },
         _count: { _all: true },
       }),
       /* By source AND the studio's own source name (Studio OS Phase 1), so
          "Housing.com" counts as itself rather than as Other. */
       prisma.studioClient.groupBy({
         by: ['source', 'leadSourceId'],
-        where: { studioId, ...LIVE },
+        where: { studioId, ...LIVE, AND: [fence] },
         _count: { _all: true },
       }),
       prisma.studioClient.groupBy({
         by: ['source', 'leadSourceId'],
-        where: { studioId, ...LIVE, stageId: { in: wonIds } },
+        where: { studioId, ...LIVE, AND: [fence], stageId: { in: wonIds } },
         _count: { _all: true },
       }),
       prisma.studioClient.groupBy({
         by: ['lostReason'],
-        where: { studioId, ...LIVE, stageId: { in: lostIds }, lostReason: { not: null } },
+        where: { studioId, ...LIVE, AND: [fence], stageId: { in: lostIds }, lostReason: { not: null } },
         _count: { _all: true },
       }),
       /* Summed from the LINES, not from a stored total — StudioQuote has no
@@ -175,7 +184,7 @@ export async function leadAnalytics(): Promise<LeadAnalytics | null> {
          quote and folding it in JavaScript. */
       prisma.studioQuoteLine.aggregate({
         where: {
-          quote: { studioId, client: { ...LIVE, stageId: { in: wonIds } } },
+          quote: { studioId, client: { ...LIVE, AND: [fence], stageId: { in: wonIds } } },
         },
         _sum: { amountPaise: true },
       }),

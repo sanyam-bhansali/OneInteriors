@@ -20,6 +20,7 @@ import 'server-only';
  * here to prevent. The count is the matching total at that moment.
  */
 
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { LIVE } from '@/modules/studio-practice/demo-lead';
 import { myLeadScope } from '@/modules/studio/lead-scope';
@@ -59,11 +60,14 @@ export type ExportStart = { ok: true; body: ReadableStream<Uint8Array>; filename
 export async function startLeadExport(params: URLSearchParams, now = new Date()): Promise<ExportStart> {
   const scope = await myLeadScope();
   if (!scope) return { ok: false, status: 401, error: 'Sign in to your studio first.' };
-  if (!can(scope.member, 'lead.export')) return { ok: false, status: 403, error: 'Only the studio owner can download the leads list.' };
+  if (!can(scope.member, 'lead.export')) return { ok: false, status: 403, error: 'Your role does not include downloading the leads list. Ask your studio owner.' };
 
   const filters = parseLeadFilters(params);
   const sort = parseSort(params.get('sort'));
-  const where = scopedLeadWhere(scope, filters, now, LIVE);
+  /* Sales roles (owner, 22 Oct 2026): only leads they may see in full. A
+     pool they may only claim from shows no phone numbers on screen, so it is
+     not in the download either (`scope.leads` fences the pool view too). */
+  const where: Prisma.StudioClientWhereInput = { AND: [scopedLeadWhere(scope, filters, now, LIVE), scope.leads] };
   const orderBy = orderByFor(sort);
 
   let rows: number;

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { appForPath, appsFor, tabForPath, STUDIO_HOME } from '@/modules/studio/apps';
 import { homeFor, mayOpen } from '@/modules/studio/surfaces';
 import type { StudioRoleName } from '@/modules/studio/roles';
+import { buildSalesContext } from '@/modules/studio/sales-access';
 
 const m = (role: StudioRoleName) => ({ role, status: 'ACTIVE' as const });
 const keys = (role: StudioRoleName) => appsFor(m(role)).map((a) => a.key);
@@ -65,12 +66,26 @@ describe('studio apps (UI handoff 12 Oct 2026)', () => {
 
   it("Quotations carries Hauspire's top bar: First Quote, Full Builder, My Quotations, Products, Terms (13 Oct 2026)", () => {
     const tabs = (role: StudioRoleName) => appsFor(m(role)).find((a) => a.key === 'quotes')?.tabs.map((t) => t.label);
-    expect(tabs('OWNER')).toEqual(['First Quote', 'Full Builder', 'My Quotations', 'Products', 'Terms']);
-    expect(tabs('PM')).toEqual(['First Quote', 'Full Builder', 'My Quotations', 'Products', 'Terms']);
+    /* To build (quotation requests, owner 22 Oct 2026): owner and PM hand requests over. */
+    expect(tabs('OWNER')).toEqual(['First Quote', 'Full Builder', 'My Quotations', 'To build', 'Products', 'Terms']);
+    expect(tabs('PM')).toEqual(['First Quote', 'Full Builder', 'My Quotations', 'To build', 'Products', 'Terms']);
     /* A salesperson opens neither the product master nor the studio's terms. */
     expect(tabs('SALES')).toEqual(['First Quote', 'Full Builder', 'My Quotations']);
     expect(mayOpen(m('SALES'), '/studio/quotations/terms')).toBe(false);
     expect(mayOpen(m('SALES'), '/studio/quotations/builder')).toBe(true);
+  });
+
+  it('To build shows for a salesperson whose sales role builds quotations, not for one without (22 Oct 2026)', () => {
+    const sales = (permissions: Record<string, unknown>) => ({
+      role: 'SALES' as const,
+      status: 'ACTIVE' as const,
+      id: 'k',
+      sales: buildSalesContext({ id: 'k', reportsToId: null }, { id: 'r', name: 'Role', permissions }, []),
+    });
+    const tabsOf = (member: ReturnType<typeof sales>) => appsFor(member).find((a) => a.key === 'quotes')?.tabs.map((t) => t.label);
+    expect(tabsOf(sales({ 'leads.view': 'own', 'quotes.write': 'own', 'quotes.build': true }))).toContain('To build');
+    expect(tabsOf(sales({ 'leads.view': 'own', 'quotes.write': 'own' }))).not.toContain('To build');
+    expect(tabForPath('/studio/quotations/requests', appForPath('/studio/quotations')!.tabs)?.label).toBe('To build');
   });
 
   it('the product master page sits under Quotations, and its own tile still opens it', () => {

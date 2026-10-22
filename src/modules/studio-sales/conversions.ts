@@ -239,7 +239,7 @@ function when(d: Date): string {
 /** Null for anyone but the owner and project managers (who see that it exists, not the controls). */
 export async function myConversionScreen(): Promise<ConversionScreen | null> {
   const member = await currentMember();
-  if (!member || !can(member, 'lead.import')) return null;
+  if (!member || !can(member, 'lead.settings')) return null;
   const canManage = member.role === 'OWNER';
   try {
     const studio = await prisma.studio.findUnique({ where: { id: member.studioId }, select: { slug: true, metaCapiEnabled: true, metaCapiStages: true } });

@@ -43,6 +43,7 @@ import { prisma } from '@/lib/prisma';
 import { starterRowsFor } from '@/modules/studio-quote/starter-catalogue';
 // The pure vocabulary, not the `server-only` service that also reads it.
 import { DEFAULT_STAGES } from '@/modules/studio-practice/vocabulary';
+import { builtInSalesRoleRows } from './sales-permissions';
 
 export interface ProvisionResult {
   products: number;
@@ -79,6 +80,16 @@ export async function provisionWorkspace(studioId: string): Promise<ProvisionRes
     result.stages = stages.count;
   } catch (error) {
     console.error('[provision] pipeline failed', studioId, error);
+  }
+
+  try {
+    /* The three built-in sales roles (owner, 22 Oct 2026; docs/studio-os/
+       SALES-ROLES.md), the same rows the 20261022110000 migration wrote for
+       every studio before it. Unique on (studioId, system), so a retry adds
+       nothing. */
+    await prisma.studioSalesRole.createMany({ data: builtInSalesRoleRows(studioId), skipDuplicates: true });
+  } catch (error) {
+    console.error('[provision] sales roles failed', studioId, error);
   }
 
   return result;

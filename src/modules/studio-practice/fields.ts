@@ -21,8 +21,8 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
-import { myStudioId } from '@/modules/studio-quote/store';
-import { leadStudioId } from '@/modules/studio/lead-scope';
+/* Sales roles (owner, 22 Oct 2026): changing the board's columns and fields is `lead.settings` (owner, PM, a sales role with lead settings). */
+import { leadSettingsStudioId, leadStudioId } from '@/modules/studio/lead-scope';
 import { fieldKeyFrom, GROUPABLE_TYPES, type FieldTypeName } from './vocabulary';
 import { nextSortOrder } from './pipeline-rules';
 
@@ -81,7 +81,7 @@ export async function addField(input: {
   type: FieldTypeName;
   options?: string;
 }): Promise<Result> {
-  const studioId = await myStudioId();
+  const studioId = await leadSettingsStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   const label = input.label.trim();
@@ -127,7 +127,7 @@ export async function addField(input: {
 
 /** Rename the label. The key does not move — see the note at the top. */
 export async function renameField(id: string, label: string): Promise<Result> {
-  const studioId = await myStudioId();
+  const studioId = await leadSettingsStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   const next = label.trim();
@@ -142,7 +142,7 @@ export async function renameField(id: string, label: string): Promise<Result> {
 }
 
 export async function setFieldGrouping(id: string, groupBy: boolean): Promise<Result> {
-  const studioId = await myStudioId();
+  const studioId = await leadSettingsStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   const field = await prisma.studioField.findFirst({
@@ -170,7 +170,7 @@ export async function setFieldGrouping(id: string, groupBy: boolean): Promise<Re
  * is derived from the label and is therefore the same key.
  */
 export async function removeField(id: string): Promise<Result> {
-  const studioId = await myStudioId();
+  const studioId = await leadSettingsStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   const { count } = await prisma.studioField.deleteMany({ where: { id, studioId } });

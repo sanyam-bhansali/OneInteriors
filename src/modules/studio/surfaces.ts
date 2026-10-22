@@ -33,10 +33,19 @@
  * `OFFICE_ROLES`: every older office module keeps finding no studio for
  * them, and the screens they do open read through `studio/lead-scope.ts`,
  * which narrows every query to the leads assigned to them.
+ *
+ * ## Sales roles and teams (owner, 22 Oct 2026)
+ *
+ * docs/studio-os/SALES-ROLES.md. A salesperson whose sales role grants it
+ * also opens: Import (`lead.import`), the Bin (`lead.delete`), lead
+ * Analytics and Calling (`lead.analytics`), Settings → Pipeline, Fields and
+ * Lead sources (`lead.settings`), and Settings → Team (`team.sales`, the
+ * sales side only). Each of those screens' modules checks the same right
+ * again. Terms and appointments stay the owner's and PM's.
  */
 
 import type { Prisma } from '@prisma/client';
-import { can, FULL_SOFTWARE_ROLES, type MemberRole, type StudioRoleName } from './roles';
+import { asSeenBy, can, FULL_SOFTWARE_ROLES, type MemberRole, type StudioRoleName } from './roles';
 
 /** The roles that work in the office. */
 export const OFFICE_ROLES: readonly StudioRoleName[] = ['OWNER', 'PM'];
@@ -151,13 +160,37 @@ function under(path: string, prefix: string): boolean {
   return path === prefix || path.startsWith(`${prefix}/`);
 }
 
+/** The lead settings a sales role with "Change lead settings" opens (`lead.settings`). */
+export const LEAD_SETTINGS_PATHS: readonly string[] = ['/studio/settings/pipeline', '/studio/settings/fields', '/studio/settings/sources'];
+
+/**
+ * The extra screens a salesperson's sales role may open (owner, 22 Oct
+ * 2026), and which right opens each. A Phase 1 salesperson has none of
+ * these rights, so for them nothing changes.
+ */
+const SALES_ROLE_SCREENS: readonly { path: string; action: Parameters<typeof can>[1] }[] = [
+  { path: '/studio/clients/import', action: 'lead.import' },
+  { path: '/studio/clients/bin', action: 'lead.delete' },
+  { path: '/studio/clients/analytics', action: 'lead.analytics' },
+  { path: TEAM_PATH, action: 'team.sales' },
+  ...LEAD_SETTINGS_PATHS.map((path) => ({ path, action: 'lead.settings' as const })),
+];
+
+function salesMayOpen(member: MemberRole, path: string): boolean {
+  const screen = SALES_ROLE_SCREENS.find((s) => under(path, s.path));
+  if (screen) return can(member, screen.action);
+  return SALES_OPEN.some((p) => under(path, p)) && !SALES_CLOSED.some((p) => under(path, p));
+}
+
 /**
  * Whether this member may open this `/studio` path. Inactive members may
  * open nothing (the layout tells them why). Unknown paths fall to the
  * office rule, so a new office screen is closed to the other roles by
  * default rather than by remembering to list it.
  */
-export function mayOpen(member: MemberRole, path: string): boolean {
+export function mayOpen(viewer: MemberRole, path: string): boolean {
+  /* Opening a screen is a read: staff viewing as this member (VIEW-AS.md) open exactly what they open. Writes on it still ask `can()`. */
+  const member = asSeenBy(viewer);
   if (member.status !== 'ACTIVE') return false;
   /* Pro Solo (owner, 21 Oct 2026): one person, so no team to manage and no pool to hand leads out from. */
   if (member.solo === true && (under(path, TEAM_PATH) || under(path, POOL_PATH))) return false;
@@ -175,7 +208,7 @@ export function mayOpen(member: MemberRole, path: string): boolean {
   if (path === STUDIO_HOME) return true;
   /* Phase 3: accounts keeps the crews and pays them; labour against the contract is the owner's. */
   if (member.role === 'ACCOUNTS') return under(path, PAYMENTS_HOME) || (under(path, CREWS_HOME) && !under(path, LABOUR_PATH));
-  if (member.role === 'SALES') return SALES_OPEN.some((p) => under(path, p)) && !SALES_CLOSED.some((p) => under(path, p));
+  if (member.role === 'SALES') return salesMayOpen(member, path);
   if (member.role === 'DESIGNER') return designerMayOpen(path);
   if (under(path, TEAM_PATH)) return can(member, 'team.manage');
   if (under(path, PAYMENT_STAGES_PATH)) return can(member, 'payments.template');

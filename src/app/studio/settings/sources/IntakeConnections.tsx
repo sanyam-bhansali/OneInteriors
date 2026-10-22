@@ -284,10 +284,10 @@ function ConnectionCard({ c, screen, people }: { c: ConnectionRow; screen: Intak
 
 /**
  * "Its leads go to" for one door (owner, 22 Oct 2026): the studio's rule, the
- * pool, take turns (the studio's list), or one person. Saved as it is picked.
+ * pool, take turns (the studio's list), one person, or a team's pool. Saved as it is picked.
  */
 function RouteOverride({ c, people }: { c: ConnectionRow; people: RoutingPerson[] }) {
-  const current = c.routeMode === 'PERSON' && c.routeMemberId ? `PERSON:${c.routeMemberId}` : (c.routeMode ?? '');
+  const current = (c.routeMode === 'PERSON' || c.routeMode === 'TEAM') && c.routeMemberId ? `${c.routeMode}:${c.routeMemberId}` : (c.routeMode ?? '');
   const [value, setValue] = useState(current);
   const { pending, result, run } = useAct();
   return (
@@ -301,7 +301,7 @@ function RouteOverride({ c, people }: { c: ConnectionRow; people: RoutingPerson[
         onChange={(e) => {
           const v = e.target.value;
           setValue(v);
-          const [mode, personId] = v.startsWith('PERSON:') ? ['PERSON', v.slice(7)] : [v as LeadRouteModeName | '', ''];
+          const [mode, personId] = v.startsWith('PERSON:') ? ['PERSON', v.slice(7)] : v.startsWith('TEAM:') ? ['TEAM', v.slice(5)] : [v as LeadRouteModeName | '', ''];
           run(() => saveConnectionRoutingAction(c.id, mode, personId));
         }}
       >
@@ -314,6 +314,14 @@ function RouteOverride({ c, people }: { c: ConnectionRow; people: RoutingPerson[
             {p.canTake ? '' : ' — cannot take leads now'}
           </option>
         ))}
+        {/* Sales roles and teams (owner, 22 Oct 2026): this door's leads wait in a head's team pool. */}
+        {people
+          .filter((p) => p.canHead)
+          .map((p) => (
+            <option key={`team-${p.id}`} value={`TEAM:${p.id}`}>
+              {p.name}’s team pool
+            </option>
+          ))}
       </select>
       <Said result={result} />
     </div>

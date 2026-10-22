@@ -64,12 +64,30 @@ function SiteChips({ sites, picked, onFlip, labelledBy }: { sites: Site[]; picke
   );
 }
 
-/** "Add someone": name, number, role card, sites. Sends the invite through MessageSender. */
-export function AddSomeone({ roles, sites, seatsLeft }: { roles: RoleCard[]; sites: Site[]; seatsLeft: number }) {
+/**
+ * "Add someone": name, number, role card, sites. Sends the invite through
+ * MessageSender. A salesperson (sales roles and teams, owner 22 Oct 2026)
+ * also gets their sales role and who they report to.
+ */
+export function AddSomeone({
+  roles,
+  sites,
+  seatsLeft,
+  salesRoles = [],
+  salespeople = [],
+}: {
+  roles: RoleCard[];
+  sites: Site[];
+  seatsLeft: number;
+  salesRoles?: { id: string; name: string; system: string | null }[];
+  salespeople?: { id: string; name: string }[];
+}) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [role, setRole] = useState<StudioRoleName>('SUPERVISOR');
+  const [role, setRole] = useState<StudioRoleName>(roles.some((r) => r.role === 'SUPERVISOR') ? 'SUPERVISOR' : (roles[0]?.role ?? 'SALES'));
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [salesRoleId, setSalesRoleId] = useState(salesRoles.find((r) => r.system === 'REP')?.id ?? salesRoles[0]?.id ?? '');
+  const [reportsToId, setReportsToId] = useState('');
   const { pending, result, setResult, run } = useResult();
 
   const flip = (id: string) =>
@@ -90,7 +108,7 @@ export function AddSomeone({ roles, sites, seatsLeft }: { roles: RoleCard[]; sit
         onSubmit={(e) => {
           e.preventDefault();
           run(
-            () => inviteAction({ name, phone, role, sites: PICKS_SITES.has(role) ? [...picked] : [] }),
+            () => inviteAction({ name, phone, role, sites: PICKS_SITES.has(role) ? [...picked] : [], ...(role === 'SALES' ? { salesRoleId, reportsToId } : {}) }),
             (r) => {
               if (r.ok) {
                 setName('');
@@ -146,6 +164,32 @@ export function AddSomeone({ roles, sites, seatsLeft }: { roles: RoleCard[]; sit
               Which sites?
             </span>
             <SiteChips sites={sites} picked={picked} onFlip={flip} labelledBy="i-sites" />
+          </div>
+        ) : null}
+
+        {role === 'SALES' ? (
+          <div className="st-grid2">
+            <label className="ox-f">
+              <span className="lbl">Sales role</span>
+              <select className="fld" value={salesRoleId} onChange={(e) => setSalesRoleId(e.target.value)} required>
+                {salesRoles.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="ox-f">
+              <span className="lbl">Reports to</span>
+              <select className="fld" value={reportsToId} onChange={(e) => setReportsToId(e.target.value)}>
+                <option value="">The owner</option>
+                {salespeople.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
         ) : null}
 

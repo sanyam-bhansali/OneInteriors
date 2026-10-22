@@ -114,8 +114,14 @@ export function StudioFrame({
           {app.tabs.length > 1 ? (
             <nav className="atabs" aria-label={`${app.name} sections`}>
               {app.tabs.map((t) => (
-                <Link key={t.href} href={t.href} aria-current={tab?.href === t.href ? 'page' : undefined}>
+                <Link key={t.href} href={t.href} aria-current={tab?.href === t.href ? 'page' : undefined} aria-label={t.count ? `${t.label}, ${t.count} waiting` : undefined}>
                   {t.label}
+                  {/* To build's waiting requests (quotation requests, 22 Oct 2026). */}
+                  {t.count ? (
+                    <span aria-hidden style={{ minWidth: 20, height: 20, padding: '0 6px', borderRadius: 999, background: 'var(--acc, var(--s-accent))', color: '#fff', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {t.count}
+                    </span>
+                  ) : null}
                 </Link>
               ))}
             </nav>

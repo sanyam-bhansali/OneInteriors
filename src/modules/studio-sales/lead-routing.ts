@@ -8,11 +8,16 @@
  * tests/studio-lead-routing.test.ts. `land.ts` asks here and writes what it
  * is told; the settings screen asks here what the rule will do.
  *
- * ## Three modes (ported from AxLeads' `resolveDefaultAssignee`, widened)
+ * ## Four modes (ported from AxLeads' `resolveDefaultAssignee`, widened)
  *
  *  - **POOL** — nobody, as before 22 Oct. The default for every studio.
  *  - **PERSON** — one chosen member gets every new lead.
  *  - **TURNS** — round the chosen members in the order the owner put them.
+ *  - **TEAM** — sales roles and teams (owner, 22 Oct 2026; docs/studio-os/
+ *    SALES-ROLES.md): nobody yet, but in the team pool of the chosen head
+ *    (`personId` / `routeMemberId` names the head), for the head to hand out
+ *    or the team to claim. A head who has left or is suspended, or is not a
+ *    salesperson, is unavailable and the lead falls to the studio pool.
  *
  * A door (StudioLeadConnection) may override the studio's rule: Meta leads
  * always to one person, a portal's always to the pool. Null follows the
@@ -39,8 +44,8 @@
 
 import { can, type StudioMemberStatusName, type StudioRoleName } from '@/modules/studio/roles';
 
-export type LeadRouteModeName = 'POOL' | 'PERSON' | 'TURNS';
-export const LEAD_ROUTE_MODES: readonly LeadRouteModeName[] = ['POOL', 'PERSON', 'TURNS'];
+export type LeadRouteModeName = 'POOL' | 'PERSON' | 'TURNS' | 'TEAM';
+export const LEAD_ROUTE_MODES: readonly LeadRouteModeName[] = ['POOL', 'PERSON', 'TURNS', 'TEAM'];
 
 /** Twenty people in a turn list is far more than a studio's sales team. */
 export const MAX_TURN_MEMBERS = 20;
@@ -80,6 +85,8 @@ export interface EffectiveRule {
 
 export type RouteDecision =
   | { kind: 'person'; memberId: string; name: string; mode: 'PERSON' | 'TURNS'; from: 'studio' | 'connection'; label: string | null }
+  /** TEAM: unassigned, in this head's team pool. */
+  | { kind: 'team'; headId: string; name: string; from: 'studio' | 'connection'; label: string | null }
   | {
       kind: 'pool';
       /** POOL: the rule says pool. UNAVAILABLE: the rule named people, none can take it. */
@@ -112,7 +119,7 @@ export function readConnectionRouting(row: { routeMode?: unknown; routeMemberId?
 /** The rule for this lead: the door's when it has one, else the studio's. TURNS always uses the studio's list. */
 export function effectiveRule(studio: StudioRouting, door: ConnectionRouting | null): EffectiveRule {
   if (door && door.mode) {
-    return { mode: door.mode, personId: door.mode === 'PERSON' ? door.personId : null, turnIds: studio.turnIds, from: 'connection', label: door.label || null };
+    return { mode: door.mode, personId: door.mode === 'PERSON' || door.mode === 'TEAM' ? door.personId : null, turnIds: studio.turnIds, from: 'connection', label: door.label || null };
   }
   return { mode: studio.mode, personId: studio.personId, turnIds: studio.turnIds, from: 'studio', label: null };
 }
@@ -124,6 +131,22 @@ export function effectiveRule(studio: StudioRouting, door: ConnectionRouting | n
  */
 export function canTakeLeads(member: Pick<RoutingMember, 'role' | 'status'>, fullSoftware: boolean): boolean {
   return can({ role: member.role, status: member.status, fullSoftware }, 'lead.edit', { assigned: true });
+}
+
+/**
+ * Whether this member's team pool can take new leads (TEAM): an active
+ * salesperson. The owner's own pool is the studio pool (POOL), and the other
+ * fixed roles have no sales team.
+ */
+export function canHeadTeam(member: Pick<RoutingMember, 'role' | 'status'>): boolean {
+  return member.role === 'SALES' && member.status === 'ACTIVE';
+}
+
+/** The head whose team pool this TEAM rule fills, if they can have one now. */
+export function teamHeadFor(rule: EffectiveRule, members: readonly RoutingMember[]): RoutingMember | null {
+  if (rule.mode !== 'TEAM' || !rule.personId) return null;
+  const head = members.find((m) => m.id === rule.personId);
+  return head && canHeadTeam(head) ? head : null;
 }
 
 /** The people this rule could give a lead to now, in the rule's order. */
@@ -151,6 +174,10 @@ export function needsTurn(rule: EffectiveRule, members: readonly RoutingMember[]
 export function routeLead(rule: EffectiveRule, members: readonly RoutingMember[], fullSoftware: boolean, turn: number | null = null): RouteDecision {
   const base = { from: rule.from, label: rule.label };
   if (rule.mode === 'POOL') return { kind: 'pool', why: 'POOL', ...base };
+  if (rule.mode === 'TEAM') {
+    const head = teamHeadFor(rule, members);
+    return head ? { kind: 'team', headId: head.id, name: head.name, ...base } : { kind: 'pool', why: 'UNAVAILABLE', ...base };
+  }
   const eligible = eligibleFor(rule, members, fullSoftware);
   if (eligible.length === 0) return { kind: 'pool', why: 'UNAVAILABLE', ...base };
   if (rule.mode === 'PERSON') {
@@ -166,6 +193,7 @@ export function routeLead(rule: EffectiveRule, members: readonly RoutingMember[]
 function ruleWords(d: RouteDecision, who: string | null): string {
   const subject = d.from === 'connection' && d.label ? `leads from ${d.label}` : 'new leads';
   if (d.kind === 'person' && d.mode === 'TURNS') return `${subject} take turns`;
+  if (d.kind === 'team') return `${subject} go to ${d.name}’s team`;
   return `${subject} go to ${who ?? 'a chosen person'}`;
 }
 
@@ -176,6 +204,7 @@ function ruleWords(d: RouteDecision, who: string | null): string {
  */
 export function routedLine(d: RouteDecision, wanted: string | null = null): { kind: 'ASSIGNED' | 'NOTE'; summary: string } | null {
   if (d.kind === 'person') return { kind: 'ASSIGNED', summary: `Given to ${d.name} (${ruleWords(d, d.name)})` };
+  if (d.kind === 'team') return { kind: 'NOTE', summary: `In ${d.name}’s team pool (${ruleWords(d, d.name)})` };
   if (d.why === 'UNAVAILABLE') {
     const subject = d.from === 'connection' && d.label ? `leads from ${d.label}` : 'new leads';
     return { kind: 'NOTE', summary: `Left in the pool: ${subject} go to ${wanted ?? 'chosen people'}, and nobody chosen can take leads right now.` };
@@ -186,6 +215,10 @@ export function routedLine(d: RouteDecision, wanted: string | null = null): { ki
 /** What the settings screen says the studio's rule does, in one sentence. */
 export function describeRouting(r: StudioRouting, members: readonly RoutingMember[], fullSoftware: boolean): string {
   if (r.mode === 'POOL') return 'New leads land in the pool. Anyone who works leads can take one.';
+  if (r.mode === 'TEAM') {
+    const head = teamHeadFor(effectiveRule(r, null), members);
+    return head ? `New leads land in ${head.name}’s team pool, for ${head.name} to hand out or the team to claim.` : 'The team chosen cannot take leads right now, so new leads land in the studio pool.';
+  }
   const rule = effectiveRule(r, null);
   const eligible = eligibleFor(rule, members, fullSoftware);
   if (r.mode === 'PERSON') {
@@ -206,6 +239,12 @@ export function checkRouting(input: { mode: unknown; personId?: unknown; turnIds
   if (!isMode(input.mode)) return { ok: false, error: 'Pick where new leads go.' };
   const takers = new Map(members.filter((m) => canTakeLeads(m, fullSoftware)).map((m) => [m.id, m]));
   if (input.mode === 'POOL') return { ok: true, routing: { mode: 'POOL', personId: null, turnIds: [] } };
+  if (input.mode === 'TEAM') {
+    const id = typeof input.personId === 'string' ? input.personId : '';
+    const head = members.find((m) => m.id === id);
+    if (!head || !canHeadTeam(head)) return { ok: false, error: 'Pick the team. Its head must be an active salesperson.' };
+    return { ok: true, routing: { mode: 'TEAM', personId: id, turnIds: [] } };
+  }
   if (input.mode === 'PERSON') {
     const id = typeof input.personId === 'string' ? input.personId : '';
     if (!takers.has(id)) return { ok: false, error: 'Pick the person. Only someone active who works leads can be given them.' };
@@ -225,6 +264,12 @@ export type OverrideCheck = { ok: true; mode: LeadRouteModeName | null; personId
 export function checkOverride(input: { mode: unknown; personId?: unknown }, members: readonly RoutingMember[], fullSoftware: boolean): OverrideCheck {
   if (input.mode === null || input.mode === '' || input.mode === undefined) return { ok: true, mode: null, personId: null };
   if (!isMode(input.mode)) return { ok: false, error: 'Pick where this source’s leads go.' };
+  if (input.mode === 'TEAM') {
+    const id = typeof input.personId === 'string' ? input.personId : '';
+    const head = members.find((x) => x.id === id);
+    if (!head || !canHeadTeam(head)) return { ok: false, error: 'Pick the team. Its head must be an active salesperson.' };
+    return { ok: true, mode: 'TEAM', personId: id };
+  }
   if (input.mode !== 'PERSON') return { ok: true, mode: input.mode, personId: null };
   const id = typeof input.personId === 'string' ? input.personId : '';
   const m = members.find((x) => x.id === id);

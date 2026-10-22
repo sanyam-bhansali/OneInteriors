@@ -15,6 +15,9 @@
  * same report, writes, prints what it wrote, and leaves one AuditLog row
  * (`studio.import.axleads`). Running it again skips everything already
  * imported. Nothing is sent to anybody: no invites, no WhatsApp, no SMS.
+ * The roles file can also set names, sales roles, reporting lines and a team
+ * pool (owner, 22 Oct 2026); if it asks for something that cannot be done,
+ * the report says what (✗) and a real run writes nothing.
  */
 
 import { readFileSync } from 'node:fs';
@@ -81,11 +84,16 @@ async function main() {
     }
 
     const started = Date.now();
-    const { plan, written } = await runImport(prisma, { studioId: studio.id, ax: parsed.data, choices: choices.choices, dryRun });
+    const { plan, blocked, written } = await runImport(prisma, { studioId: studio.id, ax: parsed.data, choices: choices.choices, dryRun });
     console.log(formatReport(plan.report, { tenant: parsed.data.tenant.name, studio: `${studio.tradeName} (${slug})`, dryRun }));
 
     if (!written) {
-      console.log('\nDry run: nothing was written. Run again without --dry-run to import.');
+      if (blocked.length && !dryRun) {
+        console.error(`\nNothing was written: the roles file asks for ${blocked.length === 1 ? 'something' : `${blocked.length} things`} that cannot be done (✗ above). Fix it, dry-run, and run again.`);
+        process.exitCode = 1;
+        return;
+      }
+      console.log(`\nDry run: nothing was written.${blocked.length ? ' Fix the roles file (✗ above) first, then' : ''} Run again without --dry-run to import.`);
       return;
     }
     console.log('\nWritten:');
@@ -97,6 +105,11 @@ async function main() {
     console.log(`  merged into a card                     ${written.merged}`);
     console.log(`  given to their person (second run)     ${written.backfilled}`);
     console.log(`  history lines                          ${written.events}`);
+    if (written.salesRolesMade.length) console.log(`  sales roles made                       ${written.salesRolesMade.join(', ')}`);
+    console.log(`  sales roles given                      ${written.salesRolesSet}`);
+    console.log(`  reporting lines set                    ${written.reportsToSet}`);
+    for (const r of written.salesRefused) console.log(`    not done: ${r.name} — ${r.reason}`);
+    if (written.poolMoves) console.log(`  moved into the team pool (second run)  ${written.poolMoves}`);
     console.log(`  in ${Math.round((Date.now() - started) / 1000)}s. Audit: studio.import.axleads. Check them at /studio/clients.`);
   } finally {
     await prisma.$disconnect();

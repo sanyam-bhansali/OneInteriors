@@ -45,7 +45,8 @@ export async function leadNeighbours(scope: LeadScope, ctx: ListContext, leadId:
     if (!here) return null;
     const cursor = parseCursor(cursorOf(ctx.sort, here));
     if (!cursor) return null;
-    const where = scopedLeadWhere(scope, filters, now, LIVE);
+    /* Only leads they may open (sales roles: a pool they can only claim from is not). */
+    const where = { AND: [scopedLeadWhere(scope, filters, now, LIVE), scope.leads] };
     const notHere = { id: { not: here.id } };
     const [next, prev] = await Promise.all([
       prisma.studioClient.findFirst({

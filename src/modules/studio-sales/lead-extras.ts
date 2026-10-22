@@ -12,6 +12,7 @@ import { prisma } from '@/lib/prisma';
 import { leadInScope, mayOnLead, myLeadScope, actingMember } from '@/modules/studio/lead-scope';
 import { record } from '@/modules/studio-practice/events';
 import { addTags, removeTag } from './tag-rules';
+import { rawSeenOrPool } from './lead-sql';
 
 export type Done = { ok: true; message?: string } | { ok: false; error: string };
 
@@ -56,12 +57,9 @@ export async function studioTags(): Promise<string[]> {
   const scope = await myLeadScope();
   if (!scope) return [];
   /* A salesperson's suggestions come from the leads they may see — their
-     own, and the pool if they may claim from it — never a colleague's. */
-  const fence = scope.seesAll
-    ? Prisma.empty
-    : scope.mayClaim
-      ? Prisma.sql`AND (c."assignedToId" = ${scope.member.id} OR c."assignedToId" IS NULL)`
-      : Prisma.sql`AND c."assignedToId" = ${scope.member.id}`;
+     own (their team's, with a sales role that reaches it), and the pools
+     they may claim from — never anyone else's (lead-sql.ts). */
+  const fence = rawSeenOrPool(scope);
   try {
     const rows = await prisma.$queryRaw<{ value: string }[]>(
       Prisma.sql`SELECT tg AS value FROM studio_clients c CROSS JOIN LATERAL unnest(c.tags) AS tg

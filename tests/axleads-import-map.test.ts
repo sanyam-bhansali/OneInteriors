@@ -19,6 +19,10 @@ import {
   type StudioContext,
   type StudioStageRef,
   answeredAny,
+  derivePermissions,
+  type ImportedRef,
+  type SalesRoleRef,
+  type StudioMemberRef,
 } from '@/modules/studio-import-axleads/map';
 import { HAUSPIRE_PIPELINE } from '@/modules/studio-practice/pipeline-preset';
 
@@ -393,5 +397,265 @@ describe('leads', () => {
     const ids = plan.leads.flatMap((l) => ('events' in l ? l.events.map((e) => e.externalId) : []));
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids.every((id) => id.startsWith('axleads:'))).toBe(true);
+  });
+});
+
+/**
+ * The sales team in the roles file (owner, 22 Oct 2026): names, sales roles
+ * (a built-in, or a new one copied from another plus permissions), reporting
+ * lines and a head's team pool. Invented people only.
+ */
+describe('the sales team', () => {
+  const A = '00000000-0000-4000-8002-000000000002'; // Test Agent A's AxLeads user id
+  const B = '00000000-0000-4000-8002-000000000003'; // Test Agent B's
+  const BUILT_INS: SalesRoleRef[] = [
+    { id: 'role-admin', name: 'Admin', system: 'ADMIN', permissions: { 'leads.view': 'all' } },
+    { id: 'role-head', name: 'Sales head', system: 'HEAD', permissions: { 'leads.view': 'team', 'leads.pool': 'team' } },
+    { id: 'role-rep', name: 'Sales rep', system: 'REP', permissions: { 'leads.view': 'own', 'leads.edit': 'own', 'leads.pool': 'team' } },
+  ];
+  /** The worked example in docs/studio-os/AXLEADS-IMPORT.md, on the fake export. */
+  const FILE = {
+    poolTeam: 'agent.a@axleads.test',
+    members: {
+      'studio@e2e.test': { salesRole: 'Admin' },
+      'agent.a@axleads.test': { name: 'Asha Head', salesRole: 'Sales head' },
+      'agent.b@axleads.test': {
+        name: 'Khushi Test',
+        phone: '9000000012',
+        salesRole: 'Sales rep + quotations',
+        salesRoleFrom: 'Sales rep',
+        addPermissions: ['quotes.build'],
+        reportsTo: 'agent.a@axleads.test',
+      },
+    },
+  };
+  const bad = (raw: unknown): string | null => {
+    const r = parseChoices(raw);
+    return r.ok ? null : r.error;
+  };
+  const one = (m: Record<string, unknown>) => ({ members: { 'a@b.test': m } });
+
+  it('reads the new options', () => {
+    const c = choices(FILE);
+    expect(c.poolTeam).toBe('agent.a@axleads.test');
+    expect(c.members['agent.b@axleads.test']).toMatchObject({
+      name: 'Khushi Test',
+      salesRole: 'Sales rep + quotations',
+      salesRoleFrom: 'Sales rep',
+      addPermissions: [{ key: 'quotes.build', reach: null }],
+      reportsTo: { key: 'agent.a@axleads.test' },
+    });
+    expect(choices(one({ reportsTo: '+91 90000 00098' })).members['a@b.test']?.reportsTo).toEqual({ phone: '+919000000098' });
+    expect(choices(one({ salesRole: 'R2', salesRoleFrom: 'Sales head', addPermissions: ['leads.view:all'] })).members['a@b.test']?.addPermissions).toEqual([{ key: 'leads.view', reach: 'all' }]);
+    expect(choices().poolTeam).toBeNull();
+  });
+
+  it('refuses what it cannot read', () => {
+    expect(bad(one({ name: 'X' }))).toMatch(/name/);
+    expect(bad(one({ salesRole: 'R', salesRoleFrom: 'Sales rep' }))).toMatch(/salesRole/);
+    expect(bad(one({ salesRoleFrom: 'Sales rep' }))).toMatch(/needs "salesRole"/);
+    expect(bad(one({ salesRole: 'New role', addPermissions: ['quotes.build'] }))).toMatch(/needs "salesRoleFrom"/);
+    expect(bad(one({ salesRole: 'New role', salesRoleFrom: 'Sales rep', addPermissions: ['quotes.fly'] }))).toMatch(/not a sales permission/);
+    expect(bad(one({ salesRole: 'New role', salesRoleFrom: 'Sales rep', addPermissions: ['quotes.build:team'] }))).toMatch(/takes no reach/);
+    expect(bad(one({ salesRole: 'New role', salesRoleFrom: 'Sales rep', addPermissions: ['leads.pool:own'] }))).toMatch(/takes team \/ all/);
+    expect(bad(one({ salesRole: 'New role', salesRoleFrom: 'Sales rep', addPermissions: 'quotes.build' }))).toMatch(/list/);
+    expect(bad(one({ reportsTo: 'nobody@b.test' }))).toMatch(/neither a key/);
+    expect(bad(one({ reportsTo: 'A@B.test' }))).toMatch(/themselves/);
+    expect(bad(one({ reportsTo: '12345' }))).toMatch(/neither a key/);
+    expect(bad({ poolTeam: 'head@b.test' })).toMatch(/poolTeam/);
+    const mixed = {
+      members: {
+        'a@b.test': { salesRole: 'Mixed', salesRoleFrom: 'Sales rep', addPermissions: ['quotes.build'] },
+        'c@b.test': { salesRole: 'mixed', salesRoleFrom: 'Sales head' },
+      },
+    };
+    expect(bad(mixed)).toMatch(/made two different ways/);
+    const same = {
+      members: {
+        'a@b.test': { salesRole: 'Same', salesRoleFrom: 'Sales rep' },
+        'c@b.test': { salesRole: 'same', salesRoleFrom: 'sales rep' },
+      },
+    };
+    expect(bad(same)).toBeNull();
+  });
+
+  it('a copied role gains permissions and never loses reach', () => {
+    expect(derivePermissions({ 'leads.view': 'own' }, [{ key: 'quotes.build', reach: null }])).toEqual({ 'leads.view': 'own', 'quotes.build': true });
+    expect(derivePermissions({ 'leads.view': 'team' }, [{ key: 'leads.view', reach: null }])).toEqual({ 'leads.view': 'team' });
+    expect(derivePermissions({ 'leads.view': 'own' }, [{ key: 'leads.view', reach: 'all' }])).toEqual({ 'leads.view': 'all' });
+    expect(derivePermissions({ 'leads.view': 'all' }, [{ key: 'leads.view', reach: 'own' }])).toEqual({ 'leads.view': 'all' });
+  });
+
+  it('the worked example: names, a built-in and a new role, a reporting line, the team pool; the owner gets neither', () => {
+    const plan = planImport(fresh(), ctx({ salesRoles: BUILT_INS }), choices(FILE), { now: NOW });
+    const st = plan.salesTeam;
+    expect(st.problems).toEqual([]);
+    expect(st.builtInsMissing).toEqual([]);
+    expect(plan.members.find((m) => m.ax.userId === A)).toMatchObject({ kind: 'create', name: 'Asha Head', label: 'Asha Head', role: 'SALES' });
+    expect(plan.members.find((m) => m.ax.userId === B)).toMatchObject({ kind: 'create', name: 'Khushi Test', phone: '+919000000012' });
+    expect(st.rolesToCreate).toEqual([
+      {
+        name: 'Sales rep + quotations',
+        from: 'Sales rep',
+        added: ['quotes.build'],
+        permissions: { 'leads.view': 'own', 'leads.edit': 'own', 'leads.pool': 'team', 'quotes.build': true },
+      },
+    ]);
+    expect(st.lines).toEqual([
+      {
+        axUserId: A,
+        who: 'Asha Head',
+        member: { kind: 'new', axUserId: A },
+        fixedRole: 'SALES',
+        salesRole: { name: 'Sales head', isNew: false, change: 'set', was: null },
+        reportsTo: null,
+      },
+      {
+        axUserId: B,
+        who: 'Khushi Test',
+        member: { kind: 'new', axUserId: B },
+        fixedRole: 'SALES',
+        salesRole: { name: 'Sales rep + quotations', isNew: true, change: 'set', was: null },
+        reportsTo: { to: { kind: 'new', axUserId: A }, name: 'Asha Head', change: 'set', was: null },
+      },
+    ]);
+    expect(st.notes).toEqual([expect.stringMatching(/^Test Owner is the owner: owners can do everything/)]);
+    expect(st.poolTeam).toEqual({ member: { kind: 'new', axUserId: A }, name: 'Asha Head' });
+
+    // Leads nobody had (2, 7) and the leaver's (6) go to Asha's team pool; Khushi's (4) and Asha's (1) are theirs.
+    expect(created(plan, 2).client.poolTeam).toEqual({ kind: 'new', axUserId: A });
+    expect(created(plan, 6).client.poolTeam).toEqual({ kind: 'new', axUserId: A });
+    expect(created(plan, 7).client.poolTeam).toEqual({ kind: 'new', axUserId: A });
+    expect(created(plan, 4).client).toMatchObject({ assignee: { kind: 'new', axUserId: B }, poolTeam: null });
+    expect(created(plan, 1).client).toMatchObject({ assignee: { kind: 'new', axUserId: A }, poolTeam: null });
+    expect(plan.report.perPool).toEqual({ 'Asha Head’s team pool': 3 });
+
+    const text = formatReport(plan.report, { tenant: 'Test Studio', studio: 'test', dryRun: true });
+    expect(text).toMatch(/Asha Head <agent\.a@axleads\.test> \[AGENT\]\s+\+ ADD as SALES/);
+    expect(text).toMatch(/\n {8}sales role: Sales head\n {8}team pool: gets the leads nobody had/);
+    expect(text).toMatch(/Khushi Test <agent\.b@axleads\.test>[^\n]*\n {8}sales role: Sales rep \+ quotations \(new role\)\n {8}reports to: Asha Head\n/);
+    expect(text).toMatch(/Sales role to make: Sales rep \+ quotations — a copy of Sales rep plus quotes\.build/);
+    expect(text).toMatch(/Note: Test Owner is the owner/);
+    expect(text).toMatch(/New cards nobody has, per pool:\n\s+Asha Head’s team pool\s+3/);
+    expect(text).not.toMatch(/✗ The roles file/);
+  });
+
+  it('without a poolTeam, pool leads stay in the studio pool; a plain file touches no sales roles', () => {
+    const plan = planImport(fresh(), ctx(), choices(), { now: NOW });
+    expect(plan.salesTeam).toMatchObject({ uses: false, builtInsMissing: [], rolesToCreate: [], lines: [], poolTeam: null, problems: [] });
+    expect(created(plan, 2).client.poolTeam).toBeNull();
+    expect(plan.report.perPool).toEqual({ 'Studio pool': 4 });
+  });
+
+  it('a studio that predates the built-ins: they are planned first and can be named', () => {
+    const plan = planImport(fresh(), ctx({ salesRoles: undefined }), choices(FILE), { now: NOW });
+    expect(plan.salesTeam.builtInsMissing).toEqual(['Admin', 'Sales head', 'Sales rep']);
+    expect(plan.salesTeam.problems).toEqual([]);
+    expect(plan.salesTeam.rolesToCreate[0]?.permissions).toMatchObject({ 'leads.view': 'own', 'quotes.build': true });
+    expect(formatReport(plan.report, { tenant: 'T', studio: 's', dryRun: true })).toMatch(/Sales roles this studio does not have yet, made first: Admin, Sales head, Sales rep/);
+  });
+
+  it('what cannot be done is a problem, and the reasons are said', () => {
+    const problems = (file: unknown, over: Partial<StudioContext> = {}) => planImport(fresh(), ctx({ salesRoles: BUILT_INS, ...over }), choices(file), { now: NOW }).salesTeam.problems;
+    const A_KEY = 'agent.a@axleads.test';
+    expect(problems({ members: { [A_KEY]: { salesRole: 'Closer' } } })).toEqual([expect.stringMatching(/"Closer" is not a sales role here.*salesRoleFrom/)]);
+    expect(problems({ members: { [A_KEY]: { salesRole: 'Closer', salesRoleFrom: 'Boss' } } })).toEqual([expect.stringMatching(/"Boss" \(salesRoleFrom\) is not a sales role here/)]);
+    // A leaver cannot be anybody's boss, nor have a pool.
+    expect(problems({ members: { [A_KEY]: { reportsTo: 'gone@axleads.test' }, 'gone@axleads.test': {} } })).toEqual([
+      expect.stringMatching(/Test Agent A: reportsTo Test Gone, who is not added here \(they left AxLeads\)/),
+    ]);
+    expect(problems({ poolTeam: 'gone@axleads.test', members: { 'gone@axleads.test': {} } })).toEqual([expect.stringMatching(/poolTeam: Test Gone is not added here/)]);
+    // The owner's pool is the studio pool; a designer heads no team.
+    expect(problems({ poolTeam: 'studio@e2e.test', members: { 'studio@e2e.test': {} } })).toEqual([expect.stringMatching(/owner's pool is the studio pool/)]);
+    expect(problems({ poolTeam: A_KEY, members: { [A_KEY]: { role: 'DESIGNER' } } })).toEqual([expect.stringMatching(/DESIGNER; a team pool belongs to a salesperson/)]);
+    // A loop, in file order: the second line is refused.
+    const loop = { members: { [A_KEY]: { reportsTo: 'agent.b@axleads.test' }, 'agent.b@axleads.test': { phone: '9000000012', reportsTo: A_KEY } } };
+    expect(problems(loop)).toEqual([expect.stringMatching(/Test Agent B: cannot report to Test Agent A: That would make a loop/)]);
+    // A boss by phone must be a salesperson of this studio.
+    const pm: StudioMemberRef = { id: 'mem-pm', name: 'Test PM', role: 'PM', status: 'ACTIVE', phone: '+919000000098', email: null };
+    expect(problems({ members: { [A_KEY]: { reportsTo: '9000000098' } } }, { members: [...ctx().members, pm] })).toEqual([expect.stringMatching(/A salesperson reports to another salesperson/)]);
+    expect(problems({ members: { [A_KEY]: { reportsTo: '9000000097' } } })).toEqual([expect.stringMatching(/…0097 is not anyone on this studio's team/)]);
+    const plan = planImport(fresh(), ctx({ salesRoles: BUILT_INS }), choices({ members: { [A_KEY]: { salesRole: 'Closer' } } }), { now: NOW });
+    expect(formatReport(plan.report, { tenant: 'T', studio: 's', dryRun: true })).toMatch(/✗ The roles file asks for something that cannot be done\. Nothing is written until it is fixed:\n {4}✗ Test Agent A: "Closer"/);
+  });
+
+  it('not a salesperson, or not added: the sales options are left out with a note, not refused', () => {
+    const file = {
+      members: {
+        'agent.a@axleads.test': { role: 'DESIGNER', salesRole: 'Sales rep' },
+        'agent.b@axleads.test': { salesRole: 'Sales rep' },
+        'gone@axleads.test': { reportsTo: 'agent.a@axleads.test' },
+      },
+    };
+    const plan = planImport(fresh(), ctx({ salesRoles: BUILT_INS }), choices(file), { now: NOW });
+    expect(plan.salesTeam.problems).toEqual([]);
+    expect(plan.salesTeam.lines).toEqual([]);
+    expect(plan.salesTeam.notes).toEqual([
+      expect.stringMatching(/^Test Agent A is DESIGNER: sales roles and reporting lines are for salespeople/),
+      expect.stringMatching(/^Test Agent B: not added here \(no phone\)/),
+      expect.stringMatching(/^Test Gone: not added here \(they left AxLeads\)/),
+    ]);
+  });
+
+  it('a reporting line to someone already on the team, by phone', () => {
+    const head: StudioMemberRef = { id: 'mem-lead', name: 'Test Team Lead', role: 'SALES', status: 'ACTIVE', phone: '+919000000098', email: null };
+    const plan = planImport(fresh(), ctx({ salesRoles: BUILT_INS, members: [...ctx().members, head] }), choices({ members: { 'agent.a@axleads.test': { reportsTo: '9000000098' } } }), { now: NOW });
+    expect(plan.salesTeam.lines[0]?.reportsTo).toEqual({ to: { kind: 'existing', id: 'mem-lead' }, name: 'Test Team Lead', change: 'set', was: null });
+  });
+
+  describe('running it again', () => {
+    const existing = (over: Partial<StudioMemberRef> = {}): StudioMemberRef[] => [
+      ...ctx().members,
+      { id: 'mem-a', name: 'Asha Head', role: 'SALES', status: 'INVITED', phone: '+919000000011', email: null, salesRoleId: 'role-head', reportsToId: null },
+      { id: 'mem-b', name: 'Khushi Test', role: 'SALES', status: 'INVITED', phone: '+919000000012', email: null, salesRoleId: 'role-repq', reportsToId: 'mem-a', ...over },
+    ];
+    const roles: SalesRoleRef[] = [...BUILT_INS, { id: 'role-repq', name: 'Sales rep + quotations', system: null, permissions: { 'leads.view': 'own', 'quotes.build': true } }];
+
+    it('changes nothing that is already as the file says, and says so', () => {
+      const plan = planImport(fresh(), ctx({ salesRoles: roles, members: existing() }), choices(FILE), { now: NOW });
+      const st = plan.salesTeam;
+      expect(st.problems).toEqual([]);
+      expect(st.rolesToCreate).toEqual([]);
+      expect(st.lines.map((l) => [l.who, l.salesRole?.change, l.reportsTo?.change ?? null])).toEqual([
+        ['Asha Head', 'same', null],
+        ['Khushi Test', 'same', 'same'],
+      ]);
+      expect(st.notes).toContainEqual(expect.stringMatching(/"Sales rep \+ quotations" is already a role here, so salesRoleFrom \/ addPermissions are not used/));
+      expect(formatReport(plan.report, { tenant: 'T', studio: 's', dryRun: true })).toMatch(/sales role: Sales rep \+ quotations \(unchanged\)\n {8}reports to: Asha Head \(unchanged\)/);
+    });
+
+    it('changes only what the file names, and reports what it was', () => {
+      const plan = planImport(fresh(), ctx({ salesRoles: roles, members: existing({ salesRoleId: 'role-rep', reportsToId: null }) }), choices(FILE), { now: NOW });
+      const khushi = plan.salesTeam.lines.find((l) => l.who === 'Khushi Test')!;
+      expect(khushi.salesRole).toEqual({ name: 'Sales rep + quotations', isNew: false, change: 'changed', was: 'Sales rep' });
+      expect(khushi.reportsTo).toMatchObject({ to: { kind: 'existing', id: 'mem-a' }, change: 'set' });
+      expect(formatReport(plan.report, { tenant: 'T', studio: 's', dryRun: true })).toMatch(/sales role: Sales rep \+ quotations \(was Sales rep\)/);
+      // A file that names no sales role for Asha leaves hers alone.
+      const quiet = planImport(fresh(), ctx({ salesRoles: roles, members: existing() }), choices({ members: { 'agent.a@axleads.test': {} } }), { now: NOW });
+      expect(quiet.salesTeam.lines).toEqual([]);
+    });
+
+    it('moves an imported card to the team pool only while nobody has it and nobody has touched it', () => {
+      const id = (n: number) => `00000000-0000-4000-9000-${String(n).padStart(12, '0')}`;
+      const imported = new Map<string, ImportedRef>([
+        [id(2), { clientId: 'c2', assignedToId: null, poolTeamId: null, fromImport: true, touched: false }],
+        [id(7), { clientId: 'c7', assignedToId: null, poolTeamId: null, fromImport: true, touched: true }],
+        [id(6), { clientId: 'c6', assignedToId: null, poolTeamId: 'mem-a', fromImport: true, touched: false }],
+        // Merged into a card that was already on the board: not the import's to pool.
+        [id(3), { clientId: 'c1', assignedToId: null, poolTeamId: null, fromImport: false, touched: false }],
+        // Somebody has it now.
+        [id(5), { clientId: 'c5', assignedToId: 'mem-owner', poolTeamId: null, fromImport: true, touched: false }],
+      ]);
+      const plan = planImport(fresh(), ctx({ salesRoles: roles, members: existing(), imported }), choices(FILE), { now: NOW });
+      expect(lead(plan, 2)).toMatchObject({ action: 'already', pool: { kind: 'existing', id: 'mem-a' } });
+      expect(lead(plan, 7)).toMatchObject({ action: 'already', pool: null });
+      expect(lead(plan, 6)).toMatchObject({ action: 'already', pool: null });
+      expect(lead(plan, 3)).toMatchObject({ action: 'already', pool: null });
+      expect(lead(plan, 5)).toMatchObject({ action: 'already', pool: null });
+      expect(plan.report).toMatchObject({ poolMoves: 1, poolLeftTouched: 1, poolAlready: 1 });
+      expect(formatReport(plan.report, { tenant: 'T', studio: 's', dryRun: true })).toMatch(
+        /now for Asha Head’s team pool: 1 moved there, 1 left where they are \(worked since the import\), 1 there already/,
+      );
+    });
   });
 });

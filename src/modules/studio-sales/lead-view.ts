@@ -26,6 +26,8 @@ export interface LeadView {
   stageKind: 'OPEN' | 'WON' | 'DONE' | 'LOST';
   assignedToId: string | null;
   assignedToName: string | null;
+  /** The pool an unassigned lead sits in: a head's member id, or null for the studio pool (sales roles, 22 Oct 2026). */
+  poolTeamId?: string | null;
   createdAt: Date;
   /** The row's last change (the "Last active" sort). */
   updatedAt: Date;
@@ -48,9 +50,23 @@ export interface LeadView {
  * salesperson only their own. A pool lead (or anything not theirs) is a
  * row to claim from — roles.ts: "not the pool lead's own page until they
  * have claimed it".
+ *
+ * Sales roles (owner, 22 Oct 2026): with team reach (`team` = them and
+ * everyone below them), a lead their team has, or one waiting in a team pool
+ * of their team, is theirs to see in full — the same rule as
+ * sales-access.ts `leadInReach`. A pool they may only claim from (a head's
+ * pool above them) stays a row to claim.
  */
-export function seesFullLead(viewer: { seesAll: boolean; member: { id: string } }, lead: { assignedToId: string | null }): boolean {
-  return viewer.seesAll || (lead.assignedToId !== null && lead.assignedToId === viewer.member.id);
+export function seesFullLead(
+  viewer: { seesAll: boolean; member: { id: string }; team?: readonly string[] | null },
+  lead: { assignedToId: string | null; poolTeamId?: string | null },
+): boolean {
+  if (viewer.seesAll) return true;
+  if (lead.assignedToId !== null && lead.assignedToId === viewer.member.id) return true;
+  const team = viewer.team;
+  if (!team) return false;
+  if (lead.assignedToId !== null) return team.includes(lead.assignedToId);
+  return typeof lead.poolTeamId === 'string' && team.includes(lead.poolTeamId);
 }
 
 /**

@@ -168,6 +168,8 @@ export async function landLead(input: LandInput): Promise<LandResult> {
         leadSourceId: input.leadSourceId ?? null,
         sourceNote: input.sourceNote,
         assignedToId: decision.kind === 'person' ? decision.memberId : null,
+        /* TEAM (sales roles, owner 22 Oct 2026): unassigned, in the head's team pool. */
+        poolTeamId: decision.kind === 'team' ? decision.headId : null,
         nextAction: 'Call them back',
         nextActionOn: new Date(),
         ...(ads ?? {}),
@@ -187,7 +189,11 @@ export async function landLead(input: LandInput): Promise<LandResult> {
       kind: line.kind,
       summary: line.summary,
       by: null,
-      meta: { toMemberId: decision.kind === 'person' ? decision.memberId : null, routed: { mode: decision.kind === 'person' ? decision.mode : routing.rule.mode, from: decision.from } },
+      meta: {
+        toMemberId: decision.kind === 'person' ? decision.memberId : null,
+        ...(decision.kind === 'team' ? { poolTeamId: decision.headId } : {}),
+        routed: { mode: decision.kind === 'person' ? decision.mode : routing.rule.mode, from: decision.from },
+      },
     });
   }
 
@@ -199,6 +205,11 @@ export async function landLead(input: LandInput): Promise<LandResult> {
   if (decision.kind === 'person') {
     const to = routing.userIds.get(decision.memberId);
     if (to && !OFFICE_ROLES.includes(to.role)) alerts.push(notify(to.userId, { kind: 'lead-assigned', clientId: client.id, count: 1, name: lead.name, by: null }));
+  }
+  /* TEAM: the head hears that a lead is waiting in their team pool. */
+  if (decision.kind === 'team') {
+    const head = routing.userIds.get(decision.headId);
+    if (head) alerts.push(notify(head.userId, { kind: 'lead-new', clientId: client.id, name: lead.name, source: input.how, again: false }));
   }
 
   return { kind: 'created', clientId: client.id, alerted: quietly(Promise.all(alerts)) };
@@ -247,7 +258,7 @@ async function routingFor(studioId: string, connectionId: string | null): Promis
       select: { id: true, userId: true, role: true, status: true, user: { select: { name: true, email: true } } },
     });
     const members: RoutingMember[] = rows.map((m) => ({ id: m.id, role: m.role, status: m.status, name: displayName(m.user?.name ?? null, m.user?.email ?? null) }));
-    const ids = rule.mode === 'PERSON' ? (rule.personId ? [rule.personId] : []) : rule.turnIds;
+    const ids = rule.mode === 'PERSON' || rule.mode === 'TEAM' ? (rule.personId ? [rule.personId] : []) : rule.turnIds;
     const names = ids.map((id) => members.find((m) => m.id === id)?.name).filter((n): n is string => !!n);
     return {
       rule,

@@ -9,6 +9,8 @@ import { introStateForClient } from '@/modules/studio/introduction';
 import { currentMember } from '@/modules/studio/access';
 import { can } from '@/modules/studio/roles';
 import { leadPage } from '@/modules/studio-sales/leads';
+import { leadRequestState } from '@/modules/studio-quote/quote-requests';
+import { QuoteRequestBox } from './QuoteRequestBox';
 import { bookingDraft } from '@/modules/studio-sales/booking';
 import { telLink, whatsappLink } from '@/modules/studio-sales/lead-rules';
 import { myStages } from '@/modules/studio-practice/stages';
@@ -74,12 +76,15 @@ export default async function ClientPage({
   if (!page) notFound();
   const { client } = page;
   const member = await currentMember();
-  const seesAll = page.may.assign;
+  /* Who may change anyone's notes and pick anyone for a task: the whole-studio view (owner, PM, a sales role that sees everyone). */
+  const leadScope = await myLeadScope();
+  const seesAll = leadScope?.seesAll ?? false;
+  const mayMerge = member !== null && can(member, 'lead.merge');
 
-  const [events, brief, dupes, intro, draft, tasks, taskWho, stages, fields, tags, vocab, previousCalls] = await Promise.all([
+  const [events, brief, dupes, intro, draft, tasks, taskWho, stages, fields, tags, vocab, previousCalls, quoteRequest] = await Promise.all([
     timelineFor(id),
     client.fromMarketplace ? marketplaceContextFor(id) : Promise.resolve(null),
-    seesAll ? duplicatesOf(id) : Promise.resolve([]),
+    mayMerge ? duplicatesOf(id) : Promise.resolve([]),
     client.fromMarketplace ? introStateForClient(id) : Promise.resolve(null),
     page.bookableQuoteId && page.may.book ? bookingDraft(member, page.bookableQuoteId) : Promise.resolve(null),
     tasksForLead(id),
@@ -89,8 +94,10 @@ export default async function ClientPage({
     leadTags(id),
     studioTags(),
     callAttempts(id),
+    /* Quotation requests (owner, 22 Oct 2026): "Quotation being built by Khushi", Request quotation. */
+    client.isDemo ? Promise.resolve(null) : leadRequestState(id),
   ]);
-  const scope = listCtx ? await myLeadScope() : null;
+  const scope = listCtx ? leadScope : null;
   const around = scope && listCtx ? await leadNeighbours(scope, listCtx, id) : null;
 
   const tel = telLink(client.phone);
@@ -146,7 +153,7 @@ export default async function ClientPage({
         tel={tel}
         whatsapp={whatsappLink(client.phone)}
         stages={stages.map((s) => ({ id: s.id, name: s.name, colour: s.colour, kind: s.kind, sortOrder: s.sortOrder, isIntake: s.isIntake, isCallStep: s.isCallStep }))}
-        may={{ edit: mayWork, quote: page.may.quote, delete: mayDelete }}
+        may={{ edit: mayWork, quote: page.may.quote, delete: mayDelete, call: page.may.call && !client.isDemo }}
         canBook={page.may.book && page.bookableQuoteId !== null}
         previousCalls={previousCalls}
       />
@@ -186,6 +193,7 @@ export default async function ClientPage({
           {intro ? <IntroAnswer state={intro} /> : null}
           {brief ? <BriefPanel ctx={brief} /> : null}
           {client.fromMarketplace && page.may.quote ? <FinalQuote clientId={client.id} /> : null}
+          {quoteRequest ? <QuoteRequestBox clientId={client.id} state={quoteRequest} meId={member?.id ?? null} /> : null}
 
           <LeadTabs
             tabs={[

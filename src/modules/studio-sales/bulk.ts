@@ -20,7 +20,10 @@ import { LIVE } from '@/modules/studio-practice/demo-lead';
 import { recordMany } from '@/modules/studio-practice/events';
 import { assignedSummary, lostSummary, stageSummary } from '@/modules/studio-practice/event-copy';
 import { BIN_DAYS, LOST_LABELS, type LostReasonName } from '@/modules/studio-practice/vocabulary';
-import { actingMember, myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
+import { actingMember, fenceFor, myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
+import { hasSalesRole } from '@/modules/studio/roles';
+import { mayAssignTo } from '@/modules/studio/sales-access';
+import { poolTarget } from '@/modules/studio-practice/clients';
 import { addDays, dayToDb, isDay, istDay, istTime } from '@/modules/project/working-days';
 import { meetingLabel, parseMeeting } from './lead-rules';
 import { BULK_CHUNK, BULK_MAX, bulkFence, chunks, mayBulk, readLimit, splitEvenly, splitSentence, type BulkAction } from './bulk-rules';
@@ -46,10 +49,12 @@ async function who(action: BulkAction): Promise<LeadScope | null> {
  * salesperson's other actions only their own leads). "First N" follows the
  * list's own order (`sort` in the query).
  */
-async function targetIds(scope: LeadScope, target: BulkTarget, action: BulkAction, extra: Prisma.StudioClientWhereInput = {}): Promise<string[] | { error: string }> {
+async function targetIds(scope: LeadScope, target: BulkTarget, action: BulkAction, more: Prisma.StudioClientWhereInput = {}): Promise<string[] | { error: string }> {
   const now = new Date();
-  const fence = bulkFence(action, scope.seesAll);
+  const fence = bulkFence(action, scope.seesAll || scope.team !== null);
   const fenced = (f: LeadFilters): LeadFilters => (fence === 'pool' ? { ...f, owner: 'pool' } : fence === 'mine' ? { ...f, owner: 'me' } : f);
+  /* Sales roles (owner, 22 Oct 2026): the bulk reach AND the action's own reach. Claiming is fenced by the pools (`owner: 'pool'`). */
+  const extra: Prisma.StudioClientWhereInput = { AND: [more, ...actionFences(scope, action)] };
   const tooMany = { error: `That is more than ${BULK_MAX.toLocaleString('en-IN')} leads. Narrow the filters first.` };
   if ('ids' in target) {
     if (!Array.isArray(target.ids) || target.ids.length === 0) return { error: 'Tick at least one lead.' };
@@ -77,6 +82,15 @@ async function targetIds(scope: LeadScope, target: BulkTarget, action: BulkActio
   });
   if (!limit && rows.length > BULK_MAX) return tooMany;
   return rows.map((r) => r.id);
+}
+
+/** The reach fences a bulk action's rows must also sit inside. */
+function actionFences(scope: LeadScope, action: BulkAction): Prisma.StudioClientWhereInput[] {
+  if (action === 'claim') return [];
+  const bulk = fenceFor(scope, 'lead.bulk');
+  if (action === 'assign' || action === 'split') return [bulk, fenceFor(scope, 'lead.assign')];
+  if (action === 'move' || action === 'followup') return [bulk, fenceFor(scope, 'lead.edit')];
+  return [bulk, scope.leads];
 }
 
 /**
@@ -135,22 +149,31 @@ async function claimFree(studioId: string, ids: string[], memberId: string): Pro
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString('en-IN')} ${n === 1 ? one : many}`;
 
-/** People a lead may be given to: active owner, PM or salesperson of this studio. */
-async function assignees(studioId: string, ids: string[]) {
+/**
+ * People a lead may be given to: active owner, PM or salesperson of this
+ * studio; for a sales role with team reach, only people in their team.
+ */
+async function assignees(scope: LeadScope, ids: string[]) {
   const rows = await prisma.studioMember.findMany({
-    where: { studioId, id: { in: ids }, status: 'ACTIVE', role: { in: ['OWNER', 'PM', 'SALES'] } },
+    where: { studioId: scope.studioId, id: { in: ids }, status: 'ACTIVE', role: { in: ['OWNER', 'PM', 'SALES'] } },
     select: { id: true, userId: true, user: { select: { name: true, email: true, phone: true } } },
   });
-  return rows.map((r) => ({ id: r.id, userId: r.userId, name: r.user.name?.trim() || r.user.email?.split('@')[0] || r.user.phone || 'Someone' }));
+  const me = scope.member;
+  return rows
+    .filter((r) => !hasSalesRole(me) || mayAssignTo(me.sales, r.id))
+    .map((r) => ({ id: r.id, userId: r.userId, name: r.user.name?.trim() || r.user.email?.split('@')[0] || r.user.phone || 'Someone' }));
 }
 
 /** Give these leads to one person (the timeline line, the person told once). */
 async function giveTo(scope: LeadScope, ids: string[], to: { id: string; userId: string; name: string } | null, by: { id: string; name: string } | null): Promise<number> {
+  /* Back to the pool: which pool (sales roles; clients.ts `poolTarget`). */
+  const pool = await poolTarget(scope, to?.id ?? null, null);
+  const poolData = pool.ok && pool.set ? { poolTeamId: pool.poolTeamId } : {};
   let done = 0;
   for (const batch of chunks(ids, BULK_CHUNK)) {
     const { count } = await prisma.studioClient.updateMany({
       where: { studioId: scope.studioId, id: { in: batch }, deletedAt: null },
-      data: { assignedToId: to?.id ?? null },
+      data: { assignedToId: to?.id ?? null, ...poolData },
     });
     done += count;
     await recordMany(
@@ -168,10 +191,10 @@ async function giveTo(scope: LeadScope, ids: string[], to: { id: string; userId:
 /** Give to one person, or (null) back to the pool. Owner and PM. */
 export async function bulkAssign(target: BulkTarget, memberId: string | null): Promise<BulkResult> {
   const scope = await who('assign');
-  if (!scope) return { ok: false, error: 'Only the owner or a project manager can give leads out.' };
+  if (!scope) return { ok: false, error: 'Your role does not include giving leads out.' };
   try {
-    const to = memberId ? ((await assignees(scope.studioId, [memberId]))[0] ?? null) : null;
-    if (memberId && !to) return { ok: false, error: 'That person cannot take leads (not active, or not on the sales team).' };
+    const to = memberId ? ((await assignees(scope, [memberId]))[0] ?? null) : null;
+    if (memberId && !to) return { ok: false, error: 'That person cannot take leads from you (not active, not on the sales team, or not in your team).' };
     const ids = await targetIds(scope, target, 'assign');
     if ('error' in ids) return { ok: false, error: ids.error };
     if (ids.length === 0) return { ok: false, error: 'None of those are leads you can see.' };
@@ -186,11 +209,11 @@ export async function bulkAssign(target: BulkTarget, memberId: string | null): P
 /** Deal the leads out evenly among the chosen people. Owner and PM. */
 export async function bulkSplit(target: BulkTarget, memberIds: string[]): Promise<BulkResult> {
   const scope = await who('split');
-  if (!scope) return { ok: false, error: 'Only the owner or a project manager can share leads out.' };
+  if (!scope) return { ok: false, error: 'Your role does not include sharing leads out.' };
   if (!Array.isArray(memberIds) || memberIds.length < 2) return { ok: false, error: 'Pick at least two people to split between.' };
   try {
     const wanted = [...new Set(memberIds.filter((m) => typeof m === 'string' && ID.test(m)))].slice(0, 50);
-    const people = await assignees(scope.studioId, wanted);
+    const people = await assignees(scope, wanted);
     if (people.length < 2) return { ok: false, error: 'Pick at least two people who can take leads.' };
     const ids = await targetIds(scope, target, 'split');
     if ('error' in ids) return { ok: false, error: ids.error };
@@ -297,7 +320,7 @@ export async function bulkFollowUp(target: BulkTarget, day: string, time: string
  */
 export async function bulkBin(target: BulkTarget): Promise<BulkResult> {
   const scope = await who('bin');
-  if (!scope) return { ok: false, error: 'Only the owner or a project manager can delete leads.' };
+  if (!scope) return { ok: false, error: 'Your role does not include deleting leads.' };
   try {
     const all = await targetIds(scope, target, 'bin');
     if ('error' in all) return { ok: false, error: all.error };

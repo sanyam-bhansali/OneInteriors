@@ -5,8 +5,9 @@ import 'server-only';
  * come in by themselves" (21 Oct 2026; docs/studio-os/LEAD-INTAKE.md).
  *
  * Every read and write is scoped by the member's own studio, and only those
- * who may import leads (`lead.import`: the owner and project managers, the
- * same people who keep the studio's source names) manage the doors. It is a
+ * who keep the studio's lead settings (`lead.settings`: the owner, project
+ * managers, and a salesperson whose sales role has "Change lead settings";
+ * it was `lead.import` until sales roles, owner 22 Oct 2026) manage the doors. It is a
  * Pro feature: every studio has it, not only the full software.
  *
  * The key is returned exactly twice in a door's life — when it is made and
@@ -86,7 +87,7 @@ export function doorUrl(kind: ConnectionKindName, id: string): string {
 export async function myIntakeScreen(): Promise<IntakeScreen | null> {
   const member = await currentMember();
   if (!member) return null;
-  const canManage = can(member, 'lead.import');
+  const canManage = can(member, 'lead.settings');
   const metaReady = {
     appSecret: Boolean(process.env.META_APP_SECRET?.trim()),
     verifyToken: Boolean(process.env.META_VERIFY_TOKEN?.trim()),
@@ -152,11 +153,11 @@ export async function myIntakeScreen(): Promise<IntakeScreen | null> {
 
 async function manager() {
   const member = await currentMember();
-  if (!member || !can(member, 'lead.import')) return null;
+  if (!member || !can(member, 'lead.settings')) return null;
   return member;
 }
 
-const REFUSED = { ok: false as const, error: 'Only the owner or a project manager sets up where leads come in from.' };
+const REFUSED = { ok: false as const, error: 'Your role does not include setting up where leads come in from. Ask your studio owner.' };
 
 /** Make a door. The key comes back once, in `secret` (none for a Meta Page). */
 export async function createConnection(input: { kind: unknown; label: unknown; metaPageId?: unknown }): Promise<IntakeResult> {

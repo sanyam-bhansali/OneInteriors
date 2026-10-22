@@ -22,10 +22,14 @@ import { opensFullSoftware, planOf } from './software-plan';
  * `StudioProjectMember` rows needed.
  */
 
+import { cache } from 'react';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { getCurrentUser, hasRole } from '@/modules/auth/session';
-import { can, needsAssignment, type MemberRole, type StudioAction } from './roles';
+import { can, isReadAction, needsAssignment, type MemberRole, type StudioAction } from './roles';
+import { buildSalesContext, type TreeMember } from './sales-access';
+import { isWriteRequest, staffViewFor } from './view-as';
 
 export { can, projectsVisibleTo, type StudioAction } from './roles';
 
@@ -35,18 +39,56 @@ export interface StudioMemberRef extends MemberRole {
   userId: string;
 }
 
-const MEMBER_SELECT = { id: true, studioId: true, userId: true, role: true, status: true, studio: { select: { fullSoftware: true, softwarePlan: true } } } as const;
+const MEMBER_SELECT = {
+  id: true,
+  studioId: true,
+  userId: true,
+  role: true,
+  status: true,
+  reportsToId: true,
+  salesRole: { select: { id: true, name: true, permissions: true } },
+  studio: { select: { fullSoftware: true, softwarePlan: true } },
+} as const;
+
+/**
+ * The studio's reporting lines (sales roles, owner 22 Oct 2026), read once
+ * per request per studio (React `cache`): a studio's team is a handful of
+ * rows, and every lead read of a SALES member needs their subtree.
+ */
+const studioTree = cache(async (studioId: string): Promise<TreeMember[]> =>
+  prisma.studioMember.findMany({ where: { studioId }, select: { id: true, reportsToId: true } }),
+);
 
 /**
  * The membership of this user, or null when they belong to no studio. `userId` is unique: one person, one studio.
  * Carries the studio's pilot switch (`fullSoftware`), so `can()` and `mayOpen` narrow a studio without the full software (studio/pilot.ts).
  */
 export async function memberFor(userId: string): Promise<StudioMemberRef | null> {
-  const row = await prisma.studioMember.findUnique({ where: { userId }, select: MEMBER_SELECT });
+  return refFor(await prisma.studioMember.findUnique({ where: { userId }, select: MEMBER_SELECT }));
+}
+
+/** The same membership, found by its own id: the member a staff view is looking as (VIEW-AS.md). */
+export async function memberById(memberId: string): Promise<StudioMemberRef | null> {
+  return refFor(await prisma.studioMember.findUnique({ where: { id: memberId }, select: MEMBER_SELECT }));
+}
+
+type MemberRow = Prisma.StudioMemberGetPayload<{ select: typeof MEMBER_SELECT }>;
+
+async function refFor(row: MemberRow | null): Promise<StudioMemberRef | null> {
   if (!row) return null;
-  const { studio, ...member } = row;
+  const { studio, salesRole, reportsToId, ...member } = row;
+  /* Sales roles (owner, 22 Oct 2026): a SALES member with a sales role is
+     governed by it (roles.ts `can`), reaching their subtree of the reporting
+     tree. No role keeps the Phase 1 rule. Never read for any other role. A
+     failure to read the tree throws, and `currentMember` returns null:
+     closed, never wider. */
+  const sales =
+    member.role === 'SALES' && salesRole
+      ? buildSalesContext({ id: member.id, reportsToId: reportsToId ?? null }, salesRole, await studioTree(member.studioId))
+      : null;
+  const base = sales ? { ...member, sales } : member;
   /* The relation is required; a test double without it narrows nothing. */
-  return studio ? { ...member, fullSoftware: opensFullSoftware(planOf(studio)), solo: planOf(studio) === 'SOLO' } : member;
+  return studio ? { ...base, fullSoftware: opensFullSoftware(planOf(studio)), solo: planOf(studio) === 'SOLO' } : base;
 }
 
 /**
@@ -58,11 +100,32 @@ export async function currentMember(): Promise<StudioMemberRef | null> {
   const user = await getCurrentUser();
   if (!user || !hasRole(user, 'STUDIO') || !hasDatabase()) return null;
   try {
+    /* Developer access (owner, 22 Oct 2026; docs/studio-os/VIEW-AS.md): OPS
+       or ADMIN with a live view is that member, `viewOnly`, so `can()` lets
+       them read and nothing else. On a write request (a server action, or
+       any method but GET/HEAD) they are nobody at all: every write helper
+       that starts here finds no member to write as. Not viewing: as before. */
+    const view = await viewAsFor(user);
+    if (view !== undefined) return view;
     return await memberFor(user.id);
   } catch (error) {
     console.error('[studio] currentMember failed', error);
     return null;
   }
+}
+
+/**
+ * The member a staff session is viewing as (VIEW-AS.md): `undefined` when
+ * this user is not staff or has no live view (so everything is as before);
+ * null when viewing but refused (a write request, or the member is gone);
+ * else the member, marked `viewOnly`. Also for the studio layout.
+ */
+export async function viewAsFor(user: { id: string; role: string }): Promise<StudioMemberRef | null | undefined> {
+  const view = await staffViewFor(user);
+  if (!view) return undefined;
+  if (await isWriteRequest()) return null;
+  const member = await memberById(view.memberId);
+  return member && member.studioId === view.studioId ? { ...member, viewOnly: true } : null;
 }
 
 /** What a member may do on one project; `may` is `can()` with the assignment already looked up. */
@@ -140,6 +203,8 @@ export class StudioAccessError extends Error {
  * page or layout races the layout's redirect (HANDOVER: "requireRole throws").
  */
 export async function assertCan(member: StudioMemberRef | null, action: StudioAction, homeProjectId?: string): Promise<void> {
+  /* Developer access: said here too, not only inside `can()`, so a viewing member is refused every write before any lookup. */
+  if (member?.viewOnly === true && !isReadAction(action)) throw new StudioAccessError(action);
   if (!member || !(await mayDo(member, action, homeProjectId))) throw new StudioAccessError(action);
 }
 

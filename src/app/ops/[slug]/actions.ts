@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { startViewAs } from '@/modules/studio/view-as';
 import {
   approveDraftRun,
   rejectDraft,
@@ -328,3 +329,20 @@ export async function setDraftRateAction(id: string, rupees: number): Promise<Dr
 export async function rejectDraftAction(id: string, note: string): Promise<DraftResult> {
   return rejectDraft(id, note);
 }
+
+/**
+ * Developer access, "Open as…" (owner, 22 Oct 2026; docs/studio-os/VIEW-AS.md):
+ * open this studio's software as one of its people, read only, for two hours.
+ * `startViewAs` checks the role (OPS or ADMIN), that the person is on this
+ * studio, and writes the audit line; this only hands over the form and goes
+ * to the studio host.
+ */
+export async function startViewAsAction(_prev: ViewAsActionState, formData: FormData): Promise<ViewAsActionState> {
+  const started = await startViewAs(String(formData.get('studioId') ?? ''), String(formData.get('memberId') ?? ''));
+  /* The page goes there with a full load (OpenAsControl), not a router
+     navigation: it is another host when the hosts are split, and a route
+     handler either way. */
+  return started.ok ? { url: started.url } : { error: started.error };
+}
+
+export type ViewAsActionState = { error: string } | { url: string } | null;

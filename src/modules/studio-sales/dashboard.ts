@@ -12,7 +12,7 @@ import { prisma } from '@/lib/prisma';
 import { fromDb } from '@/lib/money';
 import { LIVE } from '@/modules/studio-practice/demo-lead';
 import { LOST_LABELS, SOURCE_LABELS, type ClientSourceName, type LostReasonName } from '@/modules/studio-practice/vocabulary';
-import { myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
+import { analyticsScope, myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
 import type { LeadFilters } from './lead-filters';
 import { scopedLeadWhere } from './lead-where';
 import type { RangeToken } from './ist-range';
@@ -61,8 +61,11 @@ async function counted(scope: LeadScope, specs: KpiSpec[], now: Date): Promise<K
 }
 
 export async function myDashboard(range: RangeToken, now = new Date()): Promise<Dashboard | null> {
-  const scope = await myLeadScope();
-  if (!scope) return null;
+  const seen = await myLeadScope();
+  if (!seen) return null;
+  /* Sales roles (owner, 22 Oct 2026): counted in their analytics reach (team: their subtree only). */
+  const scope = analyticsScope(seen);
+  const team = scope.team;
   const where = (f: LeadFilters) => ({ ...LIVE, studioId: scope.studioId, AND: [scopedLeadWhere(scope, f, now, LIVE)] });
   const columns = personColumns(range);
 
@@ -83,14 +86,14 @@ export async function myDashboard(range: RangeToken, now = new Date()): Promise<
       prisma.studioClient.groupBy({ by: ['source', 'leadSourceId'], where: where({ added: range }), _count: { _all: true } }),
       prisma.studioClient.groupBy({ by: ['source', 'leadSourceId'], where: where(convertedFilters(range)), _count: { _all: true } }),
       prisma.studioLeadSource.findMany({ where: { studioId: scope.studioId }, select: { id: true, name: true } }),
-      scope.seesAll
+      scope.seesAll || team
         ? prisma.studioMember.findMany({
-            where: { studioId: scope.studioId, status: 'ACTIVE', role: { in: ['OWNER', 'PM', 'SALES'] } },
+            where: { studioId: scope.studioId, status: 'ACTIVE', role: { in: ['OWNER', 'PM', 'SALES'] }, ...(team ? { id: { in: [...team] } } : {}) },
             orderBy: { createdAt: 'asc' },
             select: { id: true, role: true, user: { select: { name: true, email: true, phone: true } } },
           })
         : Promise.resolve([]),
-      scope.seesAll
+      scope.seesAll || team
         ? Promise.all(columns.map((c) => prisma.studioClient.groupBy({ by: ['assignedToId'], where: where(c.filters), _count: { _all: true } })))
         : Promise.resolve([]),
     ]);
@@ -113,7 +116,8 @@ export async function myDashboard(range: RangeToken, now = new Date()): Promise<
       .sort((a, b) => Number(members.find((m) => m.id === b.id)?.role === 'SALES') - Number(members.find((m) => m.id === a.id)?.role === 'SALES'));
 
     return {
-      seesAll: scope.seesAll,
+      /* The people table shows for the studio and for a team (sales roles). */
+      seesAll: scope.seesAll || team !== null,
       now: nowK,
       fresh: freshK,
       range: rangeK,

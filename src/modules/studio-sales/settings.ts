@@ -14,7 +14,7 @@ import { currentMember } from '@/modules/studio/access';
 import { can } from '@/modules/studio/roles';
 import { leadStudioId } from '@/modules/studio/lead-scope';
 import { cleanStages, templateOrDefault, readStages, type PaymentStage } from './payment-template';
-import { canTakeLeads, checkOverride, checkRouting, describeRouting, readRouting, type RoutingMember, type StudioRouting } from './lead-routing';
+import { canHeadTeam, canTakeLeads, checkOverride, checkRouting, describeRouting, readRouting, type RoutingMember, type StudioRouting } from './lead-routing';
 import type { StudioRoleName } from '@/modules/studio/roles';
 import { opensFullSoftware, planOf } from '@/modules/studio/software-plan';
 import { displayName } from '@/modules/studio-practice/team';
@@ -72,7 +72,7 @@ export async function myLeadSources(): Promise<LeadSourceRow[]> {
 
 export async function addLeadSource(name: unknown): Promise<SettingsResult> {
   const member = await currentMember();
-  if (!member || !can(member, 'lead.import')) return { ok: false, error: 'Only the owner or a project manager adds sources.' };
+  if (!member || !can(member, 'lead.settings')) return { ok: false, error: 'Your role does not include lead settings. Ask your studio owner.' };
   const clean = typeof name === 'string' ? name.trim().replace(/\s+/g, ' ').slice(0, 40) : '';
   if (clean.length < 2) return { ok: false, error: 'Name the source, like "Housing.com".' };
   const count = await prisma.studioLeadSource.count({ where: { studioId: member.studioId } });
@@ -88,7 +88,7 @@ export async function addLeadSource(name: unknown): Promise<SettingsResult> {
 /** Remove a name. Its leads become plain "Other"; nothing else changes. */
 export async function removeLeadSource(id: unknown): Promise<SettingsResult> {
   const member = await currentMember();
-  if (!member || !can(member, 'lead.import')) return { ok: false, error: 'Only the owner or a project manager removes sources.' };
+  if (!member || !can(member, 'lead.settings')) return { ok: false, error: 'Your role does not include lead settings. Ask your studio owner.' };
   if (typeof id !== 'string') return { ok: false, error: 'That source is not yours.' };
   const { count } = await prisma.studioLeadSource.deleteMany({ where: { id, studioId: member.studioId } });
   return count > 0 ? { ok: true } : { ok: false, error: 'That source is not yours.' };
@@ -102,6 +102,8 @@ export interface RoutingPerson {
   role: StudioRoleName;
   /** Active and on a role that works leads in this plan. */
   canTake: boolean;
+  /** Can have a team pool new leads land in (TEAM): an active salesperson (sales roles, owner 22 Oct 2026). */
+  canHead: boolean;
 }
 
 export interface LeadRoutingScreen {
@@ -129,13 +131,14 @@ async function routingTeam(studioId: string): Promise<{ members: RoutingMember[]
 }
 
 /**
- * Settings → Lead sources, "New leads go to". The owner and project managers
- * (`lead.import`, who keep the studio's lead doors) see and change it.
+ * Settings → Lead sources, "New leads go to". The owner, project managers
+ * and anyone whose sales role has lead settings (`lead.settings`; it was
+ * `lead.import` until sales roles, owner 22 Oct 2026) see and change it.
  */
 export async function myLeadRouting(): Promise<LeadRoutingScreen | null> {
   const member = await currentMember();
   if (!member) return null;
-  const canManage = can(member, 'lead.import');
+  const canManage = can(member, 'lead.settings');
   try {
     const studio = await prisma.studio.findUnique({
       where: { id: member.studioId },
@@ -146,8 +149,8 @@ export async function myLeadRouting(): Promise<LeadRoutingScreen | null> {
     const { members, fullSoftware } = await routingTeam(member.studioId);
     const picked = new Set([routing.personId, ...routing.turnIds].filter(Boolean));
     const people = members
-      .map((m) => ({ id: m.id, name: m.name, role: m.role, canTake: canTakeLeads(m, fullSoftware) }))
-      .filter((p) => p.canTake || picked.has(p.id));
+      .map((m) => ({ id: m.id, name: m.name, role: m.role, canTake: canTakeLeads(m, fullSoftware), canHead: canHeadTeam(m) }))
+      .filter((p) => p.canTake || p.canHead || picked.has(p.id));
     return { canManage, routing, summary: describeRouting(routing, members, fullSoftware), people };
   } catch (error) {
     console.error('[settings] lead routing failed', error instanceof Error ? error.message : 'unknown');
@@ -157,7 +160,7 @@ export async function myLeadRouting(): Promise<LeadRoutingScreen | null> {
 
 export async function saveLeadRouting(input: { mode: unknown; personId?: unknown; turnIds?: unknown }): Promise<SettingsResult> {
   const member = await currentMember();
-  if (!member || !can(member, 'lead.import')) return { ok: false, error: 'Only the owner or a project manager decides where new leads go.' };
+  if (!member || !can(member, 'lead.settings')) return { ok: false, error: 'Your role does not include deciding where new leads go. Ask your studio owner.' };
   const { members, fullSoftware } = await routingTeam(member.studioId);
   const checked = checkRouting(input, members, fullSoftware);
   if (!checked.ok) return checked;
@@ -172,7 +175,7 @@ export async function saveLeadRouting(input: { mode: unknown; personId?: unknown
 /** One door's override ("" follows the studio). Scoped by the member's studio. */
 export async function saveConnectionRouting(connectionId: unknown, input: { mode: unknown; personId?: unknown }): Promise<SettingsResult> {
   const member = await currentMember();
-  if (!member || !can(member, 'lead.import')) return { ok: false, error: 'Only the owner or a project manager decides where new leads go.' };
+  if (!member || !can(member, 'lead.settings')) return { ok: false, error: 'Your role does not include deciding where new leads go. Ask your studio owner.' };
   if (typeof connectionId !== 'string') return { ok: false, error: 'That connection is not yours.' };
   const { members, fullSoftware } = await routingTeam(member.studioId);
   const checked = checkOverride(input, members, fullSoftware);

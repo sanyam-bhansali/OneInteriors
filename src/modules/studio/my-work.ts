@@ -42,9 +42,9 @@ import { gateOf } from '@/modules/studio-design/rules';
 import { meetingLabel } from '@/modules/studio-sales/lead-rules';
 import { openTasksDue } from '@/modules/studio-sales/tasks';
 import { buildToday, istDayBounds, type TodaySection } from '@/modules/studio-sales/today-rules';
-import { todayInput } from '@/modules/studio-sales/today';
+import { seesEveryLead, todayInput } from '@/modules/studio-sales/today';
 import { LIVE } from '@/modules/studio-practice/demo-lead';
-import { currentMember } from './access';
+import { currentMember, memberFor } from './access';
 import {
   buildMyWork,
   doneByOthers,
@@ -231,9 +231,11 @@ async function leadWork(m: WorkMember, now: Date): Promise<{ sources: WorkSource
   const { start, end } = istDayBounds(now);
   const end3 = new Date(end.getTime() + SOON_DAYS * 86_400_000);
   /* Whose leads: a salesperson's own (leadsVisibleTo); the owner the studio's; a PM only the leads given to them —
-     their work is their projects (owner, 15 Oct 2026), and the studio's follow-ups stay on Today. */
-  const mine = m.role === 'PM' ? { assignedToId: m.id } : {};
-  const base = { ...leadsVisibleTo(m), ...mine, studioId: m.studioId, deletedAt: null, isDemo: false } satisfies Prisma.StudioClientWhereInput;
+     their work is their projects (owner, 15 Oct 2026), and the studio's follow-ups stay on Today. Sales roles
+     (owner, 22 Oct 2026): "my work" stays a salesperson's OWN leads, whatever their team reach; their team's
+     follow-ups are on Today. AND, never a spread: a team reach is an OR of its own. */
+  const mine = m.role === 'PM' || m.role === 'SALES' ? { assignedToId: m.id } : {};
+  const base = { AND: [leadsVisibleTo(m), mine], studioId: m.studioId, deletedAt: null, isDemo: false } satisfies Prisma.StudioClientWhereInput;
   const open = { ...base, stage: { kind: { in: ['OPEN' as const, 'WON' as const] } } };
   const lateW = { ...open, nextActionOn: { lt: start } };
   const todayW = { ...open, nextActionOn: { gte: start, lte: end } };
@@ -448,8 +450,12 @@ export async function runMorningDigest(now = new Date()): Promise<DigestRun> {
       const digest = run ? workDigest(run.work, first, p.studio.tradeName) : null;
       let extra: string | null = null;
       if (['OWNER', 'PM', 'SALES'].includes(p.role)) {
-        const input = await todayInput(p, now);
-        extra = todayExtra(buildToday({ ...input, now, seesAll: p.role !== 'SALES' }));
+        /* A salesperson's list with their sales role and team, as on screen (sales roles, owner 22 Oct 2026). */
+        const who = p.role === 'SALES' ? await memberFor(p.userId) : p;
+        if (who && who.status === 'ACTIVE') {
+          const input = await todayInput(who, now);
+          extra = todayExtra(buildToday({ ...input, now, seesAll: seesEveryLead(who) }));
+        }
       }
       if (!digest && !extra) {
         skipped += 1;

@@ -8,7 +8,9 @@ import { Said, useAct } from '../../SalesUi';
 
 /**
  * Settings → Lead sources, "New leads go to" (owner, 22 Oct 2026;
- * studio-sales/lead-routing.ts): the pool, one person, or take turns. Only
+ * studio-sales/lead-routing.ts): the pool, one person, take turns, or a
+ * team's pool (sales roles and teams: the lead waits unassigned in the
+ * chosen head's team pool, for the head to hand out or the team to claim). Only
  * for leads that arrive by themselves (lead ads, Google forms, the website,
  * portals, the enquiry form); a lead somebody adds by hand or imports keeps
  * whoever they chose.
@@ -18,6 +20,7 @@ const MODE_LABELS: Record<LeadRouteModeName, string> = {
   POOL: 'The pool',
   PERSON: 'A person',
   TURNS: 'Take turns',
+  TEAM: 'A team’s pool',
 };
 
 const ROLE_WORDS: Record<string, string> = { OWNER: 'owner', PM: 'project manager', SALES: 'sales' };
@@ -35,6 +38,7 @@ export function LeadRouting({ screen }: { screen: LeadRoutingScreen }) {
   if (!screen.canManage) return null;
 
   const takers = screen.people.filter((p) => p.canTake);
+  const heads = screen.people.filter((p) => p.canHead || p.id === screen.routing.personId);
   const toggle = (id: string) => setTurnIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
 
   return (
@@ -55,7 +59,7 @@ export function LeadRouting({ screen }: { screen: LeadRoutingScreen }) {
         }}
       >
         <div role="radiogroup" aria-label="New leads go to" className="flex flex-wrap gap-3 text-[13.5px]">
-          {(['POOL', 'PERSON', 'TURNS'] as const).map((m) => (
+          {(['POOL', 'PERSON', 'TURNS', 'TEAM'] as const).map((m) => (
             <label key={m} className="flex items-center gap-1.5">
               <input type="radio" name="lead-route-mode" value={m} checked={mode === m} onChange={() => setMode(m)} />
               {MODE_LABELS[m]}
@@ -79,6 +83,22 @@ export function LeadRouting({ screen }: { screen: LeadRoutingScreen }) {
           </div>
         ) : null}
 
+        {mode === 'TEAM' ? (
+          <div className="flex flex-col gap-1">
+            <select aria-label="The team whose pool new leads land in" value={personId} onChange={(e) => setPersonId(e.target.value)} className="fld w-auto max-w-[24rem]">
+              <option value="">Pick the team’s head</option>
+              {heads.map((p) => (
+                <option key={p.id} value={p.id} disabled={!p.canHead}>
+                  {p.name}’s team{p.canHead ? '' : ' — cannot have a team pool now'}
+                </option>
+              ))}
+            </select>
+            <p className="m-0 text-[12.5px] muted">
+              Nobody is given them yet. They wait in that team’s pool: the head hands them out to people in their team, and the team claims them. If the head is suspended or leaves, new leads land in the studio pool. Set up teams in Settings → Team.
+            </p>
+          </div>
+        ) : null}
+
         {mode === 'TURNS' ? (
           <div className="flex flex-col gap-1">
             {takers.length < 2 ? <p className="m-0 text-[12.5px] muted">Taking turns needs at least two people who work leads. Add salespeople in Settings → Team.</p> : null}
@@ -98,7 +118,7 @@ export function LeadRouting({ screen }: { screen: LeadRoutingScreen }) {
         ) : null}
 
         <div>
-          <button type="submit" disabled={pending || (mode === 'PERSON' && !personId) || (mode === 'TURNS' && turnIds.length < 2)} className="btn pri sm">
+          <button type="submit" disabled={pending || ((mode === 'PERSON' || mode === 'TEAM') && !personId) || (mode === 'TURNS' && turnIds.length < 2)} className="btn pri sm">
             {pending ? 'Saving…' : 'Save'}
           </button>
         </div>

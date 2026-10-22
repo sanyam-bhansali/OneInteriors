@@ -15,6 +15,7 @@ import { fromDb, toDb } from '@/lib/money';
 import { computeTotals, type QuoteUnitName, type WorkCodeName } from '@/modules/studio-quote/pricing';
 import { readPhases } from '@/modules/studio/payment-phases';
 import { actingMember, mayOnLead, myLeadScope } from '@/modules/studio/lead-scope';
+import { completeRequestForQuote } from '@/modules/studio-quote/quote-request-store';
 import { record } from '@/modules/studio-practice/events';
 import {
   needsNewRevision,
@@ -195,7 +196,7 @@ export async function quoteSalesView(quoteId: string): Promise<QuoteSalesView | 
         salesFinalRevisionId: true,
         salesFinalSchedule: true,
         salesFinalAt: true,
-        client: { select: { assignedToId: true, source: true, introductionId: true } },
+        client: { select: { assignedToId: true, poolTeamId: true, source: true, introductionId: true } },
         studio: { select: { paymentPhases: true, paymentTemplate: true } },
         revisions: { orderBy: { n: 'asc' }, select: { id: true, n: true, sentAt: true, sentByName: true, totalPaise: true, lines: true, terms: true } },
       },
@@ -247,7 +248,7 @@ export async function quoteSalesView(quoteId: string): Promise<QuoteSalesView | 
       salesFinal,
       template: templateOrDefault(q.studio.paymentTemplate),
       projectId: project?.id ?? null,
-      mayMark: mayOnLead(scope, 'quote.salesFinal', { assignedToId: q.client?.assignedToId ?? null }),
+      mayMark: mayOnLead(scope, 'quote.salesFinal', { assignedToId: q.client?.assignedToId ?? null, poolTeamId: q.client?.poolTeamId ?? null }),
     };
   } catch (error) {
     console.error('[revisions] view failed', error instanceof Error ? error.name : 'unknown');
@@ -262,13 +263,16 @@ export async function sendAgain(quoteId: string): Promise<{ ok: true; n: number;
   const studioId = scope.studioId;
   const q = await prisma.studioQuote.findFirst({
     where: { ...scope.quotes, id: quoteId, studioId },
-    select: { id: true, status: true, client: { select: { assignedToId: true } } },
+    select: { id: true, status: true, clientId: true, client: { select: { assignedToId: true, poolTeamId: true } } },
   });
   if (!q) return { ok: false, error: 'That quotation is not yours.' };
-  if (!mayOnLead(scope, 'quote.write', { assignedToId: q.client?.assignedToId ?? null })) return { ok: false, error: 'That quotation is not yours.' };
+  /* Quotation requests (owner, 22 Oct 2026): the builder a request on this lead was handed to sends it too. */
+  const requestedOfMe = scope.requested !== null && q.clientId !== null && (await prisma.studioClient.findFirst({ where: { AND: [scope.requested], id: q.clientId }, select: { id: true } })) !== null;
+  if (!mayOnLead(scope, 'quote.write', { assignedToId: q.client?.assignedToId ?? null, poolTeamId: q.client?.poolTeamId ?? null, requestedOfMe })) return { ok: false, error: 'That quotation is not yours.' };
   if (q.status !== 'ISSUED') return { ok: false, error: 'Mark it as sent first.' };
   const r = await issueRevision({ quoteId: q.id, studioId });
   if (!r) return { ok: false, error: 'There is nothing on this quotation to send.' };
+  await completeRequestForQuote(studioId, q.id, await actingMember());
   return { ok: true, n: r.n, created: r.created };
 }
 
@@ -322,12 +326,12 @@ export async function markSalesFinal(quoteId: string, n: number, stages: Payment
       briefId: true,
       introductionId: true,
       salesFinalRevision: { select: { n: true } },
-      client: { select: { assignedToId: true, source: true, introductionId: true } },
+      client: { select: { assignedToId: true, poolTeamId: true, source: true, introductionId: true } },
       revisions: { where: { studioId, n }, select: { id: true, n: true, totalPaise: true } },
     },
   });
   if (!q) return { ok: false, error: 'That quotation is not yours.' };
-  if (!mayOnLead(scope, 'quote.salesFinal', { assignedToId: q.client?.assignedToId ?? null })) {
+  if (!mayOnLead(scope, 'quote.salesFinal', { assignedToId: q.client?.assignedToId ?? null, poolTeamId: q.client?.poolTeamId ?? null })) {
     return { ok: false, error: 'Your role in the studio does not include that. Ask your studio owner.' };
   }
   const revision = q.revisions[0] ?? null;

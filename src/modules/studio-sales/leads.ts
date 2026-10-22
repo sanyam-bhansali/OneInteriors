@@ -20,8 +20,11 @@ import { record } from '@/modules/studio-practice/events';
 import { normalisePhone } from '@/modules/studio-practice/csv';
 import { SOURCE_LABELS, type ClientSourceName } from '@/modules/studio-practice/vocabulary';
 import { actingMember, leadInScope, mayOnLead, myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
-import { can } from '@/modules/studio/roles';
+import { can, hasSalesRole } from '@/modules/studio/roles';
+import { assignableTo, reachOf } from '@/modules/studio/sales-access';
 import { applyConfiguration, createQuote } from '@/modules/studio-quote/quotes';
+import { openQuoteRequest } from '@/modules/studio-quote/quote-request-store';
+import { autoRequestSkip } from '@/modules/studio-quote/quote-request-rules';
 import { isConfigName } from '@/modules/studio-quote/configure';
 import { canReadPlans } from '@/modules/floorplan/read';
 import { leadFileExists, leadUploadTicket, removeLeadFiles, signedLeadFileLinks } from '@/modules/storage/lead-files';
@@ -94,13 +97,15 @@ export interface LeadPage {
   nextQuoteId: string | null;
   may: {
     edit: boolean;
+    /** Log a call (sales roles: `calls.log` reach on this lead). */
+    call: boolean;
     quote: boolean;
     assign: boolean;
     book: boolean;
     refund: boolean;
     readRooms: boolean;
   };
-  /** Who can be given the lead (owner and PM see this). */
+  /** Who can be given the lead (whoever may assign it; a sales role: only people in their reach, and from a team pool only that team). */
   members: { id: string; name: string }[];
   sources: { id: string; name: string }[];
   /** The newest quotation with a sales final and no booking, for Record booking. */
@@ -136,11 +141,11 @@ export async function leadPage(clientId: string): Promise<LeadPage | null> {
       },
     }),
     prisma.studioClientEvent.count({ where: { studioId, clientId: client.id, kind: 'CONTACTED' } }),
-    scope.seesAll
+    mayOnLead(scope, 'lead.assign', client)
       ? prisma.studioMember.findMany({
           where: { studioId, status: 'ACTIVE', role: { in: ['OWNER', 'PM', 'SALES'] } },
           orderBy: { createdAt: 'asc' },
-          select: { id: true, user: { select: { name: true, email: true, phone: true } } },
+          select: { id: true, reportsToId: true, user: { select: { name: true, email: true, phone: true } } },
         })
       : Promise.resolve([]),
     prisma.studioLeadSource.findMany({ where: { studioId }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
@@ -204,16 +209,34 @@ export async function leadPage(clientId: string): Promise<LeadPage | null> {
     nextQuoteId: quotes[0]?.id ?? null,
     may: {
       edit: mayOnLead(scope, 'lead.edit', client),
+      call: mayOnLead(scope, 'lead.call', client),
       quote: mayOnLead(scope, 'quote.write', client),
-      assign: can(scope.member, 'lead.assign'),
+      /* Sales roles (owner, 22 Oct 2026): this lead within their assign reach. */
+      assign: mayOnLead(scope, 'lead.assign', client),
       book: can(scope.member, 'booking.record'),
       refund: can(scope.member, 'booking.refund'),
       readRooms: canReadPlans(),
     },
-    members: members.map((m) => ({ id: m.id, name: m.user.name?.trim() || m.user.email?.split('@')[0] || m.user.phone || 'Someone' })),
+    members: assignTargets(scope, members, client).map((m) => ({ id: m.id, name: m.user.name?.trim() || m.user.email?.split('@')[0] || m.user.phone || 'Someone' })),
     sources,
     bookableQuoteId: !booked && withFinal ? withFinal.id : null,
   };
+}
+
+/**
+ * The people this lead may be given to (sales roles and teams, owner 22 Oct
+ * 2026): everyone who takes leads for owner and PM; a sales role, only those
+ * its `leads.assign` reaches; with team reach, an unassigned lead in a head's
+ * team pool only to that head's team (sales-access.ts `assignableTo`). The
+ * write checks the reach again.
+ */
+function assignTargets<T extends { id: string; reportsToId: string | null }>(scope: LeadScope, members: readonly T[], lead: { assignedToId: string | null; poolTeamId: string | null }): T[] {
+  const me = scope.member;
+  if (!hasSalesRole(me)) return assignableTo('all', null, members, members);
+  const reach = reachOf(me.sales, 'leads.assign');
+  /* A team pool's lead goes to that team (a head handing out); someone who assigns across the studio is not narrowed. */
+  const poolHead = reach === 'team' && lead.assignedToId === null ? lead.poolTeamId : null;
+  return assignableTo(reach, me.sales, members, members, poolHead);
 }
 
 // ── Details ────────────────────────────────────────────────────
@@ -354,7 +377,16 @@ export async function leadFileTicket(clientId: string, contentType: unknown, byt
 }
 
 /** Record a file the browser has uploaded with its ticket. */
-export async function attachLeadFile(input: { clientId: string; path: unknown; name: unknown; contentType: unknown; bytes: unknown; kind: unknown }): Promise<LeadResult> {
+export async function attachLeadFile(input: {
+  clientId: string;
+  path: unknown;
+  name: unknown;
+  contentType: unknown;
+  bytes: unknown;
+  kind: unknown;
+  /** Quotation requests: false from the First quote page, where the person adding the plan is building the quotation now. */
+  quoteRequest?: boolean;
+}): Promise<LeadResult> {
   const found = await leadFor(input.clientId, 'lead.edit');
   if ('error' in found) return { ok: false, error: found.error };
   const studioId = found.scope.studioId;
@@ -365,7 +397,8 @@ export async function attachLeadFile(input: { clientId: string; path: unknown; n
   const kind = input.kind === 'FLOOR_PLAN' ? 'FLOOR_PLAN' : 'OTHER';
   const name = cleanFileName(input.name);
   const by = await actingMember();
-  await prisma.studioClientFile.create({
+  const created = await prisma.studioClientFile.create({
+    select: { id: true },
     data: {
       studioId,
       clientId: found.lead.id,
@@ -379,7 +412,27 @@ export async function attachLeadFile(input: { clientId: string; path: unknown; n
     },
   });
   await record({ studioId, clientId: found.lead.id, kind: 'FILE', summary: kind === 'FLOOR_PLAN' ? `Floor plan attached: ${name}` : `File attached: ${name}` });
+  /* Quotation requests (owner, 22 Oct 2026; docs/studio-os/QUOTE-REQUESTS.md):
+     a floor plan makes the lead's request (or joins the open one), handed to
+     whoever builds quotations next in turn. Never fails the attach. */
+  if (kind === 'FLOOR_PLAN' && input.quoteRequest !== false) await requestForPlan(studioId, found.lead.id, created.id, by);
   return { ok: true };
+}
+
+/** A floor plan's quotation request, unless this lead should not get one by itself (quote-request-rules.ts `autoRequestSkip`). */
+async function requestForPlan(studioId: string, clientId: string, fileId: string, by: { id: string; name: string } | null): Promise<void> {
+  try {
+    const lead = await prisma.studioClient.findFirst({
+      where: { id: clientId, studioId },
+      select: { introductionId: true, source: true, bookedAt: true, _count: { select: { quotes: { where: { status: { in: ['ISSUED', 'ACCEPTED'] } } } } } },
+    });
+    if (!lead) return;
+    const skip = autoRequestSkip({ fromOneInteriors: lead.introductionId !== null || lead.source === 'ONE_INTERIORS', booked: lead.bookedAt !== null, sentQuotes: lead._count.quotes });
+    if (skip) return;
+    await openQuoteRequest({ studioId, clientId, reason: 'FLOOR_PLAN', by, fileId });
+  } catch (error) {
+    console.error('[leads] quotation request failed', error instanceof Error ? error.name : 'unknown');
+  }
 }
 
 /** Remove a file from the lead, and from storage. */

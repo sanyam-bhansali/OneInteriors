@@ -17,6 +17,8 @@ import { proposeBand } from '@/modules/studio/band';
 import { liveRatesFor } from '@/modules/quotation/filed-rate-store';
 import { HideControl } from './HideControl';
 import { SoftwarePlanControl } from './SoftwarePlanControl';
+import { OpenAsControl } from './OpenAsControl';
+import { viewAsOptions } from '@/modules/studio/view-as';
 import { ArchiveReview } from './ArchiveReview';
 import { DraftReview } from './DraftReview';
 import { pendingDraftRun } from '@/modules/studio-quote/product-drafts';
@@ -54,6 +56,8 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
   const blockers = approvalBlockers(await approvalFactsFor(studio.id));
   const draftRun = await pendingDraftRun(studio.id);
   const softwarePlan = await softwarePlanOf(studio.id);
+  /* Developer access (owner, 22 Oct 2026; docs/studio-os/VIEW-AS.md). */
+  const openAsPeople = await viewAsOptions(studio.id).catch(() => []);
 
   return (
     <>
@@ -309,6 +313,11 @@ export default async function OpsStudio({ params }: { params: Promise<{ slug: st
                 {/* The per-studio pilot switch (owner, 14 Oct 2026). */}
                 <div className="mt-4">
                   <SoftwarePlanControl studioId={studio.id} slug={studio.slug} plan={softwarePlan} />
+                </div>
+
+                {/* Developer access: the studio as one of its people, read only (owner, 22 Oct 2026). */}
+                <div className="mt-4">
+                  <OpenAsControl studioId={studio.id} people={openAsPeople} />
                 </div>
               </div>
 

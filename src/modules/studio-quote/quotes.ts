@@ -35,7 +35,8 @@ import { planUseFrom } from '@/modules/brief/mapping';
 import type { PlanRoomSize } from '@/modules/brief/types';
 import { readPhases, type PaymentPhase } from '@/modules/studio/payment-phases';
 import type { ComparableLine } from './revision';
-import { leadInScope, myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
+import { actingMember, leadForQuote, mayOnLead, myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
+import { completeRequestForQuote, linkDraftToRequest } from './quote-request-store';
 import { can } from '@/modules/studio/roles';
 import { record as recordLeadEvent } from '@/modules/studio-practice/events';
 import { issueRevision } from '@/modules/studio-sales/revisions';
@@ -387,10 +388,13 @@ export interface NewQuoteInput {
  * owner and PM, the studio's; a salesperson, only those of leads assigned
  * to them. `where` goes into every quotation query here, beside `studioId`.
  */
-async function quoteScope(): Promise<{ studioId: string; where: Prisma.StudioQuoteWhereInput; lead: LeadScope } | null> {
+async function quoteScope(): Promise<{ studioId: string; where: Prisma.StudioQuoteWhereInput; write: Prisma.StudioQuoteWhereInput; lead: LeadScope } | null> {
   const lead = await myLeadScope();
   if (!lead || !can(lead.member, 'quote.write', { assigned: true })) return null;
-  return { studioId: lead.studioId, where: lead.quotes, lead };
+  /* Sales roles (owner, 22 Oct 2026): `where` is what they may read, `write`
+     what they may change (their `quote.write` reach); every write below
+     uses `write`. */
+  return { studioId: lead.studioId, where: lead.quotes, write: lead.quotesWritable, lead };
 }
 
 /** Whether the signed-in person may write quotations at all (for the pages). */
@@ -406,8 +410,11 @@ export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
 
   /* The lead, checked: a salesperson's own, or any of the studio's for owner and PM. */
   const leadId = input.link?.clientId ?? input.clientId ?? null;
-  const lead = leadId ? await leadInScope(qs.lead, leadId) : null;
+  /* Quotation requests (owner, 22 Oct 2026): a builder may quote a lead handed to them, whatever their lead reach. */
+  const lead = leadId ? await leadForQuote(qs.lead, leadId) : null;
   if (leadId && !lead) return { ok: false, error: 'That lead is not one of yours.' };
+  /* Sales roles: seeing the lead is not enough; writing its quotation is `quote.write` on it. */
+  if (lead && !mayOnLead(qs.lead, 'quote.write', lead)) return { ok: false, error: 'Your role does not include quotations for that lead.' };
   if (!lead && !qs.lead.seesAll) return { ok: false, error: 'Pick the lead this quotation is for.' };
 
   /* Shut until the studio has confirmed the rates filled from its own
@@ -490,6 +497,8 @@ export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
         summary: `Quotation ${quote.number} started`,
         meta: { quoteId: quote.id },
       });
+      /* The lead's open quotation request (docs/studio-os/QUOTE-REQUESTS.md) builds on this draft when it has none. */
+      await linkDraftToRequest(studioId, lead.id, quote.id);
     }
 
     return { ok: true, id: quote.id };
@@ -628,7 +637,7 @@ export async function copyQuote(quoteId: string, copy: CopyKind): Promise<QuoteR
   const studioId = qs?.studioId ?? null;
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
   const source = await prisma.studioQuote.findFirst({
-    where: { ...qs?.where, id: quoteId, studioId },
+    where: { ...qs?.write, id: quoteId, studioId },
     include: { lines: { orderBy: { sortOrder: 'asc' } } },
   });
   if (!source) return { ok: false, error: 'That quotation is not yours.' };
@@ -720,7 +729,7 @@ export async function deleteQuote(quoteId: string): Promise<ActionResult> {
   const studioId = qs?.studioId ?? null;
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
   const q = await prisma.studioQuote.findFirst({
-    where: { ...qs?.where, id: quoteId, studioId },
+    where: { ...qs?.write, id: quoteId, studioId },
     select: { status: true, issuedOn: true, introductionId: true },
   });
   if (!q) return { ok: false, error: 'That quotation is not yours.' };
@@ -799,7 +808,7 @@ async function ownedQuote(quoteId: string): Promise<string | null> {
   if (!studioId) return null;
 
   const row = await prisma.studioQuote.findFirst({
-    where: { ...qs?.where, id: quoteId, studioId },
+    where: { ...qs?.write, id: quoteId, studioId },
     select: { id: true },
   });
   return row?.id ?? null;
@@ -815,7 +824,7 @@ async function writableQuote(quoteId: string): Promise<{ ok: true; id: string; f
   const studioId = qs?.studioId ?? null;
   if (!studioId) return { ok: false, error: 'That quotation is not yours.' };
   const row = await prisma.studioQuote.findFirst({
-    where: { ...qs?.where, id: quoteId, studioId },
+    where: { ...qs?.write, id: quoteId, studioId },
     select: { id: true, feeBps: true, status: true },
   });
   if (!row) return { ok: false, error: 'That quotation is not yours.' };
@@ -897,6 +906,8 @@ export async function setQuoteStatus(
            Sending exactly what was sent last time does not make a new one,
            so Reopen on a won quotation does not add an R. */
         await issueRevision({ quoteId, studioId });
+        /* Sent: the lead's quotation request is done (docs/studio-os/QUOTE-REQUESTS.md). */
+        await completeRequestForQuote(studioId, quoteId, await actingMember());
         void tellCustomer(quoteId, studioId);
       }
     }

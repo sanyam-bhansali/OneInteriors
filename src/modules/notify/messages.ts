@@ -56,7 +56,11 @@ export type ProjectEvent =
   // the evening "due tomorrow", and steps someone else completed today on their projects.
   | { kind: 'my-work'; today: number; missed: number; soon: number; first: string }
   | { kind: 'work-due-tomorrow'; count: number; list: string }
-  | { kind: 'work-done'; count: number; list: string };
+  | { kind: 'work-done'; count: number; list: string }
+  // Quotation requests (owner, 22 Oct 2026; docs/studio-os/QUOTE-REQUESTS.md), to studio staff only, never a customer:
+  // a request handed to a builder (in turn, or by a head), and the salesperson told when it was sent.
+  | { kind: 'quote-request'; clientId: string; name: string; by: string | null; how: 'TURN' | 'REASSIGNED'; why: 'FLOOR_PLAN' | 'REQUESTED' }
+  | { kind: 'quote-request-done'; clientId: string; name: string; by: string | null; number: string | null };
 
 /** Events a studio also gets by email: it works from a laptop, not our app. */
 export const EMAILED_TO_STUDIO: ProjectEvent['kind'][] = ['introduced', 'quote-signed', 'decision-made', 'snag-raised', 'lead-new', 'handover-signed'];
@@ -303,6 +307,25 @@ export function messageFor(e: ProjectEvent): Message {
         title: e.count === 1 ? 'Due tomorrow: 1 thing' : `Due tomorrow: ${e.count} things`,
         body: clip(e.list, 160),
         url: '/studio/home',
+      };
+    case 'quote-request':
+      return {
+        template: e.how === 'REASSIGNED' ? 'quote.request-reassigned' : 'quote.request',
+        title: `A quotation to build: ${clip(e.name, 60)}`,
+        body: clip(
+          e.how === 'REASSIGNED'
+            ? `${e.by ? `${e.by} gave you` : 'You were given'} the quotation for ${e.name}. It is in Quotations, To build.`
+            : `${e.why === 'FLOOR_PLAN' ? 'A floor plan was added' : 'A quotation was requested'}${e.by ? ` by ${e.by}` : ''}. Your turn: it is in Quotations, To build.`,
+          160,
+        ),
+        url: '/studio/quotations/requests',
+      };
+    case 'quote-request-done':
+      return {
+        template: 'quote.request-done',
+        title: `Quotation sent: ${clip(e.name, 60)}`,
+        body: clip(`${e.by ?? 'The builder'} sent ${e.number ? `quotation ${e.number}` : 'the quotation'} you asked for.`, 160),
+        url: `/studio/clients/${e.clientId}`,
       };
     case 'work-done':
       return {

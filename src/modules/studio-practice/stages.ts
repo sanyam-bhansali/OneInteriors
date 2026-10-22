@@ -31,8 +31,8 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 import { planPreset } from './pipeline-preset';
-import { myStudioId } from '@/modules/studio-quote/store';
-import { leadStudioId } from '@/modules/studio/lead-scope';
+/* Sales roles (owner, 22 Oct 2026): changing the board's columns and fields is `lead.settings` (owner, PM, a sales role with lead settings). */
+import { leadSettingsStudioId, leadStudioId } from '@/modules/studio/lead-scope';
 import {
   DEFAULT_STAGES,
   BOARD_KINDS,
@@ -144,7 +144,7 @@ export async function addStage(input: {
   kind: StageKindName;
   colour: ColourToken;
 }): Promise<Result> {
-  const studioId = await myStudioId();
+  const studioId = await leadSettingsStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   const name = input.name.trim();
@@ -177,7 +177,7 @@ export async function addStage(input: {
 }
 
 export async function renameStage(id: string, name: string): Promise<Result> {
-  const studioId = await myStudioId();
+  const studioId = await leadSettingsStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   const next = name.trim();
@@ -200,7 +200,7 @@ export async function renameStage(id: string, name: string): Promise<Result> {
 }
 
 export async function recolourStage(id: string, colour: ColourToken): Promise<Result> {
-  const studioId = await myStudioId();
+  const studioId = await leadSettingsStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   const { count } = await prisma.studioStage.updateMany({
@@ -218,7 +218,7 @@ export async function recolourStage(id: string, colour: ColourToken): Promise<Re
  * when it would empty a kind — see rule 2 at the top of this file.
  */
 export async function setStageKind(id: string, kind: StageKindName): Promise<Result> {
-  const studioId = await myStudioId();
+  const studioId = await leadSettingsStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   const stages = await myStages();
@@ -245,7 +245,7 @@ export async function setStageKind(id: string, kind: StageKindName): Promise<Res
  * lost column is not being cold-called.
  */
 export async function setCallStep(id: string, on: boolean): Promise<Result> {
-  const studioId = await myStudioId();
+  const studioId = await leadSettingsStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   const stage = (await myStages()).find((s) => s.id === id);
@@ -262,7 +262,7 @@ export async function setCallStep(id: string, on: boolean): Promise<Result> {
 
 /** Move a column one place. Swaps sort orders rather than renumbering the list. */
 export async function moveStage(id: string, direction: 'up' | 'down'): Promise<Result> {
-  const studioId = await myStudioId();
+  const studioId = await leadSettingsStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   const stages = await myStages();
@@ -287,7 +287,7 @@ export async function moveStage(id: string, direction: 'up' | 'down'): Promise<R
 
 /** Which column a new client lands in. Exactly one, so this clears the others. */
 export async function setIntakeStage(id: string): Promise<Result> {
-  const studioId = await myStudioId();
+  const studioId = await leadSettingsStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   const stages = await myStages();
@@ -312,7 +312,7 @@ export async function setIntakeStage(id: string): Promise<Result> {
 }
 
 export async function removeStage(id: string): Promise<Result> {
-  const studioId = await myStudioId();
+  const studioId = await leadSettingsStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
 
   const stages = await myStages();
@@ -350,7 +350,7 @@ export async function removeStage(id: string): Promise<Result> {
  * transaction; never deletes a column. Owner and PM (Settings).
  */
 export async function applyHauspirePipeline(): Promise<Result> {
-  const studioId = await myStudioId();
+  const studioId = await leadSettingsStudioId();
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
   const stages = await myStages();
   const plan = planPreset(stages);

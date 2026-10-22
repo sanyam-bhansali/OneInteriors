@@ -22,11 +22,17 @@ import 'server-only';
  * /studio/clients/analytics to sales). Should a salesperson ever reach this
  * read, it narrows itself: calls they made, leads assigned to them. The
  * studio id always comes from the signed-in member, never from the URL.
+ *
+ * Sales roles and teams (owner, 22 Oct 2026): a salesperson whose role has
+ * "See the numbers" opens the page; with team reach every number is their
+ * subtree's only — calls their team made, leads their team has
+ * (studio/lead-scope.ts `analyticsScope`, lead-sql.ts `rawLeadFence`).
  */
 
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { myLeadScope } from '@/modules/studio/lead-scope';
+import { analyticsScope, myLeadScope } from '@/modules/studio/lead-scope';
+import { rawLeadFence } from './lead-sql';
 import {
   CONNECT_OUTCOMES,
   NOT_DIAL_OUTCOMES,
@@ -53,20 +59,25 @@ const connectSql = (e: string) => Prisma.sql`(COALESCE(${outcomeOf(e)}, '') = AN
 
 export interface CallStatsPage {
   stats: CallStats;
-  /** Owner or PM: everyone's numbers. False: only the signed-in person's. */
+  /** Owner or PM: everyone's numbers. False: only the signed-in person's (or their team's: `team`). */
   seesAll: boolean;
+  /** Sales roles: the numbers are their team's (more than one person, not the studio). */
+  team?: boolean;
 }
 
 /** The Calling tab's numbers for this range, or null when the person may not see leads (or the read failed). */
 export async function callStatsFor(range: CallRange): Promise<CallStatsPage | null> {
-  const scope = await myLeadScope();
-  if (!scope) return null;
+  const seen = await myLeadScope();
+  if (!seen) return null;
+  const scope = analyticsScope(seen);
   const studioId = scope.studioId;
   const me = scope.member.id;
   const seesAll = scope.seesAll;
-  /* A salesperson: the calls they made, and only their own leads in the funnel. */
-  const byFence = seesAll ? Prisma.empty : Prisma.sql`AND e."byId" = ${me}`;
-  const leadFence = seesAll ? Prisma.empty : Prisma.sql`AND c."assignedToId" = ${me}`;
+  /* Whose calls: everyone, their team (sales roles), or only theirs. */
+  const people = seesAll ? null : scope.team ? [...scope.team] : [me];
+  /* A salesperson: the calls they (or their team) made, and only those leads in the funnel. */
+  const byFence = people === null ? Prisma.empty : Prisma.sql`AND e."byId" = ANY(${people}::text[])`;
+  const leadFence = rawLeadFence(scope);
   const from = ts(range.from);
   const to = ts(range.to);
 
@@ -78,7 +89,7 @@ export async function callStatsFor(range: CallRange): Promise<CallStatsPage | nu
         select: { id: true, name: true, kind: true, sortOrder: true, isIntake: true, isCallStep: true },
       }),
       prisma.studioMember.findMany({
-        where: { studioId, ...(seesAll ? {} : { id: me }) },
+        where: { studioId, ...(people === null ? {} : { id: { in: people } }) },
         select: { id: true, role: true, status: true, user: { select: { name: true, email: true, phone: true } } },
       }),
     ]);
@@ -136,7 +147,7 @@ export async function callStatsFor(range: CallRange): Promise<CallStatsPage | nu
           SELECT f.client_id, f.member_id, COUNT(x.id)::int AS tries
           FROM firsts f
           LEFT JOIN ev x ON x.client_id = f.client_id AND x.dial AND (x.at < f.at OR (x.at = f.at AND x.id < f.id))
-          WHERE f.at >= ${from} ${seesAll ? Prisma.empty : Prisma.sql`AND f.member_id = ${me}`}
+          WHERE f.at >= ${from} ${people === null ? Prisma.empty : Prisma.sql`AND f.member_id = ANY(${people}::text[])`}
           GROUP BY f.client_id, f.member_id
         )
         SELECT member_id, tries, COUNT(*)::int AS n FROM per_lead GROUP BY 1, 2`),
@@ -224,7 +235,7 @@ export async function callStatsFor(range: CallRange): Promise<CallStatsPage | nu
       plan,
       steps: steps.map((s): StepCount => ({ rank: Number(s.rank), entered: Number(s.entered), movedOn: Number(s.moved_on), reachedWon: Number(s.reached_won) })),
     });
-    return { stats, seesAll };
+    return { stats, seesAll, team: scope.team !== null };
   } catch (error) {
     console.error('[call-stats] read failed', error instanceof Error ? error.message : 'unknown');
     return null;

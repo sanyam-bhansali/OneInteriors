@@ -133,6 +133,19 @@ model Session {
   revokedAt  DateTime?
   createdAt  DateTime  @default(now())
 
+  /// Developer access (owner, 22 Oct 2026; docs/studio-os/VIEW-AS.md): an OPS
+  /// or ADMIN session looking at a studio's software as one of its members,
+  /// read only. Honoured only while the user is staff and `viewAsUntil` is in
+  /// the future (two hours from the start); studio/view-as-rules.ts decides.
+  viewAsMemberId   String?
+  viewAsUntil      DateTime?
+  /// SHA-256 of the one-time ticket that carries the view from the ops host
+  /// to the studio host (two minutes, single use). Null once redeemed.
+  viewAsTicketHash String?   @unique
+  /// This session exists only for the view (made on the studio host by the
+  /// ticket): Stop revokes it instead of only clearing the view.
+  viewAsOnly       Boolean   @default(false)
+
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
@@ -714,6 +727,17 @@ model Studio {
   /// `eligible[(n - 1) % eligible.length]`.
   leadRouteTurn     Int           @default(0)
 
+  /// Quotation requests (owner, 22 Oct 2026; docs/studio-os/QUOTE-REQUESTS.md).
+  /// "Who builds quotations": member ids in turn order. Empty = everyone whose
+  /// sales role has "Builds quotations" (`quotes.build`); an owner is in the
+  /// turns only when listed here. studio-quote/quote-request-rules.ts reads it.
+  quoteBuilderIds String[] @default([])
+  /// The builder the last request went to in turn (the turn cursor). The next
+  /// request goes to the first builder after them in the order; moved in the
+  /// same transaction that inserts the request, under a row lock. A
+  /// reassignment never moves it.
+  quoteTurnLastId String?
+
   /// "Tell Meta which leads turned into customers" (owner, 22 Oct 2026;
   /// studio-intake/capi-rules.ts): off by default. When on, and the dataset
   /// and token are set for this studio in STUDIO_META_CAPI (env, never here),
@@ -831,6 +855,8 @@ model Studio {
   productBackups     StudioProductBackup[]
   studioQuotes       StudioQuote[]
   studioClients      StudioClient[]
+  /// Sales roles (owner, 22 Oct 2026; docs/studio-os/SALES-ROLES.md).
+  salesRoles         StudioSalesRole[]
   studioClientEvents StudioClientEvent[]
   studioSavedViews   StudioSavedView[]
   studioForm         StudioForm?
@@ -855,6 +881,7 @@ model Studio {
   /// what was paid against them.
   homeWorkOrders     HomeWorkOrder[]
   homeCrewPayments   HomeCrewPayment[]
+  quoteRequests      StudioQuoteRequest[]
 
   /// Studio workspace Phase 2: the saved crew faces site mode taps, and the
   /// days off that are not reminder days.
@@ -921,6 +948,25 @@ model StudioMember {
   /// Last time they used the studio side; "last active" on Settings → Team.
   lastSeenAt  DateTime?
 
+  /// Sales roles and teams (owner, 22 Oct 2026; docs/studio-os/SALES-ROLES.md).
+  /// The sales role refines a SALES member's rights (roles.ts `can`): which
+  /// lead permissions they have and how far each reaches (own / team / all).
+  /// Null on a SALES member keeps the Phase 1 rule exactly (own leads + the
+  /// studio pool). Never read for any other fixed role. SetNull: deleting a
+  /// role is refused while anyone is on it, so this is a backstop only.
+  salesRoleId String?
+  salesRole   StudioSalesRole? @relation(fields: [salesRoleId], references: [id], onDelete: SetNull)
+  /// Who they report to: another member of the same studio, or null for the
+  /// owner. A person's team is everyone below them at any depth
+  /// (studio/sales-access.ts `subtreeOf`). Same studio and no cycles are
+  /// checked on every write (team-store.ts `setReportsTo`); the resolver also
+  /// walks cycle-safe, so a bad row can never widen anybody's reach.
+  reportsToId String?
+  reportsTo   StudioMember?  @relation("StudioMemberReports", fields: [reportsToId], references: [id], onDelete: SetNull)
+  reports     StudioMember[] @relation("StudioMemberReports")
+  /// The unassigned leads in this member's team pool (StudioClient.poolTeamId).
+  teamPoolClients StudioClient[] @relation("StudioClientPoolTeam")
+
   createdAt DateTime @default(now())
 
   /// The customer projects this PM or supervisor is on (owners and accounts
@@ -933,7 +979,7 @@ model StudioMember {
   assignedSnags HomeSnag[]
 
   /// Everything this person is working. See `StudioClient.assignedTo`.
-  clients StudioClient[]
+  clients StudioClient[] @relation("StudioClientAssignee")
 
   /// What they have done. SetNull on removal, so a leaver's history stays.
   clientEvents StudioClientEvent[]
@@ -953,9 +999,49 @@ model StudioMember {
   tasksAssigned StudioTask[] @relation("TaskAssignee")
   tasksCreated  StudioTask[] @relation("TaskCreator")
 
+  quoteRequestsAsked    StudioQuoteRequest[] @relation("QuoteRequestAsker")
+  quoteRequestsToBuild  StudioQuoteRequest[] @relation("QuoteRequestBuilder")
+
   @@index([studioId])
   @@index([invitedById])
+  @@index([salesRoleId])
+  @@index([reportsToId])
   @@map("studio_members")
+}
+
+/// A sales role (owner, 22 Oct 2026; docs/studio-os/SALES-ROLES.md): a named
+/// set of sales permissions the studio admin edits on Settings → Team →
+/// Roles ("Sales head", "Sales rep"). Each SALES member has at most one
+/// (`StudioMember.salesRoleId`); editing a role changes everyone on it.
+///
+/// `permissions` is `{ [key]: 'own' | 'team' | 'all' | true }`, read only
+/// through studio/sales-permissions.ts `readSalesPermissions`, which drops any
+/// key or reach it does not know — an unknown value never grants anything.
+/// The keys are the catalogue there, not a table: a permission is only real
+/// when there is code that enforces it.
+///
+/// `system` marks the three built-ins (ADMIN, HEAD, REP) created for every
+/// studio: they can be renamed and edited, but not deleted. Any role is
+/// refused deletion while somebody is on it.
+model StudioSalesRole {
+  id          String  @id @default(cuid())
+  studioId    String
+  studio      Studio  @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  permissions Json
+  system      String?
+  sortOrder   Int     @default(0)
+
+  members StudioMember[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studioId, name])
+  @@unique([studioId, system])
+  @@index([studioId, sortOrder])
+  @@map("studio_sales_roles")
 }
 
 /// The studio workspace roles (docs/studio-workspace/STUDIO-WORKSPACE-BUILD.md
@@ -3526,6 +3612,9 @@ model StudioQuote {
   /// Studio OS Phase 1: every send is a frozen, numbered revision (R1, R2…).
   revisions StudioQuoteRevision[] @relation("QuoteRevisions")
 
+  /// The quotation requests this quotation answers (docs/studio-os/QUOTE-REQUESTS.md).
+  quoteRequests StudioQuoteRequest[]
+
   /// The revision marked "Sales final", with the payment schedule agreed for
   /// this client (payment-template.ts shape), when and by whom. Marking a
   /// later revision moves the mark; the lead's timeline keeps the history.
@@ -3857,7 +3946,17 @@ model StudioClient {
   /// `SetNull` on delete, so removing somebody from the studio returns their
   /// clients to the pool rather than deleting them along with the membership.
   assignedToId String?
-  assignedTo   StudioMember? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedTo   StudioMember? @relation("StudioClientAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  /// Which pool an unassigned lead sits in (sales roles and teams, owner,
+  /// 22 Oct 2026; docs/studio-os/SALES-ROLES.md): the member whose TEAM pool
+  /// it is (a sales head), or null for the studio pool. A head hands out their
+  /// team pool's leads to the people below them; reps claim from the pools of
+  /// the teams they are in. Kept when the lead is assigned, so giving it back
+  /// returns it to the same pool. SetNull: when the head leaves, their pool's
+  /// leads fall to the studio pool.
+  poolTeamId String?
+  poolTeam   StudioMember? @relation("StudioClientPoolTeam", fields: [poolTeamId], references: [id], onDelete: SetNull)
 
   /// When somebody last actually spoke to them.
   ///
@@ -3957,6 +4056,7 @@ model StudioClient {
   tasks    StudioTask[]
   /// Conversions API events about this lead. Erased with it.
   conversionEvents StudioConversionEvent[]
+  quoteRequests    StudioQuoteRequest[]
 
   /// Where this row went when somebody merged it into another.
   ///
@@ -4001,6 +4101,7 @@ model StudioClient {
   @@unique([studioId, importedFrom, externalId])
   /// "By campaign" on lead analytics (20261022100000_lead_routing_attribution).
   @@index([studioId, campaignId])
+  @@index([studioId, poolTeamId])
   @@map("studio_clients")
 }
 
@@ -4463,6 +4564,11 @@ enum LeadRouteMode {
   PERSON
   /// Round the chosen members in turn.
   TURNS
+  /// A team's pool (owner, 22 Oct 2026; docs/studio-os/SALES-ROLES.md): the
+  /// lead lands unassigned in the team pool of the head named by the same
+  /// member column (`leadRouteMemberId` / `routeMemberId`), for the head to
+  /// hand out or the team to claim.
+  TEAM
 }
 
 /// Where one Conversions API event is.
@@ -5676,4 +5782,66 @@ enum StudioSoftwarePlan {
   SOLO
   PRO
   MAX
+}
+
+/// A quotation request (owner, 22 Oct 2026; docs/studio-os/QUOTE-REQUESTS.md):
+/// a floor plan was added to a lead, or a salesperson pressed "Request
+/// quotation", and one of the studio's builders (`quotes.build`, or the
+/// studio's "Who builds quotations" list) is handed it in turns, so nobody
+/// builds the same quotation twice. At most one OPEN or IN_PROGRESS request
+/// per lead: a partial unique index in the migration (Prisma cannot express
+/// it); a second floor plan adds to the same request (`fileIds`).
+/// DONE when the quotation is sent (or the builder marks it done); CANCELLED
+/// by a head, or when the lead is lost or in the bin.
+model StudioQuoteRequest {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  clientId String
+  client   StudioClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  /// Who asked (the salesperson who added the plan or pressed the button).
+  requestedById String?
+  requestedBy   StudioMember? @relation("QuoteRequestAsker", fields: [requestedById], references: [id], onDelete: SetNull)
+  /// Who builds it. Null only when the studio had nobody who builds quotations.
+  assignedToId String?
+  assignedTo   StudioMember? @relation("QuoteRequestBuilder", fields: [assignedToId], references: [id], onDelete: SetNull)
+  /// Given in turn (true) or handed by a head (false, after a reassignment).
+  byTurn Boolean @default(true)
+
+  status QuoteRequestStatus @default(OPEN)
+  reason QuoteRequestReason
+
+  /// The draft (first quote) it is built on, then the quotation that was sent.
+  quoteId String?
+  quote   StudioQuote? @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  /// The lead's floor plans that came with it (StudioClientFile ids).
+  fileIds String[] @default([])
+  note    String?
+  /// Why it was cancelled, in words ("The lead was lost").
+  cancelNote String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  doneAt    DateTime?
+
+  @@index([studioId, assignedToId, status])
+  @@index([studioId, status, createdAt])
+  @@index([clientId])
+  @@index([quoteId])
+  @@map("studio_quote_requests")
+}
+
+enum QuoteRequestStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum QuoteRequestReason {
+  /// A floor plan was added to the lead.
+  FLOOR_PLAN
+  /// Somebody pressed "Request quotation" on the lead.
+  REQUESTED
 }

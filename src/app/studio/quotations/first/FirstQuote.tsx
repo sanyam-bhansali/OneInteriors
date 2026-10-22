@@ -156,7 +156,7 @@ export function FirstQuote({
         if (!put.ok) return setStatus('The upload did not finish. Check your connection and try again.');
       }
       const path = ticket.path;
-      const attached = await attachFileAction({ clientId: lead.id, path, name: file.name, contentType: type, bytes: file.size, kind: 'FLOOR_PLAN' });
+      const attached = await attachFileAction({ clientId: lead.id, path, name: file.name, contentType: type, bytes: file.size, kind: 'FLOOR_PLAN', quoteRequest: false });
       if (!attached.ok) return setStatus('error' in attached ? String(attached.error) : 'That did not attach.');
       leadPlansAction(lead.id).then(setPlans).catch(() => undefined);
       if (canRead) readPlan({ path });

@@ -34,7 +34,7 @@ export const ROLE_LINES: Record<StudioRoleName, string> = {
   PM: 'Runs the plan, decisions, snags and crews’ work orders for the projects you pick. Sees quantities, never crew rates or payments, and cannot change the team.',
   SUPERVISOR: 'Phone only. Posts the daily update, ticks the checklist and fixes snags on the sites you pick. Nothing else.',
   ACCOUNTS: 'Records payments and receipts across all projects and the booking advance; keeps the crews, their rates, and pays them. Sees nothing else.',
-  SALES: 'Works the leads you give them: calls, floor plans, quotations, the sales final. Sees their own leads and the pool, and claims leads from it; never a colleague’s.',
+  SALES: 'Works leads: calls, floor plans, quotations, the sales final. How far they reach — their own leads, their team’s, or everyone’s — is their sales role, picked below (Settings → Team → Roles).',
   DESIGNER: 'Runs the design of the projects you make them the designer on: steps, drawings, mood board, site visits. Sees no money.',
   OWNER: 'Everything, including the team, prices and margins.',
 };
@@ -88,6 +88,12 @@ const ACTION_LABELS: Record<StudioAction, string> = {
   'extras.write': 'Add extra work and send it to the client',
   'signoff.request': 'Ask the client to sign a quotation',
   'project.bringIn': 'Bring a running project onto One Interiors',
+  'lead.call': 'Log calls',
+  'lead.bulk': 'Act on many leads at once',
+  'lead.analytics': 'See lead analytics',
+  'lead.settings': 'Change lead settings',
+  'team.sales': 'Manage the sales team',
+  'quote.build': 'Build quotations',
 };
 
 /**

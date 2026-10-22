@@ -40,7 +40,8 @@ import 'server-only';
  */
 
 import { prisma } from '@/lib/prisma';
-import { myStudioId } from '@/modules/studio-quote/store';
+/* Sales roles and teams (owner, 22 Oct 2026): merging is `lead.merge`, on two leads they may work. Was `myStudioId()`. */
+import { fenceFor, scopeFor } from '@/modules/studio/lead-scope';
 import { LIVE } from './demo-lead';
 import { record } from './events';
 import { normalisePhone } from './csv';
@@ -70,12 +71,13 @@ export type MergeResult = { ok: true } | { ok: false; error: string };
  * exactly the one they would want to merge rather than restore.
  */
 export async function duplicatesOf(clientId: string): Promise<DuplicateCandidate[]> {
-  const studioId = await myStudioId();
-  if (!studioId) return [];
+  const scope = await scopeFor('lead.merge');
+  const studioId = scope?.studioId ?? null;
+  if (!scope || !studioId) return [];
 
   try {
     const me = await prisma.studioClient.findFirst({
-      where: { id: clientId, studioId },
+      where: { AND: [scope.leads, { id: clientId, studioId }] },
       select: { phone: true },
     });
     if (!me?.phone) return [];
@@ -85,6 +87,8 @@ export async function duplicatesOf(clientId: string): Promise<DuplicateCandidate
 
     const rows = await prisma.studioClient.findMany({
       where: {
+        /* Only duplicates they may see (a head: their team's). */
+        AND: [scope.leads],
         studioId,
         phone: digits,
         id: { not: clientId },
@@ -134,9 +138,11 @@ export async function duplicatesOf(clientId: string): Promise<DuplicateCandidate
  * row the studio is not looking at.
  */
 export async function mergeClients(keepId: string, loserId: string): Promise<MergeResult> {
-  const studioId = await myStudioId();
-  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+  const scope = await scopeFor('lead.merge');
+  const studioId = scope?.studioId ?? null;
+  if (!scope || !studioId) return { ok: false, error: 'Your role does not include merging leads.' };
   if (keepId === loserId) return { ok: false, error: 'That is the same card.' };
+  const fence = fenceFor(scope, 'lead.edit');
 
   try {
     /* Both read under the studio scope before anything moves. Two ids from a
@@ -144,11 +150,11 @@ export async function mergeClients(keepId: string, loserId: string): Promise<Mer
        studio's client into this one. */
     const [keep, loser] = await Promise.all([
       prisma.studioClient.findFirst({
-        where: { id: keepId, studioId, ...LIVE },
+        where: { AND: [fence], id: keepId, studioId, ...LIVE },
         select: { id: true, name: true, phone: true, email: true, society: true, locality: true, config: true, carpetSqft: true, notes: true },
       }),
       prisma.studioClient.findFirst({
-        where: { id: loserId, studioId, deletedAt: null, isDemo: false },
+        where: { AND: [fence], id: loserId, studioId, deletedAt: null, isDemo: false },
         select: { id: true, name: true, phone: true, email: true, society: true, locality: true, config: true, carpetSqft: true, notes: true, _count: { select: { quotes: true, projects: true } } },
       }),
     ]);

@@ -6,6 +6,11 @@
  * (roles.ts): owner and PM may assign, split, move, set a follow-up and bin
  * any lead; a salesperson may move and set follow-ups on their own leads
  * only (their scope already narrows the rows), and never assign or bin.
+ *
+ * Sales roles (owner, 22 Oct 2026): every bulk action also needs `lead.bulk`
+ * ("Act on many leads at once"), and bulk.ts fences the rows by both the
+ * bulk reach and the action's own reach (assign, edit), so a head with team
+ * reach acts on their team's leads only.
  */
 
 import { can, type MemberRole } from '@/modules/studio/roles';
@@ -28,6 +33,7 @@ export const BULK_MAX = 30_000;
 export const BULK_CHUNK = 1000;
 
 export function mayBulk(member: MemberRole, action: BulkAction): boolean {
+  if (!can(member, 'lead.bulk')) return false;
   switch (action) {
     case 'claim':
       return can(member, 'lead.claim');
@@ -89,7 +95,9 @@ export function readLimit(raw: unknown): number | null {
 /**
  * Which leads a bulk action may reach, as a fence: claiming reads the pool
  * (only unassigned leads can be claimed); everything else a salesperson
- * does reaches their own leads only, whatever the filters said.
+ * does reaches their own leads only, whatever the filters said. `seesAll`
+ * is true for anyone who sees more than their own (owner, PM, a sales role
+ * with team or all reach): their rows are fenced by reach in bulk.ts instead.
  */
 export function bulkFence(action: BulkAction, seesAll: boolean): 'pool' | 'mine' | 'filters' {
   if (action === 'claim') return 'pool';

@@ -11,8 +11,8 @@
  * reads (money stays hidden from designers and project managers there).
  */
 
-import { can, type MemberRole, type StudioRoleName } from './roles';
-import { CREWS_HOME, DESIGN_HOME, PAYMENTS_HOME, SITE_HOME, STUDIO_HOME, TEAM_PATH, TODAY_HOME, mayOpen } from './surfaces';
+import { asSeenBy, can, type MemberRole, type StudioRoleName } from './roles';
+import { CREWS_HOME, DESIGN_HOME, LEAD_SETTINGS_PATHS, PAYMENTS_HOME, SITE_HOME, STUDIO_HOME, TEAM_PATH, TODAY_HOME, mayOpen } from './surfaces';
 
 export { STUDIO_HOME };
 
@@ -28,6 +28,21 @@ export interface AppTab {
   label: string;
   href: string;
   /** Owner-only and the like: the tab shows only when `mayOpen` lets them in. */
+  /** A number on the tab (To build: the quotation requests waiting for them). Set by the layout. */
+  count?: number;
+}
+
+/**
+ * Quotations → To build (quotation requests, owner 22 Oct 2026; docs/studio-os/
+ * QUOTE-REQUESTS.md): for whoever builds quotations, and the heads who hand
+ * requests over (owner, PM, a sales role that gives leads to people).
+ */
+export const TO_BUILD_PATH = '/studio/quotations/requests';
+
+/** Tabs shown only to some of the people who may open the app. */
+function tabFor(member: MemberRole, href: string): boolean {
+  if (href === TO_BUILD_PATH) return can(member, 'quote.build') || can(member, 'lead.assign');
+  return true;
 }
 
 export interface StudioApp {
@@ -74,6 +89,7 @@ export const APPS: readonly StudioApp[] = [
       T('First Quote', '/studio/quotations/first'),
       T('Full Builder', '/studio/quotations/builder'),
       T('My Quotations', '/studio/quotations'),
+      T('To build', TO_BUILD_PATH),
       T('Products', '/studio/products'),
       T('Terms', '/studio/quotations/terms'),
     ],
@@ -134,7 +150,8 @@ export const APPS: readonly StudioApp[] = [
  */
 const ROLE_APPS: Record<StudioRoleName, readonly AppKey[]> = {
   OWNER: ['today', 'clients', 'quotes', 'projects', 'site', 'money', 'vendors', 'calendar', 'intros', 'rates', 'team'],
-  SALES: ['clients', 'quotes', 'calendar'],
+  /* Sales roles (owner, 22 Oct 2026): Team / Settings shows only when their sales role opens it (`mayOpen`). */
+  SALES: ['clients', 'quotes', 'calendar', 'team'],
   DESIGNER: ['quotes', 'projects', 'vendors'],
   PM: ['projects', 'vendors', 'quotes', 'today', 'clients', 'site', 'calendar', 'rates', 'team'],
   ACCOUNTS: ['money', 'vendors', 'quotes'],
@@ -151,12 +168,15 @@ function under(path: string, prefix: string): boolean {
  */
 function entryFor(app: StudioApp, member: MemberRole): string {
   if (app.key === 'projects' && member.role === 'DESIGNER') return DESIGN_HOME;
+  if (app.key === 'team' && member.role === 'SALES') return can(member, 'team.sales') && member.solo !== true ? TEAM_PATH : LEAD_SETTINGS_PATHS[0]!;
   if (app.key === 'team' && (!can(member, 'team.manage') || member.solo === true)) return '/studio/settings';
   return app.href;
 }
 
 /** The apps this member's home and apps menu show, each pointed at where it opens for them. */
-export function appsFor(member: MemberRole): StudioApp[] {
+export function appsFor(viewer: MemberRole): StudioApp[] {
+  /* Staff viewing as this member (VIEW-AS.md) see their apps exactly. */
+  const member = asSeenBy(viewer);
   if (member.status !== 'ACTIVE') return [];
   const byKey = new Map(APPS.map((a) => [a.key, a]));
   const out: StudioApp[] = [];
@@ -165,7 +185,7 @@ export function appsFor(member: MemberRole): StudioApp[] {
     if (!app) continue;
     const href = entryFor(app, member);
     if (!mayOpen(member, href)) continue;
-    const tabs = app.tabs.filter((t) => mayOpen(member, t.href));
+    const tabs = app.tabs.filter((t) => mayOpen(member, t.href) && tabFor(member, t.href));
     out.push({ ...app, href, tabs, name: app.key === 'clients' && member.role === 'SALES' ? 'Leads' : app.key === 'team' && href !== TEAM_PATH ? 'Settings' : app.name });
   }
   return out;

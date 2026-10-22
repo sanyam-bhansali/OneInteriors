@@ -69,7 +69,8 @@ export function LeadHeader({
   whatsapp: string | null;
   /** In board order, with the flags the call sheet's suggested move reads (calling steps, 21 Oct 2026). */
   stages: { id: string; name: string; colour: string; kind: 'OPEN' | 'WON' | 'DONE' | 'LOST'; sortOrder?: number; isIntake?: boolean; isCallStep?: boolean }[];
-  may: { edit: boolean; quote: boolean; delete: boolean };
+  /** `call` (sales roles, owner 22 Oct 2026): may log a call on this lead; left out, logging follows `edit`. */
+  may: { edit: boolean; quote: boolean; delete: boolean; call?: boolean };
   /** A sales final waits for its booking advance (Record booking is on this page). */
   canBook: boolean;
   /** Calls already logged on this lead: the Picked up sheet's "attempt N". */
@@ -199,9 +200,10 @@ export function LeadHeader({
       </div>
 
       <div className="hstack" style={{ gap: 8 }}>
-        {may.edit ? (
+        {may.edit || may.call ? (
           <>
             <span id="log-call" style={{ scrollMarginTop: 90 }} />
+            {(may.call ?? may.edit) ? (
             <Menu label="Log call" iconPath="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" disabled={pending} left>
               {(close) => (
                 <>
@@ -223,6 +225,9 @@ export function LeadHeader({
                 </>
               )}
             </Menu>
+            ) : null}
+            {may.edit ? (
+            <>
             <button type="button" onClick={() => goTo('notes', 'note-input')} className={btnOutline} title="Add internal note">
               {icon('M5 4h14v12l-4 4H5zM15 20v-4h4M8 9h8M8 13h5')}
               Note
@@ -264,6 +269,8 @@ export function LeadHeader({
                 </>
               )}
             </Menu>
+            </>
+            ) : null}
           </>
         ) : null}
         <span className={`chip ${lead.ownerName ? '' : 'warn'}`} title={may.delete ? 'Change the owner in the panel on the right' : undefined}>

@@ -23,6 +23,8 @@ import { istDay } from '@/modules/project/working-days';
 import { istDayEnd } from './ist-range';
 import { PAGE_SIZE, cursorOf, NOT_SET, without, withCustom, type Cursor, type LeadFilters, type SortKey } from './lead-filters';
 import { clockAt, keysetWhere, kpiRules, orderByFor, scopedLeadWhere } from './lead-where';
+import { rawLeadFence, rawPoolFence } from './lead-sql';
+import { subtreeOf } from '@/modules/studio/sales-access';
 
 /** At or above this many leads, the list opens instead of the board. */
 export const LIST_DEFAULT_ABOVE = 300;
@@ -202,7 +204,8 @@ export async function filterFacets(
     const [bySource, byStage, byOwner, salesMine, salesPool, custom] = await Promise.all([
       prisma.studioClient.groupBy({ by: ['source', 'leadSourceId'], where: where(without(f, 'source')), _count: { _all: true } }),
       prisma.studioClient.groupBy({ by: ['stageId'], where: where(without(without(f, 'stage'), 'kind')), _count: { _all: true } }),
-      scope.seesAll ? prisma.studioClient.groupBy({ by: ['assignedToId'], where: where(without(f, 'owner')), _count: { _all: true } }) : Promise.resolve([]),
+      /* Sales roles: with team reach, per person in their team (the fence keeps it to the team). */
+      scope.seesAll || scope.team ? prisma.studioClient.groupBy({ by: ['assignedToId'], where: where(without(f, 'owner')), _count: { _all: true } }) : Promise.resolve([]),
       scope.seesAll ? Promise.resolve(0) : prisma.studioClient.count({ where: { ...LIVE, studioId: scope.studioId, AND: [scopedLeadWhere(scope, { ...f, owner: 'me' }, now, LIVE)] } }),
       scope.seesAll ? Promise.resolve(0) : prisma.studioClient.count({ where: { ...LIVE, studioId: scope.studioId, AND: [scopedLeadWhere(scope, { ...f, owner: 'pool' }, now, LIVE)] } }),
       Promise.all(
@@ -294,6 +297,7 @@ async function viewsOf(scope: LeadScope, rows: ViewRaw[], now: Date): Promise<Le
       stageColour: r.stage.colour,
       stageKind: r.stage.kind as LeadView['stageKind'],
       assignedToId: r.assignedToId,
+      poolTeamId: r.poolTeamId,
       assignedToName: r.assignedTo ? r.assignedTo.user.name?.trim() || r.assignedTo.user.email?.split('@')[0] || r.assignedTo.user.phone || 'Someone' : null,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
@@ -460,7 +464,56 @@ export async function stageCounts(scope: LeadScope, f: LeadFilters, now = new Da
   }
 }
 
-/** The person's fence for the raw counts below: the studio, and for a salesperson their own leads (or the pool). */
+
+export interface PoolTab {
+  /** `studio`, or a head's member id. */
+  key: string;
+  label: string;
+  /** Open, unassigned leads in it (with the other filters). */
+  n: number;
+}
+
+/**
+ * The pools this person may see, as tabs (sales roles and teams, owner
+ * 22 Oct 2026): the studio pool and each head's team pool that has leads,
+ * counted in SQL inside their pool fence. Never a pool they may not see.
+ */
+export async function poolTabsFor(scope: LeadScope, f: LeadFilters, now = new Date()): Promise<PoolTab[]> {
+  try {
+    const rows = await prisma.studioClient.groupBy({
+      by: ['poolTeamId'],
+      where: { ...LIVE, studioId: scope.studioId, AND: [scopedLeadWhere(scope, { ...f, owner: 'pool', poolTeam: undefined }, now, LIVE)] },
+      _count: { _all: true },
+    });
+    const heads = rows.map((r) => r.poolTeamId).filter((id): id is string => typeof id === 'string');
+    const names = heads.length
+      ? await prisma.studioMember.findMany({ where: { studioId: scope.studioId, id: { in: heads } }, select: { id: true, user: { select: { name: true, email: true, phone: true } } } })
+      : [];
+    const nameOf = new Map(names.map((m) => [m.id, m.user.name?.trim() || m.user.email?.split('@')[0] || m.user.phone || 'Someone']));
+    const studio = rows.find((r) => r.poolTeamId === null)?._count._all ?? 0;
+    const tabs: PoolTab[] = [];
+    if (scope.pools.kind === 'all' || (scope.pools.kind === 'some' && scope.pools.studio)) tabs.push({ key: 'studio', label: 'Studio pool', n: studio });
+    for (const r of rows) {
+      if (!r.poolTeamId) continue;
+      tabs.push({ key: r.poolTeamId, label: `${nameOf.get(r.poolTeamId) ?? 'A team'}’s team`, n: r._count._all });
+    }
+    return tabs;
+  } catch {
+    return [];
+  }
+}
+
+/** A head's team (them and everyone below them), for "assigning from a team pool offers only that head's team". Studio-scoped. */
+export async function headTeam(scope: LeadScope, headId: string): Promise<string[]> {
+  try {
+    const tree = await prisma.studioMember.findMany({ where: { studioId: scope.studioId }, select: { id: true, reportsToId: true } });
+    return tree.some((m) => m.id === headId) ? subtreeOf(headId, tree) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** The person's fence for the raw counts below: the studio, and for a salesperson their own leads, their team's (sales roles), or the pools. */
 function rawFence(scope: LeadScope, f: LeadFilters): Prisma.Sql {
   if (scope.seesAll) {
     if (f.owner === 'pool') return Prisma.sql`AND c."assignedToId" IS NULL`;
@@ -468,7 +521,15 @@ function rawFence(scope: LeadScope, f: LeadFilters): Prisma.Sql {
     if (f.owner && f.owner !== 'anyone') return Prisma.sql`AND c."assignedToId" = ${f.owner}`;
     return Prisma.empty;
   }
-  return f.owner === 'pool' ? Prisma.sql`AND c."assignedToId" IS NULL` : Prisma.sql`AND c."assignedToId" = ${scope.member.id}`;
+  if (f.owner === 'pool') return rawPoolFence(scope);
+  if (scope.team) {
+    const team = [...scope.team];
+    if (f.owner === 'me') return Prisma.sql`AND c."assignedToId" = ${scope.member.id}`;
+    if (f.owner === 'anyone') return Prisma.sql`AND c."assignedToId" = ANY(${team}::text[])`;
+    if (f.owner) return team.includes(f.owner) ? Prisma.sql`AND c."assignedToId" = ${f.owner}` : Prisma.sql`AND false`;
+    return rawLeadFence(scope);
+  }
+  return Prisma.sql`AND c."assignedToId" = ${scope.member.id}`;
 }
 
 /**
