@@ -3418,6 +3418,11 @@ model StudioBranding {
   welcomeNote String? @db.Text
   terms       String? @db.Text
 
+  /// The name printed at the top of quotations and in the builder (owner,
+  /// 22 Oct 2026: Hauspire prints "HAUSPIRE"). Null: the trading name. The
+  /// registered name and GSTIN in the footer are not changed by it.
+  documentName String?
+
   /// Does the studio want our attribution mark off their documents?
   ///
   /// A WISH, not the outcome. Whether the mark actually appears is this

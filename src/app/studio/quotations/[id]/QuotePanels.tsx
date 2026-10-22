@@ -42,6 +42,7 @@ export function DocumentPreview({
   totals: QuoteTotals;
   branding: {
     legalName: string;
+    documentName?: string | null;
     addressLine: string | null;
     city: string;
     pincode: string | null;
@@ -74,7 +75,7 @@ export function DocumentPreview({
 
   const studio: DocStudio = doc?.studio ?? {
     name: branding.legalName,
-    tradeName: null,
+    tradeName: branding.documentName?.trim() || null,
     addressLine: branding.addressLine,
     city: branding.city,
     pincode: branding.pincode,

@@ -23,6 +23,8 @@ import { join } from 'node:path';
 import { PrismaClient } from '@prisma/client';
 
 const ACCENT = '#531220';
+/** The name at the top of its quotations, as the old app printed it (owner, 22 Oct 2026). */
+const DOCUMENT_NAME = 'HAUSPIRE';
 
 /** The old app's MATERIAL_SPEC, row for row. */
 const MATERIAL_SPEC = [
@@ -61,14 +63,15 @@ async function main() {
   try {
     const studio = await db.studio.findUnique({ where: { slug }, select: { id: true, tradeName: true, legalName: true } });
     if (!studio) throw new Error(`No studio with slug ${slug}.`);
-    const before = await db.studioBranding.findUnique({ where: { studioId: studio.id }, select: { accentHex: true, terms: true, welcomeNote: true, materialSpec: true } });
+    const before = await db.studioBranding.findUnique({ where: { studioId: studio.id }, select: { accentHex: true, terms: true, welcomeNote: true, materialSpec: true, documentName: true } });
     console.log(`${studio.tradeName} (${slug})${dryRun ? '  (DRY RUN: nothing is written)' : ''}`);
+    console.log(`  name on quotes  ${before?.documentName ?? '(the trading name)'} → ${DOCUMENT_NAME}`);
     console.log(`  colour          ${before?.accentHex ?? '(no branding yet)'} → ${ACCENT}`);
     console.log(`  material spec   ${Array.isArray(before?.materialSpec) ? before.materialSpec.length : 0} rows → ${MATERIAL_SPEC.length} rows`);
     console.log(`  terms           ${before?.terms ? `${before.terms.length} characters` : 'none'} → ${terms.length} characters (Hauspire's, saved 5 Sep 2026)`);
     console.log(`  welcome note    ${before?.welcomeNote ? 'set' : 'none'} → the old app's`);
     if (dryRun) return;
-    const data = { accentHex: ACCENT, materialSpec: MATERIAL_SPEC, terms, welcomeNote: WELCOME };
+    const data = { accentHex: ACCENT, documentName: DOCUMENT_NAME, materialSpec: MATERIAL_SPEC, terms, welcomeNote: WELCOME };
     await db.$transaction(async (tx) => {
       await tx.studioBranding.upsert({
         where: { studioId: studio.id },

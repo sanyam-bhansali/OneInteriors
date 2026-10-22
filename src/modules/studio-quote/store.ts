@@ -387,6 +387,8 @@ export interface BrandingRow {
   /** Their wish about our mark. Whether it is honoured is `showsOurMark()`. */
   hideOurMark: boolean;
   welcomeNote: string | null;
+  /** Printed at the top of quotations instead of the trading name (null: the trading name). */
+  documentName: string | null;
   terms: string | null;
   feeBps: number;
   discountBps: number;
@@ -507,6 +509,7 @@ export async function myBranding(): Promise<BrandingRow | null> {
       hideOurMark: row.hideOurMark,
       accentHex: row.accentHex,
       welcomeNote: row.welcomeNote,
+      documentName: row.documentName,
       terms: row.terms,
       feeBps: row.feeBps,
       discountBps: row.discountBps,
@@ -533,6 +536,8 @@ export interface BrandingInput {
   email?: string;
   website?: string;
   welcomeNote?: string;
+  /** The name at the top of quotations; empty clears it. Absent leaves it as it is. */
+  documentName?: string;
   /** Absent leaves them as they are (they are edited on Quotations → Terms). */
   terms?: string;
   /** The document's colour, a six-digit hex. Absent or malformed leaves it as it is. */
@@ -580,6 +585,7 @@ export async function saveBranding(input: BrandingInput): Promise<SaveResult> {
     email: input.email?.trim() || null,
     website: input.website?.trim() || null,
     welcomeNote: input.welcomeNote?.trim() || null,
+    ...(input.documentName !== undefined ? { documentName: input.documentName.trim().slice(0, 60) || null } : {}),
     ...(input.terms !== undefined ? { terms: input.terms.trim() || null } : {}),
     ...(input.accentHex !== undefined && /^#[0-9a-fA-F]{6}$/.test(input.accentHex.trim()) ? { accentHex: input.accentHex.trim().toUpperCase() } : {}),
     // 7% for every studio (owner, 12 Oct 2026); the setting no longer moves

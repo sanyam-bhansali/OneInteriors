@@ -174,6 +174,16 @@ export function BrandingForm({ branding }: { branding: BrandingRow | null }) {
         note="Both of these are blank until you write them, and they stay blank if you would rather. We will not put our sentences on a quotation with your name on it."
       >
         <label className="flex flex-col gap-1.5">
+          <span className="lbl">Name on quotations — optional</span>
+          <input
+            name="documentName"
+            defaultValue={branding?.documentName ?? ''}
+            maxLength={60}
+            placeholder="Printed at the top of your quotations, e.g. your brand name. Blank uses your trading name."
+            className={input}
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
           <span className="lbl">Opening note — optional</span>
           <textarea
             name="welcomeNote"

@@ -164,6 +164,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
             branding
               ? {
                   legalName: branding.legalName,
+                  documentName: branding.documentName,
                   addressLine: branding.addressLine,
                   city: branding.city,
                   pincode: branding.pincode,

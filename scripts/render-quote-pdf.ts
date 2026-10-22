@@ -123,7 +123,7 @@ async function fromDb(quoteId: string, slug: string): Promise<DocInput> {
     if (!q) throw new Error('No such quotation in that studio.');
     const b = studio.branding;
     return {
-      studio: { name: b?.legalName ?? studio.tradeName, tradeName: studio.tradeName, addressLine: b?.addressLine ?? null, city: b?.city ?? null, pincode: b?.pincode ?? null, phone: b?.phone ?? null, email: b?.email ?? null, website: b?.website ?? null, gstin: b?.gstin ?? null, logoUrl: null, accentHex: b?.accentHex ?? null },
+      studio: { name: b?.legalName ?? studio.tradeName, tradeName: b?.documentName?.trim() || studio.tradeName, addressLine: b?.addressLine ?? null, city: b?.city ?? null, pincode: b?.pincode ?? null, phone: b?.phone ?? null, email: b?.email ?? null, website: b?.website ?? null, gstin: b?.gstin ?? null, logoUrl: null, accentHex: b?.accentHex ?? null },
       head: { clientName: q.clientName, clientPhone: q.clientPhone, flatNo: q.society, config: q.config, number: q.number, date: q.quoteDate ?? q.createdAt, location: q.locality || b?.city || null },
       lines: q.lines.map((l) => ({ room: l.room, product: l.product, code: l.code, unit: l.unit, details: l.details, widthMm: l.widthMm, heightMm: l.heightMm, qtyMilli: l.qtyMilli, amountPaise: Number(l.amountPaise), note: l.note })),
       terms: { feeBps: q.feeBps, discountBps: q.discountBps, onSpotPaise: Number(q.onSpotPaise), onSpotLabel: q.onSpotLabel, gstBps: q.gstBps, bookingAdvancePaise: Number(q.bookingAdvancePaise) },

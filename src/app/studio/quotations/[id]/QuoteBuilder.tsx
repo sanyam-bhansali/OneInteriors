@@ -64,6 +64,7 @@ export function QuoteBuilder({
   products: ProductRow[];
   branding: {
     legalName: string;
+    documentName?: string | null;
     addressLine: string | null;
     city: string;
     pincode: string | null;
@@ -703,7 +704,7 @@ export function QuoteBuilder({
           <>
             <div className="hdochead">
               <div>
-                <div className="hbig">{branding?.legalName ?? 'Your studio'}</div>
+                <div className="hbig">{branding?.documentName?.trim() || branding?.legalName || 'Your studio'}</div>
                 <div className="muted hsmall">
                   Quotation · {formatINR(shownTotal)}
                   {gstOn ? ' incl. GST' : ''}
