@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createHmac } from 'node:crypto';
 import {
+  adColumns,
   attributionFor,
+  emptyAds,
+  hasAds,
+  platformWord,
   budgetPaiseFrom,
   configFrom,
   formToObject,
@@ -133,6 +137,39 @@ describe('the generic door: website, portals, tools', () => {
     expect(JSON.stringify(lead)).not.toContain('oik_secret');
   });
 
+  it('keeps utm words and click ids as ad columns, not notes (22 Oct 2026)', () => {
+    const lead = parseGeneric({ name: 'Asha', phone: '9876543210', utm_source: 'Instagram', utm_medium: 'paid', utm_campaign: 'oct-kitchens', utm_content: 'reel-2', gclid: 'G-click', fbclid: 'F-click' });
+    expect(lead.answers).toEqual([]);
+    expect(lead.attribution).toEqual(['paid', 'oct-kitchens', 'reel-2']);
+    expect(adColumns(lead.ads)).toEqual({
+      adPlatform: 'instagram',
+      leadgenId: null,
+      campaignId: null,
+      campaignName: 'oct-kitchens',
+      adsetId: null,
+      adsetName: null,
+      adId: null,
+      adName: null,
+      formId: null,
+      gclid: 'G-click',
+      utm: { utm_source: 'Instagram', utm_medium: 'paid', utm_campaign: 'oct-kitchens', utm_content: 'reel-2', fbclid: 'F-click' },
+    });
+    expect(adColumns(parseGeneric({ phone: '9876543210', gclid: 'x' }).ads).adPlatform).toBe('google');
+    expect(adColumns(parseGeneric({ phone: '9876543210', fbclid: 'y' }).ads).adPlatform).toBe('facebook');
+    expect(hasAds(adColumns(parseGeneric({ phone: '9876543210' }).ads))).toBe(false);
+  });
+
+  it('platform words, and nothing kept when nothing came', () => {
+    expect(platformWord('IG')).toBe('instagram');
+    expect(platformWord('fb')).toBe('facebook');
+    expect(platformWord('Meta')).toBe('facebook');
+    expect(platformWord('google_ads')).toBe('google');
+    expect(platformWord('99acres')).toBe('99acres');
+    expect(platformWord('  ')).toBeNull();
+    expect(hasAds(adColumns(emptyAds()))).toBe(false);
+    expect(adColumns({ ...emptyAds(), campaignName: '  x'.padEnd(400, 'y') }).campaignName?.length).toBe(160);
+  });
+
   it('joins a first and last name, and unwraps { lead: {...} }', () => {
     const lead = parseGeneric({ source: 'Housing.com', lead: { first_name: 'Ravi', last_name: 'Kulkarni', phone: '9822012345' } });
     expect(lead.name).toBe('Ravi Kulkarni');
@@ -200,6 +237,23 @@ describe('Google lead forms', () => {
     expect(g.isTest).toBe(true);
     expect(g.lead.name).toBe('A B');
     expect(g.googleKey).toBeNull();
+  });
+
+  it('fills the ad columns, and never a leadgen id (22 Oct 2026)', () => {
+    const g = parseGoogle({ ...body, adgroup_id: 22222222222, creative_id: 33333333333, gcl_id: 'Cj0KCQ-test-gclid' });
+    expect(adColumns(g.lead.ads)).toEqual({
+      adPlatform: 'google',
+      leadgenId: null,
+      campaignId: '12345678901',
+      campaignName: null,
+      adsetId: '22222222222',
+      adsetName: null,
+      adId: '33333333333',
+      adName: null,
+      formId: '40000000000',
+      gclid: 'Cj0KCQ-test-gclid',
+      utm: null,
+    });
   });
 
   it('counts under the studio’s own “Google lead form” source', () => {
@@ -276,6 +330,26 @@ describe('Meta lead ads', () => {
     expect(a.sourceNote).toBe('Meta lead ad (Instagram) · campaign Oct kitchens · ad set PW Pune 25-45 · ad Kitchen reel');
   });
 
+  it('fills the ad columns from the Graph lead (22 Oct 2026)', () => {
+    const lead = parseMetaLead({ ...graph, campaign_id: '120200000000000001', adset_id: '120200000000000002', ad_id: '120200000000000003' });
+    expect(adColumns(lead.ads)).toEqual({
+      adPlatform: 'instagram',
+      leadgenId: '987654321012345',
+      campaignId: '120200000000000001',
+      campaignName: 'Oct kitchens',
+      adsetId: '120200000000000002',
+      adsetName: 'PW Pune 25-45',
+      adId: '120200000000000003',
+      adName: 'Kitchen reel',
+      formId: '555',
+      gclid: null,
+      utm: null,
+    });
+    /* Only Meta's digits are ever a leadgen id. */
+    expect(adColumns(parseMetaLead({ ...graph, id: 'abc' }).ads).leadgenId).toBeNull();
+    expect(parseMetaLead({ field_data: [] }).ads.adPlatform).toBe('facebook');
+  });
+
   it('fb, or no platform, is Facebook', () => {
     expect(parseMetaLead({ ...graph, platform: 'fb' }).platform).toBe('FACEBOOK');
     expect(parseMetaLead({ field_data: [] }).platform).toBe('FACEBOOK');
@@ -293,7 +367,7 @@ describe('Meta lead ads', () => {
   });
 
   it('the Graph address carries no token, and an error never shows one', () => {
-    expect(graphLeadUrl('123')).toBe('https://graph.facebook.com/v21.0/123?fields=created_time,field_data,ad_id,ad_name,adset_name,campaign_name,form_id,platform');
+    expect(graphLeadUrl('123')).toBe('https://graph.facebook.com/v21.0/123?fields=created_time,field_data,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id,platform');
     expect(graphError({ error: { message: 'Invalid OAuth access_token=EAAB123 token' } }, 400)).not.toContain('EAAB123');
     expect(graphError(null, 500)).toBe('Meta did not give the lead: HTTP 500');
   });

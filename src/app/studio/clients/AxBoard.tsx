@@ -12,6 +12,7 @@ import { LineIcon } from '../ui/icons';
 import { Modal, PillCold, PillDue, PillToday, TagChips } from './ax-ui';
 import { columnPageAction, moveLeadAction } from './list-actions';
 import { RowCall, type CallLogged, type CallSheetStage } from './CallLogger';
+import { boardColumnContext, leadHrefIn } from '@/modules/studio-sales/lead-context';
 
 export interface BoardStage {
   id: string;
@@ -224,6 +225,7 @@ export function AxBoard({
                     onDragStart={() => setDrag({ lead: l, from: s.id })}
                     onDragEnd={() => setDrag(null)}
                     call={mayCall(l) ? { stages: callStages, onLogged: (r) => called(l, s.id, r) } : null}
+                    from={boardColumnContext(query, s.id)}
                   />
                 ))}
                 {col.lazy && n > 0 ? (
@@ -271,6 +273,7 @@ function Card({
   onDragStart,
   onDragEnd,
   call,
+  from,
 }: {
   lead: LeadView;
   now: Date | null;
@@ -282,9 +285,11 @@ function Card({
   onDragEnd: () => void;
   /** Log call on this card (null: the member may not, or the pool). */
   call: { stages: CallSheetStage[]; onLogged: (r: CallLogged) => void } | null;
+  /** The board and this column, for "Next lead →" on the lead page (improvement 8, owner 22 Oct 2026). */
+  from?: string;
 }) {
   const router = useRouter();
-  const href = `/studio/clients/${lead.id}`;
+  const href = leadHrefIn(lead.id, from);
   const fresh = now ? isNewToday(lead.createdAt, now) : false;
   const cold = fresh || !now ? null : coldLabel(lead, now);
   const due = lead.flags.closed || !now ? null : dueBadge(lead.nextActionOn, now);

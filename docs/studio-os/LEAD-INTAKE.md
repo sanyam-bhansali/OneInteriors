@@ -131,6 +131,117 @@ form" (made on first lead); a portal → `FACEBOOK` / `INSTAGRAM` / `REFERRAL`�
 when its `source` names one of ours, else its `source` (or the door's label) as
 one of the studio's own source names ("99acres"), up to the thirty-name limit.
 
+## New leads go to (owner, 22 Oct 2026)
+
+Settings → Lead sources → **New leads go to** (owner and project managers,
+`lead.import`). For leads that arrive by themselves only — lead intake and the
+enquiry form, both through `studio-practice/land.ts`. A lead added by hand or
+imported (CSV, AxLeads) keeps whoever was chosen there.
+
+| Mode | Who gets the next lead |
+|---|---|
+| **The pool** (default) | Nobody. The owner and PMs are told, as before. |
+| **A person** | That member, if they are ACTIVE and on a role that works leads (owner; PM on Max; salesperson). Otherwise the pool, with a timeline note saying why. |
+| **Take turns** | The chosen members (two or more) in the owner's order: `eligible[(n − 1) mod eligible.length]`, where `n` is `Studio.leadRouteTurn` after an atomic `+1` in the landing transaction. Anyone suspended, invited and not signed in, gone, or on a role that cannot work leads is skipped without the others losing their order. Nobody eligible: the pool, and no turn is used. |
+
+Each lead door can override it ("Its leads go to"): same as new leads (null),
+the pool, take turns (the studio's list) or one person. A duplicate (a phone
+already on the board) is a timeline line on the existing card and keeps its
+assignee.
+
+A routed lead gets the normal `ASSIGNED` line ("Given to Asha (new leads go to
+Asha)", "Given to Ravi (leads from Hauspire Facebook Page go to Ravi)", "Given
+to Meena (new leads take turns)"). The person is told in their inbox
+(`lead-assigned`, unless they are the owner or a PM, who already get the
+`lead-new` alert, which now says who it went to). Nothing is sent to the
+customer. The rule is the pure `studio-sales/lead-routing.ts`
+(tests/studio-lead-routing.test.ts).
+
+## Ad attribution (owner, 22 Oct 2026)
+
+`StudioClient` has columns for the ad: `adPlatform` (facebook, instagram,
+google, or utm_source), `leadgenId` (Meta only, digits only), `campaignId`,
+`campaignName`, `adsetId`, `adsetName`, `adId`, `adName`, `formId`, `gclid`,
+`utm` (JSON: utm_source, utm_medium, utm_campaign, utm_term, utm_content,
+fbclid), indexed on `(studioId, campaignId)`. `sourceNote` stays as the human
+line.
+
+- **Meta**: from the Graph lead (`graphLeadUrl` now also asks for
+  `campaign_id` and `adset_id`).
+- **Google**: `campaign_id`, `adgroup_id` (ad set), `creative_id` (ad),
+  `form_id`, `gcl_id`. Google's `lead_id` is never a leadgen id.
+- **Website / portal**: any `utm_*`, `gclid`, `fbclid` posted;
+  `utm_campaign` is the campaign name. Click ids are no longer put in the notes.
+- **AxLeads import**: its leadgen, campaign, ad set, ad and form ids, gclid and
+  utm go to the columns instead of the "From AxLeads" notes block. A merge into
+  a card that already has an ad keeps the card's and lists the merged lead's ad
+  in the merge note.
+- A duplicate fills the columns only when the existing card has no ad at all.
+
+Lead analytics shows **By campaign** (owner and PMs): leads, called
+(`lastContactedAt`), quoted (has a quotation) and customers (booked, or in a
+Signed/Finished column) per campaign — its id, or its name when there is no id;
+the commonest name is shown, else "Campaign <id>".
+
+## Meta conversion feedback (owner, 22 Oct 2026)
+
+Off for every studio. When the owner switches on **Tell Meta which leads turned
+into customers** (Settings → Lead sources; owner only), a lead **that came from
+a Meta lead ad** (it has a `leadgenId`) moving into a chosen column sends one
+Conversions API event, at most once per lead and event. Nothing else is ever
+sent.
+
+| Column | Event (default) |
+|---|---|
+| A Signed (WON) or Finished (DONE) column | `ConvertedLead` |
+| Any open column (calling steps, Effective Lead…) | nothing, until the owner picks `QualifiedLead` or `Contacted` for it |
+| Lost | nothing |
+
+Not Meta's `Purchase` (it requires a value and currency we would have to
+invent). The request is Meta's CRM "conversion leads" format (fake values):
+
+```
+POST https://graph.facebook.com/v21.0/<DATASET_ID>/events
+Authorization: Bearer <token>
+{"data":[{"event_name":"ConvertedLead","event_time":1792656000,
+  "event_id":"oi_1234567890123456_convertedlead","action_source":"system_generated",
+  "user_data":{"lead_id":1234567890123456,"ph":["<sha256 of 919876543210>"],"em":["<sha256 of asha@example.com>"]},
+  "custom_data":{"lead_event_source":"One Interiors","event_source":"crm"}}]}
+```
+
+`ph` is the phone as 91 + ten digits, `em` the email trimmed and lower-cased,
+each SHA-256 hex, each only when known. `lead_id` is written as the exact JSON
+number. The token is only ever in the header (never the URL, a log or the
+database).
+
+Where a stage changes: the board and the lead page (`updateClient`), a call
+logged with its move (`logContactAndMove`), bulk move (`bulkMove`), and a
+booking moving the lead to Signed. Each queues into `studio_conversion_events`
+(`QUEUED` → `SENT` / `FAILED` / `SKIPPED`, `attempts`, `lastError`,
+`sentAt`; unique `(clientId, eventName)`) and sends in `after()`. A failure is
+retried by the existing daily cron **`/api/cron/bin-purge`** (21:30 UTC, 03:00
+IST), five tries in all — no new cron schedule (Vercel Hobby). Settings shows
+the last eight events and how many failed.
+
+### Setting it up for a studio
+
+1. In Meta **Events Manager**, use the studio's dataset (pixel) for its lead
+   ads, or create one (Connect data sources → CRM). Copy its **dataset ID**
+   (digits).
+2. In Business Settings → System users, give a system user access to that
+   dataset and generate a Conversions API token.
+3. In Events Manager, connect the dataset to the Page's lead forms (the CRM /
+   "conversion leads" set-up), if Meta asks for it.
+4. Paste into Vercel (production) and redeploy:
+   `STUDIO_META_CAPI = { "<studio slug>": { "datasetId": "<digits>", "token": "<token>", "testEventCode": "TEST12345" } }`.
+   `testEventCode` is optional and only for checking; remove it afterwards.
+5. The owner switches it on in Settings → Lead sources and picks the column
+   that means "qualified".
+6. **Verify**: Events Manager → the dataset → **Test events**; put its test code
+   in `testEventCode`, redeploy, move a Meta lead-ad lead into a chosen column.
+   The event shows there within a minute, and as **Sent** on Settings. Then
+   remove `testEventCode` and redeploy.
+
 ## Environment (Vercel, production)
 
 | Variable | What |
@@ -138,6 +249,7 @@ one of the studio's own source names ("99acres"), up to the thirty-name limit.
 | `META_APP_SECRET` | The Meta app's secret, for `X-Hub-Signature-256`. Without it nothing from Meta is landed (each lead is recorded FAILED). |
 | `META_VERIFY_TOKEN` | Any long random string; the same value is typed into the Meta app's webhook setup. |
 | `STUDIO_META_PAGE_TOKENS` | JSON: `{ "<pageId>": "<page access token>" }`, or `{ "<pageId>": { "token": "<token>", "studio": "<studio slug>" } }` to tie a Page to one studio (recommended: a studio that adds a Page id first cannot then receive another studio's leads). |
+| `STUDIO_META_CAPI` | JSON, per studio slug: `{ "<slug>": { "datasetId": "<digits>", "token": "<Conversions API token>", "testEventCode": "<optional>" } }`. Missing or unreadable: Meta conversion feedback says "not set up" and sends nothing. |
 | `STUDIO_HOST` | Already set; the addresses shown on Settings are built from it. |
 
 Never commit or paste a token anywhere but Vercel's environment settings.
@@ -186,7 +298,11 @@ which portal closes.
 
 ## Not verified
 
-Nothing here has called Meta or Google. The Graph fetch, the signature and the
+Nothing here has called Meta or Google. The Conversions API payload follows
+Meta's conversion-leads documentation and AxLeads' `lib/meta/capi.ts`
+(pinned in tests/studio-capi.test.ts with a fake fetch); routing and the
+"By campaign" fold are unit-tested; none of it has run against a database yet
+(migration `20261022100000_lead_routing_attribution`, not applied). The Graph fetch, the signature and the
 Google format follow Meta's and Google's documentation and AxLeads' live code;
 the parsing and the rules are unit-tested (`tests/studio-intake.test.ts`). The
 first real lead of each kind should be watched on Settings.

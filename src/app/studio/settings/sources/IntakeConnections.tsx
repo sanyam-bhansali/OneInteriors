@@ -11,7 +11,10 @@ import {
   rotateKeyAction,
   setConnectionEnabledAction,
 } from './intake-actions';
-import { Said } from '../../SalesUi';
+import { Said, useAct } from '../../SalesUi';
+import type { RoutingPerson } from '@/modules/studio-sales/settings';
+import type { LeadRouteModeName } from '@/modules/studio-sales/lead-routing';
+import { saveConnectionRoutingAction } from './routing-actions';
 import { useRouter } from 'next/navigation';
 
 /**
@@ -88,7 +91,7 @@ function Copyable({ value, label }: { value: string; label: string }) {
   );
 }
 
-export function IntakeConnections({ screen }: { screen: IntakeScreen }) {
+export function IntakeConnections({ screen, people = [] }: { screen: IntakeScreen; people?: RoutingPerson[] }) {
   const [kind, setKind] = useState<ConnectionKindName>('META_PAGE');
   const [label, setLabel] = useState('');
   const [pageId, setPageId] = useState('');
@@ -109,7 +112,7 @@ export function IntakeConnections({ screen }: { screen: IntakeScreen }) {
       <div>
         <h2 className="m-0 text-[16px] font-semibold">Leads that come in by themselves</h2>
         <p className="m-0 mt-1 text-[13.5px] leading-relaxed muted">
-          Connect your Facebook and Instagram lead ads, Google lead forms, your website and portals. Each lead lands in your pool with a callback due today, and the owner and project managers are told. Someone already on your board who enquires again gets a line on their timeline, not a second card.
+          Connect your Facebook and Instagram lead ads, Google lead forms, your website and portals. Each lead lands with a callback due today, in the pool or with whoever &ldquo;New leads go to&rdquo; says (above; each source can have its own), and the owner and project managers are told. Someone already on your board who enquires again gets a line on their timeline, not a second card.
         </p>
       </div>
 
@@ -164,7 +167,7 @@ export function IntakeConnections({ screen }: { screen: IntakeScreen }) {
       ) : (
         <ul className="m-0 flex list-none flex-col gap-3 p-0">
           {screen.connections.map((c) => (
-            <ConnectionCard key={c.id} c={c} screen={screen} />
+            <ConnectionCard key={c.id} c={c} screen={screen} people={people} />
           ))}
         </ul>
       )}
@@ -195,7 +198,7 @@ const STATUS_WORDS: Record<string, string> = {
   RECEIVED: 'Being taken…',
 };
 
-function ConnectionCard({ c, screen }: { c: ConnectionRow; screen: IntakeScreen }) {
+function ConnectionCard({ c, screen, people }: { c: ConnectionRow; screen: IntakeScreen; people: RoutingPerson[] }) {
   const [sure, setSure] = useState(false);
   const [fresh, setFresh] = useState<string | null>(null);
   const { pending, result, run } = useIntakeAct();
@@ -218,6 +221,8 @@ function ConnectionCard({ c, screen }: { c: ConnectionRow; screen: IntakeScreen 
       )}
 
       {fresh ? <FreshKey secret={fresh} label={c.label} onDone={() => setFresh(null)} /> : null}
+
+      {people.length > 0 ? <RouteOverride c={c} people={people} /> : null}
 
       <details>
         <summary className="cursor-pointer text-[13px]">How to set it up</summary>
@@ -277,7 +282,45 @@ function ConnectionCard({ c, screen }: { c: ConnectionRow; screen: IntakeScreen 
   );
 }
 
-const FIELDS_LINE = 'name (or full_name), phone (or mobile, phone_number), email, city, locality (or area), society (or project), bhk, budget, message, source, utm_campaign, and id (your own lead id, so a resend never makes a second lead). Any other field is kept in the lead’s notes.';
+/**
+ * "Its leads go to" for one door (owner, 22 Oct 2026): the studio's rule, the
+ * pool, take turns (the studio's list), or one person. Saved as it is picked.
+ */
+function RouteOverride({ c, people }: { c: ConnectionRow; people: RoutingPerson[] }) {
+  const current = c.routeMode === 'PERSON' && c.routeMemberId ? `PERSON:${c.routeMemberId}` : (c.routeMode ?? '');
+  const [value, setValue] = useState(current);
+  const { pending, result, run } = useAct();
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
+      <span className="muted">Its leads go to</span>
+      <select
+        aria-label={`Where leads from ${c.label} go`}
+        value={value}
+        disabled={pending}
+        className="fld w-auto"
+        onChange={(e) => {
+          const v = e.target.value;
+          setValue(v);
+          const [mode, personId] = v.startsWith('PERSON:') ? ['PERSON', v.slice(7)] : [v as LeadRouteModeName | '', ''];
+          run(() => saveConnectionRoutingAction(c.id, mode, personId));
+        }}
+      >
+        <option value="">Same as new leads (above)</option>
+        <option value="POOL">The pool</option>
+        <option value="TURNS">Take turns (the list above)</option>
+        {people.map((p) => (
+          <option key={p.id} value={`PERSON:${p.id}`} disabled={!p.canTake}>
+            {p.name}
+            {p.canTake ? '' : ' — cannot take leads now'}
+          </option>
+        ))}
+      </select>
+      <Said result={result} />
+    </div>
+  );
+}
+
+const FIELDS_LINE = 'name (or full_name), phone (or mobile, phone_number), email, city, locality (or area), society (or project), bhk, budget, message, source, utm_source, utm_medium, utm_campaign, utm_term, utm_content, gclid, fbclid, and id (your own lead id, so a resend never makes a second lead). Any other field is kept in the lead’s notes.';
 
 function SetupHelp({ c, screen }: { c: ConnectionRow; screen: IntakeScreen }) {
   if (c.kind === 'META_PAGE') {

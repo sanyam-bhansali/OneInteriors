@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { mayOpen } from '@/modules/studio/surfaces';
+import { can } from '@/modules/studio/roles';
 import { LineIcon } from '../ui/icons';
 import './clients.css';
 import { myStages } from '@/modules/studio-practice/stages';
@@ -95,6 +96,8 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   const boardStages = boardColumnPlan(stageList, filters.stage).shown;
 
   const mayImport = mayOpen(scope.member, '/studio/clients/import');
+  /* Download the list (improvement 8, owner 22 Oct 2026): the owner only, with these filters and this sort; audited in lead-export.ts. */
+  const mayExport = can(scope.member, 'lead.export') && !poolView;
   const title = poolView ? 'The pool' : seesAll ? 'Clients' : 'My leads';
   const sub = poolView
     ? 'Leads nobody has yet. Claim one and it is yours.'
@@ -117,6 +120,11 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
             <Link href={poolView ? '/studio/clients' : '/studio/clients/pool'} className="btn sec">
               {poolView ? 'Back to my leads' : 'The pool, claim leads'}
             </Link>
+          ) : null}
+          {mayExport ? (
+            <a href={`/api/studio/leads/export${listQuery ? `?${listQuery}` : ''}`} className="btn sec" download title="Download these leads, with the filters and sort you have on, as a CSV file for Excel">
+              Export CSV
+            </a>
           ) : null}
           {mayImport ? (
             <Link href="/studio/clients/import" className="btn sec">

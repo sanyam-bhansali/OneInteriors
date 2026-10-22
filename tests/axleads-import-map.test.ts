@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  adAttributionFor,
   formatReport,
   mapLostReason,
   mapSource,
@@ -210,7 +211,22 @@ describe('leads', () => {
     // The studio's own field, and the new ones from the workspace's field list.
     expect(l.client.fields).toEqual({ possession: 'Ready', area_sqft: '950' });
     expect(l.client.notes).toMatch(/score 70 \(hot\)/);
-    expect(l.client.notes).toMatch(/campaign test-campaign-1 · ad set test-adset-1 · ad test-ad-1/);
+    /* The ad is in the attribution columns now (22 Oct 2026), not the notes. */
+    expect(l.client.notes).not.toMatch(/test-campaign-1|test-adset-1|test-ad-1|test-meta-form-1|UTM/);
+    expect(l.client.ads).toEqual({
+      adPlatform: 'instagram',
+      /* The fake export's leadgen id is not Meta's digits, so it is not kept as one. */
+      leadgenId: null,
+      campaignId: 'test-campaign-1',
+      campaignName: null,
+      adsetId: 'test-adset-1',
+      adsetName: null,
+      adId: 'test-ad-1',
+      adName: null,
+      formId: 'test-meta-form-1',
+      gclid: null,
+      utm: null,
+    });
     expect(l.client.notes).toMatch(/when do you want to start: Next month/);
     expect(l.client.notes).toMatch(/Budget ₹8,00,000 – ₹12,00,000/);
     expect(l.client.notes).toMatch(/Open follow-ups: Send portfolio/);
@@ -250,6 +266,8 @@ describe('leads', () => {
       expect.stringMatching(/^Imported from AxLeads and merged into this card/),
     ]);
     expect(created(plan, 1).client.notes).toMatch(/Merged from AxLeads: Test Lead 3/);
+    /* Lead 3 had no ad, so the card keeps lead 1's. */
+    expect(created(plan, 1).client.ads?.campaignId).toBe('test-campaign-1');
     expect(plan.report.eventsSkipped.messageDuplicates).toBe(1);
   });
 
@@ -262,6 +280,39 @@ describe('leads', () => {
     expect(four.client.notes).toMatch(/Was with Test Agent B on AxLeads/);
     expect(four.client.notes).toMatch(/Carpet area: about 900 \(did not fit the field\)/);
     expect(four.events.map((e) => e.kind)).toContain('BINNED');
+  });
+
+  it('ad attribution: Google, WhatsApp ads, nothing, and a real Meta lead (22 Oct 2026)', () => {
+    expect(created(plan, 2).client.ads).toMatchObject({ adPlatform: 'google', gclid: 'test-gclid-2', utm: { utm_source: 'google' }, leadgenId: null });
+    expect(created(plan, 2).client.notes ?? '').not.toMatch(/gclid|UTM/);
+    expect(created(plan, 7).client.ads).toMatchObject({ adPlatform: 'facebook', adId: 'test-ad-7' });
+    expect(created(plan, 5).client.ads).toBeNull();
+    const meta = adAttributionFor({
+      source: 'META_LEAD_AD',
+      sourceDetail: { platform: 'fb', raw: { campaign_name: 'Oct kitchens', adset_name: 'PW Pune', ad_name: 'Reel 2' } },
+      leadgenId: '1234567890123456',
+      gclid: null,
+      campaignId: '120200000000000001',
+      adsetId: '120200000000000002',
+      adId: '120200000000000003',
+      formId: '555',
+      utm: {},
+    });
+    expect(meta).toEqual({
+      adPlatform: 'facebook',
+      leadgenId: '1234567890123456',
+      campaignId: '120200000000000001',
+      campaignName: 'Oct kitchens',
+      adsetId: '120200000000000002',
+      adsetName: 'PW Pune',
+      adId: '120200000000000003',
+      adName: 'Reel 2',
+      formId: '555',
+      gclid: null,
+      utm: null,
+    });
+    /* A leadgen id on anything but a Meta lead ad is not one. */
+    expect(adAttributionFor({ source: 'MANUAL', sourceDetail: null, leadgenId: '1234567890123456', gclid: null, campaignId: null, adsetId: null, adId: null, formId: null, utm: null })).toBeNull();
   });
 
   it('a lead with a leaver goes to the pool, and the AxLeads form is named', () => {
@@ -286,6 +337,15 @@ describe('leads', () => {
     expect(one.fill.locality).toBeUndefined();
     expect(one.fill.assignee).toEqual({ kind: 'new', axUserId: '00000000-0000-4000-8002-000000000002' });
     expect(three.fill.assignee).toBeUndefined();
+    /* The card had no ad: it takes lead 1's into its columns, and says nothing of it in the merge note. */
+    expect(one.fill.ads).toMatchObject({ campaignId: 'test-campaign-1', adPlatform: 'instagram' });
+    expect(one.fill.notes ?? '').not.toMatch(/Ad: /);
+    const attributed = planImport(fresh(), ctx({ existingByPhone: new Map([['9000000101', { ...existing, attributed: true }]]) }), choices(), { now: NOW });
+    const kept = lead(attributed, 1);
+    if (kept.action !== 'merge-existing') throw new Error();
+    /* A card with its own ad keeps it; the merged lead's is listed in the merge note. */
+    expect(kept.fill.ads).toBeUndefined();
+    expect(kept.fill.notes).toMatch(/Ad: campaign test-campaign-1 · ad set test-adset-1 · ad test-ad-1 · form test-meta-form-1/);
     // The second merge's notes carry the first's.
     expect(three.fill.notes).toMatch(/^Their own note\n\nMerged from AxLeads: Test Lead 1[\s\S]*Merged from AxLeads: Test Lead 3/);
     expect(p.report.mergeExisting).toBe(2);

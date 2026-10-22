@@ -47,6 +47,7 @@ import { consume, bucketFor, type Limit } from '@/modules/rate-limit/store';
 import { landLead, leadSourceIdFor } from '@/modules/studio-practice/land';
 import { fallbackExternalId, secretMatches, verifyMetaSignature } from './secrets';
 import {
+  adColumns,
   attributionFor,
   graphError,
   graphLeadUrl,
@@ -224,6 +225,8 @@ async function landClaimed(door: Door, eventId: string, incoming: IncomingLead):
       how: where.how,
       createdSummary: `Came in through ${where.how}`,
       againSummary: `Came in again through ${where.how}${said}`,
+      connectionId: door.id,
+      ads: adColumns(incoming.ads),
     });
     if (landed.kind === 'no-stage') return fail('Your board has no columns to put the lead in.');
     await settle(eventId, landed.kind === 'created' ? 'LANDED' : 'DUPLICATE', { clientId: landed.clientId });

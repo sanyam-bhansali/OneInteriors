@@ -22,6 +22,7 @@ import { Avatar, Dot, Modal, PillCold, PillDue, PillToday, StageBadge, TagChips,
 import { LostReasonDialog } from './AxBoard';
 import { BulkBar, ClaimOne } from './LeadList';
 import { RowCall, type CallLogged, type CallSheetStage } from './CallLogger';
+import { leadHrefIn, listViewContext } from '@/modules/studio-sales/lead-context';
 import { moveLeadAction, viewPageAction } from './list-actions';
 import { addNoteAction } from '../sales-actions';
 
@@ -262,7 +263,8 @@ export function AxList({
                 const cold = !now || fresh ? null : coldLabel(l, now);
                 const due = !now || l.flags.closed ? null : dueBadge(l.nextActionOn, now);
                 const ticked = matching !== false || picked.has(l.id);
-                const href = `/studio/clients/${l.id}`;
+                /* The list rides along, for "Next lead →" on the lead page (improvement 8, owner 22 Oct 2026). */
+                const href = leadHrefIn(l.id, listViewContext(query));
                 const open = () => (poolView ? undefined : router.push(href));
                 return (
                   <tr

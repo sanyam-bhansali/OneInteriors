@@ -14,10 +14,15 @@
  *
  * - **Nothing is lost.** Every lead comes over with its stage, owner, notes
  *   and every history line at its original time. What has no column here
- *   (score, campaign / ad / form ids, utm, form answers that are not one of
- *   the studio's fields, follow-ups, a phone that is not a mobile) goes into
- *   a "From AxLeads" block in the lead's notes. The export file itself is the
- *   full archive.
+ *   (score, form answers that are not one of the studio's fields,
+ *   follow-ups, a phone that is not a mobile) goes into a "From AxLeads"
+ *   block in the lead's notes. The export file itself is the full archive.
+ * - **Ad attribution** (owner, 22 Oct 2026): the leadgen, campaign, ad set,
+ *   ad and form ids, gclid and utm land in the lead's attribution columns
+ *   (`adAttributionFor`), not the notes, so lead analytics counts them "By
+ *   campaign" and a Meta lead can be reported to Meta. A merge into a card
+ *   that already has an ad keeps the card's and lists the merged lead's ad
+ *   in its merge note.
  * - **Stages** map by name first (spacing and case ignored) when the meaning
  *   agrees — a lost lead lands only in a Lost-kind column, a won one only in a
  *   Signed or Finished one — then by meaning (intake → the intake column, won
@@ -57,6 +62,7 @@ import { fieldKeyFrom, SOURCE_LABELS, type ClientSourceName, type FieldTypeName,
 import { cleanValues, type FieldShape } from '@/modules/studio-practice/field-values';
 import { addTags } from '@/modules/studio-sales/tag-rules';
 import { STUDIO_ROLES, type StudioRoleName } from '@/modules/studio/roles';
+import { adColumns, emptyAds, platformWord, UTM_KEYS, type AdColumns } from '@/modules/studio-intake/payloads';
 
 export const IMPORTED_FROM = 'axleads';
 export const EXPORT_FORMAT = 'axleads-export';
@@ -312,6 +318,8 @@ export interface ExistingClient {
   tags: string[];
   /** Set while planning, once a merge has given it a person. */
   assignedNew?: boolean;
+  /** It already has an ad (leadgen, campaign or gclid): a merge does not replace it. */
+  attributed?: boolean;
 }
 
 export interface StudioContext {
@@ -646,6 +654,8 @@ export interface ClientPlan {
   tags: string[];
   createdAt: Date;
   deletedAt: Date | null;
+  /** The ad columns (22 Oct 2026), or null when AxLeads knew no ad. */
+  ads: AdColumns | null;
 }
 
 export type LeadPlan =
@@ -848,6 +858,11 @@ export function planImport(ax: AxExport, ctx: StudioContext, choices: Choices, o
         fill.assignee = built.client.assignee;
         c.assignedNew = true;
       }
+      if (!c.attributed && built.client.ads) {
+        fill.ads = built.client.ads;
+        c.attributed = true;
+        built.adsTaken = true;
+      }
       const tags = addTags(c.tags, built.client.tags).tags;
       if (tags.length !== c.tags.length) c.tags = fill.tags = tags;
       c.notes = fill.notes = joinNotes(c.notes, mergedBlock(lead, built));
@@ -860,6 +875,10 @@ export function planImport(ax: AxExport, ctx: StudioContext, choices: Choices, o
     }
     if (card?.kind === 'file') {
       const target = card.plan.client;
+      if (!target.ads && built.client.ads) {
+        target.ads = built.client.ads;
+        built.adsTaken = true;
+      }
       target.notes = joinNotes(target.notes, mergedBlock(lead, built));
       target.tags = addTags(target.tags, built.client.tags).tags;
       for (const k of ['email', 'locality', 'society', 'config'] as const) if (!target[k] && built.client[k]) target[k] = built.client[k];
@@ -928,6 +947,8 @@ interface Built {
   phoneNotMobile: boolean;
   scoreUpdates: number;
   messageStubs: number;
+  /** Set by a merge when the card took this lead's ad into its columns. */
+  adsTaken?: boolean;
 }
 
 interface BuildCtx {
@@ -1022,17 +1043,8 @@ function buildLead(lead: AxLead, b: BuildCtx): Built {
   if (lead.timelineText) meta.push(`timeline: ${lead.timelineText}`);
   if (lead.requirements.length) meta.push(`requirements: ${lead.requirements.join(', ')}`);
   if (meta.length) extra.push(meta.join(' · '));
-  const ids = [
-    lead.campaignId && `campaign ${lead.campaignId}`,
-    lead.adsetId && `ad set ${lead.adsetId}`,
-    lead.adId && `ad ${lead.adId}`,
-    lead.formId && `form ${lead.formId}`,
-    lead.leadgenId && `lead id ${lead.leadgenId}`,
-    lead.gclid && `gclid ${lead.gclid}`,
-  ].filter(Boolean);
-  if (ids.length) extra.push(`Ad: ${ids.join(' · ')}`);
-  const utm = text(lead.utm);
-  if (utm && utm !== '{}') extra.push(`UTM: ${utm}`);
+  /* The ad ids and utm are columns now (22 Oct 2026), not lines here. */
+  const ads = adAttributionFor(lead);
   if (lead.referredBy) extra.push(`Referred by ${lead.referredBy}`);
   if (lead.sourceDetail && typeof lead.sourceDetail.firstMessage === 'string' && lead.sourceDetail.firstMessage.trim()) extra.push(`First WhatsApp message: ${clip(lead.sourceDetail.firstMessage.trim(), 300)}`);
   if (answers.length) extra.push(`Form answers — ${answers.join('; ')}`);
@@ -1081,6 +1093,7 @@ function buildLead(lead: AxLead, b: BuildCtx): Built {
       lastContactedAt: lastCall,
       tags: tagsIn.tags,
       createdAt: new Date(lead.createdAt),
+      ads,
       /* The bin erases after thirty days from deletedAt. Keeping AxLeads'
          date would let the purge erase a lead the moment it arrived, so the
          clock starts at the import; the old date is in the notes. */
@@ -1273,9 +1286,70 @@ function mergeLine(lead: AxLead, client: ClientPlan, into: string, now: Date): E
   };
 }
 
+/** One line naming an ad, for a merge note: "Ad: campaign … · ad set … · lead id …". */
+function adLine(a: AdColumns): string | null {
+  const ids = [
+    a.campaignName ? `campaign ${a.campaignName}` : a.campaignId && `campaign ${a.campaignId}`,
+    a.adsetId && `ad set ${a.adsetId}`,
+    a.adId && `ad ${a.adId}`,
+    a.formId && `form ${a.formId}`,
+    a.leadgenId && `lead id ${a.leadgenId}`,
+    a.gclid && `gclid ${a.gclid}`,
+  ].filter(Boolean);
+  return ids.length ? `Ad: ${ids.join(' · ')}` : null;
+}
+
+/**
+ * An AxLeads lead's ad, as our attribution columns (owner, 22 Oct 2026).
+ * The ids AxLeads kept on the lead; names, when its Meta lead (sourceDetail)
+ * carried them; the platform from the source (Meta lead ad: Facebook or
+ * Instagram; Google lead form or a gclid: Google; click-to-WhatsApp ads:
+ * Facebook) or utm_source. `leadgenId` only for a Meta lead ad, and only when
+ * it is Meta's digits. Null when there is nothing.
+ */
+export function adAttributionFor(lead: Pick<AxLead, 'source' | 'sourceDetail' | 'leadgenId' | 'gclid' | 'campaignId' | 'adsetId' | 'adId' | 'formId' | 'utm'>): AdColumns | null {
+  const detail = isObj(lead.sourceDetail) ? lead.sourceDetail : {};
+  const raw = isObj(detail.raw) ? detail.raw : {};
+  const pick = (...keys: string[]): string | null => {
+    for (const where of [detail, raw]) for (const k of keys) if (typeof where[k] === 'string' && (where[k] as string).trim()) return (where[k] as string).trim();
+    return null;
+  };
+  const utmIn = isObj(lead.utm) ? lead.utm : {};
+  const utm: Record<string, string> = {};
+  for (const k of UTM_KEYS) if (typeof utmIn[k] === 'string' && (utmIn[k] as string).trim()) utm[k] = (utmIn[k] as string).trim();
+  const platform =
+    lead.source === 'META_LEAD_AD'
+      ? instagramHint(lead.sourceDetail) ? 'instagram' : 'facebook'
+      : lead.source === 'GOOGLE_LEAD_FORM' || lead.gclid
+        ? 'google'
+        : lead.source === 'WHATSAPP_ADS'
+          ? 'facebook'
+          : platformWord(utm.utm_source ?? null);
+  const cols = adColumns({
+    ...emptyAds(),
+    adPlatform: platform,
+    leadgenId: lead.source === 'META_LEAD_AD' ? lead.leadgenId : null,
+    campaignId: lead.campaignId,
+    campaignName: pick('campaign_name', 'campaignName') ?? utm.utm_campaign ?? null,
+    adsetId: lead.adsetId,
+    adsetName: pick('adset_name', 'adsetName'),
+    adId: lead.adId,
+    adName: pick('ad_name', 'adName'),
+    formId: lead.formId,
+    gclid: lead.gclid,
+    utm,
+  });
+  /* A platform alone (a typed-in lead's source) is not an ad. */
+  const anyAd = (Object.keys(cols) as (keyof AdColumns)[]).some((k) => k !== 'adPlatform' && cols[k] !== null);
+  return anyAd ? cols : null;
+}
+
 function mergedBlock(lead: AxLead, built: Built): string {
   const head = `Merged from AxLeads: ${built.client.name}, ${built.stage.axName}, came in ${day(lead.createdAt)} (${built.client.sourceNote})`;
   const lines = [...built.extra.filter((l) => !l.startsWith('Stage on AxLeads'))];
+  /* The card keeps its own ad in its columns; this lead's, when it had a different one, is kept here. */
+  const ad = built.client.ads && !built.adsTaken ? adLine(built.client.ads) : null;
+  if (ad) lines.push(ad);
   if (built.client.email) lines.unshift(`Email: ${built.client.email}`);
   return [head, ...lines.map((l) => `• ${l}`)].join('\n');
 }

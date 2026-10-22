@@ -151,6 +151,8 @@ export type StudioAction =
   | 'lead.delete'
   /** Import a spreadsheet of leads. */
   | 'lead.import'
+  /** Download the leads list as a spreadsheet (improvement 8, owner 22 Oct 2026): the owner's alone — 26,000 phone numbers is the studio's whole business walking out of the door, so no other role is granted it. */
+  | 'lead.export'
   /** See the pool: leads nobody has. */
   | 'lead.pool'
   /** Take a lead nobody has (the pool) for yourself. SALES too (owner, 12 Oct 2026, after AxLeads); only ever an unassigned lead — the write checks. */
@@ -221,6 +223,7 @@ export const STUDIO_ACTIONS: readonly StudioAction[] = [
   'lead.merge',
   'lead.delete',
   'lead.import',
+  'lead.export',
   'lead.pool',
   'lead.claim',
   'quote.write',

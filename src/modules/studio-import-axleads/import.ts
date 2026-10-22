@@ -22,6 +22,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { normalisePhone } from '@/modules/studio/phone';
 import { normalisePhone as clientPhone } from '@/modules/studio-practice/csv';
+import type { AdColumns } from '@/modules/studio-intake/payloads';
 import { IMPORTED_FROM, markerId, planImport, type AxExport, type Choices, type ClientPlan, type EventPlan, type ExistingClient, type LeadPlan, type MemberPlan, type PersonRef, type Plan, type StudioContext, type UserRef } from './map';
 
 const BATCH = 200;
@@ -39,6 +40,16 @@ export interface ImportOutcome {
     backfilled: number;
     events: number;
   };
+}
+
+/** The ad columns (22 Oct 2026) as Prisma data: only what AxLeads knew, `utm` as JSON. */
+function adData(a: AdColumns | null): Partial<Record<Exclude<keyof AdColumns, 'utm'>, string>> & { utm?: Prisma.InputJsonValue } {
+  if (!a) return {};
+  const { utm, ...rest } = a;
+  const out: Partial<Record<Exclude<keyof AdColumns, 'utm'>, string>> & { utm?: Prisma.InputJsonValue } = {};
+  for (const [k, v] of Object.entries(rest) as [Exclude<keyof AdColumns, 'utm'>, string | null][]) if (v !== null) out[k] = v;
+  if (utm) out.utm = utm;
+  return out;
 }
 
 function chunks<T>(rows: readonly T[], n: number): T[][] {
@@ -72,11 +83,13 @@ export async function loadContext(db: PrismaClient, studioId: string, ax: AxExpo
     const rows = await db.studioClient.findMany({
       where: { studioId, phone: { in: part }, deletedAt: null, isDemo: false },
       orderBy: { createdAt: 'asc' },
-      select: { id: true, name: true, phone: true, assignedToId: true, email: true, locality: true, society: true, config: true, carpetSqft: true, budgetPaise: true, notes: true, tags: true },
+      select: { id: true, name: true, phone: true, assignedToId: true, email: true, locality: true, society: true, config: true, carpetSqft: true, budgetPaise: true, notes: true, tags: true, leadgenId: true, campaignId: true, gclid: true, adPlatform: true },
     });
     for (const r of rows) {
       if (!r.phone || existingByPhone.has(r.phone)) continue;
-      existingByPhone.set(r.phone, { ...r, budgetPaise: r.budgetPaise === null ? null : Number(r.budgetPaise) });
+      const { leadgenId, campaignId, gclid, adPlatform, ...rest } = r;
+      /* A card that already has an ad keeps it: a merge does not replace it (22 Oct 2026). */
+      existingByPhone.set(r.phone, { ...rest, budgetPaise: r.budgetPaise === null ? null : Number(r.budgetPaise), attributed: Boolean(leadgenId || campaignId || gclid || adPlatform) });
     }
   }
 
@@ -214,6 +227,7 @@ export async function runImport(db: PrismaClient, input: { studioId: string; ax:
     deletedAt: c.deletedAt,
     importedFrom: IMPORTED_FROM,
     externalId: axId,
+    ...adData(c.ads),
   });
 
   // 3. New cards, with their history.
@@ -263,6 +277,7 @@ export async function runImport(db: PrismaClient, input: { studioId: string; ax:
                 ...(assignedToId ? { assignedToId } : {}),
                 ...(f.tags ? { tags: f.tags } : {}),
                 ...(f.notes !== undefined ? { notes: f.notes } : {}),
+                ...adData(f.ads ?? null),
               },
             });
           }

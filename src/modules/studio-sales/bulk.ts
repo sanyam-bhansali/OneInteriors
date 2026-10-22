@@ -26,6 +26,7 @@ import { meetingLabel, parseMeeting } from './lead-rules';
 import { BULK_CHUNK, BULK_MAX, bulkFence, chunks, mayBulk, readLimit, splitEvenly, splitSentence, type BulkAction } from './bulk-rules';
 import { parseLeadFilters, parseSort, type LeadFilters } from './lead-filters';
 import { orderByFor, scopedLeadWhere } from './lead-where';
+import { queueConversions } from './conversions';
 
 /** Ticked ids, or everything the filters show (optionally only the first `limit`). */
 export type BulkTarget = { ids: string[] } | { query: string; limit?: number | null };
@@ -240,6 +241,8 @@ export async function bulkMove(target: BulkTarget, stageId: string, lostReason: 
         })),
         { by },
       );
+      /* Meta conversion feedback (22 Oct 2026): one queue call per batch; inert unless switched on. */
+      await queueConversions(scope.studioId, before.map((b) => ({ clientId: b.id, toStageId: stage.id })));
     }
     return { ok: true, message: `Done. ${plural(done, 'lead')} moved to ${stage.name}.` };
   } catch (error) {

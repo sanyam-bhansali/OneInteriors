@@ -21,6 +21,7 @@ import { can } from '@/modules/studio/roles';
 import { hashSecret, newSecret } from './secrets';
 import { isMetaId, type ConnectionKindName, type IntakeStatusName } from './payloads';
 import { retryMetaEvent } from './intake';
+import type { LeadRouteModeName } from '@/modules/studio-sales/lead-routing';
 
 export const CONNECTION_KINDS: readonly ConnectionKindName[] = ['WEBSITE', 'GOOGLE_LEAD_FORM', 'PORTAL', 'META_PAGE'];
 
@@ -44,6 +45,9 @@ export interface ConnectionRow {
   label: string;
   enabled: boolean;
   metaPageId: string | null;
+  /** "New leads go to" for this door (22 Oct 2026): null follows the studio. */
+  routeMode: LeadRouteModeName | null;
+  routeMemberId: string | null;
   /** Where the sender posts. */
   url: string;
   lastEventAt: string | null;
@@ -100,6 +104,8 @@ export async function myIntakeScreen(): Promise<IntakeScreen | null> {
         label: true,
         enabled: true,
         metaPageId: true,
+        routeMode: true,
+        routeMemberId: true,
         lastEventAt: true,
         eventCount: true,
         events: {
@@ -120,6 +126,8 @@ export async function myIntakeScreen(): Promise<IntakeScreen | null> {
         label: r.label,
         enabled: r.enabled,
         metaPageId: r.metaPageId,
+        routeMode: r.routeMode,
+        routeMemberId: r.routeMemberId,
         url: doorUrl(r.kind, r.id),
         lastEventAt: r.lastEventAt?.toISOString() ?? null,
         lastEventLabel: r.lastEventAt ? when(r.lastEventAt) : null,

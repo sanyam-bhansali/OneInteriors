@@ -8,6 +8,8 @@ import { setTaskDoneAction } from '../tasks-actions';
 import { bulkClaimAction } from '../clients/list-actions';
 import type { Done } from '../sales-types';
 import { RowCall, type CallSheetStage } from '../clients/CallLogger';
+/* "Next lead →" from Today walks the leads list's Today card (improvement 8, owner 22 Oct 2026). */
+import { TODAY_CONTEXT, leadHrefIn } from '@/modules/studio-sales/lead-context';
 import { Said, useAct } from '../SalesUi';
 import '../office-ui.css';
 import './today.css';
@@ -171,7 +173,7 @@ function Row({ row, kind, members, meId, on, flip, stages }: { row: TodayRow; ki
       <div className="tbody">
         <span className="kind">{kind}</span>
         {row.leadId ? (
-          <Link href={`/studio/clients/${row.leadId}`} className="ttl">
+          <Link href={leadHrefIn(row.leadId, TODAY_CONTEXT)} className="ttl">
             {row.title}
           </Link>
         ) : (
@@ -185,7 +187,7 @@ function Row({ row, kind, members, meId, on, flip, stages }: { row: TodayRow; ki
           <AssignOne leadId={row.leadId} members={members} meId={meId} />
         ) : task ? (
           row.leadId ? (
-            <Link href={`/studio/clients/${row.leadId}`} className="btn ghost sm">
+            <Link href={leadHrefIn(row.leadId, TODAY_CONTEXT)} className="btn ghost sm">
               Open
             </Link>
           ) : null

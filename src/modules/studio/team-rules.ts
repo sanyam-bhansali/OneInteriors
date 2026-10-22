@@ -64,6 +64,7 @@ const ACTION_LABELS: Record<StudioAction, string> = {
   'lead.merge': 'Merge duplicate leads',
   'lead.delete': 'Delete leads',
   'lead.import': 'Import a list of leads',
+  'lead.export': 'Download the leads list',
   'lead.pool': 'See leads nobody has',
   'lead.claim': 'Claim a lead from the pool',
   'quote.write': 'Write and send quotations',

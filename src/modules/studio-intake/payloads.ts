@@ -54,6 +54,92 @@ export interface IncomingLead {
   externalId: string | null;
   platform: 'FACEBOOK' | 'INSTAGRAM' | null;
   isTest: boolean;
+  /** The ad behind it, for the StudioClient attribution columns (22 Oct 2026). */
+  ads: AdAttribution;
+}
+
+/**
+ * Which ad a lead came from, as columns (owner, 22 Oct 2026): the campaign,
+ * ad set, ad and form, by id and by name when the sender gives them, the
+ * click ids, and the utm words. `sourceNote` keeps the human line; these are
+ * what lead analytics counts "By campaign" and what the Conversions API
+ * needs (`leadgenId`, Meta only).
+ */
+export interface AdAttribution {
+  /** facebook, instagram, google, or what utm_source said (lower case). */
+  adPlatform: string | null;
+  /** Meta's leadgen id. Never set from anything but a Meta lead. */
+  leadgenId: string | null;
+  campaignId: string | null;
+  campaignName: string | null;
+  adsetId: string | null;
+  adsetName: string | null;
+  adId: string | null;
+  adName: string | null;
+  formId: string | null;
+  gclid: string | null;
+  /** utm_source, utm_medium, utm_campaign, utm_term, utm_content, fbclid. */
+  utm: Record<string, string>;
+}
+
+export function emptyAds(): AdAttribution {
+  return { adPlatform: null, leadgenId: null, campaignId: null, campaignName: null, adsetId: null, adsetName: null, adId: null, adName: null, formId: null, gclid: null, utm: {} };
+}
+
+/** The keys kept in `utm`, in this order. */
+export const UTM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'fbclid'] as const;
+
+/** A platform word as stored: facebook, instagram, google, else the word itself (lower case, short). */
+export function platformWord(raw: string | null | undefined): string | null {
+  const v = raw?.trim().toLowerCase() ?? '';
+  if (!v) return null;
+  if (/^(ig|insta|instagram)/.test(v)) return 'instagram';
+  if (/^(fb|facebook|meta)/.test(v)) return 'facebook';
+  if (/^(google|adwords|gads|youtube)/.test(v)) return 'google';
+  return v.replace(/[^a-z0-9._ -]/g, '').slice(0, 30) || null;
+}
+
+/** What goes into the StudioClient columns: every string capped, `utm` null when nothing was sent. */
+export interface AdColumns {
+  adPlatform: string | null;
+  leadgenId: string | null;
+  campaignId: string | null;
+  campaignName: string | null;
+  adsetId: string | null;
+  adsetName: string | null;
+  adId: string | null;
+  adName: string | null;
+  formId: string | null;
+  gclid: string | null;
+  utm: Record<string, string> | null;
+}
+
+export function adColumns(a: AdAttribution): AdColumns {
+  const id = (v: string | null) => (v ? v.trim().slice(0, 64) || null : null);
+  const name = (v: string | null) => (v ? v.replace(/\s+/g, ' ').trim().slice(0, 160) || null : null);
+  const utm: Record<string, string> = {};
+  for (const k of UTM_KEYS) {
+    const v = a.utm[k];
+    if (typeof v === 'string' && v.trim()) utm[k] = v.trim().slice(0, k === 'fbclid' ? 255 : 160);
+  }
+  return {
+    adPlatform: platformWord(a.adPlatform),
+    leadgenId: a.leadgenId && isMetaId(a.leadgenId) ? a.leadgenId : null,
+    campaignId: id(a.campaignId),
+    campaignName: name(a.campaignName),
+    adsetId: id(a.adsetId),
+    adsetName: name(a.adsetName),
+    adId: id(a.adId),
+    adName: name(a.adName),
+    formId: id(a.formId),
+    gclid: a.gclid ? a.gclid.trim().slice(0, 255) || null : null,
+    utm: Object.keys(utm).length > 0 ? utm : null,
+  };
+}
+
+/** Whether there is anything to write. */
+export function hasAds(c: AdColumns): boolean {
+  return Object.values(c).some((v) => v !== null);
 }
 
 export function emptyLead(): IncomingLead {
@@ -73,6 +159,7 @@ export function emptyLead(): IncomingLead {
     externalId: null,
     platform: null,
     isTest: false,
+    ads: emptyAds(),
   };
 }
 
@@ -287,8 +374,22 @@ export function parseGeneric(body: unknown): IncomingLead {
   }
   for (const [k, v] of Object.entries(o).slice(0, 80)) {
     const value = text(v, k === 'message' || slotFor(k) === 'message' ? CAPS.message : 500);
-    if (value) put(lead, k, value, parts);
+    if (!value) continue;
+    /* The ad columns (22 Oct 2026). utm words still go on to `put`, which
+       keeps them in the source note as before; a click id is a column only,
+       never a line in the notes. */
+    const nk = normKey(k);
+    if ((UTM_KEYS as readonly string[]).includes(nk)) lead.ads.utm[nk] ??= value;
+    if (nk === 'gclid' || nk === 'gcl_id') {
+      lead.ads.gclid ??= value;
+      continue;
+    }
+    if (nk === 'fbclid') continue;
+    put(lead, k, value, parts);
   }
+  const u = lead.ads.utm;
+  lead.ads.campaignName = u.utm_campaign ?? null;
+  lead.ads.adPlatform = u.utm_source ? platformWord(u.utm_source) : lead.ads.gclid ? 'google' : u.fbclid ? 'facebook' : null;
   return finishName(lead, parts);
 }
 
@@ -359,6 +460,17 @@ export function parseGoogle(body: unknown): GoogleLeadPayload {
   lead.isTest = o.is_test === true || o.is_test === 'true';
   const leadId = text(o.lead_id, 120) ?? text(o.gcl_id, 120);
   lead.externalId = leadId;
+  /* The ad columns (22 Oct 2026). Google sends ids only, no names; its
+     lead_id is not a Meta leadgen id and never goes there. */
+  lead.ads = {
+    ...emptyAds(),
+    adPlatform: 'google',
+    campaignId: campaign,
+    adsetId: text(o.adgroup_id, 40),
+    adId: text(o.creative_id, 40),
+    formId: form,
+    gclid: text(o.gcl_id, 255),
+  };
   return { googleKey: text(o.google_key, 200), leadId, isTest: lead.isTest, lead: finishName(lead, parts) };
 }
 
@@ -403,7 +515,8 @@ export function parseMetaWebhook(body: unknown): MetaLeadRef[] {
 
 /**
  * A lead as Graph returns it (`GET /{leadgen_id}?fields=created_time,
- * field_data,ad_id,ad_name,adset_name,campaign_name,form_id,platform`):
+ * field_data,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,
+ * form_id,platform`; `graphLeadUrl`):
  * `field_data: [{ name, values: [...] }]`, `platform: "fb" | "ig"`.
  */
 export function parseMetaLead(graph: unknown): IncomingLead {
@@ -430,6 +543,23 @@ export function parseMetaLead(graph: unknown): IncomingLead {
   if (adset) lead.attribution.push(`ad set ${adset}`);
   if (ad) lead.attribution.push(`ad ${ad}`);
   lead.externalId = text(o.id, 40);
+  const metaId = (v: unknown): string | null => {
+    const s = typeof v === 'number' && Number.isSafeInteger(v) ? String(v) : v;
+    return isMetaId(s) ? s : null;
+  };
+  /* The ad columns (22 Oct 2026), from the fields Graph already returned. */
+  lead.ads = {
+    ...emptyAds(),
+    adPlatform: lead.platform === 'INSTAGRAM' ? 'instagram' : 'facebook',
+    leadgenId: metaId(o.id),
+    campaignId: metaId(o.campaign_id),
+    campaignName: campaign,
+    adsetId: metaId(o.adset_id),
+    adsetName: adset,
+    adId: metaId(o.ad_id),
+    adName: ad,
+    formId: metaId(o.form_id),
+  };
   return finishName(lead, parts);
 }
 
@@ -702,7 +832,7 @@ export function parsePageTokens(raw: string | null | undefined): Map<string, Pag
 /** Graph's address for one lead. The token goes in a header, never here. */
 export const GRAPH_VERSION = 'v21.0';
 export function graphLeadUrl(leadgenId: string): string {
-  return `https://graph.facebook.com/${GRAPH_VERSION}/${leadgenId}?fields=created_time,field_data,ad_id,ad_name,adset_name,campaign_name,form_id,platform`;
+  return `https://graph.facebook.com/${GRAPH_VERSION}/${leadgenId}?fields=created_time,field_data,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id,platform`;
 }
 
 /** A Graph error body's message, short and safe to show the owner. */

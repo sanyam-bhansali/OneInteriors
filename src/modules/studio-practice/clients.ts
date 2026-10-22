@@ -51,6 +51,7 @@ import {
 } from './event-copy';
 import { reactionLine, type CallReactionId } from './call-log';
 import { allowedCallMoves } from './call-step-rules';
+import { queueConversions } from '@/modules/studio-sales/conversions';
 
 export interface ClientRow {
   id: string;
@@ -643,6 +644,9 @@ export async function updateClient(input: UpdateClientInput): Promise<Result> {
               : stageSummary(before?.stage.name ?? null, to.name),
           meta: { fromStageId: before?.stageId ?? null, toStageId: to.id, kind },
         });
+        /* Meta conversion feedback (22 Oct 2026): queued, sent after the
+           response, only for a Meta lead-ad lead and only when switched on. */
+        if (before?.stageId !== to.id) await queueConversions(studioId, [{ clientId: input.id, toStageId: to.id }]);
       }
     }
 
@@ -972,6 +976,7 @@ async function logContactAndMove(
     return true;
   });
 
+  if (moved) await queueConversions(studioId, [{ clientId: id, toStageId: to.id }]);
   return moved ? { ok: true } : { ok: false, error: 'Someone moved this lead just now. Nothing was saved; refresh and log the call again.' };
 }
 

@@ -697,6 +697,32 @@ model Studio {
   /// (softwarePlan = MAX) for one release and then retired. Set by ops (audited).
   softwarePlan StudioSoftwarePlan @default(PRO)
 
+  /// "New leads go to" (owner, 22 Oct 2026; studio-sales/lead-routing.ts):
+  /// who gets a lead that arrives by itself (lead intake, the enquiry form).
+  /// POOL is today's behaviour and the default. PERSON gives each one to
+  /// `leadRouteMemberId`; TURNS goes round `leadRouteTurnIds` in order. Never
+  /// a hand-added lead or an import. Member ids are plain text, not
+  /// relations: a member who leaves, is suspended or cannot work leads is
+  /// skipped, and with nobody left the lead falls back to the pool.
+  /// Settings → Lead sources (owner and PM).
+  leadRouteMode     LeadRouteMode @default(POOL)
+  leadRouteMemberId String?
+  leadRouteTurnIds  String[]      @default([])
+  /// How many leads TURNS has handed out. Bumped atomically in the landing
+  /// transaction (UPDATE … SET n = n + 1 RETURNING), so two leads landing in
+  /// the same instant get different turns: the next person is
+  /// `eligible[(n - 1) % eligible.length]`.
+  leadRouteTurn     Int           @default(0)
+
+  /// "Tell Meta which leads turned into customers" (owner, 22 Oct 2026;
+  /// studio-intake/capi-rules.ts): off by default. When on, and the dataset
+  /// and token are set for this studio in STUDIO_META_CAPI (env, never here),
+  /// a Meta lead-ad lead moving into a chosen column sends one Conversions
+  /// API event. `metaCapiStages` is { v: 1, stages: { [stageId]: event | null } };
+  /// a column not named reads its default (WON → ConvertedLead, else none).
+  metaCapiEnabled Boolean @default(false)
+  metaCapiStages  Json?
+
   /// The owner's "Set up your studio" answers (modules/studio/setup-quiz.ts):
   /// { v, status: done | skipped, at, answers }. Null = never asked, so the
   /// owner sees the quiz on their first sign-in after the software opens.
@@ -811,6 +837,8 @@ model Studio {
   /// Lead intake (21 Oct 2026): Meta lead ads, Google lead forms, the
   /// studio's website and portals posting leads straight onto the board.
   studioLeadConnections StudioLeadConnection[]
+  /// Meta Conversions API outbox (22 Oct 2026): one row per lead and event.
+  conversionEvents   StudioConversionEvent[]
   studioStages       StudioStage[]
   studioFields       StudioField[]
   studioProjects     StudioProject[]
@@ -3897,6 +3925,28 @@ model StudioClient {
   importedFrom String?
   externalId   String?
 
+  /// Where an ad lead came from (owner, 22 Oct 2026): columns, not only the
+  /// human `sourceNote`, so lead analytics can count by campaign and Meta can
+  /// be told which lead-ad leads turned into customers. Filled by lead intake
+  /// (Meta from the Graph lead, Google from its webhook, a website or portal
+  /// from utm_* and gclid/fbclid) and the AxLeads import. All optional; a
+  /// hand-added lead has none. `adPlatform` is lower case: facebook,
+  /// instagram, google, or what utm_source said.
+  adPlatform   String?
+  /// Meta's leadgen id. Set only for a Meta lead-ad lead: the one thing that
+  /// makes a Conversions API event about this lead possible.
+  leadgenId    String?
+  campaignId   String?
+  campaignName String?
+  adsetId      String?
+  adsetName    String?
+  adId         String?
+  adName       String?
+  formId       String?
+  gclid        String?
+  /// { utm_source, utm_medium, utm_campaign, utm_term, utm_content, fbclid }, as sent.
+  utm          Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -3905,6 +3955,8 @@ model StudioClient {
   events   StudioClientEvent[]
   files    StudioClientFile[]
   tasks    StudioTask[]
+  /// Conversions API events about this lead. Erased with it.
+  conversionEvents StudioConversionEvent[]
 
   /// Where this row went when somebody merged it into another.
   ///
@@ -3947,6 +3999,8 @@ model StudioClient {
   @@index([stageId])
   /// The AxLeads import (20261021110000_axleads_import): one row per lead there.
   @@unique([studioId, importedFrom, externalId])
+  /// "By campaign" on lead analytics (20261022100000_lead_routing_attribution).
+  @@index([studioId, campaignId])
   @@map("studio_clients")
 }
 
@@ -4341,6 +4395,12 @@ model StudioLeadConnection {
   lastEventAt DateTime?
   eventCount  Int       @default(0)
 
+  /// "New leads go to", for this door only (owner, 22 Oct 2026): null follows
+  /// the studio's rule; POOL keeps its leads in the pool; PERSON gives them to
+  /// `routeMemberId`; TURNS uses the studio's turn list. Plain text member id.
+  routeMode     LeadRouteMode?
+  routeMemberId String?
+
   /// The member who made it (StudioMember id). Plain text, not a relation:
   /// removing somebody from the team must not touch the studio's lead doors.
   createdById String?
@@ -4393,6 +4453,61 @@ model StudioLeadIntakeEvent {
   @@unique([connectionId, externalId])
   @@index([connectionId, createdAt])
   @@map("studio_lead_intake_events")
+}
+
+/// Who gets a lead that arrives by itself (owner, 22 Oct 2026).
+enum LeadRouteMode {
+  /// Nobody: the pool, as before.
+  POOL
+  /// One chosen member.
+  PERSON
+  /// Round the chosen members in turn.
+  TURNS
+}
+
+/// Where one Conversions API event is.
+enum ConversionEventStatus {
+  /// Waiting to be sent (in `after()`, or by the daily retry).
+  QUEUED
+  SENT
+  /// Meta refused it or could not be reached; retried daily, five tries in all.
+  FAILED
+  /// Not sent and never will be: switched off, not set up, or the lead went.
+  SKIPPED
+}
+
+/// One Meta Conversions API event about one lead (owner, 22 Oct 2026;
+/// studio-sales/conversions.ts). Only for a lead with a `leadgenId` (it came
+/// from a Meta lead ad), only when the studio switched it on. Unique on the
+/// lead and the event, so each event is sent at most once per lead however
+/// often the card moves back and forth. No payload is kept: it is rebuilt
+/// from the lead when sent, so no hashed phone or email sits in this table.
+model StudioConversionEvent {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  clientId String
+  client   StudioClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  /// "QualifiedLead", "ConvertedLead", "Contacted".
+  eventName String
+  /// The column the move went into. Plain text: removing a column keeps the row.
+  stageId   String?
+
+  status    ConversionEventStatus @default(QUEUED)
+  attempts  Int                   @default(0)
+  /// Meta's words, short, never a token.
+  lastError String?
+  sentAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clientId, eventName])
+  @@index([studioId, createdAt])
+  @@index([status, updatedAt])
+  @@map("studio_conversion_events")
 }
 
 /// One request against a rate-limited thing.

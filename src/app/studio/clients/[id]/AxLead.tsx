@@ -16,6 +16,7 @@ import { binAction } from '../actions';
 import { addTagsAction, deleteNoteAction, editNoteAction, followUpDoneAction, moveLeadAction, removeTagAction } from '../list-actions';
 import { addNoteAction, newQuoteForLeadAction } from '../../sales-actions';
 import { Said, useAct } from '../../SalesUi';
+import { CALL_LOGGED_EVENT } from './LeadNav';
 
 const icon = (d: string, cls = '') => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={cls}>
@@ -322,7 +323,11 @@ export function LeadHeader({
           outcome={calling}
           previousCalls={previousCalls}
           onClose={() => setCalling(null)}
-          onLogged={(r) => setSaid({ ok: true, text: r.movedTo ? `Call logged · moved to ${r.movedTo.name}` : 'Call logged' })}
+          onLogged={(r) => {
+            setSaid({ ok: true, text: r.movedTo ? `Call logged · moved to ${r.movedTo.name}` : 'Call logged' });
+            /* "Next lead →" (improvement 8, owner 22 Oct 2026): LeadNav offers the next lead in the list this page came from. */
+            window.dispatchEvent(new CustomEvent(CALL_LOGGED_EVENT, { detail: { leadId: lead.id } }));
+          }}
         />
       ) : null}
     </div>

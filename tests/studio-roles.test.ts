@@ -47,6 +47,7 @@ const TABLE: Record<StudioAction, Record<StudioRoleName, Cell>> = {
   'lead.merge': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
   'lead.delete': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
   'lead.import': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
+  'lead.export': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
   'lead.pool': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
   'lead.claim': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: 'Y', DESIGNER: '-' },
   'quote.write': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: 'A', DESIGNER: '-' },

@@ -46,7 +46,7 @@ export type ProjectEvent =
   | { kind: 'decision-expired'; decisionId: string; title: string; projectId: string }
   // Studio OS Phase 1: leads, to the studio's people (never to a customer)
   | { kind: 'lead-assigned'; clientId: string | null; count: number; name: string; by: string | null }
-  | { kind: 'lead-new'; clientId: string; name: string; source: string; again: boolean }
+  | { kind: 'lead-new'; clientId: string; name: string; source: string; again: boolean; /** Who "New leads go to" gave it to (22 Oct 2026); absent or null: the pool. */ givenTo?: string | null }
   // Change orders and sign-offs (15 Oct 2026; project/change-orders.ts, project/signoffs.ts). To the customer once when sent (never WhatsApp); to the studio when answered.
   | { kind: 'extra-work'; studio: string; title: string; totalPaise: number }
   | { kind: 'extra-answered'; projectId: string; title: string; approved: boolean; totalPaise: number }
@@ -242,7 +242,7 @@ export function messageFor(e: ProjectEvent): Message {
       return {
         template: e.again ? 'lead.form-again' : 'lead.new',
         title: e.again ? `${clip(e.name, 60)} filled in your form again` : `New lead: ${clip(e.name, 60)}`,
-        body: clip(e.again ? 'Their message is on the lead’s timeline.' : `From ${e.source}. It is in the pool: give it to someone from Today or the lead.`, 160),
+        body: clip(e.again ? 'Their message is on the lead’s timeline.' : e.givenTo ? `From ${e.source}. Given to ${e.givenTo} (your "New leads go to" setting).` : `From ${e.source}. It is in the pool: give it to someone from Today or the lead.`, 160),
         url: `/studio/clients/${e.clientId}`,
       };
     case 'extra-work':

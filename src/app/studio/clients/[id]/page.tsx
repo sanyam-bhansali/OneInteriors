@@ -26,6 +26,10 @@ import { LeadTasks } from './LeadTasks';
 import { NextCall } from './NextCall';
 import { Attribution, FollowUpPanel, LeadHeader, LeadTabs, NotesPanel, TagsPanel } from './AxLead';
 import { CustomFieldsPanel } from './CustomFieldsPanel';
+import { LeadNav } from './LeadNav';
+import { myLeadScope } from '@/modules/studio/lead-scope';
+import { CONTEXT_PARAM, backHref, contextLabel, leadHrefIn, readListContext } from '@/modules/studio-sales/lead-context';
+import { leadNeighbours } from '@/modules/studio-sales/lead-neighbours';
 
 export const metadata: Metadata = {
   title: 'Lead',
@@ -53,8 +57,18 @@ export const dynamic = 'force-dynamic';
  * Opens for anyone who may see this lead: owner and PM, any lead; a
  * salesperson, their own (studio/lead-scope.ts). Anyone else gets a 404.
  */
-export default async function ClientPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ClientPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { id } = await params;
+  const sp = await searchParams;
+  /* "Next lead →" (improvement 8, owner 22 Oct 2026): the list this page was opened from, cleaned (lead-context.ts). */
+  const fromRaw = sp[CONTEXT_PARAM];
+  const listCtx = readListContext(Array.isArray(fromRaw) ? fromRaw[0] : fromRaw);
 
   const page = await leadPage(id);
   if (!page) notFound();
@@ -76,6 +90,8 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
     studioTags(),
     callAttempts(id),
   ]);
+  const scope = listCtx ? await myLeadScope() : null;
+  const around = scope && listCtx ? await leadNeighbours(scope, listCtx, id) : null;
 
   const tel = telLink(client.phone);
   const fromOneInteriors = client.source === 'ONE_INTERIORS' || client.fromMarketplace;
@@ -99,6 +115,16 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
 
   return (
     <main className="content cl-page" style={{ maxWidth: 1440 }}>
+      {listCtx && around ? (
+        <LeadNav
+          key={client.id}
+          leadId={client.id}
+          prev={around.prev ? { name: around.prev.name, href: leadHrefIn(around.prev.id, listCtx.query) } : null}
+          next={around.next ? { name: around.next.name, href: leadHrefIn(around.next.id, listCtx.query) } : null}
+          back={backHref(listCtx)}
+          label={contextLabel(listCtx, (sid) => stages.find((s) => s.id === sid)?.name ?? null)}
+        />
+      ) : null}
       <LeadHeader
         lead={{
           id: client.id,
