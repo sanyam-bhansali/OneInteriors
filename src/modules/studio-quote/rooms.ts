@@ -17,7 +17,6 @@
  * Hauspire's builder.
  */
 
-import { applyBps } from '@/lib/money';
 import { roomsFor, type ConfigName } from './configure';
 import type { WorkCodeName } from './pricing';
 
@@ -102,10 +101,13 @@ export function newRoomName(typed: string, rooms: readonly string[]): string | n
  * A line's figure after the modular discount — Hauspire's "Discounted"
  * column: modular (MO-01) lines carry the discount, on-site (NM-01) lines do
  * not. Display only: the total's discount is taken once on the modular sum
- * (`computeTotals`), so the column can differ from it by a paisa of rounding
+ * (`computeTotals`), so the column can differ from it by a rupee of rounding
  * per line; the total is the figure that prints.
+ *
+ * The old app's own formula, to the rupee (owner, 22 Oct 2026):
+ * `Math.round(amount × (1 − 15%))`, in its float order.
  */
 export function discountedPaise(amountPaise: number, code: WorkCodeName, discountBps: number): number {
   if (code !== 'MODULAR' || discountBps <= 0) return amountPaise;
-  return amountPaise - applyBps(amountPaise, discountBps);
+  return Math.round((amountPaise / 100) * (1 - discountBps / 10_000)) * 100 + 0;
 }

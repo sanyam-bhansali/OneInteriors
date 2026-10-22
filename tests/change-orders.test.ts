@@ -110,8 +110,8 @@ describe('the lines, priced like the quotation builder', () => {
     const t = extraTotals(r.lines, { discountBps: 1000, gstBps: 1800 });
     expect(t.workPaise).toBe(10_000_00);
     expect(t.discountPaise).toBe(930_00); // 10% of the ₹9,300 loft only
-    expect(t.gstPaise).toBe(1_632_60); // 18% of ₹9,070
-    expect(t.totalPaise).toBe(10_702_60);
+    expect(t.gstPaise).toBe(1_633_00); // 18% of ₹9,070 = ₹1,632.60, to the rupee as the builder (22 Oct 2026)
+    expect(t.totalPaise).toBe(10_703_00);
   });
 
   it('wants a reason to decline', () => {
