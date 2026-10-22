@@ -72,6 +72,9 @@ describe.skipIf(!RUN)('AxLeads import (test database)', () => {
     const choices = parseChoices(undefined);
     if (!choices.ok) throw new Error(choices.error);
     const ax = parsed.data;
+    /* This run's own member emails, so a database an earlier run used does not
+       match the earlier person by email (planMembers: phone, then email). */
+    for (const m of ax.members) if (m.email?.endsWith('@axleads.test')) m.email = m.email.replace('@', `.${TAG}@`);
     const ids = ax.leads.map((l) => l.id);
 
     const counts = async () => ({

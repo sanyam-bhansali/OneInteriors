@@ -70,7 +70,8 @@ export async function leadPage(scope: LeadScope, f: LeadFilters, sort: SortKey, 
 export async function countMatching(scope: LeadScope, f: LeadFilters, now = new Date()): Promise<number> {
   try {
     return await prisma.studioClient.count({ where: { ...LIVE, studioId: scope.studioId, AND: [scopedLeadWhere(scope, f, now, LIVE)] } });
-  } catch {
+  } catch (error) {
+    console.error('[leads-list] countMatching failed', error);
     return 0;
   }
 }
@@ -363,7 +364,8 @@ export async function columnPage(scope: LeadScope, f: LeadFilters, stageId: stri
     const page = rows.slice(0, VIEW_PAGE);
     const last = page[page.length - 1];
     return { rows: page, next: rows.length > VIEW_PAGE && last ? cursorOf('newest', last) : null };
-  } catch {
+  } catch (error) {
+    console.error('[leads-list] viewPage failed', error);
     return { rows: [], next: null };
   }
 }
@@ -498,7 +500,8 @@ export async function poolTabsFor(scope: LeadScope, f: LeadFilters, now = new Da
       tabs.push({ key: r.poolTeamId, label: `${nameOf.get(r.poolTeamId) ?? 'A team'}’s team`, n: r._count._all });
     }
     return tabs;
-  } catch {
+  } catch (error) {
+    console.error('[leads-list] poolTabsFor failed', error);
     return [];
   }
 }

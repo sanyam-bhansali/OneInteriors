@@ -104,11 +104,15 @@ export function leadWhere(f: LeadFilters, now: Date, meId: string | null = null)
   if (f.kind === 'won') and.push({ stage: { kind: { in: ['WON', 'DONE'] } } });
   if (f.kind === 'lost') and.push({ stage: { kind: 'LOST' } });
   if (f.kind === 'closed') and.push({ stage: { kind: { in: ['DONE', 'LOST'] } } });
-  if (f.owner === 'pool') and.push({ assignedToId: null });
   /* Sales roles and teams (owner, 22 Oct 2026): one pool, inside the person's fence. */
   if (f.poolTeam === 'studio') and.push({ assignedToId: null, poolTeamId: null });
   else if (f.poolTeam) and.push({ assignedToId: null, poolTeamId: f.poolTeam });
-  else if (f.owner === 'anyone') and.push({ assignedToId: { not: null } });
+  /* Its own branch of the chain: "pool" is no person, so it must never fall
+     through to `assignedToId: f.owner` (that matched nothing: 0 in the pool). */
+  if (f.owner === 'pool') and.push({ assignedToId: null });
+  else if (f.poolTeam) {
+    /* A pool tab already says who has it: nobody. */
+  } else if (f.owner === 'anyone') and.push({ assignedToId: { not: null } });
   else if (f.owner === 'me') and.push({ assignedToId: meId ?? '__nobody__' });
   else if (f.owner) and.push({ assignedToId: f.owner });
 

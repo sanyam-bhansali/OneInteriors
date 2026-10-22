@@ -577,3 +577,15 @@ describe('"New leads go to: a team’s pool" (routing TEAM)', () => {
     expect(rule).toMatchObject({ mode: 'TEAM', personId: 'headA', from: 'connection' });
   });
 });
+
+describe('the pool filter (found on the test site, 22 Oct 2026)', () => {
+  it('"pool" is nobody: it never becomes assignedToId = "pool"', async () => {
+    const { leadWhere } = await import('@/modules/studio-sales/lead-where');
+    const text = JSON.stringify(leadWhere({ owner: 'pool' } as never, new Date('2026-10-22T06:00:00Z')));
+    expect(text).toContain('"assignedToId":null');
+    expect(text).not.toContain('"assignedToId":"pool"');
+    const tab = JSON.stringify(leadWhere({ owner: 'pool', poolTeam: 'head1' } as never, new Date('2026-10-22T06:00:00Z')));
+    expect(tab).toContain('"poolTeamId":"head1"');
+    expect(tab).not.toContain('"assignedToId":"pool"');
+  });
+});
