@@ -11,6 +11,8 @@ import { initials } from '@/modules/studio-sales/lead-view';
 import { LineIcon } from '../ui/icons';
 import { Modal, PillCold, PillDue, PillToday, TagChips } from './ax-ui';
 import { columnPageAction, moveLeadAction } from './list-actions';
+import { RowCall, type CallLogged, type CallSheetStage } from './CallLogger';
+import { boardColumnContext, leadHrefIn } from '@/modules/studio-sales/lead-context';
 
 export interface BoardStage {
   id: string;
@@ -26,7 +28,9 @@ export interface BoardStage {
  * SQL with the filters on); cards load a page at a time, and scrolling to the
  * foot of the board loads the next page of every column that has more. Drag a
  * card to another column to move it ("Drop here" in an empty one); a lost
- * column asks why.
+ * column asks why. Each card the member may work has Call, WhatsApp and Log
+ * call (calling steps, owner 21 Oct 2026): the lead page's sheet, and a
+ * suggested move takes the card to its new column on the spot.
  */
 export function AxBoard({
   stages,
@@ -36,6 +40,8 @@ export function AxBoard({
   showOwner,
   meId,
   mayMove,
+  callStages = [],
+  seesAll = false,
 }: {
   stages: BoardStage[];
   counts: Record<string, number>;
@@ -46,6 +52,10 @@ export function AxBoard({
   showOwner: boolean;
   meId: string | null;
   mayMove: boolean;
+  /** Every column, in order, with the calling-step flags (the call sheet's suggestion reads them). */
+  callStages?: CallSheetStage[];
+  /** Owner and PM: Log call on every card; a salesperson only on their own. */
+  seesAll?: boolean;
 }) {
   const router = useRouter();
   const [cols, setCols] = useState<Record<string, { rows: LeadView[]; next: string | null; lazy?: boolean }>>(initial);
@@ -143,6 +153,21 @@ export function AxBoard({
     router.refresh();
   }
 
+  /** After a call is logged from a card: a suggested move moves the card; the refresh brings the rest. */
+  function called(lead: LeadView, from: string, r: CallLogged) {
+    const to = r.movedTo;
+    setCols((cs) => {
+      const stamp = { ...lead, lastContactedAt: r.at };
+      if (!to || to.id === from) return { ...cs, [from]: { ...(cs[from] ?? { rows: [], next: null }), rows: (cs[from]?.rows ?? []).map((x) => (x.id === lead.id ? stamp : x)) } };
+      return {
+        ...cs,
+        [from]: { ...(cs[from] ?? { rows: [], next: null }), rows: (cs[from]?.rows ?? []).filter((x) => x.id !== lead.id) },
+        [to.id]: { ...(cs[to.id] ?? { rows: [], next: null }), rows: [{ ...stamp, stageId: to.id, stageName: to.name, stageColour: to.colour, stageKind: to.kind as LeadView['stageKind'] }, ...(cs[to.id]?.rows ?? [])] },
+      };
+    });
+  }
+  const mayCall = (l: LeadView) => mayMove && !l.isDemo && callStages.length > 0 && (seesAll || (meId !== null && l.assignedToId === meId));
+
   function drop(to: string) {
     const d = drag;
     setDrag(null);
@@ -199,6 +224,8 @@ export function AxBoard({
                     dragging={drag?.lead.id === l.id}
                     onDragStart={() => setDrag({ lead: l, from: s.id })}
                     onDragEnd={() => setDrag(null)}
+                    call={mayCall(l) ? { stages: callStages, onLogged: (r) => called(l, s.id, r) } : null}
+                    from={boardColumnContext(query, s.id)}
                   />
                 ))}
                 {col.lazy && n > 0 ? (
@@ -245,6 +272,8 @@ function Card({
   dragging,
   onDragStart,
   onDragEnd,
+  call,
+  from,
 }: {
   lead: LeadView;
   now: Date | null;
@@ -254,9 +283,13 @@ function Card({
   dragging: boolean;
   onDragStart: () => void;
   onDragEnd: () => void;
+  /** Log call on this card (null: the member may not, or the pool). */
+  call: { stages: CallSheetStage[]; onLogged: (r: CallLogged) => void } | null;
+  /** The board and this column, for "Next lead →" on the lead page (improvement 8, owner 22 Oct 2026). */
+  from?: string;
 }) {
   const router = useRouter();
-  const href = `/studio/clients/${lead.id}`;
+  const href = leadHrefIn(lead.id, from);
   const fresh = now ? isNewToday(lead.createdAt, now) : false;
   const cold = fresh || !now ? null : coldLabel(lead, now);
   const due = lead.flags.closed || !now ? null : dueBadge(lead.nextActionOn, now);
@@ -302,12 +335,15 @@ function Card({
           {last}
         </span>
         <div className="cact">
-          {tel ? (
+          {call ? (
+            <RowCall lead={{ id: lead.id, name: lead.name, phone: lead.phone, stageId: lead.stageId }} stages={call.stages} whatsapp compact onLogged={call.onLogged} />
+          ) : null}
+          {!call && tel ? (
             <a href={tel} aria-label={`Call ${lead.name}`} draggable={false}>
               <LineIcon name="phone" size={15} />
             </a>
           ) : null}
-          {wa ? (
+          {!call && wa ? (
             <a href={wa} target="_blank" rel="noreferrer" aria-label={`WhatsApp ${lead.name}`} draggable={false}>
               <LineIcon name="chat" size={15} />
             </a>

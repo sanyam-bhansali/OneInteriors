@@ -250,3 +250,14 @@ export const BIN_DAYS = 30;
 
 /** A client with no contact for this long has gone quiet. */
 export const QUIET_AFTER_DAYS = 7;
+
+/**
+ * The column "Mark lost" sends a lead to (owner, 21 Oct 2026). A studio can
+ * have more than one lost-kind column — Hauspire's Junk is one, ahead of
+ * Lost on the board — so "the first lost column" would put every lost lead
+ * into Junk. The one called Lost wins; otherwise the first lost column.
+ */
+export function mainLostStage<T extends { kind: StageKindName; name: string; sortOrder?: number }>(stages: readonly T[]): T | undefined {
+  const lost = stages.filter((s) => s.kind === 'LOST').sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  return lost.find((s) => s.name.trim().toLowerCase() === 'lost') ?? lost[0];
+}

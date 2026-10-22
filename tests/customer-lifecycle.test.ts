@@ -148,3 +148,29 @@ describe('the words', () => {
     expect(mobileWords).toEqual(lifecycleWords);
   });
 });
+
+describe('change orders and sign-off (15 Oct 2026)', () => {
+  const exec = (over: Partial<LifecycleInput>) => input({ phase: 'EXECUTION', tracker: tracker('carpentry'), payments: payments([{ label: 'Booking', amountPaise: 100, paidPaise: 100 }]), ...over });
+
+  it('asks to approve extra work the studio sent, naming it', () => {
+    const l = customerLifecycle(exec({ extras: [{ state: 'waiting', title: 'Loft in bedroom 2', duePaise: 0 }] }));
+    expect(l.blocker).toMatchObject({ kind: 'approve_extra', label: 'Loft in bedroom 2', count: 1 });
+    expect(lifecycleLines(l, 'en', { studio: 'S', money: (p) => `Rs ${p / 100}`, date: (d) => d, today: '2026-10-15' }).blocker).toBe('Approve the extra work: Loft in bedroom 2');
+  });
+
+  it('then asks to pay what is due on approved extra work', () => {
+    const l = customerLifecycle(exec({ extras: [{ state: 'approved', title: 'Loft', duePaise: 12_000_00 }, { state: 'paid', title: 'Shelf', duePaise: 0 }] }));
+    expect(l.blocker).toMatchObject({ kind: 'pay_extra', amountPaise: 12_000_00 });
+    expect(lifecycleLines(l, 'en', { studio: 'S', money: (p) => `Rs ${p / 100}`, date: (d) => d, today: '2026-10-15' }).blocker).toBe('Pay Rs 12000 for the extra work');
+  });
+
+  it('asks to sign the design final when the studio asked, and nothing once signed', () => {
+    expect(customerLifecycle(exec({ signoffs: [{ kind: 'DESIGN_FINAL', state: 'waiting' }] })).blocker?.kind).toBe('sign_design_final');
+    expect(customerLifecycle(exec({ signoffs: [{ kind: 'SALES_FINAL', state: 'waiting' }] })).blocker?.kind).toBe('sign_sales_final');
+    expect(customerLifecycle(exec({ signoffs: [{ kind: 'DESIGN_FINAL', state: 'signed' }] })).blocker).toBeNull();
+  });
+
+  it('says nothing for declined or released extra work', () => {
+    expect(customerLifecycle(exec({ extras: [{ state: 'declined', title: 'Loft', duePaise: 0 }, { state: 'released', title: 'Shelf', duePaise: 0 }] })).blocker).toBeNull();
+  });
+});

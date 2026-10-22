@@ -38,7 +38,9 @@ export function nextWorkingDay(day: string): string {
 
 /** 5:30 pm IST today; from 3:30 pm on, two hours from now. */
 export function laterToday(now: Date): Date {
-  return istMinutesOfDay(now) < 15 * 60 + 30 ? istTime(istDay(now), '17:30') : new Date(now.getTime() + 2 * H);
+  if (istMinutesOfDay(now) < 15 * 60 + 30) return istTime(istDay(now), '17:30');
+  /* Never past calling hours (owner, 21 Oct 2026): a 9 pm "later" is the next working morning, not 11 pm. */
+  return inTwoHoursClamped(now);
 }
 
 /** The next working day (Mon–Sat) at 3:30 pm IST. */
@@ -50,7 +52,8 @@ export function tomorrowCall(now: Date): Date {
 export function clockAt(clock: CallClock, now: Date): Date {
   switch (clock) {
     case 'in2h':
-      return new Date(now.getTime() + 2 * H);
+      /* Inside calling hours (owner, 21 Oct 2026): "busy" at 10 pm rings back at 10 am, not 12:01 am. */
+      return inTwoHoursClamped(now);
     case 'later-today':
       return laterToday(now);
     case 'tomorrow':
@@ -84,4 +87,66 @@ export function whenLabel(at: Date, now: Date): string {
   const wd = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][isoWeekday(day) - 1];
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return `${wd} ${Number(day.slice(8, 10))} ${months[Number(day.slice(5, 7)) - 1]}, ${clock}`;
+}
+
+// ── The retry picker (owner, 21 Oct 2026) ──────────────────────
+
+/**
+ * The hours a salesperson rings in, India time. A retry the picker sets is
+ * kept inside them: "two hours from now" at 7 pm is tomorrow morning, not
+ * 9 pm, and at 8 am it is 10 am.
+ */
+export const CALL_HOURS = { start: '10:00', end: '20:00' } as const;
+
+const minutesOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+
+/** The next working day (Mon–Sat) at the start of calling hours. */
+export function tomorrowMorning(now: Date): Date {
+  return istTime(nextWorkingDay(istDay(now)), CALL_HOURS.start);
+}
+
+/**
+ * Two hours from now, inside calling hours on a working day: before 10 am
+ * it is 10 am (or two hours on, if later); past 8 pm, or on a Sunday, it is
+ * the next working morning.
+ */
+export function inTwoHoursClamped(now: Date): Date {
+  const at = new Date(now.getTime() + 2 * H);
+  const day = istDay(now);
+  if (istDay(at) !== day || isoWeekday(day) === 7 || istMinutesOfDay(at) > minutesOf(CALL_HOURS.end)) return tomorrowMorning(now);
+  const opens = istTime(day, CALL_HOURS.start);
+  return at.getTime() < opens.getTime() ? opens : at;
+}
+
+/**
+ * The retry picker's choices for a call nobody answered: the usual time
+ * for this outcome (the automatic clock, `auto`), Later today, Tomorrow
+ * morning, Pick a time, and Don't retry. `auto` is left out when it is the
+ * same instant as one of the others, and that one is the default instead.
+ */
+export type RetryChoice = 'auto' | 'later' | 'morning' | 'pick' | 'none';
+
+export const RETRY_LABELS: Record<RetryChoice, string> = {
+  auto: 'As usual',
+  later: 'Later today',
+  morning: 'Tomorrow morning',
+  pick: 'Pick a time',
+  none: 'Don’t retry',
+};
+
+export function retryChoices(auto: Date | null, now: Date): { choices: { id: RetryChoice; at: Date | null }[]; preset: RetryChoice } {
+  const later = inTwoHoursClamped(now);
+  const morning = tomorrowMorning(now);
+  const same = (a: Date | null, b: Date) => a !== null && a.getTime() === b.getTime();
+  /* Late in the evening "later today" is tomorrow morning: one button, not two. */
+  const laterToo = !same(later, morning);
+  const autoIs: RetryChoice | null = laterToo && same(auto, later) ? 'later' : same(auto, morning) ? 'morning' : null;
+  const choices: { id: RetryChoice; at: Date | null }[] = [
+    ...(auto && !autoIs ? [{ id: 'auto' as const, at: auto }] : []),
+    ...(laterToo ? [{ id: 'later' as const, at: later }] : []),
+    { id: 'morning', at: morning },
+    { id: 'pick', at: null },
+    { id: 'none', at: null },
+  ];
+  return { choices, preset: autoIs ?? (auto ? 'auto' : 'morning') };
 }

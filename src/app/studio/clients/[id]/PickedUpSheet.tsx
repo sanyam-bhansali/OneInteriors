@@ -22,7 +22,8 @@ export function PickedUpSheet({
 }: {
   lead: { id: string; name: string; phone: string | null; stageId: string | null };
   stages: { id: string; name: string; colour: string; kind: string }[];
-  previousCalls: number;
+  /** Calls already logged (the footer's "attempt N"); left out on a list row, which does not count them. */
+  previousCalls?: number;
   onClose: () => void;
   onLogged?: () => void;
 }) {
@@ -162,7 +163,7 @@ export function PickedUpSheet({
         ) : null}
 
         <div className="pu-foot">
-          <span className="muted sm">{attemptLine(previousCalls)}</span>
+          <span className="muted sm">{previousCalls === undefined ? 'Logs the call' : attemptLine(previousCalls)}</span>
           <span className="hstack">
             <button type="button" className="btn ghost sm" onClick={close} disabled={pending}>
               Cancel

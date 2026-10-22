@@ -18,6 +18,14 @@ import 'server-only';
  * customer would find themselves signed in to a studio. So a number that
  * already has a customer account is refused, with the reason. So is a number
  * already on another studio's team (`StudioMember.userId` is unique).
+ *
+ * ## The sales team (owner, 22 Oct 2026)
+ *
+ * docs/studio-os/SALES-ROLES.md. A salesperson whose sales role has "Manage
+ * the sales team" (`team.sales`) opens this screen too, sees the salespeople
+ * only, invites salespeople (with a sales role and a reporting line) and
+ * resends their invites. Suspending, signing out and sites stay the owner's.
+ * Roles and reporting lines are written by sales-team-store.ts.
  */
 
 import { Prisma } from '@prisma/client';
@@ -26,7 +34,9 @@ import { revokeAllSessions } from '@/modules/auth/session';
 import { send } from '@/modules/messaging/sender';
 import { bucketFor, consume } from '@/modules/rate-limit/store';
 import { STUDIO_SIGN_IN } from '@/lib/host';
+import { FULL_SOFTWARE_ROLES } from './roles';
 import { assertCan, currentMember, StudioAccessError, type StudioMemberRef } from './access';
+import { rolesOf, salesTeamLead, type SalesRoleRow } from './sales-team-store';
 import { FREE_SEATS, type StudioMemberStatusName, type StudioRoleName } from './roles';
 import {
   checkInvite,
@@ -41,6 +51,8 @@ import {
 export type TeamResult = { ok: true; message: string } | { ok: false; error: string };
 
 const NOT_ALLOWED = 'Only the studio owner can change the team.';
+const PRO_ROLES = 'On Pro you can add salespeople. Designers, project managers, supervisors and accounts come with the Max plan.';
+const SOLO_SEAT = 'Pro Solo is for one person. Ask One Interiors to move your studio to Pro to add your team.';
 
 /** The signed-in member when they may manage the team; null otherwise. */
 async function teamLead(): Promise<StudioMemberRef | null> {
@@ -52,6 +64,17 @@ async function teamLead(): Promise<StudioMemberRef | null> {
     if (error instanceof StudioAccessError) return null;
     throw error;
   }
+}
+
+/**
+ * Who may open the screen: the owner (everything: `full`), or a salesperson
+ * whose role manages the sales team (the salespeople only).
+ */
+async function teamAccess(): Promise<{ lead: StudioMemberRef; full: boolean } | null> {
+  const full = await teamLead();
+  if (full) return { lead: full, full: true };
+  const sales = await salesTeamLead();
+  return sales ? { lead: sales, full: false } : null;
 }
 
 // ── Reading ────────────────────────────────────────────────────
@@ -68,10 +91,18 @@ export interface TeamPerson {
   lastActive: string | null;
   language: string;
   isYou: boolean;
+  /** Sales roles (owner, 22 Oct 2026): a salesperson's sales role, and who they report to (null: the owner). */
+  salesRoleId: string | null;
+  salesRoleName: string | null;
+  reportsToId: string | null;
 }
 
 export interface TeamView {
   people: TeamPerson[];
+  /** The owner's whole screen; false for someone who manages the sales team only (salespeople, invites). */
+  full: boolean;
+  /** The studio's sales roles, for the Roles tab and every role picker. */
+  roles: SalesRoleRow[];
   /** The studio's customer projects, for the site chips. */
   sites: { id: string; label: string }[];
   seatsUsed: number;
@@ -85,10 +116,11 @@ const SITE_SELECT = {
 
 /** The Team page, or null when the signed-in person may not manage the team. */
 export async function teamView(now = new Date()): Promise<TeamView | null> {
-  const lead = await teamLead();
-  if (!lead) return null;
+  const access = await teamAccess();
+  if (!access) return null;
+  const { lead, full } = access;
 
-  const [members, projects] = await Promise.all([
+  const [all, projects, roles] = await Promise.all([
     prisma.studioMember.findMany({
       where: { studioId: lead.studioId },
       orderBy: [{ createdAt: 'asc' }],
@@ -97,16 +129,24 @@ export async function teamView(now = new Date()): Promise<TeamView | null> {
         role: true,
         status: true,
         lastSeenAt: true,
+        salesRoleId: true,
+        reportsToId: true,
+        salesRole: { select: { name: true } },
         user: { select: { name: true, phone: true, email: true, locale: true } },
         projects: { select: { homeProjectId: true } },
       },
     }),
-    prisma.homeProject.findMany({
-      where: { introduction: { studioId: lead.studioId } },
-      orderBy: { startOn: 'desc' },
-      select: SITE_SELECT,
-    }),
+    full
+      ? prisma.homeProject.findMany({
+          where: { introduction: { studioId: lead.studioId } },
+          orderBy: { startOn: 'desc' },
+          select: SITE_SELECT,
+        })
+      : Promise.resolve([]),
+    rolesOf(lead.studioId),
   ]);
+  /* Someone managing the sales team sees the salespeople, and themselves. */
+  const members = full ? all : all.filter((m) => m.role === 'SALES' || m.id === lead.id);
 
   const sites = projects.map((p) => ({ id: p.id, label: siteLabel(p.introduction.brief) }));
   const labels = new Map(sites.map((s) => [s.id, s.label]));
@@ -124,10 +164,13 @@ export async function teamView(now = new Date()): Promise<TeamView | null> {
       lastActive: lastActive(m.lastSeenAt, now),
       language: languageName(m.user.locale),
       isYou: m.id === lead.id,
+      salesRoleId: m.role === 'SALES' ? m.salesRoleId : null,
+      salesRoleName: m.role === 'SALES' ? (m.salesRole?.name ?? null) : null,
+      reportsToId: m.role === 'SALES' ? m.reportsToId : null,
     }))
     .sort((a, b) => order[a.role] - order[b.role]);
 
-  return { people, sites, seatsUsed: seatsUsed(members), freeSeats: FREE_SEATS };
+  return { people, full, roles, sites, seatsUsed: seatsUsed(all), freeSeats: FREE_SEATS };
 }
 
 // ── Writing ────────────────────────────────────────────────────
@@ -171,18 +214,39 @@ function sentLine(delivered: boolean, via: string): string {
  * The seat is used only once they sign in.
  */
 export async function inviteMember(
-  raw: { name?: unknown; phone?: unknown; role?: unknown; sites?: unknown },
+  raw: { name?: unknown; phone?: unknown; role?: unknown; sites?: unknown; salesRoleId?: unknown; reportsToId?: unknown },
   baseUrl: string,
 ): Promise<TeamResult> {
-  const lead = await teamLead();
-  if (!lead) return { ok: false, error: NOT_ALLOWED };
+  const access = await teamAccess();
+  if (!access) return { ok: false, error: NOT_ALLOWED };
+  const { lead } = access;
+  if (lead.solo === true) return { ok: false, error: SOLO_SEAT };
 
   const check = checkInvite(raw);
   if (!check.ok) return check;
   const { name, phone, role, sites } = check.invite;
+  if (lead.fullSoftware === false && FULL_SOFTWARE_ROLES.includes(role)) return { ok: false, error: PRO_ROLES };
+  /* Sales roles (owner, 22 Oct 2026): managing the sales team adds salespeople only. */
+  if (!access.full && role !== 'SALES') return { ok: false, error: 'You can add salespeople. Ask the studio owner to add anyone else.' };
 
   const siteIds = await ownSites(lead.studioId, sites);
   if (!siteIds) return { ok: false, error: 'One of those sites is not your studio’s.' };
+
+  /* A salesperson is invited with a sales role (required) and who they report to (optional: the owner). Both from this studio. */
+  let salesRoleId: string | null = null;
+  let reportsToId: string | null = null;
+  if (role === 'SALES') {
+    const roleId = typeof raw.salesRoleId === 'string' ? raw.salesRoleId : '';
+    const salesRole = roleId ? await prisma.studioSalesRole.findFirst({ where: { id: roleId, studioId: lead.studioId }, select: { id: true } }) : null;
+    if (!salesRole) return { ok: false, error: 'Pick their sales role.' };
+    salesRoleId = salesRole.id;
+    const bossId = typeof raw.reportsToId === 'string' ? raw.reportsToId : '';
+    if (bossId) {
+      const boss = await prisma.studioMember.findFirst({ where: { id: bossId, studioId: lead.studioId, role: 'SALES' }, select: { id: true } });
+      if (!boss) return { ok: false, error: 'They can report to a salesperson on your team, or to the owner.' };
+      reportsToId = boss.id;
+    }
+  }
 
   const existing = await prisma.user.findUnique({
     where: { phone },
@@ -223,6 +287,8 @@ export async function inviteMember(
           isOwner: role === 'OWNER',
           invitedById: lead.id,
           invitedAt: now,
+          salesRoleId,
+          reportsToId,
         },
         select: { id: true },
       });
@@ -238,7 +304,7 @@ export async function inviteMember(
           action: 'studio.member.invite',
           entityType: 'StudioMember',
           entityId: member.id,
-          after: { role, sites: siteIds.length },
+          after: { role, sites: siteIds.length, salesRoleId, reportsToId },
         },
       });
     });
@@ -256,10 +322,12 @@ export async function inviteMember(
 
 /** Send the invite again, to someone who has not signed in yet. Three an hour per person. */
 export async function resendInvite(memberId: string, baseUrl: string): Promise<TeamResult> {
-  const lead = await teamLead();
-  if (!lead) return { ok: false, error: NOT_ALLOWED };
+  const access = await teamAccess();
+  if (!access) return { ok: false, error: NOT_ALLOWED };
+  const { lead } = access;
   const m = await teammate(lead, memberId);
   if (!m) return { ok: false, error: 'That person is not on your team.' };
+  if (!access.full && m.role !== 'SALES') return { ok: false, error: 'That person is not on your team.' };
   if (m.status !== 'INVITED' || !m.user.phone) return { ok: false, error: 'They have already signed in.' };
   const verdict = await consume(bucketFor('team-invite', m.id), { max: 3, windowMs: 60 * 60_000 });
   if (!verdict.allowed) return { ok: false, error: 'Sent three times this hour already. Try again later.' };

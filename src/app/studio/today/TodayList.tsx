@@ -7,6 +7,9 @@ import { assignLeadsAction } from '../sales-actions';
 import { setTaskDoneAction } from '../tasks-actions';
 import { bulkClaimAction } from '../clients/list-actions';
 import type { Done } from '../sales-types';
+import { RowCall, type CallSheetStage } from '../clients/CallLogger';
+/* "Next lead →" from Today walks the leads list's Today card (improvement 8, owner 22 Oct 2026). */
+import { TODAY_CONTEXT, leadHrefIn } from '@/modules/studio-sales/lead-context';
 import { Said, useAct } from '../SalesUi';
 import '../office-ui.css';
 import './today.css';
@@ -23,13 +26,17 @@ import './today.css';
  * leads, so its tick is this person's own note that it is handled — kept in
  * this browser for the day, never sent anywhere — and the line stays until
  * the underlying lead moves on.
+ *
+ * A call due (and, for owner and PM, a lead nobody has called) has Call and
+ * Log call on its line (calling steps, owner 21 Oct 2026): the lead page's
+ * sheet; logging it ticks the line and the list refreshes in place.
  */
 
 const dayKey = () => `oi-today-ticks:${new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })}`;
 
 const CONFETTI = ['var(--acc)', 'var(--good-s)', 'var(--warn-s)', 'var(--muted2)'];
 
-export function TodayList({ sections, members, meId }: { sections: TodaySection[]; members: { id: string; name: string }[]; meId: string }) {
+export function TodayList({ sections, members, meId, stages = [] }: { sections: TodaySection[]; members: { id: string; name: string }[]; meId: string; stages?: CallSheetStage[] }) {
   const filled = sections.filter((s) => s.rows.length > 0);
   const [ticked, setTicked] = useState<Set<string>>(new Set());
 
@@ -124,7 +131,7 @@ export function TodayList({ sections, members, meId }: { sections: TodaySection[
             </div>
             {s.id === 'pool' && members.length > 0 ? <AssignAll ids={s.rows.map((r) => r.leadId!).filter(Boolean)} members={members} /> : null}
             {s.rows.map((r) => (
-              <Row key={r.key} row={r} kind={s.title} members={members} meId={meId} on={ticked.has(r.key)} flip={flip} />
+              <Row key={r.key} row={r} kind={s.title} members={members} meId={meId} on={ticked.has(r.key)} flip={flip} stages={stages} />
             ))}
             {s.more > 0 ? (
               <p className="td-more">
@@ -144,7 +151,7 @@ export function TodayList({ sections, members, meId }: { sections: TodaySection[
   );
 }
 
-function Row({ row, kind, members, meId, on, flip }: { row: TodayRow; kind: string; members: { id: string; name: string }[]; meId: string; on: boolean; flip: (key: string, on: boolean) => void }) {
+function Row({ row, kind, members, meId, on, flip, stages }: { row: TodayRow; kind: string; members: { id: string; name: string }[]; meId: string; on: boolean; flip: (key: string, on: boolean) => void; stages: CallSheetStage[] }) {
   const task = row.action.kind === 'task' && row.action.taskId ? row.action.taskId : null;
   const { pending, result, run } = useAct();
   const tick = () => {
@@ -166,7 +173,7 @@ function Row({ row, kind, members, meId, on, flip }: { row: TodayRow; kind: stri
       <div className="tbody">
         <span className="kind">{kind}</span>
         {row.leadId ? (
-          <Link href={`/studio/clients/${row.leadId}`} className="ttl">
+          <Link href={leadHrefIn(row.leadId, TODAY_CONTEXT)} className="ttl">
             {row.title}
           </Link>
         ) : (
@@ -180,10 +187,12 @@ function Row({ row, kind, members, meId, on, flip }: { row: TodayRow; kind: stri
           <AssignOne leadId={row.leadId} members={members} meId={meId} />
         ) : task ? (
           row.leadId ? (
-            <Link href={`/studio/clients/${row.leadId}`} className="btn ghost sm">
+            <Link href={leadHrefIn(row.leadId, TODAY_CONTEXT)} className="btn ghost sm">
               Open
             </Link>
           ) : null
+        ) : row.call && stages.length > 0 ? (
+          <RowCall lead={{ id: row.call.leadId, name: row.call.name, phone: row.call.phone, stageId: row.call.stageId }} stages={stages} onLogged={() => flip(row.key, true)} />
         ) : row.action.kind === 'claim' && row.action.leadId ? (
           <ActOnce label="Claim" busy="Claiming…" act={() => bulkClaimAction({ ids: [row.action.leadId!] })} />
         ) : (

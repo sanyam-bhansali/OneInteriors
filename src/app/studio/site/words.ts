@@ -18,6 +18,16 @@ export const SITE_WORDS = {
   'today.h1': { en: 'My sites today', hi: 'आज मेरी साइट', mr: 'आज माझ्या साइट' },
   'today.who': { en: '{studio} · Site supervisor', hi: '{studio} · साइट सुपरवाइज़र', mr: '{studio} · साइट सुपरवायझर' },
   'crews.h': { en: 'Crews on your sites', hi: 'आपकी साइट पर टीम', mr: 'तुमच्या साइटवर टीम' },
+  /* My work (owner, 15 Oct 2026): what is yours today, in the next 3 days, and what was missed. */
+  'work.title': { en: 'My work', hi: 'मेरा काम', mr: 'माझे काम' },
+  'work.today': { en: 'Today', hi: 'आज', mr: 'आज' },
+  'work.soon': { en: 'Next 3 days', hi: 'अगले 3 दिन', mr: 'पुढचे 3 दिवस' },
+  'work.missed': { en: 'Missed', hi: 'छूट गया', mr: 'राहून गेले' },
+  'work.emptyToday': { en: 'Nothing is due today.', hi: 'आज कुछ बाकी नहीं।', mr: 'आज काही बाकी नाही.' },
+  'work.emptySoon': { en: 'Nothing is coming up in the next 3 days.', hi: 'अगले 3 दिन में कुछ नहीं।', mr: 'पुढच्या 3 दिवसांत काही नाही.' },
+  'work.emptyMissed': { en: 'Nothing missed.', hi: 'कुछ नहीं छूटा।', mr: 'काही राहिले नाही.' },
+  'work.more': { en: 'Show {n} more', hi: '{n} और दिखाएँ', mr: 'आणखी {n} दाखवा' },
+  'work.notShown': { en: 'And {n} more not shown here', hi: 'और {n} यहाँ नहीं दिखाए', mr: 'आणखी {n} इथे दाखवले नाहीत' },
   'today.count1': { en: '{date} · 1 site', hi: '{date} · 1 साइट', mr: '{date} · 1 साइट' },
   'today.count': { en: '{date} · {n} sites', hi: '{date} · {n} साइट', mr: '{date} · {n} साइट' },
   'today.none': {

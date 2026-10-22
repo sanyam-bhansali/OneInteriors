@@ -10,10 +10,17 @@
  * - Salesperson: sees and changes only tasks given to them, writes tasks
  *   only for themselves, and only about a lead that is theirs (the lead
  *   check is the caller's, through `leadInScope`).
+ * - Sales roles and teams (owner, 22 Oct 2026): a salesperson with a sales
+ *   role sees the tasks of the people their `leads.view` reaches (team:
+ *   everyone below them), changes those their `leads.edit` reaches, and
+ *   gives tasks to the people their `leads.assign` reaches (else only
+ *   themselves).
  */
 
 import type { Prisma } from '@prisma/client';
-import { can, type MemberRole } from '@/modules/studio/roles';
+import { can, hasSalesRole, type MemberRole } from '@/modules/studio/roles';
+import { reachOf } from '@/modules/studio/sales-access';
+import type { SalesPermissionKey } from '@/modules/studio/sales-permissions';
 import { parseMeeting } from './lead-rules';
 
 export interface TaskMember extends MemberRole {
@@ -26,28 +33,52 @@ export function mayUseTasks(member: MemberRole): boolean {
   return can(member, 'lead.read', { assigned: true });
 }
 
-/** Sees every task (owner, PM), or only their own (sales). */
+/** Sees every task (owner, PM, a sales role that sees every lead), or only some (sales). */
 export function seesAllTasks(member: MemberRole): boolean {
-  return mayUseTasks(member) && can(member, 'lead.assign');
+  if (!mayUseTasks(member)) return false;
+  if (hasSalesRole(member)) return reachOf(member.sales, 'leads.view') === 'all';
+  return can(member, 'lead.assign');
+}
+
+/** Whose tasks a permission reaches for a sales role: null = everyone; else these member ids. Null role → own only. */
+function taskPeople(member: TaskMember, key: SalesPermissionKey): readonly string[] | null {
+  if (!hasSalesRole(member)) return [member.id];
+  const reach = reachOf(member.sales, key);
+  if (reach === 'all') return null;
+  if (reach === 'team') return member.sales.subtree;
+  return [member.id];
 }
 
 /** The tasks this person may see, as a `where`. Always their studio. */
 export function tasksVisibleTo(member: TaskMember): Prisma.StudioTaskWhereInput {
   if (!mayUseTasks(member)) return { studioId: member.studioId, id: { in: [] } };
   if (seesAllTasks(member)) return { studioId: member.studioId };
-  return { studioId: member.studioId, assignedToId: member.id };
+  const people = taskPeople(member, 'leads.view');
+  if (people === null) return { studioId: member.studioId };
+  if (people.length === 1 && people[0] === member.id) return { studioId: member.studioId, assignedToId: member.id };
+  return { studioId: member.studioId, assignedToId: { in: [...people] } };
 }
 
 /** May this person change (edit, tick, reschedule, delete) this task? */
 export function mayChangeTask(member: TaskMember, task: { studioId: string; assignedToId: string | null }): boolean {
   if (!mayUseTasks(member) || task.studioId !== member.studioId) return false;
+  if (hasSalesRole(member)) {
+    const people = taskPeople(member, 'leads.edit');
+    return people === null || (task.assignedToId !== null && people.includes(task.assignedToId));
+  }
   return seesAllTasks(member) || task.assignedToId === member.id;
 }
 
-/** May this person give a task to `assigneeId`? Sales: only themselves. */
+/** May this person give a task to `assigneeId`? Sales: only themselves (a sales role: whoever `leads.assign` reaches). */
 export function mayAssignTaskTo(member: TaskMember, assigneeId: string): boolean {
   if (!mayUseTasks(member)) return false;
-  return seesAllTasks(member) || assigneeId === member.id;
+  if (assigneeId === member.id) return true;
+  if (hasSalesRole(member)) {
+    if (!can(member, 'lead.assign')) return false;
+    const people = taskPeople(member, 'leads.assign');
+    return people === null || people.includes(assigneeId);
+  }
+  return seesAllTasks(member);
 }
 
 export interface TaskInput {

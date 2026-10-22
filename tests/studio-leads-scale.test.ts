@@ -122,13 +122,14 @@ describe('every query sits inside the person’s scope', () => {
 
   it('a salesperson asking for the pool gets unassigned leads only — never a colleague’s', () => {
     const w = scopedLeadWhere(scopeOf('SALES', 'm-asha'), { owner: 'pool' }, NOW, LIVE) as { AND: unknown[] };
-    expect(w.AND[0]).toEqual({ studioId: 's1', assignedToId: null });
+    /* Sales roles and teams (owner, 22 Oct 2026): a salesperson with no sales role claims from the studio pool, never a head's team pool. */
+    expect(w.AND[0]).toEqual({ studioId: 's1', assignedToId: null, poolTeamId: null });
   });
 
   it('roles: sales reads its own and claims from the pool; the pool is not in its lead scope', () => {
     const sales = member('SALES', 'm-asha');
     expect(leadsVisibleTo(sales)).toEqual({ studioId: 's1', assignedToId: 'm-asha' });
-    expect(poolVisibleTo(sales)).toEqual({ studioId: 's1', assignedToId: null });
+    expect(poolVisibleTo(sales)).toEqual({ studioId: 's1', assignedToId: null, poolTeamId: null });
     expect(can(sales, 'lead.claim')).toBe(true);
     expect(can(sales, 'lead.read', { assigned: false })).toBe(false);
     expect(can(sales, 'lead.assign')).toBe(false);

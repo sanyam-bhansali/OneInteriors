@@ -59,6 +59,7 @@ const ROW_SELECT = {
   receiptDocumentId: true,
   correctsId: true,
   recordedById: true,
+  beforeJoining: true,
   recordedAt: true,
   customerConfirmedAt: true,
   disputedAt: true,
@@ -104,6 +105,8 @@ export interface DesignStepView {
   sharePct: number;
   /** The team's sentence when it was ticked. Never the customer's. */
   doneNote: string | null;
+  /** Done before the project was brought onto One Interiors (docs/studio-os/BRING-IN-PROJECTS.md). */
+  beforeJoining: boolean;
   doneFile: { id: string; title: string; url: string } | null;
   /** Its moves, oldest first. */
   moves: { from: string; to: string; side: 'CLIENT' | 'STUDIO'; reason: string; note: string | null; at: string }[];
@@ -219,6 +222,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
               plannedOn: true,
               doneAt: true,
               doneNote: true,
+              doneSource: true,
               doneDocumentId: true,
               inScope: true,
               weightBp: true,
@@ -279,6 +283,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       lateDays: i.inScope ? lateDays({ plannedOn, done }, today) : 0,
       sharePct: i.inScope && stageBp > 0 ? Math.round(((progress.weights.get(i.id) ?? 0) * 1000) / stageBp) / 10 : 0,
       doneNote: i.doneNote,
+      beforeJoining: i.doneSource === 'BEFORE_JOINING',
       doneFile: i.doneDocumentId ? (fileUrl.get(i.doneDocumentId) ?? null) : null,
       moves: i.delays.map((d) => ({
         from: dayFromDb(d.fromDate),

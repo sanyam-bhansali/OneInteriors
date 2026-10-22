@@ -133,6 +133,19 @@ model Session {
   revokedAt  DateTime?
   createdAt  DateTime  @default(now())
 
+  /// Developer access (owner, 22 Oct 2026; docs/studio-os/VIEW-AS.md): an OPS
+  /// or ADMIN session looking at a studio's software as one of its members,
+  /// read only. Honoured only while the user is staff and `viewAsUntil` is in
+  /// the future (two hours from the start); studio/view-as-rules.ts decides.
+  viewAsMemberId   String?
+  viewAsUntil      DateTime?
+  /// SHA-256 of the one-time ticket that carries the view from the ops host
+  /// to the studio host (two minutes, single use). Null once redeemed.
+  viewAsTicketHash String?   @unique
+  /// This session exists only for the view (made on the studio host by the
+  /// ticket): Stop revokes it instead of only clearing the view.
+  viewAsOnly       Boolean   @default(false)
+
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
@@ -677,12 +690,62 @@ model Studio {
   /// the handover, in months. Settings, Warranty (owner). Hauspire 12.
   warrantyMonths Int @default(12)
 
+  /// The snag window (owner, 15 Oct 2026; project/snag-window.ts): days the
+  /// client may raise snags in the app once the handover (final) payment is
+  /// recorded after the closure. After it, raising closes until the handover
+  /// sign-off starts the warranty (warranty snags). Settings, Warranty.
+  snagWindowDays Int @default(30)
+
   /// The per-studio pilot switch (owner, 14 Oct 2026): the full Studio OS
   /// (projects, design, site mode, the payments desk, crews, team) is open
   /// only for pilot studios; every other studio gets Leads, Quotations, the
   /// product master, their settings, Today and Calendar. Set by ops on the
   /// studio's page (audited). Read through modules/studio/pilot.ts.
   fullSoftware Boolean @default(false)
+
+  /// The studio software plan (owner, 19 Oct 2026; modules/studio/software-plan.ts):
+  /// PRO for every studio (Leads, Quotations, product master, settings, Today,
+  /// Calendar), MAX for the full Studio OS (Hauspire while it is tested). The
+  /// source of truth from 19 Oct; `fullSoftware` above is kept equal to
+  /// (softwarePlan = MAX) for one release and then retired. Set by ops (audited).
+  softwarePlan StudioSoftwarePlan @default(PRO)
+
+  /// "New leads go to" (owner, 22 Oct 2026; studio-sales/lead-routing.ts):
+  /// who gets a lead that arrives by itself (lead intake, the enquiry form).
+  /// POOL is today's behaviour and the default. PERSON gives each one to
+  /// `leadRouteMemberId`; TURNS goes round `leadRouteTurnIds` in order. Never
+  /// a hand-added lead or an import. Member ids are plain text, not
+  /// relations: a member who leaves, is suspended or cannot work leads is
+  /// skipped, and with nobody left the lead falls back to the pool.
+  /// Settings → Lead sources (owner and PM).
+  leadRouteMode     LeadRouteMode @default(POOL)
+  leadRouteMemberId String?
+  leadRouteTurnIds  String[]      @default([])
+  /// How many leads TURNS has handed out. Bumped atomically in the landing
+  /// transaction (UPDATE … SET n = n + 1 RETURNING), so two leads landing in
+  /// the same instant get different turns: the next person is
+  /// `eligible[(n - 1) % eligible.length]`.
+  leadRouteTurn     Int           @default(0)
+
+  /// Quotation requests (owner, 22 Oct 2026; docs/studio-os/QUOTE-REQUESTS.md).
+  /// "Who builds quotations": member ids in turn order. Empty = everyone whose
+  /// sales role has "Builds quotations" (`quotes.build`); an owner is in the
+  /// turns only when listed here. studio-quote/quote-request-rules.ts reads it.
+  quoteBuilderIds String[] @default([])
+  /// The builder the last request went to in turn (the turn cursor). The next
+  /// request goes to the first builder after them in the order; moved in the
+  /// same transaction that inserts the request, under a row lock. A
+  /// reassignment never moves it.
+  quoteTurnLastId String?
+
+  /// "Tell Meta which leads turned into customers" (owner, 22 Oct 2026;
+  /// studio-intake/capi-rules.ts): off by default. When on, and the dataset
+  /// and token are set for this studio in STUDIO_META_CAPI (env, never here),
+  /// a Meta lead-ad lead moving into a chosen column sends one Conversions
+  /// API event. `metaCapiStages` is { v: 1, stages: { [stageId]: event | null } };
+  /// a column not named reads its default (WON → ConvertedLead, else none).
+  metaCapiEnabled Boolean @default(false)
+  metaCapiStages  Json?
 
   /// The owner's "Set up your studio" answers (modules/studio/setup-quiz.ts):
   /// { v, status: done | skipped, at, answers }. Null = never asked, so the
@@ -792,9 +855,16 @@ model Studio {
   productBackups     StudioProductBackup[]
   studioQuotes       StudioQuote[]
   studioClients      StudioClient[]
+  /// Sales roles (owner, 22 Oct 2026; docs/studio-os/SALES-ROLES.md).
+  salesRoles         StudioSalesRole[]
   studioClientEvents StudioClientEvent[]
   studioSavedViews   StudioSavedView[]
   studioForm         StudioForm?
+  /// Lead intake (21 Oct 2026): Meta lead ads, Google lead forms, the
+  /// studio's website and portals posting leads straight onto the board.
+  studioLeadConnections StudioLeadConnection[]
+  /// Meta Conversions API outbox (22 Oct 2026): one row per lead and event.
+  conversionEvents   StudioConversionEvent[]
   studioStages       StudioStage[]
   studioFields       StudioField[]
   studioProjects     StudioProject[]
@@ -811,6 +881,7 @@ model Studio {
   /// what was paid against them.
   homeWorkOrders     HomeWorkOrder[]
   homeCrewPayments   HomeCrewPayment[]
+  quoteRequests      StudioQuoteRequest[]
 
   /// Studio workspace Phase 2: the saved crew faces site mode taps, and the
   /// days off that are not reminder days.
@@ -877,6 +948,25 @@ model StudioMember {
   /// Last time they used the studio side; "last active" on Settings → Team.
   lastSeenAt  DateTime?
 
+  /// Sales roles and teams (owner, 22 Oct 2026; docs/studio-os/SALES-ROLES.md).
+  /// The sales role refines a SALES member's rights (roles.ts `can`): which
+  /// lead permissions they have and how far each reaches (own / team / all).
+  /// Null on a SALES member keeps the Phase 1 rule exactly (own leads + the
+  /// studio pool). Never read for any other fixed role. SetNull: deleting a
+  /// role is refused while anyone is on it, so this is a backstop only.
+  salesRoleId String?
+  salesRole   StudioSalesRole? @relation(fields: [salesRoleId], references: [id], onDelete: SetNull)
+  /// Who they report to: another member of the same studio, or null for the
+  /// owner. A person's team is everyone below them at any depth
+  /// (studio/sales-access.ts `subtreeOf`). Same studio and no cycles are
+  /// checked on every write (team-store.ts `setReportsTo`); the resolver also
+  /// walks cycle-safe, so a bad row can never widen anybody's reach.
+  reportsToId String?
+  reportsTo   StudioMember?  @relation("StudioMemberReports", fields: [reportsToId], references: [id], onDelete: SetNull)
+  reports     StudioMember[] @relation("StudioMemberReports")
+  /// The unassigned leads in this member's team pool (StudioClient.poolTeamId).
+  teamPoolClients StudioClient[] @relation("StudioClientPoolTeam")
+
   createdAt DateTime @default(now())
 
   /// The customer projects this PM or supervisor is on (owners and accounts
@@ -889,7 +979,7 @@ model StudioMember {
   assignedSnags HomeSnag[]
 
   /// Everything this person is working. See `StudioClient.assignedTo`.
-  clients StudioClient[]
+  clients StudioClient[] @relation("StudioClientAssignee")
 
   /// What they have done. SetNull on removal, so a leaver's history stays.
   clientEvents StudioClientEvent[]
@@ -909,9 +999,49 @@ model StudioMember {
   tasksAssigned StudioTask[] @relation("TaskAssignee")
   tasksCreated  StudioTask[] @relation("TaskCreator")
 
+  quoteRequestsAsked    StudioQuoteRequest[] @relation("QuoteRequestAsker")
+  quoteRequestsToBuild  StudioQuoteRequest[] @relation("QuoteRequestBuilder")
+
   @@index([studioId])
   @@index([invitedById])
+  @@index([salesRoleId])
+  @@index([reportsToId])
   @@map("studio_members")
+}
+
+/// A sales role (owner, 22 Oct 2026; docs/studio-os/SALES-ROLES.md): a named
+/// set of sales permissions the studio admin edits on Settings → Team →
+/// Roles ("Sales head", "Sales rep"). Each SALES member has at most one
+/// (`StudioMember.salesRoleId`); editing a role changes everyone on it.
+///
+/// `permissions` is `{ [key]: 'own' | 'team' | 'all' | true }`, read only
+/// through studio/sales-permissions.ts `readSalesPermissions`, which drops any
+/// key or reach it does not know — an unknown value never grants anything.
+/// The keys are the catalogue there, not a table: a permission is only real
+/// when there is code that enforces it.
+///
+/// `system` marks the three built-ins (ADMIN, HEAD, REP) created for every
+/// studio: they can be renamed and edited, but not deleted. Any role is
+/// refused deletion while somebody is on it.
+model StudioSalesRole {
+  id          String  @id @default(cuid())
+  studioId    String
+  studio      Studio  @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  permissions Json
+  system      String?
+  sortOrder   Int     @default(0)
+
+  members StudioMember[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studioId, name])
+  @@unique([studioId, system])
+  @@index([studioId, sortOrder])
+  @@map("studio_sales_roles")
 }
 
 /// The studio workspace roles (docs/studio-workspace/STUDIO-WORKSPACE-BUILD.md
@@ -1656,6 +1786,19 @@ model HomeProject {
   warrantyEndsOn        DateTime?    @db.Date
   closures              HomeProjectClosure[]
 
+  /// Extra work after design sign-off (change orders) and the client's
+  /// digital sign-offs of quotations (owner, 15 Oct 2026;
+  /// project/change-orders.ts, project/signoffs.ts).
+  changeOrders HomeChangeOrder[]
+  signoffs     HomeQuoteSignoff[]
+
+  /// Brought onto One Interiors while already running ("Add an existing
+  /// project", owner 20 Oct 2026; docs/studio-os/BRING-IN-PROJECTS.md): when,
+  /// and the source quotation's number in the studio's old quotation app
+  /// (null when the quotation was built in our builder).
+  broughtInAt   DateTime?
+  broughtInFrom String?
+
   @@map("home_projects")
 }
 
@@ -1684,6 +1827,9 @@ model HomeProjectClosure {
   contractPaise   BigInt
   /// Changes agreed on the client's decisions (HomeQuoteChange), GST included.
   changesPaise    BigInt      @default(0)
+  /// Approved change orders (extra work after sign-off), GST included; read
+  /// from the change orders, never typed on the closure.
+  changeOrdersPaise BigInt    @default(0)
   extrasPaise     BigInt      @default(0)
   deductionsPaise BigInt      @default(0)
   gstBps          Int         @default(0)
@@ -1723,6 +1869,156 @@ model HomeProjectClosureLine {
 
   @@index([closureId])
   @@map("home_project_closure_lines")
+}
+
+/// Extra work after design sign-off: a change order (owner, 15 Oct 2026;
+/// project/change-orders.ts). DRAFT -> SENT_TO_CLIENT -> APPROVED | DECLINED
+/// -> PAID -> RELEASED (to the factory / the work); a draft or a sent one can
+/// be CANCELLED by the studio. `status` is the current state; every move is a
+/// row in HomeChangeOrderEvent (append-only). Money in integer paise, priced
+/// the quotation's way (its modular discount and GST) and never changing the
+/// signed lines: approving writes one HomeQuoteChange on the final stage.
+model HomeChangeOrder {
+  id            String            @id @default(cuid())
+  projectId     String
+  project       HomeProject       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// 1, 2, 3… per project: "Extra work 3".
+  number        Int
+  title         String
+  /// Why it is needed, in the studio's words to the client. Crosses to the client.
+  reason        String?           @db.Text
+  status        ChangeOrderStatus @default(DRAFT)
+  /// The quotation it is priced from (design final, else the signed one).
+  quoteId       String?
+  /// Basis points copied from that quotation when the order is priced.
+  discountBps   Int               @default(0)
+  gstBps        Int               @default(0)
+  workPaise     BigInt            @default(0)
+  discountPaise BigInt            @default(0)
+  gstPaise      BigInt            @default(0)
+  /// What the client pays, GST included.
+  totalPaise    BigInt            @default(0)
+  /// An optional photo or drawing, filed in the locker (shared when sent).
+  photoDocumentId String?
+  createdById   String
+  sentAt        DateTime?
+  /// The client's answer (the owner of the brief).
+  decidedAt     DateTime?
+  decidedById   String?
+  /// The client's reason for declining. Crosses back to the client.
+  declineReason String?
+  paidAt        DateTime?
+  releasedAt    DateTime?
+  releasedById  String?
+  cancelledAt   DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  lines        HomeChangeOrderLine[]
+  events       HomeChangeOrderEvent[]
+  payments     HomeProjectPayment[]
+  quoteChanges HomeQuoteChange[]
+
+  @@unique([projectId, number])
+  @@index([projectId, status])
+  @@map("home_change_orders")
+}
+
+enum ChangeOrderStatus {
+  DRAFT
+  SENT_TO_CLIENT
+  APPROVED
+  DECLINED
+  PAID
+  RELEASED
+  CANCELLED
+}
+
+/// One line of a change order: from the product master (sized like the
+/// quotation builder: W x H, sq ft, rft or each, at the studio's rate) or a
+/// custom line with an amount. Before discount and GST. Replaced only while
+/// the order is a draft.
+model HomeChangeOrderLine {
+  id            String          @id @default(cuid())
+  changeOrderId String
+  changeOrder   HomeChangeOrder @relation(fields: [changeOrderId], references: [id], onDelete: Cascade)
+  /// The product it came from; null for a custom line. A snapshot either way.
+  productId     String?
+  room          String?
+  product       String
+  details       String?         @db.Text
+  code          StudioWorkCode
+  unit          QuoteUnit
+  widthMm       Int?
+  heightMm      Int?
+  /// Thousandths.
+  qtyMilli      Int?
+  ratePaise     BigInt          @default(0)
+  amountPaise   BigInt
+  sortOrder     Int             @default(0)
+
+  @@index([changeOrderId])
+  @@map("home_change_order_lines")
+}
+
+/// Every status move of a change order, append-only (project/append-only.ts).
+model HomeChangeOrderEvent {
+  id            String             @id @default(cuid())
+  changeOrderId String
+  changeOrder   HomeChangeOrder    @relation(fields: [changeOrderId], references: [id], onDelete: Cascade)
+  fromStatus    ChangeOrderStatus?
+  toStatus      ChangeOrderStatus
+  actorType     ProjectActorType
+  actorId       String?
+  /// The decline reason or the studio's line; never internal.
+  text          String?
+  at            DateTime           @default(now())
+
+  @@index([changeOrderId, at])
+  @@map("home_change_order_events")
+}
+
+/// The client's digital sign-off of a quotation revision (owner, 15 Oct
+/// 2026; project/signoffs.ts): the sales final (BOQ) or the design final.
+/// The studio asks; the client reads the revision, ticks "I have read and
+/// agree", types their full name and submits. Who, when, IP and user agent,
+/// and a SHA-256 of exactly the revision they signed. Filled once when
+/// signed, never deleted (project/append-only.ts). A newer revision needs a
+/// new sign-off; this one stays on its revision.
+model HomeQuoteSignoff {
+  id               String              @id @default(cuid())
+  projectId        String
+  project          HomeProject         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// "SALES_FINAL" | "DESIGN_FINAL".
+  kind             String
+  quoteId          String
+  revisionId       String
+  revision         StudioQuoteRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  quoteNumber      String
+  revisionN        Int
+  totalPaise       BigInt
+  /// SHA-256 (hex) of the revision's stored content when the sign-off was asked.
+  contentHash      String
+  requestedById    String
+  requestedAt      DateTime            @default(now())
+  withdrawnAt      DateTime?
+  signedAt         DateTime?
+  /// The customer (User id) who signed. Never sent to anyone.
+  signedById       String?
+  /// The full name they typed as their signature.
+  signerName       String?
+  /// The exact sentence they ticked.
+  agreedText       String?
+  /// The hash of what they were shown when they signed (equals contentHash).
+  signedHash       String?
+  ip               String?
+  userAgent        String?
+  /// The locker record of the signed copy.
+  lockerDocumentId String?
+
+  @@index([projectId, requestedAt])
+  @@index([revisionId])
+  @@map("home_quote_signoffs")
 }
 
 /// The invite a studio sends its OWN client to follow their project in the
@@ -1775,11 +2071,14 @@ enum ProjectStageKind {
 /// How a step was ticked: a tap, or confirmed from a voice note — either way
 /// with its photo since the step tracker (docs/studio-workspace/STEP-TRACKER.md)
 /// — or BACKFILL: ticked by scripts/studio/steps-from-template.ts because its
-/// stage was already done, with no photo.
+/// stage was already done, with no photo — or BEFORE_JOINING: done before the
+/// project was brought onto One Interiors ("Add an existing project",
+/// docs/studio-os/BRING-IN-PROJECTS.md), with no photo.
 enum ChecklistDoneSource {
   TICK
   VOICE
   BACKFILL
+  BEFORE_JOINING
 }
 
 /// A stage of a customer's project, built from the signed quote. The studio
@@ -2530,6 +2829,10 @@ model HomeProjectPayment {
   receiptDocument   HomeDocument? @relation(fields: [receiptDocumentId], references: [id], onDelete: SetNull)
   /// Internal note (UTR, who paid). NEVER crosses.
   note              String?
+  /// Money received for a change order (extra work), recorded on the stage
+  /// its price landed on. Null for an ordinary stage payment.
+  changeOrderId     String?
+  changeOrder       HomeChangeOrder? @relation(fields: [changeOrderId], references: [id], onDelete: SetNull)
 
   recordedById String
   recordedAt   DateTime @default(now())
@@ -2537,6 +2840,11 @@ model HomeProjectPayment {
   correctsId  String?
   corrects    HomeProjectPayment?  @relation("HomeProjectPaymentCorrections", fields: [correctsId], references: [id], onDelete: SetNull)
   corrections HomeProjectPayment[] @relation("HomeProjectPaymentCorrections")
+
+  /// Received before the project was brought onto One Interiors (docs/studio-os/
+  /// BRING-IN-PROJECTS.md): reads as 'earlier' (counts as paid, no client
+  /// confirmation needed), like the rows backfilled from `paidPhases`.
+  beforeJoining Boolean @default(false)
 
   /// The customer said yes, this arrived.
   customerConfirmedAt   DateTime?
@@ -2551,6 +2859,7 @@ model HomeProjectPayment {
   @@index([projectId, stageIndex])
   @@index([correctsId])
   @@index([receiptDocumentId])
+  @@index([changeOrderId])
   @@map("home_project_payments")
 }
 
@@ -2575,8 +2884,13 @@ model HomeQuoteChange {
   stageIndex  Int?
   byId        String?
   at          DateTime            @default(now())
+  /// The approved change order this price is (extra work after sign-off).
+  /// Kept apart from decisions so the closure shows it as its own line.
+  changeOrderId String?
+  changeOrder   HomeChangeOrder? @relation(fields: [changeOrderId], references: [id], onDelete: SetNull)
 
   @@index([projectId, at])
+  @@index([changeOrderId])
   @@index([decisionId])
   @@index([optionId])
   @@map("home_quote_changes")
@@ -3104,6 +3418,11 @@ model StudioBranding {
   welcomeNote String? @db.Text
   terms       String? @db.Text
 
+  /// The name printed at the top of quotations and in the builder (owner,
+  /// 22 Oct 2026: Hauspire prints "HAUSPIRE"). Null: the trading name. The
+  /// registered name and GSTIN in the footer are not changed by it.
+  documentName String?
+
   /// Does the studio want our attribution mark off their documents?
   ///
   /// A WISH, not the outcome. Whether the mark actually appears is this
@@ -3298,6 +3617,9 @@ model StudioQuote {
   /// Studio OS Phase 1: every send is a frozen, numbered revision (R1, R2…).
   revisions StudioQuoteRevision[] @relation("QuoteRevisions")
 
+  /// The quotation requests this quotation answers (docs/studio-os/QUOTE-REQUESTS.md).
+  quoteRequests StudioQuoteRequest[]
+
   /// The revision marked "Sales final", with the payment schedule agreed for
   /// this client (payment-template.ts shape), when and by whom. Marking a
   /// later revision moves the mark; the lead's timeline keeps the history.
@@ -3308,12 +3630,19 @@ model StudioQuote {
   salesFinalAt         DateTime?
   salesFinalById       String?
 
+  /// Brought in from the studio's old quotation app (docs/studio-os/
+  /// BRING-IN-PROJECTS.md): "hauspire:<source row id>", unique per studio,
+  /// so importing the same quotation twice opens the one already made.
+  importedFrom String?
+  importedAt   DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   lines StudioQuoteLine[]
 
   @@unique([studioId, number])
+  @@unique([studioId, importedFrom])
   @@index([studioId, status, updatedAt])
   /// The leads board loads up to 400 clients and includes their
   /// quotes, so Postgres runs `WHERE clientId IN (400 ids)` on every
@@ -3357,6 +3686,11 @@ model StudioQuoteLine {
   /// on an issued document it is a fact about that document.
   amountPaise BigInt
 
+  /// A note for the client on this line (owner's team, 15 Oct 2026): written
+  /// in the builder, printed under the line's details on the quotation PDF
+  /// and the Final PDF like a margin comment. Client-facing.
+  note String? @db.Text
+
   sortOrder Int @default(0)
 
   @@index([quoteId, sortOrder])
@@ -3396,6 +3730,9 @@ model StudioQuoteRevision {
   sentByName String?
 
   salesFinalOf StudioQuote? @relation("SalesFinal")
+
+  /// The client's digital sign-offs of this exact revision (15 Oct 2026).
+  signoffs HomeQuoteSignoff[]
 
   @@unique([quoteId, n])
   @@index([studioId, sentAt])
@@ -3492,6 +3829,12 @@ model StudioStage {
 
   /// Where a new client lands. Exactly one per studio, undeletable.
   isIntake Boolean @default(false)
+
+  /// A cold-calling column (owner, 21 Oct 2026): Hauspire's Calling 1–4.
+  /// Logging a call that was not picked up suggests the next one, pre-ticked
+  /// (studio-practice/call-step-rules.ts). Only an open column; a suggestion,
+  /// never a move by itself.
+  isCallStep Boolean @default(false)
 
   createdAt DateTime @default(now())
 
@@ -3608,7 +3951,17 @@ model StudioClient {
   /// `SetNull` on delete, so removing somebody from the studio returns their
   /// clients to the pool rather than deleting them along with the membership.
   assignedToId String?
-  assignedTo   StudioMember? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedTo   StudioMember? @relation("StudioClientAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  /// Which pool an unassigned lead sits in (sales roles and teams, owner,
+  /// 22 Oct 2026; docs/studio-os/SALES-ROLES.md): the member whose TEAM pool
+  /// it is (a sales head), or null for the studio pool. A head hands out their
+  /// team pool's leads to the people below them; reps claim from the pools of
+  /// the teams they are in. Kept when the lead is assigned, so giving it back
+  /// returns it to the same pool. SetNull: when the head leaves, their pool's
+  /// leads fall to the studio pool.
+  poolTeamId String?
+  poolTeam   StudioMember? @relation("StudioClientPoolTeam", fields: [poolTeamId], references: [id], onDelete: SetNull)
 
   /// When somebody last actually spoke to them.
   ///
@@ -3669,6 +4022,35 @@ model StudioClient {
   /// at most 20, compared without case (studio-sales/tag-rules.ts).
   tags String[] @default([])
 
+  /// Where an imported lead came from, and its id there (the AxLeads import,
+  /// 21 Oct 2026: importedFrom "axleads", externalId the AxLeads lead id).
+  /// Unique per studio, so running the import again skips what it already
+  /// wrote. Null for everything made here, including CSV imports.
+  importedFrom String?
+  externalId   String?
+
+  /// Where an ad lead came from (owner, 22 Oct 2026): columns, not only the
+  /// human `sourceNote`, so lead analytics can count by campaign and Meta can
+  /// be told which lead-ad leads turned into customers. Filled by lead intake
+  /// (Meta from the Graph lead, Google from its webhook, a website or portal
+  /// from utm_* and gclid/fbclid) and the AxLeads import. All optional; a
+  /// hand-added lead has none. `adPlatform` is lower case: facebook,
+  /// instagram, google, or what utm_source said.
+  adPlatform   String?
+  /// Meta's leadgen id. Set only for a Meta lead-ad lead: the one thing that
+  /// makes a Conversions API event about this lead possible.
+  leadgenId    String?
+  campaignId   String?
+  campaignName String?
+  adsetId      String?
+  adsetName    String?
+  adId         String?
+  adName       String?
+  formId       String?
+  gclid        String?
+  /// { utm_source, utm_medium, utm_campaign, utm_term, utm_content, fbclid }, as sent.
+  utm          Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -3677,6 +4059,9 @@ model StudioClient {
   events   StudioClientEvent[]
   files    StudioClientFile[]
   tasks    StudioTask[]
+  /// Conversions API events about this lead. Erased with it.
+  conversionEvents StudioConversionEvent[]
+  quoteRequests    StudioQuoteRequest[]
 
   /// Where this row went when somebody merged it into another.
   ///
@@ -3717,6 +4102,11 @@ model StudioClient {
   @@index([studioId, updatedAt])
   @@index([tags], type: Gin)
   @@index([stageId])
+  /// The AxLeads import (20261021110000_axleads_import): one row per lead there.
+  @@unique([studioId, importedFrom, externalId])
+  /// "By campaign" on lead analytics (20261022100000_lead_routing_attribution).
+  @@index([studioId, campaignId])
+  @@index([studioId, poolTeamId])
   @@map("studio_clients")
 }
 
@@ -3864,6 +4254,11 @@ enum ClientEventKind {
   BOOKED
   /// The booking advance refunded: the project is cancelled.
   REFUNDED
+  /// Brought over from another system (the AxLeads import, 21 Oct 2026):
+  /// the "Imported from AxLeads" line, and the old system's events that have
+  /// no kind here (WhatsApp messages, hot alerts, duplicate flags, tags).
+  /// Not NOTE, which is the notes panel, and not CONTACTED, which counts calls.
+  IMPORTED
 }
 
 /// Who did it.
@@ -3946,10 +4341,17 @@ model StudioClientEvent {
   /// display: from/to stage ids, a call outcome, a lost reason.
   meta Json?
 
+  /// The event's id in the system it was imported from ("axleads:<id>"),
+  /// unique per studio, so a second run of the import writes no line twice.
+  /// Null for everything that happened here.
+  externalId String?
+
   createdAt DateTime @default(now())
 
   /// The timeline read: one client, newest first.
   @@index([clientId, createdAt])
+  /// The AxLeads import (20261021110000_axleads_import).
+  @@unique([studioId, externalId])
   /// "What has this studio been doing", and the per-member activity read.
   @@index([studioId, createdAt])
   @@index([studioId, kind, createdAt])
@@ -4056,6 +4458,167 @@ model StudioForm {
   updatedAt DateTime @updatedAt
 
   @@map("studio_forms")
+}
+
+/// Where an automatic lead comes from (lead intake, 21 Oct 2026;
+/// docs/studio-os/LEAD-INTAKE.md).
+enum LeadConnectionKind {
+  /// The studio's own website form, posting JSON or a plain HTML form.
+  WEBSITE
+  /// A Google Ads lead form's webhook integration.
+  GOOGLE_LEAD_FORM
+  /// A portal (99acres, Housing.com), a WhatsApp tool, Zapier or Pabbly.
+  PORTAL
+  /// A Facebook Page whose lead ads (Facebook and Instagram) land here.
+  META_PAGE
+}
+
+/// One door leads come in through by themselves (lead intake, 21 Oct 2026).
+///
+/// The secret is shown to the owner once, when the door is made or given a
+/// new key, and only its SHA-256 is kept: a leaked database row cannot be
+/// used to post leads. A Meta Page has no secret of ours (Meta signs its
+/// posts with the app secret); it is found by `metaPageId`, which one studio
+/// at a time may hold.
+model StudioLeadConnection {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  kind  LeadConnectionKind
+  /// The owner's name for it ("Website", "99acres", "Kitchen campaign").
+  label String
+
+  /// Off: posts are refused (generic, Google) or ignored (Meta), and nothing lands.
+  enabled Boolean @default(true)
+
+  /// SHA-256 (hex) of the secret. Never the secret itself.
+  secretHash String
+
+  /// The Facebook Page id, for META_PAGE only. Unique when set.
+  metaPageId String? @unique
+
+  lastEventAt DateTime?
+  eventCount  Int       @default(0)
+
+  /// "New leads go to", for this door only (owner, 22 Oct 2026): null follows
+  /// the studio's rule; POOL keeps its leads in the pool; PERSON gives them to
+  /// `routeMemberId`; TURNS uses the studio's turn list. Plain text member id.
+  routeMode     LeadRouteMode?
+  routeMemberId String?
+
+  /// The member who made it (StudioMember id). Plain text, not a relation:
+  /// removing somebody from the team must not touch the studio's lead doors.
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  events StudioLeadIntakeEvent[]
+
+  @@index([studioId])
+  @@map("studio_lead_connections")
+}
+
+/// What happened to one incoming lead.
+enum LeadIntakeStatus {
+  /// Taken, being worked on (a Meta lead between the ack and the Graph fetch).
+  RECEIVED
+  /// A new lead on the board.
+  LANDED
+  /// Could not land (no page token, Graph refused, no name or number).
+  FAILED
+  /// The phone was already on the board: added to that lead's timeline instead.
+  DUPLICATE
+}
+
+/// One incoming lead, once (lead intake, 21 Oct 2026). Unique on the
+/// connection and the provider's own id, so a Meta or Google retry of the
+/// same lead can never make a second card. No payload is kept: the lead
+/// itself is the record, and a copy of a stranger's answers here would be
+/// personal data with no screen that reads it.
+model StudioLeadIntakeEvent {
+  id           String               @id @default(cuid())
+  connectionId String
+  connection   StudioLeadConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  /// The provider's id (Meta leadgen_id, Google lead_id), the caller's own
+  /// id, or `h:` and a hash of phone and minute when the caller sends none.
+  externalId String
+
+  status LeadIntakeStatus @default(RECEIVED)
+  /// The lead it landed as or on. Plain text, not a relation: erasing the
+  /// lead from the bin keeps the receipt (the link then goes nowhere).
+  clientId String?
+  /// Why it failed, in words the owner can act on. Never a token.
+  error    String?
+  /// Google's "Send test data": recorded here, not put on the board.
+  isTest   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([connectionId, externalId])
+  @@index([connectionId, createdAt])
+  @@map("studio_lead_intake_events")
+}
+
+/// Who gets a lead that arrives by itself (owner, 22 Oct 2026).
+enum LeadRouteMode {
+  /// Nobody: the pool, as before.
+  POOL
+  /// One chosen member.
+  PERSON
+  /// Round the chosen members in turn.
+  TURNS
+  /// A team's pool (owner, 22 Oct 2026; docs/studio-os/SALES-ROLES.md): the
+  /// lead lands unassigned in the team pool of the head named by the same
+  /// member column (`leadRouteMemberId` / `routeMemberId`), for the head to
+  /// hand out or the team to claim.
+  TEAM
+}
+
+/// Where one Conversions API event is.
+enum ConversionEventStatus {
+  /// Waiting to be sent (in `after()`, or by the daily retry).
+  QUEUED
+  SENT
+  /// Meta refused it or could not be reached; retried daily, five tries in all.
+  FAILED
+  /// Not sent and never will be: switched off, not set up, or the lead went.
+  SKIPPED
+}
+
+/// One Meta Conversions API event about one lead (owner, 22 Oct 2026;
+/// studio-sales/conversions.ts). Only for a lead with a `leadgenId` (it came
+/// from a Meta lead ad), only when the studio switched it on. Unique on the
+/// lead and the event, so each event is sent at most once per lead however
+/// often the card moves back and forth. No payload is kept: it is rebuilt
+/// from the lead when sent, so no hashed phone or email sits in this table.
+model StudioConversionEvent {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  clientId String
+  client   StudioClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  /// "QualifiedLead", "ConvertedLead", "Contacted".
+  eventName String
+  /// The column the move went into. Plain text: removing a column keeps the row.
+  stageId   String?
+
+  status    ConversionEventStatus @default(QUEUED)
+  attempts  Int                   @default(0)
+  /// Meta's words, short, never a token.
+  lastError String?
+  sentAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clientId, eventName])
+  @@index([studioId, createdAt])
+  @@index([status, updatedAt])
+  @@map("studio_conversion_events")
 }
 
 /// One request against a rate-limited thing.
@@ -5215,4 +5778,75 @@ model HomeCrewPayment {
   @@index([workOrderId, paidOn])
   @@index([studioId, paidOn])
   @@map("home_crew_payments")
+}
+
+/// The studio software plans (owner, 19 Oct 2026). Pro: Leads, Quotations,
+/// the product master, settings, Today and Calendar. Max: the full Studio OS.
+enum StudioSoftwarePlan {
+  /// Pro for a one-person company (owner, 21 Oct 2026): one login.
+  SOLO
+  PRO
+  MAX
+}
+
+/// A quotation request (owner, 22 Oct 2026; docs/studio-os/QUOTE-REQUESTS.md):
+/// a floor plan was added to a lead, or a salesperson pressed "Request
+/// quotation", and one of the studio's builders (`quotes.build`, or the
+/// studio's "Who builds quotations" list) is handed it in turns, so nobody
+/// builds the same quotation twice. At most one OPEN or IN_PROGRESS request
+/// per lead: a partial unique index in the migration (Prisma cannot express
+/// it); a second floor plan adds to the same request (`fileIds`).
+/// DONE when the quotation is sent (or the builder marks it done); CANCELLED
+/// by a head, or when the lead is lost or in the bin.
+model StudioQuoteRequest {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  clientId String
+  client   StudioClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  /// Who asked (the salesperson who added the plan or pressed the button).
+  requestedById String?
+  requestedBy   StudioMember? @relation("QuoteRequestAsker", fields: [requestedById], references: [id], onDelete: SetNull)
+  /// Who builds it. Null only when the studio had nobody who builds quotations.
+  assignedToId String?
+  assignedTo   StudioMember? @relation("QuoteRequestBuilder", fields: [assignedToId], references: [id], onDelete: SetNull)
+  /// Given in turn (true) or handed by a head (false, after a reassignment).
+  byTurn Boolean @default(true)
+
+  status QuoteRequestStatus @default(OPEN)
+  reason QuoteRequestReason
+
+  /// The draft (first quote) it is built on, then the quotation that was sent.
+  quoteId String?
+  quote   StudioQuote? @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  /// The lead's floor plans that came with it (StudioClientFile ids).
+  fileIds String[] @default([])
+  note    String?
+  /// Why it was cancelled, in words ("The lead was lost").
+  cancelNote String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  doneAt    DateTime?
+
+  @@index([studioId, assignedToId, status])
+  @@index([studioId, status, createdAt])
+  @@index([clientId])
+  @@index([quoteId])
+  @@map("studio_quote_requests")
+}
+
+enum QuoteRequestStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum QuoteRequestReason {
+  /// A floor plan was added to the lead.
+  FLOOR_PLAN
+  /// Somebody pressed "Request quotation" on the lead.
+  REQUESTED
 }

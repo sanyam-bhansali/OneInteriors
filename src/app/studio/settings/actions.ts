@@ -46,6 +46,7 @@ export async function saveBrandingAction(_prev: State, form: FormData): Promise<
     email: str('email'),
     website: str('website'),
     welcomeNote: str('welcomeNote'),
+    ...(form.has('documentName') ? { documentName: str('documentName') } : {}),
     /* The terms moved to Quotations → Terms (13 Oct 2026); a form without the field leaves them alone. */
     ...(form.has('terms') ? { terms: str('terms') } : {}),
     ...(form.has('accentHex') ? { accentHex: str('accentHex') } : {}),

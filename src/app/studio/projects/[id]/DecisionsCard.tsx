@@ -28,7 +28,7 @@ export function DecisionsCard({ data, customer }: { data: StudioDecisions; custo
         {[...open, ...picked].map((d) => {
           const pick = d.options.find((o) => o.id === d.pickedOptionId) ?? null;
           return (
-            <li key={d.id} className="flex flex-col gap-1 border-t border-[var(--fill2)] pt-2.5 text-[13.5px]">
+            <li key={d.id} id={`decision-${d.id}`} className="flex flex-col gap-1 border-t border-[var(--fill2)] pt-2.5 text-[13.5px]">
               <span className="font-medium">{d.title}</span>
               {pick ? (
                 <span className="text-[var(--good)]">

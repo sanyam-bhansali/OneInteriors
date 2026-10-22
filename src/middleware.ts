@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { opsWithoutAuth } from '@/lib/env';
 import { PATH_HEADER, audienceFor, isAlwaysAllowed, route } from '@/lib/host';
+import { METHOD_HEADER, NEXT_ACTION_HEADER, VIEW_AS_HINT_COOKIE, hintIsLive, hintSecret, viewAsGate } from '@/modules/studio/view-as-rules';
 
 /**
  * Two jobs: put each hostname in front of its own product, and keep a
@@ -40,6 +41,10 @@ import { PATH_HEADER, audienceFor, isAlwaysAllowed, route } from '@/lib/host';
 function forward(request: NextRequest, pathname: string) {
   const headers = new Headers(request.headers);
   headers.set(PATH_HEADER, pathname);
+  /* The method, for developer access (studio/view-as-rules.ts
+     `requestIsWrite`): a viewing session is nobody on a write request.
+     Always overwritten, like the path, so a client cannot claim GET. */
+  headers.set(METHOD_HEADER, request.method);
   return { request: { headers } };
 }
 
@@ -64,7 +69,36 @@ function previewCors(request: NextRequest): Headers | null {
   });
 }
 
-export function middleware(request: NextRequest) {
+/**
+ * Developer access, read only (owner, 22 Oct 2026; docs/studio-os/VIEW-AS.md).
+ *
+ * Staff viewing a studio as one of its members carry a companion cookie,
+ * signed over their session cookie (view-as-rules.ts). While it is live, any
+ * write to the studio app — a page's server action, a POST to its API — is
+ * refused here with a 403, except the Stop route. This is the early refusal,
+ * NOT the authority: it cannot see the database, so the server refuses the
+ * same writes again (access.ts `currentMember`, tenancy.ts `myStudioId`,
+ * roles.ts `can`). A forged or stale hint can only refuse its own sender's
+ * writes; a missing one widens nothing, because the server never asks it.
+ * Only computed for a write that carries the cookie, so it costs nothing on
+ * every other request.
+ */
+async function viewAsRefusal(request: NextRequest, host: string | null, path: string): Promise<NextResponse | null> {
+  const hint = request.cookies.get(VIEW_AS_HINT_COOKIE)?.value;
+  if (!hint) return null;
+  const nextAction = request.headers.has(NEXT_ACTION_HEADER);
+  const method = request.method;
+  /* Cheap first: a read never needs the signature checked. */
+  if (viewAsGate({ method, path, audience: audienceFor(host), nextAction, viewing: true }) === 'allow') return null;
+  const viewing = await hintIsLive(hintSecret(process.env), request.cookies.get('oi_session')?.value, hint, new Date());
+  if (viewAsGate({ method, path, audience: audienceFor(host), nextAction, viewing }) === 'allow') return null;
+  return new NextResponse('Read only: you are viewing this studio as one of its people. Stop viewing to make changes.', {
+    status: 403,
+    headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' },
+  });
+}
+
+export async function middleware(request: NextRequest) {
   const cors = previewCors(request);
   if (cors) {
     if (request.method === 'OPTIONS') return new NextResponse(null, { status: 204, headers: cors });
@@ -75,6 +109,10 @@ export function middleware(request: NextRequest) {
 
   const host = request.headers.get('host');
   const path = request.nextUrl.pathname;
+
+  // ── 0. Developer access is read only ──
+  const refusal = await viewAsRefusal(request, host, path);
+  if (refusal) return refusal;
 
   // ── 1. Which product answers for this host ──
   const decision = route(host, path);

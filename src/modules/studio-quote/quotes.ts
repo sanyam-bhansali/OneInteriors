@@ -35,11 +35,13 @@ import { planUseFrom } from '@/modules/brief/mapping';
 import type { PlanRoomSize } from '@/modules/brief/types';
 import { readPhases, type PaymentPhase } from '@/modules/studio/payment-phases';
 import type { ComparableLine } from './revision';
-import { leadInScope, myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
+import { actingMember, leadForQuote, mayOnLead, myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
+import { completeRequestForQuote, linkDraftToRequest } from './quote-request-store';
 import { can } from '@/modules/studio/roles';
 import { record as recordLeadEvent } from '@/modules/studio-practice/events';
 import { issueRevision } from '@/modules/studio-sales/revisions';
 import { quoteWriteRefusal } from './write-rules';
+import { cleanNote } from './line-note';
 
 export type QuoteStatusName = 'DRAFT' | 'ISSUED' | 'ACCEPTED' | 'DECLINED';
 export type QuoteStageName = 'SALES' | 'DESIGN';
@@ -69,6 +71,8 @@ export interface QuoteLineRow {
   qtyMilli: number | null;
   ratePaise: Paise;
   amountPaise: Paise;
+  /** A note for the client, printed under the line's details (15 Oct 2026). */
+  note: string | null;
   sortOrder: number;
 }
 
@@ -110,6 +114,8 @@ export interface QuoteRow {
   terms: string | null;
   issuedOn: Date | null;
   updatedAt: Date;
+  /** "hauspire:<row id>" when brought in from the Hauspire quotation app (22 Oct 2026), else null. */
+  importedFrom: string | null;
   lines: QuoteLineRow[];
 }
 
@@ -274,6 +280,7 @@ async function loadQuote(id: string, studioId: string, scope: Prisma.StudioQuote
       terms: row.terms,
       issuedOn: row.issuedOn,
       updatedAt: row.updatedAt,
+      importedFrom: row.importedFrom,
       lines: row.lines.map((l) => ({
         id: l.id,
         room: l.room,
@@ -286,6 +293,7 @@ async function loadQuote(id: string, studioId: string, scope: Prisma.StudioQuote
         qtyMilli: l.qtyMilli,
         ratePaise: fromDb(l.ratePaise),
         amountPaise: fromDb(l.amountPaise),
+        note: l.note,
         sortOrder: l.sortOrder,
       })),
     };
@@ -340,15 +348,32 @@ async function nextNumber(studioId: string): Promise<string> {
      read "002-D" as NaN, restarted at 001 and clashed with the unique
      number, so every new quotation failed once a copy existed. Read every
      number this year and take the highest leading count. */
+  /* Hauspire's running series (2300, 2301…) carries on once their old
+     quotations are here, so every number is read, not only this year's. */
   const rows = await prisma.studioQuote.findMany({
-    where: { studioId, number: { startsWith: prefix } },
+    where: { studioId, OR: [{ number: { startsWith: prefix } }, { number: { gte: '0', lt: 'A' } }] },
     select: { number: true },
   });
   return nextQuoteNumber(year, rows.map((r) => r.number));
 }
 
-/** The next "YYYY-NNN" after the highest count among `numbers`, suffixes ignored. Pure, for tests. */
+/** Where Hauspire's quotation app starts its plain running series (`quotesRepo.ts` `QUOTE_START`). */
+export const PLAIN_SERIES_START = 2300;
+
+/**
+ * The next number. A studio already on a plain running series of at least
+ * 2300 — Hauspire's, once its old quotations are imported (owner, 22 Oct
+ * 2026) — gets the highest plus one, as the old app's `nextQuoteNo` gives;
+ * every other studio the next "YYYY-NNN" after the highest count among
+ * `numbers`, suffixes ignored. Pure, for tests.
+ */
 export function nextQuoteNumber(year: number, numbers: string[]): string {
+  const plain = numbers
+    .map((n) => n.trim())
+    .filter((n) => /^\d+$/.test(n))
+    .map(Number)
+    .filter((n) => n >= PLAIN_SERIES_START && n < 100_000);
+  if (plain.length > 0) return String(Math.max(...plain) + 1);
   const prefix = `${year}-`;
   const top = numbers.reduce((max, n) => {
     const m = /^(\d+)/.exec(n.startsWith(prefix) ? n.slice(prefix.length) : '');
@@ -383,10 +408,13 @@ export interface NewQuoteInput {
  * owner and PM, the studio's; a salesperson, only those of leads assigned
  * to them. `where` goes into every quotation query here, beside `studioId`.
  */
-async function quoteScope(): Promise<{ studioId: string; where: Prisma.StudioQuoteWhereInput; lead: LeadScope } | null> {
+async function quoteScope(): Promise<{ studioId: string; where: Prisma.StudioQuoteWhereInput; write: Prisma.StudioQuoteWhereInput; lead: LeadScope } | null> {
   const lead = await myLeadScope();
   if (!lead || !can(lead.member, 'quote.write', { assigned: true })) return null;
-  return { studioId: lead.studioId, where: lead.quotes, lead };
+  /* Sales roles (owner, 22 Oct 2026): `where` is what they may read, `write`
+     what they may change (their `quote.write` reach); every write below
+     uses `write`. */
+  return { studioId: lead.studioId, where: lead.quotes, write: lead.quotesWritable, lead };
 }
 
 /** Whether the signed-in person may write quotations at all (for the pages). */
@@ -402,8 +430,11 @@ export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
 
   /* The lead, checked: a salesperson's own, or any of the studio's for owner and PM. */
   const leadId = input.link?.clientId ?? input.clientId ?? null;
-  const lead = leadId ? await leadInScope(qs.lead, leadId) : null;
+  /* Quotation requests (owner, 22 Oct 2026): a builder may quote a lead handed to them, whatever their lead reach. */
+  const lead = leadId ? await leadForQuote(qs.lead, leadId) : null;
   if (leadId && !lead) return { ok: false, error: 'That lead is not one of yours.' };
+  /* Sales roles: seeing the lead is not enough; writing its quotation is `quote.write` on it. */
+  if (lead && !mayOnLead(qs.lead, 'quote.write', lead)) return { ok: false, error: 'Your role does not include quotations for that lead.' };
   if (!lead && !qs.lead.seesAll) return { ok: false, error: 'Pick the lead this quotation is for.' };
 
   /* Shut until the studio has confirmed the rates filled from its own
@@ -486,6 +517,8 @@ export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
         summary: `Quotation ${quote.number} started`,
         meta: { quoteId: quote.id },
       });
+      /* The lead's open quotation request (docs/studio-os/QUOTE-REQUESTS.md) builds on this draft when it has none. */
+      await linkDraftToRequest(studioId, lead.id, quote.id);
     }
 
     return { ok: true, id: quote.id };
@@ -624,7 +657,7 @@ export async function copyQuote(quoteId: string, copy: CopyKind): Promise<QuoteR
   const studioId = qs?.studioId ?? null;
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
   const source = await prisma.studioQuote.findFirst({
-    where: { ...qs?.where, id: quoteId, studioId },
+    where: { ...qs?.write, id: quoteId, studioId },
     include: { lines: { orderBy: { sortOrder: 'asc' } } },
   });
   if (!source) return { ok: false, error: 'That quotation is not yours.' };
@@ -692,6 +725,7 @@ export async function copyQuote(quoteId: string, copy: CopyKind): Promise<QuoteR
             qtyMilli: l.qtyMilli,
             ratePaise: l.ratePaise,
             amountPaise: l.amountPaise,
+            note: l.note,
             sortOrder: l.sortOrder,
           })),
         },
@@ -715,7 +749,7 @@ export async function deleteQuote(quoteId: string): Promise<ActionResult> {
   const studioId = qs?.studioId ?? null;
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
   const q = await prisma.studioQuote.findFirst({
-    where: { ...qs?.where, id: quoteId, studioId },
+    where: { ...qs?.write, id: quoteId, studioId },
     select: { status: true, issuedOn: true, introductionId: true },
   });
   if (!q) return { ok: false, error: 'That quotation is not yours.' };
@@ -794,7 +828,7 @@ async function ownedQuote(quoteId: string): Promise<string | null> {
   if (!studioId) return null;
 
   const row = await prisma.studioQuote.findFirst({
-    where: { ...qs?.where, id: quoteId, studioId },
+    where: { ...qs?.write, id: quoteId, studioId },
     select: { id: true },
   });
   return row?.id ?? null;
@@ -810,7 +844,7 @@ async function writableQuote(quoteId: string): Promise<{ ok: true; id: string; f
   const studioId = qs?.studioId ?? null;
   if (!studioId) return { ok: false, error: 'That quotation is not yours.' };
   const row = await prisma.studioQuote.findFirst({
-    where: { ...qs?.where, id: quoteId, studioId },
+    where: { ...qs?.write, id: quoteId, studioId },
     select: { id: true, feeBps: true, status: true },
   });
   if (!row) return { ok: false, error: 'That quotation is not yours.' };
@@ -892,6 +926,8 @@ export async function setQuoteStatus(
            Sending exactly what was sent last time does not make a new one,
            so Reopen on a won quotation does not add an R. */
         await issueRevision({ quoteId, studioId });
+        /* Sent: the lead's quotation request is done (docs/studio-os/QUOTE-REQUESTS.md). */
+        await completeRequestForQuote(studioId, quoteId, await actingMember());
         void tellCustomer(quoteId, studioId);
       }
     }
@@ -958,6 +994,8 @@ export interface SaveLineInput {
   ratePaise: Paise;
   /** The agreed figure, overriding the arithmetic. Null returns the line to rate × quantity. */
   agreedPaise?: Paise | null;
+  /** A note for the client, printed under the line on the PDFs. Blank clears it. */
+  note?: string | null;
 }
 
 /** A line that survives the trip back from a browser. */
@@ -997,6 +1035,7 @@ function cleanLine(raw: SaveLineInput): SaveLineInput | null {
     qtyMilli: whole(raw.qtyMilli),
     ratePaise: money(raw.ratePaise),
     agreedPaise: raw.agreedPaise == null ? null : money(raw.agreedPaise),
+    note: cleanNote(raw.note),
   };
 }
 
@@ -1073,6 +1112,7 @@ export async function saveQuoteLines(
         qtyMilli: line.qtyMilli ?? null,
         ratePaise: toDb(line.ratePaise),
         amountPaise,
+        note: line.note ?? null,
         /* Position in the array IS the order. The builder lets lines be moved,
            and a sort key derived from anything else would fight it. */
         sortOrder: (index + 1) * 10,

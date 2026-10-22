@@ -13,6 +13,8 @@ import { projectForQuote } from '@/modules/project/own-project';
 import { quoteSalesView } from '@/modules/studio-sales/revisions';
 import { can } from '@/modules/studio/roles';
 import { Revisions } from './Revisions';
+/* The client's digital sign-off (15 Oct 2026): "Signed by … on …" per revision. */
+import { signaturesOfQuote } from '@/modules/project/signoffs';
 import { planReaderFor } from '@/modules/studio-quote/from-plan';
 import { quoteDocContext } from '@/modules/studio-quote/document-data';
 import { LineIcon } from '../../ui/icons';
@@ -63,6 +65,9 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
     // The PDF preview tab: brand pages, payment stages, material specification, terms (13 Oct 2026).
     quoteDocContext(quote),
   ]);
+  const signatures = await quotingStudioId()
+    .then((sid) => (sid ? signaturesOfQuote(quote.id, sid) : new Map<number, string>()))
+    .catch(() => new Map<number, string>());
   /* Owner and PM may add a typed line to the product list; a salesperson asks. */
   const mayAddProducts = member !== null && (member.role === 'OWNER' || member.role === 'PM');
   const mayBook = member !== null && can(member, 'booking.record');
@@ -159,6 +164,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
             branding
               ? {
                   legalName: branding.legalName,
+                  documentName: branding.documentName,
                   addressLine: branding.addressLine,
                   city: branding.city,
                   pincode: branding.pincode,
@@ -190,7 +196,26 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           }}
           extras={
             /* Keyed on the revision count so the compare and sales-final pickers start on the newest revision after a send. */
-            sales ? <Revisions key={sales.revisions.length} view={sales} leadHref={quote.clientId ? `/studio/clients/${quote.clientId}` : null} mayBook={mayBook} /> : null
+            sales ? (
+              <>
+                {signatures.size > 0 ? (
+                  <section className="card" data-testid="quote-signatures" style={{ padding: 16 }}>
+                    <b>Client sign-off</b>
+                    <ul className="m-0 mt-2 flex list-none flex-col gap-1 p-0">
+                      {[...signatures.entries()]
+                        .sort((a, b) => b[0] - a[0])
+                        .map(([n, line]) => (
+                          <li key={n} className="good-t sm">
+                            R{n}: {line}
+                          </li>
+                        ))}
+                    </ul>
+                    {lastRev && !signatures.has(lastRev.n) ? <p className="m-0 mt-1 muted sm">R{lastRev.n}, sent after, is not signed yet. Ask for a new sign-off from the project.</p> : null}
+                  </section>
+                ) : null}
+                <Revisions key={sales.revisions.length} view={sales} leadHref={quote.clientId ? `/studio/clients/${quote.clientId}` : null} mayBook={mayBook} />
+              </>
+            ) : null
           }
         />
     </main>

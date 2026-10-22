@@ -54,7 +54,7 @@ export async function quoteDocContext(quote: Pick<QuoteRow, 'id' | 'phases' | 't
   const studio: DocStudio | null = branding
     ? {
         name: branding.legalName,
-        tradeName: profile?.tradeName ?? null,
+        tradeName: branding.documentName?.trim() || profile?.tradeName || null,
         addressLine: branding.addressLine,
         city: branding.city,
         pincode: branding.pincode,

@@ -53,6 +53,8 @@ export interface BoardCard {
   snags: BoardSnag[];
   /** The fixed final payment, once closed out (money: owner, accounts, PM and designer on it). */
   finalDuePaise: number | null;
+  /** Change orders (15 Oct 2026): extra work with the client, approved and not paid, paid and ready to release. */
+  extras: { withClient: number; toPay: number; toRelease: number };
 }
 
 export interface LifecycleBoard {
@@ -110,6 +112,7 @@ const SELECT = {
   },
   designReviews: { select: { documentId: true, verdict: true, comment: true, at: true } },
   closures: { orderBy: { version: 'desc' }, take: 1, select: { final: true, finalDuePaise: true } },
+  changeOrders: { where: { status: { in: ['SENT_TO_CLIENT', 'APPROVED', 'PAID'] } }, select: { status: true } },
 } as const satisfies Prisma.HomeProjectSelect;
 
 type Row = Prisma.HomeProjectGetPayload<{ select: typeof SELECT }>;
@@ -166,6 +169,11 @@ function cardOf(p: Row, now: Date, seesMoney: boolean): BoardCard {
     provisionalOn: p.provisionalHandoverAt ? istDay(p.provisionalHandoverAt) : null,
     snags: shown.map(({ s, st }) => ({ id: s.id, title: s.title, room: s.room, warranty: s.warranty, state: st.state, fixBy: s.fixBy ? istDay(s.fixBy) : null })),
     finalDuePaise: seesMoney && p.closures[0]?.final ? fromDb(p.closures[0].finalDuePaise) : null,
+    extras: {
+      withClient: p.changeOrders.filter((c) => c.status === 'SENT_TO_CLIENT').length,
+      toPay: p.changeOrders.filter((c) => c.status === 'APPROVED').length,
+      toRelease: p.changeOrders.filter((c) => c.status === 'PAID').length,
+    },
   };
 }
 

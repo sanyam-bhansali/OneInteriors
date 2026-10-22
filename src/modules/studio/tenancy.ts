@@ -1,4 +1,5 @@
 import 'server-only';
+import { opensFullSoftware, planOf } from './software-plan';
 
 /**
  * Which studio the signed-in user belongs to. The tenancy primitive.
@@ -35,6 +36,7 @@ import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
 import { getCurrentUser, hasRole } from '@/modules/auth/session';
 import { OFFICE_MEMBER } from './surfaces';
+import { isWriteRequest, staffViewFor } from './view-as';
 
 export async function myStudioId(): Promise<string | null> {
   const user = await getCurrentUser();
@@ -49,13 +51,20 @@ export async function myStudioId(): Promise<string | null> {
        studio id. Everything in studio-practice/ and studio-quote/ starts
        here, so a site supervisor, an accounts member, or anyone invited or
        suspended finds no studio in any office module (studio/surfaces.ts). */
+    /* Developer access (owner, 22 Oct 2026; docs/studio-os/VIEW-AS.md): OPS
+       or ADMIN with a live view gets the viewed member's studio, by the same
+       OFFICE_MEMBER rule, on a read only. On a write request (a server
+       action, or any method but GET/HEAD) they get no studio, so no office
+       module has anywhere to write. Not viewing: exactly as before. */
+    const view = await staffViewFor(user);
+    if (view && (await isWriteRequest())) return null;
     const member = await prisma.studioMember.findUnique({
-      where: { userId: user.id, ...OFFICE_MEMBER },
-      select: { studioId: true, role: true, studio: { select: { fullSoftware: true } } },
+      where: view ? { id: view.memberId, studioId: view.studioId, ...OFFICE_MEMBER } : { userId: user.id, ...OFFICE_MEMBER },
+      select: { studioId: true, role: true, studio: { select: { fullSoftware: true, softwarePlan: true } } },
     });
     /* The pilot switch (studio/pilot.ts): a project manager's office is the
        full software's, so in a studio without it they find no studio. */
-    if (member && member.role === 'PM' && member.studio?.fullSoftware === false) return null;
+    if (member && member.role === 'PM' && member.studio && !opensFullSoftware(planOf(member.studio))) return null;
     return member?.studioId ?? null;
   } catch {
     return null;

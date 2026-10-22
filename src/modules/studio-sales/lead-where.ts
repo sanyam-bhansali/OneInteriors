@@ -104,8 +104,15 @@ export function leadWhere(f: LeadFilters, now: Date, meId: string | null = null)
   if (f.kind === 'won') and.push({ stage: { kind: { in: ['WON', 'DONE'] } } });
   if (f.kind === 'lost') and.push({ stage: { kind: 'LOST' } });
   if (f.kind === 'closed') and.push({ stage: { kind: { in: ['DONE', 'LOST'] } } });
+  /* Sales roles and teams (owner, 22 Oct 2026): one pool, inside the person's fence. */
+  if (f.poolTeam === 'studio') and.push({ assignedToId: null, poolTeamId: null });
+  else if (f.poolTeam) and.push({ assignedToId: null, poolTeamId: f.poolTeam });
+  /* Its own branch of the chain: "pool" is no person, so it must never fall
+     through to `assignedToId: f.owner` (that matched nothing: 0 in the pool). */
   if (f.owner === 'pool') and.push({ assignedToId: null });
-  else if (f.owner === 'anyone') and.push({ assignedToId: { not: null } });
+  else if (f.poolTeam) {
+    /* A pool tab already says who has it: nobody. */
+  } else if (f.owner === 'anyone') and.push({ assignedToId: { not: null } });
   else if (f.owner === 'me') and.push({ assignedToId: meId ?? '__nobody__' });
   else if (f.owner) and.push({ assignedToId: f.owner });
 
@@ -169,6 +176,8 @@ export interface ScopeLike {
   /** The pool they may list and claim from (roles.ts `poolVisibleTo`). */
   pool: Prisma.StudioClientWhereInput;
   seesAll: boolean;
+  /** Sales roles: their team (them and everyone below them) when their leads reach their team; else null or absent. */
+  team?: readonly string[] | null;
 }
 
 /**
@@ -176,6 +185,11 @@ export interface ScopeLike {
  * (`live` is `LIVE` from demo-lead.ts, or `LISTED` for the board, which shows
  * the sample). For a salesperson the `owner` filter picks between their own
  * leads (the default) and the pool; any other value reads as their own.
+ *
+ * Sales roles and teams (owner, 22 Oct 2026): with team reach the default is
+ * everything their team has (`scope.leads`), and `owner` may narrow it to
+ * `me`, `anyone`, or one person — always inside the fence, so a person
+ * outside their team finds nothing. `pool` is the pools they may claim from.
  */
 export function scopedLeadWhere(
   scope: ScopeLike,
@@ -184,6 +198,10 @@ export function scopedLeadWhere(
   live: { deletedAt: null; isDemo?: false },
 ): Prisma.StudioClientWhereInput {
   if (scope.seesAll) return { AND: [scope.leads, { studioId: scope.studioId, ...live }, leadWhere(f, now, scope.member.id)] };
+  if (scope.team) {
+    const fence = f.owner === 'pool' ? scope.pool : scope.leads;
+    return { AND: [fence, { studioId: scope.studioId, ...live }, leadWhere(f, now, scope.member.id)] };
+  }
   const fence = salesOwner(f) === 'pool' ? scope.pool : scope.leads;
   return { AND: [fence, { studioId: scope.studioId, ...live }, leadWhere({ ...f, owner: undefined }, now, scope.member.id)] };
 }

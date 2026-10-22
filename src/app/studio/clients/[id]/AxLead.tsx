@@ -5,17 +5,18 @@ import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { type CallOutcomeId } from '@/modules/studio-practice/event-copy';
 import { CALL_MENU } from '@/modules/studio-practice/call-log';
-import { PickedUpSheet } from './PickedUpSheet';
+import { CallSheet } from '../CallLogger';
 import { suggestTags } from '@/modules/studio-sales/tag-rules';
 import { dayLabel, dueBadge } from '@/modules/studio-sales/lead-view';
 import { initials } from '@/modules/studio-sales/lead-view';
 import { LineIcon } from '../../ui/icons';
-import { Dot, Modal, PillDue, PillTag, SourceIcon, btnGhost, btnOutline, btnPrimary, useDismiss } from '../ax-ui';
+import { Dot, PillDue, PillTag, SourceIcon, btnGhost, btnOutline, btnPrimary, useDismiss } from '../ax-ui';
 import { LostReasonDialog } from '../AxBoard';
-import { binAction, logContactAction, markLostAction } from '../actions';
+import { binAction } from '../actions';
 import { addTagsAction, deleteNoteAction, editNoteAction, followUpDoneAction, moveLeadAction, removeTagAction } from '../list-actions';
 import { addNoteAction, newQuoteForLeadAction } from '../../sales-actions';
 import { Said, useAct } from '../../SalesUi';
+import { CALL_LOGGED_EVENT } from './LeadNav';
 
 const icon = (d: string, cls = '') => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={cls}>
@@ -66,8 +67,10 @@ export function LeadHeader({
   lead: HeaderLead;
   tel: string | null;
   whatsapp: string | null;
-  stages: { id: string; name: string; colour: string; kind: string }[];
-  may: { edit: boolean; quote: boolean; delete: boolean };
+  /** In board order, with the flags the call sheet's suggested move reads (calling steps, 21 Oct 2026). */
+  stages: { id: string; name: string; colour: string; kind: 'OPEN' | 'WON' | 'DONE' | 'LOST'; sortOrder?: number; isIntake?: boolean; isCallStep?: boolean }[];
+  /** `call` (sales roles, owner 22 Oct 2026): may log a call on this lead; left out, logging follows `edit`. */
+  may: { edit: boolean; quote: boolean; delete: boolean; call?: boolean };
   /** A sales final waits for its booking advance (Record booking is on this page). */
   canBook: boolean;
   /** Calls already logged on this lead: the Picked up sheet's "attempt N". */
@@ -77,11 +80,12 @@ export function LeadHeader({
   const [pending, start] = useTransition();
   const [said, setSaid] = useState<{ ok: boolean; text: string } | null>(null);
   const [lostTo, setLostTo] = useState<string | null>(null);
-  const [askWrong, setAskWrong] = useState(false);
   const [explain, setExplain] = useState(false);
   const [sure, setSure] = useState(false);
-  /* Log call → Picked up (AxLeads, 13 Oct 2026). */
-  const [pickedUp, setPickedUp] = useState(false);
+  /* Log call → the outcome's sheet (AxLeads, 13 Oct 2026; calling steps,
+     21 Oct 2026): Picked up, a missed call's retry and suggested move, or
+     wrong number. The same sheet the list, the board and Today open. */
+  const [calling, setCalling] = useState<CallOutcomeId | 'picked_up' | null>(null);
 
   const act = (fn: () => Promise<object | undefined>, okText: string, after?: () => void) =>
     start(async () => {
@@ -99,7 +103,6 @@ export function LeadHeader({
       }
     });
 
-  const logCall = (o: CallOutcomeId) => act(() => logContactAction(lead.id, o, null, null), 'Call logged', o === 'wrong_number' ? () => setAskWrong(true) : undefined);
   const moveTo = (to: string) => {
     if (to === lead.stageId) return;
     if (stages.find((s) => s.id === to)?.kind === 'LOST') return setLostTo(to);
@@ -197,9 +200,10 @@ export function LeadHeader({
       </div>
 
       <div className="hstack" style={{ gap: 8 }}>
-        {may.edit ? (
+        {may.edit || may.call ? (
           <>
             <span id="log-call" style={{ scrollMarginTop: 90 }} />
+            {(may.call ?? may.edit) ? (
             <Menu label="Log call" iconPath="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" disabled={pending} left>
               {(close) => (
                 <>
@@ -209,8 +213,7 @@ export function LeadHeader({
                       key={o.id}
                       onClick={() => {
                         close();
-                        if (o.id === 'picked_up') setPickedUp(true);
-                        else logCall(o.id as CallOutcomeId);
+                        setCalling(o.id as CallOutcomeId | 'picked_up');
                       }}
                     >
                       <span className={o.id === 'picked_up' ? 'good-t' : o.id === 'wrong_number' ? 'bad-t' : 'warn-t'} aria-hidden>
@@ -222,6 +225,9 @@ export function LeadHeader({
                 </>
               )}
             </Menu>
+            ) : null}
+            {may.edit ? (
+            <>
             <button type="button" onClick={() => goTo('notes', 'note-input')} className={btnOutline} title="Add internal note">
               {icon('M5 4h14v12l-4 4H5zM15 20v-4h4M8 9h8M8 13h5')}
               Note
@@ -263,6 +269,8 @@ export function LeadHeader({
                 </>
               )}
             </Menu>
+            </>
+            ) : null}
           </>
         ) : null}
         <span className={`chip ${lead.ownerName ? '' : 'warn'}`} title={may.delete ? 'Change the owner in the panel on the right' : undefined}>
@@ -315,32 +323,19 @@ export function LeadHeader({
           }}
         />
       ) : null}
-      {pickedUp ? (
-        <PickedUpSheet
+      {calling ? (
+        <CallSheet
           lead={{ id: lead.id, name: lead.name, phone: lead.phone, stageId: lead.stageId }}
           stages={stages}
+          outcome={calling}
           previousCalls={previousCalls}
-          onClose={() => setPickedUp(false)}
-          onLogged={() => setSaid({ ok: true, text: 'Call logged' })}
+          onClose={() => setCalling(null)}
+          onLogged={(r) => {
+            setSaid({ ok: true, text: r.movedTo ? `Call logged · moved to ${r.movedTo.name}` : 'Call logged' });
+            /* "Next lead →" (improvement 8, owner 22 Oct 2026): LeadNav offers the next lead in the list this page came from. */
+            window.dispatchEvent(new CustomEvent(CALL_LOGGED_EVENT, { detail: { leadId: lead.id } }));
+          }}
         />
-      ) : null}
-      {askWrong ? (
-        <Modal onClose={() => setAskWrong(false)} width="min(420px, 92vw)" labelledBy="wrong-title">
-          <div className="sb">
-            <h2 id="wrong-title" style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>
-              Wrong number. Mark {lead.name} lost?
-            </h2>
-            <p className="cl-sub">Only if there is no other way to reach them. You can move it back any time.</p>
-            <div className="hstack" style={{ justifyContent: 'flex-end' }}>
-              <button type="button" onClick={() => setAskWrong(false)} className={btnOutline}>
-                Keep it open
-              </button>
-              <button type="button" onClick={() => act(() => markLostAction(lead.id, 'WRONG_NUMBER'), 'Marked lost — wrong number', () => setAskWrong(false))} className={btnPrimary}>
-                Mark lost — wrong number
-              </button>
-            </div>
-          </div>
-        </Modal>
       ) : null}
     </div>
   );

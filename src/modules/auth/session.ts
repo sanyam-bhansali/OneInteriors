@@ -28,7 +28,9 @@ import { bearerFrom } from './bearer';
 import type { UserRole } from '@prisma/client';
 import { sessionDaysFor } from '@/modules/studio/roles';
 
-const COOKIE = 'oi_session';
+/** The website's session cookie (developer access, studio/view-as.ts, reads it too). */
+export const SESSION_COOKIE = 'oi_session';
+const COOKIE = SESSION_COOKIE;
 /** Everyone who is not on a studio's team. Studio members: `sessionDaysFor(role)`. */
 const SESSION_DAYS = 30;
 /** Refresh lastUsedAt at most this often, to avoid a write on every request. */

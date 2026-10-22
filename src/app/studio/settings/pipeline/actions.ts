@@ -8,6 +8,7 @@ import {
   setStageKind,
   moveStage,
   setIntakeStage,
+  setCallStep,
   removeStage,
   applyHauspirePipeline,
   type ColourToken,
@@ -75,6 +76,14 @@ export async function moveStageAction(id: string, direction: 'up' | 'down'): Pro
 
 export async function setIntakeAction(id: string): Promise<State> {
   const result = await setIntakeStage(id);
+  if (!result.ok) return result;
+  refresh();
+  return { ok: true };
+}
+
+/** "Calling step" on or off for one open column (owner, 21 Oct 2026). */
+export async function setCallStepAction(id: string, on: boolean): Promise<State> {
+  const result = await setCallStep(String(id ?? ''), on === true);
   if (!result.ok) return result;
   refresh();
   return { ok: true };

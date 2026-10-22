@@ -148,6 +148,8 @@ export interface ClosureInput {
   contractPaise: number;
   /** Decisions' agreed changes, GST included. */
   changesPaise: number;
+  /** Approved change orders (extra work after sign-off), GST included; never the closure's own lines. */
+  changeOrdersPaise?: number;
   lines: readonly ClosureLineInput[];
   /** The quotation's GST rate. */
   gstBps: number;
@@ -158,6 +160,8 @@ export interface ClosureInput {
 export interface ClosureTotals {
   contractPaise: number;
   changesPaise: number;
+  /** Approved change orders, GST included (read-only on the closure). */
+  changeOrdersPaise: number;
   extrasPaise: number;
   deductionsPaise: number;
   /** Extra work less deductions, before GST. */
@@ -165,7 +169,7 @@ export interface ClosureTotals {
   gstBps: number;
   /** GST on the net, the quotation's way: last, at its rate. A net credit carries its GST back too. */
   gstPaise: number;
-  /** Contract + changes + net + GST. */
+  /** Contract + changes + change orders + net + GST. */
   totalPaise: number;
   paidPaise: number;
   /** Total less paid. Negative = the studio owes the client a refund. */
@@ -177,10 +181,12 @@ export function closureTotals(input: ClosureInput): ClosureTotals {
   const deductionsPaise = input.lines.filter((l) => l.kind === 'DEDUCTION').reduce((a, l) => a + l.amountPaise, 0);
   const netPaise = extrasPaise - deductionsPaise;
   const gstPaise = applyBps(netPaise, input.gstBps);
-  const totalPaise = input.contractPaise + input.changesPaise + netPaise + gstPaise;
+  const changeOrdersPaise = input.changeOrdersPaise ?? 0;
+  const totalPaise = input.contractPaise + input.changesPaise + changeOrdersPaise + netPaise + gstPaise;
   return {
     contractPaise: input.contractPaise,
     changesPaise: input.changesPaise,
+    changeOrdersPaise,
     extrasPaise,
     deductionsPaise,
     netPaise,

@@ -32,6 +32,8 @@ export const CUSTOMER_PAYMENT_SELECT = {
   recordedAt: true,
   customerConfirmedAt: true,
   disputedAt: true,
+  /* Received before the project was brought in: counts as paid ('earlier'). */
+  beforeJoining: true,
 } as const;
 
 export const CUSTOMER_QUOTE_CHANGE_SELECT = {
@@ -69,6 +71,7 @@ type PaymentRow = {
   recordedAt?: Date | null;
   customerConfirmedAt?: Date | null;
   disputedAt?: Date | null;
+  beforeJoining?: boolean | null;
 };
 
 type ChangeRow = {

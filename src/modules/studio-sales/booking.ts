@@ -36,6 +36,7 @@ import { stageSummary } from '@/modules/studio-practice/event-copy';
 import { readRevisionLines, readRevisionTotals, revisionLabel, sameLinesAs } from './revision-rules';
 import { readStages, refundDaysOf, scheduleAmounts, templateOrDefault } from './payment-template';
 import { snapshotOf } from './revisions';
+import { queueConversions } from './conversions';
 import {
   bookedSummary,
   bookingRefusal,
@@ -81,7 +82,7 @@ const BOOKING_QUOTE = {
   },
   lines: {
     orderBy: { sortOrder: 'asc' as const },
-    select: { room: true, product: true, code: true, unit: true, details: true, widthMm: true, heightMm: true, qtyMilli: true, ratePaise: true, amountPaise: true },
+    select: { room: true, product: true, code: true, unit: true, details: true, widthMm: true, heightMm: true, qtyMilli: true, ratePaise: true, amountPaise: true, note: true },
   },
 } satisfies Prisma.StudioQuoteSelect;
 
@@ -245,6 +246,8 @@ export async function recordBooking(input: RecordBookingInput, now = new Date())
     },
   );
   if (!started.ok) return started;
+  /* Booked is the conversion Meta most wants to hear about (22 Oct 2026); inert unless switched on. */
+  if (lead && won && lead.stageId !== won.id) await queueConversions(studioId, [{ clientId: lead.id, toStageId: won.id }]);
   return { ok: true, projectId: started.projectId, clientId: lead?.id ?? null, invitedBy: started.invite.sentVia };
 }
 

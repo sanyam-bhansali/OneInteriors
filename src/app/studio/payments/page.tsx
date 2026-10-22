@@ -3,6 +3,8 @@ import type { Metadata } from 'next';
 import { formatINR } from '@/lib/money';
 import { paymentsDesk } from '@/modules/project/payments-flow';
 import { finalPayments } from '@/modules/project/closure';
+import { extrasToCollect } from '@/modules/project/change-orders';
+import { ExtrasToCollect } from '../projects/[id]/ExtrasToCollect';
 import { PaymentsBody } from '../projects/[id]/PaymentsTab';
 import { bookingDraft, bookingsToRecord, recentBookings } from '@/modules/studio-sales/booking';
 import { currentMember } from '@/modules/studio/access';
@@ -30,7 +32,7 @@ export default async function PaymentsDeskPage() {
   /* Studio OS Phase 1: the booking advance is recorded here too, on the
      sales final, with the same form as the lead page. */
   /* The project lifecycle — TO BE SPECIFIED (owner): the accounts flow for the closure's final payment. For now it shows here, first, and is recorded with the same payment recording. */
-  const finals = await finalPayments(projects.map((p) => p.id));
+  const [finals, extras] = await Promise.all([finalPayments(projects.map((p) => p.id)), extrasToCollect(projects.map((p) => p.id))]);
   const drafts = Object.fromEntries(await Promise.all(toBook.map(async (w) => [w.quoteId, await bookingDraft(member, w.quoteId)] as const)));
   const weight = (p: (typeof projects)[number]) => {
     const rows = p.payments?.rows ?? [];
@@ -111,6 +113,8 @@ export default async function PaymentsDeskPage() {
                       </span>
                     </div>
                   ) : null}
+                  {/* Change orders (15 Oct 2026): approved extra work to collect. */}
+                  {extras.get(p.id)?.length ? <ExtrasToCollect items={extras.get(p.id)!} canRecord={p.payments?.canRecord ?? false} /> : null}
                   {p.payments ? (
                     <PaymentsBody data={p.payments} customer={p.customer.split(/\s+/)[0] ?? p.customer} />
                   ) : (

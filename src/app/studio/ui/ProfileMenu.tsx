@@ -177,6 +177,8 @@ function ProfileSheet({ signOut, onClose }: { signOut: () => Promise<void>; onCl
                   <dd>{p.roleName}</dd>
                   <dt>Studio</dt>
                   <dd>{p.studio}</dd>
+                  <dt>Studio plan</dt>
+                  <dd>{p.planName}</dd>
                   <dt>Language</dt>
                   <dd>{p.language}</dd>
                   <dt>On the team since</dt>

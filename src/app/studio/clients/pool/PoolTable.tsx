@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SELECT_FIRST, type BulkAction } from '@/modules/studio-sales/bulk-rules';
 import { NOT_SET } from '@/modules/studio-sales/lead-filters';
-import { relTime, sourceLabel, type LeadView } from '@/modules/studio-sales/lead-view';
+import { relTime, seesFullLead, sourceLabel, type LeadView } from '@/modules/studio-sales/lead-view';
+import { assignLeadsAction } from '../../sales-actions';
 import { Avatar, SelectMenu, StageBadge, btnOutline } from '../ax-ui';
 import { BulkBar, ClaimOne } from '../LeadList';
 import { bulkAssignAction, viewPageAction } from '../list-actions';
@@ -26,6 +27,10 @@ export function PoolTable({
   people,
   actions,
   seesAll,
+  assigner = seesAll,
+  team = null,
+  meId = '',
+  moveTo = [],
   showingAll,
   groups,
   groupKey,
@@ -38,6 +43,13 @@ export function PoolTable({
   people: { id: string; name: string }[];
   actions: BulkAction[];
   seesAll: boolean;
+  /** May give leads out (sales roles: `lead.assign`). */
+  assigner?: boolean;
+  /** Sales roles: their team, when their leads reach it (team pool leads open in full). */
+  team?: string[] | null;
+  meId?: string;
+  /** Pools a lead may be moved into (`studio` or a head's id). */
+  moveTo?: { key: string; label: string }[];
   showingAll: boolean;
   groups: { key: string; label: string; values: { value: string; n: number }[] }[];
   groupKey: string;
@@ -80,7 +92,9 @@ export function PoolTable({
   const [matching, setMatching] = useState<number | null | false>(false);
   const [said, setSaid] = useState<string | null>(null);
   const selected = matching !== false ? Math.min(matching ?? total, total) : picked.size;
-  const poolActions: BulkAction[] = seesAll ? actions.filter((a) => a === 'assign' || a === 'claim' || a === 'split' || a === 'bin') : actions.filter((a) => a === 'claim');
+  /* What the role allows in the pool (bulk-rules.ts already filtered by right). */
+  const poolActions: BulkAction[] = actions.filter((a) => a === 'assign' || a === 'claim' || a === 'split' || a === 'bin');
+  const opens = (l: LeadView) => seesFullLead({ seesAll, member: { id: meId }, team }, l);
   const clear = () => {
     setPicked(new Set());
     setMatching(false);
@@ -219,7 +233,7 @@ export function PoolTable({
                       <div className="hstack" style={{ gap: 10, flexWrap: 'nowrap' }}>
                         <Avatar name={l.name} />
                         <div style={{ minWidth: 0 }}>
-                          {seesAll ? (
+                          {opens(l) ? (
                             <Link href={`/studio/clients/${l.id}`} style={{ fontWeight: 600 }}>
                               {l.name}
                             </Link>
@@ -237,7 +251,7 @@ export function PoolTable({
                       <span className={`chip xs ${l.source === 'ONE_INTERIORS' ? 'oi' : ''}`}>{sourceLabel(l)}</span>
                     </td>
                     <td className={`${TD} sub`}>{now ? relTime(l.createdAt, now) : ''}</td>
-                    <td className={TD}>{seesAll ? <AssignRow id={l.id} people={people} current={l.assignedToName} /> : <ClaimOne id={l.id} />}</td>
+                    <td className={TD}>{assigner ? <AssignRow id={l.id} people={people} current={l.assignedToName} moveTo={moveTo.filter((m) => m.key !== (l.poolTeamId ?? 'studio'))} /> : <ClaimOne id={l.id} />}</td>
                   </tr>
                 );
               })}
@@ -256,16 +270,16 @@ export function PoolTable({
 const TH = '';
 const TD = '';
 
-/** Owner and PM: give this lead to someone, in one choice. */
-function AssignRow({ id, people, current }: { id: string; people: { id: string; name: string }[]; current: string | null }) {
+/** Whoever may assign: give this lead to someone, or move it into another pool, in one choice. */
+function AssignRow({ id, people, current, moveTo = [] }: { id: string; people: { id: string; name: string }[]; current: string | null; moveTo?: { key: string; label: string }[] }) {
   const { pending, result, run } = useAct();
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       <SelectMenu
         value=""
         label={pending ? 'Assigning…' : (current ?? 'Assign to…')}
-        options={people.map((p) => ({ value: p.id, label: p.name }))}
-        onChange={(v) => run(() => bulkAssignAction({ ids: [id] }, v))}
+        options={[...people.map((p) => ({ value: p.id, label: p.name })), ...moveTo.map((m) => ({ value: `pool:${m.key}`, label: `Move to ${m.label === 'Studio pool' ? 'the studio pool' : `${m.label} pool`}` }))]}
+        onChange={(v) => run(() => (v.startsWith('pool:') ? assignLeadsAction([id], null, v.slice(5)) : bulkAssignAction({ ids: [id] }, v)))}
       />
       <Said result={result} />
     </div>

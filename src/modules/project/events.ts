@@ -88,6 +88,8 @@ export const PROJECT_EVENT_TYPES = [
   'customer.joined',
   // Studio OS Phase 1 (docs/studio-os/PHASE-1-SALES.md): the booking advance refunded
   'project.cancelled',
+  // "Add an existing project" (docs/studio-os/BRING-IN-PROJECTS.md): a running project brought onto One Interiors
+  'project.brought_in',
   // Studio OS Phase 2 (docs/studio-os/PHASE-2-DESIGN.md): design
   'designer.assigned',
   'design.ticked',
@@ -113,6 +115,19 @@ export const PROJECT_EVENT_TYPES = [
   'closure.saved',
   'closure.fixed',
   'handover.signed',
+  // Change orders (owner, 15 Oct 2026): extra work after design sign-off, approved and paid by the client before it is released.
+  'extra.created',
+  'extra.edited',
+  'extra.sent',
+  'extra.approved',
+  'extra.declined',
+  'extra.paid',
+  'extra.released',
+  'extra.cancelled',
+  // Client digital sign-off of a quotation (owner, 15 Oct 2026).
+  'signoff.requested',
+  'signoff.signed',
+  'signoff.withdrawn',
 ] as const;
 
 export type ProjectEventType = (typeof PROJECT_EVENT_TYPES)[number];

@@ -85,6 +85,12 @@ export interface LeadFilters {
   kind?: KindFilter;
   /** `pool` nobody · `anyone` somebody · `me` · a member id. */
   owner?: string;
+  /**
+   * Which pool (sales roles and teams, owner 22 Oct 2026): `studio` for the
+   * studio pool, or a head's member id for their team pool. Unassigned leads
+   * only; always inside the person's own pool fence.
+   */
+  poolTeam?: string;
   /** Any of these follow-up buckets (open leads with a follow-up). */
   due?: DueFilter[];
   /** Never spoken to (open leads). */
@@ -170,6 +176,8 @@ export function parseLeadFilters(params: Params): LeadFilters {
   if (kind && (KINDS as readonly string[]).includes(kind)) f.kind = kind as KindFilter;
   const owner = one(params, 'owner');
   if (owner && ID.test(owner)) f.owner = owner;
+  const poolTeam = one(params, 'pool');
+  if (poolTeam && ID.test(poolTeam)) f.poolTeam = poolTeam;
   const due = list(params, 'due').filter((d): d is DueFilter => (DUES as string[]).includes(d));
   if (due.length) f.due = due;
   if (one(params, 'never') === '1') f.never = true;
@@ -198,6 +206,7 @@ export function leadFiltersToQuery(f: LeadFilters): string {
   if (f.stage?.length) p.set('stage', [...f.stage].sort().join(','));
   if (f.kind) p.set('kind', f.kind);
   if (f.owner) p.set('owner', f.owner);
+  if (f.poolTeam) p.set('pool', f.poolTeam);
   if (f.due?.length) p.set('due', [...f.due].sort().join(','));
   if (f.never) p.set('never', '1');
   if (f.quiet) p.set('quiet', '1');
@@ -228,8 +237,9 @@ export function leadsHref(f: LeadFilters, extra: Record<string, string> = {}): s
 }
 
 /**
- * A salesperson's `owner`: their own leads, or (owner, 12 Oct 2026) the pool
- * to claim from. Nothing else — never a colleague's.
+ * A Phase 1 salesperson's `owner`: their own leads, or (owner, 12 Oct 2026)
+ * the pool to claim from. Nothing else — never a colleague's. (A sales role
+ * with team reach may also pick someone in their team: lead-where.ts.)
  */
 export function salesOwner(f: LeadFilters): 'me' | 'pool' {
   return f.owner === 'pool' ? 'pool' : 'me';
@@ -314,6 +324,9 @@ export function describeFilters(
       label:
         f.owner === 'pool' ? 'Nobody has it (pool)' : f.owner === 'anyone' ? 'Somebody has it' : f.owner === 'me' ? 'Mine' : names.member?.(f.owner) ? `${names.member(f.owner)}'s` : 'Somebody who has left',
     });
+  }
+  if (f.poolTeam) {
+    out.push({ key: 'poolTeam', label: f.poolTeam === 'studio' ? 'Studio pool' : names.member?.(f.poolTeam) ? `${names.member(f.poolTeam)}’s team pool` : 'A team pool' });
   }
   for (const d of f.due ?? []) out.push({ key: 'due', value: d, label: DUE_LABELS[d] });
   if (f.never) out.push({ key: 'never', label: 'Not contacted yet' });

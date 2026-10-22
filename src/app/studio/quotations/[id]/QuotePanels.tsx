@@ -6,6 +6,7 @@ import type { QuoteRow } from '@/modules/studio-quote/quotes';
 import type { PaymentStage } from '@/modules/studio-sales/payment-template';
 import { docHead, type DocSpecRow, type DocStudio } from '@/modules/studio-quote/document';
 import { QuotationDocument } from '../doc/QuotationDocument';
+import '../doc/quote-doc.css';
 import type { PricedLine } from './QuoteLines';
 
 /** What the PDF needs that the builder does not edit, loaded on the server (`quoteDocContext`). */
@@ -41,6 +42,7 @@ export function DocumentPreview({
   totals: QuoteTotals;
   branding: {
     legalName: string;
+    documentName?: string | null;
     addressLine: string | null;
     city: string;
     pincode: string | null;
@@ -73,7 +75,7 @@ export function DocumentPreview({
 
   const studio: DocStudio = doc?.studio ?? {
     name: branding.legalName,
-    tradeName: null,
+    tradeName: branding.documentName?.trim() || null,
     addressLine: branding.addressLine,
     city: branding.city,
     pincode: branding.pincode,

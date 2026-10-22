@@ -47,6 +47,7 @@ const TABLE: Record<StudioAction, Record<StudioRoleName, Cell>> = {
   'lead.merge': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
   'lead.delete': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
   'lead.import': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
+  'lead.export': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
   'lead.pool': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
   'lead.claim': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: 'Y', DESIGNER: '-' },
   'quote.write': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: 'A', DESIGNER: '-' },
@@ -72,6 +73,19 @@ const TABLE: Record<StudioAction, Record<StudioRoleName, Cell>> = {
   // sign off the design and do the project closure. The PM still never sees crew money.
   'design.close': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: 'A' },
   'project.closure': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: 'A' },
+  // Change orders and client sign-off (owner, 15 Oct 2026): owner, PM and designer on the project create and send;
+  // accounts records the payment (payment.record); sales nothing.
+  'extras.write': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: 'A' },
+  'signoff.request': { OWNER: 'Y', PM: 'A', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: 'A' },
+  'project.bringIn': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: 'Y' },
+  // Sales roles (owner, 22 Oct 2026): calling and bulk split out of lead.edit; analytics and lead settings named; the
+  // sales team and building quotations are new. A SALES member without a sales role keeps Phase 1 (own leads).
+  'lead.call': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: 'A', DESIGNER: '-' },
+  'lead.bulk': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: 'Y', DESIGNER: '-' },
+  'lead.analytics': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
+  'lead.settings': { OWNER: 'Y', PM: 'Y', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
+  'team.sales': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
+  'quote.build': { OWNER: 'Y', PM: '-', SUPERVISOR: '-', ACCOUNTS: '-', SALES: '-', DESIGNER: '-' },
 };
 
 const active = (role: StudioRoleName) => ({ role, status: 'ACTIVE' as const });

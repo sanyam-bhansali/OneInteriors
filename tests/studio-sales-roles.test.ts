@@ -40,7 +40,7 @@ describe('what a salesperson may do', () => {
 
   it('picks no sites on the team screen, and its role card reads off the table', () => {
     expect(pickSites('SALES')).toBe(false);
-    expect(roleCan('SALES')).toEqual(['See leads', 'Work leads: calls, notes, floor plans', 'Add leads', 'Claim a lead from the pool', 'Write and send quotations', 'Mark the sales final']);
+    expect(roleCan('SALES')).toEqual(['See leads', 'Work leads: calls, notes, floor plans', 'Add leads', 'Claim a lead from the pool', 'Write and send quotations', 'Mark the sales final', 'Log calls', 'Act on many leads at once']);
   });
 
   it('owner and PM see every lead and may assign, merge and delete', () => {

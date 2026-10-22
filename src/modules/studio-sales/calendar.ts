@@ -54,8 +54,12 @@ export async function myCalendar(view: CalendarView, day: string, whoRaw: string
   if (!scope) return null;
   const w = calendarWindow(view, day);
   const people = await taskPeople();
-  const who = scope.seesAll ? (whoRaw && people.some((p) => p.id === whoRaw) ? whoRaw : null) : scope.member.id;
-  const owner = scope.seesAll && who ? { owner: who } : {};
+  /* Sales roles (owner, 22 Oct 2026): someone whose leads reach their team
+     sees the team's calendar and may pick one person in it, like the owner. */
+  const wide = scope.seesAll || scope.team !== null;
+  const mayPick = (id: string) => people.some((p) => p.id === id) && (scope.seesAll || (scope.team ?? []).includes(id));
+  const who = wide ? (whoRaw && mayPick(whoRaw) ? whoRaw : null) : scope.member.id;
+  const owner = wide && who ? { owner: who } : {};
   const leads = scopedLeadWhere(scope, owner, now, LIVE);
   const ownerSelect = { assignedTo: { select: { user: { select: { name: true, email: true, phone: true } } } } } as const;
   const followupWhere = (from: Date, to: Date, toInclusive = true) => ({
@@ -108,7 +112,7 @@ export async function myCalendar(view: CalendarView, day: string, whoRaw: string
     return {
       window: w,
       items,
-      seesAll: scope.seesAll,
+      seesAll: wide,
       people,
       who,
       meId: scope.member.id,
@@ -118,6 +122,6 @@ export async function myCalendar(view: CalendarView, day: string, whoRaw: string
     };
   } catch (error) {
     console.error('[calendar] read failed', error instanceof Error ? error.message : 'unknown');
-    return { window: w, items: [], seesAll: scope.seesAll, people, who, meId: scope.member.id, capped: false, missedBefore: 0, followupCounts: null };
+    return { window: w, items: [], seesAll: wide, people, who, meId: scope.member.id, capped: false, missedBefore: 0, followupCounts: null };
   }
 }

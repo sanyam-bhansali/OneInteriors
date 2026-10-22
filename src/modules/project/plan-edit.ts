@@ -432,6 +432,8 @@ export interface PlanStepView {
   hasPhoto: boolean;
   /** Ticked by the backfill because its stage was already done. */
   backfilled: boolean;
+  /** Done before the project was brought onto One Interiors (docs/studio-os/BRING-IN-PROJECTS.md): no photo. */
+  beforeJoining: boolean;
   /** Starred: a milestone the customer sees (docs/studio-os/CUSTOMER-MILESTONES.md). */
   milestone: boolean;
 }
@@ -563,6 +565,7 @@ export async function planForStudio(projectId: string, now = new Date()): Promis
             fromVoice: it.doneSource === 'VOICE',
             hasPhoto: it.donePhotoId !== null,
             backfilled: it.doneSource === 'BACKFILL',
+            beforeJoining: it.doneSource === 'BEFORE_JOINING',
             milestone: it.customerMilestone,
           });
           groups.set(it.room, list);

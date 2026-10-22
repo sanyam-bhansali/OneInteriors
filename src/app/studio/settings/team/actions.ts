@@ -13,6 +13,7 @@ import {
   suspendMember,
   type TeamResult,
 } from '@/modules/studio/team-store';
+import { createSalesRole, deleteSalesRole, setMemberSalesRole, setReportsTo, updateSalesRole, type SalesTeamResult } from '@/modules/studio/sales-team-store';
 
 /**
  * Settings → Team. Each action is a thin call: the `team.manage` check is in
@@ -37,8 +38,34 @@ async function done(r: Promise<TeamResult>): Promise<TeamResult> {
   }
 }
 
-export async function inviteAction(input: { name: string; phone: string; role: string; sites: string[] }): Promise<TeamResult> {
+export async function inviteAction(input: { name: string; phone: string; role: string; sites: string[]; salesRoleId?: string; reportsToId?: string }): Promise<TeamResult> {
   return done(inviteMember(input, await baseUrl()));
+}
+
+/*
+ * Sales roles and teams (owner, 22 Oct 2026): the Roles tab, each
+ * salesperson's role and reporting line. The checks (owner or
+ * `team.sales`, same studio, no loops) are in sales-team-store.ts.
+ */
+
+export async function createRoleAction(input: { name: string; description: string; permissions: Record<string, unknown> }): Promise<SalesTeamResult> {
+  return done(createSalesRole(input));
+}
+
+export async function updateRoleAction(roleId: string, input: { name: string; description: string; permissions: Record<string, unknown> }): Promise<SalesTeamResult> {
+  return done(updateSalesRole(String(roleId), input));
+}
+
+export async function deleteRoleAction(roleId: string): Promise<SalesTeamResult> {
+  return done(deleteSalesRole(String(roleId)));
+}
+
+export async function setSalesRoleAction(memberId: string, roleId: string | null): Promise<SalesTeamResult> {
+  return done(setMemberSalesRole(String(memberId), typeof roleId === 'string' ? roleId : null));
+}
+
+export async function setReportsToAction(memberId: string, bossId: string | null): Promise<SalesTeamResult> {
+  return done(setReportsTo(String(memberId), typeof bossId === 'string' ? bossId : null));
 }
 
 export async function resendAction(memberId: string): Promise<TeamResult> {

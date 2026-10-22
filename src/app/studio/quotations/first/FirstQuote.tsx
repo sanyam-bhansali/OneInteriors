@@ -85,7 +85,7 @@ export function FirstQuote({
       locality: location,
       quoteDate,
       fileId: reading?.fileId ?? null,
-      lines: lines.map((l) => ({ room: l.room, product: l.product, code: l.code, unit: l.unit, details: l.details, widthMm: l.widthMm, heightMm: l.heightMm, qtyMilli: l.qtyMilli, ratePaise: l.ratePaise, agreedPaise: l.agreedPaise })),
+      lines: lines.map((l) => ({ room: l.room, product: l.product, code: l.code, unit: l.unit, details: l.details, widthMm: l.widthMm, heightMm: l.heightMm, qtyMilli: l.qtyMilli, ratePaise: l.ratePaise, agreedPaise: l.agreedPaise, note: l.note ?? null })),
       onSpotPaise: rupeesToPaiseText(onSpot) ?? 0,
       onSpotLabel: onSpotLabel || null,
     });
@@ -156,7 +156,7 @@ export function FirstQuote({
         if (!put.ok) return setStatus('The upload did not finish. Check your connection and try again.');
       }
       const path = ticket.path;
-      const attached = await attachFileAction({ clientId: lead.id, path, name: file.name, contentType: type, bytes: file.size, kind: 'FLOOR_PLAN' });
+      const attached = await attachFileAction({ clientId: lead.id, path, name: file.name, contentType: type, bytes: file.size, kind: 'FLOOR_PLAN', quoteRequest: false });
       if (!attached.ok) return setStatus('error' in attached ? String(attached.error) : 'That did not attach.');
       leadPlansAction(lead.id).then(setPlans).catch(() => undefined);
       if (canRead) readPlan({ path });
@@ -435,6 +435,7 @@ function previewQuote(o: {
     terms: null,
     issuedOn: null,
     updatedAt: new Date(),
+    importedFrom: null,
     lines: [],
   };
 }

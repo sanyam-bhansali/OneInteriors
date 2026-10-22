@@ -4,6 +4,9 @@ import '../clients.css';
 import { leadAnalytics, type LeadAnalytics } from '@/modules/studio-practice/analytics';
 import { SOURCE_LABELS, LOST_LABELS, QUIET_AFTER_DAYS } from '@/modules/studio-practice/vocabulary';
 import { paiseToLakhs } from '@/lib/money';
+import { AnalyticsTabs } from './AnalyticsTabs';
+import { campaignAnalytics } from '@/modules/studio-sales/campaign-analytics';
+import type { CampaignLine } from '@/modules/studio-sales/campaign-rules';
 
 export const metadata: Metadata = {
   title: 'Lead analytics',
@@ -45,7 +48,7 @@ export const dynamic = 'force-dynamic';
  * in the same table as everything else with the same arithmetic applied.
  */
 export default async function LeadAnalyticsPage() {
-  const data = await leadAnalytics();
+  const [data, campaigns] = await Promise.all([leadAnalytics(), campaignAnalytics()]);
 
   if (!data) {
     return (
@@ -94,10 +97,12 @@ export default async function LeadAnalyticsPage() {
           <p className="muted">{`${data.total.toLocaleString('en-IN')} leads all time · ${data.newThisMonth} in the last 30 days`}</p>
         </div>
       </div>
+      <AnalyticsTabs active="leads" />
       <Tiles data={data} />
       <div className="cols">
         <div className="colmain" style={{ flexBasis: 420 }}>
           <Sources data={data} />
+          <Campaigns lines={campaigns} />
         </div>
         <div className="colside" style={{ flexBasis: 420 }}>
           <Pipeline data={data} />
@@ -218,6 +223,54 @@ function Sources({ data }: { data: LeadAnalytics }) {
           );
         })}
       </ul>
+    </section>
+  );
+}
+
+// ── By campaign (owner, 22 Oct 2026) ─────────────────────────────
+
+/**
+ * Which ad campaigns bring leads that go somewhere. From the attribution
+ * columns lead intake fills (Meta and Google campaigns, a website's
+ * utm_campaign) and the AxLeads import. Hidden until a lead has a campaign.
+ */
+function Campaigns({ lines }: { lines: CampaignLine[] | null }) {
+  if (!lines || lines.length === 0) return null;
+  return (
+    <section className="card">
+      <h2 className="h">By campaign</h2>
+      <p className="cl-sub" style={{ maxWidth: '52ch', lineHeight: 1.5 }}>
+        Leads from your ads, by campaign: how many came, were called, got a quotation and became customers.
+      </p>
+      <div style={{ overflowX: 'auto' }}>
+        <table className="w-full text-[13px]" style={{ borderCollapse: 'collapse' }}>
+          <thead>
+            <tr className="muted" style={{ textAlign: 'right' }}>
+              <th style={{ textAlign: 'left', fontWeight: 500, padding: '4px 8px 4px 0' }}>Campaign</th>
+              <th style={{ fontWeight: 500, padding: '4px 8px' }}>Leads</th>
+              <th style={{ fontWeight: 500, padding: '4px 8px' }}>Called</th>
+              <th style={{ fontWeight: 500, padding: '4px 8px' }}>Quoted</th>
+              <th style={{ fontWeight: 500, padding: '4px 0 4px 8px' }}>Customers</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map((c) => (
+              <tr key={c.key} style={{ borderTop: '1px solid var(--line)', textAlign: 'right' }}>
+                <td style={{ textAlign: 'left', padding: '6px 8px 6px 0', maxWidth: '22ch' }} className="truncate" title={c.label}>
+                  {c.label}
+                </td>
+                <td className="mono" style={{ padding: '6px 8px' }}>{c.leads}</td>
+                <td className="mono" style={{ padding: '6px 8px' }}>{c.contacted}</td>
+                <td className="mono" style={{ padding: '6px 8px' }}>{c.quoted}</td>
+                <td className="mono" style={{ padding: '6px 0 6px 8px' }}>
+                  {c.converted}
+                  {c.converted > 0 && c.rate !== null ? <span className="muted"> ({c.rate}%)</span> : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }

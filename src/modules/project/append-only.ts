@@ -23,18 +23,21 @@
  * a mistake is reversed by a correction row, never edited. The project
  * lifecycle adds the project closure (`homeProjectClosure` and its lines):
  * every save is a new version, the final one fixes the final payment.
+ * Change orders (15 Oct 2026) add their status history
+ * (`homeChangeOrderEvent`), and the client's sign-off of a quotation
+ * (`homeQuoteSignoff`) is filled once when signed and never deleted.
  *
  * Rows still go when their project does (ON DELETE CASCADE): that is
  * erasure of the whole record, not an edit of it.
  */
 
 /** Prisma client property names. */
-export const APPEND_ONLY_MODELS = ['homeProjectEvent', 'homeSnagEvent', 'homeProjectDateChange', 'homeSiteLog', 'homeQuoteChange', 'studioQuoteRevision', 'homeDesignReview', 'homeStepDelay', 'homeCrewPayment', 'homeProjectClosure', 'homeProjectClosureLine'] as const;
-export const NEVER_DELETED_MODELS = ['homeSiteLogPhoto', 'homeSiteLogCrew', 'homeProjectPayment'] as const;
+export const APPEND_ONLY_MODELS = ['homeProjectEvent', 'homeSnagEvent', 'homeProjectDateChange', 'homeSiteLog', 'homeQuoteChange', 'studioQuoteRevision', 'homeDesignReview', 'homeStepDelay', 'homeCrewPayment', 'homeProjectClosure', 'homeProjectClosureLine', 'homeChangeOrderEvent'] as const;
+export const NEVER_DELETED_MODELS = ['homeSiteLogPhoto', 'homeSiteLogCrew', 'homeProjectPayment', 'homeQuoteSignoff'] as const;
 
 /** The same, as table names, for raw SQL. */
-export const APPEND_ONLY_TABLES = ['home_project_events', 'home_snag_events', 'home_project_date_changes', 'home_site_logs', 'home_quote_changes', 'studio_quote_revisions', 'home_design_reviews', 'home_step_delays', 'home_crew_payments', 'home_project_closures', 'home_project_closure_lines'] as const;
-export const NEVER_DELETED_TABLES = ['home_site_log_photos', 'home_site_log_crew', 'home_project_payments'] as const;
+export const APPEND_ONLY_TABLES = ['home_project_events', 'home_snag_events', 'home_project_date_changes', 'home_site_logs', 'home_quote_changes', 'studio_quote_revisions', 'home_design_reviews', 'home_step_delays', 'home_crew_payments', 'home_project_closures', 'home_project_closure_lines', 'home_change_order_events'] as const;
+export const NEVER_DELETED_TABLES = ['home_site_log_photos', 'home_site_log_crew', 'home_project_payments', 'home_quote_signoffs'] as const;
 
 const EDITS = ['update', 'updateMany', 'updateManyAndReturn', 'delete', 'deleteMany', 'upsert'] as const;
 const REMOVALS = ['delete', 'deleteMany', 'upsert'] as const;

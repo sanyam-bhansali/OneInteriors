@@ -4,9 +4,10 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { formatINR } from '@/lib/money';
 import { computeTotals, DISCOUNT_NAMES, isUnpriced, keptFeeBps, lineAmount, type QuoteUnitName, type WorkCodeName } from '@/modules/studio-quote/pricing';
-import { compareToIssued, type ComparableLine } from '@/modules/studio-quote/revision';
+import type { CompareLine } from '@/modules/studio-quote/compare-lines';
 import { CONFIGS, isConfigName, type ConfigName } from '@/modules/studio-quote/configure';
 import { configRooms, moveInList, newRoomName, orderedRooms, renameInList, roomsOfLines, sortByRooms } from '@/modules/studio-quote/rooms';
+import { withRepricing } from '@/modules/studio-quote/line-edit';
 import type { QuoteRow, QuoteTermsInput, SaveLineInput } from '@/modules/studio-quote/quotes';
 
 /* quotes.ts is server-only; the two labels are repeated here. */
@@ -63,6 +64,7 @@ export function QuoteBuilder({
   products: ProductRow[];
   branding: {
     legalName: string;
+    documentName?: string | null;
     addressLine: string | null;
     city: string;
     pincode: string | null;
@@ -192,8 +194,10 @@ export function QuoteBuilder({
       }),
     [priced, live],
   );
-  const comparable: ComparableLine[] = useMemo(() => priced.map((l) => ({ room: l.room, product: l.product, amountPaise: l.amountPaise })), [priced]);
-  const revision = useMemo(() => (quote.issuedLines.length > 0 ? compareToIssued(quote.issuedLines, comparable) : null), [quote.issuedLines, comparable]);
+  /* Hauspire's "Original" for the Final tab: the quotation as it was
+     opened, until "Snapshot current as Original" (22 Oct 2026). */
+  const [baseLines, setBaseLines] = useState<CompareLine[]>(() => quote.lines.map(compareLineOf));
+  const baseTotal = useMemo(() => computeTotals(baseLines.map((l) => ({ ...l, ratePaise: 0 })), termsOfLive(live)).beforeTaxPaise, [baseLines, live]);
   const unpriced = priced.filter((l) => isUnpriced({ ...l, amountPaise: l.agreedPaise })).length;
 
   /* The one room order: the list, then rooms only on a line. */
@@ -204,8 +208,12 @@ export function QuoteBuilder({
 
   // ── Lines ──────────────────────────────────────────────────
 
+  /* Hauspire's `setField` (owner, 22 Oct 2026): changing a size on a line
+     that has a rate re-prices it, even over an amount typed earlier — W × H
+     needs both sides, the others a rate. A line without a rate keeps the
+     amount it was given. */
   const update = useCallback((key: string, patch: Partial<EditableLine>) => {
-    setLines((current) => current.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+    setLines((current) => current.map((l) => (l.key === key ? withRepricing(l, patch) : l)));
   }, []);
   const remove = useCallback((key: string) => setLines((current) => current.filter((l) => l.key !== key)), []);
   const duplicate = useCallback((key: string) => {
@@ -242,22 +250,35 @@ export function QuoteBuilder({
       return next;
     });
   }, []);
-  /** A line swapped to another product, re-priced from it; the size carries over within a unit. */
+  /**
+   * A line swapped to another product, re-priced from it — Hauspire's
+   * `setProduct`: the product's standard size from the master when it has
+   * one, else the line's own, else 1000 mm (W × H); its standard quantity,
+   * else 1 (each) or the line's own (sq ft, running ft).
+   */
   const swap = useCallback((key: string, product: ProductRow) => {
     setLines((current) =>
       current.map((l) => {
         if (l.key !== key) return l;
-        const same = l.unit === product.unit;
+        const area = product.unit === 'AREA';
+        const qty =
+          product.unit === 'UNIT'
+            ? product.defaultQty != null && product.defaultQty > 0
+              ? product.defaultQty * 1000
+              : 1000
+            : area
+              ? null
+              : (defaultQtyOf(product) ?? (l.unit === product.unit ? l.qtyMilli : 0));
         return {
           ...l,
           product: product.name,
           code: product.code,
           unit: product.unit,
-          details: product.details,
+          details: product.details || l.details,
           ratePaise: product.ratePaise,
-          widthMm: product.unit === 'AREA' ? (same ? l.widthMm : product.defaultWidthMm) : null,
-          heightMm: product.unit === 'AREA' ? (same ? l.heightMm : product.defaultHeightMm) : null,
-          qtyMilli: product.unit === 'AREA' ? null : same ? l.qtyMilli : defaultQtyOf(product),
+          widthMm: area ? product.defaultWidthMm || l.widthMm || 1000 : null,
+          heightMm: area ? product.defaultHeightMm || l.heightMm || 1000 : null,
+          qtyMilli: qty,
           agreedPaise: null,
         };
       }),
@@ -280,13 +301,13 @@ export function QuoteBuilder({
     setLines((current) => sortByRooms([...current, line], rooms));
     setBanner(`Added ${product.name} to ${room}.`);
   };
-  /** "+ add item" under a room: a blank line to pick a product into. */
+  /** "+ add item" under a room: Hauspire's blank "New item" (MO-01, ₹0, no quantity) to pick a product into or type an amount on. */
   const addItem = (room: string) => {
     setLines((current) =>
       sortByRooms(
         [
           ...current,
-          { key: freshKey(), room, product: 'New item', code: 'MODULAR', unit: 'UNIT', details: null, widthMm: null, heightMm: null, qtyMilli: 1000, ratePaise: 0, agreedPaise: null },
+          { key: freshKey(), room, product: 'New item', code: 'MODULAR', unit: 'UNIT', details: null, widthMm: null, heightMm: null, qtyMilli: null, ratePaise: 0, agreedPaise: null },
         ],
         rooms,
       ),
@@ -387,6 +408,7 @@ export function QuoteBuilder({
       qtyMilli: l.qtyMilli,
       ratePaise: l.ratePaise,
       agreedPaise: l.agreedPaise,
+      note: l.note ?? null,
     }));
     if (sentClient !== savedClient.current) {
       const carpet = Number(client.carpet);
@@ -639,6 +661,12 @@ export function QuoteBuilder({
       </aside>
 
       <section className="hwork" aria-label="Quotation">
+        {quote.importedFrom?.startsWith('hauspire:') ? (
+          /* Owner, 22 Oct 2026: imported quotations open and edit like ours, marked with where they came from. */
+          <p className="hhelp hcame" role="note">
+            Imported from the Hauspire quotation app (quotation {quote.number.replace(/-H\d*$/, '')}). Edit it here like any quotation.
+          </p>
+        ) : null}
         {banner ? <div className="hbanner">{banner}</div> : null}
         <div className="htabs">
           <div className="tabs" role="tablist" aria-label="Quotation view">
@@ -676,7 +704,7 @@ export function QuoteBuilder({
           <>
             <div className="hdochead">
               <div>
-                <div className="hbig">{branding?.legalName ?? 'Your studio'}</div>
+                <div className="hbig">{branding?.documentName?.trim() || branding?.legalName || 'Your studio'}</div>
                 <div className="muted hsmall">
                   Quotation · {formatINR(shownTotal)}
                   {gstOn ? ' incl. GST' : ''}
@@ -735,10 +763,16 @@ export function QuoteBuilder({
           </>
         ) : tab === 'final' ? (
           <FinalCompare
-            summary={revision}
-            sentLabel={sentLabel}
+            original={baseLines}
+            current={priced.map(compareLineOf)}
+            wasTotalPaise={baseTotal}
+            nowTotalPaise={totals.beforeTaxPaise}
+            onSnapshot={() => {
+              setBaseLines(priced.map(compareLineOf));
+              setBanner('Snapshot taken: what is on screen is now the “Original”.');
+            }}
             compareHref={finalHref}
-            compareLabel={quote.basedOnId ? 'Compare with the Sales Final (printable)' : 'Printable comparison of the revisions'}
+            compareLabel={quote.basedOnId ? 'Compare with the Sales Final (printable)' : `Printable comparison of the revisions${sentLabel ? ` (the client has ${sentLabel})` : ''}`}
           />
         ) : (
           <DocumentPreview
@@ -758,6 +792,16 @@ export function QuoteBuilder({
       </section>
     </div>
   );
+}
+
+/** A line as the Final tab compares it. */
+function compareLineOf(l: { room: string; product: string; code: WorkCodeName; unit: QuoteUnitName; widthMm: number | null; heightMm: number | null; qtyMilli: number | null; amountPaise: number }): CompareLine {
+  return { room: l.room, product: l.product, code: l.code, unit: l.unit, widthMm: l.widthMm, heightMm: l.heightMm, qtyMilli: l.qtyMilli, amountPaise: l.amountPaise };
+}
+
+/** The live terms, for pricing the Original on the same fee, discount and GST as the Final (as the old tab did). */
+function termsOfLive(q: Pick<QuoteRow, 'feeBps' | 'discountBps' | 'onSpotPaise' | 'bookingAdvancePaise' | 'gstBps' | 'phases'>) {
+  return { feeBps: q.feeBps, discountBps: q.discountBps, onSpotPaise: q.onSpotPaise, bookingAdvancePaise: q.bookingAdvancePaise, gstBps: q.gstBps, phases: q.phases };
 }
 
 function Tab({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -831,6 +875,7 @@ function toEditable(line: QuoteRow['lines'][number]): EditableLine {
     heightMm: line.heightMm,
     qtyMilli: line.qtyMilli,
     ratePaise: line.ratePaise,
+    note: line.note,
     /* An agreed figure is recognised, not remembered: a stored amount that is
        not rate × quantity can only have been typed, and stays an override
        across a reload. */

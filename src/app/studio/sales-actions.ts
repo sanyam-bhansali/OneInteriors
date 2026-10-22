@@ -38,15 +38,20 @@ function refreshLead(clientId?: string | null) {
 
 // ── Assigning ──────────────────────────────────────────────────
 
-/** Give leads to somebody (or the pool, with null). Owner and PM; the module checks. */
-export async function assignLeadsAction(ids: string[], memberId: string | null): Promise<Done> {
+/**
+ * Give leads to somebody (or the pool, with null; or, with `toPool`, into one
+ * pool: `studio` or a head's id, sales roles and teams, owner 22 Oct 2026).
+ * Whoever may assign; the module checks the reach.
+ */
+export async function assignLeadsAction(ids: string[], memberId: string | null, toPool?: string | null): Promise<Done> {
   if (!Array.isArray(ids) || ids.length === 0) return { ok: false, error: 'Pick at least one lead.' };
   const clean = ids.filter((i) => typeof i === 'string').slice(0, 500);
-  const r = await assignClients(clean, typeof memberId === 'string' && memberId ? memberId : null);
+  const pool = typeof toPool === 'string' && toPool ? toPool.slice(0, 64) : null;
+  const r = await assignClients(clean, typeof memberId === 'string' && memberId ? memberId : null, { toPool: pool });
   if (!r.ok) return r;
   refreshLead(clean.length === 1 ? clean[0] : null);
   revalidatePath('/studio/clients/pool');
-  return { ok: true, message: memberId ? (clean.length === 1 ? 'Assigned. They have been told.' : `${clean.length} leads assigned. They have been told.`) : 'Back in the pool.' };
+  return { ok: true, message: memberId ? (clean.length === 1 ? 'Assigned. They have been told.' : `${clean.length} leads assigned. They have been told.`) : pool ? 'Moved to that pool.' : 'Back in the pool.' };
 }
 
 // ── The lead ───────────────────────────────────────────────────
@@ -81,10 +86,11 @@ export async function setMeetingAction(clientId: string, day: string, time: stri
   return { ok: true, message: day ? 'Meeting saved. It shows on Today that day.' : 'Meeting cleared.' };
 }
 
-export async function attachFileAction(input: { clientId: string; path: string; name: string; contentType: string; bytes: number; kind: string }): Promise<Done> {
-  const r = await attachLeadFile(input);
+export async function attachFileAction(input: { clientId: string; path: string; name: string; contentType: string; bytes: number; kind: string; quoteRequest?: boolean }): Promise<Done> {
+  const r = await attachLeadFile({ ...input, quoteRequest: input.quoteRequest !== false });
   if (!r.ok) return r;
   refreshLead(input.clientId);
+  if (input.kind === 'FLOOR_PLAN') revalidatePath('/studio/quotations/requests');
   return { ok: true, message: input.kind === 'FLOOR_PLAN' ? 'Floor plan attached.' : 'File attached.' };
 }
 

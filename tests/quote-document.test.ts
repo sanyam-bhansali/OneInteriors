@@ -55,10 +55,10 @@ describe('the quotation document', () => {
     const rooms = docRooms(lines, ['Master Bedroom', 'Kitchen'], 1500);
     expect(rooms.map((r) => r.room)).toEqual(['Master Bedroom', 'Kitchen']);
     const kitchen = rooms[1]!;
-    expect(kitchen.rows[0]).toMatchObject({ n: 1, code: 'MO-01', modular: true, amountPaise: 10_918_100, discountedPaise: 9_280_385 });
+    expect(kitchen.rows[0]).toMatchObject({ n: 1, code: 'MO-01', modular: true, amountPaise: 10_918_100, discountedPaise: 9_280_400 });
     expect(kitchen.rows[1]).toMatchObject({ n: 2, code: 'NM-01', modular: false, units: '3', discountedPaise: 3_000_000 });
     expect(kitchen.subPaise).toBe(13_918_100);
-    expect(kitchen.subDiscountedPaise).toBe(12_280_385);
+    expect(kitchen.subDiscountedPaise).toBe(12_280_400);
     /* The per-line discount adds up to computeTotals' discount here (one modular line). */
     const totals = computeTotals(lines.map((l) => ({ ...l, ratePaise: 0, amountPaise: l.amountPaise })), { feeBps: 700, discountBps: 1500 });
     expect(kitchen.subPaise - kitchen.subDiscountedPaise).toBe(totals.discountPaise);
@@ -68,9 +68,11 @@ describe('the quotation document', () => {
   it("prints the studio's stages with their end deliverables, adding to the total exactly", () => {
     const totals = computeTotals([{ unit: 'UNIT', code: 'ONSITE', ratePaise: 47_094_400, qtyMilli: 1000 }], { feeBps: 0, discountBps: 0 });
     const stages = docStages(HAUSPIRE_TEMPLATE, totals);
-    expect(stages[0]!.label).toBe('Booking advance (Fully refundable within 3 days)');
+    expect(stages[0]!.label).toBe('Booking Advance (Fully refundable within 3 days)');
     expect(stages[0]!.amountPaise).toBe(2_500_000);
-    expect(stages[1]!.label).toBe('Design advance (5%)');
+    expect(stages[1]!.label).toBe('Design Advance (5%)');
+    // The old app's words, with its bold (Hauspire's own stage, its note unchanged).
+    expect(stages[1]!.deliverable).toContain('**2D drawing revisions, first 3D design, final 3D renders**');
     expect(stages[1]!.deliverable).toMatch(/first 3D design/);
     expect(stages.reduce((a, s) => a + s.amountPaise, 0)).toBe(totals.totalPaise);
     expect(STAGES_NOTE).toMatch(/^Each payment is made at the start of its stage\./);

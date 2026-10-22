@@ -1088,3 +1088,109 @@ describe('the project lifecycle (portal/lifecycle-view.ts) never leaks the teamâ
     expect(w.lifecycle).toMatchObject({ phase: 'closed', warrantyEndsOn: '2026-10-10', canSignOff: false, next: null });
   });
 });
+
+describe('change orders and sign-offs (15 Oct 2026): what crosses', () => {
+  const now = D('2026-10-15T06:00:00Z');
+  const INTERNAL = {
+    creator: 'u-creator-SECRET-CO',
+    decider: 'u-decider-SECRET-CO',
+    releaser: 'u-releaser-SECRET-CO',
+    quote: 'quote-SECRET-CO',
+    product: 'product-SECRET-CO',
+    rate: 'RATE-SECRET-CO',
+    ip: '198.51.100.77',
+    ua: 'UA-SECRET-Mozilla',
+    hash: 'HASH-SECRET-0f0f',
+    signer: 'u-signer-SECRET',
+    requester: 'u-requester-SECRET',
+  };
+  const row = () => {
+    const base = leakyRow() as unknown as Record<string, unknown> & { payments: Record<string, unknown>[] };
+    return {
+      ...base,
+      payments: [
+        ...base.payments,
+        {
+          id: 'pay-co',
+          stageIndex: 2,
+          amountPaise: BigInt(4_000_00),
+          note: SECRET.paymentNote,
+          recordedById: SECRET.staffId,
+          receivedOn: D('2026-10-14T00:00:00Z'),
+          recordedAt: D('2026-10-14T10:00:00Z'),
+          customerConfirmedAt: null,
+          disputedAt: null,
+          correctsId: null,
+          changeOrderId: 'co1',
+        },
+      ],
+      changeOrders: [
+        {
+          id: 'co1',
+          number: 1,
+          title: 'Loft in bedroom 2',
+          reason: 'Asked for on site',
+          status: 'APPROVED',
+          workPaise: BigInt(10_000_00),
+          discountPaise: BigInt(0),
+          gstBps: 1800,
+          gstPaise: BigInt(1_800_00),
+          totalPaise: BigInt(11_800_00),
+          sentAt: D('2026-10-13T06:00:00Z'),
+          decidedAt: D('2026-10-14T06:00:00Z'),
+          declineReason: null,
+          photoDocumentId: 'doc1',
+          createdById: INTERNAL.creator,
+          decidedById: INTERNAL.decider,
+          releasedById: INTERNAL.releaser,
+          quoteId: INTERNAL.quote,
+          lines: [{ product: 'Loft', room: 'Bedroom 2', details: null, unit: 'AREA', widthMm: 1200, heightMm: 600, qtyMilli: null, productId: INTERNAL.product, amountPaise: BigInt(10_000_00), ratePaise: INTERNAL.rate }],
+        },
+      ],
+      signoffs: [
+        {
+          id: 's1',
+          kind: 'DESIGN_FINAL',
+          quoteNumber: 'Q-1-D',
+          revisionN: 2,
+          totalPaise: BigInt(10_00_000_00),
+          requestedAt: D('2026-10-14T06:00:00Z'),
+          signedAt: null,
+          withdrawnAt: null,
+          signerName: null,
+          ip: INTERNAL.ip,
+          userAgent: INTERNAL.ua,
+          contentHash: INTERNAL.hash,
+          signedById: INTERNAL.signer,
+          requestedById: INTERNAL.requester,
+          revision: { quote: { revisions: [{ n: 2 }] } },
+        },
+      ],
+    } as unknown as CustomerProjectRow;
+  };
+  const out = toCustomerProject(row(), SECRET.customerId, now, { updatePhotos: [], snagPhotos: [], fixedPhotos: [], docUrls: ['https://signed/doc'] });
+  const json = JSON.stringify(out);
+
+  it('carries the extra work and the request to sign, with what is due', () => {
+    expect(out.extras).toHaveLength(1);
+    expect(out.extras[0]).toMatchObject({ number: 1, title: 'Loft in bedroom 2', state: 'approved', totalPaise: 11_800_00, paidPaise: 4_000_00, duePaise: 7_800_00, photoUrl: 'https://signed/doc' });
+    expect(out.signoffs[0]).toMatchObject({ kind: 'DESIGN_FINAL', state: 'waiting', canSign: true });
+    expect(out.lifecycle.blocker).toMatchObject({ kind: 'pay_extra', amountPaise: 7_800_00 });
+  });
+
+  it('carries no internal id, rate, IP, user agent or hash', () => {
+    for (const [name, value] of Object.entries(INTERNAL)) expect(json, name).not.toContain(value);
+    const keys = keysOf(out);
+    for (const k of ['createdById', 'decidedById', 'releasedById', 'quoteId', 'productId', 'ratePaise', 'ip', 'userAgent', 'contentHash', 'signedById', 'requestedById', 'changeOrderId']) {
+      expect(keys.has(k), k).toBe(false);
+    }
+  });
+
+  it('selects no internal column of a change order or a sign-off', () => {
+    const co = keysOf(CUSTOMER_PROJECT_SELECT.changeOrders.select);
+    for (const k of ['createdById', 'decidedById', 'releasedById', 'quoteId', 'ratePaise', 'events', 'cancelledAt']) expect(co.has(k), k).toBe(false);
+    const so = keysOf(CUSTOMER_PROJECT_SELECT.signoffs.select);
+    for (const k of ['ip', 'userAgent', 'contentHash', 'signedHash', 'signedById', 'requestedById', 'agreedText']) expect(so.has(k), k).toBe(false);
+    expect(CUSTOMER_PROJECT_SELECT.changeOrders.where).toEqual({ status: { in: ['SENT_TO_CLIENT', 'APPROVED', 'DECLINED', 'PAID', 'RELEASED'] } });
+  });
+});

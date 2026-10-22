@@ -82,8 +82,24 @@ export function ClosurePanel({ view, customer }: { view: ClosureView; customer: 
                 <td className="mono text-right">{formatINR(shown.changesPaise)}</td>
               </tr>
             ) : null}
+            {/* Change orders (15 Oct 2026): approved by the client in the app, read-only here and never typed again below. */}
+            {view.changeOrders.map((c) => (
+              <tr key={c.id} data-testid="closure-change-order">
+                <td>
+                  Extra work {c.number} approved by {customer}: {c.title}{' '}
+                  <span className="muted sm">({c.status === 'RELEASED' ? 'released' : c.status === 'PAID' ? 'paid' : 'approved, not paid yet'}; GST included)</span>
+                </td>
+                <td className="mono text-right">{formatINR(c.totalPaise)}</td>
+              </tr>
+            ))}
+            {view.changeOrders.length > 0 && (shown.changeOrdersPaise ?? 0) !== view.changeOrders.reduce((a, c) => a + c.totalPaise, 0) ? (
+              <tr>
+                <td className="muted sm">Approved extra work counted in this version</td>
+                <td className="mono text-right">{formatINR(shown.changeOrdersPaise ?? 0)}</td>
+              </tr>
+            ) : null}
             <tr>
-              <td>Extra work for {customer}</td>
+              <td>Other extra work for {customer} (typed here{view.changeOrders.length ? '; not the approved extra work above' : ''})</td>
               <td className="mono text-right">{formatINR(shown.extrasPaise)}</td>
             </tr>
             <tr>

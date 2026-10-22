@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { mayOpen } from '@/modules/studio/surfaces';
+import { can } from '@/modules/studio/roles';
 import { LineIcon } from '../ui/icons';
 import './clients.css';
 import { myStages } from '@/modules/studio-practice/stages';
@@ -68,6 +69,9 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   }
 
   const seesAll = scope.seesAll;
+  /* Sales roles and teams (owner, 22 Oct 2026): someone whose leads reach their team sees the team's leads, picks a person in it, and sees who has each one. */
+  const team = scope.team;
+  const wide = seesAll || team !== null;
   const filters = parseLeadFilters(sp);
   const sort = parseSort(one('sort'));
   const poolView = !seesAll && filters.owner === 'pool';
@@ -88,17 +92,23 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   ]);
   const total = kpis.total;
   const listTotal = view === 'list' ? (filters.kpi ? await countFor(kpis, filters.kpi) : total) : total;
-  const members = seesAll ? people : [];
+  const members = seesAll ? people : team ? people.filter((p) => team.includes(p.id)) : [];
   const stageList = stages.map((s) => ({ id: s.id, name: s.name, colour: s.colour, kind: s.kind }));
+  /* The call sheet's suggested move reads the column order and flags (calling steps, 21 Oct 2026). */
+  const callStages = stages.map((s) => ({ id: s.id, name: s.name, colour: s.colour, kind: s.kind, sortOrder: s.sortOrder, isIntake: s.isIntake, isCallStep: s.isCallStep }));
   const boardStages = boardColumnPlan(stageList, filters.stage).shown;
 
   const mayImport = mayOpen(scope.member, '/studio/clients/import');
-  const title = poolView ? 'The pool' : seesAll ? 'Clients' : 'My leads';
+  /* Download the list (improvement 8, owner 22 Oct 2026): the owner only, with these filters and this sort; audited in lead-export.ts. */
+  const mayExport = can(scope.member, 'lead.export') && !poolView;
+  const title = poolView ? 'The pool' : seesAll ? 'Clients' : team ? 'My team’s leads' : 'My leads';
   const sub = poolView
     ? 'Leads nobody has yet. Claim one and it is yours.'
     : seesAll
       ? 'Everyone who has ever called, walked in or come from us, in one list. They stay yours.'
-      : 'Only the leads assigned to you. Call, WhatsApp and log the outcome from any card.';
+      : team
+        ? 'The leads of everyone in your team, and your team pools. Pick one person to see only theirs.'
+        : 'Only the leads assigned to you. Call, WhatsApp and log the outcome from any card.';
 
   return (
     <main className="content cl-page">
@@ -110,11 +120,16 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
           <p className="muted">{sub}</p>
         </div>
         <div className="hstack">
-          {seesAll ? <OwnerPicker query={query} view={view} sort={sort} members={members} meId={scope.member.id} /> : null}
+          {wide ? <OwnerPicker query={query} view={view} sort={sort} members={members} meId={scope.member.id} /> : null}
           {!seesAll ? (
             <Link href={poolView ? '/studio/clients' : '/studio/clients/pool'} className="btn sec">
               {poolView ? 'Back to my leads' : 'The pool, claim leads'}
             </Link>
+          ) : null}
+          {mayExport ? (
+            <a href={`/api/studio/leads/export${listQuery ? `?${listQuery}` : ''}`} className="btn sec" download title="Download these leads, with the filters and sort you have on, as a CSV file for Excel">
+              Export CSV
+            </a>
           ) : null}
           {mayImport ? (
             <Link href="/studio/clients/import" className="btn sec">
@@ -156,12 +171,13 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
           next={list.next}
           total={listTotal}
           query={listQuery}
-          stages={stageList}
+          stages={callStages}
           fields={fields.map((f) => ({ key: f.key, label: f.label }))}
           actions={bulkActionsFor(scope.member)}
           people={people}
-          seesAll={seesAll}
+          seesAll={wide}
           poolView={poolView}
+          meId={scope.member.id}
         />
       ) : null}
 
@@ -171,13 +187,15 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
           counts={counts}
           initial={columns}
           query={query}
-          showOwner={seesAll && (!filters.owner || filters.owner === 'anyone')}
+          showOwner={wide && (!filters.owner || filters.owner === 'anyone')}
           meId={scope.member.id}
           mayMove={!poolView}
+          callStages={callStages}
+          seesAll={wide}
         />
       ) : null}
 
-      {seesAll ? (
+      {mayOpen(scope.member, '/studio/clients/bin') ? (
         <p className="cl-foot">
           Stages are yours to rename in Settings. <Link href="/studio/clients/bin">Deleted clients</Link> · Board cards load {VIEW_PAGE} at a time per column.
         </p>

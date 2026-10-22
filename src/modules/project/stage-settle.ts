@@ -37,7 +37,8 @@ export const countedSteps = <T extends { inScope?: boolean | null }>(items: read
  * Design (Studio OS Phase 2): design steps are ticked on the Design tab,
  * not with a site photo, each one a deliberate act by the designer or the
  * PM, some with their file. So for the DESIGN stage every ticked step counts
- * as its evidence (a backfilled tick does not).
+ * as its evidence (a backfilled tick, or one done before the project was
+ * brought in, does not).
  */
 export async function photosByStage(
   db: Db,
@@ -59,7 +60,7 @@ export async function photosByStage(
   const out = new Map<string, number>(ids.map((id) => [id, 0]));
   for (const l of logs) if (l.stageId) out.set(l.stageId, (out.get(l.stageId) ?? 0) + l._count.photos);
   for (const s of stages) {
-    const own = (s.items ?? []).filter((i) => i.donePhotoId || (s.kind === 'DESIGN' && i.doneAt && i.doneSource !== 'BACKFILL')).length;
+    const own = (s.items ?? []).filter((i) => i.donePhotoId || (s.kind === 'DESIGN' && i.doneAt && i.doneSource !== 'BACKFILL' && i.doneSource !== 'BEFORE_JOINING')).length;
     if (own) out.set(s.id, (out.get(s.id) ?? 0) + own);
     if (!isKind(s.kind)) continue;
     const keys = KIND_TRACKER_KEYS[s.kind] as readonly string[];

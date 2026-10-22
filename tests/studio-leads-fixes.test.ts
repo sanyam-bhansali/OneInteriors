@@ -133,7 +133,11 @@ describe('source guards', () => {
     expect(read('src/app/studio/clients/LeadsControls.tsx')).toMatch(/const needs = kpis\.needs;/);
   });
   it('a salesperson\'s tag suggestions are fenced to their own leads and the pool', () => {
+    /* Sales roles (owner, 22 Oct 2026): the fence moved to lead-sql.ts, shared with the other raw reads. */
     const body = read('src/modules/studio-sales/lead-extras.ts').split('export async function studioTags')[1]!.split('export async function')[0]!;
-    expect(body).toMatch(/assignedToId" = \$\{scope\.member\.id\}/);
+    expect(body).toMatch(/rawSeenOrPool\(scope\)/);
+    const sql = read('src/modules/studio-sales/lead-sql.ts');
+    expect(sql).toMatch(/assignedToId" = \$\{scope\.member\.id\}/);
+    expect(sql).toMatch(/assignedToId" IS NULL AND c\."poolTeamId" IS NULL/);
   });
 });

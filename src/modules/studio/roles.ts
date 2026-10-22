@@ -88,9 +88,19 @@
  * designer on the project); the project closure — the final payment — is
  * `project.closure` (owner; PM and designer on the project). The client's
  * handover sign-off is the customer's own act, not a studio one.
+ *
+ * ## Bringing in running projects (owner, 20 Oct 2026)
+ *
+ * docs/studio-os/BRING-IN-PROJECTS.md: `project.bringIn` (owner, PM,
+ * designer; Max only, like every project action). The project does not exist
+ * yet, so no assignment applies; whoever brings it in is put on it. Inside
+ * that flow only, they may pick or add the client's lead and import or pick
+ * its quotation; the rest of the leads and the builder keep their own rights.
  */
 
 import type { Prisma } from '@prisma/client';
+import { STUDIO_POOL_ONLY, inPool, leadInReach, poolAccessOf, poolWhere, reachOf, reachWhere, type LeadFacts, type SalesContext } from './sales-access';
+import type { SalesPermissionKey } from './sales-permissions';
 
 export type StudioRoleName = 'OWNER' | 'PM' | 'SUPERVISOR' | 'ACCOUNTS' | 'SALES' | 'DESIGNER';
 export type StudioMemberStatusName = 'INVITED' | 'ACTIVE' | 'SUSPENDED';
@@ -143,6 +153,8 @@ export type StudioAction =
   | 'lead.delete'
   /** Import a spreadsheet of leads. */
   | 'lead.import'
+  /** Download the leads list as a spreadsheet (improvement 8, owner 22 Oct 2026): the owner's alone — 26,000 phone numbers is the studio's whole business walking out of the door, so no other role is granted it. */
+  | 'lead.export'
   /** See the pool: leads nobody has. */
   | 'lead.pool'
   /** Take a lead nobody has (the pool) for yourself. SALES too (owner, 12 Oct 2026, after AxLeads); only ever an unassigned lead — the write checks. */
@@ -182,7 +194,25 @@ export type StudioAction =
   /** Lifecycle: sign off the design (close it), which moves the project to execution. */
   | 'design.close'
   /** Lifecycle: work out and fix the project closure (the final payment). */
-  | 'project.closure';
+  | 'project.closure'
+  /** Change orders (15 Oct 2026): add extra work after design sign-off, send it to the client, release it once paid. */
+  | 'extras.write'
+  /** Ask the client to sign a quotation (sales final, design final) digitally (15 Oct 2026). */
+  | 'signoff.request'
+  /** Bring a running project onto One Interiors ("Add an existing project", 20 Oct 2026): its client, quotation, steps done, payments received, team. */
+  | 'project.bringIn'
+  /** Sales roles (owner, 22 Oct 2026): log a call on a lead, its outcome and the next follow-up. Was part of `lead.edit`; SALES: own leads only. */
+  | 'lead.call'
+  /** Sales roles: select many leads and act on them together (each action still needs its own right). */
+  | 'lead.bulk'
+  /** Sales roles: lead analytics, calling numbers, by campaign. */
+  | 'lead.analytics'
+  /** Sales roles: the pipeline, lead fields, lead sources and "New leads go to" (the sources screen used to ask `lead.import`). */
+  | 'lead.settings'
+  /** Sales roles: invite salespeople, give them a sales role and a reporting line, edit sales roles. */
+  | 'team.sales'
+  /** Sales roles: builds quotations; gets quotation requests in turns (the queue is a follow-up). */
+  | 'quote.build';
 
 export const STUDIO_ACTIONS: readonly StudioAction[] = [
   'team.manage',
@@ -207,6 +237,7 @@ export const STUDIO_ACTIONS: readonly StudioAction[] = [
   'lead.merge',
   'lead.delete',
   'lead.import',
+  'lead.export',
   'lead.pool',
   'lead.claim',
   'quote.write',
@@ -227,12 +258,25 @@ export const STUDIO_ACTIONS: readonly StudioAction[] = [
   'crew.pay',
   'design.close',
   'project.closure',
+  'extras.write',
+  'signoff.request',
+  'project.bringIn',
+  'lead.call',
+  'lead.bulk',
+  'lead.analytics',
+  'lead.settings',
+  'team.sales',
+  'quote.build',
 ];
 
 /** Everything a PM does with leads and sales: all of it, across the studio. */
 const PM_SALES: readonly StudioAction[] = [
   'lead.read',
   'lead.edit',
+  'lead.call',
+  'lead.bulk',
+  'lead.analytics',
+  'lead.settings',
   'lead.add',
   'lead.assign',
   'lead.merge',
@@ -248,7 +292,7 @@ const PM_SALES: readonly StudioAction[] = [
 
 /** What each role may do. The owner is not listed: the owner may do everything. */
 const GRANTS: Record<Exclude<StudioRoleName, 'OWNER'>, readonly StudioAction[]> = {
-  SALES: ['lead.read', 'lead.edit', 'lead.add', 'lead.claim', 'quote.write', 'quote.salesFinal'],
+  SALES: ['lead.read', 'lead.edit', 'lead.call', 'lead.bulk', 'lead.add', 'lead.claim', 'quote.write', 'quote.salesFinal'],
   PM: [
     ...PM_SALES,
     'project.create',
@@ -268,6 +312,9 @@ const GRANTS: Record<Exclude<StudioRoleName, 'OWNER'>, readonly StudioAction[]> 
     'design.workload',
     'design.close',
     'project.closure',
+    'extras.write',
+    'signoff.request',
+    'project.bringIn',
     /* Phase 3: quantities only — never `workorder.money` or `crew.pay`. */
     'crew.list',
     'workorder.read',
@@ -276,11 +323,61 @@ const GRANTS: Record<Exclude<StudioRoleName, 'OWNER'>, readonly StudioAction[]> 
   SUPERVISOR: ['update.post', 'checklist.tick', 'snag.fix', 'project.read', 'workorder.read'],
   ACCOUNTS: ['payment.read', 'payment.record', 'booking.record', 'booking.refund', 'crew.list', 'crew.edit', 'workorder.read', 'workorder.money', 'crew.pay'],
   /* Studio OS Phase 2: only the projects they are the designer on. Lifecycle (owner, 13 Oct 2026): money everywhere on those projects, execution ticks, design sign-off, the closure. */
-  DESIGNER: ['project.read', 'document.upload', 'design.work', 'design.close', 'payment.read', 'update.post', 'checklist.tick', 'workorder.read', 'workorder.money', 'project.closure'],
+  DESIGNER: ['project.read', 'document.upload', 'design.work', 'design.close', 'payment.read', 'update.post', 'checklist.tick', 'workorder.read', 'workorder.money', 'project.closure', 'extras.write', 'signoff.request', 'project.bringIn'],
 };
 
 /** Lead actions a salesperson may take only on a lead assigned to them. */
-const OWN_LEAD_ONLY: ReadonlySet<StudioAction> = new Set<StudioAction>(['lead.read', 'lead.edit', 'quote.write', 'quote.salesFinal']);
+const OWN_LEAD_ONLY: ReadonlySet<StudioAction> = new Set<StudioAction>(['lead.read', 'lead.edit', 'lead.call', 'quote.write', 'quote.salesFinal']);
+
+/**
+ * Sales roles (owner, 22 Oct 2026; docs/studio-os/SALES-ROLES.md): which
+ * sales permission decides each lead action for a SALES member who has a
+ * sales role. Anything not listed is refused for them (SALES has no other
+ * grant). Owners, PMs and the other fixed roles never come through here.
+ */
+const SALES_KEY_FOR: Partial<Record<StudioAction, SalesPermissionKey>> = {
+  'lead.read': 'leads.view',
+  'lead.edit': 'leads.edit',
+  'lead.call': 'calls.log',
+  'lead.add': 'leads.add',
+  'lead.assign': 'leads.assign',
+  'lead.merge': 'leads.merge',
+  'lead.delete': 'leads.delete',
+  'lead.import': 'leads.import',
+  'lead.export': 'leads.export',
+  'lead.pool': 'leads.pool',
+  'lead.claim': 'leads.pool',
+  'lead.bulk': 'leads.bulk',
+  'lead.analytics': 'analytics.view',
+  'lead.settings': 'settings.leads',
+  'team.sales': 'team.manageSales',
+  'quote.write': 'quotes.write',
+  'quote.salesFinal': 'quotes.salesFinal',
+  'quote.build': 'quotes.build',
+};
+
+/** Actions decided per lead by the permission's reach (own / team / all). */
+const REACH_ACTIONS: ReadonlySet<StudioAction> = new Set<StudioAction>(['lead.read', 'lead.edit', 'lead.call', 'quote.write', 'quote.salesFinal', 'lead.assign', 'lead.bulk']);
+
+/**
+ * A SALES member with a sales role. Without a lead in `ctx`, a per-lead
+ * action is allowed only on their own lead (`assigned: true`), i.e. "may
+ * they do this at all", and refused otherwise: a question asked without the
+ * facts gets the safe answer. Assign and bulk without a lead: whether they
+ * have the permission at all. `lead.claim` with a lead: unassigned and in a
+ * pool they may see.
+ */
+function canBySalesRole(sales: SalesContext, action: StudioAction, ctx: CanContext): boolean {
+  const key = SALES_KEY_FOR[action];
+  if (!key) return false;
+  const reach = reachOf(sales, key);
+  if (reach === null) return false;
+  if (action === 'lead.claim' || action === 'lead.pool') return ctx.lead ? inPool(poolAccessOf(sales), ctx.lead) : true;
+  if (!REACH_ACTIONS.has(action)) return true;
+  if (ctx.lead) return leadInReach(sales, reach, ctx.lead);
+  if (action === 'lead.assign' || action === 'lead.bulk') return true;
+  return ctx.assigned === true;
+}
 
 /** Actions on one project, which a PM or supervisor may take only when assigned to it. */
 const NEEDS_ASSIGNMENT: ReadonlySet<StudioAction> = new Set<StudioAction>([
@@ -302,6 +399,8 @@ const NEEDS_ASSIGNMENT: ReadonlySet<StudioAction> = new Set<StudioAction>([
   'workorder.money',
   'design.close',
   'project.closure',
+  'extras.write',
+  'signoff.request',
 ]);
 
 /** Accounts works across every project, so assignment never applies to it. */
@@ -317,7 +416,80 @@ export interface MemberRole {
    * closes the full-software roles and actions below.
    */
   fullSoftware?: boolean;
+  /**
+   * The studio is on Pro Solo (owner, 21 Oct 2026; software-plan.ts): one
+   * person, so studio/surfaces.ts closes the team screen and the lead pool.
+   */
+  solo?: boolean;
+  /** Their membership id, when known (`memberFor` sets it): lets `can()` tell "their own lead" from `ctx.lead`. */
+  id?: string;
+  /**
+   * Sales roles (owner, 22 Oct 2026): a SALES member's sales role and place
+   * in the reporting tree, built per request (access.ts `memberFor`). Null
+   * or left out on a SALES member keeps the Phase 1 rule exactly. Ignored for
+   * every other role.
+   */
+  sales?: SalesContext | null;
+  /**
+   * Developer access (owner, 22 Oct 2026; docs/studio-os/VIEW-AS.md): One
+   * Interiors staff looking at the studio as this member. Set only by
+   * access.ts for a live view. `can()` then allows the read actions alone
+   * (`READ_ACTIONS`); every other action is refused, whatever the role.
+   */
+  viewOnly?: boolean;
 }
+
+/**
+ * The actions that only read (developer access, owner 22 Oct 2026). A
+ * `viewOnly` member may take these and nothing else: every action not listed
+ * is a write (or, for `lead.export`, the studio's whole lead list leaving the
+ * building) and is refused at the root of `can()`. Explicit both ways, and
+ * tests/view-as.test.ts walks every action in `STUDIO_ACTIONS` against it, so a
+ * new action is a write until somebody decides otherwise here.
+ *
+ * Two reads also gate some writes: `vendor.rates` (seeing rates and margins;
+ * labour rates are edited under it) and `workorder.money` (seeing crew money;
+ * bills and balances are set under it). They are reads here so the view shows
+ * the money that member sees; their writes are still refused, because a
+ * viewing session resolves to no member at all on a write request (access.ts
+ * `currentMember`, tenancy.ts `myStudioId`) and the middleware refuses the
+ * request before that.
+ */
+export const READ_ACTIONS: ReadonlySet<StudioAction> = new Set<StudioAction>([
+  'project.read',
+  'payment.read',
+  'lead.read',
+  'lead.pool',
+  'lead.analytics',
+  'design.workload',
+  'crew.list',
+  'workorder.read',
+  'workorder.money',
+  'vendor.rates',
+]);
+
+/** Whether the action only reads (`READ_ACTIONS`). */
+export const isReadAction = (action: StudioAction): boolean => READ_ACTIONS.has(action);
+
+/**
+ * The member as their own screens are drawn for them, ignoring a staff view's
+ * read-only flag: which screens open (surfaces.ts `mayOpen`), which apps show
+ * and which rows a list holds. Never for deciding a write.
+ */
+export function asSeenBy<T extends MemberRole>(member: T): T {
+  return member.viewOnly ? { ...member, viewOnly: false } : member;
+}
+
+/** What `can()` may be told about the thing acted on. */
+export interface CanContext {
+  /** On the project in question; for a lead, the lead is theirs. */
+  assigned?: boolean;
+  /** The lead acted on (sales roles reach by its owner and its pool). */
+  lead?: LeadFacts;
+}
+
+/** Whether a SALES member is governed by a sales role (else the Phase 1 rule). */
+export const hasSalesRole = (member: MemberRole): member is MemberRole & { sales: SalesContext } => member.role === 'SALES' && !!member.sales;
 
 /**
  * The roles that only make sense with the full software (owner, 14 Oct
@@ -327,12 +499,12 @@ export const FULL_SOFTWARE_ROLES: readonly StudioRoleName[] = ['PM', 'DESIGNER',
 
 /**
  * What a studio without the full software cannot do, whoever asks (the
- * owner included): projects, site, design, the payments desk, crews and the
- * team. Leads, quotations, booking a sales final, the payment stages
- * template and the calendar stay.
+ * owner included): projects, site, design, the payments desk and crews.
+ * Leads, quotations, booking a sales final, the payment stages template,
+ * the calendar and the team stay: on Pro (owner, 21 Oct 2026) the owner adds
+ * salespeople, and team-store.ts refuses the full-software roles.
  */
 export const FULL_SOFTWARE_ACTIONS: ReadonlySet<StudioAction> = new Set<StudioAction>([
-  'team.manage',
   'project.create',
   'plan.edit',
   'update.post',
@@ -359,6 +531,9 @@ export const FULL_SOFTWARE_ACTIONS: ReadonlySet<StudioAction> = new Set<StudioAc
   'crew.pay',
   'design.close',
   'project.closure',
+  'extras.write',
+  'signoff.request',
+  'project.bringIn',
 ]);
 
 /**
@@ -369,16 +544,23 @@ export const FULL_SOFTWARE_ACTIONS: ReadonlySet<StudioAction> = new Set<StudioAc
  * rates); for a project action a PM or supervisor then gets `false`, which is
  * the safe answer to a question asked without the facts.
  */
-export function can(member: MemberRole, action: StudioAction, ctx: { assigned?: boolean } = {}): boolean {
+export function can(member: MemberRole, action: StudioAction, ctx: CanContext = {}): boolean {
   if (member.status !== 'ACTIVE') return false;
+  /* Developer access (owner, 22 Oct 2026): staff viewing as this member read, and never write. First, before the owner's "everything". */
+  if (member.viewOnly === true && !READ_ACTIONS.has(action)) return false;
   /* The pilot switch (studio/pilot.ts): checked before the owner's "everything". */
   if (member.fullSoftware === false && (FULL_SOFTWARE_ROLES.includes(member.role) || FULL_SOFTWARE_ACTIONS.has(action))) return false;
   if (member.role === 'OWNER') return true;
+  /* Sales roles (owner, 22 Oct 2026): the role and its reach decide, not GRANTS. */
+  if (hasSalesRole(member)) return canBySalesRole(member.sales, action, ctx);
   if (!GRANTS[member.role]?.includes(action)) return false;
+  const assigned = ctx.assigned ?? (ctx.lead && member.id ? ctx.lead.assignedToId !== null && ctx.lead.assignedToId === member.id : undefined);
+  /* Phase 1 pool: a salesperson without a sales role claims only from the studio pool. */
+  if (action === 'lead.claim' && member.role === 'SALES' && ctx.lead) return inPool(STUDIO_POOL_ONLY, ctx.lead);
   // A lead action: only a salesperson is limited, to their own leads.
-  if (OWN_LEAD_ONLY.has(action)) return member.role !== 'SALES' || ctx.assigned === true;
+  if (OWN_LEAD_ONLY.has(action)) return member.role !== 'SALES' || assigned === true;
   if (STUDIO_WIDE_ROLES.has(member.role) || !NEEDS_ASSIGNMENT.has(action)) return true;
-  return ctx.assigned === true;
+  return assigned === true;
 }
 
 /**
@@ -389,7 +571,32 @@ export function can(member: MemberRole, action: StudioAction, ctx: { assigned?: 
  */
 export function leadsVisibleTo(member: MemberRole & { id: string; studioId: string }): Prisma.StudioClientWhereInput {
   if (!can(member, 'lead.read', { assigned: true })) return { studioId: member.studioId, id: { in: [] } };
+  /* Sales roles: as far as `leads.view` reaches (sales-access.ts `reachWhere`). */
+  if (hasSalesRole(member)) return reachWhere(member.sales, reachOf(member.sales, 'leads.view'), member.studioId);
   if (member.role === 'SALES') return { studioId: member.studioId, assignedToId: member.id };
+  return { studioId: member.studioId };
+}
+
+/** The per-lead actions a write may be fenced by (`leadsWhereFor`). */
+export type LeadWriteAction = 'lead.read' | 'lead.edit' | 'lead.call' | 'quote.write' | 'quote.salesFinal' | 'lead.assign' | 'lead.bulk';
+
+/**
+ * The leads a member may take this action on, as a `where` for
+ * `prisma.studioClient` (sales roles and teams, owner 22 Oct 2026). A write
+ * ANDs it with the lead's id, so an action whose reach is narrower than what
+ * they can see (a head who sees their team but edits only their own) matches
+ * nothing outside it. Owner and PM: the studio. A Phase 1 salesperson: their
+ * own leads (assign: none). Anyone else: none. Always inside their studio.
+ */
+export function leadsWhereFor(member: MemberRole & { id: string; studioId: string }, action: LeadWriteAction): Prisma.StudioClientWhereInput {
+  const none: Prisma.StudioClientWhereInput = { studioId: member.studioId, id: { in: [] } };
+  const general = action === 'lead.assign' || action === 'lead.bulk' ? can(member, action) : can(member, action, { assigned: true });
+  if (!general) return none;
+  if (hasSalesRole(member)) {
+    const key = SALES_KEY_FOR[action];
+    return key ? reachWhere(member.sales, reachOf(member.sales, key), member.studioId) : none;
+  }
+  if (member.role === 'SALES') return action === 'lead.assign' ? none : { studioId: member.studioId, assignedToId: member.id };
   return { studioId: member.studioId };
 }
 
@@ -401,7 +608,11 @@ export function leadsVisibleTo(member: MemberRole & { id: string; studioId: stri
  * (`leadsVisibleTo` stays their own leads only).
  */
 export function poolVisibleTo(member: MemberRole & { id: string; studioId: string }): Prisma.StudioClientWhereInput {
-  if (!can(member, 'lead.claim')) return { studioId: member.studioId, id: { in: [] } };
+  /* Who may claim is who sees the pool; a staff view sees it as the member does (`asSeenBy`), and still cannot claim. */
+  if (!can(asSeenBy(member), 'lead.claim')) return { studioId: member.studioId, id: { in: [] } };
+  /* Sales roles (owner, 22 Oct 2026): the pools `leads.pool` reaches; a Phase 1 salesperson, the studio pool. */
+  if (hasSalesRole(member)) return poolWhere(poolAccessOf(member.sales), member.studioId);
+  if (member.role === 'SALES') return poolWhere(STUDIO_POOL_ONLY, member.studioId);
   return { studioId: member.studioId, assignedToId: null };
 }
 
@@ -411,7 +622,14 @@ export function poolVisibleTo(member: MemberRole & { id: string; studioId: strin
  * lead assigned to them (a quotation with no lead is not theirs to see).
  */
 export function quotesVisibleTo(member: MemberRole & { id: string; studioId: string }): Prisma.StudioQuoteWhereInput {
-  if (!can(member, 'quote.write', { assigned: true })) return { studioId: member.studioId, id: { in: [] } };
+  /* A read: a staff view sees the quotations the member sees (`asSeenBy`); writing still asks `can()`. */
+  if (!can(asSeenBy(member), 'quote.write', { assigned: true })) return { studioId: member.studioId, id: { in: [] } };
+  /* Sales roles: the quotations of the leads they may see (writing still asks `quote.write` on the lead). */
+  if (hasSalesRole(member)) {
+    const reach = reachOf(member.sales, 'leads.view');
+    if (reach === 'all') return { studioId: member.studioId };
+    return { studioId: member.studioId, client: { ...reachWhere(member.sales, reach, member.studioId), deletedAt: null } };
+  }
   if (member.role === 'SALES') return { studioId: member.studioId, client: { assignedToId: member.id, deletedAt: null } };
   return { studioId: member.studioId };
 }

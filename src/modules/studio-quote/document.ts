@@ -14,7 +14,7 @@
  */
 
 import { scheduleAmounts, type PaymentStage } from '@/modules/studio-sales/payment-template';
-import type { QuoteTotals, QuoteUnitName, WorkCodeName } from './pricing';
+import { BOOKING_DETAIL, HAUSPIRE_STAGES, type QuoteTotals, type QuoteUnitName, type WorkCodeName } from './pricing';
 import { discountedPaise, orderedRooms } from './rooms';
 
 /** The colour a studio's document falls back to (`StudioBranding.accentHex`'s default). */
@@ -62,12 +62,28 @@ export function mix(a: string, b: string, t: number): string {
  */
 export function docColours(accentHex: string | null | undefined): { band: string; head: string; line: string; tint: string; acc: string } {
   const acc = safeAccent(accentHex);
+  if (isHauspireAccent(acc)) return { acc: HAUSPIRE_COLOURS.light, band: HAUSPIRE_COLOURS.brand, head: HAUSPIRE_COLOURS.light, line: HAUSPIRE_COLOURS.line, tint: HAUSPIRE_COLOURS.band };
   return { acc, band: mix(acc, '#000000', 0.28), head: acc, line: mix(acc, '#FFFFFF', 0.8), tint: mix(acc, '#FFFFFF', 0.9) };
+}
+
+/**
+ * Hauspire's own colours, exactly as their quotation app's Tailwind theme
+ * has them (`brand`, `brand.light`, `brand.band`, `brand.line`), and its
+ * donut's slices (`RoomDonut.tsx`). A studio whose accent is either maroon
+ * gets these to the hex, so the PDF matches the old app's (owner, 22 Oct
+ * 2026); every other studio's colours are worked out from its accent.
+ */
+export const HAUSPIRE_COLOURS = { brand: '#531220', light: '#7A2A3A', band: '#F3E9EC', line: '#E0CDD3' } as const;
+export const HAUSPIRE_DONUT = ['#7A1C2B', '#9C2A34', '#B8433C', '#CF5B3F', '#E07A4E', '#EB9A68', '#F0B787', '#CAA06F', '#8F5B3A'] as const;
+export function isHauspireAccent(hex: string | null | undefined): boolean {
+  const a = safeAccent(hex);
+  return a === HAUSPIRE_COLOURS.brand || a === HAUSPIRE_COLOURS.light;
 }
 
 /** The donut's slices: the accent, warming and lightening slice by slice, as the sample's maroon → peach. */
 export function donutPalette(accentHex: string | null | undefined, n: number): string[] {
   const acc = safeAccent(accentHex);
+  if (isHauspireAccent(acc)) return Array.from({ length: n }, (_, i) => HAUSPIRE_DONUT[i % HAUSPIRE_DONUT.length]!);
   const end = mix(mix(acc, '#F0A060', 0.55), '#FFFFFF', 0.25);
   if (n <= 1) return [acc];
   return Array.from({ length: n }, (_, i) => mix(acc, end, i / (n - 1)));
@@ -84,6 +100,8 @@ export interface DocLineInput {
   heightMm: number | null;
   qtyMilli: number | null;
   amountPaise: number;
+  /** The line's note for the client, printed under its details (15 Oct 2026). */
+  note?: string | null;
 }
 
 export interface DocRow {
@@ -92,12 +110,14 @@ export interface DocRow {
   code: string;
   modular: boolean;
   details: string;
-  /** The count, for a line priced per unit, square foot or running foot; blank for W × H. */
+  /** The count, for a line priced per unit; blank otherwise, as the old PDF prints it. */
   units: string;
   widthMm: number | null;
   heightMm: number | null;
   amountPaise: number;
   discountedPaise: number;
+  /** The note for the client under the details; '' when none. */
+  note: string;
 }
 
 export interface DocRoom {
@@ -107,7 +127,18 @@ export interface DocRoom {
   subDiscountedPaise: number;
 }
 
-function unitsText(line: DocLineInput): string {
+/**
+ * The PDF's Units cell, as Hauspire's printed it (`PrintDocument.tsx`:
+ * `unitPrice != null ? qty : ""`): the count on a line priced per unit, and
+ * nothing on a W × H, square-foot or running-foot line, or on a line that
+ * is an amount on its own (no quantity).
+ */
+export function docUnitsText(line: Pick<DocLineInput, 'unit' | 'qtyMilli'>): string {
+  return line.unit === 'UNIT' ? unitsText(line) : '';
+}
+
+/** A quantity as words for a line's size (the Final's "34.39 sqft"); '' for W × H or no quantity. */
+export function unitsText(line: Pick<DocLineInput, 'unit' | 'qtyMilli'>): string {
   if (line.unit === 'AREA' || line.qtyMilli == null) return '';
   const q = line.qtyMilli / 1000;
   return Number.isInteger(q) ? String(q) : q.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
@@ -122,13 +153,15 @@ export function docRooms(lines: readonly DocLineInput[], roomOrder: readonly str
         n: i + 1,
         product: l.product,
         code: WORK_CODE_SHORT[l.code],
-        modular: l.code === 'MODULAR' && discountBps > 0,
+        /* Struck through on every MO-01 line, as the old PDF did, discount or not. */
+        modular: l.code === 'MODULAR',
         details: l.details?.trim() ?? '',
-        units: unitsText(l),
-        widthMm: l.widthMm || null,
-        heightMm: l.heightMm || null,
+        units: docUnitsText(l),
+        widthMm: l.widthMm ?? null,
+        heightMm: l.heightMm ?? null,
         amountPaise: l.amountPaise,
         discountedPaise: discountedPaise(l.amountPaise, l.code, discountBps),
+        note: l.note?.trim() ?? '',
       }));
       return {
         room,
@@ -163,19 +196,36 @@ export function docStages(schedule: readonly PaymentStage[] | null, totals: Pick
   if (schedule && schedule.length > 0 && totals.totalPaise > 0) {
     const split = scheduleAmounts(schedule, totals.totalPaise);
     if (split.ok) {
-      return split.stages.map((s) => ({
-        label:
-          s.kind === 'PCT'
-            ? `${s.label} (${trimPct(s.pct ?? 0)}%)`
-            : s.refundDays && s.refundDays > 0
-              ? `${s.label} (Fully refundable within ${s.refundDays} ${s.refundDays === 1 ? 'day' : 'days'})`
-              : s.label,
-        deliverable: s.note,
-        amountPaise: s.amountPaise,
-      }));
+      return split.stages.map((s) => {
+        const words = hauspireWords(s.label, s.note);
+        return {
+          label:
+            s.kind === 'PCT'
+              ? `${words.label} (${trimPct(s.pct ?? 0)}%)`
+              : s.refundDays && s.refundDays > 0
+                ? `${words.label} (Fully refundable within ${s.refundDays} ${s.refundDays === 1 ? 'day' : 'days'})`
+                : words.label,
+          deliverable: words.note,
+          amountPaise: s.amountPaise,
+        };
+      });
     }
   }
   return totals.stages.map((s) => ({ label: s.pct ? `${s.label} (${trimPct(s.pct)}%)` : s.label, deliverable: s.detail, amountPaise: s.amountPaise }));
+}
+
+/**
+ * A stage of Hauspire's standard six, printed in the old app's words: its
+ * capitalised label ("Design Advance") and its End Deliverable with the
+ * **bold** it printed. Only when the studio's stage is that stage — its
+ * name, any case, and its End Deliverable unchanged; a stage a studio wrote
+ * or reworded prints exactly as they wrote it.
+ */
+const HAUSPIRE_WORDS: { label: string; detail: string }[] = [{ label: 'Booking Advance', detail: BOOKING_DETAIL }, ...HAUSPIRE_STAGES.map((s) => ({ label: s.label, detail: s.detail }))];
+export function hauspireWords(label: string, note: string): { label: string; note: string } {
+  const w = HAUSPIRE_WORDS.find((x) => x.label.toLowerCase() === label.trim().toLowerCase());
+  if (!w) return { label, note };
+  return { label: w.label, note: note.trim() === w.detail.replace(/\*\*/g, '') ? w.detail : note };
 }
 
 const trimPct = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, ''));
@@ -185,7 +235,8 @@ const trimPct = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2).r
 export type TermsBlock =
   | { kind: 'title'; text: string }
   | { kind: 'heading'; text: string }
-  | { kind: 'bullet'; text: string }
+  /** `sub`: written indented under the bullet above ("  * Electrical fittings…"), printed indented. */
+  | { kind: 'bullet'; text: string; sub?: boolean }
   | { kind: 'text'; text: string }
   | { kind: 'gap' };
 
@@ -210,7 +261,8 @@ export function parseTerms(text: string | null | undefined): TermsBlock[] {
     }
     const b = line.match(/^[-*•–]\s+(.+)$/);
     if (b && !/^\*\*/.test(line)) {
-      out.push({ kind: 'bullet', text: b[1]! });
+      /* Two or more leading spaces: a sub-point (Hauspire's terms, 5 Sep 2026). */
+      out.push(/^\s{2,}/.test(raw) ? { kind: 'bullet', text: b[1]!, sub: true } : { kind: 'bullet', text: b[1]! });
       continue;
     }
     if (line.endsWith(':') && line.length <= 70 && !/[.;]\s/.test(line)) {

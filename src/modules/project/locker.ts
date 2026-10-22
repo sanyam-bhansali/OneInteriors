@@ -238,7 +238,7 @@ export interface StudioLocker {
 }
 
 const AUTOMATIC = (d: { kind: string; contentType: string; storageKey: string }) =>
-  d.kind === 'RECEIPT' || d.contentType === DECISION_CONTENT_TYPE || d.storageKey.startsWith('signed-quote:');
+  d.kind === 'RECEIPT' || d.contentType === DECISION_CONTENT_TYPE || d.storageKey.startsWith('signed-quote:') || d.storageKey.startsWith('signoff:');
 
 /** The locker for the studio's workspace card (`project.read`); money documents only with `payment.read` or `quote.write`. */
 export async function studioLocker(projectId: string): Promise<StudioLocker | null> {

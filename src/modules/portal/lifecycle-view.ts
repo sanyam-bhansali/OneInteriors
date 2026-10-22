@@ -14,6 +14,7 @@
  */
 
 import type { Phase } from '@/modules/project/lifecycle-rules';
+import { mayRaiseSnag, type SnagWindow } from '@/modules/project/snag-window';
 import type { CustomerDesign } from '@/modules/studio-design/customer-view';
 import type { CustomerPayments } from './money-locker-view';
 import type { CustomerTracker } from './tracker-view';
@@ -53,7 +54,14 @@ export type BlockerKind =
   /** Confirm a fixed snag is fixed (`count`). */
   | 'confirm_snag'
   /** Every snag is closed: sign off the handover. */
-  | 'sign_off';
+  | 'sign_off'
+  /** Change orders (15 Oct 2026): extra work the studio sent waits for the owner's yes or no (`label` its title, `count` how many). */
+  | 'approve_extra'
+  /** Approved extra work not paid yet (`amountPaise` what is still due on it). */
+  | 'pay_extra'
+  /** The studio asked the owner to sign the design final / the sales final (digital sign-off). */
+  | 'sign_design_final'
+  | 'sign_sales_final';
 
 export interface CustomerBlocker {
   kind: BlockerKind;
@@ -76,6 +84,15 @@ export interface CustomerLifecycle {
   warrantyEndsOn: string | null;
   /** The owner of the brief may sign off the handover now. */
   canSignOff: boolean;
+  /**
+   * The snag window (owner, 15 Oct 2026; project/snag-window.ts): the last
+   * day snags may be raised (YYYY-MM-DD), from the handover payment until
+   * the handover sign-off; null when there is none (yet), and during the
+   * warranty (warranty snags instead).
+   */
+  snagWindowEndsOn: string | null;
+  /** A snag may be raised in the app today (false after the window or the warranty). */
+  canRaiseSnag: boolean;
 }
 
 export interface LifecycleInput {
@@ -88,6 +105,12 @@ export interface LifecycleInput {
   payments: CustomerPayments | null;
   snags: readonly { status: 'OPEN' | 'FIXED'; progress: { state: string; canAnswer: boolean } }[];
   decisions: readonly { title: string; state: string }[];
+  /** Change orders the customer sees (portal extras, change-order-rules.ts `toCustomerExtra`). */
+  extras?: readonly { state: string; title: string; duePaise: number }[];
+  /** Sign-offs the studio asked for (signoff-rules.ts `toCustomerSignoff`). */
+  signoffs?: readonly { kind: string; state: string }[];
+  /** The snag window, once the handover payment is recorded after the closure. */
+  snagWindow?: SnagWindow | null;
 }
 
 const PHASE_OUT: Record<Phase, CustomerPhase> = {
@@ -174,9 +197,16 @@ export function customerLifecycle(i: LifecycleInput): CustomerLifecycle {
   const canSignOff = owner && i.phase === 'SNAGS' && openSnags === 0;
   let blocker: CustomerBlocker | null = null;
   const pay = paymentBlocker(i);
+  /* Change orders and sign-offs (15 Oct 2026): extra work to approve, approved extra work to pay, a quotation to sign. */
+  const extrasWaiting = (i.extras ?? []).filter((e) => e.state === 'waiting');
+  const extraDue = (i.extras ?? []).filter((e) => e.state === 'approved').reduce((a, e) => a + Math.max(0, e.duePaise), 0);
+  const toSign = (i.signoffs ?? []).find((s) => s.state === 'waiting' && s.kind === 'DESIGN_FINAL') ?? (i.signoffs ?? []).find((s) => s.state === 'waiting') ?? null;
   if (i.phase === 'SNAGS' && openSnags === 0) blocker = { kind: 'sign_off', label: null, amountPaise: null, count: null };
   else if (toConfirm > 0) blocker = { kind: 'confirm_snag', label: null, amountPaise: null, count: toConfirm };
   else if (pay) blocker = pay;
+  else if (extrasWaiting.length > 0) blocker = { kind: 'approve_extra', label: extrasWaiting[0]!.title, amountPaise: null, count: extrasWaiting.length };
+  else if (extraDue > 0) blocker = { kind: 'pay_extra', label: null, amountPaise: extraDue, count: null };
+  else if (toSign) blocker = { kind: toSign.kind === 'SALES_FINAL' ? 'sign_sales_final' : 'sign_design_final', label: null, amountPaise: null, count: null };
   else {
     const waitingEntries = (i.payments?.entries ?? []).filter((e) => e.status === 'waiting').length;
     const drawings = (i.design?.drawings ?? []).filter((d) => d.state === 'waiting');
@@ -199,5 +229,7 @@ export function customerLifecycle(i: LifecycleInput): CustomerLifecycle {
     openSnags,
     warrantyEndsOn: ['WARRANTY', 'CLOSED'].includes(i.phase) ? i.warrantyEndsOn : null,
     canSignOff,
+    snagWindowEndsOn: i.snagWindow && ['CLOSURE', 'SNAGS'].includes(i.phase) ? i.snagWindow.endsOn : null,
+    canRaiseSnag: mayRaiseSnag(i.phase, i.snagWindow ?? null, i.today).ok,
   };
 }

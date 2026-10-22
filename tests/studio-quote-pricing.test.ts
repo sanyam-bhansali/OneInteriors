@@ -55,8 +55,8 @@ describe('areaMilli', () => {
 
 describe('lineAmount', () => {
   it('prices an area line from its dimensions', () => {
-    // 34.391 sqft at ₹1,750/sqft = ₹60,184.25
-    expect(lineAmount(area(4260, 750, 1750))).toBe(R(60_184.25));
+    // 34.3904 sqft at ₹1,750/sqft = ₹60,183.71, rounded to the rupee as Hauspire's app does
+    expect(lineAmount(area(4260, 750, 1750))).toBe(R(60_184));
   });
 
   it('prices sqft and rft lines from the stored quantity', () => {
@@ -189,7 +189,7 @@ describe('computeTotals', () => {
       discountBps: 0,
       bookingAdvancePaise: R(25_000),
     });
-    expect(t.stages[0]!.label).toBe('Booking advance');
+    expect(t.stages[0]!.label).toBe('Booking Advance (Fully refundable within 3 days)');
     expect(t.stages[0]!.amountPaise).toBe(R(25_000));
     expect(t.stages).toHaveLength(6);
 
@@ -279,7 +279,7 @@ describe('computeTotals — GST, a named discount and the studio\'s own schedule
 
   it('keeps the advance and standard stages when the studio has no schedule', () => {
     const t = computeTotals(lines, { feeBps: 700, discountBps: 0, bookingAdvancePaise: R(25_000), phases: null });
-    expect(t.stages[0]?.label).toBe('Booking advance');
+    expect(t.stages[0]?.label).toBe('Booking Advance (Fully refundable within 3 days)');
     expect(t.stages[0]?.amountPaise).toBe(R(25_000));
     expect(t.stages.reduce((a, s) => a + s.amountPaise, 0)).toBe(t.totalPaise);
   });

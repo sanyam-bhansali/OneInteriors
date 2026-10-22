@@ -11,13 +11,15 @@ import { prisma } from '@/lib/prisma';
 import { fromDb } from '@/lib/money';
 import { resolveSiteUrl } from '@/lib/site';
 import { sendNotice } from '@/modules/auth/email';
-import { can, leadsVisibleTo, poolVisibleTo, quotesVisibleTo, type MemberRole } from '@/modules/studio/roles';
+import { can, hasSalesRole, leadsVisibleTo, poolVisibleTo, quotesVisibleTo, type MemberRole } from '@/modules/studio/roles';
 import { myLeadScope } from '@/modules/studio/lead-scope';
+import { memberFor } from '@/modules/studio/access';
+import { reachOf } from '@/modules/studio/sales-access';
 import { buildToday, istDayBounds, todayEmail, type SectionId, type TodayBooking, type TodayLead, type TodayQuote, type TodaySection, type TodayTask } from './today-rules';
 import { LIVE } from '@/modules/studio-practice/demo-lead';
 import { openTasksDue } from './tasks';
 
-interface Who extends MemberRole {
+export interface Who extends MemberRole {
   id: string;
   studioId: string;
 }
@@ -31,6 +33,7 @@ const LEAD_SELECT = {
   phone: true,
   assignedToId: true,
   assignedTo: { select: { user: { select: { name: true, email: true } } } },
+  stageId: true,
   stage: { select: { kind: true } },
   nextAction: true,
   nextActionOn: true,
@@ -47,14 +50,15 @@ const LEAD_SELECT = {
  * own, first rows only, with its true size counted in SQL (leads at scale:
  * at 26,000 leads, "the 600 most recently touched" missed most of them).
  */
-async function todayInput(
+export async function todayInput(
   who: Who,
   now: Date,
 ): Promise<{ leads: TodayLead[]; quotes: TodayQuote[]; bookings: TodayBooking[]; tasks: TodayTask[]; showPool: boolean; totals: Partial<Record<SectionId, number>> }> {
   const studioId = who.studioId;
-  const seesAll = who.role !== 'SALES';
+  const seesAll = seesEveryLead(who);
   const { start, end } = istDayBounds(now);
-  const base = { ...leadsVisibleTo(who), studioId, deletedAt: null, isDemo: false };
+  /* AND, never a spread: a team reach is an OR of its own (sales roles, owner 22 Oct 2026). */
+  const base = { AND: [leadsVisibleTo(who)], studioId, deletedAt: null, isDemo: false };
   const open = { ...base, stage: { kind: { in: ['OPEN' as const, 'WON' as const] } } };
   const calls = { ...open, nextActionOn: { lte: end } };
   const plans = {
@@ -66,7 +70,7 @@ async function todayInput(
     files: { none: { kind: 'FLOOR_PLAN' as const } },
   };
   /* The pool: owner and PM assign from it; a salesperson claims from it (owner, 12 Oct 2026). */
-  const pool = { ...poolVisibleTo(who), studioId, deletedAt: null, isDemo: false, stage: { kind: { in: ['OPEN' as const, 'WON' as const] } }, bookedIntroductionId: null };
+  const pool = { AND: [poolVisibleTo(who)], studioId, deletedAt: null, isDemo: false, stage: { kind: { in: ['OPEN' as const, 'WON' as const] } }, bookedIntroductionId: null };
   const showPool = can(who, 'lead.claim') || seesAll;
   const never = { ...base, stage: { kind: 'OPEN' as const }, lastContactedAt: null, assignedToId: { not: null }, bookedIntroductionId: null };
   const weekAgo = new Date(now.getTime() - 8 * 86_400_000);
@@ -125,6 +129,7 @@ async function todayInput(
       assignedToId: l.assignedToId,
       assignedToName: l.assignedTo ? l.assignedTo.user.name?.trim() || l.assignedTo.user.email?.split('@')[0] || 'Someone' : null,
       stageKind: l.stage.kind,
+      stageId: l.stageId,
       nextAction: l.nextAction,
       nextActionOn: l.nextActionOn,
       lastContactedAt: l.lastContactedAt,
@@ -150,6 +155,12 @@ async function todayInput(
       })),
     bookings: booked.map((b) => ({ clientId: b.id, name: b.name, bookedAt: b.bookedAt!, amountPaise: advanceBy.get(b.bookedIntroductionId!) ?? null })),
   };
+}
+
+/** Every lead in the studio: owner, PM, or a sales role whose `leads.view` reaches everyone. */
+export function seesEveryLead(who: MemberRole): boolean {
+  if (who.role !== 'SALES') return true;
+  return hasSalesRole(who) && reachOf(who.sales, 'leads.view') === 'all';
 }
 
 export interface TodayView {
@@ -199,7 +210,7 @@ export interface TodayEmailRun {
 export async function sendTodayEmails(now = new Date()): Promise<TodayEmailRun> {
   const people = await prisma.studioMember.findMany({
     where: { status: 'ACTIVE', role: { in: ['OWNER', 'PM', 'SALES'] }, user: { email: { not: null } }, studio: { status: { in: ['ACTIVE', 'ONBOARDING', 'PAUSED'] } } },
-    select: { id: true, studioId: true, role: true, status: true, user: { select: { email: true, name: true } }, studio: { select: { tradeName: true } } },
+    select: { id: true, userId: true, studioId: true, role: true, status: true, user: { select: { email: true, name: true } }, studio: { select: { tradeName: true } } },
     take: 2000,
   });
   const url = `${resolveSiteUrl()}/studio/today`;
@@ -207,8 +218,14 @@ export async function sendTodayEmails(now = new Date()): Promise<TodayEmailRun> 
   let skipped = 0;
   for (const p of people) {
     try {
-      const input = await todayInput(p, now);
-      const sections = buildToday({ ...input, now, seesAll: p.role !== 'SALES' });
+      /* A salesperson's list is read with their sales role and team, exactly as on screen (sales roles, owner 22 Oct 2026). */
+      const who: Who | null = p.role === 'SALES' ? await memberFor(p.userId) : p;
+      if (!who || who.status !== 'ACTIVE') {
+        skipped += 1;
+        continue;
+      }
+      const input = await todayInput(who, now);
+      const sections = buildToday({ ...input, now, seesAll: seesEveryLead(who) });
       const first = p.user.name?.trim().split(/\s+/)[0] || 'there';
       const mail = todayEmail(sections, first, p.studio.tradeName);
       if (!mail || !p.user.email) {

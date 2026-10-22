@@ -13,6 +13,7 @@ import { formatINR, formatINRCompact } from '@/lib/money';
 import { DesignCard } from './DesignCard';
 import { PaymentEntries } from './PaymentEntries';
 import { LifecycleCard } from './LifecycleCard';
+import { ExtrasCard, SignoffsCard } from './ExtrasCard';
 
 const MONO = { margin: '4px 0 0', font: '400 13px var(--mono)', color: 'var(--ink-2)' } as const;
 
@@ -158,6 +159,10 @@ function RealProject({ project, reload }: { project: MyProject; reload: () => vo
 
         {/* The project lifecycle: current step, next step, and what unlocks it (or nothing needed). */}
         <LifecycleCard project={project} onChanged={reload} />
+
+        {/* Change orders and digital sign-off (15 Oct 2026): quotations to sign, extra work to approve and pay. */}
+        {project.signoffs?.length ? <SignoffsCard signoffs={project.signoffs} /> : null}
+        {project.extras?.length ? <ExtrasCard extras={project.extras} onChanged={reload} /> : null}
 
         <div className="oa-list">
           <Link href="/app/snags" className="oa-row" style={{ textDecoration: 'none' }}>

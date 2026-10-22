@@ -9,6 +9,8 @@ import { introStateForClient } from '@/modules/studio/introduction';
 import { currentMember } from '@/modules/studio/access';
 import { can } from '@/modules/studio/roles';
 import { leadPage } from '@/modules/studio-sales/leads';
+import { leadRequestState } from '@/modules/studio-quote/quote-requests';
+import { QuoteRequestBox } from './QuoteRequestBox';
 import { bookingDraft } from '@/modules/studio-sales/booking';
 import { telLink, whatsappLink } from '@/modules/studio-sales/lead-rules';
 import { myStages } from '@/modules/studio-practice/stages';
@@ -26,6 +28,10 @@ import { LeadTasks } from './LeadTasks';
 import { NextCall } from './NextCall';
 import { Attribution, FollowUpPanel, LeadHeader, LeadTabs, NotesPanel, TagsPanel } from './AxLead';
 import { CustomFieldsPanel } from './CustomFieldsPanel';
+import { LeadNav } from './LeadNav';
+import { myLeadScope } from '@/modules/studio/lead-scope';
+import { CONTEXT_PARAM, backHref, contextLabel, leadHrefIn, readListContext } from '@/modules/studio-sales/lead-context';
+import { leadNeighbours } from '@/modules/studio-sales/lead-neighbours';
 
 export const metadata: Metadata = {
   title: 'Lead',
@@ -53,19 +59,32 @@ export const dynamic = 'force-dynamic';
  * Opens for anyone who may see this lead: owner and PM, any lead; a
  * salesperson, their own (studio/lead-scope.ts). Anyone else gets a 404.
  */
-export default async function ClientPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ClientPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { id } = await params;
+  const sp = await searchParams;
+  /* "Next lead →" (improvement 8, owner 22 Oct 2026): the list this page was opened from, cleaned (lead-context.ts). */
+  const fromRaw = sp[CONTEXT_PARAM];
+  const listCtx = readListContext(Array.isArray(fromRaw) ? fromRaw[0] : fromRaw);
 
   const page = await leadPage(id);
   if (!page) notFound();
   const { client } = page;
   const member = await currentMember();
-  const seesAll = page.may.assign;
+  /* Who may change anyone's notes and pick anyone for a task: the whole-studio view (owner, PM, a sales role that sees everyone). */
+  const leadScope = await myLeadScope();
+  const seesAll = leadScope?.seesAll ?? false;
+  const mayMerge = member !== null && can(member, 'lead.merge');
 
-  const [events, brief, dupes, intro, draft, tasks, taskWho, stages, fields, tags, vocab, previousCalls] = await Promise.all([
+  const [events, brief, dupes, intro, draft, tasks, taskWho, stages, fields, tags, vocab, previousCalls, quoteRequest] = await Promise.all([
     timelineFor(id),
     client.fromMarketplace ? marketplaceContextFor(id) : Promise.resolve(null),
-    seesAll ? duplicatesOf(id) : Promise.resolve([]),
+    mayMerge ? duplicatesOf(id) : Promise.resolve([]),
     client.fromMarketplace ? introStateForClient(id) : Promise.resolve(null),
     page.bookableQuoteId && page.may.book ? bookingDraft(member, page.bookableQuoteId) : Promise.resolve(null),
     tasksForLead(id),
@@ -75,7 +94,11 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
     leadTags(id),
     studioTags(),
     callAttempts(id),
+    /* Quotation requests (owner, 22 Oct 2026): "Quotation being built by Khushi", Request quotation. */
+    client.isDemo ? Promise.resolve(null) : leadRequestState(id),
   ]);
+  const scope = listCtx ? leadScope : null;
+  const around = scope && listCtx ? await leadNeighbours(scope, listCtx, id) : null;
 
   const tel = telLink(client.phone);
   const fromOneInteriors = client.source === 'ONE_INTERIORS' || client.fromMarketplace;
@@ -99,6 +122,16 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
 
   return (
     <main className="content cl-page" style={{ maxWidth: 1440 }}>
+      {listCtx && around ? (
+        <LeadNav
+          key={client.id}
+          leadId={client.id}
+          prev={around.prev ? { name: around.prev.name, href: leadHrefIn(around.prev.id, listCtx.query) } : null}
+          next={around.next ? { name: around.next.name, href: leadHrefIn(around.next.id, listCtx.query) } : null}
+          back={backHref(listCtx)}
+          label={contextLabel(listCtx, (sid) => stages.find((s) => s.id === sid)?.name ?? null)}
+        />
+      ) : null}
       <LeadHeader
         lead={{
           id: client.id,
@@ -119,8 +152,8 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         }}
         tel={tel}
         whatsapp={whatsappLink(client.phone)}
-        stages={stages.map((s) => ({ id: s.id, name: s.name, colour: s.colour, kind: s.kind }))}
-        may={{ edit: mayWork, quote: page.may.quote, delete: mayDelete }}
+        stages={stages.map((s) => ({ id: s.id, name: s.name, colour: s.colour, kind: s.kind, sortOrder: s.sortOrder, isIntake: s.isIntake, isCallStep: s.isCallStep }))}
+        may={{ edit: mayWork, quote: page.may.quote, delete: mayDelete, call: page.may.call && !client.isDemo }}
         canBook={page.may.book && page.bookableQuoteId !== null}
         previousCalls={previousCalls}
       />
@@ -160,6 +193,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
           {intro ? <IntroAnswer state={intro} /> : null}
           {brief ? <BriefPanel ctx={brief} /> : null}
           {client.fromMarketplace && page.may.quote ? <FinalQuote clientId={client.id} /> : null}
+          {quoteRequest ? <QuoteRequestBox clientId={client.id} state={quoteRequest} meId={member?.id ?? null} /> : null}
 
           <LeadTabs
             tabs={[

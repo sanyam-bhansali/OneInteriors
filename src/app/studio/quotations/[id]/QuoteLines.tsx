@@ -28,6 +28,8 @@ export interface EditableLine {
   qtyMilli: number | null;
   ratePaise: number;
   agreedPaise: number | null;
+  /** A note for the client, printed under the line on the PDFs (15 Oct 2026). */
+  note?: string | null;
 }
 
 /** With the figure this line currently comes to, computed by the parent. */

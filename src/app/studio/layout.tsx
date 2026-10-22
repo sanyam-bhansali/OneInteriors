@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Container } from '@/components/ui';
-import { getCurrentUser, hasRole } from '@/modules/auth/session';
+import { getCurrentUser, hasRole, type AuthUser } from '@/modules/auth/session';
 import { LIVE } from '@/modules/studio-practice/demo-lead';
 import { prisma } from '@/lib/prisma';
 import { hasDatabase } from '@/lib/env';
@@ -12,13 +12,16 @@ import { StudioShell, type NavGroup } from './StudioShell';
 import { hasSubmittedForReview } from '@/modules/studio/submitted';
 import { headers } from 'next/headers';
 import { PATH_HEADER, STUDIO_SIGN_IN } from '@/lib/host';
-import { memberFor } from '@/modules/studio/access';
-import { can, type MemberRole } from '@/modules/studio/roles';
+import { memberFor, viewAsFor } from '@/modules/studio/access';
+import { staffViewFor, type LiveView } from '@/modules/studio/view-as';
+import { ViewAsBanner } from './ViewAsBanner';
+import { asSeenBy, can, type MemberRole } from '@/modules/studio/roles';
 import { TEAM_PATH, TODAY_HOME, usesOfficeShell } from '@/modules/studio/surfaces';
 import { doorFor, type PilotArea } from '@/modules/studio/pilot';
 import { ComingSoon } from './ComingSoon';
 import { RoleFrame } from './RoleFrame';
-import { APPS, appsFor } from '@/modules/studio/apps';
+import { APPS, TO_BUILD_PATH, appsFor } from '@/modules/studio/apps';
+import { toBuildCount } from '@/modules/studio-quote/quote-request-store';
 import { StudioFrame } from './ui/StudioFrame';
 import { THEME_SCRIPT } from './ui/theme-script';
 import './studio-ui.css';
@@ -36,8 +39,24 @@ import { STUDIO_WORDS } from '@/modules/i18n/studio';
  * authorisation model.
  */
 export default async function StudioLayout({ children }: { children: React.ReactNode }) {
+  /* Developer access (owner, 22 Oct 2026; docs/studio-os/VIEW-AS.md): staff
+     viewing the studio as one of its people get the banner on every page,
+     whatever frame is drawn below, and the page is marked view-only (write
+     buttons dimmed; the server refuses writes regardless). */
   const user = await getCurrentUser();
+  const view = user && hasDatabase() ? await staffViewFor(user) : undefined;
+  if (!view) return <StudioLayoutFor user={user}>{children}</StudioLayoutFor>;
+  return (
+    <>
+      <ViewAsBanner name={view.memberName} role={view.role} salesRole={view.salesRoleName} studio={view.studioName} until={view.until} />
+      <div data-view-only="">
+        <StudioLayoutFor user={user} view={view}>{children}</StudioLayoutFor>
+      </div>
+    </>
+  );
+}
 
+async function StudioLayoutFor({ children, user, view }: { children: React.ReactNode; user: AuthUser | null; view?: LiveView }) {
   /* Signed out: the studio sign-in, by phone — which links to the email
      sign-in for owners who use that. */
   if (!user) redirect(STUDIO_SIGN_IN);
@@ -104,7 +123,22 @@ export default async function StudioLayout({ children }: { children: React.React
   let member: Awaited<ReturnType<typeof memberFor>> = null;
   if (hasDatabase()) {
     try {
-      member = await memberFor(user.id);
+      /* Viewing as a member: that member, `viewOnly` (access.ts). Gone since the view started: the view says so, nothing else is drawn. */
+      if (view) {
+        member = (await viewAsFor(user)) ?? null;
+        if (!member) {
+          return (
+            <Themed>
+              <main className="content" style={{ maxWidth: 560, margin: '10vh auto' }}>
+                <div className="card">
+                  <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>This person is no longer on the studio’s team.</h1>
+                  <p className="muted" style={{ margin: 0 }}>Stop viewing, and open the studio again from the ops page.</p>
+                </div>
+              </main>
+            </Themed>
+          );
+        }
+      } else member = await memberFor(user.id);
     } catch (error) {
       console.error('[studio] membership lookup failed', error instanceof Error ? error.name : 'unknown');
       return (
@@ -139,7 +173,7 @@ export default async function StudioLayout({ children }: { children: React.React
         <Themed>
           <RoleFrame
             member={member}
-            name={user.name}
+            name={view ? view.memberName : user.name}
             signOut={<SignOutButton label={tx(await getLang(), STUDIO_WORDS['site.signOut'])} />}
           >
             {children}
@@ -149,7 +183,7 @@ export default async function StudioLayout({ children }: { children: React.React
     }
   }
 
-  const context = await shellContext(user.id);
+  const context = await shellContext(view ? { id: view.memberId } : { userId: user.id });
 
   /* A studio still in setup keeps the setup frame: the software opens when they
      submit (crmIsOpen), and until then Setup is the only thing in their way. */
@@ -161,7 +195,7 @@ export default async function StudioLayout({ children }: { children: React.React
         <StudioShell
           groups={navFor(context, member)}
           studioName={context?.tradeName ?? 'Your studio'}
-          email={user.email}
+          email={view ? null : user.email}
           publicHref={context?.live ? `/studios/${context.slug}` : null}
           signOut={<SignOutButton />}
         >
@@ -176,7 +210,7 @@ export default async function StudioLayout({ children }: { children: React.React
      member's apps (`appsFor` asks `mayOpen` for each, so a tile never points
      at a screen the door above would bounce). No membership row (an ops
      account looking in) sees every app, as the old rail did. */
-  const apps = member ? appsFor(member) : [...APPS];
+  const apps = member ? await withToBuild(appsFor(member), member) : [...APPS];
   const office = !member || usesOfficeShell(member);
   return (
     <Themed>
@@ -186,7 +220,7 @@ export default async function StudioLayout({ children }: { children: React.React
         verified={context?.live ?? false}
         canSearchClients={office}
         alerts={office ? (context?.toConfirm ?? 0) + (context?.clientsDue ?? 0) : 0}
-        userName={user.name}
+        userName={view ? view.memberName : user.name}
         signOut={signOutAction}
       >
         {soon ? <ComingSoon area={soon} /> : children}
@@ -288,12 +322,13 @@ interface ShellContext {
  * screen. Falls closed on any failure — a rail with no counts is fine, a
  * studio surface that 500s because a badge could not be computed is not.
  */
-async function shellContext(userId: string): Promise<ShellContext | null> {
+async function shellContext(whose: { userId: string } | { id: string }): Promise<ShellContext | null> {
   if (!hasDatabase()) return null;
 
   try {
+    /* By the signed-in user, or by the member a staff view looks as (VIEW-AS.md). */
     const member = await prisma.studioMember.findUnique({
-      where: { userId },
+      where: 'id' in whose ? { id: whose.id } : { userId: whose.userId },
       select: {
         studio: {
           select: {
@@ -394,7 +429,8 @@ async function shellContext(userId: string): Promise<ShellContext | null> {
 function navFor(context: ShellContext | null, member: MemberRole | null): NavGroup[] {
   /* No membership row (an ops account looking in, fixtures mode) keeps the
      rail as it was. A project manager loses the two owner-only rows. */
-  const owner = member === null || can(member, 'team.manage');
+  /* `asSeenBy`: a staff view draws the rail the member has (VIEW-AS.md); writes on it are still refused. */
+  const owner = member === null || can(asSeenBy(member), 'team.manage');
   /* Their own software stays reachable unless they never finished setup.
      A pause is a marketplace state: it stops us sending briefs, and it does
      not repossess a studio's client list.
@@ -513,4 +549,16 @@ function navFor(context: ShellContext | null, member: MemberRole | null): NavGro
   });
 
   return groups;
+}
+
+/**
+ * Quotations → To build carries the number of quotation requests waiting for
+ * this member (owner, 22 Oct 2026; docs/studio-os/QUOTE-REQUESTS.md). One
+ * count, only when the tab is there.
+ */
+async function withToBuild(apps: ReturnType<typeof appsFor>, member: { id: string; studioId: string }): Promise<ReturnType<typeof appsFor>> {
+  if (!apps.some((a) => a.tabs.some((t) => t.href === TO_BUILD_PATH))) return apps;
+  const count = await toBuildCount(member);
+  if (count === 0) return apps;
+  return apps.map((a) => ({ ...a, tabs: a.tabs.map((t) => (t.href === TO_BUILD_PATH ? { ...t, count } : t)) }));
 }

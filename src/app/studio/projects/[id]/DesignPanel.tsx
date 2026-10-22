@@ -178,7 +178,7 @@ function Steps({ tab }: { tab: DesignTab }) {
       <MilestoneCount n={stars} />
       <ul className="m-0 flex list-none flex-col gap-1 p-0">
         {tab.steps.map((st) => (
-          <li key={st.id} className="flex items-start gap-1.5 rounded-[8px] px-1.5 py-2 hover:bg-[var(--fill)]">
+          <li key={st.id} id={`step-${st.id}`} className="flex items-start gap-1.5 rounded-[8px] px-1.5 py-2 hover:bg-[var(--fill)]">
             <StarToggle
               projectId={tab.projectId}
               stepId={st.id}
@@ -242,6 +242,7 @@ function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onO
             Moved {st.moves.length === 1 ? 'once' : `${st.moves.length} times`}: last {dayWords(st.moves.at(-1)!.from)} → {dayWords(st.moves.at(-1)!.to)} ({st.moves.at(-1)!.side === 'CLIENT' ? 'client side' : 'studio side'}: {st.moves.at(-1)!.reason.toLowerCase()})
           </span>
         ) : null}
+        {st.done && st.beforeJoining ? <span className={`block ${muted}`}>Done before joining One Interiors</span> : null}
         {st.done && (st.doneNote || st.doneFile) ? (
           <span className={`block ${muted}`}>
             {st.doneNote ? `Team note: ${st.doneNote}` : ''}

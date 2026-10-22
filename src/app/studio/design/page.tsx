@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { designWorkload, type DesignerRow } from '@/modules/studio-design/store';
 import { lifecycleBoard } from '@/modules/studio/lifecycle-store';
+import { can, currentMember } from '@/modules/studio/access';
 import { asLifeTab, LifecycleTabs } from './LifecycleTabs';
 import '../projects/projects.css';
 
@@ -21,7 +22,7 @@ const dayWords = (iso: string | null) =>
   iso ? new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).replace(',', '') : '';
 
 export default async function DesignPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const [{ tab: rawTab }, board, w] = await Promise.all([searchParams, lifecycleBoard().catch(() => null), designWorkload()]);
+  const [{ tab: rawTab }, board, w, member] = await Promise.all([searchParams, lifecycleBoard().catch(() => null), designWorkload(), currentMember()]);
   if (!w && !board) {
     return (
       <div className="content oi-proj">
@@ -42,6 +43,13 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
               : 'Every project from design to warranty, with what is holding each up, and every designer’s load.'}
           </p>
         </div>
+        {member && can(member, 'project.bringIn') ? (
+          <div className="hstack">
+            <Link href="/studio/projects/bring-in" className="btn sec">
+              Bring in a running project
+            </Link>
+          </div>
+        ) : null}
       </div>
       {board ? <LifecycleTabs board={board} tab={tab} base="/studio/design" mine={mine} /> : null}
       {/* The designers' load (Phase 2): owner and PM, under Design. */}

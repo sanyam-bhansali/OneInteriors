@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { formatINR } from '@/lib/money';
 import { studioProjects } from '@/modules/studio/workspace';
 import { studioUpdateScore } from '@/modules/project/site-log';
-import { currentMember } from '@/modules/studio/access';
+import { can, currentMember } from '@/modules/studio/access';
 import { ATTENTION_TITLES, clock, shortDay, type AttentionKind, type WorkspaceRow } from '@/modules/studio/workspace-view';
 import { LineIcon } from '../ui/icons';
 import './projects.css';
@@ -65,6 +65,13 @@ export default async function ProjectsPage() {
       Start a project
     </Link>
   ) : null;
+  /* Owner, PM, designer on Max: bring a project already running onto the platform (BRING-IN-PROJECTS.md). */
+  const bringInButton =
+    member && can(member, 'project.bringIn') ? (
+      <Link href="/studio/projects/bring-in" className="btn sec">
+        Bring in a running project
+      </Link>
+    ) : null;
   const lanes = lanesOf(rows);
 
   return (
@@ -84,7 +91,12 @@ export default async function ProjectsPage() {
               : ''}
           </p>
         </div>
-        {startButton ? <div className="hstack">{startButton}</div> : null}
+        {startButton || bringInButton ? (
+          <div className="hstack">
+            {bringInButton}
+            {startButton}
+          </div>
+        ) : null}
       </div>
 
       {rows.length === 0 ? (

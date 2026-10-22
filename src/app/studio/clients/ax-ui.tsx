@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { colourOf } from '@/modules/studio-practice/vocabulary';
 import { initials } from '@/modules/studio-sales/lead-view';
 
@@ -200,7 +201,13 @@ export function Modal({ onClose, children, width = 'min(560px, 94vw)', labelledB
     document.addEventListener('keydown', h);
     return () => document.removeEventListener('keydown', h);
   }, [onClose]);
-  return (
+  /* Drawn at the end of the page (owner, 21 Oct 2026): opened from a list
+     row or a board card, a dialog inside the table or the column would be
+     clipped by it and sit under its sticky header. Inside `.oi-studio` so it
+     keeps the studio's look and theme. */
+  const [host, setHost] = useState<Element | null>(null);
+  useEffect(() => setHost(document.querySelector('.oi-studio') ?? document.body), []);
+  const dialog = (
     <div className="overlay" style={{ paddingTop: '12vh' }}>
       <button type="button" className="scrim" aria-label="Close" onClick={onClose} />
       <div role="dialog" aria-modal="true" aria-labelledby={labelledBy} className="cl-sheet" style={{ width, maxWidth: '100%' }}>
@@ -208,4 +215,5 @@ export function Modal({ onClose, children, width = 'min(560px, 94vw)', labelledB
       </div>
     </div>
   );
+  return host ? createPortal(dialog, host) : null;
 }

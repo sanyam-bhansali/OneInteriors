@@ -63,6 +63,7 @@ const ROW_SELECT = {
   receiptDocumentId: true,
   correctsId: true,
   recordedById: true,
+  beforeJoining: true,
   recordedAt: true,
   customerConfirmedAt: true,
   disputedAt: true,
@@ -164,7 +165,7 @@ async function writePayment(
   staff: Staff,
   projectId: string,
   p: CheckedPayment,
-  opts: { receipt?: { path: string; name: string; type: string; bytes: number } | null; correctsId?: string | null } = {},
+  opts: { receipt?: { path: string; name: string; type: string; bytes: number } | null; correctsId?: string | null; changeOrderId?: string | null } = {},
 ): Promise<{ ok: true; id: string; stageLabel: string } | { ok: false; error: string }> {
   try {
     const out = await prisma.$transaction(async (tx) => {
@@ -216,6 +217,8 @@ async function writePayment(
           note: p.note,
           recordedById: staff.userId,
           correctsId: opts.correctsId ?? null,
+          /* Money for a change order (project/change-orders.ts); a correction keeps the order of the row it replaces. */
+          changeOrderId: opts.changeOrderId ?? null,
         },
         select: { id: true },
       });
@@ -224,7 +227,14 @@ async function writePayment(
         type: opts.correctsId ? 'payment.corrected' : 'payment.recorded',
         actor: staff.actor,
         refId: row.id,
-        payload: { stageIndex: p.stageIndex, amountPaise: p.amountPaise, mode: p.mode, receipt: receiptDocumentId !== null, ...(opts.correctsId ? { corrects: opts.correctsId } : {}) },
+        payload: {
+          stageIndex: p.stageIndex,
+          amountPaise: p.amountPaise,
+          mode: p.mode,
+          receipt: receiptDocumentId !== null,
+          ...(opts.correctsId ? { corrects: opts.correctsId } : {}),
+          ...(opts.changeOrderId ? { changeOrderId: opts.changeOrderId } : {}),
+        },
       });
       await mirror(tx, projectId);
       return { id: row.id, stageLabel: stage.label };
@@ -258,7 +268,14 @@ function ghost(id: string): LedgerRowInput {
  * Accounts and the owner (`payment.record`); ops too. The customer is asked
  * to confirm it.
  */
-export async function recordPayment(projectId: string, input: RecordInput, receipt: File | null = null, now = new Date()): Promise<FlowResult> {
+export async function recordPayment(
+  projectId: string,
+  input: RecordInput,
+  receipt: File | null = null,
+  now = new Date(),
+  /* A payment for a change order (project/change-orders.ts `recordExtraPayment`). */
+  opts: { changeOrderId?: string | null } = {},
+): Promise<FlowResult> {
   const staff = await staffOn(projectId, 'payment.record');
   if (!staff.ok) return staff;
   const check = checkPaymentInput(input, now);
@@ -269,7 +286,7 @@ export async function recordPayment(projectId: string, input: RecordInput, recei
     if (!r.ok) return { ok: false, error: `The payment was not saved: ${r.error}` };
     stored = { path: r.path, name: receipt.name, type: receipt.type, bytes: receipt.size };
   }
-  const r = await writePayment(staff, projectId, check.value, { receipt: stored });
+  const r = await writePayment(staff, projectId, check.value, { receipt: stored, changeOrderId: opts.changeOrderId ?? null });
   if (!r.ok) return r;
   if (staff.customerId) {
     void notify(staff.customerId, { kind: 'payment-to-confirm', stage: r.stageLabel, amountPaise: check.value.amountPaise, studio: staff.studioName });
@@ -285,7 +302,7 @@ export async function recordPayment(projectId: string, input: RecordInput, recei
 export async function correctPayment(paymentId: string, input: { amount: unknown }): Promise<FlowResult> {
   const original = await prisma.homeProjectPayment.findUnique({
     where: { id: paymentId },
-    select: { ...ROW_SELECT, projectId: true, note: true, corrections: { select: { id: true } } },
+    select: { ...ROW_SELECT, projectId: true, note: true, changeOrderId: true, corrections: { select: { id: true } } },
   });
   if (!original) return { ok: false, error: 'That payment is not on record.' };
   const staff = await staffOn(original.projectId, 'payment.record');
@@ -304,7 +321,7 @@ export async function correctPayment(paymentId: string, input: { amount: unknown
       mode: original.mode,
       note: original.note,
     },
-    { correctsId: original.id },
+    { correctsId: original.id, changeOrderId: original.changeOrderId },
   );
   if (!r.ok) return r;
   if (staff.customerId && amountPaise > 0) {

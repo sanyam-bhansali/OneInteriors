@@ -33,7 +33,6 @@ import {
   PAYMENTS_HOME,
   SITE_CREW_PATH,
   SITE_HOME,
-  TEAM_PATH,
   homeFor,
   isFullSoftwarePath,
   mayOpen,
@@ -92,7 +91,6 @@ const AREA_PATHS: readonly [string, PilotArea][] = [
   [PAYMENTS_HOME, 'money'],
   [CREWS_HOME, 'vendors'],
   [CREW_SETTINGS_PATH, 'vendors'],
-  [TEAM_PATH, 'team'],
   ['/studio/listing', 'listing'],
 ];
 
