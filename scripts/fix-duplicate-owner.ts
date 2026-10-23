@@ -54,8 +54,8 @@ async function main() {
     const [leads, pools, tasks, requests] = await Promise.all([
       db.studioClient.count({ where: { studioId: studio.id, assignedToId: dup.id } }),
       db.studioClient.count({ where: { studioId: studio.id, poolTeamId: dup.id } }),
-      db.studioTask.count({ where: { studioId: studio.id, assignedToId: dup.id } }).catch(() => 0),
-      db.studioQuoteRequest.count({ where: { studioId: studio.id, assignedToId: dup.id } }).catch(() => 0),
+      db.studioTask.count({ where: { studioId: studio.id, assignedToId: dup.id } }),
+      db.studioQuoteRequest.count({ where: { studioId: studio.id, assignedToId: dup.id } }),
     ]);
     console.log(`${studio.tradeName} (${slug})${dryRun ? '  (DRY RUN: nothing is written)' : ''}`);
     console.log(`  keep       ${keep.user.name} · ${keep.user.email ?? 'no email'} · mobile ${keep.user.phone ? `…${keep.user.phone.slice(-4)}` : 'none'}`);
@@ -67,8 +67,8 @@ async function main() {
     await db.$transaction(async (tx) => {
       await tx.studioClient.updateMany({ where: { studioId: studio.id, assignedToId: dup.id }, data: { assignedToId: keep.id } });
       await tx.studioClient.updateMany({ where: { studioId: studio.id, poolTeamId: dup.id }, data: { poolTeamId: keep.id } });
-      await tx.studioTask.updateMany({ where: { studioId: studio.id, assignedToId: dup.id }, data: { assignedToId: keep.id } }).catch(() => undefined);
-      await tx.studioQuoteRequest.updateMany({ where: { studioId: studio.id, assignedToId: dup.id }, data: { assignedToId: keep.id } }).catch(() => undefined);
+      await tx.studioTask.updateMany({ where: { studioId: studio.id, assignedToId: dup.id }, data: { assignedToId: keep.id } });
+      await tx.studioQuoteRequest.updateMany({ where: { studioId: studio.id, assignedToId: dup.id }, data: { assignedToId: keep.id } });
       await tx.studioMember.updateMany({ where: { studioId: studio.id, reportsToId: dup.id }, data: { reportsToId: keep.id } });
       await tx.studioMember.delete({ where: { id: dup.id } });
       await tx.user.delete({ where: { id: dup.userId } });
@@ -83,7 +83,7 @@ async function main() {
           after: { leads, pools, tasks, requests, phoneMoved: !keep.user.phone, by: 'scripts/fix-duplicate-owner.ts' },
         },
       });
-    });
+    }, { timeout: 60_000, maxWait: 20_000 });
     console.log('Written. One account for this person now.');
   } finally {
     await db.$disconnect();
