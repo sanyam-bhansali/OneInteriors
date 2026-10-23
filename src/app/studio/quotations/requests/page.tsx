@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { currentMember } from '@/modules/studio/access';
-import { can } from '@/modules/studio/roles';
+import { asSeenBy, can } from '@/modules/studio/roles';
 import { myQuoteRequests, requestsOverview, type RequestView } from '@/modules/studio-quote/quote-requests';
 import { FinishRequest, OpenRequest, ReassignRequest } from './RequestControls';
 import '../quotes.css';
@@ -24,7 +24,8 @@ export const dynamic = 'force-dynamic';
  */
 export default async function ToBuildPage() {
   const member = await currentMember();
-  const builds = member ? can(member, 'quote.build') : false;
+  /* asSeenBy: under View as (staff, read only) the page shows what this person sees; writes stay refused. */
+  const builds = member ? can(asSeenBy(member), 'quote.build') : false;
   const [mine, overview] = await Promise.all([builds ? myQuoteRequests() : Promise.resolve([] as RequestView[]), requestsOverview()]);
 
   if (!builds && !overview) {

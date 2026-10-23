@@ -89,7 +89,9 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
   const soon = member ? comingSoonApps(member) : [];
 
   const name = studio?.tradeName ?? 'Your studio';
-  const firstName = (user?.name ?? '').trim().split(/\s+/)[0] || null;
+  /* View as (staff, read only): greet the person being viewed, not the staff account looking. */
+  const viewedName = member?.viewOnly ? (await prisma.studioMember.findUnique({ where: { id: member.id }, select: { user: { select: { name: true } } } }).catch(() => null))?.user.name : null;
+  const firstName = ((viewedName ?? user?.name) ?? '').trim().split(/\s+/)[0] || null;
   const now = new Date();
   const hour = Number(now.toLocaleString('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' }));
   const hello = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';

@@ -27,7 +27,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { currentMember } from '@/modules/studio/access';
 import { actingMember, fenceFor, leadForQuote, leadInScope, mayOnLead, myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
-import { can } from '@/modules/studio/roles';
+import { asSeenBy, can } from '@/modules/studio/roles';
 import { record } from '@/modules/studio-practice/events';
 import { signedLeadFileLinks } from '@/modules/storage/lead-files';
 import { applyConfiguration, createQuote } from './quotes';
@@ -181,7 +181,7 @@ export async function myQuoteRequests(): Promise<RequestView[]> {
 }
 
 /** Whether this scope oversees requests at all: owner, PM, a head who gives leads to people. */
-const oversees = (scope: LeadScope): boolean => can(scope.member, 'lead.assign');
+const oversees = (scope: LeadScope): boolean => can(asSeenBy(scope.member), 'lead.assign');
 
 export interface RequestsOverview {
   /** Open, oldest first. */
