@@ -125,7 +125,11 @@ export async function viewAsFor(user: { id: string; role: string }): Promise<Stu
   if (!view) return undefined;
   if (await isWriteRequest()) return null;
   const member = await memberById(view.memberId);
-  return member && member.studioId === view.studioId ? { ...member, viewOnly: true } : null;
+  if (!member || member.studioId !== view.studioId) return null;
+  /* Someone invited but not yet signed in is seen as they will be once they
+     do (owner, 23 Oct 2026: check each person's screens before the team logs
+     in). Read only either way; a suspended member is still seen as suspended. */
+  return { ...member, status: member.status === 'INVITED' ? 'ACTIVE' : member.status, viewOnly: true };
 }
 
 /** What a member may do on one project; `may` is `can()` with the assignment already looked up. */

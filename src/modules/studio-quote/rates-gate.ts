@@ -27,6 +27,8 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { myStudioId } from '@/modules/studio/tenancy';
 import { quotingStudioId } from '@/modules/studio/lead-scope';
+import { currentMember } from '@/modules/studio/access';
+import { asSeenBy, can } from '@/modules/studio/roles';
 
 export type RatesGate =
   /** Nothing approved yet — their quotations are with us. */
@@ -47,7 +49,11 @@ export async function ratesGateFor(studioId: string): Promise<RatesGate> {
 
 /** For the signed-in studio. A read failure shuts the builder rather than opening it. */
 export async function myRatesGate(): Promise<RatesGate> {
-  const studioId = await quotingStudioId();
+  /* View as (staff, read only; owner, 23 Oct 2026): the gate is a read, so it
+     is asked as the person being viewed — otherwise "may write quotations" is
+     always no while viewing and every studio looked locked. */
+  const member = await currentMember();
+  const studioId = member?.viewOnly ? (can(asSeenBy(member), 'quote.write', { assigned: true }) ? member.studioId : null) : await quotingStudioId();
   if (!studioId) return 'WITH_US';
   try {
     return await ratesGateFor(studioId);
