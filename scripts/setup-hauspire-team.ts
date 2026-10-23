@@ -11,6 +11,11 @@
  *     starts from the top.
  *  2. New leads go to (Settings → Lead sources): Swarupa's team pool, so she
  *     hands them out to her team as she did on AxLeads.
+ *  4. Its rates, filled and confirmed (studio-quote/rates-gate.ts): the
+ *     product master was just filled from Hauspire's own quotation app
+ *     (scripts/import-hauspire-products.ts), the rates its team quotes from
+ *     daily, so the builder opens without the read-and-check step. Only with
+ *     `--rates-confirmed`, and only when the product master is not empty.
  *  3. The brand pages (Settings → Branding): the old quotation app's cover
  *     and about pages, stored exactly as an upload in Settings stores them
  *     (storage/studio-logo.ts storeBrandPage). Skipped when the studio
@@ -45,7 +50,7 @@ async function main() {
   try {
     const studio = await db.studio.findUnique({
       where: { slug },
-      select: { id: true, tradeName: true, quoteBuilderIds: true, leadRouteMode: true, leadRouteMemberId: true, branding: { select: { brandPages: true } } },
+      select: { id: true, tradeName: true, quoteBuilderIds: true, leadRouteMode: true, leadRouteMemberId: true, ratesFilledAt: true, ratesConfirmedAt: true, branding: { select: { brandPages: true } } },
     });
     if (!studio) throw new Error(`No studio with slug ${slug}.`);
     const member = async (phone: string) =>
@@ -59,11 +64,15 @@ async function main() {
     const routeChange = studio.leadRouteMode !== 'TEAM' || studio.leadRouteMemberId !== swarupa.id;
     const hasPages = (studio.branding?.brandPages ?? []).length > 0;
     const pagesToAdd = hasPages ? [] : brand;
+    const products = await db.studioProduct.count({ where: { studioId: studio.id, isActive: true } });
+    const ratesChange = process.argv.includes('--rates-confirmed') && !studio.ratesConfirmedAt;
+    if (ratesChange && products === 0) throw new Error('The product master is empty: import the products first.');
 
     console.log(`${studio.tradeName} (${slug})${dryRun ? '  (DRY RUN: nothing is written)' : ''}`);
     console.log(`  who builds quotations   ${buildersChange ? `→ ${khushi.user.name}, ${swarupa.user.name} (in turns)` : 'already Khushi, Swarupa'}`);
     console.log(`  new leads go to         ${routeChange ? `${studio.leadRouteMode} → ${swarupa.user.name}’s team pool` : 'already Swarupa’s team pool'}`);
     console.log(`  brand pages             ${hasPages ? `already ${studio.branding!.brandPages.length}, left as they are` : pagesToAdd.length ? `→ ${pagesToAdd.map((p) => basename(p)).join(', ')}` : 'none given'}`);
+    console.log(`  rates                   ${studio.ratesConfirmedAt ? 'already confirmed' : ratesChange ? `→ filled and confirmed (${products} products)` : 'not confirmed (add --rates-confirmed)'}`);
     if (!studio.branding && pagesToAdd.length) throw new Error('This studio has no branding row yet: run scripts/setup-hauspire-document.ts first.');
     if (dryRun) return;
 
@@ -77,6 +86,10 @@ async function main() {
     await db.$transaction(async (tx) => {
       if (buildersChange) await tx.studio.update({ where: { id: studio.id }, data: { quoteBuilderIds: builders, quoteTurnLastId: null } });
       if (routeChange) await tx.studio.update({ where: { id: studio.id }, data: { leadRouteMode: 'TEAM', leadRouteMemberId: swarupa.id } });
+      if (ratesChange) {
+        const now = new Date();
+        await tx.studio.update({ where: { id: studio.id }, data: { ratesFilledAt: studio.ratesFilledAt ?? now, ratesConfirmedAt: now } });
+      }
       if (stored.length) await tx.studioBranding.update({ where: { studioId: studio.id }, data: { brandPages: { push: stored } } });
       await tx.auditLog.create({
         data: {
@@ -84,11 +97,11 @@ async function main() {
           action: 'studio.setup.hauspire',
           entityType: 'Studio',
           entityId: studio.id,
-          after: { quoteBuilders: buildersChange ? builders.length : 'unchanged', route: routeChange ? 'TEAM' : 'unchanged', brandPages: stored.length, by: 'scripts/setup-hauspire-team.ts' },
+          after: { quoteBuilders: buildersChange ? builders.length : 'unchanged', route: routeChange ? 'TEAM' : 'unchanged', brandPages: stored.length, rates: ratesChange ? 'confirmed' : 'unchanged', by: 'scripts/setup-hauspire-team.ts' },
         },
       });
     });
-    console.log(`Written: ${[buildersChange && 'who builds quotations', routeChange && 'new leads go to', stored.length && `${stored.length} brand pages`].filter(Boolean).join(', ') || 'nothing needed'}.`);
+    console.log(`Written: ${[buildersChange && 'who builds quotations', routeChange && 'new leads go to', stored.length && `${stored.length} brand pages`, ratesChange && 'rates confirmed'].filter(Boolean).join(', ') || 'nothing needed'}.`);
   } finally {
     await db.$disconnect();
   }
