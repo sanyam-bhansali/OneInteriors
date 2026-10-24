@@ -301,6 +301,37 @@ function TickForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
       <label className="flex items-center gap-2 text-[13px]">
         <input type="checkbox" name="share" /> Show the file to {tab.customerFirst} too
       </label>
+      {st.lateDays > 0 ? (
+        // A late step says why (DESIGN-PROCESS-PLAN.md Decision 6): it goes on the Delays list for the owner to check.
+        <div className="flex flex-col gap-2 rounded-[10px] border border-[var(--s-rule-soft)] bg-[var(--s-paper)] p-2">
+          <label className="flex flex-col gap-1 text-[13px]">
+            {st.lateDays === 1 ? '1 day late' : `${st.lateDays} days late`}: why?{st.responsible === 'CLIENT' ? ' (left empty: the client was not responding)' : ''}
+            <select name="reason" className="fld" required={st.responsible !== 'CLIENT'} defaultValue="">
+              <option value="">Pick one</option>
+              <optgroup label="Client side">
+                {Object.entries(CLIENT_REASONS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Studio side">
+                {Object.entries(STUDIO_REASONS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </label>
+          <OnlyYourTeam>
+            <label className="flex flex-col gap-1 text-[13px]">
+              About the delay (optional)
+              <input name="reasonNote" maxLength={500} className="fld" />
+            </label>
+          </OnlyYourTeam>
+        </div>
+      ) : null}
       <OnlyYourTeam>
         <label className="flex flex-col gap-1 text-[13px]">
           What was done (optional)

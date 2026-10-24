@@ -42,7 +42,15 @@ export async function assignDesignerAction(projectId: string, memberId: string):
 
 export async function tickDesignStepAction(form: FormData): Promise<DesignResult> {
   const projectId = id(form.get('projectId'));
-  return done(projectId, await tickDesignStep(projectId, id(form.get('stepId')), { note: text(form.get('note'), 600), share: form.get('share') }, fileOf(form.get('file'))));
+  return done(
+    projectId,
+    await tickDesignStep(
+      projectId,
+      id(form.get('stepId')),
+      { note: text(form.get('note'), 600), share: form.get('share'), reason: text(form.get('reason'), 40) || null, reasonNote: text(form.get('reasonNote'), 600) },
+      fileOf(form.get('file')),
+    ),
+  );
 }
 
 export async function moveDesignStepAction(input: { projectId: string; stepId: string; to: string; reason: string; note: string }): Promise<DesignResult> {

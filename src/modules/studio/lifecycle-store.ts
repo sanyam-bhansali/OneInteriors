@@ -194,14 +194,14 @@ export async function lifecycleBoard(now = new Date()): Promise<LifecycleBoard |
   const where: Prisma.HomeProjectWhereInput = {
     ...projectsVisibleTo(member),
     cancelledAt: null,
-    ...(member.role === 'DESIGNER' ? { designerId: member.id } : {}),
+    ...(member.role === 'DESIGNER' && !member.designHead ? { designerId: member.id } : {}),
   };
   const rows = await prisma.homeProject.findMany({ where, orderBy: { startOn: 'desc' }, take: 300, select: SELECT });
   // Money on the board: the owner, and the PM or designer on the project (all of these rows are theirs).
   const cards = rows.map((r) => cardOf(r, now, true));
   const byLate = (a: BoardCard, b: BoardCard) => b.lateDays - a.lateDays || a.client.localeCompare(b.client);
   return {
-    scope: member.role === 'DESIGNER' ? 'designer' : 'studio',
+    scope: member.role === 'DESIGNER' && !member.designHead ? 'designer' : 'studio',
     design: cards.filter((c) => c.phase === 'DESIGN').sort(byLate),
     execution: cards.filter((c) => c.phase === 'EXECUTION' || c.phase === 'CLOSURE').sort((a, b) => Number(b.phase === 'CLOSURE') - Number(a.phase === 'CLOSURE') || byLate(a, b)),
     snags: cards.filter((c) => c.phase === 'SNAGS' || c.phase === 'WARRANTY').sort((a, b) => b.snags.length - a.snags.length),
@@ -215,7 +215,7 @@ export async function closuresRemainingFor(): Promise<{ count: number; projects:
   const member = await currentMember();
   if (!member || !['OWNER', 'PM', 'DESIGNER'].includes(member.role)) return null;
   const rows = await prisma.homeProject.findMany({
-    where: { ...projectsVisibleTo(member), cancelledAt: null, phase: 'CLOSURE', ...(member.role === 'DESIGNER' ? { designerId: member.id } : {}) },
+    where: { ...projectsVisibleTo(member), cancelledAt: null, phase: 'CLOSURE', ...(member.role === 'DESIGNER' && !member.designHead ? { designerId: member.id } : {}) },
     orderBy: { provisionalHandoverAt: 'asc' },
     take: 100,
     select: { id: true, provisionalHandoverAt: true, introduction: { select: { brief: { select: { society: true, locality: true, propertyType: true, contactName: true, user: { select: { name: true } } } } } } },

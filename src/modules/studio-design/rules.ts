@@ -255,6 +255,25 @@ export const CUSTOMER_REASON: Record<DelayReasonKey, string> = {
 
 export const DELAY_NOTE_MAX = 500;
 
+/**
+ * A late step's tick needs a reason (DESIGN-PROCESS-PLAN.md Decision 6):
+ * whose delay and why, filed on the Delays list for somebody to check. A
+ * client's step is the client's delay by itself ("Client not responding")
+ * when nobody says otherwise. A step on time needs nothing. `delay` is what
+ * to file, or null.
+ */
+export function lateTickCheck(
+  step: { plannedOn: string | null; responsible: string | null },
+  today: string,
+  reason: unknown,
+): { ok: true; delay: { reason: DelayReasonKey; side: DelaySideName; days: number } | null } | { ok: false; error: string } {
+  const days = step.plannedOn ? Math.max(0, daysBetween(step.plannedOn, today)) : 0;
+  if (days === 0) return { ok: true, delay: null };
+  if (isDelayReasonKey(reason)) return { ok: true, delay: { reason, side: sideOfReason(reason), days } };
+  if (step.responsible === 'CLIENT') return { ok: true, delay: { reason: 'CLIENT_NOT_RESPONDING', side: 'CLIENT', days } };
+  return { ok: false, error: `This step is ${days === 1 ? '1 day' : `${days} days`} late. Say why: on the client side or ours.` };
+}
+
 export interface StepDay {
   id: string;
   plannedOn: string | null;

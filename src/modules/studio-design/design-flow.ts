@@ -55,6 +55,7 @@ import {
   gateOf,
   isDelayReasonKey,
   isDesignKind,
+  lateTickCheck,
   planStepMove,
   ROOM_MAX,
   sideOfReason,
@@ -154,6 +155,7 @@ export function designItemData(stageId: string, st: PlanItem): Prisma.HomeCheckl
 const STEP_SELECT = {
   id: true,
   label: true,
+  responsible: true,
   inScope: true,
   doneAt: true,
   plannedOn: true,
@@ -171,7 +173,7 @@ const STEP_SELECT = {
 export async function tickDesignStep(
   projectId: string,
   stepId: string,
-  input: { note?: unknown; share?: unknown },
+  input: { note?: unknown; share?: unknown; reason?: unknown; reasonNote?: unknown },
   file: File | null,
   now = new Date(),
 ): Promise<DesignResult> {
@@ -192,6 +194,12 @@ export async function tickDesignStep(
   const gate = gateOf(step.gatePayment, gateStagesOf(p));
   const ok = checkDesignTick({ done: step.doneAt !== null, inScope: step.inScope, needsDocument: step.needsDocument, label: step.label }, gate, hasFile, note);
   if (!ok.ok) return ok;
+  // A late step says why (DESIGN-PROCESS-PLAN.md Decision 6); filed on the Delays list.
+  const plannedDay = step.plannedOn ? dayFromDb(step.plannedOn) : null;
+  const late = lateTickCheck({ plannedOn: plannedDay, responsible: step.responsible }, istDay(now), input.reason);
+  if (!late.ok) return late;
+  const reasonNote = typeof input.reasonNote === 'string' ? input.reasonNote.trim() : '';
+  if (reasonNote.length > DELAY_NOTE_MAX) return { ok: false, error: `Keep the note under ${DELAY_NOTE_MAX} characters.` };
   let stored: { path: string } | null = null;
   if (hasFile) {
     const s = await storeProjectDoc(projectId, file!);
@@ -229,7 +237,12 @@ export async function tickDesignStep(
         data: { doneAt: now, doneById: check.member.userId, doneSource: 'TICK', doneNote: note || null, doneDocumentId: docId },
       });
       if (count !== 1) throw new Refused('Already ticked.');
-      await recordEvent(tx, { projectId, type: 'design.ticked', actor, refId: step.id, payload: { file: docId !== null } });
+      if (late.delay && plannedDay) {
+        await tx.homeStepDelay.create({
+          data: { projectId, stepId: step.id, fromDate: dayToDb(plannedDay), toDate: dayToDb(istDay(now)), side: late.delay.side, reason: late.delay.reason, note: reasonNote || null, byId: check.member.userId },
+        });
+      }
+      await recordEvent(tx, { projectId, type: 'design.ticked', actor, refId: step.id, payload: { file: docId !== null, ...(late.delay ? { lateDays: late.delay.days, side: late.delay.side } : {}) } });
       return settleStageAfterTicks(tx, projectId, step.stageId, actor, now);
     });
     if (share && stored) tell(p.introduction.brief.userId, p.introduction.studio.tradeName, step.label);

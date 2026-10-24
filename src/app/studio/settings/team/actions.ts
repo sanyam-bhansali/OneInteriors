@@ -8,6 +8,7 @@ import {
   inviteMember,
   reinstateMember,
   resendInvite,
+  setDesignHead,
   setMemberSites,
   signOutEverywhere,
   suspendMember,
@@ -86,4 +87,8 @@ export async function signOutEverywhereAction(memberId: string): Promise<TeamRes
 
 export async function setSitesAction(memberId: string, sites: string[]): Promise<TeamResult> {
   return done(setMemberSites(String(memberId), sites));
+}
+
+export async function setDesignHeadAction(memberId: string, on: boolean): Promise<TeamResult> {
+  return done(setDesignHead(String(memberId), on === true));
 }

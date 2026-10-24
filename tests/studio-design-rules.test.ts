@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   chainLocks,
   checkAnswer,
+  lateTickCheck,
   planRedateAfterPayment,
   checkDesignTick,
   checkMeasurements,
@@ -169,6 +170,21 @@ describe('dates after a payment (DESIGN-PROCESS-PLAN.md Decision 5)', () => {
   it('nothing moves while the payment is still not recorded', () => {
     const due = paid.map((x) => (x.index === 1 ? { ...x, state: 'due' as const } : x));
     expect(planRedateAfterPayment(steps, due, '2026-10-12')).toBeNull();
+  });
+});
+
+describe('ticking a late step (DESIGN-PROCESS-PLAN.md Decision 6)', () => {
+  it('needs nothing on time', () => {
+    expect(lateTickCheck({ plannedOn: '2026-10-05', responsible: 'DESIGNER' }, '2026-10-05', undefined)).toEqual({ ok: true, delay: null });
+  });
+
+  it('asks a late step why, and files the side from the reason', () => {
+    expect(lateTickCheck({ plannedOn: '2026-10-01', responsible: 'DESIGNER' }, '2026-10-05', undefined)).toEqual({ ok: false, error: 'This step is 4 days late. Say why: on the client side or ours.' });
+    expect(lateTickCheck({ plannedOn: '2026-10-01', responsible: 'DESIGNER' }, '2026-10-05', 'STUDIO_WORKLOAD')).toEqual({ ok: true, delay: { reason: 'STUDIO_WORKLOAD', side: 'STUDIO', days: 4 } });
+  });
+
+  it('a client’s late step is the client’s delay by itself', () => {
+    expect(lateTickCheck({ plannedOn: '2026-10-04', responsible: 'CLIENT' }, '2026-10-05', undefined)).toEqual({ ok: true, delay: { reason: 'CLIENT_NOT_RESPONDING', side: 'CLIENT', days: 1 } });
   });
 });
 

@@ -95,6 +95,8 @@ export interface TeamPerson {
   salesRoleId: string | null;
   salesRoleName: string | null;
   reportsToId: string | null;
+  /** A designer marked design head (DESIGN-PROCESS-PLAN.md §2.6). */
+  designHead: boolean;
 }
 
 export interface TeamView {
@@ -131,6 +133,7 @@ export async function teamView(now = new Date()): Promise<TeamView | null> {
         lastSeenAt: true,
         salesRoleId: true,
         reportsToId: true,
+        designHead: true,
         salesRole: { select: { name: true } },
         user: { select: { name: true, phone: true, email: true, locale: true } },
         projects: { select: { homeProjectId: true } },
@@ -167,6 +170,7 @@ export async function teamView(now = new Date()): Promise<TeamView | null> {
       salesRoleId: m.role === 'SALES' ? m.salesRoleId : null,
       salesRoleName: m.role === 'SALES' ? (m.salesRole?.name ?? null) : null,
       reportsToId: m.role === 'SALES' ? m.reportsToId : null,
+      designHead: m.role === 'DESIGNER' && m.designHead,
     }))
     .sort((a, b) => order[a.role] - order[b.role]);
 
@@ -397,6 +401,23 @@ export async function setMemberSites(memberId: string, rawSites: unknown): Promi
   ]);
   await audit(lead, 'studio.member.sites', m.id, null, { sites: siteIds.length });
   return { ok: true, message: 'Sites saved.' };
+}
+
+/**
+ * Marks (or clears) a designer as design head: they see and work every
+ * project and every designer's load (DESIGN-PROCESS-PLAN.md §2.6). Owner's
+ * whole team screen only; only a designer.
+ */
+export async function setDesignHead(memberId: string, on: boolean): Promise<TeamResult> {
+  const access = await teamAccess();
+  if (!access?.full) return { ok: false, error: NOT_ALLOWED };
+  const { lead } = access;
+  const m = await teammate(lead, memberId);
+  if (!m) return { ok: false, error: 'That person is not on your team.' };
+  if (m.role !== 'DESIGNER') return { ok: false, error: 'Only a designer can be the design head.' };
+  await prisma.studioMember.update({ where: { id: m.id }, data: { designHead: on } });
+  await audit(lead, 'studio.member.design_head', m.id, null, { designHead: on });
+  return { ok: true, message: on ? `${m.user.name || 'They'} ${m.user.name ? 'is' : 'are'} the design head now: every project and every designer's load.` : 'Not the design head any more.' };
 }
 
 async function audit(lead: StudioMemberRef, action: string, entityId: string, before: object | null, after: object | null) {
