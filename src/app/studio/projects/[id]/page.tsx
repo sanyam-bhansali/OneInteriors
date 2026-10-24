@@ -106,7 +106,7 @@ export default async function ProjectWorkspacePage({
   ]);
   /* Change orders and sign-offs: null for those who do not see the project's money. */
   const [extras, signoffs] = await Promise.all([extrasForStudio(w.id).catch(() => null), signoffsForStudio(w.id).catch(() => null)]);
-  const closureOpen = closure !== null && life !== null && life.phase !== 'DESIGN' && life.phase !== 'EXECUTION';
+  const closureOpen = closure !== null && life !== null && life.phase !== 'DESIGN' && life.phase !== 'PRE_EXECUTION' && life.phase !== 'EXECUTION';
   // Studio OS Phase 3: Crews for those who see work orders (owner, PM, accounts; a designer on their project since the lifecycle).
   const crews = viewer === null || roleCan(viewer, 'workorder.read', { assigned: true });
   const tabs = TABS.filter((t) => (t.key !== 'payments' || money) && (t.key !== 'crews' || crews) && (t.key !== 'closure' || closureOpen) && (t.key !== 'extras' || (extras !== null && money && (life?.phase !== 'DESIGN' || extras.extras.length > 0))));

@@ -54,6 +54,7 @@ import {
   DESIGN_KINDS,
   gateOf,
   isDelayReasonKey,
+  designPhaseAfterTicks,
   isDesignKind,
   lateTickCheck,
   planStepMove,
@@ -62,7 +63,7 @@ import {
   VISIT_NOTE_MAX,
   type MeasureInput,
 } from './rules';
-import { bhkOf, checkDesignTemplate, isResponsible, readDesignTemplate } from './template';
+import { bhkOf, checkDesignTemplate, isResponsible, PRE_EXECUTION_GROUP, readDesignTemplate } from './template';
 import { GATE_SELECT, gateStagesOf } from './store';
 
 export type DesignResult = { ok: true; message: string; id?: string } | { ok: false; error: string };
@@ -130,6 +131,24 @@ export async function assignDesigner(projectId: string, memberId: string | null)
 }
 
 // ── Design steps ──────────────────────────────────────────────
+
+/**
+ * After design ticks: the project moves to pre-execution when every design
+ * step is done, and to execution when every pre-execution step is done
+ * (DESIGN-PROCESS-PLAN.md Decision 10). Inside the tick's transaction. Never
+ * backwards.
+ */
+export async function settleDesignPhase(tx: Prisma.TransactionClient, projectId: string, actor: ProjectActor, now: Date): Promise<void> {
+  const stage = await tx.homeProjectStage.findFirst({ where: { projectId, kind: 'DESIGN' }, select: { items: { select: { room: true, inScope: true, doneAt: true } } } });
+  const event = designPhaseAfterTicks((stage?.items ?? []).map((i) => ({ room: i.room, inScope: i.inScope, done: i.doneAt !== null })));
+  if (event === 'preexecution.done') {
+    // Straight from design too: a project switched in at its last step.
+    await applyPhaseEvent(tx, projectId, { kind: 'design.done' }, actor, now);
+    await applyPhaseEvent(tx, projectId, { kind: 'preexecution.done' }, actor, now);
+  } else if (event === 'design.done') {
+    await applyPhaseEvent(tx, projectId, { kind: 'design.done' }, actor, now);
+  }
+}
 
 /** A design step as stored, from the plan: its who, file, gate, days, effort, approval and to-dos. */
 export function designItemData(stageId: string, st: PlanItem): Prisma.HomeChecklistItemUncheckedCreateInput {
@@ -243,7 +262,9 @@ export async function tickDesignStep(
         });
       }
       await recordEvent(tx, { projectId, type: 'design.ticked', actor, refId: step.id, payload: { file: docId !== null, ...(late.delay ? { lateDays: late.delay.days, side: late.delay.side } : {}) } });
-      return settleStageAfterTicks(tx, projectId, step.stageId, actor, now);
+      const settled = await settleStageAfterTicks(tx, projectId, step.stageId, actor, now);
+      await settleDesignPhase(tx, projectId, actor, now);
+      return settled;
     });
     if (share && stored) tell(p.introduction.brief.userId, p.introduction.studio.tradeName, step.label);
     return { ok: true, message: `Ticked: ${step.label}.${outcome === 'mark-done' ? ' Every design step is done: design shows finished.' : ''}` };
@@ -656,11 +677,13 @@ export async function closeDesign(projectId: string, now = new Date()): Promise<
       data: { designClosedAt: now, designFinalQuoteId: df.id, designChanges: summary as unknown as Prisma.InputJsonValue },
     });
     await recordEvent(tx, { projectId, type: 'design.closed', actor, refId: df.id, payload: { lines: summary.lines.length } });
-    // The project lifecycle: design sign-off moves the project to execution.
-    await applyPhaseEvent(tx, projectId, { kind: 'design.signed_off' }, actor, now);
+    // The project lifecycle: design sign-off moves an older plan (no pre-execution steps) to execution. A plan with the
+    // design process moves on its own ticks instead: design done, then pre-execution done (DESIGN-PROCESS-PLAN.md Decision 10).
+    const pre = await tx.homeChecklistItem.count({ where: { stage: { projectId, kind: 'DESIGN' }, room: PRE_EXECUTION_GROUP } });
+    if (pre === 0) await applyPhaseEvent(tx, projectId, { kind: 'design.signed_off' }, actor, now);
   });
   if (facts) tell(facts.introduction.brief.userId, facts.introduction.studio.tradeName, 'Your design is final. See what changed against your first quotation.');
-  return { ok: true, message: `Design signed off on ${df.number}. The project moves to execution; the client sees what changed against the sales final.` };
+  return { ok: true, message: `Design signed off on ${df.number}. The client sees what changed against the sales final.` };
 }
 
 // ── The studio's design steps (Settings) ──────────────────────

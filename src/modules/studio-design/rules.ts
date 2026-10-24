@@ -12,7 +12,7 @@
 
 import { splitAcross } from '@/lib/money';
 import { addDays, daysBetween, isDay } from '@/modules/project/working-days';
-import { DESIGN_SHARE_BP, designerDaysFor, DESIGNER_MONTH_DAYS, scaledEffort, scaledGaps, type ApprovalKind, type DesignTemplateStep, type Responsible, type StepGroup } from './template';
+import { DESIGN_GROUP, DESIGN_SHARE_BP, designerDaysFor, PRE_EXECUTION_GROUP, DESIGNER_MONTH_DAYS, scaledEffort, scaledGaps, type ApprovalKind, type DesignTemplateStep, type Responsible, type StepGroup } from './template';
 
 // ── Building the steps ────────────────────────────────────────
 
@@ -184,6 +184,23 @@ export function planRedateAfterPayment(
     .filter((s, k) => (k === 0 || (!s.done && s.inScope)) && s.plannedOn)
     .map((s) => ({ id: s.id, from: s.plannedOn!, to: addDays(s.plannedOn!, days) }));
   return { stepId: step.id, days, moves };
+}
+
+/**
+ * Where the design stage's ticks put the project (DESIGN-PROCESS-PLAN.md
+ * Decision 10): every in-scope pre-execution step done → execution; every
+ * in-scope design step done (and pre-execution steps to come) →
+ * pre-execution; else nothing. A plan without pre-execution steps (older
+ * projects) moves on the design sign-off instead, as before.
+ */
+export function designPhaseAfterTicks(items: readonly { room: string; inScope: boolean; done: boolean }[]): 'design.done' | 'preexecution.done' | null {
+  const inScope = items.filter((i) => i.inScope);
+  const design = inScope.filter((i) => i.room === DESIGN_GROUP);
+  const pre = inScope.filter((i) => i.room === PRE_EXECUTION_GROUP);
+  if (pre.length === 0) return null;
+  if (pre.every((i) => i.done) && design.every((i) => i.done)) return 'preexecution.done';
+  if (design.length > 0 && design.every((i) => i.done)) return 'design.done';
+  return null;
 }
 
 export type DesignCheck = { ok: true } | { ok: false; error: string };

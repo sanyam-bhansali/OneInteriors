@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   chainLocks,
   checkAnswer,
+  designPhaseAfterTicks,
   lateTickCheck,
   planRedateAfterPayment,
   checkDesignTick,
@@ -185,6 +186,19 @@ describe('ticking a late step (DESIGN-PROCESS-PLAN.md Decision 6)', () => {
 
   it('a client’s late step is the client’s delay by itself', () => {
     expect(lateTickCheck({ plannedOn: '2026-10-04', responsible: 'CLIENT' }, '2026-10-05', undefined)).toEqual({ ok: true, delay: { reason: 'CLIENT_NOT_RESPONDING', side: 'CLIENT', days: 1 } });
+  });
+});
+
+describe('the phase after design ticks (DESIGN-PROCESS-PLAN.md Decision 10)', () => {
+  const st = (room: string, done: boolean, inScope = true) => ({ room, done, inScope });
+  it('every design step done: pre-execution; every pre-execution step done too: execution', () => {
+    expect(designPhaseAfterTicks([st('Design', true), st('Design', false), st('Pre-execution', false)])).toBeNull();
+    expect(designPhaseAfterTicks([st('Design', true), st('Design', true), st('Pre-execution', false)])).toBe('design.done');
+    expect(designPhaseAfterTicks([st('Design', true), st('Pre-execution', true)])).toBe('preexecution.done');
+  });
+  it('out-of-scope steps do not hold it, and an older plan with no pre-execution waits for the sign-off', () => {
+    expect(designPhaseAfterTicks([st('Design', true), st('Design', false, false), st('Pre-execution', false)])).toBe('design.done');
+    expect(designPhaseAfterTicks([st('Design', true), st('Design', true)])).toBeNull();
   });
 });
 

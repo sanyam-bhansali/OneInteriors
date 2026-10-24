@@ -203,7 +203,7 @@ export async function lifecycleBoard(now = new Date()): Promise<LifecycleBoard |
   return {
     scope: member.role === 'DESIGNER' && !member.designHead ? 'designer' : 'studio',
     design: cards.filter((c) => c.phase === 'DESIGN').sort(byLate),
-    execution: cards.filter((c) => c.phase === 'EXECUTION' || c.phase === 'CLOSURE').sort((a, b) => Number(b.phase === 'CLOSURE') - Number(a.phase === 'CLOSURE') || byLate(a, b)),
+    execution: cards.filter((c) => c.phase === 'PRE_EXECUTION' || c.phase === 'EXECUTION' || c.phase === 'CLOSURE').sort((a, b) => Number(b.phase === 'CLOSURE') - Number(a.phase === 'CLOSURE') || byLate(a, b)),
     snags: cards.filter((c) => c.phase === 'SNAGS' || c.phase === 'WARRANTY').sort((a, b) => b.snags.length - a.snags.length),
     closed: cards.filter((c) => c.phase === 'CLOSED'),
     closures: cards.filter((c) => c.phase === 'CLOSURE'),

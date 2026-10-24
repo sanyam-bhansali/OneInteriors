@@ -5611,10 +5611,6 @@ model HomeStepDelay {
   note      String?           @db.Text
   byId      String
   at        DateTime          @default(now())
-  /// Somebody checked the reason (owner, design head or PM; the Delays list,
-  /// DESIGN-PROCESS-PLAN.md Decision 6). Null until then.
-  checkedAt   DateTime?
-  checkedById String?
 
   @@index([projectId, at])
   @@index([stepId])

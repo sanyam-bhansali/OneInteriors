@@ -16,6 +16,7 @@ import { can } from '@/modules/studio/roles';
 import { dayFromDb, istDay } from '@/modules/project/working-days';
 import { homeLabel } from '@/modules/studio/workspace-view';
 import { daysBetween } from '@/modules/project/working-days';
+import { dedupeKey, recordEventOnce } from '@/modules/project/events';
 import { reasonLabel } from './rules';
 
 export interface DelayRow {
@@ -68,13 +69,16 @@ export async function delaysList(now = new Date()): Promise<DelaysView | null> {
       note: true,
       byId: true,
       at: true,
-      checkedAt: true,
-      checkedById: true,
       step: { select: { label: true } },
       project: { select: { introduction: { select: { brief: { select: { society: true, locality: true, propertyType: true } } } } } },
     },
   });
-  const userIds = [...new Set(rows.flatMap((r) => [r.byId, r.checkedById].filter((x): x is string => Boolean(x))))];
+  // A check is a project event (home_step_delays is append-only): the newest per delay.
+  const checks = rows.length
+    ? await prisma.homeProjectEvent.findMany({ where: { type: 'design.delay_checked', refId: { in: rows.map((r) => r.id) } }, select: { refId: true, actorId: true, at: true } })
+    : [];
+  const checkOf = new Map(checks.map((c) => [c.refId!, c]));
+  const userIds = [...new Set([...rows.map((r) => r.byId), ...checks.map((c) => c.actorId)].filter((x): x is string => Boolean(x)))];
   const users = userIds.length ? await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } }) : [];
   const name = (id: string | null) => (id ? (users.find((u) => u.id === id)?.name?.trim() || 'Someone') : 'Someone');
   const out: DelayRow[] = rows.map((r) => {
@@ -94,7 +98,7 @@ export async function delaysList(now = new Date()): Promise<DelaysView | null> {
       note: r.note,
       by: name(r.byId),
       on: istDay(r.at),
-      checked: r.checkedAt ? { on: istDay(r.checkedAt), by: name(r.checkedById) } : null,
+      checked: checkOf.has(r.id) ? { on: istDay(checkOf.get(r.id)!.at), by: name(checkOf.get(r.id)!.actorId) } : null,
     };
   });
   return { rows: out, canCheck: everyone && !member.viewOnly, unchecked: out.filter((r) => !r.checked).length };
@@ -104,9 +108,16 @@ export async function delaysList(now = new Date()): Promise<DelaysView | null> {
 export async function checkDelay(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const member = await currentMember();
   if (!member || !can(member, 'design.workload')) return { ok: false, error: 'Only the owner, a project manager or the design head checks delays.' };
-  const { count } = await prisma.homeStepDelay.updateMany({
-    where: { id: String(id ?? ''), checkedAt: null, project: { introduction: { studioId: member.studioId } } },
-    data: { checkedAt: new Date(), checkedById: member.userId },
+  const delay = await prisma.homeStepDelay.findFirst({ where: { id: String(id ?? ''), project: { introduction: { studioId: member.studioId } } }, select: { id: true, projectId: true } });
+  if (!delay) return { ok: false, error: 'That delay is not one of yours.' };
+  // Once per delay; the delay row itself is never edited (append-only).
+  const written = await recordEventOnce(prisma, {
+    projectId: delay.projectId,
+    type: 'design.delay_checked',
+    actor: { type: 'STUDIO', id: member.userId },
+    refId: delay.id,
+    payload: {},
+    dedupeKey: dedupeKey('delay-checked', delay.id),
   });
-  return count === 1 ? { ok: true } : { ok: false, error: 'That delay is checked already, or not one of yours.' };
+  return written ? { ok: true } : { ok: false, error: 'That delay is checked already.' };
 }

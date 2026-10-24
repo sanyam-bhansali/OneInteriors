@@ -1,8 +1,8 @@
 -- The design process (owner and Hauspire's design team, 24 Oct 2026;
 -- docs/studio-os/DESIGN-PROCESS-PLAN.md §1–§2).
 --
--- Expand only: one enum value, three columns on steps, one new table, two
--- columns on step delays, one on studio members. Nothing dropped, nothing
+-- Expand only: one enum value, two columns on steps, one new table, one
+-- column on studio members. Nothing dropped, nothing
 -- backfilled, nothing rewritten: existing projects keep their steps until a
 -- studio moves them to the new steps (Settings, Design).
 --
@@ -13,7 +13,8 @@
 -- home_checklist_items."approvalKind": on a client's approval step, what
 -- approves it in the app (LAYOUT_2D | RENDER_3D | WORKING | DESIGN_FINAL).
 -- home_step_tasks: small to-dos inside a step.
--- home_step_delays."checkedAt" / "checkedById": somebody checked the reason.
+-- (A delay's reason being checked is a project event, design.delay_checked:
+-- home_step_delays is append-only.)
 -- studio_members."designHead": a designer who sees every designer's work.
 --
 -- RLS on the new table, no policies: reached only through Prisma on the
@@ -25,10 +26,6 @@ ALTER TYPE "ProjectPhase" ADD VALUE IF NOT EXISTS 'PRE_EXECUTION' BEFORE 'EXECUT
 -- AlterTable
 ALTER TABLE "home_checklist_items" ADD COLUMN "effortMin" INTEGER;
 ALTER TABLE "home_checklist_items" ADD COLUMN "approvalKind" TEXT;
-
--- AlterTable
-ALTER TABLE "home_step_delays" ADD COLUMN "checkedAt" TIMESTAMP(3);
-ALTER TABLE "home_step_delays" ADD COLUMN "checkedById" TEXT;
 
 -- AlterTable
 ALTER TABLE "studio_members" ADD COLUMN "designHead" BOOLEAN NOT NULL DEFAULT false;
