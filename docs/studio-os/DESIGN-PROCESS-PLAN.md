@@ -80,7 +80,7 @@ Hauspire moves every project onto the software on **Tuesday 27 Oct**. This plan 
 | 3BHK | ×1.2 (the meeting's "add 20% everywhere") |
 | 4BHK and larger | ×1.4 |
 
-- Days are rounded up.
+- The plan's running total is scaled and rounded, not each step on its own, so the whole plan is exactly the factor longer or shorter (a 2 BHK's 43 days become 34 / 52 / 60 for 1 / 3 / 4 BHK).
 - A 0-day step stays 0.
 - 1BHK and 4BHK were not discussed. These multipliers are my choice.
 
