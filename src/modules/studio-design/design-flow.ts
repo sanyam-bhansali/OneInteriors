@@ -54,7 +54,7 @@ import {
   DESIGN_KINDS,
   gateOf,
   isDelayReasonKey,
-  designPhaseAfterTicks,
+  approvalKindOfDrawing,
   isDesignKind,
   lateTickCheck,
   planStepMove,
@@ -65,6 +65,7 @@ import {
 } from './rules';
 import { bhkOf, checkDesignTemplate, isResponsible, PRE_EXECUTION_GROUP, readDesignTemplate } from './template';
 import { GATE_SELECT, gateStagesOf } from './store';
+import { settleDesignPhase, tickApprovalStep } from './step-settle';
 
 export type DesignResult = { ok: true; message: string; id?: string } | { ok: false; error: string };
 
@@ -132,23 +133,6 @@ export async function assignDesigner(projectId: string, memberId: string | null)
 
 // ── Design steps ──────────────────────────────────────────────
 
-/**
- * After design ticks: the project moves to pre-execution when every design
- * step is done, and to execution when every pre-execution step is done
- * (DESIGN-PROCESS-PLAN.md Decision 10). Inside the tick's transaction. Never
- * backwards.
- */
-export async function settleDesignPhase(tx: Prisma.TransactionClient, projectId: string, actor: ProjectActor, now: Date): Promise<void> {
-  const stage = await tx.homeProjectStage.findFirst({ where: { projectId, kind: 'DESIGN' }, select: { items: { select: { room: true, inScope: true, doneAt: true } } } });
-  const event = designPhaseAfterTicks((stage?.items ?? []).map((i) => ({ room: i.room, inScope: i.inScope, done: i.doneAt !== null })));
-  if (event === 'preexecution.done') {
-    // Straight from design too: a project switched in at its last step.
-    await applyPhaseEvent(tx, projectId, { kind: 'design.done' }, actor, now);
-    await applyPhaseEvent(tx, projectId, { kind: 'preexecution.done' }, actor, now);
-  } else if (event === 'design.done') {
-    await applyPhaseEvent(tx, projectId, { kind: 'design.done' }, actor, now);
-  }
-}
 
 /** A design step as stored, from the plan: its who, file, gate, days, effort, approval and to-dos. */
 export function designItemData(stageId: string, st: PlanItem): Prisma.HomeChecklistItemUncheckedCreateInput {
@@ -605,6 +589,9 @@ export async function answerDrawing(userId: string, documentId: string, verdict:
   const row = await prisma.$transaction(async (tx) => {
     const r = await tx.homeDesignReview.create({ data: { projectId: doc.projectId, documentId: doc.id, verdict: ok.verdict, comment: ok.comment, byUserId: userId, at: now }, select: { id: true } });
     await recordEvent(tx, { projectId: doc.projectId, type: 'design.answered', actor: { type: 'CUSTOMER', id: userId }, refId: doc.id, payload: { verdict: ok.verdict }, at: now });
+    // The client's approval ticks their approval step (DESIGN-PROCESS-PLAN.md Decision 4).
+    const approves = ok.verdict === 'APPROVED' ? approvalKindOfDrawing(doc.designKind) : null;
+    if (approves) await tickApprovalStep(tx, doc.projectId, approves, userId, now);
     return r;
   });
   return { ok: true, id: row.id };

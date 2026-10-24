@@ -50,6 +50,7 @@ import {
 } from './signoff-rules';
 import { contentHash } from './signoff-hash';
 import { istDay } from './working-days';
+import { tickApprovalStep } from '@/modules/studio-design/step-settle';
 
 export type SignoffResult = { ok: true; id?: string; message?: string } | { ok: false; error: string };
 
@@ -206,6 +207,8 @@ export async function signQuote(
     await tx.homeQuoteSignoff.updateMany({ where: { id: s.id }, data: { lockerDocumentId: doc.id } });
     await recordEvent(tx, { projectId: s.projectId, type: 'document.filed', actor, refId: doc.id, at: now, payload: { kind: 'SIGNOFF', signoffId: s.id } });
     await recordEvent(tx, { projectId: s.projectId, type: 'signoff.signed', actor, refId: s.id, at: now, payload: { kind, revision: s.revisionN } });
+    // Signing the Design final is the client's final design approval (DESIGN-PROCESS-PLAN.md Decision 4).
+    if (kind === 'DESIGN_FINAL') await tickApprovalStep(tx, s.projectId, 'DESIGN_FINAL', userId, now);
     return true;
   });
   if (!done) return { ok: false, error: 'You have signed this already.' };

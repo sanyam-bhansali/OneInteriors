@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  approvalKindOfDrawing,
   chainLocks,
   checkAnswer,
   designPhaseAfterTicks,
@@ -202,6 +203,12 @@ describe('the phase after design ticks (DESIGN-PROCESS-PLAN.md Decision 10)', ()
   });
 });
 
+describe('approvals in the app tick the client’s step (DESIGN-PROCESS-PLAN.md Decision 4)', () => {
+  it('a layout or furniture approval ticks the 2D approval; a 3D the 3D approval; working drawings theirs; a site photo nothing', () => {
+    expect(['LAYOUT_2D', 'FURNITURE', 'RENDER_3D', 'WORKING', 'SITE_PHOTO', null].map(approvalKindOfDrawing)).toEqual(['LAYOUT_2D', 'LAYOUT_2D', 'RENDER_3D', 'WORKING', null, null]);
+  });
+});
+
 describe('ticking a design step', () => {
   const step = { done: false, inScope: true, needsDocument: false, label: 'First draft (FD) meeting' };
 
@@ -289,14 +296,15 @@ describe('drawings and the client’s answers', () => {
     expect(waitingDays(d!, D('2026-10-10T00:00:00Z'))).toBe(4);
   });
 
-  it('read the latest answer; a draft is a draft; a working drawing is just shared', () => {
+  it('read the latest answer; a draft is a draft; a site photo is just shared; working drawings wait for approval too (24 Oct 2026)', () => {
     const answers = [
       { documentId: 'a', verdict: 'CHANGES' as const, comment: 'Darker', at: D('2026-10-05T00:00:00Z') },
       { documentId: 'a', verdict: 'APPROVED' as const, comment: null, at: D('2026-10-06T00:00:00Z') },
     ];
-    const out = drawingsOf([doc('a'), doc('b', { sharedAt: null, room: 'Kitchen' }), doc('c', { designKind: 'WORKING', room: 'Bedroom' }), doc('x', { designKind: null })], answers);
+    const out = drawingsOf([doc('a'), doc('b', { sharedAt: null, room: 'Kitchen' }), doc('c', { designKind: 'SITE_PHOTO', room: 'Bedroom' }), doc('w', { designKind: 'WORKING', room: 'Hall' }), doc('x', { designKind: null })], answers);
     expect(out.map((d) => [d.id, d.state])).toEqual([
       ['c', 'shared'],
+      ['w', 'waiting'],
       ['b', 'draft'],
       ['a', 'approved'],
     ]);
@@ -309,7 +317,8 @@ describe('drawings and the client’s answers', () => {
     expect(checkAnswer(shared, false, 'CHANGES', 'Warmer lights')).toEqual({ ok: true, verdict: 'CHANGES', comment: 'Warmer lights' });
     expect(checkAnswer(shared, true, 'APPROVED', '')).toMatchObject({ ok: false });
     expect(checkAnswer({ ...shared, sharedAt: null }, false, 'APPROVED', '')).toMatchObject({ ok: false });
-    expect(checkAnswer({ ...shared, designKind: 'WORKING' }, false, 'APPROVED', '')).toMatchObject({ ok: false });
+    expect(checkAnswer({ ...shared, designKind: 'SITE_PHOTO' }, false, 'APPROVED', '')).toMatchObject({ ok: false });
+    expect(checkAnswer({ ...shared, designKind: 'WORKING' }, false, 'APPROVED', '')).toMatchObject({ ok: true });
     expect(checkAnswer(shared, false, 'MAYBE', '')).toMatchObject({ ok: false });
   });
 

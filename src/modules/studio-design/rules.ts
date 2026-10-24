@@ -339,8 +339,20 @@ export const DESIGN_KINDS = {
 export type DesignKind = keyof typeof DESIGN_KINDS;
 export const isDesignKind = (v: unknown): v is DesignKind => typeof v === 'string' && v in DESIGN_KINDS;
 
-/** The kinds the client is asked to approve. Working drawings and site photos are for the studio and the factory. */
-export const FOR_APPROVAL: readonly DesignKind[] = ['LAYOUT_2D', 'FURNITURE', 'RENDER_3D'];
+/**
+ * The kinds the client is asked to approve: the layouts, the 3D, and the
+ * working drawings (the design process, 24 Oct 2026: working drawings are
+ * approved by the client before they are final). Site photos are not.
+ */
+export const FOR_APPROVAL: readonly DesignKind[] = ['LAYOUT_2D', 'FURNITURE', 'RENDER_3D', 'WORKING'];
+
+/** Which client approval step a drawing's approval ticks (DESIGN-PROCESS-PLAN.md Decision 4). */
+export function approvalKindOfDrawing(kind: string | null | undefined): ApprovalKind | null {
+  if (kind === 'LAYOUT_2D' || kind === 'FURNITURE') return 'LAYOUT_2D';
+  if (kind === 'RENDER_3D') return 'RENDER_3D';
+  if (kind === 'WORKING') return 'WORKING';
+  return null;
+}
 export const asksApproval = (k: string | null | undefined): boolean => (FOR_APPROVAL as readonly string[]).includes(k ?? '');
 
 export const ROOM_MAX = 60;
