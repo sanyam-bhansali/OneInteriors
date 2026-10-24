@@ -263,6 +263,12 @@ function ghost(id: string): LedgerRowInput {
   };
 }
 
+/** studio-design/payment-redate.ts, loaded when used: it reads the ledger through this module, so a static import would be a cycle. */
+async function redateDesign(projectId: string, paidOn: string, byUserId: string): Promise<void> {
+  const { redateAfterPayment } = await import('@/modules/studio-design/payment-redate');
+  await redateAfterPayment(projectId, paidOn, byUserId);
+}
+
 /**
  * Mark money received against a stage, with the receipt when there is one.
  * Accounts and the owner (`payment.record`); ops too. The customer is asked
@@ -288,6 +294,8 @@ export async function recordPayment(
   }
   const r = await writePayment(staff, projectId, check.value, { receipt: stored, changeOrderId: opts.changeOrderId ?? null });
   if (!r.ok) return r;
+  // Design steps the payment opens count from today's payment, not the plan (DESIGN-PROCESS-PLAN.md Decision 5).
+  if (!opts.changeOrderId) await redateDesign(projectId, check.value.receivedOn, staff.userId);
   if (staff.customerId) {
     void notify(staff.customerId, { kind: 'payment-to-confirm', stage: r.stageLabel, amountPaise: check.value.amountPaise, studio: staff.studioName });
   }
@@ -349,6 +357,7 @@ export async function setStagePaidFromLegacy(projectId: string, index: number, p
     if (!check.ok) return check;
     const r = await writePayment(staff, projectId, check.value);
     if (!r.ok) return r;
+    await redateDesign(projectId, check.value.receivedOn, staff.userId);
     if (staff.customerId) void notify(staff.customerId, { kind: 'payment-to-confirm', stage: stage.label, amountPaise: check.value.amountPaise, studio: staff.studioName });
     return { ok: true, id: r.id };
   }

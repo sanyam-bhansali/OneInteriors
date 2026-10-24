@@ -84,7 +84,7 @@ describe('the three lists', () => {
     expect(w.missed[1]!.when).toBe('3 days late');
   });
 
-  it('Today is grouped by kind, site updates first', () => {
+  it('Today is grouped by kind (site updates before payments)', () => {
     expect(w.todayGroups.map((g) => g.title)).toEqual(['Site updates', 'Payments']);
   });
 
@@ -116,6 +116,18 @@ describe('the three lists', () => {
 
   it('is empty when there is nothing', () => {
     expect(isEmptyWork(buildMyWork([], TODAY))).toBe(true);
+  });
+
+  it('lists a step waiting on a payment apart: never in Missed or Today (DESIGN-PROCESS-PLAN.md Decision 5)', () => {
+    const w2 = buildMyWork([src('late', '2026-10-01', { kind: 'design', waitingOn: 'Design advance' }), src('due', TODAY, { kind: 'design' })], TODAY);
+    expect(w2.missed).toEqual([]);
+    expect(w2.counts).toEqual({ today: 1, soon: 0, missed: 0 });
+    expect(w2.waiting.map((x) => [x.key, x.payment])).toEqual([['late', 'Design advance']]);
+  });
+
+  it('puts design before site in Today (owner and design team, 24 Oct 2026)', () => {
+    const w3 = buildMyWork([src('s', TODAY, { kind: 'site' }), src('d', TODAY, { kind: 'design' })], TODAY);
+    expect(w3.todayGroups.map((g) => g.id)).toEqual(['design', 'site']);
   });
 });
 

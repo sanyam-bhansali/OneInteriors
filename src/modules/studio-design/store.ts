@@ -38,7 +38,7 @@ import {
   drawingsOf,
   DESIGN_KINDS,
   formatLength,
-  gateOf,
+  chainLocks,
   lateDays,
   nextStep,
   reasonLabel,
@@ -264,10 +264,11 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
   const fileUrl = new Map(stepFiles.map((f, i) => [f.id, { id: f.id, title: f.title, url: urls[i] ?? '' }]));
   const docUrl = new Map(designDocs.map((d, i) => [d.id, urls[stepFiles.length + i] ?? '']));
 
-  const steps: DesignStepView[] = items.map((i) => {
-    const gate = gateOf(i.gatePayment, gates);
+  const locks = chainLocks(items.map((i) => ({ gatePayment: i.gatePayment, done: i.doneAt !== null, inScope: i.inScope })), gates);
+  const steps: DesignStepView[] = items.map((i, k) => {
     const plannedOn = i.plannedOn ? dayFromDb(i.plannedOn) : null;
     const done = i.doneAt !== null;
+    const lockedBy = locks[k] ?? null;
     return {
       id: i.id,
       label: i.label,
@@ -275,12 +276,12 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       responsibleLabel: isResponsible(i.responsible) ? RESPONSIBLE_LABEL[i.responsible] : null,
       needsDocument: i.needsDocument,
       gatePayment: i.gatePayment,
-      lockedBy: !done && !gate.open ? gate.payment : null,
+      lockedBy,
       inScope: i.inScope,
       done,
       doneOn: i.doneAt ? istDay(i.doneAt) : null,
       plannedOn,
-      lateDays: i.inScope ? lateDays({ plannedOn, done }, today) : 0,
+      lateDays: i.inScope && !lockedBy ? lateDays({ plannedOn, done }, today) : 0,
       sharePct: i.inScope && stageBp > 0 ? Math.round(((progress.weights.get(i.id) ?? 0) * 1000) / stageBp) / 10 : 0,
       doneNote: i.doneNote,
       beforeJoining: i.doneSource === 'BEFORE_JOINING',
@@ -465,10 +466,10 @@ export async function designWorkload(now = new Date()): Promise<DesignWorkload |
     const st = p.stages[0];
     const items = st?.items ?? [];
     const gates = gateStagesOf(p);
-    const steps = items.map((i) => ({ ...i, done: i.doneAt !== null, plannedOn: i.plannedOn ? dayFromDb(i.plannedOn) : null }));
+    const locks = chainLocks(items.map((i) => ({ gatePayment: i.gatePayment, done: i.doneAt !== null, inScope: i.inScope })), gates);
+    const steps = items.map((i, k) => ({ ...i, done: i.doneAt !== null, plannedOn: i.plannedOn ? dayFromDb(i.plannedOn) : null, lockedBy: locks[k] ?? null }));
     const progress = progressOf(steps.map((i) => ({ id: i.id, stageId: 'd', weightBp: i.weightBp, inScope: i.inScope, done: i.done })));
     const n = nextStep(steps);
-    const gate = n ? gateOf(n.gatePayment, gates) : { open: true as const };
     const dl = dueAndLate(steps, today);
     return {
       designerId: p.designerId,
@@ -478,7 +479,7 @@ export async function designWorkload(now = new Date()): Promise<DesignWorkload |
         customer: firstName(b.contactName || b.user?.name),
         bhk: bhkOf(b.propertyType),
         pct: progress.stages.get('d')?.pct ?? 0,
-        next: n ? { label: n.label, plannedOn: n.plannedOn, lockedBy: gate.open ? null : gate.payment } : null,
+        next: n ? { label: n.label, plannedOn: n.plannedOn, lockedBy: n.lockedBy } : null,
         due: dl.due,
         late: dl.late,
         endsOn: st ? dayFromDb(st.plannedEnd) : null,

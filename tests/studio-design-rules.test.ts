@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  chainLocks,
   checkAnswer,
+  planRedateAfterPayment,
   checkDesignTick,
   checkMeasurements,
   checkVisit,
@@ -103,6 +105,70 @@ describe('payment gates', () => {
     expect(gateOf(null, stages)).toEqual({ open: true });
     expect(gateOf(1, null)).toEqual({ open: true });
     expect(gateOf(9, stages)).toEqual({ open: true });
+  });
+});
+
+describe('steps waiting on a payment (DESIGN-PROCESS-PLAN.md Decision 5)', () => {
+  const stages = [
+    { index: 0, label: 'Booking advance', state: 'paid' as const },
+    { index: 1, label: 'Design advance', state: 'due' as const },
+    { index: 2, label: 'Design closure', state: 'later' as const },
+  ];
+  const st = (gatePayment: number | null, done = false) => ({ gatePayment, done });
+
+  it('the first unpaid gate and every open step after it wait on that payment; done steps never wait', () => {
+    expect(chainLocks([st(null, true), st(null), st(1), st(null), st(2), st(null)], stages)).toEqual([null, null, 'Design advance', 'Design advance', 'Design advance', 'Design advance']);
+  });
+
+  it('once the design advance is recorded, the steps wait only on the design closure', () => {
+    const paid = stages.map((x) => (x.index === 1 ? { ...x, state: 'paid' as const } : x));
+    expect(chainLocks([st(1), st(null), st(2), st(null)], paid)).toEqual([null, null, 'Design closure', 'Design closure']);
+  });
+
+  it('a step out of scope never waits, and nothing waits without payment stages', () => {
+    expect(chainLocks([{ gatePayment: 1, done: false, inScope: false }, st(null)], stages)).toEqual([null, null]);
+    expect(chainLocks([st(1), st(null)], null)).toEqual([null, null]);
+  });
+
+  it('are neither due nor late', () => {
+    expect(dueAndLate([{ plannedOn: '2026-10-01', done: false, inScope: true, lockedBy: 'Design advance' }, { plannedOn: '2026-10-01', done: false, inScope: true }], '2026-10-05')).toEqual({ due: 0, late: 1 });
+  });
+});
+
+describe('dates after a payment (DESIGN-PROCESS-PLAN.md Decision 5)', () => {
+  const paid = [
+    { index: 0, label: 'Booking advance', state: 'paid' as const },
+    { index: 1, label: 'Design advance', state: 'paid' as const },
+    { index: 2, label: 'Design closure', state: 'later' as const },
+  ];
+  const steps = [
+    { id: 'fin2d', plannedOn: '2026-10-03', done: true, inScope: true, gatePayment: null, gapDays: 0 },
+    { id: 'fd', plannedOn: '2026-10-07', done: false, inScope: true, gatePayment: 1, gapDays: 4 },
+    { id: 'chg', plannedOn: '2026-10-08', done: false, inScope: true, gatePayment: null, gapDays: 1 },
+    { id: 'wd', plannedOn: '2026-10-20', done: false, inScope: true, gatePayment: 2, gapDays: 3 },
+  ];
+
+  it('a late payment moves the step it opens, and every open step after, to count from the payment', () => {
+    expect(planRedateAfterPayment(steps, paid, '2026-10-12')).toEqual({
+      stepId: 'fd',
+      days: 9,
+      moves: [
+        { id: 'fd', from: '2026-10-07', to: '2026-10-16' },
+        { id: 'chg', from: '2026-10-08', to: '2026-10-17' },
+        { id: 'wd', from: '2026-10-20', to: '2026-10-29' },
+      ],
+    });
+  });
+
+  it('an early payment leaves the plan, and a second run moves nothing', () => {
+    expect(planRedateAfterPayment(steps, paid, '2026-10-01')).toBeNull();
+    const moved = steps.map((x) => (x.id === 'fd' ? { ...x, plannedOn: '2026-10-16' } : x));
+    expect(planRedateAfterPayment(moved, paid, '2026-10-12')).toBeNull();
+  });
+
+  it('nothing moves while the payment is still not recorded', () => {
+    const due = paid.map((x) => (x.index === 1 ? { ...x, state: 'due' as const } : x));
+    expect(planRedateAfterPayment(steps, due, '2026-10-12')).toBeNull();
   });
 });
 

@@ -136,6 +136,56 @@ export function gateOf(gatePayment: number | null | undefined, stages: readonly 
   return st.state === 'paid' || st.state === 'waiting' ? { open: true } : { open: false, payment: st.label };
 }
 
+/**
+ * Which open steps wait on a payment (DESIGN-PROCESS-PLAN.md Decision 5):
+ * the first open step whose payment is not recorded, and every open step
+ * after it, wait on that payment (the first draft waits on the design
+ * advance, and so does everything after it until the design closure). Each
+ * entry is the payment's name, or null. Done and out-of-scope steps never
+ * wait. In plan order.
+ */
+export function chainLocks(steps: readonly { gatePayment: number | null; done: boolean; inScope?: boolean }[], stages: readonly GateStage[] | null): (string | null)[] {
+  let waiting: string | null = null;
+  return steps.map((s) => {
+    if (s.done || s.inScope === false) return null;
+    if (!waiting) {
+      const g = gateOf(s.gatePayment, stages);
+      if (!g.open) waiting = g.payment;
+    }
+    return waiting;
+  });
+}
+
+/**
+ * After a payment is recorded (DESIGN-PROCESS-PLAN.md Decision 5): the first
+ * open step whose gate is now open counts its days from the payment's day,
+ * not from the plan. When it was planned earlier than that (the client paid
+ * late), it and every open step after it move later by the same days, so the
+ * days stay linked. Never earlier: a payment made early leaves the plan as it
+ * is. Null when nothing moves, so running it twice moves nothing twice.
+ */
+export function planRedateAfterPayment(
+  steps: readonly { id: string; plannedOn: string | null; done: boolean; inScope: boolean; gatePayment: number | null; gapDays: number | null }[],
+  stages: readonly GateStage[] | null,
+  paidOn: string,
+): { stepId: string; days: number; moves: { id: string; from: string; to: string }[] } | null {
+  if (!stages || !isDay(paidOn)) return null;
+  const at = steps.findIndex((s) => !s.done && s.inScope && s.gatePayment !== null && gateOf(s.gatePayment, stages).open);
+  if (at < 0) return null;
+  // Only when no open step before it is still waiting: the chain reads in order.
+  if (chainLocks(steps.slice(0, at), stages).some(Boolean)) return null;
+  const step = steps[at]!;
+  if (!step.plannedOn) return null;
+  const earliest = addDays(paidOn, Math.max(0, step.gapDays ?? 0));
+  const days = daysBetween(step.plannedOn, earliest);
+  if (days <= 0) return null;
+  const moves = steps
+    .slice(at)
+    .filter((s, k) => (k === 0 || (!s.done && s.inScope)) && s.plannedOn)
+    .map((s) => ({ id: s.id, from: s.plannedOn!, to: addDays(s.plannedOn!, days) }));
+  return { stepId: step.id, days, moves };
+}
+
 export type DesignCheck = { ok: true } | { ok: false; error: string };
 
 export const DONE_NOTE_MAX = 500;
@@ -459,12 +509,12 @@ export function designerLoad(projects: readonly LoadProject[]): { open: number; 
   return { open: projects.length, loadDays, capacityDays: DESIGNER_MONTH_DAYS, pct: Math.round((loadDays * 100) / DESIGNER_MONTH_DAYS) };
 }
 
-/** Open steps due in the next 7 days (today included) and those already late. */
-export function dueAndLate(steps: readonly { plannedOn: string | null; done: boolean; inScope: boolean }[], today: string): { due: number; late: number } {
+/** Open steps due in the next 7 days (today included) and those already late. A step waiting on a payment is neither. */
+export function dueAndLate(steps: readonly { plannedOn: string | null; done: boolean; inScope: boolean; lockedBy?: string | null }[], today: string): { due: number; late: number } {
   let due = 0;
   let late = 0;
   for (const s of steps) {
-    if (s.done || !s.inScope || !s.plannedOn) continue;
+    if (s.done || !s.inScope || !s.plannedOn || s.lockedBy) continue;
     const d = daysBetween(today, s.plannedOn);
     if (d < 0) late += 1;
     else if (d <= 6) due += 1;

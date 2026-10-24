@@ -60,7 +60,8 @@ const WHO: Record<string, string> = { DESIGNER: 'Designer', SALES: 'Sales', ACCO
 export const dayWords = (day: string): string => new Date(`${day}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 
 const openOf = (steps: readonly CardStep[]) => steps.filter((s) => s.inScope && !s.done);
-const late = (s: CardStep | undefined, today: string) => (s?.plannedOn && s.plannedOn < today ? daysBetween(s.plannedOn, today) : 0);
+/** Days the step is past its day; 0 for a step waiting on a payment (DESIGN-PROCESS-PLAN.md Decision 5). */
+const late = (s: CardStep | undefined, today: string) => (s?.plannedOn && !s.lockedBy && s.plannedOn < today ? daysBetween(s.plannedOn, today) : 0);
 
 export function lifecycleCard(i: CardInput): LifecycleCardView {
   switch (i.phase) {

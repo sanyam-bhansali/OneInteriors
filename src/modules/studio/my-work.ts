@@ -38,7 +38,7 @@ import { activeSinceOf, needsDailyPost } from '@/modules/project/reminder-rules'
 import { ledgerFromRows } from '@/modules/project/snag-window-store';
 import { eventsOrLegacy, snagStatus } from '@/modules/project/snag-status';
 import { addDays, calendarOf, dayFromDb, dayToDb, isWorkingDay, istDay, istMinutesOfDay } from '@/modules/project/working-days';
-import { gateOf } from '@/modules/studio-design/rules';
+import { chainLocks } from '@/modules/studio-design/rules';
 import { meetingLabel } from '@/modules/studio-sales/lead-rules';
 import { openTasksDue } from '@/modules/studio-sales/tasks';
 import { buildToday, istDayBounds, type TodaySection } from '@/modules/studio-sales/today-rules';
@@ -120,7 +120,8 @@ function projectSelect(from: string, to: string, sinceSite: string) {
         name: true,
         actualEnd: true,
         items: {
-          where: { doneAt: null, inScope: true, plannedOn: { gte: fromD, lte: toD } },
+          // The window's steps, and every open step with a payment gate wherever its day is: a gate earlier in the plan makes the window's steps wait (DESIGN-PROCESS-PLAN.md Decision 5).
+          where: { doneAt: null, inScope: true, OR: [{ plannedOn: { gte: fromD, lte: toD } }, { gatePayment: { not: null } }] },
           orderBy: { sortOrder: 'asc' },
           select: { id: true, label: true, plannedOn: true, responsible: true, gatePayment: true },
         },
@@ -185,11 +186,16 @@ function factsOf(p: ProjectRow, now: Date, today: string): ProjectFacts {
     designerId: p.designerId,
     phase: p.phase,
     provisionalOn: p.provisionalHandoverAt ? istDay(p.provisionalHandoverAt) : null,
-    designSteps: (design?.items ?? []).map((i) => {
-      const g = gateOf(i.gatePayment, gates);
-      return { id: i.id, label: i.label, plannedOn: day(i.plannedOn), responsible: i.responsible, lockedBy: g.open ? null : g.payment };
-    }),
-    execSteps: p.stages.filter((s) => s.kind !== 'DESIGN').flatMap((s) => s.items.map((i) => ({ id: i.id, label: i.label, plannedOn: day(i.plannedOn), stage: s.name }))),
+    designSteps: (() => {
+      const items = design?.items ?? [];
+      const locks = chainLocks(items.map((i) => ({ gatePayment: i.gatePayment, done: false })), gates);
+      return items
+        .map((i, k) => ({ id: i.id, label: i.label, plannedOn: day(i.plannedOn), responsible: i.responsible, lockedBy: locks[k] ?? null }))
+        .filter((s) => s.plannedOn !== null && s.plannedOn >= addDays(today, -MISSED_LOOKBACK_DAYS));
+    })(),
+    execSteps: p.stages
+      .filter((s) => s.kind !== 'DESIGN')
+      .flatMap((s) => s.items.filter((i) => i.gatePayment === null || (day(i.plannedOn) ?? '') >= addDays(today, -MISSED_LOOKBACK_DAYS)).map((i) => ({ id: i.id, label: i.label, plannedOn: day(i.plannedOn), stage: s.name }))),
     decisions: p.decisions.map((d) => ({ id: d.id, title: d.title, dueOn: istDay(d.dueOn) })),
     snags: p.snags.map((s) => {
       const st = snagStatus(eventsOrLegacy(s.events, s), now);

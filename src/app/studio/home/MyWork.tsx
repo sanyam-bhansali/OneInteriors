@@ -20,6 +20,8 @@ export interface WorkLabels {
   showMore: (n: number) => string;
   /** "And 120 more, oldest first in the full list" — rows not fetched. */
   notShown: (n: number) => string;
+  /** "Waiting on payment (3)": steps that open when a payment is recorded. */
+  waiting?: (n: number) => string;
 }
 
 export const WORK_LABELS: WorkLabels = {
@@ -30,6 +32,7 @@ export const WORK_LABELS: WorkLabels = {
   empty: EMPTY_LINE,
   showMore: (n) => `Show ${n} more`,
   notShown: (n) => `And ${n} more not shown here`,
+  waiting: (n) => `Waiting on payment (${n})`,
 };
 
 /** Rows shown before "Show N more". */
@@ -121,6 +124,23 @@ export function MyWork({ work, labels = WORK_LABELS, className = '' }: { work: W
           <Items items={work.missed} labels={labels} />
         </Section>
       </div>
+      {(work.waiting ?? []).length > 0 ? (
+        // Steps that open when a payment is recorded: never late, so never in Missed (DESIGN-PROCESS-PLAN.md Decision 5).
+        <details className="mw-waiting">
+          <summary className="muted sm">{(labels.waiting ?? WORK_LABELS.waiting!)(work.waiting.length)}</summary>
+          <ul className="mw-list">
+            {work.waiting.map((w) => (
+              <li key={w.key}>
+                <Link href={w.href} className="mw-item">
+                  <span className="mw-what">{w.title}</span>
+                  <span className="mw-where muted sm">{w.place}</span>
+                  <span className="mw-when sm muted">Opens when the {w.payment} is recorded</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </section>
   );
 }

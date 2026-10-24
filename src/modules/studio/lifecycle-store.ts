@@ -18,7 +18,7 @@ import { currentMember, memberOnProject, projectsVisibleTo } from './access';
 import { siteLabel } from './team-rules';
 import { readSignedStages } from '@/modules/portal/payments';
 import { GATE_SELECT, gateStagesOf } from '@/modules/studio-design/store';
-import { drawingsOf, gateOf } from '@/modules/studio-design/rules';
+import { chainLocks, drawingsOf } from '@/modules/studio-design/rules';
 import { execGate } from '@/modules/studio-crews/exec-gates';
 import { readCrewSettings } from '@/modules/studio-crews/settings';
 import { effectivePhase, isPhase, PHASE_LABEL, type Phase } from '@/modules/project/lifecycle-rules';
@@ -127,10 +127,16 @@ function cardOf(p: Row, now: Date, seesMoney: boolean): BoardCard {
   const payments = readSignedStages(p.paymentPhases) ?? [];
   const rules = readCrewSettings(p.introduction.studio.crewSettings).execGates;
   const designStage = p.stages.find((s) => s.kind === 'DESIGN');
-  const designSteps: CardStep[] = (designStage?.items ?? []).map((i) => {
-    const g = gateOf(i.gatePayment, gates);
-    return { label: i.label, done: i.doneAt !== null, inScope: i.inScope, plannedOn: day(i.plannedOn), responsible: i.responsible, lockedBy: g.open ? null : g.payment };
-  });
+  const designItems = designStage?.items ?? [];
+  const designLocks = chainLocks(designItems.map((i) => ({ gatePayment: i.gatePayment, done: i.doneAt !== null, inScope: i.inScope })), gates);
+  const designSteps: CardStep[] = designItems.map((i, k) => ({
+    label: i.label,
+    done: i.doneAt !== null,
+    inScope: i.inScope,
+    plannedOn: day(i.plannedOn),
+    responsible: i.responsible,
+    lockedBy: designLocks[k] ?? null,
+  }));
   const execSteps: CardStep[] = p.stages
     .filter((s) => s.kind !== 'DESIGN')
     .flatMap((s) =>
