@@ -9,7 +9,9 @@ import { formatINR } from '@/lib/money';
 import { CustomerSees, OnlyYourTeam } from '../marks';
 import { MilestoneCount, STAR_HINT, StarToggle } from './StarToggle';
 import {
+  addDesignStepBelowAction,
   addMoodBoardPiecesAction,
+  addStepTaskAction,
   applyDesignStepsAction,
   assignDesignerAction,
   bookVisitAction,
@@ -17,7 +19,9 @@ import {
   editDesignStepAction,
   makeDesignFinalAction,
   moveDesignStepAction,
+  moveDesignStepOrderAction,
   saveMeasurementsAction,
+  setStepTaskAction,
   setVisitStatusAction,
   shareDrawingAction,
   shareMoodBoardAction,
@@ -160,8 +164,11 @@ function Overview({ tab }: { tab: DesignTab }) {
 
 // ── Steps ─────────────────────────────────────────────────────
 
+/** "2 h", "30 min", "16 h". */
+const effortWords = (min: number | null): string | null => (min === null || min <= 0 ? null : min < 60 ? `${min} min` : `${Math.round((min / 60) * 10) / 10} h`);
+
 function Steps({ tab }: { tab: DesignTab }) {
-  const [open, setOpen] = useState<{ id: string; what: 'tick' | 'move' | 'edit' } | null>(null);
+  const [open, setOpen] = useState<{ id: string; what: 'tick' | 'move' | 'edit' | 'below' } | null>(null);
   const { message, run, pending } = useRun();
   const [starred, setStarred] = useState<{ ok: boolean; text: string } | null>(null);
   if (tab.steps.length === 0) return null;
@@ -173,11 +180,17 @@ function Steps({ tab }: { tab: DesignTab }) {
         <CustomerSees name={tab.customerFirst} />
       </div>
       <p className={`m-0 ${muted}`}>
-        <span className="font-medium acc-t">★ {STAR_HINT}</span> {tab.customerFirst} sees the design&rsquo;s % from every step. Each % is the step&rsquo;s share of the design. A locked step opens when its payment is recorded by accounts.
+        <span className="font-medium acc-t">★ {STAR_HINT}</span> {tab.customerFirst} sees every step and the design&rsquo;s %, never the dates. Each % is the step&rsquo;s share of the design, by its effort. A
+        step after an unrecorded payment waits for it, and is never late.
       </p>
       <MilestoneCount n={stars} />
       <ul className="m-0 flex list-none flex-col gap-1 p-0">
-        {tab.steps.map((st) => (
+        {tab.steps.map((st, k) => (
+          <StepHeads key={`h-${st.id}`} st={st} before={k > 0 ? tab.steps[k - 1]! : null} />
+        )).flatMap((head, k) => {
+          const st = tab.steps[k]!;
+          return [
+          head,
           <li key={st.id} id={`step-${st.id}`} className="flex items-start gap-1.5 rounded-[8px] px-1.5 py-2 hover:bg-[var(--fill)]">
             <StarToggle
               projectId={tab.projectId}
@@ -199,9 +212,25 @@ function Steps({ tab }: { tab: DesignTab }) {
                 onSave={(v) => run(() => editDesignStepAction({ projectId: tab.projectId, stepId: st.id, ...v }), () => setOpen(null))}
               />
             ) : null}
+            {open?.id === st.id && open.what === 'below' ? <AddBelowForm tab={tab} st={st} onDone={() => setOpen(null)} /> : null}
+            <Tasks tab={tab} st={st} />
+            {tab.canEditPlan && open?.id === st.id && open.what === 'edit' ? (
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                <button type="button" className="btn ghost sm" disabled={pending || st.done} onClick={() => run(() => moveDesignStepOrderAction(tab.projectId, st.id, 'up'))}>
+                  ↑ Move up
+                </button>
+                <button type="button" className="btn ghost sm" disabled={pending || st.done} onClick={() => run(() => moveDesignStepOrderAction(tab.projectId, st.id, 'down'))}>
+                  ↓ Move down
+                </button>
+                <button type="button" className="btn ghost sm" onClick={() => setOpen({ id: st.id, what: 'below' })}>
+                  + Add a step below
+                </button>
+              </div>
+            ) : null}
             </div>
-          </li>
-        ))}
+          </li>,
+          ];
+        })}
       </ul>
       <Message m={message} />
       <Message m={starred} />
@@ -234,6 +263,9 @@ function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onO
         <span className={`block ${muted} ${st.lateDays && !st.done ? '!text-[var(--bad)]' : ''}`}>
           {meta}
           {st.responsibleLabel ? ` · ${st.responsibleLabel}` : ''}
+          {st.group === 'Pre-execution' && st.responsible === 'DESIGNER' ? ' (support)' : ''}
+          {effortWords(st.effortMin) ? ` · ${effortWords(st.effortMin)}` : ''}
+          {st.approvalKind && !st.done ? ` · ticks when ${tab.customerFirst} approves in the app` : ''}
           {st.needsDocument ? ' · needs its file' : ''}
           {st.lockedBy ? ` · opens when the ${st.lockedBy} is recorded` : ''}
         </span>
@@ -278,6 +310,110 @@ function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onO
         ) : null}
       </span>
     </div>
+  );
+}
+
+/** The part headings and payment lines above a step: Design, Pre-execution, and each payment the steps wait on. */
+function StepHeads({ st, before }: { st: DesignStepView; before: DesignStepView | null }) {
+  const part = st.group !== (before?.group ?? null);
+  if (!part && !st.payment) return null;
+  return (
+    <li aria-hidden={false} className="list-none">
+      {part ? (
+        st.group === 'Pre-execution' ? (
+          <p className="m-0 mt-3 border-t border-[var(--fill2)] pt-3 text-[13px] font-semibold">
+            Pre-execution <span className={`font-normal ${muted}`}>· the execution team owns it from here; the designer supports</span>
+          </p>
+        ) : before ? (
+          <p className="m-0 mt-3 text-[13px] font-semibold">{st.group}</p>
+        ) : null
+      ) : null}
+      {st.payment ? (
+        <p className={`m-0 mt-2 rounded-[8px] px-2 py-1 text-[12.5px] ${st.payment.recorded ? 'bg-[var(--fill)] text-[var(--text2)]' : 'bg-[var(--warn-bg)] text-[var(--warn)]'}`}>
+          {st.payment.label}: {st.payment.recorded ? 'recorded' : 'not recorded yet. The steps from here wait for it.'}
+        </p>
+      ) : null}
+    </li>
+  );
+}
+
+/** The to-dos inside a step: tick them, add one (design work). Never the step's own tick. */
+function Tasks({ tab, st }: { tab: DesignTab; st: DesignStepView }) {
+  const { pending, message, run } = useRun();
+  const [adding, setAdding] = useState('');
+  if (st.tasks.length === 0 && !tab.canWork) return null;
+  return (
+    <div className="mt-1 flex flex-col gap-1 pl-8">
+      {st.tasks.map((t) => (
+        <label key={t.id} className={`flex items-center gap-2 text-[13px] ${t.done ? 'text-[var(--muted)] line-through' : ''}`}>
+          <input type="checkbox" checked={t.done} disabled={!tab.canWork || pending} onChange={(e) => run(() => setStepTaskAction(tab.projectId, t.id, e.target.checked))} />
+          {t.label}
+        </label>
+      ))}
+      {tab.canWork && !st.done ? (
+        <form
+          className="flex items-center gap-1.5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (adding.trim().length < 2) return;
+            run(() => addStepTaskAction(tab.projectId, st.id, adding), () => setAdding(''));
+          }}
+        >
+          <input value={adding} onChange={(e) => setAdding(e.target.value)} maxLength={120} placeholder="+ Add a task" aria-label={`Add a task to ${st.label}`} className="fld min-h-[30px] max-w-[260px] text-[12.5px]" />
+          {adding.trim().length >= 2 ? (
+            <button type="submit" className="btn ghost sm" disabled={pending}>
+              Add
+            </button>
+          ) : null}
+        </form>
+      ) : null}
+      <Message m={message} />
+    </div>
+  );
+}
+
+/** A new step below this one, in its part: name, who, days after, effort (owner, PM). */
+function AddBelowForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onDone: () => void }) {
+  const { pending, message, run } = useRun();
+  const [v, setV] = useState({ label: '', responsible: 'DESIGNER', days: '1', hours: '1' });
+  return (
+    <form
+      className="mt-2 flex flex-wrap items-end gap-2 rounded-[14px] bg-[var(--soft)] p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        run(() => addDesignStepBelowAction({ projectId: tab.projectId, afterId: st.id, ...v }), onDone);
+      }}
+    >
+      <label className="flex flex-col gap-1 text-[13px]">
+        New step
+        <input value={v.label} onChange={(e) => setV({ ...v, label: e.target.value })} maxLength={120} required className="fld min-w-[200px]" />
+      </label>
+      <label className="flex flex-col gap-1 text-[13px]">
+        Who
+        <select value={v.responsible} onChange={(e) => setV({ ...v, responsible: e.target.value })} className="fld">
+          {RESPONSIBLES.map((r) => (
+            <option key={r} value={r}>
+              {RESPONSIBLE_LABEL[r]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-[13px]">
+        Days after
+        <input type="number" min={0} max={30} value={v.days} onChange={(e) => setV({ ...v, days: e.target.value })} className="fld w-[70px]" />
+      </label>
+      <label className="flex flex-col gap-1 text-[13px]">
+        Effort (h)
+        <input type="number" min={0} max={40} step={0.25} value={v.hours} onChange={(e) => setV({ ...v, hours: e.target.value })} className="fld w-[80px]" />
+      </label>
+      <button type="submit" className="btn pri sm" disabled={pending}>
+        Add the step
+      </button>
+      <button type="button" className="btn ghost sm" onClick={onDone}>
+        Cancel
+      </button>
+      <Message m={message} />
+    </form>
   );
 }
 

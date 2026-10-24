@@ -225,7 +225,7 @@ export const CUSTOMER_PROJECT_SELECT = {
       items: {
         orderBy: { sortOrder: 'asc' },
         /* customerMilestone: the studio's star. Only starred steps cross by name (tracker-view.ts, studio-design/customer-view.ts). */
-        select: { room: true, label: true, doneAt: true, weightBp: true, inScope: true, plannedOn: true, id: true, responsible: true, gatePayment: true, customerMilestone: true },
+        select: { room: true, label: true, doneAt: true, weightBp: true, inScope: true, plannedOn: true, id: true, responsible: true, gatePayment: true, customerMilestone: true, effortMin: true },
       },
     },
   },

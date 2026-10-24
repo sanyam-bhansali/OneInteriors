@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { Metadata } from 'next';
 import { myDesignTemplate } from '@/modules/studio-design/design-flow';
 import { DesignStepsForm } from './DesignStepsForm';
@@ -25,6 +26,11 @@ export default async function DesignStepsPage() {
               a 1 BHK is 20% less, a 3 BHK 20% more, a 4 BHK 40% more. A step with a payment, and every step after it, opens only once that payment is
               recorded. Pre-execution steps belong to the execution team; the designer supports.
               {template.custom ? '' : ' These are Hauspire’s steps until you save your own.'}
+            </p>
+            <p className="m-0 mb-4 text-[14px]">
+              <Link href="/studio/settings/design/switch" className="btn sec sm">
+                Move running projects to these steps
+              </Link>
             </p>
             <DesignStepsForm initial={template.steps} custom={template.custom} />
           </>

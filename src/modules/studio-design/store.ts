@@ -112,6 +112,16 @@ export interface DesignStepView {
   moves: { from: string; to: string; side: 'CLIENT' | 'STUDIO'; reason: string; note: string | null; at: string }[];
   /** Starred: a design milestone the client sees (docs/studio-os/CUSTOMER-MILESTONES.md). */
   milestone: boolean;
+  /* The design process (owner and design team, 24 Oct 2026; DESIGN-PROCESS-PLAN.md). */
+  /** Design or Pre-execution (the step's group). */
+  group: string;
+  /** Effort for this home, in minutes; null on an older step. */
+  effortMin: number | null;
+  /** On a client's approval step: what in the app ticks it. */
+  approvalKind: string | null;
+  /** The payment this step is the first to wait on, and whether it is recorded: drawn as a line above it. */
+  payment: { label: string; recorded: boolean } | null;
+  tasks: { id: string; label: string; done: boolean }[];
 }
 
 export interface DrawingView {
@@ -227,6 +237,10 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
               inScope: true,
               weightBp: true,
               customerMilestone: true,
+              room: true,
+              effortMin: true,
+              approvalKind: true,
+              tasks: { orderBy: { sortOrder: 'asc' }, select: { id: true, label: true, doneAt: true } },
               delays: { orderBy: { at: 'asc' }, select: { fromDate: true, toDate: true, side: true, reason: true, note: true, at: true } },
             },
           },
@@ -295,6 +309,15 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
         at: d.at.toISOString(),
       })),
       milestone: i.customerMilestone,
+      group: i.room,
+      effortMin: i.effortMin,
+      approvalKind: i.approvalKind,
+      payment: (() => {
+        if (i.gatePayment === null) return null;
+        const g = (gates ?? []).find((x) => x.index === i.gatePayment);
+        return g ? { label: g.label, recorded: g.state === 'paid' || g.state === 'waiting' } : null;
+      })(),
+      tasks: i.tasks.map((t) => ({ id: t.id, label: t.label, done: t.doneAt !== null })),
     };
   });
   const lastOpen = [...steps].reverse().find((s) => s.inScope && !s.done && s.plannedOn);

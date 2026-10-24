@@ -34,7 +34,7 @@ import { recordEvent, type ProjectActor } from '@/modules/project/events';
 import { canSupersede } from '@/modules/project/locker-rules';
 import { settleStageAfterTicks } from '@/modules/project/stage-settle';
 import { applyPhaseEvent } from '@/modules/project/lifecycle';
-import { dayFromDb, dayToDb, istDay, istTime } from '@/modules/project/working-days';
+import { addDays, dayFromDb, dayToDb, istDay, istTime } from '@/modules/project/working-days';
 import { readSignedStages } from '@/modules/portal/payments';
 import { designStepsFor, type PlanItem } from '@/modules/portal/quote-to-plan';
 import { ROOM_KEYS, type RoomKey } from '@/modules/prepare/rooms';
@@ -55,7 +55,11 @@ import {
   gateOf,
   isDelayReasonKey,
   approvalKindOfDrawing,
+  chainLocks,
+  checkTask,
+  designWeights,
   isDesignKind,
+  rechainDays,
   lateTickCheck,
   planStepMove,
   ROOM_MAX,
@@ -194,7 +198,11 @@ export async function tickDesignStep(
   if (!p || !step) return { ok: false, error: GONE };
   const note = typeof input.note === 'string' ? input.note.replace(/\r\n/g, '\n').trim() : '';
   const hasFile = Boolean(file && file.size > 0);
-  const gate = gateOf(step.gatePayment, gateStagesOf(p));
+  // The step waits on its own payment, or on an earlier step's (DESIGN-PROCESS-PLAN.md Decision 5).
+  const gateStages = gateStagesOf(p);
+  const all = await prisma.homeChecklistItem.findMany({ where: { stageId: step.stageId }, orderBy: { sortOrder: 'asc' }, select: { id: true, gatePayment: true, doneAt: true, inScope: true } });
+  const waitingOn = chainLocks(all.map((i) => ({ gatePayment: i.gatePayment, done: i.doneAt !== null, inScope: i.inScope })), gateStages)[all.findIndex((i) => i.id === step.id)] ?? null;
+  const gate = waitingOn ? ({ open: false, payment: waitingOn } as const) : gateOf(step.gatePayment, gateStages);
   const ok = checkDesignTick({ done: step.doneAt !== null, inScope: step.inScope, needsDocument: step.needsDocument, label: step.label }, gate, hasFile, note);
   if (!ok.ok) return ok;
   // A late step says why (DESIGN-PROCESS-PLAN.md Decision 6); filed on the Delays list.
@@ -316,6 +324,126 @@ export async function editDesignStep(projectId: string, stepId: string, input: {
     await recordEvent(tx, { projectId, type: 'design.step_edited', actor, refId: step.id, payload: { gate } });
   });
   return { ok: true, message: `${step.label} saved.` };
+}
+
+// ── Tasks, order and new steps (the design process, DESIGN-PROCESS-PLAN.md Decisions 7–8) ──
+
+const DESIGN_ITEMS_SELECT = { id: true, label: true, room: true, sortOrder: true, plannedOn: true, doneAt: true, gapDays: true, inScope: true, effortMin: true } as const;
+
+async function designItems(projectId: string) {
+  return prisma.homeProjectStage.findFirst({ where: { projectId, kind: 'DESIGN' }, select: { id: true, items: { orderBy: { sortOrder: 'asc' }, select: DESIGN_ITEMS_SELECT } } });
+}
+
+/** The days, re-linked from a step on; inside the caller's transaction. */
+async function writeRechain(tx: Prisma.TransactionClient, items: readonly { id: string; plannedOn: Date | null; doneAt: Date | null; gapDays: number | null }[], from: number) {
+  const moves = rechainDays(
+    items.map((i) => ({ id: i.id, plannedOn: i.plannedOn ? dayFromDb(i.plannedOn) : null, done: i.doneAt !== null, gapDays: i.gapDays })),
+    from,
+  );
+  for (const m of moves) await tx.homeChecklistItem.update({ where: { id: m.id }, data: { plannedOn: dayToDb(m.to) } });
+  return moves.length;
+}
+
+/** Each in-scope step's share of the design by effort, when every step has one (an older plan keeps its weights). */
+async function writeEffortWeights(tx: Prisma.TransactionClient, stageId: string) {
+  const items = await tx.homeChecklistItem.findMany({ where: { stageId }, orderBy: { sortOrder: 'asc' }, select: { id: true, effortMin: true, inScope: true, weightBp: true } });
+  if (items.length === 0 || items.some((i) => i.effortMin === null)) return;
+  const weights = designWeights(items.map((i) => i.effortMin ?? 0));
+  for (const [k, i] of items.entries()) if (i.weightBp !== weights[k]) await tx.homeChecklistItem.update({ where: { id: i.id }, data: { weightBp: weights[k]! } });
+}
+
+/** Ticks or unticks a to-do inside a step (design work: owner, PM, the designer). */
+export async function setStepTask(projectId: string, taskId: string, done: boolean, now = new Date()): Promise<DesignResult> {
+  const check = await memberOnProject(projectId, 'design.work');
+  if (!check.ok) return check;
+  const task = await prisma.homeStepTask.findFirst({ where: { id: String(taskId ?? '').slice(0, 64), step: { stage: { projectId, kind: 'DESIGN' } } }, select: { id: true, label: true } });
+  if (!task) return { ok: false, error: 'That task is not on this project any more. Reload the page.' };
+  await prisma.$transaction(async (tx) => {
+    await tx.homeStepTask.update({ where: { id: task.id }, data: done ? { doneAt: now, doneById: check.member.userId } : { doneAt: null, doneById: null } });
+    await recordEvent(tx, { projectId, type: 'design.task_ticked', actor: { type: 'STUDIO', id: check.member.userId }, refId: task.id, payload: { done } });
+  });
+  return { ok: true, message: done ? `Done: ${task.label}.` : `Not done: ${task.label}.` };
+}
+
+/** Adds a to-do inside a step (design work). */
+export async function addStepTask(projectId: string, stepId: string, raw: unknown): Promise<DesignResult> {
+  const check = await memberOnProject(projectId, 'design.work');
+  if (!check.ok) return check;
+  const t = checkTask(raw);
+  if (!t.ok) return t;
+  const step = await prisma.homeChecklistItem.findFirst({ where: { id: String(stepId ?? '').slice(0, 64), stage: { projectId, kind: 'DESIGN' } }, select: { id: true, _count: { select: { tasks: true } } } });
+  if (!step) return { ok: false, error: GONE };
+  if (step._count.tasks >= 20) return { ok: false, error: 'Up to 20 tasks on a step.' };
+  await prisma.$transaction(async (tx) => {
+    const row = await tx.homeStepTask.create({ data: { stepId: step.id, label: t.label, sortOrder: step._count.tasks }, select: { id: true } });
+    await recordEvent(tx, { projectId, type: 'design.task_added', actor: { type: 'STUDIO', id: check.member.userId }, refId: row.id, payload: {} });
+  });
+  return { ok: true, message: `Task added: ${t.label}.` };
+}
+
+/** Moves a step up or down inside its part (design or pre-execution), re-linking the open steps' days (owner, PM). */
+export async function moveDesignStepOrder(projectId: string, stepId: string, dir: unknown): Promise<DesignResult> {
+  const check = await memberOnProject(projectId, 'plan.edit');
+  if (!check.ok) return check;
+  if (dir !== 'up' && dir !== 'down') return { ok: false, error: 'Up or down.' };
+  const stage = await designItems(projectId);
+  const items = stage?.items ?? [];
+  const at = items.findIndex((i) => i.id === stepId);
+  if (!stage || at < 0) return { ok: false, error: GONE };
+  const to = dir === 'up' ? at - 1 : at + 1;
+  const other = items[to];
+  if (!other || other.room !== items[at]!.room) return { ok: false, error: dir === 'up' ? 'It is the first step of its part.' : 'It is the last step of its part.' };
+  if (items[at]!.doneAt || other.doneAt) return { ok: false, error: 'Move only steps that are not done yet.' };
+  const order = [...items];
+  [order[at], order[to]] = [order[to]!, order[at]!];
+  await prisma.$transaction(async (tx) => {
+    for (const [k, i] of order.entries()) if (i.sortOrder !== k) await tx.homeChecklistItem.update({ where: { id: i.id }, data: { sortOrder: k } });
+    await writeRechain(tx, order, Math.min(at, to));
+    await recordEvent(tx, { projectId, type: 'design.step_reordered', actor: { type: 'STUDIO', id: check.member.userId }, refId: stepId, payload: { dir } });
+  });
+  return { ok: true, message: `${items[at]!.label} moved ${dir}.` };
+}
+
+/** Adds a step below another, in its part: name, who, days after, effort (owner, PM). The open steps after it move by its days. */
+export async function addDesignStepBelow(projectId: string, afterId: string, input: { label: unknown; responsible: unknown; days: unknown; hours: unknown }): Promise<DesignResult> {
+  const check = await memberOnProject(projectId, 'plan.edit');
+  if (!check.ok) return check;
+  const label = typeof input.label === 'string' ? input.label.replace(/\s+/g, ' ').trim() : '';
+  if (label.length < 2 || label.length > 120) return { ok: false, error: 'Give the step a name (up to 120 characters).' };
+  if (!isResponsible(input.responsible)) return { ok: false, error: 'Pick who does it.' };
+  const days = Number(input.days);
+  if (!Number.isInteger(days) || days < 0 || days > 30) return { ok: false, error: 'Days after the step before: a whole number from 0 to 30.' };
+  const hours = Number(input.hours);
+  if (!Number.isFinite(hours) || hours < 0 || hours > 40) return { ok: false, error: 'Effort: 0 to 40 hours.' };
+  const stage = await designItems(projectId);
+  const items = stage?.items ?? [];
+  const at = items.findIndex((i) => i.id === afterId);
+  if (!stage || at < 0) return { ok: false, error: GONE };
+  const after = items[at]!;
+  const actor: ProjectActor = { type: 'STUDIO', id: check.member.userId };
+  await prisma.$transaction(async (tx) => {
+    for (const i of items.slice(at + 1)) await tx.homeChecklistItem.update({ where: { id: i.id }, data: { sortOrder: i.sortOrder + 1 } });
+    const made = await tx.homeChecklistItem.create({
+      data: {
+        stageId: stage.id,
+        room: after.room,
+        label,
+        sortOrder: after.sortOrder + 1,
+        weightBp: 0,
+        inScope: true,
+        plannedOn: after.plannedOn ? dayToDb(addDays(dayFromDb(after.plannedOn), days)) : null,
+        responsible: input.responsible as string,
+        gapDays: days,
+        effortMin: Math.round(hours * 60),
+      },
+      select: { id: true, plannedOn: true, doneAt: true, gapDays: true },
+    });
+    const order = [...items.slice(0, at + 1), made, ...items.slice(at + 1)];
+    await writeRechain(tx, order, at + 2);
+    await writeEffortWeights(tx, stage.id);
+    await recordEvent(tx, { projectId, type: 'step.added', actor, refId: made.id, payload: { after: after.id, days } });
+  });
+  return { ok: true, message: `Added: ${label}.` };
 }
 
 /**

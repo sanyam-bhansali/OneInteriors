@@ -474,7 +474,7 @@ describe('the stages the customer sees', () => {
       items: {
         orderBy: { sortOrder: 'asc' },
         // Customer milestones: the studio's star, read to keep every other step back.
-        select: { room: true, label: true, doneAt: true, weightBp: true, inScope: true, plannedOn: true, id: true, responsible: true, gatePayment: true, customerMilestone: true },
+        select: { room: true, label: true, doneAt: true, weightBp: true, inScope: true, plannedOn: true, id: true, responsible: true, gatePayment: true, customerMilestone: true, effortMin: true },
       },
     });
   });

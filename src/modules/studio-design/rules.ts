@@ -203,6 +203,36 @@ export function designPhaseAfterTicks(items: readonly { room: string; inScope: b
   return null;
 }
 
+/**
+ * Re-links the days after a step moved or was added (DESIGN-PROCESS-PLAN.md
+ * Decision 8): from `from` on, each open step is the step before it plus its
+ * days after; a done step keeps its day and the next counts from it. The
+ * moves to make, oldest first.
+ */
+export function rechainDays(steps: readonly { id: string; plannedOn: string | null; done: boolean; gapDays: number | null }[], from: number): { id: string; from: string | null; to: string }[] {
+  const days = steps.map((s) => s.plannedOn);
+  const moves: { id: string; from: string | null; to: string }[] = [];
+  for (let k = Math.max(1, from); k < steps.length; k += 1) {
+    const s = steps[k]!;
+    const prev = days[k - 1];
+    if (s.done || !prev) continue;
+    const to = addDays(prev, Math.max(0, s.gapDays ?? 0));
+    if (to !== s.plannedOn) moves.push({ id: s.id, from: s.plannedOn, to });
+    days[k] = to;
+  }
+  return moves;
+}
+
+export const TASK_MAX = 120;
+
+/** A to-do's words, cleaned; or why not. */
+export function checkTask(raw: unknown): { ok: true; label: string } | { ok: false; error: string } {
+  const label = typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim() : '';
+  if (label.length < 2) return { ok: false, error: 'Say what the task is.' };
+  if (label.length > TASK_MAX) return { ok: false, error: `Keep it under ${TASK_MAX} characters.` };
+  return { ok: true, label };
+}
+
 export type DesignCheck = { ok: true } | { ok: false; error: string };
 
 export const DONE_NOTE_MAX = 500;

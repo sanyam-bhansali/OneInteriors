@@ -3,7 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import {
+  addDesignStepBelow,
   addMoodBoardPieces,
+  addStepTask,
   applyDesignSteps,
   assignDesigner,
   bookVisit,
@@ -11,7 +13,9 @@ import {
   editDesignStep,
   makeDesignFinal,
   moveDesignStep,
+  moveDesignStepOrder,
   saveMeasurements,
+  setStepTask,
   setVisitStatus,
   shareDrawing,
   shareMoodBoard,
@@ -114,4 +118,26 @@ export async function makeDesignFinalAction(projectId: string): Promise<DesignRe
 
 export async function closeDesignAction(projectId: string): Promise<DesignResult> {
   return done(id(projectId), await closeDesign(id(projectId)));
+}
+
+/* The design process (DESIGN-PROCESS-PLAN.md Decisions 7–8): tasks inside a step, a step's order, a step added below another. */
+
+export async function setStepTaskAction(projectId: string, taskId: string, isDone: boolean): Promise<DesignResult> {
+  return done(id(projectId), await setStepTask(id(projectId), id(taskId), isDone === true));
+}
+
+export async function addStepTaskAction(projectId: string, stepId: string, label: string): Promise<DesignResult> {
+  return done(id(projectId), await addStepTask(id(projectId), id(stepId), text(label, 200)));
+}
+
+export async function moveDesignStepOrderAction(projectId: string, stepId: string, dir: 'up' | 'down'): Promise<DesignResult> {
+  return done(id(projectId), await moveDesignStepOrder(id(projectId), id(stepId), dir));
+}
+
+export async function addDesignStepBelowAction(input: { projectId: string; afterId: string; label: string; responsible: string; days: string; hours: string }): Promise<DesignResult> {
+  const projectId = id(input.projectId);
+  return done(
+    projectId,
+    await addDesignStepBelow(projectId, id(input.afterId), { label: text(input.label, 200), responsible: text(input.responsible, 20), days: text(input.days, 4), hours: text(input.hours, 6) }),
+  );
 }
