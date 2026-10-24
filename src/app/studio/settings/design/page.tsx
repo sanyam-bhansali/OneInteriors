@@ -21,8 +21,9 @@ export default async function DesignStepsPage() {
           <>
             <p className="m-0 mb-4 max-w-[68ch] text-[14px] leading-relaxed muted">
               Your design process, from the booking to handing over to the site. Every new project starts with these steps; you can change them on
-              any one project later. &ldquo;Days&rdquo; is how long after the step before it, for a 2 BHK: smaller and bigger homes are scaled to 14,
-              27 or 29 days. A step with a payment opens only once that payment is recorded.
+              any one project later. &ldquo;Days&rdquo; is how long after the step before it, and &ldquo;Effort&rdquo; the hours of work, for a 2 BHK:
+              a 1 BHK is 20% less, a 3 BHK 20% more, a 4 BHK 40% more. A step with a payment, and every step after it, opens only once that payment is
+              recorded. Pre-execution steps belong to the execution team; the designer supports.
               {template.custom ? '' : ' These are Hauspire’s steps until you save your own.'}
             </p>
             <DesignStepsForm initial={template.steps} custom={template.custom} />

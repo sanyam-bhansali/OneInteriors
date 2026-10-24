@@ -136,8 +136,8 @@ describe('signing builds the plan', () => {
     expect(stages.map((s) => s.kind)).toEqual([...PLAN_KINDS]);
     expect(stages.every((s) => s.projectId === 'hp1')).toBe(true);
     const steps = (k: string) => stages.find((s) => s.kind === k)!.items.create;
-    // Studio OS Phase 2: the DESIGN stage holds the studio's design steps (Hauspire's here), sharing its 2%.
-    expect(steps('DESIGN').map((i) => `${i.room}: ${i.label}`)).toEqual(HAUSPIRE_DESIGN.map((t) => `Design: ${t.label}`));
+    // Studio OS Phase 2: the DESIGN stage holds the studio's design and pre-execution steps (Hauspire's here), sharing its 2%.
+    expect(steps('DESIGN').map((i) => `${i.room}: ${i.label}`)).toEqual(HAUSPIRE_DESIGN.map((t) => `${t.group}: ${t.label}`));
     expect(steps('DESIGN').reduce((a, i) => a + i.weightBp, 0)).toBe(200);
     expect(steps('CIVIL').map((i) => i.label)).toEqual(templateFor('CIVIL').map((t) => t.label));
     const all = stages.flatMap((s) => s.items.create);

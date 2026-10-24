@@ -183,15 +183,20 @@ export const SIMPLE_PAYMENTS: readonly PaymentStage[] = [
 
 /** Hauspire's design steps, shortened for a studio that does not run a full design team in-house. */
 const SHORT_LABELS = [
-  'Project allocation (sales hands over to design)',
-  'Site visit and measurement',
-  '2D layout and furniture layout final',
-  'First draft (FD) meeting',
+  'Project allocation + mood board',
+  'Site visit',
+  '2D layout',
+  '2D approval',
+  'First draft (3D)',
   'Material selection',
-  'First 3D and renders',
-  'Design closure',
-  'BOQ',
-  'Handover to execution',
+  'Final 3D & renders',
+  'Final 3D approval',
+  'Final design quotation',
+  'Final design approval',
+  'Site visit with electrician & carpenter',
+  'Working drawings',
+  'Working drawings final',
+  'Handover to execution team',
 ];
 export const SHORT_DESIGN: readonly DesignTemplateStep[] = HAUSPIRE_DESIGN.filter((s) => SHORT_LABELS.includes(s.label));
 
@@ -261,7 +266,7 @@ function sameStages(a: readonly PaymentStage[], b: readonly PaymentStage[]): boo
   return a.length === b.length && a.every((s, i) => stageKey(s) === stageKey(b[i]!));
 }
 function designKey(s: DesignTemplateStep): string {
-  return [s.label, s.responsible, s.days, s.weight, s.gate ?? '', s.needsDocument, s.milestone].join('|');
+  return [s.label, s.responsible, s.days, s.effortMin, s.group, s.approval ?? '', s.tasks.join(';'), s.gate ?? '', s.needsDocument, s.milestone].join('|');
 }
 function sameDesign(a: readonly DesignTemplateStep[], b: readonly DesignTemplateStep[]): boolean {
   return a.length === b.length && a.every((s, i) => designKey(s) === designKey(b[i]!));

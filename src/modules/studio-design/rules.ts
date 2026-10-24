@@ -12,7 +12,7 @@
 
 import { splitAcross } from '@/lib/money';
 import { addDays, daysBetween, isDay } from '@/modules/project/working-days';
-import { DESIGN_GROUP, DESIGN_SHARE_BP, designerDaysFor, DESIGNER_MONTH_DAYS, type DesignTemplateStep, type Responsible } from './template';
+import { DESIGN_SHARE_BP, designerDaysFor, DESIGNER_MONTH_DAYS, scaledEffort, scaledGaps, type ApprovalKind, type DesignTemplateStep, type Responsible, type StepGroup } from './template';
 
 // ── Building the steps ────────────────────────────────────────
 
@@ -34,10 +34,21 @@ export function linkedDays(gaps: readonly number[], start: string, length: numbe
   });
 }
 
-/** The template's weights as basis points of the whole project: the DESIGN stage's share, split in proportion. */
-export function designWeights(template: readonly Pick<DesignTemplateStep, 'weight'>[]): number[] {
-  if (template.length === 0) return [];
-  return splitAcross(DESIGN_SHARE_BP, template.map((t) => Math.max(1, t.weight)));
+/**
+ * The steps' weights as basis points of the whole project: the DESIGN
+ * stage's share, split by effort (DESIGN-PROCESS-PLAN.md Decision 3). A step
+ * with no effort (the client's) weighs nothing; when no step has any effort,
+ * they share it equally.
+ */
+export function designWeights(efforts: readonly number[]): number[] {
+  if (efforts.length === 0) return [];
+  const clean = efforts.map((e) => (Number.isFinite(e) && e > 0 ? e : 0));
+  const at = clean.map((e, i) => (e > 0 ? i : -1)).filter((i) => i >= 0);
+  if (at.length === 0) return splitAcross(DESIGN_SHARE_BP, clean.map(() => 1));
+  const parts = splitAcross(DESIGN_SHARE_BP, at.map((i) => clean[i]!));
+  const out = clean.map(() => 0);
+  at.forEach((i, k) => (out[i] = parts[k]!));
+  return out;
 }
 
 /** The index of the payment stage a gate word names ("design advance" → "Design advance 5%"), or null. */
@@ -60,20 +71,29 @@ export interface DesignPlanStep {
   needsDocument: boolean;
   gatePayment: number | null;
   gapDays: number;
-  /** Starred: a milestone the client sees. */
+  /** Starred: a milestone. */
   customerMilestone: boolean;
+  /** Effort for this home, in minutes. */
+  effortMin: number;
+  /** On a client's approval step: what approves it in the app. */
+  approvalKind: ApprovalKind | null;
+  /** To-dos seeded inside the step. */
+  tasks: string[];
 }
 
-/** The design steps of a new project, inside the DESIGN stage's window, gates matched to its payment stages. */
-export function designSteps(template: readonly DesignTemplateStep[], window: { start: string; end: string }, payments: readonly { label: string }[]): DesignPlanStep[] {
-  const days = linkedDays(
-    template.map((t) => t.days),
-    window.start,
-    Math.max(0, daysBetween(window.start, window.end)),
-  );
-  const weights = designWeights(template);
+/**
+ * The design steps of a new project from the DESIGN stage's start: each the
+ * previous one's day plus its days, exactly (never stretched to a window;
+ * DESIGN-PROCESS-PLAN.md Decision 1), days and effort scaled by the flat's
+ * size, weights by effort, gates matched to its payment stages.
+ */
+export function designSteps(template: readonly DesignTemplateStep[], start: string, payments: readonly { label: string }[], bhk: number | null = null): DesignPlanStep[] {
+  const gaps = scaledGaps(template.map((t) => t.days), bhk);
+  const days = linkedDays(gaps, start, null);
+  const efforts = template.map((t) => scaledEffort(t.effortMin, bhk));
+  const weights = designWeights(efforts);
   return template.map((t, i) => ({
-    room: DESIGN_GROUP,
+    room: t.group as StepGroup,
     label: t.label,
     quoteLineId: null,
     sortOrder: i,
@@ -83,8 +103,11 @@ export function designSteps(template: readonly DesignTemplateStep[], window: { s
     responsible: t.responsible,
     needsDocument: t.needsDocument,
     gatePayment: gateIndexFor(t.gate, payments),
-    gapDays: t.days,
+    gapDays: gaps[i]!,
     customerMilestone: t.milestone === true,
+    effortMin: efforts[i]!,
+    approvalKind: t.approval,
+    tasks: [...t.tasks],
   }));
 }
 

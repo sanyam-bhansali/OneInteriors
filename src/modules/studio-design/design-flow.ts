@@ -36,7 +36,7 @@ import { settleStageAfterTicks } from '@/modules/project/stage-settle';
 import { applyPhaseEvent } from '@/modules/project/lifecycle';
 import { dayFromDb, dayToDb, istDay, istTime } from '@/modules/project/working-days';
 import { readSignedStages } from '@/modules/portal/payments';
-import { designStepsFor } from '@/modules/portal/quote-to-plan';
+import { designStepsFor, type PlanItem } from '@/modules/portal/quote-to-plan';
 import { ROOM_KEYS, type RoomKey } from '@/modules/prepare/rooms';
 import { elementBySlug } from '@/modules/prepare/catalogue';
 import { seedBoard } from '@/modules/prepare/board';
@@ -61,7 +61,7 @@ import {
   VISIT_NOTE_MAX,
   type MeasureInput,
 } from './rules';
-import { checkDesignTemplate, isResponsible, readDesignTemplate } from './template';
+import { bhkOf, checkDesignTemplate, isResponsible, readDesignTemplate } from './template';
 import { GATE_SELECT, gateStagesOf } from './store';
 
 export type DesignResult = { ok: true; message: string; id?: string } | { ok: false; error: string };
@@ -129,6 +129,27 @@ export async function assignDesigner(projectId: string, memberId: string | null)
 }
 
 // ── Design steps ──────────────────────────────────────────────
+
+/** A design step as stored, from the plan: its who, file, gate, days, effort, approval and to-dos. */
+export function designItemData(stageId: string, st: PlanItem): Prisma.HomeChecklistItemUncheckedCreateInput {
+  return {
+    stageId,
+    room: st.room,
+    label: st.label,
+    sortOrder: st.sortOrder,
+    weightBp: st.weightBp,
+    inScope: st.inScope,
+    plannedOn: st.plannedOn,
+    responsible: st.responsible ?? null,
+    needsDocument: st.needsDocument === true,
+    gatePayment: st.gatePayment ?? null,
+    gapDays: st.gapDays ?? null,
+    customerMilestone: st.customerMilestone === true,
+    effortMin: st.effortMin ?? null,
+    approvalKind: st.approvalKind ?? null,
+    ...(st.tasks && st.tasks.length ? { tasks: { create: st.tasks.map((label, k) => ({ label, sortOrder: k })) } } : {}),
+  };
+}
 
 const STEP_SELECT = {
   id: true,
@@ -292,7 +313,7 @@ export async function applyDesignSteps(projectId: string, now = new Date()): Pro
     where: { id: projectId },
     select: {
       paymentPhases: true,
-      introduction: { select: { studio: { select: { designTemplate: true } } } },
+      introduction: { select: { studio: { select: { designTemplate: true } }, brief: { select: { propertyType: true } } } },
       stages: { where: { kind: 'DESIGN' }, take: 1, select: { id: true, plannedStart: true, plannedEnd: true, items: { select: { id: true, doneAt: true, responsible: true } } } },
     },
   });
@@ -300,7 +321,7 @@ export async function applyDesignSteps(projectId: string, now = new Date()): Pro
   if (!p || !stage) return { ok: false, error: 'This project has no design stage.' };
   const refusal = applyRefusal(stage.items);
   if (refusal) return { ok: false, error: refusal };
-  const steps = designStepsFor(stage.plannedStart, stage.plannedEnd, readDesignTemplate(p.introduction.studio.designTemplate), readSignedStages(p.paymentPhases) ?? []);
+  const steps = designStepsFor(stage.plannedStart, readDesignTemplate(p.introduction.studio.designTemplate), readSignedStages(p.paymentPhases) ?? [], bhkOf(p.introduction.brief.propertyType));
   const actor: ProjectActor = { type: 'STUDIO', id: check.member.userId };
   try {
     await prisma.$transaction(async (tx) => {
@@ -309,22 +330,7 @@ export async function applyDesignSteps(projectId: string, now = new Date()): Pro
       const again = applyRefusal(current);
       if (again) throw new Refused(again);
       await tx.homeChecklistItem.deleteMany({ where: { stageId: stage.id, doneAt: null } });
-      await tx.homeChecklistItem.createMany({
-        data: steps.map((st) => ({
-          stageId: stage.id,
-          room: st.room,
-          label: st.label,
-          sortOrder: st.sortOrder,
-          weightBp: st.weightBp,
-          inScope: true,
-          plannedOn: st.plannedOn,
-          responsible: st.responsible ?? null,
-          needsDocument: st.needsDocument === true,
-          gatePayment: st.gatePayment ?? null,
-          gapDays: st.gapDays ?? null,
-          customerMilestone: st.customerMilestone === true,
-        })),
-      });
+      for (const st of steps) await tx.homeChecklistItem.create({ data: designItemData(stage.id, st), select: { id: true } });
       await recordEvent(tx, { projectId, type: 'design.steps_applied', actor, refId: stage.id, payload: { steps: steps.length } });
       await settleStageAfterTicks(tx, projectId, stage.id, actor, now);
     });

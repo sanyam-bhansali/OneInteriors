@@ -49,10 +49,12 @@ describe('linked days', () => {
 });
 
 describe('building the design steps', () => {
-  it('share the DESIGN stage’s 2% exactly, in proportion to their weights', () => {
-    const w = designWeights(HAUSPIRE_DESIGN);
+  it('share the DESIGN stage’s 2% exactly, by effort; a client’s step weighs nothing', () => {
+    const w = designWeights(HAUSPIRE_DESIGN.map((s) => s.effortMin));
     expect(w.reduce((a, b) => a + b, 0)).toBe(DESIGN_SHARE_BP);
-    expect(w.every((x) => x > 0)).toBe(true);
+    HAUSPIRE_DESIGN.forEach((s, i) => expect(w[i]! > 0, s.label).toBe(s.effortMin > 0));
+    expect(designWeights([0, 0])).toEqual([DESIGN_SHARE_BP / 2, DESIGN_SHARE_BP / 2]);
+    expect(designWeights([60, 0, 60])).toEqual([DESIGN_SHARE_BP / 2, 0, DESIGN_SHARE_BP / 2]);
   });
 
   it('match a gate to the payment stage by its name, or set none', () => {
@@ -62,13 +64,25 @@ describe('building the design steps', () => {
     expect(gateIndexFor(null, HAUSPIRE_PAYMENTS)).toBeNull();
   });
 
-  it('carry who, file, gate and gap into the plan, inside the window', () => {
-    const steps = designSteps(HAUSPIRE_DESIGN, { start: '2026-10-01', end: '2026-10-25' }, HAUSPIRE_PAYMENTS);
-    expect(steps).toHaveLength(19);
-    expect(steps.find((s) => s.label === 'First draft (FD) meeting')!.gatePayment).toBe(1);
-    expect(steps.find((s) => s.label === 'BOQ')).toMatchObject({ gatePayment: 2, needsDocument: true, responsible: 'DESIGNER' });
-    expect(steps.at(-1)!.plannedOn).toBe('2026-10-25');
+  it('carry who, file, gate, days, effort, approval and tasks into the plan, the days exact from the start', () => {
+    const steps = designSteps(HAUSPIRE_DESIGN, '2026-10-01', HAUSPIRE_PAYMENTS);
+    expect(steps).toHaveLength(26);
+    expect(steps.find((s) => s.label === 'First draft (3D)')!.gatePayment).toBe(1);
+    expect(steps.find((s) => s.label === 'Site visit with electrician & carpenter')).toMatchObject({ gatePayment: 2, responsible: 'DESIGNER' });
+    expect(steps.find((s) => s.label === 'Working drawings final')).toMatchObject({ plannedOn: '2026-10-29', room: 'Design' });
+    expect(steps.at(-1)).toMatchObject({ plannedOn: '2026-11-13', room: 'Pre-execution', responsible: 'PM' });
+    expect(steps.find((s) => s.label === '2D approval')).toMatchObject({ approvalKind: 'LAYOUT_2D', effortMin: 0, weightBp: 0, plannedOn: '2026-10-03' });
+    expect(steps[0]!.tasks).toEqual(['Send the requirement form with the mood board']);
     expect(steps.map((s) => s.sortOrder)).toEqual(steps.map((_, i) => i));
+  });
+
+  it('scale a 3 BHK’s days and effort by 20%', () => {
+    const two = designSteps(HAUSPIRE_DESIGN, '2026-10-01', HAUSPIRE_PAYMENTS, 2);
+    const three = designSteps(HAUSPIRE_DESIGN, '2026-10-01', HAUSPIRE_PAYMENTS, 3);
+    const fd = (xs: typeof two) => xs.find((s) => s.label === 'First draft (3D)')!;
+    expect(fd(two)).toMatchObject({ gapDays: 4, effortMin: 960 });
+    expect(fd(three)).toMatchObject({ gapDays: 5, effortMin: 1152 });
+    expect(three.at(-1)!.plannedOn > two.at(-1)!.plannedOn).toBe(true);
   });
 });
 

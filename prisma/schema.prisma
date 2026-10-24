@@ -931,6 +931,9 @@ model StudioMember {
   /// studio workspace migration on. Expand → migrate → contract: it goes
   /// once nothing reads it. Never decide a permission on it — use `role`.
   isOwner    Boolean @default(false)
+  /// Design head (DESIGN-PROCESS-PLAN.md §2.6): a designer who sees every
+  /// designer's projects and steps. Only on a DESIGNER; set in Settings, Team.
+  designHead Boolean @default(false)
 
   /// What this person may do (modules/studio/roles.ts `can`). Defaults to
   /// OWNER because the only path that creates a member without saying —
@@ -1806,6 +1809,10 @@ model HomeProject {
 /// read, not only stored: a WARRANTY project past warrantyEndsOn is closed.
 enum ProjectPhase {
   DESIGN
+  /// Design done (working drawings final), the execution team owns the
+  /// project and the internal execution clock runs; the designer supports
+  /// (DESIGN-PROCESS-PLAN.md Decision 10).
+  PRE_EXECUTION
   EXECUTION
   CLOSURE
   SNAGS
@@ -2173,6 +2180,16 @@ model HomeChecklistItem {
   doneDocumentId String?
   delays         HomeStepDelay[]
 
+  /// The design process (owner and Hauspire's design team, 24 Oct 2026;
+  /// docs/studio-os/DESIGN-PROCESS-PLAN.md §1): the step's effort in minutes
+  /// for this home (its share of design progress is effort over the total),
+  /// and, on a client's approval step, what approves it in the app
+  /// (LAYOUT_2D | RENDER_3D | WORKING | DESIGN_FINAL), so the client's answer
+  /// ticks it. Null on older steps and on execution steps.
+  effortMin    Int?
+  approvalKind String?
+  tasks        HomeStepTask[]
+
   /// A starred step (owner, 12 Oct 2026; docs/studio-os/CUSTOMER-MILESTONES.md):
   /// one of the stage's 2–3 milestones the customer sees. Every other step
   /// is the studio's own; percentages still count every step.
@@ -2184,6 +2201,25 @@ model HomeChecklistItem {
   @@index([stageId, sortOrder])
   @@index([doneSiteLogId])
   @@map("home_checklist_items")
+}
+
+/// A small to-do inside a step (DESIGN-PROCESS-PLAN.md Decision 7), seeded
+/// from the studio's design template ("Send the requirement form with the
+/// mood board") or added on the project. Never changes the step's percent or
+/// day; ticking is not the step's tick.
+model HomeStepTask {
+  id        String            @id @default(cuid())
+  stepId    String
+  step      HomeChecklistItem @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  label     String
+  sortOrder Int               @default(0)
+  doneAt    DateTime?
+  /// The user who ticked it. Not a foreign key (a leaver's ticks stay).
+  doneById  String?
+  createdAt DateTime          @default(now())
+
+  @@index([stepId, sortOrder])
+  @@map("home_step_tasks")
 }
 
 /// The materials list of a signed project, copied from the quote at signing
@@ -5575,6 +5611,10 @@ model HomeStepDelay {
   note      String?           @db.Text
   byId      String
   at        DateTime          @default(now())
+  /// Somebody checked the reason (owner, design head or PM; the Delays list,
+  /// DESIGN-PROCESS-PLAN.md Decision 6). Null until then.
+  checkedAt   DateTime?
+  checkedById String?
 
   @@index([projectId, at])
   @@index([stepId])

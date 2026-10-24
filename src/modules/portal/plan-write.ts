@@ -39,7 +39,16 @@ export async function writePlan(db: PlanDb, projectId: string, plan: { stages: P
             customerMilestone: it.customerMilestone === true,
             // Studio OS Phase 2: a design step's who, file, payment gate and gap.
             ...(it.responsible
-              ? { responsible: it.responsible, needsDocument: it.needsDocument === true, gatePayment: it.gatePayment ?? null, gapDays: it.gapDays ?? null }
+              ? {
+                  responsible: it.responsible,
+                  needsDocument: it.needsDocument === true,
+                  gatePayment: it.gatePayment ?? null,
+                  gapDays: it.gapDays ?? null,
+                  // The design process: effort, the approval that ticks a client's step, the step's to-dos.
+                  effortMin: it.effortMin ?? null,
+                  approvalKind: it.approvalKind ?? null,
+                  ...(it.tasks && it.tasks.length ? { tasks: { create: it.tasks.map((label, k) => ({ label, sortOrder: k })) } } : {}),
+                }
               : {}),
           })),
         },
