@@ -173,17 +173,28 @@ function Steps({ tab }: { tab: DesignTab }) {
   const [starred, setStarred] = useState<{ ok: boolean; text: string } | null>(null);
   if (tab.steps.length === 0) return null;
   const stars = tab.steps.filter((s) => s.inScope && s.milestone).length;
+  /* A plan with the design process (its steps carry an effort): the client sees every step, without dates (DESIGN-PROCESS-PLAN.md Decision 11). */
+  const process = tab.steps.some((s) => s.effortMin !== null);
   return (
     <section aria-label="Design steps" className="card flex flex-col gap-2 p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 className={h2}>Design steps</h2>
         <CustomerSees name={tab.customerFirst} />
       </div>
-      <p className={`m-0 ${muted}`}>
-        <span className="font-medium acc-t">★ {STAR_HINT}</span> {tab.customerFirst} sees every step and the design&rsquo;s %, never the dates. Each % is the step&rsquo;s share of the design, by its effort. A
-        step after an unrecorded payment waits for it, and is never late.
-      </p>
-      <MilestoneCount n={stars} />
+      {process ? (
+        <p className={`m-0 ${muted}`}>
+          {tab.customerFirst} sees every step and the design&rsquo;s %, never the dates. Each % is the step&rsquo;s share of the design, by its effort. A step after an unrecorded payment waits for it, and is
+          never late. ★ marks a milestone.
+        </p>
+      ) : (
+        <>
+          <p className={`m-0 ${muted}`}>
+            <span className="font-medium acc-t">★ {STAR_HINT}</span> {tab.customerFirst} sees the design&rsquo;s % from every step. Each % is the step&rsquo;s share of the design. A locked step opens when its
+            payment is recorded by accounts.
+          </p>
+          <MilestoneCount n={stars} />
+        </>
+      )}
       <ul className="m-0 flex list-none flex-col gap-1 p-0">
         {tab.steps.map((st, k) => (
           <StepHeads key={`h-${st.id}`} st={st} before={k > 0 ? tab.steps[k - 1]! : null} />
@@ -298,7 +309,7 @@ function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onO
             Tick
           </button>
         ) : null}
-        {tab.canWork && st.inScope && !st.done && st.plannedOn ? (
+        {tab.canWork && st.inScope && !st.done && st.plannedOn && !st.lockedBy ? (
           <button type="button" className="btn ghost sm" onClick={() => onOpen('move')}>
             Running late
           </button>

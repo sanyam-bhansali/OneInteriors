@@ -6,7 +6,8 @@ import 'server-only';
  * 12). Once, on the day the studio starts: for each project in design, the
  * team picks the step it is at now. Its design stage gets the studio's
  * steps (Hauspire's 26 by default), every step before the one picked
- * ticked as done before the switch (no photo, no file, marked so), the
+ * ticked as done before the switch (BACKFILL: no photo, no file, the note
+ * says so), the
  * picked step planned for today and the rest linked after it by their days.
  * The old steps are replaced; how many there were, and how many were done,
  * stay in the project's history (`design.steps_switched`).
@@ -136,7 +137,7 @@ export async function switchProjectSteps(projectId: string, rawAt: unknown, now 
         if (k < at) {
           await tx.homeChecklistItem.update({
             where: { id: made.id },
-            data: { doneAt: now, doneById: check.member.userId, doneSource: 'BEFORE_JOINING', doneNote: 'Done before the switch to the new design steps.' },
+            data: { doneAt: now, doneById: check.member.userId, doneSource: 'BACKFILL', doneNote: 'Done before the switch to the new design steps.' },
           });
         }
       }

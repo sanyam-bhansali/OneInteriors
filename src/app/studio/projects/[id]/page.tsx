@@ -362,7 +362,7 @@ function CustomerPanel({ w, now }: { w: ProjectWorkspace; now: Date }) {
       {nowStage ? (
         <div className="sect">
           <span className="k">
-            {nowStage.label} · {nowStage.progressPct}% · ★ {nowStage.steps.length} milestone{nowStage.steps.length === 1 ? '' : 's'}
+            {nowStage.label} · {nowStage.progressPct}% · {nowStage.kind === 'DESIGN' && nowStage.steps.every((x) => x.plannedOn === null && x.doneOn === null) ? `${nowStage.steps.length} steps` : `★ ${nowStage.steps.length} milestone${nowStage.steps.length === 1 ? '' : 's'}`}
           </span>
           {nowStage.steps.length ? (
             <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[14px]">
