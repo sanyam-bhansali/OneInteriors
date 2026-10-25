@@ -12,12 +12,12 @@
  */
 
 import { asSeenBy, can, type MemberRole, type StudioRoleName } from './roles';
-import { CREWS_HOME, DESIGN_HOME, LEAD_SETTINGS_PATHS, PAYMENTS_HOME, SITE_HOME, STUDIO_HOME, TEAM_PATH, TODAY_HOME, mayOpen } from './surfaces';
+import { CREWS_HOME, DESIGN_HOME, DOCUMENTS_HOME, LEAD_SETTINGS_PATHS, PAYMENTS_HOME, SITE_HOME, STUDIO_HOME, TEAM_PATH, TODAY_HOME, mayOpen } from './surfaces';
 
 export { STUDIO_HOME };
 
 export type AppKey =
-  | 'today' | 'clients' | 'quotes' | 'projects' | 'site' | 'money'
+  | 'today' | 'clients' | 'quotes' | 'projects' | 'documents' | 'site' | 'money'
   | 'vendors' | 'calendar' | 'intros' | 'rates' | 'team';
 
 export type AppIconName =
@@ -101,6 +101,12 @@ export const APPS: readonly StudioApp[] = [
     owns: ['/studio/projects', DESIGN_HOME, '/studio/updates'],
   },
   {
+    /* Project documents (owner and Hauspire's design team, 24 Oct 2026; DESIGN-PROCESS-PLAN.md §3.4): a folder per project. */
+    key: 'documents', name: 'Documents', href: DOCUMENTS_HOME, icon: 'file', bg: 'var(--warn-bg)', fg: 'var(--warn)',
+    tabs: [],
+    owns: [DOCUMENTS_HOME],
+  },
+  {
     key: 'site', name: 'Site', href: SITE_HOME, icon: 'camera', bg: 'var(--ink)', fg: 'var(--paper)',
     tabs: [],
     owns: [SITE_HOME],
@@ -149,11 +155,12 @@ export const APPS: readonly StudioApp[] = [
  * plus what our roles already open: a project manager keeps the office they had).
  */
 const ROLE_APPS: Record<StudioRoleName, readonly AppKey[]> = {
-  OWNER: ['today', 'clients', 'quotes', 'projects', 'site', 'money', 'vendors', 'calendar', 'intros', 'rates', 'team'],
+  OWNER: ['today', 'clients', 'quotes', 'projects', 'documents', 'site', 'money', 'vendors', 'calendar', 'intros', 'rates', 'team'],
   /* Sales roles (owner, 22 Oct 2026): Team / Settings shows only when their sales role opens it (`mayOpen`). */
   SALES: ['clients', 'quotes', 'calendar', 'team'],
-  DESIGNER: ['quotes', 'projects', 'vendors'],
-  PM: ['projects', 'vendors', 'quotes', 'today', 'clients', 'site', 'calendar', 'rates', 'team'],
+  /* The design meeting (24 Oct 2026): a designer reaches the design final from the project, not a Quotations tile. */
+  DESIGNER: ['projects', 'documents', 'vendors'],
+  PM: ['projects', 'documents', 'vendors', 'quotes', 'today', 'clients', 'site', 'calendar', 'rates', 'team'],
   ACCOUNTS: ['money', 'vendors', 'quotes'],
   SUPERVISOR: ['site'],
 };

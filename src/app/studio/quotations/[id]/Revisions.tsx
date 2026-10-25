@@ -21,6 +21,7 @@ import type { PaymentStage } from '@/modules/studio-sales/payment-template';
 import { markSalesFinalAction, sendAgainAction } from '../../sales-actions';
 import { Said, useAct } from '../../SalesUi';
 import { PaymentStagesEditor } from '../../PaymentStagesEditor';
+import { SalesVoice } from './SalesVoice';
 
 const when = (d: Date | string) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 
@@ -115,6 +116,9 @@ function SalesFinal({ view, leadHref, mayBook }: { view: QuoteSalesView; leadHre
   const [open, setOpen] = useState(false);
   const [n, setN] = useState(last.n);
   const [stages, setStages] = useState<PaymentStage[]>(current?.schedule ?? view.template);
+  /* Notes for the design team, required; a voice note kept as audio (DESIGN-PROCESS-PLAN.md §4.2). */
+  const [notes, setNotes] = useState(current?.notes ?? '');
+  const [voicePath, setVoicePath] = useState<string | null>(null);
   const { pending, result, run } = useAct();
   const chosen = view.revisions.find((r) => r.n === n);
   const booked = view.projectId !== null;
@@ -141,6 +145,13 @@ function SalesFinal({ view, leadHref, mayBook }: { view: QuoteSalesView; leadHre
                 </li>
               ))}
             </ol>
+          ) : null}
+          {current.notes || current.voiceUrl ? (
+            <div className="sm" style={{ borderLeft: '2px solid var(--ring)', paddingLeft: 10 }}>
+              <span className="lbl">Notes for the design team</span>
+              {current.notes ? <p style={{ margin: '2px 0 0', whiteSpace: 'pre-wrap' }}>{current.notes}</p> : null}
+              {current.voiceUrl ? <audio controls src={current.voiceUrl} style={{ height: 32, marginTop: 4 }} /> : null}
+            </div>
           ) : null}
           {!current.linesUnchanged && !booked ? (
             <p className="qerr">The quotation has changed since R{current.n}. Send the new version and mark it, or undo the change, before the booking.</p>
@@ -175,8 +186,25 @@ function SalesFinal({ view, leadHref, mayBook }: { view: QuoteSalesView; leadHre
             </label>
             <p className="muted sm" style={{ margin: 0 }}>Payment stages for this client — change them here if you agreed something different:</p>
             <PaymentStagesEditor stages={stages} onChange={setStages} totalPaise={chosen?.totalPaise ?? null} />
+            <label className="qfield">
+              <span className="lbl">Notes for the design team (required)</span>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={4}
+                maxLength={3000}
+                className="fld"
+                placeholder="What the client wants, the budget, what was promised. E.g. budget 3 lakh, consider Luxe laminates; a study in bedroom 2."
+              />
+            </label>
+            <SalesVoice quoteId={view.quoteId} onPath={setVoicePath} />
             <div className="hstack">
-              <button type="button" disabled={pending} onClick={() => run(() => markSalesFinalAction(view.quoteId, n, stages, view.clientId), (r) => r.ok && setOpen(false))} className="btn pri">
+              <button
+                type="button"
+                disabled={pending || notes.trim().length < 10}
+                onClick={() => run(() => markSalesFinalAction(view.quoteId, n, stages, view.clientId, { notes, voicePath }), (r) => r.ok && setOpen(false))}
+                className="btn pri"
+              >
                 {pending ? 'Saving…' : `Mark R${n} as sales final`}
               </button>
               <button type="button" onClick={() => setOpen(false)} className="btn ghost">

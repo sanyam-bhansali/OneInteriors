@@ -115,6 +115,7 @@ export interface LifecycleInput {
 
 const PHASE_OUT: Record<Phase, CustomerPhase> = {
   DESIGN: 'design',
+  PRE_EXECUTION: 'design',
   EXECUTION: 'execution',
   CLOSURE: 'closure',
   SNAGS: 'snags',
@@ -147,7 +148,9 @@ function paymentBlocker(i: LifecycleInput): CustomerBlocker | null {
   return null;
 }
 
-export function customerLifecycle(i: LifecycleInput): CustomerLifecycle {
+export function customerLifecycle(input: LifecycleInput): CustomerLifecycle {
+  /* Pre-execution is the studio's own hand-over to the site team; the client still reads it as getting the design ready (DESIGN-PROCESS-PLAN.md Decision 11). */
+  const i: LifecycleInput = input.phase === 'PRE_EXECUTION' ? { ...input, phase: 'DESIGN' } : input;
   const phase = PHASE_OUT[i.phase];
   const owner = i.role === 'owner';
   const openSnags = i.snags.filter((s) => s.progress.state !== 'closed').length;

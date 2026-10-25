@@ -98,3 +98,7 @@
     order: -1;
   }
 }
+
+/* Steps waiting on a payment: one quiet line under the three columns. */
+.mw-waiting { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--s-rule-soft, rgba(0, 0, 0, 0.08)); }
+.mw-waiting summary { cursor: pointer; list-style: revert; }

@@ -37,7 +37,7 @@ describe('the default stars', () => {
   });
 
   it('star three of Hauspire’s design steps', () => {
-    expect(HAUSPIRE_DESIGN.filter((s) => s.milestone).map((s) => s.label)).toEqual(['Site visit and measurement', 'First 3D and renders', 'Design closure']);
+    expect(HAUSPIRE_DESIGN.filter((s) => s.milestone).map((s) => s.label)).toEqual(['Site visit', 'Final 3D & renders', 'Working drawings final']);
     for (const label of DESIGN_MILESTONES) expect(HAUSPIRE_DESIGN.some((s) => s.label === label), label).toBe(true);
   });
 
@@ -47,7 +47,8 @@ describe('the default stars', () => {
     const expected = [
       // The lifecycle migration (20261013120000) renamed Hauspire's "Handover" step to "Provisional handover"; this backfill ran before, under the old name.
       ...PLAN_KINDS.flatMap((k) => TEMPLATE_MILESTONES[k].map((l) => `${k}|${l === 'Provisional handover' ? 'Handover' : l}`)),
-      ...DESIGN_MILESTONES.map((l) => `DESIGN|${l}`),
+      // The design steps of 12 Oct 2026, before the design process of 24 Oct 2026 renamed them; the backfill ran under these names.
+      ...['Site visit and measurement', 'First 3D and renders', 'Design closure'].map((l) => `DESIGN|${l}`),
     ].sort();
     expect(pairs).toEqual(expected);
     expect(sql).toContain('ADD COLUMN "customerMilestone" BOOLEAN NOT NULL DEFAULT false');
@@ -67,7 +68,7 @@ describe('a studio’s own design steps and their stars', () => {
 
   it('give a template saved before stars existed Hauspire’s stars, by name', () => {
     const old = [
-      { label: 'Site visit and measurement', responsible: 'DESIGNER', needsDocument: false, gate: null, days: 0, weight: 2 },
+      { label: 'Site visit', responsible: 'DESIGNER', needsDocument: false, gate: null, days: 0, weight: 2 },
       { label: 'Our own step', responsible: 'DESIGNER', needsDocument: false, gate: null, days: 1, weight: 1 },
     ];
     expect(readDesignTemplate(old).map((s) => s.milestone)).toEqual([true, false]);
@@ -86,10 +87,10 @@ describe('copying the stars onto a plan', () => {
   it('a studio’s design template carries its own stars', () => {
     const steps = designSteps(
       [
-        { label: 'Brief', responsible: 'DESIGNER', needsDocument: false, gate: null, days: 0, weight: 1, milestone: false },
-        { label: 'Concept shared', responsible: 'DESIGNER', needsDocument: false, gate: null, days: 2, weight: 1, milestone: true },
+        { label: 'Brief', responsible: 'DESIGNER', needsDocument: false, gate: null, days: 0, effortMin: 60, group: 'Design', approval: null, tasks: [], milestone: false },
+        { label: 'Concept shared', responsible: 'DESIGNER', needsDocument: false, gate: null, days: 2, effortMin: 60, group: 'Design', approval: null, tasks: [], milestone: true },
       ],
-      { start: '2026-10-01', end: '2026-10-10' },
+      '2026-10-01',
       [],
     );
     expect(steps.map((s) => s.customerMilestone)).toEqual([false, true]);

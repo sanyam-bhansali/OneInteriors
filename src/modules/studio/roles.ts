@@ -424,6 +424,13 @@ export interface MemberRole {
   /** Their membership id, when known (`memberFor` sets it): lets `can()` tell "their own lead" from `ctx.lead`. */
   id?: string;
   /**
+   * Design head (owner and Hauspire's design team, 24 Oct 2026;
+   * docs/studio-os/DESIGN-PROCESS-PLAN.md §2.6): a designer who sees and
+   * works every project of the studio as if on it, and the designers' load
+   * page. Only read on a DESIGNER.
+   */
+  designHead?: boolean;
+  /**
    * Sales roles (owner, 22 Oct 2026): a SALES member's sales role and place
    * in the reporting tree, built per request (access.ts `memberFor`). Null
    * or left out on a SALES member keeps the Phase 1 rule exactly. Ignored for
@@ -544,6 +551,9 @@ export const FULL_SOFTWARE_ACTIONS: ReadonlySet<StudioAction> = new Set<StudioAc
  * rates); for a project action a PM or supervisor then gets `false`, which is
  * the safe answer to a question asked without the facts.
  */
+/** What a design head may do beyond a designer: see every designer's load. */
+const DESIGN_HEAD_ACTIONS: ReadonlySet<StudioAction> = new Set<StudioAction>(['design.workload']);
+
 export function can(member: MemberRole, action: StudioAction, ctx: CanContext = {}): boolean {
   if (member.status !== 'ACTIVE') return false;
   /* Developer access (owner, 22 Oct 2026): staff viewing as this member read, and never write. First, before the owner's "everything". */
@@ -553,8 +563,12 @@ export function can(member: MemberRole, action: StudioAction, ctx: CanContext = 
   if (member.role === 'OWNER') return true;
   /* Sales roles (owner, 22 Oct 2026): the role and its reach decide, not GRANTS. */
   if (hasSalesRole(member)) return canBySalesRole(member.sales, action, ctx);
+  const head = member.role === 'DESIGNER' && member.designHead === true;
+  /* A design head sees every designer's load (DESIGN-PROCESS-PLAN.md §2.6). */
+  if (head && DESIGN_HEAD_ACTIONS.has(action)) return true;
   if (!GRANTS[member.role]?.includes(action)) return false;
-  const assigned = ctx.assigned ?? (ctx.lead && member.id ? ctx.lead.assignedToId !== null && ctx.lead.assignedToId === member.id : undefined);
+  /* A design head is on every project of the studio. */
+  const assigned = head ? true : (ctx.assigned ?? (ctx.lead && member.id ? ctx.lead.assignedToId !== null && ctx.lead.assignedToId === member.id : undefined));
   /* Phase 1 pool: a salesperson without a sales role claims only from the studio pool. */
   if (action === 'lead.claim' && member.role === 'SALES' && ctx.lead) return inPool(STUDIO_POOL_ONLY, ctx.lead);
   // A lead action: only a salesperson is limited, to their own leads.
@@ -653,7 +667,7 @@ export function projectsVisibleTo(
   const action: StudioAction = purpose === 'payments' ? 'payment.read' : 'project.read';
   const studio: Prisma.HomeProjectWhereInput = { introduction: { studioId: member.studioId } };
   if (!can(member, action, { assigned: true })) return { id: { in: [] } };
-  if (!needsAssignment(member.role)) return studio;
+  if (!needsAssignment(member.role) || (member.role === 'DESIGNER' && member.designHead === true)) return studio;
   return { ...studio, team: { some: { memberId: member.id } } };
 }
 

@@ -140,7 +140,7 @@ export interface TrackerInputRow {
     plannedStart?: Date;
     plannedEnd: Date;
     actualEnd: Date | null;
-    items?: readonly { id?: string; room: string; label: string; doneAt: Date | null; weightBp?: number; inScope?: boolean; plannedOn?: Date | null; customerMilestone?: boolean }[];
+    items?: readonly { id?: string; room: string; label: string; doneAt: Date | null; weightBp?: number; inScope?: boolean; plannedOn?: Date | null; customerMilestone?: boolean; effortMin?: number | null }[];
   }[] | null;
   dateChanges?: readonly {
     stageId?: string | null;
@@ -223,8 +223,13 @@ export function customerTracker(row: TrackerInputRow, views: readonly StageView[
   const names = new Map(rules.map((r) => [r.id, r.name]));
   const handover = handoverStage(rules);
 
-  /* What the customer reads by name: the starred steps. The percentages above count every step. */
-  const milestones = steps.map((list) => list.filter((it) => it.customerMilestone === true));
+  /*
+   * What the customer reads by name: the starred steps. The percentages above count every step. A design stage with the
+   * design process (its steps carry an effort; owner and Hauspire's design team, 24 Oct 2026; DESIGN-PROCESS-PLAN.md
+   * Decision 11): every step, never a step's date.
+   */
+  const processDesign = (i: number) => stored[i]?.kind === 'DESIGN' && steps[i]!.some((it) => it.effortMin !== null && it.effortMin !== undefined);
+  const milestones = steps.map((list, i) => (processDesign(i) ? list : list.filter((it) => it.customerMilestone === true)));
 
   const stages: CustomerTrackerStage[] = statuses.map((s, i) => {
     const items = milestones[i]!;
@@ -252,8 +257,8 @@ export function customerTracker(row: TrackerInputRow, views: readonly StageView[
         group: it.room,
         pct: bpToPct(progress.weights.get(it.key) ?? 0),
         done: it.doneAt !== null,
-        doneOn: it.doneAt ? day(it.doneAt) : null,
-        plannedOn: it.plannedOn ? dayFromDb(it.plannedOn) : null,
+        doneOn: it.doneAt && !processDesign(i) ? day(it.doneAt) : null,
+        plannedOn: it.plannedOn && !processDesign(i) ? dayFromDb(it.plannedOn) : null,
       })),
       moved: m
         ? {

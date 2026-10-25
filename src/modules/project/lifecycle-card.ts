@@ -60,7 +60,8 @@ const WHO: Record<string, string> = { DESIGNER: 'Designer', SALES: 'Sales', ACCO
 export const dayWords = (day: string): string => new Date(`${day}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 
 const openOf = (steps: readonly CardStep[]) => steps.filter((s) => s.inScope && !s.done);
-const late = (s: CardStep | undefined, today: string) => (s?.plannedOn && s.plannedOn < today ? daysBetween(s.plannedOn, today) : 0);
+/** Days the step is past its day; 0 for a step waiting on a payment (DESIGN-PROCESS-PLAN.md Decision 5). */
+const late = (s: CardStep | undefined, today: string) => (s?.plannedOn && !s.lockedBy && s.plannedOn < today ? daysBetween(s.plannedOn, today) : 0);
 
 export function lifecycleCard(i: CardInput): LifecycleCardView {
   switch (i.phase) {
@@ -74,6 +75,18 @@ export function lifecycleCard(i: CardInput): LifecycleCardView {
       else if (cur.responsible === 'CLIENT') blocker = { side: 'client', text: `Client: ${cur.label}` };
       else blocker = { side: 'studio', text: `${WHO[cur.responsible ?? 'DESIGNER'] ?? 'Studio'} to do it` };
       return { current: cur.label, next: open[1]?.label ?? 'Design sign-off', blocker, lateDays: late(cur, i.today) };
+    }
+    case 'PRE_EXECUTION': {
+      // The execution team owns it; the designer supports (DESIGN-PROCESS-PLAN.md Decision 10).
+      const open = openOf(i.designSteps);
+      const cur = open[0];
+      if (!cur) return { current: 'Every pre-execution step ticked', next: 'Execution', blocker: null, lateDays: 0 };
+      const blocker: CardBlocker = cur.lockedBy
+        ? { side: 'client', text: `Client to pay the ${cur.lockedBy}` }
+        : cur.responsible === 'CLIENT'
+          ? { side: 'client', text: `Client: ${cur.label}` }
+          : { side: 'studio', text: `${WHO[cur.responsible ?? 'PM'] ?? 'Studio'} to do it` };
+      return { current: cur.label, next: open[1]?.label ?? 'Execution', blocker, lateDays: late(cur, i.today) };
     }
     case 'EXECUTION': {
       const open = openOf(i.execSteps);

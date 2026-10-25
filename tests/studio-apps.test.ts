@@ -9,7 +9,7 @@ const keys = (role: StudioRoleName) => appsFor(m(role)).map((a) => a.key);
 
 describe('studio apps (UI handoff 12 Oct 2026)', () => {
   it('the owner sees every app, in the launcher order', () => {
-    expect(keys('OWNER')).toEqual(['today', 'clients', 'quotes', 'projects', 'site', 'money', 'vendors', 'calendar', 'intros', 'rates', 'team']);
+    expect(keys('OWNER')).toEqual(['today', 'clients', 'quotes', 'projects', 'documents', 'site', 'money', 'vendors', 'calendar', 'intros', 'rates', 'team']);
   });
 
   it('a salesperson sees Leads, Quotations and Calendar only', () => {

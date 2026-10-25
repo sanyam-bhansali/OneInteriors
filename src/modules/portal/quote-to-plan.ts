@@ -76,7 +76,7 @@
 import { splitAcross } from '@/lib/money';
 import { templateFor } from '@/modules/project/step-template';
 import { designSteps } from '@/modules/studio-design/rules';
-import { designDaysFor, HAUSPIRE_DESIGN, type DesignTemplateStep } from '@/modules/studio-design/template';
+import { designLengthFor, HAUSPIRE_DESIGN, type DesignTemplateStep } from '@/modules/studio-design/template';
 import { spreadStepDays } from '@/modules/project/step-rules';
 import { dayToDb, istDay } from '@/modules/project/working-days';
 import { KIND_TRACKER_KEYS, PLAN_KINDS, TRACKER_STAGES, type PlanKind } from './tracker';
@@ -140,13 +140,17 @@ export interface PlanItem {
   gapDays?: number | null;
   /** Starred: one of the stage's milestones the customer sees (docs/studio-os/CUSTOMER-MILESTONES.md). */
   customerMilestone?: boolean;
+  /* The design process (DESIGN-PROCESS-PLAN.md): effort in minutes, the app approval that ticks a client's step, and the step's to-dos. */
+  effortMin?: number | null;
+  approvalKind?: string | null;
+  tasks?: string[];
 }
 
 /**
  * Studio OS Phase 2 (docs/studio-os/PHASE-2-DESIGN.md): what the DESIGN
  * stage is built from — the studio's design steps (Hauspire's when null) and
- * the flat size, which sets how long design lasts (studio-design/template.ts
- * `DESIGN_DAYS`). Without a flat size, design keeps its usual share.
+ * the flat size, which scales the steps' days and effort (studio-design/
+ * template.ts `sizeFactor`). Design lasts exactly its steps' days.
  */
 export interface DesignPlanInput {
   template?: readonly DesignTemplateStep[] | null;
@@ -290,8 +294,8 @@ export function stepsFor(kind: PlanKind, plannedStart: Date, plannedEnd: Date): 
  * scaled to the stage's window, gates matched to the payment stages by name
  * (studio-design/rules.ts `designSteps`).
  */
-export function designStepsFor(plannedStart: Date, plannedEnd: Date, template: readonly DesignTemplateStep[] | null | undefined, payments: readonly { label: string }[]): PlanItem[] {
-  return designSteps(template && template.length ? template : HAUSPIRE_DESIGN, { start: istDay(plannedStart), end: istDay(plannedEnd) }, payments).map((st) => ({
+export function designStepsFor(plannedStart: Date, template: readonly DesignTemplateStep[] | null | undefined, payments: readonly { label: string }[], bhk: number | null = null): PlanItem[] {
+  return designSteps(template && template.length ? template : HAUSPIRE_DESIGN, istDay(plannedStart), payments, bhk).map((st) => ({
     room: st.room,
     label: st.label,
     quoteLineId: null,
@@ -304,6 +308,9 @@ export function designStepsFor(plannedStart: Date, plannedEnd: Date, template: r
     gatePayment: st.gatePayment,
     gapDays: st.gapDays,
     customerMilestone: st.customerMilestone,
+    effortMin: st.effortMin,
+    approvalKind: st.approvalKind,
+    tasks: st.tasks,
   }));
 }
 
@@ -314,12 +321,13 @@ export function designStepsFor(plannedStart: Date, plannedEnd: Date, template: r
  * tracker ops started by hand) the stages are as before.
  */
 export function templateStages(startOn: Date, totalDays: number, design?: (DesignPlanInput & { payments: readonly { label: string }[] }) | null): PlanStage[] {
-  return stageDates(startOn, totalDays, design ? designDaysFor(design.bhk) : null).map((d, i) => ({
+  const steps = design ? (design.template && design.template.length ? design.template : HAUSPIRE_DESIGN) : null;
+  return stageDates(startOn, totalDays, steps ? designLengthFor(steps, design?.bhk) : null).map((d, i) => ({
     ...d,
     name: KIND_NAMES[d.kind],
     sortOrder: i,
     actualEnd: null,
-    items: design && d.kind === 'DESIGN' ? designStepsFor(d.plannedStart, d.plannedEnd, design.template, design.payments) : stepsFor(d.kind, d.plannedStart, d.plannedEnd),
+    items: design && d.kind === 'DESIGN' ? designStepsFor(d.plannedStart, design.template, design.payments, design.bhk ?? null) : stepsFor(d.kind, d.plannedStart, d.plannedEnd),
   }));
 }
 

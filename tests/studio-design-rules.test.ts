@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  approvalKindOfDrawing,
+  chainLocks,
   checkAnswer,
+  designPhaseAfterTicks,
+  lateTickCheck,
+  planRedateAfterPayment,
   checkDesignTick,
   checkMeasurements,
   checkVisit,
@@ -49,10 +54,12 @@ describe('linked days', () => {
 });
 
 describe('building the design steps', () => {
-  it('share the DESIGN stage’s 2% exactly, in proportion to their weights', () => {
-    const w = designWeights(HAUSPIRE_DESIGN);
+  it('share the DESIGN stage’s 2% exactly, by effort; a client’s step weighs nothing', () => {
+    const w = designWeights(HAUSPIRE_DESIGN.map((s) => s.effortMin));
     expect(w.reduce((a, b) => a + b, 0)).toBe(DESIGN_SHARE_BP);
-    expect(w.every((x) => x > 0)).toBe(true);
+    HAUSPIRE_DESIGN.forEach((s, i) => expect(w[i]! > 0, s.label).toBe(s.effortMin > 0));
+    expect(designWeights([0, 0])).toEqual([DESIGN_SHARE_BP / 2, DESIGN_SHARE_BP / 2]);
+    expect(designWeights([60, 0, 60])).toEqual([DESIGN_SHARE_BP / 2, 0, DESIGN_SHARE_BP / 2]);
   });
 
   it('match a gate to the payment stage by its name, or set none', () => {
@@ -62,13 +69,25 @@ describe('building the design steps', () => {
     expect(gateIndexFor(null, HAUSPIRE_PAYMENTS)).toBeNull();
   });
 
-  it('carry who, file, gate and gap into the plan, inside the window', () => {
-    const steps = designSteps(HAUSPIRE_DESIGN, { start: '2026-10-01', end: '2026-10-25' }, HAUSPIRE_PAYMENTS);
-    expect(steps).toHaveLength(19);
-    expect(steps.find((s) => s.label === 'First draft (FD) meeting')!.gatePayment).toBe(1);
-    expect(steps.find((s) => s.label === 'BOQ')).toMatchObject({ gatePayment: 2, needsDocument: true, responsible: 'DESIGNER' });
-    expect(steps.at(-1)!.plannedOn).toBe('2026-10-25');
+  it('carry who, file, gate, days, effort, approval and tasks into the plan, the days exact from the start', () => {
+    const steps = designSteps(HAUSPIRE_DESIGN, '2026-10-01', HAUSPIRE_PAYMENTS);
+    expect(steps).toHaveLength(26);
+    expect(steps.find((s) => s.label === 'First draft (3D)')!.gatePayment).toBe(1);
+    expect(steps.find((s) => s.label === 'Site visit with electrician & carpenter')).toMatchObject({ gatePayment: 2, responsible: 'DESIGNER' });
+    expect(steps.find((s) => s.label === 'Working drawings final')).toMatchObject({ plannedOn: '2026-10-29', room: 'Design' });
+    expect(steps.at(-1)).toMatchObject({ plannedOn: '2026-11-13', room: 'Pre-execution', responsible: 'PM' });
+    expect(steps.find((s) => s.label === '2D approval')).toMatchObject({ approvalKind: 'LAYOUT_2D', effortMin: 0, weightBp: 0, plannedOn: '2026-10-03' });
+    expect(steps[0]!.tasks).toEqual(['Send the requirement form with the mood board']);
     expect(steps.map((s) => s.sortOrder)).toEqual(steps.map((_, i) => i));
+  });
+
+  it('scale a 3 BHK’s days and effort by 20%', () => {
+    const two = designSteps(HAUSPIRE_DESIGN, '2026-10-01', HAUSPIRE_PAYMENTS, 2);
+    const three = designSteps(HAUSPIRE_DESIGN, '2026-10-01', HAUSPIRE_PAYMENTS, 3);
+    const fd = (xs: typeof two) => xs.find((s) => s.label === 'First draft (3D)')!;
+    expect(fd(two)).toMatchObject({ gapDays: 4, effortMin: 960 });
+    expect(fd(three)).toMatchObject({ gapDays: 5, effortMin: 1152 });
+    expect(three.at(-1)!.plannedOn > two.at(-1)!.plannedOn).toBe(true);
   });
 });
 
@@ -89,6 +108,104 @@ describe('payment gates', () => {
     expect(gateOf(null, stages)).toEqual({ open: true });
     expect(gateOf(1, null)).toEqual({ open: true });
     expect(gateOf(9, stages)).toEqual({ open: true });
+  });
+});
+
+describe('steps waiting on a payment (DESIGN-PROCESS-PLAN.md Decision 5)', () => {
+  const stages = [
+    { index: 0, label: 'Booking advance', state: 'paid' as const },
+    { index: 1, label: 'Design advance', state: 'due' as const },
+    { index: 2, label: 'Design closure', state: 'later' as const },
+  ];
+  const st = (gatePayment: number | null, done = false) => ({ gatePayment, done });
+
+  it('the first unpaid gate and every open step after it wait on that payment; done steps never wait', () => {
+    expect(chainLocks([st(null, true), st(null), st(1), st(null), st(2), st(null)], stages)).toEqual([null, null, 'Design advance', 'Design advance', 'Design advance', 'Design advance']);
+  });
+
+  it('once the design advance is recorded, the steps wait only on the design closure', () => {
+    const paid = stages.map((x) => (x.index === 1 ? { ...x, state: 'paid' as const } : x));
+    expect(chainLocks([st(1), st(null), st(2), st(null)], paid)).toEqual([null, null, 'Design closure', 'Design closure']);
+  });
+
+  it('a step out of scope never waits, and nothing waits without payment stages', () => {
+    expect(chainLocks([{ gatePayment: 1, done: false, inScope: false }, st(null)], stages)).toEqual([null, null]);
+    expect(chainLocks([st(1), st(null)], null)).toEqual([null, null]);
+  });
+
+  it('are neither due nor late', () => {
+    expect(dueAndLate([{ plannedOn: '2026-10-01', done: false, inScope: true, lockedBy: 'Design advance' }, { plannedOn: '2026-10-01', done: false, inScope: true }], '2026-10-05')).toEqual({ due: 0, late: 1 });
+  });
+});
+
+describe('dates after a payment (DESIGN-PROCESS-PLAN.md Decision 5)', () => {
+  const paid = [
+    { index: 0, label: 'Booking advance', state: 'paid' as const },
+    { index: 1, label: 'Design advance', state: 'paid' as const },
+    { index: 2, label: 'Design closure', state: 'later' as const },
+  ];
+  const steps = [
+    { id: 'fin2d', plannedOn: '2026-10-03', done: true, inScope: true, gatePayment: null, gapDays: 0 },
+    { id: 'fd', plannedOn: '2026-10-07', done: false, inScope: true, gatePayment: 1, gapDays: 4 },
+    { id: 'chg', plannedOn: '2026-10-08', done: false, inScope: true, gatePayment: null, gapDays: 1 },
+    { id: 'wd', plannedOn: '2026-10-20', done: false, inScope: true, gatePayment: 2, gapDays: 3 },
+  ];
+
+  it('a late payment moves the step it opens, and every open step after, to count from the payment', () => {
+    expect(planRedateAfterPayment(steps, paid, '2026-10-12')).toEqual({
+      stepId: 'fd',
+      days: 9,
+      moves: [
+        { id: 'fd', from: '2026-10-07', to: '2026-10-16' },
+        { id: 'chg', from: '2026-10-08', to: '2026-10-17' },
+        { id: 'wd', from: '2026-10-20', to: '2026-10-29' },
+      ],
+    });
+  });
+
+  it('an early payment leaves the plan, and a second run moves nothing', () => {
+    expect(planRedateAfterPayment(steps, paid, '2026-10-01')).toBeNull();
+    const moved = steps.map((x) => (x.id === 'fd' ? { ...x, plannedOn: '2026-10-16' } : x));
+    expect(planRedateAfterPayment(moved, paid, '2026-10-12')).toBeNull();
+  });
+
+  it('nothing moves while the payment is still not recorded', () => {
+    const due = paid.map((x) => (x.index === 1 ? { ...x, state: 'due' as const } : x));
+    expect(planRedateAfterPayment(steps, due, '2026-10-12')).toBeNull();
+  });
+});
+
+describe('ticking a late step (DESIGN-PROCESS-PLAN.md Decision 6)', () => {
+  it('needs nothing on time', () => {
+    expect(lateTickCheck({ plannedOn: '2026-10-05', responsible: 'DESIGNER' }, '2026-10-05', undefined)).toEqual({ ok: true, delay: null });
+  });
+
+  it('asks a late step why, and files the side from the reason', () => {
+    expect(lateTickCheck({ plannedOn: '2026-10-01', responsible: 'DESIGNER' }, '2026-10-05', undefined)).toEqual({ ok: false, error: 'This step is 4 days late. Say why: on the client side or ours.' });
+    expect(lateTickCheck({ plannedOn: '2026-10-01', responsible: 'DESIGNER' }, '2026-10-05', 'STUDIO_WORKLOAD')).toEqual({ ok: true, delay: { reason: 'STUDIO_WORKLOAD', side: 'STUDIO', days: 4 } });
+  });
+
+  it('a client’s late step is the client’s delay by itself', () => {
+    expect(lateTickCheck({ plannedOn: '2026-10-04', responsible: 'CLIENT' }, '2026-10-05', undefined)).toEqual({ ok: true, delay: { reason: 'CLIENT_NOT_RESPONDING', side: 'CLIENT', days: 1 } });
+  });
+});
+
+describe('the phase after design ticks (DESIGN-PROCESS-PLAN.md Decision 10)', () => {
+  const st = (room: string, done: boolean, inScope = true) => ({ room, done, inScope });
+  it('every design step done: pre-execution; every pre-execution step done too: execution', () => {
+    expect(designPhaseAfterTicks([st('Design', true), st('Design', false), st('Pre-execution', false)])).toBeNull();
+    expect(designPhaseAfterTicks([st('Design', true), st('Design', true), st('Pre-execution', false)])).toBe('design.done');
+    expect(designPhaseAfterTicks([st('Design', true), st('Pre-execution', true)])).toBe('preexecution.done');
+  });
+  it('out-of-scope steps do not hold it, and an older plan with no pre-execution waits for the sign-off', () => {
+    expect(designPhaseAfterTicks([st('Design', true), st('Design', false, false), st('Pre-execution', false)])).toBe('design.done');
+    expect(designPhaseAfterTicks([st('Design', true), st('Design', true)])).toBeNull();
+  });
+});
+
+describe('approvals in the app tick the client’s step (DESIGN-PROCESS-PLAN.md Decision 4)', () => {
+  it('a layout or furniture approval ticks the 2D approval; a 3D the 3D approval; working drawings theirs; a site photo nothing', () => {
+    expect(['LAYOUT_2D', 'FURNITURE', 'RENDER_3D', 'WORKING', 'SITE_PHOTO', null].map(approvalKindOfDrawing)).toEqual(['LAYOUT_2D', 'LAYOUT_2D', 'RENDER_3D', 'WORKING', null, null]);
   });
 });
 
@@ -179,14 +296,15 @@ describe('drawings and the client’s answers', () => {
     expect(waitingDays(d!, D('2026-10-10T00:00:00Z'))).toBe(4);
   });
 
-  it('read the latest answer; a draft is a draft; a working drawing is just shared', () => {
+  it('read the latest answer; a draft is a draft; a site photo is just shared; working drawings wait for approval too (24 Oct 2026)', () => {
     const answers = [
       { documentId: 'a', verdict: 'CHANGES' as const, comment: 'Darker', at: D('2026-10-05T00:00:00Z') },
       { documentId: 'a', verdict: 'APPROVED' as const, comment: null, at: D('2026-10-06T00:00:00Z') },
     ];
-    const out = drawingsOf([doc('a'), doc('b', { sharedAt: null, room: 'Kitchen' }), doc('c', { designKind: 'WORKING', room: 'Bedroom' }), doc('x', { designKind: null })], answers);
+    const out = drawingsOf([doc('a'), doc('b', { sharedAt: null, room: 'Kitchen' }), doc('c', { designKind: 'SITE_PHOTO', room: 'Bedroom' }), doc('w', { designKind: 'WORKING', room: 'Hall' }), doc('x', { designKind: null })], answers);
     expect(out.map((d) => [d.id, d.state])).toEqual([
       ['c', 'shared'],
+      ['w', 'waiting'],
       ['b', 'draft'],
       ['a', 'approved'],
     ]);
@@ -199,7 +317,8 @@ describe('drawings and the client’s answers', () => {
     expect(checkAnswer(shared, false, 'CHANGES', 'Warmer lights')).toEqual({ ok: true, verdict: 'CHANGES', comment: 'Warmer lights' });
     expect(checkAnswer(shared, true, 'APPROVED', '')).toMatchObject({ ok: false });
     expect(checkAnswer({ ...shared, sharedAt: null }, false, 'APPROVED', '')).toMatchObject({ ok: false });
-    expect(checkAnswer({ ...shared, designKind: 'WORKING' }, false, 'APPROVED', '')).toMatchObject({ ok: false });
+    expect(checkAnswer({ ...shared, designKind: 'SITE_PHOTO' }, false, 'APPROVED', '')).toMatchObject({ ok: false });
+    expect(checkAnswer({ ...shared, designKind: 'WORKING' }, false, 'APPROVED', '')).toMatchObject({ ok: true });
     expect(checkAnswer(shared, false, 'MAYBE', '')).toMatchObject({ ok: false });
   });
 

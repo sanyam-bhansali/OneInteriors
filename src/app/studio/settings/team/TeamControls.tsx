@@ -8,6 +8,7 @@ import {
   inviteAction,
   reinstateAction,
   resendAction,
+  setDesignHeadAction,
   setSitesAction,
   signOutEverywhereAction,
   suspendAction,
@@ -212,7 +213,7 @@ export function PersonActions({
   person,
   sites,
 }: {
-  person: { id: string; name: string; role: StudioRoleName; status: StudioMemberStatusName; siteIds: string[] };
+  person: { id: string; name: string; role: StudioRoleName; status: StudioMemberStatusName; siteIds: string[]; designHead?: boolean };
   sites: Site[];
 }) {
   const { pending, result, run } = useResult();
@@ -272,6 +273,13 @@ export function PersonActions({
           </button>
         )}
       </div>
+      {person.role === 'DESIGNER' && person.status !== 'SUSPENDED' ? (
+        // Design head (DESIGN-PROCESS-PLAN.md §2.6): every project and every designer's load.
+        <label className="hstack sm" style={{ gap: 6 }}>
+          <input type="checkbox" checked={person.designHead === true} disabled={pending} onChange={(e) => run(() => setDesignHeadAction(person.id, e.target.checked))} />
+          Design head: sees every project and every designer&apos;s work
+        </label>
+      ) : null}
       {editing ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <span id={`sites-${person.id}`} className="lbl">

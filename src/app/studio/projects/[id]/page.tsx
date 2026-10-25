@@ -36,6 +36,8 @@ import { signoffsForStudio } from '@/modules/project/signoffs';
 import { ExtrasPanel } from './ExtrasPanel';
 import { SignoffCard } from './SignoffCard';
 import '../projects.css';
+import { PriorityStars } from './PriorityStars';
+import { mayDo } from '@/modules/studio/access';
 
 export const metadata: Metadata = { title: 'Project', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -94,6 +96,9 @@ export default async function ProjectWorkspacePage({
   }
   const w = r.workspace;
   const money = w.contractPaise !== null;
+  /* Priority stars: the owner, the PM and the designer on the project set them (DESIGN-PROCESS-PLAN.md §2.4). */
+  const starMember = await currentMember();
+  const canStar = starMember ? await mayDo(starMember, 'design.work', w.id) : false;
   const me = await currentMember();
   const broughtIn = me ? await broughtInOf(w.id, me.studioId).catch(() => null) : null;
   const [viewer, decisions, life, closure, snagWin] = await Promise.all([
@@ -106,7 +111,7 @@ export default async function ProjectWorkspacePage({
   ]);
   /* Change orders and sign-offs: null for those who do not see the project's money. */
   const [extras, signoffs] = await Promise.all([extrasForStudio(w.id).catch(() => null), signoffsForStudio(w.id).catch(() => null)]);
-  const closureOpen = closure !== null && life !== null && life.phase !== 'DESIGN' && life.phase !== 'EXECUTION';
+  const closureOpen = closure !== null && life !== null && life.phase !== 'DESIGN' && life.phase !== 'PRE_EXECUTION' && life.phase !== 'EXECUTION';
   // Studio OS Phase 3: Crews for those who see work orders (owner, PM, accounts; a designer on their project since the lifecycle).
   const crews = viewer === null || roleCan(viewer, 'workorder.read', { assigned: true });
   const tabs = TABS.filter((t) => (t.key !== 'payments' || money) && (t.key !== 'crews' || crews) && (t.key !== 'closure' || closureOpen) && (t.key !== 'extras' || (extras !== null && money && (life?.phase !== 'DESIGN' || extras.extras.length > 0))));
@@ -141,6 +146,7 @@ export default async function ProjectWorkspacePage({
           </Link>
           <h1>{w.home}</h1>
           <div className="flex flex-wrap gap-2">
+            <PriorityStars projectId={w.id} initial={w.priority} canEdit={canStar} />
             <span className="chip">{w.customer}</span>
             {w.ownClient ? (
               <span className="chip" title="Not introduced by One Interiors: no introduction, no commission">
@@ -362,7 +368,7 @@ function CustomerPanel({ w, now }: { w: ProjectWorkspace; now: Date }) {
       {nowStage ? (
         <div className="sect">
           <span className="k">
-            {nowStage.label} · {nowStage.progressPct}% · ★ {nowStage.steps.length} milestone{nowStage.steps.length === 1 ? '' : 's'}
+            {nowStage.label} · {nowStage.progressPct}% · {nowStage.kind === 'DESIGN' && nowStage.steps.every((x) => x.plannedOn === null && x.doneOn === null) ? `${nowStage.steps.length} steps` : `★ ${nowStage.steps.length} milestone${nowStage.steps.length === 1 ? '' : 's'}`}
           </span>
           {nowStage.steps.length ? (
             <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[14px]">

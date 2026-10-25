@@ -48,6 +48,17 @@ describe('what a designer may do', () => {
   it('is nothing at all when suspended', () => {
     expect(can({ ...designer, status: 'SUSPENDED' }, 'design.work', { assigned: true })).toBe(false);
   });
+
+  it('as design head, works every project of the studio and sees every designer’s load (DESIGN-PROCESS-PLAN.md §2.6)', () => {
+    const head = { ...designer, designHead: true };
+    expect(can(head, 'design.work', { assigned: false })).toBe(true);
+    expect(can(head, 'design.workload')).toBe(true);
+    expect(projectsVisibleTo(head)).toEqual({ introduction: { studioId: 's1' } });
+    // Still a designer: no money recorded, no plan edits, no leads.
+    for (const a of ['payment.record', 'plan.edit', 'lead.read', 'design.template'] as const) expect(can(head, a, { assigned: true }), a).toBe(false);
+    // The flag means nothing on anyone but a designer.
+    expect(can({ ...designer, role: 'SUPERVISOR' as const, designHead: true }, 'design.workload')).toBe(false);
+  });
 });
 
 describe('where a designer works', () => {

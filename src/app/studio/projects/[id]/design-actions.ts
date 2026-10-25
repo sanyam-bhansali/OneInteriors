@@ -3,7 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import {
+  addDesignStepBelow,
   addMoodBoardPieces,
+  addStepTask,
   applyDesignSteps,
   assignDesigner,
   bookVisit,
@@ -11,7 +13,10 @@ import {
   editDesignStep,
   makeDesignFinal,
   moveDesignStep,
+  moveDesignStepOrder,
   saveMeasurements,
+  setProjectPriority,
+  setStepTask,
   setVisitStatus,
   shareDrawing,
   shareMoodBoard,
@@ -42,7 +47,15 @@ export async function assignDesignerAction(projectId: string, memberId: string):
 
 export async function tickDesignStepAction(form: FormData): Promise<DesignResult> {
   const projectId = id(form.get('projectId'));
-  return done(projectId, await tickDesignStep(projectId, id(form.get('stepId')), { note: text(form.get('note'), 600), share: form.get('share') }, fileOf(form.get('file'))));
+  return done(
+    projectId,
+    await tickDesignStep(
+      projectId,
+      id(form.get('stepId')),
+      { note: text(form.get('note'), 600), share: form.get('share'), reason: text(form.get('reason'), 40) || null, reasonNote: text(form.get('reasonNote'), 600) },
+      fileOf(form.get('file')),
+    ),
+  );
 }
 
 export async function moveDesignStepAction(input: { projectId: string; stepId: string; to: string; reason: string; note: string }): Promise<DesignResult> {
@@ -106,4 +119,49 @@ export async function makeDesignFinalAction(projectId: string): Promise<DesignRe
 
 export async function closeDesignAction(projectId: string): Promise<DesignResult> {
   return done(id(projectId), await closeDesign(id(projectId)));
+}
+
+/* The design process (DESIGN-PROCESS-PLAN.md Decisions 7–8): tasks inside a step, a step's order, a step added below another. */
+
+export async function setStepTaskAction(projectId: string, taskId: string, isDone: boolean): Promise<DesignResult> {
+  return done(id(projectId), await setStepTask(id(projectId), id(taskId), isDone === true));
+}
+
+export async function addStepTaskAction(projectId: string, stepId: string, label: string): Promise<DesignResult> {
+  return done(id(projectId), await addStepTask(id(projectId), id(stepId), text(label, 200)));
+}
+
+export async function moveDesignStepOrderAction(projectId: string, stepId: string, dir: 'up' | 'down'): Promise<DesignResult> {
+  return done(id(projectId), await moveDesignStepOrder(id(projectId), id(stepId), dir));
+}
+
+export async function addDesignStepBelowAction(input: { projectId: string; afterId: string; label: string; responsible: string; days: string; hours: string }): Promise<DesignResult> {
+  const projectId = id(input.projectId);
+  return done(
+    projectId,
+    await addDesignStepBelow(projectId, id(input.afterId), { label: text(input.label, 200), responsible: text(input.responsible, 20), days: text(input.days, 4), hours: text(input.hours, 6) }),
+  );
+}
+
+/** Records a project document the browser put straight into storage (DESIGN-PROCESS-PLAN.md §3.6); its version follows the type and room. */
+export async function uploadDocumentAction(input: { projectId: string; kind: string; room: string; share: boolean; path: string; name: string; bytes: number }): Promise<DesignResult> {
+  const projectId = id(input.projectId);
+  return done(
+    projectId,
+    await uploadDrawing(projectId, { kind: text(input.kind, 30), room: text(input.room, 80), share: input.share === true }, null, new Date(), {
+      path: text(input.path, 200),
+      name: text(input.name, 200),
+      bytes: Number(input.bytes),
+    }),
+  );
+}
+
+export async function setProjectPriorityAction(projectId: string, stars: number | null): Promise<DesignResult> {
+  const pid = id(projectId);
+  const r = await setProjectPriority(pid, stars);
+  if (r.ok) {
+    revalidatePath('/studio/projects');
+    revalidatePath('/studio/design');
+  }
+  return done(pid, r);
 }

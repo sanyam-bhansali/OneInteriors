@@ -205,7 +205,7 @@ function Drawing({ d, url, owner, onChanged }: { d: Design['drawings'][number]; 
         ) : (
           <span style={{ fontWeight: 600 }}>{d.title}</span>
         )}
-        <span className="oa-meta">{d.version > 1 ? `Version ${d.version}` : d.kindLabel}</span>
+        <span className="oa-meta">{d.version > 1 || d.state === 'approved' ? `${d.kindLabel} · v${d.versionLabel ?? d.version}` : d.kindLabel}</span>
       </div>
       <span className="oa-meta" style={{ color: d.state === 'waiting' ? 'var(--accent-ink)' : undefined }}>
         {state}

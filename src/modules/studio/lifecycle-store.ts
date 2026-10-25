@@ -18,7 +18,7 @@ import { currentMember, memberOnProject, projectsVisibleTo } from './access';
 import { siteLabel } from './team-rules';
 import { readSignedStages } from '@/modules/portal/payments';
 import { GATE_SELECT, gateStagesOf } from '@/modules/studio-design/store';
-import { drawingsOf, gateOf } from '@/modules/studio-design/rules';
+import { chainLocks, drawingsOf } from '@/modules/studio-design/rules';
 import { execGate } from '@/modules/studio-crews/exec-gates';
 import { readCrewSettings } from '@/modules/studio-crews/settings';
 import { effectivePhase, isPhase, PHASE_LABEL, type Phase } from '@/modules/project/lifecycle-rules';
@@ -26,6 +26,9 @@ import { lifecycleCard, type CardBlocker, type CardStep } from '@/modules/projec
 import { eventsOrLegacy, snagStatus } from '@/modules/project/snag-status';
 import { dayFromDb, istDay } from '@/modules/project/working-days';
 import { fromDb } from '@/lib/money';
+
+/** The category's words (BudgetTier LUXURY reads "Luxe"). */
+const CATEGORY_WORD: Record<string, string> = { ESSENTIAL: 'Essential', PREMIUM: 'Premium', LUXURY: 'Luxe' };
 
 export interface BoardSnag {
   id: string;
@@ -38,6 +41,10 @@ export interface BoardSnag {
 
 export interface BoardCard {
   id: string;
+  /** 1 to 5 stars, the studio's one priority for the project; null = not set (DESIGN-PROCESS-PLAN.md §2.4). */
+  priority: number | null;
+  /** Essential, Premium or Luxe (§2.5). */
+  category: string | null;
   client: string;
   flat: string;
   designer: string | null;
@@ -71,6 +78,8 @@ export interface LifecycleBoard {
 }
 
 const SELECT = {
+  priority: true,
+  category: true,
   id: true,
   phase: true,
   warrantyEndsOn: true,
@@ -127,10 +136,16 @@ function cardOf(p: Row, now: Date, seesMoney: boolean): BoardCard {
   const payments = readSignedStages(p.paymentPhases) ?? [];
   const rules = readCrewSettings(p.introduction.studio.crewSettings).execGates;
   const designStage = p.stages.find((s) => s.kind === 'DESIGN');
-  const designSteps: CardStep[] = (designStage?.items ?? []).map((i) => {
-    const g = gateOf(i.gatePayment, gates);
-    return { label: i.label, done: i.doneAt !== null, inScope: i.inScope, plannedOn: day(i.plannedOn), responsible: i.responsible, lockedBy: g.open ? null : g.payment };
-  });
+  const designItems = designStage?.items ?? [];
+  const designLocks = chainLocks(designItems.map((i) => ({ gatePayment: i.gatePayment, done: i.doneAt !== null, inScope: i.inScope })), gates);
+  const designSteps: CardStep[] = designItems.map((i, k) => ({
+    label: i.label,
+    done: i.doneAt !== null,
+    inScope: i.inScope,
+    plannedOn: day(i.plannedOn),
+    responsible: i.responsible,
+    lockedBy: designLocks[k] ?? null,
+  }));
   const execSteps: CardStep[] = p.stages
     .filter((s) => s.kind !== 'DESIGN')
     .flatMap((s) =>
@@ -159,6 +174,8 @@ function cardOf(p: Row, now: Date, seesMoney: boolean): BoardCard {
   const shown = phase === 'WARRANTY' || phase === 'CLOSED' ? open.filter((x) => x.s.warranty) : open;
   return {
     id: p.id,
+    priority: p.priority,
+    category: p.category ? CATEGORY_WORD[p.category] : null,
     client: b.contactName?.trim() || b.user?.name?.trim() || 'Client',
     flat: siteLabel(b),
     designer: p.designer?.user.name ?? null,
@@ -188,16 +205,17 @@ export async function lifecycleBoard(now = new Date()): Promise<LifecycleBoard |
   const where: Prisma.HomeProjectWhereInput = {
     ...projectsVisibleTo(member),
     cancelledAt: null,
-    ...(member.role === 'DESIGNER' ? { designerId: member.id } : {}),
+    ...(member.role === 'DESIGNER' && !member.designHead ? { designerId: member.id } : {}),
   };
   const rows = await prisma.homeProject.findMany({ where, orderBy: { startOn: 'desc' }, take: 300, select: SELECT });
   // Money on the board: the owner, and the PM or designer on the project (all of these rows are theirs).
   const cards = rows.map((r) => cardOf(r, now, true));
-  const byLate = (a: BoardCard, b: BoardCard) => b.lateDays - a.lateDays || a.client.localeCompare(b.client);
+  /* Stars first (the design meeting, 24 Oct 2026; DESIGN-PROCESS-PLAN.md §2.4), then the latest. */
+  const byLate = (a: BoardCard, b: BoardCard) => (b.priority ?? 0) - (a.priority ?? 0) || b.lateDays - a.lateDays || a.client.localeCompare(b.client);
   return {
-    scope: member.role === 'DESIGNER' ? 'designer' : 'studio',
+    scope: member.role === 'DESIGNER' && !member.designHead ? 'designer' : 'studio',
     design: cards.filter((c) => c.phase === 'DESIGN').sort(byLate),
-    execution: cards.filter((c) => c.phase === 'EXECUTION' || c.phase === 'CLOSURE').sort((a, b) => Number(b.phase === 'CLOSURE') - Number(a.phase === 'CLOSURE') || byLate(a, b)),
+    execution: cards.filter((c) => c.phase === 'PRE_EXECUTION' || c.phase === 'EXECUTION' || c.phase === 'CLOSURE').sort((a, b) => Number(b.phase === 'CLOSURE') - Number(a.phase === 'CLOSURE') || byLate(a, b)),
     snags: cards.filter((c) => c.phase === 'SNAGS' || c.phase === 'WARRANTY').sort((a, b) => b.snags.length - a.snags.length),
     closed: cards.filter((c) => c.phase === 'CLOSED'),
     closures: cards.filter((c) => c.phase === 'CLOSURE'),
@@ -209,7 +227,7 @@ export async function closuresRemainingFor(): Promise<{ count: number; projects:
   const member = await currentMember();
   if (!member || !['OWNER', 'PM', 'DESIGNER'].includes(member.role)) return null;
   const rows = await prisma.homeProject.findMany({
-    where: { ...projectsVisibleTo(member), cancelledAt: null, phase: 'CLOSURE', ...(member.role === 'DESIGNER' ? { designerId: member.id } : {}) },
+    where: { ...projectsVisibleTo(member), cancelledAt: null, phase: 'CLOSURE', ...(member.role === 'DESIGNER' && !member.designHead ? { designerId: member.id } : {}) },
     orderBy: { provisionalHandoverAt: 'asc' },
     take: 100,
     select: { id: true, provisionalHandoverAt: true, introduction: { select: { brief: { select: { society: true, locality: true, propertyType: true, contactName: true, user: { select: { name: true } } } } } } },

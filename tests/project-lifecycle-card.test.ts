@@ -20,8 +20,13 @@ const base = (over: Partial<CardInput>): CardInput => ({
 
 describe('the dashboard card', () => {
   it('design: the first open step, the next, a payment the client owes, and days late', () => {
+    const c = lifecycleCard(base({ designSteps: [step('Site visit', { done: true }), step('First draft meeting', { plannedOn: '2026-10-10' }), step('Design changes')] }));
+    expect(c).toEqual({ current: 'First draft meeting', next: 'Design changes', blocker: { side: 'studio', text: 'Designer to do it' }, lateDays: 3 });
+  });
+
+  it('design: a step waiting on a payment is the client’s, and never late (DESIGN-PROCESS-PLAN.md Decision 5)', () => {
     const c = lifecycleCard(base({ designSteps: [step('Site visit', { done: true }), step('First draft meeting', { lockedBy: 'Design advance', plannedOn: '2026-10-10' }), step('Design changes')] }));
-    expect(c).toEqual({ current: 'First draft meeting', next: 'Design changes', blocker: { side: 'client', text: 'Client to pay the Design advance' }, lateDays: 3 });
+    expect(c).toEqual({ current: 'First draft meeting', next: 'Design changes', blocker: { side: 'client', text: 'Client to pay the Design advance' }, lateDays: 0 });
   });
 
   it('design: the client’s drawing answer, their own step, else the studio', () => {

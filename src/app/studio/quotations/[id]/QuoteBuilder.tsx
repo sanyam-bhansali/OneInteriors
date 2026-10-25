@@ -59,6 +59,7 @@ export function QuoteBuilder({
   finalHref = null,
   extras,
   doc = null,
+  salesFinalLines = null,
 }: {
   quote: QuoteRow;
   products: ProductRow[];
@@ -88,6 +89,8 @@ export function QuoteBuilder({
   extras?: React.ReactNode;
   /** The PDF's brand pages, stages, specification and terms (server, `quoteDocContext`). */
   doc?: DocPreviewStatics | null;
+  /** A Design Final: its Sales Final's frozen lines, the Final tab's "Original" (DESIGN-PROCESS-PLAN.md §4.1). */
+  salesFinalLines?: { room: string; product: string; code: WorkCodeName; unit: QuoteUnitName; widthMm: number | null; heightMm: number | null; qtyMilli: number | null; amountPaise: number }[] | null;
 }) {
   const [lines, setLines] = useState<EditableLine[]>(() => quote.lines.map(toEditable));
   const [terms, setTerms] = useState<TermsDraft>(() => termsDraftOf(quote));
@@ -195,8 +198,9 @@ export function QuoteBuilder({
     [priced, live],
   );
   /* Hauspire's "Original" for the Final tab: the quotation as it was
-     opened, until "Snapshot current as Original" (22 Oct 2026). */
-  const [baseLines, setBaseLines] = useState<CompareLine[]>(() => quote.lines.map(compareLineOf));
+     opened, until "Snapshot current as Original" (22 Oct 2026). A Design
+     Final's Original is its Sales Final, always (24 Oct 2026). */
+  const [baseLines, setBaseLines] = useState<CompareLine[]>(() => (salesFinalLines ?? quote.lines).map(compareLineOf));
   const baseTotal = useMemo(() => computeTotals(baseLines.map((l) => ({ ...l, ratePaise: 0 })), termsOfLive(live)).beforeTaxPaise, [baseLines, live]);
   const unpriced = priced.filter((l) => isUnpriced({ ...l, amountPaise: l.agreedPaise })).length;
 

@@ -12,7 +12,7 @@
 
 import { splitAcross } from '@/lib/money';
 import { addDays, daysBetween, isDay } from '@/modules/project/working-days';
-import { DESIGN_GROUP, DESIGN_SHARE_BP, designerDaysFor, DESIGNER_MONTH_DAYS, type DesignTemplateStep, type Responsible } from './template';
+import { DESIGN_GROUP, DESIGN_SHARE_BP, designerDaysFor, PRE_EXECUTION_GROUP, DESIGNER_MONTH_DAYS, scaledEffort, scaledGaps, type ApprovalKind, type DesignTemplateStep, type Responsible, type StepGroup } from './template';
 
 // ── Building the steps ────────────────────────────────────────
 
@@ -34,10 +34,21 @@ export function linkedDays(gaps: readonly number[], start: string, length: numbe
   });
 }
 
-/** The template's weights as basis points of the whole project: the DESIGN stage's share, split in proportion. */
-export function designWeights(template: readonly Pick<DesignTemplateStep, 'weight'>[]): number[] {
-  if (template.length === 0) return [];
-  return splitAcross(DESIGN_SHARE_BP, template.map((t) => Math.max(1, t.weight)));
+/**
+ * The steps' weights as basis points of the whole project: the DESIGN
+ * stage's share, split by effort (DESIGN-PROCESS-PLAN.md Decision 3). A step
+ * with no effort (the client's) weighs nothing; when no step has any effort,
+ * they share it equally.
+ */
+export function designWeights(efforts: readonly number[]): number[] {
+  if (efforts.length === 0) return [];
+  const clean = efforts.map((e) => (Number.isFinite(e) && e > 0 ? e : 0));
+  const at = clean.map((e, i) => (e > 0 ? i : -1)).filter((i) => i >= 0);
+  if (at.length === 0) return splitAcross(DESIGN_SHARE_BP, clean.map(() => 1));
+  const parts = splitAcross(DESIGN_SHARE_BP, at.map((i) => clean[i]!));
+  const out = clean.map(() => 0);
+  at.forEach((i, k) => (out[i] = parts[k]!));
+  return out;
 }
 
 /** The index of the payment stage a gate word names ("design advance" → "Design advance 5%"), or null. */
@@ -60,20 +71,29 @@ export interface DesignPlanStep {
   needsDocument: boolean;
   gatePayment: number | null;
   gapDays: number;
-  /** Starred: a milestone the client sees. */
+  /** Starred: a milestone. */
   customerMilestone: boolean;
+  /** Effort for this home, in minutes. */
+  effortMin: number;
+  /** On a client's approval step: what approves it in the app. */
+  approvalKind: ApprovalKind | null;
+  /** To-dos seeded inside the step. */
+  tasks: string[];
 }
 
-/** The design steps of a new project, inside the DESIGN stage's window, gates matched to its payment stages. */
-export function designSteps(template: readonly DesignTemplateStep[], window: { start: string; end: string }, payments: readonly { label: string }[]): DesignPlanStep[] {
-  const days = linkedDays(
-    template.map((t) => t.days),
-    window.start,
-    Math.max(0, daysBetween(window.start, window.end)),
-  );
-  const weights = designWeights(template);
+/**
+ * The design steps of a new project from the DESIGN stage's start: each the
+ * previous one's day plus its days, exactly (never stretched to a window;
+ * DESIGN-PROCESS-PLAN.md Decision 1), days and effort scaled by the flat's
+ * size, weights by effort, gates matched to its payment stages.
+ */
+export function designSteps(template: readonly DesignTemplateStep[], start: string, payments: readonly { label: string }[], bhk: number | null = null): DesignPlanStep[] {
+  const gaps = scaledGaps(template.map((t) => t.days), bhk);
+  const days = linkedDays(gaps, start, null);
+  const efforts = template.map((t) => scaledEffort(t.effortMin, bhk));
+  const weights = designWeights(efforts);
   return template.map((t, i) => ({
-    room: DESIGN_GROUP,
+    room: t.group as StepGroup,
     label: t.label,
     quoteLineId: null,
     sortOrder: i,
@@ -83,8 +103,11 @@ export function designSteps(template: readonly DesignTemplateStep[], window: { s
     responsible: t.responsible,
     needsDocument: t.needsDocument,
     gatePayment: gateIndexFor(t.gate, payments),
-    gapDays: t.days,
+    gapDays: gaps[i]!,
     customerMilestone: t.milestone === true,
+    effortMin: efforts[i]!,
+    approvalKind: t.approval,
+    tasks: [...t.tasks],
   }));
 }
 
@@ -111,6 +134,103 @@ export function gateOf(gatePayment: number | null | undefined, stages: readonly 
   const st = stages.find((s) => s.index === gatePayment);
   if (!st) return { open: true };
   return st.state === 'paid' || st.state === 'waiting' ? { open: true } : { open: false, payment: st.label };
+}
+
+/**
+ * Which open steps wait on a payment (DESIGN-PROCESS-PLAN.md Decision 5):
+ * the first open step whose payment is not recorded, and every open step
+ * after it, wait on that payment (the first draft waits on the design
+ * advance, and so does everything after it until the design closure). Each
+ * entry is the payment's name, or null. Done and out-of-scope steps never
+ * wait. In plan order.
+ */
+export function chainLocks(steps: readonly { gatePayment: number | null; done: boolean; inScope?: boolean }[], stages: readonly GateStage[] | null): (string | null)[] {
+  let waiting: string | null = null;
+  return steps.map((s) => {
+    if (s.done || s.inScope === false) return null;
+    if (!waiting) {
+      const g = gateOf(s.gatePayment, stages);
+      if (!g.open) waiting = g.payment;
+    }
+    return waiting;
+  });
+}
+
+/**
+ * After a payment is recorded (DESIGN-PROCESS-PLAN.md Decision 5): the first
+ * open step whose gate is now open counts its days from the payment's day,
+ * not from the plan. When it was planned earlier than that (the client paid
+ * late), it and every open step after it move later by the same days, so the
+ * days stay linked. Never earlier: a payment made early leaves the plan as it
+ * is. Null when nothing moves, so running it twice moves nothing twice.
+ */
+export function planRedateAfterPayment(
+  steps: readonly { id: string; plannedOn: string | null; done: boolean; inScope: boolean; gatePayment: number | null; gapDays: number | null }[],
+  stages: readonly GateStage[] | null,
+  paidOn: string,
+): { stepId: string; days: number; moves: { id: string; from: string; to: string }[] } | null {
+  if (!stages || !isDay(paidOn)) return null;
+  const at = steps.findIndex((s) => !s.done && s.inScope && s.gatePayment !== null && gateOf(s.gatePayment, stages).open);
+  if (at < 0) return null;
+  // Only when no open step before it is still waiting: the chain reads in order.
+  if (chainLocks(steps.slice(0, at), stages).some(Boolean)) return null;
+  const step = steps[at]!;
+  if (!step.plannedOn) return null;
+  const earliest = addDays(paidOn, Math.max(0, step.gapDays ?? 0));
+  const days = daysBetween(step.plannedOn, earliest);
+  if (days <= 0) return null;
+  const moves = steps
+    .slice(at)
+    .filter((s, k) => (k === 0 || (!s.done && s.inScope)) && s.plannedOn)
+    .map((s) => ({ id: s.id, from: s.plannedOn!, to: addDays(s.plannedOn!, days) }));
+  return { stepId: step.id, days, moves };
+}
+
+/**
+ * Where the design stage's ticks put the project (DESIGN-PROCESS-PLAN.md
+ * Decision 10): every in-scope pre-execution step done → execution; every
+ * in-scope design step done (and pre-execution steps to come) →
+ * pre-execution; else nothing. A plan without pre-execution steps (older
+ * projects) moves on the design sign-off instead, as before.
+ */
+export function designPhaseAfterTicks(items: readonly { room: string; inScope: boolean; done: boolean }[]): 'design.done' | 'preexecution.done' | null {
+  const inScope = items.filter((i) => i.inScope);
+  const design = inScope.filter((i) => i.room === DESIGN_GROUP);
+  const pre = inScope.filter((i) => i.room === PRE_EXECUTION_GROUP);
+  if (pre.length === 0) return null;
+  if (pre.every((i) => i.done) && design.every((i) => i.done)) return 'preexecution.done';
+  if (design.length > 0 && design.every((i) => i.done)) return 'design.done';
+  return null;
+}
+
+/**
+ * Re-links the days after a step moved or was added (DESIGN-PROCESS-PLAN.md
+ * Decision 8): from `from` on, each open step is the step before it plus its
+ * days after; a done step keeps its day and the next counts from it. The
+ * moves to make, oldest first.
+ */
+export function rechainDays(steps: readonly { id: string; plannedOn: string | null; done: boolean; gapDays: number | null }[], from: number): { id: string; from: string | null; to: string }[] {
+  const days = steps.map((s) => s.plannedOn);
+  const moves: { id: string; from: string | null; to: string }[] = [];
+  for (let k = Math.max(1, from); k < steps.length; k += 1) {
+    const s = steps[k]!;
+    const prev = days[k - 1];
+    if (s.done || !prev) continue;
+    const to = addDays(prev, Math.max(0, s.gapDays ?? 0));
+    if (to !== s.plannedOn) moves.push({ id: s.id, from: s.plannedOn, to });
+    days[k] = to;
+  }
+  return moves;
+}
+
+export const TASK_MAX = 120;
+
+/** A to-do's words, cleaned; or why not. */
+export function checkTask(raw: unknown): { ok: true; label: string } | { ok: false; error: string } {
+  const label = typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim() : '';
+  if (label.length < 2) return { ok: false, error: 'Say what the task is.' };
+  if (label.length > TASK_MAX) return { ok: false, error: `Keep it under ${TASK_MAX} characters.` };
+  return { ok: true, label };
 }
 
 export type DesignCheck = { ok: true } | { ok: false; error: string };
@@ -182,6 +302,25 @@ export const CUSTOMER_REASON: Record<DelayReasonKey, string> = {
 
 export const DELAY_NOTE_MAX = 500;
 
+/**
+ * A late step's tick needs a reason (DESIGN-PROCESS-PLAN.md Decision 6):
+ * whose delay and why, filed on the Delays list for somebody to check. A
+ * client's step is the client's delay by itself ("Client not responding")
+ * when nobody says otherwise. A step on time needs nothing. `delay` is what
+ * to file, or null.
+ */
+export function lateTickCheck(
+  step: { plannedOn: string | null; responsible: string | null },
+  today: string,
+  reason: unknown,
+): { ok: true; delay: { reason: DelayReasonKey; side: DelaySideName; days: number } | null } | { ok: false; error: string } {
+  const days = step.plannedOn ? Math.max(0, daysBetween(step.plannedOn, today)) : 0;
+  if (days === 0) return { ok: true, delay: null };
+  if (isDelayReasonKey(reason)) return { ok: true, delay: { reason, side: sideOfReason(reason), days } };
+  if (step.responsible === 'CLIENT') return { ok: true, delay: { reason: 'CLIENT_NOT_RESPONDING', side: 'CLIENT', days } };
+  return { ok: false, error: `This step is ${days === 1 ? '1 day' : `${days} days`} late. Say why: on the client side or ours.` };
+}
+
 export interface StepDay {
   id: string;
   plannedOn: string | null;
@@ -223,15 +362,31 @@ export function lateDays(step: { plannedOn: string | null; done: boolean }, toda
 export const DESIGN_KINDS = {
   LAYOUT_2D: '2D layout',
   FURNITURE: 'Furniture layout',
-  RENDER_3D: '3D render',
-  WORKING: 'Working drawing',
+  RENDER_3D: '3D & renders',
+  WORKING: 'Working drawings',
   SITE_PHOTO: 'Site photo',
+  /* Project documents (24 Oct 2026; DESIGN-PROCESS-PLAN.md §3; documents.ts). */
+  ELECTRICAL: 'Electrical drawings & quotation',
+  MATERIAL_LIST: 'Material list',
+  CUT_LIST: 'Factory cut list',
 } as const;
 export type DesignKind = keyof typeof DESIGN_KINDS;
 export const isDesignKind = (v: unknown): v is DesignKind => typeof v === 'string' && v in DESIGN_KINDS;
 
-/** The kinds the client is asked to approve. Working drawings and site photos are for the studio and the factory. */
-export const FOR_APPROVAL: readonly DesignKind[] = ['LAYOUT_2D', 'FURNITURE', 'RENDER_3D'];
+/**
+ * The kinds the client is asked to approve: the layouts, the 3D, and the
+ * working drawings (the design process, 24 Oct 2026: working drawings are
+ * approved by the client before they are final). Site photos are not.
+ */
+export const FOR_APPROVAL: readonly DesignKind[] = ['LAYOUT_2D', 'FURNITURE', 'RENDER_3D', 'WORKING', 'ELECTRICAL'];
+
+/** Which client approval step a drawing's approval ticks (DESIGN-PROCESS-PLAN.md Decision 4). */
+export function approvalKindOfDrawing(kind: string | null | undefined): ApprovalKind | null {
+  if (kind === 'LAYOUT_2D' || kind === 'FURNITURE') return 'LAYOUT_2D';
+  if (kind === 'RENDER_3D') return 'RENDER_3D';
+  if (kind === 'WORKING') return 'WORKING';
+  return null;
+}
 export const asksApproval = (k: string | null | undefined): boolean => (FOR_APPROVAL as readonly string[]).includes(k ?? '');
 
 export const ROOM_MAX = 60;
@@ -436,12 +591,12 @@ export function designerLoad(projects: readonly LoadProject[]): { open: number; 
   return { open: projects.length, loadDays, capacityDays: DESIGNER_MONTH_DAYS, pct: Math.round((loadDays * 100) / DESIGNER_MONTH_DAYS) };
 }
 
-/** Open steps due in the next 7 days (today included) and those already late. */
-export function dueAndLate(steps: readonly { plannedOn: string | null; done: boolean; inScope: boolean }[], today: string): { due: number; late: number } {
+/** Open steps due in the next 7 days (today included) and those already late. A step waiting on a payment is neither. */
+export function dueAndLate(steps: readonly { plannedOn: string | null; done: boolean; inScope: boolean; lockedBy?: string | null }[], today: string): { due: number; late: number } {
   let due = 0;
   let late = 0;
   for (const s of steps) {
-    if (s.done || !s.inScope || !s.plannedOn) continue;
+    if (s.done || !s.inScope || !s.plannedOn || s.lockedBy) continue;
     const d = daysBetween(today, s.plannedOn);
     if (d < 0) late += 1;
     else if (d <= 6) due += 1;

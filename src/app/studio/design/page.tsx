@@ -43,13 +43,17 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
               : 'Every project from design to warranty, with what is holding each up, and every designer’s load.'}
           </p>
         </div>
-        {member && can(member, 'project.bringIn') ? (
-          <div className="hstack">
+        <div className="hstack">
+          {/* Every late design step, whose delay and why (DESIGN-PROCESS-PLAN.md Decision 6). */}
+          <Link href="/studio/design/delays" className="btn ghost">
+            Delays
+          </Link>
+          {member && can(member, 'project.bringIn') ? (
             <Link href="/studio/projects/bring-in" className="btn sec">
               Bring in a running project
             </Link>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
       {board ? <LifecycleTabs board={board} tab={tab} base="/studio/design" mine={mine} /> : null}
       {/* The designers' load (Phase 2): owner and PM, under Design. */}

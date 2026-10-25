@@ -32,6 +32,9 @@ import {
   type RevisionTotals,
 } from './revision-rules';
 import { cleanStages, readStages, scheduleAmounts, templateOrDefault, type PaymentStage, type ScheduledStage } from './payment-template';
+import { leadFileExists, leadUploadTicket, signedLeadFileLinks } from '@/modules/storage/lead-files';
+import { pathBelongsTo } from '@/modules/studio-sales/lead-rules';
+import { checkSalesNotes, voiceExtOf } from './revision-rules';
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
@@ -168,6 +171,9 @@ export interface QuoteSalesView {
     totalPaise: number;
     /** The quotation's lines today are still what R{n} said. */
     linesUnchanged: boolean;
+    /** Sales' notes for the design team, and the voice note's signed link (DESIGN-PROCESS-PLAN.md §4.2). */
+    notes: string | null;
+    voiceUrl: string | null;
   } | null;
   /** The studio's template, for marking a first sales final. */
   template: PaymentStage[];
@@ -196,6 +202,8 @@ export async function quoteSalesView(quoteId: string): Promise<QuoteSalesView | 
         salesFinalRevisionId: true,
         salesFinalSchedule: true,
         salesFinalAt: true,
+        salesFinalNotes: true,
+        salesFinalVoicePath: true,
         client: { select: { assignedToId: true, poolTeamId: true, source: true, introductionId: true } },
         studio: { select: { paymentPhases: true, paymentTemplate: true } },
         revisions: { orderBy: { n: 'asc' }, select: { id: true, n: true, sentAt: true, sentByName: true, totalPaise: true, lines: true, terms: true } },
@@ -225,6 +233,8 @@ export async function quoteSalesView(quoteId: string): Promise<QuoteSalesView | 
         amounts: amounts.ok ? amounts.stages : null,
         totalPaise: total,
         linesUnchanged: sameLinesAs(readRevisionLines(finalRow.lines), snap.lines),
+        notes: q.salesFinalNotes,
+        voiceUrl: q.salesFinalVoicePath ? ((await signedLeadFileLinks([q.salesFinalVoicePath])).get(q.salesFinalVoicePath) ?? null) : null,
       };
     }
     return {
@@ -312,7 +322,33 @@ export async function revisionPair(quoteId: string, a: number, b: number): Promi
  * this client. Moving it from an earlier revision is the same action; the
  * lead's timeline records both. Refused once the booking is recorded.
  */
-export async function markSalesFinal(quoteId: string, n: number, stages: PaymentStage[]): Promise<{ ok: true } | { ok: false; error: string }> {
+/**
+ * A one-time place in storage for the sales final's voice note (kept as
+ * audio; no speech-to-text yet, owner 25 Oct 2026): whoever may mark this
+ * quotation's sales final, in the lead's private files.
+ */
+export async function salesVoiceTicket(quoteId: string, type: unknown, bytes: unknown): Promise<{ ok: true; path: string; url: string | null } | { ok: false; error: string }> {
+  const scope = await myLeadScope();
+  if (!scope) return { ok: false, error: 'Sign in as your studio first.' };
+  const ext = voiceExtOf(type);
+  if (!ext) return { ok: false, error: 'This browser recorded in a format we cannot keep. Type the notes instead.' };
+  const size = Number(bytes);
+  if (!Number.isFinite(size) || size <= 0 || size > 8 * 1024 * 1024) return { ok: false, error: 'That recording is too long. Keep it under two minutes.' };
+  const q = await prisma.studioQuote.findFirst({
+    where: { ...scope.quotes, id: String(quoteId ?? '').slice(0, 64), studioId: scope.studioId },
+    select: { clientId: true, client: { select: { assignedToId: true, poolTeamId: true } } },
+  });
+  if (!q?.clientId) return { ok: false, error: 'That quotation is not yours.' };
+  if (!mayOnLead(scope, 'quote.salesFinal', { assignedToId: q.client?.assignedToId ?? null, poolTeamId: q.client?.poolTeamId ?? null })) return { ok: false, error: 'Your role in the studio does not include that.' };
+  return leadUploadTicket(scope.studioId, q.clientId, ext);
+}
+
+export async function markSalesFinal(
+  quoteId: string,
+  n: number,
+  stages: PaymentStage[],
+  extra: { notes?: unknown; voicePath?: unknown } = {},
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const scope = await myLeadScope();
   if (!scope) return { ok: false, error: 'Sign in as your studio first.' };
   const studioId = scope.studioId;
@@ -326,6 +362,8 @@ export async function markSalesFinal(quoteId: string, n: number, stages: Payment
       briefId: true,
       introductionId: true,
       salesFinalRevision: { select: { n: true } },
+      salesFinalNotes: true,
+      salesFinalVoicePath: true,
       client: { select: { assignedToId: true, poolTeamId: true, source: true, introductionId: true } },
       revisions: { where: { studioId, n }, select: { id: true, n: true, totalPaise: true } },
     },
@@ -348,6 +386,15 @@ export async function markSalesFinal(quoteId: string, n: number, stages: Payment
   if (!cleaned.ok) return cleaned;
   const fits = scheduleAmounts(cleaned.stages, fromDb(revision.totalPaise));
   if (!fits.ok) return { ok: false, error: fits.error };
+  /* Notes for the design team, required (DESIGN-PROCESS-PLAN.md §4.2); a voice note kept as audio, optional. */
+  const notes = checkSalesNotes(extra.notes, q.salesFinalNotes);
+  if (!notes.ok) return notes;
+  let voicePath = q.salesFinalVoicePath;
+  if (extra.voicePath !== undefined && extra.voicePath !== null && extra.voicePath !== '') {
+    if (!q.clientId || !pathBelongsTo(extra.voicePath, studioId, q.clientId)) return { ok: false, error: 'That voice note is not for this client. Record it again.' };
+    if (!(await leadFileExists(extra.voicePath))) return { ok: false, error: 'The voice note did not finish uploading. Record it again.' };
+    voicePath = extra.voicePath;
+  }
 
   const by = await actingMember();
   const previous = q.salesFinalRevision?.n ?? null;
@@ -358,6 +405,8 @@ export async function markSalesFinal(quoteId: string, n: number, stages: Payment
       salesFinalSchedule: cleaned.stages as unknown as Prisma.InputJsonValue,
       salesFinalAt: new Date(),
       salesFinalById: by?.id ?? null,
+      salesFinalNotes: notes.notes,
+      salesFinalVoicePath: voicePath,
     },
   });
   if (q.clientId && previous !== n) {

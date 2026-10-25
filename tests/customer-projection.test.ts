@@ -474,7 +474,7 @@ describe('the stages the customer sees', () => {
       items: {
         orderBy: { sortOrder: 'asc' },
         // Customer milestones: the studio's star, read to keep every other step back.
-        select: { room: true, label: true, doneAt: true, weightBp: true, inScope: true, plannedOn: true, id: true, responsible: true, gatePayment: true, customerMilestone: true },
+        select: { room: true, label: true, doneAt: true, weightBp: true, inScope: true, plannedOn: true, id: true, responsible: true, gatePayment: true, customerMilestone: true, effortMin: true },
       },
     });
   });
@@ -977,7 +977,7 @@ describe('Studio OS Phase 2: the design card (studio-design/customer-view.ts) ne
     expect(design.visits).toEqual([{ at: '2026-10-14T05:30:00.000Z', purpose: 'Measurement', status: 'booked' }]);
     expect(design.measurements).toEqual([{ room: 'Living', size: "15' × 12'", height: "9' 6\"" }]);
     expect(design.drawings).toEqual([
-      { id: 'dr2', kind: 'LAYOUT_2D', kindLabel: '2D layout', room: 'Living', title: '2D layout, Living', version: 2, state: 'approved', answeredOn: '2026-10-07', comment: null },
+      { id: 'dr2', kind: 'LAYOUT_2D', kindLabel: '2D layout', room: 'Living', title: '2D layout, Living', version: 2, versionLabel: '2.0', state: 'approved', answeredOn: '2026-10-07', comment: null },
     ]);
   });
 

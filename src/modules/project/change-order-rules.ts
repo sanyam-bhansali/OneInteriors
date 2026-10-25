@@ -84,7 +84,7 @@ export const STATUS_LABEL: Record<ChangeOrderStatusName, string> = {
 };
 
 /** The phases a new change order may be added in: after design sign-off, before the closure is fixed. */
-export const EXTRAS_PHASES = ['EXECUTION', 'CLOSURE'] as const;
+export const EXTRAS_PHASES = ['PRE_EXECUTION', 'EXECUTION', 'CLOSURE'] as const;
 
 export function extrasOpen(phase: string, closedOut: boolean): { ok: true } | { ok: false; error: string } {
   if (closedOut) return { ok: false, error: 'This project is closed out: its final payment is fixed, so extra work cannot be added.' };

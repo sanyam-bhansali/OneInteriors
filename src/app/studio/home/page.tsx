@@ -89,7 +89,9 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
   const soon = member ? comingSoonApps(member) : [];
 
   const name = studio?.tradeName ?? 'Your studio';
-  const firstName = (user?.name ?? '').trim().split(/\s+/)[0] || null;
+  /* View as (staff, read only): greet the person being viewed, not the staff account looking. */
+  const viewedName = member?.viewOnly ? (await prisma.studioMember.findUnique({ where: { id: member.id }, select: { user: { select: { name: true } } } }).catch(() => null))?.user.name : null;
+  const firstName = ((viewedName ?? user?.name) ?? '').trim().split(/\s+/)[0] || null;
   const now = new Date();
   const hour = Number(now.toLocaleString('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' }));
   const hello = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
@@ -373,7 +375,7 @@ function tileFor(key: AppKey, n: (id: SectionId) => number): { sub: string; tone
     }
     case 'quotes': {
       const q = n('quotes');
-      return q > 0 ? { sub: `${q} waiting on you`, tone: 'warn', badge: q } : { sub: 'Build and send quotations', tone: '', badge: 0 };
+      return q > 0 ? { sub: `${plural(q, 'sent quote')} to follow up`, tone: 'warn', badge: q } : { sub: 'Build and send quotations', tone: '', badge: 0 };
     }
     case 'calendar': {
       const m = n('meetings');
@@ -381,6 +383,8 @@ function tileFor(key: AppKey, n: (id: SectionId) => number): { sub: string; tone
     }
     case 'projects':
       return { sub: 'Plans, site log, snags, design', tone: '', badge: 0 };
+    case 'documents':
+      return { sub: 'Every project’s drawings, finals and handover packs', tone: '', badge: 0 };
     case 'site':
       return { sub: "Today's updates from site", tone: '', badge: 0 };
     case 'money':

@@ -94,6 +94,12 @@ export const PROJECT_EVENT_TYPES = [
   'designer.assigned',
   'design.ticked',
   'design.step_moved',
+  // The design process (owner, 24 Oct 2026; DESIGN-PROCESS-PLAN.md): a delay's reason checked; a project moved to the new steps.
+  'design.delay_checked',
+  'design.steps_switched',
+  'design.step_reordered',
+  'design.task_added',
+  'design.task_ticked',
   'design.step_edited',
   'design.steps_applied',
   'design.shared',

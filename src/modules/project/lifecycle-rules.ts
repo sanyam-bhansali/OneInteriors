@@ -6,7 +6,9 @@
  * (lifecycle.ts) call `movePhase` inside the same transaction that records
  * the event, so a phase never disagrees with what happened.
  *
- *   DESIGN ──design sign-off──▶ EXECUTION ──provisional handover ticked──▶ CLOSURE
+ *   DESIGN ──design steps done──▶ PRE_EXECUTION ──pre-execution steps done──▶ EXECUTION
+ *   DESIGN ──design sign-off (a plan with no pre-execution steps)──▶ EXECUTION
+ *   EXECUTION ──provisional handover ticked──▶ CLOSURE
  *   CLOSURE ──closure fixed (final payment)──▶ SNAGS
  *   SNAGS ──client signs off the handover, no open snag──▶ WARRANTY
  *   WARRANTY ──past warrantyEndsOn (read, not written)──▶ CLOSED
@@ -18,12 +20,13 @@
 import { applyBps } from '@/lib/money';
 import { addDays, istDay } from './working-days';
 
-export const PHASES = ['DESIGN', 'EXECUTION', 'CLOSURE', 'SNAGS', 'WARRANTY', 'CLOSED'] as const;
+export const PHASES = ['DESIGN', 'PRE_EXECUTION', 'EXECUTION', 'CLOSURE', 'SNAGS', 'WARRANTY', 'CLOSED'] as const;
 export type Phase = (typeof PHASES)[number];
 export const isPhase = (v: unknown): v is Phase => typeof v === 'string' && (PHASES as readonly string[]).includes(v);
 
 export const PHASE_LABEL: Record<Phase, string> = {
   DESIGN: 'Design',
+  PRE_EXECUTION: 'Pre-execution',
   EXECUTION: 'Execution',
   CLOSURE: 'Project closure',
   SNAGS: 'Snags',
@@ -37,6 +40,10 @@ export const PROVISIONAL_HANDOVER = 'Provisional handover';
 /** What happened, as far as the phase is concerned. */
 export type LifecycleEvent =
   | { kind: 'design.signed_off' }
+  /** Every design step ticked (the design process, owner 24 Oct 2026; DESIGN-PROCESS-PLAN.md Decision 10): the execution team owns the project. */
+  | { kind: 'design.done' }
+  /** Every pre-execution step ticked: execution begins. */
+  | { kind: 'preexecution.done' }
   | { kind: 'handover.provisional' }
   /** The provisional handover step was unticked (owner/PM correction). */
   | { kind: 'handover.provisional_undone' }
@@ -59,9 +66,13 @@ export function movePhase(current: Phase, event: LifecycleEvent): Move {
   switch (event.kind) {
     case 'design.signed_off':
       return current === 'DESIGN' ? go('EXECUTION') : stay(current);
+    case 'design.done':
+      return current === 'DESIGN' ? go('PRE_EXECUTION') : stay(current);
+    case 'preexecution.done':
+      return current === 'DESIGN' || current === 'PRE_EXECUTION' ? go('EXECUTION') : stay(current);
     case 'handover.provisional':
       // An older project may still read DESIGN (no design sign-off before design steps existed).
-      return current === 'DESIGN' || current === 'EXECUTION' ? go('CLOSURE') : stay(current);
+      return current === 'DESIGN' || current === 'PRE_EXECUTION' || current === 'EXECUTION' ? go('CLOSURE') : stay(current);
     case 'handover.provisional_undone':
       return current === 'CLOSURE' ? go('EXECUTION') : stay(current);
     case 'closure.fixed':

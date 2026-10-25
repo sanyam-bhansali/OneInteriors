@@ -58,6 +58,34 @@ describe('the customer design card dates', () => {
   });
 });
 
+describe('the client’s design card with the new steps (DESIGN-PROCESS-PLAN.md Decision 11)', () => {
+  const day = (d: string) => new Date(`${d}T00:00:00Z`);
+  const item = (label: string, o: Record<string, unknown> = {}) => ({ label, doneAt: null, plannedOn: day('2026-10-20'), weightBp: 10, inScope: true, effortMin: 60, customerMilestone: false, ...o });
+  const stages = [
+    { index: 0, label: 'Booking advance', state: 'paid' as const },
+    { index: 1, label: 'Design advance', state: 'due' as const },
+  ];
+
+  it('shows every step, starred or not, with no dates and no delay words', () => {
+    const d = toCustomerDesign(
+      { actualEnd: null, items: [item('2D layout', { doneAt: new Date('2026-10-12T10:00:00Z') }), item('2D approval', { responsible: 'CLIENT', effortMin: 0 }), item('First draft (3D)', { gatePayment: 1 }), item('Design changes')] },
+      { designClosedAt: null, moodBoardSharedAt: null, stepDelays: [] },
+      [],
+      stages,
+    )!;
+    expect(d.steps.map((x) => x.label)).toEqual(['2D layout', '2D approval', 'First draft (3D)', 'Design changes']);
+    expect(d.steps.every((x) => x.plannedOn === null && x.doneOn === null && x.moved === null)).toBe(true);
+    // From the first draft on, the steps wait on the design advance.
+    expect(d.steps.map((x) => x.waitingFor)).toEqual([null, null, 'Design advance', 'Design advance']);
+    expect(d.yourStep).toBe('2D approval');
+  });
+
+  it('an older plan (no efforts) still shows only its starred steps, with dates', () => {
+    const d = toCustomerDesign({ actualEnd: null, items: [item('A', { effortMin: null, customerMilestone: true }), item('B', { effortMin: null })] }, { designClosedAt: null, moodBoardSharedAt: null }, [], null)!;
+    expect(d.steps.map((x) => [x.label, x.plannedOn])).toEqual([['A', '2026-10-20']]);
+  });
+});
+
 describe('money documents in the locker', () => {
   it('the signed quote, agreement, receipts and decision outcomes are money; drawings are not', () => {
     expect(MONEY_DOC({ kind: 'RECEIPT', contentType: 'application/pdf', storageKey: 'p/r.pdf' })).toBe(true);

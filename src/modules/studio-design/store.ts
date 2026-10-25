@@ -27,7 +27,7 @@ import { ledger } from '@/modules/project/payment-ledger';
 import { toLedgerRow } from '@/modules/project/payments-flow';
 import { progressOf } from '@/modules/project/step-rules';
 import { dayFromDb, istDay } from '@/modules/project/working-days';
-import { signedDocUrls } from '@/modules/storage/project-docs';
+import { signedDocDownloads, signedDocUrls } from '@/modules/storage/project-docs';
 import { prepForBrief, type OpsPrepRoom } from '@/modules/prepare/prep';
 import { ROOM_KEYS, ROOM_LABELS } from '@/modules/prepare/rooms';
 import { elementsForRoom } from '@/modules/prepare/board';
@@ -38,7 +38,7 @@ import {
   drawingsOf,
   DESIGN_KINDS,
   formatLength,
-  gateOf,
+  chainLocks,
   lateDays,
   nextStep,
   reasonLabel,
@@ -49,6 +49,8 @@ import {
   type GateStage,
 } from './rules';
 import { bhkOf, isResponsible, RESPONSIBLE_LABEL, type Responsible } from './template';
+import { DOC_TYPES, docFileName, extOf, finalsOf, handoverMissing, isDocType, versionLabels, type DocType, type FinalDoc } from './documents';
+import { signedLeadFileLinks } from '@/modules/storage/lead-files';
 
 const ROW_SELECT = {
   id: true,
@@ -112,6 +114,16 @@ export interface DesignStepView {
   moves: { from: string; to: string; side: 'CLIENT' | 'STUDIO'; reason: string; note: string | null; at: string }[];
   /** Starred: a design milestone the client sees (docs/studio-os/CUSTOMER-MILESTONES.md). */
   milestone: boolean;
+  /* The design process (owner and design team, 24 Oct 2026; DESIGN-PROCESS-PLAN.md). */
+  /** Design or Pre-execution (the step's group). */
+  group: string;
+  /** Effort for this home, in minutes; null on an older step. */
+  effortMin: number | null;
+  /** On a client's approval step: what in the app ticks it. */
+  approvalKind: string | null;
+  /** The payment this step is the first to wait on, and whether it is recorded: drawn as a line above it. */
+  payment: { label: string; recorded: boolean } | null;
+  tasks: { id: string; label: string; done: boolean }[];
 }
 
 export interface DrawingView {
@@ -124,12 +136,25 @@ export interface DrawingView {
   revisions: number;
   state: DrawingState;
   url: string;
+  /** "2.1": worked out from the chain and the client's answers (documents.ts `versionLabels`). */
+  versionLabel: string;
+  /** TYPE_Studio_Client_date_time_vX.Y.ext: what the download is called. */
+  fileName: string;
   sharedOn: string | null;
   waitingDays: number;
   answer: { verdict: 'APPROVED' | 'CHANGES'; comment: string | null; on: string } | null;
   askedFor: string | null;
   /** For the designer's own WhatsApp; shown once it has waited a few days. */
   reminder: string | null;
+}
+
+/** One line of the Documents card: the version that counts for a type and room (documents.ts `finalsOf`). */
+export interface FinalView extends FinalDoc {
+  typeLabel: string;
+  versionLabel: string;
+  on: string;
+  url: string;
+  fileName: string;
 }
 
 export interface DesignTab {
@@ -159,6 +184,14 @@ export interface DesignTab {
   visits: { id: string; at: string; purpose: string; status: 'BOOKED' | 'DONE' | 'CANCELLED'; note: string | null }[];
   measurements: { room: string; length: string; width: string; height: string; note: string | null }[];
   drawings: DrawingView[];
+  /** The documents' finals, one per type and room, and what the handover pack still lacks (DESIGN-PROCESS-PLAN.md §3.4–3.5). */
+  finals: FinalView[];
+  /** Sales' notes for the design team from the sales final, and its voice note (DESIGN-PROCESS-PLAN.md §4.2). */
+  fromSales: { notes: string | null; voiceUrl: string | null; by: string | null; on: string | null } | null;
+  /** Essential, Premium or Luxe, from the quotation it was booked on; and, for Premium, the rounds of 3D changes asked so far of the 2 included. */
+  category: 'ESSENTIAL' | 'PREMIUM' | 'LUXURY' | null;
+  changeRounds: number;
+  handoverMissing: string[];
   final: {
     /** False for a member who sees no money: the quotations, their links and the totals stay out (null below). */
     seesQuotes: boolean;
@@ -188,6 +221,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
     select: {
       id: true,
       signedQuoteId: true,
+      category: true,
       designFinalQuoteId: true,
       designClosedAt: true,
       designChanges: true,
@@ -198,7 +232,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       introduction: {
         select: {
           studioId: true,
-          studio: { select: { tradeName: true } },
+          studio: { select: { tradeName: true, branding: { select: { documentName: true } } } },
           brief: { select: { id: true, contactName: true, propertyType: true, user: { select: { name: true } } } },
         },
       },
@@ -227,6 +261,10 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
               inScope: true,
               weightBp: true,
               customerMilestone: true,
+              room: true,
+              effortMin: true,
+              approvalKind: true,
+              tasks: { orderBy: { sortOrder: 'asc' }, select: { id: true, label: true, doneAt: true } },
               delays: { orderBy: { at: 'asc' }, select: { fromDate: true, toDate: true, side: true, reason: true, note: true, at: true } },
             },
           },
@@ -260,14 +298,37 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
     ? await prisma.homeDocument.findMany({ where: { projectId, id: { in: fileIds } }, select: { id: true, title: true, storageKey: true } })
     : [];
   const designDocs = p.documents;
-  const urls = await signedDocUrls([...stepFiles.map((f) => f.storageKey), ...designDocs.map((d) => d.storageKey)]).catch(() => [] as string[]);
+  /* Project documents (DESIGN-PROCESS-PLAN.md §3): version numbers from the chain and the client's answers, names we make, finals. */
+  const lastAnswer = new Map<string, 'APPROVED' | 'CHANGES'>();
+  for (const r of [...p.designReviews].sort((a, b) => a.at.getTime() - b.at.getTime())) lastAnswer.set(r.documentId, r.verdict);
+  const approvedIds = new Set([...lastAnswer.entries()].filter(([, v]) => v === 'APPROVED').map(([k]) => k));
+  const labels = versionLabels(designDocs, approvedIds);
+  const docName = p.introduction.studio.branding?.documentName?.trim() || studio;
+  const clientFull = brief.contactName?.trim() || brief.user?.name?.trim() || customerFirst;
+  const fileNameOf = (d: (typeof designDocs)[number]) =>
+    isDocType(d.designKind)
+      ? docFileName({ type: d.designKind, room: d.room, studio: docName, client: clientFull, at: d.createdAt, version: labels.get(d.id) ?? '1.0', ext: extOf(d.storageKey) })
+      : d.title;
+  const [urls, downloads] = await Promise.all([
+    signedDocUrls(stepFiles.map((f) => f.storageKey)).catch(() => [] as string[]),
+    signedDocDownloads(designDocs.map((d) => ({ key: d.storageKey, name: fileNameOf(d) }))).catch(() => [] as string[]),
+  ]);
   const fileUrl = new Map(stepFiles.map((f, i) => [f.id, { id: f.id, title: f.title, url: urls[i] ?? '' }]));
-  const docUrl = new Map(designDocs.map((d, i) => [d.id, urls[stepFiles.length + i] ?? '']));
+  const docUrl = new Map(designDocs.map((d, i) => [d.id, downloads[i] ?? '']));
+  const finals: FinalView[] = finalsOf(
+    designDocs
+      .filter((d) => !d.deletedAt && isDocType(d.designKind))
+      .map((d) => ({ id: d.id, type: d.designKind as DocType, room: d.room, version: d.version, supersedesId: d.supersedesId, shared: d.sharedAt !== null, answer: lastAnswer.get(d.id) ?? null, at: d.createdAt })),
+  ).map((f) => {
+    const d = designDocs.find((x) => x.id === f.id)!;
+    return { ...f, typeLabel: DOC_TYPES[f.type].label, versionLabel: labels.get(f.id) ?? '1.0', on: istDay(d.createdAt), url: docUrl.get(f.id) ?? '', fileName: fileNameOf(d) };
+  });
 
-  const steps: DesignStepView[] = items.map((i) => {
-    const gate = gateOf(i.gatePayment, gates);
+  const locks = chainLocks(items.map((i) => ({ gatePayment: i.gatePayment, done: i.doneAt !== null, inScope: i.inScope })), gates);
+  const steps: DesignStepView[] = items.map((i, k) => {
     const plannedOn = i.plannedOn ? dayFromDb(i.plannedOn) : null;
     const done = i.doneAt !== null;
+    const lockedBy = locks[k] ?? null;
     return {
       id: i.id,
       label: i.label,
@@ -275,12 +336,12 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       responsibleLabel: isResponsible(i.responsible) ? RESPONSIBLE_LABEL[i.responsible] : null,
       needsDocument: i.needsDocument,
       gatePayment: i.gatePayment,
-      lockedBy: !done && !gate.open ? gate.payment : null,
+      lockedBy,
       inScope: i.inScope,
       done,
       doneOn: i.doneAt ? istDay(i.doneAt) : null,
       plannedOn,
-      lateDays: i.inScope ? lateDays({ plannedOn, done }, today) : 0,
+      lateDays: i.inScope && !lockedBy ? lateDays({ plannedOn, done }, today) : 0,
       sharePct: i.inScope && stageBp > 0 ? Math.round(((progress.weights.get(i.id) ?? 0) * 1000) / stageBp) / 10 : 0,
       doneNote: i.doneNote,
       beforeJoining: i.doneSource === 'BEFORE_JOINING',
@@ -294,6 +355,15 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
         at: d.at.toISOString(),
       })),
       milestone: i.customerMilestone,
+      group: i.room,
+      effortMin: i.effortMin,
+      approvalKind: i.approvalKind,
+      payment: (() => {
+        if (i.gatePayment === null) return null;
+        const g = (gates ?? []).find((x) => x.index === i.gatePayment);
+        return g ? { label: g.label, recorded: g.state === 'paid' || g.state === 'waiting' } : null;
+      })(),
+      tasks: i.tasks.map((t) => ({ id: t.id, label: t.label, done: t.doneAt !== null })),
     };
   });
   const lastOpen = [...steps].reverse().find((s) => s.inScope && !s.done && s.plannedOn);
@@ -316,6 +386,8 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       revisions: d.revisions,
       state: d.state,
       url: docUrl.get(d.id) ?? '',
+      versionLabel: labels.get(d.id) ?? '1.0',
+      fileName: fileNameOf(designDocs.find((x) => x.id === d.id)!),
       sharedOn: d.sharedAt ? istDay(d.sharedAt) : null,
       waitingDays: w,
       answer: d.answer ? { verdict: d.answer.verdict, comment: d.answer.comment, on: istDay(d.answer.at) } : null,
@@ -323,6 +395,17 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       reminder: w >= 3 ? reminderText(customerFirst, d, studio) : null,
     };
   });
+
+  /* From sales: the notes and voice note marked with the sales final the project was booked on (DESIGN-PROCESS-PLAN.md §4.2). */
+  const sq = p.signedQuoteId
+    ? await prisma.studioQuote
+        .findUnique({ where: { id: p.signedQuoteId }, select: { salesFinalNotes: true, salesFinalVoicePath: true, salesFinalAt: true, salesFinalById: true, category: true } })
+        .catch(() => null)
+    : null;
+  const salesBy = sq?.salesFinalById ? await prisma.studioMember.findUnique({ where: { id: sq.salesFinalById }, select: { user: { select: { name: true } } } }).catch(() => null) : null;
+  const voiceUrl = sq?.salesFinalVoicePath ? ((await signedLeadFileLinks([sq.salesFinalVoicePath]).catch(() => new Map<string, string>())).get(sq.salesFinalVoicePath) ?? null) : null;
+  const fromSales = sq && (sq.salesFinalNotes || voiceUrl) ? { notes: sq.salesFinalNotes, voiceUrl, by: salesBy?.user.name?.trim() || null, on: sq.salesFinalAt ? istDay(sq.salesFinalAt) : null } : null;
+  const category = p.category ?? sq?.category ?? null;
 
   const canAssign = may('design.assign');
   // The quotations (numbers, links) and the frozen totals go to those who see payments or write quotes — a designer too since the lifecycle (owner, 13 Oct 2026: designers see money on their projects).
@@ -377,6 +460,11 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       visits: p.siteVisits.map((v) => ({ id: v.id, at: v.at.toISOString(), purpose: v.purpose, status: v.status, note: v.note })),
       measurements: p.measurements.map((m) => ({ room: m.room, length: fmt(m.lengthMm), width: fmt(m.widthMm), height: fmt(m.heightMm), note: m.note })),
       drawings,
+      finals,
+      fromSales,
+      category,
+      changeRounds: [...lastAnswer.entries()].filter(([id, v]) => v === 'CHANGES' && designDocs.some((d) => d.id === id && d.designKind === 'RENDER_3D')).length,
+      handoverMissing: handoverMissing(finals),
       final: {
         seesQuotes,
         signed: seesQuotes ? (signed ?? null) : null,
@@ -465,10 +553,10 @@ export async function designWorkload(now = new Date()): Promise<DesignWorkload |
     const st = p.stages[0];
     const items = st?.items ?? [];
     const gates = gateStagesOf(p);
-    const steps = items.map((i) => ({ ...i, done: i.doneAt !== null, plannedOn: i.plannedOn ? dayFromDb(i.plannedOn) : null }));
+    const locks = chainLocks(items.map((i) => ({ gatePayment: i.gatePayment, done: i.doneAt !== null, inScope: i.inScope })), gates);
+    const steps = items.map((i, k) => ({ ...i, done: i.doneAt !== null, plannedOn: i.plannedOn ? dayFromDb(i.plannedOn) : null, lockedBy: locks[k] ?? null }));
     const progress = progressOf(steps.map((i) => ({ id: i.id, stageId: 'd', weightBp: i.weightBp, inScope: i.inScope, done: i.done })));
     const n = nextStep(steps);
-    const gate = n ? gateOf(n.gatePayment, gates) : { open: true as const };
     const dl = dueAndLate(steps, today);
     return {
       designerId: p.designerId,
@@ -478,7 +566,7 @@ export async function designWorkload(now = new Date()): Promise<DesignWorkload |
         customer: firstName(b.contactName || b.user?.name),
         bhk: bhkOf(b.propertyType),
         pct: progress.stages.get('d')?.pct ?? 0,
-        next: n ? { label: n.label, plannedOn: n.plannedOn, lockedBy: gate.open ? null : gate.payment } : null,
+        next: n ? { label: n.label, plannedOn: n.plannedOn, lockedBy: n.lockedBy } : null,
         due: dl.due,
         late: dl.late,
         endsOn: st ? dayFromDb(st.plannedEnd) : null,

@@ -57,7 +57,7 @@ export const KIND_TITLE: Record<WorkKind, string> = {
   task: 'Tasks',
 };
 
-export const KIND_ORDER: readonly WorkKind[] = ['site', 'step', 'design', 'snag', 'decision', 'payment', 'closure', 'change-order', 'sign-off', 'meeting', 'follow-up', 'task'];
+export const KIND_ORDER: readonly WorkKind[] = ['design', 'site', 'step', 'snag', 'decision', 'payment', 'closure', 'change-order', 'sign-off', 'meeting', 'follow-up', 'task'];
 
 /** One thing to do, before it is placed in a list. */
 export interface WorkSource {
@@ -75,6 +75,21 @@ export interface WorkSource {
   /** One more line: whose step, what is locked, the amount. */
   detail?: string | null;
   /** The exact place it is done. */
+  href: string;
+  /**
+   * The payment it waits on (a design step after an unrecorded design
+   * advance or closure): never late, never in Today or Missed; listed apart
+   * (DESIGN-PROCESS-PLAN.md Decision 5).
+   */
+  waitingOn?: string | null;
+}
+
+/** A step waiting on a payment, as the "Waiting on payment" line lists it. */
+export interface WaitingItem {
+  key: string;
+  title: string;
+  place: string;
+  payment: string;
   href: string;
 }
 
@@ -106,6 +121,8 @@ export interface MyWork {
   counts: Record<Bucket, number>;
   /** Rows left off the screen, per section. */
   more: Record<Bucket, number>;
+  /** Steps waiting on a payment: one grey line, not late. */
+  waiting: WaitingItem[];
 }
 
 /** How far ahead "Next 3 days" looks. */
@@ -163,9 +180,14 @@ export function buildMyWork(
   const limit = opts.limit ?? ROWS_PER_SECTION;
   const seen = new Set<string>();
   const items: WorkItem[] = [];
+  const waiting: WaitingItem[] = [];
   for (const s of sources) {
     if (seen.has(s.key)) continue;
     seen.add(s.key);
+    if (s.waitingOn) {
+      waiting.push({ key: s.key, title: s.title, place: s.place, payment: s.waitingOn, href: s.href });
+      continue;
+    }
     const it = itemOf(s, today);
     if (it) items.push(it);
   }
@@ -209,6 +231,7 @@ export function buildMyWork(
       soon: Math.max(0, counts.soon - soonShown.length),
       missed: Math.max(0, counts.missed - missed.length),
     },
+    waiting,
   };
 }
 
@@ -318,6 +341,7 @@ export function projectSources(p: ProjectFacts, me: Me, today: string, opts: { s
       place: p.place,
       due: s.plannedOn,
       detail: [who, s.lockedBy ? `opens when the ${s.lockedBy} is recorded` : null].filter(Boolean).join(' · ') || null,
+      waitingOn: s.lockedBy,
       href: me.role === 'ACCOUNTS' ? `${base}?tab=payments` : `${base}?tab=design#step-${s.id}`,
     });
   }

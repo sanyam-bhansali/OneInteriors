@@ -74,10 +74,22 @@ export async function todayInput(
   const showPool = can(who, 'lead.claim') || seesAll;
   const never = { ...base, stage: { kind: 'OPEN' as const }, lastContactedAt: null, assignedToId: { not: null }, bookedIntroductionId: null };
   const weekAgo = new Date(now.getTime() - 8 * 86_400_000);
+  /* Quotes to chase: sent, and the lead still open and not booked (owner, 23 Oct 2026: the
+     imported old quotations of lost and junk leads made "200 waiting" on the home tile). A
+     quote with no lead yet stays: somebody still has to chase it. */
+  const chase = {
+    AND: [
+      quotesVisibleTo(who),
+      { OR: [{ clientId: null }, { client: { deletedAt: null, bookedIntroductionId: null, stage: { kind: { in: ['OPEN' as const, 'WON' as const] } } } }] },
+    ],
+    studioId,
+    status: 'ISSUED' as const,
+    revisions: { some: {} },
+  };
   const noRows = Promise.resolve([]);
   const zero = Promise.resolve(0);
 
-  const [callRows, meetRows, planRows, poolRows, neverRows, bookRows, callN, planN, poolN, neverN, quoteRows, taskRead] = await Promise.all([
+  const [callRows, meetRows, planRows, poolRows, neverRows, bookRows, callN, planN, poolN, neverN, quoteRows, taskRead, quoteN] = await Promise.all([
     prisma.studioClient.findMany({ where: calls, orderBy: [{ nextActionOn: 'asc' }, { id: 'asc' }], take: SECTION_TAKE, select: LEAD_SELECT }),
     prisma.studioClient.findMany({ where: { ...base, meetingAt: { gte: start, lte: end } }, orderBy: { meetingAt: 'asc' }, take: 50, select: LEAD_SELECT }),
     prisma.studioClient.findMany({ where: plans, orderBy: [{ lastContactedAt: 'asc' }, { id: 'asc' }], take: SECTION_TAKE, select: LEAD_SELECT }),
@@ -89,7 +101,7 @@ export async function todayInput(
     showPool ? prisma.studioClient.count({ where: { ...LIVE, ...pool } }) : zero,
     seesAll ? prisma.studioClient.count({ where: { ...LIVE, ...never } }) : zero,
     prisma.studioQuote.findMany({
-      where: { ...quotesVisibleTo(who), studioId, status: 'ISSUED', revisions: { some: {} } },
+      where: chase,
       orderBy: { updatedAt: 'desc' },
       take: 200,
       select: {
@@ -104,6 +116,7 @@ export async function todayInput(
       },
     }),
     openTasksDue(who, end, SECTION_TAKE),
+    prisma.studioQuote.count({ where: { ...chase, OR: [{ clientId: null }, { client: { isDemo: false } }] } }),
   ]);
 
   const byId = new Map<string, (typeof callRows)[number]>();
@@ -120,7 +133,7 @@ export async function todayInput(
 
   return {
     showPool: showPool && !seesAll,
-    totals: { calls: callN, 'floor-plans': planN, pool: poolN, 'never-called': neverN, tasks: taskRead.total },
+    totals: { calls: callN, quotes: quoteN, 'floor-plans': planN, pool: poolN, 'never-called': neverN, tasks: taskRead.total },
     tasks: taskRead.rows.map((t) => ({ id: t.id, title: t.title, dueAt: t.dueAt, leadId: t.leadId, leadName: t.leadName, assignedToName: t.assignedToName })),
     leads: leadRows.map((l) => ({
       id: l.id,

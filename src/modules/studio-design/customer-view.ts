@@ -24,7 +24,8 @@
 import type { Prisma } from '@prisma/client';
 import { progressOf } from '@/modules/project/step-rules';
 import { dayFromDb, istDay } from '@/modules/project/working-days';
-import { CUSTOMER_REASON, DESIGN_KINDS, drawingsOf, formatLength, gateOf, isDelayReasonKey, nextStep, type DesignKind, type GateStage } from './rules';
+import { chainLocks, CUSTOMER_REASON, DESIGN_KINDS, drawingsOf, formatLength, gateOf, isDelayReasonKey, nextStep, type DesignKind, type GateStage } from './rules';
+import { versionLabels } from './documents';
 
 /** The project columns the design card reads, besides the stages and documents the projection already selects. */
 export const CUSTOMER_DESIGN_SELECT = {
@@ -52,7 +53,9 @@ export interface DesignStepRow {
   inScope: boolean;
   responsible?: string | null;
   gatePayment?: number | null;
-  /** The studio's star: only starred steps cross by name. */
+  /** Effort in minutes: set on a plan with the design process (24 Oct 2026), which the client reads without dates. */
+  effortMin?: number | null;
+  /** The studio's star: on an older plan only starred steps cross by name. */
   customerMilestone?: boolean;
 }
 
@@ -99,6 +102,8 @@ export interface CustomerDrawing {
   room: string | null;
   title: string;
   version: number;
+  /** "2.0": the number the studio reads too (documents.ts `versionLabels`): an approval makes the next whole number. */
+  versionLabel: string;
   state: 'waiting' | 'approved' | 'changes' | 'shared';
   answeredOn: string | null;
   /** The client's own words on this version. */
@@ -169,19 +174,35 @@ export function toCustomerDesign(
   const progress = progressOf(live.map((i, k) => ({ id: String(k), stageId: 'design', weightBp: i.weightBp, inScope: true, done: i.doneAt !== null })));
   const movedById = new Map<string, string>();
   for (const d of row.stepDelays ?? []) if (isDelayReasonKey(d.reason)) movedById.set(d.stepId, CUSTOMER_REASON[d.reason]);
-  const all: CustomerDesignStep[] = live.map((i) => {
+  /*
+   * The design process (owner and Hauspire's design team, 24 Oct 2026;
+   * DESIGN-PROCESS-PLAN.md Decision 11): the client sees every step, never a
+   * design date or a delay. On a plan with the new steps (they carry an
+   * effort), no planned day, done day or "moved" crosses; an older plan's
+   * starred steps keep their dates as before. A step waits on a payment when
+   * an earlier step does (`chainLocks`).
+   */
+  const processPlan = live.some((i) => i.effortMin !== null && i.effortMin !== undefined);
+  const locks = chainLocks(live.map((i) => ({ gatePayment: i.gatePayment ?? null, done: i.doneAt !== null })), gateStages);
+  const all: CustomerDesignStep[] = live.map((i, k) => {
     const gate = gateOf(i.gatePayment ?? null, gateStages);
     return {
       label: i.label,
       done: i.doneAt !== null,
-      doneOn: isoDay(i.doneAt),
-      plannedOn: dbDay(i.plannedOn),
+      doneOn: processPlan ? null : isoDay(i.doneAt),
+      plannedOn: processPlan ? null : dbDay(i.plannedOn),
       yours: i.responsible === 'CLIENT',
-      waitingFor: i.doneAt === null && !gate.open ? gate.payment : null,
-      moved: i.id ? (movedById.get(i.id) ?? null) : null,
+      waitingFor: processPlan ? (locks[k] ?? null) : i.doneAt === null && !gate.open ? gate.payment : null,
+      moved: processPlan ? null : i.id ? (movedById.get(i.id) ?? null) : null,
     };
   });
   const answers = (row.designReviews ?? []).map((r) => ({ documentId: r.documentId, verdict: r.verdict === 'APPROVED' ? ('APPROVED' as const) : ('CHANGES' as const), comment: r.comment, at: r.at }));
+  const lastVerdict = new Map<string, 'APPROVED' | 'CHANGES'>();
+  for (const a of [...answers].sort((x, y) => x.at.getTime() - y.at.getTime())) lastVerdict.set(a.documentId, a.verdict);
+  const labels = versionLabels(
+    docs.map((d) => ({ id: d.id, version: d.version ?? 1, supersedesId: d.supersedesId ?? null })),
+    new Set([...lastVerdict.entries()].filter(([, v]) => v === 'APPROVED').map(([k]) => k)),
+  );
   // The projection's documents are shared and live already; drawings are the ones with a design kind.
   const drawings = drawingsOf(
     docs.map((d) => ({
@@ -207,6 +228,7 @@ export function toCustomerDesign(
             room: d.room,
             title: d.title,
             version: d.version,
+            versionLabel: labels.get(d.id) ?? `${d.version}.0`,
             state: d.state,
             answeredOn: d.answer ? isoDay(d.answer.at) : null,
             comment: d.answer?.comment ?? null,
@@ -217,8 +239,8 @@ export function toCustomerDesign(
   const upNext = nextStep(live.map((i, k) => ({ k, done: i.doneAt !== null, inScope: true })));
   const nowStep = upNext ? all[upNext.k]! : null;
   const waitingFor = nowStep?.waitingFor ?? null;
-  /* The client reads only the starred steps by name. */
-  const steps = all.filter((_, k) => live[k]!.customerMilestone === true);
+  /* The new steps: every step by name. An older plan: only the starred steps, as before. */
+  const steps = processPlan ? all : all.filter((_, k) => live[k]!.customerMilestone === true);
   const nextMilestone = steps.find((s) => !s.done) ?? null;
   return {
     designer: firstName(row.designer?.user?.name),

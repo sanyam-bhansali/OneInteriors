@@ -39,7 +39,16 @@ export async function writePlan(db: PlanDb, projectId: string, plan: { stages: P
             customerMilestone: it.customerMilestone === true,
             // Studio OS Phase 2: a design step's who, file, payment gate and gap.
             ...(it.responsible
-              ? { responsible: it.responsible, needsDocument: it.needsDocument === true, gatePayment: it.gatePayment ?? null, gapDays: it.gapDays ?? null }
+              ? {
+                  responsible: it.responsible,
+                  needsDocument: it.needsDocument === true,
+                  gatePayment: it.gatePayment ?? null,
+                  gapDays: it.gapDays ?? null,
+                  // The design process: effort, the approval that ticks a client's step, the step's to-dos.
+                  effortMin: it.effortMin ?? null,
+                  approvalKind: it.approvalKind ?? null,
+                  ...(it.tasks && it.tasks.length ? { tasks: { create: it.tasks.map((label, k) => ({ label, sortOrder: k })) } } : {}),
+                }
               : {}),
           })),
         },
@@ -146,10 +155,12 @@ export async function createSignedProject(db: SignedProjectDb, input: SignedProj
     design: input.design ?? null,
   });
   const payments = built.payments.map((s) => ({ label: s.label, pct: s.pct, amountPaise: s.amountPaise }));
-  await db.studioQuote.update({ where: { id: input.quote.id }, data: { status: 'ACCEPTED' } });
+  const signed = await db.studioQuote.update({ where: { id: input.quote.id }, data: { status: 'ACCEPTED' }, select: { category: true } });
   const created = await db.homeProject.create({
     data: {
       introductionId: input.introductionId,
+      // Essential, Premium or Luxe, as the quotation was priced (DESIGN-PROCESS-PLAN.md §4.3).
+      category: signed?.category ?? null,
       startOn: input.startOn,
       totalDays: input.totalDays,
       signedAt: input.signedAt,

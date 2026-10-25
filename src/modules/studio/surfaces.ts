@@ -75,6 +75,8 @@ export const PAYMENT_STAGES_PATH = '/studio/settings/payments';
 /** Studio OS Phase 2: a designer's home, and the owner's and PM's designers' workload. */
 export const DESIGN_HOME = '/studio/design';
 export const DESIGN_STEPS_PATH = '/studio/settings/design';
+/** Project documents (24 Oct 2026; DESIGN-PROCESS-PLAN.md §3.4): a folder per project. Owner, PM, designer. */
+export const DOCUMENTS_HOME = '/studio/documents';
 /** Studio OS Phase 3: the crews (owner, accounts), the owner's labour page, and Settings → Crews and trades (owner). */
 export const CREWS_HOME = '/studio/vendors';
 export const LABOUR_PATH = '/studio/vendors/labour';
@@ -97,6 +99,7 @@ export const FULL_SOFTWARE_PATHS: readonly string[] = [
   '/studio/updates',
   DESIGN_HOME,
   DESIGN_STEPS_PATH,
+  DOCUMENTS_HOME,
   SITE_HOME,
   SITE_CREW_PATH,
   PAYMENTS_HOME,
@@ -134,8 +137,12 @@ export function homeFor(role: StudioRoleName, fullSoftware?: boolean): string {
  * designer pick writes.
  */
 function designerMayOpen(path: string): boolean {
-  if (under(path, DESIGN_HOME) || path === BRING_IN_PATH) return true;
-  const m = path.match(/^\/studio\/projects\/([^/?#]+)\/?$/);
+  if (under(path, DESIGN_HOME) || under(path, DOCUMENTS_HOME) || path === BRING_IN_PATH) return true;
+  /* A Design Final quotation, its comparison and print (the design meeting, 24 Oct 2026): which quotation is checked on the page (quotes.ts `designerQuoteScope`). */
+  const q = path.match(/^\/studio\/quotations\/([A-Za-z0-9_-]+)(?:\/(?:compare|print))?\/?$/);
+  if (q && !['first', 'builder', 'requests', 'terms', 'new', 'import'].includes(q[1]!)) return true;
+  /* A project page, and its documents (all versions, the handover pack); which project is checked on the page. */
+  const m = path.match(/^\/studio\/projects\/([^/?#]+)(?:\/documents(?:\/handover)?)?\/?$/);
   return Boolean(m && m[1] !== 'start');
 }
 

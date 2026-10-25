@@ -430,6 +430,7 @@ function previewQuote(o: {
     quoteDate: new Date(`${o.quoteDate}T00:00:00`),
     phases: o.terms.phases,
     basedOnId: null,
+    category: null,
     planRooms: [],
     welcomeNote: null,
     terms: null,

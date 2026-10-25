@@ -6,6 +6,8 @@ import { studioUpdateScore } from '@/modules/project/site-log';
 import { can, currentMember } from '@/modules/studio/access';
 import { ATTENTION_TITLES, clock, shortDay, type AttentionKind, type WorkspaceRow } from '@/modules/studio/workspace-view';
 import { LineIcon } from '../ui/icons';
+import { lifecycleBoard } from '@/modules/studio/lifecycle-store';
+import { asLifeTab, LifecycleTabs } from '../design/LifecycleTabs';
 import './projects.css';
 
 export const metadata: Metadata = {
@@ -51,9 +53,15 @@ function lanesOf(rows: WorkspaceRow[]): { name: string; rows: WorkspaceRow[] }[]
   return [...lanes.values(), ...(over.rows.length ? [over] : [])].sort((a, b) => a.at - b.at);
 }
 
-export default async function ProjectsPage() {
+export default async function ProjectsPage({ searchParams }: { searchParams?: Promise<{ tab?: string }> }) {
   const now = new Date();
-  const [data, score, member] = await Promise.all([studioProjects(now), studioUpdateScore(now), currentMember()]); // score: Phase 2
+  const [data, score, member, board, sp] = await Promise.all([
+    studioProjects(now),
+    studioUpdateScore(now), // score: Phase 2
+    currentMember(),
+    lifecycleBoard().catch(() => null),
+    searchParams ?? Promise.resolve<{ tab?: string }>({}),
+  ]);
   const rows = data?.rows ?? [];
   const live = rows.filter((r) => r.stage !== null);
   const own = new Set(data?.ownClientIds ?? []);
@@ -98,6 +106,9 @@ export default async function ProjectsPage() {
           </div>
         ) : null}
       </div>
+
+      {/* My Design · My Execution · My Snags (owner and Hauspire's design team, 24 Oct 2026; DESIGN-PROCESS-PLAN.md §2.3): every project by its phase, for everyone who has the board. */}
+      {board && rows.length > 0 ? <LifecycleTabs board={board} tab={asLifeTab(sp.tab)} base="/studio/projects" mine={board.scope === 'designer'} /> : null}
 
       {rows.length === 0 ? (
         <div className="empty">

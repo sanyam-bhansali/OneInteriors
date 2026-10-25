@@ -20,7 +20,7 @@ import {
   setLeadMeeting,
   type EditResult,
 } from '@/modules/studio-sales/leads';
-import { markSalesFinal, sendAgain } from '@/modules/studio-sales/revisions';
+import { markSalesFinal, salesVoiceTicket, sendAgain } from '@/modules/studio-sales/revisions';
 import { recordBooking, refundBooking, type RefundResult } from '@/modules/studio-sales/booking';
 import { addLeadSource, removeLeadSource, savePaymentTemplate } from '@/modules/studio-sales/settings';
 import { createQuote } from '@/modules/studio-quote/quotes';
@@ -136,13 +136,27 @@ export async function sendAgainAction(quoteId: string): Promise<Done> {
   return { ok: true, message: r.created ? `Saved as R${r.n}: the copy the client has now.` : `Nothing changed since R${r.n}, so it stays R${r.n}.` };
 }
 
-export async function markSalesFinalAction(quoteId: string, n: number, stages: PaymentStage[], clientId: string | null): Promise<Done> {
-  const r = await markSalesFinal(String(quoteId), Number(n), Array.isArray(stages) ? stages : []);
+export async function markSalesFinalAction(
+  quoteId: string,
+  n: number,
+  stages: PaymentStage[],
+  clientId: string | null,
+  extra: { notes?: string; voicePath?: string | null } = {},
+): Promise<Done> {
+  const r = await markSalesFinal(String(quoteId), Number(n), Array.isArray(stages) ? stages : [], {
+    notes: typeof extra.notes === 'string' ? extra.notes.slice(0, 3200) : '',
+    voicePath: typeof extra.voicePath === 'string' ? extra.voicePath.slice(0, 300) : null,
+  });
   if (!r.ok) return r;
   revalidatePath(`/studio/quotations/${quoteId}`);
   refreshLead(clientId);
   revalidatePath('/studio/payments');
   return { ok: true, message: `R${n} is the sales final. Accounts can record the booking against it.` };
+}
+
+/** A place for the sales final's voice note (kept as audio). */
+export async function salesVoiceTicketAction(quoteId: string, type: string, bytes: number): Promise<{ ok: true; path: string; url: string | null } | { ok: false; error: string }> {
+  return salesVoiceTicket(String(quoteId), type, bytes);
 }
 
 // ── The booking ────────────────────────────────────────────────

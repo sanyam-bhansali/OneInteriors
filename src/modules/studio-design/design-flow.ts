@@ -26,17 +26,18 @@ import 'server-only';
 
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { notify } from '@/modules/notify/service';
-import { storeProjectDoc } from '@/modules/storage/project-docs';
+import { notify, notifyStudio } from '@/modules/notify/service';
+import { docPathBelongsTo, projectDocExists, projectDocTicket, storeProjectDoc } from '@/modules/storage/project-docs';
+import { checkUpload, finalsOf, handoverMissing, isDocType, isHandoverDocsStep, type DocType } from './documents';
 import { currentMember, memberOnProject } from '@/modules/studio/access';
 import { can, needsAssignment } from '@/modules/studio/roles';
 import { recordEvent, type ProjectActor } from '@/modules/project/events';
 import { canSupersede } from '@/modules/project/locker-rules';
 import { settleStageAfterTicks } from '@/modules/project/stage-settle';
 import { applyPhaseEvent } from '@/modules/project/lifecycle';
-import { dayFromDb, dayToDb, istDay, istTime } from '@/modules/project/working-days';
+import { addDays, dayFromDb, dayToDb, istDay, istTime } from '@/modules/project/working-days';
 import { readSignedStages } from '@/modules/portal/payments';
-import { designStepsFor } from '@/modules/portal/quote-to-plan';
+import { designStepsFor, type PlanItem } from '@/modules/portal/quote-to-plan';
 import { ROOM_KEYS, type RoomKey } from '@/modules/prepare/rooms';
 import { elementBySlug } from '@/modules/prepare/catalogue';
 import { seedBoard } from '@/modules/prepare/board';
@@ -54,15 +55,22 @@ import {
   DESIGN_KINDS,
   gateOf,
   isDelayReasonKey,
+  approvalKindOfDrawing,
+  chainLocks,
+  checkTask,
+  designWeights,
   isDesignKind,
+  rechainDays,
+  lateTickCheck,
   planStepMove,
   ROOM_MAX,
   sideOfReason,
   VISIT_NOTE_MAX,
   type MeasureInput,
 } from './rules';
-import { checkDesignTemplate, isResponsible, readDesignTemplate } from './template';
+import { bhkOf, checkDesignTemplate, isResponsible, PRE_EXECUTION_GROUP, readDesignTemplate } from './template';
 import { GATE_SELECT, gateStagesOf } from './store';
+import { settleDesignPhase, tickApprovalStep } from './step-settle';
 
 export type DesignResult = { ok: true; message: string; id?: string } | { ok: false; error: string };
 
@@ -130,9 +138,32 @@ export async function assignDesigner(projectId: string, memberId: string | null)
 
 // ── Design steps ──────────────────────────────────────────────
 
+
+/** A design step as stored, from the plan: its who, file, gate, days, effort, approval and to-dos. */
+export function designItemData(stageId: string, st: PlanItem): Prisma.HomeChecklistItemUncheckedCreateInput {
+  return {
+    stageId,
+    room: st.room,
+    label: st.label,
+    sortOrder: st.sortOrder,
+    weightBp: st.weightBp,
+    inScope: st.inScope,
+    plannedOn: st.plannedOn,
+    responsible: st.responsible ?? null,
+    needsDocument: st.needsDocument === true,
+    gatePayment: st.gatePayment ?? null,
+    gapDays: st.gapDays ?? null,
+    customerMilestone: st.customerMilestone === true,
+    effortMin: st.effortMin ?? null,
+    approvalKind: st.approvalKind ?? null,
+    ...(st.tasks && st.tasks.length ? { tasks: { create: st.tasks.map((label, k) => ({ label, sortOrder: k })) } } : {}),
+  };
+}
+
 const STEP_SELECT = {
   id: true,
   label: true,
+  responsible: true,
   inScope: true,
   doneAt: true,
   plannedOn: true,
@@ -150,7 +181,7 @@ const STEP_SELECT = {
 export async function tickDesignStep(
   projectId: string,
   stepId: string,
-  input: { note?: unknown; share?: unknown },
+  input: { note?: unknown; share?: unknown; reason?: unknown; reasonNote?: unknown },
   file: File | null,
   now = new Date(),
 ): Promise<DesignResult> {
@@ -168,9 +199,37 @@ export async function tickDesignStep(
   if (!p || !step) return { ok: false, error: GONE };
   const note = typeof input.note === 'string' ? input.note.replace(/\r\n/g, '\n').trim() : '';
   const hasFile = Boolean(file && file.size > 0);
-  const gate = gateOf(step.gatePayment, gateStagesOf(p));
+  // The step waits on its own payment, or on an earlier step's (DESIGN-PROCESS-PLAN.md Decision 5).
+  const gateStages = gateStagesOf(p);
+  const all = await prisma.homeChecklistItem.findMany({ where: { stageId: step.stageId }, orderBy: { sortOrder: 'asc' }, select: { id: true, gatePayment: true, doneAt: true, inScope: true } });
+  const waitingOn = chainLocks(all.map((i) => ({ gatePayment: i.gatePayment, done: i.doneAt !== null, inScope: i.inScope })), gateStages)[all.findIndex((i) => i.id === step.id)] ?? null;
+  const gate = waitingOn ? ({ open: false, payment: waitingOn } as const) : gateOf(step.gatePayment, gateStages);
   const ok = checkDesignTick({ done: step.doneAt !== null, inScope: step.inScope, needsDocument: step.needsDocument, label: step.label }, gate, hasFile, note);
   if (!ok.ok) return ok;
+  // The handover documentation step needs the handover pack (DESIGN-PROCESS-PLAN.md §3.5).
+  if (isHandoverDocsStep(step.label)) {
+    const docs = await prisma.homeDocument.findMany({
+      where: { projectId, deletedAt: null, designKind: { not: null } },
+      select: { id: true, designKind: true, room: true, version: true, supersedesId: true, sharedAt: true, createdAt: true },
+    });
+    const reviews = await prisma.homeDesignReview.findMany({ where: { projectId }, orderBy: { at: 'asc' }, select: { documentId: true, verdict: true } });
+    const last = new Map<string, 'APPROVED' | 'CHANGES'>();
+    for (const r of reviews) last.set(r.documentId, r.verdict);
+    const missing = handoverMissing(
+      finalsOf(
+        docs
+          .filter((d) => isDocType(d.designKind))
+          .map((d) => ({ id: d.id, type: d.designKind as DocType, room: d.room, version: d.version, supersedesId: d.supersedesId, shared: d.sharedAt !== null, answer: last.get(d.id) ?? null, at: d.createdAt })),
+      ),
+    );
+    if (missing.length) return { ok: false, error: `The handover pack is not complete yet: ${missing.join(', ')}. Upload them (working and electrical drawings approved by the client), then tick.` };
+  }
+  // A late step says why (DESIGN-PROCESS-PLAN.md Decision 6); filed on the Delays list.
+  const plannedDay = step.plannedOn ? dayFromDb(step.plannedOn) : null;
+  const late = lateTickCheck({ plannedOn: plannedDay, responsible: step.responsible }, istDay(now), input.reason);
+  if (!late.ok) return late;
+  const reasonNote = typeof input.reasonNote === 'string' ? input.reasonNote.trim() : '';
+  if (reasonNote.length > DELAY_NOTE_MAX) return { ok: false, error: `Keep the note under ${DELAY_NOTE_MAX} characters.` };
   let stored: { path: string } | null = null;
   if (hasFile) {
     const s = await storeProjectDoc(projectId, file!);
@@ -208,8 +267,15 @@ export async function tickDesignStep(
         data: { doneAt: now, doneById: check.member.userId, doneSource: 'TICK', doneNote: note || null, doneDocumentId: docId },
       });
       if (count !== 1) throw new Refused('Already ticked.');
-      await recordEvent(tx, { projectId, type: 'design.ticked', actor, refId: step.id, payload: { file: docId !== null } });
-      return settleStageAfterTicks(tx, projectId, step.stageId, actor, now);
+      if (late.delay && plannedDay) {
+        await tx.homeStepDelay.create({
+          data: { projectId, stepId: step.id, fromDate: dayToDb(plannedDay), toDate: dayToDb(istDay(now)), side: late.delay.side, reason: late.delay.reason, note: reasonNote || null, byId: check.member.userId },
+        });
+      }
+      await recordEvent(tx, { projectId, type: 'design.ticked', actor, refId: step.id, payload: { file: docId !== null, ...(late.delay ? { lateDays: late.delay.days, side: late.delay.side } : {}) } });
+      const settled = await settleStageAfterTicks(tx, projectId, step.stageId, actor, now);
+      await settleDesignPhase(tx, projectId, actor, now);
+      return settled;
     });
     if (share && stored) tell(p.introduction.brief.userId, p.introduction.studio.tradeName, step.label);
     return { ok: true, message: `Ticked: ${step.label}.${outcome === 'mark-done' ? ' Every design step is done: design shows finished.' : ''}` };
@@ -279,6 +345,126 @@ export async function editDesignStep(projectId: string, stepId: string, input: {
   return { ok: true, message: `${step.label} saved.` };
 }
 
+// ── Tasks, order and new steps (the design process, DESIGN-PROCESS-PLAN.md Decisions 7–8) ──
+
+const DESIGN_ITEMS_SELECT = { id: true, label: true, room: true, sortOrder: true, plannedOn: true, doneAt: true, gapDays: true, inScope: true, effortMin: true } as const;
+
+async function designItems(projectId: string) {
+  return prisma.homeProjectStage.findFirst({ where: { projectId, kind: 'DESIGN' }, select: { id: true, items: { orderBy: { sortOrder: 'asc' }, select: DESIGN_ITEMS_SELECT } } });
+}
+
+/** The days, re-linked from a step on; inside the caller's transaction. */
+async function writeRechain(tx: Prisma.TransactionClient, items: readonly { id: string; plannedOn: Date | null; doneAt: Date | null; gapDays: number | null }[], from: number) {
+  const moves = rechainDays(
+    items.map((i) => ({ id: i.id, plannedOn: i.plannedOn ? dayFromDb(i.plannedOn) : null, done: i.doneAt !== null, gapDays: i.gapDays })),
+    from,
+  );
+  for (const m of moves) await tx.homeChecklistItem.update({ where: { id: m.id }, data: { plannedOn: dayToDb(m.to) } });
+  return moves.length;
+}
+
+/** Each in-scope step's share of the design by effort, when every step has one (an older plan keeps its weights). */
+async function writeEffortWeights(tx: Prisma.TransactionClient, stageId: string) {
+  const items = await tx.homeChecklistItem.findMany({ where: { stageId }, orderBy: { sortOrder: 'asc' }, select: { id: true, effortMin: true, inScope: true, weightBp: true } });
+  if (items.length === 0 || items.some((i) => i.effortMin === null)) return;
+  const weights = designWeights(items.map((i) => i.effortMin ?? 0));
+  for (const [k, i] of items.entries()) if (i.weightBp !== weights[k]) await tx.homeChecklistItem.update({ where: { id: i.id }, data: { weightBp: weights[k]! } });
+}
+
+/** Ticks or unticks a to-do inside a step (design work: owner, PM, the designer). */
+export async function setStepTask(projectId: string, taskId: string, done: boolean, now = new Date()): Promise<DesignResult> {
+  const check = await memberOnProject(projectId, 'design.work');
+  if (!check.ok) return check;
+  const task = await prisma.homeStepTask.findFirst({ where: { id: String(taskId ?? '').slice(0, 64), step: { stage: { projectId, kind: 'DESIGN' } } }, select: { id: true, label: true } });
+  if (!task) return { ok: false, error: 'That task is not on this project any more. Reload the page.' };
+  await prisma.$transaction(async (tx) => {
+    await tx.homeStepTask.update({ where: { id: task.id }, data: done ? { doneAt: now, doneById: check.member.userId } : { doneAt: null, doneById: null } });
+    await recordEvent(tx, { projectId, type: 'design.task_ticked', actor: { type: 'STUDIO', id: check.member.userId }, refId: task.id, payload: { done } });
+  });
+  return { ok: true, message: done ? `Done: ${task.label}.` : `Not done: ${task.label}.` };
+}
+
+/** Adds a to-do inside a step (design work). */
+export async function addStepTask(projectId: string, stepId: string, raw: unknown): Promise<DesignResult> {
+  const check = await memberOnProject(projectId, 'design.work');
+  if (!check.ok) return check;
+  const t = checkTask(raw);
+  if (!t.ok) return t;
+  const step = await prisma.homeChecklistItem.findFirst({ where: { id: String(stepId ?? '').slice(0, 64), stage: { projectId, kind: 'DESIGN' } }, select: { id: true, _count: { select: { tasks: true } } } });
+  if (!step) return { ok: false, error: GONE };
+  if (step._count.tasks >= 20) return { ok: false, error: 'Up to 20 tasks on a step.' };
+  await prisma.$transaction(async (tx) => {
+    const row = await tx.homeStepTask.create({ data: { stepId: step.id, label: t.label, sortOrder: step._count.tasks }, select: { id: true } });
+    await recordEvent(tx, { projectId, type: 'design.task_added', actor: { type: 'STUDIO', id: check.member.userId }, refId: row.id, payload: {} });
+  });
+  return { ok: true, message: `Task added: ${t.label}.` };
+}
+
+/** Moves a step up or down inside its part (design or pre-execution), re-linking the open steps' days (owner, PM). */
+export async function moveDesignStepOrder(projectId: string, stepId: string, dir: unknown): Promise<DesignResult> {
+  const check = await memberOnProject(projectId, 'plan.edit');
+  if (!check.ok) return check;
+  if (dir !== 'up' && dir !== 'down') return { ok: false, error: 'Up or down.' };
+  const stage = await designItems(projectId);
+  const items = stage?.items ?? [];
+  const at = items.findIndex((i) => i.id === stepId);
+  if (!stage || at < 0) return { ok: false, error: GONE };
+  const to = dir === 'up' ? at - 1 : at + 1;
+  const other = items[to];
+  if (!other || other.room !== items[at]!.room) return { ok: false, error: dir === 'up' ? 'It is the first step of its part.' : 'It is the last step of its part.' };
+  if (items[at]!.doneAt || other.doneAt) return { ok: false, error: 'Move only steps that are not done yet.' };
+  const order = [...items];
+  [order[at], order[to]] = [order[to]!, order[at]!];
+  await prisma.$transaction(async (tx) => {
+    for (const [k, i] of order.entries()) if (i.sortOrder !== k) await tx.homeChecklistItem.update({ where: { id: i.id }, data: { sortOrder: k } });
+    await writeRechain(tx, order, Math.min(at, to));
+    await recordEvent(tx, { projectId, type: 'design.step_reordered', actor: { type: 'STUDIO', id: check.member.userId }, refId: stepId, payload: { dir } });
+  });
+  return { ok: true, message: `${items[at]!.label} moved ${dir}.` };
+}
+
+/** Adds a step below another, in its part: name, who, days after, effort (owner, PM). The open steps after it move by its days. */
+export async function addDesignStepBelow(projectId: string, afterId: string, input: { label: unknown; responsible: unknown; days: unknown; hours: unknown }): Promise<DesignResult> {
+  const check = await memberOnProject(projectId, 'plan.edit');
+  if (!check.ok) return check;
+  const label = typeof input.label === 'string' ? input.label.replace(/\s+/g, ' ').trim() : '';
+  if (label.length < 2 || label.length > 120) return { ok: false, error: 'Give the step a name (up to 120 characters).' };
+  if (!isResponsible(input.responsible)) return { ok: false, error: 'Pick who does it.' };
+  const days = Number(input.days);
+  if (!Number.isInteger(days) || days < 0 || days > 30) return { ok: false, error: 'Days after the step before: a whole number from 0 to 30.' };
+  const hours = Number(input.hours);
+  if (!Number.isFinite(hours) || hours < 0 || hours > 40) return { ok: false, error: 'Effort: 0 to 40 hours.' };
+  const stage = await designItems(projectId);
+  const items = stage?.items ?? [];
+  const at = items.findIndex((i) => i.id === afterId);
+  if (!stage || at < 0) return { ok: false, error: GONE };
+  const after = items[at]!;
+  const actor: ProjectActor = { type: 'STUDIO', id: check.member.userId };
+  await prisma.$transaction(async (tx) => {
+    for (const i of items.slice(at + 1)) await tx.homeChecklistItem.update({ where: { id: i.id }, data: { sortOrder: i.sortOrder + 1 } });
+    const made = await tx.homeChecklistItem.create({
+      data: {
+        stageId: stage.id,
+        room: after.room,
+        label,
+        sortOrder: after.sortOrder + 1,
+        weightBp: 0,
+        inScope: true,
+        plannedOn: after.plannedOn ? dayToDb(addDays(dayFromDb(after.plannedOn), days)) : null,
+        responsible: input.responsible as string,
+        gapDays: days,
+        effortMin: Math.round(hours * 60),
+      },
+      select: { id: true, plannedOn: true, doneAt: true, gapDays: true },
+    });
+    const order = [...items.slice(0, at + 1), made, ...items.slice(at + 1)];
+    await writeRechain(tx, order, at + 2);
+    await writeEffortWeights(tx, stage.id);
+    await recordEvent(tx, { projectId, type: 'step.added', actor, refId: made.id, payload: { after: after.id, days } });
+  });
+  return { ok: true, message: `Added: ${label}.` };
+}
+
 /**
  * For a project started before Phase 2 (its DESIGN stage has the one
  * "Final design and drawings signed off" step): replace the stage's steps
@@ -292,7 +478,7 @@ export async function applyDesignSteps(projectId: string, now = new Date()): Pro
     where: { id: projectId },
     select: {
       paymentPhases: true,
-      introduction: { select: { studio: { select: { designTemplate: true } } } },
+      introduction: { select: { studio: { select: { designTemplate: true } }, brief: { select: { propertyType: true } } } },
       stages: { where: { kind: 'DESIGN' }, take: 1, select: { id: true, plannedStart: true, plannedEnd: true, items: { select: { id: true, doneAt: true, responsible: true } } } },
     },
   });
@@ -300,7 +486,7 @@ export async function applyDesignSteps(projectId: string, now = new Date()): Pro
   if (!p || !stage) return { ok: false, error: 'This project has no design stage.' };
   const refusal = applyRefusal(stage.items);
   if (refusal) return { ok: false, error: refusal };
-  const steps = designStepsFor(stage.plannedStart, stage.plannedEnd, readDesignTemplate(p.introduction.studio.designTemplate), readSignedStages(p.paymentPhases) ?? []);
+  const steps = designStepsFor(stage.plannedStart, readDesignTemplate(p.introduction.studio.designTemplate), readSignedStages(p.paymentPhases) ?? [], bhkOf(p.introduction.brief.propertyType));
   const actor: ProjectActor = { type: 'STUDIO', id: check.member.userId };
   try {
     await prisma.$transaction(async (tx) => {
@@ -309,22 +495,7 @@ export async function applyDesignSteps(projectId: string, now = new Date()): Pro
       const again = applyRefusal(current);
       if (again) throw new Refused(again);
       await tx.homeChecklistItem.deleteMany({ where: { stageId: stage.id, doneAt: null } });
-      await tx.homeChecklistItem.createMany({
-        data: steps.map((st) => ({
-          stageId: stage.id,
-          room: st.room,
-          label: st.label,
-          sortOrder: st.sortOrder,
-          weightBp: st.weightBp,
-          inScope: true,
-          plannedOn: st.plannedOn,
-          responsible: st.responsible ?? null,
-          needsDocument: st.needsDocument === true,
-          gatePayment: st.gatePayment ?? null,
-          gapDays: st.gapDays ?? null,
-          customerMilestone: st.customerMilestone === true,
-        })),
-      });
+      for (const st of steps) await tx.homeChecklistItem.create({ data: designItemData(stage.id, st), select: { id: true } });
       await recordEvent(tx, { projectId, type: 'design.steps_applied', actor, refId: stage.id, payload: { steps: steps.length } });
       await settleStageAfterTicks(tx, projectId, stage.id, actor, now);
     });
@@ -449,19 +620,41 @@ export async function saveMeasurements(projectId: string, rows: readonly Measure
  * there. Shared at once or kept as a draft. Sharing one the client approves
  * sends them one notice; nothing chases them after that.
  */
+/**
+ * A one-time place in storage for a project file the browser uploads itself
+ * (up to 50 MB; DESIGN-PROCESS-PLAN.md §3.6): design work on this project,
+ * a type we take. Recorded afterwards with `uploadDrawing` and `uploaded`.
+ */
+export async function docUploadTicket(projectId: string, name: unknown, bytes: unknown): Promise<{ ok: true; path: string; url: string | null } | { ok: false; error: string }> {
+  const check = await memberOnProject(projectId, 'design.work');
+  if (!check.ok) return check;
+  const c = checkUpload(name, bytes);
+  if (!c.ok) return c;
+  return projectDocTicket(projectId, c.ext);
+}
+
 export async function uploadDrawing(
   projectId: string,
   input: { kind: unknown; room?: unknown; title?: unknown; supersedesId?: unknown; share?: unknown },
   file: File | null,
   now = new Date(),
+  /** A file the browser already put in storage with `docUploadTicket`. */
+  uploaded: { path: unknown; name: unknown; bytes: unknown } | null = null,
 ): Promise<DesignResult> {
   const check = await memberOnProject(projectId, 'design.work');
   if (!check.ok) return check;
-  const supersedesId = typeof input.supersedesId === 'string' && input.supersedesId ? input.supersedesId.slice(0, 64) : null;
+  const all = await prisma.homeDocument.findMany({ where: { projectId }, select: { id: true, version: true, supersedesId: true, sharedAt: true, deletedAt: true, designKind: true, room: true, title: true } });
+  let supersedesId = typeof input.supersedesId === 'string' && input.supersedesId ? input.supersedesId.slice(0, 64) : null;
+  /* Uploading a type (and room) again is its next version (DESIGN-PROCESS-PLAN.md §3.2): the chain's newest live document. */
+  if (!supersedesId && isDesignKind(input.kind)) {
+    const roomWanted = (typeof input.room === 'string' ? input.room.replace(/\s+/g, ' ').trim() : '').toLowerCase();
+    const replaced = new Set(all.filter((d) => !d.deletedAt).map((d) => d.supersedesId));
+    const head = all.find((d) => !d.deletedAt && d.designKind === input.kind && (d.room ?? '').toLowerCase() === roomWanted && !replaced.has(d.id));
+    if (head) supersedesId = head.id;
+  }
   let previous: { designKind: string | null; room: string | null; title: string } | null = null;
   let version = 1;
   if (supersedesId) {
-    const all = await prisma.homeDocument.findMany({ where: { projectId }, select: { id: true, version: true, supersedesId: true, sharedAt: true, deletedAt: true, designKind: true, room: true, title: true } });
     const doc = all.find((d) => d.id === supersedesId);
     if (!doc || !isDesignKind(doc.designKind)) return { ok: false, error: 'That drawing is not on this project.' };
     const allowed = canSupersede(doc, all);
@@ -470,13 +663,25 @@ export async function uploadDrawing(
     previous = doc;
   }
   const kind = previous?.designKind ?? input.kind;
-  if (!isDesignKind(kind)) return { ok: false, error: 'Pick what it is: 2D layout, furniture layout, 3D render…' };
+  if (!isDesignKind(kind)) return { ok: false, error: 'Pick what it is: 2D layout, 3D, working drawings…' };
   const room = (typeof input.room === 'string' ? input.room.replace(/\s+/g, ' ').trim() : '') || previous?.room || '';
   if (room.length > ROOM_MAX) return { ok: false, error: `Keep the room name under ${ROOM_MAX} characters.` };
   const typed = typeof input.title === 'string' ? input.title.replace(/\s+/g, ' ').trim().slice(0, TITLE_MAX) : '';
   const title = typed || previous?.title || [DESIGN_KINDS[kind], room].filter(Boolean).join(', ');
-  if (!file || file.size === 0) return { ok: false, error: 'Choose the file.' };
-  const stored = await storeProjectDoc(projectId, file);
+  let stored: { ok: true; path: string } | { ok: false; error: string };
+  let meta: { name: string; type: string; bytes: number };
+  if (uploaded) {
+    const c = checkUpload(uploaded.name, uploaded.bytes);
+    if (!c.ok) return c;
+    if (!docPathBelongsTo(uploaded.path, projectId)) return { ok: false, error: 'That upload is not for this project. Try again.' };
+    if (!(await projectDocExists(uploaded.path))) return { ok: false, error: 'The file did not finish uploading. Try again.' };
+    stored = { ok: true, path: uploaded.path };
+    meta = { name: String(uploaded.name).slice(0, 200), type: c.contentType, bytes: Number(uploaded.bytes) };
+  } else {
+    if (!file || file.size === 0) return { ok: false, error: 'Choose the file.' };
+    stored = await storeProjectDoc(projectId, file);
+    meta = { name: file.name.slice(0, 200), type: file.type, bytes: file.size };
+  }
   if (!stored.ok) return stored;
   const share = input.share === true || input.share === 'true' || input.share === 'on';
   const p = await projectFacts(projectId);
@@ -489,9 +694,9 @@ export async function uploadDrawing(
         kind: kind === 'SITE_PHOTO' ? 'OTHER' : 'DRAWINGS',
         title,
         storageKey: stored.path,
-        originalName: file.name.slice(0, 200),
-        contentType: file.type,
-        bytes: file.size,
+        originalName: meta.name,
+        contentType: meta.type,
+        bytes: meta.bytes,
         uploadedById: check.member.userId,
         byStudio: true,
         sharedAt: share ? now : null,
@@ -552,6 +757,7 @@ export async function answerDrawing(userId: string, documentId: string, verdict:
       id: true,
       projectId: true,
       designKind: true,
+      title: true,
       sharedAt: true,
       deletedAt: true,
       // Only a newer version the client can see blocks an answer: a draft v2 is the studio's, not theirs.
@@ -565,8 +771,19 @@ export async function answerDrawing(userId: string, documentId: string, verdict:
   const row = await prisma.$transaction(async (tx) => {
     const r = await tx.homeDesignReview.create({ data: { projectId: doc.projectId, documentId: doc.id, verdict: ok.verdict, comment: ok.comment, byUserId: userId, at: now }, select: { id: true } });
     await recordEvent(tx, { projectId: doc.projectId, type: 'design.answered', actor: { type: 'CUSTOMER', id: userId }, refId: doc.id, payload: { verdict: ok.verdict }, at: now });
+    // The client's approval ticks their approval step (DESIGN-PROCESS-PLAN.md Decision 4).
+    const approves = ok.verdict === 'APPROVED' ? approvalKindOfDrawing(doc.designKind) : null;
+    if (approves) await tickApprovalStep(tx, doc.projectId, approves, userId, now);
     return r;
   });
+  // The studio hears the answer (DESIGN-PROCESS-PLAN.md §3.3): the office, and the project's designer.
+  void (async () => {
+    const p = await prisma.homeProject.findUnique({ where: { id: doc.projectId }, select: { introduction: { select: { studioId: true } }, designer: { select: { userId: true } } } });
+    if (!p) return;
+    const event = { kind: 'design-answered' as const, projectId: doc.projectId, title: doc.title, approved: ok.verdict === 'APPROVED', comment: ok.comment };
+    await notifyStudio(p.introduction.studioId, event);
+    if (p.designer?.userId) await notify(p.designer.userId, event, { email: false });
+  })().catch((e) => console.error('[studio-design] answer notice failed', e));
   return { ok: true, id: row.id };
 }
 
@@ -589,7 +806,8 @@ async function designFinalOf(projectId: string, studioId: string) {
  * here — or opens the one that exists.
  */
 export async function makeDesignFinal(projectId: string): Promise<DesignResult> {
-  const check = await memberOnProject(projectId, 'design.assign');
+  /* The designer on the project makes it too (the design meeting, 24 Oct 2026: "designers will manage"). */
+  const check = await memberOnProject(projectId, 'design.close');
   if (!check.ok) return check;
   const { p, df } = await designFinalOf(projectId, check.member.studioId);
   if (!p?.signedQuoteId) return { ok: false, error: 'This project was not started from a quotation, so there is no sales final to copy.' };
@@ -637,11 +855,13 @@ export async function closeDesign(projectId: string, now = new Date()): Promise<
       data: { designClosedAt: now, designFinalQuoteId: df.id, designChanges: summary as unknown as Prisma.InputJsonValue },
     });
     await recordEvent(tx, { projectId, type: 'design.closed', actor, refId: df.id, payload: { lines: summary.lines.length } });
-    // The project lifecycle: design sign-off moves the project to execution.
-    await applyPhaseEvent(tx, projectId, { kind: 'design.signed_off' }, actor, now);
+    // The project lifecycle: design sign-off moves an older plan (no pre-execution steps) to execution. A plan with the
+    // design process moves on its own ticks instead: design done, then pre-execution done (DESIGN-PROCESS-PLAN.md Decision 10).
+    const pre = await tx.homeChecklistItem.count({ where: { stage: { projectId, kind: 'DESIGN' }, room: PRE_EXECUTION_GROUP } });
+    if (pre === 0) await applyPhaseEvent(tx, projectId, { kind: 'design.signed_off' }, actor, now);
   });
   if (facts) tell(facts.introduction.brief.userId, facts.introduction.studio.tradeName, 'Your design is final. See what changed against your first quotation.');
-  return { ok: true, message: `Design signed off on ${df.number}. The project moves to execution; the client sees what changed against the sales final.` };
+  return { ok: true, message: `Design signed off on ${df.number}. The client sees what changed against the sales final.` };
 }
 
 // ── The studio's design steps (Settings) ──────────────────────
@@ -670,4 +890,18 @@ export async function myDesignTemplate() {
   if (!member || !can(member, 'design.template')) return null;
   const s = await prisma.studio.findUnique({ where: { id: member.studioId }, select: { designTemplate: true } });
   return { steps: readDesignTemplate(s?.designTemplate ?? null), custom: Boolean(s?.designTemplate) };
+}
+
+/**
+ * The project's priority, 1 to 5 stars or none (the design meeting, 24 Oct
+ * 2026; DESIGN-PROCESS-PLAN.md §2.4): one value for the whole studio. The
+ * owner, the PM and the designer on the project.
+ */
+export async function setProjectPriority(projectId: string, raw: unknown): Promise<DesignResult> {
+  const check = await memberOnProject(projectId, 'design.work');
+  if (!check.ok) return check;
+  const n = raw === null || raw === '' || raw === undefined ? null : Number(raw);
+  if (n !== null && (!Number.isInteger(n) || n < 1 || n > 5)) return { ok: false, error: 'Pick 1 to 5 stars.' };
+  await prisma.homeProject.update({ where: { id: projectId }, data: { priority: n } });
+  return { ok: true, message: n ? `Priority: ${n} star${n === 1 ? '' : 's'}.` : 'Priority cleared.' };
 }

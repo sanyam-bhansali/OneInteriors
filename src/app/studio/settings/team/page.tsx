@@ -167,7 +167,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
                     </td>
                     <td>
                       {p.isYou || !view.full ? null : (
-                        <PersonActions person={{ id: p.id, name: p.name, role: p.role, status: p.status, siteIds: p.sites.map((s) => s.id) }} sites={view.sites} />
+                        <PersonActions person={{ id: p.id, name: p.name, role: p.role, status: p.status, siteIds: p.sites.map((s) => s.id), designHead: p.designHead }} sites={view.sites} />
                       )}
                     </td>
                   </tr>

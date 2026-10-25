@@ -2,14 +2,18 @@
 
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
-import type { DesignStepView, DesignTab, DrawingView } from '@/modules/studio-design/store';
-import { CLIENT_REASONS, DESIGN_KINDS, STUDIO_REASONS, type DesignKind } from '@/modules/studio-design/rules';
+import type { DesignStepView, DesignTab, FinalView } from '@/modules/studio-design/store';
+import type { DocType } from '@/modules/studio-design/documents';
+import { UploadDocument } from './UploadDocument';
+import { CLIENT_REASONS, STUDIO_REASONS } from '@/modules/studio-design/rules';
 import { RESPONSIBLE_LABEL, RESPONSIBLES } from '@/modules/studio-design/template';
 import { formatINR } from '@/lib/money';
 import { CustomerSees, OnlyYourTeam } from '../marks';
 import { MilestoneCount, STAR_HINT, StarToggle } from './StarToggle';
 import {
+  addDesignStepBelowAction,
   addMoodBoardPiecesAction,
+  addStepTaskAction,
   applyDesignStepsAction,
   assignDesignerAction,
   bookVisitAction,
@@ -17,12 +21,13 @@ import {
   editDesignStepAction,
   makeDesignFinalAction,
   moveDesignStepAction,
+  moveDesignStepOrderAction,
   saveMeasurementsAction,
+  setStepTaskAction,
   setVisitStatusAction,
   shareDrawingAction,
   shareMoodBoardAction,
   tickDesignStepAction,
-  uploadDrawingAction,
 } from './design-actions';
 
 /**
@@ -111,6 +116,22 @@ function Overview({ tab }: { tab: DesignTab }) {
           {next.lockedBy ? <span className="ml-1 text-[var(--warn)]"> · opens when the {next.lockedBy} is recorded</span> : null}
         </p>
       ) : null}
+      {tab.category ? (
+        <p className={`m-0 ${muted}`}>
+          <span className="font-semibold text-[var(--ink)]">{CATEGORY_WORD[tab.category]}</span>
+          {tab.category === 'PREMIUM' ? ` · 3D changes asked: ${tab.changeRounds} of the 2 rounds included${tab.changeRounds > 2 ? ' (an extra round: note it as agreed with the client)' : ''}` : ''}
+        </p>
+      ) : null}
+      {tab.fromSales ? (
+        // Sales' notes for the design team, from the sales final (DESIGN-PROCESS-PLAN.md §4.2).
+        <div className="rounded-[10px] bg-[var(--fill)] p-3 text-[13.5px]">
+          <p className="m-0 font-semibold">
+            From sales{tab.fromSales.by ? ` (${tab.fromSales.by}${tab.fromSales.on ? `, ${dayWords(tab.fromSales.on)}` : ''})` : ''}
+          </p>
+          {tab.fromSales.notes ? <p className="m-0 mt-1 whitespace-pre-wrap">{tab.fromSales.notes}</p> : null}
+          {tab.fromSales.voiceUrl ? <audio controls src={tab.fromSales.voiceUrl} className="mt-2 h-8" /> : null}
+        </div>
+      ) : null}
       {tab.overrunDays > 0 ? (
         <p className="m-0 rounded-[10px] bg-[var(--warn-bg)] p-3 text-[13.5px] text-[var(--warn)]">
           Design now ends {tab.overrunDays} day{tab.overrunDays === 1 ? '' : 's'} after the plan&rsquo;s date.{' '}
@@ -160,24 +181,47 @@ function Overview({ tab }: { tab: DesignTab }) {
 
 // ── Steps ─────────────────────────────────────────────────────
 
+/** The category words (BudgetTier LUXURY reads "Luxe", DESIGN-PROCESS-PLAN.md §4.3). */
+const CATEGORY_WORD: Record<'ESSENTIAL' | 'PREMIUM' | 'LUXURY', string> = { ESSENTIAL: 'Essential', PREMIUM: 'Premium', LUXURY: 'Luxe' };
+
+/** "2 h", "30 min", "16 h". */
+const effortWords = (min: number | null): string | null => (min === null || min <= 0 ? null : min < 60 ? `${min} min` : `${Math.round((min / 60) * 10) / 10} h`);
+
 function Steps({ tab }: { tab: DesignTab }) {
-  const [open, setOpen] = useState<{ id: string; what: 'tick' | 'move' | 'edit' } | null>(null);
+  const [open, setOpen] = useState<{ id: string; what: 'tick' | 'move' | 'edit' | 'below' } | null>(null);
   const { message, run, pending } = useRun();
   const [starred, setStarred] = useState<{ ok: boolean; text: string } | null>(null);
   if (tab.steps.length === 0) return null;
   const stars = tab.steps.filter((s) => s.inScope && s.milestone).length;
+  /* A plan with the design process (its steps carry an effort): the client sees every step, without dates (DESIGN-PROCESS-PLAN.md Decision 11). */
+  const process = tab.steps.some((s) => s.effortMin !== null);
   return (
     <section aria-label="Design steps" className="card flex flex-col gap-2 p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 className={h2}>Design steps</h2>
         <CustomerSees name={tab.customerFirst} />
       </div>
-      <p className={`m-0 ${muted}`}>
-        <span className="font-medium acc-t">★ {STAR_HINT}</span> {tab.customerFirst} sees the design&rsquo;s % from every step. Each % is the step&rsquo;s share of the design. A locked step opens when its payment is recorded by accounts.
-      </p>
-      <MilestoneCount n={stars} />
+      {process ? (
+        <p className={`m-0 ${muted}`}>
+          {tab.customerFirst} sees every step and the design&rsquo;s %, never the dates. Each % is the step&rsquo;s share of the design, by its effort. A step after an unrecorded payment waits for it, and is
+          never late. ★ marks a milestone.
+        </p>
+      ) : (
+        <>
+          <p className={`m-0 ${muted}`}>
+            <span className="font-medium acc-t">★ {STAR_HINT}</span> {tab.customerFirst} sees the design&rsquo;s % from every step. Each % is the step&rsquo;s share of the design. A locked step opens when its
+            payment is recorded by accounts.
+          </p>
+          <MilestoneCount n={stars} />
+        </>
+      )}
       <ul className="m-0 flex list-none flex-col gap-1 p-0">
-        {tab.steps.map((st) => (
+        {tab.steps.map((st, k) => (
+          <StepHeads key={`h-${st.id}`} st={st} before={k > 0 ? tab.steps[k - 1]! : null} />
+        )).flatMap((head, k) => {
+          const st = tab.steps[k]!;
+          return [
+          head,
           <li key={st.id} id={`step-${st.id}`} className="flex items-start gap-1.5 rounded-[8px] px-1.5 py-2 hover:bg-[var(--fill)]">
             <StarToggle
               projectId={tab.projectId}
@@ -199,9 +243,25 @@ function Steps({ tab }: { tab: DesignTab }) {
                 onSave={(v) => run(() => editDesignStepAction({ projectId: tab.projectId, stepId: st.id, ...v }), () => setOpen(null))}
               />
             ) : null}
+            {open?.id === st.id && open.what === 'below' ? <AddBelowForm tab={tab} st={st} onDone={() => setOpen(null)} /> : null}
+            <Tasks tab={tab} st={st} />
+            {tab.canEditPlan && open?.id === st.id && open.what === 'edit' ? (
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                <button type="button" className="btn ghost sm" disabled={pending || st.done} onClick={() => run(() => moveDesignStepOrderAction(tab.projectId, st.id, 'up'))}>
+                  ↑ Move up
+                </button>
+                <button type="button" className="btn ghost sm" disabled={pending || st.done} onClick={() => run(() => moveDesignStepOrderAction(tab.projectId, st.id, 'down'))}>
+                  ↓ Move down
+                </button>
+                <button type="button" className="btn ghost sm" onClick={() => setOpen({ id: st.id, what: 'below' })}>
+                  + Add a step below
+                </button>
+              </div>
+            ) : null}
             </div>
-          </li>
-        ))}
+          </li>,
+          ];
+        })}
       </ul>
       <Message m={message} />
       <Message m={starred} />
@@ -234,6 +294,9 @@ function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onO
         <span className={`block ${muted} ${st.lateDays && !st.done ? '!text-[var(--bad)]' : ''}`}>
           {meta}
           {st.responsibleLabel ? ` · ${st.responsibleLabel}` : ''}
+          {st.group === 'Pre-execution' && st.responsible === 'DESIGNER' ? ' (support)' : ''}
+          {effortWords(st.effortMin) ? ` · ${effortWords(st.effortMin)}` : ''}
+          {st.approvalKind && !st.done ? ` · ticks when ${tab.customerFirst} approves in the app` : ''}
           {st.needsDocument ? ' · needs its file' : ''}
           {st.lockedBy ? ` · opens when the ${st.lockedBy} is recorded` : ''}
         </span>
@@ -266,7 +329,7 @@ function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onO
             Tick
           </button>
         ) : null}
-        {tab.canWork && st.inScope && !st.done && st.plannedOn ? (
+        {tab.canWork && st.inScope && !st.done && st.plannedOn && !st.lockedBy ? (
           <button type="button" className="btn ghost sm" onClick={() => onOpen('move')}>
             Running late
           </button>
@@ -278,6 +341,110 @@ function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onO
         ) : null}
       </span>
     </div>
+  );
+}
+
+/** The part headings and payment lines above a step: Design, Pre-execution, and each payment the steps wait on. */
+function StepHeads({ st, before }: { st: DesignStepView; before: DesignStepView | null }) {
+  const part = st.group !== (before?.group ?? null);
+  if (!part && !st.payment) return null;
+  return (
+    <li aria-hidden={false} className="list-none">
+      {part ? (
+        st.group === 'Pre-execution' ? (
+          <p className="m-0 mt-3 border-t border-[var(--fill2)] pt-3 text-[13px] font-semibold">
+            Pre-execution <span className={`font-normal ${muted}`}>· the execution team owns it from here; the designer supports</span>
+          </p>
+        ) : before ? (
+          <p className="m-0 mt-3 text-[13px] font-semibold">{st.group}</p>
+        ) : null
+      ) : null}
+      {st.payment ? (
+        <p className={`m-0 mt-2 rounded-[8px] px-2 py-1 text-[12.5px] ${st.payment.recorded ? 'bg-[var(--fill)] text-[var(--text2)]' : 'bg-[var(--warn-bg)] text-[var(--warn)]'}`}>
+          {st.payment.label}: {st.payment.recorded ? 'recorded' : 'not recorded yet. The steps from here wait for it.'}
+        </p>
+      ) : null}
+    </li>
+  );
+}
+
+/** The to-dos inside a step: tick them, add one (design work). Never the step's own tick. */
+function Tasks({ tab, st }: { tab: DesignTab; st: DesignStepView }) {
+  const { pending, message, run } = useRun();
+  const [adding, setAdding] = useState('');
+  if (st.tasks.length === 0 && !tab.canWork) return null;
+  return (
+    <div className="mt-1 flex flex-col gap-1 pl-8">
+      {st.tasks.map((t) => (
+        <label key={t.id} className={`flex items-center gap-2 text-[13px] ${t.done ? 'text-[var(--muted)] line-through' : ''}`}>
+          <input type="checkbox" checked={t.done} disabled={!tab.canWork || pending} onChange={(e) => run(() => setStepTaskAction(tab.projectId, t.id, e.target.checked))} />
+          {t.label}
+        </label>
+      ))}
+      {tab.canWork && !st.done ? (
+        <form
+          className="flex items-center gap-1.5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (adding.trim().length < 2) return;
+            run(() => addStepTaskAction(tab.projectId, st.id, adding), () => setAdding(''));
+          }}
+        >
+          <input value={adding} onChange={(e) => setAdding(e.target.value)} maxLength={120} placeholder="+ Add a task" aria-label={`Add a task to ${st.label}`} className="fld min-h-[30px] max-w-[260px] text-[12.5px]" />
+          {adding.trim().length >= 2 ? (
+            <button type="submit" className="btn ghost sm" disabled={pending}>
+              Add
+            </button>
+          ) : null}
+        </form>
+      ) : null}
+      <Message m={message} />
+    </div>
+  );
+}
+
+/** A new step below this one, in its part: name, who, days after, effort (owner, PM). */
+function AddBelowForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onDone: () => void }) {
+  const { pending, message, run } = useRun();
+  const [v, setV] = useState({ label: '', responsible: 'DESIGNER', days: '1', hours: '1' });
+  return (
+    <form
+      className="mt-2 flex flex-wrap items-end gap-2 rounded-[14px] bg-[var(--soft)] p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        run(() => addDesignStepBelowAction({ projectId: tab.projectId, afterId: st.id, ...v }), onDone);
+      }}
+    >
+      <label className="flex flex-col gap-1 text-[13px]">
+        New step
+        <input value={v.label} onChange={(e) => setV({ ...v, label: e.target.value })} maxLength={120} required className="fld min-w-[200px]" />
+      </label>
+      <label className="flex flex-col gap-1 text-[13px]">
+        Who
+        <select value={v.responsible} onChange={(e) => setV({ ...v, responsible: e.target.value })} className="fld">
+          {RESPONSIBLES.map((r) => (
+            <option key={r} value={r}>
+              {RESPONSIBLE_LABEL[r]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-[13px]">
+        Days after
+        <input type="number" min={0} max={30} value={v.days} onChange={(e) => setV({ ...v, days: e.target.value })} className="fld w-[70px]" />
+      </label>
+      <label className="flex flex-col gap-1 text-[13px]">
+        Effort (h)
+        <input type="number" min={0} max={40} step={0.25} value={v.hours} onChange={(e) => setV({ ...v, hours: e.target.value })} className="fld w-[80px]" />
+      </label>
+      <button type="submit" className="btn pri sm" disabled={pending}>
+        Add the step
+      </button>
+      <button type="button" className="btn ghost sm" onClick={onDone}>
+        Cancel
+      </button>
+      <Message m={message} />
+    </form>
   );
 }
 
@@ -301,6 +468,37 @@ function TickForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
       <label className="flex items-center gap-2 text-[13px]">
         <input type="checkbox" name="share" /> Show the file to {tab.customerFirst} too
       </label>
+      {st.lateDays > 0 ? (
+        // A late step says why (DESIGN-PROCESS-PLAN.md Decision 6): it goes on the Delays list for the owner to check.
+        <div className="flex flex-col gap-2 rounded-[10px] border border-[var(--s-rule-soft)] bg-[var(--s-paper)] p-2">
+          <label className="flex flex-col gap-1 text-[13px]">
+            {st.lateDays === 1 ? '1 day late' : `${st.lateDays} days late`}: why?{st.responsible === 'CLIENT' ? ' (left empty: the client was not responding)' : ''}
+            <select name="reason" className="fld" required={st.responsible !== 'CLIENT'} defaultValue="">
+              <option value="">Pick one</option>
+              <optgroup label="Client side">
+                {Object.entries(CLIENT_REASONS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Studio side">
+                {Object.entries(STUDIO_REASONS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </label>
+          <OnlyYourTeam>
+            <label className="flex flex-col gap-1 text-[13px]">
+              About the delay (optional)
+              <input name="reasonNote" maxLength={500} className="fld" />
+            </label>
+          </OnlyYourTeam>
+        </div>
+      ) : null}
       <OnlyYourTeam>
         <label className="flex flex-col gap-1 text-[13px]">
           What was done (optional)
@@ -598,7 +796,7 @@ function MoodBoard({ tab }: { tab: DesignTab }) {
 
 // ── Drawings ──────────────────────────────────────────────────
 
-const STATE_WORDS: Record<DrawingView['state'], { text: string; tone: string }> = {
+const STATE_WORDS: Record<DesignTab['drawings'][number]['state'], { text: string; tone: string }> = {
   draft: { text: 'Draft · only your team', tone: 'var(--muted)' },
   waiting: { text: 'Waiting for the client', tone: 'var(--warn)' },
   approved: { text: 'Approved', tone: 'var(--good)' },
@@ -606,43 +804,77 @@ const STATE_WORDS: Record<DrawingView['state'], { text: string; tone: string }> 
   shared: { text: 'Shared', tone: 'var(--acc)' },
 };
 
+/** The tag on a document's version (DESIGN-PROCESS-PLAN.md §3.3). */
+const FINAL_WORDS: Record<FinalView['state'], { text: string; tone: string }> = {
+  approved: { text: 'Approved', tone: 'var(--good)' },
+  waiting: { text: 'Waiting for approval', tone: 'var(--warn)' },
+  changes: { text: 'Changes asked', tone: 'var(--bad)' },
+  shared: { text: 'Shared', tone: 'var(--text2)' },
+  draft: { text: 'Draft (team only)', tone: 'var(--muted)' },
+};
+
+/**
+ * Documents (owner and Hauspire's design team, 24 Oct 2026;
+ * DESIGN-PROCESS-PLAN.md §3): one line per type and room, the version that
+ * counts (the approved one, else the newest shared), downloads named for
+ * you; the newest version's actions under it; "Show all versions" for the
+ * repository and "Handover documents" for the pack.
+ */
 function Drawings({ tab }: { tab: DesignTab }) {
   const { pending, message, run } = useRun();
-  const [replacing, setReplacing] = useState<DrawingView | null>(null);
+  const [replacing, setReplacing] = useState<{ type: DocType; room: string | null } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const newest = (type: string, room: string | null) => tab.drawings.find((d) => d.kind === type && (d.room ?? '').toLowerCase() === (room ?? '').toLowerCase()) ?? null;
   return (
-    <section aria-label="Drawings and 3D" className="card flex flex-col gap-3 p-5">
+    <section aria-label="Documents" className="card flex flex-col gap-3 p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className={h2}>Drawings and 3D</h2>
-        <CustomerSees name={tab.customerFirst} />
+        <h2 className={h2}>Documents</h2>
+        <span className="flex flex-wrap items-center gap-3 text-[13px]">
+          <Link href={`/studio/projects/${tab.projectId}/documents`} className="acc-t">
+            Show all versions
+          </Link>
+          <Link href={`/studio/projects/${tab.projectId}/documents/handover`} className="acc-t">
+            Handover documents
+          </Link>
+          <CustomerSees name={tab.customerFirst} />
+        </span>
       </div>
-      {tab.drawings.length === 0 ? <p className={`m-0 ${muted}`}>Nothing uploaded yet.</p> : null}
+      {tab.finals.length === 0 ? <p className={`m-0 ${muted}`}>Nothing uploaded yet.</p> : null}
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
-        {tab.drawings.map((d) => {
-          const s = STATE_WORDS[d.state];
+        {tab.finals.map((f) => {
+          const s = FINAL_WORDS[f.state];
+          const d = newest(f.type, f.room);
           return (
-            <li key={d.id} className="flex flex-col gap-1 border-t border-[var(--fill2)] pt-2 text-[14px]">
+            <li key={f.id} className="flex flex-col gap-1 border-t border-[var(--fill2)] pt-2 text-[14px]">
               <div className="flex flex-wrap items-center gap-2">
-                <a href={d.url || undefined} target="_blank" rel="noreferrer" className="font-semibold text-[var(--ink)]">
-                  {d.title}
-                </a>
-                <span className={muted}>
-                  {d.kindLabel}
-                  {d.room ? ` · ${d.room}` : ''} · R{d.version}
-                  {d.revisions ? ` (${d.revisions} revision${d.revisions === 1 ? '' : 's'})` : ''}
+                <span className="font-semibold text-[var(--ink)]">
+                  {f.typeLabel}
+                  {f.room ? `, ${f.room}` : ''}
                 </span>
+                <span className="mono text-[12.5px]">v{f.versionLabel}</span>
                 <span className="text-[12.5px] font-medium" style={{ color: s.tone }}>
                   {s.text}
+                </span>
+                <span className={muted}>{dayWords(f.on)}</span>
+                {f.url ? (
+                  <a href={f.url} className="text-[12.5px] acc-t" title={f.fileName}>
+                    Download
+                  </a>
+                ) : null}
+              </div>
+              {f.newerWaiting && d ? (
+                <span className={muted}>
+                  v{d.versionLabel} shared, {STATE_WORDS[d.state].text.toLowerCase()}
                   {d.state === 'waiting' && d.waitingDays ? ` · ${d.waitingDays} day${d.waitingDays === 1 ? '' : 's'}` : ''}
                 </span>
-              </div>
-              {d.askedFor ? <span className={muted}>Asked for: &ldquo;{d.askedFor}&rdquo;</span> : null}
-              {d.answer?.comment ? (
+              ) : null}
+              {d?.askedFor ? <span className={muted}>Asked for: &ldquo;{d.askedFor}&rdquo;</span> : null}
+              {d?.answer?.comment ? (
                 <span className={muted}>
                   {tab.customerFirst} on {dayWords(d.answer.on)}: &ldquo;{d.answer.comment}&rdquo;
                 </span>
               ) : null}
-              {d.reminder ? (
+              {d?.reminder ? (
                 <span className="flex flex-wrap items-center gap-2">
                   <span className={muted}>Remind {tab.customerFirst} yourself (we send nothing):</span>
                   <button
@@ -658,13 +890,13 @@ function Drawings({ tab }: { tab: DesignTab }) {
               ) : null}
               {tab.canWork ? (
                 <span className="flex flex-wrap gap-2">
-                  {d.state === 'draft' ? (
+                  {d && d.state === 'draft' ? (
                     <button type="button" className="btn ghost sm" disabled={pending} onClick={() => run(() => shareDrawingAction(tab.projectId, d.id))}>
-                      Share with {tab.customerFirst}
+                      Share v{d.versionLabel} with {tab.customerFirst}
                     </button>
                   ) : null}
-                  <button type="button" className="btn ghost sm" onClick={() => setReplacing(d)}>
-                    Upload R{d.version + 1}
+                  <button type="button" className="btn ghost sm" onClick={() => setReplacing({ type: f.type, room: f.room })}>
+                    Upload a new version
                   </button>
                 </span>
               ) : null}
@@ -672,71 +904,11 @@ function Drawings({ tab }: { tab: DesignTab }) {
           );
         })}
       </ul>
-      {tab.canWork ? <UploadDrawing tab={tab} replacing={replacing} onDone={() => setReplacing(null)} /> : null}
+      {tab.canWork ? (
+        <UploadDocument key={replacing ? `${replacing.type}|${replacing.room}` : 'new'} projectId={tab.projectId} customerFirst={tab.customerFirst} preset={replacing} onDone={replacing ? () => setReplacing(null) : undefined} />
+      ) : null}
       <Message m={message} />
     </section>
-  );
-}
-
-function UploadDrawing({ tab, replacing, onDone }: { tab: DesignTab; replacing: DrawingView | null; onDone: () => void }) {
-  const { pending, message, run } = useRun();
-  const [kind, setKind] = useState<DesignKind>('LAYOUT_2D');
-  return (
-    <form
-      key={replacing?.id ?? 'new'}
-      className="flex flex-col gap-2 rounded-[14px] bg-[var(--soft)] p-3"
-      onSubmit={(e) => {
-        e.preventDefault();
-        const form = e.currentTarget;
-        const data = new FormData(form);
-        data.set('projectId', tab.projectId);
-        if (replacing) data.set('supersedesId', replacing.id);
-        run(() => uploadDrawingAction(data), () => {
-          form.reset();
-          onDone();
-        });
-      }}
-    >
-      <p className="m-0 text-[13.5px] font-semibold">{replacing ? `New version of ${replacing.title} (R${replacing.version + 1})` : 'Upload a drawing, render or site photo'}</p>
-      {!replacing ? (
-        <div className="flex flex-wrap gap-2">
-          <label className="flex flex-col gap-1 text-[13px]">
-            What it is
-            <select name="kind" value={kind} onChange={(e) => setKind(e.target.value as DesignKind)} className="fld">
-              {Object.entries(DESIGN_KINDS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-[13px]">
-            Room
-            <input name="room" maxLength={60} className="fld" placeholder="Living room" />
-          </label>
-          <label className="flex flex-col gap-1 text-[13px]">
-            Name (optional)
-            <input name="title" maxLength={100} className="fld" />
-          </label>
-        </div>
-      ) : null}
-      <input type="file" name="file" accept="application/pdf,image/jpeg,image/png,image/webp" required className="text-[13px]" />
-      <label className="flex items-center gap-2 text-[13px]">
-        <input type="checkbox" name="share" defaultChecked={kind !== 'SITE_PHOTO' && kind !== 'WORKING'} />
-        {replacing || ['LAYOUT_2D', 'FURNITURE', 'RENDER_3D'].includes(kind) ? `Share with ${tab.customerFirst} for approval (one notice)` : `Share with ${tab.customerFirst}`}
-      </label>
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="submit" className="btn pri sm" disabled={pending}>
-          Upload
-        </button>
-        {replacing ? (
-          <button type="button" className="btn ghost sm" onClick={onDone}>
-            Cancel
-          </button>
-        ) : null}
-      </div>
-      <Message m={message} />
-    </form>
   );
 }
 

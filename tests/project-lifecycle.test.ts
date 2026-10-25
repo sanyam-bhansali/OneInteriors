@@ -46,6 +46,16 @@ describe('the lifecycle moves', () => {
     }
   });
 
+  it('with the design process, goes design → pre-execution → execution on the steps’ ticks (DESIGN-PROCESS-PLAN.md Decision 10)', () => {
+    expect(movePhase('DESIGN', { kind: 'design.done' })).toEqual({ ok: true, phase: 'PRE_EXECUTION', changed: true });
+    expect(movePhase('PRE_EXECUTION', { kind: 'preexecution.done' })).toEqual({ ok: true, phase: 'EXECUTION', changed: true });
+    expect(movePhase('DESIGN', { kind: 'preexecution.done' })).toEqual({ ok: true, phase: 'EXECUTION', changed: true });
+    // Never backwards, and the old sign-off does not jump pre-execution.
+    expect(movePhase('EXECUTION', { kind: 'design.done' })).toEqual({ ok: true, phase: 'EXECUTION', changed: false });
+    expect(movePhase('PRE_EXECUTION', { kind: 'design.signed_off' })).toEqual({ ok: true, phase: 'PRE_EXECUTION', changed: false });
+    expect(movePhase('PRE_EXECUTION', { kind: 'handover.provisional' })).toEqual({ ok: true, phase: 'CLOSURE', changed: true });
+  });
+
   it('lets an older project still reading DESIGN reach closure at handover', () => {
     expect(movePhase('DESIGN', { kind: 'handover.provisional' })).toEqual({ ok: true, phase: 'CLOSURE', changed: true });
   });
