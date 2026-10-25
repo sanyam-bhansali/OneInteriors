@@ -383,6 +383,8 @@ function tileFor(key: AppKey, n: (id: SectionId) => number): { sub: string; tone
     }
     case 'projects':
       return { sub: 'Plans, site log, snags, design', tone: '', badge: 0 };
+    case 'documents':
+      return { sub: 'Every project’s drawings, finals and handover packs', tone: '', badge: 0 };
     case 'site':
       return { sub: "Today's updates from site", tone: '', badge: 0 };
     case 'money':

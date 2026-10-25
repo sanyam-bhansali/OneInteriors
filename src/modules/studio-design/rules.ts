@@ -362,9 +362,13 @@ export function lateDays(step: { plannedOn: string | null; done: boolean }, toda
 export const DESIGN_KINDS = {
   LAYOUT_2D: '2D layout',
   FURNITURE: 'Furniture layout',
-  RENDER_3D: '3D render',
-  WORKING: 'Working drawing',
+  RENDER_3D: '3D & renders',
+  WORKING: 'Working drawings',
   SITE_PHOTO: 'Site photo',
+  /* Project documents (24 Oct 2026; DESIGN-PROCESS-PLAN.md §3; documents.ts). */
+  ELECTRICAL: 'Electrical drawings & quotation',
+  MATERIAL_LIST: 'Material list',
+  CUT_LIST: 'Factory cut list',
 } as const;
 export type DesignKind = keyof typeof DESIGN_KINDS;
 export const isDesignKind = (v: unknown): v is DesignKind => typeof v === 'string' && v in DESIGN_KINDS;
@@ -374,7 +378,7 @@ export const isDesignKind = (v: unknown): v is DesignKind => typeof v === 'strin
  * working drawings (the design process, 24 Oct 2026: working drawings are
  * approved by the client before they are final). Site photos are not.
  */
-export const FOR_APPROVAL: readonly DesignKind[] = ['LAYOUT_2D', 'FURNITURE', 'RENDER_3D', 'WORKING'];
+export const FOR_APPROVAL: readonly DesignKind[] = ['LAYOUT_2D', 'FURNITURE', 'RENDER_3D', 'WORKING', 'ELECTRICAL'];
 
 /** Which client approval step a drawing's approval ticks (DESIGN-PROCESS-PLAN.md Decision 4). */
 export function approvalKindOfDrawing(kind: string | null | undefined): ApprovalKind | null {

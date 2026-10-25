@@ -28,7 +28,7 @@ export interface HomePrefs {
 
 export const DEFAULT_HOME_PREFS: HomePrefs = { order: [], hidden: [], strip: true, landing: 'home' };
 
-const KEYS = new Set<string>(['today', 'clients', 'quotes', 'projects', 'site', 'money', 'vendors', 'calendar', 'intros', 'rates', 'team']);
+const KEYS = new Set<string>(['today', 'clients', 'quotes', 'projects', 'documents', 'site', 'money', 'vendors', 'calendar', 'intros', 'rates', 'team']);
 
 function keyList(v: unknown): AppKey[] {
   if (!Array.isArray(v)) return [];

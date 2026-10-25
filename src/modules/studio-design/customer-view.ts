@@ -25,6 +25,7 @@ import type { Prisma } from '@prisma/client';
 import { progressOf } from '@/modules/project/step-rules';
 import { dayFromDb, istDay } from '@/modules/project/working-days';
 import { chainLocks, CUSTOMER_REASON, DESIGN_KINDS, drawingsOf, formatLength, gateOf, isDelayReasonKey, nextStep, type DesignKind, type GateStage } from './rules';
+import { versionLabels } from './documents';
 
 /** The project columns the design card reads, besides the stages and documents the projection already selects. */
 export const CUSTOMER_DESIGN_SELECT = {
@@ -101,6 +102,8 @@ export interface CustomerDrawing {
   room: string | null;
   title: string;
   version: number;
+  /** "2.0": the number the studio reads too (documents.ts `versionLabels`): an approval makes the next whole number. */
+  versionLabel: string;
   state: 'waiting' | 'approved' | 'changes' | 'shared';
   answeredOn: string | null;
   /** The client's own words on this version. */
@@ -194,6 +197,12 @@ export function toCustomerDesign(
     };
   });
   const answers = (row.designReviews ?? []).map((r) => ({ documentId: r.documentId, verdict: r.verdict === 'APPROVED' ? ('APPROVED' as const) : ('CHANGES' as const), comment: r.comment, at: r.at }));
+  const lastVerdict = new Map<string, 'APPROVED' | 'CHANGES'>();
+  for (const a of [...answers].sort((x, y) => x.at.getTime() - y.at.getTime())) lastVerdict.set(a.documentId, a.verdict);
+  const labels = versionLabels(
+    docs.map((d) => ({ id: d.id, version: d.version ?? 1, supersedesId: d.supersedesId ?? null })),
+    new Set([...lastVerdict.entries()].filter(([, v]) => v === 'APPROVED').map(([k]) => k)),
+  );
   // The projection's documents are shared and live already; drawings are the ones with a design kind.
   const drawings = drawingsOf(
     docs.map((d) => ({
@@ -219,6 +228,7 @@ export function toCustomerDesign(
             room: d.room,
             title: d.title,
             version: d.version,
+            versionLabel: labels.get(d.id) ?? `${d.version}.0`,
             state: d.state,
             answeredOn: d.answer ? isoDay(d.answer.at) : null,
             comment: d.answer?.comment ?? null,

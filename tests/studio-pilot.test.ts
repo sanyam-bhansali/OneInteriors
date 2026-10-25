@@ -122,7 +122,7 @@ describe('the pilot switch: off', () => {
     const team = appsFor(m('OWNER', false)).find((a) => a.key === 'team')!;
     expect(team.href).toBe('/studio/settings/team');
     expect(team.name).toBe('Team');
-    expect(comingSoonApps(m('OWNER', false)).map((a) => a.key)).toEqual(['projects', 'site', 'money', 'vendors', 'intros']);
+    expect(comingSoonApps(m('OWNER', false)).map((a) => a.key)).toEqual(['projects', 'documents', 'site', 'money', 'vendors', 'intros']);
     expect(comingSoonApps(m('SALES', false))).toEqual([]);
     expect(appsFor(m('SALES', false)).map((a) => a.key)).toEqual(['clients', 'quotes', 'calendar']);
   });

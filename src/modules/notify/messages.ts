@@ -52,6 +52,8 @@ export type ProjectEvent =
   | { kind: 'extra-answered'; projectId: string; title: string; approved: boolean; totalPaise: number }
   | { kind: 'signoff-requested'; studio: string; what: string }
   | { kind: 'signoff-signed'; projectId: string; what: string; name: string }
+  // Project documents (24 Oct 2026; DESIGN-PROCESS-PLAN.md §3.3), to the studio: the client approved a drawing, or asked for changes.
+  | { kind: 'design-answered'; projectId: string; title: string; approved: boolean; comment: string | null }
   // My work (owner, 15 Oct 2026; studio/my-work-rules.ts), to studio staff only: the morning digest,
   // the evening "due tomorrow", and steps someone else completed today on their projects.
   | { kind: 'my-work'; today: number; missed: number; soon: number; first: string }
@@ -269,6 +271,13 @@ export function messageFor(e: ProjectEvent): Message {
         title: `Please read and sign · ${e.studio}`,
         body: clip(`${e.what} is ready for your signature. Read it in the app, tick I agree and sign.`, 160),
         url: '/app/project',
+      };
+    case 'design-answered':
+      return {
+        template: 'design.answered',
+        title: e.approved ? 'Approved by the client' : 'Changes asked by the client',
+        body: clip(e.approved ? `${e.title}: approved. It is the final now.` : `${e.title}: ${e.comment ?? 'changes asked'}`, 160),
+        url: `/studio/projects/${e.projectId}?tab=design`,
       };
     case 'signoff-signed':
       return {

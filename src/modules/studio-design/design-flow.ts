@@ -26,8 +26,9 @@ import 'server-only';
 
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { notify } from '@/modules/notify/service';
-import { storeProjectDoc } from '@/modules/storage/project-docs';
+import { notify, notifyStudio } from '@/modules/notify/service';
+import { docPathBelongsTo, projectDocExists, projectDocTicket, storeProjectDoc } from '@/modules/storage/project-docs';
+import { checkUpload, finalsOf, handoverMissing, isDocType, isHandoverDocsStep, type DocType } from './documents';
 import { currentMember, memberOnProject } from '@/modules/studio/access';
 import { can, needsAssignment } from '@/modules/studio/roles';
 import { recordEvent, type ProjectActor } from '@/modules/project/events';
@@ -205,6 +206,24 @@ export async function tickDesignStep(
   const gate = waitingOn ? ({ open: false, payment: waitingOn } as const) : gateOf(step.gatePayment, gateStages);
   const ok = checkDesignTick({ done: step.doneAt !== null, inScope: step.inScope, needsDocument: step.needsDocument, label: step.label }, gate, hasFile, note);
   if (!ok.ok) return ok;
+  // The handover documentation step needs the handover pack (DESIGN-PROCESS-PLAN.md §3.5).
+  if (isHandoverDocsStep(step.label)) {
+    const docs = await prisma.homeDocument.findMany({
+      where: { projectId, deletedAt: null, designKind: { not: null } },
+      select: { id: true, designKind: true, room: true, version: true, supersedesId: true, sharedAt: true, createdAt: true },
+    });
+    const reviews = await prisma.homeDesignReview.findMany({ where: { projectId }, orderBy: { at: 'asc' }, select: { documentId: true, verdict: true } });
+    const last = new Map<string, 'APPROVED' | 'CHANGES'>();
+    for (const r of reviews) last.set(r.documentId, r.verdict);
+    const missing = handoverMissing(
+      finalsOf(
+        docs
+          .filter((d) => isDocType(d.designKind))
+          .map((d) => ({ id: d.id, type: d.designKind as DocType, room: d.room, version: d.version, supersedesId: d.supersedesId, shared: d.sharedAt !== null, answer: last.get(d.id) ?? null, at: d.createdAt })),
+      ),
+    );
+    if (missing.length) return { ok: false, error: `The handover pack is not complete yet: ${missing.join(', ')}. Upload them (working and electrical drawings approved by the client), then tick.` };
+  }
   // A late step says why (DESIGN-PROCESS-PLAN.md Decision 6); filed on the Delays list.
   const plannedDay = step.plannedOn ? dayFromDb(step.plannedOn) : null;
   const late = lateTickCheck({ plannedOn: plannedDay, responsible: step.responsible }, istDay(now), input.reason);
@@ -601,19 +620,41 @@ export async function saveMeasurements(projectId: string, rows: readonly Measure
  * there. Shared at once or kept as a draft. Sharing one the client approves
  * sends them one notice; nothing chases them after that.
  */
+/**
+ * A one-time place in storage for a project file the browser uploads itself
+ * (up to 50 MB; DESIGN-PROCESS-PLAN.md §3.6): design work on this project,
+ * a type we take. Recorded afterwards with `uploadDrawing` and `uploaded`.
+ */
+export async function docUploadTicket(projectId: string, name: unknown, bytes: unknown): Promise<{ ok: true; path: string; url: string | null } | { ok: false; error: string }> {
+  const check = await memberOnProject(projectId, 'design.work');
+  if (!check.ok) return check;
+  const c = checkUpload(name, bytes);
+  if (!c.ok) return c;
+  return projectDocTicket(projectId, c.ext);
+}
+
 export async function uploadDrawing(
   projectId: string,
   input: { kind: unknown; room?: unknown; title?: unknown; supersedesId?: unknown; share?: unknown },
   file: File | null,
   now = new Date(),
+  /** A file the browser already put in storage with `docUploadTicket`. */
+  uploaded: { path: unknown; name: unknown; bytes: unknown } | null = null,
 ): Promise<DesignResult> {
   const check = await memberOnProject(projectId, 'design.work');
   if (!check.ok) return check;
-  const supersedesId = typeof input.supersedesId === 'string' && input.supersedesId ? input.supersedesId.slice(0, 64) : null;
+  const all = await prisma.homeDocument.findMany({ where: { projectId }, select: { id: true, version: true, supersedesId: true, sharedAt: true, deletedAt: true, designKind: true, room: true, title: true } });
+  let supersedesId = typeof input.supersedesId === 'string' && input.supersedesId ? input.supersedesId.slice(0, 64) : null;
+  /* Uploading a type (and room) again is its next version (DESIGN-PROCESS-PLAN.md §3.2): the chain's newest live document. */
+  if (!supersedesId && isDesignKind(input.kind)) {
+    const roomWanted = (typeof input.room === 'string' ? input.room.replace(/\s+/g, ' ').trim() : '').toLowerCase();
+    const replaced = new Set(all.filter((d) => !d.deletedAt).map((d) => d.supersedesId));
+    const head = all.find((d) => !d.deletedAt && d.designKind === input.kind && (d.room ?? '').toLowerCase() === roomWanted && !replaced.has(d.id));
+    if (head) supersedesId = head.id;
+  }
   let previous: { designKind: string | null; room: string | null; title: string } | null = null;
   let version = 1;
   if (supersedesId) {
-    const all = await prisma.homeDocument.findMany({ where: { projectId }, select: { id: true, version: true, supersedesId: true, sharedAt: true, deletedAt: true, designKind: true, room: true, title: true } });
     const doc = all.find((d) => d.id === supersedesId);
     if (!doc || !isDesignKind(doc.designKind)) return { ok: false, error: 'That drawing is not on this project.' };
     const allowed = canSupersede(doc, all);
@@ -622,13 +663,25 @@ export async function uploadDrawing(
     previous = doc;
   }
   const kind = previous?.designKind ?? input.kind;
-  if (!isDesignKind(kind)) return { ok: false, error: 'Pick what it is: 2D layout, furniture layout, 3D render…' };
+  if (!isDesignKind(kind)) return { ok: false, error: 'Pick what it is: 2D layout, 3D, working drawings…' };
   const room = (typeof input.room === 'string' ? input.room.replace(/\s+/g, ' ').trim() : '') || previous?.room || '';
   if (room.length > ROOM_MAX) return { ok: false, error: `Keep the room name under ${ROOM_MAX} characters.` };
   const typed = typeof input.title === 'string' ? input.title.replace(/\s+/g, ' ').trim().slice(0, TITLE_MAX) : '';
   const title = typed || previous?.title || [DESIGN_KINDS[kind], room].filter(Boolean).join(', ');
-  if (!file || file.size === 0) return { ok: false, error: 'Choose the file.' };
-  const stored = await storeProjectDoc(projectId, file);
+  let stored: { ok: true; path: string } | { ok: false; error: string };
+  let meta: { name: string; type: string; bytes: number };
+  if (uploaded) {
+    const c = checkUpload(uploaded.name, uploaded.bytes);
+    if (!c.ok) return c;
+    if (!docPathBelongsTo(uploaded.path, projectId)) return { ok: false, error: 'That upload is not for this project. Try again.' };
+    if (!(await projectDocExists(uploaded.path))) return { ok: false, error: 'The file did not finish uploading. Try again.' };
+    stored = { ok: true, path: uploaded.path };
+    meta = { name: String(uploaded.name).slice(0, 200), type: c.contentType, bytes: Number(uploaded.bytes) };
+  } else {
+    if (!file || file.size === 0) return { ok: false, error: 'Choose the file.' };
+    stored = await storeProjectDoc(projectId, file);
+    meta = { name: file.name.slice(0, 200), type: file.type, bytes: file.size };
+  }
   if (!stored.ok) return stored;
   const share = input.share === true || input.share === 'true' || input.share === 'on';
   const p = await projectFacts(projectId);
@@ -641,9 +694,9 @@ export async function uploadDrawing(
         kind: kind === 'SITE_PHOTO' ? 'OTHER' : 'DRAWINGS',
         title,
         storageKey: stored.path,
-        originalName: file.name.slice(0, 200),
-        contentType: file.type,
-        bytes: file.size,
+        originalName: meta.name,
+        contentType: meta.type,
+        bytes: meta.bytes,
         uploadedById: check.member.userId,
         byStudio: true,
         sharedAt: share ? now : null,
@@ -704,6 +757,7 @@ export async function answerDrawing(userId: string, documentId: string, verdict:
       id: true,
       projectId: true,
       designKind: true,
+      title: true,
       sharedAt: true,
       deletedAt: true,
       // Only a newer version the client can see blocks an answer: a draft v2 is the studio's, not theirs.
@@ -722,6 +776,14 @@ export async function answerDrawing(userId: string, documentId: string, verdict:
     if (approves) await tickApprovalStep(tx, doc.projectId, approves, userId, now);
     return r;
   });
+  // The studio hears the answer (DESIGN-PROCESS-PLAN.md §3.3): the office, and the project's designer.
+  void (async () => {
+    const p = await prisma.homeProject.findUnique({ where: { id: doc.projectId }, select: { introduction: { select: { studioId: true } }, designer: { select: { userId: true } } } });
+    if (!p) return;
+    const event = { kind: 'design-answered' as const, projectId: doc.projectId, title: doc.title, approved: ok.verdict === 'APPROVED', comment: ok.comment };
+    await notifyStudio(p.introduction.studioId, event);
+    if (p.designer?.userId) await notify(p.designer.userId, event, { email: false });
+  })().catch((e) => console.error('[studio-design] answer notice failed', e));
   return { ok: true, id: row.id };
 }
 

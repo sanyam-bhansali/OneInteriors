@@ -2,8 +2,10 @@
 
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
-import type { DesignStepView, DesignTab, DrawingView } from '@/modules/studio-design/store';
-import { CLIENT_REASONS, DESIGN_KINDS, STUDIO_REASONS, type DesignKind } from '@/modules/studio-design/rules';
+import type { DesignStepView, DesignTab, FinalView } from '@/modules/studio-design/store';
+import type { DocType } from '@/modules/studio-design/documents';
+import { UploadDocument } from './UploadDocument';
+import { CLIENT_REASONS, STUDIO_REASONS } from '@/modules/studio-design/rules';
 import { RESPONSIBLE_LABEL, RESPONSIBLES } from '@/modules/studio-design/template';
 import { formatINR } from '@/lib/money';
 import { CustomerSees, OnlyYourTeam } from '../marks';
@@ -26,7 +28,6 @@ import {
   shareDrawingAction,
   shareMoodBoardAction,
   tickDesignStepAction,
-  uploadDrawingAction,
 } from './design-actions';
 
 /**
@@ -776,7 +777,7 @@ function MoodBoard({ tab }: { tab: DesignTab }) {
 
 // ── Drawings ──────────────────────────────────────────────────
 
-const STATE_WORDS: Record<DrawingView['state'], { text: string; tone: string }> = {
+const STATE_WORDS: Record<DesignTab['drawings'][number]['state'], { text: string; tone: string }> = {
   draft: { text: 'Draft · only your team', tone: 'var(--muted)' },
   waiting: { text: 'Waiting for the client', tone: 'var(--warn)' },
   approved: { text: 'Approved', tone: 'var(--good)' },
@@ -784,43 +785,77 @@ const STATE_WORDS: Record<DrawingView['state'], { text: string; tone: string }> 
   shared: { text: 'Shared', tone: 'var(--acc)' },
 };
 
+/** The tag on a document's version (DESIGN-PROCESS-PLAN.md §3.3). */
+const FINAL_WORDS: Record<FinalView['state'], { text: string; tone: string }> = {
+  approved: { text: 'Approved', tone: 'var(--good)' },
+  waiting: { text: 'Waiting for approval', tone: 'var(--warn)' },
+  changes: { text: 'Changes asked', tone: 'var(--bad)' },
+  shared: { text: 'Shared', tone: 'var(--text2)' },
+  draft: { text: 'Draft (team only)', tone: 'var(--muted)' },
+};
+
+/**
+ * Documents (owner and Hauspire's design team, 24 Oct 2026;
+ * DESIGN-PROCESS-PLAN.md §3): one line per type and room, the version that
+ * counts (the approved one, else the newest shared), downloads named for
+ * you; the newest version's actions under it; "Show all versions" for the
+ * repository and "Handover documents" for the pack.
+ */
 function Drawings({ tab }: { tab: DesignTab }) {
   const { pending, message, run } = useRun();
-  const [replacing, setReplacing] = useState<DrawingView | null>(null);
+  const [replacing, setReplacing] = useState<{ type: DocType; room: string | null } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const newest = (type: string, room: string | null) => tab.drawings.find((d) => d.kind === type && (d.room ?? '').toLowerCase() === (room ?? '').toLowerCase()) ?? null;
   return (
-    <section aria-label="Drawings and 3D" className="card flex flex-col gap-3 p-5">
+    <section aria-label="Documents" className="card flex flex-col gap-3 p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className={h2}>Drawings and 3D</h2>
-        <CustomerSees name={tab.customerFirst} />
+        <h2 className={h2}>Documents</h2>
+        <span className="flex flex-wrap items-center gap-3 text-[13px]">
+          <Link href={`/studio/projects/${tab.projectId}/documents`} className="acc-t">
+            Show all versions
+          </Link>
+          <Link href={`/studio/projects/${tab.projectId}/documents/handover`} className="acc-t">
+            Handover documents
+          </Link>
+          <CustomerSees name={tab.customerFirst} />
+        </span>
       </div>
-      {tab.drawings.length === 0 ? <p className={`m-0 ${muted}`}>Nothing uploaded yet.</p> : null}
+      {tab.finals.length === 0 ? <p className={`m-0 ${muted}`}>Nothing uploaded yet.</p> : null}
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
-        {tab.drawings.map((d) => {
-          const s = STATE_WORDS[d.state];
+        {tab.finals.map((f) => {
+          const s = FINAL_WORDS[f.state];
+          const d = newest(f.type, f.room);
           return (
-            <li key={d.id} className="flex flex-col gap-1 border-t border-[var(--fill2)] pt-2 text-[14px]">
+            <li key={f.id} className="flex flex-col gap-1 border-t border-[var(--fill2)] pt-2 text-[14px]">
               <div className="flex flex-wrap items-center gap-2">
-                <a href={d.url || undefined} target="_blank" rel="noreferrer" className="font-semibold text-[var(--ink)]">
-                  {d.title}
-                </a>
-                <span className={muted}>
-                  {d.kindLabel}
-                  {d.room ? ` · ${d.room}` : ''} · R{d.version}
-                  {d.revisions ? ` (${d.revisions} revision${d.revisions === 1 ? '' : 's'})` : ''}
+                <span className="font-semibold text-[var(--ink)]">
+                  {f.typeLabel}
+                  {f.room ? `, ${f.room}` : ''}
                 </span>
+                <span className="mono text-[12.5px]">v{f.versionLabel}</span>
                 <span className="text-[12.5px] font-medium" style={{ color: s.tone }}>
                   {s.text}
+                </span>
+                <span className={muted}>{dayWords(f.on)}</span>
+                {f.url ? (
+                  <a href={f.url} className="text-[12.5px] acc-t" title={f.fileName}>
+                    Download
+                  </a>
+                ) : null}
+              </div>
+              {f.newerWaiting && d ? (
+                <span className={muted}>
+                  v{d.versionLabel} shared, {STATE_WORDS[d.state].text.toLowerCase()}
                   {d.state === 'waiting' && d.waitingDays ? ` · ${d.waitingDays} day${d.waitingDays === 1 ? '' : 's'}` : ''}
                 </span>
-              </div>
-              {d.askedFor ? <span className={muted}>Asked for: &ldquo;{d.askedFor}&rdquo;</span> : null}
-              {d.answer?.comment ? (
+              ) : null}
+              {d?.askedFor ? <span className={muted}>Asked for: &ldquo;{d.askedFor}&rdquo;</span> : null}
+              {d?.answer?.comment ? (
                 <span className={muted}>
                   {tab.customerFirst} on {dayWords(d.answer.on)}: &ldquo;{d.answer.comment}&rdquo;
                 </span>
               ) : null}
-              {d.reminder ? (
+              {d?.reminder ? (
                 <span className="flex flex-wrap items-center gap-2">
                   <span className={muted}>Remind {tab.customerFirst} yourself (we send nothing):</span>
                   <button
@@ -836,13 +871,13 @@ function Drawings({ tab }: { tab: DesignTab }) {
               ) : null}
               {tab.canWork ? (
                 <span className="flex flex-wrap gap-2">
-                  {d.state === 'draft' ? (
+                  {d && d.state === 'draft' ? (
                     <button type="button" className="btn ghost sm" disabled={pending} onClick={() => run(() => shareDrawingAction(tab.projectId, d.id))}>
-                      Share with {tab.customerFirst}
+                      Share v{d.versionLabel} with {tab.customerFirst}
                     </button>
                   ) : null}
-                  <button type="button" className="btn ghost sm" onClick={() => setReplacing(d)}>
-                    Upload R{d.version + 1}
+                  <button type="button" className="btn ghost sm" onClick={() => setReplacing({ type: f.type, room: f.room })}>
+                    Upload a new version
                   </button>
                 </span>
               ) : null}
@@ -850,71 +885,11 @@ function Drawings({ tab }: { tab: DesignTab }) {
           );
         })}
       </ul>
-      {tab.canWork ? <UploadDrawing tab={tab} replacing={replacing} onDone={() => setReplacing(null)} /> : null}
+      {tab.canWork ? (
+        <UploadDocument key={replacing ? `${replacing.type}|${replacing.room}` : 'new'} projectId={tab.projectId} customerFirst={tab.customerFirst} preset={replacing} onDone={replacing ? () => setReplacing(null) : undefined} />
+      ) : null}
       <Message m={message} />
     </section>
-  );
-}
-
-function UploadDrawing({ tab, replacing, onDone }: { tab: DesignTab; replacing: DrawingView | null; onDone: () => void }) {
-  const { pending, message, run } = useRun();
-  const [kind, setKind] = useState<DesignKind>('LAYOUT_2D');
-  return (
-    <form
-      key={replacing?.id ?? 'new'}
-      className="flex flex-col gap-2 rounded-[14px] bg-[var(--soft)] p-3"
-      onSubmit={(e) => {
-        e.preventDefault();
-        const form = e.currentTarget;
-        const data = new FormData(form);
-        data.set('projectId', tab.projectId);
-        if (replacing) data.set('supersedesId', replacing.id);
-        run(() => uploadDrawingAction(data), () => {
-          form.reset();
-          onDone();
-        });
-      }}
-    >
-      <p className="m-0 text-[13.5px] font-semibold">{replacing ? `New version of ${replacing.title} (R${replacing.version + 1})` : 'Upload a drawing, render or site photo'}</p>
-      {!replacing ? (
-        <div className="flex flex-wrap gap-2">
-          <label className="flex flex-col gap-1 text-[13px]">
-            What it is
-            <select name="kind" value={kind} onChange={(e) => setKind(e.target.value as DesignKind)} className="fld">
-              {Object.entries(DESIGN_KINDS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-[13px]">
-            Room
-            <input name="room" maxLength={60} className="fld" placeholder="Living room" />
-          </label>
-          <label className="flex flex-col gap-1 text-[13px]">
-            Name (optional)
-            <input name="title" maxLength={100} className="fld" />
-          </label>
-        </div>
-      ) : null}
-      <input type="file" name="file" accept="application/pdf,image/jpeg,image/png,image/webp" required className="text-[13px]" />
-      <label className="flex items-center gap-2 text-[13px]">
-        <input type="checkbox" name="share" defaultChecked={kind !== 'SITE_PHOTO' && kind !== 'WORKING'} />
-        {replacing || ['LAYOUT_2D', 'FURNITURE', 'RENDER_3D'].includes(kind) ? `Share with ${tab.customerFirst} for approval (one notice)` : `Share with ${tab.customerFirst}`}
-      </label>
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="submit" className="btn pri sm" disabled={pending}>
-          Upload
-        </button>
-        {replacing ? (
-          <button type="button" className="btn ghost sm" onClick={onDone}>
-            Cancel
-          </button>
-        ) : null}
-      </div>
-      <Message m={message} />
-    </form>
   );
 }
 

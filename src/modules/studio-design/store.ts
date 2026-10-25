@@ -27,7 +27,7 @@ import { ledger } from '@/modules/project/payment-ledger';
 import { toLedgerRow } from '@/modules/project/payments-flow';
 import { progressOf } from '@/modules/project/step-rules';
 import { dayFromDb, istDay } from '@/modules/project/working-days';
-import { signedDocUrls } from '@/modules/storage/project-docs';
+import { signedDocDownloads, signedDocUrls } from '@/modules/storage/project-docs';
 import { prepForBrief, type OpsPrepRoom } from '@/modules/prepare/prep';
 import { ROOM_KEYS, ROOM_LABELS } from '@/modules/prepare/rooms';
 import { elementsForRoom } from '@/modules/prepare/board';
@@ -49,6 +49,7 @@ import {
   type GateStage,
 } from './rules';
 import { bhkOf, isResponsible, RESPONSIBLE_LABEL, type Responsible } from './template';
+import { DOC_TYPES, docFileName, extOf, finalsOf, handoverMissing, isDocType, versionLabels, type DocType, type FinalDoc } from './documents';
 
 const ROW_SELECT = {
   id: true,
@@ -134,12 +135,25 @@ export interface DrawingView {
   revisions: number;
   state: DrawingState;
   url: string;
+  /** "2.1": worked out from the chain and the client's answers (documents.ts `versionLabels`). */
+  versionLabel: string;
+  /** TYPE_Studio_Client_date_time_vX.Y.ext: what the download is called. */
+  fileName: string;
   sharedOn: string | null;
   waitingDays: number;
   answer: { verdict: 'APPROVED' | 'CHANGES'; comment: string | null; on: string } | null;
   askedFor: string | null;
   /** For the designer's own WhatsApp; shown once it has waited a few days. */
   reminder: string | null;
+}
+
+/** One line of the Documents card: the version that counts for a type and room (documents.ts `finalsOf`). */
+export interface FinalView extends FinalDoc {
+  typeLabel: string;
+  versionLabel: string;
+  on: string;
+  url: string;
+  fileName: string;
 }
 
 export interface DesignTab {
@@ -169,6 +183,9 @@ export interface DesignTab {
   visits: { id: string; at: string; purpose: string; status: 'BOOKED' | 'DONE' | 'CANCELLED'; note: string | null }[];
   measurements: { room: string; length: string; width: string; height: string; note: string | null }[];
   drawings: DrawingView[];
+  /** The documents' finals, one per type and room, and what the handover pack still lacks (DESIGN-PROCESS-PLAN.md §3.4–3.5). */
+  finals: FinalView[];
+  handoverMissing: string[];
   final: {
     /** False for a member who sees no money: the quotations, their links and the totals stay out (null below). */
     seesQuotes: boolean;
@@ -208,7 +225,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       introduction: {
         select: {
           studioId: true,
-          studio: { select: { tradeName: true } },
+          studio: { select: { tradeName: true, branding: { select: { documentName: true } } } },
           brief: { select: { id: true, contactName: true, propertyType: true, user: { select: { name: true } } } },
         },
       },
@@ -274,9 +291,31 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
     ? await prisma.homeDocument.findMany({ where: { projectId, id: { in: fileIds } }, select: { id: true, title: true, storageKey: true } })
     : [];
   const designDocs = p.documents;
-  const urls = await signedDocUrls([...stepFiles.map((f) => f.storageKey), ...designDocs.map((d) => d.storageKey)]).catch(() => [] as string[]);
+  /* Project documents (DESIGN-PROCESS-PLAN.md §3): version numbers from the chain and the client's answers, names we make, finals. */
+  const lastAnswer = new Map<string, 'APPROVED' | 'CHANGES'>();
+  for (const r of [...p.designReviews].sort((a, b) => a.at.getTime() - b.at.getTime())) lastAnswer.set(r.documentId, r.verdict);
+  const approvedIds = new Set([...lastAnswer.entries()].filter(([, v]) => v === 'APPROVED').map(([k]) => k));
+  const labels = versionLabels(designDocs, approvedIds);
+  const docName = p.introduction.studio.branding?.documentName?.trim() || studio;
+  const clientFull = brief.contactName?.trim() || brief.user?.name?.trim() || customerFirst;
+  const fileNameOf = (d: (typeof designDocs)[number]) =>
+    isDocType(d.designKind)
+      ? docFileName({ type: d.designKind, room: d.room, studio: docName, client: clientFull, at: d.createdAt, version: labels.get(d.id) ?? '1.0', ext: extOf(d.storageKey) })
+      : d.title;
+  const [urls, downloads] = await Promise.all([
+    signedDocUrls(stepFiles.map((f) => f.storageKey)).catch(() => [] as string[]),
+    signedDocDownloads(designDocs.map((d) => ({ key: d.storageKey, name: fileNameOf(d) }))).catch(() => [] as string[]),
+  ]);
   const fileUrl = new Map(stepFiles.map((f, i) => [f.id, { id: f.id, title: f.title, url: urls[i] ?? '' }]));
-  const docUrl = new Map(designDocs.map((d, i) => [d.id, urls[stepFiles.length + i] ?? '']));
+  const docUrl = new Map(designDocs.map((d, i) => [d.id, downloads[i] ?? '']));
+  const finals: FinalView[] = finalsOf(
+    designDocs
+      .filter((d) => !d.deletedAt && isDocType(d.designKind))
+      .map((d) => ({ id: d.id, type: d.designKind as DocType, room: d.room, version: d.version, supersedesId: d.supersedesId, shared: d.sharedAt !== null, answer: lastAnswer.get(d.id) ?? null, at: d.createdAt })),
+  ).map((f) => {
+    const d = designDocs.find((x) => x.id === f.id)!;
+    return { ...f, typeLabel: DOC_TYPES[f.type].label, versionLabel: labels.get(f.id) ?? '1.0', on: istDay(d.createdAt), url: docUrl.get(f.id) ?? '', fileName: fileNameOf(d) };
+  });
 
   const locks = chainLocks(items.map((i) => ({ gatePayment: i.gatePayment, done: i.doneAt !== null, inScope: i.inScope })), gates);
   const steps: DesignStepView[] = items.map((i, k) => {
@@ -340,6 +379,8 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       revisions: d.revisions,
       state: d.state,
       url: docUrl.get(d.id) ?? '',
+      versionLabel: labels.get(d.id) ?? '1.0',
+      fileName: fileNameOf(designDocs.find((x) => x.id === d.id)!),
       sharedOn: d.sharedAt ? istDay(d.sharedAt) : null,
       waitingDays: w,
       answer: d.answer ? { verdict: d.answer.verdict, comment: d.answer.comment, on: istDay(d.answer.at) } : null,
@@ -401,6 +442,8 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       visits: p.siteVisits.map((v) => ({ id: v.id, at: v.at.toISOString(), purpose: v.purpose, status: v.status, note: v.note })),
       measurements: p.measurements.map((m) => ({ room: m.room, length: fmt(m.lengthMm), width: fmt(m.widthMm), height: fmt(m.heightMm), note: m.note })),
       drawings,
+      finals,
+      handoverMissing: handoverMissing(finals),
       final: {
         seesQuotes,
         signed: seesQuotes ? (signed ?? null) : null,

@@ -10,7 +10,7 @@ import 'server-only';
  * authorised (the customer's own project, the studio's, ops).
  */
 
-import { supabaseConfig } from '@/lib/env';
+import { isProduction, supabaseConfig } from '@/lib/env';
 import { siteUrlFor } from '@/lib/site';
 import { generatedDocLink } from '@/modules/portal/documents';
 
@@ -88,4 +88,74 @@ async function signedStorageUrls(paths: string[]): Promise<string[]> {
   } catch {
     return paths.map(() => '');
   }
+}
+
+// ── Large files straight from the browser (DESIGN-PROCESS-PLAN.md §3.6) ──
+
+/** Storage is not set up on this machine and it is not production: a path is handed out, nothing is stored (local development). */
+const unstored = () => !(secretKey() && supabaseConfig()) && !isProduction();
+
+export type DocTicket = { ok: true; path: string; url: string | null } | { ok: false; error: string };
+
+/**
+ * A one-time URL the browser PUTs one project file to (up to 50 MB: the
+ * bucket's own size limit must allow it), so a drawing set or a SketchUp
+ * model never passes through a server function. `url: null` in local
+ * development with no storage. The caller has already checked who may upload
+ * to this project, and the file's type and size (studio-design/documents.ts
+ * `checkUpload`).
+ */
+export async function projectDocTicket(projectId: string, ext: string): Promise<DocTicket> {
+  const path = `project_${projectId}/${crypto.randomUUID()}.${ext}`;
+  if (unstored()) return { ok: true, path: `dev-unstored/${path}`, url: null };
+  const config = supabaseConfig();
+  const key = secretKey();
+  if (!config || !key) return { ok: false, error: 'Documents are not switched on for this deployment yet.' };
+  try {
+    const res = await fetch(`${config.url}/storage/v1/object/upload/sign/${BUCKET}/${encodeURI(path)}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (!res.ok) return { ok: false, error: 'We could not get a place to store that file. Try again.' };
+    const json = (await res.json()) as { url?: string };
+    if (!json.url) return { ok: false, error: 'We could not get a place to store that file. Try again.' };
+    return { ok: true, path, url: `${config.url}/storage/v1${json.url}` };
+  } catch {
+    return { ok: false, error: 'We could not reach storage. Try again in a minute.' };
+  }
+}
+
+/** Is a path this project's own upload? (A path from a browser proves nothing until checked.) */
+export const docPathBelongsTo = (path: unknown, projectId: string): path is string =>
+  typeof path === 'string' && (path.startsWith(`project_${projectId}/`) || path.startsWith(`dev-unstored/project_${projectId}/`)) && !path.includes('..') && path.length < 200;
+
+/** Whether a finished upload is really in the bucket. */
+export async function projectDocExists(path: string): Promise<boolean> {
+  if (path.startsWith('dev-unstored/')) return unstored();
+  const config = supabaseConfig();
+  const key = secretKey();
+  if (!config || !key) return false;
+  try {
+    const res = await fetch(`${config.url}/storage/v1/object/info/${BUCKET}/${encodeURI(path)}`, { headers: { Authorization: `Bearer ${key}`, apikey: key } });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Signed links that download under a name we made (TYPE_Studio_Client_…,
+ * studio-design/documents.ts `docFileName`), in order; "" where one could not
+ * be made, or for a local file that was never stored.
+ */
+export async function signedDocDownloads(items: readonly { key: string; name: string }[]): Promise<string[]> {
+  const real = items.map((i, k) => ({ ...i, k })).filter((i) => i.key && !i.key.startsWith('dev-unstored/'));
+  const urls = real.length ? await signedDocUrls(real.map((i) => i.key)) : [];
+  const out = items.map(() => '');
+  real.forEach((i, n) => {
+    const u = urls[n] ?? '';
+    out[i.k] = u && u.includes('/storage/v1/') ? `${u}${u.includes('?') ? '&' : '?'}download=${encodeURIComponent(i.name)}` : u;
+  });
+  return out;
 }

@@ -141,3 +141,16 @@ export async function addDesignStepBelowAction(input: { projectId: string; after
     await addDesignStepBelow(projectId, id(input.afterId), { label: text(input.label, 200), responsible: text(input.responsible, 20), days: text(input.days, 4), hours: text(input.hours, 6) }),
   );
 }
+
+/** Records a project document the browser put straight into storage (DESIGN-PROCESS-PLAN.md §3.6); its version follows the type and room. */
+export async function uploadDocumentAction(input: { projectId: string; kind: string; room: string; share: boolean; path: string; name: string; bytes: number }): Promise<DesignResult> {
+  const projectId = id(input.projectId);
+  return done(
+    projectId,
+    await uploadDrawing(projectId, { kind: text(input.kind, 30), room: text(input.room, 80), share: input.share === true }, null, new Date(), {
+      path: text(input.path, 200),
+      name: text(input.name, 200),
+      bytes: Number(input.bytes),
+    }),
+  );
+}
