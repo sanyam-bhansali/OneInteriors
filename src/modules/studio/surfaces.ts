@@ -138,6 +138,9 @@ export function homeFor(role: StudioRoleName, fullSoftware?: boolean): string {
  */
 function designerMayOpen(path: string): boolean {
   if (under(path, DESIGN_HOME) || under(path, DOCUMENTS_HOME) || path === BRING_IN_PATH) return true;
+  /* A Design Final quotation, its comparison and print (the design meeting, 24 Oct 2026): which quotation is checked on the page (quotes.ts `designerQuoteScope`). */
+  const q = path.match(/^\/studio\/quotations\/([A-Za-z0-9_-]+)(?:\/(?:compare|print))?\/?$/);
+  if (q && !['first', 'builder', 'requests', 'terms', 'new', 'import'].includes(q[1]!)) return true;
   /* A project page, and its documents (all versions, the handover pack); which project is checked on the page. */
   const m = path.match(/^\/studio\/projects\/([^/?#]+)(?:\/documents(?:\/handover)?)?\/?$/);
   return Boolean(m && m[1] !== 'start');

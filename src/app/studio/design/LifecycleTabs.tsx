@@ -103,7 +103,13 @@ function ProjectCard({ c, tab, showDesigner }: { c: BoardCard; tab: LifeTab; sho
       <div className="lhead">
         <span className="min-w-0">
           <b>{c.client}</b>
+          {c.priority ? (
+            <span className="ml-1 text-[var(--warn)]" title={`Priority ${c.priority} of 5`} aria-label={`Priority ${c.priority} of 5`}>
+              {'★'.repeat(c.priority)}
+            </span>
+          ) : null}
           <span className="muted sm">
+            {c.category ? `${c.category} · ` : ''}
             {c.flat}
             {showDesigner && c.designer ? ` · ${c.designer}` : ''}
           </span>

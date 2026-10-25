@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import {
   createQuote,
+  setQuoteCategory,
   setQuoteStatus,
   saveQuoteLines,
   applyConfiguration,
@@ -364,4 +365,16 @@ export async function saveFirstQuoteAction(input: FirstQuoteInput & { newLead?: 
   refresh(r.id);
   revalidatePath(`/studio/clients/${clientId}`);
   redirect(`/studio/quotations/${r.id}`);
+}
+
+/** Essential, Premium or Luxe on a quotation (DESIGN-PROCESS-PLAN.md §4.3); the project booked on it follows. */
+export async function setQuoteCategoryAction(quoteId: string, category: string | null): Promise<{ ok: true } | { ok: false; error: string }> {
+  const id = String(quoteId ?? '').slice(0, 64);
+  const r = await setQuoteCategory(id, category);
+  if (r.ok) {
+    revalidatePath(`/studio/quotations/${id}`);
+    revalidatePath('/studio/quotations');
+    revalidatePath('/studio/projects');
+  }
+  return r;
 }

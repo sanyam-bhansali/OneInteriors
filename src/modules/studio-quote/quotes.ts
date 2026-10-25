@@ -42,6 +42,8 @@ import { record as recordLeadEvent } from '@/modules/studio-practice/events';
 import { issueRevision } from '@/modules/studio-sales/revisions';
 import { quoteWriteRefusal } from './write-rules';
 import { cleanNote } from './line-note';
+import { readRevisionLines, readRevisionTerms, type RevisionLine, type RevisionTerms } from '@/modules/studio-sales/revision-rules';
+import { currentMember } from '@/modules/studio/access';
 
 export type QuoteStatusName = 'DRAFT' | 'ISSUED' | 'ACCEPTED' | 'DECLINED';
 export type QuoteStageName = 'SALES' | 'DESIGN';
@@ -108,6 +110,8 @@ export interface QuoteRow {
   phases: PaymentPhase[] | null;
   /** The Sales Final this Design Final was made from. */
   basedOnId: string | null;
+  /** Essential, Premium or Luxe (DESIGN-PROCESS-PLAN.md §4.3); null when not set. */
+  category: 'ESSENTIAL' | 'PREMIUM' | 'LUXURY' | null;
   /** The client's floor plan rooms, when their brief came with a read plan. */
   planRooms: PlanRoomSize[];
   welcomeNote: string | null;
@@ -124,6 +128,8 @@ export interface QuoteSummary {
   number: string;
   status: QuoteStatusName;
   stage: QuoteStageName;
+  /** Essential, Premium or Luxe (DESIGN-PROCESS-PLAN.md §4.3). */
+  category: 'ESSENTIAL' | 'PREMIUM' | 'LUXURY' | null;
   clientName: string;
   clientPhone: string | null;
   clientId: string | null;
@@ -181,6 +187,7 @@ export async function myQuotes(search?: string): Promise<QuoteSummary[]> {
         number: row.number,
         status: row.status as QuoteStatusName,
         stage: row.stage as QuoteStageName,
+        category: row.category,
         clientName: row.clientName,
         clientPhone: row.clientPhone,
         clientId: row.clientId,
@@ -235,7 +242,7 @@ export async function quotesToCompareInStudio(currentId: string, studioId: strin
   const current = await loadQuote(currentId, studioId, {});
   if (!current?.basedOnId) return null;
   const base = await loadQuote(current.basedOnId, studioId, {});
-  return base ? { base, current } : null;
+  return base ? { base: await asSalesFinal(base), current } : null;
 }
 
 async function loadQuote(id: string, studioId: string, scope: Prisma.StudioQuoteWhereInput): Promise<QuoteRow | null> {
@@ -274,6 +281,7 @@ async function loadQuote(id: string, studioId: string, scope: Prisma.StudioQuote
       quoteDate: row.quoteDate ?? row.createdAt,
       phases: quotePhases(row.phases, row.studio.paymentPhases),
       basedOnId: row.basedOnId,
+      category: row.category,
       clientId: row.clientId,
       planRooms,
       welcomeNote: row.welcomeNote,
@@ -408,25 +416,53 @@ export interface NewQuoteInput {
  * owner and PM, the studio's; a salesperson, only those of leads assigned
  * to them. `where` goes into every quotation query here, beside `studioId`.
  */
-async function quoteScope(): Promise<{ studioId: string; where: Prisma.StudioQuoteWhereInput; write: Prisma.StudioQuoteWhereInput; lead: LeadScope } | null> {
+async function quoteScope(): Promise<{ studioId: string; where: Prisma.StudioQuoteWhereInput; write: Prisma.StudioQuoteWhereInput; lead: LeadScope | null } | null> {
   const lead = await myLeadScope();
-  if (!lead || !can(lead.member, 'quote.write', { assigned: true })) return null;
+  if (!lead || !can(lead.member, 'quote.write', { assigned: true })) return designerQuoteScope();
   /* Sales roles (owner, 22 Oct 2026): `where` is what they may read, `write`
      what they may change (their `quote.write` reach); every write below
      uses `write`. */
   return { studioId: lead.studioId, where: lead.quotes, write: lead.quotesWritable, lead };
 }
 
+/**
+ * A designer's quotations (the design meeting, 24 Oct 2026;
+ * DESIGN-PROCESS-PLAN.md §4.1: "designers will manage" the final design
+ * quotation): they read the sales final of the projects they design (they
+ * see money on their projects since 13 Oct) and write only the Design Final
+ * made from it. A design head: every project's. Never a lead, never a sales
+ * quotation, never a new quotation.
+ */
+async function designerQuoteScope(): Promise<{ studioId: string; where: Prisma.StudioQuoteWhereInput; write: Prisma.StudioQuoteWhereInput; lead: null } | null> {
+  const member = await currentMember();
+  if (!member || member.role !== 'DESIGNER' || member.status !== 'ACTIVE' || member.viewOnly) return null;
+  const projects = await prisma.homeProject.findMany({
+    where: { introduction: { studioId: member.studioId }, cancelledAt: null, signedQuoteId: { not: null }, ...(member.designHead ? {} : { designerId: member.id }) },
+    select: { signedQuoteId: true, designFinalQuoteId: true },
+    take: 500,
+  });
+  const signed = projects.map((p) => p.signedQuoteId!).filter(Boolean);
+  const finals = projects.map((p) => p.designFinalQuoteId).filter((x): x is string => Boolean(x));
+  const designFinals: Prisma.StudioQuoteWhereInput = { stage: 'DESIGN', OR: [{ basedOnId: { in: signed } }, { id: { in: finals } }] };
+  return {
+    studioId: member.studioId,
+    where: { studioId: member.studioId, OR: [{ id: { in: signed } }, designFinals] },
+    write: { studioId: member.studioId, ...designFinals },
+    lead: null,
+  };
+}
+
 /** Whether the signed-in person may write quotations at all (for the pages). */
 export async function mayQuote(): Promise<{ seesAll: boolean } | null> {
   const qs = await quoteScope();
-  return qs ? { seesAll: qs.lead.seesAll } : null;
+  return qs ? { seesAll: qs.lead?.seesAll ?? false } : null;
 }
 
 export async function createQuote(input: NewQuoteInput): Promise<QuoteResult> {
   const qs = await quoteScope();
   const studioId = qs?.studioId ?? null;
   if (!qs || !studioId) return { ok: false, error: 'No studio on this account.' };
+  if (!qs.lead) return { ok: false, error: 'New quotations are made by sales. Open the Design Final from the project.' };
 
   /* The lead, checked: a salesperson's own, or any of the studio's for owner and PM. */
   const leadId = input.link?.clientId ?? input.clientId ?? null;
@@ -656,14 +692,15 @@ export async function copyQuote(quoteId: string, copy: CopyKind): Promise<QuoteR
   const qs = await quoteScope();
   const studioId = qs?.studioId ?? null;
   if (!studioId) return { ok: false, error: 'No studio on this account.' };
+  /* A Design Final reads its source (the sales final) and writes only the copy: a designer may read their projects' sales finals, not change them. */
   const source = await prisma.studioQuote.findFirst({
-    where: { ...qs?.write, id: quoteId, studioId },
+    where: { ...(copy.kind === 'design-final' ? qs?.where : qs?.write), id: quoteId, studioId },
     include: { lines: { orderBy: { sortOrder: 'asc' } } },
   });
   if (!source) return { ok: false, error: 'That quotation is not yours.' };
   /* A template copy has no lead, and a salesperson sees only their leads'
      quotations: start a new one from the lead instead. */
-  if (copy.kind === 'template' && qs?.lead.seesAll === false) {
+  if (copy.kind === 'template' && (!qs?.lead || qs.lead.seesAll === false)) {
     return { ok: false, error: 'Start a new quotation from the lead it is for.' };
   }
 
@@ -679,6 +716,20 @@ export async function copyQuote(quoteId: string, copy: CopyKind): Promise<QuoteR
       number = `${source.number}-D${n}`;
     }
   }
+
+  /* A Design Final starts from the sales final as frozen (the revision the booking was made on), not the live lines (DESIGN-PROCESS-PLAN.md §4.1). */
+  const snap = template ? null : await salesFinalSnapshot(source.id);
+  const fromSnap = snap
+    ? {
+        lines: snap.lines.map((l, i) => ({ ...l, sortOrder: i })),
+        feeBps: snap.terms.feeBps,
+        discountBps: snap.terms.discountBps,
+        onSpotPaise: toDb(snap.terms.onSpotPaise),
+        onSpotLabel: snap.terms.onSpotLabel,
+        bookingAdvancePaise: toDb(snap.terms.bookingAdvancePaise),
+        gstBps: snap.terms.gstBps,
+      }
+    : null;
 
   try {
     const created = await prisma.studioQuote.create({
@@ -701,33 +752,49 @@ export async function copyQuote(quoteId: string, copy: CopyKind): Promise<QuoteR
               basedOnId: source.id,
             }),
         config: source.config,
+        category: source.category,
         carpetSqft: source.carpetSqft,
         kitchenRunMm: source.kitchenRunMm,
         bathrooms: source.bathrooms,
-        feeBps: source.feeBps,
-        discountBps: source.discountBps,
-        onSpotPaise: source.onSpotPaise,
-        onSpotLabel: source.onSpotLabel,
-        bookingAdvancePaise: source.bookingAdvancePaise,
-        gstBps: source.gstBps,
+        feeBps: fromSnap?.feeBps ?? source.feeBps,
+        discountBps: fromSnap?.discountBps ?? source.discountBps,
+        onSpotPaise: fromSnap?.onSpotPaise ?? source.onSpotPaise,
+        onSpotLabel: fromSnap ? fromSnap.onSpotLabel : source.onSpotLabel,
+        bookingAdvancePaise: fromSnap?.bookingAdvancePaise ?? source.bookingAdvancePaise,
+        gstBps: fromSnap?.gstBps ?? source.gstBps,
         phases: (source.phases ?? undefined) as Prisma.InputJsonValue | undefined,
         welcomeNote: source.welcomeNote,
         terms: source.terms,
         lines: {
-          create: source.lines.map((l) => ({
-            room: l.room,
-            product: l.product,
-            code: l.code,
-            unit: l.unit,
-            details: l.details,
-            widthMm: l.widthMm,
-            heightMm: l.heightMm,
-            qtyMilli: l.qtyMilli,
-            ratePaise: l.ratePaise,
-            amountPaise: l.amountPaise,
-            note: l.note,
-            sortOrder: l.sortOrder,
-          })),
+          create: fromSnap
+            ? fromSnap.lines.map((l) => ({
+                room: l.room,
+                product: l.product,
+                code: l.code as WorkCodeName,
+                unit: l.unit as QuoteUnitName,
+                details: l.details,
+                widthMm: l.widthMm,
+                heightMm: l.heightMm,
+                qtyMilli: l.qtyMilli,
+                ratePaise: toDb(l.ratePaise),
+                amountPaise: toDb(l.amountPaise),
+                note: l.note ?? null,
+                sortOrder: l.sortOrder,
+              }))
+            : source.lines.map((l) => ({
+                room: l.room,
+                product: l.product,
+                code: l.code,
+                unit: l.unit,
+                details: l.details,
+                widthMm: l.widthMm,
+                heightMm: l.heightMm,
+                qtyMilli: l.qtyMilli,
+                ratePaise: l.ratePaise,
+                amountPaise: l.amountPaise,
+                note: l.note,
+                sortOrder: l.sortOrder,
+              })),
         },
       },
       select: { id: true },
@@ -776,7 +843,40 @@ export async function quotesToCompare(currentId: string, baseId?: string): Promi
   const id = baseId ?? current.basedOnId;
   if (!id) return null;
   const base = await getQuote(id);
-  return base ? { base, current } : null;
+  if (!base) return null;
+  // A Design Final against its Sales Final: always the frozen sales final, never the live lines (DESIGN-PROCESS-PLAN.md §4.1).
+  return { base: !baseId && current.stage === 'DESIGN' ? await asSalesFinal(base) : base, current };
+}
+
+/**
+ * The quotation as its sales final froze it (the revision the booking was
+ * made on): its lines and terms in place of the live ones. As it is when no
+ * sales final was marked. The design meeting (24 Oct 2026;
+ * DESIGN-PROCESS-PLAN.md §4.1): every design revision is compared with what
+ * the client booked, never with the previous design revision.
+ */
+export async function asSalesFinal(q: QuoteRow): Promise<QuoteRow> {
+  const snap = await salesFinalSnapshot(q.id);
+  if (!snap) return q;
+  return {
+    ...q,
+    lines: snap.lines.map((l, i) => ({ ...l, id: `sf-${i}`, sortOrder: i, note: l.note ?? null })),
+    feeBps: snap.terms.feeBps,
+    discountBps: snap.terms.discountBps,
+    onSpotPaise: snap.terms.onSpotPaise,
+    bookingAdvancePaise: snap.terms.bookingAdvancePaise,
+    gstBps: snap.terms.gstBps,
+  };
+}
+
+/** The sales final revision's frozen lines and terms, or null when none was marked. */
+export async function salesFinalSnapshot(quoteId: string): Promise<{ n: number; lines: RevisionLine[]; terms: RevisionTerms } | null> {
+  const row = await prisma.studioQuote
+    .findUnique({ where: { id: quoteId }, select: { salesFinalRevision: { select: { n: true, lines: true, terms: true } } } })
+    .catch(() => null);
+  const r = row?.salesFinalRevision;
+  if (!r) return null;
+  return { n: r.n, lines: readRevisionLines(r.lines), terms: readRevisionTerms(r.terms) };
 }
 
 /**
@@ -852,6 +952,31 @@ async function writableQuote(quoteId: string): Promise<{ ok: true; id: string; f
   const refusal = quoteWriteRefusal({ liveProject: live !== null });
   if (refusal) return { ok: false, error: refusal };
   return { ok: true, id: row.id, feeBps: row.feeBps, status: row.status };
+}
+
+/**
+ * The quotation's category: Essential, Premium or Luxe (the design meeting,
+ * 24 Oct 2026; DESIGN-PROCESS-PLAN.md §4.3), or none. Shown on the quotation,
+ * the list, and the project booked on it, which takes it too.
+ */
+export async function setQuoteCategory(quoteId: string, raw: unknown): Promise<ActionResult> {
+  const qs = await quoteScope();
+  const studioId = qs?.studioId ?? null;
+  if (!qs || !studioId) return { ok: false, error: 'No studio on this account.' };
+  const category = raw === 'ESSENTIAL' || raw === 'PREMIUM' || raw === 'LUXURY' ? raw : null;
+  if (raw !== null && raw !== '' && raw !== undefined && !category) return { ok: false, error: 'Pick Essential, Premium or Luxe.' };
+  const q = await prisma.studioQuote.findFirst({ where: { ...qs.write, id: quoteId, studioId }, select: { id: true, basedOnId: true } });
+  if (!q) return { ok: false, error: 'That quotation is not yours.' };
+  try {
+    await prisma.$transaction([
+      prisma.studioQuote.update({ where: { id: q.id }, data: { category } }),
+      prisma.homeProject.updateMany({ where: { introduction: { studioId }, OR: [{ signedQuoteId: q.id }, { designFinalQuoteId: q.id }, ...(q.basedOnId ? [{ signedQuoteId: q.basedOnId }] : [])] }, data: { category } }),
+    ]);
+    return { ok: true };
+  } catch (error) {
+    console.error('[studio-quote] setQuoteCategory failed', error);
+    return { ok: false, error: 'That did not save.' };
+  }
 }
 
 export async function setQuoteStatus(

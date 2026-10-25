@@ -1763,6 +1763,11 @@ model HomeProject {
   moodBoardNote      String?
   designFinalQuoteId String?
   designClosedAt     DateTime?
+  /// The design meeting (24 Oct 2026; DESIGN-PROCESS-PLAN.md §2.4–2.5): the
+  /// project's priority, 1 to 5 stars, one value the whole studio sees (null
+  /// = not set); and its category, copied from the quotation it was booked on.
+  priority           Int?
+  category           BudgetTier?
   designChanges      Json?
   siteVisits         HomeSiteVisit[]
   measurements       HomeMeasurement[]
@@ -3665,6 +3670,14 @@ model StudioQuote {
   salesFinalSchedule   Json?
   salesFinalAt         DateTime?
   salesFinalById       String?
+  /// The design meeting (24 Oct 2026; docs/studio-os/DESIGN-PROCESS-PLAN.md
+  /// §4.2–4.3): sales' notes for the design team, required to mark the
+  /// sales final, and a voice note kept as audio (a lead-files path; no
+  /// speech-to-text yet, owner 25 Oct 2026). The category the quotation is
+  /// priced as: Essential, Premium or Luxe (BudgetTier LUXURY reads "Luxe").
+  salesFinalNotes      String?     @db.Text
+  salesFinalVoicePath  String?
+  category             BudgetTier?
 
   /// Brought in from the studio's old quotation app (docs/studio-os/
   /// BRING-IN-PROJECTS.md): "hauspire:<source row id>", unique per studio,

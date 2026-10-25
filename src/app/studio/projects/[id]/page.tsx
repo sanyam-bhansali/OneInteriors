@@ -36,6 +36,8 @@ import { signoffsForStudio } from '@/modules/project/signoffs';
 import { ExtrasPanel } from './ExtrasPanel';
 import { SignoffCard } from './SignoffCard';
 import '../projects.css';
+import { PriorityStars } from './PriorityStars';
+import { mayDo } from '@/modules/studio/access';
 
 export const metadata: Metadata = { title: 'Project', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -94,6 +96,9 @@ export default async function ProjectWorkspacePage({
   }
   const w = r.workspace;
   const money = w.contractPaise !== null;
+  /* Priority stars: the owner, the PM and the designer on the project set them (DESIGN-PROCESS-PLAN.md §2.4). */
+  const starMember = await currentMember();
+  const canStar = starMember ? await mayDo(starMember, 'design.work', w.id) : false;
   const me = await currentMember();
   const broughtIn = me ? await broughtInOf(w.id, me.studioId).catch(() => null) : null;
   const [viewer, decisions, life, closure, snagWin] = await Promise.all([
@@ -141,6 +146,7 @@ export default async function ProjectWorkspacePage({
           </Link>
           <h1>{w.home}</h1>
           <div className="flex flex-wrap gap-2">
+            <PriorityStars projectId={w.id} initial={w.priority} canEdit={canStar} />
             <span className="chip">{w.customer}</span>
             {w.ownClient ? (
               <span className="chip" title="Not introduced by One Interiors: no introduction, no commission">

@@ -15,6 +15,7 @@ import {
   moveDesignStep,
   moveDesignStepOrder,
   saveMeasurements,
+  setProjectPriority,
   setStepTask,
   setVisitStatus,
   shareDrawing,
@@ -153,4 +154,14 @@ export async function uploadDocumentAction(input: { projectId: string; kind: str
       bytes: Number(input.bytes),
     }),
   );
+}
+
+export async function setProjectPriorityAction(projectId: string, stars: number | null): Promise<DesignResult> {
+  const pid = id(projectId);
+  const r = await setProjectPriority(pid, stars);
+  if (r.ok) {
+    revalidatePath('/studio/projects');
+    revalidatePath('/studio/design');
+  }
+  return done(pid, r);
 }

@@ -203,6 +203,7 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
                               <span className="mono">{q.number}</span>
                               <span className={`chip hchip ${TONE[q.status]}`}>{STATUS_LABELS[q.status]}</span>
                               <span className="chip hchip">{STAGE_LABELS[q.stage]}</span>
+                              {q.category ? <span className="chip hchip">{q.category === 'LUXURY' ? 'Luxe' : q.category === 'PREMIUM' ? 'Premium' : 'Essential'}</span> : null}
                               {q.fromMarketplace ? <span className="chip hchip oi">One Interiors</span> : null}
                               {q.lineCount === 0 ? <span className="warn-t">No lines yet</span> : null}
                             </div>

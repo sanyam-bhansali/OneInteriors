@@ -1,6 +1,7 @@
 'use server';
 
 import { findClients, type FoundClient } from '@/modules/studio-practice/clients';
+import { searchEverything, type FoundThing } from '@/modules/studio/search';
 
 /**
  * Find somebody, from anywhere in the studio.
@@ -17,4 +18,10 @@ import { findClients, type FoundClient } from '@/modules/studio-practice/clients
 export async function searchAction(query: string): Promise<FoundClient[]> {
   if (typeof query !== 'string') return [];
   return findClients(query);
+}
+
+/** Projects, quotations, documents and notes (the design meeting, 24 Oct 2026; DESIGN-PROCESS-PLAN.md §5). */
+export async function searchMoreAction(query: string): Promise<FoundThing[]> {
+  if (typeof query !== 'string') return [];
+  return searchEverything(query);
 }

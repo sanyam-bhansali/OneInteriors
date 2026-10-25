@@ -50,6 +50,7 @@ import {
 } from './rules';
 import { bhkOf, isResponsible, RESPONSIBLE_LABEL, type Responsible } from './template';
 import { DOC_TYPES, docFileName, extOf, finalsOf, handoverMissing, isDocType, versionLabels, type DocType, type FinalDoc } from './documents';
+import { signedLeadFileLinks } from '@/modules/storage/lead-files';
 
 const ROW_SELECT = {
   id: true,
@@ -185,6 +186,11 @@ export interface DesignTab {
   drawings: DrawingView[];
   /** The documents' finals, one per type and room, and what the handover pack still lacks (DESIGN-PROCESS-PLAN.md §3.4–3.5). */
   finals: FinalView[];
+  /** Sales' notes for the design team from the sales final, and its voice note (DESIGN-PROCESS-PLAN.md §4.2). */
+  fromSales: { notes: string | null; voiceUrl: string | null; by: string | null; on: string | null } | null;
+  /** Essential, Premium or Luxe, from the quotation it was booked on; and, for Premium, the rounds of 3D changes asked so far of the 2 included. */
+  category: 'ESSENTIAL' | 'PREMIUM' | 'LUXURY' | null;
+  changeRounds: number;
   handoverMissing: string[];
   final: {
     /** False for a member who sees no money: the quotations, their links and the totals stay out (null below). */
@@ -215,6 +221,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
     select: {
       id: true,
       signedQuoteId: true,
+      category: true,
       designFinalQuoteId: true,
       designClosedAt: true,
       designChanges: true,
@@ -389,6 +396,17 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
     };
   });
 
+  /* From sales: the notes and voice note marked with the sales final the project was booked on (DESIGN-PROCESS-PLAN.md §4.2). */
+  const sq = p.signedQuoteId
+    ? await prisma.studioQuote
+        .findUnique({ where: { id: p.signedQuoteId }, select: { salesFinalNotes: true, salesFinalVoicePath: true, salesFinalAt: true, salesFinalById: true, category: true } })
+        .catch(() => null)
+    : null;
+  const salesBy = sq?.salesFinalById ? await prisma.studioMember.findUnique({ where: { id: sq.salesFinalById }, select: { user: { select: { name: true } } } }).catch(() => null) : null;
+  const voiceUrl = sq?.salesFinalVoicePath ? ((await signedLeadFileLinks([sq.salesFinalVoicePath]).catch(() => new Map<string, string>())).get(sq.salesFinalVoicePath) ?? null) : null;
+  const fromSales = sq && (sq.salesFinalNotes || voiceUrl) ? { notes: sq.salesFinalNotes, voiceUrl, by: salesBy?.user.name?.trim() || null, on: sq.salesFinalAt ? istDay(sq.salesFinalAt) : null } : null;
+  const category = p.category ?? sq?.category ?? null;
+
   const canAssign = may('design.assign');
   // The quotations (numbers, links) and the frozen totals go to those who see payments or write quotes — a designer too since the lifecycle (owner, 13 Oct 2026: designers see money on their projects).
   const seesQuotes = may('payment.read') || may('quote.write');
@@ -443,6 +461,9 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       measurements: p.measurements.map((m) => ({ room: m.room, length: fmt(m.lengthMm), width: fmt(m.widthMm), height: fmt(m.heightMm), note: m.note })),
       drawings,
       finals,
+      fromSales,
+      category,
+      changeRounds: [...lastAnswer.entries()].filter(([id, v]) => v === 'CHANGES' && designDocs.some((d) => d.id === id && d.designKind === 'RENDER_3D')).length,
       handoverMissing: handoverMissing(finals),
       final: {
         seesQuotes,

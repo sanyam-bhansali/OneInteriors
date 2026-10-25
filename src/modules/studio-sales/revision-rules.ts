@@ -77,6 +77,29 @@ export function needsNewRevision(last: { lines: readonly RevisionLine[]; terms: 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
 /** A stored revision's lines, read defensively: a row that does not parse is left out. */
+export const SALES_NOTES_MIN = 10;
+export const SALES_NOTES_MAX = 3000;
+
+/**
+ * Sales' notes for the design team, required to mark the sales final (the
+ * design meeting, 24 Oct 2026; DESIGN-PROCESS-PLAN.md §4.2): what the client
+ * wants, the budget, what was promised. Empty keeps the notes already there
+ * (changing the payment stages of the same sales final).
+ */
+export function checkSalesNotes(raw: unknown, existing: string | null): { ok: true; notes: string } | { ok: false; error: string } {
+  const text = typeof raw === 'string' ? raw.replace(/\r\n/g, '\n').trim() : '';
+  const notes = text || (existing ?? '').trim();
+  if (notes.length < SALES_NOTES_MIN) return { ok: false, error: 'Write the notes for the design team: what the client wants, the budget, what was promised.' };
+  if (notes.length > SALES_NOTES_MAX) return { ok: false, error: `Keep the notes under ${SALES_NOTES_MAX} characters.` };
+  return { ok: true, notes };
+}
+
+/** The voice note's file extension from its recorded type; null for a type we do not keep. */
+export function voiceExtOf(type: unknown): 'webm' | 'm4a' | 'ogg' | null {
+  const t = typeof type === 'string' ? type.split(';')[0]!.trim().toLowerCase() : '';
+  return t === 'audio/webm' ? 'webm' : t === 'audio/mp4' || t === 'audio/x-m4a' ? 'm4a' : t === 'audio/ogg' ? 'ogg' : null;
+}
+
 export function readRevisionLines(raw: unknown): RevisionLine[] {
   if (!Array.isArray(raw)) return [];
   const out: RevisionLine[] = [];

@@ -5,7 +5,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { appForPath, tabForPath, STUDIO_HOME, type StudioApp } from '@/modules/studio/apps';
 import type { FoundClient } from '@/modules/studio-practice/clients';
-import { searchAction } from '../search-actions';
+import { searchAction, searchMoreAction } from '../search-actions';
+import type { FoundThing } from '@/modules/studio/search';
 import { AppIcon, LineIcon } from './icons';
 import { Oim, Verified } from './brand';
 import { ThemeToggle } from './theme';
@@ -218,7 +219,7 @@ interface Row {
   href: string;
   title: string;
   sub?: string;
-  group: 'Apps' | 'Clients';
+  group: 'Apps' | 'Clients' | 'Projects' | 'Documents' | 'Quotations' | 'Notes';
   app?: StudioApp;
 }
 
@@ -226,6 +227,7 @@ function Palette({ apps, canSearchClients, onClose }: { apps: StudioApp[]; canSe
   const router = useRouter();
   const [q, setQ] = useState('');
   const [clients, setClients] = useState<FoundClient[]>([]);
+  const [more, setMore] = useState<FoundThing[]>([]);
   const [busy, setBusy] = useState(false);
   const [sel, setSel] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -234,8 +236,9 @@ function Palette({ apps, canSearchClients, onClose }: { apps: StudioApp[]; canSe
 
   const query = q.trim();
   useEffect(() => {
-    if (!canSearchClients || query.length < 2) {
+    if (query.length < 2) {
       setClients([]);
+      setMore([]);
       setBusy(false);
       return;
     }
@@ -243,10 +246,17 @@ function Palette({ apps, canSearchClients, onClose }: { apps: StudioApp[]; canSe
     let live = true;
     const t = setTimeout(async () => {
       try {
-        const found = await searchAction(query);
-        if (live) setClients(found);
+        /* Clients for the office and sales; projects, quotations, documents and notes for everyone, as far as they may read (DESIGN-PROCESS-PLAN.md §5). */
+        const [found, things] = await Promise.all([canSearchClients ? searchAction(query) : Promise.resolve([]), searchMoreAction(query)]);
+        if (live) {
+          setClients(found);
+          setMore(things);
+        }
       } catch {
-        if (live) setClients([]);
+        if (live) {
+          setClients([]);
+          setMore([]);
+        }
       } finally {
         if (live) setBusy(false);
       }
@@ -275,8 +285,9 @@ function Palette({ apps, canSearchClients, onClose }: { apps: StudioApp[]; canSe
       sub: [c.society, c.stageName, c.assignedToName ? `with ${c.assignedToName}` : 'in the pool'].filter(Boolean).join(' · '),
       group: 'Clients',
     }));
-    return [...clientRows, ...appRows];
-  }, [apps, clients, query]);
+    const moreRows: Row[] = more.map((m) => ({ key: m.key, href: m.href, title: m.title, sub: m.sub, group: m.group }));
+    return [...clientRows, ...moreRows, ...appRows];
+  }, [apps, clients, more, query]);
 
   useEffect(() => setSel(0), [rows.length]);
 
@@ -289,7 +300,7 @@ function Palette({ apps, canSearchClients, onClose }: { apps: StudioApp[]; canSe
     [onClose, router],
   );
 
-  const groups: Row['group'][] = ['Clients', 'Apps'];
+  const groups: Row['group'][] = ['Clients', 'Projects', 'Documents', 'Quotations', 'Notes', 'Apps'];
   let index = -1;
 
   return (
@@ -315,7 +326,7 @@ function Palette({ apps, canSearchClients, onClose }: { apps: StudioApp[]; canSe
                 go(rows[sel]);
               }
             }}
-            placeholder={canSearchClients ? 'Type a name, phone, society or an app' : 'Type an app'}
+            placeholder={canSearchClients ? 'Type a name, phone, society, quotation, note or an app' : 'Type a client, document, note or an app'}
             aria-label="Search everything"
           />
           <button type="button" className="btn ghost sm" onClick={onClose}>
@@ -360,7 +371,7 @@ function Palette({ apps, canSearchClients, onClose }: { apps: StudioApp[]; canSe
         <div className="pfoot">
           <span>Enter to open</span>
           <span>Up and down to move</span>
-          <span>{canSearchClients ? 'Type a name, phone or society' : 'Type an app'}</span>
+          <span>{canSearchClients ? 'Type a name, phone, society or a few words of a note' : 'Type a client, a document ("Rohan 2D") or a note'}</span>
         </div>
       </div>
     </div>

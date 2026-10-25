@@ -19,6 +19,9 @@ import { planReaderFor } from '@/modules/studio-quote/from-plan';
 import { quoteDocContext } from '@/modules/studio-quote/document-data';
 import { LineIcon } from '../../ui/icons';
 import '../quotes.css';
+import { salesFinalSnapshot } from '@/modules/studio-quote/quotes';
+import type { QuoteUnitName, WorkCodeName } from '@/modules/studio-quote/pricing';
+import { CategoryPick } from './CategoryPick';
 
 export const metadata: Metadata = {
   title: 'Quotation',
@@ -74,6 +77,8 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
 
   const TONE = { DRAFT: '', ISSUED: 'warn', ACCEPTED: 'good', DECLINED: 'bad' } as const;
 
+  /* A Design Final compares with the sales final as frozen (DESIGN-PROCESS-PLAN.md §4.1). */
+  const salesFinal = quote.stage === 'DESIGN' && quote.basedOnId ? await salesFinalSnapshot(quote.basedOnId) : null;
   /* Booked: a live project runs on it, and the server refuses writes (write-rules.ts). */
   const locked = Boolean(sales?.projectId ?? project.projectId);
   const lastRev = sales?.revisions[sales.revisions.length - 1] ?? null;
@@ -106,6 +111,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
               {STATUS_LABELS[quote.status]}
             </span>
             <span className="chip">{STAGE_LABELS[quote.stage]}</span>
+            <CategoryPick quoteId={quote.id} initial={quote.category} canEdit={!quote.fromMarketplace} />
             {quote.fromMarketplace ? <span className="chip oi">One Interiors</span> : null}
             {quote.issuedOn ? (
               <span>
@@ -186,6 +192,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           locked={locked}
           sentLabel={lastRev ? lastRev.label : null}
           finalHref={finalHref}
+          salesFinalLines={salesFinal ? salesFinal.lines.map((l) => ({ room: l.room, product: l.product, code: l.code as WorkCodeName, unit: l.unit as QuoteUnitName, widthMm: l.widthMm, heightMm: l.heightMm, qtyMilli: l.qtyMilli, amountPaise: l.amountPaise })) : null}
           doc={{
             studio: docCtx.studio,
             brandPages: docCtx.brandPages,

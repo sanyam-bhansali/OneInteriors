@@ -806,7 +806,8 @@ async function designFinalOf(projectId: string, studioId: string) {
  * here — or opens the one that exists.
  */
 export async function makeDesignFinal(projectId: string): Promise<DesignResult> {
-  const check = await memberOnProject(projectId, 'design.assign');
+  /* The designer on the project makes it too (the design meeting, 24 Oct 2026: "designers will manage"). */
+  const check = await memberOnProject(projectId, 'design.close');
   if (!check.ok) return check;
   const { p, df } = await designFinalOf(projectId, check.member.studioId);
   if (!p?.signedQuoteId) return { ok: false, error: 'This project was not started from a quotation, so there is no sales final to copy.' };
@@ -889,4 +890,18 @@ export async function myDesignTemplate() {
   if (!member || !can(member, 'design.template')) return null;
   const s = await prisma.studio.findUnique({ where: { id: member.studioId }, select: { designTemplate: true } });
   return { steps: readDesignTemplate(s?.designTemplate ?? null), custom: Boolean(s?.designTemplate) };
+}
+
+/**
+ * The project's priority, 1 to 5 stars or none (the design meeting, 24 Oct
+ * 2026; DESIGN-PROCESS-PLAN.md §2.4): one value for the whole studio. The
+ * owner, the PM and the designer on the project.
+ */
+export async function setProjectPriority(projectId: string, raw: unknown): Promise<DesignResult> {
+  const check = await memberOnProject(projectId, 'design.work');
+  if (!check.ok) return check;
+  const n = raw === null || raw === '' || raw === undefined ? null : Number(raw);
+  if (n !== null && (!Number.isInteger(n) || n < 1 || n > 5)) return { ok: false, error: 'Pick 1 to 5 stars.' };
+  await prisma.homeProject.update({ where: { id: projectId }, data: { priority: n } });
+  return { ok: true, message: n ? `Priority: ${n} star${n === 1 ? '' : 's'}.` : 'Priority cleared.' };
 }

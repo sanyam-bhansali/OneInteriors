@@ -155,10 +155,12 @@ export async function createSignedProject(db: SignedProjectDb, input: SignedProj
     design: input.design ?? null,
   });
   const payments = built.payments.map((s) => ({ label: s.label, pct: s.pct, amountPaise: s.amountPaise }));
-  await db.studioQuote.update({ where: { id: input.quote.id }, data: { status: 'ACCEPTED' } });
+  const signed = await db.studioQuote.update({ where: { id: input.quote.id }, data: { status: 'ACCEPTED' }, select: { category: true } });
   const created = await db.homeProject.create({
     data: {
       introductionId: input.introductionId,
+      // Essential, Premium or Luxe, as the quotation was priced (DESIGN-PROCESS-PLAN.md §4.3).
+      category: signed?.category ?? null,
       startOn: input.startOn,
       totalDays: input.totalDays,
       signedAt: input.signedAt,

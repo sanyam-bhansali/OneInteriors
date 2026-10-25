@@ -145,6 +145,8 @@ export interface ProjectWorkspace {
   customerFirst: string;
   bhk: string | null;
   tier: string | null;
+  /** 1 to 5 stars, the studio's one priority; null = not set (DESIGN-PROCESS-PLAN.md §2.4). */
+  priority: number | null;
   /** Null for a role that sees no money. */
   contractPaise: number | null;
   signedAt: Date | null;
@@ -174,7 +176,7 @@ export interface ProjectWorkspace {
   canEditNotes: boolean;
 }
 
-const TIER: Record<string, string> = { ESSENTIAL: 'Essential', PREMIUM: 'Premium', LUXURY: 'Luxury' };
+const TIER: Record<string, string> = { ESSENTIAL: 'Essential', PREMIUM: 'Premium', LUXURY: 'Luxe' };
 
 export type WorkspaceResult = { ok: true; workspace: ProjectWorkspace } | { ok: false; error: string };
 
@@ -187,6 +189,8 @@ export async function projectWorkspace(projectId: string, now = new Date()): Pro
   const p = await prisma.homeProject.findUnique({
     where: { id: projectId },
     select: {
+      priority: true,
+      category: true,
       id: true,
       startOn: true,
       totalDays: true,
@@ -276,7 +280,9 @@ export async function projectWorkspace(projectId: string, now = new Date()): Pro
       customer: name,
       customerFirst: firstName(name),
       bhk: bhkLabel(b.propertyType),
-      tier: b.tier ? (TIER[b.tier] ?? null) : null,
+      // The quotation's category (DESIGN-PROCESS-PLAN.md §4.3), else the brief's tier.
+      tier: (p.category ?? b.tier) ? (TIER[(p.category ?? b.tier)!] ?? null) : null,
+      priority: p.priority,
       contractPaise: money && p.contractPaise !== null ? fromDb(p.contractPaise) : null,
       signedAt: p.signedAt,
       plan: planName(p.plan),

@@ -116,6 +116,22 @@ function Overview({ tab }: { tab: DesignTab }) {
           {next.lockedBy ? <span className="ml-1 text-[var(--warn)]"> · opens when the {next.lockedBy} is recorded</span> : null}
         </p>
       ) : null}
+      {tab.category ? (
+        <p className={`m-0 ${muted}`}>
+          <span className="font-semibold text-[var(--ink)]">{CATEGORY_WORD[tab.category]}</span>
+          {tab.category === 'PREMIUM' ? ` · 3D changes asked: ${tab.changeRounds} of the 2 rounds included${tab.changeRounds > 2 ? ' (an extra round: note it as agreed with the client)' : ''}` : ''}
+        </p>
+      ) : null}
+      {tab.fromSales ? (
+        // Sales' notes for the design team, from the sales final (DESIGN-PROCESS-PLAN.md §4.2).
+        <div className="rounded-[10px] bg-[var(--fill)] p-3 text-[13.5px]">
+          <p className="m-0 font-semibold">
+            From sales{tab.fromSales.by ? ` (${tab.fromSales.by}${tab.fromSales.on ? `, ${dayWords(tab.fromSales.on)}` : ''})` : ''}
+          </p>
+          {tab.fromSales.notes ? <p className="m-0 mt-1 whitespace-pre-wrap">{tab.fromSales.notes}</p> : null}
+          {tab.fromSales.voiceUrl ? <audio controls src={tab.fromSales.voiceUrl} className="mt-2 h-8" /> : null}
+        </div>
+      ) : null}
       {tab.overrunDays > 0 ? (
         <p className="m-0 rounded-[10px] bg-[var(--warn-bg)] p-3 text-[13.5px] text-[var(--warn)]">
           Design now ends {tab.overrunDays} day{tab.overrunDays === 1 ? '' : 's'} after the plan&rsquo;s date.{' '}
@@ -164,6 +180,9 @@ function Overview({ tab }: { tab: DesignTab }) {
 }
 
 // ── Steps ─────────────────────────────────────────────────────
+
+/** The category words (BudgetTier LUXURY reads "Luxe", DESIGN-PROCESS-PLAN.md §4.3). */
+const CATEGORY_WORD: Record<'ESSENTIAL' | 'PREMIUM' | 'LUXURY', string> = { ESSENTIAL: 'Essential', PREMIUM: 'Premium', LUXURY: 'Luxe' };
 
 /** "2 h", "30 min", "16 h". */
 const effortWords = (min: number | null): string | null => (min === null || min <= 0 ? null : min < 60 ? `${min} min` : `${Math.round((min / 60) * 10) / 10} h`);
