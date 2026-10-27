@@ -201,6 +201,10 @@ function ProfileSheet({ signOut, onClose }: { signOut: () => Promise<void>; onCl
                     ? 'Names, numbers and roles for your team are changed in Team.'
                     : 'Your name, number and role are set by your studio owner in Team.'}
                 </p>
+                {/* Password sign-in (owner, 27 Oct 2026): change your own. A full load, so the page reads the latest. */}
+                <a href="/studio/password" className="btn ghost sm" style={{ alignSelf: 'flex-start' }}>
+                  Change password
+                </a>
               </section>
 
               <section className="pfsec" aria-labelledby="pf-role">

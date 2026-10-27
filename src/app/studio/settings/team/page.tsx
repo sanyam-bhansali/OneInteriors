@@ -5,6 +5,7 @@ import { currentMember } from '@/modules/studio/access';
 import { FULL_SOFTWARE_ROLES } from '@/modules/studio/roles';
 import { ROLE_LINES, ROLE_NAMES, ROLE_ORDER, STATUS_LINES, roleCan, seatLine } from '@/modules/studio/team-rules';
 import { AddSomeone, PersonActions } from './TeamControls';
+import { studioSignInMode } from '@/modules/auth/studio-password-rules';
 import { RolesTab, SalesPersonControls, TeamTree, type SalesPerson } from './SalesTeam';
 import { buildersSettings } from '@/modules/studio-quote/quote-requests';
 import { QuoteBuilders } from './QuoteBuilders';
@@ -33,6 +34,8 @@ const TABS = [
 
 export default async function TeamPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const [view, member, sp] = await Promise.all([teamView(), currentMember(), searchParams]);
+  /* Password sign-in until WhatsApp codes are live (owner, 27 Oct 2026; auth/studio-password-rules.ts). */
+  const passwordMode = studioSignInMode() === 'password';
   if (!view) {
     return <p className="ox-note">Only your studio owner manages the team.</p>;
   }
@@ -167,7 +170,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
                     </td>
                     <td>
                       {p.isYou || !view.full ? null : (
-                        <PersonActions person={{ id: p.id, name: p.name, role: p.role, status: p.status, siteIds: p.sites.map((s) => s.id), designHead: p.designHead }} sites={view.sites} />
+                        <PersonActions person={{ id: p.id, name: p.name, role: p.role, status: p.status, siteIds: p.sites.map((s) => s.id), designHead: p.designHead }} sites={view.sites} passwordMode={passwordMode} />
                       )}
                     </td>
                   </tr>
@@ -178,6 +181,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         </section>
 
         <AddSomeone
+          passwordMode={passwordMode}
           roles={roles}
           sites={view.sites}
           seatsLeft={Math.max(0, view.freeSeats - view.seatsUsed)}

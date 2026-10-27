@@ -10,6 +10,7 @@ import {
   resendInvite,
   setDesignHead,
   setMemberSites,
+  setTemporaryPassword,
   signOutEverywhere,
   suspendMember,
   type TeamResult,
@@ -87,6 +88,10 @@ export async function signOutEverywhereAction(memberId: string): Promise<TeamRes
 
 export async function setSitesAction(memberId: string, sites: string[]): Promise<TeamResult> {
   return done(setMemberSites(String(memberId), sites));
+}
+
+export async function setPasswordAction(memberId: string): Promise<TeamResult> {
+  return done(setTemporaryPassword(String(memberId)));
 }
 
 export async function setDesignHeadAction(memberId: string, on: boolean): Promise<TeamResult> {

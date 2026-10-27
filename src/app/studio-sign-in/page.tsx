@@ -9,6 +9,7 @@ import { hasDatabase } from '@/lib/env';
 import { THEME_SCRIPT } from '../studio/ui/theme-script';
 import { Splash } from '../studio/home/HomeBits';
 import { StudioSignInForm } from './StudioSignInForm';
+import { studioSignInMode } from '@/modules/auth/studio-password-rules';
 import '../studio/studio-ui.css';
 import './sign-in.css';
 
@@ -40,7 +41,7 @@ export default async function StudioSignInPage() {
     <div className="oi-studio studio-app">
       <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       <Splash greeting="Studio" sub="The software your practice runs on" />
-      <StudioSignInForm initialLang={lang} />
+      <StudioSignInForm initialLang={lang} mode={studioSignInMode()} />
     </div>
   );
 }

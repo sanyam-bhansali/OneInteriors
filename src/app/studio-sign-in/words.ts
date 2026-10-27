@@ -64,6 +64,42 @@ export const SI_WORDS = {
   'phone.hintOk': { en: 'Codes expire in 10 minutes.', hi: 'कोड 10 मिनट में खत्म हो जाता है।', mr: 'कोड 10 मिनिटांत संपतो.' },
   'phone.hintMore': { en: 'Enter all 10 digits', hi: 'पूरे 10 अंक डालें', mr: 'पूर्ण 10 अंक टाका' },
 
+  /* Password sign-in (owner, 27 Oct 2026), until WhatsApp codes are live. */
+  'pw.sub': {
+    en: 'The number your studio added you with, and your password.',
+    hi: 'वही नंबर जिससे स्टूडियो ने आपको जोड़ा, और आपका पासवर्ड।',
+    mr: 'स्टुडिओने ज्या नंबरने तुम्हाला जोडले तो, आणि तुमचा पासवर्ड.',
+  },
+  'pw.label': { en: 'Password', hi: 'पासवर्ड', mr: 'पासवर्ड' },
+  'pw.show': { en: 'Show', hi: 'दिखाएँ', mr: 'दाखवा' },
+  'pw.hide': { en: 'Hide', hi: 'छिपाएँ', mr: 'लपवा' },
+  'pw.note': {
+    en: 'First time? Use the one-time password your studio owner gave you. You choose your own next.',
+    hi: 'पहली बार? स्टूडियो मालिक का दिया एक बार का पासवर्ड डालें। फिर आप अपना पासवर्ड चुनेंगे।',
+    mr: 'पहिल्यांदा? स्टुडिओ मालकाने दिलेला एकदाचा पासवर्ड टाका. मग तुम्ही तुमचा पासवर्ड निवडाल.',
+  },
+  'pw.cta': { en: 'Sign in', hi: 'साइन इन करें', mr: 'साइन इन करा' },
+  'pw.hint': {
+    en: 'Forgot it? Your studio owner makes you a new one in Settings, Team.',
+    hi: 'भूल गए? स्टूडियो मालिक Settings, Team में नया बना देंगे।',
+    mr: 'विसरलात? स्टुडिओ मालक Settings, Team मध्ये नवीन बनवतील.',
+  },
+  'pw.err.invalid_phone': { en: 'That is not a mobile number. Ten digits, starting 6 to 9.', hi: 'यह मोबाइल नंबर नहीं है। 10 अंक, 6 से 9 से शुरू।', mr: 'हा मोबाइल नंबर नाही. 10 अंक, 6 ते 9 ने सुरू.' },
+  'pw.err.no_match': { en: 'That mobile number and password did not match.', hi: 'मोबाइल नंबर और पासवर्ड मेल नहीं खाए।', mr: 'मोबाइल नंबर आणि पासवर्ड जुळले नाहीत.' },
+  'pw.err.no_password': {
+    en: 'You have no password yet. Ask your studio owner to make one for you in Settings, Team.',
+    hi: 'आपका पासवर्ड अभी नहीं बना। स्टूडियो मालिक से Settings, Team में बनवाएँ।',
+    mr: 'तुमचा पासवर्ड अजून नाही. स्टुडिओ मालकाला Settings, Team मध्ये बनवायला सांगा.',
+  },
+  'pw.err.locked': {
+    en: 'Locked after five wrong tries. Ask your studio owner to make you a new password in Settings, Team.',
+    hi: 'पाँच गलत कोशिशों के बाद बंद। स्टूडियो मालिक से Settings, Team में नया पासवर्ड बनवाएँ।',
+    mr: 'पाच चुकीच्या प्रयत्नांनंतर बंद. स्टुडिओ मालकाला Settings, Team मध्ये नवीन पासवर्ड बनवायला सांगा.',
+  },
+  'pw.err.suspended': { en: 'Your studio owner has paused your access. Ask them to reinstate you.', hi: 'स्टूडियो मालिक ने आपकी पहुँच रोकी है। उनसे फिर चालू करवाएँ।', mr: 'स्टुडिओ मालकाने तुमचा प्रवेश थांबवला आहे. त्यांना पुन्हा सुरू करायला सांगा.' },
+  'pw.err.rate_limited': { en: 'Too many tries from here. Wait a few minutes and try again.', hi: 'यहाँ से बहुत कोशिशें हुईं। कुछ मिनट रुककर फिर कोशिश करें।', mr: 'इथून खूप प्रयत्न झाले. काही मिनिटे थांबून पुन्हा करा.' },
+  'pw.err.unavailable': { en: 'Sign-in is not working right now. This is our problem, not yours. Try again shortly.', hi: 'साइन-इन अभी नहीं चल रहा। गलती हमारी है। थोड़ी देर में कोशिश करें।', mr: 'साइन-इन आत्ता चालत नाही. चूक आमची आहे. थोड्या वेळाने करा.' },
+
   'code.h1': { en: 'Enter the 6-digit code', hi: '6 अंकों का कोड डालें', mr: '6 अंकी कोड टाका' },
   'code.sent': { en: 'Sent on WhatsApp to {phone}.', hi: '{phone} पर WhatsApp से भेजा।', mr: '{phone} वर WhatsApp ने पाठवला.' },
   'code.label': { en: '6-digit code', hi: '6 अंकों का कोड', mr: '6 अंकी कोड' },

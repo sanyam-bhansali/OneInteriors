@@ -16,7 +16,8 @@ import { memberFor, viewAsFor } from '@/modules/studio/access';
 import { staffViewFor, type LiveView } from '@/modules/studio/view-as';
 import { ViewAsBanner } from './ViewAsBanner';
 import { asSeenBy, can, type MemberRole } from '@/modules/studio/roles';
-import { TEAM_PATH, TODAY_HOME, usesOfficeShell } from '@/modules/studio/surfaces';
+import { PASSWORD_PATH, TEAM_PATH, TODAY_HOME, usesOfficeShell } from '@/modules/studio/surfaces';
+import { mustChoosePassword } from '@/modules/auth/studio-password';
 import { doorFor, type PilotArea } from '@/modules/studio/pilot';
 import { ComingSoon } from './ComingSoon';
 import { RoleFrame } from './RoleFrame';
@@ -161,6 +162,9 @@ async function StudioLayoutFor({ children, user, view }: { children: React.React
   if (member) {
     if (member.status !== 'ACTIVE') return <Themed><NotActive suspended={member.status === 'SUSPENDED'} /></Themed>;
     const path = (await headers()).get(PATH_HEADER);
+    /* A one-time password from the owner (owner, 27 Oct 2026): choose your
+       own before anything else. Not while staff view as someone (read only). */
+    if (path && !view && !path.startsWith(PASSWORD_PATH) && (await mustChoosePassword(user.id))) redirect(PASSWORD_PATH);
     /* No header (middleware did not run) means no redirect: redirecting on a
        guess could loop. The module layer still holds. */
     const door = path ? doorFor(member, path) : null;
