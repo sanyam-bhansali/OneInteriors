@@ -14,7 +14,9 @@
  * is REMOVED and holds a GSTIN, and `--to` is not REMOVED. In one
  * transaction the GSTIN leaves `--from` and is set on `--to` (with its PAN's
  * last four, clearing any "no registration" declaration, as `setGstin`
- * does). Still a claim: no verification check is recorded. Audited
+ * does), and the quotation letterhead's copy (studio_branding) follows on
+ * both (27 Oct 2026: without it Settings and quotations kept saying "Not
+ * given"). Still a claim: no verification check is recorded. Audited
  * (`studio.gstin.moved`) on both studios.
  *
  * The database is DATABASE_URL from the environment; the host is printed
@@ -52,10 +54,12 @@ async function main() {
 
     await db.$transaction(async (tx) => {
       await tx.studio.update({ where: { id: from.id }, data: { gstin: null } });
+      await tx.studioBranding.updateMany({ where: { studioId: from.id }, data: { gstin: null } });
       await tx.studio.update({
         where: { id: to.id },
         data: { gstin, panLast4: gstin.slice(2, 12).slice(-4), gstinNotApplicable: false, gstinNote: null },
       });
+      await tx.studioBranding.updateMany({ where: { studioId: to.id }, data: { gstin } });
       const after = { gstin, from: from.id, to: to.id, by: 'scripts/move-gstin.ts' };
       await tx.auditLog.createMany({
         data: [
