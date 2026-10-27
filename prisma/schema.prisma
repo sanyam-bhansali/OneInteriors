@@ -877,6 +877,7 @@ model Studio {
   quoteRevisions     StudioQuoteRevision[]
   /// Leads at scale (12 Oct 2026): calendar tasks.
   studioTasks        StudioTask[]
+  officeMeetings     StudioMeeting[]
   /// Studio OS Phase 3: work orders for site crews on customer projects, and
   /// what was paid against them.
   homeWorkOrders     HomeWorkOrder[]
@@ -1001,6 +1002,10 @@ model StudioMember {
   /// Leads at scale: calendar tasks given to them, and ones they wrote.
   tasksAssigned StudioTask[] @relation("TaskAssignee")
   tasksCreated  StudioTask[] @relation("TaskCreator")
+
+  /// Office meetings (owner, 27 Oct 2026): ones they set up, and ones they were asked to.
+  meetingsOrganised StudioMeeting[]      @relation("MeetingOrganiser")
+  meetingInvites    StudioMeetingGuest[]
 
   quoteRequestsAsked    StudioQuoteRequest[] @relation("QuoteRequestAsker")
   quoteRequestsToBuild  StudioQuoteRequest[] @relation("QuoteRequestBuilder")
@@ -5898,4 +5903,65 @@ enum QuoteRequestReason {
   FLOOR_PLAN
   /// Somebody pressed "Request quotation" on the lead.
   REQUESTED
+}
+
+/// An office meeting (owner, 27 Oct 2026; docs/studio-os/OFFICE-MEETINGS.md):
+/// anyone at the studio sets one up with anyone else there, through the
+/// calendar. Each person asked accepts it or suggests another time; the
+/// organiser takes a suggested time (the meeting moves and the others are
+/// asked again), moves it, or cancels it. Never a client: studio staff only.
+model StudioMeeting {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  title    String
+  startsAt DateTime
+  /// How long, in minutes (15 to 480).
+  minutes  Int     @default(30)
+  /// "Conference room", "Site: VTP Cygnus", "Google Meet".
+  place    String?
+  note     String? @db.Text
+
+  /// Who set it up. SetNull when they leave, so the meeting stays for the others.
+  organiserId String?
+  organiser   StudioMember? @relation("MeetingOrganiser", fields: [organiserId], references: [id], onDelete: SetNull)
+
+  cancelledAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  guests StudioMeetingGuest[]
+
+  @@index([studioId, startsAt])
+  @@index([organiserId, startsAt])
+  @@map("studio_meetings")
+}
+
+/// One person asked to an office meeting, and their answer.
+model StudioMeetingGuest {
+  id        String        @id @default(cuid())
+  meetingId String
+  meeting   StudioMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  memberId  String
+  member    StudioMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  answer     MeetingAnswer @default(PENDING)
+  /// PROPOSED: the time they suggest instead.
+  proposedAt DateTime?
+  /// Their words with the answer ("In a site visit till 4").
+  note       String?
+  answeredAt DateTime?
+
+  @@unique([meetingId, memberId])
+  @@index([memberId, answer])
+  @@map("studio_meeting_guests")
+}
+
+/// PENDING: not answered (or the time changed since). ACCEPTED: coming.
+/// PROPOSED: suggests another time, waiting on the organiser.
+enum MeetingAnswer {
+  PENDING
+  ACCEPTED
+  PROPOSED
 }

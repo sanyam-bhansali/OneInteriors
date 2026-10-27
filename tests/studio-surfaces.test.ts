@@ -16,18 +16,20 @@ type Status = 'INVITED' | 'ACTIVE' | 'SUSPENDED';
 const m = (role: Role, status: Status = 'ACTIVE') => ({ role, status });
 
 describe('mayOpen and homeFor', () => {
-  const office = ['/studio', '/studio/clients', '/studio/quotations/q1', '/studio/products', '/studio/settings', '/studio/settings/pipeline', '/studio/projects', '/studio/updates', '/studio/calendar'];
+  const office = ['/studio', '/studio/clients', '/studio/quotations/q1', '/studio/products', '/studio/settings', '/studio/settings/pipeline', '/studio/projects', '/studio/updates', '/studio/calendar/appointments'];
 
-  it('a site supervisor opens site mode and nothing else', () => {
+  it('a site supervisor opens site mode and their calendar (office meetings, 27 Oct 2026), nothing else', () => {
     expect(mayOpen(m('SUPERVISOR'), '/studio/site')).toBe(true);
+    expect(mayOpen(m('SUPERVISOR'), '/studio/calendar/meetings')).toBe(true);
     for (const p of [...office, '/studio/payments', '/studio/settings/team', '/studio/vendors', '/studio/sitex']) {
       expect(mayOpen(m('SUPERVISOR'), p), p).toBe(false);
     }
     expect(homeFor('SUPERVISOR')).toBe('/studio/site');
   });
 
-  it('accounts opens the payments desk and the crews (Phase 3), and nothing else', () => {
+  it('accounts opens the payments desk, the crews (Phase 3) and their calendar, and nothing else', () => {
     expect(mayOpen(m('ACCOUNTS'), '/studio/payments')).toBe(true);
+    expect(mayOpen(m('ACCOUNTS'), '/studio/calendar')).toBe(true);
     expect(mayOpen(m('ACCOUNTS'), '/studio/vendors')).toBe(true);
     expect(mayOpen(m('ACCOUNTS'), '/studio/vendors/pay')).toBe(true);
     expect(mayOpen(m('ACCOUNTS'), '/studio/vendors/orders/wo1/statement')).toBe(true);

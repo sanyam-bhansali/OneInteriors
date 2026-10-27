@@ -146,6 +146,16 @@ function designerMayOpen(path: string): boolean {
   return Boolean(m && m[1] !== 'start');
 }
 
+/**
+ * The calendar every role opens (owner, 27 Oct 2026: office meetings): their
+ * calendar and their meetings. One Interiors visits stay the owner's and PM's.
+ */
+export const CALENDAR_HOME = '/studio/calendar';
+const APPOINTMENTS_PATH = '/studio/calendar/appointments';
+function calendarForAll(path: string): boolean {
+  return under(path, CALENDAR_HOME) && !under(path, APPOINTMENTS_PATH);
+}
+
 /** Who gets the office frame (the rail and search): the office roles, and sales. */
 export function usesOfficeShell(member: MemberRole): boolean {
   return usesOffice(member) || (member.status === 'ACTIVE' && member.role === 'SALES');
@@ -210,13 +220,13 @@ export function mayOpen(viewer: MemberRole, path: string): boolean {
   }
   /* The setup quiz sets the studio's settings up: the owner's alone. */
   if (under(path, SETUP_PATH)) return member.role === 'OWNER';
-  if (member.role === 'SUPERVISOR') return under(path, SITE_HOME);
+  if (member.role === 'SUPERVISOR') return under(path, SITE_HOME) || calendarForAll(path);
   /* Every other role's home: the launcher, which shows only the apps below. */
   if (path === STUDIO_HOME) return true;
   /* Phase 3: accounts keeps the crews and pays them; labour against the contract is the owner's. */
-  if (member.role === 'ACCOUNTS') return under(path, PAYMENTS_HOME) || (under(path, CREWS_HOME) && !under(path, LABOUR_PATH));
+  if (member.role === 'ACCOUNTS') return under(path, PAYMENTS_HOME) || (under(path, CREWS_HOME) && !under(path, LABOUR_PATH)) || calendarForAll(path);
   if (member.role === 'SALES') return salesMayOpen(member, path);
-  if (member.role === 'DESIGNER') return designerMayOpen(path);
+  if (member.role === 'DESIGNER') return designerMayOpen(path) || calendarForAll(path);
   if (under(path, TEAM_PATH)) return can(member, 'team.manage');
   if (under(path, PAYMENT_STAGES_PATH)) return can(member, 'payments.template');
   if (under(path, DESIGN_STEPS_PATH)) return can(member, 'design.template');

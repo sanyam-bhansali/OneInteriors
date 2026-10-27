@@ -24,6 +24,7 @@ import { HomeSearch, LangSeg, Splash } from './HomeBits';
 import { SalesCalls, YourList, type ListRow } from './HomeSections';
 import { MyWork } from './MyWork';
 import { workFor } from '@/modules/studio/my-work';
+import { meetingsWaiting } from '@/modules/studio-office/meetings';
 import { mySitesToday, type SiteCard } from '@/modules/project/site-log';
 import { crewsOnMySites } from '@/modules/studio-crews/store';
 import { closuresRemainingFor, lifecycleBoard } from '@/modules/studio/lifecycle-store';
@@ -63,7 +64,7 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
      this member may see (mySitesToday reads through projectsVisibleTo),
      crews only for roles that may read work orders (crewsOnMySites returns
      nothing to a designer), a designer's own design steps. */
-  const [studio, today, lang, sites, crews, board, closures, work, { tab: rawTab }] = await Promise.all([
+  const [studio, today, lang, sites, crews, board, closures, work, meetingsToAnswer, { tab: rawTab }] = await Promise.all([
     member
       ? prisma.studio.findUnique({ where: { id: member.studioId }, select: { tradeName: true, status: true, onboardingSteps: true, setupQuiz: true } }).catch(() => null)
       : Promise.resolve(null),
@@ -77,6 +78,8 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
     member && ['OWNER', 'PM'].includes(member.role) ? closuresRemainingFor().catch(() => null) : Promise.resolve(null),
     /* My work (owner, 15 Oct 2026): Today, Next 3 days, Missed — the first thing on every home. */
     member ? workFor(member, new Date()).then((r) => r?.work ?? null).catch(() => null) : Promise.resolve(null),
+    /* Office meetings (owner, 27 Oct 2026): ones asked of them, and suggested times on theirs. */
+    member ? meetingsWaiting(member) : Promise.resolve(0),
     searchParams,
   ]);
 
@@ -101,7 +104,7 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
 
   const sections = today?.sections ?? [];
   const n = (id: SectionId) => sectionCount(sections, id);
-  const strip = prefs.strip ? stripFor(sections, allApps) : [];
+  const strip = prefs.strip ? stripFor(sections, allApps, meetingsToAnswer) : [];
   const sees = new Set(allApps.map((a) => a.key));
   const leadsWord = member?.role === 'SALES' ? 'lead' : 'client';
   const cards = sites?.cards ?? [];
@@ -164,7 +167,7 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
           <HomeSearch label={member?.role === 'SALES' ? 'Find a lead' : 'Search anything'} />
           <div className="ph-grid">
             {apps.map((a) => {
-              const t = tileFor(a.key, n);
+              const t = tileFor(a.key, n, meetingsToAnswer);
               return (
                 <Link key={a.key} href={a.href} className="ph-app">
                   <span className="tico" style={{ background: a.bg, color: a.fg }}>
@@ -236,7 +239,7 @@ export default async function StudioHomePage({ searchParams }: { searchParams: P
           </div>
           <div className={`lgrid${apps.length <= 3 ? ' few' : ''}`}>
             {apps.map((a) => {
-              const t = tileFor(a.key, n);
+              const t = tileFor(a.key, n, meetingsToAnswer);
               return (
                 <Link key={a.key} href={a.href} className="tile">
                   <span className="tico" style={{ background: a.bg, color: a.fg }}>
@@ -359,7 +362,7 @@ function sectionCount(sections: readonly TodaySection[], id: SectionId): number 
 }
 
 /** A tile's line under its name, in the design's words, with a count where we have one. */
-function tileFor(key: AppKey, n: (id: SectionId) => number): { sub: string; tone: '' | 'warn' | 'hot'; badge: number } {
+function tileFor(key: AppKey, n: (id: SectionId) => number, meetingsToAnswer = 0): { sub: string; tone: '' | 'warn' | 'hot'; badge: number } {
   const plural = (k: number, one: string, many = `${one}s`) => `${k} ${k === 1 ? one : many}`;
   switch (key) {
     case 'today': {
@@ -378,6 +381,7 @@ function tileFor(key: AppKey, n: (id: SectionId) => number): { sub: string; tone
       return q > 0 ? { sub: `${plural(q, 'sent quote')} to follow up`, tone: 'warn', badge: q } : { sub: 'Build and send quotations', tone: '', badge: 0 };
     }
     case 'calendar': {
+      if (meetingsToAnswer > 0) return { sub: `${plural(meetingsToAnswer, 'meeting')} to answer`, tone: 'warn', badge: meetingsToAnswer };
       const m = n('meetings');
       return m > 0 ? { sub: `${plural(m, 'meeting')} today`, tone: '', badge: 0 } : { sub: 'Nothing booked today', tone: '', badge: 0 };
     }
@@ -401,9 +405,10 @@ function tileFor(key: AppKey, n: (id: SectionId) => number): { sub: string; tone
 }
 
 /** "Right now": the first few things due, each opening where it is done. */
-function stripFor(sections: readonly TodaySection[], apps: readonly StudioApp[]): { t: string; href: string; c: string }[] {
+function stripFor(sections: readonly TodaySection[], apps: readonly StudioApp[], meetingsToAnswer = 0): { t: string; href: string; c: string }[] {
   const has = new Set(apps.map((a) => a.key));
   const out: { t: string; href: string; c: string }[] = [];
+  if (has.has('calendar') && meetingsToAnswer > 0) out.push({ t: `${meetingsToAnswer} ${meetingsToAnswer === 1 ? 'meeting' : 'meetings'} to answer`, href: '/studio/calendar/meetings', c: 'var(--warn-s)' });
   if (has.has('today') && sections.some((s) => s.rows.length > 0)) out.push({ t: 'See your full list for today', href: '/studio/today', c: 'var(--ink)' });
   const words: Partial<Record<SectionId, [string, string, string]>> = {
     calls: ['call left today', 'calls left today', 'var(--acc)'],

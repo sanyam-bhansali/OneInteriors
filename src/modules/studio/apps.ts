@@ -129,7 +129,7 @@ export const APPS: readonly StudioApp[] = [
   },
   {
     key: 'calendar', name: 'Calendar', href: '/studio/calendar', icon: 'calendar', bg: 'var(--info-bg)', fg: 'var(--info)',
-    tabs: [T('Calendar', '/studio/calendar'), T('One Interiors visits', '/studio/calendar/appointments')],
+    tabs: [T('Calendar', '/studio/calendar'), T('Meetings', '/studio/calendar/meetings'), T('One Interiors visits', '/studio/calendar/appointments')],
     owns: ['/studio/calendar'],
   },
   {
@@ -159,10 +159,11 @@ const ROLE_APPS: Record<StudioRoleName, readonly AppKey[]> = {
   /* Sales roles (owner, 22 Oct 2026): Team / Settings shows only when their sales role opens it (`mayOpen`). */
   SALES: ['clients', 'quotes', 'calendar', 'team'],
   /* The design meeting (24 Oct 2026): a designer reaches the design final from the project, not a Quotations tile. */
-  DESIGNER: ['projects', 'documents', 'vendors'],
+  DESIGNER: ['projects', 'documents', 'vendors', 'calendar'],
   PM: ['projects', 'documents', 'vendors', 'quotes', 'today', 'clients', 'site', 'calendar', 'rates', 'team'],
-  ACCOUNTS: ['money', 'vendors', 'quotes'],
-  SUPERVISOR: ['site'],
+  ACCOUNTS: ['money', 'vendors', 'quotes', 'calendar'],
+  /* Office meetings (owner, 27 Oct 2026): everyone has the calendar. A supervisor reaches it from site mode. */
+  SUPERVISOR: ['site', 'calendar'],
 };
 
 function under(path: string, prefix: string): boolean {
