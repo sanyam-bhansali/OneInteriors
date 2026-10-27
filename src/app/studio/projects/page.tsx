@@ -53,15 +53,16 @@ function lanesOf(rows: WorkspaceRow[]): { name: string; rows: WorkspaceRow[] }[]
   return [...lanes.values(), ...(over.rows.length ? [over] : [])].sort((a, b) => a.at - b.at);
 }
 
-export default async function ProjectsPage({ searchParams }: { searchParams?: Promise<{ tab?: string }> }) {
+export default async function ProjectsPage({ searchParams }: { searchParams?: Promise<{ tab?: string; deleted?: string }> }) {
   const now = new Date();
   const [data, score, member, board, sp] = await Promise.all([
     studioProjects(now),
     studioUpdateScore(now), // score: Phase 2
     currentMember(),
     lifecycleBoard().catch(() => null),
-    searchParams ?? Promise.resolve<{ tab?: string }>({}),
+    searchParams ?? Promise.resolve<{ tab?: string; deleted?: string }>({}),
   ]);
+  const justDeleted = sp.deleted === '1';
   const rows = data?.rows ?? [];
   const live = rows.filter((r) => r.stage !== null);
   const own = new Set(data?.ownClientIds ?? []);
@@ -81,6 +82,13 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
       </Link>
     ) : null;
   const lanes = lanesOf(rows);
+  /* Delete and restore (owner, 27 Oct 2026; studio/project-delete.ts). */
+  const deletedLink =
+    member?.role === 'OWNER' ? (
+      <Link href="/studio/projects/deleted" className="btn ghost">
+        Deleted projects
+      </Link>
+    ) : null;
 
   return (
     <div className="content oi-proj">
@@ -99,13 +107,19 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
               : ''}
           </p>
         </div>
-        {startButton || bringInButton ? (
+        {startButton || bringInButton || deletedLink ? (
           <div className="hstack">
+            {deletedLink}
             {bringInButton}
             {startButton}
           </div>
         ) : null}
       </div>
+      {justDeleted ? (
+        <p role="status" className="ox-ok" style={{ margin: 0 }}>
+          Project deleted. It is in Deleted projects if you need it back.
+        </p>
+      ) : null}
 
       {/* My Design · My Execution · My Snags (owner and Hauspire's design team, 24 Oct 2026; DESIGN-PROCESS-PLAN.md §2.3): every project by its phase, for everyone who has the board. */}
       {board && rows.length > 0 ? <LifecycleTabs board={board} tab={asLifeTab(sp.tab)} base="/studio/projects" mine={board.scope === 'designer'} /> : null}

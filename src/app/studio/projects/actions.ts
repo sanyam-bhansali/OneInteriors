@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { addProject, setProjectStage, type ProjectStageName } from '@/modules/studio-practice/projects';
+import { deleteProject, restoreProject, type DeleteResult } from '@/modules/studio/project-delete';
 
 // `State` and `IDLE` live in studio/form-state.ts. A 'use server'
 // file may only export async functions — and Turbopack rejects even a
@@ -37,4 +38,25 @@ export async function setStageAction(id: string, stage: ProjectStageName): Promi
   if (!result.ok) return result;
   refresh();
   return { ok: true };
+}
+
+/* Delete and restore a project (owner, 27 Oct 2026; studio/project-delete.ts). */
+export async function deleteProjectAction(projectId: string, typedName: string, reason: string): Promise<DeleteResult> {
+  const r = await deleteProject(projectId, typedName, reason);
+  if (r.ok) {
+    refresh();
+    revalidatePath('/studio/home');
+    revalidatePath('/studio/design');
+  }
+  return r;
+}
+
+export async function restoreProjectAction(projectId: string): Promise<DeleteResult> {
+  const r = await restoreProject(projectId);
+  if (r.ok) {
+    refresh();
+    revalidatePath('/studio/projects/deleted');
+    revalidatePath('/studio/home');
+  }
+  return r;
 }
