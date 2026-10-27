@@ -17,7 +17,9 @@ import { dayFromDb, istDay } from '@/modules/project/working-days';
 import { homeLabel } from '@/modules/studio/workspace-view';
 import { daysBetween } from '@/modules/project/working-days';
 import { dedupeKey, recordEventOnce } from '@/modules/project/events';
-import { reasonLabel } from './rules';
+import { chainLocks, lateDays, reasonLabel } from './rules';
+import { GATE_SELECT, gateStagesOf } from './store';
+import { RESPONSIBLE_LABEL, isResponsible } from './template';
 
 export interface DelayRow {
   id: string;
@@ -36,7 +38,25 @@ export interface DelayRow {
   checked: { on: string; by: string } | null;
 }
 
+/**
+ * A design step late right now: its day has passed and it is not ticked
+ * (owner, 27 Oct 2026: the list said "every step is on its day" while three
+ * of Ankita's were late). Its reason is asked when it is ticked; a step
+ * waiting on a payment is never late.
+ */
+export interface LateNowRow {
+  projectId: string;
+  stepId: string;
+  home: string;
+  step: string;
+  plannedOn: string;
+  days: number;
+  who: string | null;
+}
+
 export interface DelaysView {
+  /** Late right now, most late first. */
+  lateNow: LateNowRow[];
   rows: DelayRow[];
   /** May tick "checked": owner, PM, design head. */
   canCheck: boolean;
@@ -101,7 +121,47 @@ export async function delaysList(now = new Date()): Promise<DelaysView | null> {
       checked: checkOf.has(r.id) ? { on: istDay(checkOf.get(r.id)!.at), by: name(checkOf.get(r.id)!.actorId) } : null,
     };
   });
-  return { rows: out, canCheck: everyone && !member.viewOnly, unchecked: out.filter((r) => !r.checked).length };
+  const lateNow = await lateRightNow(member.studioId, everyone ? null : member.id, istDay(now));
+  return { lateNow, rows: out, canCheck: everyone && !member.viewOnly, unchecked: out.filter((r) => !r.checked).length };
+}
+
+/** Open design steps whose day has passed, on projects still in design (a designer: their own). */
+async function lateRightNow(studioId: string, designerId: string | null, today: string): Promise<LateNowRow[]> {
+  const projects = await prisma.homeProject.findMany({
+    where: { cancelledAt: null, introduction: { studioId }, stages: { some: { kind: 'DESIGN', actualEnd: null } }, ...(designerId ? { designerId } : {}) },
+    take: 300,
+    select: {
+      id: true,
+      ...GATE_SELECT,
+      introduction: { select: { brief: { select: { society: true, locality: true, propertyType: true } } } },
+      stages: {
+        where: { kind: 'DESIGN' },
+        take: 1,
+        select: { items: { orderBy: { sortOrder: 'asc' }, select: { id: true, label: true, inScope: true, doneAt: true, plannedOn: true, gatePayment: true, responsible: true } } },
+      },
+    },
+  });
+  const out: LateNowRow[] = [];
+  for (const p of projects) {
+    const items = p.stages[0]?.items ?? [];
+    const locks = chainLocks(items.map((i) => ({ gatePayment: i.gatePayment, done: i.doneAt !== null, inScope: i.inScope })), gateStagesOf(p));
+    items.forEach((i, k) => {
+      if (!i.inScope || i.doneAt || locks[k] || !i.plannedOn) return;
+      const plannedOn = dayFromDb(i.plannedOn);
+      const days = lateDays({ plannedOn, done: false }, today);
+      if (days <= 0) return;
+      out.push({
+        projectId: p.id,
+        stepId: i.id,
+        home: homeLabel(p.introduction.brief),
+        step: i.label,
+        plannedOn,
+        days,
+        who: i.responsible && isResponsible(i.responsible) ? RESPONSIBLE_LABEL[i.responsible] : null,
+      });
+    });
+  }
+  return out.sort((a, b) => b.days - a.days).slice(0, 200);
 }
 
 /** Marks a delay's reason as checked (owner, PM, design head). Once. */

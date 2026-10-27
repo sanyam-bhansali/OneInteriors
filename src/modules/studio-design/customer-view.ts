@@ -177,12 +177,11 @@ export function toCustomerDesign(
   /*
    * The design process (owner and Hauspire's design team, 24 Oct 2026;
    * DESIGN-PROCESS-PLAN.md Decision 11): the client sees every step, never a
-   * design date or a delay. On a plan with the new steps (they carry an
-   * effort), no planned day, done day or "moved" crosses; an older plan's
-   * starred steps keep their dates as before. A step waits on a payment when
-   * an earlier step does (`chainLocks`).
+   * design date or a delay: no planned day, done day or "moved" crosses. On
+   * every plan (owner, 27 Oct 2026: an older plan too, not only one on the new
+   * steps). A step waits on a payment when an earlier step does (`chainLocks`).
    */
-  const processPlan = live.some((i) => i.effortMin !== null && i.effortMin !== undefined);
+  const processPlan = true;
   const locks = chainLocks(live.map((i) => ({ gatePayment: i.gatePayment ?? null, done: i.doneAt !== null })), gateStages);
   const all: CustomerDesignStep[] = live.map((i, k) => {
     const gate = gateOf(i.gatePayment ?? null, gateStages);

@@ -193,8 +193,10 @@ function Steps({ tab }: { tab: DesignTab }) {
   const [starred, setStarred] = useState<{ ok: boolean; text: string } | null>(null);
   if (tab.steps.length === 0) return null;
   const stars = tab.steps.filter((s) => s.inScope && s.milestone).length;
-  /* A plan with the design process (its steps carry an effort): the client sees every step, without dates (DESIGN-PROCESS-PLAN.md Decision 11). */
-  const process = tab.steps.some((s) => s.effortMin !== null);
+  /* The client sees every design step, without dates (DESIGN-PROCESS-PLAN.md Decision 11), on every plan since 27 Oct 2026. */
+  const process = true;
+  /* Weights by effort on the new steps; an older plan's are its own. */
+  const byEffort = tab.steps.some((s) => s.effortMin !== null);
   return (
     <section aria-label="Design steps" className="card flex flex-col gap-2 p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -203,7 +205,7 @@ function Steps({ tab }: { tab: DesignTab }) {
       </div>
       {process ? (
         <p className={`m-0 ${muted}`}>
-          {tab.customerFirst} sees every step and the design&rsquo;s %, never the dates. Each % is the step&rsquo;s share of the design, by its effort. A step after an unrecorded payment waits for it, and is
+          {tab.customerFirst} sees every step and the design&rsquo;s %, never the dates. Each % is the step&rsquo;s share of the design{byEffort ? ', by its effort' : ''}. A step after an unrecorded payment waits for it, and is
           never late. ★ marks a milestone.
         </p>
       ) : (

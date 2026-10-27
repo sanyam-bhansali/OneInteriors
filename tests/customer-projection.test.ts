@@ -933,20 +933,19 @@ describe('Studio OS Phase 2: the design card (studio-design/customer-view.ts) ne
   const design = out.design!;
   const json = JSON.stringify(out);
 
-  it('shows only the starred steps (milestones), the next one, the payment the design waits on and whose step it is', () => {
+  /* Owner, 27 Oct 2026 (DESIGN-PROCESS-PLAN.md Decision 11, now on every plan): every design step by name, never a date. */
+  it('shows every design step, starred or not, with no dates, the next one, the payment it waits on and whose step it is', () => {
     expect(design.designer).toBe('Meera');
-    expect(design.steps.map((s) => s.label)).toEqual(['Site visit and measurement', 'Approve the layout', 'First 3D and renders']);
-    // The next milestone; the payment comes from the design's next step, starred or not.
-    expect(design.next).toMatchObject({ label: 'Approve the layout', yours: true, waitingFor: 'Design advance', moved: null });
+    expect(design.steps.map((s) => s.label)).toEqual(['Site visit and measurement', 'First draft SECRET-UNSTARRED', 'Approve the layout', 'First 3D and renders']);
+    expect(design.next).toMatchObject({ label: 'First draft SECRET-UNSTARRED', yours: false, waitingFor: 'Design advance', moved: null });
     expect(design.waitingFor).toBe('Design advance');
     expect(design.yourStep).toBeNull();
-    expect(design.steps[2]).toMatchObject({ done: false, plannedOn: '2026-10-15', waitingFor: null });
+    expect(design.steps.every((s) => s.plannedOn === null && s.doneOn === null && s.moved === null)).toBe(true);
     // % from every in-scope step: 20 done of 20 + 20 + 10 + 10.
     expect(design.pct).toBe(33);
   });
 
-  it('never names an unstarred design step, its day or why it moved', () => {
-    expect(json).not.toContain('SECRET-UNSTARRED');
+  it('never carries a design step’s day or why it moved', () => {
     const dj = JSON.stringify({ design: out.design, tracker: out.tracker });
     expect(dj).not.toContain('2026-10-09');
     expect(dj).not.toContain('Moved to a day that suits you.');
@@ -967,9 +966,8 @@ describe('Studio OS Phase 2: the design card (studio-design/customer-view.ts) ne
       null,
     )!;
     expect(own.yourStep).toBe('Send your floor plan');
-    expect(own.steps.map((s) => s.label)).toEqual(['Brief']);
-    expect(own.next).toBeNull();
-    expect(JSON.stringify(own)).not.toContain('SECRET-UNSTARRED');
+    expect(own.steps.map((s) => s.label)).toEqual(['Brief', 'Send your floor plan', 'Internal review SECRET-UNSTARRED']);
+    expect(own.next).toMatchObject({ label: 'Send your floor plan', yours: true, plannedOn: null });
   });
 
   it('shows the mood board message, the booked visit (not the cancelled one), the sizes and the drawing’s answer', () => {
@@ -1064,9 +1062,8 @@ describe('the project lifecycle (portal/lifecycle-view.ts) never leaks the team�
     expect(out.lifecycle.blocker?.kind).toBe('sign_off');
   });
 
-  it('never carries the closure, who signed off, crew money or an unstarred step', () => {
+  it('never carries the closure, who signed off or crew money', () => {
     for (const v of Object.values(LIFE_SECRET)) expect(json).not.toContain(v);
-    expect(json).not.toContain('SECRET-UNSTARRED');
     const keys = keysOf(out);
     for (const k of ['closures', 'handoverSignedById', 'closedOutAt', 'provisionalHandoverAt', 'workOrders', 'finalDuePaise', 'extrasPaise']) expect(keys.has(k), k).toBe(false);
   });
