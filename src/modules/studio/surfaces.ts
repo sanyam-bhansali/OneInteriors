@@ -143,7 +143,7 @@ function designerMayOpen(path: string): boolean {
   if (q && !['first', 'builder', 'requests', 'terms', 'new', 'import'].includes(q[1]!)) return true;
   /* A project page, and its documents (all versions, the handover pack); which project is checked on the page. */
   const m = path.match(/^\/studio\/projects\/([^/?#]+)(?:\/documents(?:\/handover)?)?\/?$/);
-  return Boolean(m && m[1] !== 'start');
+  return Boolean(m && m[1] !== 'start' && m[1] !== 'deleted' && m[1] !== 'bring-in');
 }
 
 /** Choose or change your own password (owner, 27 Oct 2026: password sign-in). Every active member opens it. */

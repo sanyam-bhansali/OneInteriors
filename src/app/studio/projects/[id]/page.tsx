@@ -6,6 +6,7 @@ import { projectWorkspace, TEAM_NOTES_MAX, type ProjectWorkspace, type Workspace
 import { clock, istDay, shortDay } from '@/modules/studio/workspace-view';
 import { OnlyYourTeam } from '../marks';
 import { TeamNotes } from './TeamNotes';
+import { DeleteProject } from '../DeleteProject';
 import { SiteLogTab } from './SiteLogTab';
 import { SnagsTab as SnagsPanel } from './SnagsTab';
 /* Phase 5: payments from the rows, the customer's decisions, the locker (project/payments-flow.ts, decision-flow.ts, locker.ts). */
@@ -81,9 +82,9 @@ export default async function ProjectWorkspacePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string; started?: string }>;
+  searchParams: Promise<{ tab?: string; started?: string; restored?: string }>;
 }) {
-  const [{ id }, { tab: rawTab, started }] = await Promise.all([params, searchParams]);
+  const [{ id }, { tab: rawTab, started, restored }] = await Promise.all([params, searchParams]);
   const now = new Date();
   const r = await projectWorkspace(id.slice(0, 64), now);
   if (!r.ok) {
@@ -191,6 +192,11 @@ export default async function ProjectWorkspacePage({
         </div>
       </div>
 
+      {restored === '1' ? (
+        <p role="status" className="ox-ok" style={{ margin: 0 }}>
+          Restored. It is back in your lists; share the new app link below with {w.customerFirst}.
+        </p>
+      ) : null}
       {w.invite && (!w.customerJoined || started === '1') ? (
         <InviteBanner
           projectId={w.id}
@@ -240,6 +246,8 @@ export default async function ProjectWorkspacePage({
           <OnlyYourTeam>
             <TeamNotes projectId={w.id} initial={w.teamNotes} canEdit={w.canEditNotes} max={TEAM_NOTES_MAX} />
           </OnlyYourTeam>
+          {/* Delete (owner, 27 Oct 2026; studio/project-delete.ts): the owner's alone, never while viewing as someone. */}
+          {viewer?.role === 'OWNER' && !viewer.viewOnly ? <DeleteProject projectId={w.id} client={w.customer} /> : null}
         </aside>
       </div>
     </div>
