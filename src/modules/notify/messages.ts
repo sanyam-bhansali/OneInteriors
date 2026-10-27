@@ -62,7 +62,10 @@ export type ProjectEvent =
   // Quotation requests (owner, 22 Oct 2026; docs/studio-os/QUOTE-REQUESTS.md), to studio staff only, never a customer:
   // a request handed to a builder (in turn, or by a head), and the salesperson told when it was sent.
   | { kind: 'quote-request'; clientId: string; name: string; by: string | null; how: 'TURN' | 'REASSIGNED'; why: 'FLOOR_PLAN' | 'REQUESTED' }
-  | { kind: 'quote-request-done'; clientId: string; name: string; by: string | null; number: string | null };
+  | { kind: 'quote-request-done'; clientId: string; name: string; by: string | null; number: string | null }
+  // Office meetings (owner, 27 Oct 2026; docs/studio-os/OFFICE-MEETINGS.md), to studio staff only, never a customer:
+  // asked to one, an answer to the organiser, the meeting moved or cancelled.
+  | { kind: 'office-meeting'; what: 'asked' | 'accepted' | 'proposed' | 'moved' | 'cancelled'; by: string; meetingId: string; title: string; when: string };
 
 /** Events a studio also gets by email: it works from a laptop, not our app. */
 export const EMAILED_TO_STUDIO: ProjectEvent['kind'][] = ['introduced', 'quote-signed', 'decision-made', 'snag-raised', 'lead-new', 'handover-signed'];
@@ -357,5 +360,20 @@ export function messageFor(e: ProjectEvent): Message {
         body: clip(e.title, 160),
         url: '/app/project',
       };
+    case 'office-meeting': {
+      const title = {
+        asked: `${e.by} asks to meet`,
+        accepted: `${e.by} is coming`,
+        proposed: `${e.by} suggests another time`,
+        moved: `${e.by} moved a meeting`,
+        cancelled: `${e.by} cancelled a meeting`,
+      }[e.what];
+      return {
+        template: `office_meeting.${e.what}`,
+        title,
+        body: clip(`${e.title} · ${e.when}`, 160),
+        url: `/studio/calendar/meetings#m-${e.meetingId}`,
+      };
+    }
   }
 }

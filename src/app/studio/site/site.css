@@ -590,7 +590,7 @@ html[data-theme='dark'] .oi-studio .st-reads {
   max-width: 560px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 .oi-studio .st-tab {
   min-height: 56px;

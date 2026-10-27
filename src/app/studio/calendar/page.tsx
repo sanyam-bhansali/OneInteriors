@@ -6,6 +6,9 @@ import { calendarWindow, itemsByDay, parseDay, parseView, shiftDay, windowTitle 
 import { istDay } from '@/modules/project/working-days';
 import { taskPeople } from '@/modules/studio-sales/tasks';
 import { CalendarBody, Legend, NewTask, PersonPicker } from './CalendarView';
+import { NewMeeting } from './MeetingUi';
+import { currentMember } from '@/modules/studio/access';
+import { meetingPeople, meetingsWaiting } from '@/modules/studio-office/meetings';
 import '../office-ui.css';
 import './calendar.css';
 
@@ -18,20 +21,25 @@ export const dynamic = 'force-dynamic';
  * visits. Click one to open the lead; move it to another day or time in
  * place. Owner and PM see everyone or one person; a salesperson their own.
  * Nothing here moves by itself.
+ *
+ * Office meetings (owner, 27 Oct 2026; docs/studio-os/OFFICE-MEETINGS.md):
+ * everyone at the studio has this calendar and sets up meetings from it.
+ * Someone who works no leads sees their meetings alone.
  */
 export default async function CalendarPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = await searchParams;
   const now = new Date();
   const view = parseView(sp.view);
   const day = parseDay(sp.day, now);
-  const [cal, people] = await Promise.all([myCalendar(view, day, sp.who ?? null, now), taskPeople()]);
-  if (!cal) {
+  const [cal, people, guests, member] = await Promise.all([myCalendar(view, day, sp.who ?? null, now), taskPeople(), meetingPeople(), currentMember()]);
+  if (!cal || !member) {
     return (
       <main className="content ox-page">
-        <p className="ox-note">The calendar is for the people who work leads. Ask your studio owner if you should see it.</p>
+        <p className="ox-note">Sign in to your studio to see your calendar.</p>
       </main>
     );
   }
+  const waiting = await meetingsWaiting(member, now);
   const w = calendarWindow(view, day);
   const href = (over: Record<string, string | null>) => {
     const p = new URLSearchParams();
@@ -49,11 +57,27 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         <div>
           <h1>Calendar</h1>
           <p className="muted">
-            {cal.seesAll ? 'Meetings, follow-ups and tasks for the whole team.' : 'Your follow-ups, meetings and tasks.'} One Interiors visits land here by themselves.
+            {!cal.leads
+              ? 'Your meetings with the rest of the studio.'
+              : cal.seesAll
+                ? 'Meetings, follow-ups and tasks for the whole team. One Interiors visits land here by themselves.'
+                : 'Your follow-ups, meetings and tasks.'}
           </p>
         </div>
-        <NewTask people={people} defaultDay={day === today || view !== 'day' ? today : day} seesAll={cal.seesAll} meId={cal.meId} />
+        <div className="hstack" style={{ gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <NewMeeting people={guests} day={day} primary={!cal.leads} />
+          {cal.leads ? <NewTask people={people} defaultDay={day === today || view !== 'day' ? today : day} seesAll={cal.seesAll} meId={cal.meId} /> : null}
+        </div>
       </div>
+
+      {waiting > 0 ? (
+        <p className="cal-waiting" role="status">
+          <span>
+            {waiting === 1 ? 'A meeting is waiting for your answer.' : `${waiting} meetings are waiting for your answer.`}
+          </span>
+          <Link href="/studio/calendar/meetings">Answer {waiting === 1 ? 'it' : 'them'}</Link>
+        </p>
+      ) : null}
 
       <div className="cal-bar">
         <div className="cal-nav">
@@ -79,7 +103,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       </div>
 
       <div className="hstack" style={{ gap: 8 }}>
-        <Legend />
+        <Legend kinds={cal.leads ? undefined : ['office']} />
         <span className="muted sm">· {windowTitle(w)} · {whose}</span>
       </div>
 
@@ -93,7 +117,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       ) : null}
       {cal.capped ? <p className="muted sm" style={{ margin: 0 }}>Showing the first 500 of each kind. Pick one person or a shorter view to see all.</p> : null}
 
-      <CalendarBody view={view} days={w.days} month={day.slice(0, 7)} today={today} byDay={Object.fromEntries(itemsByDay(cal.items, w.days))} callCounts={cal.followupCounts} people={people} seesAll={cal.seesAll} dayHref={Object.fromEntries(w.days.map((d) => [d, href({ view: 'day', day: d })]))} />
+      <CalendarBody view={view} days={w.days} month={day.slice(0, 7)} today={today} byDay={Object.fromEntries(itemsByDay(cal.items, w.days))} callCounts={cal.followupCounts} people={people} seesAll={cal.seesAll} dayHref={Object.fromEntries(w.days.map((d) => [d, href({ view: 'day', day: d })]))} leads={cal.leads} />
     </main>
   );
 }

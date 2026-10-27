@@ -19,6 +19,7 @@ const KIND_CLASS: Record<CalendarItem['kind'], string> = {
   meeting: 'k-first',
   task: 'k-task',
   appointment: 'k-site',
+  office: 'k-office',
 };
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -27,10 +28,10 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const istHm = (at: Date) => new Date(new Date(at).getTime() + 330 * 60_000).toISOString().slice(11, 16);
 
 /** The legend over the calendar: what each colour is. */
-export function Legend() {
+export function Legend({ kinds }: { kinds?: readonly CalendarItem['kind'][] }) {
   return (
     <div className="hstack cal-legend" style={{ gap: 8 }}>
-      {(['meeting', 'appointment', 'followup', 'task'] as const).map((k) => (
+      {(kinds ?? (['office', 'meeting', 'appointment', 'followup', 'task'] as const)).map((k) => (
         <span key={k} className={`chip ${KIND_CLASS[k]}`} style={{ boxShadow: 'none' }}>
           {KIND_WORDS[k]}
         </span>
@@ -75,6 +76,7 @@ export function CalendarBody({
   people,
   seesAll,
   dayHref,
+  leads = true,
 }: {
   view: CalendarView;
   days: string[];
@@ -87,6 +89,8 @@ export function CalendarBody({
   people: { id: string; name: string }[];
   seesAll: boolean;
   dayHref: Record<string, string>;
+  /** They work leads (follow-ups, tasks); false for a designer, accounts or a supervisor, who have meetings only. */
+  leads?: boolean;
 }) {
   const label = (d: string) => {
     const js = new Date(`${d}T00:00:00Z`).getUTCDay();
@@ -94,7 +98,7 @@ export function CalendarBody({
   };
 
   if (view === 'day') {
-    return <DayList items={byDay[days[0]!] ?? []} people={people} seesAll={seesAll} />;
+    return <DayList items={byDay[days[0]!] ?? []} people={people} seesAll={seesAll} leads={leads} />;
   }
 
   if (view === 'week') {
@@ -194,13 +198,13 @@ const WEEK_CALLS_SHOWN = 6;
 const DAY_SHOWN = 100;
 
 /** The day view: everything on one day, the first hundred at once. */
-function DayList({ items, people, seesAll }: { items: CalendarItem[]; people: { id: string; name: string }[]; seesAll: boolean }) {
+function DayList({ items, people, seesAll, leads }: { items: CalendarItem[]; people: { id: string; name: string }[]; seesAll: boolean; leads: boolean }) {
   const [all, setAll] = useState(false);
   if (items.length === 0) {
     return (
       <div className="empty cal-day">
         <b>Nothing on this day.</b>
-        <span className="muted sm">Give a lead a follow-up date, or add a task.</span>
+        <span className="muted sm">{leads ? 'Give a lead a follow-up date, add a task, or set up a meeting.' : 'Set up a meeting with someone at the studio.'}</span>
       </div>
     );
   }
@@ -228,7 +232,8 @@ function Item({ item, people, seesAll, wide = false }: { item: CalendarItem; peo
   const [moving, setMoving] = useState(false);
   const [editing, setEditing] = useState(false);
   const { pending, result, run } = useAct();
-  const movable = item.kind !== 'appointment' && !(item.kind === 'meeting' && item.done);
+  /* Office meetings move on the Meetings page, where everyone asked answers again. */
+  const movable = item.kind !== 'appointment' && item.kind !== 'office' && !(item.kind === 'meeting' && item.done);
 
   const check =
     item.kind === 'task' ? (

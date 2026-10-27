@@ -9,6 +9,8 @@
  * - **Meetings**: a lead's meeting and its note.
  * - **Tasks**: `StudioTask`.
  * - **One Interiors appointments**: owner and PM, when there are any.
+ * - **Office meetings** (owner, 27 Oct 2026; studio-office/meetings.ts):
+ *   between people at the studio, for every role.
  *
  * Something not done whose time has passed is marked overdue.
  */
@@ -19,13 +21,14 @@ import { istDayEnd, istDayStart, istMonday, monthEnd, monthStart, shortDay } fro
 export type CalendarView = 'day' | 'week' | 'month';
 export const CALENDAR_VIEWS: readonly CalendarView[] = ['day', 'week', 'month'];
 
-export type CalendarKind = 'followup' | 'meeting' | 'task' | 'appointment';
+export type CalendarKind = 'followup' | 'meeting' | 'task' | 'appointment' | 'office';
 
 export const KIND_WORDS: Record<CalendarKind, string> = {
   followup: 'Follow-up',
   meeting: 'Meeting',
   task: 'Task',
   appointment: 'One Interiors visit',
+  office: 'Office meeting',
 };
 
 export interface CalendarItem {
@@ -77,6 +80,19 @@ export interface AppointmentIn {
   startsAt: Date;
   title: string;
   detail: string | null;
+}
+
+export interface OfficeIn {
+  id: string;
+  title: string;
+  startsAt: Date;
+  /** Who it is with, and where it stands: "With Renuka · Waiting for Renuka". */
+  detail: string | null;
+  ownerName: string | null;
+  /** Not everyone has accepted, or a new time is suggested. */
+  unsettled: boolean;
+  /** The viewer set it up or was asked: it is on their Meetings page. Otherwise (owner, PM looking at everyone's) it opens the day. */
+  involved: boolean;
 }
 
 export interface CalendarWindow {
@@ -157,7 +173,7 @@ export function followupAt(on: Date): { at: Date; defaultTime: boolean } {
 const leadHref = (id: string) => `/studio/clients/${id}`;
 
 export function buildCalendarItems(
-  input: { followups?: readonly FollowupIn[]; meetings?: readonly MeetingIn[]; tasks?: readonly TaskIn[]; appointments?: readonly AppointmentIn[] },
+  input: { followups?: readonly FollowupIn[]; meetings?: readonly MeetingIn[]; tasks?: readonly TaskIn[]; appointments?: readonly AppointmentIn[]; office?: readonly OfficeIn[] },
   now: Date,
   w?: Pick<CalendarWindow, 'start' | 'end'>,
 ): CalendarItem[] {
@@ -225,6 +241,23 @@ export function buildCalendarItems(
       ownerName: null,
       overdue: false,
       done: a.startsAt.getTime() < now.getTime(),
+      taskId: null,
+      defaultTime: false,
+    });
+  }
+
+  for (const o of input.office ?? []) {
+    items.push({
+      key: `office:${o.id}`,
+      kind: 'office',
+      ...base(o.startsAt),
+      title: o.unsettled ? `${o.title} (not settled)` : o.title,
+      detail: o.detail,
+      leadId: null,
+      href: o.involved ? `/studio/calendar/meetings#m-${o.id}` : `/studio/calendar?view=day&day=${istDay(o.startsAt)}`,
+      ownerName: o.ownerName,
+      overdue: false,
+      done: o.startsAt.getTime() < now.getTime(),
       taskId: null,
       defaultTime: false,
     });

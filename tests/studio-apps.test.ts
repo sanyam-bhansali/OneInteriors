@@ -43,12 +43,12 @@ describe('studio apps (UI handoff 12 Oct 2026)', () => {
     expect(appsFor(m('DESIGNER')).find((a) => a.key === 'projects')?.href).toBe('/studio/design');
   });
 
-  it('accounts keeps Money and Vendors', () => {
-    expect(keys('ACCOUNTS')).toEqual(['money', 'vendors']);
+  it('accounts keeps Money and Vendors, and the calendar everyone has (27 Oct 2026)', () => {
+    expect(keys('ACCOUNTS')).toEqual(['money', 'vendors', 'calendar']);
   });
 
-  it('a supervisor has site mode only and lands there', () => {
-    expect(keys('SUPERVISOR')).toEqual(['site']);
+  it('a supervisor has site mode (and the calendar everyone has) and lands there', () => {
+    expect(keys('SUPERVISOR')).toEqual(['site', 'calendar']);
     expect(homeFor('SUPERVISOR')).toBe('/studio/site');
   });
 
