@@ -7,6 +7,7 @@ import { clock, istDay, shortDay } from '@/modules/studio/workspace-view';
 import { OnlyYourTeam } from '../marks';
 import { TeamNotes } from './TeamNotes';
 import { DeleteProject } from '../DeleteProject';
+import { mayDeleteProjects } from '@/modules/studio/project-delete';
 import { SiteLogTab } from './SiteLogTab';
 import { SnagsTab as SnagsPanel } from './SnagsTab';
 /* Phase 5: payments from the rows, the customer's decisions, the locker (project/payments-flow.ts, decision-flow.ts, locker.ts). */
@@ -246,8 +247,8 @@ export default async function ProjectWorkspacePage({
           <OnlyYourTeam>
             <TeamNotes projectId={w.id} initial={w.teamNotes} canEdit={w.canEditNotes} max={TEAM_NOTES_MAX} />
           </OnlyYourTeam>
-          {/* Delete (owner, 27 Oct 2026; studio/project-delete.ts): the owner's alone, never while viewing as someone. */}
-          {viewer?.role === 'OWNER' && !viewer.viewOnly ? <DeleteProject projectId={w.id} client={w.customer} /> : null}
+          {/* Delete (owner, 27 Oct 2026; studio/project-delete.ts): the owner and the design head, never while viewing as someone. */}
+          {mayDeleteProjects(viewer) && !viewer?.viewOnly ? <DeleteProject projectId={w.id} client={w.customer} /> : null}
         </aside>
       </div>
     </div>

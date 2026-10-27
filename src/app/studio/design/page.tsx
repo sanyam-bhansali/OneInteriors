@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { mayDeleteProjects } from '@/modules/studio/project-delete';
 import type { Metadata } from 'next';
 import { designWorkload, type DesignerRow } from '@/modules/studio-design/store';
 import { lifecycleBoard } from '@/modules/studio/lifecycle-store';
@@ -48,6 +49,12 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
           <Link href="/studio/design/delays" className="btn ghost">
             Delays
           </Link>
+          {/* Delete and restore (owner and design head, 27 Oct 2026; studio/project-delete.ts). */}
+          {mayDeleteProjects(member) ? (
+            <Link href="/studio/projects/deleted" className="btn ghost">
+              Deleted projects
+            </Link>
+          ) : null}
           {member && can(member, 'project.bringIn') ? (
             <Link href="/studio/projects/bring-in" className="btn sec">
               Bring in a running project

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { mayDeleteProjects } from '@/modules/studio/project-delete';
 import type { Metadata } from 'next';
 import { formatINR } from '@/lib/money';
 import { studioProjects } from '@/modules/studio/workspace';
@@ -84,7 +85,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
   const lanes = lanesOf(rows);
   /* Delete and restore (owner, 27 Oct 2026; studio/project-delete.ts). */
   const deletedLink =
-    member?.role === 'OWNER' ? (
+    mayDeleteProjects(member) ? (
       <Link href="/studio/projects/deleted" className="btn ghost">
         Deleted projects
       </Link>
