@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { deletedProjects } from '@/modules/studio/project-delete';
+import { currentMember } from '@/modules/studio/access';
 import { RestoreProject } from '../DeleteProject';
 
 export const metadata: Metadata = { title: 'Deleted projects', robots: { index: false, follow: false } };
@@ -12,7 +13,9 @@ export const dynamic = 'force-dynamic';
  * Restore: money went back on it.
  */
 export default async function DeletedProjectsPage() {
-  const rows = await deletedProjects();
+  const [rows, member] = await Promise.all([deletedProjects(), currentMember()]);
+  /* The design head's projects are the Design page; the Projects list is the owner's. */
+  const back = member?.role === 'OWNER' ? { href: '/studio/projects', label: 'Back to projects' } : { href: '/studio/design', label: 'Back to design' };
   if (!rows) {
     return (
       <div className="content oi-proj">
@@ -30,8 +33,8 @@ export default async function DeletedProjectsPage() {
           </p>
         </div>
         <div className="hstack">
-          <Link href="/studio/projects" className="btn ghost">
-            Back to projects
+          <Link href={back.href} className="btn ghost">
+            {back.label}
           </Link>
         </div>
       </div>

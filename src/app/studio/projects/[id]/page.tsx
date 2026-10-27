@@ -248,7 +248,7 @@ export default async function ProjectWorkspacePage({
             <TeamNotes projectId={w.id} initial={w.teamNotes} canEdit={w.canEditNotes} max={TEAM_NOTES_MAX} />
           </OnlyYourTeam>
           {/* Delete (owner, 27 Oct 2026; studio/project-delete.ts): the owner and the design head, never while viewing as someone. */}
-          {mayDeleteProjects(viewer) && !viewer?.viewOnly ? <DeleteProject projectId={w.id} client={w.customer} /> : null}
+          {mayDeleteProjects(viewer) && !viewer?.viewOnly ? <DeleteProject projectId={w.id} client={w.customer} after={viewer?.role === 'OWNER' ? '/studio/projects' : '/studio/design'} /> : null}
         </aside>
       </div>
     </div>
