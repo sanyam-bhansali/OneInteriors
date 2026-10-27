@@ -9,7 +9,7 @@ import { asLang } from '@/modules/i18n/site';
 import { localeFor, type StudioWord } from '@/modules/i18n/studio';
 import { currentMember, memberFor } from '@/modules/studio/access';
 import type { StudioRoleName } from '@/modules/studio/roles';
-import { homeFor } from '@/modules/studio/surfaces';
+import { homeFor, PASSWORD_PATH } from '@/modules/studio/surfaces';
 import { landingFor } from '@/modules/studio/profile';
 import { myToday } from '@/modules/studio-sales/today';
 import type { SectionId } from '@/modules/studio-sales/today-rules';
@@ -17,6 +17,8 @@ import { designWorkload } from '@/modules/studio-design/store';
 import { mySitesToday } from '@/modules/project/site-log';
 import { record } from '@/modules/analytics/record';
 import { asPicked, roleMismatch } from './pick';
+import { studioPasswordSignIn } from '@/modules/auth/studio-password';
+import type { StudioPasswordRefusal } from '@/modules/auth/studio-password-rules';
 
 /**
  * The studio phone sign-in (/studio/sign-in). Same codes, same challenge
@@ -79,6 +81,38 @@ export async function verifyStudioCodeAction(phone: string, code: string, lang: 
   } catch (error) {
     console.error('[studio-sign-in] verifyOtp threw:', error);
     return { ok: false, error: 'err.unavailable' };
+  }
+}
+
+export type StudioPasswordResult =
+  | { ok: true; to: string; role: StudioRoleName; mismatch: boolean; studio: string | null; mustChange: boolean }
+  | { ok: false; error: StudioPasswordRefusal };
+
+/**
+ * Mobile number + password (owner, 27 Oct 2026: until WhatsApp codes are
+ * live; auth/studio-password.ts). Lands like the code did; someone on a
+ * one-time password goes to choose their own first.
+ */
+export async function passwordSignInAction(phone: string, password: string, lang: string, picked?: string | null): Promise<StudioPasswordResult> {
+  if (!hasDatabase()) return { ok: false, error: 'unavailable' };
+  const h = await headers();
+  try {
+    const r = await studioPasswordSignIn(String(phone), String(password), {
+      locale: localeFor(asLang(lang)),
+      userAgent: h.get('user-agent'),
+      ip: await clientIp(),
+    });
+    if (!r.ok) return { ok: false, error: r.reason };
+    await record('signin.completed');
+    const member = await memberFor(r.userId).catch(() => null);
+    const studio = member
+      ? ((await prisma.studio.findUnique({ where: { id: member.studioId }, select: { tradeName: true } }).catch(() => null))?.tradeName ?? null)
+      : null;
+    const to = r.mustChange ? PASSWORD_PATH : member ? await landingFor(member, homeFor(r.role)).catch(() => homeFor(r.role)) : homeFor(r.role);
+    return { ok: true, to, role: r.role, mismatch: roleMismatch(asPicked(picked), r.role), studio, mustChange: r.mustChange };
+  } catch (error) {
+    console.error('[studio-sign-in] password sign-in threw:', error);
+    return { ok: false, error: 'unavailable' };
   }
 }
 

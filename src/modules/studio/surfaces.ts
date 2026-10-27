@@ -146,6 +146,9 @@ function designerMayOpen(path: string): boolean {
   return Boolean(m && m[1] !== 'start');
 }
 
+/** Choose or change your own password (owner, 27 Oct 2026: password sign-in). Every active member opens it. */
+export const PASSWORD_PATH = '/studio/password';
+
 /**
  * The calendar every role opens (owner, 27 Oct 2026: office meetings): their
  * calendar and their meetings. One Interiors visits stay the owner's and PM's.
@@ -209,6 +212,7 @@ export function mayOpen(viewer: MemberRole, path: string): boolean {
   /* Opening a screen is a read: staff viewing as this member (VIEW-AS.md) open exactly what they open. Writes on it still ask `can()`. */
   const member = asSeenBy(viewer);
   if (member.status !== 'ACTIVE') return false;
+  if (under(path, PASSWORD_PATH)) return true;
   /* Pro Solo (owner, 21 Oct 2026): one person, so no team to manage and no pool to hand leads out from. */
   if (member.solo === true && (under(path, TEAM_PATH) || under(path, POOL_PATH))) return false;
   /* The pilot switch (owner, 14 Oct 2026): a studio without the full

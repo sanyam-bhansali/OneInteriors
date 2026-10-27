@@ -49,6 +49,11 @@ model User {
   /// everyone who has not set one, which is the normal state.
   passwordHash  String?
   passwordSetAt DateTime?
+  /// A one-time password the studio owner made for this person (owner, 27 Oct
+  /// 2026: password sign-in for studio staff until WhatsApp codes are live).
+  /// True until they choose their own, which the studio asks for before
+  /// anything else (auth/studio-password.ts).
+  passwordTemporary Boolean @default(false)
   /// Consecutive failed password attempts. Cleared on any successful sign-in,
   /// including by magic link.
   failedSignIns Int       @default(0)

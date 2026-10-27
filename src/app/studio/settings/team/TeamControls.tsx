@@ -9,6 +9,7 @@ import {
   reinstateAction,
   resendAction,
   setDesignHeadAction,
+  setPasswordAction,
   setSitesAction,
   signOutEverywhereAction,
   suspendAction,
@@ -37,9 +38,38 @@ function useResult() {
 function Note({ result }: { result: TeamResult | null }) {
   if (!result) return null;
   return (
-    <p role="status" className={result.ok ? 'ox-ok' : 'ox-err'}>
-      {result.ok ? result.message : result.error}
-    </p>
+    <>
+      <p role="status" className={result.ok ? 'ox-ok' : 'ox-err'}>
+        {result.ok ? result.message : result.error}
+      </p>
+      {result.ok && result.password ? <OneTimePassword password={result.password} /> : null}
+    </>
+  );
+}
+
+/**
+ * A one-time password, shown once (owner, 27 Oct 2026: password sign-in).
+ * Only its hash is kept, so leaving the page loses it: make another then.
+ */
+function OneTimePassword({ password }: { password: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="ox-panel" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span className="lbl">One-time password</span>
+      <div className="hstack" style={{ gap: 8 }}>
+        <code style={{ fontSize: 18, letterSpacing: '.06em', padding: '4px 10px', borderRadius: 8, background: 'var(--paper)' }}>{password}</code>
+        <button
+          type="button"
+          className="btn ghost sm"
+          onClick={() => {
+            void navigator.clipboard?.writeText(password).then(() => setCopied(true)).catch(() => undefined);
+          }}
+        >
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <span className="muted sm">Shown once. They sign in at studio.oneinteriors.in with their mobile number and this, then choose their own.</span>
+    </div>
   );
 }
 
@@ -76,7 +106,10 @@ export function AddSomeone({
   seatsLeft,
   salesRoles = [],
   salespeople = [],
+  passwordMode = false,
 }: {
+  /** Password sign-in (owner, 27 Oct 2026): adding someone makes their one-time password; no WhatsApp invite. */
+  passwordMode?: boolean;
   roles: RoleCard[];
   sites: Site[];
   seatsLeft: number;
@@ -195,10 +228,10 @@ export function AddSomeone({
         ) : null}
 
         <button type="submit" className="btn pri lg" disabled={pending}>
-          {pending ? 'Sending…' : 'Send invite on WhatsApp'}
+          {pending ? (passwordMode ? 'Adding…' : 'Sending…') : passwordMode ? 'Add and make a one-time password' : 'Send invite on WhatsApp'}
         </button>
         <p className="muted sm" style={{ margin: 0, lineHeight: 1.45 }}>
-          They get a link and sign in with this number. A seat is used only once they sign in
+          {passwordMode ? 'You get a one-time password to give them; they sign in with this number and it.' : 'They get a link and sign in with this number.'} A seat is used only once they sign in
           {seatsLeft > 0 ? ` (${seatsLeft} free ${seatsLeft === 1 ? 'seat' : 'seats'} left)` : ''}.
           {PICKS_SITES.has(role) ? ` ${picked.size} ${picked.size === 1 ? 'site' : 'sites'} selected.` : ''}
         </p>
@@ -212,7 +245,9 @@ export function AddSomeone({
 export function PersonActions({
   person,
   sites,
+  passwordMode = false,
 }: {
+  passwordMode?: boolean;
   person: { id: string; name: string; role: StudioRoleName; status: StudioMemberStatusName; siteIds: string[]; designHead?: boolean };
   sites: Site[];
 }) {
@@ -230,9 +265,23 @@ export function PersonActions({
   return (
     <div style={{ display: 'flex', minWidth: 180, flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}>
       <div className="hstack" style={{ gap: 6 }}>
-        {person.status === 'INVITED' ? (
+        {person.status === 'INVITED' && !passwordMode ? (
           <button type="button" className="btn ghost sm" disabled={pending} onClick={() => run(() => resendAction(person.id))}>
             Resend
+          </button>
+        ) : null}
+        {person.status !== 'SUSPENDED' ? (
+          <button
+            type="button"
+            className="btn ghost sm"
+            disabled={pending}
+            onClick={() => {
+              if (window.confirm(`Make ${person.name} a new one-time password? Any password they have stops working and they are signed out everywhere.`)) {
+                run(() => setPasswordAction(person.id));
+              }
+            }}
+          >
+            Set password
           </button>
         ) : null}
         {PICKS_SITES.has(person.role) && person.status !== 'SUSPENDED' ? (

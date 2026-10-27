@@ -31,6 +31,8 @@ import 'server-only';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { revokeAllSessions } from '@/modules/auth/session';
+import { hashPassword } from '@/modules/auth/password';
+import { studioSignInMode, temporaryPassword } from '@/modules/auth/studio-password-rules';
 import { send } from '@/modules/messaging/sender';
 import { bucketFor, consume } from '@/modules/rate-limit/store';
 import { STUDIO_SIGN_IN } from '@/lib/host';
@@ -48,7 +50,8 @@ import {
   siteLabel,
 } from './team-rules';
 
-export type TeamResult = { ok: true; message: string } | { ok: false; error: string };
+/** `password`: a one-time password just made, shown to the owner once and never stored in the clear. */
+export type TeamResult = { ok: true; message: string; password?: string } | { ok: false; error: string };
 
 const NOT_ALLOWED = 'Only the studio owner can change the team.';
 const PRO_ROLES = 'On Pro you can add salespeople. Designers, project managers, supervisors and accounts come with the Max plan.';
@@ -278,9 +281,17 @@ export async function inviteMember(
   }
 
   const now = new Date();
+  let oneTime: string | null = studioSignInMode() === 'password' ? temporaryPassword() : null;
   try {
     await prisma.$transaction(async (tx) => {
       const userId = existing?.id ?? (await tx.user.create({ data: { phone, name, role: 'STUDIO' }, select: { id: true } })).id;
+      /* Password sign-in (owner, 27 Oct 2026): a new person gets a one-time
+         password now, unless their login already has a password of its own. */
+      if (oneTime) {
+        const has = await tx.user.findUnique({ where: { id: userId }, select: { passwordHash: true } });
+        if (has?.passwordHash) oneTime = null;
+        else await tx.user.update({ where: { id: userId }, data: { passwordHash: await hashPassword(oneTime), passwordSetAt: now, passwordTemporary: true, failedSignIns: 0, lockedOutAt: null } });
+      }
       const member = await tx.studioMember.create({
         data: {
           studioId: lead.studioId,
@@ -320,8 +331,39 @@ export async function inviteMember(
     throw error;
   }
 
+  if (studioSignInMode() === 'password') {
+    return oneTime
+      ? { ok: true, password: oneTime, message: `Added. Give ${name.split(' ')[0] || name} this one-time password with their mobile number; they choose their own when they first sign in.` }
+      : { ok: true, message: 'Added. They sign in with their mobile number and the password they already have.' };
+  }
   const sent = await sendInvite(lead, phone, name, baseUrl);
   return { ok: true, message: sentLine(sent.delivered, sent.via) };
+}
+
+/**
+ * Make someone a one-time password (owner, 27 Oct 2026: password sign-in
+ * until WhatsApp codes are live). For a first sign-in, a forgotten password,
+ * or a lock after five wrong tries. They are signed out everywhere and
+ * choose their own password when they next sign in. The owner sees it once;
+ * only its hash is kept. Not for the owner's own login: theirs is changed
+ * from the profile menu.
+ */
+export async function setTemporaryPassword(memberId: string): Promise<TeamResult> {
+  const lead = await teamLead();
+  if (!lead) return { ok: false, error: NOT_ALLOWED };
+  const m = await teammate(lead, memberId);
+  if (!m) return { ok: false, error: 'That person is not on your team.' };
+  if (m.id === lead.id) return { ok: false, error: 'Change your own password from your profile menu: Change password.' };
+  if (m.status === 'SUSPENDED') return { ok: false, error: 'Reinstate them first.' };
+  const plain = temporaryPassword();
+  await prisma.user.update({
+    where: { id: m.userId },
+    data: { passwordHash: await hashPassword(plain), passwordSetAt: new Date(), passwordTemporary: true, failedSignIns: 0, lockedOutAt: null },
+  });
+  await revokeAllSessions(m.userId);
+  await audit(lead, 'studio.member.password_set', m.id, null, { temporary: true });
+  const first = (m.user.name ?? '').split(' ')[0] || 'them';
+  return { ok: true, password: plain, message: `Give ${first} this one-time password with their mobile number. They choose their own when they sign in; any old password stops working now.` };
 }
 
 /** Send the invite again, to someone who has not signed in yet. Three an hour per person. */

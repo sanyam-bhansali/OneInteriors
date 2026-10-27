@@ -8,6 +8,9 @@
  *    or "On site today?" (a site supervisor, straight to mobile).
  * 2. **Email or mobile.** Mobile is our studio phone code; email opens the
  *    email sign-in owners already have (/sign-in). No new provider.
+ *    In password mode (owner, 27 Oct 2026, until WhatsApp codes are live:
+ *    auth/studio-password-rules.ts) mobile takes a password here instead,
+ *    and step 3 is skipped; a one-time password lands on /studio/password.
  * 3. **The 6-digit code**, typed, pasted whole or filled from the
  *    notification; it submits on the sixth digit. On this laptop the code is
  *    shown on the page (local development only, `studioDevCode`).
@@ -32,7 +35,8 @@ import { setLang as keepLang } from '@/components/app/i18n';
 import type { StudioRoleName } from '@/modules/studio/roles';
 import { ThemeToggle } from '../studio/ui/theme';
 import { Oim } from '../studio/ui/brand';
-import { pickAgainAction, requestStudioCodeAction, verifyStudioCodeAction, welcomeAction, type Welcome } from './actions';
+import { passwordSignInAction, pickAgainAction, requestStudioCodeAction, verifyStudioCodeAction, welcomeAction, type Welcome } from './actions';
+import type { StudioPasswordRefusal, StudioSignInMode } from '@/modules/auth/studio-password-rules';
 import { ROLE_CARDS, codeDigits, defaultVia, stepDots, type PickedRole } from './pick';
 import { ROLE_TX, SI_WORDS, type SiWord } from './words';
 
@@ -50,7 +54,7 @@ const LOOK: Record<StudioRoleName, { bg: string; fg: string }> = {
   ACCOUNTS: { bg: 'var(--good-bg)', fg: 'var(--good)' },
 };
 
-export function StudioSignInForm({ initialLang }: { initialLang: Lang }) {
+export function StudioSignInForm({ initialLang, mode = 'otp' }: { initialLang: Lang; mode?: StudioSignInMode }) {
   const [lang, setLang] = useState<Lang>(initialLang);
   const t = (key: SiWord, vars?: Record<string, string | number>) => tx(lang, SI_WORDS[key], vars);
   const e = (key: StudioWord, vars?: Record<string, string | number>) => tx(lang, STUDIO_WORDS[key], vars);
@@ -61,6 +65,10 @@ export function StudioSignInForm({ initialLang }: { initialLang: Lang }) {
   const [via, setVia] = useState<'email' | 'phone'>('phone');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [pwError, setPwError] = useState<StudioPasswordRefusal | null>(null);
+  const usePassword = mode === 'password';
   const [busy, setBusy] = useState(false);
   const [shake, setShake] = useState(false);
   const [error, setError] = useState<StudioWord | null>(null);
@@ -116,6 +124,39 @@ export function StudioSignInForm({ initialLang }: { initialLang: Lang }) {
     setCode('');
     setCooldown(RESEND_SECONDS);
     setStep('code');
+  }
+
+  async function passwordSubmit() {
+    setPwError(null);
+    setError(null);
+    if (!phoneOk) {
+      setPwError('invalid_phone');
+      return;
+    }
+    if (!password) {
+      setPwError('no_match');
+      return;
+    }
+    setBusy(true);
+    const r = await passwordSignInAction(phone, password, lang, picked);
+    setBusy(false);
+    if (!r.ok) {
+      setPwError(r.error);
+      setShake(true);
+      setTimeout(() => setShake(false), 450);
+      return;
+    }
+    setPassword('');
+    /* A one-time password: choose your own first, nothing else. */
+    if (r.mustChange) {
+      window.location.assign(r.to);
+      return;
+    }
+    if (r.mismatch) {
+      setMismatch({ real: r.role, studio: r.studio, to: r.to });
+      return;
+    }
+    await arrive(r.to);
   }
 
   async function arrive(dest: string) {
@@ -310,7 +351,7 @@ export function StudioSignInForm({ initialLang }: { initialLang: Lang }) {
               className="si-step"
               onSubmit={(ev) => {
                 ev.preventDefault();
-                if (via === 'phone' && !busy) void askForCode();
+                if (via === 'phone' && !busy && !mismatch) void (usePassword ? passwordSubmit() : askForCode());
               }}
             >
               <button
@@ -342,7 +383,7 @@ export function StudioSignInForm({ initialLang }: { initialLang: Lang }) {
               ) : null}
               <div className="si-hgroup">
                 <h1>{via === 'email' ? t('contact.email.h1') : t('contact.phone.h1')}</h1>
-                <p className="si-sub">{via === 'email' ? t('contact.email.sub') : t('contact.phone.sub')}</p>
+                <p className="si-sub">{via === 'email' ? t('contact.email.sub') : usePassword ? t('pw.sub') : t('contact.phone.sub')}</p>
               </div>
               {!isSite ? (
                 <div className="si-seg" role="radiogroup" aria-label={t('via')}>
@@ -380,9 +421,29 @@ export function StudioSignInForm({ initialLang }: { initialLang: Lang }) {
                       ) : null}
                     </div>
                   </div>
+                  {usePassword ? (
+                    <div className={`si-fld${shake ? ' shake' : ''}`}>
+                      <label htmlFor="studio-password">{t('pw.label')}</label>
+                      <div className="si-box">
+                        <input
+                          id="studio-password"
+                          type={showPw ? 'text' : 'password'}
+                          autoComplete="current-password"
+                          value={password}
+                          onChange={(ev) => {
+                            setPassword(ev.target.value.slice(0, 200));
+                            setPwError(null);
+                          }}
+                        />
+                        <button type="button" className="si-link" onClick={() => setShowPw((s) => !s)} style={{ flex: 'none', paddingRight: 10 }}>
+                          {showPw ? t('pw.hide') : t('pw.show')}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="si-note">
                     <Lock />
-                    <span>{t('phone.note')}</span>
+                    <span>{usePassword ? t('pw.note') : t('phone.note')}</span>
                   </div>
                 </>
               ) : (
@@ -396,9 +457,35 @@ export function StudioSignInForm({ initialLang }: { initialLang: Lang }) {
                   {e(error)}
                 </p>
               ) : null}
+              {pwError ? (
+                <p role="alert" className="si-err">
+                  {t(`pw.err.${pwError}` as SiWord)}
+                </p>
+              ) : null}
+              {usePassword && mismatch ? (
+                <div className="si-warnc" role="alert">
+                  <b>{t('mis.h', { studio: mismatch.studio ?? 'Your studio', real: roleName(mismatch.real), picked: picked ? roleName(picked) : '' })}</b>
+                  <p>{t('mis.p', { real: roleName(mismatch.real) })}</p>
+                  <div className="btns">
+                    <button type="button" className="p" onClick={() => void arrive(mismatch.to)}>
+                      {t('mis.go', { real: roleName(mismatch.real) })}
+                    </button>
+                    <button type="button" className="s" disabled={busy} onClick={() => void signOutAndRestart()}>
+                      {t('mis.again')}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               <div className="si-grow" />
               <div className="si-foot">
-                {via === 'phone' ? (
+                {via === 'phone' && usePassword ? (
+                  <>
+                    <button type="submit" className="si-cta pri" aria-disabled={!phoneOk || !password || busy || mismatch !== null}>
+                      {busy ? '…' : t('pw.cta')} <Arrow />
+                    </button>
+                    <span className="si-hint">{phoneOk ? t('pw.hint') : t('phone.hintMore')}</span>
+                  </>
+                ) : via === 'phone' ? (
                   <>
                     <button type="submit" className="si-cta pri" aria-disabled={!phoneOk || busy}>
                       {e('signin.getCode')} <Arrow />

@@ -44,8 +44,9 @@ const db = vi.hoisted(() => {
       update: rec('studioMember.update'),
     },
     user: {
-      findUnique: rec('user.findUnique', (a) => users[a.where.phone] ?? null),
+      findUnique: rec('user.findUnique', (a) => (a.where.phone ? (users[a.where.phone] ?? null) : null)),
       create: rec('user.create', () => ({ id: 'u-new' })),
+      update: rec('user.update'),
     },
     homeProject: {
       findMany: rec('homeProject.findMany', (a) => {
@@ -74,7 +75,7 @@ const send = vi.hoisted(() => vi.fn(async () => ({ delivered: true, via: 'whatsa
 vi.mock('@/modules/messaging/sender', () => ({ send }));
 vi.mock('@/modules/rate-limit/store', () => ({ bucketFor: (a: string, b: string) => `${a}:${b}`, consume: vi.fn(async () => ({ allowed: true, remaining: 2 })) }));
 
-import { inviteMember, reinstateMember, resendInvite, signOutEverywhere, suspendMember, teamView } from '@/modules/studio/team-store';
+import { inviteMember, reinstateMember, resendInvite, setTemporaryPassword, signOutEverywhere, suspendMember, teamView } from '@/modules/studio/team-store';
 import { roleCan, seatLine, seatsUsed, checkInvite } from '@/modules/studio/team-rules';
 
 const ops = (op: string) => db.calls.filter((c) => c.op === op);
@@ -125,7 +126,8 @@ describe('only the owner changes the team', () => {
 });
 
 describe('inviting', () => {
-  it('creates a STUDIO user and an INVITED member with its sites, and sends the sign-in link', async () => {
+  it('creates a STUDIO user and an INVITED member with its sites, and sends the sign-in link (WhatsApp codes on)', async () => {
+    vi.stubEnv('STUDIO_SIGN_IN', 'otp');
     const r = await inviteMember(invite, BASE);
     expect(r.ok).toBe(true);
     expect(ops('user.create')[0]!.args.data).toEqual({ phone: '+919850066124', name: 'Imran Shaikh', role: 'STUDIO' });
@@ -162,6 +164,7 @@ describe('inviting', () => {
   });
 
   it('reuses a studio account with no team', async () => {
+    vi.stubEnv('STUDIO_SIGN_IN', 'otp');
     db.users['+919850066124'] = { id: 'u-free', role: 'STUDIO', deletedAt: null, studioMember: null };
     expect((await inviteMember(invite, BASE)).ok).toBe(true);
     expect(ops('user.create')).toHaveLength(0);
@@ -185,6 +188,38 @@ describe('inviting', () => {
     expect((await resendInvite('m-inv', BASE)).ok).toBe(true);
     expect((await resendInvite('m-sup', BASE)).ok).toBe(false);
     expect((await resendInvite('m-other', BASE)).ok).toBe(false);
+  });
+});
+
+describe('password sign-in (owner, 27 Oct 2026)', () => {
+  it('adding someone makes their one-time password, shown once, and sends no WhatsApp', async () => {
+    const r = await inviteMember(invite, BASE);
+    expect(r.ok && r.password).toMatch(/^[a-z2-9]{4}-[a-z2-9]{4}-[a-z2-9]{4}$/);
+    const set = ops('user.update')[0]!.args;
+    expect(set.where).toEqual({ id: 'u-new' });
+    expect(set.data).toMatchObject({ passwordTemporary: true, failedSignIns: 0, lockedOutAt: null });
+    expect(set.data.passwordHash).toMatch(/^s1\$/);
+    expect(set.data.passwordHash).not.toContain(r.ok ? r.password : '');
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('the owner makes a new one-time password: old ones stop, they are signed out, it is audited', async () => {
+    const r = await setTemporaryPassword('m-sup');
+    expect(r.ok && r.password).toBeTruthy();
+    expect(ops('user.update')[0]!.args).toMatchObject({ where: { id: 'u-sup' }, data: { passwordTemporary: true, lockedOutAt: null } });
+    expect(revokeAllSessions).toHaveBeenCalledWith('u-sup');
+    expect(ops('auditLog.create')[0]!.args.data).toMatchObject({ action: 'studio.member.password_set', entityId: 'm-sup' });
+    expect(JSON.stringify(ops('auditLog.create')[0]!.args)).not.toContain(r.ok ? r.password! : 'x');
+  });
+
+  it('not for yourself, not another studio, not a suspended person, and only the owner', async () => {
+    expect((await setTemporaryPassword('m-owner')).ok).toBe(false);
+    expect((await setTemporaryPassword('m-other')).ok).toBe(false);
+    db.members.sup!.status = 'SUSPENDED';
+    expect((await setTemporaryPassword('m-sup')).ok).toBe(false);
+    session.userId = 'u-pm';
+    expect((await setTemporaryPassword('m-inv')).ok).toBe(false);
+    expect(ops('user.update')).toHaveLength(0);
   });
 });
 

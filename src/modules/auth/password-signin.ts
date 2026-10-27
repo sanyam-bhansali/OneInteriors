@@ -149,7 +149,7 @@ export async function setOwnPassword(
 ): Promise<SetPasswordResult> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, role: true, passwordHash: true },
+    select: { id: true, role: true, passwordHash: true, passwordTemporary: true },
   });
 
   if (!user || !canUsePassword(user.role)) {
@@ -160,8 +160,10 @@ export async function setOwnPassword(
 
   /* Changing an existing password requires the old one. Without this, anyone
      who borrows an unlocked laptop for thirty seconds owns the account
-     permanently, rather than until the session expires. */
-  if (user.passwordHash) {
+     permanently, rather than until the session expires.
+     Not for a one-time password the studio owner made (studio-password.ts):
+     they signed in with it a moment ago, and it is replaced now. */
+  if (user.passwordHash && !user.passwordTemporary) {
     if (!currentPassword || !(await verifyPassword(currentPassword, user.passwordHash))) {
       return { ok: false, message: 'Your current password is not right.' };
     }
@@ -175,6 +177,7 @@ export async function setOwnPassword(
     data: {
       passwordHash: await hashPassword(newPassword),
       passwordSetAt: new Date(),
+      passwordTemporary: false,
       failedSignIns: 0,
       lockedOutAt: null,
     },
