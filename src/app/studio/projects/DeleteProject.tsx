@@ -32,7 +32,7 @@ export function DeleteProject({ projectId, client }: { projectId: string; client
       <b className="sm bad-t">Delete {client}&rsquo;s project?</b>
       <span className="muted sm">
         It leaves every studio list and {client}&rsquo;s app, and their app link stops working. The sales final is free to start a new project from, and the lead goes back to before
-        booking. Payments recorded stay in its history; to give money back, use Refund booking on the lead. Restore it from Projects → Deleted projects.
+        booking. Payments recorded stay in its history; to give money back, use Refund booking on the lead. Restore it from Deleted projects.
       </span>
       <label className="ox-f">
         <span className="lbl">Type {client} to confirm</span>
