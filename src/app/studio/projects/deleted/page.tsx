@@ -53,7 +53,11 @@ export default async function DeletedProjectsPage() {
                   {r.reason ? ` · ${r.reason}` : ''}
                 </span>
               </div>
-              {r.restorable ? <RestoreProject projectId={r.id} /> : <span className="muted sm">Booking refunded: not restored here</span>}
+              {r.restorable ? (
+                <RestoreProject projectId={r.id} />
+              ) : (
+                <span className="muted sm">{r.state === 'replaced' ? 'Replaced by a new project for this client' : 'Booking refunded: not restored here'}</span>
+              )}
             </li>
           ))}
         </ul>

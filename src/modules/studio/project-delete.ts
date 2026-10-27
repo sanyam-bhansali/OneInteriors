@@ -35,6 +35,8 @@ export interface DeletedProject {
   reason: string | null;
   /** A refunded booking is cancelled too, but money went back: not restored from here. */
   restorable: boolean;
+  /** Why not: refunded, or replaced by a new project for the same client. */
+  state: 'deleted' | 'refunded' | 'replaced';
 }
 
 /** The owner, or the design head (owner, 27 Oct 2026), who sees every project. */
@@ -119,11 +121,21 @@ type DeletedPayload = { quoteId?: string | null; leadId?: string | null; leadSta
 /** The project's newest delete, when it was deleted (not refunded) and not restored since. */
 async function lastDelete(projectId: string) {
   const ev = await prisma.homeProjectEvent.findFirst({
-    where: { projectId, type: { in: ['project.deleted', 'project.restored', 'project.cancelled'] } },
+    where: { projectId, type: { in: ['project.deleted', 'project.restored', 'project.cancelled', 'project.replaced'] } },
     orderBy: { at: 'desc' },
     select: { type: true, payload: true },
   });
   return ev?.type === 'project.deleted' ? ((ev.payload ?? {}) as DeletedPayload) : null;
+}
+
+async function stateOf(projectId: string): Promise<Pick<DeletedProject, 'restorable' | 'state'>> {
+  const ev = await prisma.homeProjectEvent.findFirst({
+    where: { projectId, type: { in: ['project.deleted', 'project.restored', 'project.cancelled', 'project.replaced'] } },
+    orderBy: { at: 'desc' },
+    select: { type: true },
+  });
+  if (ev?.type === 'project.deleted') return { restorable: true, state: 'deleted' };
+  return { restorable: false, state: ev?.type === 'project.replaced' ? 'replaced' : 'refunded' };
 }
 
 export async function deletedProjects(): Promise<DeletedProject[] | null> {
@@ -147,7 +159,7 @@ export async function deletedProjects(): Promise<DeletedProject[] | null> {
       home: homeLabel(r.introduction.brief),
       deletedOn: r.cancelledAt!,
       reason: r.cancelReason,
-      restorable: (await lastDelete(r.id)) !== null,
+      ...(await stateOf(r.id)),
     })),
   );
 }

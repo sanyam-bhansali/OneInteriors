@@ -349,8 +349,27 @@ export async function writeOwnProject(tx: Prisma.TransactionClient, w: OwnProjec
       select: { id: true },
     }));
 
-  const prior = await tx.introduction.findUnique({ where: { briefId_studioId: { briefId: brief.id, studioId: member.studioId } }, select: { source: true } });
-  if (prior) throw new Refused(prior.source === 'ONE_INTERIORS' ? CUSTOMER_ERRORS.introduced : CUSTOMER_ERRORS.alreadyHere);
+  const prior = await tx.introduction.findUnique({
+    where: { briefId_studioId: { briefId: brief.id, studioId: member.studioId } },
+    select: { id: true, source: true, homeProject: { select: { id: true, cancelledAt: true } } },
+  });
+  if (prior) {
+    /*
+     * Start again after a delete or a refunded booking (owner, 27 Oct 2026:
+     * "delete Ankita as she is on the previous version and remake the
+     * project"). A client has one introduction per studio, and a project
+     * one introduction, so the cancelled project steps aside: its
+     * introduction moves to a copy of the brief with no account on it. It
+     * stays in Deleted projects as a record, replaced and not restorable;
+     * the client, their brief and their account go to the new project.
+     */
+    const cancelled = prior.source === 'STUDIO_OWN_CLIENT' && prior.homeProject?.cancelledAt != null;
+    if (!cancelled) throw new Refused(prior.source === 'ONE_INTERIORS' ? CUSTOMER_ERRORS.introduced : CUSTOMER_ERRORS.alreadyHere);
+    const old = await tx.brief.findUniqueOrThrow({ where: { id: brief.id }, select: { contactName: true, contactPhone: true, contactEmail: true, society: true, locality: true, propertyType: true } });
+    const copy = await tx.brief.create({ data: { ...old, userId: null }, select: { id: true } });
+    await tx.introduction.update({ where: { id: prior.id }, data: { briefId: copy.id } });
+    await recordEvent(tx, { projectId: prior.homeProject!.id, type: 'project.replaced', actor: { type: 'STUDIO', id: member.userId }, refId: q.id, payload: { by: 'a new project for the same client' } });
+  }
 
   const intro = await tx.introduction.create({
     data: {

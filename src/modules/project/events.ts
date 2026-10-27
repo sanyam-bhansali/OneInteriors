@@ -91,6 +91,8 @@ export const PROJECT_EVENT_TYPES = [
   // The owner deleted a project (a mistake, a duplicate) and may restore it (owner, 27 Oct 2026; studio/project-delete.ts)
   'project.deleted',
   'project.restored',
+  // A deleted (or refunded) project set aside when the same client's project is started again
+  'project.replaced',
   // "Add an existing project" (docs/studio-os/BRING-IN-PROJECTS.md): a running project brought onto One Interiors
   'project.brought_in',
   // Studio OS Phase 2 (docs/studio-os/PHASE-2-DESIGN.md): design

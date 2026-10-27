@@ -55,6 +55,12 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
               Deleted projects
             </Link>
           ) : null}
+          {/* The design head starts projects too (owner, 27 Oct 2026). */}
+          {member && member.role === 'DESIGNER' && can(member, 'project.create') ? (
+            <Link href="/studio/projects/start" className="btn pri">
+              Start a project
+            </Link>
+          ) : null}
           {member && can(member, 'project.bringIn') ? (
             <Link href="/studio/projects/bring-in" className="btn sec">
               Bring in a running project
