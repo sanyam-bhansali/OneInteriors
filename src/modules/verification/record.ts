@@ -433,6 +433,13 @@ export async function setGstin(studioId: string, raw: string): Promise<RecordRes
         },
       });
 
+      // The quotation letterhead is a copy of the registration
+      // (studio-quote/store.ts `myBranding`), made once. Without this the
+      // GSTIN ops sets never reaches Settings or the quotations (27 Oct 2026:
+      // Hauspire's read "Not given" after its GSTIN was set). A studio with no
+      // letterhead yet gets one with the GSTIN when it first quotes.
+      await tx.studioBranding.updateMany({ where: { studioId }, data: { gstin: result.gstin } });
+
       await writeAudit(tx, actor, 'studio.gstin.set', 'Studio', studioId, before, {
         gstin: result.gstin,
         state: result.parts.stateName,

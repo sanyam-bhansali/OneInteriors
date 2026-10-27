@@ -56,8 +56,10 @@ async function main() {
   console.log(`▶ database: ${(process.env.DATABASE_URL ?? '').replace(/^.*@/, '').replace(/[/?].*$/, '') || '(none)'}`);
   const db = new PrismaClient();
   try {
-    const studio = await db.studio.findUnique({ where: { slug }, select: { id: true, tradeName: true, softwarePlan: true, fullSoftware: true } });
+    const studio = await db.studio.findUnique({ where: { slug }, select: { id: true, tradeName: true, status: true, softwarePlan: true, fullSoftware: true } });
     if (!studio) throw new Error(`No studio with slug ${slug}.`);
+    /* 27 Oct 2026: Hauspire's designers went to `hauspire`, a removed duplicate of the company. */
+    if (studio.status === 'REMOVED') throw new Error(`${studio.tradeName} (${slug}) is REMOVED; nobody is added to a removed studio. Check the slug.`);
     if (seatLimit(planOf(studio)) !== null) throw new Error(`${studio.tradeName} is on Pro Solo: one login, no team.`);
     const owner = await db.studioMember.findFirst({ where: { studioId: studio.id, role: 'OWNER', status: 'ACTIVE' }, select: { id: true } });
 
