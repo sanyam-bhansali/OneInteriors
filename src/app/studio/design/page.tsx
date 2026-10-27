@@ -22,8 +22,8 @@ const muted = 'text-[12.5px] text-[var(--muted)]';
 const dayWords = (iso: string | null) =>
   iso ? new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).replace(',', '') : '';
 
-export default async function DesignPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const [{ tab: rawTab }, board, w, member] = await Promise.all([searchParams, lifecycleBoard().catch(() => null), designWorkload(), currentMember()]);
+export default async function DesignPage({ searchParams }: { searchParams: Promise<{ tab?: string; deleted?: string }> }) {
+  const [{ tab: rawTab, deleted }, board, w, member] = await Promise.all([searchParams, lifecycleBoard().catch(() => null), designWorkload(), currentMember()]);
   if (!w && !board) {
     return (
       <div className="content oi-proj">
@@ -62,6 +62,11 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
           ) : null}
         </div>
       </div>
+      {deleted === '1' ? (
+        <p role="status" className="ox-ok" style={{ margin: 0 }}>
+          Project deleted. It is in Deleted projects if you need it back.
+        </p>
+      ) : null}
       {board ? <LifecycleTabs board={board} tab={tab} base="/studio/design" mine={mine} /> : null}
       {/* The designers' load (Phase 2): owner and PM, under Design. */}
       {w && !mine && tab === 'design' ? (

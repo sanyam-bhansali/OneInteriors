@@ -85,7 +85,8 @@ export async function deleteProject(projectId: unknown, typedName: unknown, rawR
   const back = lead?.preBookingStageId ? await prisma.studioStage.findFirst({ where: { id: lead.preBookingStageId, studioId: m.studioId }, select: { id: true } }) : null;
 
   await prisma.$transaction(async (tx) => {
-    await tx.homeProject.update({ where: { id: p.id }, data: { cancelledAt: now, cancelReason: `Deleted by the owner${reason ? `: ${reason}` : ''}`, signedQuoteId: null } });
+    const by = m.role === 'OWNER' ? 'the owner' : 'the design head';
+    await tx.homeProject.update({ where: { id: p.id }, data: { cancelledAt: now, cancelReason: `Deleted by ${by}${reason ? `: ${reason}` : ''}`, signedQuoteId: null } });
     await recordEvent(tx, {
       projectId: p.id,
       type: 'project.deleted',

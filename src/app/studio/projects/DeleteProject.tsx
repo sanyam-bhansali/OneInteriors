@@ -8,7 +8,7 @@ import { deleteProjectAction, restoreProjectAction } from './actions';
  * confirmation with the client's name, an optional reason. Nothing is
  * erased; Projects → Deleted projects restores it.
  */
-export function DeleteProject({ projectId, client }: { projectId: string; client: string }) {
+export function DeleteProject({ projectId, client, after = '/studio/projects' }: { projectId: string; client: string; /** Where to land: Projects, or Design for the design head (who cannot open the Projects list). */ after?: string }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState('');
   const [reason, setReason] = useState('');
@@ -60,7 +60,7 @@ export function DeleteProject({ projectId, client }: { projectId: string; client
                 setError(r.error);
                 return;
               }
-              window.location.assign('/studio/projects?deleted=1');
+              window.location.assign(`${after}?deleted=1`);
             })
           }
         >
