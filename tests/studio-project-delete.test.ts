@@ -5,6 +5,7 @@ vi.mock('@/lib/prisma', () => ({ prisma: {} }));
 
 import { mayDeleteProjects, nameMatches } from '@/modules/studio/project-delete';
 import { mayOpen } from '@/modules/studio/surfaces';
+import { can } from '@/modules/studio/roles';
 import { PROJECT_EVENT_TYPES } from '@/modules/project/events';
 
 /** Delete and restore a project (owner, 27 Oct 2026; studio/project-delete.ts). */
@@ -36,9 +37,21 @@ describe('who deletes, and opens Deleted projects', () => {
   });
 });
 
+describe('the design head starts projects too (27 Oct 2026)', () => {
+  it('may create and open the start page; another designer may not', () => {
+    const head = { role: 'DESIGNER' as const, status: 'ACTIVE' as const, fullSoftware: true, designHead: true };
+    const plain = { role: 'DESIGNER' as const, status: 'ACTIVE' as const, fullSoftware: true };
+    expect(can(head, 'project.create')).toBe(true);
+    expect(can(plain, 'project.create')).toBe(false);
+    expect(mayOpen(head, '/studio/projects/start')).toBe(true);
+    expect(mayOpen(plain, '/studio/projects/start')).toBe(false);
+  });
+});
+
 describe('the record', () => {
   it('deleting and restoring are project events', () => {
     expect(PROJECT_EVENT_TYPES).toContain('project.deleted');
+    expect(PROJECT_EVENT_TYPES).toContain('project.replaced');
     expect(PROJECT_EVENT_TYPES).toContain('project.restored');
   });
 });
