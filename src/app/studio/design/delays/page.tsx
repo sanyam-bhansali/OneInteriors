@@ -44,9 +44,32 @@ export default async function DelaysPage() {
           </Link>
         </div>
       </div>
+      {view.lateNow.length > 0 ? (
+        <section className="card p-0" aria-label="Late right now">
+          <div className="px-3 pt-3">
+            <h2 className="m-0 text-[15px]">Late right now · {view.lateNow.length}</h2>
+            <p className="muted m-0 text-[13px]">Their day has passed and they are not ticked. Whose delay and why is asked when each is ticked.</p>
+          </div>
+          <ul className="m-0 list-none p-0">
+            {view.lateNow.map((l) => (
+              <li key={l.stepId} className="flex flex-wrap items-baseline justify-between gap-2 border-t border-[var(--line)] px-3 py-2 text-[13.5px]">
+                <span>
+                  <Link href={`/studio/projects/${l.projectId}?tab=design#step-${l.stepId}`} className="font-medium">
+                    {l.step}
+                  </Link>
+                  <span className="muted"> · {l.home}{l.who ? ` · ${l.who}` : ''}</span>
+                </span>
+                <span className="bad-t" style={{ fontWeight: 600 }}>
+                  {l.days} day{l.days === 1 ? '' : 's'} late
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {view.rows.length === 0 ? (
         <div className="empty">
-          <p className="m-0">No late design steps. Every step is on its day.</p>
+          <p className="m-0">{view.lateNow.length ? 'No delay filed yet in the last four months.' : 'No late design steps. Every step is on its day.'}</p>
         </div>
       ) : (
         <div className="card overflow-x-auto p-0">

@@ -224,11 +224,11 @@ export function customerTracker(row: TrackerInputRow, views: readonly StageView[
   const handover = handoverStage(rules);
 
   /*
-   * What the customer reads by name: the starred steps. The percentages above count every step. A design stage with the
-   * design process (its steps carry an effort; owner and Hauspire's design team, 24 Oct 2026; DESIGN-PROCESS-PLAN.md
-   * Decision 11): every step, never a step's date.
+   * What the customer reads by name: the starred steps. The percentages above count every step. The design stage
+   * (owner and Hauspire's design team, 24 Oct 2026; DESIGN-PROCESS-PLAN.md Decision 11): every step, never a step's
+   * date, on every plan (owner, 27 Oct 2026: older plans too, not only those on the new steps).
    */
-  const processDesign = (i: number) => stored[i]?.kind === 'DESIGN' && steps[i]!.some((it) => it.effortMin !== null && it.effortMin !== undefined);
+  const processDesign = (i: number) => stored[i]?.kind === 'DESIGN';
   const milestones = steps.map((list, i) => (processDesign(i) ? list : list.filter((it) => it.customerMilestone === true)));
 
   const stages: CustomerTrackerStage[] = statuses.map((s, i) => {

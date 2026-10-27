@@ -41,7 +41,7 @@ describe('Use our design steps', () => {
 });
 
 describe('the customer design card dates', () => {
-  it('reads a moment as its day in India and a planned day as stored', () => {
+  it('reads a moment as its day in India; a design step carries no day at all (27 Oct 2026)', () => {
     const d = toCustomerDesign(
       {
         actualEnd: null,
@@ -51,8 +51,8 @@ describe('the customer design card dates', () => {
       [],
       null,
     )!;
-    expect(d.steps[0]!.doneOn).toBe('2026-10-13'); // 01:15 IST on the 13th
-    expect(d.steps[0]!.plannedOn).toBe('2026-10-13');
+    expect(d.steps[0]!.doneOn).toBeNull();
+    expect(d.steps[0]!.plannedOn).toBeNull();
     expect(d.closedOn).toBe('2026-10-21');
     expect(d.moodBoard.sharedOn).toBe('2026-10-13');
   });
@@ -80,9 +80,9 @@ describe('the client’s design card with the new steps (DESIGN-PROCESS-PLAN.md 
     expect(d.yourStep).toBe('2D approval');
   });
 
-  it('an older plan (no efforts) still shows only its starred steps, with dates', () => {
+  it('an older plan (no efforts) shows every step too, with no dates (owner, 27 Oct 2026)', () => {
     const d = toCustomerDesign({ actualEnd: null, items: [item('A', { effortMin: null, customerMilestone: true }), item('B', { effortMin: null })] }, { designClosedAt: null, moodBoardSharedAt: null }, [], null)!;
-    expect(d.steps.map((x) => [x.label, x.plannedOn])).toEqual([['A', '2026-10-20']]);
+    expect(d.steps.map((x) => [x.label, x.plannedOn])).toEqual([['A', null], ['B', null]]);
   });
 });
 
