@@ -73,7 +73,8 @@ export async function writePlan(db: PlanDb, projectId: string, plan: { stages: P
 /**
  * File the agreement and the signed quotation in the customer's Locker,
  * shared from the moment of signing (portal/documents.ts says what they
- * point at). `filedById` is the customer who signed; `byStudio` is false —
+ * point at). When the studio started the project, the agreement stays
+ * hidden until the studio asks the client to sign it (27 Oct 2026). `filedById` is the customer who signed; `byStudio` is false —
  * the studio did not upload them.
  */
 export async function fileSignedQuote(
@@ -96,7 +97,7 @@ export async function fileSignedQuote(
       bytes: 0,
       uploadedById: filedById,
       byStudio,
-      sharedAt: at,
+      sharedAt: byStudio && d.kind === 'AGREEMENT' ? null : at,
       createdAt: at,
     })),
   });

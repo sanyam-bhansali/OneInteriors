@@ -71,6 +71,18 @@ export const lifecycleWords = {
   'life.sign.title': { en: 'To sign', hi: 'हस्ताक्षर के लिए', mr: 'सहीसाठी' },
   'life.sign.kind.SALES_FINAL': { en: 'Final quotation (BOQ) {number}', hi: 'अंतिम कोटेशन (BOQ) {number}', mr: 'अंतिम कोटेशन (BOQ) {number}' },
   'life.sign.kind.DESIGN_FINAL': { en: 'Design final {number}', hi: 'डिज़ाइन फ़ाइनल {number}', mr: 'डिझाइन फायनल {number}' },
+  'life.sign.kind.AGREEMENT': { en: 'Agreement for {number}', hi: '{number} का एग्रीमेंट', mr: '{number} साठी करार' },
+  'life.sign.agree.AGREEMENT': {
+    en: 'I have read the agreement in full and I agree to everything in it.',
+    hi: 'मैंने एग्रीमेंट पूरा पढ़ लिया है और मैं इसकी हर बात से सहमत हूँ।',
+    mr: 'मी करार पूर्ण वाचला आहे आणि मला त्यातील सर्व काही मान्य आहे.',
+  },
+  'life.sign.paper': {
+    en: 'Prefer paper? Print this, sign it, and bring it to the studio with copies of your Aadhaar and PAN.',
+    hi: 'काग़ज़ पर करना है? इसे प्रिंट करें, हस्ताक्षर करें और आधार व पैन की कॉपी के साथ स्टूडियो ले आएँ।',
+    mr: 'कागदावर करायचे आहे? हे प्रिंट करा, सही करा आणि आधार व पॅनच्या प्रतींसह स्टुडिओत आणा.',
+  },
+  'life.sign.noTerms': { en: 'The studio has not written its terms yet.', hi: 'स्टूडियो ने अभी अपनी शर्तें नहीं लिखी हैं।', mr: 'स्टुडिओने अजून त्यांच्या अटी लिहिलेल्या नाहीत.' },
   'life.sign.read': { en: 'Read and sign', hi: 'पढ़ें और हस्ताक्षर करें', mr: 'वाचा आणि सही करा' },
   'life.sign.open': { en: 'Open the signed copy', hi: 'हस्ताक्षरित कॉपी खोलें', mr: 'सही केलेली प्रत उघडा' },
   'life.sign.signed': { en: 'Signed by {name} on {date}', hi: '{name} ने {date} को हस्ताक्षर किए', mr: '{name} यांनी {date} रोजी सही केली' },

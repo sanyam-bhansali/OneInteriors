@@ -93,4 +93,4 @@ export function decisionDocTitle(title: string, option: string, price: string): 
  * sees the drawings and the rest (Studio OS Phase 2: a designer sees no money).
  */
 export const MONEY_DOC = (d: { kind: string; contentType: string; storageKey: string }) =>
-  d.kind === 'RECEIPT' || d.kind === 'QUOTATION' || d.kind === 'AGREEMENT' || d.contentType === DECISION_CONTENT_TYPE || d.storageKey.startsWith('signed-quote:');
+  d.kind === 'RECEIPT' || d.kind === 'QUOTATION' || d.kind === 'AGREEMENT' || d.kind === 'SIGNED_AGREEMENT' || d.contentType === DECISION_CONTENT_TYPE || d.storageKey.startsWith('signed-quote:');

@@ -97,15 +97,16 @@ export function SignoffScreen({
         ) : null}
         {state === 'waiting' && viewer === 'family' ? <p className="oa-note">{lw(lang, 'life.sign.ownerOnly')}</p> : null}
 
-        <div style={{ overflow: 'auto', maxHeight: '70vh', borderRadius: 12, border: '1px solid var(--line)' }} data-testid="signoff-document">
+        <div style={{ overflow: 'auto', maxHeight: kind === 'AGREEMENT' ? '40vh' : '70vh', borderRadius: 12, border: '1px solid var(--line)' }} data-testid="signoff-document">
           {children}
         </div>
+        {kind === 'AGREEMENT' && open ? <p className="oa-note">{lw(lang, 'life.sign.paper')}</p> : null}
 
         {open ? (
           <>
             <label className="oa-row" style={{ alignItems: 'flex-start', justifyContent: 'flex-start' }}>
               <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-1 h-5 w-5 accent-[var(--accent)]" data-testid="signoff-agree" />
-              <span className="text-[15px] leading-[1.45]">{lw(lang, 'life.sign.agree')}</span>
+              <span className="text-[15px] leading-[1.45]">{lw(lang, kind === 'AGREEMENT' ? 'life.sign.agree.AGREEMENT' : 'life.sign.agree')}</span>
             </label>
             <label className="oa-label" htmlFor="oa-signoff-name">
               {lw(lang, 'life.sign.name')}

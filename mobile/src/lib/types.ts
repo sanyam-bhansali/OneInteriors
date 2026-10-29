@@ -102,7 +102,7 @@ export interface Update {
 
 export interface Doc {
   id: string;
-  kind: 'AGREEMENT' | 'QUOTATION' | 'DRAWINGS' | 'RECEIPT' | 'WARRANTY' | 'OTHER';
+  kind: 'AGREEMENT' | 'SIGNED_AGREEMENT' | 'QUOTATION' | 'DRAWINGS' | 'RECEIPT' | 'WARRANTY' | 'OTHER';
   title: string;
   meta: string;
   url: string;
@@ -400,6 +400,7 @@ export interface Notice {
 
 export const DOC_KINDS: Record<Doc['kind'], string> = {
   AGREEMENT: 'Agreement',
+  SIGNED_AGREEMENT: 'Signed agreement (paper)',
   QUOTATION: 'Signed quotation',
   DRAWINGS: 'Design drawings',
   RECEIPT: 'Payment receipt',

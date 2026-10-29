@@ -6,6 +6,8 @@
 
 export const DOC_KINDS = {
   AGREEMENT: 'Agreement',
+  /* The agreement signed on paper at the office, with Aadhaar and PAN copies (27 Oct 2026). */
+  SIGNED_AGREEMENT: 'Signed agreement (paper)',
   QUOTATION: 'Signed quotation',
   DRAWINGS: 'Design drawings',
   RECEIPT: 'Payment receipt',

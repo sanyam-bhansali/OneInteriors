@@ -2,8 +2,8 @@
 
 /**
  * Client sign-off on the project (owner, 15 Oct 2026; project/signoffs.ts):
- * the sales final (BOQ) and the design final, each with "Ask {client} to
- * sign" (optional, the studio decides when), the requests and "Signed by …
+ * the sales final (BOQ), the agreement (27 Oct 2026: hidden from the client
+ * until asked) and the design final, each with "Ask {client} to sign" (optional, the studio decides when), the requests and "Signed by …
  * on …". A newer revision needs a new sign-off; the old signature stays on
  * its revision. The signed copy opens the page the client signed on, and is
  * filed in the locker by itself.
@@ -35,7 +35,9 @@ export function SignoffCard({ data, customer }: { data: StudioSignoffs; customer
     <section className="card flex flex-col gap-3 p-4" aria-label="Client sign-off" data-testid="signoff-card">
       <div className="flex flex-col gap-1">
         <b>Client sign-off</b>
-        <span className="muted sm">Optional. {customer} reads the quotation in the app, ticks I agree and types their name.</span>
+        <span className="muted sm">
+          Optional. {customer} reads it in the app, ticks I agree and types their name. The agreement can also be signed on paper at the office: upload it as &quot;Signed agreement (paper)&quot;.
+        </span>
       </div>
       {data.targets.map((t) => (
         <div key={t.kind} className="flex flex-col gap-1.5" data-testid={`signoff-${t.kind}`}>
