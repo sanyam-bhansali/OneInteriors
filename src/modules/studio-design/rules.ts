@@ -267,7 +267,14 @@ export function applyRefusal(items: readonly { doneAt: Date | null; responsible:
 
 // ── Late steps ────────────────────────────────────────────────
 
+/*
+ * Two choices now (owner, 27 Oct 2026: "the user should only choose if it is
+ * a client delay or our delay"): CLIENT_DELAY, shown to the client as days
+ * waiting on them, and STUDIO_DELAY, never shown; the team's note says why.
+ * The older reasons stay readable on delays filed before.
+ */
 export const CLIENT_REASONS = {
+  CLIENT_DELAY: 'Client delay',
   CLIENT_UNAVAILABLE: 'Client not available',
   CLIENT_NOT_RESPONDING: 'Client not responding',
   POSSESSION_LATE: 'Possession is late',
@@ -276,6 +283,7 @@ export const CLIENT_REASONS = {
 } as const;
 
 export const STUDIO_REASONS = {
+  STUDIO_DELAY: 'Our delay',
   DESIGNER_LEAVE: 'Designer on leave',
   STUDIO_WORKLOAD: 'Too much work at the studio',
   STUDIO_OTHER: 'Our own delay',
@@ -290,6 +298,8 @@ export const reasonLabel = (r: string): string => (CLIENT_REASONS as Record<stri
 
 /** What the customer reads for a moved step: plain words, never the studio's note. */
 export const CUSTOMER_REASON: Record<DelayReasonKey, string> = {
+  CLIENT_DELAY: 'Waiting on you.',
+  STUDIO_DELAY: "The studio's own delay.",
   CLIENT_UNAVAILABLE: 'Moved to a day that suits you.',
   CLIENT_NOT_RESPONDING: 'Waiting to hear from you.',
   POSSESSION_LATE: 'Waiting for possession of the flat.',
@@ -317,8 +327,8 @@ export function lateTickCheck(
   const days = step.plannedOn ? Math.max(0, daysBetween(step.plannedOn, today)) : 0;
   if (days === 0) return { ok: true, delay: null };
   if (isDelayReasonKey(reason)) return { ok: true, delay: { reason, side: sideOfReason(reason), days } };
-  if (step.responsible === 'CLIENT') return { ok: true, delay: { reason: 'CLIENT_NOT_RESPONDING', side: 'CLIENT', days } };
-  return { ok: false, error: `This step is ${days === 1 ? '1 day' : `${days} days`} late. Say why: on the client side or ours.` };
+  if (step.responsible === 'CLIENT') return { ok: true, delay: { reason: 'CLIENT_DELAY', side: 'CLIENT', days } };
+  return { ok: false, error: `This step is ${days === 1 ? '1 day' : `${days} days`} late. Say whose delay: the client's or ours.` };
 }
 
 export interface StepDay {
@@ -364,6 +374,7 @@ export const DESIGN_KINDS = {
   FURNITURE: 'Furniture layout',
   RENDER_3D: '3D & renders',
   WORKING: 'Working drawings',
+  VALIDATION: 'Validation drawings',
   SITE_PHOTO: 'Site photo',
   /* Project documents (24 Oct 2026; DESIGN-PROCESS-PLAN.md §3; documents.ts). */
   ELECTRICAL: 'Electrical drawings & quotation',
@@ -378,7 +389,7 @@ export const isDesignKind = (v: unknown): v is DesignKind => typeof v === 'strin
  * working drawings (the design process, 24 Oct 2026: working drawings are
  * approved by the client before they are final). Site photos are not.
  */
-export const FOR_APPROVAL: readonly DesignKind[] = ['LAYOUT_2D', 'FURNITURE', 'RENDER_3D', 'WORKING', 'ELECTRICAL'];
+export const FOR_APPROVAL: readonly DesignKind[] = ['LAYOUT_2D', 'FURNITURE', 'RENDER_3D', 'WORKING', 'VALIDATION', 'ELECTRICAL'];
 
 /** Which client approval step a drawing's approval ticks (DESIGN-PROCESS-PLAN.md Decision 4). */
 export function approvalKindOfDrawing(kind: string | null | undefined): ApprovalKind | null {

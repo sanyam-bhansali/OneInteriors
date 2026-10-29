@@ -180,13 +180,16 @@ describe('ticking a late step (DESIGN-PROCESS-PLAN.md Decision 6)', () => {
     expect(lateTickCheck({ plannedOn: '2026-10-05', responsible: 'DESIGNER' }, '2026-10-05', undefined)).toEqual({ ok: true, delay: null });
   });
 
-  it('asks a late step why, and files the side from the reason', () => {
-    expect(lateTickCheck({ plannedOn: '2026-10-01', responsible: 'DESIGNER' }, '2026-10-05', undefined)).toEqual({ ok: false, error: 'This step is 4 days late. Say why: on the client side or ours.' });
+  it('asks whose delay a late step is, and files the side (27 Oct 2026: client or ours)', () => {
+    expect(lateTickCheck({ plannedOn: '2026-10-01', responsible: 'DESIGNER' }, '2026-10-05', undefined)).toEqual({ ok: false, error: "This step is 4 days late. Say whose delay: the client's or ours." });
+    expect(lateTickCheck({ plannedOn: '2026-10-01', responsible: 'DESIGNER' }, '2026-10-05', 'STUDIO_DELAY')).toEqual({ ok: true, delay: { reason: 'STUDIO_DELAY', side: 'STUDIO', days: 4 } });
+    expect(lateTickCheck({ plannedOn: '2026-10-01', responsible: 'DESIGNER' }, '2026-10-05', 'CLIENT_DELAY')).toEqual({ ok: true, delay: { reason: 'CLIENT_DELAY', side: 'CLIENT', days: 4 } });
+    // An older reason filed before still reads, with its side.
     expect(lateTickCheck({ plannedOn: '2026-10-01', responsible: 'DESIGNER' }, '2026-10-05', 'STUDIO_WORKLOAD')).toEqual({ ok: true, delay: { reason: 'STUDIO_WORKLOAD', side: 'STUDIO', days: 4 } });
   });
 
   it('a client’s late step is the client’s delay by itself', () => {
-    expect(lateTickCheck({ plannedOn: '2026-10-04', responsible: 'CLIENT' }, '2026-10-05', undefined)).toEqual({ ok: true, delay: { reason: 'CLIENT_NOT_RESPONDING', side: 'CLIENT', days: 1 } });
+    expect(lateTickCheck({ plannedOn: '2026-10-04', responsible: 'CLIENT' }, '2026-10-05', undefined)).toEqual({ ok: true, delay: { reason: 'CLIENT_DELAY', side: 'CLIENT', days: 1 } });
   });
 });
 

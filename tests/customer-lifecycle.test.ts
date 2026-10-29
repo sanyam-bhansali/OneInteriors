@@ -14,6 +14,7 @@ import type { CustomerTracker } from '@/modules/portal/tracker-view';
 
 const design = (over: Partial<CustomerDesign> = {}): CustomerDesign => ({
   designer: 'Neha',
+  clientDelayDays: 0,
   pct: 20,
   done: false,
   closedOn: null,

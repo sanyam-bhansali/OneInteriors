@@ -5,11 +5,10 @@ import { useState, useTransition } from 'react';
 import type { DesignStepView, DesignTab, FinalView } from '@/modules/studio-design/store';
 import type { DocType } from '@/modules/studio-design/documents';
 import { UploadDocument } from './UploadDocument';
-import { CLIENT_REASONS, STUDIO_REASONS } from '@/modules/studio-design/rules';
 import { RESPONSIBLE_LABEL, RESPONSIBLES } from '@/modules/studio-design/template';
 import { formatINR } from '@/lib/money';
 import { CustomerSees, OnlyYourTeam } from '../marks';
-import { MilestoneCount, STAR_HINT, StarToggle } from './StarToggle';
+
 import {
   addDesignStepBelowAction,
   addMoodBoardPiecesAction,
@@ -190,11 +189,8 @@ const effortWords = (min: number | null): string | null => (min === null || min 
 function Steps({ tab }: { tab: DesignTab }) {
   const [open, setOpen] = useState<{ id: string; what: 'tick' | 'move' | 'edit' | 'below' } | null>(null);
   const { message, run, pending } = useRun();
-  const [starred, setStarred] = useState<{ ok: boolean; text: string } | null>(null);
   if (tab.steps.length === 0) return null;
-  const stars = tab.steps.filter((s) => s.inScope && s.milestone).length;
-  /* The client sees every design step, without dates (DESIGN-PROCESS-PLAN.md Decision 11), on every plan since 27 Oct 2026. */
-  const process = true;
+  /* The client sees every design step, without dates (DESIGN-PROCESS-PLAN.md Decision 11), on every plan since 27 Oct 2026; no star to choose any (owner, 27 Oct 2026). */
   /* Weights by effort on the new steps; an older plan's are its own. */
   const byEffort = tab.steps.some((s) => s.effortMin !== null);
   return (
@@ -203,20 +199,10 @@ function Steps({ tab }: { tab: DesignTab }) {
         <h2 className={h2}>Design steps</h2>
         <CustomerSees name={tab.customerFirst} />
       </div>
-      {process ? (
-        <p className={`m-0 ${muted}`}>
-          {tab.customerFirst} sees every step and the design&rsquo;s %, never the dates. Each % is the step&rsquo;s share of the design{byEffort ? ', by its effort' : ''}. A step after an unrecorded payment waits for it, and is
-          never late. ★ marks a milestone.
-        </p>
-      ) : (
-        <>
-          <p className={`m-0 ${muted}`}>
-            <span className="font-medium acc-t">★ {STAR_HINT}</span> {tab.customerFirst} sees the design&rsquo;s % from every step. Each % is the step&rsquo;s share of the design. A locked step opens when its
-            payment is recorded by accounts.
-          </p>
-          <MilestoneCount n={stars} />
-        </>
-      )}
+      <p className={`m-0 ${muted}`}>
+        {tab.customerFirst} sees every step and the design&rsquo;s %, never the dates. Each % is the step&rsquo;s share of the design{byEffort ? ', by its effort' : ''}. A step after an unrecorded payment waits for it, and is
+        never late. The dates are your team&rsquo;s plan: move one when it changes.
+      </p>
       <ul className="m-0 flex list-none flex-col gap-1 p-0">
         {tab.steps.map((st, k) => (
           <StepHeads key={`h-${st.id}`} st={st} before={k > 0 ? tab.steps[k - 1]! : null} />
@@ -225,14 +211,6 @@ function Steps({ tab }: { tab: DesignTab }) {
           return [
           head,
           <li key={st.id} id={`step-${st.id}`} className="flex items-start gap-1.5 rounded-[8px] px-1.5 py-2 hover:bg-[var(--fill)]">
-            <StarToggle
-              projectId={tab.projectId}
-              stepId={st.id}
-              label={st.label}
-              starred={st.milestone}
-              canEdit={tab.canEditPlan}
-              say={(r) => setStarred(r.ok ? { ok: true, text: r.message } : { ok: false, text: r.error })}
-            />
             <div className="min-w-0 flex-1">
             <StepLine tab={tab} st={st} onOpen={(what) => setOpen(open?.id === st.id && open.what === what ? null : { id: st.id, what })} />
             {open?.id === st.id && open.what === 'tick' ? <TickForm tab={tab} st={st} onDone={() => setOpen(null)} /> : null}
@@ -266,7 +244,6 @@ function Steps({ tab }: { tab: DesignTab }) {
         })}
       </ul>
       <Message m={message} />
-      <Message m={starred} />
     </section>
   );
 }
@@ -332,8 +309,9 @@ function StepLine({ tab, st, onOpen }: { tab: DesignTab; st: DesignStepView; onO
           </button>
         ) : null}
         {tab.canWork && st.inScope && !st.done && st.plannedOn && !st.lockedBy ? (
+          /* "Running late" on a step that was not late confused the team (27 Oct 2026): it moves the step's day. */
           <button type="button" className="btn ghost sm" onClick={() => onOpen('move')}>
-            Running late
+            Move date
           </button>
         ) : null}
         {tab.canEditPlan ? (
@@ -473,29 +451,19 @@ function TickForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
       {st.lateDays > 0 ? (
         // A late step says why (DESIGN-PROCESS-PLAN.md Decision 6): it goes on the Delays list for the owner to check.
         <div className="flex flex-col gap-2 rounded-[10px] border border-[var(--s-rule-soft)] bg-[var(--s-paper)] p-2">
-          <label className="flex flex-col gap-1 text-[13px]">
-            {st.lateDays === 1 ? '1 day late' : `${st.lateDays} days late`}: why?{st.responsible === 'CLIENT' ? ' (left empty: the client was not responding)' : ''}
-            <select name="reason" className="fld" required={st.responsible !== 'CLIENT'} defaultValue="">
-              <option value="">Pick one</option>
-              <optgroup label="Client side">
-                {Object.entries(CLIENT_REASONS).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="Studio side">
-                {Object.entries(STUDIO_REASONS).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-          </label>
+          {/* Whose delay, nothing more (owner, 27 Oct 2026): the client's shows in their app as days waiting on them; ours never does. */}
+          <fieldset className="m-0 flex flex-col gap-1 border-0 p-0 text-[13px]">
+            <legend className="mb-1">{st.lateDays === 1 ? '1 day late' : `${st.lateDays} days late`}: whose delay?</legend>
+            <label className="flex items-center gap-2">
+              <input type="radio" name="reason" value="CLIENT_DELAY" required={st.responsible !== 'CLIENT'} defaultChecked={st.responsible === 'CLIENT'} /> The client&rsquo;s ({tab.customerFirst} sees the days)
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="radio" name="reason" value="STUDIO_DELAY" /> Ours (only the team sees it)
+            </label>
+          </fieldset>
           <OnlyYourTeam>
             <label className="flex flex-col gap-1 text-[13px]">
-              About the delay (optional)
+              Why, for the team (optional)
               <input name="reasonNote" maxLength={500} className="fld" />
             </label>
           </OnlyYourTeam>
@@ -538,26 +506,15 @@ function MoveForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
           New day
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="fld" required />
         </label>
-        <label className="flex flex-col gap-1 text-[13px]">
-          Why
-          <select value={reason} onChange={(e) => setReason(e.target.value)} className="fld" required>
-            <option value="">Pick one</option>
-            <optgroup label="Client side">
-              {Object.entries(CLIENT_REASONS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="Studio side">
-              {Object.entries(STUDIO_REASONS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </optgroup>
-          </select>
-        </label>
+        <fieldset className="m-0 flex flex-col gap-1 border-0 p-0 text-[13px]">
+          <legend className="mb-1">Whose delay?</legend>
+          <label className="flex items-center gap-2">
+            <input type="radio" name="moveReason" value="CLIENT_DELAY" checked={reason === 'CLIENT_DELAY'} onChange={() => setReason('CLIENT_DELAY')} required /> The client&rsquo;s
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="radio" name="moveReason" value="STUDIO_DELAY" checked={reason === 'STUDIO_DELAY'} onChange={() => setReason('STUDIO_DELAY')} /> Ours
+          </label>
+        </fieldset>
       </div>
       <OnlyYourTeam>
         <label className="flex flex-col gap-1 text-[13px]">
@@ -565,7 +522,7 @@ function MoveForm({ tab, st, onDone }: { tab: DesignTab; st: DesignStepView; onD
           <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} className="fld" />
         </label>
       </OnlyYourTeam>
-      <p className={`m-0 ${muted}`}>The open steps after this one move by the same days. {tab.customerFirst} sees the new day and the reason, never the note.</p>
+      <p className={`m-0 ${muted}`}>The open steps after this one move by the same days. {tab.customerFirst} never sees the dates or the note; a delay of theirs shows as days waiting on them.</p>
       <div className="flex flex-wrap items-center gap-2">
         <button type="submit" className="btn pri sm" disabled={pending}>
           Move

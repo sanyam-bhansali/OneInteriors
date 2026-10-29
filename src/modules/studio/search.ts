@@ -31,6 +31,7 @@ const TYPE_WORDS: { re: RegExp; type: DocType }[] = [
   { re: /^(2d|layout|layouts)$/i, type: 'LAYOUT_2D' },
   { re: /^(3d|render|renders)$/i, type: 'RENDER_3D' },
   { re: /^(wd|working)$/i, type: 'WORKING' },
+  { re: /^(val|validation)$/i, type: 'VALIDATION' },
   { re: /^(elec|electrical)$/i, type: 'ELECTRICAL' },
   { re: /^(material|materials|matlist)$/i, type: 'MATERIAL_LIST' },
   { re: /^(cut|cutlist)$/i, type: 'CUT_LIST' },

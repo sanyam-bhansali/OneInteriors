@@ -42,6 +42,12 @@ export function DesignCard({ design, studio, owner, docs, onChanged }: { design:
           <span role="progressbar" aria-label={`Design ${design.pct}% done`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={design.pct} style={{ display: 'block', height: 8, borderRadius: 99, background: 'var(--line)', overflow: 'hidden' }}>
             <span style={{ display: 'block', height: '100%', width: `${design.pct}%`, borderRadius: 99, background: 'var(--accent)' }} />
           </span>
+          {/* Days the design waited on them (owner, 27 Oct 2026); never the studio's own delays, never a date. */}
+          {design.clientDelayDays > 0 && !design.done ? (
+            <span className="oa-meta">
+              Waited on you so far: {design.clientDelayDays} day{design.clientDelayDays === 1 ? '' : 's'}
+            </span>
+          ) : null}
         </div>
       ) : null}
 

@@ -23,7 +23,7 @@
 
 import type { Prisma } from '@prisma/client';
 import { progressOf } from '@/modules/project/step-rules';
-import { dayFromDb, istDay } from '@/modules/project/working-days';
+import { dayFromDb, daysBetween, istDay } from '@/modules/project/working-days';
 import { chainLocks, CUSTOMER_REASON, DESIGN_KINDS, drawingsOf, formatLength, gateOf, isDelayReasonKey, nextStep, type DesignKind, type GateStage } from './rules';
 import { versionLabels } from './documents';
 
@@ -41,7 +41,7 @@ export const CUSTOMER_DESIGN_SELECT = {
   /* The customer's own answers: verdict, their words, when. Never `byUserId`. */
   designReviews: { orderBy: { at: 'asc' }, select: { documentId: true, verdict: true, comment: true, at: true } },
   /* Which step moved, to when, and why (a key read as plain words). Never `note` or `byId`. */
-  stepDelays: { orderBy: { at: 'asc' }, select: { stepId: true, toDate: true, reason: true } },
+  stepDelays: { orderBy: { at: 'asc' }, select: { stepId: true, fromDate: true, toDate: true, reason: true, side: true } },
 } satisfies Prisma.HomeProjectSelect;
 
 export interface DesignStepRow {
@@ -78,7 +78,7 @@ export interface DesignRow {
   siteVisits?: readonly { at: Date; purpose: string; status: string }[];
   measurements?: readonly { room: string; lengthMm: number | null; widthMm: number | null; heightMm: number | null }[];
   designReviews?: readonly { documentId: string; verdict: string; comment: string | null; at: Date }[];
-  stepDelays?: readonly { stepId: string; toDate: Date; reason: string }[];
+  stepDelays?: readonly { stepId: string; fromDate?: Date; toDate: Date; reason: string; side?: string }[];
 }
 
 export interface CustomerDesignStep {
@@ -130,6 +130,11 @@ export interface CustomerDesign {
   waitingFor: string | null;
   /** The design's next step when it is the client's own to do (starred or not): its name, so they know it is on them. */
   yourStep: string | null;
+  /**
+   * Days the design waited on the client (owner, 27 Oct 2026): the client
+   * delays the team filed, added up. The studio's own delays never cross.
+   */
+  clientDelayDays: number;
   moodBoard: { shared: boolean; sharedOn: string | null; note: string | null };
   visits: { at: string; purpose: string; status: 'booked' | 'done' }[];
   measurements: { room: string; size: string; height: string | null }[];
@@ -250,6 +255,9 @@ export function toCustomerDesign(
     next: nextMilestone ? { ...nextMilestone, waitingFor: waitingFor ?? nextMilestone.waitingFor } : null,
     waitingFor,
     yourStep: nowStep?.yours ? nowStep.label : null,
+    clientDelayDays: (row.stepDelays ?? [])
+      .filter((d) => d.side === 'CLIENT' && d.fromDate)
+      .reduce((sum, d) => sum + Math.max(0, daysBetween(dayFromDb(d.fromDate!), dayFromDb(d.toDate))), 0),
     moodBoard: { shared: Boolean(row.moodBoardSharedAt), sharedOn: isoDay(row.moodBoardSharedAt), note: row.moodBoardSharedAt ? (row.moodBoardNote ?? null) : null },
     visits: (row.siteVisits ?? [])
       .filter((v) => v.status !== 'CANCELLED')
