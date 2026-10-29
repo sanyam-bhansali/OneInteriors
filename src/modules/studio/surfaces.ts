@@ -230,8 +230,8 @@ export function mayOpen(viewer: MemberRole, path: string): boolean {
   /* Phase 3: accounts keeps the crews and pays them; labour against the contract is the owner's. */
   if (member.role === 'ACCOUNTS') return under(path, PAYMENTS_HOME) || (under(path, CREWS_HOME) && !under(path, LABOUR_PATH)) || calendarForAll(path);
   if (member.role === 'SALES') return salesMayOpen(member, path);
-  /* The design head deletes and restores projects with the owner (27 Oct 2026; studio/project-delete.ts). */
-  if (member.role === 'DESIGNER' && member.designHead === true && (under(path, '/studio/projects/deleted') || under(path, '/studio/projects/start'))) return true;
+  /* The design head starts projects (27 Oct 2026); deleting is the owner's only (29 Oct 2026; studio/project-delete.ts). */
+  if (member.role === 'DESIGNER' && member.designHead === true && under(path, '/studio/projects/start')) return true;
   if (member.role === 'DESIGNER') return designerMayOpen(path) || calendarForAll(path);
   if (under(path, TEAM_PATH)) return can(member, 'team.manage');
   if (under(path, PAYMENT_STAGES_PATH)) return can(member, 'payments.template');

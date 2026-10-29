@@ -49,7 +49,7 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
           <Link href="/studio/design/delays" className="btn ghost">
             Delays
           </Link>
-          {/* Delete and restore (owner and design head, 27 Oct 2026; studio/project-delete.ts). */}
+          {/* Delete and restore (the owner only, 29 Oct 2026; studio/project-delete.ts). */}
           {mayDeleteProjects(member) ? (
             <Link href="/studio/projects/deleted" className="btn ghost">
               Deleted projects

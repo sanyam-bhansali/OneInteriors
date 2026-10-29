@@ -2,7 +2,7 @@ import 'server-only';
 
 /**
  * Delete a project, and restore one (owner, 27 Oct 2026: "I need an option
- * to delete project"). The owner and the design head (`mayDeleteProjects`).
+ * to delete project"). The owner only (`mayDeleteProjects`).
  *
  * Deleting never erases. A project's payments and history are records
  * (append-only tables, the client's own documents), so a deleted project is
@@ -39,16 +39,16 @@ export interface DeletedProject {
   state: 'deleted' | 'refunded' | 'replaced';
 }
 
-/** The owner, or the design head (owner, 27 Oct 2026), who sees every project. */
+/** The owner only (owner, 29 Oct 2026: "only owner can delete project"; not the design head). */
 export function mayDeleteProjects(m: Pick<StudioMemberRef, 'role' | 'designHead' | 'status'> | null | undefined): boolean {
-  return Boolean(m && m.status === 'ACTIVE' && (m.role === 'OWNER' || (m.role === 'DESIGNER' && m.designHead === true)));
+  return Boolean(m && m.status === 'ACTIVE' && m.role === 'OWNER');
 }
 
 async function owner(): Promise<StudioMemberRef | { error: string }> {
   const m = await currentMember();
   if (!m || m.status !== 'ACTIVE') return { error: 'Sign in to your studio first.' };
   if (m.viewOnly) return { error: 'Viewing as someone is read only.' };
-  if (!mayDeleteProjects(m)) return { error: 'Only the studio owner or the design head deletes or restores a project.' };
+  if (!mayDeleteProjects(m)) return { error: 'Only the studio owner deletes or restores a project.' };
   return m;
 }
 
@@ -113,7 +113,7 @@ export async function deleteProject(projectId: unknown, typedName: unknown, rawR
     }
     await tx.auditLog.create({ data: { actorId: m.userId, action: 'studio.project.delete', entityType: 'HomeProject', entityId: p.id, after: { reason, quoteId: p.signedQuoteId, leadId: lead?.id ?? null } } });
   });
-  return { ok: true, message: `Deleted. ${client}’s project is gone from your lists and their app. Restore it from Deleted projects (on Projects, or Design for the design head).` };
+  return { ok: true, message: `Deleted. ${client}’s project is gone from your lists and their app. Restore it from Deleted projects on Projects.` };
 }
 
 type DeletedPayload = { quoteId?: string | null; leadId?: string | null; leadStageId?: string | null; leadBookedAt?: string | null; leadPreBookingStageId?: string | null; reason?: string | null };
