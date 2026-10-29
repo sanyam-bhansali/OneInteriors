@@ -97,3 +97,5 @@
 .oi-studio .meet-when{display:flex;flex-direction:column;gap:6px;max-width:24rem}
 .oi-studio .cal-waiting{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;border-radius:10px;background:var(--warn-bg);color:var(--warn);font-size:14px}
 .oi-studio .cal-waiting a{font-weight:600;color:inherit}
+
+.oi-studio .meet-busy{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border-radius:8px;background:var(--soft)}

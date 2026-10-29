@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { meetingPeople, myMeetings, type MeetingRow } from '@/modules/studio-office/meetings';
+import { meetingPeople, myBusyBlocks, myMeetings, type MeetingRow } from '@/modules/studio-office/meetings';
 import { lengthLabel, standing, whenLabel } from '@/modules/studio-office/meeting-rules';
 import { istDay } from '@/modules/project/working-days';
-import { AnswerButtons, NewMeeting, OrganiserButtons, TakeSuggestion } from '../MeetingUi';
+import { AnswerButtons, BusyTimes, NewMeeting, OrganiserButtons, TakeSuggestion } from '../MeetingUi';
 import '../../office-ui.css';
 import '../calendar.css';
 
@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
  */
 export default async function MeetingsPage() {
   const now = new Date();
-  const [data, people] = await Promise.all([myMeetings(now), meetingPeople()]);
+  const [data, people, blocks] = await Promise.all([myMeetings(now), meetingPeople(), myBusyBlocks()]);
   if (!data) {
     return (
       <main className="content ox-page">
@@ -95,6 +95,8 @@ export default async function MeetingsPage() {
           ))}
         </Section>
       ) : null}
+
+      <BusyTimes blocks={blocks} />
 
       {past.length > 0 ? (
         <Section title="Last two weeks" count={past.length}>

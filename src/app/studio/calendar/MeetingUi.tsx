@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Said, useAct } from '../SalesUi';
 import { LineIcon } from '../ui/icons';
 import type { Done } from '@/modules/studio-office/meetings';
-import { acceptMeetingAction, cancelMeetingAction, createMeetingAction, moveMeetingAction, proposeMeetingTimeAction } from './meeting-actions';
+import { acceptMeetingAction, addBusyBlockAction, busyOnAction, cancelMeetingAction, createMeetingAction, moveMeetingAction, proposeMeetingTimeAction, removeBusyBlockAction } from './meeting-actions';
+import { minutesLabel, overlaps, WEEKDAYS, type BusySpan } from '@/modules/studio-office/meeting-rules';
 
 /**
  * Office meetings on the calendar (owner, 27 Oct 2026;
@@ -69,6 +70,21 @@ function MeetingForm({ people, day, onClose }: { people: Person[]; day: string |
   const [note, setNote] = useState('');
   const [picked, setPicked] = useState<string[]>([]);
   const [find, setFind] = useState('');
+  /* Who is busy when, that day (27 Oct 2026): their meetings and regular busy times, so you pick a free time. */
+  const [busy, setBusy] = useState<Record<string, BusySpan[]>>({});
+  useEffect(() => {
+    if (picked.length === 0 || !when.day) return;
+    let stale = false;
+    busyOnAction(picked, when.day)
+      .then((b) => {
+        if (!stale) setBusy(b);
+      })
+      .catch(() => undefined);
+    return () => {
+      stale = true;
+    };
+  }, [picked, when.day]);
+  const startMin = /^\d{2}:\d{2}$/.test(when.time) ? Number(when.time.slice(0, 2)) * 60 + Number(when.time.slice(3, 5)) : null;
   const { pending, result, run } = useAct();
   const shown = people.filter((p) => !find.trim() || `${p.name} ${p.role}`.toLowerCase().includes(find.trim().toLowerCase()));
   const toggle = (id: string) => setPicked((x) => (x.includes(id) ? x.filter((y) => y !== id) : [...x, id]));
@@ -126,6 +142,28 @@ function MeetingForm({ people, day, onClose }: { people: Person[]; day: string |
         </div>
       </div>
 
+      {picked.length > 0 ? (
+        <div className="meet-busy" aria-label="Who is busy that day">
+          {picked.map((id) => {
+            const p = people.find((x) => x.id === id);
+            const spans = busy[id] ?? [];
+            const clash = startMin !== null ? overlaps(spans, startMin, minutes) : [];
+            return (
+              <p key={id} className="sm" style={{ margin: 0 }}>
+                <b>{p?.name ?? 'Someone'}</b>{' '}
+                {spans.length === 0 ? (
+                  <span className="good-t">free all day</span>
+                ) : (
+                  <span className="muted">
+                    busy {spans.map((b) => `${minutesLabel(b.fromMin)}–${minutesLabel(b.toMin)} (${b.label})`).join(', ')}
+                  </span>
+                )}
+                {clash.length > 0 ? <span className="bad-t"> · clashes with your time</span> : null}
+              </p>
+            );
+          })}
+        </div>
+      ) : null}
       <textarea aria-label="Note (optional)" placeholder="A note for them (optional): what to bring, what to look at first" value={note} onChange={(e) => setNote(e.target.value)} className="fld sm" rows={2} maxLength={1000} />
       <div className="hstack" style={{ gap: 8 }}>
         <button type="button" disabled={pending || title.trim().length < 2 || picked.length === 0 || !when.day || !when.time} onClick={save} className="btn pri sm">
@@ -229,5 +267,52 @@ export function OrganiserButtons({ id }: { id: string }) {
       </div>
       <Said result={result} />
     </div>
+  );
+}
+
+/** Your regular busy times, on the Meetings page (27 Oct 2026: "every Wednesday the design meeting"). */
+export function BusyTimes({ blocks }: { blocks: { id: string; weekday: number; startMin: number; minutes: number; label: string }[] }) {
+  const [weekday, setWeekday] = useState(3);
+  const [from, setFrom] = useState('14:00');
+  const [to, setTo] = useState('15:00');
+  const [label, setLabel] = useState('');
+  const { pending, result, run } = useAct();
+  return (
+    <section className="meet-section" aria-label="Your regular busy times">
+      <h2>Your regular busy times</h2>
+      <p className="muted sm" style={{ margin: 0 }}>
+        Every week, the times you are not free. Whoever picks a meeting time with you sees them.
+      </p>
+      {blocks.length > 0 ? (
+        <ul className="card" style={{ margin: 0, padding: '6px 14px', listStyle: 'none' }}>
+          {blocks.map((b) => (
+            <li key={b.id} className="hstack sm" style={{ justifyContent: 'space-between', padding: '6px 0', gap: 8 }}>
+              <span>
+                <b>{WEEKDAYS[b.weekday - 1]}</b> {minutesLabel(b.startMin)}–{minutesLabel(b.startMin + b.minutes)} · {b.label}
+              </span>
+              <button type="button" className="ox-plain bad-t" disabled={pending} onClick={() => run(() => removeBusyBlockAction(b.id))}>
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <div className="hstack" style={{ gap: 6, flexWrap: 'wrap' }}>
+        <select aria-label="Day of the week" value={weekday} onChange={(e) => setWeekday(Number(e.target.value))} className="fld sm fit">
+          {WEEKDAYS.map((w, i) => (
+            <option key={w} value={i + 1}>
+              Every {w}
+            </option>
+          ))}
+        </select>
+        <input type="time" aria-label="From" value={from} onChange={(e) => setFrom(e.target.value)} className="fld sm fit" />
+        <input type="time" aria-label="To" value={to} onChange={(e) => setTo(e.target.value)} className="fld sm fit" />
+        <input type="text" aria-label="What it is" placeholder="Design meeting" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={60} className="fld sm fit" />
+        <button type="button" className="btn sec sm" disabled={pending || label.trim().length < 2} onClick={() => run(() => addBusyBlockAction({ weekday, from, to, label }), (r) => r.ok && setLabel(''))}>
+          Add
+        </button>
+      </div>
+      <Said result={result} />
+    </section>
   );
 }
