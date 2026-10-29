@@ -222,7 +222,8 @@ describe('tasks', () => {
     expect(tasksVisibleTo(member('OWNER'))).toEqual({ studioId: 's1' });
     expect(tasksVisibleTo(member('PM'))).toEqual({ studioId: 's1' });
     expect(tasksVisibleTo(member('SALES', 'm-asha'))).toEqual({ studioId: 's1', assignedToId: 'm-asha' });
-    expect(tasksVisibleTo(member('SUPERVISOR'))).toEqual({ studioId: 's1', id: { in: [] } });
+    // Everyone else at the studio: their own tasks (27 Oct 2026: "today I am doing this").
+    expect(tasksVisibleTo(member('SUPERVISOR'))).toEqual({ studioId: 's1', assignedToId: 'm-supervisor' });
     expect(seesAllTasks(member('SALES'))).toBe(false);
   });
 

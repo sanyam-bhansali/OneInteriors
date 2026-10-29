@@ -75,10 +75,18 @@ function officeItem(m: MeetingRow, meId: string, now: Date): OfficeIn {
 /** Someone who works no leads: their office meetings, nothing else. */
 async function meetingsOnly(member: StudioMemberRef, view: CalendarView, day: string, now: Date): Promise<CalendarData> {
   const w = calendarWindow(view, day);
-  const rows = await meetingsBetween(member, w.start, w.end, null, CALENDAR_CAP);
+  const [rows, tasks] = await Promise.all([meetingsBetween(member, w.start, w.end, null, CALENDAR_CAP), tasksBetween(member, w.start, w.end, null, CALENDAR_CAP)]);
   return {
     window: w,
-    items: buildCalendarItems({ office: rows.map((m) => officeItem(m, member.id, now)) }, now, w),
+    items: buildCalendarItems(
+      {
+        office: rows.map((m) => officeItem(m, member.id, now)),
+        /* Their own tasks too (27 Oct 2026: "today I am doing this"). */
+        tasks: tasks.map((t) => ({ id: t.id, title: t.title, dueAt: t.dueAt, doneAt: t.doneAt, leadId: null, leadName: null, ownerName: null })),
+      },
+      now,
+      w,
+    ),
     seesAll: false,
     people: [],
     who: null,

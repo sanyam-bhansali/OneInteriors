@@ -15,6 +15,8 @@
  *   everyone below them), changes those their `leads.edit` reaches, and
  *   gives tasks to the people their `leads.assign` reaches (else only
  *   themselves).
+ * - Everyone else at the studio (owner and the design team, 27 Oct 2026:
+ *   "today I am doing this"): their own tasks only, about no lead.
  */
 
 import type { Prisma } from '@prisma/client';
@@ -28,9 +30,9 @@ export interface TaskMember extends MemberRole {
   studioId: string;
 }
 
-/** May this person use tasks at all: anyone who works leads. */
+/** May this person use tasks at all: everyone active at the studio (their own, when they work no leads). */
 export function mayUseTasks(member: MemberRole): boolean {
-  return can(member, 'lead.read', { assigned: true });
+  return member.status === 'ACTIVE';
 }
 
 /** Sees every task (owner, PM, a sales role that sees every lead), or only some (sales). */
