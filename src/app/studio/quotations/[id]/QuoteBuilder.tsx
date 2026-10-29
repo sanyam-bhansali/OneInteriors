@@ -90,7 +90,7 @@ export function QuoteBuilder({
   /** The PDF's brand pages, stages, specification and terms (server, `quoteDocContext`). */
   doc?: DocPreviewStatics | null;
   /** A Design Final: its Sales Final's frozen lines, the Final tab's "Original" (DESIGN-PROCESS-PLAN.md §4.1). */
-  salesFinalLines?: { room: string; product: string; code: WorkCodeName; unit: QuoteUnitName; widthMm: number | null; heightMm: number | null; qtyMilli: number | null; amountPaise: number }[] | null;
+  salesFinalLines?: { room: string; product: string; code: WorkCodeName; unit: QuoteUnitName; widthMm: number | null; heightMm: number | null; qtyMilli: number | null; amountPaise: number; details?: string | null }[] | null;
 }) {
   const [lines, setLines] = useState<EditableLine[]>(() => quote.lines.map(toEditable));
   const [terms, setTerms] = useState<TermsDraft>(() => termsDraftOf(quote));
@@ -639,11 +639,11 @@ export function QuoteBuilder({
             onClick={() => saveAs('DESIGN')}
             title={
               quote.stage === 'DESIGN'
-                ? 'Save this Design Final'
-                : 'Save, then make the Design Final from this Sales Final (a copy; the Sales Final stays as sent)'
+                ? 'Save this design revision (a draft until you mark it as the design final)'
+                : 'Save, then start the design revision from this Sales Final (a copy; the Sales Final stays as sent)'
             }
           >
-            Save Design Final
+            {quote.stage === 'DESIGN' ? 'Save design draft' : 'Revise for design'}
           </button>
         </div>
         <p className={`hsaved ${saving ? 'muted' : dirty ? 'warn-t' : 'good-t'}`} role="status">
@@ -655,7 +655,7 @@ export function QuoteBuilder({
           </p>
         ) : null}
         <p className="hhelp">
-          Two quotations per project — <b>Sales Final</b> and <b>Design Final</b>. Saving overrides this one; each time you send it, the copy the client has is kept as a revision (R1, R2…).
+          Two quotations per project — the <b>Sales Final</b>, and the design revision of it. Save the design revision as often as you like; it becomes the <b>Design Final</b> when you mark it, and each copy the client gets is kept (R1, R2…). It is always compared with the Sales Final.
         </p>
 
         <details className="hmore">
@@ -799,8 +799,8 @@ export function QuoteBuilder({
 }
 
 /** A line as the Final tab compares it. */
-function compareLineOf(l: { room: string; product: string; code: WorkCodeName; unit: QuoteUnitName; widthMm: number | null; heightMm: number | null; qtyMilli: number | null; amountPaise: number }): CompareLine {
-  return { room: l.room, product: l.product, code: l.code, unit: l.unit, widthMm: l.widthMm, heightMm: l.heightMm, qtyMilli: l.qtyMilli, amountPaise: l.amountPaise };
+function compareLineOf(l: { room: string; product: string; code: WorkCodeName; unit: QuoteUnitName; widthMm: number | null; heightMm: number | null; qtyMilli: number | null; amountPaise: number; details?: string | null }): CompareLine {
+  return { room: l.room, product: l.product, code: l.code, unit: l.unit, widthMm: l.widthMm, heightMm: l.heightMm, qtyMilli: l.qtyMilli, amountPaise: l.amountPaise, details: l.details ?? null };
 }
 
 /** The live terms, for pricing the Original on the same fee, discount and GST as the Final (as the old tab did). */

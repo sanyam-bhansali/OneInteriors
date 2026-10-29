@@ -894,11 +894,11 @@ function DesignFinal({ tab }: { tab: DesignTab }) {
           {f.designFinal ? (
             <>
               {' '}
-              · Design Final:{' '}
+              · {f.designFinal.status === 'DRAFT' ? 'Revising' : 'Design final'}:{' '}
               <Link href={`/studio/quotations/${f.designFinal.id}`} className="acc-t">
                 {f.designFinal.number}
               </Link>{' '}
-              <span className={muted}>({f.designFinal.status === 'DRAFT' ? 'draft' : f.designFinal.status === 'ISSUED' ? 'sent' : f.designFinal.status.toLowerCase()})</span> ·{' '}
+              <span className={muted}>({f.designFinal.status === 'DRAFT' ? 'not final yet: mark it in the quotation' : f.designFinal.status === 'ISSUED' ? 'sent' : f.designFinal.status.toLowerCase()})</span> ·{' '}
               <Link href={`/studio/quotations/${f.designFinal.id}/compare`} className="acc-t">
                 Compare with the sales final
               </Link>
@@ -921,8 +921,9 @@ function DesignFinal({ tab }: { tab: DesignTab }) {
         <div className="flex flex-wrap items-center gap-2">
           {!f.designFinal ? (
             tab.canAssign ? (
+              /* "Make design final" before anything was changed read as final (walkthrough, 27 Oct 2026): it makes the working copy. */
               <button type="button" className="btn pri sm" disabled={pending} onClick={() => run(() => makeDesignFinalAction(tab.projectId))}>
-                Make Design Final
+                Revise from the sales final
               </button>
             ) : null
           ) : (
@@ -941,9 +942,11 @@ function DesignFinal({ tab }: { tab: DesignTab }) {
           <span className={muted}>
             {!f.designFinal
               ? tab.canAssign
-                ? 'A copy of the sales final for the changes the design made.'
-                : 'The owner or project manager makes the Design Final from the sales final.'
-              : 'Send the Design Final first, then sign off. The project then moves to execution.'}
+                ? 'A working copy of the sales final for the design’s changes. Revise it as often as needed; it is the design final only once you mark it in the quotation.'
+                : 'The owner, the project manager or the designer revises the sales final into the design final.'
+              : f.designFinal.status === 'DRAFT'
+                ? 'Revise it in the quotation, then mark it as the design final there. Sign-off comes after.'
+                : 'Sign off when the design is done. The project then moves to execution.'}
           </span>
         </div>
       ) : null}

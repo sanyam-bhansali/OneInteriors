@@ -62,9 +62,17 @@ export function StatusBar({
       {error ? <span className="qerr">{error}</span> : null}
 
       {status === 'DRAFT' ? (
-        <button type="button" disabled={pending || !canPrint} onClick={() => set('ISSUED')} className="btn pri" title="When you have sent it to the client; the copy they have is kept as a revision">
+        <button
+          type="button"
+          disabled={pending || !canPrint}
+          onClick={() => set('ISSUED')}
+          className="btn pri"
+          title={stage === 'DESIGN' ? 'When this is the design final you send the client; the copy they have is kept, and the earlier drafts stay in the quotation’s history' : 'When you have sent it to the client; the copy they have is kept as a revision'}
+        >
           <LineIcon name="arrow" size={16} />
-          Mark as sent{clientFirstName ? ` to ${clientFirstName}` : ''}
+          {/* The design team (27 Oct 2026): "Make it design final" belongs here, on the quotation, after the changes. */}
+          {stage === 'DESIGN' ? 'Mark as design final' : 'Mark as sent'}
+          {clientFirstName ? ` to ${clientFirstName}` : ''}
         </button>
       ) : null}
 

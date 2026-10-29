@@ -328,6 +328,12 @@ export function FinalCompare({
                         <td>
                           <b className={r.status === 'removed' ? 'struck' : ''}>{r.product}</b>
                           {tag ? <span className={`chip ${tag.c} hchip`}>{tag.t}</span> : null}
+                          {(r.c ?? r.o)?.details ? (
+                            <span className="muted" style={{ display: 'block', fontSize: 12.5, lineHeight: 1.35 }}>
+                              {(r.c ?? r.o)!.details}
+                              {r.o?.details && r.c?.details && r.o.details !== r.c.details ? <span className="struck"> (was: {r.o.details})</span> : null}
+                            </span>
+                          ) : null}
                         </td>
                         <td>
                           {r.status === 'changed' && os !== fs ? (
