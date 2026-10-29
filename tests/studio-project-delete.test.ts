@@ -21,17 +21,17 @@ describe('confirming a delete', () => {
 });
 
 describe('who deletes, and opens Deleted projects', () => {
-  it('the owner and the design head; no other designer, PM, sales or accounts', () => {
+  it('the owner only: not the design head, another designer, PM, sales or accounts', () => {
     expect(mayDeleteProjects({ role: 'OWNER', status: 'ACTIVE' })).toBe(true);
-    expect(mayDeleteProjects({ role: 'DESIGNER', status: 'ACTIVE', designHead: true })).toBe(true);
+    expect(mayDeleteProjects({ role: 'DESIGNER', status: 'ACTIVE', designHead: true })).toBe(false);
     for (const role of ['DESIGNER', 'PM', 'SALES', 'ACCOUNTS', 'SUPERVISOR'] as const) expect(mayDeleteProjects({ role, status: 'ACTIVE' }), role).toBe(false);
     expect(mayDeleteProjects({ role: 'DESIGNER', status: 'SUSPENDED', designHead: true })).toBe(false);
     expect(mayDeleteProjects(null)).toBe(false);
   });
 
-  it('the owner and the design head open the page; a designer does not, even though a designer opens a project page', () => {
+  it('only the owner opens the page; a designer does not, even though a designer opens a project page', () => {
     expect(mayOpen({ role: 'OWNER', status: 'ACTIVE', fullSoftware: true }, '/studio/projects/deleted')).toBe(true);
-    expect(mayOpen({ role: 'DESIGNER', status: 'ACTIVE', fullSoftware: true, designHead: true }, '/studio/projects/deleted')).toBe(true);
+    expect(mayOpen({ role: 'DESIGNER', status: 'ACTIVE', fullSoftware: true, designHead: true }, '/studio/projects/deleted')).toBe(false);
     expect(mayOpen({ role: 'DESIGNER', status: 'ACTIVE', fullSoftware: true }, '/studio/projects/deleted')).toBe(false);
     expect(mayOpen({ role: 'DESIGNER', status: 'ACTIVE', fullSoftware: true }, '/studio/projects/p1')).toBe(true);
   });

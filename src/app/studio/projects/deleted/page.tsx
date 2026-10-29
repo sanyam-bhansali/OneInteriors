@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: 'Deleted projects', robots: { index: 
 export const dynamic = 'force-dynamic';
 
 /**
- * Deleted projects, newest first, with Restore (owner and design head, 27 Oct 2026;
+ * Deleted projects, newest first, with Restore (the owner only, 29 Oct 2026;
  * studio/project-delete.ts). A booking refunded is listed too, without
  * Restore: money went back on it.
  */
@@ -19,7 +19,7 @@ export default async function DeletedProjectsPage() {
   if (!rows) {
     return (
       <div className="content oi-proj">
-        <p className="m-0 text-[15px] text-[var(--text2)]">Only the studio owner and the design head see deleted projects.</p>
+        <p className="m-0 text-[15px] text-[var(--text2)]">Only the studio owner sees deleted projects.</p>
       </div>
     );
   }
