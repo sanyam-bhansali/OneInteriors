@@ -192,7 +192,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           locked={locked}
           sentLabel={lastRev ? lastRev.label : null}
           finalHref={finalHref}
-          salesFinalLines={salesFinal ? salesFinal.lines.map((l) => ({ room: l.room, product: l.product, code: l.code as WorkCodeName, unit: l.unit as QuoteUnitName, widthMm: l.widthMm, heightMm: l.heightMm, qtyMilli: l.qtyMilli, amountPaise: l.amountPaise })) : null}
+          salesFinalLines={salesFinal ? salesFinal.lines.map((l) => ({ room: l.room, product: l.product, code: l.code as WorkCodeName, unit: l.unit as QuoteUnitName, widthMm: l.widthMm, heightMm: l.heightMm, qtyMilli: l.qtyMilli, amountPaise: l.amountPaise, details: l.details })) : null}
           doc={{
             studio: docCtx.studio,
             brandPages: docCtx.brandPages,

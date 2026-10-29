@@ -24,6 +24,8 @@ export interface CompareLine {
   heightMm: number | null;
   qtyMilli: number | null;
   amountPaise: number;
+  /** The line's description, shown under its name (walkthrough, 27 Oct 2026: "it doesn't show the description"). Never part of the match. */
+  details?: string | null;
 }
 
 export interface CompareRow<L extends CompareLine = CompareLine> {

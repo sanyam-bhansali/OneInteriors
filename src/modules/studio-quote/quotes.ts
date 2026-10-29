@@ -970,6 +970,8 @@ export async function setQuoteCategory(quoteId: string, raw: unknown): Promise<A
   try {
     await prisma.$transaction([
       prisma.studioQuote.update({ where: { id: q.id }, data: { category } }),
+      /* Its design revision with no category of its own takes it too (walkthrough, 27 Oct 2026: the design final showed none). */
+      prisma.studioQuote.updateMany({ where: { studioId, basedOnId: q.id, category: null }, data: { category } }),
       prisma.homeProject.updateMany({ where: { introduction: { studioId }, OR: [{ signedQuoteId: q.id }, { designFinalQuoteId: q.id }, ...(q.basedOnId ? [{ signedQuoteId: q.basedOnId }] : [])] }, data: { category } }),
     ]);
     return { ok: true };

@@ -247,12 +247,14 @@ export async function leadSettingsStudioId(): Promise<string | null> {
 
 /**
  * The studio id for reading what quoting needs (products, branding, the
- * rates gate) — owner, PM and sales. Writes to those stay with
+ * rates gate) — owner, PM, sales and designers. Writes to those stay with
  * `myStudioId()`.
  */
 export async function quotingStudioId(): Promise<string | null> {
   const member = await currentMember();
-  return member && can(member, 'quote.write', { assigned: true }) ? member.studioId : null;
+  if (!member) return null;
+  /* A designer revises the design final, so reads the product master and the letterhead too (walkthrough, 27 Oct 2026). */
+  return can(member, 'quote.write', { assigned: true }) || can(member, 'design.work', { assigned: true }) ? member.studioId : null;
 }
 
 /** The signed-in member, as the author of a timeline line. Any active role. */
