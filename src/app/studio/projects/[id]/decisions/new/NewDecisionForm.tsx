@@ -26,7 +26,7 @@ type Option = { label: string; detail: string; delta: string; cost: string; swat
 
 const blank = (): Option => ({ label: '', detail: '', delta: '', cost: '', swatch: '#9fb59a', useSwatch: false, photo: null, preview: null });
 
-const MAX_OPTIONS = 3;
+const MAX_OPTIONS = 6;
 
 const field = 'fld w-full';
 const label = 'lbl';

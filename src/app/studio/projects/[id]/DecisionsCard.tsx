@@ -23,7 +23,29 @@ export function DecisionsCard({ data, customer }: { data: StudioDecisions; custo
         <h2 className="t m-0">Decisions</h2>
         <CustomerSees name={customer} />
       </div>
-      {data.decisions.length === 0 ? <p className={`m-0 ${muted}`}>Nothing asked yet. {customer}&rsquo;s pick updates the quote, the final payment and the locker by itself.</p> : null}
+      {data.decisions.length === 0 && data.drawings.length === 0 ? <p className={`m-0 ${muted}`}>Nothing asked yet. {customer}&rsquo;s pick updates the quote, the final payment and the locker by itself.</p> : null}
+      {data.drawings.length > 0 ? (
+        /* Drawings shared for approval and what the client said (walkthrough, 27 Oct 2026). */
+        <ul className="m-0 flex list-none flex-col gap-2 p-0" aria-label="Drawings for approval">
+          {data.drawings.map((d) => (
+            <li key={d.documentId} className="flex flex-col gap-0.5 border-t border-[var(--fill2)] pt-2.5 text-[13.5px]">
+              <span className="font-medium">
+                {d.kind} · v{d.version}
+              </span>
+              {d.state === 'approved' ? (
+                <span className="text-[var(--good)]">
+                  {d.kind === 'Catalogue to choose from' ? 'Picked' : 'Approved'} by {customer} · {shortDay(d.at)}
+                </span>
+              ) : d.state === 'changes' ? (
+                <span className="text-[var(--bad)]">Changes asked · {shortDay(d.at)}</span>
+              ) : (
+                <span className="text-[var(--warn)]">Waiting on {customer} since {shortDay(d.at)}</span>
+              )}
+              {d.comment ? <span className="whitespace-pre-wrap">&ldquo;{d.comment}&rdquo;</span> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <ul className="m-0 flex list-none flex-col gap-3 p-0">
         {[...open, ...picked].map((d) => {
           const pick = d.options.find((o) => o.id === d.pickedOptionId) ?? null;

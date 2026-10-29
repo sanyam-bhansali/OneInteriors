@@ -186,7 +186,7 @@ function Drawing({ d, url, owner, onChanged }: { d: Design['drawings'][number]; 
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ verdict, comment: verdict === 'CHANGES' ? comment : '' }),
+        body: JSON.stringify({ verdict, comment: verdict === 'CHANGES' || catalogue ? comment : '' }),
       });
       const body = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (!res.ok || !body?.ok) setError(body?.error ?? 'That did not go through. Try again.');
@@ -200,7 +200,9 @@ function Drawing({ d, url, owner, onChanged }: { d: Design['drawings'][number]; 
       setBusy(false);
     }
   };
-  const state = d.state === 'approved' ? 'Approved' : d.state === 'changes' ? 'Changes asked' : d.state === 'waiting' ? 'Waiting for your answer' : 'Shared';
+  /* A catalogue is answered with the codes picked, not approved (walkthrough, 27 Oct 2026). */
+  const catalogue = d.kind === 'CATALOGUE';
+  const state = d.state === 'approved' ? (catalogue ? 'Your pick is sent' : 'Approved') : d.state === 'changes' ? 'Changes asked' : d.state === 'waiting' ? (catalogue ? 'Open it and pick' : 'Waiting for your answer') : 'Shared';
   return (
     <div className="oa-card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
@@ -217,7 +219,18 @@ function Drawing({ d, url, owner, onChanged }: { d: Design['drawings'][number]; 
         {state}
         {d.comment ? ` · “${d.comment}”` : ''}
       </span>
-      {owner && d.state === 'waiting' && !asking ? (
+      {owner && d.state === 'waiting' && catalogue ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <label className="oa-meta" htmlFor={`c-${d.id}`}>
+            The codes or names you picked
+          </label>
+          <textarea id={`c-${d.id}`} value={comment} onChange={(e) => setComment(e.target.value)} rows={2} maxLength={1000} style={{ width: '100%', font: 'inherit', padding: 8, borderRadius: 8, border: '1px solid var(--line)' }} />
+          <button type="button" className="oa-cta" disabled={busy || comment.trim().length < 2} onClick={() => void send('APPROVED')} style={{ alignSelf: 'flex-start' }}>
+            Send my pick
+          </button>
+        </div>
+      ) : null}
+      {owner && d.state === 'waiting' && !asking && !catalogue ? (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button type="button" className="oa-cta" disabled={busy} onClick={() => void send('APPROVED')}>
             Approve

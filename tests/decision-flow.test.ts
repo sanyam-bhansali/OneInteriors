@@ -39,9 +39,10 @@ describe('a new decision, checked', () => {
     expect(v!.quoteLineId).toBe('ql-shutters');
   });
 
-  it('wants two or three named options, a date not past, and the late text', () => {
+  it('wants two to six named options (27 Oct 2026), a date not past, and the late text', () => {
     expect(checkNewDecision(input({ options: [{ label: 'Only one' }] }), NOW).ok).toBe(false);
-    expect(checkNewDecision(input({ options: [{ label: 'a' }, { label: 'b' }, { label: 'c' }, { label: 'd' }] }), NOW).ok).toBe(false);
+    expect(checkNewDecision(input({ options: ['a', 'b', 'c', 'd', 'e', 'f'].map((label) => ({ label })) }), NOW).ok).toBe(true);
+    expect(checkNewDecision(input({ options: ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((label) => ({ label })) }), NOW).ok).toBe(false);
     expect(checkNewDecision(input({ dueOn: '2026-10-10' }), NOW).ok).toBe(false);
     expect(checkNewDecision(input({ why: 'soon' }), NOW).ok).toBe(false);
     expect(checkNewDecision(input({ options: [{ label: 'A', delta: 'lots' }, { label: 'B' }] }), NOW)).toEqual({ ok: false, error: 'The price change on “A” is not an amount.' });

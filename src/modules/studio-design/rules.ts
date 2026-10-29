@@ -376,6 +376,7 @@ export const DESIGN_KINDS = {
   WORKING: 'Working drawings',
   VALIDATION: 'Validation drawings',
   SITE_PHOTO: 'Site photo',
+  CATALOGUE: 'Catalogue to choose from',
   /* Project documents (24 Oct 2026; DESIGN-PROCESS-PLAN.md §3; documents.ts). */
   ELECTRICAL: 'Electrical drawings & quotation',
   MATERIAL_LIST: 'Material list',
@@ -389,7 +390,7 @@ export const isDesignKind = (v: unknown): v is DesignKind => typeof v === 'strin
  * working drawings (the design process, 24 Oct 2026: working drawings are
  * approved by the client before they are final). Site photos are not.
  */
-export const FOR_APPROVAL: readonly DesignKind[] = ['LAYOUT_2D', 'FURNITURE', 'RENDER_3D', 'WORKING', 'VALIDATION', 'ELECTRICAL'];
+export const FOR_APPROVAL: readonly DesignKind[] = ['LAYOUT_2D', 'FURNITURE', 'RENDER_3D', 'WORKING', 'VALIDATION', 'ELECTRICAL', 'CATALOGUE'];
 
 /** Which client approval step a drawing's approval ticks (DESIGN-PROCESS-PLAN.md Decision 4). */
 export function approvalKindOfDrawing(kind: string | null | undefined): ApprovalKind | null {
