@@ -12,6 +12,7 @@ import 'server-only';
  * Cancelled projects are left out.
  */
 
+import { effectivePriority } from '@/modules/studio-design/template';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { currentMember, memberOnProject, projectsVisibleTo } from './access';
@@ -174,7 +175,8 @@ function cardOf(p: Row, now: Date, seesMoney: boolean): BoardCard {
   const shown = phase === 'WARRANTY' || phase === 'CLOSED' ? open.filter((x) => x.s.warranty) : open;
   return {
     id: p.id,
-    priority: p.priority,
+    /* Stars set by someone, else from the category (27 Oct 2026). */
+    priority: effectivePriority(p.priority, p.category),
     category: p.category ? CATEGORY_WORD[p.category] : null,
     client: b.contactName?.trim() || b.user?.name?.trim() || 'Client',
     flat: siteLabel(b),

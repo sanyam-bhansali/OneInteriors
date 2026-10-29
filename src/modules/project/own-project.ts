@@ -20,6 +20,7 @@ import 'server-only';
  * the member's studio.
  */
 
+import { designLengthFor, bhkOf, HAUSPIRE_DESIGN } from '@/modules/studio-design/template';
 import { randomBytes } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
@@ -48,6 +49,7 @@ import {
   OWN_QUOTE_ERRORS,
   ownQuoteRefusal,
   parseStartOn,
+  parseDesignDays,
   parseTotalDays,
   propertyTypeFrom,
   STARTABLE_STATUSES,
@@ -117,6 +119,8 @@ export interface StartableQuote {
   /** The date on the quotation. */
   date: Date;
   defaultDays: number;
+  /** The design steps' own length for this flat size (27 Oct 2026: "Design done in N days"). */
+  defaultDesignDays: number;
 }
 
 /**
@@ -142,6 +146,8 @@ export async function startableQuotes(member: StudioMemberRef | null): Promise<S
     prisma.homeProject.findMany({ where: { introduction: { studioId: member.studioId } }, select: { signedQuoteId: true } }),
   ]);
   const taken = new Set(started.map((p) => p.signedQuoteId).filter(Boolean));
+  const plan = await designPlanInput(member.studioId, {});
+  const steps = plan.template && plan.template.length ? plan.template : HAUSPIRE_DESIGN;
   return rows
     .filter((q) => !taken.has(q.id))
     .map((q) => {
@@ -160,6 +166,7 @@ export async function startableQuotes(member: StudioMemberRef | null): Promise<S
         totalPaise: totals.totalPaise,
         date: q.quoteDate ?? q.issuedOn ?? q.createdAt,
         defaultDays: defaultDays(q),
+        defaultDesignDays: designLengthFor(steps, bhkOf(propertyTypeFrom(q.config ?? q.client?.config))),
       };
     })
     .filter((q) => q.totalPaise > 0);
@@ -173,6 +180,8 @@ export interface StartOwnProjectInput {
   startOn: string;
   /** Sign-off to handover in days; the studio's whole-home figure when left out. */
   totalDays?: number | string | null;
+  /** Design done in days (27 Oct 2026); the design steps' own length for the flat when left out. */
+  designDays?: number | string | null;
   customer: { name: string; phone: string; email?: string | null };
 }
 
@@ -259,6 +268,10 @@ export async function startOwnProject(
   const code = freshCode();
   // Studio OS Phase 2: the studio's design steps and the flat size, for the DESIGN stage.
   const design = await designPlanInput(member.studioId, { propertyType: propertyTypeFrom(q.config ?? q.client?.config) });
+  const designDays = parseDesignDays(input.designDays, null);
+  if (designDays === false) return { ok: false, error: 'Design done in 3 to 365 days, please.' };
+  if (designDays !== null && designDays > totalDays - 4) return { ok: false, error: `Design in ${designDays} days leaves too little of ${totalDays} days for the rest. Make the handover later or the design shorter.` };
+  design.days = designDays;
   try {
     const started = await prisma.$transaction(
       (tx) =>
