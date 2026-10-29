@@ -1,7 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { answerMeeting, cancelOfficeMeeting, createMeeting, moveOfficeMeeting, type Done } from '@/modules/studio-office/meetings';
+import { addBusyBlock, answerMeeting, busyOn, cancelOfficeMeeting, createMeeting, moveOfficeMeeting, removeBusyBlock, type Done } from '@/modules/studio-office/meetings';
+import type { BusySpan } from '@/modules/studio-office/meeting-rules';
 
 /**
  * Office meeting actions (owner, 27 Oct 2026). Thin: who may do what is
@@ -42,5 +43,22 @@ export async function moveMeetingAction(id: string, fromGuest: string | null, da
 export async function cancelMeetingAction(id: string): Promise<Done> {
   const r = await cancelOfficeMeeting(id);
   if (r.ok) refresh();
+  return r;
+}
+
+/* Regular busy times and who is free (owner and the design team, 27 Oct 2026). */
+export async function busyOnAction(memberIds: string[], day: string): Promise<Record<string, BusySpan[]>> {
+  return busyOn(Array.isArray(memberIds) ? memberIds.map(String) : [], String(day));
+}
+
+export async function addBusyBlockAction(input: { weekday: number; from: string; to: string; label: string }): Promise<Done> {
+  const r = await addBusyBlock(input);
+  if (r.ok) revalidatePath('/studio/calendar/meetings');
+  return r;
+}
+
+export async function removeBusyBlockAction(id: string): Promise<Done> {
+  const r = await removeBusyBlock(id);
+  if (r.ok) revalidatePath('/studio/calendar/meetings');
   return r;
 }

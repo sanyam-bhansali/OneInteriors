@@ -184,3 +184,52 @@ export function standing(m: Omit<MeetingState, 'guests'> & { guests: (GuestState
   const names = waiting.map((g) => g.name);
   return { word: `Waiting for ${names.length <= 2 ? names.join(' and ') : `${names[0]} and ${names.length - 1} others`}`, tone: 'warn' };
 }
+
+// ── Regular busy times (owner and the design team, 27 Oct 2026) ──────
+
+export const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
+
+export interface BusyBlockValue {
+  weekday: number;
+  startMin: number;
+  minutes: number;
+  label: string;
+}
+
+const hm = (v: unknown): number | null => {
+  if (typeof v !== 'string') return null;
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(v.trim());
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+};
+
+/** A weekly busy time: a weekday 1–7, from and to ("HH:MM", India), what it is. */
+export function checkBusyBlock(input: { weekday: unknown; from: unknown; to: unknown; label: unknown }): Checked<BusyBlockValue> {
+  const weekday = Number(input.weekday);
+  if (!Number.isInteger(weekday) || weekday < 1 || weekday > 7) return { ok: false, error: 'Pick the day of the week.' };
+  const from = hm(input.from);
+  const to = hm(input.to);
+  if (from === null || to === null) return { ok: false, error: 'Pick from and to.' };
+  if (to <= from) return { ok: false, error: 'It has to end after it starts.' };
+  const label = typeof input.label === 'string' ? input.label.trim().replace(/\s+/g, ' ').slice(0, 60) : '';
+  if (label.length < 2) return { ok: false, error: 'Say what it is, for example “Design meeting”.' };
+  return { ok: true, value: { weekday, startMin: from, minutes: to - from, label } };
+}
+
+/** "3:00 pm" for minutes after midnight. */
+export function minutesLabel(min: number): string {
+  const h = Math.floor(min / 60) % 24;
+  const m = min % 60;
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
+}
+
+export interface BusySpan {
+  fromMin: number;
+  toMin: number;
+  label: string;
+}
+
+/** Whether a meeting from `fromMin` for `minutes` touches any busy span. */
+export function overlaps(spans: readonly BusySpan[], fromMin: number, minutes: number): BusySpan[] {
+  const to = fromMin + minutes;
+  return spans.filter((s) => s.fromMin < to && fromMin < s.toMin);
+}

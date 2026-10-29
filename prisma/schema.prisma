@@ -883,6 +883,7 @@ model Studio {
   /// Leads at scale (12 Oct 2026): calendar tasks.
   studioTasks        StudioTask[]
   officeMeetings     StudioMeeting[]
+  busyBlocks         StudioBusyBlock[]
   /// Studio OS Phase 3: work orders for site crews on customer projects, and
   /// what was paid against them.
   homeWorkOrders     HomeWorkOrder[]
@@ -1011,6 +1012,8 @@ model StudioMember {
   /// Office meetings (owner, 27 Oct 2026): ones they set up, and ones they were asked to.
   meetingsOrganised StudioMeeting[]      @relation("MeetingOrganiser")
   meetingInvites    StudioMeetingGuest[]
+  /// Their regular busy times (27 Oct 2026), shown when someone picks a meeting time.
+  busyBlocks        StudioBusyBlock[]
 
   quoteRequestsAsked    StudioQuoteRequest[] @relation("QuoteRequestAsker")
   quoteRequestsToBuild  StudioQuoteRequest[] @relation("QuoteRequestBuilder")
@@ -5969,4 +5972,30 @@ enum MeetingAnswer {
   PENDING
   ACCEPTED
   PROPOSED
+}
+
+/// A regular busy time for one person (owner and the design team, 27 Oct
+/// 2026: "every Wednesday the design meeting, my calendar is blocked"):
+/// weekly, a weekday and a span of the day in India. Shown to whoever picks
+/// a meeting time with them; never stops a request, the person answers it.
+model StudioBusyBlock {
+  id       String       @id @default(cuid())
+  studioId String
+  studio   Studio       @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  memberId String
+  member   StudioMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  /// 1 Monday … 7 Sunday.
+  weekday  Int
+  /// Minutes after midnight, India time.
+  startMin Int
+  minutes  Int
+  /// "Design meeting", "Site visits".
+  label    String
+
+  createdAt DateTime @default(now())
+
+  @@index([memberId])
+  @@index([studioId])
+  @@map("studio_busy_blocks")
 }

@@ -17,7 +17,9 @@ import { after } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { currentMember, type StudioMemberRef } from '@/modules/studio/access';
 import { notify } from '@/modules/notify/service';
-import { checkMeeting, checkWhen, guestAnswer, isOpen, mayCancel, moveMeeting, whenLabel, type Answer, type MeetingInput } from './meeting-rules';
+import { checkBusyBlock, checkMeeting, checkWhen, guestAnswer, isOpen, mayCancel, MAX_GUESTS, moveMeeting, whenLabel, type Answer, type BusySpan, type MeetingInput } from './meeting-rules';
+import { isDay, isoWeekday, istMinutesOfDay } from '@/modules/project/working-days';
+import { istDayEnd, istDayStart } from '@/modules/studio-sales/ist-range';
 
 export type Done = { ok: true; message?: string } | { ok: false; error: string };
 
@@ -359,5 +361,86 @@ export async function cancelOfficeMeeting(id: unknown, now = new Date()): Promis
   } catch (error) {
     console.error('[meetings] cancel failed', error instanceof Error ? error.message : 'unknown');
     return { ok: false, error: 'That did not save. Try again.' };
+  }
+}
+
+// ── Regular busy times and who is free (owner and the design team, 27 Oct 2026) ──
+
+export interface BusyBlockRow {
+  id: string;
+  weekday: number;
+  startMin: number;
+  minutes: number;
+  label: string;
+}
+
+/** This member's weekly busy times. */
+export async function myBusyBlocks(): Promise<BusyBlockRow[]> {
+  const m = await me();
+  if (!m) return [];
+  try {
+    return await prisma.studioBusyBlock.findMany({ where: { memberId: m.id, studioId: m.studioId }, orderBy: [{ weekday: 'asc' }, { startMin: 'asc' }], select: { id: true, weekday: true, startMin: true, minutes: true, label: true } });
+  } catch {
+    return [];
+  }
+}
+
+export async function addBusyBlock(input: { weekday: unknown; from: unknown; to: unknown; label: unknown }): Promise<Done> {
+  const m = await writer();
+  if ('error' in m) return { ok: false, error: m.error };
+  const checked = checkBusyBlock(input);
+  if (!checked.ok) return checked;
+  try {
+    const count = await prisma.studioBusyBlock.count({ where: { memberId: m.id } });
+    if (count >= 30) return { ok: false, error: 'Thirty busy times at most. Remove one first.' };
+    await prisma.studioBusyBlock.create({ data: { studioId: m.studioId, memberId: m.id, ...checked.value } });
+    return { ok: true, message: 'Saved. Whoever picks a meeting time with you sees it.' };
+  } catch {
+    return { ok: false, error: 'That did not save. Try again.' };
+  }
+}
+
+export async function removeBusyBlock(id: unknown): Promise<Done> {
+  const m = await writer();
+  if ('error' in m) return { ok: false, error: m.error };
+  if (typeof id !== 'string' || id.length > 40) return { ok: false, error: 'That is not one of yours.' };
+  const { count } = await prisma.studioBusyBlock.deleteMany({ where: { id, memberId: m.id } });
+  return count ? { ok: true, message: 'Removed.' } : { ok: false, error: 'That is not one of yours.' };
+}
+
+/**
+ * When these people are busy on an India day: their meetings (by title when
+ * the viewer is in it too, else "In a meeting") and their weekly busy times.
+ * Only people of the viewer's studio; nobody's notes.
+ */
+export async function busyOn(memberIds: readonly string[], day: string): Promise<Record<string, BusySpan[]>> {
+  const m = await me();
+  if (!m || !isDay(day)) return {};
+  const ids = [...new Set(memberIds.filter((x) => typeof x === 'string'))].slice(0, MAX_GUESTS + 1);
+  if (ids.length === 0) return {};
+  try {
+    const people = await prisma.studioMember.findMany({ where: { id: { in: ids }, studioId: m.studioId }, select: { id: true } });
+    const known = people.map((p) => p.id);
+    const start = istDayStart(day);
+    const end = istDayEnd(day);
+    const [meetings, blocks] = await Promise.all([
+      prisma.studioMeeting.findMany({
+        where: { studioId: m.studioId, cancelledAt: null, startsAt: { gte: start, lte: end }, OR: [{ organiserId: { in: known } }, { guests: { some: { memberId: { in: known } } } }] },
+        select: { title: true, startsAt: true, minutes: true, organiserId: true, guests: { select: { memberId: true } } },
+      }),
+      prisma.studioBusyBlock.findMany({ where: { memberId: { in: known }, weekday: isoWeekday(day) }, select: { memberId: true, startMin: true, minutes: true, label: true } }),
+    ]);
+    const out: Record<string, BusySpan[]> = Object.fromEntries(known.map((id) => [id, [] as BusySpan[]]));
+    for (const mt of meetings) {
+      const inIt = [mt.organiserId, ...mt.guests.map((g) => g.memberId)];
+      const fromMin = istMinutesOfDay(mt.startsAt);
+      const label = inIt.includes(m.id) ? mt.title : 'In a meeting';
+      for (const id of known) if (inIt.includes(id)) out[id]!.push({ fromMin, toMin: fromMin + mt.minutes, label });
+    }
+    for (const b of blocks) out[b.memberId]!.push({ fromMin: b.startMin, toMin: b.startMin + b.minutes, label: b.label });
+    for (const id of known) out[id]!.sort((a, b) => a.fromMin - b.fromMin);
+    return out;
+  } catch {
+    return {};
   }
 }

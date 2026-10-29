@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkMeeting, checkWhen, guestAnswer, isOpen, lengthLabel, mayCancel, moveMeeting, standing, whenLabel, type MeetingState } from '@/modules/studio-office/meeting-rules';
+import { checkBusyBlock, checkMeeting, checkWhen, guestAnswer, isOpen, lengthLabel, mayCancel, minutesLabel, moveMeeting, overlaps, standing, whenLabel, type MeetingState } from '@/modules/studio-office/meeting-rules';
 import { buildCalendarItems } from '@/modules/studio-sales/calendar-rules';
 import { appsFor } from '@/modules/studio/apps';
 import { mayOpen } from '@/modules/studio/surfaces';
@@ -155,5 +155,23 @@ describe('on the calendar, for everyone', () => {
       expect(cal!.tabs.map((t) => t.label), role).toContain('Meetings');
     }
     expect(appsFor(member('DESIGNER')).find((a) => a.key === 'calendar')!.tabs.map((t) => t.label)).toEqual(['Calendar', 'Meetings']);
+  });
+});
+
+describe('regular busy times and who is free (27 Oct 2026)', () => {
+  it('a weekly span: a weekday, from before to, and what it is', () => {
+    expect(checkBusyBlock({ weekday: 3, from: '14:00', to: '15:30', label: ' Design  meeting ' })).toEqual({ ok: true, value: { weekday: 3, startMin: 840, minutes: 90, label: 'Design meeting' } });
+    expect(checkBusyBlock({ weekday: 8, from: '14:00', to: '15:00', label: 'x' }).ok).toBe(false);
+    expect(checkBusyBlock({ weekday: 3, from: '15:00', to: '14:00', label: 'Design meeting' }).ok).toBe(false);
+    expect(checkBusyBlock({ weekday: 3, from: '14:00', to: '15:00', label: '' }).ok).toBe(false);
+  });
+
+  it('says when a meeting time clashes, edges touching are free', () => {
+    const spans = [{ fromMin: 840, toMin: 900, label: 'Design meeting' }];
+    expect(overlaps(spans, 870, 30)).toHaveLength(1);
+    expect(overlaps(spans, 900, 30)).toHaveLength(0);
+    expect(overlaps(spans, 810, 30)).toHaveLength(0);
+    expect(minutesLabel(840)).toBe('2:00 pm');
+    expect(minutesLabel(0)).toBe('12:00 am');
   });
 });
