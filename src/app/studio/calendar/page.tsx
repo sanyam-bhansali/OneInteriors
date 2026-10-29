@@ -58,7 +58,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           <h1>Calendar</h1>
           <p className="muted">
             {!cal.leads
-              ? 'Your meetings with the rest of the studio.'
+              ? 'Your meetings and your own tasks.'
               : cal.seesAll
                 ? 'Meetings, follow-ups and tasks for the whole team. One Interiors visits land here by themselves.'
                 : 'Your follow-ups, meetings and tasks.'}
@@ -66,7 +66,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         </div>
         <div className="hstack" style={{ gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <NewMeeting people={guests} day={day} primary={!cal.leads} />
-          {cal.leads ? <NewTask people={people} defaultDay={day === today || view !== 'day' ? today : day} seesAll={cal.seesAll} meId={cal.meId} /> : null}
+          <NewTask people={people} defaultDay={day === today || view !== 'day' ? today : day} seesAll={cal.seesAll} meId={cal.meId} />
         </div>
       </div>
 
@@ -103,7 +103,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       </div>
 
       <div className="hstack" style={{ gap: 8 }}>
-        <Legend kinds={cal.leads ? undefined : ['office']} />
+        <Legend kinds={cal.leads ? undefined : ['office', 'task']} />
         <span className="muted sm">· {windowTitle(w)} · {whose}</span>
       </div>
 

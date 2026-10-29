@@ -125,7 +125,7 @@ export async function taskPeople(): Promise<{ id: string; name: string }[]> {
   if (!member) return [];
   try {
     const rows = await prisma.studioMember.findMany({
-      where: { studioId: member.studioId, status: 'ACTIVE', role: { in: ['OWNER', 'PM', 'SALES'] } },
+      where: { studioId: member.studioId, status: 'ACTIVE', OR: [{ role: { in: ['OWNER', 'PM', 'SALES'] } }, { id: member.id }] },
       orderBy: { createdAt: 'asc' },
       select: { id: true, user: { select: { name: true, email: true, phone: true } } },
     });
@@ -146,7 +146,7 @@ export interface TaskWrite {
 /** Write a task. Given to the writer unless (owner, PM) they pick someone. */
 export async function createTask(input: TaskWrite): Promise<Done> {
   const member = await me();
-  if (!member) return { ok: false, error: 'Tasks are for the people who work leads.' };
+  if (!member) return { ok: false, error: 'Sign in to your studio first.' };
   const t = readTask(input);
   if (!t.ok) return t;
   const assignee = typeof input.assignedToId === 'string' && input.assignedToId ? input.assignedToId : member.id;
@@ -182,7 +182,7 @@ async function ownTask(member: TaskMember, id: unknown) {
 /** Change the title, the day/time, or (owner, PM) who has it. */
 export async function updateTask(id: unknown, input: TaskWrite): Promise<Done> {
   const member = await me();
-  if (!member) return { ok: false, error: 'Tasks are for the people who work leads.' };
+  if (!member) return { ok: false, error: 'Sign in to your studio first.' };
   try {
     const task = await ownTask(member, id);
     if (!task) return { ok: false, error: 'That task is not yours to change.' };
@@ -205,7 +205,7 @@ export async function updateTask(id: unknown, input: TaskWrite): Promise<Done> {
 /** Tick done, or untick. */
 export async function setTaskDone(id: unknown, done: boolean): Promise<Done> {
   const member = await me();
-  if (!member) return { ok: false, error: 'Tasks are for the people who work leads.' };
+  if (!member) return { ok: false, error: 'Sign in to your studio first.' };
   try {
     const task = await ownTask(member, id);
     if (!task) return { ok: false, error: 'That task is not yours to change.' };
@@ -218,7 +218,7 @@ export async function setTaskDone(id: unknown, done: boolean): Promise<Done> {
 
 export async function deleteTask(id: unknown): Promise<Done> {
   const member = await me();
-  if (!member) return { ok: false, error: 'Tasks are for the people who work leads.' };
+  if (!member) return { ok: false, error: 'Sign in to your studio first.' };
   try {
     const task = await ownTask(member, id);
     if (!task) return { ok: false, error: 'That task is not yours to change.' };
