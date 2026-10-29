@@ -8,6 +8,7 @@ export const locker = {
   'locker.search.placeholder': { en: 'Search, for example hinge warranty', hi: 'खोजें, जैसे हिंज की वारंटी', mr: 'शोधा, उदा. बिजागरीची वॉरंटी' },
   'locker.docs': { en: 'Documents', hi: 'दस्तावेज़', mr: 'कागदपत्रे' },
   'locker.kind.AGREEMENT': { en: 'Agreement', hi: 'एग्रीमेंट', mr: 'करार' },
+  'locker.kind.SIGNED_AGREEMENT': { en: 'Signed agreement (paper)', hi: 'हस्ताक्षरित एग्रीमेंट (काग़ज़)', mr: 'सही केलेला करार (कागद)' },
   'locker.kind.QUOTATION': { en: 'Signed quotation', hi: 'साइन किया हुआ कोटेशन', mr: 'सही केलेले कोटेशन' },
   'locker.kind.DRAWINGS': { en: 'Design drawings', hi: 'डिज़ाइन ड्रॉइंग', mr: 'डिझाइन ड्रॉइंग' },
   'locker.kind.RECEIPT': { en: 'Payment receipts', hi: 'भुगतान की रसीदें', mr: 'पेमेंटच्या पावत्या' },

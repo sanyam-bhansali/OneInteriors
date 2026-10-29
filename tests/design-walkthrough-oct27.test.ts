@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { designLengthFor, effectivePriority, scaledGaps, HAUSPIRE_DESIGN } from '@/modules/studio-design/template';
 import { parseDesignDays } from '@/modules/project/own-project-rules';
 import { templateStages } from '@/modules/portal/quote-to-plan';
+import { AGREE_TEXT, agreeTextOf, isSignoffKind, requestRefusal } from '@/modules/project/signoff-rules';
+import { DOC_KINDS } from '@/modules/portal/documents';
+import { MONEY_DOC } from '@/modules/project/locker-rules';
 
 /** The design team walkthrough, 27 Oct 2026 (plan approved 29 Oct). */
 
@@ -39,5 +42,23 @@ describe('Default stars from the category (item 18)', () => {
     expect(effectivePriority(null, 'ESSENTIAL')).toBe(3);
     expect(effectivePriority(2, 'LUXURY')).toBe(2);
     expect(effectivePriority(null, null)).toBeNull();
+  });
+});
+
+describe('the agreement sign-off (item 15)', () => {
+  it('is a third kind with its own sentence to tick', () => {
+    expect(isSignoffKind('AGREEMENT')).toBe(true);
+    expect(agreeTextOf('AGREEMENT')).toMatch(/agreement in full/);
+    expect(agreeTextOf('SALES_FINAL')).toBe(AGREE_TEXT);
+  });
+  it('needs a sales final and the studio terms', () => {
+    expect(requestRefusal({ hasRevision: false, kind: 'AGREEMENT', pendingSameRevision: false, signedSameRevision: false })).toMatch(/agreement goes with it/);
+    expect(requestRefusal({ hasRevision: true, kind: 'AGREEMENT', pendingSameRevision: false, signedSameRevision: false, hasTerms: false })).toMatch(/terms first/);
+    expect(requestRefusal({ hasRevision: true, kind: 'AGREEMENT', pendingSameRevision: false, signedSameRevision: false, hasTerms: true })).toBeNull();
+    expect(requestRefusal({ hasRevision: true, kind: 'SALES_FINAL', pendingSameRevision: false, signedSameRevision: false, hasTerms: false })).toBeNull();
+  });
+  it('a paper signed agreement is a money document', () => {
+    expect(DOC_KINDS.SIGNED_AGREEMENT).toBe('Signed agreement (paper)');
+    expect(MONEY_DOC({ kind: 'SIGNED_AGREEMENT', contentType: 'application/pdf', storageKey: 'x' })).toBe(true);
   });
 });

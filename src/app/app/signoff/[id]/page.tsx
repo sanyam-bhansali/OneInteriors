@@ -1,13 +1,16 @@
-import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
-import { hasDatabase } from '@/lib/env';
-import { signoffDocument } from '@/modules/project/signoffs';
-import { QuotationDocument } from '@/app/studio/quotations/doc/QuotationDocument';
-import '@/app/studio/quotations/doc/quote-doc.css';
-import { SignoffScreen } from './SignoffScreen';
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { hasDatabase } from "@/lib/env";
+import { signoffDocument } from "@/modules/project/signoffs";
+import { QuotationDocument } from "@/app/studio/quotations/doc/QuotationDocument";
+import "@/app/studio/quotations/doc/quote-doc.css";
+import { SignoffScreen } from "./SignoffScreen";
 
-export const metadata: Metadata = { title: 'Read and sign', robots: { index: false, follow: false } };
-export const dynamic = 'force-dynamic';
+export const metadata: Metadata = {
+  title: "Read and sign",
+  robots: { index: false, follow: false },
+};
+export const dynamic = "force-dynamic";
 
 /**
  * Read and sign a quotation (owner, 15 Oct 2026; project/signoffs.ts): the
@@ -18,7 +21,11 @@ export const dynamic = 'force-dynamic';
  * inside the app. Open to the owner of the project and their family (only
  * the owner signs), the studio on the project who sees its money, and ops.
  */
-export default async function SignoffPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function SignoffPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   if (!hasDatabase()) notFound();
   const { id } = await params;
   const d = await signoffDocument(id);
@@ -36,25 +43,44 @@ export default async function SignoffPage({ params }: { params: Promise<{ id: st
       changedSince={d.changedSince}
       signed={d.signed}
     >
-      <QuotationDocument
-        embedded
-        studio={d.doc.studio}
-        brandPages={d.doc.brandPages}
-        head={d.doc.head}
-        lines={d.doc.lines}
-        roomOrder={d.doc.roomOrder}
-        totals={d.doc.totals}
-        feeBps={d.doc.feeBps}
-        discountBps={d.doc.discountBps}
-        gstBps={d.doc.gstBps}
-        onSpotLabel={d.doc.onSpotLabel}
-        schedule={d.doc.schedule}
-        spec={d.doc.spec}
-        terms={d.doc.terms}
-        welcomeNote={d.doc.welcomeNote}
-        showMark={false}
-        markText=""
-      />
+      {d.kind === "AGREEMENT" ? (
+        <div
+          style={{
+            padding: 16,
+            whiteSpace: "pre-wrap",
+            fontSize: 14,
+            lineHeight: 1.55,
+          }}
+          data-testid="agreement-terms"
+        >
+          {d.doc.studio ? (
+            <p style={{ margin: "0 0 10px", fontWeight: 600 }}>
+              {d.doc.studio.name}
+            </p>
+          ) : null}
+          {d.doc.terms?.trim() ? d.doc.terms : null}
+        </div>
+      ) : (
+        <QuotationDocument
+          embedded
+          studio={d.doc.studio}
+          brandPages={d.doc.brandPages}
+          head={d.doc.head}
+          lines={d.doc.lines}
+          roomOrder={d.doc.roomOrder}
+          totals={d.doc.totals}
+          feeBps={d.doc.feeBps}
+          discountBps={d.doc.discountBps}
+          gstBps={d.doc.gstBps}
+          onSpotLabel={d.doc.onSpotLabel}
+          schedule={d.doc.schedule}
+          spec={d.doc.spec}
+          terms={d.doc.terms}
+          welcomeNote={d.doc.welcomeNote}
+          showMark={false}
+          markText=""
+        />
+      )}
     </SignoffScreen>
   );
 }
