@@ -87,8 +87,8 @@ export interface DesignPlanStep {
  * DESIGN-PROCESS-PLAN.md Decision 1), days and effort scaled by the flat's
  * size, weights by effort, gates matched to its payment stages.
  */
-export function designSteps(template: readonly DesignTemplateStep[], start: string, payments: readonly { label: string }[], bhk: number | null = null): DesignPlanStep[] {
-  const gaps = scaledGaps(template.map((t) => t.days), bhk);
+export function designSteps(template: readonly DesignTemplateStep[], start: string, payments: readonly { label: string }[], bhk: number | null = null, length: number | null = null): DesignPlanStep[] {
+  const gaps = scaledGaps(template.map((t) => t.days), bhk, length);
   const days = linkedDays(gaps, start, null);
   const efforts = template.map((t) => scaledEffort(t.effortMin, bhk));
   const weights = designWeights(efforts);

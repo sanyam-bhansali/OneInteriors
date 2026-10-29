@@ -16,6 +16,7 @@ export async function startOwnProjectAction(form: FormData): Promise<{ ok: true;
     quoteId: s('quoteId'),
     startOn: s('startOn'),
     totalDays: s('totalDays'),
+    designDays: s('designDays'),
     customer: { name: s('name'), phone: s('phone'), email: s('email') },
   });
   if (!r.ok) return r;

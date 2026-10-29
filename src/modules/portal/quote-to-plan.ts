@@ -155,6 +155,8 @@ export interface PlanItem {
 export interface DesignPlanInput {
   template?: readonly DesignTemplateStep[] | null;
   bhk?: number | null;
+  /** "Design done in N days" (Start a project, 27 Oct 2026): the steps scale to end on it; the flat's size when left out. */
+  days?: number | null;
 }
 
 export interface PlanStage {
@@ -294,8 +296,8 @@ export function stepsFor(kind: PlanKind, plannedStart: Date, plannedEnd: Date): 
  * scaled to the stage's window, gates matched to the payment stages by name
  * (studio-design/rules.ts `designSteps`).
  */
-export function designStepsFor(plannedStart: Date, template: readonly DesignTemplateStep[] | null | undefined, payments: readonly { label: string }[], bhk: number | null = null): PlanItem[] {
-  return designSteps(template && template.length ? template : HAUSPIRE_DESIGN, istDay(plannedStart), payments, bhk).map((st) => ({
+export function designStepsFor(plannedStart: Date, template: readonly DesignTemplateStep[] | null | undefined, payments: readonly { label: string }[], bhk: number | null = null, length: number | null = null): PlanItem[] {
+  return designSteps(template && template.length ? template : HAUSPIRE_DESIGN, istDay(plannedStart), payments, bhk, length).map((st) => ({
     room: st.room,
     label: st.label,
     quoteLineId: null,
@@ -322,12 +324,12 @@ export function designStepsFor(plannedStart: Date, template: readonly DesignTemp
  */
 export function templateStages(startOn: Date, totalDays: number, design?: (DesignPlanInput & { payments: readonly { label: string }[] }) | null): PlanStage[] {
   const steps = design ? (design.template && design.template.length ? design.template : HAUSPIRE_DESIGN) : null;
-  return stageDates(startOn, totalDays, steps ? designLengthFor(steps, design?.bhk) : null).map((d, i) => ({
+  return stageDates(startOn, totalDays, steps ? designLengthFor(steps, design?.bhk, design?.days ?? null) : null).map((d, i) => ({
     ...d,
     name: KIND_NAMES[d.kind],
     sortOrder: i,
     actualEnd: null,
-    items: design && d.kind === 'DESIGN' ? designStepsFor(d.plannedStart, design.template, design.payments, design.bhk ?? null) : stepsFor(d.kind, d.plannedStart, d.plannedEnd),
+    items: design && d.kind === 'DESIGN' ? designStepsFor(d.plannedStart, design.template, design.payments, design.bhk ?? null, design.days ?? null) : stepsFor(d.kind, d.plannedStart, d.plannedEnd),
   }));
 }
 

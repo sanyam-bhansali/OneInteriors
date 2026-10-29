@@ -18,6 +18,7 @@ import 'server-only';
  * truth the app does.
  */
 
+import { effectivePriority } from '@/modules/studio-design/template';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { fromDb } from '@/lib/money';
@@ -282,7 +283,8 @@ export async function projectWorkspace(projectId: string, now = new Date()): Pro
       bhk: bhkLabel(b.propertyType),
       // The quotation's category (DESIGN-PROCESS-PLAN.md §4.3), else the brief's tier.
       tier: (p.category ?? b.tier) ? (TIER[(p.category ?? b.tier)!] ?? null) : null,
-      priority: p.priority,
+      /* Stars set by someone, else from the category (27 Oct 2026). */
+      priority: effectivePriority(p.priority, p.category ?? b.tier),
       contractPaise: money && p.contractPaise !== null ? fromDb(p.contractPaise) : null,
       signedAt: p.signedAt,
       plan: planName(p.plan),

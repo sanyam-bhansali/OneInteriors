@@ -169,13 +169,15 @@ export const sizeFactor = (bhk: number | null | undefined): number => SIZE_FACTO
  * a 1 BHK no shorter and a 3 BHK far longer), and a same-day step stays on
  * the same day.
  */
-export function scaledGaps(days: readonly number[], bhk: number | null | undefined): number[] {
-  const f = sizeFactor(bhk);
-  let base = 0;
+export function scaledGaps(days: readonly number[], bhk: number | null | undefined, length: number | null = null): number[] {
+  /* A length asked for (owner, 27 Oct 2026: "Design done in N days" on Start a project): every step's days scaled to end on it. */
+  const base = days.reduce((a, d) => a + (Number.isFinite(d) && d > 0 ? d : 0), 0);
+  const f = length !== null && Number.isInteger(length) && length > 0 && base > 0 ? length / base : sizeFactor(bhk);
+  let run = 0;
   let prev = 0;
   return days.map((d) => {
-    base += Number.isFinite(d) && d > 0 ? d : 0;
-    const at = Math.round(base * f);
+    run += Number.isFinite(d) && d > 0 ? d : 0;
+    const at = Math.round(run * f);
     const gap = Math.max(0, at - prev);
     prev = Math.max(prev, at);
     return gap;
@@ -186,14 +188,23 @@ export function scaledGaps(days: readonly number[], bhk: number | null | undefin
 export const scaledEffort = (effortMin: number, bhk: number | null | undefined): number => Math.max(0, Math.round(effortMin * sizeFactor(bhk)));
 
 /** The DESIGN stage's length in days for this flat: every step's days, scaled, end to end (at least a day). */
-export const designLengthFor = (template: readonly Pick<DesignTemplateStep, 'days'>[], bhk: number | null | undefined): number =>
-  Math.max(1, scaledGaps(template.map((t) => t.days), bhk).reduce((a, b) => a + b, 0));
+export const designLengthFor = (template: readonly Pick<DesignTemplateStep, 'days'>[], bhk: number | null | undefined, length: number | null = null): number =>
+  Math.max(1, scaledGaps(template.map((t) => t.days), bhk, length).reduce((a, b) => a + b, 0));
 
 /** Designer-days a project takes, by flat size (Hauspire's capacity sheet; 4 BHK is our estimate). */
 export const DESIGNER_DAYS: Readonly<Record<1 | 2 | 3 | 4, number>> = { 1: 14, 2: 20, 3: 27, 4: 32 };
 
 /** Working days a designer has in a month (Hauspire's sheet). */
 export const DESIGNER_MONTH_DAYS = 25;
+
+/**
+ * Stars a project starts with when nobody has set them (owner and Hauspire's
+ * design team, 27 Oct 2026): Luxe first, then Premium, then Essential. The
+ * owner, PM or designer still sets their own.
+ */
+export const CATEGORY_PRIORITY: Readonly<Record<string, number>> = { LUXURY: 5, PREMIUM: 4, ESSENTIAL: 3 };
+export const effectivePriority = (priority: number | null | undefined, category: string | null | undefined): number | null =>
+  priority ?? (category ? (CATEGORY_PRIORITY[category] ?? null) : null);
 
 /** A brief's property type as a flat size 1–4, or null when it is not a flat size (villa counts as 4). */
 export function bhkOf(propertyType: string | null | undefined): 1 | 2 | 3 | 4 | null {

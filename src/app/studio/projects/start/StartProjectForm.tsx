@@ -23,11 +23,16 @@ type Quote = {
   totalPaise: number;
   date: string;
   defaultDays: number;
+  defaultDesignDays: number;
 };
 
 const field = 'fld w-full';
 const label = 'lbl mb-1.5 block';
 const hint = 'm-0 mt-1 text-[12.5px] text-[var(--muted)]';
+
+const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+/** A quotation matches the search by client, number or society, any case. */
+const matches = (q: Quote, find: string) => !norm(find) || norm(`${q.client} ${q.number} ${q.home ?? ''}`).includes(norm(find));
 
 const day = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
 
@@ -37,6 +42,9 @@ export function StartProjectForm({ quotes, initialQuoteId, today }: { quotes: Qu
   const [quoteId, setQuoteId] = useState(first.id);
   const [startOn, setStartOn] = useState(today);
   const [days, setDays] = useState(String(first.defaultDays));
+  const [designDays, setDesignDays] = useState(String(first.defaultDesignDays));
+  /* Search the quotations by client, number or society (27 Oct 2026: sixty of them in one list). */
+  const [find, setFind] = useState('');
   const [showDays, setShowDays] = useState(false);
   const [name, setName] = useState(first.customer.name);
   const [phone, setPhone] = useState(first.customer.phone);
@@ -52,6 +60,7 @@ export function StartProjectForm({ quotes, initialQuoteId, today }: { quotes: Qu
     setPhone(q.customer.phone);
     setEmail(q.customer.email);
     setDays(String(q.defaultDays));
+    setDesignDays(String(q.defaultDesignDays));
     setError(null);
   };
 
@@ -69,8 +78,16 @@ export function StartProjectForm({ quotes, initialQuoteId, today }: { quotes: Qu
     <form onSubmit={submit} className="grid max-w-[980px] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
       <fieldset className="m-0 min-w-0 border-0 p-0">
         <legend className="mb-2 text-[16px] font-semibold">1. The quotation your client accepted</legend>
+        <input
+          type="search"
+          aria-label="Find a quotation"
+          placeholder="Find by client, number or society"
+          value={find}
+          onChange={(e) => setFind(e.target.value)}
+          className={`${field} mb-2`}
+        />
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
-          {quotes.map((q) => (
+          {quotes.filter((q) => q.id === quoteId || matches(q, find)).map((q) => (
             <li key={q.id}>
               <label
                 className="card flex-row cursor-pointer items-start"
@@ -91,6 +108,7 @@ export function StartProjectForm({ quotes, initialQuoteId, today }: { quotes: Qu
             </li>
           ))}
         </ul>
+        {find.trim() && !quotes.some((q) => matches(q, find)) ? <p className={hint}>No quotation matches &ldquo;{find.trim()}&rdquo;.</p> : null}
         {chosen.status === 'ISSUED' ? <p className={hint}>Starting the project marks this quotation as won.</p> : null}
       </fieldset>
 
@@ -101,6 +119,16 @@ export function StartProjectForm({ quotes, initialQuoteId, today }: { quotes: Qu
             Work starts on
           </label>
           <input id="startOn" name="startOn" type="date" required value={startOn} onChange={(e) => setStartOn(e.target.value)} className={field} />
+        </div>
+        <div>
+          {/* Design's own length (27 Oct 2026): the team read "Handover" as the design's; the design steps stretch or shrink to it by their hours. */}
+          <label htmlFor="designDays" className={label}>
+            Design done in (days)
+          </label>
+          <input id="designDays" name="designDays" type="number" min={3} max={365} required value={designDays} onChange={(e) => setDesignDays(e.target.value)} className={field} />
+          <p className={hint}>From the design steps for this flat size; the client never sees it. The steps spread across it by their hours.</p>
+        </div>
+        <div>
           {showDays ? (
             <div className="mt-3">
               <label htmlFor="totalDays" className={label}>
@@ -110,7 +138,7 @@ export function StartProjectForm({ quotes, initialQuoteId, today }: { quotes: Qu
             </div>
           ) : (
             <p className={hint}>
-              Handover in {days} days.{' '}
+              Whole project handed over in {days} days.{' '}
               <button type="button" onClick={() => setShowDays(true)} className="text-[12.5px] acc-t underline">
                 Change the handover
               </button>

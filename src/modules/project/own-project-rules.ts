@@ -108,6 +108,14 @@ export function parseStartOn(raw: unknown, today: Date): Date | null {
 }
 
 /** Sign-off to handover in days: 7 to 730, the matching profile's own limits. */
+/** "Design done in N days": 3 to 365, or the steps' own length for the flat (`fallback`) when left out. */
+export function parseDesignDays(raw: unknown, fallback: number | null): number | null | false {
+  if (raw === undefined || raw === null || raw === '') return fallback;
+  const n = typeof raw === 'number' ? raw : Number(String(raw).trim());
+  if (!Number.isInteger(n) || n < 3 || n > 365) return false;
+  return n;
+}
+
 export function parseTotalDays(raw: unknown, fallback: number): number | null {
   if (raw === undefined || raw === null || raw === '') return fallback;
   const n = typeof raw === 'number' ? raw : Number(String(raw).trim());
