@@ -182,8 +182,8 @@ export function customerTracker(row: TrackerInputRow, views: readonly StageView[
     const cur = views.find((s) => s.state === 'now') ?? null;
     return {
       tracker: null,
-      overallLateDays: legacyLateDays(views, now),
-      stageStatus: cur ? { key: cur.key, label: cur.label, status: cur.late ? 'late' : 'on-track', lateDays: legacyLateDays([cur], now) } : null,
+      overallLateDays: 0,
+      stageStatus: cur ? { key: cur.key, label: cur.label, status: cur.late && cur.key !== 'DESIGN' ? 'late' : 'on-track', lateDays: cur.key === 'DESIGN' ? 0 : legacyLateDays([cur], now) } : null,
     };
   }
 
@@ -246,8 +246,9 @@ export function customerTracker(row: TrackerInputRow, views: readonly StageView[
       actualEnd: s.actualEnd,
       forecastEnd: s.forecastEnd,
       state: s.state,
-      status: s.status,
-      lateDays: s.lateDays,
+      /* The client never reads the design as late (owner and Hauspire's design team, 27 Oct 2026): it has no timeline for them. */
+      status: s.kind === 'DESIGN' && s.status === 'late' ? 'on-track' : s.status,
+      lateDays: s.kind === 'DESIGN' ? 0 : s.lateDays,
       earlyDays: s.earlyDays,
       checklist: { done: c.done, total: c.total },
       // A stage with no step in scope is as done as the stage itself.
@@ -288,13 +289,18 @@ export function customerTracker(row: TrackerInputRow, views: readonly StageView[
       plannedHandover: overall.plannedHandover,
       forecastHandover: overall.forecastHandover,
       handedOver: overall.handedOver,
-      lateDays: overall.lateDays,
+      /*
+       * No "overall · N days late" for the client (owner, 27 Oct 2026: "they
+       * will panic"). The days their own delays cost are still theirs to
+       * see (`customerDays`); the studio's never are.
+       */
+      lateDays: 0,
       earlyDays: overall.earlyDays,
       customerDays: overall.customerDays,
-      studioDays: overall.studioDays,
+      studioDays: 0,
     } },
-    overallLateDays: overall.lateDays,
-    stageStatus: cur ? { key: KIND_KEY[cur.kind], label: cur.name, status: cur.status, lateDays: cur.lateDays } : null,
+    overallLateDays: 0,
+    stageStatus: cur ? { key: KIND_KEY[cur.kind], label: cur.name, status: cur.kind === 'DESIGN' && cur.status === 'late' ? 'on-track' : cur.status, lateDays: cur.kind === 'DESIGN' ? 0 : cur.lateDays } : null,
   };
 }
 

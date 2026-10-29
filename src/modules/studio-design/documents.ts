@@ -27,6 +27,8 @@ export const DOC_TYPES = {
   LAYOUT_2D: { short: '2D', label: '2D layout', approval: true, offered: true },
   RENDER_3D: { short: '3D', label: '3D & renders', approval: true, offered: true },
   WORKING: { short: 'WD', label: 'Working drawings', approval: true, offered: true },
+  /* The site validation's drawings (owner and Hauspire's design team, 27 Oct 2026). */
+  VALIDATION: { short: 'VAL', label: 'Validation drawings', approval: true, offered: true },
   ELECTRICAL: { short: 'ELEC', label: 'Electrical drawings & quotation', approval: true, offered: true },
   MATERIAL_LIST: { short: 'MATLIST', label: 'Material list', approval: false, offered: true },
   CUT_LIST: { short: 'CUTLIST', label: 'Factory cut list', approval: false, offered: true },

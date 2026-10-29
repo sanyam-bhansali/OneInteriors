@@ -774,8 +774,9 @@ describe('Phase 3: the tracker, moved dates and computed statuses (portal/tracke
   it('computes stage and overall status, never typed, with the customer days labelled as theirs', () => {
     expect(out.stageStatus).toEqual({ key: 'SITE', label: 'Civil and electrical', status: 'late', lateDays: 5 });
     // Planned 25 Nov; now 30 Nov + 5 working days of overrun = 5 Dec: 9 working days late, 4 of them the customer's.
-    expect(t.overall).toMatchObject({ plannedHandover: '2026-11-25', forecastHandover: '2026-12-05', lateDays: 9, customerDays: 4, studioDays: 5 });
-    expect(out.overallLateDays).toBe(9);
+    // The client never reads "overall · N days late" (owner, 27 Oct 2026): only the days their own delays cost.
+    expect(t.overall).toMatchObject({ plannedHandover: '2026-11-25', forecastHandover: '2026-12-05', lateDays: 0, customerDays: 4, studioDays: 0 });
+    expect(out.overallLateDays).toBe(0);
   });
 
   it('sends planned vs actual per stage and the current room checklist, without who ticked', () => {

@@ -348,7 +348,7 @@ function CustomerPanel({ w, now }: { w: ProjectWorkspace; now: Date }) {
   const next = v.money?.next ?? null;
   /* Customer milestones (docs/studio-os/CUSTOMER-MILESTONES.md): the stage under way and only its starred steps, as the app shows them. */
   const nowStage = v.tracker?.stages.find((s) => s.state === 'now') ?? null;
-  const late = w.row.lateDays;
+  const clientDays = v.tracker?.overall.customerDays ?? 0;
   const openSnags = v.snags.filter((s) => s.status === 'OPEN').length;
   return (
     <section className="oi-sees seescard" aria-label={`What ${w.customerFirst} sees right now`}>
@@ -356,13 +356,16 @@ function CustomerPanel({ w, now }: { w: ProjectWorkspace; now: Date }) {
         <LineIcon name="eye" size={15} />
         What {w.customerFirst} sees right now
       </span>
+      {/* As the client's app reads it (portal/tracker-view.ts, owner 27 Oct 2026): never "running late" in design, never "overall · N days late"; the days their own delays cost, when there are any. */}
       <div className="flex flex-wrap gap-2">
-        <span className="ipill" style={{ color: current?.late ? 'var(--inv-bad)' : 'var(--inv-good)' }}>
-          {current ? `${current.label} · ${current.late ? 'running late' : 'on track'}` : 'Handed over'}
+        <span className="ipill" style={{ color: nowStage?.status === 'late' ? 'var(--inv-bad)' : 'var(--inv-good)' }}>
+          {current ? `${current.label} · ${nowStage?.status === 'late' ? 'running late' : 'on track'}` : 'Handed over'}
         </span>
-        <span className="ipill" style={{ color: late > 0 ? 'var(--inv-bad)' : 'var(--inv-good)' }}>
-          {late > 0 ? `Overall · ${late} day${late === 1 ? '' : 's'} late` : 'Overall · on time'}
-        </span>
+        {clientDays > 0 ? (
+          <span className="ipill" style={{ color: 'var(--inv-bad)' }}>
+            {clientDays} day{clientDays === 1 ? '' : 's'} waiting on {w.customerFirst}
+          </span>
+        ) : null}
       </div>
       <div
         className="stg"
