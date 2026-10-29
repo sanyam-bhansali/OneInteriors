@@ -28,6 +28,7 @@ import 'server-only';
  *   daily cron).
  */
 
+import { DESIGN_KINDS, FOR_APPROVAL, type DesignKind } from '@/modules/studio-design/rules';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { fromDb, toDb } from '@/lib/money';
@@ -387,9 +388,26 @@ export interface StudioDecision {
   options: StudioDecisionOption[];
 }
 
+/**
+ * A drawing shared with the client for approval, and their answer (walkthrough,
+ * 27 Oct 2026: "the client's comments on the 2D show in Decisions"). The
+ * newest version of each drawing, waiting, approved, or changes asked in
+ * their own words.
+ */
+export interface StudioDrawingAnswer {
+  documentId: string;
+  title: string;
+  kind: string;
+  version: number;
+  state: 'waiting' | 'approved' | 'changes';
+  comment: string | null;
+  at: string;
+}
+
 export interface StudioDecisions {
   projectId: string;
   decisions: StudioDecision[];
+  drawings: StudioDrawingAnswer[];
   canCreate: boolean;
 }
 
@@ -441,7 +459,33 @@ export async function studioDecisions(projectId: string, now = new Date()): Prom
       })),
     });
   }
-  return { projectId, decisions, canCreate: costs };
+  return { projectId, decisions, drawings: await drawingAnswers(projectId), canCreate: costs };
+}
+
+/** The newest shared version of each drawing that asks for approval, with the client's last answer on it. */
+async function drawingAnswers(projectId: string): Promise<StudioDrawingAnswer[]> {
+  try {
+    const docs = await prisma.homeDocument.findMany({
+      where: { projectId, deletedAt: null, sharedAt: { not: null }, designKind: { in: [...FOR_APPROVAL] }, supersededBy: { none: { deletedAt: null, sharedAt: { not: null } } } },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+      select: { id: true, title: true, designKind: true, version: true, sharedAt: true, reviews: { orderBy: { at: 'desc' }, take: 1, select: { verdict: true, comment: true, at: true } } },
+    });
+    return docs.map((d) => {
+      const r = d.reviews[0];
+      return {
+        documentId: d.id,
+        title: d.title,
+        kind: DESIGN_KINDS[d.designKind as DesignKind] ?? 'Drawing',
+        version: d.version,
+        state: !r ? 'waiting' : r.verdict === 'APPROVED' ? 'approved' : 'changes',
+        comment: r?.comment ?? null,
+        at: (r?.at ?? d.sharedAt!).toISOString(),
+      };
+    });
+  } catch {
+    return [];
+  }
 }
 
 export interface NewDecisionContext {

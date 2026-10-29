@@ -22,7 +22,8 @@ import { formatINR } from '@/lib/money';
 import { endOfIstDay } from '@/modules/portal/decisions';
 import { parseRupees } from './payment-ledger';
 
-export const DECISION_RULES = { minOptions: 2, maxOptions: 3, title: 120, why: 600, label: 60, detail: 160, maxDeltaPaise: 1_00_00_000_00 } as const;
+/* Up to six (walkthrough, 27 Oct 2026: catalogues of handles, knobs, laminates); more no longer fits a phone screen. */
+export const DECISION_RULES = { minOptions: 2, maxOptions: 6, title: 120, why: 600, label: 60, detail: 160, maxDeltaPaise: 1_00_00_000_00 } as const;
 
 export interface NewOption {
   label: string;
@@ -65,7 +66,7 @@ export function checkNewDecision(input: NewDecisionInput, now = new Date()): { o
   if (Number.isNaN(dueOn.getTime())) return { ok: false, error: 'Pick the decide-by date.' };
   if (dueOn.getTime() < now.getTime()) return { ok: false, error: 'The decide-by date has already passed.' };
   const quoteLineId = typeof input.quoteLineId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(input.quoteLineId) ? input.quoteLineId : null;
-  if (!Array.isArray(input.options)) return { ok: false, error: 'Give two or three options.' };
+  if (!Array.isArray(input.options)) return { ok: false, error: 'Give two to six options.' };
   const options: NewOption[] = [];
   for (const [i, raw] of input.options.entries()) {
     if (!raw || typeof raw !== 'object') continue;
@@ -82,7 +83,7 @@ export function checkNewDecision(input: NewDecisionInput, now = new Date()): { o
     options.push({ label, detail: text(o.detail, DECISION_RULES.detail) || null, swatch, deltaPaise: delta, studioCostDeltaPaise: cost });
   }
   if (options.length < DECISION_RULES.minOptions) return { ok: false, error: 'Give at least two options, each with a name.' };
-  if (options.length > DECISION_RULES.maxOptions) return { ok: false, error: 'Three options at most: more makes it harder to decide.' };
+  if (options.length > DECISION_RULES.maxOptions) return { ok: false, error: 'Six options at most: more no longer fits on the client’s phone.' };
   const names = new Set(options.map((o) => o.label.toLowerCase()));
   if (names.size !== options.length) return { ok: false, error: 'Two options have the same name.' };
   return { ok: true, value: { title, why, dueDay: input.dueOn, dueOn, quoteLineId, options } };

@@ -33,6 +33,8 @@ export const DOC_TYPES = {
   MATERIAL_LIST: { short: 'MATLIST', label: 'Material list', approval: false, offered: true },
   CUT_LIST: { short: 'CUTLIST', label: 'Factory cut list', approval: false, offered: true },
   SITE_PHOTO: { short: 'PHOTO', label: 'Site photo', approval: false, offered: true },
+  /* A catalogue (handles, knobs, laminates) the client picks from and answers with the codes (walkthrough, 27 Oct 2026). */
+  CATALOGUE: { short: 'CAT', label: 'Catalogue to choose from', approval: true, offered: true },
   /** Before 24 Oct 2026 the furniture layout was its own drawing; now part of the 2D. Read, never offered. */
   FURNITURE: { short: 'FURN', label: 'Furniture layout', approval: true, offered: false },
 } as const;
