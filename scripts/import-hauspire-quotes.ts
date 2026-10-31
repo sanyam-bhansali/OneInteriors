@@ -5,11 +5,21 @@
  *     npx tsx scripts/import-hauspire-quotes.ts --studio <slug> --dry-run
  *     npx tsx scripts/import-hauspire-quotes.ts --studio <slug> [--pool-team <member email or phone>]
  *     npx tsx scripts/import-hauspire-quotes.ts --studio <slug> --from-file rows.json --dry-run
+ *     npx tsx scripts/import-hauspire-quotes.ts --studio <slug> --from-file excel.json --source "Hauspire's Excel quotation"
+ *     npx tsx scripts/import-hauspire-quotes.ts --studio <slug> --from-file new.json --previous old.json --dry-run
+ *     npx tsx scripts/import-hauspire-quotes.ts --studio <slug> --from-file rows.json --replace 2379,2371 --dry-run
  *
  * Reads the old app through the same read-only connection as "bring in a
  * running project" (HAUSPIRE_QUOTES_SUPABASE_URL / _KEY / _STUDIO_SLUG, GET
  * only — nothing is ever written there), page by page. `--from-file` reads a
  * JSON array of `quotes` rows instead (an export, or fake rows to try it).
+ * `--source` names where those rows came from, as the lead, its timeline
+ * and each revision say it (default: the Hauspire quotation app).
+ * `--previous` is the file an earlier run imported: a quotation here that
+ * still says exactly what that file said counts as untouched, whatever its
+ * timestamps (for rows a slow earlier run stamped as edited). `--replace`
+ * names quotation numbers to take from the source even though ours changed
+ * here; each also moves to the lead its mobile now matches.
  * The database is DATABASE_URL from the environment; this script loads no
  * .env file (`scripts/with-env.ps1` does, for those who want it). The target
  * host is printed first, never the credentials.
@@ -57,6 +67,11 @@ async function main() {
   const pool = arg('pool-team');
   const file = arg('from-file');
   const dryRun = process.argv.includes('--dry-run');
+  const source = arg('source');
+  if (source && !file) {
+    console.error('--source names rows read with --from-file; the quotation app is always the quotation app.');
+    process.exit(1);
+  }
   if (!slug) {
     console.error('Usage: npx tsx scripts/import-hauspire-quotes.ts --studio <slug> [--dry-run] [--pool-team <member email or phone>] [--from-file rows.json]');
     process.exit(1);
@@ -68,7 +83,8 @@ async function main() {
   }
   console.log(`▶ database: ${url.replace(/^postgres(ql)?:\/\/[^@]*@/, '').split(/[/?]/)[0]}`);
 
-  const prisma = new PrismaClient();
+  /* The pooler can be slow to hand over its one connection: wait a minute for it, not Prisma's 10 seconds. */
+  const prisma = new PrismaClient(/[?&]pool_timeout=/.test(url) ? undefined : { datasourceUrl: `${url}${url.includes('?') ? '&' : '?'}pool_timeout=60` });
   try {
     const studio = await prisma.studio.findUnique({ where: { slug }, select: { id: true, tradeName: true } });
     if (!studio) {
@@ -85,9 +101,20 @@ async function main() {
       poolTeam = t.team;
     }
     const rows = await readRows(slug, file);
+    const prevFile = arg('previous');
+    const previous = prevFile ? await readRows(slug, prevFile) : undefined;
+    const replace = arg('replace')?.split(',').map((s) => s.trim()).filter(Boolean);
     const started = Date.now();
-    const { plan, written } = await runHauspireImport(prisma, { studioId: studio.id, rows, dryRun, poolTeam });
+    const { plan, written } = await runHauspireImport(prisma, { studioId: studio.id, rows, dryRun, poolTeam, source, previous, replace });
     console.log(formatReport(plan.report, { studio: `${studio.tradeName} (${slug})`, dryRun, poolTeam: poolTeam?.name ?? null }));
+    // Which quotations, by name: the counts above say how many, this says which (31 Oct 2026).
+    const words = { create: 'new', update: 'updated', 'edited-here': 'edited here, kept' } as const;
+    const listed = plan.quotes.filter((q) => q.action !== 'same');
+    if (listed.length) console.log('\nBy quotation');
+    for (const q of listed) {
+      const rupees = `₹${Math.round(q.mapped.totals.beforeTaxPaise / 100).toLocaleString('en-IN')}`;
+      console.log(`  ${words[q.action as keyof typeof words].padEnd(18)} ${q.mapped.number.padEnd(9)} ${q.mapped.client.slice(0, 28).padEnd(28)} ${rupees.padStart(12)}  ${q.mapped.savedAt?.slice(0, 10) ?? ''}`);
+    }
     if (!written) {
       console.log('\nDry run: nothing was written. Run again without --dry-run to import.');
       return;
