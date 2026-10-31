@@ -109,9 +109,9 @@ export interface Written {
  * itself, however slow (31 Oct 2026: one start time for the whole run made
  * the later rows of a 10-second run look edited).
  */
-async function stampImported(tx: Prisma.TransactionClient, quoteId: string): Promise<void> {
+async function stampImported(tx: Prisma.TransactionClient, studioId: string, quoteId: string): Promise<void> {
   const at = new Date();
-  await tx.studioQuote.update({ where: { id: quoteId }, data: { importedAt: at, updatedAt: at } });
+  await tx.studioQuote.updateMany({ where: { id: quoteId, studioId }, data: { importedAt: at, updatedAt: at } });
 }
 
 export async function runHauspireImport(
@@ -179,7 +179,7 @@ export async function runHauspireImport(
             data: { ...termsData(q.mapped), ...clientData(q.mapped), ...(clientId ? { clientId } : {}), importedAt: now, lines: { create: linesData(q.mapped.lines) } },
           });
           await addRevisions(tx, studioId, q.existingId, [q.mapped], { advance, phases, source });
-          await stampImported(tx, q.existingId);
+          await stampImported(tx, studioId, q.existingId);
           written.quotesUpdated += 1;
           written.revisions += 1;
           return;
@@ -226,7 +226,7 @@ export async function runHauspireImport(
             },
           });
         }
-        await stampImported(tx, created.id);
+        await stampImported(tx, studioId, created.id);
         written.quotesCreated += 1;
       });
     } catch (error) {
