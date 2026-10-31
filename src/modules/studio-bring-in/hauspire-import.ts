@@ -17,12 +17,18 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 import { computeTotals } from '@/modules/studio-quote/pricing';
 import { readPhases } from '@/modules/studio/payment-phases';
 import type { RevisionLine, RevisionTerms, RevisionTotals } from '@/modules/studio-sales/revision-rules';
-import type { MappedLine, MappedQuote, SourceQuote } from './hauspire-map';
+import { mapQuote, type MappedLine, type MappedQuote, type SourceQuote } from './hauspire-map';
 import { contentKey, IMPORTED_PREFIX, planImport, SOURCE_NOTE, type ExistingClient, type ExistingQuote, type ImportPlan } from './hauspire-import-plan';
 
 export const AUDIT_ACTION = 'studio.import.hauspireQuotes';
 const BY = 'scripts/import-hauspire-quotes.ts';
-const SENT_BY = 'Hauspire quotation app';
+/**
+ * Where the rows came from, as people read it on the lead, its timeline and
+ * each revision. The Hauspire quotation app by default; Hauspire's older
+ * Excel quotations come through the same import as rows shaped like the
+ * app's (owner, 30 Oct 2026), and must not say they came from the app.
+ */
+export const DEFAULT_SOURCE = 'Hauspire quotation app';
 
 type Db = PrismaClient;
 type Tx = Prisma.TransactionClient;
@@ -97,14 +103,27 @@ export interface Written {
 }
 
 /** Plan, and unless it is a dry run, write. */
+/**
+ * The row's own import time, written last so it equals the row's last change:
+ * "edited here" (updatedAt past importedAt) is then never tripped by the run
+ * itself, however slow (31 Oct 2026: one start time for the whole run made
+ * the later rows of a 10-second run look edited).
+ */
+async function stampImported(tx: Prisma.TransactionClient, quoteId: string): Promise<void> {
+  const at = new Date();
+  await tx.studioQuote.update({ where: { id: quoteId }, data: { importedAt: at, updatedAt: at } });
+}
+
 export async function runHauspireImport(
   db: Db,
-  input: { studioId: string; rows: readonly SourceQuote[]; dryRun: boolean; poolTeam: PoolTeam | null; now?: Date },
+  input: { studioId: string; rows: readonly SourceQuote[]; dryRun: boolean; poolTeam: PoolTeam | null; now?: Date; source?: string; previous?: readonly SourceQuote[]; replace?: readonly string[] },
 ): Promise<{ plan: ImportPlan; written: Written | null }> {
   const { studioId, dryRun, poolTeam } = input;
+  const source = input.source?.trim() || DEFAULT_SOURCE;
   const now = input.now ?? new Date();
   const { existing, clients } = await loadExisting(db, studioId);
-  const plan = planImport({ rows: input.rows, existing, clients });
+  const previous = input.previous ? new Map(input.previous.map((r) => [r.id, contentKey(mapQuote(r))])) : undefined;
+  const plan = planImport({ rows: input.rows, existing, clients, previous, replace: input.replace ? new Set(input.replace) : undefined });
   if (dryRun) return { plan, written: null };
 
   const studio = await db.studio.findUnique({ where: { id: studioId }, select: { paymentPhases: true, branding: { select: { welcomeNote: true, terms: true, bookingAdvancePaise: true } } } });
@@ -133,7 +152,7 @@ export async function runHauspireImport(
         locality: c.locality,
         config: c.config,
         source: 'OTHER',
-        sourceNote: SOURCE_NOTE,
+        sourceNote: source === DEFAULT_SOURCE ? SOURCE_NOTE : `From ${source}`,
         poolTeamId: poolTeam?.memberId ?? null,
         importedFrom: 'hauspire-quotes',
         externalId: c.key.slice(0, 190),
@@ -157,9 +176,10 @@ export async function runHauspireImport(
           await tx.studioQuoteLine.deleteMany({ where: { quoteId: q.existingId } });
           await tx.studioQuote.update({
             where: { id: q.existingId },
-            data: { ...termsData(q.mapped), ...clientData(q.mapped), importedAt: now, lines: { create: linesData(q.mapped.lines) } },
+            data: { ...termsData(q.mapped), ...clientData(q.mapped), ...(clientId ? { clientId } : {}), importedAt: now, lines: { create: linesData(q.mapped.lines) } },
           });
-          await addRevisions(tx, studioId, q.existingId, [q.mapped], { advance, phases });
+          await addRevisions(tx, studioId, q.existingId, [q.mapped], { advance, phases, source });
+          await stampImported(tx, q.existingId);
           written.quotesUpdated += 1;
           written.revisions += 1;
           return;
@@ -192,7 +212,7 @@ export async function runHauspireImport(
         });
         ourIdOfSource.set(q.mapped.sourceId, created.id);
         /* Every save the old app kept, then the quotation as it stands: R1, R2… — what the client was sent. */
-        written.revisions += await addRevisions(tx, studioId, created.id, [...q.earlier, q.mapped], { advance, phases });
+        written.revisions += await addRevisions(tx, studioId, created.id, [...q.earlier, q.mapped], { advance, phases, source });
         if (clientId) {
           await tx.studioClientEvent.create({
             data: {
@@ -200,12 +220,13 @@ export async function runHauspireImport(
               clientId,
               kind: 'QUOTED',
               actor: 'SYSTEM',
-              byName: SENT_BY,
-              summary: `Quotation ${created.number} imported from the Hauspire quotation app${number !== wanted ? ` (its number there: ${q.mapped.number})` : ''}`,
+              byName: source,
+              summary: `Quotation ${created.number} imported from ${source === DEFAULT_SOURCE ? 'the Hauspire quotation app' : source}${number !== wanted ? ` (its number there: ${q.mapped.number})` : ''}`,
               meta: { quoteId: created.id, hauspireImport: true, sourceNumber: q.mapped.number } as Prisma.InputJsonValue,
             },
           });
         }
+        await stampImported(tx, created.id);
         written.quotesCreated += 1;
       });
     } catch (error) {
@@ -278,7 +299,7 @@ function linesData(lines: readonly MappedLine[]) {
 }
 
 /** Frozen revisions in the shape revisions.ts keeps, numbered after any the quotation has. */
-async function addRevisions(tx: Tx, studioId: string, quoteId: string, versions: readonly MappedQuote[], ctx: { advance: bigint; phases: { label: string; pct: number }[] | null }): Promise<number> {
+async function addRevisions(tx: Tx, studioId: string, quoteId: string, versions: readonly MappedQuote[], ctx: { advance: bigint; phases: { label: string; pct: number }[] | null; source: string }): Promise<number> {
   const last = await tx.studioQuoteRevision.findFirst({ where: { studioId, quoteId }, orderBy: { n: 'desc' }, select: { n: true } });
   let n = last?.n ?? 0;
   for (const v of versions) {
@@ -297,7 +318,7 @@ async function addRevisions(tx: Tx, studioId: string, quoteId: string, versions:
         totalPaise: BigInt(t.totalPaise),
         totals: totals as unknown as Prisma.InputJsonValue,
         sentAt: v.savedAt ? new Date(v.savedAt) : new Date(),
-        sentByName: SENT_BY,
+        sentByName: ctx.source,
       },
     });
   }
