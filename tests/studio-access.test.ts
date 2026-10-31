@@ -286,10 +286,11 @@ describe('the tracker writers (tracker-store.ts)', () => {
     as('u-acc');
     await projectsForStudio();
     const wheres = ops('homeProject.findMany').map((c) => (c.args as { where: unknown }).where);
+    // A deleted project is in no list (tests/deleted-projects-hidden.test.ts).
     expect(wheres).toEqual([
-      { introduction: { studioId: 's1' }, team: { some: { memberId: 'm-sup' } } },
-      { introduction: { studioId: 's1' } },
-      { id: { in: [] } },
+      { introduction: { studioId: 's1' }, team: { some: { memberId: 'm-sup' } }, cancelledAt: null },
+      { introduction: { studioId: 's1' }, cancelledAt: null },
+      { id: { in: [] }, cancelledAt: null },
     ]);
   });
 });

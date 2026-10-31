@@ -54,6 +54,9 @@ describe('whose lead', () => {
     expect(matchClient({ phone: null, client: 'test client b', location: 'Testnagar' }, clients)).toEqual({ id: 'c-name', how: 'name+location' });
     expect(matchClient({ phone: null, client: 'test client b', location: 'Pune' }, clients)).toEqual({ id: 'c-name', how: 'name+location' });
     expect(matchClient({ phone: null, client: 'test client b', location: 'Otherplace' }, clients)).toEqual({ id: null, why: 'none' });
+    // A mobile on the quotation and another on the lead: not the same client (31 Oct 2026).
+    expect(matchClient({ phone: '9930700000', client: 'Someone Else', location: 'Pune' }, clients)).toEqual({ id: null, why: 'none' });
+    expect(matchClient({ phone: '9930700000', client: 'test client b', location: 'Pune' }, clients)).toEqual({ id: 'c-name', how: 'name+location' });
   });
   it('more than one lead: ambiguous, never a guess', () => {
     expect(matchClient({ phone: '9876500009', client: 'Twin Name', location: 'Testnagar' }, clients)).toEqual({ id: null, why: 'ambiguous' });
@@ -137,6 +140,25 @@ describe('idempotent: run it again', () => {
     expect(p.quotes[0]!.action).toBe('edited-here');
     expect(formatReport(p.report, { studio: 'Test Studio (test)', dryRun: true, poolTeam: null })).toMatch(/changed there AND edited here \(ours kept\)\s+1/);
   });
+  it('--replace: a number the owner names is updated though edited here, and moves to the lead its mobile matches (31 Oct 2026)', () => {
+    const moved = row('s1', { mobile: '+91 98765 00001' });
+    const edited = { ...base, content: 'older', updatedAt: new Date('2026-10-23T09:00:00Z') };
+    const p = planImport({ rows: [moved], existing: [edited], clients, replace: new Set([mapQuote(moved).number]) });
+    expect(p.quotes[0]!.action).toBe('update');
+    expect(p.quotes[0]!.client).toEqual({ kind: 'existing', id: 'c-phone', how: 'phone' });
+    expect(p.quotes[0]!.movedFrom).toBe('c-kept');
+    // Never the quotation a live project was signed on, named or not (review, 31 Oct 2026).
+    expect(planImport({ rows: [moved], existing: [{ ...edited, signed: true }], clients, replace: new Set([mapQuote(moved).number]) }).quotes[0]!.action).toBe('edited-here');
+    expect(planImport({ rows: [moved], existing: [{ ...base, content: 'older', signed: true }], clients, previous: new Map([['s1', 'older']]) }).quotes[0]!.action).toBe('edited-here');
+    const kept = planImport({ rows: [moved], existing: [edited], clients, replace: new Set(['other']) });
+    expect(kept.quotes[0]!.action).toBe('edited-here');
+    expect(kept.quotes[0]!.client).toEqual({ kind: 'existing', id: 'c-kept', how: 'already' });
+  });
+  it('with the earlier file: untouched content is updated whatever the clock says (31 Oct 2026)', () => {
+    const late = { ...base, content: 'older', updatedAt: new Date('2026-10-23T09:00:00Z') };
+    expect(planImport({ rows: [r], existing: [late], clients, previous: new Map([['s1', 'older']]) }).quotes[0]!.action).toBe('update');
+    expect(planImport({ rows: [r], existing: [late], clients, previous: new Map([['s1', 'what was imported']]) }).quotes[0]!.action).toBe('edited-here');
+  });
 });
 
 describe('the report (fake sample)', () => {
@@ -179,6 +201,7 @@ describe('a dry run writes nothing', () => {
     const db = {
       studioQuote: { findMany: async () => [], create: refuse, update: refuse },
       studioClient: { findMany: async () => clients, create: refuse },
+      homeProject: { findMany: async () => [] },
       auditLog: { create: refuse },
       $transaction: refuse,
     } as unknown as Parameters<typeof runHauspireImport>[0];

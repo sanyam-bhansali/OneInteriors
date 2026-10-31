@@ -164,7 +164,7 @@ export async function projectsForStudio(now = new Date()): Promise<StudioProject
   const member = await currentMember();
   if (!member) return [];
   const projects = await prisma.homeProject.findMany({
-    where: projectsVisibleTo(member),
+    where: { ...projectsVisibleTo(member), cancelledAt: null },
     orderBy: { startOn: 'desc' },
     include: {
       introduction: { select: { brief: { select: { propertyType: true, locality: true, society: true } } } },

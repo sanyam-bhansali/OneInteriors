@@ -344,6 +344,12 @@ export interface PlanPreview {
 export async function planPreview(input: { quote: QuoteChoice; config?: unknown }, now = new Date()): Promise<{ ok: true; preview: PlanPreview } | { ok: false; error: string }> {
   const m = await bringInMember();
   if (!m.ok) return m;
+  return planPreviewAs(m.member, input, now);
+}
+
+/** `planPreview` for a member found another way (scripts/bring-in-hauspire-projects.ts); the caller has checked `project.bringIn`. */
+export async function planPreviewAs(member: StudioMemberRef, input: { quote: QuoteChoice; config?: unknown }, now = new Date()): Promise<{ ok: true; preview: PlanPreview } | { ok: false; error: string }> {
+  const m = { member };
   const resolved = await resolveQuote(m.member.studioId, input.quote);
   if (!resolved.ok) return resolved;
   const amounts = scheduleAmounts(resolved.schedule, resolved.contractPaise);
@@ -443,9 +449,24 @@ export type BringInResult = { ok: true; projectId: string; invitedBy: string[]; 
 export async function bringIn(input: BringInInput, now = new Date()): Promise<BringInResult> {
   const m = await bringInMember();
   if (!m.ok) return m;
-  const { member } = m;
+  return bringInAs(m.member, await actingMember(), input, now);
+}
+
+/**
+ * `bringIn` for a member found another way: the owner's sheet of running
+ * projects (scripts/bring-in-hauspire-projects.ts, 30 Oct 2026). The caller
+ * has checked `project.bringIn`; `by` names them on the timelines; `tx`
+ * may give the transaction longer.
+ */
+export async function bringInAs(
+  member: StudioMemberRef,
+  by: { id: string; name: string } | null,
+  input: BringInInput,
+  now = new Date(),
+  /** A longer transaction for a script on a slow connection (31 Oct 2026: three of 25 passed the 30 s); the page keeps PLAN_TX. */
+  tx: { maxWait: number; timeout: number } = PLAN_TX,
+): Promise<BringInResult> {
   const studioId = member.studioId;
-  const by = await actingMember();
   const today = istDay(now);
 
   if (!isBringInPhase(input.phase)) return { ok: false, error: 'Say where the project is now: design, execution, snags or warranty.' };
@@ -661,7 +682,7 @@ export async function bringIn(input: BringInInput, now = new Date()): Promise<Br
           });
         },
       });
-    }, PLAN_TX);
+    }, tx);
 
     let invitedBy: string[] = [];
     const invite = await prisma.homeProjectInvite.findUnique({ where: { code }, select: { phone: true, email: true, name: true } });

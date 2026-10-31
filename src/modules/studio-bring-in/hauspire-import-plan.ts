@@ -88,6 +88,12 @@ export interface ExistingQuote {
   updatedAt: Date;
   /** `contentKey` of our copy as it stands. */
   content: string;
+  /**
+   * A live project was signed on it (its sales final or design final): never
+   * rewritten from the source, whatever `--previous` or `--replace` say
+   * (review, 31 Oct 2026). A change after signing is the project's to make.
+   */
+  signed?: boolean;
 }
 
 export interface ExistingClient {
@@ -125,6 +131,8 @@ export interface QuotePlan {
   /** For a Design Final: the source row id of its Sales Final, when the old app has one. */
   salesSourceId: string | null;
   existingId: string | null;
+  /** `--replace` moved it off this lead, to the one its mobile matches. */
+  movedFrom?: string;
 }
 
 export interface Unreadable {
@@ -192,7 +200,11 @@ export function matchClient(m: Pick<MappedQuote, 'phone' | 'client' | 'location'
   const name = textKey(m.client);
   const place = textKey(m.location);
   if (!name) return { id: null, why: 'none' };
-  const hits = clients.filter((c) => textKey(c.name) === name && Boolean(place) && (textKey(c.locality) === place || textKey(c.city) === place));
+  /* Never a lead whose own mobile is another number (31 Oct 2026: "Mr Yogesh" in Pune, mobile …1323, went onto a
+     lead "Yogesh" in Pune with …4609). With a mobile and no lead on it, the client is new. */
+  const hits = clients.filter(
+    (c) => textKey(c.name) === name && Boolean(place) && (textKey(c.locality) === place || textKey(c.city) === place) && !(phone && phoneKey(c.phone) && phoneKey(c.phone) !== phone),
+  );
   if (hits.length === 1) return { id: hits[0]!.id, how: 'name+location' };
   return { id: null, why: hits.length > 1 ? 'ambiguous' : 'none' };
 }
@@ -209,7 +221,27 @@ function unreadableReason(r: SourceQuote): string | null {
   return null;
 }
 
-export function planImport(input: { rows: readonly SourceQuote[]; existing: readonly ExistingQuote[]; clients: readonly ExistingClient[] }): ImportPlan {
+/**
+ * `previous`: source id → `contentKey` of what an earlier run imported (the
+ * file that run read). When given for a row, "edited here" means our copy no
+ * longer says that — not the clock, which a slow earlier run could trip
+ * (31 Oct 2026: a 10-second run stamped one start time on every row, so the
+ * later rows looked edited).
+ */
+export function planImport(input: {
+  rows: readonly SourceQuote[];
+  existing: readonly ExistingQuote[];
+  clients: readonly ExistingClient[];
+  previous?: ReadonlyMap<string, string>;
+  /**
+   * Quotation numbers the owner says to take from the source even though
+   * ours changed here (31 Oct 2026: projects brought in on an older save,
+   * deleted to be remade on the agreed one). Such a quotation also moves to
+   * the lead its mobile now matches, when that is another lead (2523: saved
+   * first with Anshu's mobile, then Chetan Joshi's).
+   */
+  replace?: ReadonlySet<string>;
+}): ImportPlan {
   const byKey = new Map(input.existing.map((e) => [e.importedFrom, e]));
   const report: ImportReport = {
     rows: input.rows.length,
@@ -275,13 +307,21 @@ export function planImport(input: { rows: readonly SourceQuote[]; existing: read
     let action: QuoteAction = 'create';
     if (prior) {
       const changedThere = prior.content !== contentKey(mapped);
-      const editedHere = prior.importedAt ? prior.updatedAt.getTime() - prior.importedAt.getTime() > EDITED_AFTER_MS : true;
-      action = !changedThere ? 'same' : editedHere ? 'edited-here' : 'update';
+      const before = input.previous?.get(top.id);
+      const editedHere = before !== undefined ? prior.content !== before : prior.importedAt ? prior.updatedAt.getTime() - prior.importedAt.getTime() > EDITED_AFTER_MS : true;
+      /* --replace names Sales Finals: a Design Final of the same number is ours (2379-D), not the one named. */
+      const replaced = mapped.stage === 'sales' && Boolean(input.replace?.has(mapped.number));
+      action = !changedThere ? 'same' : prior.signed || (editedHere && !replaced) ? 'edited-here' : 'update';
     }
     report.byAction[action] += 1;
 
     let client: ClientRef;
-    if (prior?.clientId) {
+    const moved = prior?.clientId && action === 'update' && mapped.stage === 'sales' && input.replace?.has(mapped.number) ? matchClient(mapped, input.clients) : null;
+    const movedFrom = moved && moved.id !== null && moved.how === 'phone' && moved.id !== prior!.clientId ? prior!.clientId! : undefined;
+    if (movedFrom && moved && moved.id !== null) {
+      client = { kind: 'existing', id: moved.id, how: 'phone' };
+      report.clients.byPhone += 1;
+    } else if (prior?.clientId) {
       client = { kind: 'existing', id: prior.clientId, how: 'already' };
       report.clients.already += 1;
     } else {
@@ -306,6 +346,7 @@ export function planImport(input: { rows: readonly SourceQuote[]; existing: read
       client,
       salesSourceId: mapped.stage === 'design' ? (salesByNumber.get(numberOf(top)) ?? null) : null,
       existingId: prior?.id ?? null,
+      ...(movedFrom ? { movedFrom } : {}),
     });
   }
 

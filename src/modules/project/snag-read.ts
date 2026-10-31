@@ -234,7 +234,7 @@ export async function siteSnagList(now = new Date()): Promise<SiteSnag[]> {
   const member = await currentMember();
   if (!member) return [];
   const projects = await prisma.homeProject.findMany({
-    where: { AND: [projectsVisibleTo(member), { snags: { some: { status: 'OPEN' } } }] },
+    where: { AND: [projectsVisibleTo(member), { cancelledAt: null, snags: { some: { status: 'OPEN' } } }] },
     select: { ...PROJECT_FOR_SITE, snags: { where: { status: 'OPEN' }, take: 100, select: SNAG_SELECT } },
     take: 50,
   });

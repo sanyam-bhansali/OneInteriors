@@ -1,342 +1,393 @@
 # One Interiors — handover
 
-**Rewritten 29 September 2026 against `main` at `73a4a15`. Read this first,
+**Rewritten 30 October 2026 against `main` at `160feff`. Read this first,
 then `CONTRIBUTING.md`. Trust this file and the code over `README.md`, which
 still describes v0.1.**
 
 This file brings a new assistant up to speed on a codebase and a
-decision-history that is larger than any one conversation. It is deliberately
-opinionated: it records *why* things are the way they are, because almost every
-mistake made on this project so far came from not knowing the why and doing the
-locally-sensible thing.
+decision-history that is larger than any one conversation. It records *why*
+things are the way they are, because almost every mistake made on this project
+so far came from not knowing the why and doing the locally-sensible thing.
 
-The previous version was written on 17 September. Three weeks of work landed
-after it — the host split, the Leads section, the onboarding rebuild, rates read
-from a studio's own quotations, the quotation builder rebuild, the studio
-agreement and the demo — and it had drifted far enough to mislead. §11 lists
-the docs that are still behind.
+The previous version (29 Sep) described a marketplace with a pilot CRM beside
+it. October turned the studio side into a full practice-management system that
+Hauspire Luxury Design Studio runs every project on, and added a native phone
+app for customers. §12 lists which docs are still behind.
 
 ---
 
 ## 1. What the business is
 
-**One Interiors** is a curated interior-design marketplace for **Pune, India**,
-and the practice software the studios on it run their business on.
+**One Interiors** is two things for **Pune, India**, in one codebase:
 
-A homeowner answers a nine-question brief, gets a reasoned match against a
-roster of verified studios, sees a first quote priced from each studio's own
-filed rates, compares them, and talks it through with our expert, who then
-introduces them to the studio they pick.
+1. **A curated interior-design marketplace.** A homeowner answers a brief, gets
+   a reasoned match against verified studios, sees a first quote priced from
+   each studio's own rates, compares, and books a call with our expert, who
+   introduces them to the studio they pick. After signing, they follow the
+   project in our app. **Built, not yet open to the public** (§6).
+2. **The software a studio runs its practice on** — leads, quotations, design,
+   execution, site crews, payments, documents, meetings. **Live** at
+   `studio.oneinteriors.in`, used daily by Hauspire since 22 Oct (§3).
 
-### The customer journey has names
+The bet: the marketplace alone has a retention problem (a studio that gets no
+lead this month has no reason to open us). A studio that quotes, designs and
+builds inside our software does not churn when a month goes by without an
+introduction — and the delivery record that software produces is what makes
+the marketplace's verification real.
 
-`src/modules/brief/journey.ts` is the single source:
+### The owner, and the reference products
 
-| Step | Route | What happens |
-|---|---|---|
-| **OneBrief** | `/quiz` | Nine questions. The tier (Essential / Premium / Luxury) is chosen *inside* the budget question — there used to be a separate `/tier` step and it was the same question twice |
-| **OneMatch** | `/match` | Ranked studios with the reasoning shown |
-| **OneQuote** | inside `/match` and `/studios/[slug]` | A first quote from the studio's filed rates |
-| **OneCompare** | `/compare` | Side by side, line by line, materials under every price |
-| **OneExpert** | `/expert` | A 30-minute call; ops then makes the introduction |
+The owner (Sanyam) also runs **Hauspire Luxury Design Studio** and
+**AxLeads** (`axleads.axgen.co`, the lead CRM Hauspire used before; the owner
+sometimes calls it "Action CRM"). Hauspire is the first and, for now, only
+studio on the full software. Two of the owner's own apps are the bar for
+parity: AxLeads for leads, and the **Hauspire Quotation Studio**
+(hauspire-quotation-app.vercel.app) for quotations.
 
-It was called "OneQuiz" in older decks and in the design-system folder. It is
-**OneBrief**. The `One` prefix is a placeholder until the brand is settled and
-is defined once in `journey.ts`.
-
-### Three products, three hostnames, one app
+### Three hostnames, one app
 
 Split by `Host` header in `src/lib/host.ts` (pure, tested in
 `tests/host-routing.test.ts`), applied by `src/middleware.ts`:
 
 | Host | Serves | Everything else |
 |---|---|---|
-| `STUDIO_HOST` | `/` → `/studio`, plus `/studio/**` and `/apply/**` | real 404 |
-| `OPS_HOST` | `/` → `/ops`, plus `/ops/**` | real 404 |
-| `PUBLIC_HOST` | the customer journey | `/studio`, `/ops` 404 |
-| unset / unrecognised (local, Vercel previews) | everything | — |
+| `STUDIO_HOST` (studio.oneinteriors.in) | `/` → `/studio`, `/studio/**`, `/apply/**`, `/studio-sign-in` | real 404 |
+| `OPS_HOST` | `/` → `/ops`, `/ops/**` (no cookie → `/sign-in`) | real 404 |
+| `PUBLIC_HOST` | the customer side, while `CUSTOMER_LIVE=1` | `/studio`, `/ops`, `/studio-sign-in` 404 |
+| unset / unknown (local, `*.vercel.app` previews) | everything | only the customer gate applies |
 
-Always reachable on every host: `/api`, `/auth`, `/sign-in`, `/set-password`,
-`/f` (studio enquiry forms), `/_next`, favicon, robots, sitemap.
+Always reachable: `/api`, `/auth`, `/r` (referral redirect), `/call` (a booked
+call's private link), `/sign-in`, `/set-password`, `/f` (studio enquiry forms),
+`/privacy`, `/_next`, favicon, robots, sitemap. `/studio/sign-in` is rewritten
+to `/studio-sign-in`. A hidden path answers a **real 404 status**, not a 200
+with a 404 page — that was a bug once.
 
-**The customer side is closed.** While `CUSTOMER_LIVE !== '1'`, the customer
-app (`/quiz /tier /match /compare /expert /prepare /account /quotes /shared`)
-and the public pages (`/studios`, `/verification`) redirect to `/`. In
-production the apex domain is a **separate Vercel project** — the waitlist
-landing page — which posts signups to this app's `POST /api/waitlist`
-(bearer `WAITLIST_INGEST_TOKEN`; 503 if the token is unset, 401 if wrong).
-Signups land in `waitlist_signups` and show at `/ops/waitlist`.
-
-A hidden path answers a **real 404** (a rewrite to `/404` with
-`status: 404`), not a 200 with a 404 page. That was a bug once.
+**The bare `oneinteriors.in` is a separate Vercel project** — the waitlist page
+(source outside this repo, in the owner's Downloads). It posts to this app's
+`/api/waitlist` with bearer `WAITLIST_INGEST_TOKEN`. Pune launches at **2,000
+real signups**; the rules (referral ladder, society unlocks, the count hidden
+below 100) live in `src/modules/waitlist/queue.ts` and the page only displays
+what the product returns. An earlier fake count of 412 must never come back.
 
 ### The rules that are the whole brand
 
-**Unmeasured is not zero.** Anywhere the product makes a claim about a studio —
-match score, delivery variance, dispute count — a missing value renders as "not
-enough data yet", never as a favourable default. The matching engine returns
-`null` for unmeasurable factors and normalises over measured weight only, so a
-cold-start studio shows "matched on 4 of 6 factors" rather than a fabricated
-94%. Enforced in `score.ts`, covered by tests. Do not soften this.
-
-**Verification, not volume.** Every claim about a studio is backed by a
-`VerificationCheck` row with a source and a date. There is no hardcoded badge.
-
-**No fabricated social proof.** FUTURE-SCOPE lists it under "never". Note that
-the landing page currently breaks this — see §10.
-
-**v1 does not hold client funds.** We author the milestone plan, verify each
-stage against site photographs, and publish the variance. The customer pays the
-studio directly. Escrow is a later phase and **no copy anywhere may imply
-otherwise**. See `docs/FUTURE-SCOPE.md`.
-
-**Never describe getting a quote as *requesting* one.** The first quote is
-priced from filed rates in seconds; no studio is asked and nobody is phoned.
-"Request a quote" is what every lead-gen competitor says and it means *we will
-pass on your number*. Every CTA says **get** or **find**.
+- **Unmeasured is not zero.** A missing value renders as "not enough data
+  yet", never as a favourable default. The matching engine returns `null` for
+  unmeasurable factors and normalises over measured weight only. Enforced in
+  `modules/matching/score.ts`, covered by tests. Do not soften this.
+- **Verification, not volume.** Every claim about a studio is backed by a
+  `VerificationCheck` row with a source and a date. No hardcoded badge.
+- **No fabricated social proof** and no invented counts or urgency anywhere
+  (CCPA dark-pattern rules apply to the waitlist too).
+- **v1 does not hold client funds.** The customer pays the studio directly.
+  Escrow is a later phase and **no copy anywhere may imply otherwise**.
+- **Never "request" a quote.** The first quote is priced from the studio's
+  rates in seconds; every CTA says **get** or **find**.
+- **Customers never get WhatsApp from us.** Notices go by app push, else email
+  (`modules/notify/service.ts`). Studio staff may get WhatsApp.
+- **Easy, not automatic** (owner, 12 Oct). The studio software records what
+  people decide; it never decides for them. Nothing moves, assigns or ticks by
+  itself; automatic help is an optional button. The salesperson still asks for
+  the floor plan on WhatsApp and attaches it; the salesperson picks which
+  revision is the sales final.
 
 ---
 
-## 2. The strategic shift — the studio software
-
-The marketplace alone has a retention problem. A studio that stops getting
-leads from us has no reason to open our website again. So One Interiors is also
-**the software a studio runs its practice on** — used daily, for work that has
-nothing to do with us. Leads we send and leads they found themselves live in
-the same list. The bet is that a studio that quotes and tracks its clients
-inside our software does not churn when a month goes by without an
-introduction.
-
-### The instruction that governs all of this
-
-> *"we want a proper consolidated software where they can manage everything at
-> one place"*
-
-**One login. One app. `/studio/**` inside this codebase.** The CRM was once
-split into a separate repo with an argument for it; the owner's response was
-*"this is nothing like what we discussed"*. **Do not propose splitting the
-studio software out again.**
-
-### The rail encodes the argument
-
-`src/app/studio/layout.tsx`:
-
-- **Dashboard**
-- **Your work** — Leads (children: Pool, Import, Analytics, Bin), Quotations,
-  Project tracker, Vendors
-- **From us** — Calendar, Your listing *(only once the studio is ACTIVE)*
-- **Settings**
-
-"Your work" is software a studio uses whether or not we ever send them a lead.
-"From us" is the marketplace. Putting them in one flat list would say they are
-the same kind of thing, and the retention case is that they are not. **Keep the
-grouping.**
-
-**Product master is not in the rail.** It is reached through the walkthrough
-(`modules/studio/guide.ts`), which takes a studio through it in the order the
-quotation builder needs it.
-
-### The pilot shows two things, not six
-
-`src/modules/studio/features.ts` → `STUDIO_FEATURES`. For the pilot only
-**Leads** and **Quotations** are open (plus Products and Settings, which the
-builder cannot work without). Projects, Vendors, Calendar and Listing are
-**fully built and switched off**: the rail item becomes a non-link "soon" pill
-and the route itself renders `ComingSoon` — a pill beside a working link is a
-sign on an unlocked door. Shipping one is flipping its boolean. Nothing was
-deleted.
-
-The reason: a pilot studio opens whatever is in the sidebar, finds the weakest
-screen, and judges the whole product by it.
-
-### When a studio gets what
-
-The lifecycle, and the one place each rule lives:
-
-1. **Apply** — `/apply` (pitch) → `/apply/start` (five-step form, draft kept in
-   `sessionStorage`, optional website lookup that pre-fills suggestions).
-   Writes a `StudioApplication`. `modules/studio/application.ts`.
-2. **Ops approves** — one transaction creates the `Studio` (`ONBOARDING`,
-   `UNVERIFIED`), upserts the `User` as `STUDIO`, the `StudioMember` as owner,
-   and an `AuditLog` row; then `provisionWorkspace()` writes the starter
-   catalogue and the six default pipeline stages, and a 7-day welcome link goes
-   to the studio host.
-3. **Onboarding** — five steps: profile, registration, portfolio, rates,
-   review (`onboarding-steps.ts`, pure). Completion is *derived from the data*
-   on every read by `assessSteps`; only the submission itself is stored. Locked
-   steps redirect server-side to the first incomplete one.
-4. **Submit for review** — the CRM opens **now**, not at approval. The rule is
-   `crmIsOpen()` in `modules/studio/standing.ts`. It is one pure function
-   because the rail once read its own copy of the rule and the dashboard
-   opened while the navigation did not.
-5. **Ops sets ACTIVE** — standing becomes `LISTED`, the "From us" group
-   appears, a `studio.approved` notification is written in the same
-   transaction, and the studio's `/f/[slug]` enquiry form goes live.
-
-### The commercial model, as of 26 Sep
-
-From the studio deck (`scripts/build-studio-deck.js`) and the agreement
-(`docs/STUDIO-AGREEMENT.md`):
-
-- **Commission: 5%** of contract value on introduced clients only. Falls due
-  once the studio has collected **20%** of the contract; billed monthly,
-  payable by the 10th; earned on signature, not refundable. Nothing on a
-  studio's own clients.
-- **Introduction tail: 12 months**, written as a payment obligation rather
-  than a non-compete (s.27 Contract Act).
-- **Subscription by band**, where a band is the studio's **rate per sq ft**,
-  not a project size: Essential ₹25,000/mo, Premium ₹49,000/mo, Luxury
-  ₹99,000/mo (`modules/studio/subscription.ts`). First three months at ₹1.
-  Subscription buys volume, never ranking position.
-- Guaranteed brief counts (8/16/30) were taken out of the pitch; they remain in
-  `subscription.ts` as an internal allocation target.
-- The agreement is **"DRAFT — NOT YET REVIEWED BY A LAWYER"**, and the
-  liability cap was removed on the owner's instruction.
-- Seat pricing is **not implemented** — there is no seat field anywhere.
-
-**Unresolved, flag rather than quietly pick a side:**
-
-- **Roster size.** `/apply` has said "eight studios, not eight hundred"; the
-  landing page says 14; the deck caps Pune at ~50; the pilot target was 150
-  studios in three months. The likely resolution — 150 on the *software*, a
-  small roster on the *marketplace* — has not been decided.
-- **Commission in code is 4%.** `PILOT_COMMISSION_BPS: 400` in
-  `src/lib/money.ts:139` (and asserted in `tests/money.test.ts`), against 5%
-  in the schema default and the agreement.
-- **Two band scales.** Customer quotes use ₹700–1,100 / 1,100–1,800 /
-  1,800–3,200 per sq ft (`modules/quotation/tiers.ts`); the studio deck uses
-  ₹1,200–1,500 / 1,500–2,500 / 2,500+ under the same names.
-
-### The reference product — AxLeads
-
-The owner runs **AxLeads** (`axleads.axgen.co`) for their own studio,
-Hauspire Luxury Design Studio (~21,500 leads). It is the bar for the CRM.
-
-| AxLeads feature | State in `/studio` |
-|---|---|
-| Configurable pipeline stages | **Built** |
-| Custom fields, group-by | **Built** |
-| Unassigned **Pool**, bulk assign | **Built** — `/studio/clients/pool`, badge on the rail, "Take all" on the board |
-| **Import CSV** | **Built** — CSV only (no `.xlsx`), duplicate phones skipped, lands in the pool, capped at 5,000 rows |
-| **Bin** — soft delete, restore, erase date | **Built** — but nothing erases at 30 days; there is no scheduler |
-| "Needs attention — no contact in 7+ days" | **Built** — `clients/NeedsAttention.tsx`, dashboard banner |
-| Analytics | **Partial** — `/studio/clients/analytics`; no contacted rate or time-to-first-contact |
-| Global search | **Partial** — the rail's "Find a client" searches clients only |
-| Team + seats, invites, suspend/remove | **Not built** — `team.ts` computes per-person counts; no page uses it |
-| Notifications page, Billing with invoices | **Not built** |
-| Connected sources (Meta) | **Not built** — substitutes: `/f/[slug]` enquiry form, and the introduction → board bridge (`studio-practice/bridge.ts`) |
-| EN / हिं, workspace switcher | **Not built** (a user belongs to one studio: `StudioMember.userId` is unique) |
-
-Also built in the Leads section: a timeline per client (`StudioClientEvent`),
-seven call outcomes that each write the next follow-up, saved views, merge of
-duplicates, drag between columns (moving into a `LOST` column asks for a
-reason), and a sample lead a new studio can take off the board.
-
-### Design direction — three palettes, each scoped, none global
-
-**`.oi-landing` / `.oi-app` — "Tactile Assurance", the locked customer
-palette.** Raw Silk `#EAE6DF` ground, Alabaster `#FCFCFA` cards, Deep Espresso
-`#2C2624` ink, Terracotta `#C0613C`, Muted Sage `#839073`, Hairline `#DBD5CB`.
-Instrument Serif for headlines, Instrument Sans for body and UI, IBM Plex Mono
-for **evidence only** — labels, money, quantities, specs, scores, never body
-copy. Squared corners except glass surfaces. `.oi-landing` is `/`; `.oi-app` is
-`/quiz`, `/match`, `/compare`, `/expert`, `/studios/[slug]`. The mechanics —
-glass grades, the three motions (Rise, Drawer, Count), contrast computed
-against the composite — are in `docs/DESIGN-LANGUAGE.md` and asserted in
-`tests/design-language.test.ts`.
-
-- **Quicksand** (`.oi-quick`) is layered on match, compare, expert, the studio
-  profile, `/apply`, `/f` and `/set-password`. It is *not* the locked pairing
-  and is pending approval (`src/app/layout.tsx`).
-- **Terracotta is for high-intent actions and attention flags only.** A
-  terracotta rule or hover state costs the primary button its meaning.
-- The spec lives in `One Interiors design system (1)/design_handoff_landing_page/LOCKED-DESIGN-DECISIONS.md`.
-  Palette A (beige/charcoal/deep terracotta/olive) is rejected.
-
-**`.studio-app` — the studio software, deep forest green** (since 26 Sep,
-commit `f5edcd9`). `--s-accent #16423C` on a `--s-ground #F9F8F6`, white
-cards on a hairline. Terracotta failed as text (3.5:1) and behind white
-(4.19:1); the green measures 9.95:1 as text and 11.18:1 as a button, so one
-token does both. The typefaces did not move — the mono-for-evidence rule is
-the most distinctive thing on those screens. (The previous sage `#dfe0d2`
-palette in older docs is gone.)
-
-**Older paper/petrol `@theme` tokens** still paint `/tier`, `/prepare`,
-`/account`, `/shared`, the `/studios` list, `/verification`, `not-found` and
-the ops console. Known inconsistency, not an oversight.
-
-**No dark mode on the studio surface, on purpose.** A `prefers-color-scheme:
-dark` block once repainted everything, so on any machine set to dark nobody saw
-the palette. It was removed along with `color-scheme: light` — without that
-the browser paints its *own* widgets dark on a light page. If dark mode is ever
-wanted, it is a separate design.
-
-Layout instruction, explicit: *"why is everypage so centered and clustered use
-the whole space"* — full-width, dense, no narrow centred columns on the studio
-and ops surfaces.
-
----
-
-## 3. Stack and where things live
+## 2. Stack and where things live
 
 - **Next.js 15.5.25**, App Router, React 19, TypeScript, Tailwind v4
-- **Prisma 6.19.3** + **Supabase Postgres** (`ap-south-1`, Pro)
-- **Vercel** (`bom1`), Node 22
-- Runtime connects via the **Supavisor pooler on :6543** (`DATABASE_URL`);
-  migrations use the **direct connection on :5432** (`DIRECT_URL`).
+- **Prisma 6.19.3** + **Supabase Postgres** (`ap-south-1`)
+- **Vercel** (`bom1`), Node 22. **Merging to `main` deploys production** —
+  in practice; CONTRIBUTING describes a release-branch flow that is not used.
+- **Expo** (SDK ~57, React Native, expo-router) for the customer phone app in
+  `mobile/`
+- Runtime DB via the **Supavisor pooler on :6543** (`DATABASE_URL`);
+  migrations via the **direct connection on :5432** (`DIRECT_URL`).
   Migrations through the pooler hang.
-- **Resend** for email (domain `oneinteriors.in` verified 19 Sep).
-  **Anthropic** for archive extraction, the match explanation and portfolio
-  drafts. **Google Places** for the application lookup. **Supabase Storage**:
-  five buckets, all reached server-side with `SUPABASE_SECRET_KEY` — four
-  private with 5-minute signed URLs, `portfolio-images` public.
+- **Resend** (email), **Anthropic** (raw `fetch`, no SDK — floor-plan and
+  quotation reading, match explanations, compare summary, inspiration photo,
+  portfolio drafts, GEIO), **Google Places** (application lookup),
+  **Supabase Storage** (§9), **Expo push**, **WhatsApp Cloud API** (studio
+  staff messages and customer OTP).
 
 ```
 src/
   app/            routes; may import from modules/
+    studio/       the studio software            (§3)
+    ops/          our console                    (§5)
+    app/          the customer app on the web    (§6)
+    api/          app/v1, cron, staff, studio, waitlist (§8)
   modules/        domain layer; may NEVER import from app/
   lib/            money.ts, prisma.ts, env.ts, host.ts, site.ts
-  data/           fixture studios, placeholder filed rates, localities
+  data/           fixture studios, placeholder rates, localities, style photos
+  components/     home/ (the v4 landing), oi/, ui/ …
+mobile/           Expo customer app; `@/` aliases the website's src/ for pure modules
 prisma/
-  schema.prisma   55 models, 41 enums
-  migrations/     40, hand-written or diffed offline, applied with `migrate deploy`
+  schema.prisma   120 models, 75 enums
+  migrations/     107, hand-written or diffed offline, applied with `migrate deploy`
   *.ts            guard-destructive, load-env, roster-check, seeds, unseed
-tests/            67 files, ~1,030 tests, Vitest
-scripts/          screenshots/, deck and agreement builders
-docs/             see §11
+scripts/          Hauspire setup/import scripts, quotation reading, decks, screenshots
+tests/            233 test files, ~4,030 tests, Vitest
+docs/             §12
 ```
 
 ### Running it
 
 ```
 npm run dev | build | lint | typecheck | test
-npm run db:deploy          # apply migrations
+npm run db:deploy          # apply migrations (the owner runs this on production)
 npm run roster:check       # read-only readiness count before going live
 npm run shots              # capture every screen (scripts/screenshots)
 ```
 
 **With no `DATABASE_URL` the app runs on fixtures** — eight invented studios in
-`src/data/studios.ts`, placeholder rates in `src/data/filed-rates.ts`. This is
-a first-class mode, not an error path, and it is what the demo runs on.
+`src/data/studios.ts`. First-class mode, not an error path; the demo and the
+CI build run on it.
 
-**`.env.local` in the main checkout holds the PRODUCTION connection string.**
-So `npm run db:migrate` would point `migrate dev` at the live database, and
-`migrate dev` offers to reset the schema when it finds drift. That was a near
-miss once. `prisma/guard-destructive.ts` refuses `migrate dev` and
-`migrate reset` against a non-local host; new migrations are generated offline
-with `prisma migrate diff`. `.env.development.local` forces fixtures mode for
-`npm run dev` — **do not delete it** (see `docs/DEMO-RUNBOOK.md`).
-
-**A fresh checkout or worktree has no `.env.local`**, so `npm ci` fails at
-`postinstall`: `prisma generate` loads `prisma.config.ts` → `prisma/load-env.ts`,
-which exits when `DATABASE_URL` is missing. Packages are still installed. Run
-generate with a dummy URL — it never connects:
+**A fresh worktree has no `.env.local`**, so `npm ci` fails at `postinstall`
+(`prisma generate` → `prisma/load-env.ts` exits without `DATABASE_URL`).
+Generate never connects, so a dummy URL is safe:
 
 ```bash
-DATABASE_URL=postgresql://x:x@localhost:5432/x npx prisma generate
+DATABASE_URL=postgresql://x:x@localhost:5432/x DIRECT_URL=postgresql://x:x@localhost:5432/x npm ci
 ```
 
-This is also why **GitHub CI has been red since 7 September** — see §10.
+CI does exactly this (`.github/workflows/ci.yml`) and has been **green since
+the end of September** — typecheck, lint, test, build on every PR and push.
+
+**`.env.local` in the main checkout holds the PRODUCTION connection string.**
+`prisma/guard-destructive.ts` refuses `migrate dev` / `migrate reset` against a
+non-local host; new migrations are generated offline with
+`prisma migrate diff`. `seed-studio.ts` has no such guard. `.env.development.local`
+in the main checkout forces fixtures mode for `npm run dev` — **do not delete
+it** (`docs/DEMO-RUNBOOK.md`).
+
+**End-to-end tests run on a throwaway PGlite database** in the session
+scratchpad, never on production and never on Hauspire's Supabase. There is no
+separate test Supabase project.
+
+---
+
+## 3. The studio software (`/studio/**`)
+
+### One login, one app — do not split it
+
+> *"we want a proper consolidated software where they can manage everything at
+> one place"*
+
+The CRM was once split into a separate repo; the owner's response was *"this
+is nothing like what we discussed"*. **Do not propose splitting the studio
+software out again.**
+
+### Plans: Solo, Pro, Max
+
+`src/modules/studio/software-plan.ts` — `SOLO | PRO | MAX`, stored in
+`Studio.softwarePlan` (default PRO), picked by ops on `/ops/[slug]`.
+`Studio.fullSoftware` is the older boolean, kept in step for one release;
+`planOf()` reads either.
+
+| Plan | Who | What |
+|---|---|---|
+| **Pro Solo** | one-person studio | Pro with one login: no team screen, no pool (`seatLimit` 1) |
+| **Pro** | every studio | Leads, Quotations, Product master, Settings, Today, Calendar; the owner can add salespeople |
+| **Max** | **Hauspire only** while it is tested | the full Studio OS: projects, design, documents, site, money, crews, team roles |
+
+### Navigation follows the role
+
+`src/app/studio/layout.tsx` picks the frame:
+
+- A studio **still in setup** (`crmIsOpen()` false) gets the old side rail
+  (`StudioShell.tsx`, built by `navFor()`).
+- Everyone else gets **`StudioFrame`, an app launcher** (`modules/studio/apps.ts`):
+  Today, Clients, Quotations, Projects, Documents, Site, Money, Vendors,
+  Calendar, From One Interiors, Product master, Team — with Ctrl K search.
+  `ROLE_APPS` orders them per role (SALES: clients, quotes, calendar, team;
+  DESIGNER: projects, documents, vendors, calendar; ACCOUNTS: money, vendors,
+  quotes, calendar; SUPERVISOR: site, calendar via `RoleFrame.tsx`; PM: most).
+- The look is the owner's own design (12 Oct, light/dark, Geist, app tiles).
+  Restyle to match it, but **never drop a feature or loosen a permission to
+  match a drawing**.
+
+### Where each gate lives — one rule, one place
+
+| Question | The one function |
+|---|---|
+| May this person open this screen? | `modules/studio/surfaces.ts` `mayOpen` (Solo, not-Max `FULL_SOFTWARE_PATHS`, per-role paths; unknown paths close) |
+| What does a closed door show? | `pilot.ts` `doorFor` + `PilotGate.tsx` ("coming soon") |
+| May this person do this action? | `roles.ts` `can()` — `GRANTS`, `FULL_SOFTWARE_ACTIONS`, `NEEDS_ASSIGNMENT` |
+| Which rows may they see? | `leadsWhereFor`, `poolVisibleTo`, `quotesVisibleTo`, `projectsVisibleTo` |
+| Is the CRM open yet? | `standing.ts` `crmIsOpen()` |
+| May they delete/restore a project? | `project-delete.ts` `mayDeleteProjects` — **owner only** (29 Oct) |
+
+Rule 13 in §10 is why: two copies of one rule drift.
+
+**`modules/studio/features.ts` is partly stale.** It still says
+`projects:false, calendar:false`, but those areas are now gated by plan and
+role. Only the `ready` flags in `navFor`, the appointments page and the listing
+still read it. Do not treat it as the switchboard.
+
+### Roles
+
+`StudioMember.role`: OWNER, SALES, DESIGNER, PM, ACCOUNTS, SUPERVISOR (the
+non-sales roles need Max). On top of SALES, **editable sales roles** (22 Oct,
+`studio/sales-access.ts`, `sales-permissions.ts`, `docs/studio-os/SALES-ROLES.md`):
+each lead permission has a **reach** — own, team or all — where "team" is
+everyone below a person in the `reportsToId` tree. Built-in roles Admin, Sales
+head, Sales rep. Team pools (`poolTeamId`): a lead source can route to a team's
+pool. A SALES member with no sales role keeps the Phase 1 rule (own leads + the
+studio pool). `lead.export` is the owner's alone. **Every lead read or write
+path must honour the reach.**
+
+**Design head** (`StudioMember.designHead`, Renuka at Hauspire): sees every
+designer's projects, workload and the Delays list; may start projects.
+**Designers see money** on their own projects (owner, 13 Oct — reversing an
+earlier rule). **A PM never sees crew money** — quantities only.
+
+**View as** (`studio/view-as.ts`, `docs/studio-os/VIEW-AS.md`): staff (the
+owner) can view a studio as one of its members — read only, two hours,
+audited; middleware refuses writes with 403. The owner is not on Hauspire's
+team and uses this instead.
+
+### Sign-in
+
+Phone + password for everyone at a studio (owner, 27 Oct, "for now", until the
+company is registered and WhatsApp templates are approved).
+`STUDIO_SIGN_IN=otp` in Vercel switches back to the WhatsApp code.
+The owner makes one-time passwords in Settings → Team; `mustChoosePassword`
+sends the person to `/studio/password`. Five wrong tries lock; 20 per IP per
+hour. **Never type a real person's password on production** — the owner signs
+people in.
+
+### The flow it is built for — Hauspire's
+
+From `docs/studio-os/PROJECT-LIFECYCLE.md` and the owner's 12 Oct description.
+Built for Hauspire first; configurable for other studios later.
+
+1. **Leads** from many sources land in the **pool**; owner/PM/heads assign,
+   salespeople can **claim**. One phone, one lead (`studio-practice/land.ts`).
+2. **First quote** — from the floor plan the client sent on WhatsApp
+   (`studio-quote/from-plan.ts` reads it with Claude), or built by hand.
+   **Quotation requests** go *in turns* to the people with `quotes.build`
+   (Quotations → To build; `quote-request-*.ts`, `QUOTE-REQUESTS.md`).
+3. **Office meeting**, revisions, then the salesperson marks the **sales
+   final** (`StudioQuote.salesFinalRevisionId`, compulsory handover notes,
+   category Essential/Premium/Luxe).
+4. **Booking**: sales final accepted + ₹25,000 token → `studio-sales/booking.ts`
+   → `project/own-project.ts` → `portal/plan-write.ts createSignedProject`. The
+   lead moves to the first WON column; the client gets the app. A refund is a
+   correction row and the project is cancelled, never deleted.
+5. **Design** — Hauspire's step template (`studio-design/template.ts`, 26 steps
+   incl. pre-execution, held in `Studio.designTemplate`), from the 24 Oct design
+   meeting. A 2BHK is the base; other sizes scale (`sizeFactor`). "Design done
+   in N days" scales the gaps. Steps waiting on a payment are **never counted
+   late** and re-date from the day the payment is recorded (`payment-redate.ts`).
+   A late step asks **whose delay** (client/us) and why (`delays.ts`,
+   `HomeStepDelay`, append-only); the client sees only days waiting on them, and
+   sees the steps but not the dates.
+6. **Design final** — `design-flow.ts makeDesignFinal` copies the signed
+   quotation; it is always compared line by line with the sales final
+   (`compare-lines.ts`, `final-doc.ts`).
+7. **Pre-execution** → **execution** — the PM owns the project from here. Step
+   tracker (`project/step-template.ts`, `docs/studio-workspace/STEP-TRACKER.md`):
+   weights sum to 100%, **a tick needs a photo and a sentence**. Designer and
+   supervisor both tick. Site mode at `/studio/site`.
+8. **Crews** = the site trades (carpenter, electrician, POP, painter…), **not**
+   material procurement, and **not** Hauspire's factory (owner: don't integrate
+   it). Paid by **running bills** — any amount up to the balance
+   (`studio-crews/*`, `HomeWorkOrder`, `HomeCrewPayment`). Orders reach a crew
+   by the studio sharing a link on its own WhatsApp; we send nothing.
+9. **Change orders** mid-project (`project/change-orders.ts`) — client approves
+   in the app, then pays. Each project was leaving ₹1.5–2 L unbilled.
+10. **Closure** (extra work + final payment, `project/closure.ts`) → **snags**
+    → client signs off the handover in the app → **warranty** (default 12
+    months, per studio).
+
+Phases (`ProjectPhase`): DESIGN → PRE_EXECUTION → EXECUTION → CLOSURE → SNAGS
+→ WARRANTY → CLOSED. They move **only** through `project/lifecycle-rules.ts
+movePhase` / `lifecycle.ts applyPhaseEvent`.
+
+Hauspire's payment stages, each paid at the start of its stage: booking
+₹25,000 → design advance 5% → design closure 10% (working drawings stay locked
+until paid) → material procurement 40% → material dispatch 40% → handover 5%.
+
+### What the client of a studio sees
+
+Through the customer app (`/app/*` on the web, `mobile/` on phones) and
+`modules/portal/*` (`customer-project-view.ts`, `lifecycle-view.ts`):
+current step, next step and the blocker they must clear; decisions with 2–6
+options (`project/decision-rules.ts`); **sign-offs** of three kinds —
+SALES_FINAL, AGREEMENT, DESIGN_FINAL (`project/signoff-rules.ts`). The
+agreement stays hidden until the studio asks them to sign; they tick "I agree"
+and type their name, or sign on paper at the office (filed as "Signed
+agreement (paper)"). **Documents** (`studio-design/documents.ts`): one list of
+types; names and versions are generated, never typed
+(`TYPE_Studio_Client_date_vX.Y`; approval makes the next whole number).
+
+**One customer projection, no internal field crosses it**
+(`tests/customer-projection*`). Delay notes, crew money and margins never reach
+the client.
+
+### Also built
+
+- **Leads at scale** (`studio-sales/*`, `LEADS-SCALE-BUILT.md`): list with
+  pagination, filters with counts, saved views, bulk assign/split, KPI cards,
+  board, stale review, analytics, bin (purged after 30 days by cron), timeline,
+  call outcomes, merge, custom fields, configurable stages.
+- **Lead intake** (`studio-intake/*`, `LEAD-INTAKE.md`): website forms
+  (`/api/studio/intake/[id]`, key in `x-oi-key`), Google Ads lead forms, Meta
+  lead ads (HMAC with `META_APP_SECRET`), with conversion feedback to Meta.
+- **AxLeads import** (`scripts/import-axleads.ts`, `studio-import-axleads/*`):
+  idempotent by `externalId`, sends nothing. Hauspire's 26,441 leads came in on
+  22–23 Oct.
+- **Bring in running projects** (`studio-bring-in/*`, `/studio/projects/bring-in`,
+  `BRING-IN-PROJECTS.md`): Hauspire's live projects, old quotes read from the
+  Hauspire quotation app (`HAUSPIRE_QUOTES_*` env). "Done before joining" ticks
+  exist only here.
+- **Calendar and office meetings** (`studio-office/*`, `OFFICE-MEETINGS.md`):
+  everyone has a calendar and their own tasks; anyone can set up a meeting with
+  anyone, the other accepts or suggests a time (no "decline", on purpose);
+  regular weekly busy times and a clash warning (29 Oct).
+- **Today / My work**: today, next 3 days, missed, "waiting on payment"; a daily
+  digest email by cron.
+- **Delete and restore a project**: owner only, type the client's name to
+  confirm; leaves every list and the client's app and revokes the app link.
+
+### Quotations and prices
+
+The builder (`studio-quote/*`) was rebuilt on 10–11 Oct to match the Hauspire
+Quotation Studio, generalised per studio: fee, modular discount
+(`StudioBranding.discountBps`; Hauspire 15%), booking advance, payment stages,
+GST, terms, brands, cover/about pages, room sets per BHK. Fee 7% + GST 18% for
+all studios. `hauspire-calc.ts` keeps Hauspire's maths as the yardstick for
+`pricing.ts` (`QUOTE-PARITY.md`). Lines shut once a live project runs on a
+quotation (`write-rules.ts`). Any line can carry a note printed in the PDF; the
+final PDF keeps Work Code and Description.
+
+**One price list is the target**: the studio's product master
+(`StudioProduct`) prices both its own quotations and the customer's first
+quote. **Quotation reading runs in the owner's Claude Code**, not the API
+(uploads only store files; `scripts/quotations/{fetch,submit,approve}` →
+product-master rows PENDING → ops approves → studio confirms). The API reading
+got stuck and burned credits. The older `StudioFiledRate` and `RateCardItem`
+price lists are still in the schema, waiting to be retired into it.
+
+**Studio approval rule** (owner, 30 Sep; threshold lowered 12 Oct): no studio
+goes ACTIVE until **25** of its own quotations have been analysed into live
+rates and its product master filled from them (`MIN_QUOTATIONS_FOR_RATES` in
+`modules/quotation/catalogue.ts`; `studio-quote/rates-gate.ts` holds the
+builder until then). Typed rates alone never qualify.
+
+### The commercial model (studio side)
+
+From `docs/STUDIO-AGREEMENT.md` and `modules/studio/subscription.ts`:
+commission **5%** on introduced clients only, due once the studio has
+collected 20%; 12-month introduction tail as a payment obligation; subscription
+by band. The agreement is **"DRAFT — NOT YET REVIEWED BY A LAWYER"**. Pricing
+for Solo/Pro/Max seats is not in code.
+
+**Unresolved, flag rather than pick a side:** `PILOT_COMMISSION_BPS: 400`
+(4%) in `src/lib/money.ts:139` against `COMMISSION_BPS = 500` in
+`subscription.ts` and the agreement.
 
 ---
 
@@ -344,38 +395,37 @@ This is also why **GitHub CI has been red since 7 September** — see §10.
 
 ### Money is integer paise
 
-Never rupees, never a float. `₹8,50,000` is `85000000`. All arithmetic goes
-through `src/lib/money.ts` — `applyBps` for rates, `splitAcross` for exact
-splits that must sum back to the total. `fromDb`/`toDb` convert at the Prisma
-boundary because Postgres holds `BigInt` and a `BigInt` cannot cross the RSC
-boundary into a client component.
-
-Currency renders in the Indian numbering system — lakh and crore grouping, via
-`formatINR()` / `formatINRCompact()`. Never hand-roll `toLocaleString` for this.
+Never rupees, never a float. `₹8,50,000` is `85000000`. All arithmetic through
+`src/lib/money.ts` — `applyBps` for rates, `splitAcross` for exact splits.
+`fromDb`/`toDb` at the Prisma boundary (`BigInt` cannot cross into a client
+component). Indian grouping via `formatINR()` / `formatINRCompact()`; never
+hand-roll `toLocaleString`.
 
 ### Quantities are thousandths
 
-`qtyMilli` — an integer, so it crosses the RSC boundary as a number, unlike a
-Prisma `Decimal`. `QTY_SCALE = 1000`, `MM_PER_SQFT = 92_903.04`.
+`qtyMilli`, an integer. `QTY_SCALE = 1000`, `MM_PER_SQFT = 92_903.04`.
 
 ### Never store a total
 
-Bills, paid, balance, quoted value — all computed on every read from the lines.
-A stored total goes stale the first time somebody edits a line.
+Bills, paid, balance, quoted value, document versions — computed on every read.
 
 ### Snapshot anything that prints
 
-Quote lines and work-order lines copy the rate at creation. Editing the product
-master must never change a quotation already sent to a client. Same for
-`StudioProject.contractPaise`, frozen when the project is created. A quotation
-freezes a copy of its lines on first issue (`issuedLines`) and the builder
-diffs against it.
+Quote and work-order lines copy the rate at creation. Editing the product
+master never changes a quotation already sent. A quotation freezes its lines on
+first issue (`issuedLines`).
+
+### Append-only, corrections are new rows
+
+`project/append-only.ts`: site logs, payments, delays, closure, change-order
+events, crew payments — plus `AuditLog`, `Consent` and the (unused) escrow
+tables.
 
 ### Every migration that adds a table carries RLS
 
-Supabase's PostgREST exposes every table in `public` to `anon` and
-`authenticated` by default, and Prisma-created tables get no policies. So
-**every** migration adding a table ends with:
+Supabase's PostgREST exposes every `public` table to `anon` and
+`authenticated`; Prisma tables get no policies. Every migration adding a table
+ends with:
 
 ```sql
 ALTER TABLE "x" ENABLE ROW LEVEL SECURITY;
@@ -383,429 +433,376 @@ ALTER TABLE "x" FORCE ROW LEVEL SECURITY;
 REVOKE ALL ON "x" FROM anon, authenticated;
 ```
 
-Prisma connects as `postgres` (`rolbypassrls`), so this does not affect the
-app. `tests/security-invariants.test.ts` fails any migration that creates a
-table without it. **Never edit a migration that has run anywhere** — a fix is a
-new migration. Migrations use table names, not model names
-(`tests/migration-names.test.ts`).
+`tests/security-invariants.test.ts` fails a migration without it. **Never edit
+a migration that has run anywhere** — a fix is a new migration. Migrations use
+table names, not model names (`tests/migration-names.test.ts`). One migration
+per PR; expand only — add, backfill, and drop in a later release.
 
-### Studio scoping — the single most important query rule
+### Studio scoping — the most important query rule
 
-> **Every query is scoped by the studio id from the session, and nothing in
-> `studio-practice/` or `studio-quote/` takes a studio id as an argument.**
+> **Every query is scoped by the studio id from the session; nothing in a
+> studio module takes a studio id as an argument.**
 
-`myStudioId()` (`modules/studio/tenancy.ts`) is the only way in. These
-tables hold one studio's price list, cost base and clients' phone numbers, in
-the same tables as every competitor's. `tests/tenant-scope.test.ts` walks every
-Prisma call on a studio-owned model and fails one that is not scoped,
-role-gated, or explicitly excused.
-
-`studio_vendor_rates` is the worst of them: beside `studio_products` it gives a
-reader a studio's margin on every line.
+`myStudioId()` (`modules/studio/tenancy.ts`) is the only way in.
+`tests/tenant-scope.test.ts` walks every Prisma call on a studio-owned model
+and fails one that is not scoped, role-gated or explicitly excused. The same
+tables hold every studio's prices, costs and clients' phone numbers.
 
 ### Stages: the studio owns names, we own meaning
 
-The studio owns stage **names, order, colours and how many**. We own **kind**:
+The studio owns stage names, order, colours and count; we own the **kind** —
+`OPEN`, `WON` (a project starts only from here), `DONE`, `LOST` (needs a
+reason). **Every query reads the kind, never the name.** Exactly one intake
+stage; at least one of each kind (`wouldStrand()` in `pipeline-rules.ts`); a
+stage holding clients cannot be deleted. Custom-field keys are frozen once
+derived.
 
-| Kind | Means | What depends on it |
-|---|---|---|
-| `OPEN` | Still in play | The board; "waiting on you" |
-| `WON` | Signed | **A project can only be started from a WON column** |
-| `DONE` | Handed over | Comes off the board |
-| `LOST` | Gone | Requires a reason |
+### Other rules that cost a bug to learn
 
-**Every query reads the kind, never the name** — `stage: { kind: { in: [...] } }`.
-That is what lets a studio rename "Booked" to "Advance received" without
-breaking anything. Three rules, each because breaking it strands data:
-exactly one intake stage; at least one stage of each kind (`wouldStrand()` in
-`pipeline-rules.ts`); a stage holding clients cannot be deleted.
-
-Custom fields: definitions in `studio_fields`, values in `StudioClient.fields`
-(`jsonb`) keyed by a `key` that is derived once and frozen — renaming the label
-never orphans captured values. Form inputs are named `custom.<key>` so a field
-called "name" cannot overwrite the client's name. No default fields, on
-purpose: which questions a studio asks depends on how it sells.
-
-### The sample lead is real, and never counted
-
-A new studio gets one sample lead on its board. It is a real row, so every
-count that feeds a badge or a number must use `...LIVE` (which excludes it)
-rather than `deletedAt: null`; display uses `LISTED`. `tests/demo-lead.test.ts`
-fails any `studioClient.count` that omits it. Otherwise a brand-new studio is
-told one lead is going untouched — a number we invented about work we invented.
-
-### `ClientSource.ONE_INTERIORS` is set only by the introduction bridge
-
-Never by hand, never by import (both rewrite it to `OTHER`). Otherwise a studio
-could label a walk-in as one of ours and corrupt the one report that says
-whether the roster is worth paying for.
-
-### `requireRole` throws — so it is wrong in render paths
-
-Correct for server actions. **Wrong for pages and layouts**, because Next
-renders a layout and its page in parallel, so the throw beats the layout's
-redirect and you get a 500 where a redirect belongs. In render paths use
-`getCurrentUser` + `hasRole`. This has been fixed twice and has come back a
-third time (§10).
-
-### Pure logic does not live in a `server-only` file — CONTRIBUTING §9.5
-
-Anything worth testing that does not touch the database or session goes in a
-sibling file with no `server-only`, and the server module re-exports it.
-
-```
-studio-practice/clients.ts         'server-only' — Prisma, auth, writes
-studio-practice/pipeline-rules.ts  pure — the rules, exhaustively tested
-studio/onboarding.ts               'server-only'
-studio/onboarding-steps.ts         pure
-studio/standing.ts                 pure — who gets which half of the rail
-```
-
-Vitest aliases `server-only` to `tests/stubs/server-only.ts` (since 26 Sep),
-because the real package throws on import outside React's `react-server`
-condition and `tests/scrape.test.ts` had silently never run. This does **not**
-weaken the boundary: `next build` still fails on a client component importing
-server code, and `tests/server-only-boundary.test.ts` reads source text.
-
-### Environment variables: truthiness, never `??`
-
-`NEXT_PUBLIC_*` vars are inlined at build; Vercel supplies an unset one as `''`,
-which `??` does not catch. `src/lib/site.ts` is the pattern. CONTRIBUTING §8.
-
-### Dev bypasses are gated twice
-
-`DEV_SHOW_UNVERIFIED_STUDIOS`, `DEV_SHOW_OTP_ON_SCREEN`, `DEV_OPS_NO_AUTH`
-(`src/lib/env.ts`) each require `!isProduction()` **and**
-`!rosterIsReal()` (`NEXT_PUBLIC_ROSTER_IS_REAL=1`). Note `isProduction()` is
-`NODE_ENV === 'production'`, which is also true on Vercel previews — so none of
-them work on any deployed build, whatever their comments say.
+- **The sample lead is real and never counted** — counts use `...LIVE`
+  (`tests/demo-lead.test.ts`).
+- **`ClientSource.ONE_INTERIORS` is set only by the introduction bridge**,
+  never by hand or import.
+- **`requireRole` throws, so it is wrong in render paths** (pages, layouts —
+  Next renders them in parallel and the throw beats the redirect). Use
+  `getCurrentUser` + `hasRole` there. It has come back three times; §11 lists
+  where it still is.
+- **Pure logic does not live in a `server-only` file** (CONTRIBUTING §9.5):
+  rules in a pure sibling (`*-rules.ts`), the server module re-exports. Vitest
+  aliases `server-only` to a stub; `tests/server-only-boundary.test.ts` guards
+  the real boundary.
+- **Env vars: truthiness, never `??`** — Vercel supplies an unset
+  `NEXT_PUBLIC_*` as `''` (CONTRIBUTING §8).
+- **Dev bypasses are gated twice** (`DEV_SHOW_UNVERIFIED_STUDIOS`,
+  `DEV_SHOW_OTP_ON_SCREEN`, `DEV_OPS_NO_AUTH`): `!isProduction()` and
+  `!rosterIsReal()`. `isProduction()` is also true on Vercel previews.
 
 ---
 
-## 5. Data model map
+## 5. Ops console (`/ops/**`)
 
-55 models. All studio-software tables are keyed on `studioId`.
-
-**Identity** — `User` (role CUSTOMER < STUDIO < OPS < ADMIN), `Session`
-(only a SHA-256 of the token is stored), `LoginChallenge` (magic links *and*
-WhatsApp OTPs), `Consent` (append-only), `RateLimitHit`.
-
-**Customer journey** — `Brief` (keyed by user or an httpOnly anon cookie),
-`FirstQuote` / `FirstQuoteLine` (what the customer was shown), `QuoteDecision`
-(stars and the compared set), `Consultation`, `PrepRoom`, `AnalyticsEvent`,
-`Match` and `Shortlist` (see §10 — nothing writes `Match`).
-
-**Studio and verification** — `StudioApplication`, `Studio`, `StudioMember`,
-`VerificationCheck`, `PortfolioProject`, `RateCardItem`, `ProfileDraft`,
-`StudioDocument`, `AuditLog`, `Notification`, `Subscription`.
-
-**Handoff** — `Introduction`, `Appointment` (kinds
-`FIRST_MEETING | SITE_VISIT | FOLLOW_UP` — import `KIND_LABELS` from
-`studio/introduction`, do not invent kinds).
-
-**Quotation builder** (`studio-quote/`) — `StudioBranding` (what makes the
-builder white-label: their legal name, GSTIN, logo, terms), `StudioProduct`
-(the product master; starter rows ship with **`ratePaise: 0`** — "we do not set
-your prices"), `StudioQuote` / `StudioQuoteLine` (every product field is a
-snapshot).
-
-**CRM** (`studio-practice/`) — `StudioStage`, `StudioField`, `StudioClient`
-(we hold these as a **processor**), `StudioClientEvent`, `StudioSavedView`,
-`StudioForm`.
-
-**Trades ledger** (gated in the pilot) — `StudioProject`, `StudioVendor`,
-`StudioVendorRate`, `StudioWorkOrder`, `StudioWorkOrderLine`,
-`StudioVendorPayment`. `canPay()` refuses an overpayment and reports by how
-much, rather than clamping.
-
-**Rates from a studio's own quotations** — `QuotationArchive`,
-`QuotationFile`, `StudioFiledRate` (`PENDING → LIVE → SUPERSEDED`).
-
-**Waitlist** — `WaitlistSignup`.
-
-**Never written by the app** — `Quotation`, `QuotationLineItem` (legacy; the
-journey writes `FirstQuote`), `AllocationPeriod`, `Dispute`,
-`EscrowTransaction`, `Milestone`, `MilestoneEvidence`. The escrow tables are
-append-only by rule for when they are used.
-
-### There are four places a price lives
-
-This is the biggest structural debt in the data model:
-
-1. `RateCardItem` — six categories, typed on `/studio/rates`, feeds the legacy
-   `quoteBrief` engine (`/expert`, `/shared`).
-2. `StudioFiledRate` — read from the studio's own quotations, approved by ops,
-   feeds the customer's first quote.
-3. `src/data/filed-rates.ts` — placeholder archive medians, used for any studio
-   with no live filed rates. `ratesAreReal()` is hard-coded `false`.
-4. `StudioProduct` — the studio's own product master, feeds their quotations.
-
-`docs/DATA-ARCHITECTURE.md` records reconciling them as pending.
+Overview queue, applications (site scrape, Google lookup), per-studio page
+`/ops/[slug]` (verification, status, **software plan**, archive review, product
+proposals), allocation, consultations, introductions, verification queue,
+experts, follow-ups (24-hour call list), funnel, waitlist, the weekly challenge,
+readiness (`/ops/data` — check it after any env change), CSV export, hiding
+test studios. `app/ops/layout.tsx` redirects anyone who is not OPS.
 
 ---
 
-## 6. How the main flows work
+## 6. The customer side — built, not open
 
-### Rates: one derivation, three surfaces
+While `CUSTOMER_LIVE !== '1'`, `/app /quiz /match /compare /expert /prepare
+/account /quotes /shared` redirect to `/` and the phone API answers 404.
+`/studios` and `/verification` are gated with them on the public host.
 
-1. In the onboarding rates step, a studio uploads past quotations
-   (`ArchivePanel` → `uploadQuotations`, private `quotation-archives` bucket).
-2. `after()` runs `analyseArchive`: an Anthropic call that reads **PDFs and
-   images only** (workbooks are stored and skipped), then the pure
-   `ingestQuotations` produces `StudioFiledRate` rows in `PENDING`.
-3. Ops reviews on `/ops/[slug]` and `approveRates`: in one transaction the old
-   `LIVE` rows become `SUPERSEDED` and `PENDING` becomes `LIVE`.
-4. The result feeds (a) the customer's first quote via `resolveRatesFor`,
-   (b) the studio's product master via `fillProductMaster` (prices only
-   zero-rate rows), and (c) the studio's first quotation, "Build the 3 BHK"
-   (`applyConfiguration` → `planQuotation`), using the same kitchen-run ladder.
+### The choosing journey
 
-### The customer journey
+`src/modules/brief/journey.ts`: **OneBrief → OneMatch → OneQuote → OneCompare
+→ OneExpert** (the band is chosen inside the budget question; there is no
+separate tier step). The `One` prefix is a placeholder until the brand is
+settled.
 
-- **OneBrief** (`app/quiz/QuizClient.tsx`) writes `sessionStorage`
-  (`oi.brief.v1`) on every change and fires `saveBriefAction` per step. The
-  server upserts `Brief` by user or anon cookie.
-- **OneMatch** — `modules/matching/score.ts`, `ENGINE_VERSION = 'match@1.0.0'`,
-  **runs in the browser**. Hard filters (active, verified, not paused, style
-  dislikes < 40% of portfolio, minimum project value, same locality zone), then
-  six weighted factors — style 25, budget 20, working style 20, delivery 15,
-  scope 10, priority 10 — normalised over measured weight. Each card gets a
-  written read from `explainAction` (Anthropic, 9s timeout, deterministic
-  fallback from `matchSummary`).
-- **OneQuote** — `components/oi/QuoteFlow.tsx` → `buildFirstQuote`
-  (`modules/quotation/first-quote.ts`) over the room-wise `catalogue.ts`.
-  A floor-plan gate offers a plan, a measured kitchen run, or a standard
-  kitchen, and the range width depends on which.
-- **OneCompare** — client-only, `compareMany` over the quotes in
-  `sessionStorage`; decisions saved to `QuoteDecision`.
-- **OneExpert** — sign-in required; creates a `Consultation`. Ops runs the
-  call from `/ops/consultations`, records the outcome, creates the
-  `Introduction` (optionally releasing contact details), and proposes an
-  `Appointment`. Releasing contact creates the client on the studio's board
-  via the bridge, with `source: ONE_INTERIORS`.
+- **Matching** — `ENGINE_VERSION = 'match@2.2.0'`; weights style 30,
+  priorities 30, similar work 15, working style 10, household 10, timeline 5;
+  one server ranker; matches stored with their engine version. Changing weights
+  never rescores a match a customer already saw.
+- **Bands** per sq ft, before GST (`modules/quotation/tiers.ts`): Essential
+  ₹1,200–1,800, Premium ₹1,800–2,500, Luxury ₹2,500+. "One band up" is on.
+  Per-sq-ft studio rates are never shown to customers.
+- **First quote** from the floor plan (Claude reads it; `modules/floorplan/*`,
+  sizes reused across a society), scope-aware (full home, kitchen & wardrobes,
+  single room, renovation).
+- **Compare** with an AI summary whose figures are checked against the quotes.
+- **Expert** — Ar. Swarupa Tondare, booked directly; the pre-sign call is free.
+- **Benefits** show only once their terms are written in
+  `modules/portal/benefits.ts`.
 
-Localities: 64 areas in six zones (`src/data/localities.ts`); matching is by
-**zone**, not exact area.
+### After signing — Basic and Assured
 
-### Sign-in
+`modules/portal/plans.ts` (owner, 11 Oct): **Basic** is free and the default;
+**Assured** is paid (fee not set) — we personally make sure the tracker and
+site feed are updated daily, plus GEIO and 5 expert calls. Choosing Assured
+only registers interest (`assuredRequestedAt`); ops switches the plan. Copy that
+promises daily checks belongs to Assured only.
+
+- **GEIO** (`modules/app/geio*.ts`) — the customer's AI guide, English, Hindi,
+  Marathi; rupee figures checked against the facts; out-of-scope questions go
+  to the expert; monthly cap `GEIO_MONTHLY_BUDGET_INR` (default ₹1,500); falls
+  back to written answers without a key. Open before signing; after, Assured
+  only.
+- **Home Coins** (`modules/engagement/coin-rules.ts`) — earn only until partner
+  brands are signed; never spent on the studio bill, never cashed out.
+- **Family** on a project can vote on decisions; only the owner chooses and
+  approves payments.
+- **3D**: `/app/3d` is example data; `/account` draws the customer's own flat.
+  The owner is building a separate 3D design tool (`DESIGN_TOOL_URL`).
+
+### The phone app (`mobile/`)
+
+Native screens: tabs Home, Project, Site, GEIO, Me; decisions, locker, snags
+(camera), notifications, plan, delete account, and a native version of the
+choosing journey. `web.tsx` is a web view limited to the website's `/app`.
+Talks to `/api/app/v1` with a bearer session (the same `Session` row as the
+cookie; `modules/auth/bearer.ts`), token in secure storage, Face ID /
+fingerprint lock, push via Expo, last project kept offline.
+`EXPO_PUBLIC_SAMPLE=1` answers every call from sample data. Bundle id
+`in.oneinteriors.app`.
+
+**Not tested end to end.** It has never signed in against a real database
+(that needs a preview deploy with a test database — never production), and
+`mobile/` has no tests. The owner handles the Apple and Google store accounts.
+
+---
+
+## 7. Sign-in, all roles
 
 | Who | How |
 |---|---|
-| Customer | WhatsApp OTP (6 digits, 10 min, 5 attempts) or email magic link. **OTP needs Meta template approval, which is outstanding** |
-| Studio, ops | Email magic link (15 min; 7 days for invites) or password (scrypt; 5 failures lock the account with no timer — only a magic link unlocks it) |
+| Customer | WhatsApp OTP (6 digits, 10 min, 5 attempts, per-phone and per-IP limits); optional Google/Apple/Facebook buttons, shown only when their keys are set. On `/app/verify` the phone code is off unless `NEXT_PUBLIC_APP_PHONE_CODE=1` |
+| Studio staff | phone + password (§3); `STUDIO_SIGN_IN=otp` for the WhatsApp code |
+| Ops | email magic link (15 min, single use) or password |
 
-Sessions: `oi_session` cookie, 30 days, host-only, role re-read from the
-database on every request. `src/middleware.ts` is only a cookie pre-filter —
-the edge runtime cannot query Postgres. **The layouts are the authorisation
+Sessions: `oi_session` cookie, host-only, httpOnly, 30 days (site supervisors
+90); only a hash of the token is stored; role re-read on every request. The
+middleware is only a cookie pre-filter — **the layouts are the authorisation
 model** (`app/ops/layout.tsx`, `app/studio/layout.tsx`).
 
 ---
 
-## 7. Traps that have already cost time
+## 8. API routes and crons
 
-Read this before writing code. Every item is a real bug that shipped.
+- **`/api/app/v1`** — the phone/customer API: auth, me, brief, journey,
+  choose, expert, plan, project, decisions, design answers, extras, payments
+  (confirm/dispute), sign-offs, snags, GEIO, coins, devices, notifications.
+  `modules/app-api/http.ts`: 404 unless `CUSTOMER_LIVE`, 503 with no database,
+  `no-store`. `tests/app-api.test.ts` checks every route calls the gate first.
+- **`/api/studio`** — document upload, lead intake (website, Google, Meta),
+  leads export/upload, the site app's queued daily update, site photos and
+  voice.
+- **`/api/staff/view-as`** — enter/stop View as.
+- **`/api/waitlist`** — join, extras, stats, status (bearer token).
+- **`/api/cron/*`** — `Authorization: Bearer $CRON_SECRET` (401 if unset).
+  `vercel.json` schedules: decision reminders, snag auto-close (7 days), site
+  daily-update reminders (twice), bin purge (30 days), the Today digest email.
 
-1. **The `server-only` boundary.** `import { STAGE_LABELS } from './clients'`
-   is a real runtime import of a value; if `clients.ts` is `server-only`, Prisma
-   lands in the browser bundle and the route stops building. `tsc` cannot catch
-   it. `tests/server-only-boundary.test.ts` does. Do not weaken it.
-2. **`prisma.config.ts` switches off path inference.** The fallback is
-   `./migrations` at the root, and `migrate deploy` against a missing directory
-   prints something that reads like success. `migrations.path` is explicit.
-   If a migration seems not to have applied, run `npx prisma migrate status`
-   and read the list, not the last line.
-3. **Prisma CLI reads `.env`; Next reads `.env.local`.** `prisma/load-env.ts`,
-   imported by `prisma.config.ts`, is the only thing loading it for the CLI.
-4. **`prisma generate` is platform-specific.** Running it from Linux breaks
-   Windows. `EPERM … rename query_engine-windows.dll.node` means the dev server
-   is holding the DLL — stop it first.
-5. **Silent catches hide broken reads.** `myClients()` and friends return `[]`
-   on failure, so a missing table looks like "no clients yet". `saveFailed()`
-   returns the real reason in development.
-6. **A form that never closes reads as a form that never saved.** Sheets close
-   when the row is written; empty states have their own button.
-7. **Display-rounded numbers in tests.** Compute the expected value; do not
-   copy it from a rendered string.
-8. **Every "minimum N" rule needs a small-N path.** A two-studio roster made
-   `/expert` unusable. `min = max(1, min(MIN_STUDIOS, available))`.
-9. **Prisma ambiguous relation.** `prisma format` adds a back-relation; add
-   yours by hand and there are two.
-10. **A migration that failed on production** (20 Sep) — the whole class is
-    now caught by `tests/migration-names.test.ts`.
-11. **Native form validation silently cancelled every `/apply` submit**, and
-    the button gave no sign. A submit that goes nowhere must say so; the form
-    now offers a `mailto` fallback after 8 seconds.
-12. **"Do not set `SUPABASE_SECRET_KEY`, nothing uses it"** was in the deploy
-    checklist. Five storage modules and the readiness screen read it; without
-    it, uploads quietly report themselves as "not switched on". Check
-    `/ops/data` after any env change.
-13. **Two copies of one rule drift.** The rail and the dashboard each decided
-    whether the CRM was open, and disagreed. Put a rule in one pure function
-    and call it from both (`standing.ts`, `features.ts`).
+---
+
+## 9. Data, storage and environment
+
+### Data model map (120 models)
+
+- **Identity** — `User`, `Session`, `LoginChallenge`, `Consent` (append-only),
+  `RateLimitHit`.
+- **Customer journey** — `Brief`, `FirstQuote(Line)`, `QuoteDecision`, `Match`,
+  `Consultation`, waitlist.
+- **Studio and verification** — `StudioApplication`, `Studio`, `StudioMember`,
+  `VerificationCheck`, `PortfolioProject`, `StudioDocument`, `AuditLog`,
+  `Notification`, `Subscription`.
+- **Leads** — `StudioStage`, `StudioField`, `StudioClient`,
+  `StudioClientEvent`, `StudioSavedView`, `StudioForm`, sales roles, intake
+  connections.
+- **Quotations** — `StudioBranding`, `StudioProduct`, `StudioQuote(Line)`,
+  `StudioQuoteRequest`; legacy `StudioFiledRate`, `RateCardItem`,
+  `QuotationArchive`.
+- **The project** — `HomeProject` and its `Home*` family: stages, checklist,
+  payments, site logs, decisions, snags, documents, step delays, change orders,
+  closure, sign-offs, work orders and crew payments. `StudioVendor` for crews.
+- **Office** — `StudioMeeting`, `StudioMeetingGuest`, `StudioBusyBlock`, tasks.
+- **Never written** — `Quotation`, `QuotationLineItem`, `Dispute`,
+  `EscrowTransaction`, `Milestone`, `MilestoneEvidence`.
+
+### Storage buckets (Supabase, server-side with `SUPABASE_SECRET_KEY`)
+
+`floor-plans` 15 MB · `quotation-archives` 25 MB/file · `business-proof` 10 MB ·
+`portfolio-images` 8 MB (public) · `site-photos` 8 MB · `project-docs` 50 MB by
+signed upload · `lead-files` 15 MB · `crew-kyc` 4 MB · `studio-logos` 2 MB. All
+private with short signed links except portfolio images. A bucket's own size
+limit is set in Supabase by the owner — raise it there when the code allows
+more.
+
+### Environment
+
+Read by code and **missing from `.env.example`**: `CRON_SECRET`,
+`SAMPLE_DATA_ONLY`, `STUDIO_SIGN_IN`, `NEXT_PUBLIC_APP_PHONE_CODE`,
+`GEIO_MODEL`, `GEIO_MONTHLY_BUDGET_INR`, `SPEECH_PROVIDER`,
+`EXPO_ACCESS_TOKEN`, `META_APP_SECRET`, `META_VERIFY_TOKEN`,
+`STUDIO_META_CAPI`, `STUDIO_META_PAGE_TOKENS`, `GOOGLE_PLACES_API_KEY`,
+`DESIGN_TOOL_URL`, `WAITLIST_SITE_URL`, `WHATSAPP_TEMPLATE_LOCALE`,
+`WHATSAPP_WAITLIST_TEMPLATE`, `WHATSAPP_STUDIO_*_TEMPLATE`,
+`HAUSPIRE_QUOTES_*`.
+
+Listed in `.env.example` but **read by nothing**: `SESSION_SECRET`,
+`REDIS_URL`, `S3_*`, `RAZORPAY_*`, `ESCROW_*`, `KYC_*`,
+`NEXT_PUBLIC_POSTHOG_*`, `SUPABASE_JWKS_URL`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`.
+
+Anthropic: `ANTHROPIC_MODEL` (default `claude-sonnet-5`, `src/lib/env.ts:79`)
+for everything except GEIO, which uses `GEIO_MODEL` (default
+`claude-haiku-4-5-20251001`). Everything degrades without `ANTHROPIC_API_KEY`.
+
+---
+
+## 10. Traps that have already cost time
+
+Every item is a real bug that shipped, or a near miss.
+
+1. **The `server-only` boundary.** Importing a value from a `server-only` file
+   pulls Prisma into the browser bundle; `tsc` cannot catch it,
+   `tests/server-only-boundary.test.ts` does.
+2. **`prisma.config.ts` switches off path inference.** `migrations.path` is
+   explicit. If a migration seems not to have applied, run
+   `npx prisma migrate status` and read the list, not the last line.
+3. **Prisma CLI reads `.env`; Next reads `.env.local`.** `prisma/load-env.ts`
+   bridges them.
+4. **`prisma generate` is platform-specific**, and `EPERM … query_engine-windows.dll.node`
+   means the dev server holds the DLL — stop it first.
+5. **Silent catches hide broken reads** — a missing table looks like "no
+   clients yet". `saveFailed()` shows the real reason in development.
+6. **A form that never closes reads as a form that never saved.**
+7. **Display-rounded numbers in tests.** Compute the expected value.
+8. **Every "minimum N" rule needs a small-N path.**
+9. **Prisma ambiguous relation** when you add a back-relation by hand after
+   `prisma format`.
+10. **Migration names vs table names** — `tests/migration-names.test.ts`.
+11. **A submit that goes nowhere must say so** (native validation silently
+    cancelled every `/apply` submit once).
+12. **"Nothing uses `SUPABASE_SECRET_KEY`"** was in a checklist. Uploads then
+    reported themselves "not switched on". It also signs the View-as hint.
+13. **Two copies of one rule drift.** Put a rule in one pure function and call
+    it from every surface (§3 table).
 14. **PowerShell treats `<` as reserved.** Never put angle-bracket
-    placeholders in a command the user will paste.
+    placeholders in a command the owner will paste.
+15. **Windows line endings break two tests locally.** Git checks files out
+    with CRLF here (`core.autocrlf=true`, no `.gitattributes`), and
+    `tests/app-api.test.ts` and `tests/studio-sales-permissions.test.ts` match
+    source text against `\n`. They pass on CI (Linux) and fail on the owner's
+    machine. A local red run of exactly those two is this, not a regression.
+16. **Prod commands are the owner's.** Migrations, Hauspire scripts and merges
+    against production are run by the owner from a "prod" terminal tab, with
+    `DATABASE_URL` loaded from the main checkout's `.env.local` (a worktree's
+    copy lacks it). **Production migrations go in before the merge to `main`**,
+    because the merge deploys.
 
 ---
 
-## 8. What is built, gated, and missing
+## 11. Health and known issues — as of 30 Oct
 
-**Built and working**
-
-- Customer: the full journey on fixtures and on the database — OneBrief,
-  OneMatch with the AI read, OneQuote with the floor-plan gate, OneCompare,
-  OneExpert, `/prepare`, `/account`, studio profiles.
-- Studio: application, onboarding (five gated steps with live previews),
-  Leads (board, pool, import, analytics, bin, timeline, outcomes, views, merge,
-  drag, enquiry form, introduction bridge), Quotations (white-label builder,
-  first-issue snapshot, print with their logo and our mark in the footer),
-  product master, Settings (your details and logo, pipeline, fields), the walkthrough.
-- Ops: overview queue, applications with site scrape and Google lookup,
-  per-studio verification, archive review and rate approval, allocation,
-  consultations, introductions, verification queue, funnel, waitlist,
-  readiness (`/ops/data`), CSV export, hiding test studios.
-- Infra: host split, rate limiting in Postgres, SSRF-guarded scraping, CSP and
-  HSTS, password + magic-link auth, the destructive-command guard, the
-  screenshot tool.
-
-**Built but switched off** — Projects, Vendors, Calendar, Listing
-(`STUDIO_FEATURES`); the whole customer side (`CUSTOMER_LIVE`).
-
-**Not built** — team / seats / invites, notifications, billing, Meta lead
-sources, EN/HI, a scheduler of any kind (`vercel.json` has no crons — the bin
-never purges and the auto-pause sweep runs only from its button), a PWA shell
-(there is no `public/` directory), a `/privacy` page, customer consent
-recording, `/studio/analytics` from `docs/STUDIO-DASHBOARD.md`.
-
-**Orphaned** — `/tier` (folded into the brief), `/prepare` (no entry point),
-`/shared/[token]` (the share action has no UI). Files nothing imports:
-`components/ConsentGate.tsx`, `Shortlist.tsx`, `JourneyNav.tsx`,
-`art/FloorPlan.tsx`, `art/MilestoneTrack.tsx`.
-
----
-
-## 9. Launch status
-
-**Done:** code pushed and deployed (20 Sep); 23 migrations applied to
-production (20 Sep — whether the 17 since have been applied is not recorded
-in the repo; run `npx prisma migrate status`); Resend domain verified
-(19 Sep); DPDP and GST positions sorted out by the owner (no written record in
-the repo, and the product-side DPDP work below is still open).
-
-**Open, none of them code:**
-
-1. **WhatsApp template approval with Meta** — customer identity is
-   phone-based and depends on it.
-2. **The brand name** — `oneinteriors.in` is in use; the name is not settled.
-3. **Lawyer review of the studio agreement.**
-4. **Vercel plan** — Hobby forbids commercial use; confirm Pro before launch.
-5. **Supabase secret key rotation** — deferred to the first real studio or
-   31 Dec 2026, whichever comes first.
-6. **Real rates** — `ratesAreReal()` stays `false` until approved filed rates
-   exist; the customer copy depends on it.
-
-**Open, code:** `/privacy` page and consent recording (DPDP); the §10 list.
-
-Before the customer side goes live: `npm run roster:check`, flip
-`NEXT_PUBLIC_ROSTER_IS_REAL`, set `CUSTOMER_LIVE=1` and `PUBLIC_HOST`, remove
-the fixture studios (`npm run db:unseed`), and lift `noindex`. The footer's
-pre-launch notice stays until the fixtures are gone.
-
----
-
-## 10. Health and known issues — as of 29 Sep
-
-Verified by running the checks on `73a4a15`:
+Verified in a fresh worktree on `160feff`:
 
 | Check | Result |
 |---|---|
 | `npm run typecheck` | clean |
-| `npm run build` | passes (fixtures mode) |
-| `npm test` | **1 of 1,034 fails** — `20260926000000_waitlist_signups` creates a table with no RLS/REVOKE block |
-| `npm run lint` | **8 errors**, all in `scripts/build-deck-logo.js` and `scripts/build-studio-deck.js` |
-| GitHub CI | **red on every push since 7 Sep** — dies at `npm ci` (the `postinstall` / `load-env.ts` exit, §3). No check has gated a push since; that is how the two failures above landed |
+| `npm run lint` | clean |
+| `npm test` | 4,017 pass, 10 skipped, **2 fail on Windows only** (trap 15); CI green |
+| GitHub CI | green on every PR and push since late September |
 
-Bugs confirmed in the code (fix each with a test that reproduces it first —
-CONTRIBUTING §6):
+### Still open from the 29 Sep audit (fix each with a test that reproduces it first — CONTRIBUTING §6)
 
-- **Security.** `/set-password` renders `next=//host` as the Skip link
-  (`page.tsx:63`) — an open redirect. `consumeMagicLink` finds a
-  `LoginChallenge` by hash without checking its channel, so
-  `/auth/verify?token=whatsapp:<phone>:<code>` can guess OTPs past the
-  5-attempt limit (no rate limit on that route). `waitlist_signups` lacks RLS
-  (if already applied to production, fix with a new migration).
-- **Render-path `requireRole`, third time.** `/ops/data` (`featureReadiness`)
-  and `/ops/[slug]` (`archivesForStudio`, `ratesForReview`).
-- **Studio data.** `createQuote` never sets `clientId`, so "Quoted" on a lead
-  is always empty, won value is always ₹0, and the bin's has-quotations guard
-  never fires. `standingOf` maps `PAUSED` to `SETTING_UP`, so a paused studio
-  loses its CRM — contrary to the rule the layout states. Quote numbers sort
-  as strings, so the 1,000th quote in a year collides.
-- **Customer data.** `storeMatches` and `storeQuotes` have no callers, so the
-  `Match` table is empty and the studio dashboard and ops allocation read 0. A
-  studio with no live filed rates is quoted on placeholder medians.
-- **Copy.** The landing page hardcodes "4.8 from 41 clients", "6,000 studios
-  screened, 14 listed" and `+91 20 4000 0000` (`src/app/page.tsx`) —
-  fabricated social proof. The demo starts on this page.
+- **Security — `consumeMagicLink` ignores the challenge's channel.**
+  `modules/auth/magic-link.ts:198` finds a `LoginChallenge` by hash only, and
+  WhatsApp challenges hash `whatsapp:<phone>:<code>` (`otp.ts:134`). So
+  `/auth/verify?token=whatsapp:<phone>:<code>` can guess OTPs with no attempt
+  limit and no rate limit. The most serious open item.
+- **Security — open redirect.** `src/app/set-password/page.tsx:63` accepts
+  `next=//host` because it only checks `startsWith('/')`.
+- **`requireRole` in render paths** (500 instead of a redirect, behind the ops
+  layout): `/ops/data` (`featureReadiness`), `/ops/[slug]`
+  (`archivesForStudio`, `ratesForReview`, `softwarePlanOf`, `pendingDraftRun`),
+  `/ops/challenge` (calls it directly), `/ops/applications`
+  (`listApplications`), `/ops/follow-ups` (`followUpList`).
+- **`standingOf` maps `PAUSED` to `SETTING_UP`** (`modules/studio/standing.ts`),
+  so a studio that pauses leads loses its CRM.
+- **Commission 4% vs 5%** (§3).
+- **`storeQuotes`** (`modules/quotation/generate.ts:105`) has no callers.
+  (`storeMatches` is now called.)
 
-`docs/FINDINGS.md` holds the earlier customer-side audit; most of its open
-items are still open.
+Fixed since 29 Sep: waitlist RLS (follow-up migration), `createQuote` sets the
+client, quote numbering, the bin purge cron, `ratesAreReal()` follows the
+roster (its doc comment still says `false`), the landing page's invented
+figures (the page was rewritten), the CI install.
+
+### Known gaps, not bugs
+
+- **Speech-to-text** has no provider; voice notes are kept as audio.
+- **SMS** for studio staff is a stub (needs DLT registration).
+- **No Pro/Max seat pricing or billing** in code.
+- **Electrical bill module** — not in scope.
+- `/tier` is still in the host gate list but has no route.
+- At Hauspire: Ankita (VTP Cygnus) had no designer and was on the old steps as
+  of 27 Oct; the "Whose" picker on meetings cannot select a designer.
 
 ---
 
-## 11. Docs — which to trust
+## 12. Docs — which to trust
 
-| Current | Behind the code |
+**Current:** `CONTRIBUTING.md`; `docs/studio-os/*` (one file per built piece —
+`PROJECT-LIFECYCLE.md`, `PHASE-1/2/3-BUILT.md`, `SALES-ROLES.md`,
+`LEAD-INTAKE.md`, `QUOTE-PARITY.md`, `QUOTE-REQUESTS.md`, `VIEW-AS.md`,
+`BRING-IN-PROJECTS.md`, `AXLEADS-IMPORT.md`); `docs/studio-workspace/STEP-TRACKER.md`;
+`docs/CUSTOMER-PLATFORM-PLAN.md`; `docs/MOBILE-APP-PLAN.md`;
+`docs/app-handover/*` (the customer app design and decisions);
+`docs/DESIGN-LANGUAGE.md`; `docs/STUDIO-AGREEMENT.md`; `docs/FUTURE-SCOPE.md`.
+
+**Behind the code:**
+
+| Doc | What is wrong |
 |---|---|
-| `CONTRIBUTING.md` | `README.md` — still v0.1 ("not built yet") |
-| `docs/DESIGN-LANGUAGE.md` | `.env.example` — lists vars nothing reads, misses `GOOGLE_PLACES_API_KEY`, says the secret key is unused |
-| `docs/DATA-ARCHITECTURE.md` (23 Sep; says there are no passwords — there are) | `docs/LAUNCH.md` — known gaps 1–3 are built; stage 6 names the old waitlist vars |
-| `docs/STUDIO-AGREEMENT.md` | `docs/DEPLOY-CHECKLIST.md` — names `OPS_PREVIEW`, which is `DEV_OPS_NO_AUTH` |
-| `docs/DEMO-RUNBOOK.md` | `docs/WHAT-I-NEED-FROM-YOU.md` — Resend and push are done |
-| `docs/CUSTOMER-JOURNEY-REVIEW.md` (29 Sep) | `docs/LEADS-V2.md` — a plan, now mostly built |
-| `docs/FINDINGS.md` | |
-| `docs/CUSTOMER-APP-PLAN.md` (22 Sep; says never Capacitor, which contradicts older docs) | `docs/STUDIO-CRM.md`, `QUOTATION-BUILDER.md`, `STUDIO-DASHBOARD.md` — predate the rebuilds |
-| `docs/FUTURE-SCOPE.md` — every deferral has a trigger | `docs/ARCHITECTURE.md`, `DATABASE.md` — the 7 Sep picture |
+| `README.md` | still v0.1 ("not built yet") |
+| `docs/studio-os/DESIGN-PROCESS-PLAN.md` | header says "Nothing below is built yet"; most of it was built 25–29 Oct (PRs #22–#29) |
+| `docs/studio-os/OFFICE-MEETINGS.md` | says "No clash check"; weekly busy times and the clash warning landed 29 Oct |
+| `docs/studio-workspace/STUDIO-WORKSPACE-BUILD.md` | says "No passwords"; studio password sign-in landed 27 Oct |
+| `mobile/README.md` | calls the web view the journey; there is now a native journey and GEIO tab |
+| `.env.example` | §9 |
+| `docs/ARCHITECTURE.md`, `DATABASE.md`, `DATA-ARCHITECTURE.md` | the September picture; four price lists, no Studio OS |
+| `docs/STUDIO-CRM.md`, `QUOTATION-BUILDER.md`, `STUDIO-DASHBOARD.md`, `LEADS-V2.md` | predate the rebuilds |
+| `docs/LAUNCH.md`, `DEPLOY-CHECKLIST.md`, `WHAT-I-NEED-FROM-YOU.md` | old variable names and done items |
+| `src/modules/studio/features.ts` | comments describe it as the switchboard; plans and roles are (§3) |
 
 ---
 
-## 12. How to work on this
+## 13. How to work on this
 
 **Verify, do not assume.** The owner runs commands and pastes the output.
 Before claiming something works: `npm run typecheck`, `npm run lint`,
-`npm test`. For a migration, apply it inside a transaction and roll back to
-prove it applies before asking anyone to run it for real. Until CI is fixed,
-nothing else checks.
+`npm test`; CI checks the same on every PR. For a migration, apply it inside a
+transaction and roll back to prove it applies (PGlite is fine) before asking the
+owner to run it on production.
+
+**Work from the owner's meetings.** Most October work came from the owner's
+walkthroughs with Hauspire's team (15, 24 and 27 Oct), pasted as transcripts.
+Turn one into a numbered plan, get decisions on the open points, then ship it
+item by item, one PR each (e.g. "Design walkthrough 27 Oct, item 15"). Defaults
+in bold are used unless the owner says otherwise.
 
 **Own mistakes plainly and fix them.** The owner has caught real errors — a
-third instance of a bug after two were fixed, a `.com`/`.co` mix-up, an invented
-enum. Say what went wrong, say why, fix it. Do not pad.
+third instance of a bug after two were fixed, a `.com`/`.co` mix-up, an
+invented enum. Say what went wrong, say why, fix it.
 
-**Write the comment that explains the why.** This codebase's doc comments carry
-the decision history — the argument against the obvious alternative, the bug
-that made a rule necessary. There are no `TODO` markers anywhere; unfinished
-work is described in prose. Match it. Commit messages do the same: a
+**Write the comment that explains the why.** Doc comments carry the decision
+history, often with the owner and date ("owner, 29 Oct 2026"). There are no
+`TODO` markers; unfinished work is described in prose. Commit messages: a
 sentence-case summary, then the why.
 
-**Never write secrets into files.** The owner pastes keys into env files
-themselves. `.env.local` is gitignored and must never be committed.
+**Never write secrets into files.** The owner pastes keys into env files and
+Vercel themselves. `.env.local` is gitignored and must never be committed.
+Never sign in as a real person.
 
 **Windows.** The repo is `C:\Sanyam\OneInteriors`; the owner is on PowerShell.
-New sessions usually start in a git worktree under `.claude/worktrees/` — see §3
-for getting one to build.
+Sessions start in a git worktree under `.claude/worktrees/` (§2 for getting one
+to build).
 
 ---
 
-## 13. If you are a new chat, start here
+## 14. If you are a new chat, start here
 
-1. Read §4 and §7 of this file, then `CONTRIBUTING.md` §5 and §9.
-2. Open `src/app/studio/layout.tsx` — the rail is the product thesis.
-3. Open `src/modules/studio-practice/stages.ts` and `pipeline-rules.ts` — the
-   name-versus-meaning split is the pattern the customisation work follows.
+1. Read §1, §4 and §10 of this file, then `CONTRIBUTING.md` §5 and §9.
+2. Open `src/modules/studio/surfaces.ts` and `roles.ts` — who sees what is the
+   heart of the studio software.
+3. Open `docs/studio-os/PROJECT-LIFECYCLE.md` and
+   `src/modules/project/lifecycle-rules.ts` — how a project moves.
 4. Open `src/lib/host.ts` — what is reachable where.
-5. Check §10 against the code before relying on it; items there get fixed.
-6. **Current direction (29 Sep):** the customer-side workflow — making OneBrief
-   → OneMatch → OneQuote → OneCompare → OneExpert genuinely find each
-   homeowner the right studio, with as much personalisation as the data
-   honestly supports. Start from `docs/CUSTOMER-JOURNEY-REVIEW.md` (the
-   analysis and the phased plan), then `docs/FINDINGS.md`,
-   `docs/CUSTOMER-APP-PLAN.md` and `modules/matching/score.ts`.
+5. Check §11 against the code before relying on it; items there get fixed.
+6. **Current direction (30 Oct):** Hauspire runs every project on the Max plan
+   since 27 Oct; the work is the owner's list from the Hauspire design and
+   sales teams, shipped item by item. The customer side waits on the waitlist
+   reaching 2,000 and on the phone app being tested end to end.
