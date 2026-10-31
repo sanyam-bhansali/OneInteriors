@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Body, Button, ErrorText, Eyebrow, Screen, Title } from '../components/ui';
 import { api } from '../lib/api';
+import { projectsOnly } from '../lib/config';
+import { PasswordSignIn } from '../components/sign-in/PasswordSignIn';
 import { useAuth } from '../lib/auth';
 import { useHeadline, useT } from '../lib/i18n';
 import { color, font } from '../lib/theme';
@@ -19,7 +21,12 @@ const WAIT = 30;
 /** "98220 41736", as the design writes a number. */
 const spaced = (d: string) => (d.length > 5 ? `${d.slice(0, 5)} ${d.slice(5)}` : d);
 
+/** Password while only the project app is open (owner, 1 Nov 2026); the WhatsApp code once codes are live. */
 export default function SignIn() {
+  return projectsOnly() ? <PasswordSignIn /> : <CodeSignIn />;
+}
+
+function CodeSignIn() {
   const { signIn } = useAuth();
   const t = useT();
   const h1 = useHeadline(38);

@@ -15,3 +15,14 @@ export function apiBase(): string {
   const host = Constants.expoConfig?.hostUri?.split(':')[0];
   return `http://${host ?? 'localhost'}:3100`;
 }
+
+/**
+ * Only the project app (owner, 1 Nov 2026): Hauspire's clients first, the
+ * choosing journey later. `EXPO_PUBLIC_PROJECTS_ONLY=1` in the build profile
+ * (eas.json): the app opens on sign-in (mobile number and the password the
+ * studio gave), never on the welcome and quiz, matching the website's
+ * `CUSTOMER_PROJECTS_LIVE`.
+ */
+export function projectsOnly(): boolean {
+  return process.env.EXPO_PUBLIC_PROJECTS_ONLY === '1';
+}

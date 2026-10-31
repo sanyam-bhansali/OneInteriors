@@ -1,6 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { projectsOnly } from '@/lib/host';
 import { signOut } from '@/modules/auth/session';
 
 /**
@@ -12,5 +13,5 @@ import { signOut } from '@/modules/auth/session';
 export async function switchNumberAction(code: string): Promise<void> {
   const clean = String(code ?? '').replace(/[^A-Za-z0-9]/g, '').slice(0, 32);
   await signOut();
-  redirect(`/sign-in?next=${encodeURIComponent(`/app/join/${clean}`)}`);
+  redirect(`${projectsOnly() ? '/app/sign-in' : '/sign-in'}?next=${encodeURIComponent(`/app/join/${clean}`)}`);
 }

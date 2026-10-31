@@ -17,6 +17,23 @@ import type { Lifecycle, LifecycleStep } from '../../lib/types';
  * warranty. The server's projection works everything out
  * (portal/lifecycle-view.ts); this only says it.
  */
+/** The client's one thing to do, said in their language; null = nothing needed. Shared with the home screen. */
+export function blockerLine(life: Lifecycle, t: T): string | null {
+  const b = life.blocker;
+  if (!b) return null;
+  const amount = b.amountPaise !== null ? inr(b.amountPaise) : '';
+  if (b.kind === 'pay') return ['snags', 'warranty'].includes(life.phase) ? t('life.block.payFinal', { amount }) : t('life.block.pay', { label: b.label ?? '', amount });
+  if (b.kind === 'confirm_snag') return (b.count ?? 1) > 1 ? t('life.block.confirm_snags', { n: b.count ?? 1 }) : t('life.block.confirm_snag');
+  return t(`life.block.${b.kind}` as Parameters<T>[0], { label: b.label ?? '', amount });
+}
+
+/** "Now" and "Next" in words. */
+export function stepLine(s: LifecycleStep, t: T): string {
+  if ((s.kind === 'design' || s.kind === 'stage') && s.label) return s.label;
+  if (s.kind === 'design') return t('life.phase.design');
+  return t(`life.step.${s.kind}` as Parameters<T>[0]);
+}
+
 export function LifecycleCard({ projectId, life, studio, onChanged, t }: { projectId: string; life: Lifecycle; studio: string; onChanged: () => void; t: T }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,14 +45,7 @@ export function LifecycleCard({ projectId, life, studio, onChanged, t }: { proje
     if (s.kind === 'design') return t('life.phase.design');
     return t(`life.step.${s.kind}` as Parameters<T>[0]);
   };
-  const b = life.blocker;
-  let blocker: string | null = null;
-  if (b) {
-    const amount = b.amountPaise !== null ? inr(b.amountPaise) : '';
-    if (b.kind === 'pay') blocker = ['snags', 'warranty'].includes(life.phase) ? t('life.block.payFinal', { amount }) : t('life.block.pay', { label: b.label ?? '', amount });
-    else if (b.kind === 'confirm_snag') blocker = (b.count ?? 1) > 1 ? t('life.block.confirm_snags', { n: b.count ?? 1 }) : t('life.block.confirm_snag');
-    else blocker = t(`life.block.${b.kind}` as Parameters<T>[0], { label: b.label ?? '', amount });
-  }
+  const blocker = blockerLine(life, t);
   const warranty = life.warrantyEndsOn ? t(life.warrantyEndsOn >= today ? 'life.warrantyUntil' : 'life.warrantyEnded', { date: shortDate(life.warrantyEndsOn) }) : null;
   /* The snag window (owner, 15 Oct 2026): until when snags may be raised, or that it has closed. */
   const snagWindow = life.snagWindowEndsOn
@@ -73,7 +83,7 @@ export function LifecycleCard({ projectId, life, studio, onChanged, t }: { proje
         <View style={styles.ask}>
           <Text style={[styles.eyebrow, { color: color.accentInk }]}>{t('life.yourTurn')}</Text>
           <Text style={styles.big}>{blocker}</Text>
-          {b?.kind === 'confirm_snag' ? (
+          {life.blocker?.kind === 'confirm_snag' ? (
             <Press onPress={() => router.push('/snags')} haptic={false} accessibilityRole="link">
               <Text style={styles.link}>{t('life.phase.snags')} →</Text>
             </Press>

@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const g = gate();
+  const g = gate('project');
   if (!g.ok) return g.response;
   const me = await signedIn();
   if (!me.ok) return me.response;
@@ -26,7 +26,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const g = gate();
+  const g = gate('project');
   if (!g.ok) return g.response;
   const me = await signedIn();
   if (!me.ok) return me.response;

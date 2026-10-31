@@ -419,3 +419,50 @@ describe('the whole sign-in round trip is reachable on every host', () => {
     expect(isAlwaysAllowed('/privacy-policy')).toBe(false);
   });
 });
+
+/**
+ * The clients' project app on its own address (owner, 1 Nov 2026): Hauspire's
+ * clients follow their projects while the choosing journey stays closed.
+ */
+describe('the project app (app.oneinteriors.in)', () => {
+  const APP = 'app.oneinteriors.in';
+  const SPLIT_APP: HostEnv = { ...SPLIT, APP_HOST: APP };
+  const PROJECTS: HostEnv = { ...SPLIT_APP, CUSTOMER_PROJECTS_LIVE: '1' };
+
+  it('answers for the app host by its exact name', () => {
+    expect(audienceFor(APP, SPLIT_APP)).toBe('app');
+    expect(audienceFor(`www.${APP}`, SPLIT_APP)).toBe('all');
+  });
+
+  it('is nothing at all until the project switch is on', () => {
+    expect(route(APP, '/', SPLIT_APP).kind).toBe('notFound');
+    expect(route(APP, '/app/home', SPLIT_APP).kind).toBe('notFound');
+  });
+
+  it('opens the project pages and sends / to the client home', () => {
+    expect(route(APP, '/', PROJECTS)).toEqual({ kind: 'redirect', to: '/app/home' });
+    for (const p of ['/app/home', '/app/project', '/app/project/moodboard', '/app/join/AB12CD', '/app/connect', '/app/chats', '/app/sign-in', '/app/password', '/app/signoff/x', '/app/me']) {
+      expect(route(APP, p, PROJECTS).kind, p).toBe('next');
+    }
+  });
+
+  it('keeps the choosing journey, the studio and ops off it', () => {
+    for (const p of ['/app', '/app/matches', '/app/coins', '/app/family', '/quiz', '/match', '/studio', '/ops', '/apply', '/studios']) {
+      expect(route(APP, p, PROJECTS).kind, p).toBe('notFound');
+    }
+  });
+
+  it('opens the choosing journey there too once the marketplace is live', () => {
+    expect(route(APP, '/app/matches', { ...SPLIT_APP, CUSTOMER_LIVE: '1' }).kind).toBe('next');
+  });
+
+  it('still lets sign-in, the API and the privacy notice through', () => {
+    for (const p of ['/api/app/v1/project', '/sign-in', '/privacy']) expect(route(APP, p, PROJECTS).kind, p).toBe('next');
+  });
+
+  it('opens only the project pages on a preview, and the studio host still refuses them', () => {
+    expect(route(PREVIEW, '/app/home', PROJECTS).kind).toBe('next');
+    expect(route(PREVIEW, '/app/matches', PROJECTS)).toEqual({ kind: 'redirect', to: '/' });
+    expect(route(STUDIO, '/app/home', PROJECTS).kind).toBe('notFound');
+  });
+});

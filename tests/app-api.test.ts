@@ -84,6 +84,17 @@ describe('the app API is closed until the marketplace opens', () => {
     if (!g.ok) expect(g.response.status).toBe(404);
   });
 
+  it('opens only the project routes with CUSTOMER_PROJECTS_LIVE alone', async () => {
+    vi.stubEnv('CUSTOMER_LIVE', '');
+    vi.stubEnv('CUSTOMER_PROJECTS_LIVE', '1');
+    const { gate } = await import('@/modules/app-api/http');
+    const journey = gate();
+    expect(journey.ok).toBe(false);
+    const project = gate('project');
+    // Past the switch: it then answers on the database, which a test run may not have.
+    if (!project.ok) expect(project.response.status).not.toBe(404);
+  });
+
   it('every route checks the gate first', () => {
     const root = join(process.cwd(), 'src/app/api/app');
     const routes: string[] = [];
@@ -99,7 +110,8 @@ describe('the app API is closed until the marketplace opens', () => {
     for (const path of routes) {
       const source = readFileSync(path, 'utf8');
       const handlers = source.match(/export async function (GET|POST|PUT|PATCH|DELETE)\b/g) ?? [];
-      const gates = source.match(/const g = gate\(\);\n\s+if \(!g\.ok\) return g\.response;/g) ?? [];
+      // `gate('project')`: the project app's routes, open with CUSTOMER_PROJECTS_LIVE alone (owner, 1 Nov 2026).
+      const gates = source.match(/const g = gate\((?:'project')?\);\r?\n\s+if \(!g\.ok\) return g\.response;/g) ?? [];
       expect(gates.length, path).toBe(handlers.length);
     }
   });

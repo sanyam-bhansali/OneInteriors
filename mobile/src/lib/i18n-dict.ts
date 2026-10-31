@@ -240,6 +240,19 @@ export const DICT = {
   'tab.project': { en: 'Project', hi: 'प्रोजेक्ट', mr: 'प्रोजेक्ट' },
   'tab.geio': { en: 'GEIO', hi: 'GEIO', mr: 'GEIO' },
   'tab.site': { en: 'Site', hi: 'साइट', mr: 'साइट' },
+  'tab.chats': { en: 'Chats', hi: 'चैट', mr: 'चॅट' },
+  'chats.team': { en: 'Your home team', hi: 'आपकी होम टीम', mr: 'तुमची होम टीम' },
+  'chats.soon': { en: 'Chat with your home team is coming here soon.', hi: 'आपकी होम टीम से चैट जल्द यहाँ आएगी।', mr: 'तुमच्या होम टीमशी चॅट लवकरच इथे येईल.' },
+  'chats.soon.body': {
+    en: 'Your designer, your site head and everyone at home, in one place, with photos and voice notes. Until then, call your designer.',
+    hi: 'आपके डिज़ाइनर, साइट हेड और घर के सब लोग, एक जगह, फ़ोटो और वॉइस नोट के साथ। तब तक अपने डिज़ाइनर को कॉल करें।',
+    mr: 'तुमचे डिझायनर, साइट हेड आणि घरचे सगळे, एकाच ठिकाणी, फोटो आणि व्हॉइस नोटसह. तोपर्यंत तुमच्या डिझायनरला कॉल करा.',
+  },
+  'chats.designer': { en: 'Designer', hi: 'डिज़ाइनर', mr: 'डिझायनर' },
+  'chats.pm': { en: 'Project manager', hi: 'प्रोजेक्ट मैनेजर', mr: 'प्रोजेक्ट मॅनेजर' },
+  'chats.call': { en: 'Call {name}', hi: '{name} को कॉल करें', mr: '{name} ला कॉल करा' },
+  'chats.callShort': { en: 'Call', hi: 'कॉल', mr: 'कॉल' },
+  'chats.none': { en: 'Your designer shows here once your studio adds them to your project.', hi: 'स्टूडियो के जोड़ने पर आपके डिज़ाइनर यहाँ दिखेंगे।', mr: 'स्टुडिओने जोडल्यावर तुमचे डिझायनर इथे दिसतील.' },
   'tab.me': { en: 'Me', hi: 'मैं', mr: 'मी' },
 
   // Me

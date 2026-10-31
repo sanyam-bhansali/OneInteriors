@@ -49,6 +49,11 @@ export const BackIcon = ({ color, size = 22 }: P) => (
     <Path d="M12.5 4.5 7 10l5.5 5.5" {...s(color)} />
   </Svg>
 );
+export const ChatIcon = ({ color, size = 22 }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Path d="M5 18.5V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H8.5Z" {...s(color)} />
+  </Svg>
+);
 export const PersonIcon = ({ color, size = 22 }: P) => (
   <Svg width={size} height={size} viewBox="0 0 24 24">
     <Circle cx="12" cy="8.5" r="3.5" {...s(color)} />

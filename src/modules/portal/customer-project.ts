@@ -20,6 +20,17 @@ import { CUSTOMER_PROJECT_SELECT, NO_LINKS, toCustomerProject, type CustomerProj
 
 export type { CustomerDecision, CustomerDocument, CustomerProject, CustomerSnag } from './customer-project-view';
 
+/** Whether this person has a project to open (their own, or one they joined as family). For the app's door (app/app/layout.tsx). */
+export async function hasLiveProject(userId: string): Promise<boolean> {
+  const n = await prisma.homeProject.count({
+    where: {
+      cancelledAt: null,
+      OR: [{ introduction: { brief: { userId } } }, { family: { some: { userId, joinedAt: { not: null }, removedAt: null } } }],
+    },
+  });
+  return n > 0;
+}
+
 /**
  * Every project on this customer's brief, or one they joined as family,
  * newest first. Empty when they have none yet.

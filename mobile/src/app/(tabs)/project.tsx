@@ -123,6 +123,14 @@ export default function Project() {
           <DesignCard design={p.design} studio={p.studio} owner={p.role !== 'family'} docs={p.documents} onChanged={() => void refresh()} t={t} />
         ) : null}
 
+        {/* Site moved inside Project when Chats took its tab (the owner's v1 screens, 1 Nov 2026). */}
+        <Press onPress={() => router.push('/site')} accessibilityRole="link" accessibilityLabel={t('tab.site')} style={styles.decisionTile}>
+          <Text style={[styles.tileTitle, { color: color.onDark }]}>{t('tab.site')}</Text>
+          <Text style={[styles.tileSub, { color: color.onDark2 }]} numberOfLines={2}>
+            {p.updates[0] ? `${p.updates[0].note || t('tab.site')} · ${dayLabel(p.updates[0].at)}` : t('site.none')}
+          </Text>
+        </Press>
+
         <View style={styles.row2}>
           <Stagger i={3} start={120} style={{ flex: 1 }}>
             <Press onPress={() => router.push('/snags')} accessibilityLabel={`${t('project.snags')}. ${snagSub}`} style={styles.snagTile}>

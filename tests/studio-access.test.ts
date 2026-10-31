@@ -100,6 +100,8 @@ const db = vi.hoisted(() => {
     },
     // Phase 5: a payment row, written after locking the project row.
     homeProjectPayment: { create: rec('homeProjectPayment.create', () => ({ id: 'pay-new' })) },
+    // 1 Nov 2026: a payment recorded before the client joined the app counts as paid (payments-flow.ts).
+    homeProjectInvite: { findMany: rec('homeProjectInvite.findMany', () => []) },
     $queryRaw: vi.fn(async () => []),
     homeProjectEvent: {
       create: rec('homeProjectEvent.create', () => ({ id: 'pe-new' })),

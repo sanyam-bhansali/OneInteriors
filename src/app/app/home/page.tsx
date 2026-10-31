@@ -1,19 +1,19 @@
 'use client';
 
 /**
- * Home, build stage (the owner's v1 screens): where the flat is, the one
- * decision due, and today's photos. The customer's real project when they
- * have one (useMyProject); the labelled example otherwise.
+ * Home (the owner's v1 screens). A real project shows format C, one thing at
+ * a time (OneThingHome.tsx, chosen 1 Nov 2026); with none, the labelled
+ * example's build-stage home: where the flat is, the decision due, today's
+ * photos.
  */
 
 import Link from 'next/link';
 import { Arrow, BellIcon, ExampleTag, Frame, Tabs, useBrief } from '@/components/app/ui';
-import { useMyProject, type MyProject } from '@/components/app/useMyProject';
+import { useMyProject } from '@/components/app/useMyProject';
 import { DECISION, EXAMPLE, PHOTOS, TODAY } from '@/modules/app/example-project';
-import { STAGE_SHORT, currentStage, dayLabel, dayOf, daysLate, pickDecision, shortDate, timeLabel } from '@/modules/app/project-view';
-import { formatINR } from '@/lib/money';
 import { useEffect, useState } from 'react';
 import { openedUpdateAction, walletAction } from '../engage/actions';
+import { OneThingHome } from './OneThingHome';
 
 interface HomeData {
   label: string;
@@ -43,48 +43,19 @@ const EXAMPLE_HOME: HomeData = {
   today: { label: EXAMPLE.today, photos: TODAY, note: null },
 };
 
-function realHome(p: MyProject): HomeData {
-  const latest = p.updates[0] ?? null;
-  const { stage } = currentStage(p.stages);
-  const { day, of } = dayOf(p.startOn, p.stages);
-  const d = pickDecision(p.decisions, null);
-  const late = daysLate(p.stages);
-  const open = d && (d.state === 'open' || d.state === 'due-soon') ? d : null;
-  return {
-    label: `With ${p.studio}`,
-    hero: latest?.photos[0] ?? null,
-    refreshed: latest ? `Updated from site ${dayLabel(latest.at)}, ${timeLabel(latest.at)}` : null,
-    stageLine: stage ? `${STAGE_SHORT[stage.key] ?? stage.label}, day ${day} of ${of}` : 'Handed over',
-    status: {
-      stage: stage ? `${STAGE_SHORT[stage.key] ?? stage.label} · ${stage.late ? 'running late' : 'on track'}` : null,
-      overall: `Overall · ${late ? `${late} day${late === 1 ? '' : 's'} late` : 'on time'}`,
-      late: late > 0,
-    },
-    stages: p.stages.map((s) => ({
-      label: STAGE_SHORT[s.key] ?? s.label,
-      state: s.state === 'done' ? 'done' : s.state === 'now' ? 'now' : 'next',
-    })),
-    decision: open ? { id: open.id, due: dayLabel(open.dueOn), title: open.title, why: open.why } : null,
-    today: {
-      label: latest ? dayLabel(latest.at) : '',
-      photos: (latest?.photos ?? []).slice(0, 3).map((src, i) => ({ src, alt: `Site photo ${i + 1}` })),
-      note: latest?.note ?? null,
-    },
-  };
-}
-
 export default function AppHome() {
   const [brief] = useBrief();
   const mine = useMyProject();
   const coins = useCoins(mine.state === 'real');
   if (mine.state === 'loading') return <Frame>{null}</Frame>;
-  const real = mine.state === 'real';
-  const name = brief?.contactName?.trim() || (real ? '' : 'Priya');
-  const h = real ? realHome(mine.project) : EXAMPLE_HOME;
+  /* A real project: format C, one thing at a time (the owner's pick, 1 Nov 2026). The example keeps the build-stage home. */
+  if (mine.state === 'real') return <OneThingHome project={mine.project} />;
+  const name = brief?.contactName?.trim() || 'Priya';
+  const h = EXAMPLE_HOME;
 
   return (
     <Frame>
-      {real ? null : <ExampleTag />}
+      <ExampleTag />
       <section className="oa-hero">
         {h.hero ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -148,25 +119,13 @@ export default function AppHome() {
               className="oa-cta"
               style={{ display: 'inline-flex', width: 'auto', paddingInline: 22 }}
             >
-              {real ? 'Decide' : 'Choose a finish'} <Arrow />
+              Choose a finish <Arrow />
             </Link>
           </div>
         ) : null}
 
-        {real && mine.project.money?.next ? (
-          <Link href="/app/project" className="oa-card oa-next-pay">
-            <span className="oa-label" style={{ margin: 0 }}>
-              Next payment{mine.project.money.next.dueOn ? `, due ${shortDate(mine.project.money.next.dueOn)}` : ''}
-            </span>
-            <b>{formatINR(mine.project.money.next.amountPaise)}</b>
-            <span className="oa-note">
-              To {mine.project.studio} for {mine.project.money.next.label.toLowerCase()}. You pay the studio directly; we keep track of it here.
-            </span>
-          </Link>
-        ) : null}
-
         <div className="oa-section-head" style={{ borderBottom: '1px solid var(--line)', paddingBottom: 10 }}>
-          <h2>{real ? 'Latest from site' : 'Today on site'}</h2>
+          <h2>Today on site</h2>
           <span className="oa-meta">{h.today.label}</span>
         </div>
         {h.today.photos.length ? (
@@ -198,9 +157,6 @@ export default function AppHome() {
           <b>Give 5,000 coins, get 5,000</b>
           <span className="oa-note">When a friend or neighbour signs. Three flats in your society earn everyone a bonus.</span>
         </Link>
-        {real && !mine.project.updates.length ? (
-          <p className="oa-note">The first update from site will appear here, and on your phone, as soon as the studio posts it.</p>
-        ) : null}
       </main>
       <Tabs />
     </Frame>

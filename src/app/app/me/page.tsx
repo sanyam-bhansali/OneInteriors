@@ -21,6 +21,7 @@ import { localityLabel } from '@/modules/brief/types';
 import { TIER } from '@/modules/quotation/tiers';
 import { walletAction } from '../engage/actions';
 import { LangPicker, useT } from '@/components/app/i18n';
+import { useProjectsOnly } from '@/components/app/mode';
 
 const HOMES: Record<string, string> = { BHK_1: '1 BHK', BHK_2: '2 BHK', BHK_3: '3 BHK', BHK_4_PLUS: '4+ BHK', VILLA: 'Villa' };
 const expert = ARCHITECT.name.split(' ')[0];
@@ -34,6 +35,7 @@ export default function AppMe() {
   const [me, setMe] = useState<Me | undefined>(undefined);
   const [unread, setUnread] = useState(0);
   const t = useT();
+  const only = useProjectsOnly();
   const [coins, setCoins] = useState<{ balance: number; streak: number } | null>(null);
 
   useEffect(() => {
@@ -98,6 +100,8 @@ export default function AppMe() {
             sub={unread ? t('me.unread', { n: unread }) : t('me.notifications.sub')}
             icon={<BellIcon />}
           />
+          {only ? null : (
+          <>
           <Row
             href="/app/coins"
             title={t('me.coins')}
@@ -111,6 +115,8 @@ export default function AppMe() {
           <Row href="/app/dream" title={t('me.dream')} sub={t('me.dream.sub')} />
           <Row href="/app/refer" title={t('me.refer')} sub={t('me.refer.sub')} />
           <Row href="/app/geio?ask=expert" title={t('me.expert', { expert })} sub={t('me.expert.sub')} />
+          </>
+          )}
           <Row href="/app/geio" title={t('me.geio')} sub={t('me.geio.sub')} />
           <Row href="/privacy" title={t('me.privacy')} sub={t('me.privacy.sub')} />
         </nav>
@@ -126,7 +132,7 @@ export default function AppMe() {
             {t('me.logout')}
           </button>
         ) : me === null ? (
-          <Link href="/sign-in?next=/app/me" className="oa-cta">
+          <Link href={`${only ? '/app/sign-in' : '/sign-in'}?next=/app/me`} className="oa-cta">
             {t('me.signIn')}
           </Link>
         ) : null}

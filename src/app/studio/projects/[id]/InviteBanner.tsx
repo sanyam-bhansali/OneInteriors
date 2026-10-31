@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { resendInviteAction } from '../start/actions';
+import { clientPasswordAction, resendInviteAction } from '../start/actions';
 
 /**
  * The studio's own client's invite to the app (docs/studio-workspace/
@@ -9,6 +9,8 @@ import { resendInviteAction } from '../start/actions';
  * yourself — customers never get WhatsApp from us, so the studio's own
  * WhatsApp or SMS to its client is the surest way. Copy buttons, the message
  * in English, Hindi and Marathi, and "send a new link" (the old one stops).
+ * Until sign-in codes are live the client signs in with a one-time password
+ * the studio makes here and hands over with the link (owner, 1 Nov 2026).
  */
 
 type Lang = 'en' | 'hi' | 'mr';
@@ -41,6 +43,16 @@ export function InviteBanner({
   const [copied, setCopied] = useState<'link' | 'message' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [oneTime, setOneTime] = useState<{ password: string; message: string } | null>(null);
+
+  const makePassword = () =>
+    start(async () => {
+      const r = await clientPasswordAction(projectId);
+      if (r.ok) {
+        setOneTime({ password: r.password, message: r.message });
+        setError(null);
+      } else setError(r.error);
+    });
 
   const copy = async (what: 'link' | 'message') => {
     try {
@@ -125,6 +137,23 @@ export function InviteBanner({
           </div>
         </>
       ) : null}
+ <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={makePassword}
+          className={quiet}
+          title="Signs the client out everywhere; they choose their own password when they next sign in"
+        >
+          {pending ? 'Making…' : joined ? 'New one-time password' : 'Make a one-time password'}
+        </button>
+        {oneTime ? (
+          <span className="text-[13px]">
+            <code className="mono rounded-[10px] bg-[var(--fill)] px-2.5 py-1.5 text-[14px]">{oneTime.password}</code>
+          </span>
+        ) : null}
+      </div>
+      {oneTime ? <p className="m-0 text-[13px] text-[var(--text2)]">{oneTime.message} It is shown only now.</p> : null}
       {error ? (
         <p role="alert" className="m-0 text-[13px] text-[var(--bad)]">
           {error}

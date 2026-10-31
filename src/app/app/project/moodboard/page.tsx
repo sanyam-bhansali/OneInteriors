@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Frame } from '@/components/app/ui';
 import { loadPrepPack } from '@/modules/prepare/prep';
+import { getCurrentUser } from '@/modules/auth/session';
+import { hasLiveProject } from '@/modules/portal/project-store';
 import { PrepClient } from '@/app/prepare/PrepClient';
 
 export const metadata: Metadata = { title: 'Your mood board', robots: { index: false, follow: false } };
@@ -18,6 +20,9 @@ export const dynamic = 'force-dynamic';
  */
 export default async function AppMoodBoard() {
   const prep = await loadPrepPack();
+  /* A studio's own client never fills in the choosing quiz: their project opens the board (owner, 1 Nov 2026). */
+  const user = prep && !prep.brief.completedAt ? await getCurrentUser() : null;
+  const open = Boolean(prep && (prep.brief.completedAt || (user && (await hasLiveProject(user.id)))));
   return (
     <Frame>
       <header className="oa-page-head">
@@ -27,7 +32,7 @@ export default async function AppMoodBoard() {
         <h1>Your mood board</h1>
       </header>
       <main className="oa-body">
-        {prep && prep.brief.completedAt ? (
+        {prep && open ? (
           <>
             <p className="oa-meta" style={{ margin: 0 }}>
               Pick what you like for each room. Your designer sees it.

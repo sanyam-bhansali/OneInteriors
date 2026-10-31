@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { hasOpened, Opening } from '../components/Opening';
 import { Button, ErrorText, Screen, Title } from '../components/ui';
 import { useAuth } from '../lib/auth';
+import { projectsOnly } from '../lib/config';
 import { VERIFIED_STUDIOS } from '../lib/claims';
 import { LANGS, useHeadline, useLang, useT, type Key, type Lang } from '../lib/i18n';
 import { useReducedMotion } from '../lib/motion';
@@ -34,6 +35,8 @@ export default function Index() {
   if (!opened) return <Opening onDone={() => setOpened(true)} />;
   if (state.status === 'loading') return <ShortLogo />;
   if (state.status === 'signed-in') return <Redirect href="/home" />;
+  /* Only the project app (owner, 1 Nov 2026): no welcome and quiz, straight to sign-in. */
+  if (state.status === 'signed-out' && projectsOnly()) return <Redirect href="/sign-in" />;
   if (state.status === 'offline') {
     return (
       <Screen footer={<Button label={t('welcomeApp.retry')} onPress={() => void retry()} />}>

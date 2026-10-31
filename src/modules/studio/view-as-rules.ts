@@ -126,7 +126,7 @@ function under(path: string, prefix: string): boolean {
  * — where the same browser may be using /ops in another tab, which this
  * leaves alone.
  */
-export function viewAsGate(input: { method: string; path: string; audience: 'studio' | 'ops' | 'public' | 'all'; nextAction: boolean; viewing: boolean }): 'allow' | 'block' {
+export function viewAsGate(input: { method: string; path: string; audience: 'studio' | 'ops' | 'public' | 'app' | 'all'; nextAction: boolean; viewing: boolean }): 'allow' | 'block' {
   if (!input.viewing) return 'allow';
   if (input.path === VIEW_AS_STOP_PATH) return 'allow';
   const m = input.method.toUpperCase();
