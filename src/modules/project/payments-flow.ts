@@ -166,7 +166,7 @@ async function writePayment(
   projectId: string,
   p: CheckedPayment,
   opts: { receipt?: { path: string; name: string; type: string; bytes: number } | null; correctsId?: string | null; changeOrderId?: string | null } = {},
-): Promise<{ ok: true; id: string; stageLabel: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; id: string; stageLabel: string; beforeJoining: boolean } | { ok: false; error: string }> {
   try {
     const out = await prisma.$transaction(async (tx) => {
       await lockProject(tx, projectId);
@@ -206,8 +206,14 @@ async function writePayment(
         receiptDocumentId = doc.id;
         await recordEvent(tx, { projectId, type: 'document.filed', actor: staff.actor, refId: doc.id, payload: { kind: 'RECEIPT' } });
       }
+      /* Received before the client joined the app (owner, 1 Nov 2026: Hauspire's accounts records what was
+         already paid before anyone is invited): counts as paid, as at bring-in, with no confirmation asked of
+         a client who is not in the app. Only a project with an invite nobody has opened yet. */
+      const invited = await tx.homeProjectInvite.findMany({ where: { projectId, revokedAt: null }, select: { joinedAt: true } });
+      const beforeJoining = invited.length > 0 && invited.every((i) => i.joinedAt === null);
       const row = await tx.homeProjectPayment.create({
         data: {
+          beforeJoining,
           projectId,
           stageIndex: p.stageIndex,
           amountPaise: toDb(p.amountPaise),
@@ -237,7 +243,7 @@ async function writePayment(
         },
       });
       await mirror(tx, projectId);
-      return { id: row.id, stageLabel: stage.label };
+      return { id: row.id, stageLabel: stage.label, beforeJoining };
     });
     return { ok: true, ...out };
   } catch (error) {
@@ -296,7 +302,8 @@ export async function recordPayment(
   if (!r.ok) return r;
   // Design steps the payment opens count from today's payment, not the plan (DESIGN-PROCESS-PLAN.md Decision 5).
   if (!opts.changeOrderId) await redateDesign(projectId, check.value.receivedOn, staff.userId);
-  if (staff.customerId) {
+  /* Nothing to confirm for a client not in the app yet: it already counts as paid. */
+  if (staff.customerId && !r.beforeJoining) {
     void notify(staff.customerId, { kind: 'payment-to-confirm', stage: r.stageLabel, amountPaise: check.value.amountPaise, studio: staff.studioName });
   }
   return { ok: true, id: r.id };

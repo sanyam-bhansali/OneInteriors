@@ -2,19 +2,19 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { CoinToast } from '../../components/brand';
-import { dayIso, dayOfIsoDay, timeline, week, type DayGroup } from '../../components/site/days';
-import { SiteDayView } from '../../components/site/SiteDayView';
-import { CubeIcon, SmallPill } from '../../components/site/parts';
-import { Body, DarkCard, Eyebrow, Loading, Meta, Rise, Screen, Stagger, Title } from '../../components/ui';
-import { api } from '../../lib/api';
-import { dayLabel, timeLabel } from '../../lib/format';
-import { useHeadline, useT, type T } from '../../lib/i18n';
-import { usePlan } from '../../lib/plan';
-import { useProfile } from '../../lib/profile';
-import { useProject } from '../../lib/project';
-import { color, font } from '../../lib/theme';
-import { STAGE_SHORT, type Project } from '../../lib/types';
+import { CoinToast } from '../components/brand';
+import { dayIso, dayOfIsoDay, timeline, week, type DayGroup } from '../components/site/days';
+import { SiteDayView } from '../components/site/SiteDayView';
+import { CubeIcon, SmallPill } from '../components/site/parts';
+import { Body, DarkCard, Eyebrow, Loading, Meta, Rise, Screen, Stagger, Title } from '../components/ui';
+import { api } from '../lib/api';
+import { dayLabel, timeLabel } from '../lib/format';
+import { useHeadline, useT, type T } from '../lib/i18n';
+import { usePlan } from '../lib/plan';
+import { useProfile } from '../lib/profile';
+import { useProject } from '../lib/project';
+import { color, font } from '../lib/theme';
+import { STAGE_SHORT, type Project } from '../lib/types';
 
 /**
  * On site (Feed.dc.html, screen 25): every working day, newest first. This
@@ -70,7 +70,7 @@ export default function Site() {
 
   if (!project) {
     return (
-      <Screen>
+      <Screen back>
         <View style={styles.body}>
           {header}
           <Body muted>{t('site.none')}</Body>
@@ -82,7 +82,7 @@ export default function Site() {
   const latest = items.findIndex((i) => i.kind !== 'gap');
   return (
     <View style={{ flex: 1 }}>
-      <Screen onRefresh={() => void refresh()} refreshing={refreshing}>
+      <Screen back onRefresh={() => void refresh()} refreshing={refreshing}>
         <View style={styles.body}>
           {header}
           {state.status === 'ready' && state.stale && state.error ? <Meta>{t('site.stale')}</Meta> : null}

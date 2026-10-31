@@ -4086,3 +4086,7 @@ html:is([lang="hi"], [lang="mr"]) .oa :is(h1, h2, h3, .oa-title, .oa-row-title, 
 html:is([lang="hi"], [lang="mr"]) .oa :is(.oa-sub, .oa-note, .oa-row-sub, p) {
   line-height: 1.6;
 }
+
+.oa-error {
+  color: #b3261e;
+}

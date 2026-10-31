@@ -165,6 +165,16 @@ function RealProject({ project, reload }: { project: MyProject; reload: () => vo
         {project.extras?.length ? <ExtrasCard extras={project.extras} onChanged={reload} /> : null}
 
         <div className="oa-list">
+          {/* Site moved inside Project when Chats took its tab (the owner's v1 screens, 1 Nov 2026). */}
+          <Link href="/app/site" className="oa-row" style={{ textDecoration: 'none' }}>
+            <span>
+              <span className="oa-row-title">On site</span>
+              <span className="oa-row-sub">
+                {project.updates[0] ? `Last update ${dayLabel(project.updates[0].at)}: photos from every working day` : 'Photos from every working day, once work starts on site'}
+              </span>
+            </span>
+            <span aria-hidden>→</span>
+          </Link>
           <Link href="/app/snags" className="oa-row" style={{ textDecoration: 'none' }}>
             <span>
               <span className="oa-row-title">Snags</span>

@@ -111,6 +111,13 @@ export async function featureReadiness(): Promise<FeatureReadiness[]> {
       needs: [present('FACEBOOK_APP_ID'), present('FACEBOOK_APP_SECRET')],
     },
     {
+      /* Owner, 1 Nov 2026: Hauspire's clients follow their projects before the marketplace opens. */
+      feature: 'Clients’ project app open (app.oneinteriors.in)',
+      ready: process.env.CUSTOMER_PROJECTS_LIVE?.trim() === '1' || process.env.CUSTOMER_LIVE?.trim() === '1',
+      fallback: 'Invite links and the phone app cannot sign in; the project pages redirect away.',
+      needs: [present('CUSTOMER_PROJECTS_LIVE'), present('APP_HOST')],
+    },
+    {
       feature: 'Customer marketplace open',
       ready: process.env.CUSTOMER_LIVE?.trim() === '1',
       fallback: 'The quiz, matches and compare redirect to the landing page.',

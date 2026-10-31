@@ -118,17 +118,17 @@ export function useBrief(): [Brief | null, (patch: Partial<Brief>) => void] {
   return [brief, update];
 }
 
-// ── After signing: the tab bar (v79) ──────────────────────────
+// ── After signing: the tab bar (the owner's v1 screens, 1 Nov 2026) ──
 //
-// Home · Project · GEIO · Site · Me. Snags and decisions live inside
-// Project, 3D inside Site, the Locker inside Me; GEIO is the orb in the
-// middle, so there is no floating button over the screens.
+// Home · Project · GEIO · Chats · Me. Site, snags and decisions live inside
+// Project (3D and the story inside Site), the Locker inside Me; GEIO is the
+// orb in the middle, so there is no floating button over the screens.
 
 const TABS = [
   { href: '/app/home', label: 'tab.home', icon: <HomeIcon />, also: [] as string[] },
-  { href: '/app/project', label: 'tab.project', icon: <ListIcon />, also: ['/app/snags', '/app/decision'] },
+  { href: '/app/project', label: 'tab.project', icon: <ListIcon />, also: ['/app/snags', '/app/decision', '/app/site', '/app/3d', '/app/story', '/app/signoff'] },
   { href: '/app/geio', label: 'tab.geio', icon: null, also: [] },
-  { href: '/app/site', label: 'tab.site', icon: <CameraIcon />, also: ['/app/3d', '/app/story'] },
+  { href: '/app/chats', label: 'tab.chats', icon: <ChatIcon />, also: [] },
   { href: '/app/me', label: 'tab.me', icon: <PersonIcon />, also: ['/app/locker', '/app/notifications', '/app/coins', '/app/family', '/app/dream', '/app/refer'] },
 ] as const;
 
@@ -193,6 +193,13 @@ export function CameraIcon() {
     <svg viewBox="0 0 24 24" aria-hidden {...S}>
       <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7H8l1.5-2h5L16 7h2.5A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5Z" />
       <circle cx="12" cy="13" r="3.5" />
+    </svg>
+  );
+}
+function ChatIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden {...S}>
+      <path d="M5 18.5V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H8.5Z" />
     </svg>
   );
 }

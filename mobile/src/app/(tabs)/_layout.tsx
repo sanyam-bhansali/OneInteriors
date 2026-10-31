@@ -2,7 +2,7 @@ import { Redirect, Tabs } from 'expo-router';
 import { useEffect } from 'react';
 import { Text, type ColorValue } from 'react-native';
 import { GeioOrb } from '../../components/brand';
-import { CameraIcon, HomeIcon, ListIcon, PersonIcon } from '../../components/icons';
+import { ChatIcon, HomeIcon, ListIcon, PersonIcon } from '../../components/icons';
 import { Loading } from '../../components/ui';
 import { useAuth } from '../../lib/auth';
 import { useT } from '../../lib/i18n';
@@ -10,8 +10,8 @@ import { registerForPush } from '../../lib/push';
 import { color, font } from '../../lib/theme';
 
 /**
- * The signed-in app's tab bar (v79 design): Home · Project · GEIO · Site · Me.
- * Snags and decisions open from Project, the Locker and settings from Me,
+ * The signed-in app's tab bar (the owner's v1 screens, 1 Nov 2026): Home ·
+ * Project · GEIO · Chats · Me. Site, snags and decisions open from Project, the Locker and settings from Me,
  * and GEIO is the orb in the middle (DESIGN-SPEC.md, Bottom bar: ink, 13 px
  * labels, the chosen tab in warm terracotta). Asks for notifications once,
  * on arrival.
@@ -43,7 +43,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="home" options={{ tabBarLabel: label(t('tab.home')), tabBarIcon: ({ color: c }) => <HomeIcon color={c} /> }} />
       <Tabs.Screen name="project" options={{ tabBarLabel: label(t('tab.project')), tabBarIcon: ({ color: c }) => <ListIcon color={c} /> }} />
       <Tabs.Screen name="geio" options={{ tabBarLabel: label(t('tab.geio')), tabBarAccessibilityLabel: t('me.geio'), tabBarIcon: () => <GeioOrb size={52} ring style={{ marginTop: -30 }} /> }} />
-      <Tabs.Screen name="site" options={{ tabBarLabel: label(t('tab.site')), tabBarIcon: ({ color: c }) => <CameraIcon color={c} /> }} />
+      <Tabs.Screen name="chats" options={{ tabBarLabel: label(t('tab.chats')), tabBarIcon: ({ color: c }) => <ChatIcon color={c} /> }} />
       <Tabs.Screen name="me" options={{ tabBarLabel: label(t('tab.me')), tabBarIcon: ({ color: c }) => <PersonIcon color={c} /> }} />
     </Tabs>
   );

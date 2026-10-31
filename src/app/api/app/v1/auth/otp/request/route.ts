@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
-  const g = gate();
+  const g = gate('project');
   if (!g.ok) return g.response;
 
   const body = (await readJson(req)) as Record<string, unknown> | null;

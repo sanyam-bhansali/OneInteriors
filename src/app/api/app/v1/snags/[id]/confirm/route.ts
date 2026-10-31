@@ -10,7 +10,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const g = gate();
+  const g = gate('project');
   if (!g.ok) return g.response;
   const me = await signedIn();
   if (!me.ok) return me.response;

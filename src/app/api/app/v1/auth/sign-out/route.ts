@@ -6,7 +6,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST() {
-  const g = gate();
+  const g = gate('project');
   if (!g.ok) return g.response;
   await signOut().catch(() => {});
   return json({ ok: true });

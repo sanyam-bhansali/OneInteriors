@@ -24,7 +24,7 @@ import { designLengthFor, bhkOf, HAUSPIRE_DESIGN } from '@/modules/studio-design
 import { randomBytes } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { siteUrl } from '@/lib/site';
+import { siteUrlFor } from '@/lib/site';
 import { sendNotice } from '@/modules/auth/email';
 import { smsProvider } from '@/modules/messaging/sms';
 import { createSignedProject, PLAN_TX } from '@/modules/portal/plan-write';
@@ -103,7 +103,8 @@ export function istToday(now = new Date()): string {
   return new Date(now.getTime() + 330 * 60_000).toISOString().slice(0, 10);
 }
 
-export const joinLink = (code: string) => new URL(`/app/join/${code}`, siteUrl()).toString();
+/** On the clients' app address when there is one (APP_HOST, owner 1 Nov 2026); the site otherwise. */
+export const joinLink = (code: string) => new URL(`/app/join/${code}`, siteUrlFor('app')).toString();
 
 // ── The quotations a project can start from ────────────────────
 

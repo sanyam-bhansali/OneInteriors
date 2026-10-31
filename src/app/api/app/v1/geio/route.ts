@@ -34,7 +34,7 @@ async function body(req: Request): Promise<Record<string, unknown> | null> {
 }
 
 export async function POST(req: Request) {
-  const g = gate();
+  const g = gate('project');
   if (!g.ok) return g.response;
   const me = await signedIn();
   if (!me.ok) return me.response;

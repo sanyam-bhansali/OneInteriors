@@ -42,7 +42,7 @@ export type ActionResult = { ok: true; id?: string } | { ok: false; error: strin
  * place. Re-exported, so callers and the tests that mock this module stay as
  * they were.
  */
-export { customerProjects } from './customer-project';
+export { customerProjects, hasLiveProject } from './customer-project';
 export type { CustomerDecision, CustomerDocument, CustomerProject, CustomerSnag } from './customer-project';
 
 // ── The customer's actions ─────────────────────────────────────

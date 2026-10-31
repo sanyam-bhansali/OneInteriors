@@ -18,14 +18,19 @@
       },
       "channel": "preview",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://one-interiors-git-claude-detailed-review-planni-fd1989-kairos20.vercel.app"
+        "EXPO_PUBLIC_API_URL": "https://app.oneinteriors.in",
+        "EXPO_PUBLIC_PROJECTS_ONLY": "1"
       }
     },
     "production": {
       "autoIncrement": true,
       "channel": "production",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://oneinteriors.in"
+        "EXPO_PUBLIC_API_URL": "https://app.oneinteriors.in",
+        "EXPO_PUBLIC_PROJECTS_ONLY": "1"
+      },
+      "android": {
+        "buildType": "app-bundle"
       }
     }
   },

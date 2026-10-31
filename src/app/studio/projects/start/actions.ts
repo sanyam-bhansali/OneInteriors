@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { currentMember } from '@/modules/studio/access';
 import { resendOwnInvite, startOwnProject } from '@/modules/project/own-project';
+import { setClientOneTimePassword } from '@/modules/auth/customer-password';
 
 /**
  * "Start a project" for the studio's own client
@@ -31,4 +32,9 @@ export async function resendInviteAction(projectId: string): Promise<{ ok: boole
   if (!r.ok) return { ok: false, error: r.error };
   revalidatePath(`/studio/projects/${projectId}`);
   return { ok: true };
+}
+
+/** A one-time password for the client to sign in to the app with (owner, 1 Nov 2026); shown once, handed over by the studio. */
+export async function clientPasswordAction(projectId: string): Promise<{ ok: true; password: string; message: string } | { ok: false; error: string }> {
+  return setClientOneTimePassword(String(projectId).slice(0, 64));
 }

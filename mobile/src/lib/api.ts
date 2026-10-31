@@ -47,7 +47,21 @@ export interface Me {
   phone: string | null;
 }
 
+/** Who to call about the home until chat is built (GET /contacts): the designer first. */
+export interface Contact {
+  name: string;
+  role: 'Designer' | 'Project manager';
+  phone: string | null;
+}
+
 export const api = {
+  /** The clients' sign-in while codes are not live (owner, 1 Nov 2026): mobile number and the studio's password. */
+  passwordSignIn: (phone: string, password: string) => call<{ token: string; mustChange: boolean }>('POST', '/auth/password', { phone, password }),
+  /** Replace the studio's one-time password with their own. */
+  choosePassword: (password: string) => call<object>('POST', '/auth/password/choose', { password }),
+  /** "Connect your project": the link or code the designer sent. */
+  join: (code: string) => call<{ studio: string }>('POST', '/join', { code }),
+  contacts: () => call<{ studio: string | null; contacts: Contact[] }>('GET', '/contacts'),
   requestCode: (phone: string, name: string) =>
     call<{ devCode?: string }>('POST', '/auth/otp/request', { phone, name }),
   verifyCode: (phone: string, code: string, name: string) =>

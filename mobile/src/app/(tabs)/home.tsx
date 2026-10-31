@@ -9,6 +9,8 @@ import { KenBurns, LightPill, RefreshChip, StageTrack, type TrackStage } from '.
 import { ArrowMark, BellMark } from '../../components/home/marks';
 import { Body, Button, DarkCard, Eyebrow, Loading, Press, Rise, StatusChip, Title } from '../../components/ui';
 import { api } from '../../lib/api';
+import { projectsOnly } from '../../lib/config';
+import { OneThingHome } from '../../components/home/one-thing';
 import { useAuth } from '../../lib/auth';
 import { dayLabel, inr, timeLabel } from '../../lib/format';
 import { useBrief } from '../../lib/brief';
@@ -57,6 +59,21 @@ export default function Home() {
   const name = auth.status === 'signed-in' ? (auth.user.name ?? '').trim().split(' ')[0] : '';
   const newCount = unread ?? profile.unread;
 
+  /* Only the project app (owner, 1 Nov 2026): format C for a real project, "Connect your project" without one. */
+  if (projectsOnly() && state.status === 'ready') {
+    return <OneThingHome p={state.project} name={name} unread={newCount} t={t} refreshing={refreshing} onRefresh={onRefresh} />;
+  }
+  if (projectsOnly() && state.status === 'none') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: color.paper }} edges={['top', 'left', 'right']}>
+        <ScrollView contentContainerStyle={{ padding: 20, gap: 18 }}>
+          <Title size={h1Size}>{t('one.none.h1')}</Title>
+          <Body muted>{t('one.none.body')}</Body>
+          <Button label={t('connect.cta')} onPress={() => router.push('/connect')} />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
   if (state.status === 'none') {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: color.paper }} edges={['top', 'left', 'right']}>

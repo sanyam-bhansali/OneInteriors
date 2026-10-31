@@ -103,6 +103,8 @@ export function makeDb() {
     },
     $queryRaw: async () => [],
     $transaction: async (fn: (tx: Row) => Promise<unknown>) => fn(client),
+    /* 1 Nov 2026: a payment recorded before the client joined counts as paid (payments-flow.ts). None here: the client is in the app. */
+    homeProjectInvite: { findMany: async () => [] },
     homeProjectPayment: {
       create: async (a: Row) => {
         const row = {

@@ -110,7 +110,7 @@ export function resolveSiteUrl(
  * every preview deployment.
  */
 export function siteUrlFor(
-  audience: 'studio' | 'ops' | 'public',
+  audience: 'studio' | 'ops' | 'public' | 'app',
   env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
 ): string {
   const host =
@@ -118,7 +118,9 @@ export function siteUrlFor(
       ? firstPresent(env.STUDIO_HOST)
       : audience === 'ops'
         ? firstPresent(env.OPS_HOST)
-        : firstPresent(env.PUBLIC_HOST);
+        : audience === 'app'
+          ? firstPresent(env.APP_HOST)
+          : firstPresent(env.PUBLIC_HOST);
 
   return host ? withProtocol(host) : resolveSiteUrl(env);
 }
@@ -143,7 +145,7 @@ export function siteUrlForHost(
   const h = (host ?? '').split(':')[0]?.trim().toLowerCase() ?? '';
   if (!h) return resolveSiteUrl(env);
 
-  for (const key of ['STUDIO_HOST', 'OPS_HOST', 'PUBLIC_HOST'] as const) {
+  for (const key of ['STUDIO_HOST', 'OPS_HOST', 'PUBLIC_HOST', 'APP_HOST'] as const) {
     const configured = firstPresent(env[key]);
     if (!configured) continue;
     const c = configured.replace(/^https?:\/\//i, '').split('/')[0]!.toLowerCase();

@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { hasDatabase } from '@/lib/env';
-import { customerLive } from '@/lib/host';
+import { customerLive, projectsLive } from '@/lib/host';
 import { getCurrentUser, hashIp, type AuthUser } from '@/modules/auth/session';
 import { addressOf, bucketFor, consume, waitPhrase, type Limit } from '@/modules/rate-limit/store';
 
@@ -28,8 +28,14 @@ export function fail(status: number, error: string): Response {
   return json({ ok: false, error }, status);
 }
 
-export function gate(): Gate {
-  if (!customerLive()) return { ok: false, response: fail(404, 'Not found.') };
+/**
+ * `project`: the project app's routes (sign-in, the project, its decisions,
+ * sign-offs, payments, snags), open with `CUSTOMER_PROJECTS_LIVE` alone
+ * (owner, 1 Nov 2026). Everything else is the choosing journey and waits for
+ * `CUSTOMER_LIVE`.
+ */
+export function gate(part: 'journey' | 'project' = 'journey'): Gate {
+  if (!(part === 'project' ? projectsLive() : customerLive())) return { ok: false, response: fail(404, 'Not found.') };
   if (!hasDatabase()) {
     return {
       ok: false,

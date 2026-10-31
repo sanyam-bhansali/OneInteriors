@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 const MAX_BYTES = 4 * 1024 * 1024;
 
 export async function POST(req: Request) {
-  const g = gate();
+  const g = gate('project');
   if (!g.ok) return g.response;
   const me = await signedIn();
   if (!me.ok) return me.response;

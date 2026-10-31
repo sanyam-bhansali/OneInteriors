@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { hasDatabase } from '@/lib/env';
+import { projectsOnly } from '@/lib/host';
 import { getCurrentUser } from '@/modules/auth/session';
 import { joinOwnProject, joinView } from '@/modules/project/own-project';
 import { switchNumberAction } from './actions';
@@ -33,13 +34,16 @@ export default async function JoinProjectPage({ params }: { params: Promise<{ co
       body={
         user
           ? `This link is for a different number. Sign in with ${view.phoneHint}, the number you gave ${view.studio}, to follow the work.`
-          : `Follow it here or in the One Interiors app: a site update every working day, the plan, payments and your documents. Sign in with ${view.phoneHint}.`
+          : `Follow it here: every design step, the site, payments and your documents. Steps ${view.studio} finished before today show as done. Sign in with ${view.phoneHint}${projectsOnly() ? ' and the password your designer gave you' : ''}.`
       }
-      cta={user ? undefined : { href: `/sign-in?next=${encodeURIComponent(`/app/join/${code}`)}`, label: 'Sign in to follow it' }}
+      cta={user ? undefined : { href: `${signInPath()}?next=${encodeURIComponent(`/app/join/${code}`)}`, label: 'Sign in to follow it' }}
       switchCode={user ? code : undefined}
     />
   );
 }
+
+/** The clients' password sign-in while only the project app is open (owner, 1 Nov 2026); the code sign-in once everything is. */
+const signInPath = () => (projectsOnly() ? '/app/sign-in' : '/sign-in');
 
 function Shell({ title, body, cta, switchCode }: { title: string; body: string; cta?: { href: string; label: string }; switchCode?: string }) {
   return (

@@ -11,6 +11,7 @@
  *   studio.oneinteriors.in   the practice software
  *   ops.oneinteriors.in      the console
  *   oneinteriors.in          the public site
+ *   app.oneinteriors.in      the clients' project app (APP_HOST, 1 Nov 2026)
  *
  * ## Why this is worth doing rather than just tidy
  *
@@ -38,7 +39,7 @@
  * the edge runtime and the tests import it directly.
  */
 
-export type Audience = 'studio' | 'ops' | 'public' | 'all';
+export type Audience = 'studio' | 'ops' | 'public' | 'app' | 'all';
 
 /**
  * What these functions read.
@@ -52,7 +53,11 @@ export interface HostEnv {
   STUDIO_HOST?: string | undefined;
   OPS_HOST?: string | undefined;
   PUBLIC_HOST?: string | undefined;
+  /** The clients' project app, app.oneinteriors.in (owner, 1 Nov 2026). */
+  APP_HOST?: string | undefined;
   CUSTOMER_LIVE?: string | undefined;
+  /** The project app alone, without the choosing journey (owner, 1 Nov 2026). */
+  CUSTOMER_PROJECTS_LIVE?: string | undefined;
   [key: string]: string | undefined;
 }
 
@@ -80,11 +85,13 @@ export function audienceFor(
   const studioHost = normaliseHost(env.STUDIO_HOST);
   const opsHost = normaliseHost(env.OPS_HOST);
   const publicHost = normaliseHost(env.PUBLIC_HOST);
+  const appHost = normaliseHost(env.APP_HOST);
 
-  // Neither configured: one origin, everything on. See the header.
-  if (!studioHost && !opsHost) return 'all';
+  // None configured: one origin, everything on. See the header.
+  if (!studioHost && !opsHost && !appHost) return 'all';
 
   const h = normaliseHost(host);
+  if (appHost && h === appHost) return 'app';
   if (studioHost && h === studioHost) return 'studio';
   if (opsHost && h === opsHost) return 'ops';
   if (publicHost && (h === publicHost || h === `www.${publicHost}`)) return 'public';
@@ -126,6 +133,34 @@ const CUSTOMER_APP = [
   '/account',
   '/quotes',
   '/shared',
+];
+
+/**
+ * The project app: what a client uses once their home's work has started
+ * (owner, 1 Nov 2026: Hauspire's clients first, before the choosing journey
+ * opens). `CUSTOMER_PROJECTS_LIVE` opens these alone; `CUSTOMER_LIVE` opens
+ * them with everything else. `/app` itself is the choosing journey's welcome,
+ * so it is not here, and nor are Coins, family, referrals, the dream board,
+ * the story and 3D, which wait for their own plan.
+ */
+const PROJECT_APP = [
+  '/app/home',
+  '/app/project',
+  '/app/site',
+  '/app/snags',
+  '/app/decision',
+  '/app/signoff',
+  '/app/locker',
+  '/app/me',
+  '/app/notifications',
+  '/app/chats',
+  /* The orb in the tab bar. Basic plans see it locked (geio-ask.ts `plan`), as decided 11 Oct. */
+  '/app/geio',
+  '/app/join',
+  '/app/connect',
+  '/app/sign-in',
+  '/app/password',
+  '/app/session',
 ];
 
 /**
@@ -197,6 +232,10 @@ export function isCustomerApp(path: string): boolean {
   return under(path, CUSTOMER_APP);
 }
 
+export function isProjectApp(path: string): boolean {
+  return under(path, PROJECT_APP);
+}
+
 export function isPublicPage(path: string): boolean {
   return under(path, PUBLIC_PAGES);
 }
@@ -204,6 +243,21 @@ export function isPublicPage(path: string): boolean {
 /** Has the customer marketplace been opened to the public? */
 export function customerLive(env: HostEnv = process.env): boolean {
   return env.CUSTOMER_LIVE?.trim() === '1';
+}
+
+/** Is the project app open: on its own (`CUSTOMER_PROJECTS_LIVE`), or with the whole customer side? */
+export function projectsLive(env: HostEnv = process.env): boolean {
+  return customerLive(env) || env.CUSTOMER_PROJECTS_LIVE?.trim() === '1';
+}
+
+/** Only the project app is open: the choosing journey is still closed. */
+export function projectsOnly(env: HostEnv = process.env): boolean {
+  return projectsLive(env) && !customerLive(env);
+}
+
+/** May this customer path answer? Everything when the marketplace is live; the project app when it alone is. */
+export function customerOpen(path: string, env: HostEnv = process.env): boolean {
+  return customerLive(env) || (projectsLive(env) && isProjectApp(path));
 }
 
 /** The path being rendered, set by `middleware.ts` on every request it passes on. */
@@ -247,7 +301,6 @@ export function route(
   if (isAlwaysAllowed(path)) return { kind: 'next' };
 
   const audience = audienceFor(host, env);
-  const live = customerLive(env);
 
   /* The studio phone sign-in. Its address is under /studio, but it has to be
      reachable signed out, and everything under app/studio sits inside the
@@ -270,16 +323,27 @@ export function route(
     return { kind: 'notFound' };
   }
 
+  /* The clients' app (owner, 1 Nov 2026): the customer pages that are open,
+     and nothing else — not the waitlist, not the studio, not ops. `/` opens
+     the client's home, which sends a signed-out visitor to sign in. */
+  if (audience === 'app') {
+    if (!projectsLive(env)) return { kind: 'notFound' };
+    if (path === '/') return { kind: 'redirect', to: '/app/home' };
+    if (isCustomerApp(path) || isPublicPage(path)) return customerOpen(path, env) ? { kind: 'next' } : { kind: 'notFound' };
+    return { kind: 'notFound' };
+  }
+
   if (audience === 'public') {
     // The two products live on their own hostnames now.
     if (under(path, ['/studio', '/ops', STUDIO_SIGN_IN_PAGE])) return { kind: 'notFound' };
-    if (!live && (isCustomerApp(path) || isPublicPage(path))) {
+    if (isPublicPage(path) && !customerLive(env)) return { kind: 'redirect', to: '/' };
+    if (isCustomerApp(path) && !customerOpen(path, env)) {
       return path === '/' ? { kind: 'next' } : { kind: 'redirect', to: '/' };
     }
     return { kind: 'next' };
   }
 
   // 'all' — one origin. Only the customer gate applies.
-  if (!live && isCustomerApp(path)) return { kind: 'redirect', to: '/' };
+  if (isCustomerApp(path) && !customerOpen(path, env)) return { kind: 'redirect', to: '/' };
   return { kind: 'next' };
 }
