@@ -88,6 +88,12 @@ export interface ExistingQuote {
   updatedAt: Date;
   /** `contentKey` of our copy as it stands. */
   content: string;
+  /**
+   * A live project was signed on it (its sales final or design final): never
+   * rewritten from the source, whatever `--previous` or `--replace` say
+   * (review, 31 Oct 2026). A change after signing is the project's to make.
+   */
+  signed?: boolean;
 }
 
 export interface ExistingClient {
@@ -125,6 +131,8 @@ export interface QuotePlan {
   /** For a Design Final: the source row id of its Sales Final, when the old app has one. */
   salesSourceId: string | null;
   existingId: string | null;
+  /** `--replace` moved it off this lead, to the one its mobile matches. */
+  movedFrom?: string;
 }
 
 export interface Unreadable {
@@ -301,13 +309,16 @@ export function planImport(input: {
       const changedThere = prior.content !== contentKey(mapped);
       const before = input.previous?.get(top.id);
       const editedHere = before !== undefined ? prior.content !== before : prior.importedAt ? prior.updatedAt.getTime() - prior.importedAt.getTime() > EDITED_AFTER_MS : true;
-      action = !changedThere ? 'same' : editedHere && !input.replace?.has(mapped.number) ? 'edited-here' : 'update';
+      /* --replace names Sales Finals: a Design Final of the same number is ours (2379-D), not the one named. */
+      const replaced = mapped.stage === 'sales' && Boolean(input.replace?.has(mapped.number));
+      action = !changedThere ? 'same' : prior.signed || (editedHere && !replaced) ? 'edited-here' : 'update';
     }
     report.byAction[action] += 1;
 
     let client: ClientRef;
-    const moved = prior?.clientId && action === 'update' && input.replace?.has(mapped.number) ? matchClient(mapped, input.clients) : null;
-    if (moved && moved.id !== null && moved.how === 'phone' && moved.id !== prior!.clientId) {
+    const moved = prior?.clientId && action === 'update' && mapped.stage === 'sales' && input.replace?.has(mapped.number) ? matchClient(mapped, input.clients) : null;
+    const movedFrom = moved && moved.id !== null && moved.how === 'phone' && moved.id !== prior!.clientId ? prior!.clientId! : undefined;
+    if (movedFrom && moved && moved.id !== null) {
       client = { kind: 'existing', id: moved.id, how: 'phone' };
       report.clients.byPhone += 1;
     } else if (prior?.clientId) {
@@ -335,6 +346,7 @@ export function planImport(input: {
       client,
       salesSourceId: mapped.stage === 'design' ? (salesByNumber.get(numberOf(top)) ?? null) : null,
       existingId: prior?.id ?? null,
+      ...(movedFrom ? { movedFrom } : {}),
     });
   }
 

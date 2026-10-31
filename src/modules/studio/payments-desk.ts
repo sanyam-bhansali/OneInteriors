@@ -31,7 +31,7 @@ export async function paymentsDesk(): Promise<DeskProject[]> {
   if (!member) return [];
   try {
     const rows = await prisma.homeProject.findMany({
-      where: projectsVisibleTo(member, 'payments'),
+      where: { ...projectsVisibleTo(member, 'payments'), cancelledAt: null },
       orderBy: { startOn: 'desc' },
       select: {
         id: true,

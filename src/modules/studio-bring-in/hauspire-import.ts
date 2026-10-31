@@ -77,6 +77,12 @@ export async function loadExisting(db: Db, studioId: string): Promise<{ existing
     }),
     db.studioClient.findMany({ where: { studioId, deletedAt: null }, select: { id: true, name: true, phone: true, locality: true, city: true } }),
   ]);
+  /* Quotations a live project was signed on, as its sales final or its design final: kept as they are. */
+  const live = await db.homeProject.findMany({
+    where: { cancelledAt: null, introduction: { studioId }, OR: [{ signedQuoteId: { in: quotes.map((q) => q.id) } }, { designFinalQuoteId: { in: quotes.map((q) => q.id) } }] },
+    select: { signedQuoteId: true, designFinalQuoteId: true },
+  });
+  const signed = new Set(live.flatMap((p) => [p.signedQuoteId, p.designFinalQuoteId]).filter((id): id is string => Boolean(id)));
   return {
     existing: quotes.map((q) => ({
       id: q.id,
@@ -85,6 +91,7 @@ export async function loadExisting(db: Db, studioId: string): Promise<{ existing
       clientId: q.clientId,
       importedAt: q.importedAt,
       updatedAt: q.updatedAt,
+      signed: signed.has(q.id),
       content: contentKey({
         lines: q.lines.map((l) => ({ ...l, code: l.code, unit: l.unit, ratePaise: Number(l.ratePaise), amountPaise: Number(l.amountPaise) })),
         terms: { feeBps: q.feeBps, discountBps: q.discountBps, onSpotPaise: Number(q.onSpotPaise), onSpotLabel: q.onSpotLabel, gstBps: q.gstBps, quoteDate: isoDay(q.quoteDate) },
@@ -179,6 +186,12 @@ export async function runHauspireImport(
             data: { ...termsData(q.mapped), ...clientData(q.mapped), ...(clientId ? { clientId } : {}), importedAt: now, lines: { create: linesData(q.mapped.lines) } },
           });
           await addRevisions(tx, studioId, q.existingId, [q.mapped], { advance, phases, source });
+          if (q.movedFrom && clientId) {
+            /* Both leads say it moved, as scripts/move-quote-lead.ts does. */
+            const why = `its mobile is this client's (${source === DEFAULT_SOURCE ? 'the Hauspire quotation app' : source})`;
+            await tx.studioClientEvent.create({ data: { studioId, clientId, kind: 'QUOTED', actor: 'SYSTEM', byName: source, summary: `Quotation ${q.mapped.number} moved here: ${why}`, meta: { quoteId: q.existingId, hauspireImport: true } as Prisma.InputJsonValue } });
+            await tx.studioClientEvent.create({ data: { studioId, clientId: q.movedFrom, kind: 'NOTE', actor: 'SYSTEM', byName: source, summary: `Quotation ${q.mapped.number} moved to another lead: ${why}`, meta: { quoteId: q.existingId, hauspireImport: true } as Prisma.InputJsonValue } });
+          }
           await stampImported(tx, studioId, q.existingId);
           written.quotesUpdated += 1;
           written.revisions += 1;

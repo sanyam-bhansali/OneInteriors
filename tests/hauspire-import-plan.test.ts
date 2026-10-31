@@ -146,6 +146,10 @@ describe('idempotent: run it again', () => {
     const p = planImport({ rows: [moved], existing: [edited], clients, replace: new Set([mapQuote(moved).number]) });
     expect(p.quotes[0]!.action).toBe('update');
     expect(p.quotes[0]!.client).toEqual({ kind: 'existing', id: 'c-phone', how: 'phone' });
+    expect(p.quotes[0]!.movedFrom).toBe('c-kept');
+    // Never the quotation a live project was signed on, named or not (review, 31 Oct 2026).
+    expect(planImport({ rows: [moved], existing: [{ ...edited, signed: true }], clients, replace: new Set([mapQuote(moved).number]) }).quotes[0]!.action).toBe('edited-here');
+    expect(planImport({ rows: [moved], existing: [{ ...base, content: 'older', signed: true }], clients, previous: new Map([['s1', 'older']]) }).quotes[0]!.action).toBe('edited-here');
     const kept = planImport({ rows: [moved], existing: [edited], clients, replace: new Set(['other']) });
     expect(kept.quotes[0]!.action).toBe('edited-here');
     expect(kept.quotes[0]!.client).toEqual({ kind: 'existing', id: 'c-kept', how: 'already' });
@@ -197,6 +201,7 @@ describe('a dry run writes nothing', () => {
     const db = {
       studioQuote: { findMany: async () => [], create: refuse, update: refuse },
       studioClient: { findMany: async () => clients, create: refuse },
+      homeProject: { findMany: async () => [] },
       auditLog: { create: refuse },
       $transaction: refuse,
     } as unknown as Parameters<typeof runHauspireImport>[0];

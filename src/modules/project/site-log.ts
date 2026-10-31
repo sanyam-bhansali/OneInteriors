@@ -392,7 +392,7 @@ export async function mySitesToday(now = new Date()): Promise<{ cards: SiteCard[
   const [studio, projects] = await Promise.all([
     prisma.studio.findUnique({ where: { id: member.studioId }, select: { tradeName: true, workingDays: true, holidays: { where: { day: dayToDb(today) }, select: { day: true } } } }),
     prisma.homeProject.findMany({
-      where: projectsVisibleTo(member),
+      where: { ...projectsVisibleTo(member), cancelledAt: null },
       orderBy: { startOn: 'desc' },
       select: {
         id: true,
@@ -703,7 +703,7 @@ export async function studioUpdateScore(now = new Date()): Promise<UpdateScore |
   const [studio, projects] = await Promise.all([
     prisma.studio.findUnique({ where: { id: member.studioId }, select: { workingDays: true, holidays: { where: { day: { gte: dayToDb(since) } }, select: { day: true } } } }),
     prisma.homeProject.findMany({
-      where: projectsVisibleTo(member),
+      where: { ...projectsVisibleTo(member), cancelledAt: null },
       select: {
         id: true,
         startOn: true,
