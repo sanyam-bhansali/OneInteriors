@@ -48,6 +48,8 @@ export interface SheetRow {
   format: QuoteFormat;
   /** The quotation it runs on, from an optional "Quote no" column ("2475", "XL-AMIT"); null when blank or no such column. */
   quoteNo: string | null;
+  /** The project's start, as the sheet writes it ("28-Dec"), from an optional "Date" column (owner, 1 Nov 2026); read by start-dates.ts. */
+  date?: string | null;
 }
 
 /** The sheet's stage (as `stageKey` reads it) → the new step the project is at. */
@@ -118,11 +120,11 @@ export type SheetRead = { ok: true; rows: SheetRow[]; problems: string[] } | { o
 export function readSheet(csv: string): SheetRead {
   const lines = csv.replace(/^﻿/, '').split(/\r?\n/);
   let header = -1;
-  let col = { client: -1, designer: -1, stage: -1, format: -1, quote: -1 };
+  let col = { client: -1, designer: -1, stage: -1, format: -1, quote: -1, date: -1 };
   for (let i = 0; i < lines.length && header < 0; i++) {
     const keys = cells(lines[i]!).map((c) => textKey(c));
     const at = (pred: (k: string) => boolean) => keys.findIndex(pred);
-    const c = { client: at((k) => k === 'client'), designer: at((k) => k === 'designer'), stage: at((k) => k === 'stage'), format: at((k) => k.startsWith('quotation')), quote: at((k) => k === 'quote no' || k === 'app quote no') };
+    const c = { client: at((k) => k === 'client'), designer: at((k) => k === 'designer'), stage: at((k) => k === 'stage'), format: at((k) => k.startsWith('quotation')), quote: at((k) => k === 'quote no' || k === 'app quote no'), date: at((k) => k === 'date' || k === 'start date') };
     if (c.client >= 0 && c.designer >= 0 && c.stage >= 0 && c.format >= 0) {
       header = i;
       col = c;
@@ -145,7 +147,7 @@ export function readSheet(csv: string): SheetRead {
     if (!format) problems.push(`line ${line} (${client}): quotation format "${c[col.format] ?? ''}" is neither old nor new`);
     if (!designer) problems.push(`line ${line} (${client}): no designer`);
     const quoteNo = col.quote >= 0 ? (c[col.quote] ?? '').trim() || null : null;
-    rows.push({ line, client, designer, stage, format: format ?? 'EXCEL', quoteNo });
+    rows.push({ line, client, designer, stage, format: format ?? 'EXCEL', quoteNo, ...(col.date >= 0 ? { date: (c[col.date] ?? '').trim() || null } : {}) });
   }
   const seen = new Map<string, number>();
   for (const r of rows) {
