@@ -157,7 +157,7 @@ export function StaleReview({ count, query }: { count: number; /** The page's fi
           <div className="cl-sheet" role="dialog" aria-modal="true" aria-labelledby="stale-title" style={{ maxWidth: 720 }}>
             <div className="sh">
               <h2 id="stale-title">
-                Clients gone quiet{' '}
+                Leads gone quiet{' '}
                 <span className="muted sm" style={{ fontWeight: 400 }}>
                   {total.toLocaleString('en-IN')} · no contact in {QUIET_AFTER_DAYS}+ days
                 </span>

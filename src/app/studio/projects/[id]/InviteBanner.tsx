@@ -11,6 +11,9 @@ import { clientPasswordAction, resendInviteAction } from '../start/actions';
  * in English, Hindi and Marathi, and "send a new link" (the old one stops).
  * Until sign-in codes are live the client signs in with a one-time password
  * the studio makes here and hands over with the link (owner, 1 Nov 2026).
+ * The link stays shareable after they join ("we need a sharable link here
+ * too", 1 Nov 2026): Share opens the phone's share sheet, or the studio's own
+ * WhatsApp on a laptop, and a fresh password copies together with the link.
  */
 
 type Lang = 'en' | 'hi' | 'mr';
@@ -40,7 +43,7 @@ export function InviteBanner({
   canResend: boolean;
 }) {
   const [lang, setLang] = useState<Lang>('en');
-  const [copied, setCopied] = useState<'link' | 'message' | null>(null);
+  const [copied, setCopied] = useState<'link' | 'message' | 'password' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [oneTime, setOneTime] = useState<{ password: string; message: string } | null>(null);
@@ -54,14 +57,39 @@ export function InviteBanner({
       } else setError(r.error);
     });
 
-  const copy = async (what: 'link' | 'message') => {
+  /* What the client needs to sign in: the link, and the one-time password once there is one. */
+  const signInText = (password: string | null) =>
+    password
+      ? `${customer}, your home project app: ${link}
+Sign in with your mobile number and this one-time password: ${password}
+You then choose your own password.`
+      : joined
+        ? `${customer}, your home project app: ${link}
+Sign in with your mobile number.`
+        : messages[lang];
+
+  const copy = async (what: 'link' | 'message' | 'password') => {
     try {
-      await navigator.clipboard.writeText(what === 'link' ? link : messages[lang]);
+      await navigator.clipboard.writeText(what === 'link' ? link : what === 'password' ? signInText(oneTime?.password ?? null) : messages[lang]);
       setCopied(what);
       setTimeout(() => setCopied(null), 2000);
     } catch {
       setError('Copying did not work here. Select the text and copy it.');
     }
+  };
+
+  /* The phone's share sheet where there is one; the studio's own WhatsApp otherwise (the studio messaging its own client; we never do). */
+  const share = async () => {
+    const text = signInText(oneTime?.password ?? null);
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ text });
+        return;
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') return;
+      }
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
   };
 
   const sent =
@@ -86,17 +114,23 @@ export function InviteBanner({
         </p>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <code className="min-w-0 break-all rounded-[10px] bg-[var(--fill)] mono px-2.5 py-1.5 text-[13px]">{link}</code>
+        <button type="button" onClick={() => copy('link')} className={quiet}>
+          {copied === 'link' ? 'Copied' : 'Copy link'}
+        </button>
+        <button type="button" onClick={share} className={quiet} title={`Send ${customer} the app link from your phone or WhatsApp`}>
+          Share
+        </button>
+        {!joined ? (
+          <span className="text-[12.5px] text-[var(--muted)]">
+            Code <span className="mono">{code}</span>
+          </span>
+        ) : null}
+      </div>
+
       {!joined ? (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            <code className="min-w-0 break-all rounded-[10px] bg-[var(--fill)] mono px-2.5 py-1.5 text-[13px]">{link}</code>
-            <button type="button" onClick={() => copy('link')} className={quiet}>
-              {copied === 'link' ? 'Copied' : 'Copy link'}
-            </button>
-            <span className="text-[12.5px] text-[var(--muted)]">
-              Code <span className="mono">{code}</span>
-            </span>
-          </div>
 
           <div>
             <div role="tablist" aria-label="Message language" className="tabs mb-2">
@@ -137,7 +171,7 @@ export function InviteBanner({
           </div>
         </>
       ) : null}
- <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           disabled={pending}
@@ -151,6 +185,11 @@ export function InviteBanner({
           <span className="text-[13px]">
             <code className="mono rounded-[10px] bg-[var(--fill)] px-2.5 py-1.5 text-[14px]">{oneTime.password}</code>
           </span>
+        ) : null}
+        {oneTime ? (
+          <button type="button" onClick={() => copy('password')} className={quiet}>
+            {copied === 'password' ? 'Copied' : 'Copy link and password'}
+          </button>
         ) : null}
       </div>
       {oneTime ? <p className="m-0 text-[13px] text-[var(--text2)]">{oneTime.message} It is shown only now.</p> : null}

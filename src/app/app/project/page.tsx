@@ -3,13 +3,14 @@
 /** Project tracker (v79 design): late, paid and handover up top, snags and decisions inside, payments and changes in rupees, then every stage. */
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { sharedMilestoneAction } from '../engage/actions';
 import { ExampleTag, Frame, Tabs } from '@/components/app/ui';
 import { useMyProject, type MyProject } from '@/components/app/useMyProject';
 import { CARPENTRY, EXAMPLE, MILESTONES } from '@/modules/app/example-project';
 import { dayLabel, daysLate, pickDecision, shortDate } from '@/modules/app/project-view';
 import { formatINR, formatINRCompact } from '@/lib/money';
+import { projectFocus, type Block } from '@/modules/app/project-focus';
 import { DesignCard } from './DesignCard';
 import { PaymentEntries } from './PaymentEntries';
 import { LifecycleCard } from './LifecycleCard';
@@ -95,13 +96,12 @@ function Progress({ pct, label }: { pct: number; label: string }) {
 }
 
 /**
- * The real project (v79 + trust fixes 5 and 7, and the step tracker):
- * how much of the home is done, overall delay, paid so far and handover up
- * top; snags and the next decision one tap away; the payment stages in
- * rupees with what is paid and what is next; every change made on a
- * decision, totalled; then every stage with its date, its percentage and
- * its steps — ticked with the day, or the day planned. Photos live in the
- * site feed, never here.
+ * The real project, laid out by where it is (owner, 1 Nov 2026; modules/app/
+ * project-focus.ts): in design only the design's progress and what matters
+ * now; on site the home's progress and today; at handover the snags, the
+ * sign-off and the last payment. Everything else — every stage, the full
+ * payments, the changes — waits under "See the whole plan". Photos live in
+ * the site feed, never here.
  */
 function RealProject({ project, reload }: { project: MyProject; reload: () => void }) {
   const late = daysLate(project.stages);
@@ -114,77 +114,78 @@ function RealProject({ project, reload }: { project: MyProject; reload: () => vo
   const tracker = project.tracker;
   // The server's per-stage steps line up with the stages only when both come from the plan.
   const tracked = tracker && tracker.stages.length === project.stages.length ? tracker.stages : null;
-  return (
-    <Frame>
-      <header className="oa-page-head">
-        <span className="oa-meta">
-          {project.studio}, since {shortDate(project.startOn)}
-        </span>
-        <h1>Your project</h1>
-      </header>
-      <main className="oa-body">
-        {project.progressPct !== null && project.progressPct !== undefined ? (
-          <section aria-label="How much is done" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+  const design = project.design && (project.design.pct !== null || project.design.steps.length > 0) ? project.design : null;
+  const layout = projectFocus({
+    phase: project.lifecycle?.phase,
+    designRunning: Boolean(design && !design.done),
+    snags: project.snags.length,
+    paymentToConfirm: (project.payments?.waitingPaise ?? 0) > 0,
+  });
+  const inDesign = layout.focus === 'design';
+
+  const block = (b: Block): ReactNode => {
+    switch (b) {
+      case 'progress': {
+        const pct = inDesign ? (design?.pct ?? null) : (project.progressPct ?? null);
+        if (pct === null) return null;
+        return (
+          <section aria-label={inDesign ? 'How much of the design is done' : 'How much is done'} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <span className="oa-meta">Done so far</span>
-              <b style={{ font: '600 28px var(--mono)' }}>{project.progressPct}%</b>
+              <span className="oa-meta">{inDesign ? 'Design so far' : 'Your home so far'}</span>
+              <b style={{ font: '600 28px var(--mono)' }}>{pct}%</b>
             </div>
-            <Progress pct={project.progressPct} label={`Your home is ${project.progressPct}% done`} />
+            <Progress pct={pct} label={inDesign ? `Your design is ${pct}% done` : `Your home is ${pct}% done`} />
             <p className="oa-note" style={{ margin: 0 }}>
-              Goes up as {project.studio} ticks off each step, with a photo you can see in Site.
+              {inDesign
+                ? `Goes up as ${project.studio} finishes each design step${design?.designer ? ` with ${design.designer}` : ''}.`
+                : `Goes up as ${project.studio} ticks off each step, with a photo you can see in Site.`}
             </p>
+            {/* Days the design waited on them (owner, 27 Oct 2026); never the studio's own delays. */}
+            {inDesign && design && design.clientDelayDays > 0 ? (
+              <span className="oa-meta">
+                Waited on you so far: {design.clientDelayDays} day{design.clientDelayDays === 1 ? '' : 's'}
+              </span>
+            ) : null}
           </section>
-        ) : null}
-        <div className="oa-stats">
-          <div>
-            <span className="oa-meta">Overall</span>
-            <b style={late ? { color: 'var(--accent-ink)' } : { color: 'var(--ok)' }}>{late ? `${late} day${late === 1 ? '' : 's'} late` : 'On time'}</b>
+        );
+      }
+      case 'stats':
+        return (
+          <div className="oa-stats">
+            <div>
+              <span className="oa-meta">Overall</span>
+              <b style={late ? { color: 'var(--accent-ink)' } : { color: 'var(--ok)' }}>{late ? `${late} day${late === 1 ? '' : 's'} late` : 'On time'}</b>
+            </div>
+            <div>
+              <span className="oa-meta">Paid</span>
+              {money ? (
+                <b>
+                  {formatINRCompact(money.paidPaise)}{' '}
+                  <small style={{ fontSize: 13, fontWeight: 400, color: 'var(--ink-2)' }}>of {formatINRCompact(money.contractPaise)}</small>
+                </b>
+              ) : (
+                <b>—</b>
+              )}
+            </div>
+            <div>
+              <span className="oa-meta">Handover</span>
+              <b>{handover ? shortDate(handover.targetOn) : '—'}</b>
+            </div>
           </div>
-          <div>
-            <span className="oa-meta">Paid</span>
-            {money ? (
-              <b>
-                {formatINRCompact(money.paidPaise)}{' '}
-                <small style={{ fontSize: 13, fontWeight: 400, color: 'var(--ink-2)' }}>of {formatINRCompact(money.contractPaise)}</small>
-              </b>
-            ) : (
-              <b>—</b>
-            )}
-          </div>
-          <div>
-            <span className="oa-meta">Handover</span>
-            <b>{handover ? shortDate(handover.targetOn) : '—'}</b>
-          </div>
-        </div>
-
-        {/* The project lifecycle: current step, next step, and what unlocks it (or nothing needed). */}
-        <LifecycleCard project={project} onChanged={reload} />
-
-        {/* Change orders and digital sign-off (15 Oct 2026): quotations to sign, extra work to approve and pay. */}
-        {project.signoffs?.length ? <SignoffsCard signoffs={project.signoffs} /> : null}
-        {project.extras?.length ? <ExtrasCard extras={project.extras} onChanged={reload} /> : null}
-
-        <div className="oa-list">
-          {/* Site moved inside Project when Chats took its tab (the owner's v1 screens, 1 Nov 2026). */}
-          <Link href="/app/site" className="oa-row" style={{ textDecoration: 'none' }}>
-            <span>
-              <span className="oa-row-title">On site</span>
-              <span className="oa-row-sub">
-                {project.updates[0] ? `Last update ${dayLabel(project.updates[0].at)}: photos from every working day` : 'Photos from every working day, once work starts on site'}
-              </span>
-            </span>
-            <span aria-hidden>→</span>
-          </Link>
-          <Link href="/app/snags" className="oa-row" style={{ textDecoration: 'none' }}>
-            <span>
-              <span className="oa-row-title">Snags</span>
-              <span className="oa-row-sub">
-                {project.snags.length ? `${open} open · ${fixed} fixed` : 'Nothing raised. Photograph anything that is not right.'}
-              </span>
-            </span>
-            <span aria-hidden>→</span>
-          </Link>
-          {pending ? (
+        );
+      case 'lifecycle':
+        return <LifecycleCard project={project} onChanged={reload} />;
+      case 'signoffs':
+        /* Change orders and digital sign-off (15 Oct 2026): quotations to sign, extra work to approve and pay. */
+        return (
+          <>
+            {project.signoffs?.length ? <SignoffsCard signoffs={project.signoffs} /> : null}
+            {project.extras?.length ? <ExtrasCard extras={project.extras} onChanged={reload} /> : null}
+          </>
+        );
+      case 'decision':
+        return pending ? (
+          <div className="oa-list">
             <Link href={`/app/decision?id=${pending.id}`} className="oa-row" style={{ textDecoration: 'none' }}>
               <span>
                 <span className="oa-row-title">Your decision</span>
@@ -194,64 +195,146 @@ function RealProject({ project, reload }: { project: MyProject; reload: () => vo
               </span>
               <span aria-hidden>→</span>
             </Link>
-          ) : null}
-        </div>
-
-        {/* Studio OS Phase 2: the design phase, while it runs and once it closes. */}
-        {project.design && (project.design.pct !== null || project.design.steps.length > 0) && (!project.design.done || project.design.changes) ? (
-          <DesignCard design={project.design} studio={project.studio} owner={project.role === 'owner'} docs={project.documents} onChanged={reload} />
-        ) : null}
-
-        {money ? <Payments money={money} studio={project.studio} payments={project.payments} owner={project.role === 'owner'} onChanged={reload} /> : null}
-        {project.changes.items.length ? <Changes changes={project.changes} contractPaise={money?.contractPaise ?? null} /> : null}
-
-        <div className="oa-section-head">
-          <h2>Every stage</h2>
-        </div>
-        <ol className="oa-timeline">
-          {project.stages.map((s, i) => (
-            <li key={s.key} className={`oa-tl ${s.state === 'done' ? 'done' : s.state === 'now' ? 'now' : 'next'}`}>
-              <h3 style={s.state === 'next' || s.state === 'later' ? { color: 'var(--ink-2)' } : undefined}>
-                {s.state === 'now' ? `${s.label}, now` : s.label}
-              </h3>
-              <p style={MONO}>
-                {s.state === 'done' ? 'Done' : `Planned ${shortDate(s.targetOn)}`}
-                {s.state === 'now' ? (s.late ? ' · running late' : ' · on track') : ''}
-                {tracked?.[i] ? ` · ${tracked[i]!.progressPct}% done` : ''}
-              </p>
-              {tracked?.[i] && tracked[i]!.steps.length ? <StageMilestones stage={tracked[i]!} /> : null}
-              {s.state === 'done' && project.role === 'owner' ? <ShareMilestone stageKey={s.key} label={s.label} studio={project.studio} /> : null}
-              {s.late ? (
-                <div className="oa-flag">
-                  <span className="oa-meta" style={{ color: 'var(--accent-ink)' }}>
-                    Past its date
-                  </span>
-                  <p style={{ margin: '6px 0 0' }}>Planned for {shortDate(s.targetOn)} and not marked done yet. Your expert is following it up.</p>
-                </div>
-              ) : null}
-            </li>
-          ))}
-        </ol>
-
-        {!money && project.phases ? (
+          </div>
+        ) : null;
+      case 'design':
+        return design ? <DesignCard design={design} studio={project.studio} owner={project.role === 'owner'} docs={project.documents} onChanged={reload} hideProgress={inDesign} /> : null;
+      case 'site':
+        return (
+          <div className="oa-list">
+            {/* Site moved inside Project when Chats took its tab (the owner's v1 screens, 1 Nov 2026). */}
+            <Link href="/app/site" className="oa-row" style={{ textDecoration: 'none' }}>
+              <span>
+                <span className="oa-row-title">On site</span>
+                <span className="oa-row-sub">
+                  {project.updates[0] ? `Last update ${dayLabel(project.updates[0].at)}: photos from every working day` : 'Photos from every working day, once work starts on site'}
+                </span>
+              </span>
+              <span aria-hidden>→</span>
+            </Link>
+          </div>
+        );
+      case 'snags':
+        return (
+          <div className="oa-list">
+            <Link href="/app/snags" className="oa-row" style={{ textDecoration: 'none' }}>
+              <span>
+                <span className="oa-row-title">Snags</span>
+                <span className="oa-row-sub">{project.snags.length ? `${open} open · ${fixed} fixed` : 'Nothing raised. Photograph anything that is not right.'}</span>
+              </span>
+              <span aria-hidden>→</span>
+            </Link>
+          </div>
+        );
+      case 'nextPayment':
+        return <NextPayment money={money} phases={project.phases} studio={project.studio} />;
+      case 'payments':
+        return money ? <Payments money={money} studio={project.studio} payments={project.payments} owner={project.role === 'owner'} onChanged={reload} /> : null;
+      case 'changes':
+        return project.changes.items.length ? <Changes changes={project.changes} contractPaise={money?.contractPaise ?? null} /> : null;
+      case 'stages':
+        return (
           <>
             <div className="oa-section-head">
-              <h2>Payment plan</h2>
-              <span className="oa-meta">You pay the studio</span>
+              <h2>Every stage</h2>
             </div>
-            <ul className="oa-items" style={{ marginTop: 0 }}>
-              {project.phases.map((p) => (
-                <li key={p.label} className="next">
-                  <span>{p.label}</span>
-                  <span>{p.pct}%</span>
+            <ol className="oa-timeline">
+              {project.stages.map((s, i) => (
+                <li key={s.key} className={`oa-tl ${s.state === 'done' ? 'done' : s.state === 'now' ? 'now' : 'next'}`}>
+                  <h3 style={s.state === 'next' || s.state === 'later' ? { color: 'var(--ink-2)' } : undefined}>{s.state === 'now' ? `${s.label}, now` : s.label}</h3>
+                  <p style={MONO}>
+                    {s.state === 'done' ? 'Done' : `Planned ${shortDate(s.targetOn)}`}
+                    {s.state === 'now' ? (s.late ? ' · running late' : ' · on track') : ''}
+                    {tracked?.[i] ? ` · ${tracked[i]!.progressPct}% done` : ''}
+                  </p>
+                  {tracked?.[i] && tracked[i]!.steps.length ? <StageMilestones stage={tracked[i]!} /> : null}
+                  {s.state === 'done' && project.role === 'owner' ? <ShareMilestone stageKey={s.key} label={s.label} studio={project.studio} /> : null}
+                  {s.late ? (
+                    <div className="oa-flag">
+                      <span className="oa-meta" style={{ color: 'var(--accent-ink)' }}>
+                        Past its date
+                      </span>
+                      <p style={{ margin: '6px 0 0' }}>Planned for {shortDate(s.targetOn)} and not marked done yet. Your expert is following it up.</p>
+                    </div>
+                  ) : null}
                 </li>
               ))}
-            </ul>
+            </ol>
           </>
+        );
+    }
+  };
+
+  return (
+    <Frame>
+      <header className="oa-page-head">
+        <span className="oa-meta">
+          {project.studio}, since {shortDate(project.startOn)}
+        </span>
+        <h1>{inDesign ? 'Your design' : layout.focus === 'handover' ? 'Your handover' : 'Your home'}</h1>
+      </header>
+      <main className="oa-body">
+        {layout.main.map((b) => (
+          <Fragment key={b}>{block(b)}</Fragment>
+        ))}
+        {layout.folded.length ? (
+          <details>
+            <summary className="oa-row" style={{ cursor: 'pointer', listStyle: 'none' }}>
+              <span>
+                <span className="oa-row-title">See the whole plan</span>
+                <span className="oa-row-sub">{inDesign ? 'Every stage after design, site, snags and all payments' : 'Every stage, all payments and changes'}</span>
+              </span>
+              <span aria-hidden>↓</span>
+            </summary>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 14 }}>
+              {layout.folded.map((b) => (
+                <Fragment key={b}>{block(b)}</Fragment>
+              ))}
+            </div>
+          </details>
         ) : null}
       </main>
       <Tabs />
     </Frame>
+  );
+}
+
+/** The next payment alone: amount, stage and when (the whole plan has the rest). */
+function NextPayment({ money, phases, studio }: { money: MyProject['money']; phases: MyProject['phases']; studio: string }) {
+  if (!money) {
+    if (!phases?.length) return null;
+    return (
+      <section className="oa-card" aria-label="Payment plan">
+        <span className="oa-meta">Payment plan · you pay {studio}</span>
+        <ul className="oa-items" style={{ marginTop: 6 }}>
+          {phases.map((p) => (
+            <li key={p.label} className="next">
+              <span>{p.label}</span>
+              <span>{p.pct}%</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
+  const next = money.next;
+  return (
+    <section className="oa-card" aria-label="Next payment">
+      <span className="oa-meta">{next ? 'Next payment' : 'Payments'}</span>
+      {next ? (
+        <>
+          <b style={{ display: 'block', font: '600 26px var(--mono)', marginTop: 4 }}>{formatINR(next.amountPaise)}</b>
+          <p className="oa-note" style={{ margin: '4px 0 0' }}>
+            {next.label} · to {studio}
+            {next.dueOn ? `, due ${shortDate(next.dueOn)}` : ', when this stage starts'}
+          </p>
+        </>
+      ) : (
+        <p className="oa-note" style={{ margin: '4px 0 0' }}>
+          All paid: {formatINR(money.paidPaise)}.
+        </p>
+      )}
+    </section>
   );
 }
 

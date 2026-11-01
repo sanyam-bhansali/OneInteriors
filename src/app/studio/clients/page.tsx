@@ -51,7 +51,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
     return (
       <main className="content cl-page">
         <div className="empty">
-          <b>Clients are for the people who work them.</b>
+          <b>Leads are for the people who work them.</b>
           <span className="muted">Ask your studio owner if you should see them.</span>
         </div>
       </main>
@@ -101,7 +101,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   const mayImport = mayOpen(scope.member, '/studio/clients/import');
   /* Download the list (improvement 8, owner 22 Oct 2026): the owner only, with these filters and this sort; audited in lead-export.ts. */
   const mayExport = can(scope.member, 'lead.export') && !poolView;
-  const title = poolView ? 'The pool' : seesAll ? 'Clients' : team ? 'My team’s leads' : 'My leads';
+  const title = poolView ? 'The pool' : seesAll ? 'Leads' : team ? 'My team’s leads' : 'My leads';
   const sub = poolView
     ? 'Leads nobody has yet. Claim one and it is yours.'
     : seesAll

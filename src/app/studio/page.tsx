@@ -200,7 +200,7 @@ export default async function StudioHome() {
             <div className="chead" style={{ paddingBottom: 8 }}>
               <h2 id="h-wait">Waiting on you</h2>
               <Link href="/studio/clients" className="btn ghost sm">
-                All clients
+                All leads
               </Link>
             </div>
             {dueCount === 0 ? (

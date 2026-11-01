@@ -23,7 +23,24 @@ import { ProgressBar } from './tracker';
  * against the first quotation. Everything comes from the server's projection;
  * nothing here works a state out.
  */
-export function DesignCard({ design, studio, owner, docs, onChanged, t }: { design: Design; studio: string; owner: boolean; docs: Doc[]; onChanged: () => void; t: T }) {
+export function DesignCard({
+  design,
+  studio,
+  owner,
+  docs,
+  onChanged,
+  t,
+  hideProgress = false,
+}: {
+  design: Design;
+  studio: string;
+  owner: boolean;
+  docs: Doc[];
+  onChanged: () => void;
+  t: T;
+  /** The Project screen already shows the design's % on top (project-focus.ts). */
+  hideProgress?: boolean;
+}) {
   const [showSteps, setShowSteps] = useState(false);
   const next = design.next;
   const urlOf = (id: string) => docs.find((d) => d.id === id)?.url ?? '';
@@ -34,7 +51,7 @@ export function DesignCard({ design, studio, owner, docs, onChanged, t }: { desi
         <Text style={styles.title}>{t('design.title')}</Text>
         <Meta>{design.designer ? t('design.with', { name: design.designer }) : studio}</Meta>
       </View>
-      {typeof design.pct === 'number' ? (
+      {typeof design.pct === 'number' && !hideProgress ? (
         <View style={{ gap: 6 }}>
           <Text style={styles.pct}>{design.pct}%</Text>
           <ProgressBar pct={design.pct} label={t('design.pct.a11y', { n: design.pct })} />

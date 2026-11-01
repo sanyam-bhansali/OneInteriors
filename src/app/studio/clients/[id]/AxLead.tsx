@@ -123,7 +123,7 @@ export function LeadHeader({
         className="cl-back"
       >
         {icon('M15 18l-6-6 6-6')}
-        Clients
+        Leads
       </Link>
 
       <div className="cl-lhead">
