@@ -83,6 +83,12 @@ const DRAW: Record<Exclude<AppIconName, 'inbox'>, React.ReactNode> = {
       <path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8" />
     </g>
   ),
+  chat: (
+    <g className="a-float">
+      <path d="M5 18.5V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H8.5Z" />
+      <path d="M9 10h6M9 13h3.5" />
+    </g>
+  ),
   gear: (
     <g className="a-gear">
       <circle cx="12" cy="12" r="3" />

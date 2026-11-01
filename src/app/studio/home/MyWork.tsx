@@ -4,7 +4,8 @@ import { EMPTY_LINE, type Bucket, type MyWork as Work, type WorkGroup, type Work
 
 /**
  * My work (owner, 15 Oct 2026): the first block on every role's home and on
- * site mode's Today — **Today**, **Next 3 days**, **Missed** — each with its
+ * site mode's Today — **Today**, **Next 3 days**, **Missed**, and under them
+ * **Next month** (owner, 1 Nov 2026), folded, by week — each with its
  * count, each item naming what, which project or lead, when, and opening the
  * exact place it is done. Lists from studio/my-work-rules.ts; no client
  * state: a long section folds the rest under "Show N more".
@@ -14,6 +15,8 @@ export interface WorkLabels {
   title: string;
   today: string;
   soon: string;
+  /** "Next month" (owner, 1 Nov 2026): folded under the three lists. */
+  month: string;
   missed: string;
   empty: Record<Bucket, string>;
   /** "Show 4 more". */
@@ -28,6 +31,7 @@ export const WORK_LABELS: WorkLabels = {
   title: 'My work',
   today: 'Today',
   soon: 'Next 3 days',
+  month: 'Next month',
   missed: 'Missed',
   empty: EMPTY_LINE,
   showMore: (n) => `Show ${n} more`,
@@ -108,6 +112,7 @@ function Section({ id, title, count, tone, more, labels, children }: { id: Bucke
 export function MyWork({ work, labels = WORK_LABELS, className = '' }: { work: Work; labels?: WorkLabels; className?: string }) {
   const todayItems = work.todayGroups.reduce((n, g) => n + g.items.length, 0);
   const soonItems = work.soonGroups.reduce((n, g) => n + g.items.length, 0);
+  const monthItems = work.monthGroups.reduce((n, g) => n + g.items.length, 0);
   return (
     <section className={`card mw ${className}`} aria-labelledby="mw-title" data-testid="my-work">
       <div className="chead">
@@ -124,6 +129,14 @@ export function MyWork({ work, labels = WORK_LABELS, className = '' }: { work: W
           <Items items={work.missed} labels={labels} />
         </Section>
       </div>
+      <details className="mw-month" data-testid="mywork-month">
+        <summary className="mw-h">
+          <span>{labels.month}</span>
+          <span className={`chip ${work.counts.month > 0 ? 'ink' : ''}`}>{work.counts.month}</span>
+        </summary>
+        {work.counts.month === 0 ? <p className="muted sm mw-empty">{labels.empty.month}</p> : <Groups groups={work.monthGroups} labels={labels} />}
+        {work.counts.month - monthItems > 0 ? <p className="muted sm mw-empty">{labels.notShown(work.counts.month - monthItems)}</p> : null}
+      </details>
       {(work.waiting ?? []).length > 0 ? (
         // Steps that open when a payment is recorded: never late, so never in Missed (DESIGN-PROCESS-PLAN.md Decision 5).
         <details className="mw-waiting">

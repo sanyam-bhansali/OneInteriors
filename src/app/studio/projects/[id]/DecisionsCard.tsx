@@ -52,6 +52,12 @@ export function DecisionsCard({ data, customer }: { data: StudioDecisions; custo
           return (
             <li key={d.id} id={`decision-${d.id}`} className="flex flex-col gap-1 border-t border-[var(--fill2)] pt-2.5 text-[13.5px]">
               <span className="font-medium">{d.title}</span>
+              {/* The client's "None of these" (1 Nov 2026): post a new decision with other options. */}
+              {d.redo ? (
+                <span className="chip warn" style={{ alignSelf: 'flex-start' }}>
+                  {`Asks for other options${d.redo.note ? `: ${d.redo.note}` : ''}`}
+                </span>
+              ) : null}
               {pick ? (
                 <span className="text-[var(--good)]">
                   Picked: {pick.label} · {priceChange(pick.deltaPaise)}

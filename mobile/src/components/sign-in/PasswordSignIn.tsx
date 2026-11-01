@@ -7,8 +7,7 @@ import { useAuth } from '../../lib/auth';
 import { useHeadline, useT } from '../../lib/i18n';
 import { color, font } from '../../lib/theme';
 
-/** "98220 41736", as the design writes a number. */
-const spaced = (d: string) => (d.length > 5 ? `${d.slice(0, 5)} ${d.slice(5)}` : d);
+import { spacedMobile } from '../../lib/chat-merge';
 
 /**
  * "Good to see you again" (the owner's v1 screens), with the password the
@@ -52,7 +51,7 @@ export function PasswordSignIn() {
           <Text style={styles.prefix}>+91</Text>
           <TextInput
             value={phone}
-            onChangeText={(v) => setPhone(spaced(v.replace(/\D/g, '').replace(/^(91|0)(?=\d{10}$)/, '').slice(0, 10)))}
+            onChangeText={(v) => setPhone(spacedMobile(v))}
             keyboardType="phone-pad"
             autoComplete="tel-national"
             textContentType="telephoneNumber"

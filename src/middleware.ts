@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { opsWithoutAuth } from '@/lib/env';
 import { PATH_HEADER, audienceFor, isAlwaysAllowed, route } from '@/lib/host';
 import { METHOD_HEADER, NEXT_ACTION_HEADER, VIEW_AS_HINT_COOKIE, hintIsLive, hintSecret, viewAsGate } from '@/modules/studio/view-as-rules';
+import { PHONE_PAGE, isPhone, phoneMayOpen } from '@/modules/studio/phone-rules';
 
 /**
  * Two jobs: put each hostname in front of its own product, and keep a
@@ -148,6 +149,15 @@ export async function middleware(request: NextRequest) {
   if (decision.kind === 'redirect') {
     const url = request.nextUrl.clone();
     url.pathname = decision.to;
+    url.search = '';
+    return NextResponse.redirect(url);
+  }
+
+  // ── 1b. On a phone the studio is site mode only (owner, 1 Nov 2026; studio/phone-rules.ts) ──
+  const served = decision.kind === 'rewrite' ? decision.to : path;
+  if (!phoneMayOpen(served) && isPhone(request.headers.get('user-agent'), request.headers.get('sec-ch-ua-mobile'))) {
+    const url = request.nextUrl.clone();
+    url.pathname = PHONE_PAGE;
     url.search = '';
     return NextResponse.redirect(url);
   }

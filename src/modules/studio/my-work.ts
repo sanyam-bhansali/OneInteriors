@@ -53,6 +53,7 @@ import {
   MISSED_LOOKBACK_DAYS,
   projectSources,
   shortList,
+  MONTH_DAYS,
   SOON_DAYS,
   workDigest,
   type Bucket,
@@ -224,7 +225,7 @@ async function projectWork(m: WorkMember, me: Me, now: Date, today: string): Pro
     where,
     orderBy: { startOn: 'desc' },
     take: PROJECT_TAKE,
-    select: projectSelect(addDays(today, -MISSED_LOOKBACK_DAYS), addDays(today, SOON_DAYS), addDays(today, -14)),
+    select: projectSelect(addDays(today, -MISSED_LOOKBACK_DAYS), addDays(today, MONTH_DAYS), addDays(today, -14)),
   });
   return rows.flatMap((p) => projectSources(factsOf(p, now, today), me, today));
 }
@@ -236,6 +237,8 @@ async function leadWork(m: WorkMember, now: Date): Promise<{ sources: WorkSource
   if (!can(m, 'lead.read', { assigned: true })) return { sources: [], hidden: {} };
   const { start, end } = istDayBounds(now);
   const end3 = new Date(end.getTime() + SOON_DAYS * 86_400_000);
+  /* Next month (owner, 1 Nov 2026). */
+  const endMonth = new Date(end.getTime() + MONTH_DAYS * 86_400_000);
   /* Whose leads: a salesperson's own (leadsVisibleTo); the owner the studio's; a PM only the leads given to them —
      their work is their projects (owner, 15 Oct 2026), and the studio's follow-ups stay on Today. Sales roles
      (owner, 22 Oct 2026): "my work" stays a salesperson's OWN leads, whatever their team reach; their team's
@@ -246,18 +249,21 @@ async function leadWork(m: WorkMember, now: Date): Promise<{ sources: WorkSource
   const lateW = { ...open, nextActionOn: { lt: start } };
   const todayW = { ...open, nextActionOn: { gte: start, lte: end } };
   const soonW = { ...open, nextActionOn: { gt: end, lte: end3 } };
+  const monthW = { ...open, nextActionOn: { gt: end3, lte: endMonth } };
   const sel = { id: true, name: true, nextAction: true, nextActionOn: true } as const;
-  const [late, todays, soon, nLate, nToday, nSoon, meetings, tasks] = await Promise.all([
+  const [late, todays, soon, month, nLate, nToday, nSoon, nMonth, meetings, tasks] = await Promise.all([
     prisma.studioClient.findMany({ where: lateW, orderBy: [{ nextActionOn: 'asc' }, { id: 'asc' }], take: LEAD_TAKE, select: sel }),
     prisma.studioClient.findMany({ where: todayW, orderBy: [{ nextActionOn: 'asc' }, { id: 'asc' }], take: LEAD_TAKE, select: sel }),
     prisma.studioClient.findMany({ where: soonW, orderBy: [{ nextActionOn: 'asc' }, { id: 'asc' }], take: LEAD_TAKE, select: sel }),
+    prisma.studioClient.findMany({ where: monthW, orderBy: [{ nextActionOn: 'asc' }, { id: 'asc' }], take: LEAD_TAKE, select: sel }),
     prisma.studioClient.count({ where: { ...LIVE, ...lateW } }),
     prisma.studioClient.count({ where: { ...LIVE, ...todayW } }),
     prisma.studioClient.count({ where: { ...LIVE, ...soonW } }),
-    prisma.studioClient.findMany({ where: { ...base, meetingAt: { gte: start, lte: end3 } }, orderBy: { meetingAt: 'asc' }, take: LEAD_TAKE, select: { id: true, name: true, meetingAt: true, meetingNote: true } }),
-    openTasksDue(m, end3, LEAD_TAKE),
+    prisma.studioClient.count({ where: { ...LIVE, ...monthW } }),
+    prisma.studioClient.findMany({ where: { ...base, meetingAt: { gte: start, lte: endMonth } }, orderBy: { meetingAt: 'asc' }, take: LEAD_TAKE, select: { id: true, name: true, meetingAt: true, meetingNote: true } }),
+    openTasksDue(m, endMonth, LEAD_TAKE),
   ]);
-  const follow = [...late, ...todays, ...soon];
+  const follow = [...late, ...todays, ...soon, ...month];
   /* A PM sees every task (task-rules.ts); their own work is the ones given to them. */
   const myTasks = m.role === 'PM' ? tasks.rows.filter((t) => t.assignedToId === m.id) : tasks.rows;
   const tasksHidden = m.role === 'PM' ? 0 : Math.max(0, tasks.total - tasks.rows.length);
@@ -272,6 +278,7 @@ async function leadWork(m: WorkMember, now: Date): Promise<{ sources: WorkSource
       missed: Math.max(0, nLate - late.length),
       today: Math.max(0, nToday - todays.length),
       soon: Math.max(0, nSoon - soon.length) + tasksHidden,
+      month: Math.max(0, nMonth - month.length),
     },
   };
 }

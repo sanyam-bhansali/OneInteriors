@@ -14,8 +14,10 @@ export const dynamic = 'force-dynamic';
  * and beside it what the customer will see, live as it is typed. Owner, or
  * the PM on the project (`decision.create`, checked in the module).
  */
-export default async function NewDecisionPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function NewDecisionPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ title?: string }> }) {
   const { id } = await params;
+  /* From a client's chat message (1 Nov 2026): its words start the title. */
+  const { title } = await searchParams;
   const ctx = await newDecisionContext(id.slice(0, 64));
   if (!ctx.ok) {
     if (ctx.error === 'That project is not one of yours.') notFound();
@@ -47,6 +49,7 @@ export default async function NewDecisionPage({ params }: { params: Promise<{ id
         lines={ctx.lines}
         suggestedDue={ctx.suggestedDue}
         today={ctx.today}
+        initialTitle={typeof title === 'string' ? title.slice(0, 120) : ''}
       />
     </div>
   );

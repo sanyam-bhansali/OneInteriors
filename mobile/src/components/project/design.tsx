@@ -4,7 +4,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { ArrowIcon } from '../icons';
-import { Card, ErrorText, Meta, Press } from '../ui';
+import { Button, Card, ErrorText, Meta, Press } from '../ui';
 import { api } from '../../lib/api';
 import { inr, shortDate } from '../../lib/format';
 import type { T } from '../../lib/i18n';
@@ -26,7 +26,6 @@ import { ProgressBar } from './tracker';
 export function DesignCard({ design, studio, owner, docs, onChanged, t }: { design: Design; studio: string; owner: boolean; docs: Doc[]; onChanged: () => void; t: T }) {
   const [showSteps, setShowSteps] = useState(false);
   const next = design.next;
-  const visit = design.visits.find((v) => v.status === 'booked') ?? null;
   const urlOf = (id: string) => docs.find((d) => d.id === id)?.url ?? '';
   const done = design.steps.filter((s) => s.done).length;
   return (
@@ -69,18 +68,30 @@ export function DesignCard({ design, studio, owner, docs, onChanged, t }: { desi
         </View>
       ) : null}
 
-      {visit ? (
-        <View style={styles.row}>
-          <Text style={styles.rowTitle}>{t('design.visit', { purpose: visit.purpose })}</Text>
-          <Text style={styles.mono}>
-            {new Date(visit.at).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
-          </Text>
-        </View>
+      {design.visits
+        .filter((v) => v.status === 'booked')
+        .map((v) => (
+          <VisitRow key={v.id ?? v.at} visit={v} owner={owner} onChanged={onChanged} t={t} />
+        ))}
+
+      {design.requirementForm ? (
+        <Press
+          onPress={() => router.push('/requirements')}
+          accessibilityRole="link"
+          accessibilityLabel={t(design.requirementForm === 'filled' ? 'req.done.row' : 'req.row')}
+          style={styles.link}
+        >
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={styles.rowTitle}>{t(design.requirementForm === 'filled' ? 'req.done.row' : 'req.row')}</Text>
+            <Text style={styles.note}>{t(design.requirementForm === 'filled' ? 'req.done.body' : 'req.row.body')}</Text>
+          </View>
+          <ArrowIcon color={color.ink} size={14} />
+        </Press>
       ) : null}
 
       {design.moodBoard.shared ? (
         <Press
-          onPress={() => router.push({ pathname: '/web', params: { path: '/app/project/moodboard', title: t('design.mood.title') } })}
+          onPress={() => router.push('/moodboard')}
           accessibilityRole="link"
           accessibilityLabel={t('design.mood.title')}
           style={styles.link}
@@ -257,3 +268,52 @@ const styles = StyleSheet.create({
   btnText: { fontFamily: font.sansSemi, fontSize: 14.5, color: color.ink },
   input: { minHeight: 80, borderRadius: 12, borderWidth: 1, borderColor: color.line, padding: 12, fontFamily: font.sans, fontSize: 15, color: color.ink, backgroundColor: color.white, textAlignVertical: 'top' },
 });
+
+/**
+ * A booked site visit or meeting (owner, 1 Nov 2026; customer app Phase 2):
+ * the owner says they will be there, or asks for another day with why.
+ */
+function VisitRow({ visit, owner, onChanged, t }: { visit: Design['visits'][number]; owner: boolean; onChanged: () => void; t: T }) {
+  const [asking, setAsking] = useState(false);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const answer = async (a: 'confirm' | 'move') => {
+    if (!visit.id) return;
+    setBusy(true);
+    setMsg(null);
+    const r = await api.answerVisit(visit.id, a, reason);
+    setBusy(false);
+    if (!r.ok) return setMsg(r.error);
+    setAsking(false);
+    setMsg(r.data.message ?? null);
+    onChanged();
+  };
+  return (
+    <View style={[styles.row, { gap: 8 }]}>
+      <Text style={styles.rowTitle}>{/meeting/i.test(visit.purpose) ? visit.purpose : t('design.visit', { purpose: visit.purpose })}</Text>
+      <Text style={styles.mono}>
+        {new Date(visit.at).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
+      </Text>
+      {visit.answer === 'confirmed' ? <Text style={[styles.note, { color: color.ok }]}>{t('visit.confirmed')}</Text> : null}
+      {visit.answer === 'move' ? <Text style={styles.note}>{t('visit.moved', { reason: visit.reason ?? '' })}</Text> : null}
+      {owner && visit.id && !asking ? (
+        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+          {visit.answer !== 'confirmed' ? <Button label={t('visit.there')} arrow={false} busy={busy} onPress={() => void answer('confirm')} /> : null}
+          <Button label={t('visit.another')} variant="ghost" arrow={false} onPress={() => setAsking(true)} />
+        </View>
+      ) : null}
+      {asking ? (
+        <View style={{ gap: 8 }}>
+          <Text style={styles.note}>{t('visit.why')}</Text>
+          <TextInput value={reason} onChangeText={setReason} multiline maxLength={500} aria-label={t('visit.why')} style={styles.input} />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Button label={t('visit.send')} arrow={false} busy={busy} disabled={reason.trim().length < 3} onPress={() => void answer('move')} />
+            <Button label={t('chat.cancel')} variant="quiet" arrow={false} onPress={() => setAsking(false)} />
+          </View>
+        </View>
+      ) : null}
+      {msg ? <Text style={styles.note}>{msg}</Text> : null}
+    </View>
+  );
+}

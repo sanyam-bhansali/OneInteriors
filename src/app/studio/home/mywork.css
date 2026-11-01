@@ -102,3 +102,29 @@
 /* Steps waiting on a payment: one quiet line under the three columns. */
 .mw-waiting { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--s-rule-soft, rgba(0, 0, 0, 0.08)); }
 .mw-waiting summary { cursor: pointer; list-style: revert; }
+/* Next month (owner, 1 Nov 2026): folded under the three lists, by week. */
+.oi-studio .mw-month {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 18px 16px;
+  border-top: 1px solid var(--line);
+}
+.oi-studio .mw-month > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.oi-studio .mw-month > summary::-webkit-details-marker {
+  display: none;
+}
+.oi-studio .mw-month > summary::before {
+  content: '▸';
+  margin-right: 6px;
+  color: var(--muted);
+}
+.oi-studio .mw-month[open] > summary::before {
+  content: '▾';
+}
+.oi-studio .mw-month[open] > .mw-group {
+  margin-top: 8px;
+}

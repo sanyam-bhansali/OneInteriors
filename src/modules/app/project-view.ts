@@ -37,6 +37,8 @@ export interface WireDecision {
   state: DecisionState;
   options: DecisionOption[];
   chosenIndex: number | null;
+  /** The owner asked for other options (1 Nov 2026); older servers omit it. */
+  redo?: { at: string; note: string | null } | null;
 }
 
 const IST = 'Asia/Kolkata';

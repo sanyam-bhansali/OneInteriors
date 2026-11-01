@@ -1,4 +1,5 @@
 import { designForStudio } from '@/modules/studio-design/store';
+import { studioRequirementForm } from '@/modules/project/requirement-form';
 import { DesignPanel } from './DesignPanel';
 
 /**
@@ -7,7 +8,7 @@ import { DesignPanel } from './DesignPanel';
  * panel for its one-action-per-row controls.
  */
 export async function DesignTab({ projectId, now }: { projectId: string; now: Date }) {
-  const r = await designForStudio(projectId, now);
+  const [r, requirements] = await Promise.all([designForStudio(projectId, now), studioRequirementForm(projectId).catch(() => null)]);
   if (!r.ok) {
     return (
       <section className="card p-5">
@@ -15,5 +16,5 @@ export async function DesignTab({ projectId, now }: { projectId: string; now: Da
       </section>
     );
   }
-  return <DesignPanel tab={r.tab} />;
+  return <DesignPanel tab={r.tab} requirements={requirements} />;
 }

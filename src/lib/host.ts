@@ -154,6 +154,8 @@ const PROJECT_APP = [
   '/app/me',
   '/app/notifications',
   '/app/chats',
+  /* The requirement form the designer sends with the mood board (owner, 1 Nov 2026). */
+  '/app/requirements',
   /* The orb in the tab bar. Basic plans see it locked (geio-ask.ts `plan`), as decided 11 Oct. */
   '/app/geio',
   '/app/join',

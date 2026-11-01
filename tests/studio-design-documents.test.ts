@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkUpload, docFileName, finalsOf, handoverMissing, isHandoverDocsStep, nameWord, versionLabels, type DocVersion } from '@/modules/studio-design/documents';
+import { checkUpload, docFileName, finalsOf, handoverMissing, isHandoverDocsStep, markFinalWarning, nameWord, versionLabels, type DocVersion } from '@/modules/studio-design/documents';
 import { crc32, makeZip } from '@/lib/zip';
 
 /** Project documents (owner and Hauspire's design team, 24 Oct 2026; docs/studio-os/DESIGN-PROCESS-PLAN.md §3). */
@@ -55,7 +55,20 @@ describe('finals', () => {
 
   it('the newest approved version counts; a newer one waiting is flagged', () => {
     const f = finalsOf([d('a', { answer: 'APPROVED' }), d('b', { version: 2, supersedesId: 'a' })]);
-    expect(f).toEqual([{ id: 'a', type: 'LAYOUT_2D', room: null, state: 'approved', versions: 2, newerWaiting: true }]);
+    expect(f).toEqual([{ id: 'a', type: 'LAYOUT_2D', room: null, state: 'approved', versions: 2, newerWaiting: true, marked: false }]);
+  });
+
+  it('the version the designer marked is the final, an older one too, never the newest by itself', () => {
+    const f = finalsOf([d('a', { markedFinal: true }), d('b', { version: 2, supersedesId: 'a', answer: 'APPROVED' }), d('c', { version: 3, supersedesId: 'b' })]);
+    expect(f[0]).toMatchObject({ id: 'a', marked: true, newerWaiting: true });
+    expect(finalsOf([d('a'), d('b', { version: 2, supersedesId: 'a' })])[0]).toMatchObject({ marked: false });
+  });
+
+  it('marking an unapproved drawing final warns; a list that needs no approval never does', () => {
+    expect(markFinalWarning({ type: 'LAYOUT_2D', answer: null })).toBe('The client has not approved this version.');
+    expect(markFinalWarning({ type: 'WORKING', answer: 'CHANGES' })).toBe('The client asked for changes on this version.');
+    expect(markFinalWarning({ type: 'LAYOUT_2D', answer: 'APPROVED' })).toBeNull();
+    expect(markFinalWarning({ type: 'CUT_LIST', answer: null })).toBeNull();
   });
 
   it('else the newest shared, waiting or with changes asked; else the newest draft', () => {
@@ -73,13 +86,13 @@ describe('finals', () => {
     ]);
   });
 
-  it('the handover pack needs approved working and electrical drawings, and a material and cut list', () => {
-    expect(handoverMissing(finalsOf([d('w', { type: 'WORKING' })]))).toEqual(['Working drawings', 'Electrical drawings & quotation', 'Material list', 'Factory cut list']);
+  it('the handover pack needs working and electrical drawings, a material and cut list, each marked final', () => {
+    expect(handoverMissing(finalsOf([d('w', { type: 'WORKING', answer: 'APPROVED' })]))).toEqual(['Working drawings', 'Electrical drawings & quotation', 'Material list', 'Factory cut list']);
     const ready = finalsOf([
-      d('w', { type: 'WORKING', answer: 'APPROVED' }),
-      d('e', { type: 'ELECTRICAL', answer: 'APPROVED' }),
-      d('m', { type: 'MATERIAL_LIST', shared: false }),
-      d('c', { type: 'CUT_LIST' }),
+      d('w', { type: 'WORKING', answer: 'APPROVED', markedFinal: true }),
+      d('e', { type: 'ELECTRICAL', answer: 'APPROVED', markedFinal: true }),
+      d('m', { type: 'MATERIAL_LIST', shared: false, markedFinal: true }),
+      d('c', { type: 'CUT_LIST', markedFinal: true }),
     ]);
     expect(handoverMissing(ready)).toEqual([]);
     expect(isHandoverDocsStep('Final documentation for handover')).toBe(true);

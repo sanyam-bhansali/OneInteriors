@@ -973,7 +973,7 @@ describe('Studio OS Phase 2: the design card (studio-design/customer-view.ts) ne
 
   it('shows the mood board message, the booked visit (not the cancelled one), the sizes and the drawing’s answer', () => {
     expect(design.moodBoard).toEqual({ shared: true, sharedOn: '2026-10-03', note: 'Pick two looks for the living room.' });
-    expect(design.visits).toEqual([{ at: '2026-10-14T05:30:00.000Z', purpose: 'Measurement', status: 'booked' }]);
+    expect(design.visits).toEqual([{ id: 'v1', at: '2026-10-14T05:30:00.000Z', purpose: 'Measurement', status: 'booked', answer: null, reason: null }]); // the visit's id and the client's answer (1 Nov 2026); never the team's note
     expect(design.measurements).toEqual([{ room: 'Living', size: "15' × 12'", height: "9' 6\"" }]);
     expect(design.drawings).toEqual([
       { id: 'dr2', kind: 'LAYOUT_2D', kindLabel: '2D layout', room: 'Living', title: '2D layout, Living', version: 2, versionLabel: '2.0', state: 'approved', answeredOn: '2026-10-07', comment: null },

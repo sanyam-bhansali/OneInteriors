@@ -19,6 +19,7 @@ import {
   closeDesignAction,
   editDesignStepAction,
   makeDesignFinalAction,
+  markFinalAction,
   moveDesignStepAction,
   moveDesignStepOrderAction,
   saveMeasurementsAction,
@@ -28,6 +29,8 @@ import {
   shareMoodBoardAction,
   tickDesignStepAction,
 } from './design-actions';
+import { RequirementCard } from './RequirementCard';
+import type { StudioRequirementForm } from '@/modules/project/requirement-form';
 
 /**
  * The project's Design tab (Studio OS Phase 2, docs/studio-os/PHASE-2-DESIGN.md):
@@ -70,13 +73,14 @@ function Message({ m }: { m: { ok: boolean; text: string } | null }) {
   );
 }
 
-export function DesignPanel({ tab }: { tab: DesignTab }) {
+export function DesignPanel({ tab, requirements = null }: { tab: DesignTab; requirements?: StudioRequirementForm | null }) {
   return (
     <div className="flex flex-col gap-5">
       <Overview tab={tab} />
       <Steps tab={tab} />
       <VisitAndSizes tab={tab} />
       <MoodBoard tab={tab} />
+      {requirements ? <RequirementCard form={requirements} customerFirst={tab.customerFirst} /> : null}
       <Drawings tab={tab} />
       <DesignFinal tab={tab} />
     </div>
@@ -600,6 +604,12 @@ function VisitAndSizes({ tab }: { tab: DesignTab }) {
                 {v.purpose} · {whenWords(v.at)}
               </span>
               <span className={muted}>{v.status === 'DONE' ? 'Done' : v.status === 'CANCELLED' ? 'Cancelled' : 'Booked'}</span>
+              {v.status === 'BOOKED' && v.clientAnswer === 'CONFIRMED' ? <span className="chip good">{tab.customerFirst} will be there</span> : null}
+              {v.status === 'BOOKED' && v.clientAnswer === 'ASKED_TO_MOVE' ? (
+                <span className="chip warn" title="Book a new visit on a day that suits, and cancel this one">
+                  {tab.customerFirst} asks for another day{v.clientReason ? `: ${v.clientReason}` : ''}
+                </span>
+              ) : null}
               {v.note ? <span className={muted}>· Team note: {v.note}</span> : null}
               {tab.canWork && v.status === 'BOOKED' ? (
                 <>
@@ -635,14 +645,21 @@ function VisitAndSizes({ tab }: { tab: DesignTab }) {
           </label>
           <label className="flex flex-col gap-1 text-[13px]">
             For
-            <input value={purpose} onChange={(e) => setPurpose(e.target.value)} maxLength={80} className="fld" required />
+            <input value={purpose} onChange={(e) => setPurpose(e.target.value)} maxLength={80} className="fld" required list={`visit-for-${tab.projectId}`} />
+            {/* The final quotation meeting (owner, 1 Nov 2026; customer app Phase 2) is booked here too: the client sees it and answers like a visit. */}
+            <datalist id={`visit-for-${tab.projectId}`}>
+              <option value="Measurement" />
+              <option value="Site visit with electrician & carpenter" />
+              <option value="Site validation" />
+              <option value="Final quotation meeting at our office" />
+            </datalist>
           </label>
           <label className="flex flex-col gap-1 text-[13px]">
             Team note
             <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} className="fld" />
           </label>
           <button type="submit" className="btn pri sm" disabled={pending}>
-            Book the visit
+            Book it
           </button>
         </form>
       ) : null}
@@ -814,6 +831,12 @@ function Drawings({ tab }: { tab: DesignTab }) {
                 <span className="text-[12.5px] font-medium" style={{ color: s.tone }}>
                   {s.text}
                 </span>
+                {/* Only a version the designer marked is final (owner, 1 Nov 2026); the newest never is by itself. */}
+                {f.marked ? (
+                  <span className="chip good text-[12px]">Final</span>
+                ) : (
+                  <span className={`${muted} text-[12.5px]`}>No final marked</span>
+                )}
                 <span className={muted}>{dayWords(f.on)}</span>
                 {f.url ? (
                   <a href={f.url} className="text-[12.5px] acc-t" title={f.fileName}>
@@ -852,6 +875,16 @@ function Drawings({ tab }: { tab: DesignTab }) {
                   {d && d.state === 'draft' ? (
                     <button type="button" className="btn ghost sm" disabled={pending} onClick={() => run(() => shareDrawingAction(tab.projectId, d.id))}>
                       Share v{d.versionLabel} with {tab.customerFirst}
+                    </button>
+                  ) : null}
+                  {!f.marked ? (
+                    <button type="button" className="btn ghost sm" disabled={pending} onClick={() => run(() => markFinalAction(tab.projectId, f.id, true))}>
+                      Mark v{f.versionLabel} as final
+                    </button>
+                  ) : null}
+                  {d && d.id !== f.id && d.state === 'approved' ? (
+                    <button type="button" className="btn ghost sm" disabled={pending} onClick={() => run(() => markFinalAction(tab.projectId, d.id, true))}>
+                      Mark v{d.versionLabel} as final instead
                     </button>
                   ) : null}
                   <button type="button" className="btn ghost sm" onClick={() => setReplacing({ type: f.type, room: f.room })}>

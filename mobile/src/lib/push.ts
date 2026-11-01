@@ -3,6 +3,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { router, type Href } from 'expo-router';
+import { routeFor } from './route-for';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { api } from './api';
@@ -55,30 +56,7 @@ export async function unregisterPush(): Promise<void> {
   await SecureStore.deleteItemAsync(TOKEN_KEY).catch(() => {});
 }
 
-/** A notification's web path (from the server) as a screen in this app. */
-export function routeFor(url: string | undefined): Href | null {
-  if (!url) return null;
-  const [path, query = ''] = url.split('?');
-  const id = new URLSearchParams(query).get('id');
-  // App paths, as the sample and newer notices send them.
-  if (path && /^\/(home|project|site|geio|me|snags|locker|notifications)$/.test(path)) return path as Href;
-  const decision = /^\/decision\/([^/]+)$/.exec(path ?? '');
-  if (decision) return { pathname: '/decision/[id]', params: { id: decision[1]! } };
-  switch (path) {
-    case '/app/project':
-      return '/project';
-    case '/app/site':
-      return '/site';
-    case '/app/snags':
-      return '/snags';
-    case '/app/locker':
-      return '/locker';
-    case '/app/decision':
-      return id ? { pathname: '/decision/[id]', params: { id } } : '/home';
-    default:
-      return path?.startsWith('/app') ? '/home' : null;
-  }
-}
+export { routeFor } from './route-for';
 
 /** Opens the screen a tapped notification points at, including the one that launched the app. */
 export function useNotificationRouting(enabled: boolean): void {
@@ -87,7 +65,7 @@ export function useNotificationRouting(enabled: boolean): void {
     if (!enabled || Platform.OS === 'web') return;
     const open = (r: Notifications.NotificationResponse | null) => {
       const href = routeFor((r?.notification.request.content.data as { url?: string } | undefined)?.url);
-      if (href) router.push(href);
+      if (href) router.push(href as Href);
     };
     const last = Notifications.getLastNotificationResponse();
     if (last) open(last);

@@ -66,6 +66,7 @@ type A11y = {
 export function Press({
   children,
   onPress,
+  onLongPress,
   disabled,
   style,
   haptic = true,
@@ -76,6 +77,8 @@ export function Press({
 }: {
   children: ReactNode;
   onPress?: () => void;
+  /** A long press (the chat list's archive). */
+  onLongPress?: () => void;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
   haptic?: boolean;
@@ -107,6 +110,7 @@ export function Press({
         if (haptic) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress?.();
       }}
+      onLongPress={onLongPress}
     >
       <Animated.View style={[style, { transform: [{ scale: s }] }]}>{children}</Animated.View>
     </Pressable>

@@ -46,6 +46,7 @@
 
 import type { Prisma } from '@prisma/client';
 import { asSeenBy, can, FULL_SOFTWARE_ROLES, type MemberRole, type StudioRoleName } from './roles';
+import { PHONE_PAGE } from './phone-rules';
 
 /** The roles that work in the office. */
 export const OFFICE_ROLES: readonly StudioRoleName[] = ['OWNER', 'PM'];
@@ -96,6 +97,8 @@ export const SETUP_PATH = '/studio/setup';
  */
 export const FULL_SOFTWARE_PATHS: readonly string[] = [
   '/studio/projects',
+  /* Chats with clients are about their projects (1 Nov 2026). */
+  '/studio/chats',
   '/studio/updates',
   DESIGN_HOME,
   DESIGN_STEPS_PATH,
@@ -154,6 +157,13 @@ export const PASSWORD_PATH = '/studio/password';
  * calendar and their meetings. One Interiors visits stay the owner's and PM's.
  */
 export const CALENDAR_HOME = '/studio/calendar';
+
+/**
+ * Chats with clients (owner, 1 Nov 2026; modules/chat): everyone who works on
+ * projects. Which conversations each person sees is decided per project in
+ * chat/rules.ts; sales and accounts have none.
+ */
+export const CHATS_HOME = '/studio/chats';
 const APPOINTMENTS_PATH = '/studio/calendar/appointments';
 function calendarForAll(path: string): boolean {
   return under(path, CALENDAR_HOME) && !under(path, APPOINTMENTS_PATH);
@@ -213,6 +223,8 @@ export function mayOpen(viewer: MemberRole, path: string): boolean {
   const member = asSeenBy(viewer);
   if (member.status !== 'ACTIVE') return false;
   if (under(path, PASSWORD_PATH)) return true;
+  /* "Open this on your laptop" (owner, 1 Nov 2026; studio/phone-rules.ts): every member, on a phone. */
+  if (under(path, PHONE_PAGE)) return true;
   /* Pro Solo (owner, 21 Oct 2026): one person, so no team to manage and no pool to hand leads out from. */
   if (member.solo === true && (under(path, TEAM_PATH) || under(path, POOL_PATH))) return false;
   /* The pilot switch (owner, 14 Oct 2026): a studio without the full
@@ -222,6 +234,7 @@ export function mayOpen(viewer: MemberRole, path: string): boolean {
     if (needsFullSoftware(member.role)) return path === STUDIO_HOME;
     if (isFullSoftwarePath(path)) return false;
   }
+  if (under(path, CHATS_HOME)) return member.role !== 'SALES' && member.role !== 'ACCOUNTS';
   /* The setup quiz sets the studio's settings up: the owner's alone. */
   if (under(path, SETUP_PATH)) return member.role === 'OWNER';
   if (member.role === 'SUPERVISOR') return under(path, SITE_HOME) || calendarForAll(path);

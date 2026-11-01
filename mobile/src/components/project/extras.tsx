@@ -34,7 +34,7 @@ export function SignoffsCard({ signoffs, t }: { signoffs: Signoff[]; t: T }) {
       {signoffs.map((s) => (
         <Press
           key={s.id}
-          onPress={() => router.push({ pathname: '/web', params: { path: `/app/signoff/${s.id}`, title: t('life.sign.title') } })}
+          onPress={() => router.push({ pathname: '/signoff/[id]', params: { id: s.id } })}
           accessibilityRole="link"
           style={styles.row}
         >

@@ -54,6 +54,8 @@ function AppDecision() {
   const [pick, setPick] = useState<number | null>(null);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [redoOpen, setRedoOpen] = useState(false);
+  const [redoNote, setRedoNote] = useState('');
 
   if (mine.state === 'loading') return <Frame>{null}</Frame>;
   const real = mine.state === 'real';
@@ -90,6 +92,25 @@ function AppDecision() {
   // Family vote; the owner chooses (v79 "Family vote").
   const family = real && mine.project.role === 'family';
   const votes = (real && found ? mine.project.decisions.find((x) => x.id === found.id)?.votes : null) ?? [];
+
+  /* "None of these: show me other options" (the v1 screens' Redo; owner, 1 Nov 2026). The owner only, before picking. */
+  const redo = found?.redo ?? null;
+  const askOther = async () => {
+    if (!d.id) return;
+    setBusy(true);
+    const res = await fetch(`/api/app/v1/decisions/${encodeURIComponent(d.id)}/redo`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ note: redoNote }),
+    }).catch(() => null);
+    const body = (await res?.json().catch(() => null)) as { error?: string } | null;
+    setBusy(false);
+    if (!res?.ok) return setStatus({ ok: false, text: body?.error ?? 'That did not go through. Try again.' });
+    setRedoOpen(false);
+    setStatus({ ok: true, text: `Sent. ${studio} will show you other options.` });
+    mine.reload();
+  };
 
   const vote = async () => {
     if (!d.id) return;
@@ -173,6 +194,35 @@ function AppDecision() {
             ))}
             {!family ? <p className="oa-note">Your vote decides.</p> : null}
           </section>
+        ) : null}
+        {real && !family && d.id && d.chosen === null && !d.closed ? (
+          redo && !redoOpen ? (
+            <p className="oa-note" style={{ margin: 0 }}>
+              You asked for other options{redo.note ? `: “${redo.note}”` : ''}. {studio} will post them here.{' '}
+              <button type="button" className="oa-inline-link" onClick={() => setRedoOpen(true)}>
+                Change what you asked
+              </button>
+            </p>
+          ) : redoOpen ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <label className="oa-label" htmlFor="redo-note">
+                What would you like instead?
+              </label>
+              <textarea id="redo-note" className="oa-input" rows={3} maxLength={1000} value={redoNote} onChange={(e) => setRedoNote(e.target.value)} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" className="oa-cta" style={{ width: 'auto', paddingInline: 18 }} disabled={busy || redoNote.trim().length < 3} onClick={() => void askOther()}>
+                  Ask for other options
+                </button>
+                <button type="button" className="oa-cta outline" style={{ width: 'auto', paddingInline: 18 }} onClick={() => setRedoOpen(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className="oa-inline-link" style={{ alignSelf: 'flex-start' }} onClick={() => setRedoOpen(true)}>
+              None of these? Ask for other options
+            </button>
+          )
         ) : null}
         <p className="oa-note" style={{ margin: 0 }}>
           Not sure?{' '}

@@ -26,7 +26,7 @@ const when = (iso: string) =>
 export function DesignCard({ design, studio, owner, docs, onChanged }: { design: Design; studio: string; owner: boolean; docs: MyProject['documents']; onChanged: () => void }) {
   const urlOf = (id: string) => docs.find((d) => d.id === id)?.url ?? '';
   const next = design.next;
-  const visit = design.visits.find((v) => v.status === 'booked') ?? null;
+  const booked = design.visits.filter((v) => v.status === 'booked');
   return (
     <section aria-label="Your design" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="oa-section-head">
@@ -82,13 +82,20 @@ export function DesignCard({ design, studio, owner, docs, onChanged }: { design:
         </div>
       ) : null}
 
-      {visit ? (
-        <div className="oa-row" style={{ cursor: 'default' }}>
+      {booked.map((v) => (
+        <VisitCard key={v.id} visit={v} owner={owner} onChanged={onChanged} />
+      ))}
+
+      {design.requirementForm ? (
+        <Link href="/app/requirements" className="oa-row" style={{ textDecoration: 'none' }} data-testid="requirements-row">
           <span>
-            <span className="oa-row-title">Site visit: {visit.purpose}</span>
-            <span className="oa-row-sub">{when(visit.at)}</span>
+            <span className="oa-row-title">{design.requirementForm === 'filled' ? 'Your requirement form' : 'Fill in your requirement form'}</span>
+            <span className="oa-row-sub">
+              {design.requirementForm === 'filled' ? 'Sent. Read what you told your designer.' : 'What your designer needs before the design starts: appliances, finishes, budget. About 10 minutes.'}
+            </span>
           </span>
-        </div>
+          <span aria-hidden>→</span>
+        </Link>
       ) : null}
 
       {design.moodBoard.shared ? (
@@ -261,6 +268,74 @@ function Drawing({ d, url, owner, onChanged }: { d: Design['drawings'][number]; 
           {error}
         </span>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * A booked site visit (owner, 1 Nov 2026; customer app Phase 2): the client
+ * says they will be there, or asks for another day with why. Their designer
+ * hears it at once.
+ */
+function VisitCard({ visit, owner, onChanged }: { visit: Design['visits'][number]; owner: boolean; onChanged: () => void }) {
+  const [asking, setAsking] = useState(false);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function answer(a: 'confirm' | 'move') {
+    setBusy(true);
+    setMsg(null);
+    const res = await fetch(`/api/app/v1/visits/${encodeURIComponent(visit.id)}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ answer: a, reason }),
+    }).catch(() => null);
+    const body = (await res?.json().catch(() => null)) as { message?: string; error?: string } | null;
+    setBusy(false);
+    if (!res?.ok) return setMsg(body?.error ?? 'That did not go through. Try again.');
+    setAsking(false);
+    setMsg(body?.message ?? null);
+    onChanged();
+  }
+
+  return (
+    <div className="oa-card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <span className="oa-meta">{/meeting/i.test(visit.purpose) ? 'Meeting' : 'Site visit'}</span>
+      <b>{visit.purpose}</b>
+      <span className="oa-row-sub">{when(visit.at)}</span>
+      {visit.answer === 'confirmed' ? <span className="oa-meta" style={{ color: 'var(--ok)' }}>You said you will be there.</span> : null}
+      {visit.answer === 'move' ? <span className="oa-meta">You asked for another day{visit.reason ? `: ${visit.reason}` : ''}. Your designer will suggest one.</span> : null}
+      {owner && !asking ? (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {visit.answer !== 'confirmed' ? (
+            <button type="button" className="oa-cta" style={{ width: 'auto', paddingInline: 18 }} disabled={busy} onClick={() => void answer('confirm')}>
+              I&rsquo;ll be there
+            </button>
+          ) : null}
+          <button type="button" className="oa-cta outline" style={{ width: 'auto', paddingInline: 18 }} disabled={busy} onClick={() => setAsking(true)}>
+            Ask for another day
+          </button>
+        </div>
+      ) : null}
+      {asking ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <label className="oa-label" htmlFor={`why-${visit.id}`}>
+            Why, and which days suit you?
+          </label>
+          <textarea id={`why-${visit.id}`} className="oa-input" rows={3} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" className="oa-cta" style={{ width: 'auto', paddingInline: 18 }} disabled={busy || reason.trim().length < 3} onClick={() => void answer('move')}>
+              Send
+            </button>
+            <button type="button" className="oa-cta outline" style={{ width: 'auto', paddingInline: 18 }} onClick={() => setAsking(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {msg ? <p className="oa-note" role="status" style={{ margin: 0 }}>{msg}</p> : null}
     </div>
   );
 }

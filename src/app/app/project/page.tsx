@@ -368,7 +368,8 @@ function Payments({
                     : s.dueOn
                     ? `Due ${shortDate(s.dueOn)}`
                     : s.state === 'next'
-                      ? 'Next · the studio sets the date'
+                      ? /* Plain for a project brought in mid-way (owner, 1 Nov 2026): money paid before the app may not be recorded yet. */
+                        'Next · paid it already? Your studio records it here'
                       : 'Later'}
               </small>
             </span>

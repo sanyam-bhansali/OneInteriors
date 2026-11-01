@@ -54,7 +54,136 @@ export interface Contact {
   phone: string | null;
 }
 
+/** One room of the client's mood board (GET /moodboard, 1 Nov 2026). */
+/** The requirement form (1 Nov 2026; the server's project/requirement-form.ts): its questions come from the server. */
+export interface FormQuestion {
+  id: string;
+  label: string;
+  kind: 'text' | 'long' | 'choice';
+  options?: string[];
+  help?: string;
+  required: boolean;
+  commitment?: boolean;
+}
+export interface RequirementForm {
+  projectId: string;
+  studio: string;
+  title: string;
+  intro: string;
+  state: 'sent' | 'filled';
+  filledOn: string | null;
+  sections: { id: string; title: string; questions: FormQuestion[] }[];
+  answers: Record<string, string>;
+}
+export interface MoodRoom {
+  key: string;
+  label: string;
+  style: string;
+  materials: string[];
+  optionCount: number;
+  shuffle: number;
+  question: string;
+  options: { label: string; note: string }[];
+  chosenOption: number | null;
+  note: string;
+  items: { slug: string; label: string }[];
+  picker: { slug: string; label: string; aboveBand: boolean }[];
+}
+
+/** A quotation to read and sign in the app (GET /signoffs/:id, 1 Nov 2026). */
+export interface SignoffView {
+  id: string;
+  kind: 'SALES_FINAL' | 'DESIGN_FINAL' | 'AGREEMENT';
+  kindLabel: string;
+  quoteNumber: string;
+  revision: number;
+  state: string;
+  canSign: boolean;
+  viewer: 'owner' | 'family' | 'studio';
+  hash: string;
+  changedSince: boolean;
+  signed: { name: string; on: string; line: string } | null;
+  agreeText: string;
+  studio: string | null;
+  lines: { room: string; product: string; details: string | null; note: string | null; amountPaise: number }[];
+  totals: { workPaise: number; feePaise: number; discountPaise: number; gstPaise: number; totalPaise: number };
+  stages: { label: string; amountPaise: number }[];
+  terms: string | null;
+}
+
+/** In-app chat (owner, 1 Nov 2026; the website's modules/chat). */
+export type ChatKind = 'DESIGNER' | 'TEAM' | 'ONE_INTERIORS';
+export interface ChatRow {
+  projectId: string;
+  kind: ChatKind;
+  title: string;
+  home: string;
+  studio: string;
+  last: { preview: string; at: string; from: string; mine: boolean } | null;
+  unread: number;
+  archived?: boolean;
+}
+export interface ChatHit {
+  projectId: string;
+  kind: ChatKind;
+  title: string;
+  home: string;
+  from: string;
+  preview: string;
+  at: string;
+}
+export interface ChatMsg {
+  id: string;
+  from: string;
+  role: string;
+  side: string;
+  mine: boolean;
+  kind: 'TEXT' | 'PHOTO' | 'VOICE' | 'FILE';
+  body: string;
+  url: string | null;
+  fileName: string | null;
+  durationMs: number | null;
+  replyTo: { id: string; from: string; preview: string } | null;
+  at: string;
+  tick: 'sent' | 'delivered' | 'read' | null;
+  taken: boolean;
+  canTakeBack: boolean;
+  pending?: boolean;
+  failed?: string;
+}
+export interface ChatThread {
+  projectId: string;
+  kind: ChatKind;
+  title: string;
+  studio: string;
+  people: { name: string; role: string }[];
+  messages: ChatMsg[];
+  cursor: string | null;
+  /** Where to listen for "something new" (Supabase Realtime); null without it. */
+  live?: { socket: string; key: string; topic: string } | null;
+}
+const chatPath = (projectId: string, kind: ChatKind) => `/chats/${encodeURIComponent(projectId)}/${kind.toLowerCase()}`;
+
 export const api = {
+  /** A booked site visit or meeting: "I'll be there", or ask for another day with why (1 Nov 2026). */
+  answerVisit: (visitId: string, answer: 'confirm' | 'move', reason?: string) => call<{ message?: string | null }>('POST', `/visits/${encodeURIComponent(visitId)}`, { answer, reason: reason ?? '' }),
+  /** "None of these: show me other options" on a decision (1 Nov 2026). */
+  askOtherOptions: (decisionId: string, note: string) => call<object>('POST', `/decisions/${encodeURIComponent(decisionId)}/redo`, { note }),
+  requirements: () => call<{ form: RequirementForm | null }>('GET', '/requirements'),
+  sendRequirements: (answers: Record<string, string>) => call<{ message?: string }>('POST', '/requirements', { answers }),
+  moodboard: () => call<{ open: boolean; rooms: MoodRoom[] }>('GET', '/moodboard'),
+  saveMoodRoom: (room: string, patch: { shuffle?: number; chosenOption?: number | null; note?: string; items?: string[] }) => call<object>('POST', `/moodboard/${encodeURIComponent(room)}`, patch),
+  signoff: (id: string) => call<SignoffView>('GET', `/signoffs/${encodeURIComponent(id)}`),
+  signSignoff: (id: string, b: { agreed: boolean; name: string; hash: string }) => call<{ message?: string | null; signedLine?: string | null }>('POST', `/signoffs/${encodeURIComponent(id)}`, b),
+  chats: (archived = false) => call<{ chats: ChatRow[]; unread: number }>('GET', archived ? '/chats?archived=1' : '/chats'),
+  chatSearch: (q: string) => call<{ hits: ChatHit[] }>('GET', `/chats?q=${encodeURIComponent(q)}`),
+  chatArchive: (projectId: string, kind: ChatKind, archive: boolean) => call<{ archived: boolean }>('POST', `${chatPath(projectId, kind)}/archive`, { archive }),
+  chatThread: (projectId: string, kind: ChatKind, since?: string | null) =>
+    call<ChatThread>('GET', `${chatPath(projectId, kind)}${since ? `?since=${encodeURIComponent(since)}` : ''}`),
+  chatSend: (projectId: string, kind: ChatKind, body: string, replyToId?: string | null) => call<{ id: string }>('POST', chatPath(projectId, kind), { body, replyToId }),
+  /** Multipart: file ({ uri, name, type }), body, durationMs, replyToId. */
+  chatSendFile: (projectId: string, kind: ChatKind, form: FormData) => call<{ id: string }>('POST', chatPath(projectId, kind), form),
+  chatTakeBack: (messageId: string) => call<object>('DELETE', `/chats/messages/${encodeURIComponent(messageId)}`),
   /** The clients' sign-in while codes are not live (owner, 1 Nov 2026): mobile number and the studio's password. */
   passwordSignIn: (phone: string, password: string) => call<{ token: string; mustChange: boolean }>('POST', '/auth/password', { phone, password }),
   /** Replace the studio's one-time password with their own. */

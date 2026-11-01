@@ -397,6 +397,7 @@ export function approvalKindOfDrawing(kind: string | null | undefined): Approval
   if (kind === 'LAYOUT_2D' || kind === 'FURNITURE') return 'LAYOUT_2D';
   if (kind === 'RENDER_3D') return 'RENDER_3D';
   if (kind === 'WORKING') return 'WORKING';
+  if (kind === 'VALIDATION') return 'VALIDATION';
   return null;
 }
 export const asksApproval = (k: string | null | undefined): boolean => (FOR_APPROVAL as readonly string[]).includes(k ?? '');

@@ -9,7 +9,7 @@ const keys = (role: StudioRoleName) => appsFor(m(role)).map((a) => a.key);
 
 describe('studio apps (UI handoff 12 Oct 2026)', () => {
   it('the owner sees every app, in the launcher order', () => {
-    expect(keys('OWNER')).toEqual(['today', 'clients', 'quotes', 'projects', 'documents', 'site', 'money', 'vendors', 'calendar', 'intros', 'rates', 'team']);
+    expect(keys('OWNER')).toEqual(['today', 'clients', 'quotes', 'projects', 'chats', 'documents', 'site', 'money', 'vendors', 'calendar', 'intros', 'rates', 'team']);
   });
 
   it('a salesperson sees Leads, Quotations and Calendar only', () => {
@@ -48,7 +48,7 @@ describe('studio apps (UI handoff 12 Oct 2026)', () => {
   });
 
   it('a supervisor has site mode (and the calendar everyone has) and lands there', () => {
-    expect(keys('SUPERVISOR')).toEqual(['site', 'calendar']);
+    expect(keys('SUPERVISOR')).toEqual(['site', 'chats', 'calendar']); // Chats with clients, 1 Nov 2026: the site head is on the home team
     expect(homeFor('SUPERVISOR')).toBe('/studio/site');
   });
 

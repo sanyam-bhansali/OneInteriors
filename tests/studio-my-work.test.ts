@@ -11,6 +11,7 @@ import {
   leadSources,
   projectSources,
   shortList,
+  weekOf,
   workDigest,
   type Me,
   type ProjectFacts,
@@ -52,12 +53,14 @@ const project = (over: Partial<ProjectFacts> = {}): ProjectFacts => ({
 });
 
 describe('which list a day falls in', () => {
-  it('before today is missed, today is today, the next three days are soon, later is left out', () => {
+  it('before today is missed, today is today, the next three days are soon, then the next month, later is left out', () => {
     expect(bucketOf('2026-10-14', TODAY)).toBe('missed');
     expect(bucketOf('2026-10-15', TODAY)).toBe('today');
     expect(bucketOf('2026-10-16', TODAY)).toBe('soon');
     expect(bucketOf('2026-10-18', TODAY)).toBe('soon');
-    expect(bucketOf('2026-10-19', TODAY)).toBeNull();
+    expect(bucketOf('2026-10-19', TODAY)).toBe('month');
+    expect(bucketOf('2026-11-14', TODAY)).toBe('month');
+    expect(bucketOf('2026-11-15', TODAY)).toBeNull();
     expect(bucketOf('not a day', TODAY)).toBeNull();
   });
 });
@@ -93,8 +96,16 @@ describe('the three lists', () => {
     expect(w.soonGroups[1]!.items[0]!.when).toBe('Sun 18 Oct, 11 am');
   });
 
+  it('Next month is grouped by week, from its Monday', () => {
+    expect(w.monthGroups.map((g) => g.title)).toEqual(['Week of Mon 19 Oct']);
+    expect(w.monthGroups[0]!.items.map((i) => i.key)).toEqual(['g']);
+    expect(weekOf('2026-10-25')).toBe('2026-10-19');
+    expect(weekOf('2026-10-19')).toBe('2026-10-19');
+  });
+
   it('counts each section, leaving out what is further away', () => {
-    expect(w.counts).toEqual({ today: 2, soon: 2, missed: 2 });
+    expect(buildMyWork([src('far', '2026-12-30')], TODAY).counts.month).toBe(0);
+    expect(w.counts).toEqual({ today: 2, soon: 2, month: 1, missed: 2 });
     expect(isEmptyWork(w)).toBe(false);
   });
 
@@ -121,7 +132,7 @@ describe('the three lists', () => {
   it('lists a step waiting on a payment apart: never in Missed or Today (DESIGN-PROCESS-PLAN.md Decision 5)', () => {
     const w2 = buildMyWork([src('late', '2026-10-01', { kind: 'design', waitingOn: 'Design advance' }), src('due', TODAY, { kind: 'design' })], TODAY);
     expect(w2.missed).toEqual([]);
-    expect(w2.counts).toEqual({ today: 1, soon: 0, missed: 0 });
+    expect(w2.counts).toEqual({ today: 1, soon: 0, month: 0, missed: 0 });
     expect(w2.waiting.map((x) => [x.key, x.payment])).toEqual([['late', 'Design advance']]);
   });
 

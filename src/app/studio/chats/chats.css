@@ -1,0 +1,48 @@
+/* Studio Chats (1 Nov 2026): the list beside the open conversation on a
+   laptop; one at a time on a phone. */
+
+.sc-page {
+  padding-bottom: 0;
+}
+.sc-split {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 16px;
+  height: calc(100dvh - 140px);
+  min-height: 480px;
+}
+.sc-list {
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.sc-title {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 600;
+}
+.sc-room {
+  min-height: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--line, #e6e3dc);
+  display: flex;
+  flex-direction: column;
+}
+.sc-room > .chat-room {
+  flex: 1;
+}
+.sc-pick {
+  margin: auto;
+}
+@media (max-width: 760px) {
+  .sc-split {
+    grid-template-columns: 1fr;
+    height: calc(100dvh - 120px);
+  }
+  .sc-split.has-open .sc-list {
+    display: none;
+  }
+  .sc-split:not(.has-open) .sc-room {
+    display: none;
+  }
+}

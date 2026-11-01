@@ -185,6 +185,13 @@ export default async function ProjectWorkspacePage({
               Open site mode
             </Link>
           ) : null}
+          {/* In-app chat with the client (owner, 1 Nov 2026; modules/chat). Who sees which conversation is checked there. */}
+          <Link href={`/studio/chats?project=${w.id}&thread=DESIGNER`} className="btn wsbtn paper">
+            Chat with {w.customerFirst}
+          </Link>
+          <Link href={`/studio/chats?project=${w.id}&thread=TEAM`} className="btn wsbtn paper">
+            Home team chat
+          </Link>
           {decisions?.canCreate ? (
             <Link href={`/studio/projects/${w.id}/decisions/new`} className="btn pri wsbtn">
               New decision for {w.customerFirst}
@@ -198,7 +205,8 @@ export default async function ProjectWorkspacePage({
           Restored. It is back in your lists; share the new app link below with {w.customerFirst}.
         </p>
       ) : null}
-      {w.invite && (!w.customerJoined || started === '1') ? (
+      {/* Kept after joining (1 Nov 2026): a client who forgets their password needs a new one-time password from here. */}
+      {w.invite ? (
         <InviteBanner
           projectId={w.id}
           customer={w.customerFirst}

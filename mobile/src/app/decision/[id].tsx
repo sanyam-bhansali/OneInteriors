@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowIcon } from '../../components/icons';
 import { ChevronBack, Pop, TickIcon } from '../../components/project/parts';
@@ -268,6 +268,7 @@ export default function DecisionScreen() {
             </View>
           ) : null}
 
+          {!family && confirmed === null && !past ? <Redo decisionId={d.id} asked={d.redo ?? null} onDone={() => void refresh()} t={t} /> : null}
           {error ? <ErrorText>{error}</ErrorText> : null}
         </View>
       </ScrollView>
@@ -370,3 +371,43 @@ const styles = StyleSheet.create({
   pillText: { flexShrink: 1, fontFamily: font.sansSemi, fontSize: 15, color: color.onDark, textAlign: 'center' },
   familyNote: { fontFamily: font.sans, fontSize: 14.5, lineHeight: 21, color: color.ink2, textAlign: 'center', paddingVertical: 8 },
 });
+
+/** "None of these: show me other options" (the v1 screens' Redo; owner, 1 Nov 2026). The owner only, before picking. */
+function Redo({ decisionId, asked, onDone, t }: { decisionId: string; asked: { at: string; note: string | null } | null; onDone: () => void; t: T }) {
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const send = async () => {
+    setBusy(true);
+    setErr(null);
+    const r = await api.askOtherOptions(decisionId, note);
+    setBusy(false);
+    if (!r.ok) return setErr(r.error);
+    setOpen(false);
+    onDone();
+  };
+  if (asked && !open) return <Body muted>{t('redo.asked', { note: asked.note ?? '' })}</Body>;
+  if (!open) {
+    return (
+      <Press onPress={() => setOpen(true)} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>
+        <Text style={{ fontFamily: font.sansMedium, fontSize: 15, color: color.ink, textDecorationLine: 'underline' }}>{t('redo.open')}</Text>
+      </Press>
+    );
+  }
+  return (
+    <View style={{ gap: 8 }}>
+      <Body muted>{t('redo.what')}</Body>
+      <TextInput
+        value={note}
+        onChangeText={setNote}
+        multiline
+        maxLength={1000}
+        aria-label={t('redo.what')}
+        style={{ minHeight: 80, borderRadius: 12, borderWidth: 1, borderColor: color.line, padding: 12, fontFamily: font.sans, fontSize: 15, color: color.ink, backgroundColor: color.white, textAlignVertical: 'top' }}
+      />
+      <Button label={t('redo.send')} arrow={false} busy={busy} disabled={note.trim().length < 3} onPress={() => void send()} />
+      {err ? <ErrorText>{err}</ErrorText> : null}
+    </View>
+  );
+}

@@ -6,6 +6,7 @@ import { blockerLine, stepLine } from '../project/lifecycle';
 import { Button, DarkCard, Press } from '../ui';
 import { BellIcon } from '../icons';
 import { dayLabel } from '../../lib/format';
+import { oneThingTarget } from '../../lib/chat-merge';
 import type { T } from '../../lib/i18n';
 import { color, font } from '../../lib/theme';
 import { STAGE_SHORT, type Lifecycle, type Project } from '../../lib/types';
@@ -18,14 +19,11 @@ import { STAGE_SHORT, type Lifecycle, type Project } from '../../lib/types';
  * waiting, what the studio is doing. Then shortcuts, and the stages.
  */
 
-/** Where the one thing is done. */
+/** Where the one thing is done (lib/chat-merge.ts `oneThingTarget`, tested). */
 function go(kind: NonNullable<Lifecycle['blocker']>['kind'], p: Project) {
-  if (kind === 'decide') {
-    const d = p.decisions.find((x) => x.state === 'open' || x.state === 'due-soon');
-    if (d) return router.push({ pathname: '/decision/[id]', params: { id: d.id } });
-  }
-  if (kind === 'confirm_snag' || kind === 'sign_off') return router.push('/snags');
-  return router.push('/project');
+  const target = oneThingTarget(kind, p.decisions);
+  if (target.to === 'decision') return router.push({ pathname: '/decision/[id]', params: { id: target.id } });
+  return router.push(target.to === 'snags' ? '/snags' : '/project');
 }
 
 function greeting(t: T): string {

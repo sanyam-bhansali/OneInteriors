@@ -15,7 +15,8 @@ import { projectsVisibleTo } from '@/modules/studio/roles';
 import { istDay } from '@/modules/project/working-days';
 import { signedDocDownloads } from '@/modules/storage/project-docs';
 import { homeLabel } from '@/modules/studio/workspace-view';
-import { DOC_TYPES, docFileName, extOf, finalsOf, handoverMissing, isDocType, versionLabels, type DocType, type FinalDoc } from './documents';
+import { signedLine } from '@/modules/project/signoff-rules';
+import { DOC_TYPES, docFileName, extOf, finalsOf, handoverMissing, isDocType, markFinalWarning, nameWord, versionLabels, type DocType, type FinalDoc } from './documents';
 
 export interface DocVersionView {
   id: string;
@@ -29,6 +30,10 @@ export interface DocVersionView {
   fileName: string;
   url: string;
   comment: string | null;
+  /** The designer marked it the final of its type and room. */
+  markedFinal: boolean;
+  /** Said when marking it final: the client has not approved it (documents.ts `markFinalWarning`). */
+  finalWarning: string | null;
 }
 
 export interface DocChainView {
@@ -46,6 +51,27 @@ export interface ProjectDocsView {
   chains: DocChainView[];
   finals: (FinalDoc & { typeLabel: string; versionLabel: string; fileName: string; url: string; on: string })[];
   handoverMissing: string[];
+  /** The quotations and the agreement for the handover pack (owner, 1 Nov 2026). */
+  papers: HandoverPaper[];
+  /** May mark finals (`design.work`). */
+  canWork: boolean;
+}
+
+/**
+ * A quotation or the agreement in the handover pack (walkthrough, 27 Oct
+ * 2026: "the final quotation comes in too"; owner, 1 Nov 2026). A quotation is
+ * a page, not a file: `href` opens its print page (Save as PDF). The agreement
+ * signed on paper is a file, so it has a `url` and goes in the zip.
+ */
+export interface HandoverPaper {
+  key: string;
+  label: string;
+  /** "Signed by … on …", "Not signed yet", or the date it was filed. */
+  line: string;
+  done: boolean;
+  href: string | null;
+  url: string | null;
+  fileName: string | null;
 }
 
 export async function projectDocuments(projectId: string): Promise<ProjectDocsView | null> {
@@ -54,6 +80,8 @@ export async function projectDocuments(projectId: string): Promise<ProjectDocsVi
   const p = await prisma.homeProject.findUnique({
     where: { id: projectId },
     select: {
+      signedQuoteId: true,
+      designFinalQuoteId: true,
       introduction: {
         select: {
           studio: { select: { tradeName: true, branding: { select: { documentName: true } } } },
@@ -63,12 +91,18 @@ export async function projectDocuments(projectId: string): Promise<ProjectDocsVi
       documents: {
         where: { deletedAt: null, designKind: { not: null } },
         orderBy: { createdAt: 'asc' },
-        select: { id: true, designKind: true, room: true, version: true, supersedesId: true, sharedAt: true, createdAt: true, storageKey: true, uploadedById: true },
+        select: { id: true, designKind: true, room: true, version: true, supersedesId: true, sharedAt: true, createdAt: true, storageKey: true, uploadedById: true, markedFinalAt: true },
       },
       designReviews: { orderBy: { at: 'asc' }, select: { documentId: true, verdict: true, comment: true } },
     },
   });
   if (!p) return null;
+  const paperAgreements = await prisma.homeDocument.findMany({
+    where: { projectId, deletedAt: null, kind: 'SIGNED_AGREEMENT' },
+    orderBy: { createdAt: 'desc' },
+    take: 1,
+    select: { storageKey: true, createdAt: true },
+  });
   const b = p.introduction.brief;
   const client = b.contactName?.trim() || b.user?.name?.trim() || 'Client';
   const studio = p.introduction.studio.branding?.documentName?.trim() || p.introduction.studio.tradeName;
@@ -99,6 +133,8 @@ export async function projectDocuments(projectId: string): Promise<ProjectDocsVi
       fileName: names[k]!,
       url: urls[k] ?? '',
       comment: a?.comment ?? null,
+      markedFinal: d.markedFinalAt !== null,
+      finalWarning: markFinalWarning({ type: d.designKind as DocType, answer: a?.verdict ?? null }),
     };
   });
   const chainsMap = new Map<string, DocChainView>();
@@ -113,12 +149,67 @@ export async function projectDocuments(projectId: string): Promise<ProjectDocsVi
     .map((c) => ({ ...c, versions: [...c.versions].sort((x, y) => y.version - x.version) }))
     .sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type) || (a.room ?? '').localeCompare(b.room ?? ''));
   const finals = finalsOf(
-    docs.map((d) => ({ id: d.id, type: d.designKind as DocType, room: d.room, version: d.version, supersedesId: d.supersedesId, shared: d.sharedAt !== null, answer: last.get(d.id)?.verdict ?? null, at: d.createdAt })),
+    docs.map((d) => ({ id: d.id, type: d.designKind as DocType, room: d.room, version: d.version, supersedesId: d.supersedesId, shared: d.sharedAt !== null, answer: last.get(d.id)?.verdict ?? null, at: d.createdAt, markedFinal: d.markedFinalAt !== null })),
   ).map((f) => {
     const v = views.find((x) => x.id === f.id)!;
     return { ...f, typeLabel: DOC_TYPES[f.type].label, versionLabel: v.versionLabel, fileName: v.fileName, url: v.url, on: v.on };
   });
-  return { projectId, home: homeLabel(b), client, chains, finals, handoverMissing: handoverMissing(finals) };
+  const papers = check.access.may('payment.read') ? await handoverPapers(projectId, check.member.studioId, { ...p, paper: paperAgreements[0] ?? null }, client) : [];
+  return { projectId, home: homeLabel(b), client, chains, finals, handoverMissing: handoverMissing(finals), papers, canWork: check.access.may('design.work') };
+}
+
+/** The sales final and the design final, each with its signature, and the agreement: signed in the app, or the paper copy. */
+async function handoverPapers(
+  projectId: string,
+  studioId: string,
+  p: { signedQuoteId: string | null; designFinalQuoteId: string | null; paper: { storageKey: string; createdAt: Date } | null },
+  client: string,
+): Promise<HandoverPaper[]> {
+  const ids = [p.signedQuoteId, p.designFinalQuoteId].filter((x): x is string => Boolean(x));
+  const [quotes, signed] = await Promise.all([
+    ids.length ? prisma.studioQuote.findMany({ where: { id: { in: ids }, studioId }, select: { id: true, number: true } }) : Promise.resolve([]),
+    prisma.homeQuoteSignoff.findMany({
+      where: { projectId, signedAt: { not: null }, withdrawnAt: null },
+      orderBy: { signedAt: 'desc' },
+      select: { kind: true, quoteId: true, revisionN: true, signerName: true, signedAt: true },
+    }),
+  ]);
+  const signedOf = (kind: string, quoteId: string | null) => signed.find((s) => s.kind === kind && (!quoteId || s.quoteId === quoteId));
+  const out: HandoverPaper[] = [];
+  const quoteRow = (key: string, label: string, kind: string, quoteId: string | null) => {
+    if (!quoteId) return;
+    const q = quotes.find((x) => x.id === quoteId);
+    const s = signedOf(kind, quoteId);
+    out.push({
+      key,
+      label: `${label}${q ? ` ${q.number}` : ''}${s ? ` · R${s.revisionN}` : ''}`,
+      line: s?.signedAt && s.signerName ? signedLine(s.signerName, s.signedAt) : 'Not signed yet',
+      done: Boolean(s),
+      href: `/studio/quotations/${quoteId}/print`,
+      url: null,
+      fileName: null,
+    });
+  };
+  quoteRow('sales', 'Sales final quotation', 'SALES_FINAL', p.signedQuoteId);
+  quoteRow('design', 'Design final quotation', 'DESIGN_FINAL', p.designFinalQuoteId);
+  if (p.paper) {
+    const ext = extOf(p.paper.storageKey);
+    const fileName = `Agreement_${nameWord(client, 'Client')}_${istDay(p.paper.createdAt)}${ext ? `.${ext}` : ''}`;
+    const [url] = await signedDocDownloads([{ key: p.paper.storageKey, name: fileName }]).catch(() => ['']);
+    out.push({ key: 'agreement', label: 'Agreement (signed on paper)', line: `Filed ${istDay(p.paper.createdAt)}`, done: true, href: null, url: url || null, fileName });
+  } else {
+    const s = signedOf('AGREEMENT', null);
+    out.push({
+      key: 'agreement',
+      label: 'Agreement',
+      line: s?.signedAt && s.signerName ? signedLine(s.signerName, s.signedAt) : 'Not signed yet',
+      done: Boolean(s),
+      href: s ? `/studio/quotations/${s.quoteId}/print` : null,
+      url: null,
+      fileName: null,
+    });
+  }
+  return out;
 }
 
 export interface DocFolder {
