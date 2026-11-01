@@ -219,7 +219,7 @@ interface Row {
   href: string;
   title: string;
   sub?: string;
-  group: 'Apps' | 'Clients' | 'Projects' | 'Documents' | 'Quotations' | 'Notes';
+  group: 'Apps' | 'Leads' | 'Projects' | 'Documents' | 'Quotations' | 'Notes';
   app?: StudioApp;
 }
 
@@ -283,7 +283,7 @@ function Palette({ apps, canSearchClients, onClose }: { apps: StudioApp[]; canSe
       href: `/studio/clients/${c.id}`,
       title: c.name,
       sub: [c.society, c.stageName, c.assignedToName ? `with ${c.assignedToName}` : 'in the pool'].filter(Boolean).join(' · '),
-      group: 'Clients',
+      group: 'Leads',
     }));
     const moreRows: Row[] = more.map((m) => ({ key: m.key, href: m.href, title: m.title, sub: m.sub, group: m.group }));
     return [...clientRows, ...moreRows, ...appRows];
@@ -300,7 +300,7 @@ function Palette({ apps, canSearchClients, onClose }: { apps: StudioApp[]; canSe
     [onClose, router],
   );
 
-  const groups: Row['group'][] = ['Clients', 'Projects', 'Documents', 'Quotations', 'Notes', 'Apps'];
+  const groups: Row['group'][] = ['Leads', 'Quotations', 'Projects', 'Documents', 'Notes', 'Apps'];
   let index = -1;
 
   return (

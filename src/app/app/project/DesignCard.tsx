@@ -23,7 +23,22 @@ const MONO = { margin: '4px 0 0', font: '400 13px var(--mono)', color: 'var(--in
 const when = (iso: string) =>
   new Date(iso).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' });
 
-export function DesignCard({ design, studio, owner, docs, onChanged }: { design: Design; studio: string; owner: boolean; docs: MyProject['documents']; onChanged: () => void }) {
+export function DesignCard({
+  design,
+  studio,
+  owner,
+  docs,
+  onChanged,
+  hideProgress = false,
+}: {
+  design: Design;
+  studio: string;
+  owner: boolean;
+  docs: MyProject['documents'];
+  onChanged: () => void;
+  /** The Project screen already shows the design's % on top (project-focus.ts). */
+  hideProgress?: boolean;
+}) {
   const urlOf = (id: string) => docs.find((d) => d.id === id)?.url ?? '';
   const next = design.next;
   const booked = design.visits.filter((v) => v.status === 'booked');
@@ -33,7 +48,7 @@ export function DesignCard({ design, studio, owner, docs, onChanged }: { design:
         <h2>Your design</h2>
         <span className="oa-meta">{design.designer ? `with ${design.designer}` : studio}</span>
       </div>
-      {design.pct !== null ? (
+      {design.pct !== null && !hideProgress ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <span className="oa-meta">{design.done ? 'Design done' : 'Design so far'}</span>

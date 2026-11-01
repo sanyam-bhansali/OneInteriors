@@ -188,7 +188,7 @@ export function AxBoard({
       <div ref={topRef} onScroll={() => mirror(topRef.current, boardRef.current)} className="cl-topscroll" aria-hidden>
         <div style={{ width: scrollW, height: 1 }} />
       </div>
-      <div ref={boardRef} onScroll={() => mirror(boardRef.current, topRef.current)} className="board" role="list" aria-label="Clients by stage">
+      <div ref={boardRef} onScroll={() => mirror(boardRef.current, topRef.current)} className="board" role="list" aria-label="Leads by stage">
         {stages.map((s) => {
           const col = cols[s.id] ?? { rows: [], next: null };
           const isOver = over === s.id;

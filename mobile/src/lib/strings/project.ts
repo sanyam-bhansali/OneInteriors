@@ -3,6 +3,30 @@ import type { Entry } from './entry';
 /** The project screen's words, English, Hindi and Marathi (first draft: Sanyam reviews). */
 export const project = {
   'project.title': { en: 'Your project', hi: 'आपका प्रोजेक्ट', mr: 'तुमचा प्रोजेक्ट' },
+  'project.title.design': { en: 'Your design', hi: 'आपका डिज़ाइन', mr: 'तुमचे डिझाइन' },
+  'project.title.home': { en: 'Your home', hi: 'आपका घर', mr: 'तुमचे घर' },
+  'project.title.handover': { en: 'Your handover', hi: 'आपका हैंडओवर', mr: 'तुमचे हँडओव्हर' },
+  'project.designSoFar': { en: 'Design so far', hi: 'डिज़ाइन अब तक', mr: 'डिझाइन आतापर्यंत' },
+  'project.designSoFar.body': {
+    en: 'Goes up as {studio} finishes each design step.',
+    hi: '{studio} डिज़ाइन का हर काम पूरा करता है, तो यह बढ़ता है।',
+    mr: '{studio} डिझाइनचे प्रत्येक काम पूर्ण करतो तसे हे वाढते.',
+  },
+  'project.wholePlan': { en: 'See the whole plan', hi: 'पूरी योजना देखें', mr: 'संपूर्ण योजना पहा' },
+  'project.wholePlan.design': {
+    en: 'Every stage after design, site, snags and all payments',
+    hi: 'डिज़ाइन के बाद के सभी चरण, साइट, कमियाँ और सारे भुगतान',
+    mr: 'डिझाइननंतरचे सर्व टप्पे, साइट, त्रुटी आणि सर्व पेमेंट',
+  },
+  'project.wholePlan.sub': { en: 'Every stage, all payments and changes', hi: 'सभी चरण, सारे भुगतान और बदलाव', mr: 'सर्व टप्पे, सर्व पेमेंट आणि बदल' },
+  'project.nextPayment': { en: 'Next payment', hi: 'अगला भुगतान', mr: 'पुढचे पेमेंट' },
+  'project.nextPayment.due': { en: '{stage} · to {studio}, due {date}', hi: '{stage} · {studio} को, {date} तक', mr: '{stage} · {studio} ला, {date} पर्यंत' },
+  'project.nextPayment.when': {
+    en: '{stage} · to {studio}, when this stage starts',
+    hi: '{stage} · {studio} को, यह चरण शुरू होने पर',
+    mr: '{stage} · {studio} ला, हा टप्पा सुरू झाल्यावर',
+  },
+  'project.allPaid': { en: 'All paid', hi: 'सब भुगतान हो गया', mr: 'सर्व भरले' },
   'project.since': { en: '{studio}, since {date}', hi: '{studio}, {date} से', mr: '{studio}, {date} पासून' },
   'project.none.body': {
     en: 'The timeline appears here the day you sign with a studio.',

@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { ArrowIcon } from '../../components/icons';
 import { CalendarIcon, GrowLine, NowDot, SnagIcon } from '../../components/project/parts';
@@ -15,6 +15,7 @@ import { PaymentEntries } from '../../components/project/payment-entries';
 import { DesignCard } from '../../components/project/design';
 import { LifecycleCard } from '../../components/project/lifecycle';
 import { ExtrasCard, SignoffsCard } from '../../components/project/extras';
+import { projectFocus, type Block } from '@/modules/app/project-focus';
 import type { Decision, Money, Payments as PaymentsData, Project as ProjectData, Stage, Tracker, TrackerStage } from '../../lib/types';
 
 /**
@@ -27,6 +28,10 @@ import type { Decision, Money, Payments as PaymentsData, Project as ProjectData,
  * also sends how much of the home is done, overall and per stage, and each
  * stage's steps; the percentage card leads, and the stage under way lists
  * its steps (older servers: its room checklist).
+ *
+ * Laid out by where the project is (owner, 1 Nov 2026; modules/app/
+ * project-focus.ts, shared with the website): in design only the design's
+ * progress and what matters now; the rest under "See the whole plan".
  */
 export default function Project() {
   const t = useT();
@@ -35,6 +40,7 @@ export default function Project() {
   const size = useHeadline(42);
   const { state, refresh, refreshing } = useProject();
   const [now] = useState(() => Date.now());
+  const [whole, setWhole] = useState(false);
   if (state.status === 'loading') return <Loading />;
   if (state.status === 'none') {
     return (
@@ -56,7 +62,6 @@ export default function Project() {
   const fixed = p.snags.length - open;
   const due = p.decisions.find((d) => d.state === 'due-soon' || d.state === 'open') ?? null;
   const chosen = [...p.decisions].reverse().find((d) => d.state === 'chosen') ?? null;
-  const decision = due ?? chosen;
   const openDecision = (d: Decision) => router.push({ pathname: '/decision/[id]', params: { id: d.id } });
   const snagSub = p.snags.length ? t('project.snagsCount', { open, fixed }) : t('project.snagsNone');
   const decisionSub = due
@@ -66,146 +71,216 @@ export default function Project() {
       : t('project.decisionNone');
   const titleLine = lang === 'en' ? 20 : 26;
 
+  /* Only what the phase needs (owner, 1 Nov 2026; modules/app/project-focus.ts, shared with the website). */
+  const design = p.design && (typeof p.design.pct === 'number' || p.design.steps.length > 0) ? p.design : null;
+  const layout = projectFocus({
+    phase: p.lifecycle?.phase,
+    designRunning: Boolean(design && !design.done),
+    snags: p.snags.length,
+    paymentToConfirm: (p.payments?.waitingPaise ?? 0) > 0,
+  });
+  const inDesign = layout.focus === 'design';
+  const heading = inDesign ? t('project.title.design') : layout.focus === 'handover' ? t('project.title.handover') : t('project.title.home');
+
+  const block = (b: Block): ReactNode => {
+    switch (b) {
+      case 'progress': {
+        const pct = inDesign ? (design?.pct ?? null) : (p.progressPct ?? null);
+        if (typeof pct !== 'number') return null;
+        return (
+          <Card>
+            <View style={styles.cardHead}>
+              <Text style={styles.cardTitle}>{inDesign ? t('project.designSoFar') : t('project.progress')}</Text>
+              <Text style={styles.progressPct}>{pct}%</Text>
+            </View>
+            <ProgressBar pct={pct} label={inDesign ? t('design.pct.a11y', { n: pct }) : t('project.progress.a11y', { n: pct })} />
+            <Text style={styles.note}>{inDesign ? t('project.designSoFar.body', { studio: p.studio }) : t('project.progress.body', { studio: p.studio })}</Text>
+          </Card>
+        );
+      }
+      case 'stats':
+        return (
+          <>
+            <View style={styles.row3}>
+              <Stagger i={0} start={120} style={{ flex: 1 }}>
+                <Tile
+                  tint="peach"
+                  label={t('project.overall')}
+                  value={late ? (late === 1 ? t('project.dayLate') : t('project.daysLate', { n: late })) : t('project.onTime')}
+                  valueColor={late ? color.accentInk : color.ok}
+                />
+              </Stagger>
+              <Stagger i={1} start={120} style={{ flex: 1 }}>
+                <Tile
+                  tint="mint"
+                  label={t('project.paid')}
+                  value={p.money ? lakh(p.money.paidPaise) : '—'}
+                  sub={p.money ? t('project.paidOf', { total: lakhFigure(p.money.contractPaise) }) : undefined}
+                />
+              </Stagger>
+              <Stagger i={2} start={120} style={{ flex: 1 }}>
+                <Tile tint="sand" label={t('project.handover')} value={handover ? shortDate(handover.targetOn) : '—'} />
+              </Stagger>
+            </View>
+            {late > 0 && customerDays > 0 ? <Text style={styles.note}>{t('project.customerDays', { n: customerDays })}</Text> : null}
+          </>
+        );
+      case 'lifecycle':
+        /* The project lifecycle: where it is, what is next, and what unlocks it. */
+        return p.lifecycle ? <LifecycleCard projectId={p.id} life={p.lifecycle} studio={p.studio} onChanged={() => void refresh()} t={t} /> : null;
+      case 'signoffs':
+        /* Change orders and digital sign-off (15 Oct 2026): quotations to sign, extra work to approve and pay. */
+        return (
+          <>
+            {p.signoffs?.length ? <SignoffsCard signoffs={p.signoffs} t={t} /> : null}
+            {p.extras?.length ? <ExtrasCard extras={p.extras} onChanged={() => void refresh()} t={t} /> : null}
+          </>
+        );
+      case 'decision':
+        return due ? (
+          <Press onPress={() => openDecision(due)} accessibilityLabel={`${t('project.decision')}. ${decisionSub}`} style={styles.decisionTile}>
+            <View style={styles.tileHead}>
+              <CalendarIcon color={color.accentWarm} />
+            </View>
+            <Text style={[styles.tileTitle, { color: color.onDark }]}>{t('project.decision')}</Text>
+            <Text style={[styles.tileSub, { color: color.onDark2 }]} numberOfLines={2}>
+              {decisionSub}
+            </Text>
+          </Press>
+        ) : null;
+      case 'design':
+        return design ? <DesignCard design={design} studio={p.studio} owner={p.role !== 'family'} docs={p.documents} onChanged={() => void refresh()} t={t} hideProgress={inDesign} /> : null;
+      case 'site':
+        /* Site moved inside Project when Chats took its tab (the owner's v1 screens, 1 Nov 2026). */
+        return (
+          <Press onPress={() => router.push('/site')} accessibilityRole="link" accessibilityLabel={t('tab.site')} style={styles.decisionTile}>
+            <Text style={[styles.tileTitle, { color: color.onDark }]}>{t('tab.site')}</Text>
+            <Text style={[styles.tileSub, { color: color.onDark2 }]} numberOfLines={2}>
+              {p.updates[0] ? `${p.updates[0].note || t('tab.site')} · ${dayLabel(p.updates[0].at)}` : t('site.none')}
+            </Text>
+          </Press>
+        );
+      case 'snags':
+        return (
+          <Press onPress={() => router.push('/snags')} accessibilityLabel={`${t('project.snags')}. ${snagSub}`} style={styles.snagTile}>
+            <View style={styles.tileHead}>
+              <SnagIcon color={color.accent} />
+              {open ? (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{open}</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text style={styles.tileTitle}>{t('project.snags')}</Text>
+            <Text style={styles.tileSub}>{snagSub}</Text>
+          </Press>
+        );
+      case 'nextPayment':
+        return <NextPayment money={p.money} phases={p.phases} studio={p.studio} t={t} />;
+      case 'payments':
+        return p.money ? <Payments money={p.money} changes={p.changes} payments={p.payments ?? null} onChanged={() => void refresh()} t={t} /> : null;
+      case 'changes':
+        return null; // The phone's payments card carries the changes.
+      case 'stages':
+        return (
+          <>
+            <View role="list" aria-label={t('project.stages')}>
+              {p.stages.map((s, i) => (
+                <StageRow
+                  key={s.key}
+                  stage={s}
+                  i={i}
+                  last={i === p.stages.length - 1}
+                  decision={s.state === 'now' && due ? due : null}
+                  onDecision={openDecision}
+                  titleLine={titleLine}
+                  assured={assured}
+                  studio={p.studio}
+                  tracked={tracker && tracker.stages.length === p.stages.length ? (tracker.stages[i] ?? null) : null}
+                  current={s.state === 'now' ? (tracker?.current ?? null) : null}
+                  t={t}
+                />
+              ))}
+            </View>
+            {tracker ? <MovesCard moves={tracker.moves} t={t} /> : null}
+          </>
+        );
+    }
+  };
+
   return (
     <Screen onRefresh={() => void refresh()} refreshing={refreshing}>
       <View style={{ gap: 22, paddingTop: 10 }}>
         <View style={{ gap: 8 }}>
           <Eyebrow>{t('project.since', { studio: p.studio, date: shortDate(p.startOn) })}</Eyebrow>
           <Title size={size} style={{ letterSpacing: size * -0.05, lineHeight: lang === 'en' ? size * 0.98 : size * 1.25 }}>
-            {t('project.title')}
+            {heading}
           </Title>
         </View>
 
-        <View style={styles.row3}>
-          <Stagger i={0} start={120} style={{ flex: 1 }}>
-            <Tile
-              tint="peach"
-              label={t('project.overall')}
-              value={late ? (late === 1 ? t('project.dayLate') : t('project.daysLate', { n: late })) : t('project.onTime')}
-              valueColor={late ? color.accentInk : color.ok}
-            />
-          </Stagger>
-          <Stagger i={1} start={120} style={{ flex: 1 }}>
-            <Tile
-              tint="mint"
-              label={t('project.paid')}
-              value={p.money ? lakh(p.money.paidPaise) : '—'}
-              sub={p.money ? t('project.paidOf', { total: lakhFigure(p.money.contractPaise) }) : undefined}
-            />
-          </Stagger>
-          <Stagger i={2} start={120} style={{ flex: 1 }}>
-            <Tile tint="sand" label={t('project.handover')} value={handover ? shortDate(handover.targetOn) : '—'} />
-          </Stagger>
-        </View>
+        {layout.main.map((b) => (
+          <Fragment key={b}>{block(b)}</Fragment>
+        ))}
 
-        {late > 0 && customerDays > 0 ? <Text style={styles.note}>{t('project.customerDays', { n: customerDays })}</Text> : null}
-
-        {typeof p.progressPct === 'number' ? (
-          <Card>
-            <View style={styles.cardHead}>
-              <Text style={styles.cardTitle}>{t('project.progress')}</Text>
-              <Text style={styles.progressPct}>{p.progressPct}%</Text>
-            </View>
-            <ProgressBar pct={p.progressPct} label={t('project.progress.a11y', { n: p.progressPct })} />
-            <Text style={styles.note}>{t('project.progress.body', { studio: p.studio })}</Text>
-          </Card>
-        ) : null}
-
-        {/* The project lifecycle: where it is, what is next, and what unlocks it. */}
-        {p.lifecycle ? <LifecycleCard projectId={p.id} life={p.lifecycle} studio={p.studio} onChanged={() => void refresh()} t={t} /> : null}
-
-        {/* Change orders and digital sign-off (15 Oct 2026): quotations to sign, extra work to approve and pay. */}
-        {p.signoffs?.length ? <SignoffsCard signoffs={p.signoffs} t={t} /> : null}
-        {p.extras?.length ? <ExtrasCard extras={p.extras} onChanged={() => void refresh()} t={t} /> : null}
-
-        {/* Studio OS Phase 2: the design phase, while it runs and once it closes with what changed. */}
-        {p.design && (typeof p.design.pct === 'number' || p.design.steps.length > 0) && (!p.design.done || p.design.changes) ? (
-          <DesignCard design={p.design} studio={p.studio} owner={p.role !== 'family'} docs={p.documents} onChanged={() => void refresh()} t={t} />
-        ) : null}
-
-        {/* Site moved inside Project when Chats took its tab (the owner's v1 screens, 1 Nov 2026). */}
-        <Press onPress={() => router.push('/site')} accessibilityRole="link" accessibilityLabel={t('tab.site')} style={styles.decisionTile}>
-          <Text style={[styles.tileTitle, { color: color.onDark }]}>{t('tab.site')}</Text>
-          <Text style={[styles.tileSub, { color: color.onDark2 }]} numberOfLines={2}>
-            {p.updates[0] ? `${p.updates[0].note || t('tab.site')} · ${dayLabel(p.updates[0].at)}` : t('site.none')}
-          </Text>
-        </Press>
-
-        <View style={styles.row2}>
-          <Stagger i={3} start={120} style={{ flex: 1 }}>
-            <Press onPress={() => router.push('/snags')} accessibilityLabel={`${t('project.snags')}. ${snagSub}`} style={styles.snagTile}>
-              <View style={styles.tileHead}>
-                <SnagIcon color={color.accent} />
-                {open ? (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{open}</Text>
-                  </View>
-                ) : null}
+        {layout.folded.length ? (
+          <>
+            <Press onPress={() => setWhole((w) => !w)} accessibilityRole="button" accessibilityState={{ selected: whole }} style={styles.wholePlan}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.tileTitle}>{t('project.wholePlan')}</Text>
+                <Text style={[styles.tileSub, { marginTop: 0 }]}>{inDesign ? t('project.wholePlan.design') : t('project.wholePlan.sub')}</Text>
               </View>
-              <Text style={styles.tileTitle}>{t('project.snags')}</Text>
-              <Text style={styles.tileSub}>{snagSub}</Text>
+              <Text style={styles.tileTitle}>{whole ? '↑' : '↓'}</Text>
             </Press>
-          </Stagger>
-          <Stagger i={4} start={120} style={{ flex: 1 }}>
-            <Press
-              onPress={decision ? () => openDecision(decision) : undefined}
-              disabled={!decision}
-              accessibilityLabel={`${decision ? t('project.decision') : t('project.decisions')}. ${decisionSub}`}
-              style={styles.decisionTile}
-            >
-              <View style={styles.tileHead}>
-                <CalendarIcon color={color.accentWarm} />
-              </View>
-              <Text style={[styles.tileTitle, { color: color.onDark }]}>{decision ? t('project.decision') : t('project.decisions')}</Text>
-              <Text style={[styles.tileSub, { color: color.onDark2 }]} numberOfLines={2}>
-                {decisionSub}
-              </Text>
-            </Press>
-          </Stagger>
-        </View>
-
-        <View role="list" aria-label={t('project.stages')}>
-          {p.stages.map((s, i) => (
-            <StageRow
-              key={s.key}
-              stage={s}
-              i={i}
-              last={i === p.stages.length - 1}
-              decision={s.state === 'now' && due ? due : null}
-              onDecision={openDecision}
-              titleLine={titleLine}
-              assured={assured}
-              studio={p.studio}
-              tracked={tracker && tracker.stages.length === p.stages.length ? (tracker.stages[i] ?? null) : null}
-              current={s.state === 'now' ? (tracker?.current ?? null) : null}
-              t={t}
-            />
-          ))}
-        </View>
-
-        {tracker ? <MovesCard moves={tracker.moves} t={t} /> : null}
-
-        {p.money ? <Payments money={p.money} changes={p.changes} payments={p.payments ?? null} onChanged={() => void refresh()} t={t} /> : null}
-        {!p.money && p.phases ? (
-          <Card>
-            <View style={styles.cardHead}>
-              <Text style={styles.cardTitle}>{t('project.paymentPlan')}</Text>
-              <Meta>{t('project.youPay')}</Meta>
-            </View>
-            {p.phases.map((ph) => (
-              <View key={ph.label} style={styles.payRow}>
-                <Text style={[styles.payLabel, { flex: 1 }]}>{ph.label}</Text>
-                <Text style={styles.amt}>{ph.pct}%</Text>
-              </View>
-            ))}
-            <Text style={styles.note}>{t('project.payNote')}</Text>
-          </Card>
+            {whole
+              ? layout.folded.map((b) => (
+                  <Fragment key={b}>{block(b)}</Fragment>
+                ))
+              : null}
+          </>
         ) : null}
 
         {/* Promises Assured-plan service (FLOWS.md): flagged for Sanyam, kept. */}
         <Text style={styles.note}>{assured ? t('project.footnote') : t('plan.basic.footnote')}</Text>
       </View>
     </Screen>
+  );
+}
+
+/** The next payment alone: amount, stage and when (the whole plan has the rest). */
+function NextPayment({ money, phases, studio, t }: { money: Money | null; phases: ProjectData['phases']; studio: string; t: T }) {
+  if (!money) {
+    if (!phases?.length) return null;
+    return (
+      <Card>
+        <View style={styles.cardHead}>
+          <Text style={styles.cardTitle}>{t('project.paymentPlan')}</Text>
+          <Meta>{t('project.youPay')}</Meta>
+        </View>
+        {phases.map((ph) => (
+          <View key={ph.label} style={styles.payRow}>
+            <Text style={[styles.payLabel, { flex: 1 }]}>{ph.label}</Text>
+            <Text style={styles.amt}>{ph.pct}%</Text>
+          </View>
+        ))}
+        <Text style={styles.note}>{t('project.payNote')}</Text>
+      </Card>
+    );
+  }
+  const next = money.next;
+  return (
+    <Card>
+      <Text style={styles.cardTitle}>{next ? t('project.nextPayment') : t('project.allPaid')}</Text>
+      {next ? (
+        <>
+          <Text style={styles.progressPct}>{inr(next.amountPaise)}</Text>
+          <Text style={styles.note}>
+            {next.dueOn ? t('project.nextPayment.due', { stage: next.label, studio, date: shortDate(next.dueOn) }) : t('project.nextPayment.when', { stage: next.label, studio })}
+          </Text>
+        </>
+      ) : (
+        <Text style={styles.note}>{inr(money.paidPaise)}</Text>
+      )}
+    </Card>
   );
 }
 
@@ -420,6 +495,7 @@ const styles = StyleSheet.create({
   payRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.line },
   payLabel: { fontFamily: font.sansMedium, fontSize: 14.5, color: color.ink },
   amt: { fontFamily: font.monoMedium, fontSize: 13.5, color: color.ink, textAlign: 'right', flexShrink: 1 },
+  wholePlan: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 18, padding: 16, backgroundColor: color.soft },
   note: { fontFamily: font.sans, fontSize: 13.5, lineHeight: 20, color: color.ink2 },
   progressPct: { fontFamily: font.mono, fontSize: 24, color: color.ink },
 

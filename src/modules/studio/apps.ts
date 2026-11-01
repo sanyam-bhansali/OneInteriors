@@ -60,17 +60,17 @@ export interface StudioApp {
 
 const T = (label: string, href: string): AppTab => ({ label, href });
 
-/** In the owner's order (StudioLauncher). */
+/**
+ * In the work's order (owner, 1 Nov 2026: "leads then quotation then
+ * projects"): a lead is quoted, booked into a project, designed, built and
+ * paid for; then the day's tools, then the studio's own. Every role's home and
+ * apps menu keep this order (`appsFor`).
+ */
 export const APPS: readonly StudioApp[] = [
   {
-    key: 'today', name: 'Today', href: TODAY_HOME, icon: 'home', bg: 'var(--ink)', fg: 'var(--paper)',
-    tabs: [T('Your list', TODAY_HOME), T('Overview', '/studio')],
-    owns: [TODAY_HOME],
-  },
-  {
-    key: 'clients', name: 'Clients', href: '/studio/clients', icon: 'users', bg: 'var(--acc-soft)', fg: 'var(--acc-ink)',
+    key: 'clients', name: 'Leads', href: '/studio/clients', icon: 'users', bg: 'var(--acc-soft)', fg: 'var(--acc-ink)',
     tabs: [
-      T('All clients', '/studio/clients'),
+      T('All leads', '/studio/clients'),
       T('Pool', '/studio/clients/pool'),
       T('Numbers', '/studio/dashboard'),
       T('Import', '/studio/clients/import'),
@@ -128,6 +128,11 @@ export const APPS: readonly StudioApp[] = [
     owns: [CREWS_HOME],
   },
   {
+    key: 'today', name: 'Today', href: TODAY_HOME, icon: 'home', bg: 'var(--ink)', fg: 'var(--paper)',
+    tabs: [T('Your list', TODAY_HOME), T('Overview', '/studio')],
+    owns: [TODAY_HOME],
+  },
+  {
     key: 'calendar', name: 'Calendar', href: '/studio/calendar', icon: 'calendar', bg: 'var(--info-bg)', fg: 'var(--info)',
     tabs: [T('Calendar', '/studio/calendar'), T('Meetings', '/studio/calendar/meetings'), T('One Interiors visits', '/studio/calendar/appointments')],
     owns: ['/studio/calendar'],
@@ -157,8 +162,8 @@ export const APPS: readonly StudioApp[] = [
 ];
 
 /**
- * Each role's apps, in the order their home shows them (the brief's table,
- * plus what our roles already open: a project manager keeps the office they had).
+ * Each role's apps (the brief's table, plus what our roles already open: a
+ * project manager keeps the office they had). Shown in the `APPS` order.
  */
 const ROLE_APPS: Record<StudioRoleName, readonly AppKey[]> = {
   OWNER: ['today', 'clients', 'quotes', 'projects', 'chats', 'documents', 'site', 'money', 'vendors', 'calendar', 'intros', 'rates', 'team'],
@@ -192,15 +197,14 @@ export function appsFor(viewer: MemberRole): StudioApp[] {
   /* Staff viewing as this member (VIEW-AS.md) see their apps exactly. */
   const member = asSeenBy(viewer);
   if (member.status !== 'ACTIVE') return [];
-  const byKey = new Map(APPS.map((a) => [a.key, a]));
+  const mine = new Set(ROLE_APPS[member.role]);
   const out: StudioApp[] = [];
-  for (const key of ROLE_APPS[member.role]) {
-    const app = byKey.get(key);
-    if (!app) continue;
+  for (const app of APPS) {
+    if (!mine.has(app.key)) continue;
     const href = entryFor(app, member);
     if (!mayOpen(member, href)) continue;
     const tabs = app.tabs.filter((t) => mayOpen(member, t.href) && tabFor(member, t.href));
-    out.push({ ...app, href, tabs, name: app.key === 'clients' && member.role === 'SALES' ? 'Leads' : app.key === 'team' && href !== TEAM_PATH ? 'Settings' : app.name });
+    out.push({ ...app, href, tabs, name: app.key === 'team' && href !== TEAM_PATH ? 'Settings' : app.name });
   }
   return out;
 }

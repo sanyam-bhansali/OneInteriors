@@ -117,7 +117,7 @@ describe('the pilot switch: off', () => {
   });
 
   it('the apps menu shows only open apps; the owner sees the rest as coming soon', () => {
-    expect(appsFor(m('OWNER', false)).map((a) => a.key)).toEqual(['today', 'clients', 'quotes', 'calendar', 'rates', 'team']);
+    expect(appsFor(m('OWNER', false)).map((a) => a.key)).toEqual(['clients', 'quotes', 'today', 'calendar', 'rates', 'team']);
     /* Pro (owner, 21 Oct 2026): the Team app opens the team, where the owner adds salespeople. */
     const team = appsFor(m('OWNER', false)).find((a) => a.key === 'team')!;
     expect(team.href).toBe('/studio/settings/team');

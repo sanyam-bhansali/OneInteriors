@@ -8,8 +8,14 @@ const m = (role: StudioRoleName) => ({ role, status: 'ACTIVE' as const });
 const keys = (role: StudioRoleName) => appsFor(m(role)).map((a) => a.key);
 
 describe('studio apps (UI handoff 12 Oct 2026)', () => {
-  it('the owner sees every app, in the launcher order', () => {
-    expect(keys('OWNER')).toEqual(['today', 'clients', 'quotes', 'projects', 'chats', 'documents', 'site', 'money', 'vendors', 'calendar', 'intros', 'rates', 'team']);
+  it('the owner sees every app, Leads then Quotations then Projects (1 Nov 2026)', () => {
+    expect(keys('OWNER')).toEqual(['clients', 'quotes', 'projects', 'documents', 'site', 'money', 'vendors', 'today', 'calendar', 'chats', 'intros', 'rates', 'team']);
+    expect(appsFor(m('OWNER'))[0].name).toBe('Leads');
+  });
+
+  it('every role keeps that order', () => {
+    expect(keys('PM')).toEqual(['clients', 'quotes', 'projects', 'documents', 'site', 'today', 'calendar', 'chats', 'rates', 'team']);
+    expect(keys('DESIGNER')).toEqual(['projects', 'documents', 'calendar', 'chats']);
   });
 
   it('a salesperson sees Leads, Quotations and Calendar only', () => {
@@ -48,7 +54,7 @@ describe('studio apps (UI handoff 12 Oct 2026)', () => {
   });
 
   it('a supervisor has site mode (and the calendar everyone has) and lands there', () => {
-    expect(keys('SUPERVISOR')).toEqual(['site', 'chats', 'calendar']); // Chats with clients, 1 Nov 2026: the site head is on the home team
+    expect(keys('SUPERVISOR')).toEqual(['site', 'calendar', 'chats']); // Chats with clients, 1 Nov 2026: the site head is on the home team
     expect(homeFor('SUPERVISOR')).toBe('/studio/site');
   });
 
@@ -106,6 +112,6 @@ describe('studio apps (UI handoff 12 Oct 2026)', () => {
     expect(appForPath(STUDIO_HOME)).toBeNull();
     const clients = appForPath('/studio/clients/pool')!;
     expect(tabForPath('/studio/clients/pool', clients.tabs)?.label).toBe('Pool');
-    expect(tabForPath('/studio/clients/abc', clients.tabs)?.label).toBe('All clients');
+    expect(tabForPath('/studio/clients/abc', clients.tabs)?.label).toBe('All leads');
   });
 });
