@@ -36,6 +36,17 @@ export async function settleDesignPhase(tx: Prisma.TransactionClient, projectId:
 }
 
 /**
+ * Plans made before 1 Nov 2026 carry "Post-validation approval" as a working-
+ * drawings approval. Validation drawings tick it; working drawings no longer do.
+ */
+const OLD_POST_VALIDATION = 'Post-validation approval';
+function approvalWhere(kind: ApprovalKind): Prisma.HomeChecklistItemWhereInput {
+  if (kind === 'VALIDATION') return { OR: [{ approvalKind: 'VALIDATION' }, { approvalKind: 'WORKING', label: OLD_POST_VALIDATION }] };
+  if (kind === 'WORKING') return { approvalKind: 'WORKING', NOT: { label: OLD_POST_VALIDATION } };
+  return { approvalKind: kind };
+}
+
+/**
  * The client approved in the app: the first open client step that this kind
  * of approval ticks is ticked, by the client, with a line saying so. Late,
  * it is the client's delay (filed for the Delays list). Nothing when no such
@@ -43,7 +54,7 @@ export async function settleDesignPhase(tx: Prisma.TransactionClient, projectId:
  */
 export async function tickApprovalStep(tx: Prisma.TransactionClient, projectId: string, kind: ApprovalKind, userId: string, now: Date): Promise<boolean> {
   const step = await tx.homeChecklistItem.findFirst({
-    where: { stage: { projectId, kind: 'DESIGN' }, approvalKind: kind, doneAt: null, inScope: true },
+    where: { stage: { projectId, kind: 'DESIGN' }, doneAt: null, inScope: true, ...approvalWhere(kind) },
     orderBy: { sortOrder: 'asc' },
     select: { id: true, stageId: true, label: true, plannedOn: true, responsible: true },
   });

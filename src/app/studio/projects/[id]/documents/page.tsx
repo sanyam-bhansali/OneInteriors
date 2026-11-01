@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { projectDocuments } from '@/modules/studio-design/documents-store';
+import { MarkFinal } from './MarkFinal';
 import '../../projects.css';
 
 export const metadata: Metadata = { title: 'All versions', robots: { index: false, follow: false } };
@@ -34,7 +35,7 @@ export default async function AllVersionsPage({ params }: { params: Promise<{ id
         <div>
           <h1>Documents · {view.client}</h1>
           <p className="muted" style={{ margin: '6px 0 0' }}>
-            {view.home}. Every version of every document, newest first. The project page shows only the one that counts.
+            {view.home}. Every version of every document, newest first. Mark the one that is final; the handover documents are the ones marked final.
           </p>
         </div>
         <div className="hstack">
@@ -62,6 +63,7 @@ export default async function AllVersionsPage({ params }: { params: Promise<{ id
                 <li key={v.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-[var(--s-rule-soft)] px-4 py-2 text-[13.5px]">
                   <span className="mono w-[52px]">v{v.versionLabel}</span>
                   <span className={`chip ${TAG[v.state]!.cls}`}>{TAG[v.state]!.text}</span>
+                  {v.markedFinal ? <span className="chip good">Final</span> : null}
                   <span className="muted">
                     {dayWords(v.on)} · {v.by}
                   </span>
@@ -76,6 +78,7 @@ export default async function AllVersionsPage({ params }: { params: Promise<{ id
                   ) : (
                     <span className="muted sm">Not stored on this machine</span>
                   )}
+                  {view.canWork ? <MarkFinal projectId={id} documentId={v.id} marked={v.markedFinal} warning={v.finalWarning} /> : null}
                 </li>
               ))}
             </ul>

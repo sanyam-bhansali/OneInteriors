@@ -130,23 +130,31 @@ export interface DocVersion {
   /** The client's latest answer on this version. */
   answer: 'APPROVED' | 'CHANGES' | null;
   at: Date;
+  /** The designer marked this version the final of its type and room (walkthrough, 27 Oct 2026; owner's pick 1 Nov 2026). */
+  markedFinal?: boolean;
 }
 
 export type FinalState = 'approved' | 'waiting' | 'changes' | 'shared' | 'draft';
 
 export interface FinalDoc {
-  /** The version that counts: the newest approved, else the newest shared, else the newest draft. */
+  /** The version that counts: the one marked final, else the newest approved, else the newest shared, else the newest draft. */
   id: string;
   type: DocType;
   room: string | null;
   state: FinalState;
   /** Versions in the chain. */
   versions: number;
-  /** A newer version than the final is waiting (shared after the approval). */
+  /** A newer version than the final is waiting (shared after the approval or the mark). */
   newerWaiting: boolean;
+  /**
+   * The designer marked it final. Only a marked version is final: the newest
+   * is never final by itself ("it is the designer's responsibility to mark
+   * which document is final", walkthrough, 27 Oct 2026). One per type and room.
+   */
+  marked: boolean;
 }
 
-/** One line per type and room: the version that counts now, for the project page and the handover pack. */
+/** One line per type and room: the version that counts now, for the project page; the handover pack takes the marked ones. */
 export function finalsOf(docs: readonly DocVersion[]): FinalDoc[] {
   const chains = new Map<string, DocVersion[]>();
   for (const d of docs) {
@@ -156,9 +164,11 @@ export function finalsOf(docs: readonly DocVersion[]): FinalDoc[] {
   const out: FinalDoc[] = [];
   for (const list of chains.values()) {
     const byNew = [...list].sort((a, b) => b.version - a.version || b.at.getTime() - a.at.getTime());
+    const marked = byNew.find((d) => d.markedFinal === true);
     const approved = byNew.find((d) => d.answer === 'APPROVED');
     const newestShared = byNew.find((d) => d.shared);
-    const pick = approved ?? newestShared ?? byNew[0]!;
+    const pick = marked ?? approved ?? newestShared ?? byNew[0]!;
+    const settled = marked ?? approved;
     const needs = DOC_TYPES[pick.type].approval;
     const state: FinalState = pick.answer === 'APPROVED' ? 'approved' : !pick.shared ? 'draft' : !needs ? 'shared' : pick.answer === 'CHANGES' ? 'changes' : 'waiting';
     out.push({
@@ -167,7 +177,8 @@ export function finalsOf(docs: readonly DocVersion[]): FinalDoc[] {
       room: pick.room,
       state,
       versions: list.length,
-      newerWaiting: Boolean(approved && newestShared && newestShared.version > approved.version),
+      newerWaiting: Boolean(settled && newestShared && newestShared.version > settled.version),
+      marked: Boolean(marked),
     });
   }
   const order = Object.keys(DOC_TYPES);
@@ -175,12 +186,24 @@ export function finalsOf(docs: readonly DocVersion[]): FinalDoc[] {
 }
 
 /**
- * Is the handover pack complete (DESIGN-PROCESS-PLAN.md §3.5)? A final of each
- * required type: approved where the client approves it, shared or drafted
- * where they do not. The missing types, by label; empty when ready.
+ * Is the handover pack complete (DESIGN-PROCESS-PLAN.md §3.5)? A version of
+ * each required type marked final by the designer (1 Nov 2026: the designer
+ * marks the final, the newest never is by itself). The missing types, by
+ * label; empty when ready.
  */
 export function handoverMissing(finals: readonly FinalDoc[]): string[] {
-  return HANDOVER_REQUIRED.filter((t) => !finals.some((f) => f.type === t && (DOC_TYPES[t].approval ? f.state === 'approved' : true))).map((t) => DOC_TYPES[t].label);
+  return HANDOVER_REQUIRED.filter((t) => !finals.some((f) => f.type === t && f.marked)).map((t) => DOC_TYPES[t].label);
+}
+
+/**
+ * Marking a version final (owner, 1 Nov 2026). Any version of the chain may be
+ * marked, an older one too ("the client said the first one was fine"); one
+ * where the client approves it is marked once they have, else the designer is
+ * told and may still mark it (a drawing approved at the office, on paper).
+ */
+export function markFinalWarning(v: { type: DocType; answer: 'APPROVED' | 'CHANGES' | null }): string | null {
+  if (!DOC_TYPES[v.type].approval || v.answer === 'APPROVED') return null;
+  return v.answer === 'CHANGES' ? 'The client asked for changes on this version.' : 'The client has not approved this version.';
 }
 
 /** The step whose tick needs the handover pack (Hauspire's "Final documentation for handover"). */

@@ -59,6 +59,7 @@ export function NewDecisionForm({
   lines,
   suggestedDue,
   today,
+  initialTitle = '',
 }: {
   projectId: string;
   customer: string;
@@ -66,8 +67,10 @@ export function NewDecisionForm({
   lines: Line[];
   suggestedDue: string;
   today: string;
+  /** From a client's chat message (1 Nov 2026). */
+  initialTitle?: string;
 }) {
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(initialTitle);
   const [why, setWhy] = useState('');
   const [due, setDue] = useState(suggestedDue);
   const [lineId, setLineId] = useState('');

@@ -27,6 +27,7 @@ const design = (over: Partial<CustomerDesign> = {}): CustomerDesign => ({
   waitingFor: null,
   yourStep: null,
   moodBoard: { shared: false, sharedOn: null, note: null },
+  requirementForm: null,
   visits: [],
   measurements: [],
   drawings: [],

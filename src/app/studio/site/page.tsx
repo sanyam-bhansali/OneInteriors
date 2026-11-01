@@ -63,8 +63,9 @@ export default async function SiteTodayPage() {
               title: t('work.title'),
               today: t('work.today'),
               soon: t('work.soon'),
+              month: t('work.month'),
               missed: t('work.missed'),
-              empty: { today: t('work.emptyToday'), soon: t('work.emptySoon'), missed: t('work.emptyMissed') },
+              empty: { today: t('work.emptyToday'), soon: t('work.emptySoon'), month: t('work.emptyMonth'), missed: t('work.emptyMissed') },
               showMore: (n) => t('work.more', { n }),
               notShown: (n) => t('work.notShown', { n }),
             }}

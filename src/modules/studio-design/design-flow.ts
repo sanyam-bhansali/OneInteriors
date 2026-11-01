@@ -28,7 +28,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { notify, notifyStudio } from '@/modules/notify/service';
 import { docPathBelongsTo, projectDocExists, projectDocTicket, storeProjectDoc } from '@/modules/storage/project-docs';
-import { checkUpload, finalsOf, handoverMissing, isDocType, isHandoverDocsStep, type DocType } from './documents';
+import { checkUpload, finalsOf, handoverMissing, isDocType, isHandoverDocsStep, markFinalWarning, type DocType } from './documents';
 import { currentMember, memberOnProject } from '@/modules/studio/access';
 import { can, needsAssignment } from '@/modules/studio/roles';
 import { recordEvent, type ProjectActor } from '@/modules/project/events';
@@ -210,7 +210,7 @@ export async function tickDesignStep(
   if (isHandoverDocsStep(step.label)) {
     const docs = await prisma.homeDocument.findMany({
       where: { projectId, deletedAt: null, designKind: { not: null } },
-      select: { id: true, designKind: true, room: true, version: true, supersedesId: true, sharedAt: true, createdAt: true },
+      select: { id: true, designKind: true, room: true, version: true, supersedesId: true, sharedAt: true, createdAt: true, markedFinalAt: true },
     });
     const reviews = await prisma.homeDesignReview.findMany({ where: { projectId }, orderBy: { at: 'asc' }, select: { documentId: true, verdict: true } });
     const last = new Map<string, 'APPROVED' | 'CHANGES'>();
@@ -219,10 +219,10 @@ export async function tickDesignStep(
       finalsOf(
         docs
           .filter((d) => isDocType(d.designKind))
-          .map((d) => ({ id: d.id, type: d.designKind as DocType, room: d.room, version: d.version, supersedesId: d.supersedesId, shared: d.sharedAt !== null, answer: last.get(d.id) ?? null, at: d.createdAt })),
+          .map((d) => ({ id: d.id, type: d.designKind as DocType, room: d.room, version: d.version, supersedesId: d.supersedesId, shared: d.sharedAt !== null, answer: last.get(d.id) ?? null, at: d.createdAt, markedFinal: d.markedFinalAt !== null })),
       ),
     );
-    if (missing.length) return { ok: false, error: `The handover pack is not complete yet: ${missing.join(', ')}. Upload them (working and electrical drawings approved by the client), then tick.` };
+    if (missing.length) return { ok: false, error: `The handover pack is not complete yet: ${missing.join(', ')}. Upload them and mark each one final, then tick.` };
   }
   // A late step says why (DESIGN-PROCESS-PLAN.md Decision 6); filed on the Delays list.
   const plannedDay = step.plannedOn ? dayFromDb(step.plannedOn) : null;
@@ -595,6 +595,75 @@ export async function setVisitStatus(projectId: string, visitId: string, status:
   return { ok: true, message: status === 'DONE' ? 'Marked done.' : status === 'CANCELLED' ? 'Cancelled. The client no longer sees it.' : 'Booked again.' };
 }
 
+/**
+ * The client answers a booked visit in the app (owner, 1 Nov 2026; customer
+ * app Phase 2): "I'll be there", or "Ask for another day" with why. The
+ * reason stays on the visit for the delay record, and the studio and the
+ * project's designer hear it. Only the home's owner answers, until the visit
+ * is done or cancelled; a new answer replaces the last.
+ */
+export async function answerVisit(userId: string, visitId: string, answer: unknown, reason: unknown, now = new Date()): Promise<DesignResult> {
+  if (answer !== 'confirm' && answer !== 'move') return { ok: false, error: 'Say whether you will be there.' };
+  const why = typeof reason === 'string' ? reason.trim().replace(/\s+/g, ' ') : '';
+  if (answer === 'move' && why.length < 3) return { ok: false, error: 'Say why another day suits better, and which days work for you.' };
+  if (why.length > VISIT_NOTE_MAX) return { ok: false, error: `Keep it under ${VISIT_NOTE_MAX} characters.` };
+  const visit = await prisma.homeSiteVisit.findFirst({
+    where: { id: String(visitId).slice(0, 40), project: { cancelledAt: null, introduction: { brief: { userId } } } },
+    select: {
+      id: true,
+      at: true,
+      purpose: true,
+      status: true,
+      projectId: true,
+      project: { select: { introduction: { select: { studioId: true } }, designer: { select: { userId: true } } } },
+    },
+  });
+  if (!visit) return { ok: false, error: 'That visit is not on your project.' };
+  if (visit.status !== 'BOOKED') return { ok: false, error: visit.status === 'DONE' ? 'That visit has already happened.' : 'That visit was cancelled.' };
+  const confirmed = answer === 'confirm';
+  await prisma.$transaction(async (tx) => {
+    await tx.homeSiteVisit.update({
+      where: { id: visit.id },
+      data: { clientAnswer: confirmed ? 'CONFIRMED' : 'ASKED_TO_MOVE', clientAnsweredAt: now, clientReason: confirmed ? null : why },
+    });
+    await recordEvent(tx, { projectId: visit.projectId, type: 'visit.answered', actor: { type: 'CUSTOMER', id: userId }, refId: visit.id, payload: { confirmed } });
+  });
+  const event = { kind: 'visit-answered' as const, projectId: visit.projectId, purpose: visit.purpose, when: whenWords(visit.at), confirmed, reason: confirmed ? null : why };
+  void (async () => {
+    await notifyStudio(visit.project.introduction.studioId, event);
+    if (visit.project.designer?.userId) await notify(visit.project.designer.userId, event, { email: false });
+  })().catch((e) => console.error('[studio-design] visit answer notice failed', e));
+  return { ok: true, message: confirmed ? 'Thank you. Your designer knows you will be there.' : 'Sent. Your designer will suggest another day.' };
+}
+
+/**
+ * The evening before a booked visit (owner, 1 Nov 2026; customer app Phase
+ * 2): "Will you be there?" to the home's owner, unless they already said yes.
+ * From the site-reminders cron's 18:00 run only (its 21:00 run sends nothing
+ * here), so each visit is asked about once.
+ */
+export async function runVisitReminders(now = new Date()): Promise<number> {
+  const ist = new Date(now.getTime() + 330 * 60_000);
+  if (ist.getUTCHours() !== 18) return 0;
+  const tomorrow = istDay(new Date(now.getTime() + 86_400_000));
+  const from = istTime(tomorrow, '00:00');
+  const to = new Date(from.getTime() + 86_400_000);
+  const visits = await prisma.homeSiteVisit.findMany({
+    where: { status: 'BOOKED', at: { gte: from, lt: to }, NOT: { clientAnswer: 'CONFIRMED' }, project: { cancelledAt: null } },
+    select: { at: true, purpose: true, project: { select: { introduction: { select: { studio: { select: { tradeName: true } }, brief: { select: { userId: true } } } } } } },
+    take: 500,
+  });
+  let sent = 0;
+  for (const v of visits) {
+    const userId = v.project.introduction.brief.userId;
+    if (!userId) continue;
+    const time = v.at.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+    await notify(userId, { kind: 'visit-tomorrow', studio: v.project.introduction.studio.tradeName, purpose: v.purpose, time }).catch(() => undefined);
+    sent += 1;
+  }
+  return sent;
+}
+
 /** Saves the rooms' measurements: the list as typed replaces the one before. */
 export async function saveMeasurements(projectId: string, rows: readonly MeasureInput[]): Promise<DesignResult> {
   const check = await memberOnProject(projectId, 'design.work');
@@ -743,6 +812,39 @@ export async function shareDrawing(projectId: string, documentId: string, now = 
   });
   if (shared) tell(p.introduction.brief.userId, p.introduction.studio.tradeName, asksApproval(doc.designKind) ? `${doc.title}: approve it, or say what to change.` : doc.title);
   return { ok: true, message: 'Shared with the client.' };
+}
+
+/**
+ * "Mark as final" (walkthrough, 27 Oct 2026; owner's pick, 1 Nov 2026): the
+ * designer says which version is the final of its type and room; the newest
+ * never is by itself. One per type and room: marking one clears the others,
+ * every version stays in the repository. `final: false` takes the mark off.
+ * The handover pack is the marked finals (documents.ts `handoverMissing`).
+ */
+export async function markDocumentFinal(projectId: string, documentId: string, final: boolean, now = new Date()): Promise<DesignResult> {
+  const check = await memberOnProject(projectId, 'design.work');
+  if (!check.ok) return check;
+  const doc = await prisma.homeDocument.findFirst({
+    where: { id: documentId, projectId, deletedAt: null, designKind: { not: null } },
+    select: { id: true, version: true, designKind: true, room: true, markedFinalAt: true, reviews: { orderBy: { at: 'desc' }, take: 1, select: { verdict: true } } },
+  });
+  if (!doc || !isDocType(doc.designKind)) return { ok: false, error: 'That document is not on this project.' };
+  if (final === (doc.markedFinalAt !== null)) return { ok: true, message: final ? 'Already the final.' : 'Not marked final.' };
+  const actor: ProjectActor = { type: 'STUDIO', id: check.member.userId };
+  const room = doc.room?.trim() ? doc.room : null;
+  await prisma.$transaction(async (tx) => {
+    if (final) {
+      await tx.homeDocument.updateMany({
+        where: { projectId, designKind: doc.designKind, markedFinalAt: { not: null }, id: { not: doc.id }, ...(room ? { room: { equals: room, mode: 'insensitive' } } : { OR: [{ room: null }, { room: '' }] }) },
+        data: { markedFinalAt: null, markedFinalById: null },
+      });
+    }
+    await tx.homeDocument.update({ where: { id: doc.id }, data: final ? { markedFinalAt: now, markedFinalById: check.member.userId } : { markedFinalAt: null, markedFinalById: null } });
+    await recordEvent(tx, { projectId, type: 'document.final_marked', actor, refId: doc.id, payload: { version: doc.version, final } });
+  });
+  if (!final) return { ok: true, message: 'No longer the final. Mark another version final.' };
+  const warning = markFinalWarning({ type: doc.designKind, answer: doc.reviews[0]?.verdict ?? null });
+  return { ok: true, message: warning ? `Marked final. ${warning}` : 'Marked final. It is the one in the handover documents.' };
 }
 
 /**

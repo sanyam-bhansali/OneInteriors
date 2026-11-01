@@ -12,6 +12,7 @@ import {
   closeDesign,
   editDesignStep,
   makeDesignFinal,
+  markDocumentFinal,
   moveDesignStep,
   moveDesignStepOrder,
   saveMeasurements,
@@ -24,6 +25,7 @@ import {
   uploadDrawing,
   type DesignResult,
 } from '@/modules/studio-design/design-flow';
+import { sendRequirementForm, type FormResult } from '@/modules/project/requirement-form';
 
 /**
  * The Design tab's writes (Studio OS Phase 2). Every check — who may, on
@@ -108,6 +110,20 @@ export async function uploadDrawingAction(form: FormData): Promise<DesignResult>
 
 export async function shareDrawingAction(projectId: string, documentId: string): Promise<DesignResult> {
   return done(id(projectId), await shareDrawing(id(projectId), id(documentId)));
+}
+
+/** Sends the client their requirement form (owner, 1 Nov 2026; project/requirement-form.ts). */
+export async function sendRequirementFormAction(projectId: string): Promise<FormResult> {
+  const r = await sendRequirementForm(id(projectId));
+  if (r.ok) revalidatePath(`/studio/projects/${id(projectId)}`);
+  return r;
+}
+
+/** "Mark as final" on a version, or take the mark off (owner, 1 Nov 2026). */
+export async function markFinalAction(projectId: string, documentId: string, final: boolean): Promise<DesignResult> {
+  const r = await markDocumentFinal(id(projectId), id(documentId), final === true);
+  if (r.ok) revalidatePath(`/studio/projects/${id(projectId)}/documents`, 'layout');
+  return done(id(projectId), r);
 }
 
 /** Makes (or finds) the Design Final, then opens it in the quotation builder. */

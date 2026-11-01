@@ -397,6 +397,8 @@ function tileFor(key: AppKey, n: (id: SectionId) => number, meetingsToAnswer = 0
       return { sub: 'Crews, work orders and pay', tone: '', badge: 0 };
     case 'intros':
       return { sub: 'Introductions and your listing', tone: 'hot', badge: 0 };
+    case 'chats':
+      return { sub: 'Talk with your clients and their families', tone: '', badge: 0 };
     case 'rates':
       return { sub: 'Your price list', tone: '', badge: 0 };
     case 'team':

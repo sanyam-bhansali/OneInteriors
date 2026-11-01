@@ -23,6 +23,8 @@ export const SITE_WORDS = {
   'work.today': { en: 'Today', hi: 'आज', mr: 'आज' },
   'work.soon': { en: 'Next 3 days', hi: 'अगले 3 दिन', mr: 'पुढचे 3 दिवस' },
   'work.missed': { en: 'Missed', hi: 'छूट गया', mr: 'राहून गेले' },
+  'work.month': { en: 'Next month', hi: 'अगला महीना', mr: 'पुढचा महिना' },
+  'work.emptyMonth': { en: 'Nothing else in the next month.', hi: 'अगले महीने में और कुछ नहीं।', mr: 'पुढच्या महिन्यात आणखी काही नाही.' },
   'work.emptyToday': { en: 'Nothing is due today.', hi: 'आज कुछ बाकी नहीं।', mr: 'आज काही बाकी नाही.' },
   'work.emptySoon': { en: 'Nothing is coming up in the next 3 days.', hi: 'अगले 3 दिन में कुछ नहीं।', mr: 'पुढच्या 3 दिवसांत काही नाही.' },
   'work.emptyMissed': { en: 'Nothing missed.', hi: 'कुछ नहीं छूटा।', mr: 'काही राहिले नाही.' },

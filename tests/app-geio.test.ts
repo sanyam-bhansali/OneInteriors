@@ -91,6 +91,7 @@ const PROJECT: CustomerProject = {
       votes: [],
       choices: [],
       pickedOptionId: null,
+      redo: null,
     },
   ],
   snags: [],

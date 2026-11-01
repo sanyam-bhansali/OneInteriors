@@ -33,10 +33,12 @@ export const CUSTOMER_DESIGN_SELECT = {
   designer: { select: { user: { select: { name: true } } } },
   moodBoardSharedAt: true,
   moodBoardNote: true,
+  /* Sent and filled, never the answers (they are read on their own page). */
+  requirementForm: { select: { sentAt: true, submittedAt: true } },
   designClosedAt: true,
   designChanges: true,
   /* Day, time, purpose, status. Never the team's `note` or `byId`. */
-  siteVisits: { orderBy: { at: 'asc' }, select: { at: true, purpose: true, status: true } },
+  siteVisits: { orderBy: { at: 'asc' }, select: { id: true, at: true, purpose: true, status: true, clientAnswer: true, clientReason: true } },
   measurements: { orderBy: { sortOrder: 'asc' }, select: { room: true, lengthMm: true, widthMm: true, heightMm: true } },
   /* The customer's own answers: verdict, their words, when. Never `byUserId`. */
   designReviews: { orderBy: { at: 'asc' }, select: { documentId: true, verdict: true, comment: true, at: true } },
@@ -73,9 +75,10 @@ export interface DesignRow {
   designer?: { user: { name: string | null } | null } | null;
   moodBoardSharedAt?: Date | null;
   moodBoardNote?: string | null;
+  requirementForm?: { sentAt: Date; submittedAt: Date | null } | null;
   designClosedAt?: Date | null;
   designChanges?: unknown;
-  siteVisits?: readonly { at: Date; purpose: string; status: string }[];
+  siteVisits?: readonly { id?: string; at: Date; purpose: string; status: string; clientAnswer?: string | null; clientReason?: string | null }[];
   measurements?: readonly { room: string; lengthMm: number | null; widthMm: number | null; heightMm: number | null }[];
   designReviews?: readonly { documentId: string; verdict: string; comment: string | null; at: Date }[];
   stepDelays?: readonly { stepId: string; fromDate?: Date; toDate: Date; reason: string; side?: string }[];
@@ -136,7 +139,10 @@ export interface CustomerDesign {
    */
   clientDelayDays: number;
   moodBoard: { shared: boolean; sharedOn: string | null; note: string | null };
-  visits: { at: string; purpose: string; status: 'booked' | 'done' }[];
+  /** The requirement form (owner, 1 Nov 2026): null until the designer sends it. */
+  requirementForm: 'to-fill' | 'filled' | null;
+  /** `answer`: the client's own answer to a booked visit (1 Nov 2026), null before they answer. */
+  visits: { id: string; at: string; purpose: string; status: 'booked' | 'done'; answer: 'confirmed' | 'move' | null; reason: string | null }[];
   measurements: { room: string; size: string; height: string | null }[];
   drawings: CustomerDrawing[];
   changes: CustomerDesignChanges | null;
@@ -259,9 +265,17 @@ export function toCustomerDesign(
       .filter((d) => d.side === 'CLIENT' && d.fromDate)
       .reduce((sum, d) => sum + Math.max(0, daysBetween(dayFromDb(d.fromDate!), dayFromDb(d.toDate))), 0),
     moodBoard: { shared: Boolean(row.moodBoardSharedAt), sharedOn: isoDay(row.moodBoardSharedAt), note: row.moodBoardSharedAt ? (row.moodBoardNote ?? null) : null },
+    requirementForm: row.requirementForm ? (row.requirementForm.submittedAt ? 'filled' : 'to-fill') : null,
     visits: (row.siteVisits ?? [])
       .filter((v) => v.status !== 'CANCELLED')
-      .map((v) => ({ at: v.at.toISOString(), purpose: v.purpose, status: v.status === 'DONE' ? ('done' as const) : ('booked' as const) })),
+      .map((v) => ({
+        id: v.id ?? '',
+        at: v.at.toISOString(),
+        purpose: v.purpose,
+        status: v.status === 'DONE' ? ('done' as const) : ('booked' as const),
+        answer: v.clientAnswer === 'CONFIRMED' ? ('confirmed' as const) : v.clientAnswer === 'ASKED_TO_MOVE' ? ('move' as const) : null,
+        reason: v.clientAnswer === 'ASKED_TO_MOVE' ? (v.clientReason ?? null) : null,
+      })),
     measurements: (row.measurements ?? []).map((m) => ({
       room: m.room,
       size: `${formatLength(m.lengthMm)} × ${formatLength(m.widthMm)}`,

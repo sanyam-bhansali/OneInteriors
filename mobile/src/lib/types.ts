@@ -33,6 +33,8 @@ export interface Decision {
   votes?: { name: string; optionIndex: number; note: string | null; mine: boolean }[];
   /** Phase 5: the options as rows, with a photo and a price change that may be negative. Older servers omit it. */
   choices?: DecisionChoice[];
+  /** The owner asked for other options (1 Nov 2026). Older servers omit it. */
+  redo?: { at: string; note: string | null } | null;
   /** The option picked, by id. Older servers omit it. */
   pickedOptionId?: string | null;
 }
@@ -277,7 +279,10 @@ export interface Design {
   /** The design's next step when it is yours to do. Older servers omit it. */
   yourStep?: string | null;
   moodBoard: { shared: boolean; sharedOn: string | null; note: string | null };
-  visits: { at: string; purpose: string; status: 'booked' | 'done' }[];
+  /** The requirement form (1 Nov 2026): null until the designer sends it. Older servers omit it. */
+  requirementForm?: 'to-fill' | 'filled' | null;
+  /** `id`, `answer`, `reason`: the client's own answer to a booked visit (1 Nov 2026); older servers omit them. */
+  visits: { id?: string; at: string; purpose: string; status: 'booked' | 'done'; answer?: 'confirmed' | 'move' | null; reason?: string | null }[];
   measurements: { room: string; size: string; height: string | null }[];
   drawings: DesignDrawing[];
   changes: {

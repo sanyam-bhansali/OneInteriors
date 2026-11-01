@@ -312,6 +312,41 @@ async function lateDecisionDelay(
  * A family member's vote: advice to the owner, who decides. Written as the
  * option row and the older index, both, while older readers remain.
  */
+/**
+ * "None of these: show me other options" (the owner's v1 screens, Redo;
+ * owner, 1 Nov 2026). The owner of the home asks the studio for different
+ * options, saying what they would like instead. The decision stays open with
+ * its due day; the studio and the project's designer hear it and post a new
+ * decision. Asking again replaces the note.
+ */
+export async function askForOtherOptions(userId: string, decisionId: string, note: unknown, now = new Date()): Promise<DecisionResult> {
+  const words = typeof note === 'string' ? note.trim().replace(/\s+/g, ' ') : '';
+  if (words.length < 3) return { ok: false, error: 'Say what you would like instead, so your designer can find it.' };
+  if (words.length > 1000) return { ok: false, error: 'Keep it under 1,000 characters.' };
+  const d = await prisma.homeDecision.findUnique({
+    where: { id: String(decisionId).slice(0, 40) },
+    select: {
+      id: true,
+      title: true,
+      projectId: true,
+      pickedOptionId: true,
+      project: { select: { cancelledAt: true, introduction: { select: { studioId: true, brief: { select: { userId: true } } } }, designer: { select: { userId: true } } } },
+    },
+  });
+  if (!d || d.project.cancelledAt || d.project.introduction.brief.userId !== userId) return { ok: false, error: 'That decision is not on your project.' };
+  if (d.pickedOptionId) return { ok: false, error: 'You have already chosen. Ask your designer in Chats to change it.' };
+  await prisma.$transaction(async (tx) => {
+    await tx.homeDecision.update({ where: { id: d.id }, data: { redoAskedAt: now, redoNote: words } });
+    await recordEvent(tx, { projectId: d.projectId, type: 'decision.redo', actor: { type: 'CUSTOMER', id: userId }, refId: d.id });
+  });
+  const event = { kind: 'decision-redo' as const, projectId: d.projectId, title: d.title, note: words };
+  void (async () => {
+    await notifyStudio(d.project.introduction.studioId, event);
+    if (d.project.designer?.userId) await notify(d.project.designer.userId, event, { email: false });
+  })().catch(() => undefined);
+  return { ok: true, id: d.id };
+}
+
 export async function castVote(userId: string, decisionId: string, choice: { optionId?: unknown; index?: unknown }, note: unknown, now = new Date()): Promise<DecisionResult> {
   const d = await prisma.homeDecision.findFirst({
     where: { id: decisionId, project: { family: { some: { userId, joinedAt: { not: null }, removedAt: null } } } },
@@ -385,6 +420,8 @@ export interface StudioDecision {
   state: 'open' | 'late' | 'picked';
   pickedOptionId: string | null;
   pickedAt: string | null;
+  /** The client asked for other options (1 Nov 2026): when, and what they want instead. */
+  redo: { at: string; note: string | null } | null;
   options: StudioDecisionOption[];
 }
 
@@ -427,6 +464,8 @@ export async function studioDecisions(projectId: string, now = new Date()): Prom
       dueOn: true,
       chosenAt: true,
       pickedOptionId: true,
+      redoAskedAt: true,
+      redoNote: true,
       votes: { select: { optionId: true } },
       choices: {
         orderBy: { sortOrder: 'asc' },
@@ -447,6 +486,7 @@ export async function studioDecisions(projectId: string, now = new Date()): Prom
       state: d.pickedOptionId ? 'picked' : d.dueOn.getTime() < now.getTime() ? 'late' : 'open',
       pickedOptionId: d.pickedOptionId,
       pickedAt: d.chosenAt?.toISOString() ?? null,
+      redo: d.redoAskedAt && !d.pickedOptionId ? { at: d.redoAskedAt.toISOString(), note: d.redoNote } : null,
       options: d.choices.map((c) => ({
         id: c.id,
         label: c.label,

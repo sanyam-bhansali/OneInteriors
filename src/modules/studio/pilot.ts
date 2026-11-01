@@ -84,6 +84,8 @@ export const PILOT_SOON: Record<PilotArea, { title: string; what: string; meanwh
 
 const AREA_PATHS: readonly [string, PilotArea][] = [
   ['/studio/projects', 'projects'],
+  /* Chats with clients (1 Nov 2026) are about their projects. */
+  ['/studio/chats', 'projects'],
   ['/studio/updates', 'projects'],
   [DESIGN_HOME, 'design'],
   [DESIGN_STEPS_PATH, 'design'],

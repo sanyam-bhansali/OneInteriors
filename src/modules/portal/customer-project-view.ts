@@ -118,6 +118,8 @@ export interface CustomerDecision {
   choices: CustomerChoice[];
   /** The option picked, by id; null until picked. */
   pickedOptionId: string | null;
+  /** The owner asked for other options (1 Nov 2026), and what they want instead; null otherwise. */
+  redo: { at: string; note: string | null } | null;
 }
 
 export interface CustomerSnag {
@@ -278,6 +280,8 @@ export const CUSTOMER_PROJECT_SELECT = {
       votes: { orderBy: { createdAt: 'asc' }, select: { userId: true, optionIndex: true, note: true } },
       /* Phase 5: the options as rows and the pick. Never `studioCostDeltaPaise`. */
       pickedOptionId: true,
+      redoAskedAt: true,
+      redoNote: true,
       choices: { orderBy: { sortOrder: 'asc' }, select: CUSTOMER_CHOICE_SELECT },
     },
   },
@@ -512,6 +516,7 @@ export function toCustomerProject(p: CustomerProjectRow, userId: string, now: Da
       votes: d.votes.map((v) => ({ name: names.get(v.userId) ?? 'Family', optionIndex: v.optionIndex, note: v.note, mine: v.userId === userId })),
       choices: customerChoices(d.choices, links.choicePhotos?.[i]),
       pickedOptionId: d.pickedOptionId ?? null,
+      redo: d.redoAskedAt && !d.pickedOptionId ? { at: d.redoAskedAt.toISOString(), note: d.redoNote ?? null } : null,
     })),
     snags,
     documents: visibleDocIndexes(p.documents).map((i) => {

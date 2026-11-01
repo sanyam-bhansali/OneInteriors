@@ -29,7 +29,8 @@
         "CAMERA",
         "USE_BIOMETRIC",
         "USE_FINGERPRINT",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "RECORD_AUDIO"
       ]
     },
     "web": {
@@ -69,7 +70,13 @@
         }
       ],
       "expo-video",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "To record a voice note for your designer and your home team."
+        }
+      ]
     ],
     "scheme": "oneinteriors",
     "experiments": {

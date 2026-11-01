@@ -14,9 +14,10 @@
  *   lifecycle doc names for each action).
  * - `leadSources`: follow-ups, tasks and meetings (the sales Today list's
  *   lines, studio-sales/today-rules.ts, over three more days).
- * - `buildMyWork`: the three lists. Missed = due before today and not done,
+ * - `buildMyWork`: the four lists. Missed = due before today and not done,
  *   oldest first, "x days late"; Today grouped by kind; Next 3 days grouped
- *   by day.
+ *   by day; Next month (the walkthrough, 27 Oct 2026; owner, 1 Nov 2026: the
+ *   30 days after those three) grouped by week.
  * - `workDigest`, `dueTomorrow`: what the morning digest and the evening
  *   "due tomorrow" notice say (notify/messages.ts carries them).
  *
@@ -93,7 +94,7 @@ export interface WaitingItem {
   href: string;
 }
 
-export type Bucket = 'today' | 'soon' | 'missed';
+export type Bucket = 'today' | 'soon' | 'month' | 'missed';
 
 export interface WorkItem extends WorkSource {
   bucket: Bucket;
@@ -115,6 +116,8 @@ export interface MyWork {
   todayGroups: WorkGroup[];
   /** The next three days, grouped by day. */
   soonGroups: WorkGroup[];
+  /** The rest of the next month, grouped by week. */
+  monthGroups: WorkGroup[];
   /** Oldest first. */
   missed: WorkItem[];
   /** True totals, for the section headers (rows not shown included). */
@@ -127,6 +130,8 @@ export interface MyWork {
 
 /** How far ahead "Next 3 days" looks. */
 export const SOON_DAYS = 3;
+/** How far ahead "Next month" looks, from today (owner, 1 Nov 2026). */
+export const MONTH_DAYS = 30;
 /** How far back Missed looks for project steps (older plans predate the step tracker). */
 export const MISSED_LOOKBACK_DAYS = 45;
 /** Rows shown per section; the rest is counted. */
@@ -150,7 +155,14 @@ export function bucketOf(due: string, today: string): Bucket | null {
   const d = daysBetween(today, due);
   if (d < 0) return 'missed';
   if (d === 0) return 'today';
-  return d <= SOON_DAYS ? 'soon' : null;
+  if (d <= SOON_DAYS) return 'soon';
+  return d <= MONTH_DAYS ? 'month' : null;
+}
+
+/** The Monday of a day's week, "2026-11-09". */
+export function weekOf(day: string): string {
+  const wd = new Date(`${day}T00:00:00Z`).getUTCDay();
+  return addDays(day, -((wd + 6) % 7));
 }
 
 function itemOf(s: WorkSource, today: string): WorkItem | null {
@@ -197,15 +209,18 @@ export function buildMyWork(
   const missedAll = items.filter((i) => i.bucket === 'missed').sort(byOrder);
   const todayAll = items.filter((i) => i.bucket === 'today').sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || byOrder(a, b));
   const soonAll = items.filter((i) => i.bucket === 'soon').sort(byOrder);
+  const monthAll = items.filter((i) => i.bucket === 'month').sort(byOrder);
 
   const hidden = opts.hidden ?? {};
   const counts: Record<Bucket, number> = {
     today: todayAll.length + (hidden.today ?? 0),
     soon: soonAll.length + (hidden.soon ?? 0),
+    month: monthAll.length + (hidden.month ?? 0),
     missed: missedAll.length + (hidden.missed ?? 0),
   };
   const todayShown = todayAll.slice(0, limit);
   const soonShown = soonAll.slice(0, limit);
+  const monthShown = monthAll.slice(0, limit);
   const missed = missedAll.slice(0, limit);
 
   const todayGroups: WorkGroup[] = [];
@@ -219,16 +234,25 @@ export function buildMyWork(
     const its = soonShown.filter((i) => i.due === day);
     if (its.length) soonGroups.push({ id: day, title: d === 1 ? `Tomorrow, ${dayLabel(day)}` : dayLabel(day), items: its });
   }
+  const monthGroups: WorkGroup[] = [];
+  for (const i of monthShown) {
+    const w = weekOf(i.due);
+    const g = monthGroups.find((x) => x.id === w);
+    if (g) g.items.push(i);
+    else monthGroups.push({ id: w, title: `Week of ${dayLabel(w)}`, items: [i] });
+  }
 
   return {
     today,
     todayGroups,
     soonGroups,
+    monthGroups,
     missed,
     counts,
     more: {
       today: Math.max(0, counts.today - todayShown.length),
       soon: Math.max(0, counts.soon - soonShown.length),
+      month: Math.max(0, counts.month - monthShown.length),
       missed: Math.max(0, counts.missed - missed.length),
     },
     waiting,
@@ -236,12 +260,13 @@ export function buildMyWork(
 }
 
 /** Nothing anywhere. */
-export const isEmptyWork = (w: MyWork): boolean => w.counts.today + w.counts.soon + w.counts.missed === 0;
+export const isEmptyWork = (w: MyWork): boolean => w.counts.today + w.counts.soon + w.counts.month + w.counts.missed === 0;
 
 /** What each section says when it is empty. */
 export const EMPTY_LINE: Record<Bucket, string> = {
   today: 'Nothing is due today.',
   soon: 'Nothing is coming up in the next 3 days.',
+  month: 'Nothing else in the next month.',
   missed: 'Nothing missed. Everything due so far is done.',
 };
 

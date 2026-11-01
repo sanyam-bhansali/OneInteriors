@@ -49,7 +49,7 @@ describe('Hauspire’s design process', () => {
       ['Final 3D approval', 'RENDER_3D'],
       ['Final design approval', 'DESIGN_FINAL'],
       ['Working drawings approval', 'WORKING'],
-      ['Post-validation approval', 'WORKING'],
+      ['Post-validation approval', 'VALIDATION'], // 1 Nov 2026: the validation drawings tick it
       ['Agreement signed', null],
     ]);
     expect(client.every((s) => s.effortMin === 0)).toBe(true);

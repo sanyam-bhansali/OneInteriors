@@ -34,6 +34,8 @@ export type ProjectEvent =
   | { kind: 'quote-sent'; quoteId: string; studio: string; number: string }
   | { kind: 'quote-signed'; quoteId: string; client: string; number: string; totalPaise: number }
   | { kind: 'intro-declined'; studio: string; reason: string }
+  // In-app chat (owner, 1 Nov 2026; modules/chat): a new message, to everyone else in the conversation. `toStudio`: the studio's link, not the app's.
+  | { kind: 'chat'; projectId: string; thread: 'DESIGNER' | 'TEAM' | 'ONE_INTERIORS'; from: string; preview: string; toStudio: boolean }
   // To ops: GEIO passed a customer's question to the expert.
   | { kind: 'geio-handover'; customer: string; home: string | null; note: string }
   // To ops: a customer asked for the Assured plan (portal/plans.ts). Ops confirms the fee and switches it.
@@ -54,6 +56,14 @@ export type ProjectEvent =
   | { kind: 'signoff-signed'; projectId: string; what: string; name: string }
   // Project documents (24 Oct 2026; DESIGN-PROCESS-PLAN.md §3.3), to the studio: the client approved a drawing, or asked for changes.
   | { kind: 'design-answered'; projectId: string; title: string; approved: boolean; comment: string | null }
+  // Customer app Phase 2 (owner, 1 Nov 2026), to the studio: the client will be at a booked site visit, or asks for another day.
+  | { kind: 'visit-answered'; projectId: string; purpose: string; when: string; confirmed: boolean; reason: string | null }
+  // To the studio: the client asked for other options on a decision (the v1 screens' Redo).
+  | { kind: 'decision-redo'; projectId: string; title: string; note: string }
+  // To the studio: the client sent in their requirement form (owner, 1 Nov 2026; project/requirement-form.ts).
+  | { kind: 'requirements-filled'; projectId: string }
+  // To the client, the evening before a booked visit (cron/site-reminders, the 18:00 run).
+  | { kind: 'visit-tomorrow'; studio: string; purpose: string; time: string }
   // My work (owner, 15 Oct 2026; studio/my-work-rules.ts), to studio staff only: the morning digest,
   // the evening "due tomorrow", and steps someone else completed today on their projects.
   | { kind: 'my-work'; today: number; missed: number; soon: number; first: string }
@@ -83,6 +93,13 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trim
 
 export function messageFor(e: ProjectEvent): Message {
   switch (e.kind) {
+    case 'chat':
+      return {
+        title: e.from,
+        body: e.preview.length > 140 ? `${e.preview.slice(0, 137)}…` : e.preview,
+        url: e.toStudio ? `/studio/chats?project=${e.projectId}&thread=${e.thread}` : `/app/chats/${e.thread.toLowerCase()}?project=${e.projectId}`,
+        template: 'chat',
+      };
     case 'update':
       return {
         template: 'project.update',
@@ -273,6 +290,34 @@ export function messageFor(e: ProjectEvent): Message {
         template: 'project.signoff',
         title: `Please read and sign · ${e.studio}`,
         body: clip(`${e.what} is ready for your signature. Read it in the app, tick I agree and sign.`, 160),
+        url: '/app/project',
+      };
+    case 'visit-answered':
+      return {
+        template: 'visit.answered',
+        title: e.confirmed ? 'The client will be there' : 'The client asks for another day',
+        body: clip(e.confirmed ? `${e.purpose}, ${e.when}: confirmed.` : `${e.purpose}, ${e.when}: ${e.reason ?? 'asked to move it'}`, 160),
+        url: `/studio/projects/${e.projectId}?tab=design`,
+      };
+    case 'requirements-filled':
+      return {
+        template: 'requirements.filled',
+        title: 'The client filled in the requirement form',
+        body: 'Their answers are on the project, under Design.',
+        url: `/studio/projects/${e.projectId}?tab=design`,
+      };
+    case 'decision-redo':
+      return {
+        template: 'decision.redo',
+        title: 'The client asks for other options',
+        body: clip(`${e.title}: ${e.note}`, 160),
+        url: `/studio/projects/${e.projectId}`,
+      };
+    case 'visit-tomorrow':
+      return {
+        template: 'visit.tomorrow',
+        title: `Site visit tomorrow · ${e.studio}`,
+        body: clip(`${e.purpose} at ${e.time}. Will you be there? Answer in the app, or ask for another day.`, 160),
         url: '/app/project',
       };
     case 'design-answered':

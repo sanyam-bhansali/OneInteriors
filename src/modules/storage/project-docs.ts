@@ -32,20 +32,49 @@ const secretKey = () => process.env.SUPABASE_SECRET_KEY?.trim() || null;
 
 export type DocResult = { ok: true; path: string } | { ok: false; error: string };
 
+/**
+ * A chat's photo, voice note or PDF (owner, 1 Nov 2026; modules/chat): the same
+ * private bucket and limits, voice notes as well, under `chat_<project>/`.
+ */
+const CHAT_ALLOWED = new Map<string, string>([
+  ...ALLOWED,
+  ['image/heic', 'heic'],
+  ['image/heif', 'heif'],
+  ['audio/webm', 'webm'],
+  ['audio/ogg', 'ogg'],
+  ['audio/mp4', 'm4a'],
+  ['audio/m4a', 'm4a'],
+  ['audio/x-m4a', 'm4a'],
+  ['audio/aac', 'aac'],
+  ['audio/mpeg', 'mp3'],
+  ['audio/3gpp', '3gp'],
+]);
+
+export async function storeChatFile(projectId: string, file: File): Promise<DocResult> {
+  return storeIn(`chat_${projectId}`, file, CHAT_ALLOWED, 'We can take photos, voice notes and PDFs.');
+}
+
+/** Signed links, in order, for chat files the caller may see; "" where one could not be made. */
+export const signedChatUrls = (paths: string[]) => signedStorageUrls(paths);
+
 export async function storeProjectDoc(projectId: string, file: File): Promise<DocResult> {
+  return storeIn(`project_${projectId}`, file, ALLOWED, `We can take ${ACCEPTED_DOCS}.`);
+}
+
+async function storeIn(folder: string, file: File, allowed: Map<string, string>, refused: string): Promise<DocResult> {
   const config = supabaseConfig();
   const key = secretKey();
   if (!config || !key) return { ok: false, error: 'Documents are not switched on for this deployment yet.' };
-  const extension = ALLOWED.get(file.type);
-  if (!extension) return { ok: false, error: `We can take ${ACCEPTED_DOCS}.` };
+  const extension = allowed.get(file.type.split(';')[0]!.trim());
+  if (!extension) return { ok: false, error: refused };
   if (file.size === 0) return { ok: false, error: 'That file is empty.' };
   if (file.size > MAX_DOC_BYTES) return { ok: false, error: 'Files can be up to 3.8 MB for now. Split a large drawing set into parts.' };
 
-  const path = `project_${projectId}/${crypto.randomUUID()}.${extension}`;
+  const path = `${folder}/${crypto.randomUUID()}.${extension}`;
   try {
     const response = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': file.type, 'x-upsert': 'false' },
+      headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': file.type.split(';')[0]!.trim(), 'x-upsert': 'false' },
       body: await file.arrayBuffer(),
     });
     if (!response.ok) return { ok: false, error: 'We could not store that file. Try again.' };

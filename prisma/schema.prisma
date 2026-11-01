@@ -900,6 +900,11 @@ model Studio {
   documents         StudioDocument[]
   filedRates        StudioFiledRate[]
 
+  /// In-app chat with clients (owner, 1 Nov 2026).
+  chatThreads ChatThread[]
+  /// The clients' requirement forms (owner, 1 Nov 2026).
+  requirementForms HomeRequirementForm[]
+
   @@index([city, status, tier])
   /// Every customer-facing query filters paused studios out.
   @@index([pausedAt])
@@ -1749,6 +1754,10 @@ model HomeProject {
 
   /// Studio workspace Phase 1: who on the studio's team is on it, and the
   /// plan built from the signed quote (modules/studio/quote-to-plan.ts).
+  /// In-app chat (owner, 1 Nov 2026): the designer one-to-one, the home-team group, One Interiors.
+  chatThreads ChatThread[]
+  /// The requirement form the designer sends with the mood board (owner, 1 Nov 2026).
+  requirementForm HomeRequirementForm?
   team      StudioProjectMember[]
   stages    HomeProjectStage[]
   materials HomeMaterial[]
@@ -2308,6 +2317,11 @@ model HomeDecision {
   byStudio   Boolean   @default(false)
   /// Set when the 2-days-left reminder went out, so it goes out once.
   remindedAt DateTime?
+  /// "None of these: show me other options" (the owner's v1 screens, Redo;
+  /// owner 1 Nov 2026). The studio posts a new decision; this one stays open
+  /// until then, and its due day does not move.
+  redoAskedAt DateTime?
+  redoNote    String?   @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2615,6 +2629,10 @@ model HomeDocument {
   designKind String?
   room       String?
   reviews    HomeDesignReview[]
+  /// The designer marked this version the final of its type and room (owner,
+  /// 1 Nov 2026). One per type and room: marking one clears the others.
+  markedFinalAt   DateTime?
+  markedFinalById String?
 
   createdAt DateTime  @default(now())
   /// Soft delete: a removed document stops showing and stays for the record.
@@ -5550,6 +5568,11 @@ enum SiteVisitStatus {
   CANCELLED
 }
 
+enum SiteVisitAnswer {
+  CONFIRMED
+  ASKED_TO_MOVE
+}
+
 /// A site visit the designer books (measurement, a visit with the carpenter).
 /// The customer sees the day, time, what it is for and its status; `note`
 /// stays with the team.
@@ -5562,6 +5585,12 @@ model HomeSiteVisit {
   status    SiteVisitStatus @default(BOOKED)
   /// Internal: NEVER crosses.
   note      String?         @db.Text
+  /// The client's answer in the app (owner, 1 Nov 2026; customer app Phase 2):
+  /// they will be there, or they ask for another day, with why (kept for the
+  /// delay record; the studio sees it).
+  clientAnswer     SiteVisitAnswer?
+  clientAnsweredAt DateTime?
+  clientReason     String?
   byId      String
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
@@ -5998,4 +6027,126 @@ model StudioBusyBlock {
   @@index([memberId])
   @@index([studioId])
   @@map("studio_busy_blocks")
+}
+
+/// In-app chat, instead of WhatsApp (owner, 1 Nov 2026: "a chat option in our
+/// app only that works very smooth like WhatsApp"). One thread of each kind
+/// per project, made on first use: the client and the designer; the home team
+/// (the client, family who joined, and the studio people on the project); and
+/// One Interiors (our notices and Meera). Studio-scoped like every studio
+/// table (`studioId`), reached only through Prisma on the server.
+model ChatThread {
+  id            String        @id @default(cuid())
+  studioId      String
+  studio        Studio        @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  projectId     String
+  project       HomeProject   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind          ChatKind
+  /// The newest message's time, for the inbox order.
+  lastMessageAt DateTime?
+  createdAt     DateTime      @default(now())
+  messages      ChatMessage[]
+  reads         ChatRead[]
+
+  @@unique([projectId, kind])
+  @@index([studioId, lastMessageAt])
+  @@map("chat_threads")
+}
+
+enum ChatKind {
+  /// The client and their designer.
+  DESIGNER
+  /// The client, family who joined, and everyone on the studio's project team.
+  TEAM
+  /// The client and One Interiors: our notices, and Meera.
+  ONE_INTERIORS
+}
+
+enum ChatSide {
+  CLIENT
+  FAMILY
+  STUDIO
+  ONE_INTERIORS
+}
+
+enum ChatMessageKind {
+  TEXT
+  PHOTO
+  VOICE
+  FILE
+}
+
+/// One message. The author's name and role are kept as written, so the
+/// thread reads the same after someone leaves the team. A photo, voice note
+/// or file is in the private project-docs bucket (`storageKey`) and is only
+/// ever opened through a short-lived signed link.
+model ChatMessage {
+  id          String          @id @default(cuid())
+  threadId    String
+  thread      ChatThread      @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  studioId    String
+  /// The User who wrote it; null for a notice from the system.
+  authorId    String?
+  authorName  String
+  /// "Designer", "Site head", "Mother": what the others see under the name.
+  authorRole  String
+  side        ChatSide
+  kind        ChatMessageKind @default(TEXT)
+  body        String          @default("")
+  storageKey  String?
+  fileName    String?
+  contentType String?
+  bytes       Int?
+  /// A voice note's length.
+  durationMs  Int?
+  replyToId   String?
+  createdAt   DateTime        @default(now())
+  /// Taken back by its author: the row stays, the words and the file do not show.
+  deletedAt   DateTime?
+
+  @@index([threadId, createdAt])
+  @@index([studioId])
+  @@map("chat_messages")
+}
+
+/// How far each person has read a thread: unread counts and the read ticks;
+/// and their own archive of it.
+model ChatRead {
+  threadId   String
+  thread     ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  userId     String
+  studioId   String
+  lastReadAt DateTime
+  /// When this person's app last fetched their conversations: messages before
+  /// it show "delivered" to the sender.
+  deliveredAt DateTime?
+  /// Archived by this person: hidden from their list until a newer message.
+  archivedAt  DateTime?
+
+  @@id([threadId, userId])
+  @@index([userId])
+  @@map("chat_reads")
+}
+
+/// The client's requirement form (walkthrough, 27 Oct 2026; owner, 1 Nov
+/// 2026): Hauspire's "Pre-design client input and commitment form", sent by
+/// the designer with the mood board and filled in the app, once. Its answers,
+/// by question id (project/requirement-form-rules.ts), are the commitment
+/// reference: never edited after `submittedAt`.
+model HomeRequirementForm {
+  id            String      @id @default(cuid())
+  projectId     String      @unique
+  project       HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  studioId      String
+  studio        Studio      @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  sentAt        DateTime
+  /// Who sent it. Not a foreign key (a leaver's sends stay).
+  sentById      String
+  answers       Json?
+  submittedAt   DateTime?
+  submittedById String?
+  createdAt     DateTime    @default(now())
+
+  @@index([studioId])
+  @@map("home_requirement_forms")
 }

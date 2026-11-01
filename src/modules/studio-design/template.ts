@@ -39,6 +39,8 @@ export const APPROVAL_KINDS = {
   LAYOUT_2D: 'The client approves the 2D layout',
   RENDER_3D: 'The client approves the 3D',
   WORKING: 'The client approves the working drawings',
+  /* Owner, 1 Nov 2026 (customer app plan, Phase 2): the validation drawings after the site validation tick "Post-validation approval". */
+  VALIDATION: 'The client approves the validation drawings',
   DESIGN_FINAL: 'The client signs the Design final quotation',
 } as const;
 export type ApprovalKind = keyof typeof APPROVAL_KINDS;
@@ -142,7 +144,7 @@ export const HAUSPIRE_DESIGN: readonly DesignTemplateStep[] = [
   s('Working drawings final', 'DESIGNER', 2, 2 * H, { doc: true }),
   s('Site validation', 'PM', 3, 4 * H, { pre: true }),
   s('Post-validation changes', 'DESIGNER', 1, 2 * H, { pre: true }),
-  s('Post-validation approval', 'CLIENT', 0, 0, { pre: true, approval: 'WORKING' }),
+  s('Post-validation approval', 'CLIENT', 0, 0, { pre: true, approval: 'VALIDATION' }),
   s('Final documentation for handover', 'DESIGNER', 3, 4 * H, { pre: true, doc: true }),
   s('Agreement signed', 'CLIENT', 0, 0, { pre: true }),
   s('Handover to execution team', 'PM', 3, 2 * H, { pre: true }),

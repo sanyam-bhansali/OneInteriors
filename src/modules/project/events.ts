@@ -82,6 +82,11 @@ export const PROJECT_EVENT_TYPES = [
   'document.filed',
   'document.shared',
   'document.superseded',
+  // The designer marked a version the final of its type and room (owner, 1 Nov 2026)
+  'document.final_marked',
+  // The requirement form (owner, 1 Nov 2026; project/requirement-form.ts): sent by the designer, filled by the client
+  'requirements.sent',
+  'requirements.filled',
   'material.ordered',
   // A studio's own client (docs/studio-workspace/OWN-CLIENTS.md)
   'customer.invited',
@@ -114,6 +119,8 @@ export const PROJECT_EVENT_TYPES = [
   'moodboard.edited',
   'visit.booked',
   'visit.updated',
+  'visit.answered',
+  'decision.redo',
   'measurements.saved',
   // Studio OS Phase 3: site crews' work orders and payments (internal; never read for a customer).
   'crew.ordered',

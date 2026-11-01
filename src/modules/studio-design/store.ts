@@ -181,7 +181,8 @@ export interface DesignTab {
     rooms: OpsPrepRoom[];
     roomOptions: { key: string; label: string; pieces: { slug: string; label: string }[] }[];
   };
-  visits: { id: string; at: string; purpose: string; status: 'BOOKED' | 'DONE' | 'CANCELLED'; note: string | null }[];
+  /** `clientAnswer`/`clientReason`: the client's answer in the app (1 Nov 2026). */
+  visits: { id: string; at: string; purpose: string; status: 'BOOKED' | 'DONE' | 'CANCELLED'; note: string | null; clientAnswer: 'CONFIRMED' | 'ASKED_TO_MOVE' | null; clientReason: string | null }[];
   measurements: { room: string; length: string; width: string; height: string; note: string | null }[];
   drawings: DrawingView[];
   /** The documents' finals, one per type and room, and what the handover pack still lacks (DESIGN-PROCESS-PLAN.md §3.4–3.5). */
@@ -270,12 +271,12 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
           },
         },
       },
-      siteVisits: { orderBy: { at: 'asc' }, select: { id: true, at: true, purpose: true, status: true, note: true } },
+      siteVisits: { orderBy: { at: 'asc' }, select: { id: true, at: true, purpose: true, status: true, note: true, clientAnswer: true, clientReason: true } },
       measurements: { orderBy: { sortOrder: 'asc' }, select: { room: true, lengthMm: true, widthMm: true, heightMm: true, note: true } },
       documents: {
         where: { deletedAt: null, designKind: { not: null } },
         orderBy: { createdAt: 'asc' },
-        select: { id: true, title: true, designKind: true, room: true, version: true, supersedesId: true, sharedAt: true, deletedAt: true, createdAt: true, storageKey: true },
+        select: { id: true, title: true, designKind: true, room: true, version: true, supersedesId: true, sharedAt: true, deletedAt: true, createdAt: true, storageKey: true, markedFinalAt: true },
       },
       designReviews: { orderBy: { at: 'asc' }, select: { documentId: true, verdict: true, comment: true, at: true } },
     },
@@ -318,7 +319,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
   const finals: FinalView[] = finalsOf(
     designDocs
       .filter((d) => !d.deletedAt && isDocType(d.designKind))
-      .map((d) => ({ id: d.id, type: d.designKind as DocType, room: d.room, version: d.version, supersedesId: d.supersedesId, shared: d.sharedAt !== null, answer: lastAnswer.get(d.id) ?? null, at: d.createdAt })),
+      .map((d) => ({ id: d.id, type: d.designKind as DocType, room: d.room, version: d.version, supersedesId: d.supersedesId, shared: d.sharedAt !== null, answer: lastAnswer.get(d.id) ?? null, at: d.createdAt, markedFinal: d.markedFinalAt !== null })),
   ).map((f) => {
     const d = designDocs.find((x) => x.id === f.id)!;
     return { ...f, typeLabel: DOC_TYPES[f.type].label, versionLabel: labels.get(f.id) ?? '1.0', on: istDay(d.createdAt), url: docUrl.get(f.id) ?? '', fileName: fileNameOf(d) };
@@ -457,7 +458,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
         rooms,
         roomOptions: ROOM_KEYS.map((key) => ({ key, label: ROOM_LABELS[key], pieces: elementsForRoom(key).map((e) => ({ slug: e.slug, label: e.label })) })),
       },
-      visits: p.siteVisits.map((v) => ({ id: v.id, at: v.at.toISOString(), purpose: v.purpose, status: v.status, note: v.note })),
+      visits: p.siteVisits.map((v) => ({ id: v.id, at: v.at.toISOString(), purpose: v.purpose, status: v.status, note: v.note, clientAnswer: v.clientAnswer, clientReason: v.clientReason })),
       measurements: p.measurements.map((m) => ({ room: m.room, length: fmt(m.lengthMm), width: fmt(m.widthMm), height: fmt(m.heightMm), note: m.note })),
       drawings,
       finals,

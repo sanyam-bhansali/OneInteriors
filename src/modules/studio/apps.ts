@@ -18,11 +18,11 @@ export { STUDIO_HOME };
 
 export type AppKey =
   | 'today' | 'clients' | 'quotes' | 'projects' | 'documents' | 'site' | 'money'
-  | 'vendors' | 'calendar' | 'intros' | 'rates' | 'team';
+  | 'vendors' | 'calendar' | 'chats' | 'intros' | 'rates' | 'team';
 
 export type AppIconName =
   | 'home' | 'users' | 'file' | 'layers' | 'camera' | 'rupee'
-  | 'truck' | 'calendar' | 'inbox' | 'box' | 'gear';
+  | 'truck' | 'calendar' | 'inbox' | 'box' | 'gear' | 'chat';
 
 export interface AppTab {
   label: string;
@@ -133,6 +133,12 @@ export const APPS: readonly StudioApp[] = [
     owns: ['/studio/calendar'],
   },
   {
+    /* In-app chat with clients (owner, 1 Nov 2026; modules/chat). */
+    key: 'chats', name: 'Chats', href: '/studio/chats', icon: 'chat', bg: 'var(--good-bg, #e5f4e4)', fg: 'var(--good, #2e7d32)',
+    tabs: [T('Chats', '/studio/chats')],
+    owns: ['/studio/chats'],
+  },
+  {
     key: 'intros', name: 'From One Interiors', href: '/studio/listing', icon: 'inbox', bg: 'var(--acc)', fg: '#FFFFFF',
     tabs: [T('Your listing', '/studio/listing'), T('Client projects', '/studio/updates'), T('Profile', '/studio/profile')],
     owns: ['/studio/listing', '/studio/profile', '/studio/onboarding'],
@@ -155,15 +161,15 @@ export const APPS: readonly StudioApp[] = [
  * plus what our roles already open: a project manager keeps the office they had).
  */
 const ROLE_APPS: Record<StudioRoleName, readonly AppKey[]> = {
-  OWNER: ['today', 'clients', 'quotes', 'projects', 'documents', 'site', 'money', 'vendors', 'calendar', 'intros', 'rates', 'team'],
+  OWNER: ['today', 'clients', 'quotes', 'projects', 'chats', 'documents', 'site', 'money', 'vendors', 'calendar', 'intros', 'rates', 'team'],
   /* Sales roles (owner, 22 Oct 2026): Team / Settings shows only when their sales role opens it (`mayOpen`). */
   SALES: ['clients', 'quotes', 'calendar', 'team'],
   /* The design meeting (24 Oct 2026): a designer reaches the design final from the project, not a Quotations tile. */
-  DESIGNER: ['projects', 'documents', 'vendors', 'calendar'],
-  PM: ['projects', 'documents', 'vendors', 'quotes', 'today', 'clients', 'site', 'calendar', 'rates', 'team'],
+  DESIGNER: ['projects', 'chats', 'documents', 'vendors', 'calendar'],
+  PM: ['projects', 'chats', 'documents', 'vendors', 'quotes', 'today', 'clients', 'site', 'calendar', 'rates', 'team'],
   ACCOUNTS: ['money', 'vendors', 'quotes', 'calendar'],
   /* Office meetings (owner, 27 Oct 2026): everyone has the calendar. A supervisor reaches it from site mode. */
-  SUPERVISOR: ['site', 'calendar'],
+  SUPERVISOR: ['site', 'chats', 'calendar'],
 };
 
 function under(path: string, prefix: string): boolean {
