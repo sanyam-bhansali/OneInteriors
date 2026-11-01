@@ -46,3 +46,10 @@
     display: none;
   }
 }
+/* With the KPI row above (owner, 1 Nov 2026), the split is shorter by its height. */
+.oi-studio .sc-page .kpi-row {
+  margin-bottom: 12px;
+}
+.oi-studio .sc-page .kpi-row + .sc-split {
+  height: calc(100dvh - 250px);
+}

@@ -219,6 +219,12 @@ export interface DocFolder {
   phase: string;
   documents: number;
   approved: number;
+  /** Shared for approval, the newest of its type, not answered yet (the Documents KPIs, 1 Nov 2026). */
+  waiting: number;
+  /** The client's latest answer asked for changes. */
+  changes: number;
+  /** Versions the designer marked final. */
+  finals: number;
 }
 
 /** The Documents app: one folder per project the member sees, with how many documents and how many approved. */
@@ -233,13 +239,14 @@ export async function documentFolders(): Promise<DocFolder[] | null> {
       id: true,
       phase: true,
       introduction: { select: { brief: { select: { society: true, locality: true, propertyType: true, contactName: true, user: { select: { name: true } } } } } },
-      documents: { where: { deletedAt: null, designKind: { not: null } }, select: { id: true } },
+      documents: { where: { deletedAt: null, designKind: { not: null } }, select: { id: true, designKind: true, sharedAt: true, supersedesId: true, markedFinalAt: true } },
       designReviews: { orderBy: { at: 'asc' }, select: { documentId: true, verdict: true } },
     },
   });
   return projects.map((p) => {
     const last = new Map<string, string>();
     for (const r of p.designReviews) last.set(r.documentId, r.verdict);
+    const replaced = new Set(p.documents.map((d) => d.supersedesId).filter((x): x is string => Boolean(x)));
     const b = p.introduction.brief;
     return {
       projectId: p.id,
@@ -248,6 +255,9 @@ export async function documentFolders(): Promise<DocFolder[] | null> {
       phase: p.phase,
       documents: p.documents.length,
       approved: p.documents.filter((d) => last.get(d.id) === 'APPROVED').length,
+      waiting: p.documents.filter((d) => d.sharedAt && !replaced.has(d.id) && !last.has(d.id) && isDocType(d.designKind) && DOC_TYPES[d.designKind].approval).length,
+      changes: p.documents.filter((d) => !replaced.has(d.id) && last.get(d.id) === 'CHANGES').length,
+      finals: p.documents.filter((d) => d.markedFinalAt !== null).length,
     };
   });
 }

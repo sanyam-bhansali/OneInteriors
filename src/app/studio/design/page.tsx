@@ -5,6 +5,10 @@ import { designWorkload, type DesignerRow } from '@/modules/studio-design/store'
 import { lifecycleBoard } from '@/modules/studio/lifecycle-store';
 import { can, currentMember } from '@/modules/studio/access';
 import { asLifeTab, LifecycleTabs } from './LifecycleTabs';
+import { KpiRow } from '../ui/KpiRow';
+import { designKpis } from '@/modules/studio/app-kpis';
+import { byDesigner, designerChoices, pickDesigner, NO_DESIGNER } from '@/modules/studio/designer-filter';
+import type { LifecycleBoard } from '@/modules/studio/lifecycle-store';
 import '../projects/projects.css';
 
 export const metadata: Metadata = { title: 'Design', robots: { index: false, follow: false } };
@@ -22,8 +26,13 @@ const muted = 'text-[12.5px] text-[var(--muted)]';
 const dayWords = (iso: string | null) =>
   iso ? new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).replace(',', '') : '';
 
-export default async function DesignPage({ searchParams }: { searchParams: Promise<{ tab?: string; deleted?: string }> }) {
-  const [{ tab: rawTab, deleted }, board, w, member] = await Promise.all([searchParams, lifecycleBoard().catch(() => null), designWorkload(), currentMember()]);
+export default async function DesignPage({ searchParams }: { searchParams: Promise<{ tab?: string; deleted?: string; designer?: string }> }) {
+  const [{ tab: rawTab, deleted, designer }, fullBoard, w, member] = await Promise.all([searchParams, lifecycleBoard().catch(() => null), designWorkload(), currentMember()]);
+  /* By designer (owner, 1 Nov 2026): the owner, a PM and the design head narrow the board to one designer's projects. */
+  const choices = fullBoard?.scope === 'studio' ? designerChoices([...fullBoard.design, ...fullBoard.execution, ...fullBoard.snags, ...fullBoard.closed]) : [];
+  const picked = pickDesigner(designer, choices);
+  const board: LifecycleBoard | null = fullBoard && picked ? narrowBoard(fullBoard, picked) : fullBoard;
+  const designers = w ? w.designers.filter((d) => picked === null || (picked === NO_DESIGNER ? d.id === null : d.id === picked)) : null;
   if (!w && !board) {
     return (
       <div className="content oi-proj">
@@ -73,18 +82,33 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
           Project deleted. It is in Deleted projects if you need it back.
         </p>
       ) : null}
-      {board ? <LifecycleTabs board={board} tab={tab} base="/studio/design" mine={mine} /> : null}
+      {/* The app's numbers first (owner, 1 Nov 2026; studio/app-kpis.ts). */}
+      <KpiRow label="Design at a glance" items={designKpis({ board, designers: mine ? null : designers, unassigned: board ? board.design.filter((c) => c.designerId === null).length : 0, tab: rawTab ? tab : undefined })} />
+      {choices.length > 1 ? (
+        <nav aria-label="Projects by designer" className="hstack" style={{ flexWrap: 'wrap', gap: 8 }} data-testid="designer-filter">
+          <span className="muted sm">Designer:</span>
+          <Link href={`/studio/design?tab=${tab}`} className={`chip${picked ? '' : ' good'}`} aria-current={picked ? undefined : 'true'}>
+            Everyone
+          </Link>
+          {choices.map((c) => (
+            <Link key={c.id} href={`/studio/design?tab=${tab}&designer=${encodeURIComponent(c.id)}`} className={`chip${picked === c.id ? ' good' : ''}`} aria-current={picked === c.id ? 'true' : undefined}>
+              {c.name} · {c.projects}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
+      {board ? <LifecycleTabs board={board} tab={tab} base="/studio/design" mine={mine} keep={picked ? `&designer=${encodeURIComponent(picked)}` : ''} /> : null}
       {/* The designers' load (Phase 2): owner and PM, under Design. */}
       {w && !mine && tab === 'design' ? (
         <>
           <h2 className="m-0 text-[17px]">Designers</h2>
-          {w.designers.length === 0 ? (
+          {designers!.length === 0 ? (
             <div className="empty">
               <b>No designers yet.</b>
               <span className="muted">Add one in Settings, Team, with the Designer role.</span>
             </div>
           ) : null}
-          {w.designers.map((d) => (
+          {designers!.map((d) => (
             <Designer key={d.id ?? 'nobody'} d={d} showLoad={d.id !== null} />
           ))}
         </>
@@ -145,4 +169,10 @@ function Designer({ d, showLoad }: { d: DesignerRow; showLoad: boolean }) {
       </ul>
     </section>
   );
+}
+
+/** The board with only the picked designer's projects (designer-filter.ts). */
+function narrowBoard(b: LifecycleBoard, picked: string): LifecycleBoard {
+  const keep = <T extends { designerId: string | null }>(l: T[]) => l.filter((c) => byDesigner(c.designerId, picked));
+  return { ...b, design: keep(b.design), execution: keep(b.execution), snags: keep(b.snags), closed: keep(b.closed), closures: keep(b.closures) };
 }

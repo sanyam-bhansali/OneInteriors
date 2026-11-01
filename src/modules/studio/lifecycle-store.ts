@@ -49,6 +49,8 @@ export interface BoardCard {
   client: string;
   flat: string;
   designer: string | null;
+  /** The designer's member id, for the owner's and heads' "by designer" filter (owner, 1 Nov 2026). */
+  designerId: string | null;
   phase: Phase;
   phaseLabel: string;
   current: string;
@@ -181,6 +183,7 @@ function cardOf(p: Row, now: Date, seesMoney: boolean): BoardCard {
     client: b.contactName?.trim() || b.user?.name?.trim() || 'Client',
     flat: siteLabel(b),
     designer: p.designer?.user.name ?? null,
+    designerId: p.designerId ?? null,
     phase,
     phaseLabel: PHASE_LABEL[phase],
     ...view,

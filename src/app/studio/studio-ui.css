@@ -234,3 +234,15 @@ a.tile:hover .tico,.lapp:hover span{transform:rotate(-7deg) scale(1.1)}
 .cheer i{position:absolute;top:0;width:8px;height:12px;border-radius:2px;animation:oiFall 1.6s ease-out both}
 @media (prefers-reduced-motion: reduce){&,& *,& *::before,& *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.01ms!important}}
 }
+
+/* The KPI row at the top of every app (owner, 1 Nov 2026; ui/KpiRow.tsx), in the Clients cards' look. */
+.oi-studio .kpi-row{display:grid;grid-template-columns:repeat(var(--kpi-cols,6),minmax(0,1fr));gap:12px;margin:0 0 4px}
+.oi-studio .kpi{display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:16px;background:var(--paper);box-shadow:0 1px 0 var(--line);color:var(--ink);min-width:0;text-decoration:none}
+.oi-studio a.kpi{transition:transform .2s ease,box-shadow .2s ease}
+.oi-studio a.kpi:hover{transform:translateY(-2px)}
+.oi-studio .kpi[aria-current='true']{box-shadow:0 0 0 2px var(--acc)}
+.oi-studio .kpi .l{font-size:13px;color:var(--muted);font-weight:500}
+.oi-studio .kpi .v{font-family:var(--font-geist-mono),ui-monospace,monospace;font-size:24px;font-weight:500;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.oi-studio .kpi .s{font-size:12.5px;color:var(--muted)}
+@media (max-width:1100px){.oi-studio .kpi-row{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:640px){.oi-studio .kpi-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}}

@@ -8,13 +8,18 @@ import { ExtrasToCollect } from '../projects/[id]/ExtrasToCollect';
 import { PaymentsBody } from '../projects/[id]/PaymentsTab';
 import { bookingDraft, bookingsToRecord, recentBookings } from '@/modules/studio-sales/booking';
 import { currentMember } from '@/modules/studio/access';
+import { KpiRow } from '../ui/KpiRow';
+import { moneyKpis } from '@/modules/studio/app-kpis';
 import { Bookings } from './Bookings';
 import { CrewToday } from '../vendors/CrewToday';
 import '../office-ui.css';
 import '../vendors/vendors.css';
 import './payments.css';
 
-export const metadata: Metadata = { title: 'Payments', robots: { index: false, follow: false } };
+export const metadata: Metadata = {
+  title: 'Payments',
+  robots: { index: false, follow: false },
+};
 export const dynamic = 'force-dynamic';
 
 /**
@@ -45,6 +50,13 @@ export default async function PaymentsDeskPage() {
   const owed = projects.reduce((n, p) => n + Math.max(0, p.payments?.ledger.balancePaise ?? 0), 0);
   const waiting = projects.reduce((n, p) => n + (p.payments?.ledger.waitingPaise ?? 0), 0);
   const disputed = projects.filter((p) => weight(p) === 0).length;
+  /* Received this month (IST): what was recorded and not refused. */
+  const month = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 7);
+  const received = projects.reduce(
+    (n, p) =>
+      n + (p.payments?.rows ?? []).filter((r) => r.receivedOn.slice(0, 7) === month && r.status !== 'disputed' && r.status !== 'replaced').reduce((m, r) => m + r.amountPaise, 0),
+    0,
+  );
 
   return (
     <main className="content ox-page">
@@ -57,28 +69,20 @@ export default async function PaymentsDeskPage() {
         </div>
       </div>
 
-      {projects.length > 0 ? (
-        <section className="card" aria-label="Money across projects">
-          <div className="money">
-            <div className="vd-due">
-              <span className="sm">Still to come in</span>
-              <b className="mono">{formatINR(owed)}</b>
-              <span className="sm">
-                across {projects.length} project{projects.length === 1 ? '' : 's'}
-              </span>
-            </div>
-            <div>
-              <span className="muted sm">Recorded, waiting for the customer to confirm</span>
-              <b className="mono">{formatINR(waiting)}</b>
-            </div>
-            <div style={disputed ? { background: 'var(--bad-bg)' } : undefined}>
-              <span className={disputed ? 'sm bad-t' : 'muted sm'}>Customer says not paid</span>
-              <b className={disputed ? 'bad-t' : undefined}>{disputed ? `${disputed} project${disputed === 1 ? '' : 's'}` : 'None'}</b>
-              {disputed ? <span className="sm bad-t">One Interiors is looking into it and will call you.</span> : null}
-            </div>
-          </div>
-        </section>
-      ) : null}
+      {/* The app's numbers first (owner, 1 Nov 2026; studio/app-kpis.ts). */}
+      <KpiRow
+        label="Money at a glance"
+        items={moneyKpis({
+          owedPaise: owed,
+          waitingPaise: waiting,
+          disputed,
+          projects: projects.length,
+          receivedThisMonthPaise: received,
+          bookings: toBook.length,
+          finals: [...finals.keys()].filter((id) => (projects.find((p) => p.id === id)?.payments?.ledger.balancePaise ?? 0) > 0).length,
+        })}
+      />
+      {disputed ? <p className="m-0 sm bad-t">A client says a recorded payment was not made. One Interiors is looking into it and will call you.</p> : null}
 
       <div className="cols">
         <div className="colmain">
@@ -105,11 +109,26 @@ export default async function PaymentsDeskPage() {
                     ) : null}
                   </div>
                   {finals.has(p.id) ? (
-                    <div className="banner" role="status" data-testid="final-payment" style={{ background: (p.payments?.ledger.balancePaise ?? 0) > 0 ? 'var(--warn-bg)' : 'var(--good-bg)', color: (p.payments?.ledger.balancePaise ?? 0) > 0 ? 'var(--warn)' : 'var(--good)', padding: '10px 14px', borderRadius: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    <div
+                      className="banner"
+                      role="status"
+                      data-testid="final-payment"
+                      style={{
+                        background: (p.payments?.ledger.balancePaise ?? 0) > 0 ? 'var(--warn-bg)' : 'var(--good-bg)',
+                        color: (p.payments?.ledger.balancePaise ?? 0) > 0 ? 'var(--warn)' : 'var(--good)',
+                        padding: '10px 14px',
+                        borderRadius: 12,
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 8,
+                      }}
+                    >
                       <b>Final payment from closure: {formatINR(finals.get(p.id)!.finalDuePaise)}</b>
                       <span className="sm">
                         Closed out {finals.get(p.id)!.closedOn}.{' '}
-                        {(p.payments?.ledger.balancePaise ?? 0) > 0 ? `${formatINR(p.payments!.ledger.balancePaise)} still to record, on the last stage below.` : 'Recorded in full.'}
+                        {(p.payments?.ledger.balancePaise ?? 0) > 0
+                          ? `${formatINR(p.payments!.ledger.balancePaise)} still to record, on the last stage below.`
+                          : 'Recorded in full.'}
                       </span>
                     </div>
                   ) : null}

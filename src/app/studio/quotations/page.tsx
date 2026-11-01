@@ -9,6 +9,8 @@ import { StartQuote } from './NewQuote';
 import { RatesGateCard } from '../RatesGateCard';
 import { myRatesGate, RATES_GATE_COPY } from '@/modules/studio-quote/rates-gate';
 import { LineIcon } from '../ui/icons';
+import { KpiRow } from '../ui/KpiRow';
+import { quoteKpis } from '@/modules/studio/app-kpis';
 import './quotes.css';
 
 export const metadata: Metadata = {
@@ -104,6 +106,9 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
         <h1>Welcome</h1>
         <p className="muted qsub">Auto-build a first quotation from a floor plan, or open the full builder.</p>
       </div>
+
+      {/* The app's numbers first (owner, 1 Nov 2026; studio/app-kpis.ts): the quotations this person sees, after any search. */}
+      <KpiRow label="Quotations at a glance" items={quoteKpis(quotes, new Date(), status)} />
 
       <div className="hcards">
         <Link href="/studio/quotations/first" className="hcard">

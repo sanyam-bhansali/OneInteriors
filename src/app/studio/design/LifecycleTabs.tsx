@@ -18,7 +18,7 @@ export type LifeTab = 'design' | 'execution' | 'snags';
 export const LIFE_TABS: readonly LifeTab[] = ['design', 'execution', 'snags'];
 export const asLifeTab = (v: string | undefined): LifeTab => (LIFE_TABS.includes(v as LifeTab) ? (v as LifeTab) : 'design');
 
-export function LifecycleTabs({ board, tab, base, mine }: { board: LifecycleBoard; tab: LifeTab; base: string; mine: boolean }) {
+export function LifecycleTabs({ board, tab, base, mine, keep = '' }: { board: LifecycleBoard; tab: LifeTab; base: string; mine: boolean; /** Kept on the tab links, "&designer=…" (owner, 1 Nov 2026). */ keep?: string }) {
   const label: Record<LifeTab, string> = mine
     ? { design: 'My Design', execution: 'My Execution', snags: 'My Snags' }
     : { design: 'Design', execution: 'Execution', snags: 'Snags' };
@@ -28,7 +28,7 @@ export function LifecycleTabs({ board, tab, base, mine }: { board: LifecycleBoar
     <div className="oi-life">
       <nav role="tablist" aria-label="Projects by phase" className="ptabs">
         {LIFE_TABS.map((t) => (
-          <Link key={t} role="tab" aria-selected={t === tab} href={`${base}?tab=${t}`}>
+          <Link key={t} role="tab" aria-selected={t === tab} href={`${base}?tab=${t}${keep}`}>
             {label[t]}
             <span className="mono">{counts[t]}</span>
           </Link>

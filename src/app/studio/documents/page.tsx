@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { documentFolders } from '@/modules/studio-design/documents-store';
+import { KpiRow } from '../ui/KpiRow';
+import { documentKpis } from '@/modules/studio/app-kpis';
 import { PHASE_LABEL, isPhase } from '@/modules/project/lifecycle-rules';
 import '../projects/projects.css';
 
@@ -39,6 +41,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
           <input name="q" defaultValue={q ?? ''} placeholder="Find a client or society" aria-label="Find a project" className="fld" />
         </form>
       </div>
+      {/* The app's numbers first (owner, 1 Nov 2026; studio/app-kpis.ts). */}
+      <KpiRow label="Documents at a glance" items={documentKpis(folders)} />
       {shown.length === 0 ? (
         <div className="empty">
           <p className="m-0">{query ? 'No project matches that.' : 'No projects yet.'}</p>

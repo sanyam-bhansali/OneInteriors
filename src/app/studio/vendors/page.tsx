@@ -7,8 +7,13 @@ import { AddCrew } from './CrewForms';
 import { LineIcon } from '../ui/icons';
 import '../office-ui.css';
 import './vendors.css';
+import { KpiRow } from '../ui/KpiRow';
+import { vendorKpis } from '@/modules/studio/app-kpis';
 
-export const metadata: Metadata = { title: 'Crews', robots: { index: false, follow: false } };
+export const metadata: Metadata = {
+  title: 'Crews',
+  robots: { index: false, follow: false },
+};
 export const dynamic = 'force-dynamic';
 
 /**
@@ -62,12 +67,25 @@ export default async function CrewsPage() {
         </div>
       </div>
 
+      {/* The app's numbers first (owner, 1 Nov 2026; studio/app-kpis.ts). */}
+      <KpiRow
+        label="Vendors at a glance"
+        items={vendorKpis({
+          crews: live.length,
+          trades: tradesUsed,
+          kycMissing: gaps,
+          openOrders,
+          billedPaise: billed,
+          owedPaise: owed,
+        })}
+      />
+
       {live.length === 0 ? (
         <div className="empty">
           <b>Your site crews, and what each is owed.</b>
           <span className="muted sm" style={{ maxWidth: '64ch' }}>
-            Add a carpenter, a painter, an electrician. Each keeps their own rate card: two carpenters can price the same work differently. On a booked project, the Crews tab
-            turns the final quotation into work orders and prices most lines from the crew&apos;s card by itself.
+            Add a carpenter, a painter, an electrician. Each keeps their own rate card: two carpenters can price the same work differently. On a booked project, the Crews tab turns
+            the final quotation into work orders and prices most lines from the crew&apos;s card by itself.
           </span>
         </div>
       ) : (
