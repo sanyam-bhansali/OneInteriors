@@ -9,6 +9,10 @@ import { ATTENTION_TITLES, clock, shortDay, type AttentionKind, type WorkspaceRo
 import { LineIcon } from '../ui/icons';
 import { lifecycleBoard } from '@/modules/studio/lifecycle-store';
 import { asLifeTab, LifecycleTabs } from '../design/LifecycleTabs';
+import { KpiRow } from '../ui/KpiRow';
+import { projectKpis } from '@/modules/studio/app-kpis';
+import { byDesigner, designerChoices, pickDesigner } from '@/modules/studio/designer-filter';
+import type { LifecycleBoard } from '@/modules/studio/lifecycle-store';
 import './projects.css';
 
 export const metadata: Metadata = {
@@ -41,11 +45,12 @@ const HANDED_OVER = 'Handed over';
 /** The board's columns: each project in the stage under way, in the order the stages run (by stage kind, named as the studio names it). */
 function lanesOf(rows: WorkspaceRow[]): { name: string; rows: WorkspaceRow[] }[] {
   const lanes = new Map<string, { name: string; at: number; rows: WorkspaceRow[] }>();
-  for (const r of rows) r.stages.forEach((s, i) => {
-    const l = lanes.get(s.key);
-    if (!l) lanes.set(s.key, { name: s.label, at: i, rows: [] });
-    else l.at = Math.min(l.at, i);
-  });
+  for (const r of rows)
+    r.stages.forEach((s, i) => {
+      const l = lanes.get(s.key);
+      if (!l) lanes.set(s.key, { name: s.label, at: i, rows: [] });
+      else l.at = Math.min(l.at, i);
+    });
   const over = { name: HANDED_OVER, at: 99, rows: [] as WorkspaceRow[] };
   for (const r of rows) {
     const now = r.stages.find((s) => s.state === 'now');
@@ -54,17 +59,26 @@ function lanesOf(rows: WorkspaceRow[]): { name: string; rows: WorkspaceRow[] }[]
   return [...lanes.values(), ...(over.rows.length ? [over] : [])].sort((a, b) => a.at - b.at);
 }
 
-export default async function ProjectsPage({ searchParams }: { searchParams?: Promise<{ tab?: string; deleted?: string }> }) {
+export default async function ProjectsPage({ searchParams }: { searchParams?: Promise<{ tab?: string; deleted?: string; designer?: string }> }) {
   const now = new Date();
-  const [data, score, member, board, sp] = await Promise.all([
+  const [data, score, member, fullBoard, sp] = await Promise.all([
     studioProjects(now),
     studioUpdateScore(now), // score: Phase 2
     currentMember(),
     lifecycleBoard().catch(() => null),
-    searchParams ?? Promise.resolve<{ tab?: string; deleted?: string }>({}),
+    searchParams ?? Promise.resolve<{ tab?: string; deleted?: string; designer?: string }>({}),
   ]);
   const justDeleted = sp.deleted === '1';
-  const rows = data?.rows ?? [];
+  /* By designer (owner, 1 Nov 2026): the owner, a PM and the design head see every project, so they can narrow it to one designer's. */
+  const allCards = fullBoard ? [...fullBoard.design, ...fullBoard.execution, ...fullBoard.snags, ...fullBoard.closed] : [];
+  const choices = fullBoard?.scope === 'studio' ? designerChoices(allCards) : [];
+  const picked = pickDesigner(sp.designer, choices);
+  const designerOf = new Map(allCards.map((c) => [c.id, c.designerId]));
+  const board: LifecycleBoard | null = fullBoard && picked ? narrow(fullBoard, picked) : fullBoard;
+  const keep = picked ? `&designer=${encodeURIComponent(picked)}` : '';
+  const rows = (data?.rows ?? []).filter((r) => byDesigner(designerOf.get(r.id) ?? null, picked));
+  const lifeTab = sp.tab ? asLifeTab(sp.tab) : undefined;
+  const attention = (data?.attention ?? []).filter((a) => byDesigner(designerOf.get(a.projectId) ?? null, picked));
   const live = rows.filter((r) => r.stage !== null);
   const own = new Set(data?.ownClientIds ?? []);
   const title = member?.role === 'DESIGNER' ? 'My projects' : member?.role === 'PM' ? 'All sites' : 'Projects';
@@ -84,19 +98,21 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
     ) : null;
   const lanes = lanesOf(rows);
   /* Delete and restore (owner, 27 Oct 2026; studio/project-delete.ts). */
-  const deletedLink =
-    mayDeleteProjects(member) ? (
-      <Link href="/studio/projects/deleted" className="btn ghost">
-        Deleted projects
-      </Link>
-    ) : null;
+  const deletedLink = mayDeleteProjects(member) ? (
+    <Link href="/studio/projects/deleted" className="btn ghost">
+      Deleted projects
+    </Link>
+  ) : null;
 
   return (
     <div className="content oi-proj">
       <div className="phead">
         <div>
           <h1>
-            {title} <span className="mono muted" style={{ fontSize: 18 }}>{rows.length}</span>
+            {title}{' '}
+            <span className="mono muted" style={{ fontSize: 18 }}>
+              {rows.length}
+            </span>
           </h1>
           <p className="muted" style={{ margin: '6px 0 0' }}>
             Each project shows in its customer&rsquo;s app. What your team records here is what they see.
@@ -122,15 +138,50 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
         </p>
       ) : null}
 
+      {/* The app's numbers first (owner, 1 Nov 2026; studio/app-kpis.ts). */}
+      <KpiRow
+        label="Projects at a glance"
+        items={projectKpis({
+          board,
+          rows,
+          money: data?.seesMoney ?? false,
+          tab: lifeTab,
+          base: '/studio/projects',
+        })}
+      />
+
+      {choices.length > 1 ? (
+        <nav aria-label="Projects by designer" className="hstack" style={{ flexWrap: 'wrap', gap: 8 }} data-testid="designer-filter">
+          <span className="muted sm">Designer:</span>
+          <Link
+            href={`/studio/projects${sp.tab ? `?tab=${encodeURIComponent(sp.tab)}` : ''}`}
+            className={`chip${picked ? '' : ' good'}`}
+            aria-current={picked ? undefined : 'true'}
+          >
+            Everyone
+          </Link>
+          {choices.map((c) => (
+            <Link
+              key={c.id}
+              href={`/studio/projects?designer=${encodeURIComponent(c.id)}${sp.tab ? `&tab=${encodeURIComponent(sp.tab)}` : ''}`}
+              className={`chip${picked === c.id ? ' good' : ''}`}
+              aria-current={picked === c.id ? 'true' : undefined}
+            >
+              {c.name} · {c.projects}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
+
       {/* My Design · My Execution · My Snags (owner and Hauspire's design team, 24 Oct 2026; DESIGN-PROCESS-PLAN.md §2.3): every project by its phase, for everyone who has the board. */}
-      {board && rows.length > 0 ? <LifecycleTabs board={board} tab={asLifeTab(sp.tab)} base="/studio/projects" mine={board.scope === 'designer'} /> : null}
+      {board && rows.length > 0 ? <LifecycleTabs board={board} tab={asLifeTab(sp.tab)} base="/studio/projects" mine={board.scope === 'designer'} keep={keep} /> : null}
 
       {rows.length === 0 ? (
         <div className="empty">
           <b>A project starts when a customer signs your final quote.</b>
           <p className="m-0 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--text2)]">
-            Signing builds the plan from the quote — the stages, each room&rsquo;s checklist, the payment stages and the materials — and the
-            customer follows it in their app. Projects you are on appear here.
+            Signing builds the plan from the quote — the stages, each room&rsquo;s checklist, the payment stages and the materials — and the customer follows it in their app.
+            Projects you are on appear here.
           </p>
           {startButton ? (
             <p className="m-0 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--text2)]">
@@ -147,11 +198,11 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
             <h2 id="h-attn" className="m-0 text-[17px] font-semibold">
               Needs attention today
             </h2>
-            {data!.attention.length === 0 ? (
+            {attention.length === 0 ? (
               <p className="m-0 muted">Nothing. Every live site has posted today and nothing is overdue.</p>
             ) : (
               <div className="attn">
-                {data!.attention.map((a, i) => (
+                {attention.map((a, i) => (
                   <Link key={`${a.kind}-${a.projectId}-${i}`} href={`/studio/projects/${a.projectId}`} style={{ boxShadow: `inset 4px 0 0 ${ACCENT[a.kind].bar}` }}>
                     <span className={`sm ${ACCENT[a.kind].cls}`} style={{ fontWeight: 600 }}>
                       {ATTENTION_TITLES[a.kind]}
@@ -201,7 +252,10 @@ function Card({ r, money, own }: { r: WorkspaceRow; money: boolean; own: boolean
   const prog = r.stages.length ? Math.round((done / r.stages.length) * 100) : 0;
   const health =
     r.lateDays > 0
-      ? { cls: r.customerLateDays === r.lateDays ? 'warn' : 'bad', text: `${r.lateDays} day${r.lateDays === 1 ? '' : 's'} late` }
+      ? {
+          cls: r.customerLateDays === r.lateDays ? 'warn' : 'bad',
+          text: `${r.lateDays} day${r.lateDays === 1 ? '' : 's'} late`,
+        }
       : { cls: 'good', text: handedOver ? 'Done' : 'On track' };
   const today = handedOver
     ? null
@@ -213,7 +267,14 @@ function Card({ r, money, own }: { r: WorkspaceRow; money: boolean; own: boolean
   const w = r.waiting[0] ?? null;
   return (
     <Link href={`/studio/projects/${r.id}`} className="pcard">
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: 8,
+          alignItems: 'flex-start',
+        }}
+      >
         <b style={{ fontSize: 14.5, fontWeight: 600 }}>{r.home}</b>
         <span className={`chip ${r.plan === 'assured' ? 'oi' : ''}`}>{r.plan === 'assured' ? 'Assured' : 'Basic'}</span>
       </div>
@@ -246,7 +307,8 @@ function Card({ r, money, own }: { r: WorkspaceRow; money: boolean; own: boolean
       ) : null}
       {r.snags.overdue.length ? (
         <span className="sm bad-t">
-          You: {r.snags.overdue.length} snag{r.snags.overdue.length === 1 ? '' : 's'} overdue
+          You: {r.snags.overdue.length} snag
+          {r.snags.overdue.length === 1 ? '' : 's'} overdue
         </span>
       ) : r.snags.open ? (
         <span className="sm">
@@ -268,4 +330,17 @@ function Card({ r, money, own }: { r: WorkspaceRow; money: boolean; own: boolean
       ) : null}
     </Link>
   );
+}
+
+/** The board with only the picked designer's projects (designer-filter.ts). */
+function narrow(b: LifecycleBoard, picked: string): LifecycleBoard {
+  const keep = <T extends { designerId: string | null }>(l: T[]) => l.filter((c) => byDesigner(c.designerId, picked));
+  return {
+    ...b,
+    design: keep(b.design),
+    execution: keep(b.execution),
+    snags: keep(b.snags),
+    closed: keep(b.closed),
+    closures: keep(b.closures),
+  };
 }

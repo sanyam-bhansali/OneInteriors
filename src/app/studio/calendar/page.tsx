@@ -8,6 +8,8 @@ import { taskPeople } from '@/modules/studio-sales/tasks';
 import { CalendarBody, Legend, NewTask, PersonPicker } from './CalendarView';
 import { NewMeeting } from './MeetingUi';
 import { currentMember } from '@/modules/studio/access';
+import { KpiRow } from '../ui/KpiRow';
+import { calendarKpis } from '@/modules/studio/app-kpis';
 import { meetingPeople, meetingsWaiting } from '@/modules/studio-office/meetings';
 import '../office-ui.css';
 import './calendar.css';
@@ -39,7 +41,12 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       </main>
     );
   }
-  const waiting = await meetingsWaiting(member, now);
+  const today0 = istDay(now);
+  /* The KPI row counts this week from today, whatever view is on screen (owner, 1 Nov 2026; studio/app-kpis.ts). */
+  const [waiting, week] = await Promise.all([
+    meetingsWaiting(member, now),
+    view === 'week' && day === today0 ? Promise.resolve(cal) : myCalendar('week', today0, sp.who ?? null, now).catch(() => null),
+  ]);
   const w = calendarWindow(view, day);
   const href = (over: Record<string, string | null>) => {
     const p = new URLSearchParams();
@@ -69,6 +76,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           <NewTask people={people} defaultDay={day === today || view !== 'day' ? today : day} seesAll={cal.seesAll} meId={cal.meId} />
         </div>
       </div>
+
+      {/* The app's numbers first (owner, 1 Nov 2026; studio/app-kpis.ts). */}
+      {week ? <KpiRow label="Calendar at a glance" items={calendarKpis(week.items, today, waiting)} /> : null}
 
       {waiting > 0 ? (
         <p className="cal-waiting" role="status">
