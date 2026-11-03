@@ -1,13 +1,15 @@
+import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Body, Button, ErrorText, Eyebrow, Screen, Title } from '../components/ui';
+import { LightLook } from '../components/ui';
 import { api } from '../lib/api';
 import { projectsOnly } from '../lib/config';
 import { PasswordSignIn } from '../components/sign-in/PasswordSignIn';
 import { useAuth } from '../lib/auth';
 import { useHeadline, useT } from '../lib/i18n';
-import { color, font } from '../lib/theme';
+import { light as color, font } from '../lib/theme';
 
 /**
  * A returning customer's sign-in (the phone screen, #12, without the quote
@@ -22,7 +24,7 @@ const WAIT = 30;
 const spaced = (d: string) => (d.length > 5 ? `${d.slice(0, 5)} ${d.slice(5)}` : d);
 
 /** Password while only the project app is open (owner, 1 Nov 2026); the WhatsApp code once codes are live. */
-export default function SignIn() {
+function SignInScreen() {
   return projectsOnly() ? <PasswordSignIn /> : <CodeSignIn />;
 }
 
@@ -174,3 +176,13 @@ const styles = StyleSheet.create({
   wait: { fontFamily: font.sans, fontSize: 13, color: color.ink2 },
   link: { fontFamily: font.sansMedium, fontSize: 15, color: color.ink, textDecorationLine: 'underline' },
 });
+
+/** Before Home the app keeps the light look (the owner's handoff, 1 Nov 2026). */
+export default function SignIn() {
+  return (
+    <LightLook>
+      <StatusBar style="dark" />
+      <SignInScreen />
+    </LightLook>
+  );
+}

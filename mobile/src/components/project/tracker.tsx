@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
   headTitle: { flexShrink: 1, fontFamily: font.sansSemi, fontSize: 15, color: color.ink },
   room: { fontFamily: font.sansSemi, fontSize: 13, letterSpacing: 13 * 0.04, textTransform: 'uppercase', color: color.ink2 },
   item: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 28 },
-  box: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: '#B9B7B1', alignItems: 'center', justifyContent: 'center' },
+  box: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: '#5A4A3D', alignItems: 'center', justifyContent: 'center' },
   boxDone: { backgroundColor: color.accent, borderColor: color.accent },
   itemText: { flex: 1, fontFamily: font.sans, fontSize: 14.5, lineHeight: 20, color: color.ink },
   moveRow: { gap: 3, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.line },

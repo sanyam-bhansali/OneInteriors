@@ -1,16 +1,18 @@
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Fragment, useState, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { ArrowIcon } from '../../components/icons';
-import { CalendarIcon, GrowLine, NowDot, SnagIcon } from '../../components/project/parts';
-import { MilestoneLine, MovedNote, MovesCard, ProgressBar, StageChecklist, StageSteps, stageLine } from '../../components/project/tracker';
+import { CalendarIcon, GrowLine, SnagIcon } from '../../components/project/parts';
+import { MilestoneLine, MovedNote, MovesCard, StageChecklist, StageSteps, stageLine } from '../../components/project/tracker';
 import { Body, Card, Eyebrow, Loading, Meta, Press, Screen, Stagger, Tile, Title } from '../../components/ui';
 import { dayLabel, inr, lakh, shortDate } from '../../lib/format';
 import { useHeadline, useLang, useT, type T } from '../../lib/i18n';
 import { daysLate } from '../../lib/progress';
 import { usePlan } from '../../lib/plan';
 import { useProject } from '../../lib/project';
-import { color, font } from '../../lib/theme';
+import { color, font, warm } from '../../lib/theme';
 import { PaymentEntries } from '../../components/project/payment-entries';
 import { DesignCard } from '../../components/project/design';
 import { LifecycleCard } from '../../components/project/lifecycle';
@@ -87,15 +89,29 @@ export default function Project() {
       case 'progress': {
         const pct = inDesign ? (design?.pct ?? null) : (p.progressPct ?? null);
         if (typeof pct !== 'number') return null;
+        /* One segment a design step (in design) or a stage (after), each filled by how far it is. */
+        const segs: number[] = inDesign
+          ? (design?.steps ?? []).map((x) => (x.done ? 1 : 0))
+          : tracker && tracker.stages.length
+            ? tracker.stages.map((x) => (x.state === 'done' ? 1 : (x.progressPct ?? 0) / 100))
+            : p.stages.map((x) => (x.state === 'done' ? 1 : 0));
         return (
-          <Card>
-            <View style={styles.cardHead}>
-              <Text style={styles.cardTitle}>{inDesign ? t('project.designSoFar') : t('project.progress')}</Text>
-              <Text style={styles.progressPct}>{pct}%</Text>
+          <View style={styles.bigCard} accessible accessibilityLabel={inDesign ? t('design.pct.a11y', { n: pct }) : t('project.progress.a11y', { n: pct })}>
+            <View style={styles.bigHead}>
+              <Text style={styles.bigLabel}>{inDesign ? t('project.designIs') : t('project.homeIs')}</Text>
+              <Text style={styles.bigPct}>
+                {pct}%<Text style={styles.bigDone}> {t('project.doneWord')}</Text>
+              </Text>
             </View>
-            <ProgressBar pct={pct} label={inDesign ? t('design.pct.a11y', { n: pct }) : t('project.progress.a11y', { n: pct })} />
-            <Text style={styles.note}>{inDesign ? t('project.designSoFar.body', { studio: p.studio }) : t('project.progress.body', { studio: p.studio })}</Text>
-          </Card>
+            <View style={styles.segs}>
+              {(segs.length ? segs : [pct / 100]).map((f, i) => (
+                <View key={i} style={styles.seg}>
+                  <View style={[styles.segFill, { width: `${Math.round(Math.max(0, Math.min(1, f)) * 100)}%` }]} />
+                </View>
+              ))}
+            </View>
+            <Text style={styles.note}>{inDesign ? t('project.designSoFar.body', { studio: p.studio }) : t('project.segs.body')}</Text>
+          </View>
         );
       }
       case 'stats':
@@ -138,14 +154,16 @@ export default function Project() {
         );
       case 'decision':
         return due ? (
-          <Press onPress={() => openDecision(due)} accessibilityLabel={`${t('project.decision')}. ${decisionSub}`} style={styles.decisionTile}>
-            <View style={styles.tileHead}>
-              <CalendarIcon color={color.accentWarm} />
-            </View>
-            <Text style={[styles.tileTitle, { color: color.onDark }]}>{t('project.decision')}</Text>
-            <Text style={[styles.tileSub, { color: color.onDark2 }]} numberOfLines={2}>
-              {decisionSub}
-            </Text>
+          <Press onPress={() => openDecision(due)} accessibilityLabel={`${t('project.decision')}. ${decisionSub}`}>
+            <LinearGradient colors={warm.glass} style={styles.glass}>
+              <View style={styles.tileHead}>
+                <CalendarIcon color={color.accentWarm} />
+              </View>
+              <Text style={styles.glassTitle}>{t('project.decisions')}</Text>
+              <Text style={styles.tileSub} numberOfLines={2}>
+                {decisionSub}
+              </Text>
+            </LinearGradient>
           </Press>
         ) : null;
       case 'design':
@@ -153,26 +171,35 @@ export default function Project() {
       case 'site':
         /* Site moved inside Project when Chats took its tab (the owner's v1 screens, 1 Nov 2026). */
         return (
-          <Press onPress={() => router.push('/site')} accessibilityRole="link" accessibilityLabel={t('tab.site')} style={styles.decisionTile}>
-            <Text style={[styles.tileTitle, { color: color.onDark }]}>{t('tab.site')}</Text>
-            <Text style={[styles.tileSub, { color: color.onDark2 }]} numberOfLines={2}>
-              {p.updates[0] ? `${p.updates[0].note || t('tab.site')} · ${dayLabel(p.updates[0].at)}` : t('site.none')}
-            </Text>
+          <Press onPress={() => router.push('/site')} accessibilityRole="link" accessibilityLabel={t('tab.site')}>
+            <LinearGradient colors={warm.glass} style={styles.siteCard}>
+              {p.updates[0]?.photos[0] ? <Image source={{ uri: p.updates[0].photos[0] }} style={styles.siteThumb} contentFit="cover" /> : null}
+              <View style={{ flex: 1, gap: 3 }}>
+                <Text style={styles.siteEyebrow}>{p.updates[0] ? `${t('tab.site')} · ${dayLabel(p.updates[0].at)}` : t('tab.site')}</Text>
+                <Text style={styles.glassTitle} numberOfLines={2}>
+                  {p.updates[0]?.note || t('site.none')}
+                </Text>
+                {p.updates[0] ? <Text style={styles.tileSub}>{t('project.site.photos', { n: p.updates[0].photos.length })}</Text> : null}
+              </View>
+              <ArrowIcon color={color.ink2} size={18} />
+            </LinearGradient>
           </Press>
         );
       case 'snags':
         return (
-          <Press onPress={() => router.push('/snags')} accessibilityLabel={`${t('project.snags')}. ${snagSub}`} style={styles.snagTile}>
-            <View style={styles.tileHead}>
-              <SnagIcon color={color.accent} />
-              {open ? (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{open}</Text>
-                </View>
-              ) : null}
-            </View>
-            <Text style={styles.tileTitle}>{t('project.snags')}</Text>
-            <Text style={styles.tileSub}>{snagSub}</Text>
+          <Press onPress={() => router.push('/snags')} accessibilityLabel={`${t('project.snags')}. ${snagSub}`}>
+            <LinearGradient colors={warm.glass} style={styles.glass}>
+              <View style={styles.tileHead}>
+                <SnagIcon color={color.accentWarm} />
+                {open ? (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{open}</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={styles.glassTitle}>{t('project.snags')}</Text>
+              <Text style={styles.tileSub}>{snagSub}</Text>
+            </LinearGradient>
           </Press>
         );
       case 'nextPayment':
@@ -184,6 +211,9 @@ export default function Project() {
       case 'stages':
         return (
           <>
+            <Text role="heading" style={styles.everyStep}>
+              {t('project.everyStep')}
+            </Text>
             <View role="list" aria-label={t('project.stages')}>
               {p.stages.map((s, i) => (
                 <StageRow
@@ -335,29 +365,30 @@ function StageRow({
     <Stagger i={i} start={220}>
       <View role="listitem" style={styles.tlInner}>
         <View style={styles.rail}>
-          {done ? (
-            <View style={[styles.node, { backgroundColor: color.accent }]} />
-          ) : nowStage ? (
-            <View style={[styles.node, styles.nodeNow]}>
-              <NowDot color={color.accent} />
-            </View>
-          ) : (
-            <View style={[styles.node, styles.nodeLater]} />
-          )}
+          <View style={[styles.num, done ? styles.numDone : nowStage ? styles.numNow : styles.numLater]}>
+            <Text style={[styles.numText, done && { color: color.onDark }, !done && !nowStage && { color: color.ink3 }]}>{String(i + 1).padStart(2, '0')}</Text>
+          </View>
           {!last ? <GrowLine color={done ? color.accent : color.line} delay={350 + i * 500} /> : null}
         </View>
         <View style={[styles.stageBody, last && { paddingBottom: 0 }]}>
-          <Text
-            role="heading"
-            style={[
-              styles.stageTitle,
-              { lineHeight: titleLine },
-              nowStage && { color: color.accent },
-              !done && !nowStage && { color: color.ink2 },
-            ]}
-          >
-            {nowStage ? t('project.stageNow', { stage: s.label }) : s.label}
-          </Text>
+          <View style={[styles.stageCard, nowStage && styles.stageCardNow]}>
+          <View style={styles.stageHead}>
+            <Text
+              role="heading"
+              style={[styles.stageTitle, { lineHeight: titleLine, flex: 1 }, nowStage && { color: color.accentWarm }, !done && !nowStage && { color: color.ink2 }]}
+            >
+              {s.label}
+            </Text>
+            {typeof tracked?.progressPct === 'number' ? <Text style={styles.stagePct}>{done ? 100 : tracked.progressPct}%</Text> : null}
+          </View>
+          <View style={styles.stageBarRow}>
+            <View style={styles.stageBar}>
+              <View style={[styles.stageBarFill, { width: `${done ? 100 : (tracked?.progressPct ?? 0)}%` }]} />
+            </View>
+            <Text style={[styles.stageState, done && { color: warm.green }, nowStage && { color: color.accentWarm }]}>
+              {done ? t('project.state.done') : nowStage ? t('project.state.now') : t('project.state.later')}
+            </Text>
+          </View>
           <Text style={styles.mono}>
             {line}
             {typeof tracked?.progressPct === 'number' && tracked.steps ? ` · ${t('project.stagePct', { n: tracked.progressPct })}` : ''}
@@ -383,6 +414,7 @@ function StageRow({
               <ArrowIcon color={color.ink} size={14} />
             </Press>
           ) : null}
+          </View>
         </View>
       </View>
     </Stagger>
@@ -460,27 +492,48 @@ function Payments({
 }
 
 /* The late note's warm tints are the design's own (Tracker.dc.html), not theme tokens. */
-const LATE_BG = '#F5E2D8';
-const LATE_EYEBROW = '#8E3B1B';
-const LATE_TEXT = '#4A2A1C';
-const RING_LATER = '#B9B7B1';
+const LATE_BG = '#3A261B';
+const LATE_EYEBROW = '#F7B07A';
+const LATE_TEXT = '#F6EEE6';
 
 const styles = StyleSheet.create({
+  bigCard: { backgroundColor: color.soft, borderRadius: 26, padding: 18, gap: 14, borderWidth: 1, borderColor: color.line },
+  bigHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 },
+  bigLabel: { fontFamily: font.sans, fontSize: 17, color: color.ink2, paddingBottom: 6 },
+  bigPct: { fontFamily: font.sansMedium, fontSize: 52, letterSpacing: -2.4, color: color.ink },
+  bigDone: { fontFamily: font.sans, fontSize: 18, letterSpacing: 0, color: color.ink2 },
+  segs: { flexDirection: 'row', gap: 5 },
+  seg: { flex: 1, height: 12, borderRadius: 6, backgroundColor: 'rgba(255,236,214,.12)', overflow: 'hidden' },
+  segFill: { height: '100%', borderRadius: 6, backgroundColor: color.accentWarm },
+  glass: { borderRadius: 22, padding: 16, gap: 6, borderWidth: 1, borderColor: warm.glassRing },
+  glassTitle: { fontFamily: font.sansSemi, fontSize: 17, color: color.ink },
+  siteCard: { borderRadius: 22, padding: 12, gap: 12, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: warm.glassRing },
+  siteThumb: { width: 76, height: 76, borderRadius: 14 },
+  siteEyebrow: { fontFamily: font.sansMedium, fontSize: 13.5, color: color.accentWarm },
+  everyStep: { fontFamily: font.sansMedium, fontSize: 24, letterSpacing: -0.7, color: color.ink, marginBottom: 6 },
+  num: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  numDone: { backgroundColor: color.accentWarm },
+  numNow: { borderWidth: 2, borderColor: color.accentWarm, backgroundColor: color.paper },
+  numLater: { borderWidth: 1.5, borderColor: '#5A4A3D', backgroundColor: color.paper },
+  numText: { fontFamily: font.mono, fontSize: 13.5, color: color.accentWarm },
+  stageCard: { backgroundColor: color.soft, borderRadius: 20, padding: 14, gap: 8, borderWidth: 1, borderColor: color.line },
+  stageCardNow: { borderColor: 'rgba(240,138,75,.55)' },
+  stageHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  stagePct: { fontFamily: font.mono, fontSize: 14, color: color.ink2 },
+  stageBarRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  stageBar: { flex: 1, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,236,214,.12)', overflow: 'hidden' },
+  stageBarFill: { height: '100%', borderRadius: 3, backgroundColor: color.accentWarm },
+  stageState: { fontFamily: font.sansMedium, fontSize: 13.5, color: color.ink3 },
   row3: { flexDirection: 'row', gap: 8 },
   row2: { flexDirection: 'row', gap: 10 },
-  snagTile: { flex: 1, minHeight: 112, backgroundColor: color.soft, borderRadius: 24, padding: 14, gap: 8 },
-  decisionTile: { flex: 1, minHeight: 112, backgroundColor: color.ink, borderRadius: 18, padding: 14, gap: 8 },
   tileHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 24 },
   badge: { minWidth: 24, height: 24, borderRadius: 12, paddingHorizontal: 6, backgroundColor: color.accent, alignItems: 'center', justifyContent: 'center' },
   badgeText: { fontFamily: font.sansSemi, fontSize: 13, color: color.white },
   tileTitle: { fontFamily: font.sansSemi, fontSize: 16, color: color.ink },
   tileSub: { fontFamily: font.sans, fontSize: 13.5, lineHeight: 19, color: color.ink2, marginTop: -6 },
 
-  tlInner: { flexDirection: 'row', gap: 16 },
-  rail: { width: 18, alignItems: 'center' },
-  node: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  nodeNow: { backgroundColor: color.paper, borderWidth: 2, borderColor: color.accent },
-  nodeLater: { borderWidth: 1.5, borderColor: RING_LATER },
+  tlInner: { flexDirection: 'row', gap: 12 },
+  rail: { width: 40, alignItems: 'center' },
   stageBody: { flex: 1, paddingBottom: 22, gap: 6 },
   stageTitle: { fontFamily: font.sansSemi, fontSize: 18, letterSpacing: -0.36, color: color.ink },
   mono: { fontFamily: font.mono, fontSize: 13, lineHeight: 18, color: color.ink2 },

@@ -47,7 +47,8 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: color.accentWarm,
         tabBarInactiveTintColor: color.tabIdle,
-        tabBarStyle: { backgroundColor: color.ink, borderTopWidth: 0, height: 88, paddingTop: 8 },
+        /* The handoff's bar: #1E1712, its top corners rounded 26. */
+        tabBarStyle: { backgroundColor: color.bar, borderTopWidth: 0, height: 88, paddingTop: 8, borderTopLeftRadius: 26, borderTopRightRadius: 26 },
       }}
     >
       <Tabs.Screen name="home" options={{ tabBarLabel: label(t('tab.home')), tabBarIcon: ({ color: c }) => <HomeIcon color={c} /> }} />

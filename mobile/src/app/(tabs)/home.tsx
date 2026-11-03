@@ -10,7 +10,7 @@ import { ArrowMark, BellMark } from '../../components/home/marks';
 import { Body, Button, DarkCard, Eyebrow, Loading, Press, Rise, StatusChip, Title } from '../../components/ui';
 import { api } from '../../lib/api';
 import { projectsOnly } from '../../lib/config';
-import { OneThingHome } from '../../components/home/one-thing';
+import { MainHome } from '../../components/home/main-home';
 import { useAuth } from '../../lib/auth';
 import { dayLabel, inr, timeLabel } from '../../lib/format';
 import { useBrief } from '../../lib/brief';
@@ -59,9 +59,11 @@ export default function Home() {
   const name = auth.status === 'signed-in' ? (auth.user.name ?? '').trim().split(' ')[0] : '';
   const newCount = unread ?? profile.unread;
 
-  /* Only the project app (owner, 1 Nov 2026): format C for a real project, "Connect your project" without one. */
+  /* Only the project app (owner, 1 Nov 2026): the handoff's Home (Main, warm dark, 3 Nov 2026) for a real project, "Connect your project" without one. */
   if (projectsOnly() && state.status === 'ready') {
-    return <OneThingHome p={state.project} name={name} unread={newCount} t={t} refreshing={refreshing} onRefresh={onRefresh} />;
+    return (
+      <MainHome p={state.project} name={name} unread={newCount} coins={profile.coins.balance} latest={fromSite(state.project, t)} t={t} refreshing={refreshing} onRefresh={onRefresh} />
+    );
   }
   if (projectsOnly() && state.status === 'none') {
     return (
@@ -129,7 +131,7 @@ export default function Home() {
         <View style={[styles.hero, { minHeight: 360 + insets.top }]}>
           <KenBurns source={latest?.photos[0] ? { uri: latest.photos[0] } : require('../../../assets/app/home-hero.webp')} label={latest?.note} />
           <LinearGradient
-            colors={['rgba(11,11,11,.55)', 'rgba(11,11,11,.1)', 'rgba(11,11,11,.4)', 'rgba(11,11,11,.92)']}
+            colors={['rgba(22,17,13,.55)', 'rgba(22,17,13,.1)', 'rgba(22,17,13,.45)', 'rgba(22,17,13,1)']}
             locations={[0, 0.35, 0.6, 1]}
             style={StyleSheet.absoluteFill}
           />
@@ -293,7 +295,7 @@ const sameDay = (iso: string, now: number) => istDay(Date.parse(iso)) === istDay
 const lowerFirst = (s: string) => (s ? s[0]!.toLowerCase() + s.slice(1) : s);
 
 const styles = StyleSheet.create({
-  hero: { backgroundColor: color.ink, overflow: 'hidden' },
+  hero: { backgroundColor: color.paper, overflow: 'hidden' },
   heroInner: { flex: 1, paddingHorizontal: 20, paddingBottom: 22, justifyContent: 'space-between' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   place: { flexShrink: 1, fontFamily: font.sansMedium, fontSize: 13, letterSpacing: 13 * 0.07, textTransform: 'uppercase', color: 'rgba(255,255,255,.85)' },

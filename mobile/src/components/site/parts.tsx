@@ -40,7 +40,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: 16,
     borderRadius: 999,
-    backgroundColor: color.ink,
+    backgroundColor: color.accent,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,

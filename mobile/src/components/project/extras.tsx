@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   link: { fontFamily: font.sansMedium, fontSize: 13.5, color: color.accentInk, paddingVertical: 6 },
   input: { minHeight: 72, borderWidth: 1, borderColor: color.line, borderRadius: 12, padding: 10, fontFamily: font.sans, fontSize: 14.5, color: color.ink, textAlignVertical: 'top' },
   buttons: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
-  btn: { minHeight: 44, borderRadius: 999, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: color.ink },
+  btn: { minHeight: 44, borderRadius: 999, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: color.accent },
   btnText: { fontFamily: font.sansSemi, fontSize: 14.5, color: color.white },
   btnGhost: { minHeight: 44, borderRadius: 999, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: color.line },
   btnGhostText: { fontFamily: font.sansSemi, fontSize: 14.5, color: color.ink },

@@ -76,7 +76,7 @@ export function Toggle({ on, onChange, label }: { on: boolean; onChange: (on: bo
       <Animated.View
         style={[
           styles.track,
-          { backgroundColor: x.interpolate({ inputRange: [0, 1], outputRange: ['#C9C7C1', color.ok], extrapolate: 'clamp' }) },
+          { backgroundColor: x.interpolate({ inputRange: [0, 1], outputRange: ['#5A4A3D', color.ok], extrapolate: 'clamp' }) },
         ]}
       >
         <Animated.View style={[styles.knob, { transform: [{ translateX: x.interpolate({ inputRange: [0, 1], outputRange: [0, 20] }) }] }]} />
@@ -100,9 +100,9 @@ export function SwitchRow({ title, sub, on, onChange }: { title: string; sub: st
 
 export const styles = StyleSheet.create({
   group: { backgroundColor: color.soft, borderRadius: radius.lg, paddingHorizontal: 16, paddingVertical: 4 },
-  divider: { borderTopWidth: 1, borderTopColor: '#EDEDEA' },
+  divider: { borderTopWidth: 1, borderTopColor: 'rgba(255,236,214,.1)' },
   row: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
-  iconTile: { width: 36, height: 36, borderRadius: 12, backgroundColor: color.white, alignItems: 'center', justifyContent: 'center' },
+  iconTile: { width: 36, height: 36, borderRadius: 12, backgroundColor: 'rgba(255,236,214,.08)', alignItems: 'center', justifyContent: 'center' },
   title: { fontFamily: font.sansSemi, fontSize: 16, color: color.ink },
   sub: { fontFamily: font.sans, fontSize: 14, lineHeight: 19, color: color.ink2 },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 10 },

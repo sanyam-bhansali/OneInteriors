@@ -93,7 +93,7 @@ function Entry({ entry: e, onChanged, t }: { entry: PaymentEntry; onChanged: () 
 }
 
 /* The design's warm tint for something waiting on the customer (Tracker.dc.html), not a theme token. */
-const ASK_BG = '#F5E2D8';
+const ASK_BG = '#3A261B';
 
 const styles = StyleSheet.create({
   box: { borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14, gap: 4, backgroundColor: color.paper, borderWidth: 1, borderColor: color.line },
@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   buttons: { flexDirection: 'row', gap: 8, marginTop: 6, flexWrap: 'wrap' },
   btn: { minHeight: 44, borderRadius: 999, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', flexGrow: 1 },
-  yes: { backgroundColor: color.ink },
+  yes: { backgroundColor: color.accent },
   no: { borderWidth: 1, borderColor: color.ink },
   btnText: { fontFamily: font.sansSemi, fontSize: 14.5, color: color.ink },
 });

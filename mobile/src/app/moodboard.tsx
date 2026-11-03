@@ -68,7 +68,7 @@ export default function MoodBoard() {
               accessibilityState={{ checked: room.chosenOption === i }}
               style={[styles.option, room.chosenOption === i && styles.optionOn]}
             >
-              <Text style={[styles.optionLabel, room.chosenOption === i && { color: color.white }]}>{o.label}</Text>
+              <Text style={[styles.optionLabel, room.chosenOption === i && { color: color.onDark }]}>{o.label}</Text>
               <Text style={[styles.optionNote, room.chosenOption === i && { color: color.onDark2 }]}>{o.note}</Text>
             </Press>
           ))}
@@ -86,7 +86,7 @@ export default function MoodBoard() {
                 accessibilityLabel={t('mood.remove', { item: it.label })}
                 style={[styles.chip, styles.chipOn]}
               >
-                <Text style={[styles.chipText, { color: color.white }]}>{it.label} ×</Text>
+                <Text style={[styles.chipText, { color: color.onDark }]}>{it.label} ×</Text>
               </Press>
             ))}
           </View>

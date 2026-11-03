@@ -1,4 +1,4 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useState, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { CalendarMark, CameraMark, ChatMark, ChevronBack, FolderMark, LinesMark, TickMark } from '../components/home/marks';
@@ -101,9 +101,9 @@ function Row({ n, i, now }: { n: Notice; i: number; now: number }) {
   const label = [fresh ? t('notif.unread') : null, n.payload.title, n.payload.body, when].filter(Boolean).map((x) => String(x).replace(/[.。।]+$/, '')).join('. ');
   return (
     <Stagger i={Math.min(i, 10)} start={120}>
-      <Press haptic={false} disabled={!href} onPress={() => href && router.push(href)} accessibilityRole="link" accessibilityLabel={label} style={styles.row}>
+      <Press haptic={false} disabled={!href} onPress={() => href && router.push(href as Href)} accessibilityRole="link" accessibilityLabel={label} style={styles.row}>
         {fresh ? <View style={styles.dot} /> : null}
-        <View style={[styles.icon, { backgroundColor: fresh ? '#F5E2D8' : color.soft2 }]}>
+        <View style={[styles.icon, { backgroundColor: fresh ? '#3A261B' : color.soft2 }]}>
           <NoticeIcon template={n.template} url={n.payload.url} color={ink} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>

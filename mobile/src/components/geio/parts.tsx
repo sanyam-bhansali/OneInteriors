@@ -340,7 +340,7 @@ export function Composer({
     <View style={styles.dock}>
       <LinearGradient
         pointerEvents="none"
-        colors={['rgba(255,255,255,0)', '#F1F0EC']}
+        colors={['rgba(22,17,13,0)', '#16110D']}
         locations={[0, 0.22]}
         style={StyleSheet.absoluteFill}
       />
@@ -423,12 +423,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  nextBtnText: { fontFamily: font.sansMedium, fontSize: 14, color: color.ink },
+  nextBtnText: { fontFamily: font.sansMedium, fontSize: 14, color: color.onDark },
   ring: { borderRadius: 24, borderWidth: 2, borderColor: color.accentWarm },
   avatar: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 24, backgroundColor: color.ok, alignItems: 'center', justifyContent: 'center' },
   passed: { backgroundColor: color.paper, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14, gap: 4 },
   mineWrap: { alignSelf: 'flex-end', maxWidth: '82%' },
-  mine: { backgroundColor: color.ink, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderBottomLeftRadius: 22, borderBottomRightRadius: 6, paddingVertical: 12, paddingHorizontal: 16 },
+  mine: { backgroundColor: color.accent, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderBottomLeftRadius: 22, borderBottomRightRadius: 6, paddingVertical: 12, paddingHorizontal: 16 },
   mineText: { fontFamily: font.sans, fontSize: 15.5, lineHeight: 22.5, color: color.onDark },
   // 26 below the disclaimer, as the design: the raised GEIO orb in the tab bar sits over the bottom edge.
   dock: { paddingTop: 10, paddingBottom: 26 },

@@ -156,7 +156,7 @@ function when(iso: string): string {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: color.line, minHeight: 64 },
-  avatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#F1E3DA', alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#3A261B', alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontFamily: font.sansSemi, fontSize: 16, color: color.accent },
   line: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   title: { flex: 1, fontFamily: font.sansSemi, fontSize: 16, color: color.ink },

@@ -2,6 +2,35 @@ import type { Entry } from './entry';
 
 /** The home screen's words, English, Hindi and Marathi (first draft: Sanyam reviews). */
 export const home = {
+  /* The handoff's Home (Main.dc.html, warm dark; 3 Nov 2026; components/home/main-home.tsx). */
+  'main.h1.half': { en: 'Your dream home is more than', hi: 'आपका सपनों का घर', mr: 'तुमचे स्वप्नातले घर' },
+  'main.h1.half.warm': { en: 'half ready.', hi: 'आधे से ज़्यादा तैयार है।', mr: 'अर्ध्याहून जास्त तयार आहे.' },
+  'main.h1.pct': { en: 'Your dream home is', hi: 'आपका सपनों का घर', mr: 'तुमचे स्वप्नातले घर' },
+  'main.h1.pct.warm': { en: '{n}% ready.', hi: '{n}% तैयार है।', mr: '{n}% तयार आहे.' },
+  'main.h1.ready': { en: 'Your dream home is', hi: 'आपका सपनों का घर', mr: 'तुमचे स्वप्नातले घर' },
+  'main.h1.ready.warm': { en: 'ready.', hi: 'तैयार है।', mr: 'तयार आहे.' },
+  'main.h1.started': { en: 'Your dream home has', hi: 'आपके सपनों का घर', mr: 'तुमच्या स्वप्नातल्या घराचे काम' },
+  'main.h1.started.warm': { en: 'begun.', hi: 'बनना शुरू हो गया है।', mr: 'सुरू झाले आहे.' },
+  'main.lede': {
+    en: 'Every update, decision and payment for your home, in one place.',
+    hi: 'आपके घर का हर अपडेट, फ़ैसला और भुगतान, एक ही जगह।',
+    mr: 'तुमच्या घराचा प्रत्येक अपडेट, निर्णय आणि पेमेंट, एकाच ठिकाणी.',
+  },
+  'main.ring.done': { en: 'Complete', hi: 'पूरा', mr: 'पूर्ण' },
+  'main.ring.soon': { en: 'Not measured yet', hi: 'अभी मापा नहीं', mr: 'अजून मोजले नाही' },
+  'main.ring.a11y': { en: 'Your home is {n}% complete', hi: 'आपका घर {n}% पूरा है', mr: 'तुमचे घर {n}% पूर्ण आहे' },
+  'main.ring.none': { en: 'How much is done is not measured yet', hi: 'कितना काम हुआ, यह अभी मापा नहीं गया', mr: 'किती काम झाले ते अजून मोजलेले नाही' },
+  'main.stage.now': { en: 'Ongoing', hi: 'चल रहा है', mr: 'सुरू आहे' },
+  'main.stage.later': { en: 'Later', hi: 'बाद में', mr: 'नंतर' },
+  'main.stage.last': { en: 'Last', hi: 'आख़िर में', mr: 'शेवटी' },
+  'main.one': { en: 'Your one thing today', hi: 'आज आपका एक काम', mr: 'आज तुमचे एक काम' },
+  'main.pay.due': { en: 'To {studio} · due {date}', hi: '{studio} को · {date} तक', mr: '{studio} ला · {date} पर्यंत' },
+  'main.pay.when': { en: 'To {studio} · {stage}', hi: '{studio} को · {stage}', mr: '{studio} ला · {stage}' },
+  'main.pay.details': { en: 'Details', hi: 'विवरण', mr: 'तपशील' },
+  'main.tile.plan': { en: 'Project Plan', hi: 'प्रोजेक्ट योजना', mr: 'प्रोजेक्ट योजना' },
+  'main.tile.site': { en: 'Site Updates', hi: 'साइट अपडेट', mr: 'साइट अपडेट' },
+  'main.tile.pay': { en: 'Payments', hi: 'भुगतान', mr: 'पेमेंट' },
+  'main.tile.expert': { en: 'Ask Expert', hi: 'विशेषज्ञ से पूछें', mr: 'तज्ज्ञाला विचारा' },
   'home.welcome.name': { en: 'Welcome, {name}.', hi: 'स्वागत है, {name}।', mr: 'स्वागत आहे, {name}.' },
   'home.welcome': { en: 'Welcome.', hi: 'स्वागत है।', mr: 'स्वागत आहे.' },
   'home.none.body': {

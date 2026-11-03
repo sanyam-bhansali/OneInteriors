@@ -243,6 +243,6 @@ const styles = StyleSheet.create({
   langText: { fontFamily: font.sansSemi, fontSize: 15, color: color.ink2 },
   sub: { fontFamily: font.sans, fontSize: 14, color: color.ink2 },
   switches: { backgroundColor: color.soft, borderRadius: 24, paddingHorizontal: 16, paddingVertical: 2 },
-  divider: { height: 1, backgroundColor: '#EDEDEA' },
+  divider: { height: 1, backgroundColor: 'rgba(255,236,214,.1)' },
   version: { fontFamily: font.sans, fontSize: 13, color: color.ink3, textAlign: 'center' },
 });

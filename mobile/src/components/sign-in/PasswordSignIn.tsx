@@ -5,7 +5,7 @@ import { Body, Button, ErrorText, Eyebrow, Screen, Title } from '../ui';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useHeadline, useT } from '../../lib/i18n';
-import { color, font } from '../../lib/theme';
+import { light as color, font } from '../../lib/theme';
 
 import { spacedMobile } from '../../lib/chat-merge';
 

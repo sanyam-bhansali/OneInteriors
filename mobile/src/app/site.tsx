@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
   bar: { width: '100%', height: 4, borderRadius: 2 },
   dayName: { fontFamily: font.mono, fontSize: 13 },
   mono: { fontFamily: font.mono, fontSize: 13, color: color.ink2 },
-  gapBody: { fontFamily: font.sans, fontSize: 15, lineHeight: 22.5, color: '#D6D4CE' },
+  gapBody: { fontFamily: font.sans, fontSize: 15, lineHeight: 22.5, color: '#7A6656' },
   day: { gap: 12 },
   dayRule: { borderTopWidth: 1, borderTopColor: color.line, paddingTop: 16, gap: 10 },
   dayHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 },
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(11,11,11,.18)',
+    borderColor: 'rgba(255,236,214,.18)',
     overflow: 'hidden',
   },
 });

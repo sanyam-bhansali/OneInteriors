@@ -89,7 +89,7 @@ export default function DeleteAccount() {
             }}
             style={styles.tickRow}
           >
-            <View style={[styles.box, sure && { backgroundColor: color.ink, borderColor: color.ink }]}>{sure ? <TickIcon color={color.white} /> : null}</View>
+            <View style={[styles.box, sure && { backgroundColor: color.ink, borderColor: color.ink }]}>{sure ? <TickIcon color={color.onDark} /> : null}</View>
             <Text style={styles.tickText}>{t('meApp.del.tick')}</Text>
           </Pressable>
         </Stagger>
