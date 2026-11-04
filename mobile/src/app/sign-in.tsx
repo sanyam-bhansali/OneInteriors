@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Body, Button, ErrorText, Eyebrow, Screen, Title } from '../components/ui';
 import { LightLook } from '../components/ui';
-import { api } from '../lib/api';
+import { confirmPhoneCode, sendPhoneCode } from '../lib/phone-code';
 import { projectsOnly } from '../lib/config';
 import { PasswordSignIn } from '../components/sign-in/PasswordSignIn';
 import { useAuth } from '../lib/auth';
@@ -53,7 +53,7 @@ function CodeSignIn() {
   async function sendCode() {
     setBusy(true);
     setError(null);
-    const res = await api.requestCode(`+91${digits}`, '');
+    const res = await sendPhoneCode(`+91${digits}`, '');
     setBusy(false);
     if (!res.ok) return setError(res.error);
     setDevCode(res.data.devCode ?? null);
@@ -66,7 +66,7 @@ function CodeSignIn() {
   async function verify() {
     setBusy(true);
     setError(null);
-    const res = await api.verifyCode(`+91${digits}`, code.trim(), '');
+    const res = await confirmPhoneCode(`+91${digits}`, code.trim(), '');
     if (!res.ok) {
       setBusy(false);
       return setError(res.error);

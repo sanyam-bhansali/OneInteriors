@@ -77,7 +77,7 @@ export function AppHeader() {
           </nav>
           {/* Line, not filled: the one filled action belongs to the screen. */}
           <Pill
-            href="/account"
+            href="/account/profile"
             tone="line"
             size="sm"
             className="ml-auto min-[861px]:ml-0"

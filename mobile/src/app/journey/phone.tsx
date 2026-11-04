@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { QuizScreen } from '../../components/journey/parts';
 import { Tick } from '../../components/journey-quote/Confetti';
 import { Body, Button, ErrorText, Eyebrow, Loading, Press, Title } from '../../components/ui';
-import { api } from '../../lib/api';
+import { confirmPhoneCode, sendPhoneCode } from '../../lib/phone-code';
 import { useAuth } from '../../lib/auth';
 import { useBrief } from '../../lib/brief';
 import { useHeadline, useT } from '../../lib/i18n';
@@ -66,7 +66,7 @@ export default function PhoneScreen() {
   async function sendCode() {
     setBusy(true);
     setError(null);
-    const res = await api.requestCode(`+91${digits}`, brief.contactName ?? '');
+    const res = await sendPhoneCode(`+91${digits}`, brief.contactName ?? '');
     setBusy(false);
     if (!res.ok) return setError(res.error);
     setDevCode(res.data.devCode ?? null);
@@ -80,7 +80,7 @@ export default function PhoneScreen() {
     setBusy(true);
     setError(null);
     verifying.current = true;
-    const res = await quoteApi.verifyWithBrief(`+91${digits}`, code.trim(), brief.contactName ?? '', brief, { share, offers });
+    const res = await confirmPhoneCode(`+91${digits}`, code.trim(), brief.contactName ?? '', { brief, consent: { share, offers } });
     if (!res.ok) {
       verifying.current = false;
       setBusy(false);

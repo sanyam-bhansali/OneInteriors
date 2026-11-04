@@ -10,6 +10,7 @@ import { redirect } from 'next/navigation';
 import { siteUrlForHost } from '@/lib/site';
 import { hasDatabase } from '@/lib/env';
 import { claimBrief } from '@/modules/brief/repository';
+import { firebaseSignInMessage, signInWithFirebasePhone } from '@/modules/auth/firebase-phone';
 import { claimConsent } from '@/modules/consent/record';
 import { record } from '@/modules/analytics/record';
 
@@ -222,6 +223,35 @@ export async function verifyOtpAction(
     return { ok: false, error: verifyOtpMessage(result.reason) };
   } catch (error) {
     console.error('[sign-in] verifyOtp threw:', error);
+    return { ok: false, error: UNAVAILABLE };
+  }
+}
+
+// ── Customer sign-in: Firebase SMS code (owner, 4 Nov 2026) ─────
+//
+// Firebase sends and checks the code in the browser; this receives the token
+// it hands back, checks it, and signs in exactly as `verifyOtpAction` does,
+// claiming the Home Profile this browser filled in before signing in.
+
+export async function firebaseSignInAction(idToken: string, name: string | null): Promise<OtpVerifyResult> {
+  if (!hasDatabase()) return { ok: false, error: UNAVAILABLE };
+
+  const h = await headers();
+
+  try {
+    const result = await signInWithFirebasePhone(idToken, name, {
+      userAgent: h.get('user-agent'),
+      ip: h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+    });
+    if (!result.ok) return { ok: false, error: firebaseSignInMessage(result.reason) };
+
+    const { claimed, anonKey } = await claimBrief(result.userId);
+    await claimConsent(result.userId, anonKey);
+    if (claimed) await record('brief.claimed');
+    await record('signin.completed');
+    return { ok: true };
+  } catch (error) {
+    console.error('[sign-in] firebase sign-in threw:', error);
     return { ok: false, error: UNAVAILABLE };
   }
 }

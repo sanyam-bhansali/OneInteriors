@@ -28,7 +28,7 @@ import { googleCalendarUrl, slotLabel } from '@/modules/consultation/slots';
 import { ARCHITECT } from '@/modules/consultation/architect';
 import { formatINRCompact } from '@/lib/money';
 import { normalisePhone } from '@/modules/studio/phone';
-import { requestOtpAction, verifyOtpAction } from '@/app/sign-in/actions';
+import { checkPhoneCode, sendPhoneCode } from '@/modules/auth/phone-code-client';
 import { Pill, PillButton, Split } from '@/components/home/parts';
 import { requestExpertAction, type ExpertState } from './actions';
 import { useLang, useSiteT } from '@/components/app/i18n';
@@ -252,7 +252,7 @@ export function ExpertForm({
       return;
     }
     setSending(true);
-    const r = await requestOtpAction(phone, name);
+    const r = await sendPhoneCode(phone, name);
     setSending(false);
     if (!r.ok) return setCodeError(r.error);
     setSentTo(phone);
@@ -268,7 +268,7 @@ export function ExpertForm({
       return;
     }
     setConfirming(true);
-    const v = await verifyOtpAction(phone, code, name);
+    const v = await checkPhoneCode(phone, code, name);
     setConfirming(false);
     if (!v.ok) return setCodeError(v.error);
     const data = new FormData();

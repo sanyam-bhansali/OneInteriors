@@ -13,11 +13,11 @@ export const CHROME_DICT = {
   'header.homeAria': { en: 'One Interiors, home', hi: 'One Interiors, होम', mr: 'One Interiors, होम' },
   'header.studios': { en: 'Studios', hi: 'स्टूडियो', mr: 'स्टुडिओ' },
   'header.verify': { en: 'How we verify', hi: 'हम कैसे जाँचते हैं', mr: 'आम्ही कसे तपासतो' },
-  'header.project': { en: 'Your project', hi: 'आपका प्रोजेक्ट', mr: 'तुमचा प्रोजेक्ट' },
+  'header.project': { en: 'My profile', hi: 'मेरी प्रोफ़ाइल', mr: 'माझी प्रोफाइल' },
 
   // Spine
   'spine.aria': { en: 'Your project so far', hi: 'आपका प्रोजेक्ट अब तक', mr: 'तुमचा प्रोजेक्ट आतापर्यंत' },
-  'spine.brief': { en: 'Your brief', hi: 'आपकी ज़रूरतें', mr: 'तुमच्या गरजा' },
+  'spine.brief': { en: 'Home Profile', hi: 'होम प्रोफ़ाइल', mr: 'होम प्रोफाइल' },
   'spine.match': { en: 'Who fits', hi: 'कौन सही है', mr: 'कोण योग्य आहे' },
   'spine.quote': { en: 'The quote', hi: 'कोटेशन', mr: 'कोटेशन' },
   'spine.compare': { en: 'Side by side', hi: 'आमने-सामने', mr: 'शेजारी-शेजारी' },
@@ -31,7 +31,7 @@ export const CHROME_DICT = {
     mr: 'पुण्यातले इंटीरियर स्टुडिओ — पंधरा प्रकारे तपासलेले, ओळीने ओळ कोटेशनसह.',
   },
   'footer.project': { en: 'Your project', hi: 'आपका प्रोजेक्ट', mr: 'तुमचा प्रोजेक्ट' },
-  'footer.startBrief': { en: 'Start the brief', hi: 'अपनी ज़रूरतें बताएँ', mr: 'तुमच्या गरजा सांगा' },
+  'footer.startBrief': { en: 'Start your Home Profile', hi: 'अपनी होम प्रोफ़ाइल शुरू करें', mr: 'तुमची होम प्रोफाइल सुरू करा' },
   'footer.everything': { en: 'Everything so far', hi: 'अब तक का सब कुछ', mr: 'आतापर्यंतचं सगळं' },
   'footer.studios': { en: 'Studios', hi: 'स्टूडियो', mr: 'स्टुडिओ' },
   'footer.checks': { en: 'The fifteen checks', hi: 'पंद्रह जाँचें', mr: 'पंधरा तपासण्या' },
