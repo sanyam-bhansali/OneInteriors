@@ -390,7 +390,7 @@ export default async function AccountPage() {
               second place to be, with a second floor-plan upload the brief
               already asks for. */}
           <div id="rooms" />
-          <Section title="Your rooms">
+          <Section title="Your rooms" action={{ href: '/account/design', label: 'Design your home' }}>
             <Empty>
               {rooms.length > 0
                 ? `${rooms.length} room${rooms.length === 1 ? '' : 's'} on your mood board. The expert and your studio see them before they talk to you.`

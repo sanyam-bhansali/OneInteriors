@@ -1,0 +1,46 @@
+import type { Entry } from './entry';
+
+/** Design your home (owner, 4 Nov 2026): mood board, Design DNA, room ideas. First draft: Sanyam reviews. */
+export const designDnaWords = {
+  'dd.title': { en: 'Design your home', hi: 'अपना घर डिज़ाइन करें', mr: 'तुमचे घर डिझाइन करा' },
+  'dd.me.sub': { en: 'Mood board, Design DNA and room ideas', hi: 'मूड बोर्ड, Design DNA और कमरों के आइडिया', mr: 'मूड बोर्ड, Design DNA आणि खोल्यांच्या कल्पना' },
+  'dd.h1': { en: 'Your Design DNA', hi: 'आपका Design DNA', mr: 'तुमचा Design DNA' },
+  'dd.lede': {
+    en: 'Build a mood board for your rooms, and we turn it into your Design DNA. Say yes or no to room ideas drawn in it, and it gets sharper with every answer.',
+    hi: 'अपने कमरों के लिए मूड बोर्ड बनाइए, हम उसे आपके Design DNA में बदलते हैं। उसमें बने कमरों के आइडिया पर हाँ या ना कहिए, हर जवाब से यह और सटीक होता है।',
+    mr: 'तुमच्या खोल्यांसाठी मूड बोर्ड बनवा, आम्ही त्याचा तुमचा Design DNA बनवतो. त्यात बनवलेल्या खोल्यांच्या कल्पनांना हो किंवा नाही म्हणा, प्रत्येक उत्तराने तो अधिक नेमका होतो.',
+  },
+  'dd.closed.call': { en: 'This opens once your free architect call is booked.', hi: 'यह आपकी मुफ़्त आर्किटेक्ट कॉल बुक होते ही खुलता है।', mr: 'तुमचा मोफत आर्किटेक्ट कॉल बुक झाल्यावर हे उघडते.' },
+  'dd.closed.profile': { en: 'First, tell us about your home in your Home Profile.', hi: 'पहले अपनी Home Profile में अपने घर के बारे में बताइए।', mr: 'आधी तुमच्या Home Profile मध्ये तुमच्या घराबद्दल सांगा.' },
+  'dd.materials': { en: 'Materials: {list}', hi: 'मटीरियल: {list}', mr: 'मटेरियल: {list}' },
+  'dd.evidence': {
+    en: 'Built from {likes} liked styles, {items} things on your mood boards and {answers} answers.',
+    hi: '{likes} पसंद की गई स्टाइल, मूड बोर्ड की {items} चीज़ों और {answers} जवाबों से बना।',
+    mr: '{likes} आवडलेल्या स्टाइल, मूड बोर्डवरील {items} गोष्टी आणि {answers} उत्तरांवरून बनलेला.',
+  },
+  'dd.stretch': {
+    en: '{above} of the {total} things on your boards sit above your budget. Worth raising on your architect call.',
+    hi: 'आपके बोर्ड की {total} में से {above} चीज़ें आपके बजट से ऊपर हैं। आर्किटेक्ट कॉल पर इसकी बात कीजिए।',
+    mr: 'तुमच्या बोर्डवरील {total} पैकी {above} गोष्टी तुमच्या बजेटपेक्षा जास्त आहेत. आर्किटेक्ट कॉलवर याबद्दल बोला.',
+  },
+  'dd.board.h': { en: '1. Build your mood board', hi: '1. अपना मूड बोर्ड बनाइए', mr: '1. तुमचा मूड बोर्ड बनवा' },
+  'dd.board.sub': { en: 'Tap what you like, room by room. Every pick feeds your DNA.', hi: 'कमरे-दर-कमरे, जो पसंद हो उस पर टैप कीजिए। हर पसंद आपके DNA में जुड़ती है।', mr: 'खोली-दर-खोली, आवडेल त्यावर टॅप करा. प्रत्येक निवड तुमच्या DNA मध्ये जोडली जाते.' },
+  'dd.board.above': { en: 'above budget', hi: 'बजट से ऊपर', mr: 'बजेटपेक्षा जास्त' },
+  'dd.ideas.h': { en: '2. Room ideas in your DNA', hi: '2. आपके DNA में कमरों के आइडिया', mr: '2. तुमच्या DNA मधील खोल्यांच्या कल्पना' },
+  'dd.ideas.note': { en: 'AI ideas in your Design DNA, not your actual home. {n} more today.', hi: 'आपके Design DNA में AI आइडिया, आपका असली घर नहीं। आज {n} और।', mr: 'तुमच्या Design DNA मधील AI कल्पना, तुमचे खरे घर नाही. आज आणखी {n}.' },
+  'dd.ideas.first': { en: 'Show me room ideas', hi: 'कमरों के आइडिया दिखाइए', mr: 'खोल्यांच्या कल्पना दाखवा' },
+  'dd.ideas.more': { en: 'Show me new ideas', hi: 'नए आइडिया दिखाइए', mr: 'नवीन कल्पना दाखवा' },
+  'dd.ideas.drawing': { en: 'Drawing three ideas…', hi: 'तीन आइडिया बन रहे हैं…', mr: 'तीन कल्पना तयार होत आहेत…' },
+  'dd.ideas.ask': { en: 'Tell us yes or no on each. Your answers shape the next ideas.', hi: 'हर एक पर हाँ या ना बताइए। आपके जवाब अगले आइडिया तय करते हैं।', mr: 'प्रत्येकावर हो किंवा नाही सांगा. तुमची उत्तरे पुढच्या कल्पना ठरवतात.' },
+  'dd.yes': { en: 'Yes', hi: 'हाँ', mr: 'हो' },
+  'dd.no': { en: 'No', hi: 'ना', mr: 'नाही' },
+  'dd.why': { en: 'What’s off?', hi: 'क्या ठीक नहीं लगा?', mr: 'काय खटकले?' },
+  'dd.justNo': { en: 'Just no', hi: 'बस ना', mr: 'फक्त नाही' },
+  'dd.sample': { en: 'Sample picture', hi: 'नमूना तस्वीर', mr: 'नमुना चित्र' },
+  'dd.reason.too_dark': { en: 'Too dark', hi: 'बहुत अँधेरा', mr: 'खूप अंधार' },
+  'dd.reason.too_light': { en: 'Too pale', hi: 'बहुत फीका', mr: 'खूप फिका' },
+  'dd.reason.too_busy': { en: 'Too busy', hi: 'बहुत भरा-भरा', mr: 'खूप गच्च' },
+  'dd.reason.too_plain': { en: 'Too empty', hi: 'बहुत खाली', mr: 'खूप रिकामे' },
+  'dd.reason.wrong_colours': { en: 'Not my colours', hi: 'मेरे रंग नहीं', mr: 'माझे रंग नाहीत' },
+  'dd.reason.too_expensive': { en: 'Looks too expensive', hi: 'बहुत महँगा लगता है', mr: 'खूप महाग वाटते' },
+} satisfies Record<string, Entry>;

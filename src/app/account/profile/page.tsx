@@ -112,6 +112,14 @@ export default async function HomeProfilePage() {
                 </Link>
                 {profile.complete ? (
                   <Link
+                    href="/account/design"
+                    className="rounded-full border border-[var(--color-rule)] px-5 py-2.5 text-[14.5px] text-[var(--color-ink)] no-underline"
+                  >
+                    Design your home
+                  </Link>
+                ) : null}
+                {profile.complete ? (
+                  <Link
                     href="/match"
                     className="rounded-full border border-[var(--color-rule)] px-5 py-2.5 text-[14.5px] text-[var(--color-ink)] no-underline"
                   >
