@@ -163,6 +163,8 @@ const PROJECT_APP = [
   '/app/sign-in',
   '/app/password',
   '/app/session',
+  /* Deleting an account from the web: the stores ask for a web address (owner, 3 Nov 2026). */
+  '/app/delete-account',
 ];
 
 /**

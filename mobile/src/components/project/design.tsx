@@ -253,7 +253,7 @@ function Drawing({ d, url, owner, onChanged, t }: { d: DesignDrawing; url: strin
 }
 
 /* The warm tint for something waiting on the customer, as on the payments card (Tracker.dc.html). */
-const ASK_BG = '#F5E2D8';
+const ASK_BG = '#3A261B';
 
 const styles = StyleSheet.create({
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 },
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
   waiting: { backgroundColor: ASK_BG, borderColor: ASK_BG },
   buttons: { flexDirection: 'row', gap: 8, marginTop: 4, flexWrap: 'wrap' },
   btn: { minHeight: 44, borderRadius: 999, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', flexGrow: 1 },
-  yes: { backgroundColor: color.ink },
+  yes: { backgroundColor: color.accent },
   no: { borderWidth: 1, borderColor: color.ink },
   btnText: { fontFamily: font.sansSemi, fontSize: 14.5, color: color.ink },
   input: { minHeight: 80, borderRadius: 12, borderWidth: 1, borderColor: color.line, padding: 12, fontFamily: font.sans, fontSize: 15, color: color.ink, backgroundColor: color.white, textAlignVertical: 'top' },

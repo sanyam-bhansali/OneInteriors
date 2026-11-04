@@ -182,8 +182,8 @@ function Tab({ label, count, on, onPress, i }: { label: string; count: number; o
         accessibilityLabel={`${label} ${count}`}
         style={[styles.tab, on ? { backgroundColor: color.ink, borderColor: color.ink } : null]}
       >
-        <Text style={[styles.tabText, on && { color: color.white }]}>
-          {label} <Text style={[styles.tabCount, on && { color: color.white }]}>{count}</Text>
+        <Text style={[styles.tabText, on && { color: color.onDark }]}>
+          {label} <Text style={[styles.tabCount, on && { color: color.onDark }]}>{count}</Text>
         </Text>
       </Press>
     </Stagger>
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
   camera: {
     minHeight: 60,
     borderRadius: 999,
-    backgroundColor: color.ink,
+    backgroundColor: color.accent,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -367,5 +367,5 @@ const styles = StyleSheet.create({
   snagTitle: { fontFamily: font.sansSemi, fontSize: 17, lineHeight: 21, letterSpacing: -0.34, color: color.ink },
   mono: { fontFamily: font.mono, fontSize: 13, lineHeight: 18, color: color.ink2 },
   walk: { borderRadius: 18, padding: 18, gap: 8 },
-  walkBody: { fontFamily: font.sans, fontSize: 15, lineHeight: 22.5, color: '#D6D4CE' },
+  walkBody: { fontFamily: font.sans, fontSize: 15, lineHeight: 22.5, color: '#7A6656' },
 });

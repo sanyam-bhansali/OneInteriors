@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -19,16 +19,29 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLang } from '../lib/i18n';
 import { useReducedMotion } from '../lib/motion';
-import { color, font, motion, radius, space, type, type Tint } from '../lib/theme';
+import { color, font, light, motion, radius, space, type, type Tint } from '../lib/theme';
 import { ArrowIcon, BackIcon } from './icons';
 
 /**
- * The app's parts, to the 10 Oct restyle (docs/app-handover/DESIGN-SPEC.md):
- * a white canvas, one sans face set large and tight, black pill buttons
- * ending in an arrow disc, soft rounded cards, ink for whatever is chosen.
+ * The app's parts (docs/app-handover/DESIGN-SPEC.md, restyled to the owner's
+ * warm dark handoff on 3 Nov 2026): one sans face set large and tight, pill
+ * buttons ending in an arrow disc, rounded cards, cream for whatever is chosen.
  * Headlines rise in, lists arrive 60 ms apart, a press springs to 96.5%.
  * With "reduce motion" on, all of it lands at once.
  */
+
+/**
+ * The two looks (the owner's mobile handoff, 1 Nov 2026): warm dark from Home
+ * on, light before it. The parts below read the look from here; the opening
+ * and sign-in screens wrap themselves in `LightLook`.
+ */
+export type Palette = { readonly [K in keyof typeof color]: string };
+const PaletteContext = createContext<Palette>(color);
+export const usePalette = (): Palette => useContext(PaletteContext);
+export const isLight = (c: Palette) => c.paper === light.paper;
+export function LightLook({ children }: { children: ReactNode }) {
+  return <PaletteContext.Provider value={light}>{children}</PaletteContext.Provider>;
+}
 
 /** Rises 18 px and fades in, `delay` ms after it mounts. */
 export function Rise({ children, delay = 0, style }: { children: ReactNode; delay?: number; style?: StyleProp<ViewStyle> }) {
@@ -136,14 +149,15 @@ export function Screen({
   /** A back arrow above the screen, for screens opened from a tab rather than in the tab bar. */
   back?: boolean;
 }) {
-  const bg = dark ? color.ink : color.paper;
+  const c = usePalette();
+  const bg = dark ? c.ink : c.paper;
   const t = useLang().t;
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={['top', 'left', 'right']}>
       {back ? (
         <View style={{ paddingHorizontal: 12, paddingTop: 4 }}>
           <Press onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))} style={styles.back} accessibilityLabel={t('kit.back')}>
-            <BackIcon color={dark ? color.white : color.ink} />
+            <BackIcon color={dark ? c.paper : c.ink} />
           </Press>
         </View>
       ) : null}
@@ -151,7 +165,7 @@ export function Screen({
       <ScrollView
         contentContainerStyle={styles.body}
         keyboardShouldPersistTaps="handled"
-        refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={color.accent} /> : undefined}
+        refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} /> : undefined}
       >
         {children}
       </ScrollView>
@@ -162,21 +176,24 @@ export function Screen({
 
 /** Secondary text at the 13 px floor. */
 export function Meta({ children, style }: { children: ReactNode; style?: StyleProp<TextStyle> }) {
-  return <Text style={[styles.meta, style]}>{children}</Text>;
+  const c = usePalette();
+  return <Text style={[styles.meta, { color: c.ink2 }, style]}>{children}</Text>;
 }
 
 /** The line above a heading, and row labels in tables: 13 px, uppercase, tracked out. */
 export function Eyebrow({ children, style, onDark }: { children: ReactNode; style?: StyleProp<TextStyle>; onDark?: boolean }) {
-  return <Text style={[type.eyebrow, onDark && { color: color.accentWarm }, style]}>{children}</Text>;
+  const c = usePalette();
+  return <Text style={[type.eyebrow, { color: c.ink2 }, onDark && { color: c.accentWarm }, style]}>{children}</Text>;
 }
 
 /** The headline: 40 px, weight 500, set tight. Hindi and Marathi pass 34. */
 export function Title({ children, style, size = 40 }: { children: ReactNode; style?: StyleProp<TextStyle>; size?: number }) {
   // Devanagari's marks above the line need room a tight Latin headline does not.
   const tall = useLang().lang !== 'en';
+  const c = usePalette();
   return (
     <Rise>
-      <Text role="heading" style={[type.headline, { fontSize: size, lineHeight: tall ? size * 1.3 : size, letterSpacing: tall ? 0 : size * -0.045 }, style]}>
+      <Text role="heading" style={[type.headline, { color: c.ink, fontSize: size, lineHeight: tall ? size * 1.3 : size, letterSpacing: tall ? 0 : size * -0.045 }, style]}>
         {children}
       </Text>
     </Rise>
@@ -185,19 +202,22 @@ export function Title({ children, style, size = 40 }: { children: ReactNode; sty
 
 /** A section heading: 21 px, weight 500. */
 export function Heading({ children, style }: { children: ReactNode; style?: StyleProp<TextStyle> }) {
+  const c = usePalette();
   return (
-    <Text role="heading" style={[type.section, style]}>
+    <Text role="heading" style={[type.section, { color: c.ink }, style]}>
       {children}
     </Text>
   );
 }
 
 export function Body({ children, muted, style }: { children: ReactNode; muted?: boolean; style?: StyleProp<TextStyle> }) {
-  return <Text style={[type.body, muted && { color: color.ink2 }, style]}>{children}</Text>;
+  const c = usePalette();
+  return <Text style={[type.body, { color: muted ? c.ink2 : c.ink }, style]}>{children}</Text>;
 }
 
 export function ErrorText({ children }: { children: ReactNode }) {
-  return <Text style={[type.body, { color: color.accentInk }]}>{children}</Text>;
+  const c = usePalette();
+  return <Text style={[type.body, { color: c.accentInk }]}>{children}</Text>;
 }
 
 /**
@@ -230,9 +250,15 @@ export function Button({
   const [h, setH] = useState(56);
   const off = disabled || busy;
   const solid = variant === 'primary' || variant === 'dark' || variant === 'light';
-  const light = variant === 'light';
-  const bg = disabled ? color.soft2 : solid ? (light ? color.white : color.ink) : 'transparent';
-  const fg = disabled ? color.ink3 : solid ? (light ? color.ink : color.white) : color.ink;
+  const inverse = variant === 'light';
+  const c = usePalette();
+  /* Light look: an ink pill. Warm dark: the orange pill (handoff: #E8823F to #C8622E), and `light` is the cream one. */
+  const day = isLight(c);
+  const bg = disabled ? c.soft2 : solid ? (inverse ? (day ? c.white : c.ink) : day ? c.ink : c.accent) : 'transparent';
+  const fg = disabled ? c.ink3 : solid ? (inverse ? (day ? c.ink : c.onDark) : c.white) : c.ink;
+  const pressFill = day ? c.accent : '#C8622E';
+  const discBg = inverse ? (day ? c.ink : c.onDark) : c.white;
+  const discArrow = inverse ? c.white : day ? c.ink : c.accent;
   const withArrow = (arrow ?? solid) && !disabled;
   const press = (down: boolean) => {
     if (!solid || off) return;
@@ -249,7 +275,7 @@ export function Button({
         style={[
           styles.button,
           { backgroundColor: bg },
-          variant === 'ghost' && { borderWidth: 1, borderColor: color.ring },
+          variant === 'ghost' && { borderWidth: 1, borderColor: c.ring },
           variant === 'quiet' && { minHeight: 44 },
           withArrow && { paddingLeft: 26, paddingRight: 14, justifyContent: 'space-between' },
         ]}
@@ -259,7 +285,7 @@ export function Button({
             <Animated.View
               style={[
                 StyleSheet.absoluteFill,
-                { backgroundColor: color.accent, transform: [{ translateY: fill.interpolate({ inputRange: [0, 1], outputRange: [h, 0] }) }] },
+                { backgroundColor: pressFill, transform: [{ translateY: fill.interpolate({ inputRange: [0, 1], outputRange: [h, 0] }) }] },
               ]}
             />
           ) : null}
@@ -270,8 +296,8 @@ export function Button({
           <Text style={[styles.buttonText, { color: fg }, variant === 'quiet' && { fontSize: 15 }]}>{label}</Text>
         )}
         {withArrow ? (
-          <View style={[styles.disc, { backgroundColor: light ? color.ink : color.white }]}>
-            <ArrowIcon color={light ? color.white : color.ink} size={16} />
+          <View style={[styles.disc, { backgroundColor: discBg }]}>
+            <ArrowIcon color={discArrow} size={16} />
           </View>
         ) : null}
       </Press>
@@ -281,11 +307,12 @@ export function Button({
 }
 
 export function Field({ label, hint, ...rest }: TextInputProps & { label: string; hint?: string }) {
+  const c = usePalette();
   return (
     <View style={{ gap: 10 }}>
       <Eyebrow>{label}</Eyebrow>
-      <TextInput placeholderTextColor={color.ink3} accessibilityLabel={label} style={styles.input} {...rest} />
-      {hint ? <Text style={[type.body, { fontSize: 14, color: color.ink2 }]}>{hint}</Text> : null}
+      <TextInput placeholderTextColor={c.ink3} accessibilityLabel={label} style={[styles.input, { color: c.ink, borderBottomColor: c.ink }]} {...rest} />
+      {hint ? <Text style={[type.body, { fontSize: 14, color: c.ink2 }]}>{hint}</Text> : null}
     </View>
   );
 }
@@ -521,9 +548,10 @@ export function Rule() {
 }
 
 export function Loading() {
+  const c = usePalette();
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: color.paper }}>
-      <ActivityIndicator color={color.ink} />
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.paper }}>
+      <ActivityIndicator color={c.ink} />
     </View>
   );
 }
@@ -590,8 +618,10 @@ export const styles = StyleSheet.create({
   seg: { flex: 1, minHeight: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, paddingVertical: 4 },
   segText: { fontFamily: font.sansSemi, fontSize: 14, color: color.ink2 },
   segSub: { fontFamily: font.sansMedium, fontSize: 13, color: color.ink2, opacity: 0.8 },
-  card: { backgroundColor: color.soft, borderRadius: radius.lg, padding: 16, gap: 10 },
-  dark: { backgroundColor: color.ink, borderRadius: radius.md, padding: 20, gap: 10 },
+  /* The handoff's glass tile: a raised warm surface with a faint cream edge. */
+  card: { backgroundColor: color.soft, borderRadius: radius.lg, padding: 16, gap: 10, borderWidth: 1, borderColor: color.line },
+  /* On warm dark, the old ink card is the handoff's cream card. */
+  dark: { backgroundColor: '#F6EBDF', borderRadius: radius.lg, padding: 20, gap: 10 },
   panel: {
     backgroundColor: color.ink,
     borderBottomLeftRadius: radius.panel,
@@ -601,7 +631,7 @@ export const styles = StyleSheet.create({
     paddingBottom: 28,
     gap: 12,
   },
-  tile: { flex: 1, minHeight: 92, borderRadius: radius.md, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'space-between', gap: 6 },
+  tile: { flex: 1, minHeight: 92, borderRadius: radius.md, paddingVertical: 14, paddingHorizontal: 12, justifyContent: 'space-between', gap: 6, borderWidth: 1, borderColor: color.line },
   tileValue: { fontFamily: font.sansMedium, fontSize: 20, letterSpacing: -0.6, color: color.ink },
   status: { alignSelf: 'flex-start', paddingVertical: 5, paddingHorizontal: 10, borderRadius: radius.pill },
   statusText: { fontFamily: font.sansSemi, fontSize: 13, color: color.white },

@@ -78,7 +78,7 @@ export default function Requirements() {
                         accessibilityState={{ checked: v === o }}
                         style={[styles.option, v === o && styles.optionOn]}
                       >
-                        <Text style={[styles.optionText, v === o && { color: color.white }]}>{o}</Text>
+                        <Text style={[styles.optionText, v === o && { color: color.onDark }]}>{o}</Text>
                       </Press>
                     ))}
                   </View>

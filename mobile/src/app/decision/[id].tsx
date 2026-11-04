@@ -330,7 +330,7 @@ function Avatar({ letter, tone }: { letter: string; tone: string }) {
 }
 
 const styles = StyleSheet.create({
-  hero: { backgroundColor: color.ink, overflow: 'hidden' },
+  hero: { backgroundColor: color.paper, overflow: 'hidden' },
   heroInner: { flex: 1, paddingLeft: 12, paddingRight: 20, paddingBottom: 18, justifyContent: 'space-between' },
   back: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,.16)', alignItems: 'center', justifyContent: 'center' },
   heroMeta: { paddingLeft: 8, fontFamily: font.sansMedium, fontSize: 13, letterSpacing: 13 * 0.07, textTransform: 'uppercase', color: DUE_ON_PHOTO },
@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
   options: { borderBottomWidth: 1, borderBottomColor: color.line },
   option: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderTopWidth: 1, borderTopColor: color.line },
   swatchRing: { padding: 0, borderWidth: 3, borderRadius: 13 },
-  swatch: { width: 56, height: 68, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(11,11,11,.12)' },
+  swatch: { width: 56, height: 68, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,236,214,.2)' },
   optName: { fontFamily: font.sansSemi, fontSize: 18, letterSpacing: -0.36, color: color.ink },
   optNote: { fontFamily: font.sans, fontSize: 13.5, lineHeight: 19, color: color.ink2 },
   price: { fontFamily: font.mono, fontSize: 13, color: color.ink },
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
   pill: {
     minHeight: 56,
     borderRadius: 999,
-    backgroundColor: color.ink,
+    backgroundColor: color.accent,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

@@ -35,7 +35,7 @@ export default function RootLayout() {
           <ProfileProvider>
             <ProjectProvider>
               <LockGate>
-                <StatusBar style="dark" />
+                <StatusBar style="light" />
                 <Routes />
               </LockGate>
             </ProjectProvider>

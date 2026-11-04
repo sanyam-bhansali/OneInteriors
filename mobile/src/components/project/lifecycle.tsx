@@ -121,6 +121,6 @@ const styles = StyleSheet.create({
   text: { fontFamily: font.sans, fontSize: 14.5, color: color.ink },
   note: { fontFamily: font.sans, fontSize: 13.5, lineHeight: 19, color: color.ink2 },
   link: { fontFamily: font.sansMedium, fontSize: 13.5, color: color.accentInk, paddingVertical: 6 },
-  btn: { minHeight: 44, borderRadius: 999, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: color.ink },
+  btn: { minHeight: 44, borderRadius: 999, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: color.accent },
   btnText: { fontFamily: font.sansSemi, fontSize: 14.5, color: color.white },
 });

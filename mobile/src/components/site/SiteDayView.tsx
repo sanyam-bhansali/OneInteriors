@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
   hero: { width: '100%', height: 220, borderRadius: 16, backgroundColor: color.soft },
   photo: { width: '100%', height: 170, borderRadius: 12, backgroundColor: color.soft },
   note: { fontFamily: font.sans, fontSize: 15.5, lineHeight: 23, color: color.ink },
-  darkBody: { fontFamily: font.sans, fontSize: 15, lineHeight: 22.5, color: '#D6D4CE' },
+  darkBody: { fontFamily: font.sans, fontSize: 15, lineHeight: 22.5, color: '#7A6656' },
   done: { fontFamily: font.sans, fontSize: 14, lineHeight: 20, color: color.ink2 },
   stepDone: { fontFamily: font.sansSemi, fontSize: 15, lineHeight: 21, color: color.ok },
 
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(11,11,11,.18)',
+    borderColor: 'rgba(255,236,214,.18)',
     overflow: 'hidden',
   },
 });

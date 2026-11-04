@@ -27,6 +27,20 @@ export const project = {
     mr: '{stage} · {studio} ला, हा टप्पा सुरू झाल्यावर',
   },
   'project.allPaid': { en: 'All paid', hi: 'सब भुगतान हो गया', mr: 'सर्व भरले' },
+  /* The handoff's Project (Tracker.dc.html, warm dark; 3 Nov 2026). */
+  'project.homeIs': { en: 'Your home is', hi: 'आपका घर', mr: 'तुमचे घर' },
+  'project.designIs': { en: 'Your design is', hi: 'आपका डिज़ाइन', mr: 'तुमचे डिझाइन' },
+  'project.doneWord': { en: 'done', hi: 'पूरा', mr: 'पूर्ण' },
+  'project.segs.body': {
+    en: 'Each stage counts for part of your home. Every finished step adds its share.',
+    hi: 'हर चरण आपके घर का एक हिस्सा है। हर पूरा हुआ काम अपना हिस्सा जोड़ता है।',
+    mr: 'प्रत्येक टप्पा तुमच्या घराचा एक भाग आहे. प्रत्येक पूर्ण झालेले काम आपला वाटा जोडते.',
+  },
+  'project.everyStep': { en: 'Every step of your home', hi: 'आपके घर का हर कदम', mr: 'तुमच्या घराची प्रत्येक पायरी' },
+  'project.state.done': { en: 'Done', hi: 'पूरा', mr: 'पूर्ण' },
+  'project.state.now': { en: 'Happening now', hi: 'अभी चल रहा है', mr: 'आता सुरू आहे' },
+  'project.state.later': { en: 'Later', hi: 'बाद में', mr: 'नंतर' },
+  'project.site.photos': { en: '{n} photos · daily updates', hi: '{n} फ़ोटो · रोज़ अपडेट', mr: '{n} फोटो · रोजचे अपडेट' },
   'project.since': { en: '{studio}, since {date}', hi: '{studio}, {date} से', mr: '{studio}, {date} पासून' },
   'project.none.body': {
     en: 'The timeline appears here the day you sign with a studio.',

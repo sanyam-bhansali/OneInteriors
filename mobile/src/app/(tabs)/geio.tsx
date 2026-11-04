@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
   cell: { width: '48.5%', flexGrow: 1 },
   suggest: { minHeight: 116, borderRadius: radius.lg, backgroundColor: color.soft, padding: 14, justifyContent: 'space-between', gap: 10 },
   suggestText: { fontFamily: font.sansMedium, fontSize: 15, lineHeight: 20, color: color.ink },
-  suggestIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F5E2D8', alignItems: 'center', justifyContent: 'center' },
+  suggestIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#3A261B', alignItems: 'center', justifyContent: 'center' },
   ai: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   aiBody: { flex: 1, minWidth: 0, gap: 12 },
   err: { fontFamily: font.sans, fontSize: 15.5, lineHeight: 23, color: color.ink2 },

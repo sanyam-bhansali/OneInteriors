@@ -1,8 +1,10 @@
+import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { passwordStyles } from '../components/sign-in/PasswordSignIn';
 import { Body, Button, ErrorText, Eyebrow, Screen, Title } from '../components/ui';
+import { LightLook } from '../components/ui';
 import { api } from '../lib/api';
 import { useHeadline, useT } from '../lib/i18n';
 import { useProject } from '../lib/project';
@@ -13,7 +15,7 @@ import { useProject } from '../lib/project';
  * account for the invited number; this checks the code is theirs and opens
  * it, or says which number to sign in with.
  */
-export default function Connect() {
+function ConnectScreen() {
   const t = useT();
   const h1 = useHeadline(38);
   const { refresh } = useProject();
@@ -54,5 +56,15 @@ export default function Connect() {
       </View>
       {error ? <ErrorText>{error}</ErrorText> : <Body muted>{t('connect.none')}</Body>}
     </Screen>
+  );
+}
+
+/** Before Home the app keeps the light look (the owner's handoff, 1 Nov 2026). */
+export default function Connect() {
+  return (
+    <LightLook>
+      <StatusBar style="dark" />
+      <ConnectScreen />
+    </LightLook>
   );
 }

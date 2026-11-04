@@ -1,3 +1,4 @@
+import { StatusBar } from 'expo-status-bar';
 import { Image } from 'expo-image';
 import { Redirect, router } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -5,12 +6,13 @@ import { Animated, Easing, Pressable, StyleSheet, Text, View, useWindowDimension
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { hasOpened, Opening } from '../components/Opening';
 import { Button, ErrorText, Screen, Title } from '../components/ui';
+import { LightLook } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { projectsOnly } from '../lib/config';
 import { VERIFIED_STUDIOS } from '../lib/claims';
 import { LANGS, useHeadline, useLang, useT, type Key, type Lang } from '../lib/i18n';
 import { useReducedMotion } from '../lib/motion';
-import { color, font, motion } from '../lib/theme';
+import { light as color, font, motion } from '../lib/theme';
 
 /**
  * The front door. First launch plays the opening (screen #0); after that a
@@ -18,7 +20,7 @@ import { color, font, motion } from '../lib/theme';
  * (Start.dc.html, #1): the language switch, the logo, the verified-studios
  * pill, the promise, the two ways in, and a tilted table of style prints.
  */
-export default function Index() {
+function IndexScreen() {
   const { state, retry } = useAuth();
   const t = useT();
   const [opened, setOpened] = useState<boolean | null>(null);
@@ -254,3 +256,13 @@ const styles = StyleSheet.create({
   caption: { position: 'absolute', left: 10, bottom: 10, paddingVertical: 5, paddingHorizontal: 10, borderRadius: 999, backgroundColor: 'rgba(255,255,255,.86)' },
   captionText: { fontFamily: font.sansMedium, fontSize: 13, color: color.ink },
 });
+
+/** Before Home the app keeps the light look (the owner's handoff, 1 Nov 2026). */
+export default function Index() {
+  return (
+    <LightLook>
+      <StatusBar style="dark" />
+      <IndexScreen />
+    </LightLook>
+  );
+}

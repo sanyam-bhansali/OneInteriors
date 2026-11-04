@@ -110,7 +110,7 @@ export default function SignoffScreen() {
       {canSign ? (
         <View style={{ gap: 12 }}>
           <Pressable role="checkbox" aria-checked={agreed} onPress={() => setAgreed((a) => !a)} style={styles.agree}>
-            <View style={[styles.box, agreed && styles.boxOn]}>{agreed ? <Text style={{ color: color.white, fontSize: 14 }}>✓</Text> : null}</View>
+            <View style={[styles.box, agreed && styles.boxOn]}>{agreed ? <Text style={{ color: color.onDark, fontSize: 14 }}>✓</Text> : null}</View>
             <Text style={[styles.details, { flex: 1, color: color.ink }]}>{d.agreeText}</Text>
           </Pressable>
           <Eyebrow>{t('life.sign.name')}</Eyebrow>

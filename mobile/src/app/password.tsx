@@ -5,6 +5,7 @@ import { passwordStyles } from '../components/sign-in/PasswordSignIn';
 import { Body, Button, ErrorText, Eyebrow, Screen, Title } from '../components/ui';
 import { api } from '../lib/api';
 import { useHeadline, useT } from '../lib/i18n';
+import { color } from '../lib/theme';
 
 /** After the studio's one-time password (owner, 1 Nov 2026): the client chooses their own before anything else. */
 export default function ChoosePassword() {
@@ -37,7 +38,7 @@ export default function ChoosePassword() {
         autoComplete="new-password"
         textContentType="newPassword"
         aria-label={label}
-        style={passwordStyles.input}
+        style={[passwordStyles.input, { color: color.ink, borderBottomColor: color.ink }]}
       />
     </View>
   );

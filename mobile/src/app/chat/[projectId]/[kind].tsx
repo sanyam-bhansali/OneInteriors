@@ -206,7 +206,7 @@ export default function ChatScreen() {
 
   let lastDay = '';
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#16110D' }} edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.head}>
         <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/chats'))} accessibilityLabel={t('kit.back')} style={styles.back}>
           <BackIcon color={color.ink} />
@@ -354,7 +354,7 @@ function Voice({ url, ms, mine }: { url: string | null; ms: number | null; mine:
   );
 }
 
-const WALL = '#F3EFE7';
+const WALL = '#16110D';
 const time = (iso: string) => new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
 function dayLabel(iso: string, t: ReturnType<typeof useT>): string {
   const d = new Date(iso);
@@ -370,10 +370,10 @@ const styles = StyleSheet.create({
   headTitle: { fontFamily: font.sansSemi, fontSize: 17, color: color.ink },
   headSub: { fontFamily: font.sans, fontSize: 13, color: color.ink2 },
   empty: { fontFamily: font.sans, fontSize: 14, color: color.ink2, textAlign: 'center', marginVertical: 16, paddingHorizontal: 24 },
-  day: { alignSelf: 'center', marginVertical: 8, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: '#FFFFFF', fontFamily: font.sans, fontSize: 13, color: color.ink2, overflow: 'hidden' },
+  day: { alignSelf: 'center', marginVertical: 8, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: '#2A211A', fontFamily: font.sans, fontSize: 13, color: color.ink2, overflow: 'hidden' },
   bubble: { maxWidth: '82%', paddingHorizontal: 10, paddingTop: 8, paddingBottom: 6, gap: 4 },
-  theirs: { alignSelf: 'flex-start', backgroundColor: '#FFFFFF', borderRadius: 14, borderBottomLeftRadius: 4 },
-  mine: { alignSelf: 'flex-end', backgroundColor: color.ink, borderRadius: 14, borderBottomRightRadius: 4 },
+  theirs: { alignSelf: 'flex-start', backgroundColor: '#2A211A', borderRadius: 14, borderBottomLeftRadius: 4 },
+  mine: { alignSelf: 'flex-end', backgroundColor: color.accent, borderRadius: 14, borderBottomRightRadius: 4 },
   from: { fontFamily: font.sansSemi, fontSize: 13, color: color.accent },
   quote: { borderLeftWidth: 3, borderLeftColor: color.accent, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'rgba(0,0,0,.05)' },
   quoteText: { fontFamily: font.sans, fontSize: 13, color: color.ink },
@@ -382,9 +382,9 @@ const styles = StyleSheet.create({
   photo: { width: 240, height: 240, borderRadius: 10 },
   meta: { alignSelf: 'flex-end', fontFamily: font.sans, fontSize: 12, color: color.ink2 },
   failed: { fontFamily: font.sans, fontSize: 13, color: '#FFB4A2' },
-  replying: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: color.line },
+  replying: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, backgroundColor: '#1E1712', borderTopWidth: 1, borderTopColor: color.line },
   compose: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, padding: 8, backgroundColor: WALL },
-  round: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  send: { backgroundColor: color.ink },
-  input: { flex: 1, minHeight: 46, maxHeight: 140, borderRadius: 23, backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, fontFamily: font.sans, fontSize: 16, color: color.ink },
+  round: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#2A211A', alignItems: 'center', justifyContent: 'center' },
+  send: { backgroundColor: color.accent },
+  input: { flex: 1, minHeight: 46, maxHeight: 140, borderRadius: 23, backgroundColor: '#2A211A', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, fontFamily: font.sans, fontSize: 16, color: color.ink },
 });
