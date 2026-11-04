@@ -16,6 +16,7 @@ import { usePlan } from '../../lib/plan';
 import { useProfile } from '../../lib/profile';
 import { useProject } from '../../lib/project';
 import { color, font } from '../../lib/theme';
+import { projectsOnly } from '../../lib/config';
 
 /**
  * Me (Me.dc.html, screen 27): who is signed in, their home, the Locker and
@@ -116,6 +117,10 @@ export default function Me() {
               />
             ) : null}
             <Row title={t('me.profile')} sub={t('me.profile.sub')} icon={<HouseIcon color={color.ink} />} onPress={() => router.push('/home-profile' as Href)} />
+            {/* The choosing journey's part: hidden in the projects-only store build until the marketplace opens. */}
+            {projectsOnly() ? null : (
+              <Row title={t('dd.title')} sub={t('dd.me.sub')} icon={<HouseIcon color={color.ink} />} onPress={() => router.push('/design' as Href)} />
+            )}
             <Row title={t('me.locker')} sub={t('me.locker.sub')} icon={<LockerIcon color={color.ink} />} onPress={() => router.push('/locker')} />
             <Row
               title={t('me.notifications')}
