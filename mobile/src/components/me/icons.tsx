@@ -25,6 +25,12 @@ export const BellLineIcon = ({ color, size = 18 }: P) => (
     <Path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" {...s(color)} />
   </Svg>
 );
+/** A house outline, for My Home Profile. */
+export const HouseIcon = ({ color, size = 18 }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" {...s(color)} />
+  </Svg>
+);
 export const MailIcon = ({ color, size = 18 }: P) => (
   <Svg width={size} height={size} viewBox="0 0 24 24">
     <Path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" {...s(color)} />

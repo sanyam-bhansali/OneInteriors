@@ -123,10 +123,20 @@ const nextConfig: NextConfig = {
        when asked for by name, and never on Vercel, whatever is set there. */
     const plainHttp = process.env.LOCAL_HTTP_TEST === '1' && !process.env.VERCEL;
 
+    /* Firebase phone sign-in (owner, 4 Nov 2026), only once it is set up:
+       its invisible reCAPTCHA loads Google's script and frame, and the code is
+       sent and checked by Google's identity API. Nothing is opened for it on a
+       deployment without the Firebase settings. */
+    const fbDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN?.trim();
+    const firebase = Boolean(process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim() && fbDomain);
+    const fbScript = firebase ? ' https://www.google.com https://www.gstatic.com https://apis.google.com' : '';
+    const fbConnect = firebase ? ' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google.com' : '';
+    const fbFrame = firebase ? [`frame-src https://www.google.com https://${fbDomain}`] : [];
+
     const csp = [
       "default-src 'self'",
       // Next inlines hydration data; see above.
-      `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ''}`,
+      `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ''}${fbScript}`,
       // Tailwind and the design tokens set styles inline.
       "style-src 'self' 'unsafe-inline'",
       // Supabase storage for floor plans and portfolio images; Unsplash for
@@ -134,7 +144,8 @@ const nextConfig: NextConfig = {
       "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co",
       "font-src 'self' data:",
       // Server actions post to our own origin; storage is the one exception.
-      "connect-src 'self' https://*.supabase.co",
+      `connect-src 'self' https://*.supabase.co${fbConnect}`,
+      ...fbFrame,
       "frame-ancestors 'none'",
       "object-src 'none'",
       "base-uri 'self'",

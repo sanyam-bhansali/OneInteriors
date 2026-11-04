@@ -30,7 +30,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui';
 import { cleanCode, isOtpShape, isValidName } from '@/modules/auth/otp-code';
 import { normalisePhone } from '@/modules/studio/phone';
-import { requestOtpAction, verifyOtpAction } from './actions';
+import { checkPhoneCode, sendPhoneCode } from '@/modules/auth/phone-code-client';
 
 const RESEND_SECONDS = 30;
 
@@ -77,7 +77,7 @@ export function OtpForm({
   async function send() {
     setError(null);
     setBusy(true);
-    const result = await requestOtpAction(phone, name);
+    const result = await sendPhoneCode(phone, name);
     setBusy(false);
 
     if (!result.ok) {
@@ -92,7 +92,7 @@ export function OtpForm({
   async function verify(value: string) {
     setError(null);
     setBusy(true);
-    const result = await verifyOtpAction(phone, value, name || null);
+    const result = await checkPhoneCode(phone, value, name || null);
     setBusy(false);
 
     if (!result.ok) {
@@ -160,7 +160,7 @@ export function OtpForm({
             />
           </div>
           <p className="m-0 mt-2 text-[13.5px] leading-relaxed text-[var(--color-ink-3)]">
-            We send a code on WhatsApp. No password, and no one calls this number — your quotes
+            We send a code by SMS. No password, and no one calls this number — your quotes
             live on this site, not in your messages.
           </p>
         </div>
@@ -196,7 +196,7 @@ export function OtpForm({
           className="tabular w-full rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-5 py-4 text-center font-[family-name:var(--font-mono)] text-[28px] tracking-[0.3em] text-[var(--color-ink)] placeholder:tracking-[0.2em] placeholder:text-[var(--color-ink-3)]"
         />
         <p className="m-0 mt-3 text-[14px] leading-relaxed text-[var(--color-ink-2)]">
-          Sent on WhatsApp to +91 {phone.replace(/\D/g, '').slice(-10)}.{' '}
+          Sent by SMS to +91 {phone.replace(/\D/g, '').slice(-10)}.{' '}
           <button
             type="button"
             onClick={() => {

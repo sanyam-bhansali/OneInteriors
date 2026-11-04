@@ -449,9 +449,9 @@ export const EXPERT_DICT = {
   'flow.mobile': { en: 'Mobile', hi: 'मोबाइल', mr: 'मोबाइल' },
   'flow.email': { en: 'Email', hi: 'ईमेल', mr: 'ईमेल' },
   'flow.step4': { en: 'Confirm with a code', hi: 'कोड से पक्का करें', mr: 'कोडने पक्के करा' },
-  'flow.sendCode': { en: 'Send code on WhatsApp', hi: 'WhatsApp पर कोड भेजें', mr: 'WhatsApp वर कोड पाठवा' },
+  'flow.sendCode': { en: 'Send code by SMS', hi: 'SMS से कोड भेजें', mr: 'SMS ने कोड पाठवा' },
   'flow.sending': { en: 'Sending…', hi: 'भेज रहे हैं…', mr: 'पाठवतोय…' },
-  'flow.codeSent': { en: 'We sent a 6-digit code to +91 {phone} on WhatsApp.', hi: 'हमने +91 {phone} पर WhatsApp से 6 अंकों का कोड भेजा है।', mr: 'आम्ही +91 {phone} वर WhatsApp वर 6 अंकी कोड पाठवला आहे.' },
+  'flow.codeSent': { en: 'We sent a 6-digit code to +91 {phone} by SMS.', hi: 'हमने +91 {phone} पर SMS से 6 अंकों का कोड भेजा है।', mr: 'आम्ही +91 {phone} वर SMS ने 6 अंकी कोड पाठवला आहे.' },
   'flow.code': { en: '6-digit code', hi: '6 अंकों का कोड', mr: '6 अंकी कोड' },
   'flow.resendIn': { en: 'Resend in {s}s', hi: '{s} सेकंड में फिर भेजें', mr: '{s} सेकंदात पुन्हा पाठवा' },
   'flow.resend': { en: 'Resend code', hi: 'कोड फिर भेजें', mr: 'कोड पुन्हा पाठवा' },
@@ -466,7 +466,7 @@ export const EXPERT_DICT = {
   'flow.needSlot': { en: 'Pick a date and time first.', hi: 'पहले तारीख और समय चुनें।', mr: 'आधी तारीख आणि वेळ निवडा.' },
   'flow.needStudios': { en: 'Pick at least {n} studio(s) first.', hi: 'पहले कम से कम {n} स्टूडियो चुनें।', mr: 'आधी किमान {n} स्टुडिओ निवडा.' },
   'flow.testBuild': { en: 'Test build — any 6 digits work, and nothing is booked.', hi: 'टेस्ट बिल्ड — कोई भी 6 अंक चलेंगे, कुछ बुक नहीं होगा।', mr: 'टेस्ट बिल्ड — कोणतेही 6 अंक चालतील, काहीही बुक होणार नाही.' },
-  'flow.verifyFirst': { en: 'Verify your number with the WhatsApp code first.', hi: 'पहले WhatsApp कोड से अपना नंबर पक्का करें।', mr: 'आधी WhatsApp कोडने तुमचा नंबर पक्का करा.' },
+  'flow.verifyFirst': { en: 'Verify your number with the SMS code first.', hi: 'पहले SMS कोड से अपना नंबर पक्का करें।', mr: 'आधी SMS कोडने तुमचा नंबर पक्का करा.' },
   // ── The app-style header and picker (owner, 10 Oct 2026) ──
   'hero.meta': { en: 'Free, 30 minutes', hi: 'मुफ़्त, 30 मिनट', mr: 'मोफत, 30 मिनिटे' },
   'hero.title': {

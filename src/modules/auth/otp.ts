@@ -408,43 +408,9 @@ export async function verifyOtp(
       return { ok: true as const, userId: member.userId, studioRole: member.role };
     }
 
-    const existing = await tx.user.findUnique({ where: { phone } });
-
-    /**
-     * First verified sign-in creates a CUSTOMER. Always CUSTOMER.
-     *
-     * An OPS or STUDIO account is never self-served, so the most a stranger
-     * with a working phone can do here is become a customer — which is exactly
-     * what we want them to be able to do.
-     *
-     * An existing elevated account is never demoted, and its name is not
-     * overwritten by whatever was typed on a sign-in form.
-     */
-    const user =
-      existing ??
-      (await tx.user.create({
-        data: {
-          phone,
-          name: name ?? null,
-          role: 'CUSTOMER',
-          phoneVerified: new Date(),
-        },
-      }));
-
-    if (user.deletedAt) return { ok: false as const, reason: 'invalid_code' as const };
-
-    if (existing) {
-      await tx.user.update({
-        where: { id: user.id },
-        data: {
-          phoneVerified: user.phoneVerified ?? new Date(),
-          // Fill a blank name; never replace one they already have.
-          ...(!user.name && name ? { name } : {}),
-        },
-      });
-    }
-
-    return { ok: true as const, userId: user.id };
+    const userId = await customerForVerifiedPhone(tx, phone, name);
+    if (!userId) return { ok: false as const, reason: 'invalid_code' as const };
+    return { ok: true as const, userId };
   });
 
   if (!outcome.ok) return outcome;
@@ -452,4 +418,52 @@ export async function verifyOtp(
   const token = await createSession(outcome.userId, meta);
   const studioRole = 'studioRole' in outcome ? { studioRole: outcome.studioRole } : {};
   return meta.bearer ? { ok: true, userId: outcome.userId, token, ...studioRole } : { ok: true, userId: outcome.userId, ...studioRole };
+}
+
+/**
+ * The account behind a number someone has just proved they hold, by our own
+ * code or by Firebase's SMS (modules/auth/firebase-phone.ts). Null when that
+ * account was deleted.
+ *
+ * First verified sign-in creates a CUSTOMER. Always CUSTOMER.
+ *
+ * An OPS or STUDIO account is never self-served, so the most a stranger
+ * with a working phone can do here is become a customer — which is exactly
+ * what we want them to be able to do.
+ *
+ * An existing elevated account is never demoted, and its name is not
+ * overwritten by whatever was typed on a sign-in form.
+ */
+export async function customerForVerifiedPhone(
+  tx: Pick<typeof prisma, 'user'>,
+  phone: string,
+  name: string | null,
+): Promise<string | null> {
+  const existing = await tx.user.findUnique({ where: { phone } });
+
+  const user =
+    existing ??
+    (await tx.user.create({
+      data: {
+        phone,
+        name: name ?? null,
+        role: 'CUSTOMER',
+        phoneVerified: new Date(),
+      },
+    }));
+
+  if (user.deletedAt) return null;
+
+  if (existing) {
+    await tx.user.update({
+      where: { id: user.id },
+      data: {
+        phoneVerified: user.phoneVerified ?? new Date(),
+        // Fill a blank name; never replace one they already have.
+        ...(!user.name && name ? { name } : {}),
+      },
+    });
+  }
+
+  return user.id;
 }

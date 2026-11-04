@@ -56,7 +56,7 @@ export function MatchesScreen({ data }: { data: AppData }) {
           {brief.completedAt ? <TierSwitch value={shown} onChange={setTier} /> : null}
         </Body>
         <Foot>
-          <Cta href="/app/q/1">{brief.completedAt ? 'Change my answers' : 'Start the brief'}</Cta>
+          <Cta href="/app/q/1">{brief.completedAt ? 'Change my answers' : 'Start my Home Profile'}</Cta>
         </Foot>
       </Frame>
     );

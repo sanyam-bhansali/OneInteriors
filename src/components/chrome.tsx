@@ -79,7 +79,7 @@ export function SiteFooter() {
               href="/quiz"
               className="text-[14px] text-[var(--color-ink-2)] no-underline hover:text-[var(--color-petrol)]"
             >
-              Start the brief
+              Start your Home Profile
             </Link>
             {/* `/account` existed with nothing anywhere linking to it — a
                 customer who signed in had no route back to their own quotes,
@@ -95,6 +95,12 @@ export function SiteFooter() {
               className="text-[14px] text-[var(--color-ink-2)] no-underline hover:text-[var(--color-petrol)]"
             >
               Your project
+            </Link>
+            <Link
+              href="/account/profile"
+              className="text-[14px] text-[var(--color-ink-2)] no-underline hover:text-[var(--color-petrol)]"
+            >
+              My Home Profile
             </Link>
             {/* Designers look for this in the footer, not the nav — and the
                 header is customer space. */}

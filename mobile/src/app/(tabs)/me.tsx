@@ -1,11 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, type Href } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { BellLineIcon, LockerIcon, LogoutIcon, MailIcon, QuestionIcon, ShieldIcon, TrashIcon } from '../../components/me/icons';
+import { BellLineIcon, HouseIcon, LockerIcon, LogoutIcon, MailIcon, QuestionIcon, ShieldIcon, TrashIcon } from '../../components/me/icons';
 import { Row, RowGroup, SwitchRow } from '../../components/me/parts';
 import { Body, Rise, Screen, Stagger } from '../../components/ui';
 import { api } from '../../lib/api';
@@ -115,6 +115,7 @@ export default function Me() {
                 onPress={() => router.push('/plan')}
               />
             ) : null}
+            <Row title={t('me.profile')} sub={t('me.profile.sub')} icon={<HouseIcon color={color.ink} />} onPress={() => router.push('/home-profile' as Href)} />
             <Row title={t('me.locker')} sub={t('me.locker.sub')} icon={<LockerIcon color={color.ink} />} onPress={() => router.push('/locker')} />
             <Row
               title={t('me.notifications')}

@@ -141,10 +141,10 @@ export default async function AccountPage() {
           </div>
 
           {/* ── Brief ────────────────────────────────────── */}
-          <Section title="Your brief" action={{ href: '/quiz', label: 'Edit' }}>
+          <Section title="Your Home Profile" action={{ href: '/account/profile', label: 'See all' }}>
             {!found || !brief.completedAt ? (
               <Empty>
-                You have not finished your brief yet.{' '}
+                You have not finished your Home Profile yet.{' '}
                 <Link href="/quiz" className="text-[var(--color-petrol)]">
                   Pick up where you left off
                 </Link>

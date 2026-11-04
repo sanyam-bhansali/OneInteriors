@@ -139,6 +139,30 @@ const HANDOVER_STEPS = steps(
 
 export const SAMPLE_USER = { id: 'sample', name: 'Priya', phone: '+919822041736' };
 
+/** Sample data: Priya's Home Profile, as GET /profile returns it. */
+export const SAMPLE_HOME_PROFILE = {
+  title: "Priya's Home Profile",
+  homeLine: '2 BHK · 960 sq ft · Baner',
+  planLine: 'Full home · Premium',
+  complete: true,
+  dna: {
+    shares: [
+      { tag: 'warm-modern', label: 'Warm Modern', pct: 52 },
+      { tag: 'japandi', label: 'Japandi', pct: 30 },
+      { tag: 'indian-contemporary', label: 'Indian Contemporary', pct: 18 },
+    ],
+    palette: ['#F2EBE1', '#B98B5E', '#6B4F3A', '#D9CBB8', '#C2643B'],
+    materials: ['Oak veneer', 'Fluted glass', 'Brushed brass'],
+  },
+  groups: [
+    { id: 'home', title: 'Your home', answers: [{ label: 'Home', value: '2 BHK, 960 sq ft' }, { label: 'Where', value: 'Sample Society, Baner' }, { label: 'Possession', value: 'I have the keys' }] },
+    { id: 'work', title: 'What you want done', answers: [{ label: 'Scope', value: 'Full home' }] },
+    { id: 'budget', title: 'Budget', answers: [{ label: 'Level', value: 'Premium' }] },
+    { id: 'style', title: 'Your style', answers: [{ label: 'Likes', value: 'Warm Modern, Japandi, Indian Contemporary' }, { label: 'Rules out', value: 'Luxe Glam' }] },
+    { id: 'family', title: 'Who lives here', answers: [{ label: 'Household', value: '2 adults, 1 child' }] },
+  ],
+};
+
 /*
  * The sample starts on Basic so the locked GEIO tab and the upgrade can be
  * seen; asking for Assured in the sample switches it at once, as if our
@@ -506,6 +530,7 @@ export async function sampleCall<T>(method: string, path: string, body?: unknown
   if (journey) return ok(journey.answer(route, body));
   if (route === 'POST /auth/otp/request') return ok({ devCode: '123456' });
   if (route === 'POST /auth/otp/verify') return ok({ token: 'sample' });
+  if (route === 'GET /profile') return ok({ profile: SAMPLE_HOME_PROFILE, contact: { name: SAMPLE_USER.name, phone: SAMPLE_USER.phone, email: null } });
   if (route === 'GET /me') return ok({ user: SAMPLE_USER, ...SAMPLE_PROFILE, unread: SAMPLE_NOTICES.filter((n) => !n.readAt && !read.has(n.id)).length });
   if (route === 'GET /project') return ok({ projects: [SAMPLE_PROJECT] });
   if (route === 'GET /notifications') {

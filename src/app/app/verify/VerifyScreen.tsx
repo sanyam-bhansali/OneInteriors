@@ -18,7 +18,7 @@ import { Body, Cta, Foot, Frame, Head } from '@/components/app/ui';
 import { useJourney } from '@/components/app/useJourney';
 import { normalisePhone } from '@/modules/studio/phone';
 import { submitContactAction } from '@/app/quiz/actions';
-import { requestOtpAction, verifyOtpAction } from '@/app/sign-in/actions';
+import { checkPhoneCode, sendPhoneCode } from '@/modules/auth/phone-code-client';
 import { useAppData } from '@/components/app/useAppData';
 import type { AppData } from '../data';
 import { useT } from '@/components/app/i18n';
@@ -69,7 +69,7 @@ export function VerifyScreen({ data }: { data: AppData }) {
       return;
     }
     setBusy(true);
-    const r = await requestOtpAction(phone, name);
+    const r = await sendPhoneCode(phone, name);
     setBusy(false);
     if (!r.ok) return setError(r.error);
     setSentTo(normal);
@@ -91,7 +91,7 @@ export function VerifyScreen({ data }: { data: AppData }) {
       return setError(Object.values(contact.errors)[0] ?? 'Check your details and try again.');
     }
     if (REQUIRE_CODE) {
-      const v = await verifyOtpAction(phone, code, name);
+      const v = await checkPhoneCode(phone, code, name);
       if (!v.ok) {
         setBusy(false);
         return setError(v.error);

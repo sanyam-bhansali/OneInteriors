@@ -252,12 +252,12 @@ export default async function SignInPage({
               /* They have already seen their quotes by now; this screen used
                  to say the quotes were next (review, 8 Oct). */
               <>
-                Your brief and quotes are saved. Your name and number, a code on WhatsApp, and then
+                Your brief and quotes are saved. Your name and number, a code by SMS, and then
                 you pick a time — so our architect can reach you and your booking stays yours.
               </>
             ) : fromQuotes ? (
               <>
-                Your answers are saved. Your name and number, a code on WhatsApp, and the quotes
+                Your answers are saved. Your name and number, a code by SMS, and the quotes
                 are on the next screen — so they stay yours and you can come back to them.
               </>
             ) : google ? (
@@ -266,10 +266,10 @@ export default async function SignInPage({
                   .filter(Boolean)
                   .join(', ')
                   .replace(/, ([^,]*)$/, ' or $1')}
-                , or your number and a code on WhatsApp. No password to remember or lose.
+                , or your number and a code by SMS. No password to remember or lose.
               </>
             ) : (
-              <>Your number and a code on WhatsApp. No password to remember or lose.</>
+              <>Your number and a code by SMS. No password to remember or lose.</>
             )}
           </p>
 

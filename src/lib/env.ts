@@ -283,6 +283,21 @@ export function googleOAuth(): { clientId: string; clientSecret: string } | null
 }
 
 /**
+ * The Firebase project that sends customers' sign-in codes by SMS, or null
+ * when it is not set up (owner, 4 Nov 2026: Firebase phone sign-in, so no
+ * DLT registration is needed). The server needs only the project id to check
+ * the token Firebase hands the browser or the app; the public web config
+ * lives in `firebaseWebConfig()` (modules/auth/firebase-web-config.ts).
+ *
+ * Null keeps the older WhatsApp code path, so nothing changes on a deployment
+ * until the project is added.
+ */
+export function firebaseProjectId(): string | null {
+  const id = (process.env.FIREBASE_PROJECT_ID ?? process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID)?.trim();
+  return id ? id : null;
+}
+
+/**
  * Facebook sign-in, or null when it is not set up — the same all-or-nothing
  * rule as `googleOAuth()`: no button unless the flow can finish.
  */

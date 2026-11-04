@@ -79,6 +79,9 @@ import {
   type StyleTag,
 } from '@/modules/brief/types';
 import { loadBrief, saveBrief } from '@/modules/brief/store';
+import { checkPhoneCode, sendPhoneCode } from '@/modules/auth/phone-code-client';
+import { normalisePhone } from '@/modules/studio/phone';
+import { cleanCode } from '@/modules/auth/otp-code';
 import {
   CHAPTER,
   NAME_MAX,
@@ -232,6 +235,14 @@ export function QuizClient({
   /** Set while they are changing one answer from the brief panel: Continue
       takes them straight back here instead of through every later step. */
   const [returnTo, setReturnTo] = useState<number | null>(null);
+  /** The sign-in code on the last screen (owner, 4 Nov 2026): the Home
+      Profile ends signed in, so it is on their account from then on. */
+  const [otp, setOtp] = useState<OtpState>(NO_OTP);
+  useEffect(() => {
+    if (otp.wait <= 0) return;
+    const timer = setTimeout(() => setOtp((o) => ({ ...o, wait: o.wait - 1 })), 1000);
+    return () => clearTimeout(timer);
+  }, [otp.wait]);
 
   useEffect(() => {
     // sessionStorage first so the quiz paints immediately, then reconcile with
@@ -360,15 +371,47 @@ export function QuizClient({
       return;
     }
     setContactErrors({});
-    setFinishing(true);
 
+    // Second press: the code they typed signs them in, then the matches.
+    if (!account && otp.sentTo) {
+      setFinishing(true);
+      const signedIn = await checkPhoneCode(input.phone, otp.code, check.value.name);
+      if (!signedIn.ok) {
+        setOtp((o) => ({ ...o, code: '', error: signedIn.error }));
+        setFinishing(false);
+        return;
+      }
+      finish({ ...brief, contactName: check.value.name });
+      return;
+    }
+
+    setFinishing(true);
     const result = await submitContactAction(brief, input, { requireEmail: true }).catch(() => null);
     if (result && !result.ok) {
       setContactErrors(result.errors);
       setFinishing(false);
       return;
     }
-    finish({ ...brief, contactName: check.value.name });
+    if (account) {
+      finish({ ...brief, contactName: check.value.name });
+      return;
+    }
+
+    // Not signed in yet: send the code, and wait for it on this screen.
+    const sent = await sendPhoneCode(input.phone, check.value.name);
+    setFinishing(false);
+    if (!sent.ok) {
+      setContactErrors({ form: sent.error });
+      return;
+    }
+    setOtp({ sentTo: normalisePhone(input.phone), code: '', devCode: sent.devCode ?? null, wait: RESEND_SECONDS, error: null });
+  }
+
+  async function resendCode() {
+    const name = contact.name || brief.contactName || '';
+    const sent = await sendPhoneCode(contact.phone, name);
+    if (!sent.ok) return setOtp((o) => ({ ...o, error: sent.error }));
+    setOtp((o) => ({ ...o, code: '', devCode: sent.devCode ?? null, wait: RESEND_SECONDS, error: null }));
   }
 
   function next() {
@@ -411,7 +454,8 @@ export function QuizClient({
   }
 
   const stepId = stepAt(step);
-  const canAdvance = isStepAnswered(brief, stepId);
+  const waitingForCode = stepId === 'contact' && !account && otp.sentTo !== null;
+  const canAdvance = isStepAnswered(brief, stepId) && (!waitingForCode || otp.code.length === 6);
   const pickerPhotos = useMemo(() => studioPickerPhotos(studios), [studios]);
 
   const contactCtx: ContactContext = {
@@ -419,6 +463,8 @@ export function QuizClient({
     socialSignIn,
     contact,
     setContact: (next) => {
+      // A different number needs a new code.
+      if (otp.sentTo && normalisePhone(next.phone) !== otp.sentTo) setOtp(NO_OTP);
       setContact(next);
       rememberContact({ name: next.name, phone: next.phone, email: next.email });
       // An error disappears as soon as they start fixing it.
@@ -426,6 +472,9 @@ export function QuizClient({
     },
     errors: contactErrors,
     pickerPhotos,
+    otp: account ? NO_OTP : otp,
+    setOtpCode: (code) => setOtp((o) => ({ ...o, code: cleanCode(code), error: null })),
+    resendCode: () => void resendCode(),
   };
 
   // Capped at the number the site states (lib/claims.ts), and it only narrows.
@@ -592,7 +641,13 @@ export function QuizClient({
                 className="shrink-0 disabled:pointer-events-none max-sm:!px-5"
               >
                 {finishing
-                  ? t('cta.writing')
+                  ? stepId === 'contact' && !account && !otp.sentTo
+                    ? t('cta.sending')
+                    : t('cta.writing')
+                  : stepId === 'contact' && !account
+                    ? otp.sentTo
+                      ? t('cta.verify')
+                      : t('cta.sendCode')
                   : step === TOTAL_STEPS
                     ? t('cta.see')
                     : returnTo !== null && returnTo > step
@@ -626,7 +681,22 @@ interface ContactContext {
   errors: ContactErrors;
   /** Studios' own photos for the style picker, unnamed (brief/picker-photos.ts). */
   pickerPhotos: Partial<Record<StyleTag, PickerPhoto>>;
+  otp: OtpState;
+  setOtpCode: (code: string) => void;
+  resendCode: () => void;
 }
+
+/** The sign-in code on the contact screen. `sentTo` is null until it is sent. */
+interface OtpState {
+  sentTo: string | null;
+  code: string;
+  devCode: string | null;
+  /** Seconds until another code may be asked for. */
+  wait: number;
+  error: string | null;
+}
+const NO_OTP: OtpState = { sentTo: null, code: '', devCode: null, wait: 0, error: null };
+const RESEND_SECONDS = 30;
 
 function QuestionStep({
   id,
@@ -673,6 +743,9 @@ function stepContent(
             contact={ctx.contact}
             setContact={ctx.setContact}
             errors={ctx.errors}
+            otp={ctx.otp}
+            setOtpCode={ctx.setOtpCode}
+            resendCode={ctx.resendCode}
           />
         ),
       };
@@ -817,6 +890,9 @@ function ContactStep({
   contact,
   setContact,
   errors,
+  otp,
+  setOtpCode,
+  resendCode,
 }: {
   brief: Brief;
   account: { name: string | null; email: string | null } | null;
@@ -824,6 +900,9 @@ function ContactStep({
   contact: ContactInput;
   setContact: (next: ContactInput) => void;
   errors: ContactErrors;
+  otp: OtpState;
+  setOtpCode: (code: string) => void;
+  resendCode: () => void;
 }) {
   const t = useSiteT(QUIZ_DICT);
   const lang = useLang();
@@ -926,6 +1005,37 @@ function ContactStep({
           </span>
         </label>
       </div>
+
+      {otp.sentTo ? (
+        <label className="block">
+          <FieldLabel>{t('contact.code', { phone: otp.sentTo.slice(-10) })}</FieldLabel>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            autoFocus
+            value={otp.code}
+            onChange={(e) => setOtpCode(e.target.value)}
+            placeholder="6-digit code"
+            maxLength={6}
+            className={`${field} ${border(!!otp.error)} tracking-[0.3em]`}
+          />
+          <Err text={otp.error ?? undefined} />
+          <p className="m-0 mt-2 pl-[22px] text-[13.5px] leading-snug text-[var(--ink-2)]">
+            {t('contact.codeHint')}{' '}
+            {otp.wait > 0 ? (
+              <span>{t('contact.resendIn', { n: otp.wait })}</span>
+            ) : (
+              <button type="button" onClick={resendCode} className="text-[var(--ink)] underline underline-offset-2">
+                {t('contact.resend')}
+              </button>
+            )}
+          </p>
+          {otp.devCode ? (
+            <p className="m-0 mt-2 pl-[22px] font-mono text-[13.5px] text-[var(--ink-2)]">{t('contact.devCode', { code: otp.devCode })}</p>
+          ) : null}
+        </label>
+      ) : null}
 
       <Err text={quizServerText(lang, errors.form)} />
     </div>

@@ -47,7 +47,7 @@ export function QuoteScreen({ data }: { data: AppData }) {
           <p className="oa-sub">Finish the seven questions and the three studios that fit price the same lines for you.</p>
         </Body>
         <Foot>
-          <Cta href="/app/q/1">Start the brief</Cta>
+          <Cta href="/app/q/1">Start my Home Profile</Cta>
         </Foot>
       </Frame>
     );
