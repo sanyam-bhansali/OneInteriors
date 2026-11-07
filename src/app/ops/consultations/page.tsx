@@ -166,7 +166,7 @@ async function PrepCard({
             <div key={a.label} className="contents">
               <dt className="label m-0 pt-0.5">{a.label}</dt>
               <dd
-                className={`m-0 text-[14px] leading-snug ${a.label === 'Rules out' ? 'text-[var(--color-atrisk)]' : 'text-[var(--color-ink)]'}`}
+                className={`m-0 whitespace-pre-line text-[14px] leading-snug ${a.label === 'Rules out' ? 'text-[var(--color-atrisk)]' : 'text-[var(--color-ink)]'}`}
               >
                 {a.value}
               </dd>

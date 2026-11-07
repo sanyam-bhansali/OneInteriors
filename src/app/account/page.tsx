@@ -4,6 +4,7 @@ import { BEDROOMS } from '@/modules/quotation/estimate';
 import { carpetAreaFor } from '@/modules/brief/steps';
 import { selectionOf } from '@/modules/quotation/scope';
 import { layoutRoomsInScope } from '@/modules/brief/flat-layout';
+import { RoomsFold } from './RoomsFold';
 import { loadPrepPack } from '@/modules/prepare/prep';
 import { PrepClient } from '@/app/prepare/PrepClient';
 import { countdownFor } from '@/modules/portal/countdown';
@@ -88,7 +89,7 @@ export default async function AccountPage() {
             {user.name ? `Hello, ${user.name.split(' ')[0]}.` : 'Your project'}
           </h1>
           <p className="lede mb-6 max-w-[58ch]">
-            Your home, with us — your brief, the studios that fit, your quotes, your expert call and
+            Your home, with us — your Home Profile, the studios that fit, your quotes, your expert call and
             everything after it, in one place.
           </p>
 
@@ -199,7 +200,7 @@ export default async function AccountPage() {
                     .
                   </>
                 ) : (
-                  'They appear once your brief is finished.'
+                  'They appear once your Home Profile is finished.'
                 )}
               </Empty>
             ) : (
@@ -229,7 +230,7 @@ export default async function AccountPage() {
             action={quotes.length > 0 ? { href: '/compare', label: 'Compare' } : undefined}
           >
             {quotes.length === 0 ? (
-              <Empty>No quotes yet. They appear once you have finished your brief.</Empty>
+              <Empty>No quotes yet. They appear once you have finished your Home Profile.</Empty>
             ) : (
               <>
                 <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -389,7 +390,6 @@ export default async function AccountPage() {
           {/* The room boards live here now (queue item 21): /prepare was a
               second place to be, with a second floor-plan upload the brief
               already asks for. */}
-          <div id="rooms" />
           <Section title="Your rooms">
             <Empty>
               {rooms.length > 0
@@ -397,7 +397,7 @@ export default async function AccountPage() {
                 : 'A mood board for each room — styles, finishes and what matters there. None of it is required; the expert and your studio see it before they talk to you.'}
             </Empty>
             {prep && prep.brief.completedAt ? (
-              <div className="mt-5">
+              <RoomsFold count={prep.plan.rooms.length}>
                 <PrepClient
                   rooms={prep.plan.rooms.map((room) => ({
                     key: room.key,
@@ -419,7 +419,7 @@ export default async function AccountPage() {
                     ]),
                   )}
                 />
-              </div>
+              </RoomsFold>
             ) : null}
             {designTool ? (
               <p className="m-0 mt-3">
@@ -463,7 +463,7 @@ export default async function AccountPage() {
               </p>
               <p className="m-0 mt-1 text-[13.5px] text-[var(--color-ink-3)]">
                 Share oneinteriors.in/r/{referral.code}
-                {referral.count > 0 ? ` · ${referral.count} ${referral.count === 1 ? 'friend has' : 'friends have'} started a brief with it` : ''}
+                {referral.count > 0 ? ` · ${referral.count} ${referral.count === 1 ? 'friend has' : 'friends have'} started a Home Profile with it` : ''}
               </p>
             </Section>
           ) : null}
@@ -472,7 +472,7 @@ export default async function AccountPage() {
           {briefDone ? (
             <Section title="Deciding with someone?">
               <p className="m-0 mb-4 max-w-[62ch] text-[14.5px] leading-relaxed text-[var(--color-ink-2)]">
-                A read-only link to your brief, your quotes and the comparison — for whoever else is
+                A read-only link to your Home Profile, your quotes and the comparison — for whoever else is
                 deciding. It does not show your phone number, and you can switch it off.
               </p>
               <ShareButton />
@@ -572,7 +572,10 @@ export default async function AccountPage() {
               <Empty>Nothing recorded yet.</Empty>
             ) : (
               <ul className="m-0 flex list-none flex-col gap-2 p-0">
-                {latestByPurpose(consents).map((consent) => (
+                {latestByPurpose(consents)
+                  /* No WhatsApp from us (owner, 1 Nov 2026): listed only so an earlier yes can be withdrawn. */
+                  .filter((c) => c.purpose !== 'MARKETING_WHATSAPP' || (c.granted && !c.withdrawnAt))
+                  .map((consent) => (
                   <li
                     key={consent.purpose}
                     className="flex flex-wrap items-baseline justify-between gap-3 border-b border-[var(--color-rule-soft)] py-3"
@@ -611,7 +614,7 @@ export default async function AccountPage() {
 }
 
 const PATH: { stage: Stage; label: string }[] = [
-  { stage: 'BRIEF_DONE', label: 'Brief' },
+  { stage: 'BRIEF_DONE', label: 'Home Profile' },
   { stage: 'CALL_BOOKED', label: 'Expert call' },
   { stage: 'INTRODUCED', label: 'Introduced' },
   { stage: 'SIGNED', label: 'Signed' },

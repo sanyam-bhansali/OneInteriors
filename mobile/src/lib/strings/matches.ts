@@ -20,11 +20,11 @@ export const matchesWords = {
   },
   'matches.first.h1': { en: 'Seven questions first.', hi: 'पहले सात सवाल।', mr: 'आधी सात प्रश्न.' },
   'matches.first.sub': {
-    en: 'Your matches are worked out from your answers, so they come after the brief.',
+    en: 'Your matches are worked out from your answers, so they come after your Home Profile.',
     hi: 'आपके मैच आपके जवाबों से तय होते हैं, इसलिए वे सवालों के बाद आते हैं।',
     mr: 'तुमचे मॅच तुमच्या उत्तरांवरून ठरतात, म्हणून ते प्रश्नांनंतर येतात.',
   },
-  'matches.first.cta': { en: 'Start the brief', hi: 'सवाल शुरू करें', mr: 'प्रश्न सुरू करा' },
+  'matches.first.cta': { en: 'Start your Home Profile', hi: 'सवाल शुरू करें', mr: 'प्रश्न सुरू करा' },
   'matches.none.h1': { en: 'No studio fits all of that yet.', hi: 'अभी कोई स्टूडियो इन सब पर खरा नहीं उतरता।', mr: 'अजून कोणताही स्टुडिओ या सगळ्यात बसत नाही.' },
   'matches.none.sub': {
     en: 'We would rather say so than show you a studio that does not fit. Change an answer and we will look again.',
@@ -44,7 +44,7 @@ export const matchesWords = {
   'studios.count': { en: '{n} studios, best match first', hi: '{n} स्टूडियो, सबसे अच्छा मैच पहले', mr: '{n} स्टुडिओ, सर्वोत्तम मॅच आधी' },
   'studios.countOne': { en: '1 studio, best match first', hi: '1 स्टूडियो, सबसे अच्छा मैच पहले', mr: '1 स्टुडिओ, सर्वोत्तम मॅच आधी' },
   'studios.countPlain': {
-    en: '{n} studios. Finish the brief to see how each one matches.',
+    en: '{n} studios. Finish your Home Profile to see how each one matches.',
     hi: '{n} स्टूडियो। हर एक का मैच देखने के लिए सवाल पूरे करें।',
     mr: '{n} स्टुडिओ. प्रत्येकाचा मॅच पाहण्यासाठी प्रश्न पूर्ण करा.',
   },
@@ -58,7 +58,7 @@ export const matchesWords = {
   'studio.save': { en: 'Save studio', hi: 'स्टूडियो सेव करें', mr: 'स्टुडिओ सेव्ह करा' },
   'studio.saved': { en: 'Saved on this phone', hi: 'इस फ़ोन पर सेव किया', mr: 'या फोनवर सेव्ह केले' },
   'studio.tile.match': { en: 'Match for you', hi: 'आपके लिए मैच', mr: 'तुमच्यासाठी मॅच' },
-  'studio.tile.unscored': { en: 'Finish the brief to score', hi: 'अंक के लिए सवाल पूरे करें', mr: 'गुणांसाठी प्रश्न पूर्ण करा' },
+  'studio.tile.unscored': { en: 'Finish your Home Profile to score', hi: 'अंक के लिए सवाल पूरे करें', mr: 'गुणांसाठी प्रश्न पूर्ण करा' },
   'studio.tile.checks': { en: 'Checks passed', hi: 'जाँच पास', mr: 'तपासण्या पास' },
   'studio.tile.homes': { en: 'Homes handed over with us', hi: 'हमारे साथ सौंपे गए घर', mr: 'आमच्यासोबत सुपूर्द केलेली घरे' },
   'studio.tile.reviews': { en: '{n} verified reviews', hi: '{n} पक्के रिव्यू', mr: '{n} पडताळलेले रिव्ह्यू' },
@@ -98,7 +98,7 @@ export const matchesWords = {
   'studio.reviews.h': { en: '{stars} from {n} customers', hi: '{n} ग्राहकों से {stars}', mr: '{n} ग्राहकांकडून {stars}' },
   'studio.reviews.verified': { en: 'Verified project', hi: 'पक्का प्रोजेक्ट', mr: 'पडताळलेला प्रकल्प' },
   'studio.cta': { en: 'Get my quote from {name}', hi: '{name} से मेरा कोटेशन लें', mr: '{name} कडून माझे कोटेशन घ्या' },
-  'studio.start': { en: 'Start my brief', hi: 'मेरे सवाल शुरू करें', mr: 'माझे प्रश्न सुरू करा' },
+  'studio.start': { en: 'Start my Home Profile', hi: 'मेरे सवाल शुरू करें', mr: 'माझे प्रश्न सुरू करा' },
   'studio.missing.h1': { en: 'We could not find that studio.', hi: 'वह स्टूडियो हमें नहीं मिला।', mr: 'तो स्टुडिओ आम्हाला सापडला नाही.' },
   'studio.missing.sub': {
     en: 'It may have paused new work. Every studio taking work is on the full list.',

@@ -19,7 +19,7 @@ export const COMPARE_DICT = {
     hi: 'हर कोटेशन एक जैसी लाइनों पर, हर दाम के नीचे उसका मटीरियल।',
     mr: 'प्रत्येक कोटेशन सारख्याच ओळींवर, प्रत्येक किमतीखाली त्याचे मटेरियल.',
   },
-  'meta.briefTitle': { en: 'Comparison brief', hi: 'तुलना का सार', mr: 'तुलनेचा सारांश' },
+  'meta.briefTitle': { en: 'Comparison summary', hi: 'तुलना का सार', mr: 'तुलनेचा सारांश' },
 
   // ── the star ──
   'star.on': {
@@ -140,7 +140,7 @@ export const COMPARE_DICT = {
     mr: 'दोन्ही बाजूंना तेच मटेरियल. इथे सरळ किमतीचा फरक आहे.',
   },
   briefLink: {
-    en: 'The one-page brief — to print, save or send to family →',
+    en: 'The one-page summary — to print, save or send to family →',
     hi: 'एक पेज का सार — प्रिंट करें, सेव करें या परिवार को भेजें →',
     mr: 'एका पानाचा सारांश — प्रिंट करा, सेव्ह करा किंवा कुटुंबाला पाठवा →',
   },
@@ -158,9 +158,9 @@ export const COMPARE_DICT = {
   },
   another: { en: 'Price another studio', hi: 'दूसरे स्टूडियो का दाम देखें', mr: 'दुसऱ्या स्टुडिओची किंमत पाहा' },
   footnote: {
-    en: 'Standard scope, priced before anybody has stood in your flat — the bands say how far each could move. Your architect is paid by us, never by a studio.',
-    hi: 'स्टैंडर्ड काम, आपके फ़्लैट को किसी के देखे बिना लगाया गया दाम — रेंज बताती है कि हर दाम कितना ऊपर-नीचे हो सकता है। आपके आर्किटेक्ट को पैसे हम देते हैं, कोई स्टूडियो कभी नहीं।',
-    mr: 'स्टँडर्ड काम, तुमचा फ्लॅट कोणी पाहण्याआधी लावलेली किंमत — रेंज सांगते की प्रत्येक किंमत किती कमी-जास्त होऊ शकते. तुमच्या आर्किटेक्टला पैसे आम्ही देतो, कोणताही स्टुडिओ कधीच नाही.',
+    en: 'Standard scope, priced before anybody has stood in your flat — the bands say how far each could move. Your expert is paid by us, never by a studio.',
+    hi: 'स्टैंडर्ड काम, आपके फ़्लैट को किसी के देखे बिना लगाया गया दाम — रेंज बताती है कि हर दाम कितना ऊपर-नीचे हो सकता है। आपके एक्सपर्ट को पैसे हम देते हैं, कोई स्टूडियो कभी नहीं।',
+    mr: 'स्टँडर्ड काम, तुमचा फ्लॅट कोणी पाहण्याआधी लावलेली किंमत — रेंज सांगते की प्रत्येक किंमत किती कमी-जास्त होऊ शकते. तुमच्या एक्सपर्टला पैसे आम्ही देतो, कोणताही स्टुडिओ कधीच नाही.',
   },
 
   // ── who fits ──
@@ -271,7 +271,7 @@ export const COMPARE_DICT = {
     mr: 'आधी किमान दोन कोटेशन शेजारी-शेजारी ठेवा.',
   },
   'brief.backToCompare': { en: 'Back to compare', hi: 'तुलना पर वापस', mr: 'तुलनेकडे परत' },
-  'brief.eyebrow': { en: 'Comparison brief · {date}', hi: 'तुलना का सार · {date}', mr: 'तुलनेचा सारांश · {date}' },
+  'brief.eyebrow': { en: 'Comparison summary · {date}', hi: 'तुलना का सार · {date}', mr: 'तुलनेचा सारांश · {date}' },
   'brief.preparedFor': { en: 'Prepared for {who}', hi: '{who} के लिए तैयार', mr: '{who} यांच्यासाठी तयार' },
   'brief.print': { en: 'Print or save as PDF', hi: 'प्रिंट करें या PDF में सेव करें', mr: 'प्रिंट करा किंवा PDF म्हणून सेव्ह करा' },
   'brief.footer': {

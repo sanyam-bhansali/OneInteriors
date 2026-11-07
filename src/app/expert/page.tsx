@@ -259,6 +259,7 @@ export default async function ExpertPage({
             defaultName={user?.name ?? contact?.name ?? brief.contactName ?? null}
             defaultPhone={user?.phone ?? contact?.phone ?? null}
             defaultEmail={user?.email ?? null}
+            verifiedPhone={user?.phone ?? null}
             preview={Boolean(previewBrief)}
             slots={(previewBrief && slots.length === 0 ? usualHours() : slots).map((s) => s.startsAt)}
             initialSlot={typeof slot === 'string' ? slot : null}

@@ -32,7 +32,7 @@ export async function createShareLinkAction(): Promise<ShareLinkResult> {
       ok: false,
       error:
         result.reason === 'no_brief'
-          ? 'We could not find your brief on this account.'
+          ? 'We could not find your Home Profile on this account.'
           : 'Could not create a link just now. Try again in a moment.',
     };
   }

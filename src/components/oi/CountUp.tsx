@@ -32,7 +32,10 @@ export function CountUp({
   label: string;
 }) {
   const reduced = useReducedMotion();
-  const [shown, setShown] = useState(reduced ? to : 0);
+  // Always start at 0: the server cannot know the motion setting, so starting
+  // at `to` when reduced would make the first paint differ from the server's
+  // HTML and break hydration. The effect below jumps straight to `to`.
+  const [shown, setShown] = useState(0);
   /** So a re-render mid-tween does not restart the count. */
   const ran = useRef(false);
 

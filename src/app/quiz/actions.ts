@@ -80,7 +80,7 @@ export async function recordQuizConsentAction(
   if (blocking.length > 0) {
     return {
       ok: false,
-      error: 'We cannot introduce you to a studio without passing on your brief.',
+      error: 'We cannot introduce you to a studio without passing on your Home Profile.',
     };
   }
 

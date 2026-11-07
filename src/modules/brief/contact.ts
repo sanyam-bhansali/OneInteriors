@@ -33,7 +33,7 @@ import { cleanName } from './steps';
 export interface ContactInput {
   name: string;
   phone: string;
-  /** Required on the website (owner, 10 Oct 2026); optional in the phone app, which does not ask. */
+  /** Optional (owner, 4 Nov 2026: number and code are enough). The phone app does not ask. */
   email: string;
   /** The notice. Required. */
   agreed: boolean;
