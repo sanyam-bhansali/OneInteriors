@@ -5,6 +5,7 @@ import { rosterIsReal } from '@/lib/env';
 import { StartLink } from '@/components/StartCta';
 
 const NAV = [
+  { href: '/discover', label: 'Discover' },
   { href: '/studios', label: 'Studios' },
   { href: '/verification', label: 'How we verify' },
 ];

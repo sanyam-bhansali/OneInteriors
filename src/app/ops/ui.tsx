@@ -1,65 +1,10 @@
-import Link from 'next/link';
-import { Container } from '@/components/ui';
-import { Mark } from '@/components/brand';
-
 /**
- * Ops chrome. Deliberately distinct from the customer header — a dark band, so
- * nobody is ever confused about which surface they are on, and no screenshot of
- * an internal queue can be mistaken for the public site.
+ * Ops chrome now lives in the ops layout (OpsShell: the studio app's look,
+ * owner 7 Nov 2026). Pages still render <OpsHeader />; it draws nothing, so
+ * they need no change.
  */
 export function OpsHeader() {
-  return (
-    <header className="border-b border-[var(--color-rule)] bg-[var(--color-petrol-deep)] text-[var(--color-paper)]">
-      <Container size="wide">
-        <div className="flex items-center justify-between gap-4 py-3.5">
-          <Link href="/ops" className="flex items-center gap-2.5 no-underline">
-            <Mark className="h-6 w-6 text-[var(--color-paper)]" />
-            <span className="font-[family-name:var(--font-display)] text-[19px] leading-none text-[var(--color-paper)]">
-              One Interiors
-            </span>
-            <span className="rounded-full bg-[var(--color-brass-bright)] px-2 py-0.5 font-[family-name:var(--font-mono)] text-[9.5px] uppercase tracking-[0.14em] text-[#1A1405]">
-              Ops
-            </span>
-          </Link>
-          {/* Ordered by how often ops actually opens them, not alphabetically.
-              Overview first because it is where the day starts. */}
-          <nav className="flex flex-wrap items-center gap-x-5 gap-y-1">
-            <OpsLink href="/ops">Overview</OpsLink>
-            <OpsLink href="/ops/applications">Applications</OpsLink>
-            <OpsLink href="/ops/verification">Verification</OpsLink>
-            <OpsLink href="/ops/allocation">Allocation</OpsLink>
-            <OpsLink href="/ops/coverage">Coverage</OpsLink>
-            <OpsLink href="/ops/consultations">Calls</OpsLink>
-            <OpsLink href="/ops/follow-ups">Follow-ups</OpsLink>
-            <OpsLink href="/ops/experts">Expert hours</OpsLink>
-            {/* After the call. Everything from the handoff to whether the
-                meeting happened — the half of the funnel we charge for and,
-                until now, the only half nothing on this surface could see. */}
-            <OpsLink href="/ops/introductions">Introductions</OpsLink>
-            <OpsLink href="/ops/funnel">Funnel</OpsLink>
-            {/* The customer app's weekly "Spot the mistake" photo. */}
-            <OpsLink href="/ops/challenge">Challenge</OpsLink>
-            {/* Pre-launch signups from oneinteriors.in, and which society
-                WhatsApp group each one came through. */}
-            <OpsLink href="/ops/waitlist">Waitlist</OpsLink>
-            <OpsLink href="/ops/data">Data</OpsLink>
-            <OpsLink href="/">Public site</OpsLink>
-          </nav>
-        </div>
-      </Container>
-    </header>
-  );
-}
-
-function OpsLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-[var(--color-paper)] no-underline opacity-70 hover:opacity-100"
-    >
-      {children}
-    </Link>
-  );
+  return null;
 }
 
 /** Checks complete, as a bar. Colour follows completeness, shape carries it too. */
