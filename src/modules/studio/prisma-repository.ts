@@ -86,6 +86,7 @@ function toPortfolio(row: StudioRow['portfolio'][number]): PortfolioProject {
     tags: row.tags,
     imageRooms: row.imageRooms,
     pickerConsent: row.pickerConsent,
+    imageTags: row.imageTags ?? null,
   };
 }
 

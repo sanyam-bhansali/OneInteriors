@@ -28,6 +28,7 @@ import { getLang } from '@/modules/i18n/server';
 import { translator, tx, type Lang } from '@/modules/i18n/site';
 import { EXPERT_DICT, offerText } from '@/modules/i18n/site/expert';
 import { PROPERTY_TX } from '@/modules/i18n/site/labels';
+import { DiscoverSync } from '@/app/discover/DiscoverSync';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = translator(await getLang(), EXPERT_DICT);
@@ -132,6 +133,7 @@ export default async function ExpertPage({
 
   return (
     <FlowShell>
+      <DiscoverSync />
       <AppHeader />
       <Spine
         at="expert"

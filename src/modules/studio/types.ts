@@ -76,6 +76,8 @@ export interface PortfolioProject {
   imageRooms?: string[];
   /** May these appear, unnamed, in the homeowner's style picker? */
   pickerConsent?: boolean;
+  /** Discover: per image, our team's materials and check (modules/discover/tags.ts). */
+  imageTags?: unknown;
 }
 
 export interface Studio {
