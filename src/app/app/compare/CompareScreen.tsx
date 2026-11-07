@@ -34,7 +34,7 @@ export function CompareScreen({ data }: { data: AppData }) {
         <Head back="/app/quote" />
         <Body>
           <h1 className="oa-title">Nothing to compare yet.</h1>
-          <p className="oa-sub">A comparison needs at least two studios priced on your brief.</p>
+          <p className="oa-sub">A comparison needs at least two studios priced on your Home Profile.</p>
         </Body>
         <Foot>
           <Cta href="/app/q/1">Change my answers</Cta>

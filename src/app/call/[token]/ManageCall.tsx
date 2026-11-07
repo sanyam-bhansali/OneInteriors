@@ -42,7 +42,7 @@ export function ManageCall({ token, slots }: { token: string; slots: string[] })
       <section className="border-t border-[var(--line)] pt-6">
         {confirmCancel ? (
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-[14.5px]">Cancel the call? Your brief and quotes stay in &ldquo;Your home&rdquo;.</span>
+            <span className="text-[14.5px]">Cancel the call? Your Home Profile and quotes stay in &ldquo;Your home&rdquo;.</span>
             <button
               type="button"
               disabled={pending}

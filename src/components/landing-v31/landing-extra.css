@@ -1,0 +1,183 @@
+/* The design's serif, Playfair Display (SIL OFL), bundled like the site's other
+   faces and loaded only on this page. */
+@font-face {
+  font-family: 'Playfair Display';
+  src: url('../../app/fonts/playfair-display-latin.woff2') format('woff2');
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Playfair Display';
+  src: url('../../app/fonts/playfair-display-latin-italic.woff2') format('woff2');
+  font-weight: 400 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* The language picker. Written by hand, not generated: the design has none.
+   It stays at the top of the page and scrolls away, so it never floats over
+   the content. On wide screens it sits in the empty stretch of the top bar
+   right of the logo; below that, under the button. */
+.lv31-langbar {
+  position: absolute;
+  top: 22px;
+  left: calc(clamp(16px, 4vw, 56px) + 128px);
+  z-index: 60;
+}
+.lv31-langbar .oi-langs {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(14, 14, 13, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(241, 240, 236, 0.16);
+}
+.lv31-langbar .oi-langs button {
+  border: 0;
+  background: transparent;
+  color: #f1f0ec;
+  font: 500 13px/1 var(--font-geist), system-ui, sans-serif;
+  padding: 7px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.lv31-langbar .oi-langs button[aria-checked='true'] {
+  background: #f1f0ec;
+  color: #0e0e0d;
+}
+@media (max-width: 1099px) {
+  .lv31-langbar {
+    top: 76px;
+    left: auto;
+    right: clamp(16px, 4vw, 56px);
+  }
+  .lv31-langbar .oi-langs button {
+    padding: 8px 10px;
+    font-size: 12.5px;
+  }
+}
+
+/* Fixes on the design file (owner asked, 4 Nov 2026). */
+/* The photo caption sat on top of the "Free · About 4 minutes · …" line
+   between phone and wide-laptop widths: the line now stops short of it. */
+@media (min-width: 601px) and (max-width: 1280px) {
+  .lv31 .hero-note { max-width: calc(100% - 240px); }
+}
+/* The hero slides stuck out a few pixels on narrow screens. */
+.lv31 .hero { overflow: hidden; }
+
+/* Hindi and Marathi: Devanagari's top line and matras need more height than
+   the design's English line-height, or the roll-over text is clipped. */
+.lv31:is(:lang(hi), :lang(mr)) .roll { line-height: 1.55; }
+.lv31:is(:lang(hi), :lang(mr)) .split .w { padding-top: 0.12em; margin-top: -0.12em; padding-bottom: 0.16em; margin-bottom: -0.16em; }
+.lv31:is(:lang(hi), :lang(mr)) .h-xl,
+.lv31:is(:lang(hi), :lang(mr)) .h-l,
+.lv31:is(:lang(hi), :lang(mr)) .h-m { line-height: 1.18; letter-spacing: -0.01em; }
+
+/* The site's Tailwind reset reaches inside the page; give back the browser
+   defaults the design was drawn with. :where() keeps the design's own rules
+   winning wherever it sets these itself. */
+.lv31 :where(sup) { position: static; top: auto; line-height: inherit; vertical-align: super; font-size: smaller; }
+.lv31 :where(button) { padding: 1px 6px; line-height: normal; }
+.lv31 :where(input[type='range']) { margin: 2px; font-size: 13.333px; line-height: normal; color: #101010; background-color: #fff; }
+
+/* The closing heading's orange words are "Home Profile". The design colours
+   from the fourth word on; the wording here puts them third and fourth in
+   English, second and third in Hindi and Marathi. */
+.lv31 .fin .h-l .w:nth-of-type(3) .wi { color: #c1582e; }
+.lv31:is(:lang(hi), :lang(mr)) .fin .h-l .w:nth-of-type(2) .wi { color: #c1582e; }
+.lv31:is(:lang(hi), :lang(mr)) .fin .h-l .w:nth-of-type(4) .wi { color: inherit; }
+
+/* The design hides sideways overflow on <body>, where the browser passes it to
+   the window. On this wrapper `hidden` would make a scroll box of its own and
+   stop everything inside from pinning, such as the room in "How it works".
+   `clip` hides the overflow without that. */
+.lv31 { overflow-x: clip; overflow-y: visible; }
+
+/* "How it works": a card over the room showing what each step actually is
+   (owner, 7 Nov 2026). The room keeps building behind it. The numbers are the
+   page's own sample, the same as the match and quote sections further down. */
+.lv31 .scenes { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(14, 14, 13, 0.12), rgba(14, 14, 13, 0.38)); }
+.lv31 .sc {
+  position: absolute; left: 50%; top: 50%; width: min(86%, 500px); box-sizing: border-box;
+  padding: clamp(16px, 2.1vw, 26px); border-radius: 18px; color: #0e0e0d; background: rgba(251, 249, 244, 0.97);
+  box-shadow: 0 30px 70px -24px rgba(0, 0, 0, 0.65), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  opacity: 0; transform: translate(-50%, calc(-50% + 18px)) scale(0.98); visibility: hidden;
+  transition: opacity 0.45s ease, transform 0.55s cubic-bezier(0.2, 0.7, 0.2, 1), visibility 0s linear 0.45s;
+}
+.lv31 .sc.on { opacity: 1; transform: translate(-50%, -50%); visibility: visible; transition-delay: 0.08s, 0.08s, 0s; }
+.lv31 .sc [style*='--i'] { opacity: 0; transform: translateY(8px); transition: opacity 0.4s ease, transform 0.4s ease; }
+.lv31 .sc.on [style*='--i'] { opacity: 1; transform: none; transition-delay: calc(0.14s + var(--i) * 0.06s); }
+.lv31 .sc-h { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-bottom: 12px; font: 600 clamp(16px, 1.45vw, 19px)/1.2 var(--display); letter-spacing: -0.02em; }
+.lv31 .sc-ex { flex: none; font: 500 10px/1 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: #6b655c; padding: 5px 8px; border-radius: 999px; background: rgba(14, 14, 13, 0.06); }
+.lv31 .sc b { font-weight: 600; }
+.lv31 .sc em { font-style: normal; }
+
+.lv31 .sc-r, .lv31 .sc-t { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 9px 0; border-top: 1px solid rgba(14, 14, 13, 0.1); font-size: 14px; line-height: 1.3; }
+.lv31 .sc-r > span { color: #6b655c; }
+.lv31 .sc-r > b { text-align: right; font-variant-numeric: tabular-nums; }
+.lv31 .sc-t { margin-top: 8px; padding: 12px 14px; border: 0; border-radius: 12px; align-items: center; background: #c1582e; color: #fff; font-size: 13px; }
+.lv31 .sc-t b { flex: none; font: 600 clamp(20px, 2vw, 26px)/1 var(--display); letter-spacing: -0.02em; }
+
+.lv31 .sc-done { display: flex; align-items: center; gap: 12px; padding-top: 12px; font: 500 11px/1 var(--mono); color: #6b655c; white-space: nowrap; }
+.lv31 .sc-done i, .lv31 .sc-bar { display: block; flex: 1; height: 5px; border-radius: 9px; overflow: hidden; background: rgba(14, 14, 13, 0.09); }
+.lv31 .sc-done u, .lv31 .sc-bar u { display: block; height: 100%; border-radius: 9px; background: #c1582e; transform: scaleX(0); transform-origin: left; transition: transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.2s; }
+.lv31 .sc-done u { width: 100%; }
+.lv31 .sc.on .sc-done u, .lv31 .sc.on .sc-bar u { transform: none; }
+
+.lv31 .sc-m { display: grid; grid-template-columns: 56px 34px minmax(0, 1fr); column-gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid rgba(14, 14, 13, 0.1); }
+.lv31 .sc-score { font: 600 24px/1 var(--display); letter-spacing: -0.03em; color: #c1582e; }
+.lv31 .sc-score small { font-size: 12px; }
+.lv31 .sc .st-logo { width: 34px; height: 34px; border-radius: 10px; }
+.lv31 .sc-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 14px; line-height: 1.25; }
+.lv31 .sc-who em { font-size: 12px; color: #6b655c; }
+.lv31 .sc-bar { grid-column: 1 / -1; flex: none; height: 3px; margin-top: 9px; }
+
+.lv31 .sc-c, .lv31 .sc-why { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr) minmax(0, 1.05fr); column-gap: 10px; align-items: baseline; }
+.lv31 .sc-c { padding: 9px 0; border-top: 1px solid rgba(14, 14, 13, 0.1); font-size: 14px; font-variant-numeric: tabular-nums; }
+.lv31 .sc-c > span { color: #6b655c; }
+.lv31 .sc-ch { border-top: 0; padding-top: 0; font-size: 12.5px; line-height: 1.2; }
+.lv31 .sc-hot { margin: 0 -10px; padding: 9px 10px 3px; border-top: 0; border-radius: 10px 10px 0 0; background: rgba(193, 88, 46, 0.12); }
+.lv31 .sc-why { margin: 0 -10px; padding: 0 10px 9px; border-radius: 0 0 10px 10px; background: rgba(193, 88, 46, 0.12); font-size: 11.5px; line-height: 1.25; color: #8a3f20; }
+.lv31 .sc-tot { font-size: 15px; }
+.lv31 .sc-tot > b { font-family: var(--display); }
+.lv31 .sc-q { padding-top: 10px; text-align: center; font-size: 13px; font-weight: 600; color: #c1582e; }
+
+.lv31 .sc-call { display: flex; align-items: center; gap: 14px; padding-bottom: 14px; }
+.lv31 .sc-av { flex: none; display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; color: #fff; background: #c1582e; }
+.lv31 .sc-call .sc-who { flex: 1; font-size: 17px; }
+.lv31 .sc-call .sc-who em { font-size: 13px; }
+.lv31 .sc-live { flex: none; width: 10px; height: 10px; border-radius: 50%; background: #3d8b5f; box-shadow: 0 0 0 5px rgba(61, 139, 95, 0.18); }
+.lv31 .sc-l { list-style: none; margin: 0; padding: 0; }
+.lv31 .sc-l li { display: flex; gap: 10px; align-items: baseline; padding: 10px 0; border-top: 1px solid rgba(14, 14, 13, 0.1); font-size: 14px; line-height: 1.3; }
+.lv31 .sc-l li > span { flex: none; color: #3d8b5f; font-weight: 700; }
+
+/* A short room frame: on phones it is a band across the top of the screen. */
+@media (max-width: 960px), (max-height: 640px) {
+  .lv31 .sc { width: 92%; padding: 12px 14px; border-radius: 14px; }
+  .lv31 .sc-x { display: none; }
+  .lv31 .sc-h { padding-bottom: 7px; font-size: 14.5px; }
+  .lv31 .sc-r, .lv31 .sc-c, .lv31 .sc-l li { padding: 6px 0; font-size: 12.5px; }
+  .lv31 .sc-t { margin-top: 5px; padding: 8px 10px; font-size: 11.5px; }
+  .lv31 .sc-t b { font-size: 18px; }
+  .lv31 .sc-done { padding-top: 7px; }
+  .lv31 .sc-m { grid-template-columns: 44px 26px minmax(0, 1fr); column-gap: 8px; padding: 6px 0; }
+  .lv31 .sc-score { font-size: 18px; }
+  .lv31 .sc .st-logo { width: 26px; height: 26px; border-radius: 8px; }
+  .lv31 .sc-who { font-size: 12.5px; }
+  .lv31 .sc-who em { font-size: 10.5px; }
+  .lv31 .sc-bar { margin-top: 5px; }
+  .lv31 .sc-ch { font-size: 11px; }
+  .lv31 .sc-why { font-size: 10.5px; padding-bottom: 6px; }
+  .lv31 .sc-hot { padding-top: 6px; }
+  .lv31 .sc-tot { font-size: 13px; }
+  .lv31 .sc-q { padding-top: 6px; font-size: 12px; }
+  .lv31 .sc-call { gap: 10px; padding-bottom: 8px; }
+  .lv31 .sc-av { width: 38px; height: 38px; }
+  .lv31 .sc-av svg { width: 20px; height: 20px; }
+  .lv31 .sc-call .sc-who { font-size: 14px; }
+  .lv31 .sc-call .sc-who em { font-size: 11.5px; }
+}

@@ -69,7 +69,7 @@ export const quoteWords = {
     hi: 'सातों सवाल पूरे कीजिए, फिर आपके लिए सही तीन स्टूडियो वही लाइनें प्राइस करेंगे।',
     mr: 'सातही प्रश्न पूर्ण करा, मग तुम्हाला जुळणारे तीन स्टुडिओ त्याच ओळींची किंमत देतील.',
   },
-  'quoteApp.none.cta': { en: 'Start the brief', hi: 'ब्रीफ़ शुरू करें', mr: 'ब्रीफ सुरू करा' },
+  'quoteApp.none.cta': { en: 'Start your Home Profile', hi: 'अपनी Home Profile बनाइए', mr: 'तुमची Home Profile बनवा' },
   'quoteApp.retry': { en: 'Try again', hi: 'फिर से कोशिश करें', mr: 'पुन्हा प्रयत्न करा' },
 
   // Compare (#14)
@@ -103,9 +103,9 @@ export const quoteWords = {
   },
   'compare.none.h1': { en: 'Nothing to compare yet.', hi: 'अभी तुलना के लिए कुछ नहीं।', mr: 'अजून तुलना करण्यासारखे काही नाही.' },
   'compare.none.sub': {
-    en: 'A comparison needs at least two studios priced on your brief.',
-    hi: 'तुलना के लिए आपके ब्रीफ़ पर कम से कम दो स्टूडियो के दाम चाहिए।',
-    mr: 'तुलनेसाठी तुमच्या ब्रीफवर किमान दोन स्टुडिओंच्या किमती हव्यात.',
+    en: 'A comparison needs at least two studios priced on your Home Profile.',
+    hi: 'तुलना के लिए आपकी Home Profile पर कम से कम दो स्टूडियो के दाम चाहिए।',
+    mr: 'तुलनेसाठी तुमच्या Home Profile वर किमान दोन स्टुडिओंच्या किमती हव्यात.',
   },
   'compare.error': { en: 'We could not put the quotes side by side.', hi: 'हम कोटेशन साथ-साथ नहीं दिखा सके।', mr: 'आम्ही कोटेशन शेजारी-शेजारी दाखवू शकलो नाही.' },
 

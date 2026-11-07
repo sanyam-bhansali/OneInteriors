@@ -284,7 +284,7 @@ export async function sendCallBooked(
           hello,
           '',
           `Your expert call on ${call.when.day} at ${call.when.time} is cancelled.`,
-          'Nothing else changes — your brief and quotes are still in "Your home",',
+          'Nothing else changes — your Home Profile and quotes are still in "Your home",',
           'and you can book another time whenever you like.',
         ]
       : [
@@ -296,7 +296,7 @@ export async function sendCallBooked(
           '',
           call.studios.length > 0 ? `We will go through ${call.studios.join(', ')} with you.` : '',
           'We ring you; there is nothing to install and nothing to prepare. The',
-          'expert has your brief and your quotes, exactly as you saw them.',
+          'expert has your Home Profile and your quotes, exactly as you saw them.',
           '',
           call.manageUrl
             ? `To move or cancel it (up to an hour before): ${call.manageUrl}`

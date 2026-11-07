@@ -42,7 +42,7 @@ export const JOURNEY: JourneyStep[] = [
   {
     name: `${PREFIX}Match`,
     title: 'Studios that fit, ranked by fit',
-    body: 'From the verified roster, ordered by how well they match your brief and nothing else. We show you why each one appeared, and where the score is a guess rather than a measurement.',
+    body: 'From the verified roster, ordered by how well they match your Home Profile and nothing else. We show you why each one appeared, and where the score is a guess rather than a measurement.',
     duration: 'Instant',
   },
   {

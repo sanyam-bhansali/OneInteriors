@@ -19,7 +19,7 @@ export type Stage = (typeof STAGES)[number];
 
 const STAGE_WORDS: Record<Stage, string> = {
   START: 'now',
-  BRIEF_DONE: 'once your brief is finished',
+  BRIEF_DONE: 'once your Home Profile is finished',
   CALL_BOOKED: 'once your expert call is booked',
   INTRODUCED: 'once we introduce you to a studio',
   SIGNED: 'when you sign with a studio through us',
@@ -70,7 +70,7 @@ export const BENEFITS: Benefit[] = [
     title: 'An expert who is not selling',
     terms: 'No studio pays our experts. They are there to help you choose, not to sell you one.',
     unlocksAt: 'BRIEF_DONE',
-    short: 'An architect who is not selling',
+    short: 'An expert who is not selling',
   },
   {
     id: 'curated-discount',

@@ -45,7 +45,6 @@ export function VerifyScreen({ data }: { data: AppData }) {
   const [wait, setWait] = useState(0);
   const [devCode, setDevCode] = useState<string | null>(null);
   const [agreed, setAgreed] = useState(false);
-  const [whatsapp, setWhatsapp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,7 +84,7 @@ export function VerifyScreen({ data }: { data: AppData }) {
       return;
     }
     setBusy(true);
-    const contact = await submitContactAction(brief, { name, phone, email: '', agreed, whatsappUpdates: whatsapp });
+    const contact = await submitContactAction(brief, { name, phone, email: '', agreed, whatsappUpdates: false });
     if (!contact.ok) {
       setBusy(false);
       return setError(Object.values(contact.errors)[0] ?? 'Check your details and try again.');
@@ -180,15 +179,6 @@ export function VerifyScreen({ data }: { data: AppData }) {
               </a>
               .
             </span>
-          </label>
-          <label className="oa-row" style={{ alignItems: 'flex-start', justifyContent: 'flex-start' }}>
-            <input
-              type="checkbox"
-              checked={whatsapp}
-              onChange={(e) => setWhatsapp(e.target.checked)}
-              className="mt-1 h-5 w-5 accent-[var(--accent)]"
-            />
-            <span className="text-[15px] leading-[1.45] text-[var(--ink-2)]">{t('verify.tips')}</span>
           </label>
         </div>
 

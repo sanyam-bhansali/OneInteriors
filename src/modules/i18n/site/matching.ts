@@ -271,14 +271,14 @@ export const MATCHING_DICT = {
   'since.yesterday': { en: 'since yesterday', hi: 'कल से', mr: 'कालपासून' },
   'since.day': { en: 'since {day}', hi: '{day} से', mr: '{day}पासून' },
   'welcome.one': {
-    en: 'Welcome back — one new studio fits your brief {since}.',
-    hi: 'फिर से स्वागत है — {since} एक नया स्टूडियो आपके ब्रीफ़ में फ़िट बैठता है।',
-    mr: 'पुन्हा स्वागत आहे — {since} एक नवीन स्टुडिओ तुमच्या ब्रीफमध्ये बसतो.',
+    en: 'Welcome back — one new studio fits your Home Profile {since}.',
+    hi: 'फिर से स्वागत है — {since} एक नया स्टूडियो आपकी Home Profile में फ़िट बैठता है।',
+    mr: 'पुन्हा स्वागत आहे — {since} एक नवीन स्टुडिओ तुमच्तुमच्या Home Profile मध्ये बसतो.',
   },
   'welcome.many': {
-    en: 'Welcome back — {n} new studios fit your brief {since}.',
-    hi: 'फिर से स्वागत है — {since} {n} नए स्टूडियो आपके ब्रीफ़ में फ़िट बैठते हैं।',
-    mr: 'पुन्हा स्वागत आहे — {since} {n} नवीन स्टुडिओ तुमच्या ब्रीफमध्ये बसतात.',
+    en: 'Welcome back — {n} new studios fit your Home Profile {since}.',
+    hi: 'फिर से स्वागत है — {since} {n} नए स्टूडियो आपकी Home Profile में फ़िट बैठते हैं।',
+    mr: 'पुन्हा स्वागत आहे — {since} {n} नवीन स्टुडिओ तुमच्तुमच्या Home Profile मध्ये बसतात.',
   },
 } satisfies Record<string, Tx>;
 

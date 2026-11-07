@@ -362,10 +362,11 @@ export function QuizClient({
   async function submitContact() {
     /* Consent by the button (owner, 10 Oct 2026): the notice sits right above
        "See who fits", and pressing it is the affirmative act DPDP asks for —
-       no pre-ticked box, and no box to tick. WhatsApp stays a separate,
-       unticked opt-in. */
+       no pre-ticked box, and no box to tick. No WhatsApp box: customers get no
+       WhatsApp from us (owner, 1 and 4 Nov 2026). */
     const input = { ...contact, agreed: true, name: contact.name || brief.contactName || '' };
-    const check = checkContact(input, { requireEmail: true });
+    // Number and code are enough to sign in; email is optional (owner, 4 Nov 2026).
+    const check = checkContact(input);
     if (!check.ok) {
       setContactErrors(check.errors);
       return;
@@ -386,7 +387,7 @@ export function QuizClient({
     }
 
     setFinishing(true);
-    const result = await submitContactAction(brief, input, { requireEmail: true }).catch(() => null);
+    const result = await submitContactAction(brief, input).catch(() => null);
     if (result && !result.ok) {
       setContactErrors(result.errors);
       setFinishing(false);
@@ -475,6 +476,7 @@ export function QuizClient({
     otp: account ? NO_OTP : otp,
     setOtpCode: (code) => setOtp((o) => ({ ...o, code: cleanCode(code), error: null })),
     resendCode: () => void resendCode(),
+    changeNumber: () => setOtp(NO_OTP),
   };
 
   // Capped at the number the site states (lib/claims.ts), and it only narrows.
@@ -624,8 +626,10 @@ export function QuizClient({
                   wants all four ranked, and a dead button with no reason was
                   where people stopped (review, 8 Oct). */}
               {!canAdvance ? (
-                <span className="min-w-0 text-right text-[13px] leading-snug text-[var(--ink-2)]">
-                  {stepId === 'priorities'
+                <span className={`min-w-0 text-right text-[13px] leading-snug text-[var(--ink-2)] ${waitingForCode ? 'max-sm:hidden' : ''}`}>
+                  {waitingForCode
+                    ? t('need.code')
+                    : stepId === 'priorities'
                     ? t('need.rank', { n: brief.priorityRanking.length })
                     : stepId === 'likes'
                       ? t('need.two')
@@ -684,6 +688,7 @@ interface ContactContext {
   otp: OtpState;
   setOtpCode: (code: string) => void;
   resendCode: () => void;
+  changeNumber: () => void;
 }
 
 /** The sign-in code on the contact screen. `sentTo` is null until it is sent. */
@@ -746,6 +751,7 @@ function stepContent(
             otp={ctx.otp}
             setOtpCode={ctx.setOtpCode}
             resendCode={ctx.resendCode}
+            changeNumber={ctx.changeNumber}
           />
         ),
       };
@@ -879,8 +885,7 @@ function stepContent(
  * Name (from the first screen), mobile, an optional email, and the notice.
  * The notice's words come from `PURPOSE_NOTICE`, the same object the consent
  * row records, so what they read and what we store cannot drift apart. The
- * WhatsApp line is separate, optional and unticked (DPDP: specific consent,
- * an affirmative act). Errors appear against the field they belong to;
+ * Errors appear against the field they belong to;
  * Continue is never greyed out without saying why.
  */
 function ContactStep({
@@ -893,6 +898,7 @@ function ContactStep({
   otp,
   setOtpCode,
   resendCode,
+  changeNumber,
 }: {
   brief: Brief;
   account: { name: string | null; email: string | null } | null;
@@ -903,6 +909,7 @@ function ContactStep({
   otp: OtpState;
   setOtpCode: (code: string) => void;
   resendCode: () => void;
+  changeNumber: () => void;
 }) {
   const t = useSiteT(QUIZ_DICT);
   const lang = useLang();
@@ -921,6 +928,49 @@ function ContactStep({
   const Err = ({ text }: { text?: string }) =>
     text ? <p className="m-0 mt-2 pl-[22px] text-[13.5px] leading-snug text-[var(--accent-ink)]">{text}</p> : null;
   const name = contact.name || brief.contactName || '';
+
+  /* The code gets the screen to itself: it used to sit under the whole form
+     and the notice, below the fold on a phone. They agreed by pressing Send. */
+  if (otp.sentTo) {
+    return (
+      <div className="flex max-w-lg flex-col gap-4">
+        <label className="block">
+          <FieldLabel>{t('contact.code', { phone: otp.sentTo.slice(-10) })}</FieldLabel>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            autoFocus
+            value={otp.code}
+            onChange={(e) => setOtpCode(e.target.value)}
+            placeholder="6-digit code"
+            maxLength={6}
+            className={`${field} ${border(!!otp.error)} tracking-[0.3em]`}
+          />
+          <Err text={otp.error ?? undefined} />
+        </label>
+        <p className="m-0 pl-[22px] text-[13.5px] leading-snug text-[var(--ink-2)]">
+          {t('contact.codeHint')}{' '}
+          {otp.wait > 0 ? (
+            <span>{t('contact.resendIn', { n: otp.wait })}</span>
+          ) : (
+            <button type="button" onClick={resendCode} className="text-[var(--ink)] underline underline-offset-2">
+              {t('contact.resend')}
+            </button>
+          )}
+        </p>
+        <p className="m-0 pl-[22px] text-[13.5px]">
+          <button type="button" onClick={changeNumber} className="text-[var(--ink)] underline underline-offset-2">
+            {t('contact.changeNumber')}
+          </button>
+        </p>
+        {otp.devCode ? (
+          <p className="m-0 pl-[22px] font-mono text-[13.5px] text-[var(--ink-2)]">{t('contact.devCode', { code: otp.devCode })}</p>
+        ) : null}
+        <Err text={quizServerText(lang, errors.form)} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex max-w-lg flex-col gap-5">
@@ -967,7 +1017,7 @@ function ContactStep({
       </label>
 
       <label className="block">
-        <FieldLabel>{t('contact.email')}</FieldLabel>
+        <FieldLabel>{t('contact.email')} · {t('contact.optional')}</FieldLabel>
         <input
           type="email"
           inputMode="email"
@@ -991,51 +1041,7 @@ function ContactStep({
           </Link>
         </p>
         <Err text={quizServerText(lang, errors.agreed)} />
-
-        <label className="flex cursor-pointer items-start gap-3.5 text-[15px] leading-relaxed text-[var(--ink-2)]">
-          <input
-            type="checkbox"
-            checked={contact.whatsappUpdates}
-            onChange={(e) => set({ whatsappUpdates: e.target.checked })}
-            className="mt-[5px] h-[18px] w-[18px] shrink-0 accent-[var(--ink)]"
-          />
-          <span>
-            {PURPOSE_NOTICE.MARKETING_WHATSAPP.label} — {t('contact.optional')}.{' '}
-            {PURPOSE_NOTICE.MARKETING_WHATSAPP.detail}
-          </span>
-        </label>
       </div>
-
-      {otp.sentTo ? (
-        <label className="block">
-          <FieldLabel>{t('contact.code', { phone: otp.sentTo.slice(-10) })}</FieldLabel>
-          <input
-            type="text"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            autoFocus
-            value={otp.code}
-            onChange={(e) => setOtpCode(e.target.value)}
-            placeholder="6-digit code"
-            maxLength={6}
-            className={`${field} ${border(!!otp.error)} tracking-[0.3em]`}
-          />
-          <Err text={otp.error ?? undefined} />
-          <p className="m-0 mt-2 pl-[22px] text-[13.5px] leading-snug text-[var(--ink-2)]">
-            {t('contact.codeHint')}{' '}
-            {otp.wait > 0 ? (
-              <span>{t('contact.resendIn', { n: otp.wait })}</span>
-            ) : (
-              <button type="button" onClick={resendCode} className="text-[var(--ink)] underline underline-offset-2">
-                {t('contact.resend')}
-              </button>
-            )}
-          </p>
-          {otp.devCode ? (
-            <p className="m-0 mt-2 pl-[22px] font-mono text-[13.5px] text-[var(--ink-2)]">{t('contact.devCode', { code: otp.devCode })}</p>
-          ) : null}
-        </label>
-      ) : null}
 
       <Err text={quizServerText(lang, errors.form)} />
     </div>
