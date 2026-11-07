@@ -341,7 +341,7 @@ export function ExpertForm({
                     </span>
                     <span className="text-[16px] font-medium">{studio.name}</span>
                   </span>
-                  <span className={`text-[13.5px] tabular-nums ${checked ? 'text-white/65' : 'text-[var(--ink-2)]'}`}>
+                  <span className={`whitespace-nowrap text-[13.5px] tabular-nums ${checked ? 'text-white/65' : 'text-[var(--ink-2)]'}`}>
                     {formatINRCompact(studio.lowPaise)}–{formatINRCompact(studio.highPaise)}
                   </span>
                 </button>
