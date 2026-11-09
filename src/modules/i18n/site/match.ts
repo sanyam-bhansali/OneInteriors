@@ -60,6 +60,7 @@ export const MATCH_DICT = {
   'quote.another': { en: 'Price another studio', hi: 'दूसरे स्टूडियो का दाम देखें', mr: 'दुसऱ्या स्टुडिओची किंमत पाहा' },
 
   // ── progress spine facts ──
+  'spine.home': { en: '{home}', hi: '{home}', mr: '{home}' },
   'spine.bhk': { en: '{n} BHK', hi: '{n} BHK', mr: '{n} BHK' },
   'spine.fit': { en: '{n} fit', hi: '{n} फ़िट', mr: '{n} जुळले' },
   'spine.priced': { en: '{n} priced', hi: '{n} के दाम', mr: '{n} च्या किमती' },
@@ -68,17 +69,17 @@ export const MATCH_DICT = {
   // ── empty states ──
   'empty.eyebrow': { en: 'Who fits', hi: 'कौन फ़िट है', mr: 'कोण जुळते' },
   'empty.noBrief': { en: 'Tell us about your flat first.', hi: 'पहले अपने फ़्लैट के बारे में बताइए।', mr: 'आधी तुमच्या फ्लॅटबद्दल सांगा.' },
-  'empty.noFit': { en: 'Nobody on the roster fits this brief.', hi: 'हमारी लिस्ट में कोई भी स्टूडियो इस ब्रीफ़ में फ़िट नहीं होता।', mr: 'आमच्या यादीतील कोणताही स्टुडिओ या ब्रीफमध्ये बसत नाही.' },
+  'empty.noFit': { en: 'No studio fits your Home Profile yet.', hi: 'हमारी लिस्ट में कोई भी स्टूडियो आपकी Home Profile में फ़िट नहीं होता।', mr: 'आमच्या यादीतील कोणताही स्टुडिओ तुमच्या Home Profile मध्ये बसत नाही.' },
   'empty.noBriefBody': {
-    en: 'Scoring studios against an empty brief would give you the roster in an arbitrary order with numbers on it. About four minutes of your brief, and these become real.',
-    hi: 'खाली ब्रीफ़ पर स्टूडियो को स्कोर करें तो बस बेतरतीब लिस्ट पर नंबर लग जाएँगे। अपने ब्रीफ़ पर करीब चार मिनट दीजिए, फिर ये नंबर सच में मायने रखेंगे।',
-    mr: 'रिकाम्या ब्रीफवर स्टुडिओंना स्कोअर दिला तर फक्त कशीही लावलेली यादी आणि त्यावर आकडे मिळतील. तुमच्या ब्रीफला साधारण चार मिनिटे द्या, मग हे आकडे खरे ठरतील.',
+    en: 'Scoring studios against an empty Home Profile would give you the roster in an arbitrary order with numbers on it. About four minutes on your Home Profile, and these become real.',
+    hi: 'खाली Home Profile पर स्टूडियो को स्कोर करें तो बस बेतरतीब लिस्ट पर नंबर लग जाएँगे। अपनी Home Profile पर करीब चार मिनट दीजिए, फिर ये नंबर सच में मायने रखेंगे।',
+    mr: 'रिकाम्या Home Profile वर स्टुडिओंना स्कोअर दिला तर फक्त कशीही लावलेली यादी आणि त्यावर आकडे मिळतील. तुमच्या Home Profileला साधारण चार मिनिटे द्या, मग हे आकडे खरे ठरतील.',
   },
-  'empty.start': { en: 'Start the brief', hi: 'ब्रीफ़ शुरू करें', mr: 'ब्रीफ सुरू करा' },
+  'empty.start': { en: 'Start your Home Profile', hi: 'अपनी Home Profile बनाइए', mr: 'तुमची Home Profile बनवा' },
   'empty.noFitBody': {
-    en: 'Nothing on the roster matches this brief — usually the level or the kind of work. Changing either is the quickest fix.',
-    hi: 'लिस्ट में कोई भी इस ब्रीफ़ से मेल नहीं खाता — अक्सर वजह लेवल या काम का प्रकार होता है। इनमें से किसी एक को बदलना सबसे आसान उपाय है।',
-    mr: 'यादीतील काहीही या ब्रीफशी जुळत नाही — बहुतेक वेळा कारण लेव्हल किंवा कामाचा प्रकार असतो. यापैकी एक बदलणे हा सर्वात सोपा उपाय आहे.',
+    en: 'No studio on our list matches your Home Profile — usually the level or the kind of work. Changing either is the quickest fix.',
+    hi: 'लिस्ट में कोई भी आपकी Home Profile से मेल नहीं खाता — अक्सर वजह लेवल या काम का प्रकार होता है। इनमें से किसी एक को बदलना सबसे आसान उपाय है।',
+    mr: 'यादीतील काहीही तुमच्या Home Profile शी जुळत नाही — बहुतेक वेळा कारण लेव्हल किंवा कामाचा प्रकार असतो. यापैकी एक बदलणे हा सर्वात सोपा उपाय आहे.',
   },
   'empty.change': { en: 'Change your answers', hi: 'अपने जवाब बदलें', mr: 'तुमची उत्तरे बदला' },
 
@@ -142,7 +143,7 @@ export const MATCH_DICT = {
   'card.about': { en: 'Interior studio in {city}.', hi: '{city} में इंटीरियर स्टूडियो।', mr: '{city} मधील इंटीरियर स्टुडिओ.' },
   'card.yrs': { en: '{n} yrs', hi: '{n} साल', mr: '{n} वर्षे' },
   'card.team': { en: 'Team of {n}', hi: '{n} लोगों की टीम', mr: '{n} जणांची टीम' },
-  'card.yourQuote': { en: 'Your quote', hi: 'आपका कोटेशन', mr: 'तुमचे कोटेशन' },
+  'card.yourQuote': { en: 'Your quote, incl. GST', hi: 'आपका कोटेशन, GST सहित', mr: 'तुमचे कोटेशन, GST सह' },
   'card.notPriced': { en: 'Not priced yet', hi: 'अभी दाम नहीं निकला', mr: 'अजून किंमत काढलेली नाही' },
   'card.noRates': { en: 'Rates not filed yet', hi: 'रेट अभी जमा नहीं हुए', mr: 'रेट अजून जमा केलेले नाहीत' },
   'card.delivered': { en: 'Projects delivered', hi: 'पूरे किए प्रोजेक्ट', mr: 'पूर्ण केलेले प्रोजेक्ट' },
@@ -152,7 +153,7 @@ export const MATCH_DICT = {
   'card.widenedZone': { en: 'Works in another part of Pune', hi: 'पुणे के दूसरे इलाके में काम करते हैं', mr: 'पुण्याच्या दुसऱ्या भागात काम करतात' },
   'card.widenedBand': { en: 'One level above the one you chose', hi: 'आपके चुने लेवल से एक ऊपर', mr: 'तुम्ही निवडलेल्या लेव्हलपेक्षा एक वर' },
   'card.whyFits': { en: 'Why this one fits you', hi: 'यह आपके लिए क्यों सही है', mr: 'हा तुमच्यासाठी का योग्य आहे' },
-  'card.reading': { en: 'Reading your brief against their work…', hi: 'आपका ब्रीफ़ इनके काम से मिलाया जा रहा है…', mr: 'तुमचा ब्रीफ त्यांच्या कामाशी जुळवत आहोत…' },
+  'card.reading': { en: 'Reading your Home Profile against their work…', hi: 'आपकी Home Profile इनके काम से मिलाया जा रहा है…', mr: 'तुमची Home Profile त्यांच्या कामाशी जुळवत आहोत…' },
   'card.meet': { en: 'Meet {studio} — their intro video', hi: '{studio} से मिलिए — उनका परिचय वीडियो', mr: '{studio} ला भेटा — त्यांचा ओळख व्हिडिओ' },
   'card.getQuote': { en: 'Get a quote', hi: 'कोटेशन लें', mr: 'कोटेशन मिळवा' },
   'card.seeQuote': { en: 'See the quote', hi: 'कोटेशन देखें', mr: 'कोटेशन पाहा' },

@@ -25,6 +25,7 @@
  * and nothing is hidden to manufacture curiosity.
  */
 
+import { useEffect, useState } from "react";
 import { useSiteT } from "@/components/app/i18n";
 import { CHROME_DICT } from "@/modules/i18n/site/chrome";
 import Link from "next/link";
@@ -43,11 +44,11 @@ import { Wrap } from "@/components/landing/parts";
  * and "The quote" together and hand React two identical keys.
  */
 export const CHAPTERS = [
-  { id: "brief", href: "/quiz", name: "Your brief" },
+  { id: "brief", href: "/quiz", name: "Your Home Profile" },
   { id: "match", href: "/match", name: "Who fits" },
   { id: "quote", href: "/match", name: "The quote" },
   { id: "compare", href: "/compare", name: "Side by side" },
-  { id: "expert", href: "/expert", name: "Your architect" },
+  { id: "expert", href: "/expert", name: "Your expert" },
 ] as const;
 
 export type ChapterId = (typeof CHAPTERS)[number]["id"];
@@ -90,6 +91,8 @@ export function AppHeader() {
   );
 }
 
+const SPINE_KEY = "oi.spine.facts";
+
 export interface SpineFact {
   /** Which chapter this fact belongs to. */
   id: ChapterId;
@@ -114,7 +117,22 @@ export function Spine({
   facts?: SpineFact[];
 }) {
   const t = useSiteT(CHROME_DICT);
-  const known = new Map(facts.map((f) => [f.id, f.fact]));
+  /* A chapter's fact is only known on some screens ("6 fit" on the matches):
+     keep it for this tab, or the spine reads as if the work was forgotten. */
+  const [remembered, setRemembered] = useState<Record<string, string>>({});
+  const factsKey = JSON.stringify(facts);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(SPINE_KEY) ?? "{}") as Record<string, string>;
+      const next = { ...saved, ...Object.fromEntries(facts.map((f) => [f.id, f.fact])) };
+      sessionStorage.setItem(SPINE_KEY, JSON.stringify(next));
+      setRemembered(next);
+    } catch {
+      /* Private window: the spine just shows this screen's facts. */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- facts by value
+  }, [factsKey]);
+  const known = new Map<string, string>([...Object.entries(remembered), ...facts.map((f): [string, string] => [f.id, f.fact])]);
 
   return (
     <nav

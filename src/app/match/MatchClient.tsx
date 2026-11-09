@@ -189,15 +189,6 @@ function preparedFor(brief: Brief | null, lang: Lang, t: MatchT): string | null 
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
-/** Bedrooms by configuration, for the quote request. */
-const BEDROOMS: Record<string, number> = {
-  BHK_1: 1,
-  BHK_2: 2,
-  BHK_3: 3,
-  BHK_4_PLUS: 4,
-  VILLA: 4,
-};
-
 export function MatchClient({
   studios,
   allowUnverified,
@@ -582,7 +573,7 @@ export function MatchClient({
         at="match"
         facts={[
           ...(briefed && brief?.propertyType
-            ? [{ id: 'brief' as const, fact: t('spine.bhk', { n: BEDROOMS[brief.propertyType] ?? 2 }) }]
+            ? [{ id: 'brief' as const, fact: lbl(lang, PROPERTY_TX, brief.propertyType) }]
             : []),
           ...(briefed ? [{ id: 'match' as const, fact: t('spine.fit', { n: matches.length }) }] : []),
           ...(quoted.length > 0

@@ -31,7 +31,7 @@ export async function bookExpertCall(input: { startsAt: string; studioIds: strin
     : anonKey
       ? await prisma.brief.findUnique({ where: { anonKey }, select: { id: true, contactName: true, contactPhone: true } })
       : null;
-  if (!brief) return { ok: false, signIn: true, error: 'We could not find your brief. Finish the questions and try again.' };
+  if (!brief) return { ok: false, signIn: true, error: 'We could not find your Home Profile. Finish the questions and try again.' };
   if (!brief.contactPhone && !user?.phone) {
     return { ok: false, signIn: true, error: 'Add your number first, so your expert knows who to ring.' };
   }

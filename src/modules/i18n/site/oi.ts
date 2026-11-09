@@ -26,18 +26,18 @@ export const OI_DICT = {
 
   // ── NextStepBar ──
   'bar.note': {
-    en: '30 minutes with our architect, before you meet any studio',
-    hi: 'किसी भी स्टूडियो से मिलने से पहले, हमारे आर्किटेक्ट के साथ 30 मिनट',
-    mr: 'कोणत्याही स्टुडिओला भेटण्याआधी, आमच्या आर्किटेक्टसोबत 30 मिनिटं',
+    en: '30 minutes with our expert, before you meet any studio',
+    hi: 'किसी भी स्टूडियो से मिलने से पहले, हमारे एक्सपर्ट के साथ 30 मिनट',
+    mr: 'कोणत्याही स्टुडिओला भेटण्याआधी, आमच्या एक्सपर्टसोबत 30 मिनिटं',
   },
   'bar.inclGst': { en: 'incl. GST', hi: 'GST सहित', mr: 'GST सह' },
   'bar.bookShort': { en: 'Book the call', hi: 'कॉल बुक करें', mr: 'कॉल बुक करा' },
   'bar.bookFreeShort': { en: 'Book free call', hi: 'मुफ़्त कॉल बुक करें', mr: 'मोफत कॉल बुक करा' },
-  'bar.bookLong': { en: 'Book your architect call', hi: 'आर्किटेक्ट के साथ कॉल बुक करें', mr: 'आर्किटेक्टसोबत कॉल बुक करा' },
+  'bar.bookLong': { en: 'Book your expert call', hi: 'एक्सपर्ट के साथ कॉल बुक करें', mr: 'एक्सपर्टसोबत कॉल बुक करा' },
   'bar.bookFreeLong': {
-    en: 'Book your free architect call',
-    hi: 'आर्किटेक्ट के साथ मुफ़्त कॉल बुक करें',
-    mr: 'आर्किटेक्टसोबत मोफत कॉल बुक करा',
+    en: 'Book your free expert call',
+    hi: 'एक्सपर्ट के साथ मुफ़्त कॉल बुक करें',
+    mr: 'एक्सपर्टसोबत मोफत कॉल बुक करा',
   },
 
   // ── StyleDnaCard ──
@@ -102,7 +102,7 @@ export const OI_DICT = {
     hi: 'अपने फ़्लैट के बारे में लगभग चार मिनट, और हम इस स्टूडियो का लाइन-दर-लाइन दाम निकाल देंगे — लगभग दस सेकंड में, हर लाइन में मात्रा के साथ।',
     mr: 'तुमच्या फ्लॅटबद्दल सुमारे चार मिनिटं, आणि आम्ही या स्टुडिओचे ओळीने ओळ दर काढू — सुमारे दहा सेकंदांत, प्रत्येक ओळीत प्रमाणासह.',
   },
-  'panel.start': { en: 'Start the brief', hi: 'अपनी ज़रूरतें बताएँ', mr: 'तुमच्या गरजा सांगा' },
+  'panel.start': { en: 'Start your Home Profile', hi: 'अपनी ज़रूरतें बताएँ', mr: 'तुमच्या गरजा सांगा' },
   'panel.inCompare': { en: 'In your comparison', hi: 'आपकी तुलना में है', mr: 'तुमच्या तुलनेत आहे' },
   'panel.addCompare': { en: 'Add to compare', hi: 'तुलना में जोड़ें', mr: 'तुलनेत जोडा' },
   'panel.compareN': { en: 'Compare {n} line for line', hi: '{n} की लाइन-दर-लाइन तुलना करें', mr: '{n} ची ओळीने ओळ तुलना करा' },
@@ -363,7 +363,7 @@ export const OI_DICT = {
   'canvas.fromHad': { en: '{delta} from the quote you had', hi: 'पिछले कोटेशन से {delta}', mr: 'आधीच्या कोटेशनपेक्षा {delta}' },
   'canvas.live': { en: 'Every match, live', hi: 'हर मैच, लाइव', mr: 'प्रत्येक मॅच, लाइव्ह' },
   'canvas.thisOne': { en: 'this one', hi: 'यह वाला', mr: 'हा' },
-  'canvas.save': { en: 'Save to my brief', hi: 'मेरी ज़रूरतों में सेव करें', mr: 'माझ्या गरजांमध्ये सेव्ह करा' },
+  'canvas.save': { en: 'Save to my Home Profile', hi: 'मेरी ज़रूरतों में सेव करें', mr: 'माझ्या गरजांमध्ये सेव्ह करा' },
   'canvas.undo': { en: 'Undo changes', hi: 'बदलाव हटाएँ', mr: 'बदल रद्द करा' },
   'canvas.tap': {
     en: 'Tap a room to take things out or put them back.',

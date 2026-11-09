@@ -80,7 +80,7 @@ export function briefAnswers(brief: Brief): Answer[] {
     add('Household', parts.join(', '));
   }
   add('Needs', brief.needs.map((n) => HOME_NEED_LABELS[n]).join(', '));
-  add('Priorities', brief.priorityRanking.map((p, i) => `${i + 1}. ${PRIORITY_LABELS[p]}`).join('  '));
+  add('Priorities', brief.priorityRanking.map((p, i) => `${i + 1}. ${PRIORITY_LABELS[p]}`).join('\n'));
   add('Involvement', brief.involvement ? INVOLVEMENT_LABELS[brief.involvement] : null);
   add('Language', brief.language ? LANGUAGE_LABELS[brief.language] : null);
   return out;

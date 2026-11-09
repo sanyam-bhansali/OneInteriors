@@ -115,13 +115,13 @@ export default function PrivacyPage() {
         <Section n={1} title={SECTIONS[0]}>
           <ul>
             <li>
-              <strong>Your brief</strong> — your home, where it is, possession, the work you want,
+              <strong>Your Home Profile</strong> — your home, where it is, possession, the work you want,
               your budget level, the styles you like and rule out, who lives there, what the home
               needs, how you like to work and your priorities.
             </li>
             <li>
               <strong>Your name, mobile number and, if you give it, email</strong> — on the last
-              screen of the brief, once you agree to this notice. Your name stays on your own
+              screen of the Home Profile, once you agree to this notice. Your name stays on your own
               device until then.
             </li>
             <li>
@@ -140,9 +140,9 @@ export default function PrivacyPage() {
             </li>
             <li>
               <strong>Technical details</strong> — a cookie that keeps you signed in, a cookie that
-              lets your brief survive a reload before you have an account, and a scrambled (hashed)
+              lets your Home Profile survive a reload before you have an account, and a scrambled (hashed)
               form of your connection&rsquo;s address, kept briefly to stop abuse. We record which
-              screens of the brief are completed, without your name or number, to find where it is
+              screens of the Home Profile are completed, without your name or number, to find where it is
               hard to use.
             </li>
           </ul>
@@ -164,7 +164,7 @@ export default function PrivacyPage() {
 
         <Section n={3} title={SECTIONS[2]}>
           <p className="m-0">
-            <strong>Studios see your brief and your contact details only when you choose them</strong>{' '}
+            <strong>Studios see your Home Profile and your contact details only when you choose them</strong>{' '}
             — when you ask our expert to introduce you. No studio pays to see anyone&rsquo;s
             details, and we do not sell your information to anyone.
           </p>
@@ -178,7 +178,7 @@ export default function PrivacyPage() {
               Anthropic — writes the short explanation beside each match and the plain-words
               comparison of your quotes, reads the sizes off a floor plan if you upload one, and
               tells you the styles in a room photo if you share one (the photo is read once and
-              not kept). It receives your brief&rsquo;s answers, the quotes, the studio&rsquo;s
+              not kept). It receives your Home Profile&rsquo;s answers, the quotes, the studio&rsquo;s
               record, the plan or the photo — never your name or number.
             </li>
             <li>Google, Apple or Facebook — only if you choose to sign in with one of them.</li>
@@ -187,7 +187,7 @@ export default function PrivacyPage() {
 
         <Section n={4} title={SECTIONS[3]}>
           <p className="m-0">
-            Your brief and contact details for as long as you are using One Interiors, and for{' '}
+            Your Home Profile and contact details for as long as you are using One Interiors, and for{' '}
             {PRIVACY.retentionMonths} months after your last activity — unless you ask us to delete
             them sooner. We keep the record of what you agreed to, and when, for longer: it is how we
             show we asked properly.

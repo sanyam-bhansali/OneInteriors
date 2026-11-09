@@ -51,7 +51,7 @@ export function MatchesScreen({ data }: { data: AppData }) {
           <p className="oa-sub">
             {brief.completedAt
               ? 'We would rather say so than show you a studio that does not fit. Change an answer and we will look again.'
-              : 'Your matches are worked out from your answers, so they come after the brief.'}
+              : 'Your matches are worked out from your answers, so they come after your Home Profile.'}
           </p>
           {brief.completedAt ? <TierSwitch value={shown} onChange={setTier} /> : null}
         </Body>

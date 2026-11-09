@@ -204,7 +204,7 @@ export async function savePrepRoom(
   }
 
   const row = await ownBrief();
-  if (!row) return { ok: false, error: 'We could not find your brief on this device.' };
+  if (!row) return { ok: false, error: 'We could not find your Home Profile on this device.' };
 
   const data: {
     shuffle?: number;

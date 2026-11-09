@@ -61,7 +61,7 @@ export type SubmitResult = { ok: true; shortlisted: number } | { ok: false; stat
  */
 export async function submitJourney(slugs: string[], data: AppData): Promise<SubmitResult> {
   const loaded = await loadBrief();
-  if (!loaded.found || !loaded.id) return { ok: false, status: 409, error: 'We do not have your brief yet. Save it and try again.' };
+  if (!loaded.found || !loaded.id) return { ok: false, status: 409, error: 'We do not have your Home Profile yet. Save it and try again.' };
   if (!loaded.brief.completedAt) return { ok: false, status: 409, error: 'Finish the questions first.' };
   const listed = listedStudios(data);
   const chosen = [...new Set(slugs)].map((slug) => listed.find((s) => s.slug === slug)).filter((s) => s !== undefined);

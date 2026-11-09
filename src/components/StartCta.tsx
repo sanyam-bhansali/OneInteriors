@@ -58,14 +58,14 @@ function resumeFrom(): Resume {
     return {
       href: '/match',
       label: 'See my matches',
-      note: 'You finished your brief — picking up where you left off.',
+      note: 'You finished your Home Profile — picking up where you left off.',
     };
   }
 
   if ((brief.lastStep ?? 0) > 1) {
     return {
       href: '/quiz',
-      label: 'Finish my brief',
+      label: 'Finish my Home Profile',
       note: 'You were part-way through. Nothing was lost.',
     };
   }

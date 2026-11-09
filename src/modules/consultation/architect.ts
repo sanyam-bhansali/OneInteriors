@@ -60,14 +60,14 @@ export const ARCHITECT: Architect = {
   briefsRead: null,
   credential: 'Interior expert',
   says:
-    'I read your brief, your floor plan and every quote before we speak, so the call starts where the studios differ rather than at your requirements. No studio pays me — if none of them suits your home, I will tell you so, and there is nothing on this call to buy.',
+    'I read your Home Profile, your floor plan and every quote before we speak, so the call starts where the studios differ rather than at your requirements. No studio pays me — if none of them suits your home, I will tell you so, and there is nothing on this call to buy.',
 };
 
 /** The three facts that carry the argument, for the mono strip under the name. */
 export function architectFacts(a: Architect = ARCHITECT): { label: string; value: string }[] {
   return [
     ...(a.years !== null ? [{ label: 'Practising', value: `${a.years} years` }] : []),
-    ...(a.briefsRead !== null ? [{ label: 'Briefs read here', value: String(a.briefsRead) }] : []),
+    ...(a.briefsRead !== null ? [{ label: 'Home Profiles read here', value: String(a.briefsRead) }] : []),
     { label: 'Paid by a studio', value: 'Never' },
   ];
 }

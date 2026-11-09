@@ -60,7 +60,7 @@ export function StudiosScreen({ data }: { data: AppData }) {
         </div>
         <p className="oa-note">
           {rows.length === all.length ? `Showing all ${all.length}` : `${rows.length} of ${all.length}`}
-          {brief?.completedAt ? ', scored on your brief' : ''}
+          {brief?.completedAt ? ', scored on your Home Profile' : ''}
         </p>
         <div className="oa-list">
           {rows.map(({ s, score }) => {
