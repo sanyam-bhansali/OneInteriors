@@ -38,6 +38,7 @@ export function PlanReader({
 }) {
   const [state, setState] = useState<State>({ kind: 'idle', error: null });
   const t = useSiteT(QUIZ_DICT);
+  const [fileName, setFileName] = useState<string | null>(null);
   const lang = useLang();
   const [bedrooms, setBedrooms] = useState('');
   const [area, setArea] = useState('');
@@ -228,14 +229,19 @@ export function PlanReader({
           <p className="m-0 mt-3 text-[13px] text-[var(--ink-2)]">{t('plan.orUpload')}</p>
         </div>
       ) : null}
+      <label className="flex cursor-pointer items-center gap-3 rounded-[var(--r-m)] bg-[var(--soft)] p-2 focus-within:outline focus-within:outline-2 focus-within:outline-[var(--ink)]">
+        <span className="shrink-0 rounded-full bg-[var(--paper)] px-4 py-2 text-[14px] font-medium text-[var(--ink)] shadow-[inset_0_0_0_1px_var(--line)]">{t('plan.choose')}</span>
+        <span className="min-w-0 truncate text-[14px] text-[var(--ink-2)]">{fileName ?? t('plan.noFile')}</span>
       <input
         type="file"
         name="plan"
+        onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
         accept="application/pdf,image/png,image/jpeg,image/webp"
-        className="w-full max-w-full cursor-pointer rounded-[var(--r-m)] bg-[var(--soft)] p-2 text-[14px] text-[var(--ink-2)] file:mr-3 file:min-h-10 file:cursor-pointer file:rounded-full file:border-0 file:bg-[var(--ink)] file:px-4 file:text-[14px] file:font-medium file:text-white"
-      />
+        className="sr-only"
+        />
+      </label>
       <div className="flex flex-wrap items-center gap-4">
-        <PillButton type="submit" size="sm" disabled={state.kind === 'reading'}>
+        <PillButton type="submit" size="sm" disabled={state.kind === 'reading' || !fileName}>
           {state.kind === 'reading' ? t('plan.reading') : t('plan.read')}
         </PillButton>
         <span className="text-[13.5px] text-[var(--ink-2)]">{t('plan.formats')}</span>

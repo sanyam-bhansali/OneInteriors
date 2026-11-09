@@ -50,7 +50,7 @@ export type ConsentPurpose = (typeof CONSENT_PURPOSES)[number];
  */
 export const PURPOSE_NOTICE: Record<ConsentPurpose, { label: string; detail: string }> = {
   DATA_PROCESSING: {
-    label: 'Use my brief and number to find my matches and arrange my expert call',
+    label: 'Use my Home Profile and number to find my matches and arrange my expert call',
     detail:
       'We use your answers to match and price studios, and your name and number to reach you about your matches and your call. A studio sees them only when you choose that studio. Without this we cannot introduce you to anyone.',
   },
@@ -64,10 +64,10 @@ export const PURPOSE_NOTICE: Record<ConsentPurpose, { label: string; detail: str
   },
   MARKETING_SMS: {
     label: 'Send me SMS updates',
-    detail: 'Only where WhatsApp does not reach you.',
+    detail: 'Short updates about your enquiry and your call.',
   },
   SHARE_WITH_STUDIO: {
-    label: 'Share my brief, name and number with the studios I pick',
+    label: 'Share my Home Profile, name and number with the studios I pick',
     detail:
       'Only the studios you tick, only once we introduce you, and only so they can arrange a meeting with you. You can withdraw this from "Your home"; studios already introduced keep what they were given.',
   },

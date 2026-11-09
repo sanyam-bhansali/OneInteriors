@@ -85,6 +85,7 @@ export function ExpertForm({
   defaultName,
   defaultPhone = null,
   defaultEmail,
+  verifiedPhone,
   minStudios,
   maxStudios,
   slots = [],
@@ -98,6 +99,8 @@ export function ExpertForm({
   /** The number they gave at the start, when the server knows it. */
   defaultPhone?: string | null;
   defaultEmail: string | null;
+  /** The signed-in account's number, which has already passed a code. */
+  verifiedPhone: string | null;
   minStudios: number;
   maxStudios: number;
   /** Open 30-minute slots (ISO). Empty when no expert has hours set — then we call to fix a time. */
@@ -241,6 +244,10 @@ export function ExpertForm({
           ? t('flow.needPhone')
           : null;
   const codeOpen = sentTo !== null && sentTo === phone;
+  /* Signed in on this number means it has already passed a code: no second one
+     (owner, 7 Nov 2026). Changing the number asks for a code again, and the
+     server still refuses a booking on any number but the signed-in one. */
+  const alreadyVerified = !preview && Boolean(verifiedPhone) && normalisePhone(phone) === normalisePhone(verifiedPhone ?? '');
 
   const sendCode = async () => {
     if (blocker) return;
@@ -261,16 +268,18 @@ export function ExpertForm({
   };
 
   const confirm = async () => {
-    if (blocker || code.length !== 6) return;
+    if (blocker || (!alreadyVerified && code.length !== 6)) return;
     setCodeError(null);
     if (preview) {
       setPreviewDone(true);
       return;
     }
-    setConfirming(true);
-    const v = await checkPhoneCode(phone, code, name);
-    setConfirming(false);
-    if (!v.ok) return setCodeError(v.error);
+    if (!alreadyVerified) {
+      setConfirming(true);
+      const v = await checkPhoneCode(phone, code, name);
+      setConfirming(false);
+      if (!v.ok) return setCodeError(v.error);
+    }
     const data = new FormData();
     data.set('briefId', briefId);
     picked.forEach((id) => data.append('studioIds', id));
@@ -332,7 +341,7 @@ export function ExpertForm({
                     </span>
                     <span className="text-[16px] font-medium">{studio.name}</span>
                   </span>
-                  <span className={`text-[13.5px] tabular-nums ${checked ? 'text-white/65' : 'text-[var(--ink-2)]'}`}>
+                  <span className={`whitespace-nowrap text-[13.5px] tabular-nums ${checked ? 'text-white/65' : 'text-[var(--ink-2)]'}`}>
                     {formatINRCompact(studio.lowPaise)}–{formatINRCompact(studio.highPaise)}
                   </span>
                 </button>
@@ -468,8 +477,8 @@ export function ExpertForm({
 
       {/* 4 · The code, then the booking */}
       <section className="flow-card" data-reveal="">
-        <Step n={4} title={t('flow.step4')} />
-        {codeOpen ? (
+        <Step n={4} title={alreadyVerified ? t('flow.step4Verified') : t('flow.step4')} />
+        {codeOpen && !alreadyVerified ? (
           <>
             <p className="m-0 mb-4 max-w-[60ch] text-[15px] text-[var(--ink-2)]">{t('flow.codeSent', { phone: shownPhone })}</p>
             <label className="block max-w-[280px]">
@@ -504,13 +513,13 @@ export function ExpertForm({
         {err.shareConsent ? <Alert>{err.shareConsent}</Alert> : null}
 
         <p className="m-0 mb-5 mt-5 max-w-[60ch] text-[13.5px] leading-[1.6] text-[var(--ink-2)]">{t('flow.consent')}</p>
-        {codeOpen ? (
+        {codeOpen || alreadyVerified ? (
           <PillButton
             arrow
             size="lg"
             className={longPill}
             onClick={confirm}
-            disabled={Boolean(blocker) || code.length !== 6 || confirming || pending}
+            disabled={Boolean(blocker) || (!alreadyVerified && code.length !== 6) || confirming || pending}
           >
             {confirmLabel}
           </PillButton>

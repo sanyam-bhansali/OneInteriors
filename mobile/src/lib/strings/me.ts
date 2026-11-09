@@ -42,7 +42,7 @@ export const me = {
   'meApp.del.gone1': { en: 'Your name, phone number and email', hi: 'आपका नाम, फ़ोन नंबर और ईमेल', mr: 'तुमचे नाव, फोन नंबर आणि ईमेल' },
   'meApp.del.gone2': { en: 'Your sign-ins on every phone', hi: 'हर फ़ोन पर आपका साइन-इन', mr: 'प्रत्येक फोनवरील तुमचे साइन-इन' },
   'meApp.del.gone4': { en: 'Your notifications', hi: 'आपकी सूचनाएँ', mr: 'तुमच्या सूचना' },
-  'meApp.del.gone3': { en: 'The contact details in your brief', hi: 'आपके ब्रीफ़ में दी गई संपर्क जानकारी', mr: 'तुमच्या ब्रीफमधील संपर्क माहिती' },
+  'meApp.del.gone3': { en: 'The contact details in your Home Profile', hi: 'आपकी Home Profile में दी गई संपर्क जानकारी', mr: 'तुमच्या Home Profile मधील संपर्क माहिती' },
   'meApp.del.kept': { en: 'What we keep', hi: 'हम क्या रखते हैं', mr: 'आम्ही काय ठेवतो' },
   'meApp.del.kept.body': {
     en: 'Signed project records your studio needs, such as the agreement, quotation and payment receipts, with your name and number taken off. The law requires us to keep these.',

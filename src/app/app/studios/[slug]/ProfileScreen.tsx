@@ -105,7 +105,7 @@ export function ProfileScreen({ data, slug }: { data: AppData; slug: string }) {
         <div className="oa-profile-stats">
           <div>
             <b>{match ? Math.round(match.score) : '—'}</b>
-            <span>{match ? 'Match for you' : 'Finish the brief to score'}</span>
+            <span>{match ? 'Match for you' : 'Finish your Home Profile to score'}</span>
           </div>
           <div>
             <b>{passed.length}/{counted.length}</b>
@@ -207,7 +207,7 @@ export function ProfileScreen({ data, slug }: { data: AppData; slug: string }) {
       </Body>
       <Foot>
         <Cta href={brief?.completedAt ? '/app/verify' : '/app/name'}>
-          {brief?.completedAt ? `Get my quote from ${studio.tradeName}` : 'Start my brief'}
+          {brief?.completedAt ? `Get my quote from ${studio.tradeName}` : 'Start my Home Profile'}
         </Cta>
       </Foot>
     </Frame>

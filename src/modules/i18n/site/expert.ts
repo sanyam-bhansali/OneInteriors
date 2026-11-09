@@ -28,7 +28,7 @@ export const EXPERT_DICT = {
   'fact.level': { en: 'Level', hi: 'लेवल', mr: 'लेव्हल' },
   'fact.quotes': { en: 'Quotes', hi: 'कोटेशन', mr: 'कोटेशन' },
 
-  'ch.eyebrow': { en: 'Your architect', hi: 'आपके आर्किटेक्ट', mr: 'तुमचे आर्किटेक्ट' },
+  'ch.eyebrow': { en: 'Your expert', hi: 'आपके एक्सपर्ट', mr: 'तुमचे एक्सपर्ट' },
   'ch.title': {
     en: 'One call, and then we introduce you.',
     hi: 'एक कॉल, फिर हम आपकी मुलाक़ात करवाते हैं।',
@@ -36,20 +36,20 @@ export const EXPERT_DICT = {
   },
   'ch.aside': { en: 'No studio pays them', hi: 'कोई स्टूडियो इन्हें पैसे नहीं देता', mr: 'कोणताही स्टुडिओ त्यांना पैसे देत नाही' },
   'ch.body': {
-    en: 'Someone who has read your brief, your quotes and every studio’s delivery record spends half an hour helping you choose. Then we set up the meeting or site visit with that studio ourselves. It is slower than a contact button, and it is the reason people do not end up in a meeting with a studio that was never going to suit them.',
+    en: 'Someone who has read your Home Profile, your quotes and every studio’s delivery record spends half an hour helping you choose. Then we set up the meeting or site visit with that studio ourselves. It is slower than a contact button, and it is the reason people do not end up in a meeting with a studio that was never going to suit them.',
     hi: 'जिसने आपकी ज़रूरतें, आपके कोटेशन और हर स्टूडियो का काम का रिकॉर्ड पढ़ा है, वह आधा घंटा आपको चुनने में मदद करता है। फिर उस स्टूडियो के साथ मीटिंग या साइट विज़िट हम खुद तय करते हैं। यह एक "कॉन्टैक्ट" बटन से धीमा है — और इसी वजह से लोग ऐसे स्टूडियो के साथ मीटिंग में नहीं फँसते जो उनके लिए कभी सही था ही नहीं।',
     mr: 'ज्यांनी तुमच्या गरजा, तुमची कोटेशन्स आणि प्रत्येक स्टुडिओचा कामाचा रेकॉर्ड वाचलाय, ते अर्धा तास तुम्हाला निवड करायला मदत करतात. मग त्या स्टुडिओसोबत मीटिंग किंवा साइट व्हिजिट आम्ही स्वतः ठरवतो. हे "कॉन्टॅक्ट" बटणापेक्षा हळू आहे — आणि म्हणूनच लोक अशा स्टुडिओसोबत मीटिंगमध्ये अडकत नाहीत जो त्यांच्यासाठी कधीच योग्य नव्हता.',
   },
   'who.eyebrow': { en: 'Who will ring you', hi: 'आपको कौन कॉल करेगा', mr: 'तुम्हाला कोण फोन करेल' },
   'flag.placeholder': {
-    en: 'Pre-launch placeholder — a named architect and their real record go here before anybody is asked for a phone number',
-    hi: 'लॉन्च से पहले का नमूना — किसी से फ़ोन नंबर माँगने से पहले यहाँ आर्किटेक्ट का नाम और उनका असली रिकॉर्ड आएगा',
-    mr: 'लॉन्चपूर्वीचा नमुना — कोणाकडे फोन नंबर मागण्याआधी इथे आर्किटेक्टचं नाव आणि त्यांचा खरा रेकॉर्ड येईल',
+    en: 'Pre-launch placeholder — a named expert and their real record go here before anybody is asked for a phone number',
+    hi: 'लॉन्च से पहले का नमूना — किसी से फ़ोन नंबर माँगने से पहले यहाँ एक्सपर्ट का नाम और उनका असली रिकॉर्ड आएगा',
+    mr: 'लॉन्चपूर्वीचा नमुना — कोणाकडे फोन नंबर मागण्याआधी इथे एक्सपर्टचं नाव आणि त्यांचा खरा रेकॉर्ड येईल',
   },
 
   'reads.label': { en: 'What {name} reads before ringing', hi: 'कॉल से पहले {name} क्या पढ़ती हैं', mr: 'फोन करण्याआधी {name} काय वाचतात' },
   'reads.brief': {
-    en: 'Your brief, in full — including what you ruled out',
+    en: 'Your Home Profile, in full — including what you ruled out',
     hi: 'आपकी पूरी ज़रूरतें — जो आपने मना किया, वह भी',
     mr: 'तुमच्या पूर्ण गरजा — तुम्ही जे नको म्हटलं तेही',
   },
@@ -72,17 +72,17 @@ export const EXPERT_DICT = {
     mr: 'तुम्हाला तुमचा फ्लॅट पुन्हा समजावून सांगावा लागणार नाही.',
   },
   'skipped.one': {
-    en: '{name} suits this brief but has not published rates for all of this work yet, so we cannot put a number against their name — and a studio on this call without a quote would be one you could not compare.',
+    en: '{name} suits your Home Profile but has not published rates for all of this work yet, so we cannot put a number against their name — and a studio on this call without a quote would be one you could not compare.',
     hi: '{name} आपकी ज़रूरतों के लिए सही है, पर इस पूरे काम के रेट अभी तक नहीं डाले हैं, इसलिए उनके नाम के आगे हम कोई रक़म नहीं लिख सकते — और बिना कोटेशन वाले स्टूडियो की आप तुलना नहीं कर पाएँगे।',
     mr: '{name} तुमच्या गरजांसाठी योग्य आहे, पण या सगळ्या कामाचे दर अजून दिलेले नाहीत, त्यामुळे त्यांच्या नावापुढे आम्ही रक्कम लिहू शकत नाही — आणि कोटेशन नसलेल्या स्टुडिओची तुम्हाला तुलना करता येणार नाही.',
   },
   'skipped.many': {
-    en: '{n} studios that suit this brief have not published rates for all of this work yet. We have left them out rather than show you a name with no number against it.',
+    en: '{n} studios that suit your Home Profile have not published rates for all of this work yet. We have left them out rather than show you a name with no number against it.',
     hi: 'आपकी ज़रूरतों के लिए सही {n} स्टूडियो ने इस पूरे काम के रेट अभी तक नहीं डाले हैं। बिना रक़म के नाम दिखाने के बजाय हमने उन्हें छोड़ दिया है।',
     mr: 'तुमच्या गरजांसाठी योग्य असलेल्या {n} स्टुडिओंनी या सगळ्या कामाचे दर अजून दिलेले नाहीत. रकमेशिवाय नाव दाखवण्यापेक्षा आम्ही त्यांना वगळलं आहे.',
   },
   'onlyOne': {
-    en: 'There is one studio we can quote for this brief today, so this call is about whether they are right for you rather than about choosing between two. If the answer is no, we will say so — and we would rather tell you that than introduce you anyway.',
+    en: 'There is one studio we can quote for your Home Profile today, so this call is about whether they are right for you rather than about choosing between two. If the answer is no, we will say so — and we would rather tell you that than introduce you anyway.',
     hi: 'आज आपकी ज़रूरतों के लिए हम एक ही स्टूडियो का कोटेशन दे सकते हैं, इसलिए यह कॉल दो में से चुनने के बारे में नहीं, बल्कि इस बारे में है कि वह आपके लिए सही है या नहीं। अगर जवाब "नहीं" है, तो हम साफ़ बता देंगे — फिर भी मुलाक़ात करवाने से बेहतर है सच बताना।',
     mr: 'आज तुमच्या गरजांसाठी आम्ही एकाच स्टुडिओचं कोटेशन देऊ शकतो, म्हणून हा कॉल दोघांतून निवडण्याबद्दल नाही, तर तो स्टुडिओ तुमच्यासाठी योग्य आहे का याबद्दल आहे. उत्तर "नाही" असेल तर आम्ही स्पष्ट सांगू — तरीही ओळख करून देण्यापेक्षा खरं सांगणं आम्हाला जास्त योग्य वाटतं.',
   },
@@ -97,13 +97,13 @@ export const EXPERT_DICT = {
   // ── The architect (mirrors modules/consultation/architect.ts) ──
   'architect.role': { en: 'Your One Interiors expert', hi: 'आपकी One Interiors एक्सपर्ट', mr: 'तुमच्या One Interiors एक्सपर्ट' },
   'architect.says': {
-    en: 'I read your brief, your floor plan and every quote before we speak, so the call starts where the studios differ rather than at your requirements. No studio pays me — if none of them suits your home, I will tell you so, and there is nothing on this call to buy.',
+    en: 'I read your Home Profile, your floor plan and every quote before we speak, so the call starts where the studios differ rather than at your requirements. No studio pays me — if none of them suits your home, I will tell you so, and there is nothing on this call to buy.',
     hi: 'बात करने से पहले मैं आपकी ज़रूरतें, फ़्लोर प्लान और हर कोटेशन पढ़ लेती हूँ, ताकि कॉल वहीं से शुरू हो जहाँ स्टूडियो अलग हैं — आपकी ज़रूरतें दोहराने से नहीं। मुझे कोई स्टूडियो पैसे नहीं देता — अगर उनमें से कोई भी आपके घर के लिए सही नहीं है, तो मैं साफ़ बता दूँगी, और इस कॉल पर खरीदने को कुछ नहीं है।',
     mr: 'बोलण्याआधी मी तुमच्या गरजा, फ्लोअर प्लॅन आणि प्रत्येक कोटेशन वाचते, म्हणजे कॉल तिथून सुरू होतो जिथे स्टुडिओ वेगळे आहेत — तुमच्या गरजा पुन्हा सांगण्यापासून नाही. मला कोणताही स्टुडिओ पैसे देत नाही — त्यांच्यापैकी कोणीच तुमच्या घरासाठी योग्य नसेल, तर मी तसं सांगेन, आणि या कॉलवर विकत घेण्यासारखं काहीच नाही.',
   },
   'architect.practising': { en: 'Practising', hi: 'अनुभव', mr: 'अनुभव' },
   'architect.years': { en: '{n} years', hi: '{n} साल', mr: '{n} वर्षं' },
-  'architect.briefsRead': { en: 'Briefs read here', hi: 'यहाँ पढ़ी गई ज़रूरतें', mr: 'इथे वाचलेल्या गरजा' },
+  'architect.briefsRead': { en: 'Home Profiles read here', hi: 'यहाँ पढ़ी गई ज़रूरतें', mr: 'इथे वाचलेल्या गरजा' },
   'architect.paidBy': { en: 'Paid by a studio', hi: 'स्टूडियो से पैसे', mr: 'स्टुडिओकडून पैसे' },
   'architect.never': { en: 'Never', hi: 'कभी नहीं', mr: 'कधीच नाही' },
 
@@ -155,12 +155,12 @@ export const EXPERT_DICT = {
   'sent.when': { en: '{day}, {time}.', hi: '{day}, {time}.', mr: '{day}, {time}.' },
   'sent.weCall': { en: 'We’ll call you.', hi: 'हम आपको कॉल करेंगे।', mr: 'आम्ही तुम्हाला फोन करू.' },
   'sent.bookedBody': {
-    en: 'Thirty minutes, and we ring you. The invite is in your email if you gave us one. Before the call the expert reads your brief, your floor plan and every quote on your comparison — you will not have to explain any of it again.',
+    en: 'Thirty minutes, and we ring you. The invite is in your email if you gave us one. Before the call the expert reads your Home Profile, your floor plan and every quote on your comparison — you will not have to explain any of it again.',
     hi: 'तीस मिनट, और कॉल हम करेंगे। अगर आपने ईमेल दिया है, तो इनवाइट उसमें है। कॉल से पहले एक्सपर्ट आपकी ज़रूरतें, फ़्लोर प्लान और आपकी तुलना का हर कोटेशन पढ़ लेंगी — आपको कुछ भी दोबारा समझाना नहीं पड़ेगा।',
     mr: 'तीस मिनिटं, आणि फोन आम्ही करू. तुम्ही ईमेल दिला असेल, तर इनव्हाइट त्यात आहे. कॉलआधी एक्सपर्ट तुमच्या गरजा, फ्लोअर प्लॅन आणि तुलनेतलं प्रत्येक कोटेशन वाचतील — तुम्हाला काहीही पुन्हा समजावून सांगावं लागणार नाही.',
   },
   'sent.requestedBody': {
-    en: 'Someone will be in touch within one working day to fix a time. Before the call they will read your brief, your floor plan and every quote on your comparison — you will not have to explain any of it again.',
+    en: 'Someone will be in touch within one working day to fix a time. Before the call they will read your Home Profile, your floor plan and every quote on your comparison — you will not have to explain any of it again.',
     hi: 'एक कामकाजी दिन के अंदर कोई आपसे समय तय करने के लिए संपर्क करेगा। कॉल से पहले वे आपकी ज़रूरतें, फ़्लोर प्लान और आपकी तुलना का हर कोटेशन पढ़ लेंगे — आपको कुछ भी दोबारा समझाना नहीं पड़ेगा।',
     mr: 'एका कामकाजाच्या दिवसात कोणीतरी वेळ ठरवण्यासाठी तुमच्याशी संपर्क करेल. कॉलआधी ते तुमच्या गरजा, फ्लोअर प्लॅन आणि तुलनेतलं प्रत्येक कोटेशन वाचतील — तुम्हाला काहीही पुन्हा समजावून सांगावं लागणार नाही.',
   },
@@ -197,20 +197,20 @@ export const EXPERT_DICT = {
     mr: 'तुम्हाला कोणत्या स्टुडिओंबद्दल बोलायचंय?',
   },
   'studios.help': {
-    en: 'Pick between {min} and {max}. Your architect reads all of them before the call, so choosing fewer means a deeper conversation about each.',
-    hi: '{min} से {max} के बीच चुनें। आपकी आर्किटेक्ट कॉल से पहले सबको पढ़ती हैं, इसलिए कम चुनेंगे तो हर एक पर गहराई से बात होगी।',
-    mr: '{min} ते {max} मधून निवडा. तुमच्या आर्किटेक्ट कॉलआधी सगळे वाचतात, त्यामुळे कमी निवडले तर प्रत्येकावर सविस्तर बोलणं होईल.',
+    en: 'Pick between {min} and {max}. Your expert reads all of them before the call, so choosing fewer means a deeper conversation about each.',
+    hi: '{min} से {max} के बीच चुनें। आपकी एक्सपर्ट कॉल से पहले सबको पढ़ती हैं, इसलिए कम चुनेंगे तो हर एक पर गहराई से बात होगी।',
+    mr: '{min} ते {max} मधून निवडा. तुमच्या एक्सपर्ट कॉलआधी सगळे वाचतात, त्यामुळे कमी निवडले तर प्रत्येकावर सविस्तर बोलणं होईल.',
   },
 
   // ── Form: questions ──
   'asks.legend': { en: 'What do you want answered?', hi: 'आप किन सवालों के जवाब चाहते हैं?', mr: 'तुम्हाला कोणत्या प्रश्नांची उत्तरं हवीत?' },
   'asks.help': {
-    en: 'Tick anything you want looked into before the call. The first ones are written from your own quotes and your brief. Nobody is going to open with “so, tell me about your requirement”.',
+    en: 'Tick anything you want looked into before the call. The first ones are written from your own quotes and your Home Profile. Nobody is going to open with “so, tell me about your requirement”.',
     hi: 'कॉल से पहले जिन बातों पर काम चाहिए, उन पर टिक करें। पहले वाले सवाल आपके अपने कोटेशन और आपकी ज़रूरतों से बने हैं। कोई भी “तो, अपनी requirement बताइए” से शुरुआत नहीं करेगा।',
     mr: 'कॉलआधी ज्या गोष्टींवर काम हवं, त्यांवर टिक करा. पहिले प्रश्न तुमच्याच कोटेशन्स आणि गरजांवरून लिहिलेले आहेत. कोणीही “तर, तुमची requirement सांगा” असं सुरू करणार नाही.',
   },
   'asks.fromQuotes': { en: 'From your own quotes', hi: 'आपके अपने कोटेशन से', mr: 'तुमच्याच कोटेशन्सवरून' },
-  'asks.fromBrief': { en: 'From your brief', hi: 'आपकी ज़रूरतों से', mr: 'तुमच्या गरजांवरून' },
+  'asks.fromBrief': { en: 'From your Home Profile', hi: 'आपकी ज़रूरतों से', mr: 'तुमच्या गरजांवरून' },
   'asks.common': { en: 'Things most people ask', hi: 'ज़्यादातर लोग यह पूछते हैं', mr: 'बहुतेक लोक हे विचारतात' },
   'asks.own': { en: 'Anything else — optional', hi: 'और कुछ — अपनी मर्ज़ी से', mr: 'आणखी काही — हवं असल्यास' },
   'asks.ownPlaceholder': {
@@ -251,7 +251,7 @@ export const EXPERT_DICT = {
 
   // ── Form: consent and submit ──
   'consent.label': {
-    en: 'Share my brief, name and number with the studios I have ticked — only once you introduce me, and only so they can arrange to meet.',
+    en: 'Share my Home Profile, name and number with the studios I have ticked — only once you introduce me, and only so they can arrange to meet.',
     hi: 'मेरी ज़रूरतें, नाम और नंबर उन स्टूडियो के साथ शेयर करें जिन पर मैंने टिक किया है — सिर्फ़ आपके मुलाक़ात करवाने के बाद, और सिर्फ़ मिलने का समय तय करने के लिए।',
     mr: 'माझ्या गरजा, नाव आणि नंबर मी टिक केलेल्या स्टुडिओंसोबत शेअर करा — फक्त तुम्ही ओळख करून दिल्यावर, आणि फक्त भेट ठरवण्यासाठी.',
   },
@@ -308,7 +308,7 @@ export const EXPERT_DICT = {
     hi: 'स्टूडियो से मुलाक़ात तभी करवा सकते हैं जब वे आपका नाम और नंबर देख सकें।',
     mr: 'स्टुडिओला तुमचं नाव आणि नंबर बघता आला तरच आम्ही ओळख करून देऊ शकतो.',
   },
-  'err.noBrief': { en: 'We could not find that brief.', hi: 'हमें आपकी ज़रूरतों वाला फ़ॉर्म नहीं मिला।', mr: 'आम्हाला तुमच्या गरजांचा फॉर्म सापडला नाही.' },
+  'err.noBrief': { en: 'We could not find that Home Profile.', hi: 'हमें आपकी ज़रूरतों वाला फ़ॉर्म नहीं मिला।', mr: 'आम्हाला तुमच्या गरजांचा फॉर्म सापडला नाही.' },
   'err.slotGone': {
     en: 'That time has just gone. Pick another — the list is up to date now.',
     hi: 'वह समय अभी-अभी निकल गया। दूसरा चुनें — लिस्ट अब अपडेट है।',
@@ -322,7 +322,7 @@ export const EXPERT_DICT = {
 
   // ── BriefRescue ──
   'rescue.defaultDest': { en: 'your quotes', hi: 'आपके कोटेशन', mr: 'तुमची कोटेशन्स' },
-  'rescue.picking': { en: 'Picking up your brief…', hi: 'आपकी ज़रूरतें ला रहे हैं…', mr: 'तुमच्या गरजा आणतोय…' },
+  'rescue.picking': { en: 'Picking up your Home Profile…', hi: 'आपकी ज़रूरतें ला रहे हैं…', mr: 'तुमच्या गरजा आणतोय…' },
   'rescue.pickingBody': {
     en: 'Your answers were saved in this browser. We are attaching them to your account, then {dest} will load.',
     hi: 'आपके जवाब इस ब्राउज़र में सेव थे। हम उन्हें आपके अकाउंट से जोड़ रहे हैं, फिर {dest} खुल जाएगा।',
@@ -340,9 +340,9 @@ export const EXPERT_DICT = {
   },
   'rescue.retry': { en: 'Try again', hi: 'फिर कोशिश करें', mr: 'पुन्हा प्रयत्न करा' },
   'rescue.back': { en: 'Back to your matches', hi: 'अपने मैच पर वापस', mr: 'तुमच्या मॅचेसकडे परत' },
-  'rescue.emptyH1': { en: 'We do not have your brief yet.', hi: 'आपकी ज़रूरतें अभी हमारे पास नहीं हैं।', mr: 'तुमच्या गरजा अजून आमच्याकडे नाहीत.' },
+  'rescue.emptyH1': { en: 'We do not have your Home Profile yet.', hi: 'आपकी ज़रूरतें अभी हमारे पास नहीं हैं।', mr: 'तुमच्या गरजा अजून आमच्याकडे नाहीत.' },
   'rescue.emptyBody': {
-    en: 'Either it was not finished, or it was answered in a different browser — briefs are held per browser until you sign in. About four minutes, and {dest} follow immediately.',
+    en: 'Either it was not finished, or it was answered in a different browser — answers are held per browser until you sign in. About four minutes, and {dest} follow immediately.',
     hi: 'या तो सवाल पूरे नहीं हुए, या किसी दूसरे ब्राउज़र में जवाब दिए गए — साइन इन करने तक जवाब हर ब्राउज़र में अलग रहते हैं। लगभग चार मिनट लगेंगे, और फिर तुरंत {dest} दिखेंगे।',
     mr: 'एकतर प्रश्न पूर्ण झाले नाहीत, किंवा दुसऱ्या ब्राउझरमध्ये उत्तरं दिली — साइन इन करेपर्यंत उत्तरं प्रत्येक ब्राउझरमध्ये वेगळी राहतात. सुमारे चार मिनिटं, आणि मग लगेच {dest} दिसतील.',
   },
@@ -366,7 +366,7 @@ export const EXPERT_DICT = {
     mr: 'हे {name} सोबत बघा, 30 मिनिटं.',
   },
   'pitch.body': {
-    en: 'She reads your brief and every quote first, tells you where the studios really differ, and sets up the meeting with the one you choose. No studio pays her.',
+    en: 'She reads your Home Profile and every quote first, tells you where the studios really differ, and sets up the meeting with the one you choose. No studio pays her.',
     hi: 'वे पहले आपकी ज़रूरतें और हर कोटेशन पढ़ती हैं, बताती हैं कि स्टूडियो असल में कहाँ अलग हैं, और जिसे आप चुनें उसके साथ मीटिंग तय करती हैं। उन्हें कोई स्टूडियो पैसे नहीं देता।',
     mr: 'त्या आधी तुमच्या गरजा आणि प्रत्येक कोटेशन वाचतात, स्टुडिओ खरंच कुठे वेगळे आहेत ते सांगतात, आणि तुम्ही निवडलेल्या स्टुडिओसोबत मीटिंग ठरवतात. त्यांना कोणताही स्टुडिओ पैसे देत नाही.',
   },
@@ -392,7 +392,7 @@ export const EXPERT_DICT = {
     hi: 'एक्सपर्ट कॉल के बाद, जब स्टूडियो के साथ मीटिंग तय हो जाए, तो स्टूडियो तक आपकी कैब हम बुक करते हैं — पहली बार, पुणे में कहीं से भी।',
     mr: 'एक्सपर्ट कॉलनंतर, स्टुडिओसोबत मीटिंग ठरली की स्टुडिओपर्यंत तुमची कॅब आम्ही बुक करतो — पहिल्या वेळी, पुण्यात कुठूनही.',
   },
-  'benefit.unbiased-expert.short': { en: 'An architect who is not selling', hi: 'ऐसे आर्किटेक्ट जो कुछ बेच नहीं रहे', mr: 'काहीही न विकणारे आर्किटेक्ट' },
+  'benefit.unbiased-expert.short': { en: 'An expert who is not selling', hi: 'ऐसे एक्सपर्ट जो कुछ बेच नहीं रहे', mr: 'काहीही न विकणारे एक्सपर्ट' },
   'benefit.unbiased-expert.terms': {
     en: 'No studio pays our experts. They are there to help you choose, not to sell you one.',
     hi: 'हमारे एक्सपर्ट को कोई स्टूडियो पैसे नहीं देता। वे चुनने में आपकी मदद के लिए हैं, कुछ बेचने के लिए नहीं।',
@@ -431,7 +431,7 @@ export const EXPERT_DICT = {
     mr: 'एखाद्या मित्राला रेफर करा. आमच्यामार्फत निवडलेल्या स्टुडिओसोबत त्यांच्या प्रोजेक्टचा 20% ॲडव्हान्स भरला की तुम्हाला ₹10,000 मिळतील — प्रत्येक पक्क्या प्रोजेक्टवर.',
   },
   // ── The short booking flow (owner, 10 Oct 2026) ──
-  'flow.brief': { en: 'Your brief', hi: 'आपका ब्रीफ़', mr: 'तुमचे ब्रीफ' },
+  'flow.brief': { en: 'Your Home Profile', hi: 'आपकी Home Profile', mr: 'तुमची Home Profile' },
   'flow.editBrief': { en: 'Edit', hi: 'बदलें', mr: 'बदला' },
   'flow.step1': { en: 'Which studios should we talk about?', hi: 'किन स्टूडियो के बारे में बात करें?', mr: 'कोणत्या स्टुडिओबद्दल बोलूया?' },
   'flow.step1Help': { en: 'Pick {min} to {max}.', hi: '{min} से {max} चुनें।', mr: '{min} ते {max} निवडा.' },
@@ -457,10 +457,11 @@ export const EXPERT_DICT = {
   'flow.resend': { en: 'Resend code', hi: 'कोड फिर भेजें', mr: 'कोड पुन्हा पाठवा' },
   'flow.confirm': { en: 'Confirm booking', hi: 'बुकिंग पक्की करें', mr: 'बुकिंग पक्की करा' },
   'flow.confirming': { en: 'Booking…', hi: 'बुक हो रहा है…', mr: 'बुक होतंय…' },
+  'flow.step4Verified': { en: 'Confirm your call', hi: 'अपनी कॉल पक्की करें', mr: 'तुमचा कॉल पक्का करा' },
   'flow.consent': {
-    en: 'By confirming, you agree we share your brief, name and number with the studios you picked — and only them. You can withdraw any time from Your project.',
-    hi: 'पक्का करके आप मानते हैं कि हम आपका ब्रीफ़, नाम और नंबर सिर्फ़ आपके चुने स्टूडियो के साथ साझा करें। आप कभी भी "आपका प्रोजेक्ट" से इसे वापस ले सकते हैं।',
-    mr: 'पक्के करून तुम्ही मान्य करता की आम्ही तुमचे ब्रीफ, नाव आणि नंबर फक्त तुम्ही निवडलेल्या स्टुडिओसोबत शेअर करू. "तुमचा प्रोजेक्ट" मधून तुम्ही कधीही हे मागे घेऊ शकता.',
+    en: 'No studio sees anything yet. By confirming, you agree that once your expert introduces you to a studio you picked, that studio can see your Home Profile, name and number. You can withdraw any time from Your project.',
+    hi: 'अभी कोई स्टूडियो कुछ नहीं देखता। पक्का करके आप मानते हैं कि जब आपका एक्सपर्ट आपके चुने किसी स्टूडियो से आपका परिचय कराएगा, तब वह स्टूडियो आपकी Home Profile, नाम और नंबर देख सकेगा। आप कभी भी "आपका प्रोजेक्ट" से इसे वापस ले सकते हैं।',
+    mr: 'अजून कोणताही स्टुडिओ काहीही पाहत नाही. पक्के करून तुम्ही मान्य करता की तुमचे एक्सपर्ट तुम्ही निवडलेल्या स्टुडिओशी तुमची ओळख करून देतील तेव्हा तो स्टुडिओ तुमची Home Profile, नाव आणि नंबर पाहू शकेल. "तुमचा प्रोजेक्ट" मधून तुम्ही कधीही हे मागे घेऊ शकता.',
   },
   'flow.needPhone': { en: 'Add your mobile number above.', hi: 'ऊपर अपना मोबाइल नंबर डालें।', mr: 'वर तुमचा मोबाइल नंबर टाका.' },
   'flow.needSlot': { en: 'Pick a date and time first.', hi: 'पहले तारीख और समय चुनें।', mr: 'आधी तारीख आणि वेळ निवडा.' },

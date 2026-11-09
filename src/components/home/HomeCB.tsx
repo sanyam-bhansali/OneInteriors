@@ -95,7 +95,7 @@ function gallery(): { tag: StyleTag; room: GalleryRoom; photo: StylePhoto }[] {
 const COLLAGE: StyleTag[] = ['warm-modern', 'japandi', 'indian-contemporary', 'scandinavian', 'luxe-glam', 'rustic-earthy'];
 
 /** The questions, in order. Words in HOME_DICT `faq.<k>.q` / `faq.<k>.a`. */
-const FAQ = ['cost', 'seconds', 'rank', 'number', 'architect', 'pune'] as const;
+const FAQ = ['cost', 'seconds', 'rank', 'unmatched', 'number', 'architect', 'pune'] as const;
 
 /** The finish level's "not for" line, first sentence only. English exactly as before. */
 function firstSentence(lang: Lang, text: string): string {
@@ -305,7 +305,7 @@ export function HomeCB({ offer, lang = 'en' }: { offer: OfferState; lang?: Lang 
           </ol>
         </section>
 
-        {/* ── The fifteen checks, as a reel ── */}
+        {/* ── The checks, by name, as a reel ── */}
         <section className="reel" aria-labelledby="reel-h">
           <h2 className="reel-h" id="reel-h" data-reveal="">
             {t('reel.pre')} <em data-count={checks.length}>{checks.length}</em> {t('reel.post')}
