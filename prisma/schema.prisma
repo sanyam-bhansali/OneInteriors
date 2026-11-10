@@ -336,6 +336,9 @@ model Brief {
   /// Studios whose own portfolio photo they picked in the style picker —
   /// shown unnamed, with the studio's consent (brief/picker-photos.ts).
   styleStudioPicks String[] @default([])
+  /// Discover (7 Nov 2026): the rooms they saved in the feed, pin ids, newest
+  /// last. Synced from the device so the expert sees them before the call.
+  discoverSaves    String[] @default([])
 
   // Q6
   adults        Int?
@@ -1237,6 +1240,10 @@ model PortfolioProject {
   /// style picker? Separate from clientConsented, which covers the studio's
   /// own page.
   pickerConsent  Boolean  @default(false)
+  /// Discover (7 Nov 2026): per image, aligned with `images` by index —
+  /// { materials: string[], checked: boolean, checkedBy, checkedAt }. Only an
+  /// image our team has checked appears in the Discover feed.
+  imageTags      Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

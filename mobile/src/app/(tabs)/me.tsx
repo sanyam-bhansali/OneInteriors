@@ -5,6 +5,7 @@ import { router, useFocusEffect, type Href } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { HeartIcon } from '../../components/icons';
 import { BellLineIcon, HouseIcon, LockerIcon, LogoutIcon, MailIcon, QuestionIcon, ShieldIcon, TrashIcon } from '../../components/me/icons';
 import { Row, RowGroup, SwitchRow } from '../../components/me/parts';
 import { Body, Rise, Screen, Stagger } from '../../components/ui';
@@ -117,6 +118,7 @@ export default function Me() {
               />
             ) : null}
             <Row title={t('me.profile')} sub={t('me.profile.sub')} icon={<HouseIcon color={color.ink} />} onPress={() => router.push('/home-profile' as Href)} />
+            <Row title={t('me.discover')} sub={t('me.discover.sub')} icon={<HeartIcon color={color.ink} />} onPress={() => router.push('/discover' as Href)} />
             {/* The choosing journey's part: hidden in the projects-only store build until the marketplace opens. */}
             {projectsOnly() ? null : (
               <Row title={t('dd.title')} sub={t('dd.me.sub')} icon={<HouseIcon color={color.ink} />} onPress={() => router.push('/design' as Href)} />
