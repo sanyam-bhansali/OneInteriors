@@ -1,6 +1,11 @@
 import { redirect } from 'next/navigation';
 import { getCurrentUser, hasRole } from '@/modules/auth/session';
 import { opsWithoutAuth } from '@/lib/env';
+import { THEME_SCRIPT } from '@/app/studio/ui/theme-script';
+import { OpsShell } from './OpsShell';
+import '../studio/studio-ui.css';
+import '../studio/studio-extra.css';
+import './ops-ui.css';
 
 /**
  * Every /ops route is gated here.
@@ -28,14 +33,14 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
    */
   if (opsWithoutAuth()) {
     return (
-      <>
+      <OpsFrame userName={null}>
         <div className="bg-[var(--color-atrisk)] py-2 text-center">
           <p className="m-0 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-[0.11em] text-white">
             Dev · ops console is open to anyone with this URL · no sign-in required
           </p>
         </div>
         {children}
-      </>
+      </OpsFrame>
     );
   }
 
@@ -44,5 +49,18 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
   if (!user) redirect('/sign-in');
   if (!hasRole(user, 'OPS')) redirect('/');
 
-  return <>{children}</>;
+  return <OpsFrame userName={user.name ?? user.email ?? null}>{children}</OpsFrame>;
+}
+
+/**
+ * The studio app's look for ops (owner, 7 Nov 2026): its tokens and theme
+ * script, the `.oi-studio` scope they live in, and the grouped side rail.
+ */
+function OpsFrame({ userName, children }: { userName: string | null; children: React.ReactNode }) {
+  return (
+    <div className="oi-studio oi-ops">
+      <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      <OpsShell userName={userName}>{children}</OpsShell>
+    </div>
+  );
 }

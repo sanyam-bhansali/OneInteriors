@@ -10,6 +10,8 @@ import { signedUrlFor } from '@/modules/storage/floor-plan';
 import { prepForBrief } from '@/modules/prepare/prep';
 import { expertPack } from '@/modules/consultation/pack';
 import { CallOutcome } from './CallOutcome';
+import { savedRooms } from '@/modules/discover/expert';
+import { TIER } from '@/modules/quotation/tiers';
 
 export const metadata: Metadata = { title: 'Expert calls', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -116,6 +118,7 @@ async function PrepCard({
   const planUrl = await signedUrlFor(request.briefId);
   const prep = await prepForBrief(request.briefId);
   const pack = await expertPack(request.briefId, request.studioIds);
+  const saved = await savedRooms(request.briefId);
 
   return (
     <li key={request.id} className="rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] p-6">
@@ -224,6 +227,27 @@ async function PrepCard({
               <li key={q}>{q}</li>
             ))}
           </ul>
+        </div>
+      ) : null}
+
+      {/* Rooms they saved in Discover (7 Nov 2026): what they love, in
+          pictures, before the call. The style line is what the feed showed
+          them; real rooms carry their band, examples are marked. */}
+      {saved.pins.length > 0 ? (
+        <div className="mb-5 rounded-[10px] border border-[var(--color-rule-soft)] bg-[var(--color-paper)] p-4">
+          <p className="label m-0 mb-1">Rooms they saved in Discover ({saved.pins.length})</p>
+          {saved.style ? <p className="m-0 mb-3 text-[14px] text-[var(--color-ink-2)]">{saved.style}</p> : null}
+          <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6">
+            {saved.pins.slice(0, 12).map((p) => (
+              <figure key={p.id} className="relative m-0 overflow-hidden rounded-[8px]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.src} alt={p.alt} loading="lazy" className="block aspect-square w-full object-cover" />
+                <figcaption className="absolute inset-x-0 bottom-0 bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
+                  {p.kind === 'built' ? (p.tier ? TIER[p.tier].label : 'Real room') : 'Example'}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
         </div>
       ) : null}
 

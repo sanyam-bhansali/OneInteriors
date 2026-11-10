@@ -13,6 +13,7 @@ import { filedRatesFor } from '@/data/filed-rates';
 import { getLang } from '@/modules/i18n/server';
 import { translator } from '@/modules/i18n/site';
 import { MATCH_DICT } from '@/modules/i18n/site/match';
+import { DiscoverSync } from '@/app/discover/DiscoverSync';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = translator(await getLang(), MATCH_DICT);
@@ -78,17 +79,20 @@ export default async function MatchPage() {
   }
 
   return (
-    <MatchClient
-      offer={offer}
-      studios={publicStudios(studios)}
-      allowUnverified={allowUnverified}
-      /* The brief as we hold it, for a tab that has none — a new tab, another
-         device after signing in. sessionStorage is per tab, so without this
-         the page told somebody with a finished brief to start one. */
-      savedBrief={saved.found && saved.brief.completedAt ? saved.brief : null}
-      filedRates={Object.fromEntries(
-        Object.entries(filedRates).map(([slug, r]) => [slug, r.rates]),
-      )}
-    />
+    <>
+      <DiscoverSync />
+      <MatchClient
+        offer={offer}
+        studios={publicStudios(studios)}
+        allowUnverified={allowUnverified}
+        /* The brief as we hold it, for a tab that has none — a new tab, another
+           device after signing in. sessionStorage is per tab, so without this
+           the page told somebody with a finished brief to start one. */
+        savedBrief={saved.found && saved.brief.completedAt ? saved.brief : null}
+        filedRates={Object.fromEntries(
+          Object.entries(filedRates).map(([slug, r]) => [slug, r.rates]),
+        )}
+      />
+    </>
   );
 }

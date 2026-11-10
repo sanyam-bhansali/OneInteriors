@@ -1,0 +1,125 @@
+/* The ops console in the studio app's look (owner, 7 Nov 2026).
+
+   The studio's tokens and frame come from ../studio/studio-ui.css, scoped to
+   `.oi-studio`. Ops pages were written against the customer site's
+   `--color-*` and `--font-*` names, so inside the ops frame those names are
+   pointed at the studio's tokens: every existing ops page takes the new
+   colours, Geist type and the dark theme without being rewritten. */
+
+.oi-studio.oi-ops {
+  --color-ink: var(--ink);
+  --color-ink-2: var(--text2);
+  --color-ink-3: var(--muted);
+  --color-paper: var(--paper);
+  --color-paper-2: var(--soft);
+  --color-paper-3: var(--fill);
+  --color-rule: var(--line);
+  --color-rule-soft: var(--fill);
+  --color-petrol: var(--acc);
+  --color-petrol-deep: var(--acc-h);
+  --color-petrol-soft: var(--acc-soft);
+  --color-brass: var(--warn-s);
+  --color-brass-bright: var(--warn-s);
+  --color-brass-soft: var(--warn-bg);
+  --color-ontrack: var(--good-s);
+  --color-ontrack-soft: var(--good-bg);
+  --color-atrisk: var(--bad-s);
+  --color-atrisk-soft: var(--bad-bg);
+  --color-terracotta: var(--bad-s);
+  --font-display: var(--font-geist), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+/* Headings in the studio's type, not the site's display serif. */
+.oi-ops h1,
+.oi-ops h2,
+.oi-ops .h2,
+.oi-ops .h3 {
+  font-family: var(--font-geist), system-ui, sans-serif;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+.oi-ops h1 {
+  font-weight: 600;
+}
+
+/* The page area: content sits on the ground colour; cards on paper. */
+.oi-ops .ops-page {
+  padding: 8px 0 48px;
+}
+.oi-ops .ops-page main {
+  padding-top: 24px;
+}
+
+.oi-ops .ops-title {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.oi-ops .ops-title small {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.oi-ops .ops-title b {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.oi-ops .ops-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.oi-ops .ops-menu {
+  display: none;
+}
+.oi-ops .rail {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  overflow-y: auto;
+}
+
+/* Phones: the rail becomes a drawer behind the menu button. */
+@media (max-width: 860px) {
+  .oi-ops .ops-menu {
+    display: flex;
+  }
+  .oi-ops .rail {
+    display: none;
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 40;
+    width: 260px;
+    box-shadow: 0 18px 40px -12px rgba(var(--sh), 0.45);
+  }
+  .oi-ops .rail.open {
+    display: flex;
+  }
+  .oi-ops .top {
+    padding: 12px 16px;
+  }
+}
+
+/* The studio CSS sets colour and size on every link and form control. Those
+   rules are outside any cascade layer, so they beat the Tailwind classes ops
+   pages use (which live in a layer) and a dark button lost its white text.
+   Inside ops, hand those properties back to the layers: the page's own class
+   wins, and without one the browser default applies. */
+.oi-studio.oi-ops a,
+.oi-studio.oi-ops a:hover {
+  color: revert-layer;
+  text-decoration: revert-layer;
+}
+.oi-studio.oi-ops :is(button, input, select, textarea) {
+  font-size: revert-layer;
+  color: revert-layer;
+}
+/* The ops frame's own rail and header keep the studio look. */
+.oi-studio.oi-ops :is(.rail, .top) a {
+  color: var(--text2);
+  text-decoration: none;
+}
+.oi-studio.oi-ops :is(.rail, .top) a[aria-current='page'] {
+  color: var(--ink);
+}
