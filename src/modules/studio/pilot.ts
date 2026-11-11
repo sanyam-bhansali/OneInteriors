@@ -38,10 +38,11 @@ import {
   isFullSoftwarePath,
   mayOpen,
   needsFullSoftware,
+  SOCIETIES_PATH,
 } from './surfaces';
 
 /** The closed areas, each with its own "coming soon". */
-export type PilotArea = 'projects' | 'design' | 'site' | 'money' | 'vendors' | 'team' | 'listing';
+export type PilotArea = 'projects' | 'design' | 'site' | 'money' | 'vendors' | 'team' | 'listing' | 'societies';
 
 /** What each closed area says for itself (the COMING_SOON shape, features.ts). */
 export const PILOT_SOON: Record<PilotArea, { title: string; what: string; meanwhile: string | null }> = {
@@ -80,6 +81,11 @@ export const PILOT_SOON: Record<PilotArea, { title: string; what: string; meanwh
     what: 'Your public profile, your portfolio and the rate card customers are matched against.',
     meanwhile: 'Your listing is live and unchanged. Tell us what you want edited and we will do it.',
   },
+  societies: {
+    title: 'Societies',
+    what: 'Every society you work: its wings and possession dates, who owns it, notes, and which to call first, worked out from possession and how its owners respond.',
+    meanwhile: 'Your leads keep the society typed on them, so nothing is lost when this opens.',
+  },
 };
 
 const AREA_PATHS: readonly [string, PilotArea][] = [
@@ -96,6 +102,7 @@ const AREA_PATHS: readonly [string, PilotArea][] = [
   [CREWS_HOME, 'vendors'],
   [CREW_SETTINGS_PATH, 'vendors'],
   ['/studio/listing', 'listing'],
+  [SOCIETIES_PATH, 'societies'],
 ];
 
 /** The closed area a path belongs to, or null for a screen every studio opens. */

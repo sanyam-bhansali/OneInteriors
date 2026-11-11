@@ -47,20 +47,20 @@ model User {
   /// scrypt, `s1$N$r$p$salt$hash`. OPS accounts only — see
   /// modules/auth/password.ts for why studios stay magic-link-only. Null for
   /// everyone who has not set one, which is the normal state.
-  passwordHash  String?
-  passwordSetAt DateTime?
+  passwordHash      String?
+  passwordSetAt     DateTime?
   /// A one-time password the studio owner made for this person (owner, 27 Oct
   /// 2026: password sign-in for studio staff until WhatsApp codes are live).
   /// True until they choose their own, which the studio asks for before
   /// anything else (auth/studio-password.ts).
-  passwordTemporary Boolean @default(false)
+  passwordTemporary Boolean   @default(false)
   /// Consecutive failed password attempts. Cleared on any successful sign-in,
   /// including by magic link.
-  failedSignIns Int       @default(0)
+  failedSignIns     Int       @default(0)
   /// Set when the attempt limit is reached. Password sign-in stays refused
   /// until a magic link is redeemed — deliberately not a timed lock, which an
   /// attacker simply waits out.
-  lockedOutAt   DateTime?
+  lockedOutAt       DateTime?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -857,41 +857,41 @@ model Studio {
   wonQuoteDecisions QuoteDecision[] @relation("FirstQuoteWinner")
 
   // The studio's own software. See the section at the foot of this file.
-  branding           StudioBranding?
-  products           StudioProduct[]
-  productDrafts      StudioProductDraft[]
-  productBackups     StudioProductBackup[]
-  studioQuotes       StudioQuote[]
-  studioClients      StudioClient[]
+  branding              StudioBranding?
+  products              StudioProduct[]
+  productDrafts         StudioProductDraft[]
+  productBackups        StudioProductBackup[]
+  studioQuotes          StudioQuote[]
+  studioClients         StudioClient[]
   /// Sales roles (owner, 22 Oct 2026; docs/studio-os/SALES-ROLES.md).
-  salesRoles         StudioSalesRole[]
-  studioClientEvents StudioClientEvent[]
-  studioSavedViews   StudioSavedView[]
-  studioForm         StudioForm?
+  salesRoles            StudioSalesRole[]
+  studioClientEvents    StudioClientEvent[]
+  studioSavedViews      StudioSavedView[]
+  studioForm            StudioForm?
   /// Lead intake (21 Oct 2026): Meta lead ads, Google lead forms, the
   /// studio's website and portals posting leads straight onto the board.
   studioLeadConnections StudioLeadConnection[]
   /// Meta Conversions API outbox (22 Oct 2026): one row per lead and event.
-  conversionEvents   StudioConversionEvent[]
-  studioStages       StudioStage[]
-  studioFields       StudioField[]
-  studioProjects     StudioProject[]
-  studioVendors      StudioVendor[]
-  studioWorkOrders   StudioWorkOrder[]
+  conversionEvents      StudioConversionEvent[]
+  studioStages          StudioStage[]
+  studioFields          StudioField[]
+  studioProjects        StudioProject[]
+  studioVendors         StudioVendor[]
+  studioWorkOrders      StudioWorkOrder[]
   /// Studio OS Phase 1: lead files, the studio's own source names, and the
   /// frozen copy of each quotation as it was sent.
-  studioClientFiles  StudioClientFile[]
-  studioLeadSources  StudioLeadSource[]
-  quoteRevisions     StudioQuoteRevision[]
+  studioClientFiles     StudioClientFile[]
+  studioLeadSources     StudioLeadSource[]
+  quoteRevisions        StudioQuoteRevision[]
   /// Leads at scale (12 Oct 2026): calendar tasks.
-  studioTasks        StudioTask[]
-  officeMeetings     StudioMeeting[]
-  busyBlocks         StudioBusyBlock[]
+  studioTasks           StudioTask[]
+  officeMeetings        StudioMeeting[]
+  busyBlocks            StudioBusyBlock[]
   /// Studio OS Phase 3: work orders for site crews on customer projects, and
   /// what was paid against them.
-  homeWorkOrders     HomeWorkOrder[]
-  homeCrewPayments   HomeCrewPayment[]
-  quoteRequests      StudioQuoteRequest[]
+  homeWorkOrders        HomeWorkOrder[]
+  homeCrewPayments      HomeCrewPayment[]
+  quoteRequests         StudioQuoteRequest[]
 
   /// Studio workspace Phase 2: the saved crew faces site mode taps, and the
   /// days off that are not reminder days.
@@ -904,9 +904,11 @@ model Studio {
   filedRates        StudioFiledRate[]
 
   /// In-app chat with clients (owner, 1 Nov 2026).
-  chatThreads ChatThread[]
+  chatThreads      ChatThread[]
   /// The clients' requirement forms (owner, 1 Nov 2026).
   requirementForms HomeRequirementForm[]
+  /// Society data (Max, owner 11 Nov 2026): the societies the studio works, with wings and notes.
+  societies        StudioSociety[]
 
   @@index([city, status, tier])
   /// Every customer-facing query filters paused studios out.
@@ -972,18 +974,18 @@ model StudioMember {
   /// Null on a SALES member keeps the Phase 1 rule exactly (own leads + the
   /// studio pool). Never read for any other fixed role. SetNull: deleting a
   /// role is refused while anyone is on it, so this is a backstop only.
-  salesRoleId String?
-  salesRole   StudioSalesRole? @relation(fields: [salesRoleId], references: [id], onDelete: SetNull)
+  salesRoleId     String?
+  salesRole       StudioSalesRole? @relation(fields: [salesRoleId], references: [id], onDelete: SetNull)
   /// Who they report to: another member of the same studio, or null for the
   /// owner. A person's team is everyone below them at any depth
   /// (studio/sales-access.ts `subtreeOf`). Same studio and no cycles are
   /// checked on every write (team-store.ts `setReportsTo`); the resolver also
   /// walks cycle-safe, so a bad row can never widen anybody's reach.
-  reportsToId String?
-  reportsTo   StudioMember?  @relation("StudioMemberReports", fields: [reportsToId], references: [id], onDelete: SetNull)
-  reports     StudioMember[] @relation("StudioMemberReports")
+  reportsToId     String?
+  reportsTo       StudioMember?    @relation("StudioMemberReports", fields: [reportsToId], references: [id], onDelete: SetNull)
+  reports         StudioMember[]   @relation("StudioMemberReports")
   /// The unassigned leads in this member's team pool (StudioClient.poolTeamId).
-  teamPoolClients StudioClient[] @relation("StudioClientPoolTeam")
+  teamPoolClients StudioClient[]   @relation("StudioClientPoolTeam")
 
   createdAt DateTime @default(now())
 
@@ -1023,8 +1025,12 @@ model StudioMember {
   /// Their regular busy times (27 Oct 2026), shown when someone picks a meeting time.
   busyBlocks        StudioBusyBlock[]
 
-  quoteRequestsAsked    StudioQuoteRequest[] @relation("QuoteRequestAsker")
-  quoteRequestsToBuild  StudioQuoteRequest[] @relation("QuoteRequestBuilder")
+  quoteRequestsAsked   StudioQuoteRequest[] @relation("QuoteRequestAsker")
+  quoteRequestsToBuild StudioQuoteRequest[] @relation("QuoteRequestBuilder")
+
+  /// Societies this person owns, and the notes they wrote on societies (11 Nov 2026).
+  societiesOwned StudioSociety[]     @relation("SocietyAssignee")
+  societyNotes   StudioSocietyNote[]
 
   @@index([studioId])
   @@index([invitedById])
@@ -1762,12 +1768,12 @@ model HomeProject {
   /// Studio workspace Phase 1: who on the studio's team is on it, and the
   /// plan built from the signed quote (modules/studio/quote-to-plan.ts).
   /// In-app chat (owner, 1 Nov 2026): the designer one-to-one, the home-team group, One Interiors.
-  chatThreads ChatThread[]
+  chatThreads     ChatThread[]
   /// The requirement form the designer sends with the mood board (owner, 1 Nov 2026).
   requirementForm HomeRequirementForm?
-  team      StudioProjectMember[]
-  stages    HomeProjectStage[]
-  materials HomeMaterial[]
+  team            StudioProjectMember[]
+  stages          HomeProjectStage[]
+  materials       HomeMaterial[]
 
   /// Studio workspace Phases 2–5 (docs/studio-workspace/PHASES-2-5-
   /// FOUNDATION.md): the site log, moved dates, payments received, quote
@@ -1787,7 +1793,7 @@ model HomeProject {
   /// shared with its message to the client, the design final and when design
   /// closed, with a frozen "what changed vs the sales final" for the client.
   designerId         String?
-  designer           StudioMember? @relation("ProjectDesigner", fields: [designerId], references: [id], onDelete: SetNull)
+  designer           StudioMember?      @relation("ProjectDesigner", fields: [designerId], references: [id], onDelete: SetNull)
   moodBoardSharedAt  DateTime?
   moodBoardNote      String?
   designFinalQuoteId String?
@@ -1813,14 +1819,14 @@ model HomeProject {
   /// (designClosedAt) -> EXECUTION; the provisional handover step ticked ->
   /// CLOSURE; the closure fixed -> SNAGS; the client signs off the handover
   /// with no open snag -> WARRANTY; past warrantyEndsOn it reads as CLOSED.
-  phase                 ProjectPhase @default(DESIGN)
+  phase                 ProjectPhase         @default(DESIGN)
   phaseAt               DateTime?
   provisionalHandoverAt DateTime?
   closedOutAt           DateTime?
   handoverSignedAt      DateTime?
   /// The customer (User id) who signed off. Never sent to anyone.
   handoverSignedById    String?
-  warrantyEndsOn        DateTime?    @db.Date
+  warrantyEndsOn        DateTime?            @db.Date
   closures              HomeProjectClosure[]
 
   /// Extra work after design sign-off (change orders) and the client's
@@ -1860,31 +1866,31 @@ enum ProjectPhase {
 /// another. Money in integer paise; GST as the quotation charges it (last,
 /// at the quotation's rate, on the net extra work).
 model HomeProjectClosure {
-  id              String      @id @default(cuid())
-  projectId       String
-  project         HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  version         Int
+  id                String                   @id @default(cuid())
+  projectId         String
+  project           HomeProject              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  version           Int
   /// The contract the closure starts from: the design final's total, else the signed total (GST included).
-  contractPaise   BigInt
+  contractPaise     BigInt
   /// Changes agreed on the client's decisions (HomeQuoteChange), GST included.
-  changesPaise    BigInt      @default(0)
+  changesPaise      BigInt                   @default(0)
   /// Approved change orders (extra work after sign-off), GST included; read
   /// from the change orders, never typed on the closure.
-  changeOrdersPaise BigInt    @default(0)
-  extrasPaise     BigInt      @default(0)
-  deductionsPaise BigInt      @default(0)
-  gstBps          Int         @default(0)
-  gstPaise        BigInt      @default(0)
-  totalPaise      BigInt
+  changeOrdersPaise BigInt                   @default(0)
+  extrasPaise       BigInt                   @default(0)
+  deductionsPaise   BigInt                   @default(0)
+  gstBps            Int                      @default(0)
+  gstPaise          BigInt                   @default(0)
+  totalPaise        BigInt
   /// Payments recorded and counted when this version was saved.
-  paidPaise       BigInt
-  finalDuePaise   BigInt
-  note            String?     @db.Text
+  paidPaise         BigInt
+  finalDuePaise     BigInt
+  note              String?                  @db.Text
   /// Set on the version that closed the project out (fixes the final payment).
-  final           Boolean     @default(false)
-  createdById     String?
-  createdAt       DateTime    @default(now())
-  lines           HomeProjectClosureLine[]
+  final             Boolean                  @default(false)
+  createdById       String?
+  createdAt         DateTime                 @default(now())
+  lines             HomeProjectClosureLine[]
 
   @@unique([projectId, version])
   @@index([projectId, final])
@@ -1920,40 +1926,40 @@ model HomeProjectClosureLine {
 /// the quotation's way (its modular discount and GST) and never changing the
 /// signed lines: approving writes one HomeQuoteChange on the final stage.
 model HomeChangeOrder {
-  id            String            @id @default(cuid())
-  projectId     String
-  project       HomeProject       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id              String            @id @default(cuid())
+  projectId       String
+  project         HomeProject       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   /// 1, 2, 3… per project: "Extra work 3".
-  number        Int
-  title         String
+  number          Int
+  title           String
   /// Why it is needed, in the studio's words to the client. Crosses to the client.
-  reason        String?           @db.Text
-  status        ChangeOrderStatus @default(DRAFT)
+  reason          String?           @db.Text
+  status          ChangeOrderStatus @default(DRAFT)
   /// The quotation it is priced from (design final, else the signed one).
-  quoteId       String?
+  quoteId         String?
   /// Basis points copied from that quotation when the order is priced.
-  discountBps   Int               @default(0)
-  gstBps        Int               @default(0)
-  workPaise     BigInt            @default(0)
-  discountPaise BigInt            @default(0)
-  gstPaise      BigInt            @default(0)
+  discountBps     Int               @default(0)
+  gstBps          Int               @default(0)
+  workPaise       BigInt            @default(0)
+  discountPaise   BigInt            @default(0)
+  gstPaise        BigInt            @default(0)
   /// What the client pays, GST included.
-  totalPaise    BigInt            @default(0)
+  totalPaise      BigInt            @default(0)
   /// An optional photo or drawing, filed in the locker (shared when sent).
   photoDocumentId String?
-  createdById   String
-  sentAt        DateTime?
+  createdById     String
+  sentAt          DateTime?
   /// The client's answer (the owner of the brief).
-  decidedAt     DateTime?
-  decidedById   String?
+  decidedAt       DateTime?
+  decidedById     String?
   /// The client's reason for declining. Crosses back to the client.
-  declineReason String?
-  paidAt        DateTime?
-  releasedAt    DateTime?
-  releasedById  String?
-  cancelledAt   DateTime?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  declineReason   String?
+  paidAt          DateTime?
+  releasedAt      DateTime?
+  releasedById    String?
+  cancelledAt     DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   lines        HomeChangeOrderLine[]
   events       HomeChangeOrderEvent[]
@@ -2182,7 +2188,7 @@ model HomeChecklistItem {
   /// The signed quote line it came from. A snapshot reference, not a key:
   /// quote lines are copied at signing and may be edited or deleted later.
   quoteLineId String?
-  sortOrder   Int     @default(0)
+  sortOrder   Int       @default(0)
 
   doneAt        DateTime?
   /// The user who ticked it (studio member or ops). Not a foreign key, as
@@ -2207,10 +2213,10 @@ model HomeChecklistItem {
   /// its days after the previous step. doneNote is the team's sentence: it
   /// never crosses to the customer.
   responsible    String?
-  needsDocument  Boolean @default(false)
+  needsDocument  Boolean         @default(false)
   gatePayment    Int?
   gapDays        Int?
-  doneNote       String? @db.Text
+  doneNote       String?         @db.Text
   doneDocumentId String?
   delays         HomeStepDelay[]
 
@@ -2320,10 +2326,10 @@ model HomeDecision {
   /// snapshot reference, like `HomeChecklistItem.quoteLineId`.
   quoteLineId    String?
 
-  postedById String
-  byStudio   Boolean   @default(false)
+  postedById  String
+  byStudio    Boolean   @default(false)
   /// Set when the 2-days-left reminder went out, so it goes out once.
-  remindedAt DateTime?
+  remindedAt  DateTime?
   /// "None of these: show me other options" (the owner's v1 screens, Redo;
   /// owner 1 Nov 2026). The studio posts a new decision; this one stays open
   /// until then, and its due day does not move.
@@ -2633,9 +2639,9 @@ model HomeDocument {
 
   /// Studio OS Phase 2: a design drawing (LAYOUT_2D | FURNITURE | RENDER_3D |
   /// WORKING | SITE_PHOTO) and the room it is for; the client's answers.
-  designKind String?
-  room       String?
-  reviews    HomeDesignReview[]
+  designKind      String?
+  room            String?
+  reviews         HomeDesignReview[]
   /// The designer marked this version the final of its type and room (owner,
   /// 1 Nov 2026). One per type and room: marking one clears the others.
   markedFinalAt   DateTime?
@@ -2893,19 +2899,19 @@ model HomeProjectDateChange {
 /// with `correctsId` replaces it (amount 0 to void). Only the customer's
 /// confirm/dispute fields are ever set after insert, once.
 model HomeProjectPayment {
-  id                String        @id @default(cuid())
+  id                String           @id @default(cuid())
   projectId         String
-  project           HomeProject   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project           HomeProject      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   /// Index into `HomeProject.paymentPhases` (the stages as signed).
   stageIndex        Int
   amountPaise       BigInt
   /// The IST day the money arrived.
-  receivedOn        DateTime      @db.Date
+  receivedOn        DateTime         @db.Date
   /// Null only on rows backfilled from `paidPhases`, which never said.
   mode              PaymentMode?
   /// The receipt, filed in the locker as a RECEIPT document.
   receiptDocumentId String?
-  receiptDocument   HomeDocument? @relation(fields: [receiptDocumentId], references: [id], onDelete: SetNull)
+  receiptDocument   HomeDocument?    @relation(fields: [receiptDocumentId], references: [id], onDelete: SetNull)
   /// Internal note (UTR, who paid). NEVER crosses.
   note              String?
   /// Money received for a change order (extra work), recorded on the stage
@@ -2947,26 +2953,26 @@ model HomeProjectPayment {
 /// as signed; this row is the change beside it. Append-only: a re-pick is a
 /// new row reversing the old one.
 model HomeQuoteChange {
-  id          String              @id @default(cuid())
-  projectId   String
-  project     HomeProject         @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  decisionId  String?
-  decision    HomeDecision?       @relation(fields: [decisionId], references: [id], onDelete: SetNull)
-  optionId    String?
-  option      HomeDecisionOption? @relation(fields: [optionId], references: [id], onDelete: SetNull)
-  quoteLineId String?
+  id            String              @id @default(cuid())
+  projectId     String
+  project       HomeProject         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  decisionId    String?
+  decision      HomeDecision?       @relation(fields: [decisionId], references: [id], onDelete: SetNull)
+  optionId      String?
+  option        HomeDecisionOption? @relation(fields: [optionId], references: [id], onDelete: SetNull)
+  quoteLineId   String?
   /// "Shutter finish: Gloss".
-  label       String
+  label         String
   /// GST included, customer-visible; negative when it takes money off.
-  deltaPaise  BigInt
+  deltaPaise    BigInt
   /// The payment stage it lands on (the final one, by the brief).
-  stageIndex  Int?
-  byId        String?
-  at          DateTime            @default(now())
+  stageIndex    Int?
+  byId          String?
+  at            DateTime            @default(now())
   /// The approved change order this price is (extra work after sign-off).
   /// Kept apart from decisions so the closure shows it as its own line.
   changeOrderId String?
-  changeOrder   HomeChangeOrder? @relation(fields: [changeOrderId], references: [id], onDelete: SetNull)
+  changeOrder   HomeChangeOrder?    @relation(fields: [changeOrderId], references: [id], onDelete: SetNull)
 
   @@index([projectId, at])
   @@index([changeOrderId])
@@ -3713,7 +3719,7 @@ model StudioQuote {
   /// sales final, and a voice note kept as audio (a lead-files path; no
   /// speech-to-text yet, owner 25 Oct 2026). The category the quotation is
   /// priced as: Essential, Premium or Luxe (BudgetTier LUXURY reads "Luxe").
-  salesFinalNotes      String?     @db.Text
+  salesFinalNotes      String?              @db.Text
   salesFinalVoicePath  String?
   category             BudgetTier?
 
@@ -4050,6 +4056,14 @@ model StudioClient {
   poolTeamId String?
   poolTeam   StudioMember? @relation("StudioClientPoolTeam", fields: [poolTeamId], references: [id], onDelete: SetNull)
 
+  /// The society and wing this lead lives in (owner, 11 Nov 2026). `society`
+  /// above stays as typed; this is the link the Societies tab counts by.
+  /// SetNull: deleting a society or a wing never deletes its leads.
+  societyId     String?
+  societyRecord StudioSociety?     @relation(fields: [societyId], references: [id], onDelete: SetNull)
+  wingId        String?
+  wing          StudioSocietyWing? @relation(fields: [wingId], references: [id], onDelete: SetNull)
+
   /// When somebody last actually spoke to them.
   ///
   /// Deliberately not `updatedAt`, which moves when anything at all changes —
@@ -4141,11 +4155,11 @@ model StudioClient {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  quotes   StudioQuote[]
-  projects StudioProject[]
-  events   StudioClientEvent[]
-  files    StudioClientFile[]
-  tasks    StudioTask[]
+  quotes           StudioQuote[]
+  projects         StudioProject[]
+  events           StudioClientEvent[]
+  files            StudioClientFile[]
+  tasks            StudioTask[]
   /// Conversions API events about this lead. Erased with it.
   conversionEvents StudioConversionEvent[]
   quoteRequests    StudioQuoteRequest[]
@@ -4168,10 +4182,14 @@ model StudioClient {
   /// One row per introduction, so a redelivery cannot create a second
   /// client for the same handoff.
   @@unique([studioId, introductionId])
+  /// The AxLeads import (20261021110000_axleads_import): one row per lead there.
+  @@unique([studioId, importedFrom, externalId])
   @@index([studioId, stageId, nextActionOn])
   /// The board, the pool and the bin are all "this studio, not deleted".
   @@index([studioId, deletedAt])
   @@index([studioId, assignedToId, deletedAt])
+  @@index([societyId])
+  @@index([wingId])
   /// Today's "meetings today", and the bin purge.
   @@index([studioId, meetingAt])
   @@index([deletedAt])
@@ -4189,8 +4207,6 @@ model StudioClient {
   @@index([studioId, updatedAt])
   @@index([tags], type: Gin)
   @@index([stageId])
-  /// The AxLeads import (20261021110000_axleads_import): one row per lead there.
-  @@unique([studioId, importedFrom, externalId])
   /// "By campaign" on lead analytics (20261022100000_lead_routing_attribution).
   @@index([studioId, campaignId])
   @@index([studioId, poolTeamId])
@@ -4435,10 +4451,10 @@ model StudioClientEvent {
 
   createdAt DateTime @default(now())
 
-  /// The timeline read: one client, newest first.
-  @@index([clientId, createdAt])
   /// The AxLeads import (20261021110000_axleads_import).
   @@unique([studioId, externalId])
+  /// The timeline read: one client, newest first.
+  @@index([clientId, createdAt])
   /// "What has this studio been doing", and the per-member activity read.
   @@index([studioId, createdAt])
   @@index([studioId, kind, createdAt])
@@ -4631,14 +4647,14 @@ model StudioLeadIntakeEvent {
   /// id, or `h:` and a hash of phone and minute when the caller sends none.
   externalId String
 
-  status LeadIntakeStatus @default(RECEIVED)
+  status   LeadIntakeStatus @default(RECEIVED)
   /// The lead it landed as or on. Plain text, not a relation: erasing the
   /// lead from the bin keeps the receipt (the link then goes nowhere).
   clientId String?
   /// Why it failed, in words the owner can act on. Never a token.
   error    String?
   /// Google's "Send test data": recorded here, not put on the board.
-  isTest   Boolean @default(false)
+  isTest   Boolean          @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -5584,23 +5600,23 @@ enum SiteVisitAnswer {
 /// The customer sees the day, time, what it is for and its status; `note`
 /// stays with the team.
 model HomeSiteVisit {
-  id        String          @id @default(cuid())
-  projectId String
-  project   HomeProject     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  at        DateTime
-  purpose   String
-  status    SiteVisitStatus @default(BOOKED)
+  id               String           @id @default(cuid())
+  projectId        String
+  project          HomeProject      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  at               DateTime
+  purpose          String
+  status           SiteVisitStatus  @default(BOOKED)
   /// Internal: NEVER crosses.
-  note      String?         @db.Text
+  note             String?          @db.Text
   /// The client's answer in the app (owner, 1 Nov 2026; customer app Phase 2):
   /// they will be there, or they ask for another day, with why (kept for the
   /// delay record; the studio sees it).
   clientAnswer     SiteVisitAnswer?
   clientAnsweredAt DateTime?
   clientReason     String?
-  byId      String
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  byId             String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   @@index([projectId, at])
   @@map("home_site_visits")
@@ -5807,12 +5823,12 @@ model HomeWorkOrderLine {
   /// The quote line it came from (a reference, not a key). Null for extras.
   quoteLineId String?
 
-  room     String
-  product  String
-  code     StudioWorkCode?
-  details  String?         @db.Text
-  widthMm  Int?
-  heightMm Int?
+  room              String
+  product           String
+  code              StudioWorkCode?
+  details           String?         @db.Text
+  widthMm           Int?
+  heightMm          Int?
   /// What the client is charged for this line, paise. Null for extras.
   quotedAmountPaise BigInt?
 
@@ -5897,9 +5913,9 @@ enum StudioSoftwarePlan {
 /// DONE when the quotation is sent (or the builder marks it done); CANCELLED
 /// by a head, or when the lead is lost or in the bin.
 model StudioQuoteRequest {
-  id       String @id @default(cuid())
+  id       String       @id @default(cuid())
   studioId String
-  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  studio   Studio       @relation(fields: [studioId], references: [id], onDelete: Cascade)
   clientId String
   client   StudioClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
@@ -5907,20 +5923,20 @@ model StudioQuoteRequest {
   requestedById String?
   requestedBy   StudioMember? @relation("QuoteRequestAsker", fields: [requestedById], references: [id], onDelete: SetNull)
   /// Who builds it. Null only when the studio had nobody who builds quotations.
-  assignedToId String?
-  assignedTo   StudioMember? @relation("QuoteRequestBuilder", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedToId  String?
+  assignedTo    StudioMember? @relation("QuoteRequestBuilder", fields: [assignedToId], references: [id], onDelete: SetNull)
   /// Given in turn (true) or handed by a head (false, after a reassignment).
-  byTurn Boolean @default(true)
+  byTurn        Boolean       @default(true)
 
   status QuoteRequestStatus @default(OPEN)
   reason QuoteRequestReason
 
   /// The draft (first quote) it is built on, then the quotation that was sent.
-  quoteId String?
-  quote   StudioQuote? @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  quoteId    String?
+  quote      StudioQuote? @relation(fields: [quoteId], references: [id], onDelete: SetNull)
   /// The lead's floor plans that came with it (StudioClientFile ids).
-  fileIds String[] @default([])
-  note    String?
+  fileIds    String[]     @default([])
+  note       String?
   /// Why it was cancelled, in words ("The lead was lost").
   cancelNote String?
 
@@ -5962,10 +5978,10 @@ model StudioMeeting {
   title    String
   startsAt DateTime
   /// How long, in minutes (15 to 480).
-  minutes  Int     @default(30)
+  minutes  Int      @default(30)
   /// "Conference room", "Site: VTP Cygnus", "Google Meet".
   place    String?
-  note     String? @db.Text
+  note     String?  @db.Text
 
   /// Who set it up. SetNull when they leave, so the meeting stays for the others.
   organiserId String?
@@ -6119,11 +6135,11 @@ model ChatMessage {
 /// How far each person has read a thread: unread counts and the read ticks;
 /// and their own archive of it.
 model ChatRead {
-  threadId   String
-  thread     ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  userId     String
-  studioId   String
-  lastReadAt DateTime
+  threadId    String
+  thread      ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  userId      String
+  studioId    String
+  lastReadAt  DateTime
   /// When this person's app last fetched their conversations: messages before
   /// it show "delivered" to the sender.
   deliveredAt DateTime?
@@ -6156,4 +6172,103 @@ model HomeRequirementForm {
 
   @@index([studioId])
   @@map("home_requirement_forms")
+}
+
+/// Priority by hand (owner, 11 Nov 2026). Left empty, the priority comes from
+/// possession (modules/studio-practice/society-rules.ts `priorityFor`).
+enum SocietyPriority {
+  P1
+  P2
+  P3
+}
+
+/// How a society's leads are responding, set by hand. Empty = worked out from calls.
+enum SocietyHeat {
+  HOT
+  WARM
+  COLD
+}
+
+/// A housing society the studio works (Max plan; owner, 11 Nov 2026).
+///
+/// Hauspire's leads mostly come from society sheets, so the society is the
+/// unit the sales team plans by: who owns it, when its wings get possession,
+/// how its owners are responding. Priority and heat are worked out on read
+/// from the wings and the calls, so they are never stale; the override
+/// columns hold a person's call, with the reason, when they know better.
+model StudioSociety {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  name     String
+  /// Lower-case letters and digits of the name: "Life Republic R-10" and
+  /// "life republic r10" are one society.
+  key      String
+  locality String?
+  builder  String?
+
+  assignedToId String?
+  assignedTo   StudioMember? @relation("SocietyAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  priorityOverride SocietyPriority?
+  priorityReason   String?
+  heatOverride     SocietyHeat?
+  heatReason       String?
+  /// Heat set by hand lapses after 30 days, back to the calls.
+  heatOverrideAt   DateTime?
+
+  /// The sheet it came in on, and when.
+  sourceSheet      String?
+  sourceImportedAt DateTime?
+
+  wings   StudioSocietyWing[]
+  notes   StudioSocietyNote[]
+  clients StudioClient[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studioId, key])
+  @@index([studioId, assignedToId])
+  @@map("studio_societies")
+}
+
+/// One wing or tower. Possession is per wing: one often hands over months
+/// before another, and the nearest one sets the society's priority.
+model StudioSocietyWing {
+  id        String        @id @default(cuid())
+  societyId String
+  society   StudioSociety @relation(fields: [societyId], references: [id], onDelete: Cascade)
+
+  name         String
+  flats        Int?
+  /// The first of the possession month, expected or actual.
+  possessionOn DateTime?
+
+  clients StudioClient[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([societyId, name])
+  @@map("studio_society_wings")
+}
+
+/// A dated note on a society: possession news, the society office, events.
+model StudioSocietyNote {
+  id        String        @id @default(cuid())
+  societyId String
+  society   StudioSociety @relation(fields: [societyId], references: [id], onDelete: Cascade)
+
+  authorId   String?
+  author     StudioMember? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  /// Kept as written, so a leaver's notes still say who wrote them.
+  authorName String?
+
+  body String @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@index([societyId, createdAt])
+  @@map("studio_society_notes")
 }

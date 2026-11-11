@@ -101,18 +101,26 @@ export function StudioFrame({
 
   return (
     <div className="oi-frame">
-      {!onHome && app ? (
+      {!onHome ? (
         <header className="apphead">
+          {/* Home first, on every page (owner, 11 Nov 2026): one tap back from
+              anywhere, pinned while the page scrolls (.apphead is sticky). */}
+          <Link href={STUDIO_HOME} className="iconbtn homebtn" aria-label="Home">
+            <LineIcon name="home" />
+            <span className="homelbl">Home</span>
+          </Link>
           <button type="button" className="iconbtn" onClick={() => setMenu((m) => !m)} aria-label="All apps" aria-expanded={menu} style={{ border: 0, cursor: 'pointer' }}>
             <LineIcon name="grid" />
           </button>
-          <Link href={STUDIO_HOME} className="appid" title="Back to home">
-            <span className="appico" style={{ background: app.bg, color: app.fg }}>
-              <AppIcon name={app.icon} size={20} />
-            </span>
-            <b>{app.name}</b>
-          </Link>
-          {app.tabs.length > 1 ? (
+          {app ? (
+            <Link href={app.href} className="appid" title={app.name}>
+              <span className="appico" style={{ background: app.bg, color: app.fg }}>
+                <AppIcon name={app.icon} size={20} />
+              </span>
+              <b>{app.name}</b>
+            </Link>
+          ) : null}
+          {app && app.tabs.length > 1 ? (
             <nav className="atabs" aria-label={`${app.name} sections`}>
               {app.tabs.map((t) => (
                 <Link key={t.href} href={t.href} aria-current={tab?.href === t.href ? 'page' : undefined} aria-label={t.count ? `${t.label}, ${t.count} waiting` : undefined}>
@@ -137,9 +145,6 @@ export function StudioFrame({
             <Link href={STUDIO_HOME} className="iconbtn" aria-label={alerts > 0 ? `Notifications, ${alerts} new` : 'Notifications'}>
               <LineIcon name="bell" />
               {alerts > 0 ? <span className="pip" /> : null}
-            </Link>
-            <Link href={STUDIO_HOME} className="iconbtn" aria-label="Home">
-              <LineIcon name="home" />
             </Link>
             <ProfileMenu name={userName} signOut={signOut} />
           </div>

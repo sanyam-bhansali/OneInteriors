@@ -72,6 +72,8 @@ export const PAYMENTS_HOME = '/studio/payments';
 export const TEAM_PATH = '/studio/settings/team';
 /** The unassigned leads (closed on Pro Solo). */
 export const POOL_PATH = '/studio/clients/pool';
+/** The Leads app's Societies tab (owner, 11 Nov 2026; Max only). */
+export const SOCIETIES_PATH = '/studio/clients/societies';
 export const PAYMENT_STAGES_PATH = '/studio/settings/payments';
 /** Studio OS Phase 2: a designer's home, and the owner's and PM's designers' workload. */
 export const DESIGN_HOME = '/studio/design';
@@ -109,6 +111,8 @@ export const FULL_SOFTWARE_PATHS: readonly string[] = [
   CREWS_HOME,
   CREW_SETTINGS_PATH,
   '/studio/listing',
+  /* Societies (owner, 11 Nov 2026): Max only. */
+  SOCIETIES_PATH,
 ];
 
 /** Whether a role only makes sense with the full software (designer, PM, supervisor, accounts). */
@@ -200,6 +204,7 @@ export const LEAD_SETTINGS_PATHS: readonly string[] = ['/studio/settings/pipelin
  */
 const SALES_ROLE_SCREENS: readonly { path: string; action: Parameters<typeof can>[1] }[] = [
   { path: '/studio/clients/import', action: 'lead.import' },
+  { path: `${SOCIETIES_PATH}/import`, action: 'lead.import' },
   { path: '/studio/clients/bin', action: 'lead.delete' },
   { path: '/studio/clients/analytics', action: 'lead.analytics' },
   { path: TEAM_PATH, action: 'team.sales' },
