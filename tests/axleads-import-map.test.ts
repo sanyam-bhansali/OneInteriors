@@ -378,6 +378,7 @@ describe('leads', () => {
     expect(one.client.stageId).toBeTruthy();
     expect(one.events.every((e) => e.externalId.startsWith('axleads:'))).toBe(true);
     expect(lead(p, 5)).toMatchObject({ action: 'refresh', clientId: 'c5', fromImport: false });
+    expect(typeof one.assigneeUnknown).toBe('boolean');
     expect(p.report.refreshed).toBe(2);
     expect(p.report.already).toBe(0);
     expect(p.report.create).toBeGreaterThan(0);

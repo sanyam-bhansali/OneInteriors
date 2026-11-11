@@ -454,7 +454,8 @@ export async function runImport(db: PrismaClient, input: { studioId: string; ax:
           if (!was) continue;
           if (l.fromImport) {
             const c = l.client;
-            const assignedToId = memberId(c.assignee);
+            /* Given on AxLeads to someone not matched here: whoever has it here keeps it. */
+            const assignedToId = l.assigneeUnknown ? was.assignedToId : memberId(c.assignee);
             const oldFields = was.fields && typeof was.fields === 'object' && !Array.isArray(was.fields) ? (was.fields as Record<string, unknown>) : {};
             await tx.studioClient.update({
               where: { id: l.clientId },
@@ -473,7 +474,8 @@ export async function runImport(db: PrismaClient, input: { studioId: string; ax:
                 nextAction: c.nextAction,
                 nextActionOn: c.nextActionOn,
                 assignedToId,
-                poolTeamId: assignedToId ? null : memberId(c.poolTeam),
+                /* Still nobody's: it keeps the pool it is in (Swarupa's team pool, say) unless the roles file names one. */
+                ...(assignedToId ? { poolTeamId: null } : c.poolTeam && !l.assigneeUnknown ? { poolTeamId: memberId(c.poolTeam) } : {}),
                 lastContactedAt: c.lastContactedAt,
                 tags: c.tags,
                 deletedAt: c.deletedAt,

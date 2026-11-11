@@ -52,6 +52,26 @@ export interface BuildPlan {
   small: NameCount[];
 }
 
+/**
+ * A wing as the lead's wing field gives it, made short: the society's own
+ * name taken off the front ("Millennium Falcon A Wing" → "A", "Godrej
+ * Woodsville Tower 1" → "Tower 1"), "Wing A" / "B Bldg" read as the letter,
+ * and a bare word ("Wing", "NA") as no wing.
+ */
+export function cleanWing(raw: string | null | undefined, society: string): string | null {
+  let s = String(raw ?? '').replace(/\s+/g, ' ').trim();
+  if (!s) return null;
+  const own = new Set(society.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+  const parts = s.split(' ');
+  while (parts.length > 1 && own.has(parts[0]!.toLowerCase().replace(/[^a-z0-9]/g, ''))) parts.shift();
+  s = parts.join(' ');
+  /* The letter at the end wins: "Wing D Wing D", "Wing D And E Wing E", "A And B Building B Building". */
+  const m = s.match(/(?:^|\s)(?:wing|building|bldg\.?)\s+([a-z0-9]{1,3})$/i) ?? s.match(/(?:^|\s)([a-z0-9]{1,3})\s+(?:wing|building|bldg\.?)$/i);
+  if (m) return m[1]!.toUpperCase();
+  if (/^(wing|building|bldg|tower|na|n\/a|nil|none|-+)$/i.test(s)) return null;
+  return tidyWing(s) || null;
+}
+
 const mode = <T>(xs: readonly T[]): T | null => {
   const n = new Map<T, number>();
   for (const x of xs) n.set(x, (n.get(x) ?? 0) + 1);
@@ -98,13 +118,14 @@ export function planSocietyBuild(leads: readonly BuildLead[], existing: readonly
 
   const links = new Map<string, { ref: string; wing: string | null }>();
   const members = new Map<string, BuildLead[]>();
+  const nameOf = new Map(societies.map((s) => [s.ref, s.name]));
   for (const l of leads) {
     const t = l.society?.trim();
     if (!t) continue;
     const p = parseSociety(t);
     const ref = refOfSpelling.get(p.base);
     if (!ref) continue;
-    const wing = tidyWing(l.wing ?? '') || p.wing || null;
+    const wing = cleanWing(l.wing, `${nameOf.get(ref) ?? ''} ${p.base}`) || p.wing || null;
     links.set(l.id, { ref, wing });
     members.set(ref, [...(members.get(ref) ?? []), l]);
   }

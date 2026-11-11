@@ -1065,7 +1065,7 @@ export type LeadPlan =
   /** `pool`: a re-run moves the card, still unassigned and untouched since its import, into this team pool. */
   | { action: 'already'; axId: string; clientId: string; backfill: PersonRef['member']; pool?: MemberRef | null }
   /** `--refresh`: an imported card brought up to AxLeads again (fromImport), or only its new lines (a merge line into a card that was here before). */
-  | { action: 'refresh'; axId: string; clientId: string; fromImport: boolean; client: ClientPlan; events: EventPlan[] }
+  | { action: 'refresh'; axId: string; clientId: string; fromImport: boolean; client: ClientPlan; events: EventPlan[]; assigneeUnknown: boolean }
   | { action: 'skip-binned'; axId: string }
   /** Answered a question in `skipIfAnswered`: a job applicant, not a client. */
   | { action: 'skip-answered'; axId: string };
@@ -1257,7 +1257,9 @@ export function planImport(ax: AxExport, ctx: StudioContext, choices: Choices, o
     if (done && opts.refresh) {
       const built = buildLead(lead, { ax, stageById, axStageName, intake, people, fields, fieldKeyOf, now: opts.now });
       if (!built.client.assignee && toTeamPool(lead)) built.client.poolTeam = poolTeam;
-      leads.push({ action: 'refresh', axId: lead.id, clientId: done.clientId, fromImport: done.fromImport === true, client: built.client, events: built.events });
+      /* Given on AxLeads to someone not matched here (no phone, not added): the card keeps whoever has it here. */
+      const assigneeUnknown = !!lead.assignedTo && !built.client.assignee;
+      leads.push({ action: 'refresh', axId: lead.id, clientId: done.clientId, fromImport: done.fromImport === true, client: built.client, events: built.events, assigneeUnknown });
       report.refreshed += 1;
       continue;
     }

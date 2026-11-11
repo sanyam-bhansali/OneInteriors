@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planSocietyBuild, type BuildLead } from '@/modules/studio-practice/society-build';
+import { cleanWing, planSocietyBuild, type BuildLead } from '@/modules/studio-practice/society-build';
 
 let n = 0;
 const lead = (society: string | null, extra: Partial<BuildLead> = {}): BuildLead => ({ id: `l${n++}`, society, locality: null, wing: null, assignedToId: null, ...extra });
@@ -39,6 +39,20 @@ describe('Building societies from leads', () => {
     expect(plan.societies[0]).toMatchObject({ ref: 'gm', existing: true, name: 'Godrej Meadows', leads: 2 });
     expect(plan.societies[0]!.aliases).toEqual(['godrejmedow']);
     expect([...plan.links.values()].every((l) => l.ref === 'gm')).toBe(true);
+  });
+
+  it('makes wing names short (Hauspire’s real wing values)', () => {
+    expect(cleanWing('Millennium Falcon A Wing', 'Millennium Falcon')).toBe('A');
+    expect(cleanWing('Godrej Woodsville Tower 1', 'Godrej Woodsville')).toBe('Tower 1');
+    expect(cleanWing('Presidential Towers A', 'Presidential Towers')).toBe('A');
+    expect(cleanWing('The Canary Phase 2 Building D', 'The Canary Phase 2')).toBe('D');
+    expect(cleanWing('Godrej Sky Greens Phase 1 Tower 05', 'Godrej Sky Greens Phase 1')).toBe('Tower 05');
+    expect(cleanWing('Wing', 'Legacy Kairos')).toBeNull();
+    expect(cleanWing('Eastern River Residency Wing D Wing D', 'Eastern River Residency')).toBe('D');
+    expect(cleanWing('Basil Maximus Wing D And E Wing E', 'Basil Maximus')).toBe('E');
+    expect(cleanWing('Legacy Kairos A And B Building B Building', 'Legacy Kairos')).toBe('B');
+    expect(cleanWing('b', 'Anything')).toBe('B');
+    expect(cleanWing('', 'X')).toBeNull();
   });
 
   it('gives a society to nobody when most of its leads are nobody’s', () => {
