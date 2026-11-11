@@ -7,8 +7,11 @@ import { leadsHref, type LeadFilters } from '@/modules/studio-sales/lead-filters
 import { parseRange, rangeLabel, rangeToString } from '@/modules/studio-sales/ist-range';
 import { LOST_FILTERS, convertedFilters, pctText } from '@/modules/studio-sales/dashboard-rules';
 import { RangePicker } from './RangePicker';
+import { AnalyticsTabs } from '../clients/analytics/AnalyticsTabs';
+import { currentMember } from '@/modules/studio/access';
+import { mayOpen } from '@/modules/studio/surfaces';
 
-export const metadata: Metadata = { title: 'Dashboard', robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: 'Analytics', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
 
 const list = (f: LeadFilters) => leadsHref(f, { view: 'list' });
@@ -22,7 +25,9 @@ const list = (f: LeadFilters) => leadsHref(f, { view: 'list' });
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
   const sp = await searchParams;
   const range = parseRange(sp.range) ?? '7d';
-  const d = await myDashboard(range);
+  const [d, member] = await Promise.all([myDashboard(range), currentMember()]);
+  /* The Sources and Calling sections need `lead.analytics`; Overview is everyone's who works leads. */
+  const full = member ? mayOpen(member, '/studio/clients/analytics') : false;
   if (!d) {
     return (
       <main className="content cl-page">
@@ -40,10 +45,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     <main className="content cl-page" style={{ maxWidth: 1240 }}>
       <div className="phead">
         <div>
-          <h1>Numbers</h1>
+          <h1>Analytics</h1>
           <p className="muted">{d.seesAll ? 'Every lead in the studio. Tap any number to see those leads.' : 'Your leads. Tap any number to see them.'}</p>
         </div>
       </div>
+      <AnalyticsTabs active="overview" full={full} />
 
       <Section title="Right now">
         <Tiles kpis={d.now} />

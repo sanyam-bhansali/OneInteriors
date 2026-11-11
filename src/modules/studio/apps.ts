@@ -30,6 +30,8 @@ export interface AppTab {
   /** Owner-only and the like: the tab shows only when `mayOpen` lets them in. */
   /** A number on the tab (To build: the quotation requests waiting for them). Set by the layout. */
   count?: number;
+  /** Other paths that light this tab up (Analytics: its Sources and Calling sections). */
+  also?: readonly string[];
 }
 
 /**
@@ -73,9 +75,11 @@ export const APPS: readonly StudioApp[] = [
       T('All leads', '/studio/clients'),
       T('Pool', '/studio/clients/pool'),
       T('Societies', '/studio/clients/societies'),
-      T('Numbers', '/studio/dashboard'),
+      /* One Analytics tab (owner, 11 Nov 2026): the dashboard that was
+         "Numbers", with the old Analytics (sources, pipeline) and Calling as
+         sections inside it. */
+      { label: 'Analytics', href: '/studio/dashboard', also: ['/studio/clients/analytics'] },
       T('Import', '/studio/clients/import'),
-      T('Analytics', '/studio/clients/analytics'),
       T('Bin', '/studio/clients/bin'),
     ],
     owns: ['/studio/clients', '/studio/dashboard'],
@@ -113,7 +117,7 @@ export const APPS: readonly StudioApp[] = [
     owns: [SITE_HOME],
   },
   {
-    key: 'money', name: 'Money', href: PAYMENTS_HOME, icon: 'rupee', bg: 'var(--good-bg)', fg: 'var(--good)',
+    key: 'money', name: 'Accounts & Finance', href: PAYMENTS_HOME, icon: 'rupee', bg: 'var(--good-bg)', fg: 'var(--good)',
     tabs: [T('Payments desk', PAYMENTS_HOME)],
     owns: [PAYMENTS_HOME],
   },
@@ -245,8 +249,14 @@ export function appForPath(path: string, apps: readonly StudioApp[] = APPS): Stu
 /** The tab a path is on: the longest tab href it sits under. */
 export function tabForPath(path: string, tabs: readonly AppTab[]): AppTab | null {
   let best: AppTab | null = null;
+  let bestLen = 0;
   for (const t of tabs) {
-    if (under(path, t.href) && (!best || t.href.length > best.href.length)) best = t;
+    for (const p of [t.href, ...(t.also ?? [])]) {
+      if (under(path, p) && p.length > bestLen) {
+        best = t;
+        bestLen = p.length;
+      }
+    }
   }
   return best;
 }

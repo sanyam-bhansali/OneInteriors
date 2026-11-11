@@ -62,7 +62,7 @@ export const PILOT_SOON: Record<PilotArea, { title: string; what: string; meanwh
     meanwhile: null,
   },
   money: {
-    title: 'Payments desk',
+    title: 'Accounts & Finance',
     what: 'Every project’s payment stages, what is due, and receipts recorded by your accounts team.',
     meanwhile: 'Booking advances on your quotations are recorded as before.',
   },
