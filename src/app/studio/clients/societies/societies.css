@@ -1,0 +1,76 @@
+/* Societies (owner, 11 Nov 2026; Max plan). Built on the Leads app's styles. */
+.soc-page { display: flex; flex-direction: column; gap: 16px; max-width: 1200px; }
+.soc-page .phead { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+
+.soc-p.soc-p1 { background: var(--bad-bg, #fde8e8); color: var(--bad, #b42318); font-weight: 700; }
+.soc-p.soc-p2 { background: var(--warn-bg, #fff4e0); color: var(--warn, #b54708); font-weight: 700; }
+.soc-p.soc-p3 { background: var(--fill); color: var(--text2); font-weight: 700; }
+.soc-h.soc-hot { background: var(--bad-bg, #fde8e8); color: var(--bad, #b42318); }
+.soc-h.soc-warm { background: var(--warn-bg, #fff4e0); color: var(--warn, #b54708); }
+.soc-h.soc-cold { background: var(--info-bg, #e6f0fb); color: var(--info, #175cd3); }
+.soc-h.soc-none { background: var(--fill); color: var(--muted); }
+
+.soc-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.soc-filters input, .soc-filters select,
+.soc-form input, .soc-override input, .soc-override select,
+.soc-wing-form input, .soc-inline select, .soc-note-form textarea, .soc-leads select {
+  min-height: 38px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font: inherit; font-size: 14px;
+}
+.soc-filters input[name='q'] { min-width: 220px; flex: 1 1 220px; }
+.soc-note-form textarea { width: 100%; padding: 10px; min-height: 76px; resize: vertical; }
+.soc-note-form { display: flex; flex-direction: column; gap: 8px; }
+
+.soc-name { font-weight: 600; color: var(--ink); }
+.soc-tbl .sub, .soc-leads .sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.soc-tbl td.num, .soc-tbl th.num, .soc-wings .num { text-align: right; }
+.soc-clip { display: inline-block; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+
+.soc-form { gap: 12px; }
+.soc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.soc-grid label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; }
+
+.soc-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.soc-facts .card { gap: 8px; }
+.soc-page .card > .linkbtn, .soc-page td .linkbtn { align-self: flex-start; text-align: left; padding: 0; }
+.soc-k { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.soc-small { font-size: 13px; margin: 0; }
+.soc-override { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.soc-override input { flex: 1 1 180px; }
+.soc-inline { gap: 6px; flex-wrap: wrap; }
+.soc-wing-form { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.soc-wing-form input[name='name'] { width: 100px; }
+.soc-wing-form input[name='flats'] { width: 80px; }
+
+.soc-h2 { font-size: 16px; font-weight: 600; margin: 0; }
+.soc-two { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; align-items: start; }
+.soc-notes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.soc-notes li { border-top: 1px solid var(--soft); padding-top: 10px; }
+.soc-notes p { margin: 4px 0 0; white-space: pre-wrap; font-size: 14px; }
+
+.soc-err { color: var(--bad, #b42318); font-size: 13px; margin: 0; }
+.soc-ok { color: var(--good, #2e7d32); font-size: 13px; margin: 0; }
+
+.soc-assign { gap: 12px; }
+.soc-seg { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 999px; background: var(--fill); align-self: flex-start; }
+.soc-seg button { min-height: 34px; padding: 0 14px; border-radius: 999px; border: 0; background: transparent; font: inherit; font-size: 14px; font-weight: 500; color: var(--text2); cursor: pointer; }
+.soc-seg button.on { background: var(--paper); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.soc-assign-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.soc-assign-row label, .soc-people legend { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; }
+.soc-assign select, .soc-assign input[type='number'] { min-height: 38px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font: inherit; font-size: 14px; }
+.soc-people { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.soc-people legend { margin-bottom: 6px; }
+.soc-people label { font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+.soc-format td, .soc-format th { padding: 7px 12px; font-size: 13px; }
+
+.soc-import { display: flex; flex-direction: column; gap: 12px; }
+.soc-import .soc-grid input, .soc-import .soc-grid select, .soc-map select {
+  min-height: 38px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font: inherit; font-size: 14px;
+}
+.soc-map td { font-size: 13px; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.soc-map tr.soc-headrow td { font-weight: 600; color: var(--muted); }
+.soc-plan { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+
+@media (max-width: 860px) {
+  .soc-facts, .soc-two { grid-template-columns: 1fr; }
+  .soc-notecol { display: none; }
+}

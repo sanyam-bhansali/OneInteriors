@@ -908,6 +908,8 @@ model Studio {
   chatThreads      ChatThread[]
   /// The clients' requirement forms (owner, 1 Nov 2026).
   requirementForms HomeRequirementForm[]
+  /// Society data (Max, owner 11 Nov 2026): the societies the studio works, with wings and notes.
+  societies        StudioSociety[]
 
   @@index([city, status, tier])
   /// Every customer-facing query filters paused studios out.
@@ -1026,6 +1028,10 @@ model StudioMember {
 
   quoteRequestsAsked   StudioQuoteRequest[] @relation("QuoteRequestAsker")
   quoteRequestsToBuild StudioQuoteRequest[] @relation("QuoteRequestBuilder")
+
+  /// Societies this person owns, and the notes they wrote on societies (11 Nov 2026).
+  societiesOwned StudioSociety[]     @relation("SocietyAssignee")
+  societyNotes   StudioSocietyNote[]
 
   @@index([studioId])
   @@index([invitedById])
@@ -3634,12 +3640,80 @@ model StudioProduct {
   sortOrder Int     @default(100)
   isActive  Boolean @default(true)
 
+  /// The One Interiors item this product is (owner, 10 Nov 2026: every
+  /// quotation line carries a photo and opens its own public page). The
+  /// item holds the photos and the public description; the product keeps
+  /// the studio's own name and rate, which never reach the item's page.
+  /// Null: matched by name against the items' aliases instead.
+  itemId String?
+  item   ItemPage? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([studioId, name])
   @@index([studioId, sortOrder])
+  @@index([itemId])
   @@map("studio_products")
+}
+
+/// One thing that goes on a quotation — "Wardrobe", "Base cabinets",
+/// "False ceiling" — with its photos and a plain description, shown to the
+/// customer on every quotation line and on its own public page, /items/<slug>
+/// (owner, 10 Nov 2026).
+///
+/// Shared and ours, never a studio's: no studio name, product name or rate is
+/// stored here, because this is what strangers and search engines read. A
+/// studio's product points at it (`StudioProduct.itemId`) or is matched by
+/// name against `aliases`. A quotation cannot be sent while any of its lines
+/// resolves to an item with no photo (modules/items/rules.ts).
+model ItemPage {
+  id   String @id @default(cuid())
+  /// The address: /items/<slug>. Lowercase words joined by hyphens.
+  slug String @unique
+
+  /// English. Hindi and Marathi live in `translations`.
+  name        String
+  /// Which room it usually belongs in ("Kitchen", "Bedroom", "Whole home").
+  room        String
+  /// One sentence: what it is.
+  summary     String   @db.Text
+  /// What it does for the household, in two or three sentences.
+  whatItDoes  String   @db.Text
+  materials   String[] @default([])
+  finishes    String[] @default([])
+  /// "1800 × 2100 mm for a double wardrobe". Free text: sizes vary by item.
+  typicalSize String?
+
+  /// Public URLs (the portfolio-images bucket, under items/), in display
+  /// order; the first is the one shown on hover. Required for a quotation
+  /// to be sent with this item on it.
+  photos String[] @default([])
+
+  /// Other names studios use for it, lowercase ("sliding wardrobe",
+  /// "wardrobe shutter"), so a product not linked by hand still finds it.
+  aliases String[] @default([])
+
+  /// The first-quote catalogue lines this item is (modules/quotation/
+  /// catalogue.ts codes: "master_wardrobe", "second_wardrobe"…).
+  catalogueCodes String[] @default([])
+
+  /// { hi: { name, summary, whatItDoes, materials, finishes, typicalSize },
+  /// mr: {…} }. First drafts for a native reviewer, like the site's dictionaries.
+  translations Json?
+
+  /// Off: not on the public site or in the sitemap. A line still shows its
+  /// photo on a quotation.
+  published Boolean @default(true)
+  sortOrder Int     @default(100)
+
+  products StudioProduct[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([published, sortOrder])
+  @@map("item_pages")
 }
 
 /// A quotation a studio sends its own client.
@@ -4094,6 +4168,14 @@ model StudioClient {
   poolTeamId String?
   poolTeam   StudioMember? @relation("StudioClientPoolTeam", fields: [poolTeamId], references: [id], onDelete: SetNull)
 
+  /// The society and wing this lead lives in (owner, 11 Nov 2026). `society`
+  /// above stays as typed; this is the link the Societies tab counts by.
+  /// SetNull: deleting a society or a wing never deletes its leads.
+  societyId     String?
+  societyRecord StudioSociety?     @relation(fields: [societyId], references: [id], onDelete: SetNull)
+  wingId        String?
+  wing          StudioSocietyWing? @relation(fields: [wingId], references: [id], onDelete: SetNull)
+
   /// When somebody last actually spoke to them.
   ///
   /// Deliberately not `updatedAt`, which moves when anything at all changes —
@@ -4218,6 +4300,8 @@ model StudioClient {
   /// The board, the pool and the bin are all "this studio, not deleted".
   @@index([studioId, deletedAt])
   @@index([studioId, assignedToId, deletedAt])
+  @@index([societyId])
+  @@index([wingId])
   /// Today's "meetings today", and the bin purge.
   @@index([studioId, meetingAt])
   @@index([deletedAt])
@@ -6200,4 +6284,103 @@ model HomeRequirementForm {
 
   @@index([studioId])
   @@map("home_requirement_forms")
+}
+
+/// Priority by hand (owner, 11 Nov 2026). Left empty, the priority comes from
+/// possession (modules/studio-practice/society-rules.ts `priorityFor`).
+enum SocietyPriority {
+  P1
+  P2
+  P3
+}
+
+/// How a society's leads are responding, set by hand. Empty = worked out from calls.
+enum SocietyHeat {
+  HOT
+  WARM
+  COLD
+}
+
+/// A housing society the studio works (Max plan; owner, 11 Nov 2026).
+///
+/// Hauspire's leads mostly come from society sheets, so the society is the
+/// unit the sales team plans by: who owns it, when its wings get possession,
+/// how its owners are responding. Priority and heat are worked out on read
+/// from the wings and the calls, so they are never stale; the override
+/// columns hold a person's call, with the reason, when they know better.
+model StudioSociety {
+  id       String @id @default(cuid())
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  name     String
+  /// Lower-case letters and digits of the name: "Life Republic R-10" and
+  /// "life republic r10" are one society.
+  key      String
+  locality String?
+  builder  String?
+
+  assignedToId String?
+  assignedTo   StudioMember? @relation("SocietyAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  priorityOverride SocietyPriority?
+  priorityReason   String?
+  heatOverride     SocietyHeat?
+  heatReason       String?
+  /// Heat set by hand lapses after 30 days, back to the calls.
+  heatOverrideAt   DateTime?
+
+  /// The sheet it came in on, and when.
+  sourceSheet      String?
+  sourceImportedAt DateTime?
+
+  wings   StudioSocietyWing[]
+  notes   StudioSocietyNote[]
+  clients StudioClient[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studioId, key])
+  @@index([studioId, assignedToId])
+  @@map("studio_societies")
+}
+
+/// One wing or tower. Possession is per wing: one often hands over months
+/// before another, and the nearest one sets the society's priority.
+model StudioSocietyWing {
+  id        String        @id @default(cuid())
+  societyId String
+  society   StudioSociety @relation(fields: [societyId], references: [id], onDelete: Cascade)
+
+  name         String
+  flats        Int?
+  /// The first of the possession month, expected or actual.
+  possessionOn DateTime?
+
+  clients StudioClient[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([societyId, name])
+  @@map("studio_society_wings")
+}
+
+/// A dated note on a society: possession news, the society office, events.
+model StudioSocietyNote {
+  id        String        @id @default(cuid())
+  societyId String
+  society   StudioSociety @relation(fields: [societyId], references: [id], onDelete: Cascade)
+
+  authorId   String?
+  author     StudioMember? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  /// Kept as written, so a leaver's notes still say who wrote them.
+  authorName String?
+
+  body String @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@index([societyId, createdAt])
+  @@map("studio_society_notes")
 }

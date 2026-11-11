@@ -2907,3 +2907,67 @@ html:is([lang='hi'], [lang='mr']) .split .w {
   font-weight: 500;
   letter-spacing: -0.035em;
 }
+
+/* ── A quotation line's item: photo on hover or tap, page in a new tab (owner, 10 Nov 2026; components/items/ItemName.tsx). ── */
+.oi-itemname {
+  color: inherit;
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  cursor: zoom-in;
+}
+.oi-itemname:hover,
+.oi-itemname:focus-visible {
+  text-decoration-style: solid;
+}
+.oi-itemcard {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #fff;
+  color: #14181c;
+  box-shadow: 0 12px 32px rgba(10, 16, 24, 0.22), 0 0 0 1px rgba(10, 16, 24, 0.08);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.35;
+  text-align: left;
+  pointer-events: auto;
+}
+.oi-itemcard img {
+  display: block;
+  width: 100%;
+  height: 186px;
+  object-fit: cover;
+  background: #eef0f2;
+}
+.oi-itemcard-none {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 120px;
+  background: #eef0f2;
+  color: #5b6570;
+}
+.oi-itemcard-name {
+  padding: 10px 12px 2px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.oi-itemcard-hint {
+  padding: 0 12px 10px;
+  color: #5b6570;
+  font-size: 12px;
+}
+.oi-itemcard-open {
+  margin: 6px 12px 12px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #14181c;
+  color: #fff !important;
+  text-align: center;
+  text-decoration: none !important;
+  font-weight: 600;
+}

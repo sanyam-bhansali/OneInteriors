@@ -16,6 +16,7 @@ import { formatINR, formatINRCompact } from '@/lib/money';
 import { ARCHITECT } from '@/modules/consultation/architect';
 import type { FinalQuoteView } from '@/modules/portal/choose';
 import { Steps } from '../../ChooseScreen';
+import { ItemName } from '@/components/items/ItemName';
 
 const expert = ARCHITECT.name.split(' ')[0];
 const SHOWN = 6;
@@ -54,7 +55,15 @@ export function FinalQuoteScreen({ q }: { q: FinalQuoteView }) {
             <div key={r.room} className="oa-qrow">
               <b>{r.room}</b>
               <span className="amt">{formatINR(r.amountPaise)}</span>
-              <span className="spec">{r.lines.map((l) => l.product).join(', ')}</span>
+              {/* Each product shows its photo on hover or tap and opens its page in a new tab (owner, 10 Nov 2026). */}
+              <span className="spec">
+                {r.lines.map((l, i) => (
+                  <span key={`${l.product}-${i}`}>
+                    {i > 0 ? ', ' : null}
+                    <ItemName item={q.items[l.product] ?? null}>{l.product}</ItemName>
+                  </span>
+                ))}
+              </span>
             </div>
           ))}
         </div>

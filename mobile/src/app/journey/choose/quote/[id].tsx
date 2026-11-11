@@ -7,6 +7,7 @@ import { inr } from '../../../../lib/format';
 import { useHeadline, useT } from '../../../../lib/i18n';
 import { chooseApi, type FinalQuoteView } from '../../../../lib/journey/choose';
 import { useProfile } from '../../../../lib/profile';
+import { ItemTap } from '../../../../components/ItemPreview';
 import { color, font, radius } from '../../../../lib/theme';
 
 /**
@@ -165,7 +166,9 @@ export default function FinalQuote() {
                 ? r.lines.map((l, i) => (
                     <View key={`${l.product}-${i}`} style={styles.line}>
                       <View style={{ flex: 1, gap: 2 }}>
-                        <Text style={styles.lineName}>{l.product}</Text>
+                        <ItemTap item={q.items?.[l.product]}>
+                          <Text style={styles.lineName}>{l.product}</Text>
+                        </ItemTap>
                         {l.details ? <Text style={styles.lineSpec}>{l.details}</Text> : null}
                       </View>
                       <Text style={styles.lineAmount}>{inr(l.amountPaise)}</Text>

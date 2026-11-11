@@ -332,3 +332,24 @@ body:has(.oi-studio) .roster-gate {
   outline-offset: 2px;
   border-radius: 10px;
 }
+
+/* Home, first in the top bar on every studio page (owner, 11 Nov 2026).
+   The word beside the icon on a laptop; the icon alone on a phone. */
+.oi-studio .apphead .homebtn {
+  width: auto;
+  padding: 0 14px;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  flex-shrink: 0;
+}
+@media (max-width: 720px) {
+  .oi-studio .apphead .homebtn {
+    width: 42px;
+    padding: 0;
+  }
+  .oi-studio .apphead .homebtn .homelbl {
+    display: none;
+  }
+}
