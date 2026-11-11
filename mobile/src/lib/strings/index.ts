@@ -1,5 +1,6 @@
 import { decision } from './decision';
 import { designWords } from './design';
+import { itemWords } from './items';
 import { discoverWords } from './discover';
 import { lifecycleWords } from './lifecycle';
 import { geio } from './geio';
@@ -49,5 +50,6 @@ export const NATIVE = {
   ...chooseWords,
   ...designWords,
   ...discoverWords,
+  ...itemWords,
   ...lifecycleWords,
 };

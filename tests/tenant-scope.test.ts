@@ -124,6 +124,11 @@ const ALLOWED: { file: string; model: string; why: string }[] = [
     model: 'studioLeadConnection',
     why: 'Lead intake webhooks (docs/studio-os/LEAD-INTAKE.md) have no session: the studio is found FROM the door (its id in the path, or the Facebook Page id Meta names), which is then opened only by the door key or Meta\'s signature, like capture.ts finding a studio from its public slug. The lookups select one door; the update only bumps its counters.',
   },
+  {
+    file: 'src/modules/items/ops.ts',
+    model: 'studioProduct',
+    why: 'Our team ties any studio\'s product to a One Interiors item from /ops/items (owner, 10 Nov 2026): cross-studio by design, called only from OPS-role actions (app/ops/items/actions.ts), and it writes only the itemId column.',
+  },
 ];
 
 function walk(dir: string): string[] {

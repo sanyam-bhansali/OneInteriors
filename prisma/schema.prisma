@@ -3596,12 +3596,80 @@ model StudioProduct {
   sortOrder Int     @default(100)
   isActive  Boolean @default(true)
 
+  /// The One Interiors item this product is (owner, 10 Nov 2026: every
+  /// quotation line carries a photo and opens its own public page). The
+  /// item holds the photos and the public description; the product keeps
+  /// the studio's own name and rate, which never reach the item's page.
+  /// Null: matched by name against the items' aliases instead.
+  itemId String?
+  item   ItemPage? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([studioId, name])
   @@index([studioId, sortOrder])
+  @@index([itemId])
   @@map("studio_products")
+}
+
+/// One thing that goes on a quotation — "Wardrobe", "Base cabinets",
+/// "False ceiling" — with its photos and a plain description, shown to the
+/// customer on every quotation line and on its own public page, /items/<slug>
+/// (owner, 10 Nov 2026).
+///
+/// Shared and ours, never a studio's: no studio name, product name or rate is
+/// stored here, because this is what strangers and search engines read. A
+/// studio's product points at it (`StudioProduct.itemId`) or is matched by
+/// name against `aliases`. A quotation cannot be sent while any of its lines
+/// resolves to an item with no photo (modules/items/rules.ts).
+model ItemPage {
+  id   String @id @default(cuid())
+  /// The address: /items/<slug>. Lowercase words joined by hyphens.
+  slug String @unique
+
+  /// English. Hindi and Marathi live in `translations`.
+  name        String
+  /// Which room it usually belongs in ("Kitchen", "Bedroom", "Whole home").
+  room        String
+  /// One sentence: what it is.
+  summary     String  @db.Text
+  /// What it does for the household, in two or three sentences.
+  whatItDoes  String  @db.Text
+  materials   String[] @default([])
+  finishes    String[] @default([])
+  /// "1800 × 2100 mm for a double wardrobe". Free text: sizes vary by item.
+  typicalSize String?
+
+  /// Public URLs (the portfolio-images bucket, under items/), in display
+  /// order; the first is the one shown on hover. Required for a quotation
+  /// to be sent with this item on it.
+  photos String[] @default([])
+
+  /// Other names studios use for it, lowercase ("sliding wardrobe",
+  /// "wardrobe shutter"), so a product not linked by hand still finds it.
+  aliases String[] @default([])
+
+  /// The first-quote catalogue lines this item is (modules/quotation/
+  /// catalogue.ts codes: "master_wardrobe", "second_wardrobe"…).
+  catalogueCodes String[] @default([])
+
+  /// { hi: { name, summary, whatItDoes, materials, finishes, typicalSize },
+  /// mr: {…} }. First drafts for a native reviewer, like the site's dictionaries.
+  translations Json?
+
+  /// Off: not on the public site or in the sitemap. A line still shows its
+  /// photo on a quotation.
+  published Boolean @default(true)
+  sortOrder Int     @default(100)
+
+  products StudioProduct[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([published, sortOrder])
+  @@map("item_pages")
 }
 
 /// A quotation a studio sends its own client.

@@ -843,3 +843,18 @@
 .oi-studio .hrecent { min-width: 720px; table-layout: auto; font-size: 13.5px; }
 .oi-studio .hrecent td, .oi-studio .hrecent th { padding: 8px 12px; vertical-align: middle; }
 .oi-studio .hrecent .hmini { margin-left: 0; white-space: nowrap; }
+
+/* Lines with no photo (owner, 10 Nov 2026). */
+.oi-studio .qnote.bad {
+  box-shadow: inset 3px 0 0 var(--bad-s);
+  background: var(--bad-bg);
+  color: var(--ink);
+}
+.oi-studio .qphotos-group {
+  margin-top: 8px;
+}
+.oi-studio .qphotos-group ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+}

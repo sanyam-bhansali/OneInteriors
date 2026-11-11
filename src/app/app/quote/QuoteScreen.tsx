@@ -24,6 +24,8 @@ import { puneRanges, type LineRange } from '@/modules/app/pune-range';
 import { CATALOGUE, GST_BPS, MODULAR_DISCOUNT_BPS, PROFESSIONAL_FEE_BPS, ROOM_LABELS } from '@/modules/quotation/catalogue';
 import type { FirstQuote, QuoteLine } from '@/modules/quotation/first-quote';
 import type { AppData } from '../data';
+import { ItemName } from '@/components/items/ItemName';
+import { useCatalogueItems } from '@/components/items/useCatalogueItems';
 
 export function QuoteScreen({ data }: { data: AppData }) {
   const { brief, quotes } = useJourney(data);
@@ -143,6 +145,7 @@ export function QuoteScreen({ data }: { data: AppData }) {
 }
 
 function Line({ line, range }: { line: QuoteLine; range?: LineRange }) {
+  const items = useCatalogueItems();
   // The bar's ends sit a little outside the range so the dot never touches the edge.
   const pad = range ? Math.max((range.highPaise - range.lowPaise) * 0.2, range.highPaise * 0.04) : 0;
   const min = range ? range.lowPaise - pad : 0;
@@ -151,7 +154,10 @@ function Line({ line, range }: { line: QuoteLine; range?: LineRange }) {
   return (
     <div className="oa-qline">
       <div className="top">
-        <b>{line.label}</b>
+        {/* Hover or tap: the item's photo; click: its page in a new tab (owner, 10 Nov 2026). */}
+        <b>
+          <ItemName item={items[line.code] ?? null}>{line.label}</ItemName>
+        </b>
         <span>{formatINR(line.amountPaise)}</span>
       </div>
       <span className="m">

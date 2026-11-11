@@ -31,6 +31,7 @@ const GROUPS: { title: string; items: Item[] }[] = [
       { href: '/ops/allocation', label: 'Allocation' },
       { href: '/ops/coverage', label: 'Coverage' },
       { href: '/ops/discover-photos', label: 'Discover photos' },
+      { href: '/ops/items', label: 'Item photos' },
     ],
   },
   {

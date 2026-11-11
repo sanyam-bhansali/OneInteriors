@@ -22,6 +22,9 @@ import '../quotes.css';
 import { salesFinalSnapshot } from '@/modules/studio-quote/quotes';
 import type { QuoteUnitName, WorkCodeName } from '@/modules/studio-quote/pricing';
 import { CategoryPick } from './CategoryPick';
+import { PhotoCheck } from './PhotoCheck';
+import { missingPhotosOnQuote } from '@/modules/items/server';
+import { photosRequired } from '@/modules/items/rules';
 
 export const metadata: Metadata = {
   title: 'Quotation',
@@ -68,6 +71,9 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
     // The PDF preview tab: brand pages, payment stages, material specification, terms (13 Oct 2026).
     quoteDocContext(quote),
   ]);
+  /* Every line needs a photo before it is sent (owner, 10 Nov 2026): what is missing, worked out on the server like the refusal itself. */
+  const photoStudioId = await quotingStudioId();
+  const noPhotos = photoStudioId && quote.lines.length > 0 ? await missingPhotosOnQuote(quote.id, photoStudioId) : [];
   const signatures = await quotingStudioId()
     .then((sid) => (sid ? signaturesOfQuote(quote.id, sid) : new Map<number, string>()))
     .catch(() => new Map<number, string>());
@@ -162,6 +168,8 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           </p>
         </div>
       ) : null}
+
+      {noPhotos.length > 0 && !locked ? <PhotoCheck missing={noPhotos} required={photosRequired()} canLink={mayAddProducts} /> : null}
 
         <QuoteBuilder
           quote={quote}

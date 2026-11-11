@@ -93,6 +93,7 @@ const view: FinalQuoteView = {
     { label: 'At handover', pct: 20, amountPaise: 3_68_000_01 },
   ],
   firstBeforeGstPaise: null,
+  items: {},
 };
 
 const ops = (op: string) => db.calls.filter((c) => c.op === op);

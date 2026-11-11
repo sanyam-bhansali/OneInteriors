@@ -94,7 +94,7 @@ export interface ApiQuote {
   lowPaise: number;
   highPaise: number;
   validTill: string;
-  lines: { room: string; item: string; spec: string | null; size: string; amountPaise: number }[];
+  lines: { room: string; item: string; spec: string | null; size: string; amountPaise: number; /** The catalogue line (catalogue.ts), for its item photo and page. */ code: string }[];
 }
 
 export interface StudioCard {
@@ -155,7 +155,7 @@ export function apiQuote(quote: FirstQuote, validTill: Date): ApiQuote {
     highPaise: quote.highPaise,
     validTill: validTill.toISOString(),
     lines: quote.rooms.flatMap((r) =>
-      r.lines.map((l) => ({ room: r.label, item: l.label, spec: l.spec || null, size: l.size, amountPaise: l.amountPaise })),
+      r.lines.map((l) => ({ room: r.label, item: l.label, spec: l.spec || null, size: l.size, amountPaise: l.amountPaise, code: l.code })),
     ),
   };
 }

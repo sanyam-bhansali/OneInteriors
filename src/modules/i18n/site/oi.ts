@@ -160,6 +160,13 @@ export const OI_DICT = {
 
   // ── QuoteFlow: the document ──
   'doc.eyebrow': { en: 'First quote · generated', hi: 'पहला कोटेशन · तैयार', mr: 'पहिलं कोटेशन · तयार' },
+  'item.opens': {
+    en: 'Click to see what it is (opens in a new tab)',
+    hi: 'यह क्या है, देखने के लिए क्लिक करें (नए टैब में खुलेगा)',
+    mr: 'हे काय आहे ते पाहण्यासाठी क्लिक करा (नव्या टॅबमध्ये उघडेल)',
+  },
+  'item.open': { en: 'See what it is', hi: 'देखें यह क्या है', mr: 'हे काय आहे ते पाहा' },
+  'item.noPhoto': { en: 'Photo coming soon', hi: 'फ़ोटो जल्द आएगी', mr: 'फोटो लवकरच येईल' },
   'doc.preparedFor': { en: 'Prepared for {name}', hi: '{name} के लिए', mr: '{name} यांच्यासाठी' },
   'doc.archive': {
     en: 'Pre-launch — priced on archive rates, not this studio’s own filed card',

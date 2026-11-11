@@ -153,7 +153,8 @@ export function DocRow({
   emphasis = false,
   action,
 }: {
-  label: string;
+  /** The line's name. A node so a quotation line can be an item with its photo (components/items/ItemName). */
+  label: React.ReactNode;
   /** A small control beside the label — the quiz's "Edit". */
   action?: React.ReactNode;
   /** "1800 × 2100 mm · 12.4 sq ft". Mono, and the point of the row. */
