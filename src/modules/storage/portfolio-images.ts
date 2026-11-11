@@ -82,6 +82,15 @@ export type ImageResult = { ok: true; url: string } | { ok: false; error: string
  * should not lose the other seven because one was a HEIC.
  */
 export async function storePortfolioImage(studioId: string, file: File): Promise<ImageResult> {
+  return storePublicImage(`studio_${studioId}`, file);
+}
+
+/**
+ * The same, into a folder of our own: `items/<id>` for the One Interiors item
+ * photos shown on quotation lines and item pages (owner, 10 Nov 2026). Same
+ * bucket, because these are equally meant for strangers.
+ */
+export async function storePublicImage(folder: string, file: File): Promise<ImageResult> {
   const config = supabaseConfig();
   const key = secretKey();
   if (!config || !key) {
@@ -101,7 +110,7 @@ export async function storePortfolioImage(studioId: string, file: File): Promise
   }
 
   // Generated, never derived from what the studio called the file.
-  const path = `studio_${studioId}/${crypto.randomUUID()}.${extension}`;
+  const path = `${folder}/${crypto.randomUUID()}.${extension}`;
 
   try {
     const response = await fetch(`${config.url}/storage/v1/object/${BUCKET}/${encodeURI(path)}`, {

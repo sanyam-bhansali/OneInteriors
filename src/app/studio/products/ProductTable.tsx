@@ -5,7 +5,7 @@ import { paiseToRupees } from '@/lib/money';
 import { ROOM_CATEGORIES } from '@/modules/studio-quote/starter-catalogue';
 import { UNIT_LABELS, WORK_CODE_LABELS, type QuoteUnitName, type WorkCodeName } from '@/modules/studio-quote/pricing';
 import type { ProductRow } from '@/modules/studio-quote/store';
-import { saveRateAction, addProductAction, toggleStandardAction } from './actions';
+import { saveRateAction, addProductAction, toggleStandardAction, setProductItemAction } from './actions';
 import { IDLE } from '../form-state';
 import { ProductEditor } from './ProductEditor';
 import { LineIcon } from '../ui/icons';
@@ -44,6 +44,56 @@ function RateCell({ product }: { product: ProductRow }) {
         <span className="perr">{state.error}</span>
       ) : null}
     </form>
+  );
+}
+
+export interface ItemPick {
+  id: string;
+  name: string;
+  hasPhoto: boolean;
+  /** Found by the product's name rather than picked by hand. */
+  auto: boolean;
+}
+
+/**
+ * The One Interiors item this product is (owner, 10 Nov 2026): its photo shows
+ * on every quotation line, and a quotation with a line that has no photo
+ * cannot be sent. Matched by name until somebody picks one; saves on change.
+ */
+function ItemCell({ product, options, current }: { product: ProductRow; options: { id: string; name: string; hasPhoto: boolean }[]; current: ItemPick | null }) {
+  const [value, setValue] = useState(current && !current.auto ? current.id : '');
+  const [pending, start] = useTransition();
+  const [failed, setFailed] = useState<string | null>(null);
+  const shown = value ? options.find((o) => o.id === value) ?? null : current?.auto ? current : null;
+  return (
+    <div className="pitem">
+      <select
+        className="fld"
+        style={{ minHeight: 34, maxWidth: 210 }}
+        value={value}
+        disabled={pending}
+        aria-label={`One Interiors item for ${product.name}`}
+        onChange={(e) => {
+          const next = e.target.value;
+          setValue(next);
+          setFailed(null);
+          start(async () => {
+            const r = await setProductItemAction(product.id, next);
+            if (r && 'ok' in r && !r.ok) setFailed(r.error);
+          });
+        }}
+      >
+        <option value="">{current?.auto ? `Matched: ${current.name}` : 'Not matched'}</option>
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.name}
+            {o.hasPhoto ? '' : ' (no photo yet)'}
+          </option>
+        ))}
+      </select>
+      {!shown ? <span className="chip bad">No photo</span> : shown.hasPhoto ? null : <span className="chip warn">Photo pending</span>}
+      {failed ? <span className="perr">{failed}</span> : null}
+    </div>
   );
 }
 
@@ -105,8 +155,13 @@ export function ProductTable({
   summary,
   allPriced,
   notes,
+  itemOptions = [],
+  itemOf = {},
 }: {
   products: ProductRow[];
+  /** The One Interiors items a product can be tied to, for its photo. */
+  itemOptions?: { id: string; name: string; hasPhoto: boolean }[];
+  itemOf?: Record<string, ItemPick | null>;
   /** "31 of 75 priced", for the chip beside the tabs. */
   summary: string;
   allPriced: boolean;
@@ -245,13 +300,14 @@ export function ProductTable({
           </span>
         </div>
         <div className="tscroll">
-          <table className="tbl ptbl" style={{ minWidth: 980 }}>
+          <table className="tbl ptbl" style={{ minWidth: 1180 }}>
             <thead>
               <tr>
                 <th scope="col">Item</th>
                 <th scope="col">Work</th>
                 <th scope="col">Unit</th>
                 <th scope="col">In the standard build</th>
+                <th scope="col">Photo item</th>
                 <th scope="col" style={{ textAlign: 'right' }}>
                   Your rate
                 </th>
@@ -283,6 +339,9 @@ export function ProductTable({
                     <td>
                       <StandardCell product={p} />
                     </td>
+                    <td>
+                      <ItemCell product={p} options={itemOptions} current={itemOf[p.id] ?? null} />
+                    </td>
                     <td style={{ textAlign: 'right' }}>
                       <RateCell product={p} />
                     </td>
@@ -294,7 +353,7 @@ export function ProductTable({
                   </tr>
                   {editing === p.id ? (
                     <tr className="pedit">
-                      <td colSpan={6}>
+                      <td colSpan={7}>
                         <ProductEditor product={p} onClose={() => setEditing(null)} />
                       </td>
                     </tr>

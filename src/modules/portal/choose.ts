@@ -18,6 +18,8 @@ import 'server-only';
  * lets a customer see another customer's introduction, quote or project.
  */
 
+import { itemRefsFor } from '@/modules/items/server';
+import type { ItemRef } from '@/modules/items/rules';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser, type AuthUser } from '@/modules/auth/session';
 import { readPhases } from '@/modules/studio/payment-phases';
@@ -211,6 +213,8 @@ export interface FinalQuoteView {
   stages: { label: string; pct: number | null; amountPaise: number }[];
   /** Their first quote for this studio, before GST — null when it cannot be priced now. */
   firstBeforeGstPaise: number | null;
+  /** Each product's item photo and page (owner, 10 Nov 2026): no studio rate or name in it. */
+  items: Record<string, ItemRef | null>;
 }
 
 /** One final quote the signed-in customer may read: issued, and on their own introduction. */
@@ -233,6 +237,7 @@ export async function finalQuoteView(quoteId: string, firstBeforeGst: (slug: str
       : { id: quoteId, status: { in: [...VISIBLE_QUOTE] }, introductionId: { in: mine } },
     select: {
       id: true,
+      studioId: true,
       number: true,
       status: true,
       issuedOn: true,
@@ -294,6 +299,7 @@ export async function finalQuoteView(quoteId: string, firstBeforeGst: (slug: str
       ownSigned && intro.homeProject ? intro.homeProject.totalDays : durationFor(intro.brief.scope, readProfile(q.studio.matchingProfile).durationDays),
     stages,
     firstBeforeGstPaise: await firstBeforeGst(q.studio.slug).catch(() => null),
+    items: await itemRefsFor(q.studioId, q.lines.map((l) => l.product)).catch(() => ({})),
   };
 }
 

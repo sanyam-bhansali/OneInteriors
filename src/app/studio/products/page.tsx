@@ -5,6 +5,9 @@ import { Proposals } from './Proposals';
 import { pendingProposals } from '@/modules/studio-quote/proposals';
 import { RatesGateCard } from '../RatesGateCard';
 import { myRatesGate, RATES_GATE_COPY } from '@/modules/studio-quote/rates-gate';
+import { allItems } from '@/modules/items/server';
+import { matchByName } from '@/modules/items/rules';
+import type { ItemPick } from './ProductTable';
 import './products.css';
 
 export const metadata: Metadata = {
@@ -33,7 +36,15 @@ export const dynamic = 'force-dynamic';
  * codes and the sizes that recur. The numbers are theirs.
  */
 export default async function ProductsPage() {
-  const [products, gate, proposals] = await Promise.all([myProducts(), myRatesGate(), pendingProposals()]);
+  const [products, gate, proposals, items] = await Promise.all([myProducts(), myRatesGate(), pendingProposals(), allItems()]);
+  /* Which One Interiors item each product is, for its photo on every quotation line (owner, 10 Nov 2026). */
+  const itemOptions = items.map((i) => ({ id: i.id, name: i.name, hasPhoto: i.photos.length > 0 }));
+  const itemOf: Record<string, ItemPick | null> = {};
+  for (const p of products) {
+    const picked = p.itemId ? items.find((i) => i.id === p.itemId) : null;
+    const item = picked ?? matchByName(p.name, items);
+    itemOf[p.id] = item ? { id: item.id, name: item.name, hasPhoto: item.photos.length > 0, auto: !picked } : null;
+  }
   const priced = products.filter((p) => p.ratePaise > 0).length;
   const blank = products.length - priced;
   const standard = products.filter((p) => p.inStandardBuild).length;
@@ -116,6 +127,8 @@ export default async function ProductsPage() {
           summary={blank === 0 ? `${products.length} products, all priced` : `${priced} of ${products.length} priced`}
           allPriced={blank === 0}
           notes={notes}
+          itemOptions={itemOptions}
+          itemOf={itemOf}
         />
       )}
 

@@ -59,6 +59,8 @@ export interface ProductRow {
   inStandardBuild: boolean;
   /** Build rules — flat size, balcony, per bathroom, default sq ft… (`configure.ts`). */
   rules: ProductRules | null;
+  /** The One Interiors item picked for it by hand (photos, public page). Null: matched by name. */
+  itemId: string | null;
 }
 
 /**
@@ -116,6 +118,7 @@ function toProductRow(row: {
   isActive: boolean;
   inStandardBuild: boolean;
   rules: unknown;
+  itemId?: string | null;
 }): ProductRow {
   return {
     id: row.id,
@@ -134,6 +137,7 @@ function toProductRow(row: {
     isActive: row.isActive,
     inStandardBuild: row.inStandardBuild,
     rules: readRules(row.rules),
+    itemId: row.itemId ?? null,
   };
 }
 
@@ -239,6 +243,25 @@ export async function setProductStandard(
       where: { id: productId, studioId },
       data: { inStandardBuild },
     });
+    if (count === 0) return { ok: false, error: 'That product is not yours.' };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'That did not save.' };
+  }
+}
+
+/**
+ * Which One Interiors item a product is (owner, 10 Nov 2026): where its
+ * photo on every quotation line comes from. Null goes back to matching by name.
+ */
+export async function setProductItem(productId: string, itemId: string | null): Promise<SaveResult> {
+  const studioId = await myStudioId();
+  if (!studioId) return { ok: false, error: 'No studio on this account.' };
+  try {
+    if (itemId && !(await prisma.itemPage.findUnique({ where: { id: itemId }, select: { id: true } }))) {
+      return { ok: false, error: 'That item is not on the list.' };
+    }
+    const { count } = await prisma.studioProduct.updateMany({ where: { id: productId, studioId }, data: { itemId } });
     if (count === 0) return { ok: false, error: 'That product is not yours.' };
     return { ok: true };
   } catch {

@@ -29,6 +29,7 @@ import {
   type WorkCodeName,
 } from './pricing';
 import { planQuotation, readRules, type CatalogueProduct, type HomeConfig } from './configure';
+import { photoGate } from '@/modules/items/server';
 import { ratesGateFor } from './rates-gate';
 import { notify } from '@/modules/notify/service';
 import { planUseFrom } from '@/modules/brief/mapping';
@@ -992,6 +993,15 @@ export async function setQuoteStatus(
      it stays Won. */
   if (await prisma.homeProject.findFirst({ where: { signedQuoteId: quoteId }, select: { id: true } })) {
     return { ok: false, error: 'A project has started from this quotation, so it stays won.' };
+  }
+
+  /* Every line needs a photo before the client sees it (owner, 10 Nov 2026;
+     modules/items/rules.ts). Checked on the way to Sent only: Won, Lost and
+     Reopen never send anything. */
+  if (status === 'ISSUED') {
+    const studioId = (await quoteScope())?.studioId ?? null;
+    const refusal = studioId ? await photoGate({ studioId, quoteId }, 'send') : null;
+    if (refusal) return { ok: false, error: refusal };
   }
 
   try {

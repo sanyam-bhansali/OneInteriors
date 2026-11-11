@@ -19,6 +19,8 @@ import "server-only";
  *   revision.
  */
 
+import { itemRefsFor } from "@/modules/items/server";
+import type { ItemRef } from "@/modules/items/rules";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { fromDb } from "@/lib/money";
@@ -453,6 +455,8 @@ export interface SignoffDocument {
   kindLabel: string;
   quoteNumber: string;
   revision: number;
+  /** Each product's item photo and page, for the hover (owner, 10 Nov 2026). */
+  itemRefs: Record<string, ItemRef | null>;
   state: SignoffState;
   hash: string;
   /** What is shown no longer hashes to what was asked (the terms or the revision changed). */
@@ -648,6 +652,8 @@ export async function signoffDocument(
           }
         : null,
     agreeText: agreeTextOf(s.kind),
+    /* Each line's photo and item page, for the hover (owner, 10 Nov 2026). */
+    itemRefs: await itemRefsFor(studioId, lines.map((l) => l.product)),
     doc: {
       studio,
       brandPages,

@@ -13,7 +13,7 @@ export interface ApiQuote {
   lowPaise: number;
   highPaise: number;
   validTill: string;
-  lines: { room: string; item: string; spec: string | null; size: string; amountPaise: number }[];
+  lines: { room: string; item: string; spec: string | null; size: string; amountPaise: number; code?: string }[];
 }
 
 export interface StudioCard {

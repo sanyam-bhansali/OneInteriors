@@ -79,6 +79,7 @@ export default async function SignoffPage({
           welcomeNote={d.doc.welcomeNote}
           showMark={false}
           markText=""
+          itemRefs={d.itemRefs}
         />
       )}
     </SignoffScreen>

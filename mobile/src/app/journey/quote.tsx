@@ -10,6 +10,8 @@ import { useHeadline, useT } from '../../lib/i18n';
 import { useMatches } from '../../lib/journey/matches-hook';
 import { ratesArePreLaunch, useChosenMatches } from '../../lib/journey/quote';
 import type { ApiQuote } from '../../lib/journey/types';
+import { ItemTap } from '../../components/ItemPreview';
+import { useCatalogueItems } from '../../lib/items';
 import { color, font, radius, type } from '../../lib/theme';
 
 /**
@@ -37,6 +39,7 @@ function byRoom(q: ApiQuote): Room[] {
 
 export default function QuoteScreen() {
   const t = useT();
+  const catalogueItems = useCatalogueItems();
   const h1 = useHeadline(36);
   const chosen = useChosenMatches();
   const { state } = useMatches();
@@ -153,7 +156,9 @@ export default function QuoteScreen() {
                     {r.lines.map((l, i) => (
                       <View key={`${l.item}-${i}`} style={styles.line} accessible accessibilityLabel={`${l.item}, ${inr(l.amountPaise)}. ${[l.size, l.spec].filter(Boolean).join(', ')}`}>
                         <View style={styles.rowTop}>
-                          <Text style={styles.lineItem}>{l.item}</Text>
+                          <ItemTap item={l.code ? catalogueItems[l.code] : null}>
+                            <Text style={styles.lineItem}>{l.item}</Text>
+                          </ItemTap>
                           <Text style={styles.lineAmt}>{inr(l.amountPaise)}</Text>
                         </View>
                         <Text style={styles.spec}>{[l.size, l.spec].filter(Boolean).join(' · ')}</Text>

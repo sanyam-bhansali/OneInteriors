@@ -6,6 +6,7 @@ import {
   setProductRate,
   setProductActive,
   setProductStandard,
+  setProductItem,
   addProduct,
   updateProduct,
   type ProductEdit,
@@ -56,6 +57,11 @@ export async function saveRateAction(_prev: State, form: FormData): Promise<Stat
   }
 
   return done(await setProductRate(id, rupeesToPaise(rupees)));
+}
+
+/** Tie a product to a One Interiors item, or back to matching by name (''). */
+export async function setProductItemAction(id: string, itemId: string): Promise<State> {
+  return done(await setProductItem(String(id), itemId ? String(itemId) : null));
 }
 
 export async function toggleActiveAction(id: string, isActive: boolean): Promise<State> {

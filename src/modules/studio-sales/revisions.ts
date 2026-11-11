@@ -35,6 +35,7 @@ import { cleanStages, readStages, scheduleAmounts, templateOrDefault, type Payme
 import { leadFileExists, leadUploadTicket, signedLeadFileLinks } from '@/modules/storage/lead-files';
 import { pathBelongsTo } from '@/modules/studio-sales/lead-rules';
 import { checkSalesNotes, voiceExtOf } from './revision-rules';
+import { photoGate } from '@/modules/items/server';
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
@@ -280,6 +281,8 @@ export async function sendAgain(quoteId: string): Promise<{ ok: true; n: number;
   const requestedOfMe = scope.requested !== null && q.clientId !== null && (await prisma.studioClient.findFirst({ where: { AND: [scope.requested], id: q.clientId }, select: { id: true } })) !== null;
   if (!mayOnLead(scope, 'quote.write', { assignedToId: q.client?.assignedToId ?? null, poolTeamId: q.client?.poolTeamId ?? null, requestedOfMe })) return { ok: false, error: 'That quotation is not yours.' };
   if (q.status !== 'ISSUED') return { ok: false, error: 'Mark it as sent first.' };
+  const noPhoto = await photoGate({ studioId, quoteId: q.id }, 'send');
+  if (noPhoto) return { ok: false, error: noPhoto };
   const r = await issueRevision({ quoteId: q.id, studioId });
   if (!r) return { ok: false, error: 'There is nothing on this quotation to send.' };
   await completeRequestForQuote(studioId, q.id, await actingMember());
@@ -365,7 +368,7 @@ export async function markSalesFinal(
       salesFinalNotes: true,
       salesFinalVoicePath: true,
       client: { select: { assignedToId: true, poolTeamId: true, source: true, introductionId: true } },
-      revisions: { where: { studioId, n }, select: { id: true, n: true, totalPaise: true } },
+      revisions: { where: { studioId, n }, select: { id: true, n: true, totalPaise: true, lines: true } },
     },
   });
   if (!q) return { ok: false, error: 'That quotation is not yours.' };
@@ -382,6 +385,9 @@ export async function markSalesFinal(
     alreadyMarked: q.salesFinalRevision?.n === n,
   });
   if (refusal || !revision) return { ok: false, error: refusal ?? 'That revision is not on this quotation.' };
+  /* The revision the client signs against: every line on it needs a photo (owner, 10 Nov 2026). */
+  const noPhoto = await photoGate({ studioId, lines: readRevisionLines(revision.lines) }, 'final');
+  if (noPhoto) return { ok: false, error: noPhoto };
   const cleaned = cleanStages(stages);
   if (!cleaned.ok) return cleaned;
   const fits = scheduleAmounts(cleaned.stages, fromDb(revision.totalPaise));
