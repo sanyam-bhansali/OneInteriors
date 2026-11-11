@@ -1,3 +1,4 @@
+import type { ItemRef } from '../items';
 import { call } from '../api';
 
 /**
@@ -70,6 +71,8 @@ export interface FinalQuoteView {
   stages: { label: string; pct: number | null; amountPaise: number }[];
   /** Their first quote for this studio, before GST — null when it cannot be priced now. */
   firstBeforeGstPaise: number | null;
+  /** Each product's item photo and page (owner, 10 Nov 2026). Absent from an older server. */
+  items?: Record<string, ItemRef | null>;
 }
 
 export type SignPlan = 'basic' | 'assured';

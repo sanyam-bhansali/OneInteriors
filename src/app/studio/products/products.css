@@ -133,3 +133,11 @@
 .oi-studio .ppage .tscroll {
   position: relative;
 }
+
+/* The One Interiors item a product is, for its photo (owner, 10 Nov 2026). */
+.oi-studio .pitem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}

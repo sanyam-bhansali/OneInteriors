@@ -1,4 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
+import type { ItemRef } from '@/modules/items/rules';
+import { ItemName } from '@/components/items/ItemName';
 import { formatINR } from '@/lib/money';
 import { DEFAULT_DISCOUNT_NAME, type QuoteTotals } from '@/modules/studio-quote/pricing';
 import type { PaymentStage } from '@/modules/studio-sales/payment-template';
@@ -75,6 +77,12 @@ export interface QuotationDocProps {
   extra?: ReactNode;
   /** Inside the builder: no grey desk around the pages. */
   embedded?: boolean;
+  /**
+   * Each product's item photo and page (owner, 10 Nov 2026). Given on the
+   * client's screens: hovering a product shows its photo, clicking opens its
+   * page in a new tab. Absent (the PDF, the print page): the plain name.
+   */
+  itemRefs?: Record<string, ItemRef | null>;
 }
 
 /** A figure as the old PDF prints it: `Math.round(rupees).toLocaleString("en-IN")`. */
@@ -237,7 +245,13 @@ export function QuotationDocument(props: QuotationDocProps) {
                   <tr key={row.n}>
                     <td>{row.n}</td>
                     <td>
-                      <b>{row.product}</b>
+                      {props.itemRefs ? (
+                        <b>
+                          <ItemName item={props.itemRefs[row.product] ?? null}>{row.product}</ItemName>
+                        </b>
+                      ) : (
+                        <b>{row.product}</b>
+                      )}
                     </td>
                     <td>{row.code}</td>
                     <td className="qd-details">

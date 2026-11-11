@@ -47,6 +47,8 @@ import { advanceIsHigh, phaseAmounts, type PaymentPhase } from '@/modules/studio
 import { useLang, useSiteT } from '@/components/app/i18n';
 import { OI_DICT, roomName } from '@/modules/i18n/site/oi';
 import { known } from '@/modules/i18n/site/expert';
+import { ItemName } from '@/components/items/ItemName';
+import { useCatalogueItems } from '@/components/items/useCatalogueItems';
 
 type Phase = 'gate' | 'building' | 'done';
 
@@ -224,6 +226,8 @@ export function QuoteDocument({
    * is the same term, worded the same way, in the other.
    */
   const [term, setTerm] = useState<Material | null>(null);
+  const items = useCatalogueItems();
+  const itemWords = { opens: t('item.opens'), open: t('item.open'), noPhoto: t('item.noPhoto') };
 
   return (
     <div className="flow-card">
@@ -298,7 +302,8 @@ export function QuoteDocument({
           {room.lines.map((line) => (
             <DocRow
               key={line.code}
-              label={line.label}
+              /* Hover or tap: the item's photo; click: its page in a new tab (owner, 10 Nov 2026). */
+              label={<ItemName item={items[line.code] ?? null} words={itemWords}>{line.label}</ItemName>}
               // Size and quantity, never the rate: a studio's per-unit rate is not
               // shown on any customer screen (the owner, 30 Sep 2026).
               quantity={line.unit === 'unit' ? line.size : `${line.size}  ·  ${line.quantity.toLocaleString('en-IN')} ${line.unit}`}

@@ -218,6 +218,13 @@ const ALWAYS = [
    * personal data too — on the studio host as much as the public one.
    */
   '/privacy',
+  /**
+   * Item pages (owner, 10 Nov 2026): every quotation line links to one, from
+   * the studio's builder, the client's app and the public site alike, so
+   * they answer on every host. Public by design: our words and photos only,
+   * no studio name or rate (modules/items/rules.ts).
+   */
+  '/items',
   '/_next',
   '/favicon',
   '/robots.txt',
