@@ -72,6 +72,7 @@ export const APPS: readonly StudioApp[] = [
     tabs: [
       T('All leads', '/studio/clients'),
       T('Pool', '/studio/clients/pool'),
+      T('Societies', '/studio/clients/societies'),
       T('Numbers', '/studio/dashboard'),
       T('Import', '/studio/clients/import'),
       T('Analytics', '/studio/clients/analytics'),

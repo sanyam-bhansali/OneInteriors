@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { LineIcon } from '../ui/icons';
+import { SOCIETY_LIST_ID, SocietyNames } from './societies/SocietyNames';
 import { formatINRCompact } from '@/lib/money';
 // Values from the PURE module. `clients.ts` carries `server-only`, and a label
 // map is a value rather than a type — importing it from there pulls Prisma into
@@ -614,7 +615,8 @@ function AddClient({ label, fields, sources = [] }: { label: string; fields: Fie
         <div className="flex flex-wrap gap-3">
           <label className="flex flex-1 flex-col gap-1.5">
             <span className="lbl">Society or area</span>
-            <input name="society" placeholder="Kalyani Nagar" className={input} />
+            <input name="society" placeholder="Kalyani Nagar" className={input} list={SOCIETY_LIST_ID} autoComplete="off" />
+            <SocietyNames />
           </label>
           <label className="flex flex-col gap-1.5">
             <span className="lbl">Where from</span>

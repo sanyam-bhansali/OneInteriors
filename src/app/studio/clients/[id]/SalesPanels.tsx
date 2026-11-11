@@ -10,6 +10,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { SOCIETY_LIST_ID, SocietyNames } from '../societies/SocietyNames';
 import { formatINR } from '@/lib/money';
 import { SOURCE_LABELS, type ClientSourceName } from '@/modules/studio-practice/vocabulary';
 import { LEAD_FILE_ACCEPT, checkLeadFile, fileSize, meetingInputs, budgetInput, type NextStep } from '@/modules/studio-sales/lead-rules';
@@ -255,7 +256,8 @@ export function Details({ clientId, v, sources, may, fromOneInteriors }: { clien
           <input name="email" defaultValue={v.email} type="email" className={inputClass} />
         </Field>
         <Field label="Society">
-          <input name="society" defaultValue={v.society} className={inputClass} />
+          <input name="society" defaultValue={v.society} className={inputClass} list={SOCIETY_LIST_ID} autoComplete="off" />
+          <SocietyNames />
         </Field>
         <Field label="BHK">
           <input name="config" defaultValue={v.config} placeholder="3 BHK" className={inputClass} />
