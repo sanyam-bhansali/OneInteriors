@@ -1064,6 +1064,8 @@ export type LeadPlan =
   | { action: 'merge-file'; axId: string; intoAxId: string; into: string; events: EventPlan[]; name: string; phone: string }
   /** `pool`: a re-run moves the card, still unassigned and untouched since its import, into this team pool. */
   | { action: 'already'; axId: string; clientId: string; backfill: PersonRef['member']; pool?: MemberRef | null }
+  /** `--refresh`: an imported card brought up to AxLeads again (fromImport), or only its new lines (a merge line into a card that was here before). */
+  | { action: 'refresh'; axId: string; clientId: string; fromImport: boolean; client: ClientPlan; events: EventPlan[]; assigneeUnknown: boolean }
   | { action: 'skip-binned'; axId: string }
   /** Answered a question in `skipIfAnswered`: a job applicant, not a client. */
   | { action: 'skip-answered'; axId: string };
@@ -1074,6 +1076,8 @@ export interface Report {
   mergeExisting: number;
   mergeFile: number;
   already: number;
+  /** `--refresh`: already-imported leads brought up to AxLeads again. */
+  refreshed: number;
   backfill: number;
   binned: number;
   skippedBinned: number;
@@ -1158,6 +1162,13 @@ function openFollowUps(raw: unknown): string[] {
 export interface PlanOptions {
   /** When the import runs; the bin clock and the notes block read it. */
   now: Date;
+  /**
+   * A refresh run (owner, 11 Nov 2026; `--refresh`): AxLeads is still where
+   * the team works, so a lead already imported takes AxLeads' stage, person,
+   * details and binned state again, and its new history lines are added
+   * (each line's `axleads:<id>` keeps the old ones from doubling).
+   */
+  refresh?: boolean;
 }
 
 export function planImport(ax: AxExport, ctx: StudioContext, choices: Choices, opts: PlanOptions): Plan {
@@ -1206,6 +1217,7 @@ export function planImport(ax: AxExport, ctx: StudioContext, choices: Choices, o
     mergeExisting: 0,
     mergeFile: 0,
     already: 0,
+    refreshed: 0,
     backfill: 0,
     binned: 0,
     skippedBinned: 0,
@@ -1242,6 +1254,15 @@ export function planImport(ax: AxExport, ctx: StudioContext, choices: Choices, o
   const leads: LeadPlan[] = [];
   for (const lead of order) {
     const done = ctx.imported.get(lead.id);
+    if (done && opts.refresh) {
+      const built = buildLead(lead, { ax, stageById, axStageName, intake, people, fields, fieldKeyOf, now: opts.now });
+      if (!built.client.assignee && toTeamPool(lead)) built.client.poolTeam = poolTeam;
+      /* Given on AxLeads to someone not matched here (no phone, not added): the card keeps whoever has it here. */
+      const assigneeUnknown = !!lead.assignedTo && !built.client.assignee;
+      leads.push({ action: 'refresh', axId: lead.id, clientId: done.clientId, fromImport: done.fromImport === true, client: built.client, events: built.events, assigneeUnknown });
+      report.refreshed += 1;
+      continue;
+    }
     if (done) {
       const assignee = lead.assignedTo ? people.get(lead.assignedTo)?.member ?? null : null;
       const backfill = !done.assignedToId && assignee ? assignee : null;
@@ -1814,6 +1835,7 @@ export function formatReport(r: Report, opts: { tenant: string; studio: string; 
   out.push(`  new cards              ${r.create}${r.binned ? ` (${r.binned} into the bin, as they were on AxLeads)` : ''}`);
   out.push(`  merged into a card     ${r.mergeExisting} already on the board, ${r.mergeFile} with an earlier lead in this file`);
   out.push(`  already imported       ${r.already}${r.backfill ? ` (${r.backfill} now given to their person)` : ''}`);
+  if (r.refreshed) out.push(`  refreshed from AxLeads ${r.refreshed} (stage, person and details as on AxLeads; only their new history lines added)`);
   if (r.skippedBinned) out.push(`  binned, skipped        ${r.skippedBinned}`);
   if (r.skippedAnswered) out.push(`  left out (answered a skipIfAnswered question, e.g. job applicants)  ${r.skippedAnswered}`);
   out.push(`  without a phone        ${r.noPhone}${r.phonesNotMobile ? `; ${r.phonesNotMobile} phones were not mobiles (kept in the notes)` : ''}`);

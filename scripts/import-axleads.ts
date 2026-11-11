@@ -4,6 +4,7 @@
  *
  *     npx tsx scripts/import-axleads.ts --file hauspire-export.json --studio <slug> --dry-run
  *     npx tsx scripts/import-axleads.ts --file hauspire-export.json --studio <slug> [--roles roles.json]
+ *     npx tsx scripts/import-axleads.ts --file hauspire-export.json --studio <slug> --refresh [--dry-run]
  *
  * The file is AxLeads' `scripts/export-tenant.mjs` output. The database is
  * DATABASE_URL from the environment — this script loads no .env file, so it
@@ -18,6 +19,12 @@
  * The roles file can also set names, sales roles, reporting lines and a team
  * pool (owner, 22 Oct 2026); if it asks for something that cannot be done,
  * the report says what (✗) and a real run writes nothing.
+ *
+ * `--refresh` (owner, 11 Nov 2026): for a studio whose team kept working in
+ * AxLeads after the first import. New leads come in as usual; every lead
+ * already imported takes AxLeads' stage, person, details and binned state
+ * again, and only its new history lines are added. Use it only while
+ * AxLeads is where the team works: it overwrites what was changed here.
  */
 
 import { readFileSync } from 'node:fs';
@@ -47,8 +54,9 @@ async function main() {
   const slug = arg('studio')?.trim();
   const rolesFile = arg('roles');
   const dryRun = process.argv.includes('--dry-run');
+  const refresh = process.argv.includes('--refresh');
   if (!file || !slug) {
-    console.error('Usage: npx tsx scripts/import-axleads.ts --file <export.json> --studio <slug> [--dry-run] [--roles roles.json]');
+    console.error('Usage: npx tsx scripts/import-axleads.ts --file <export.json> --studio <slug> [--dry-run] [--refresh] [--roles roles.json]');
     process.exit(1);
   }
   const url = process.env.DATABASE_URL;
@@ -84,7 +92,7 @@ async function main() {
     }
 
     const started = Date.now();
-    const { plan, blocked, written } = await runImport(prisma, { studioId: studio.id, ax: parsed.data, choices: choices.choices, dryRun });
+    const { plan, blocked, written } = await runImport(prisma, { studioId: studio.id, ax: parsed.data, choices: choices.choices, dryRun, refresh });
     console.log(formatReport(plan.report, { tenant: parsed.data.tenant.name, studio: `${studio.tradeName} (${slug})`, dryRun }));
 
     if (!written) {
@@ -103,6 +111,7 @@ async function main() {
     console.log(`  source names added                     ${written.leadSources}`);
     console.log(`  new cards                              ${written.created}`);
     console.log(`  merged into a card                     ${written.merged}`);
+    if (refresh) console.log(`  refreshed from AxLeads                 ${written.refreshed}`);
     console.log(`  given to their person (second run)     ${written.backfilled}`);
     console.log(`  history lines                          ${written.events}`);
     if (written.salesRolesMade.length) console.log(`  sales roles made                       ${written.salesRolesMade.join(', ')}`);
