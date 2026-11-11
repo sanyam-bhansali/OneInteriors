@@ -6273,6 +6273,10 @@ model StudioSociety {
   /// Lower-case letters and digits of the name: "Life Republic R-10" and
   /// "life republic r10" are one society.
   key      String
+  /// Other ways leads type it (owner, 11 Nov 2026; studio-practice/society-match.ts
+  /// keys): "Godrej Medow" for Godrej Meadows. A lead typed with one links here,
+  /// on every import and every time the list is opened.
+  aliases  String[] @default([])
   locality String?
   builder  String?
 

@@ -62,6 +62,8 @@ export interface ImportOutcome {
     leadSources: number;
     created: number;
     merged: number;
+    /** `--refresh`: imported cards brought up to AxLeads again. */
+    refreshed: number;
     backfilled: number;
     events: number;
     /** Sales side (owner, 22 Oct 2026). */
@@ -177,10 +179,10 @@ export async function loadContext(db: PrismaClient, studioId: string, ax: AxExpo
  * Plan, and — unless `dryRun` — write. Returns the plan either way, so the
  * runner prints the same report for both.
  */
-export async function runImport(db: PrismaClient, input: { studioId: string; ax: AxExport; choices: Choices; dryRun: boolean; now?: Date }): Promise<ImportOutcome> {
+export async function runImport(db: PrismaClient, input: { studioId: string; ax: AxExport; choices: Choices; dryRun: boolean; now?: Date; refresh?: boolean }): Promise<ImportOutcome> {
   const now = input.now ?? new Date();
   const ctx = await loadContext(db, input.studioId, input.ax);
-  const plan = planImport(input.ax, ctx, input.choices, { now });
+  const plan = planImport(input.ax, ctx, input.choices, { now, refresh: input.refresh === true });
   const blocked = plan.salesTeam.problems;
   /* A roles file that asks for what cannot be done writes nothing at all —
      not the leads either: a half-applied team (Khushi with no boss, the pool
@@ -436,6 +438,64 @@ export async function runImport(db: PrismaClient, input: { studioId: string; ax:
     events += n;
   }
 
+  // 4b. `--refresh` (owner, 11 Nov 2026): imported cards brought up to AxLeads again, and every lead's new lines.
+  const refreshes = plan.leads.filter((l): l is Extract<LeadPlan, { action: 'refresh' }> => l.action === 'refresh');
+  let refreshed = 0;
+  for (const batch of chunks(refreshes, BATCH)) {
+    const r = await db.$transaction(
+      async (tx) => {
+        let lines = 0;
+        let cards = 0;
+        const before = new Map(
+          (await tx.studioClient.findMany({ where: { studioId, id: { in: batch.map((l) => l.clientId) } }, select: { id: true, stageId: true, assignedToId: true, fields: true } })).map((c) => [c.id, c]),
+        );
+        for (const l of batch) {
+          const was = before.get(l.clientId);
+          if (!was) continue;
+          if (l.fromImport) {
+            const c = l.client;
+            const assignedToId = memberId(c.assignee);
+            const oldFields = was.fields && typeof was.fields === 'object' && !Array.isArray(was.fields) ? (was.fields as Record<string, unknown>) : {};
+            await tx.studioClient.update({
+              where: { id: l.clientId },
+              data: {
+                stageId: c.stageId,
+                name: c.name,
+                email: c.email,
+                society: c.society,
+                locality: c.locality,
+                config: c.config,
+                carpetSqft: c.carpetSqft,
+                budgetPaise: c.budgetPaise === null ? null : BigInt(c.budgetPaise),
+                lostReason: c.lostReason,
+                lostNote: c.lostNote,
+                fields: { ...oldFields, ...c.fields } as Prisma.InputJsonValue,
+                nextAction: c.nextAction,
+                nextActionOn: c.nextActionOn,
+                assignedToId,
+                poolTeamId: assignedToId ? null : memberId(c.poolTeam),
+                lastContactedAt: c.lastContactedAt,
+                tags: c.tags,
+                deletedAt: c.deletedAt,
+              },
+            });
+            cards += 1;
+            if (was.stageId !== c.stageId || was.assignedToId !== assignedToId) {
+              await tx.studioClientEvent.create({
+                data: { studioId, clientId: l.clientId, kind: 'IMPORTED', actor: 'SYSTEM', summary: 'Brought up to date from AxLeads (stage and person as they are there)', meta: { axleads: { refresh: true } } },
+              });
+            }
+          }
+          if (l.events.length) lines += (await tx.studioClientEvent.createMany({ data: l.events.map((e) => eventRow(l.clientId, e)), skipDuplicates: true })).count;
+        }
+        return { lines, cards };
+      },
+      { timeout: 120_000, maxWait: 30_000 },
+    );
+    refreshed += r.cards;
+    events += r.lines;
+  }
+
   // 5. A second run: leads still in the pool whose person has since been matched.
   let backfilled = 0;
   for (const l of plan.leads) {
@@ -475,7 +535,7 @@ export async function runImport(db: PrismaClient, input: { studioId: string; ax:
     }
   }
 
-  const written = { members: newMember.size, membersRefused, fields, leadSources, created, merged, backfilled, events, salesRolesMade, salesRolesSet, reportsToSet, salesRefused, poolMoves };
+  const written = { members: newMember.size, membersRefused, fields, leadSources, created, merged, refreshed, backfilled, events, salesRolesMade, salesRolesSet, reportsToSet, salesRefused, poolMoves };
   await db.auditLog.create({
     data: {
       /* Nobody signed in: the owner ran a script with database access. The

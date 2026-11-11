@@ -367,6 +367,23 @@ describe('leads', () => {
     expect(p.report).toMatchObject({ already: 2, backfill: 1 });
   });
 
+  it('--refresh brings imported leads up to AxLeads again, with their history, and still adds new leads', () => {
+    const imported = new Map([
+      ['00000000-0000-4000-9000-000000000001', { clientId: 'c1', assignedToId: null, fromImport: true }],
+      ['00000000-0000-4000-9000-000000000005', { clientId: 'c5', assignedToId: 'mem-owner', fromImport: false }],
+    ]);
+    const p = planImport(fresh(), ctx({ imported }), choices(), { now: NOW, refresh: true });
+    const one = lead(p, 1) as Extract<LeadPlan, { action: 'refresh' }>;
+    expect(one).toMatchObject({ action: 'refresh', clientId: 'c1', fromImport: true });
+    expect(one.client.stageId).toBeTruthy();
+    expect(one.events.every((e) => e.externalId.startsWith('axleads:'))).toBe(true);
+    expect(lead(p, 5)).toMatchObject({ action: 'refresh', clientId: 'c5', fromImport: false });
+    expect(p.report.refreshed).toBe(2);
+    expect(p.report.already).toBe(0);
+    expect(p.report.create).toBeGreaterThan(0);
+    expect(p.leads.some((l) => l.action === 'already')).toBe(false);
+  });
+
   it('leaves out leads that answered a skipIfAnswered question (job applicants)', () => {
     const c = choices({ skipIfAnswered: ['Why_Should_We_Hire_You?'] });
     expect(c.skipIfAnswered).toEqual(['why_should_we_hire_you?']);

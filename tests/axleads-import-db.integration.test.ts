@@ -127,6 +127,26 @@ describe.skipIf(!RUN)('AxLeads import (test database)', () => {
     expect(last.clients).toBe(after.clients);
     expect(last.events).toBe(after.events);
 
+    /* --refresh (owner, 11 Nov 2026): the team kept working on AxLeads. Lead 1
+       moved to Follow up and got one new call; a refresh brings exactly that
+       over, and a second refresh adds nothing. */
+    const moved = ax.leads[0]!;
+    moved.stageId = ax.stages.find((s) => s.name === 'Follow up')!.id;
+    const newCall = { ...moved.activities[3]!, id: `${TAG}-0000-4000-a000-00000000ffff`, createdAt: '2026-11-05T06:00:00.000Z' };
+    moved.activities.push(newCall);
+    const refreshed = await runImport(prisma, { studioId: studio.id, ax, choices: choices.choices, dryRun: false, refresh: true });
+    expect(refreshed.plan.report).toMatchObject({ create: 0, already: 0 });
+    expect(refreshed.written?.refreshed).toBe(6);
+    const card1 = await prisma.studioClient.findFirstOrThrow({ where: { studioId: studio.id, importedFrom: IMPORTED_FROM, externalId: moved.id }, select: { id: true, stage: { select: { name: true } } } });
+    expect(card1.stage.name).toBe('Follow up');
+    expect(await prisma.studioClientEvent.count({ where: { studioId: studio.id, externalId: `axleads:${newCall.id}` } })).toBe(1);
+    const afterRefresh = await counts();
+    /* The new call, plus one "brought up to date" line for the card whose stage changed. */
+    expect(afterRefresh.events - last.events).toBe(2);
+    const twice = await runImport(prisma, { studioId: studio.id, ax, choices: choices.choices, dryRun: false, refresh: true });
+    expect(twice.written?.events).toBe(0);
+    expect((await counts()).events).toBe(afterRefresh.events);
+
     expect(sent.count).toBe(0);
   }, 120_000);
 

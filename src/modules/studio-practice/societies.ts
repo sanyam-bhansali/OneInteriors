@@ -22,6 +22,7 @@ import { can } from '@/modules/studio/roles';
 import { myLeadScope, type LeadScope } from '@/modules/studio/lead-scope';
 import { bulkAssign, bulkSplit } from '@/modules/studio-sales/bulk';
 import { normalisePhone } from './csv';
+import { parseSociety, societyTargets } from './society-match';
 import { recordMany } from './events';
 import { intakeStageId } from './stages';
 import type { SocietyImportPayload } from './society-import';
@@ -290,16 +291,17 @@ export async function linkLeadsByName(studioId: string, society: { id: string; k
  * having to know about societies.
  */
 export async function syncLeadSocieties(studioId: string): Promise<number> {
-  const societies = await prisma.studioSociety.findMany({ where: { studioId }, select: { id: true, key: true } });
+  const societies = await prisma.studioSociety.findMany({ where: { studioId }, select: { id: true, name: true, aliases: true } });
   if (societies.length === 0) return 0;
-  const byKey = new Map(societies.map((s) => [s.key, s.id]));
   const leads = await prisma.studioClient.findMany({
     where: { studioId, deletedAt: null, OR: [{ society: { not: null } }, { societyId: { not: null } }] },
     select: { id: true, society: true, societyId: true },
   });
+  /* Each distinct spelling is matched once (typos included; society-match.ts). */
+  const target = societyTargets([...new Set(leads.map((l) => l.society).filter((s): s is string => !!s))], societies);
   const moves = new Map<string, string[]>();
   for (const l of leads) {
-    const want = l.society ? (byKey.get(societyKey(l.society)) ?? null) : null;
+    const want = l.society ? (target.get(l.society) ?? null) : null;
     if (want === l.societyId) continue;
     const k = want ?? '';
     moves.set(k, [...(moves.get(k) ?? []), l.id]);
@@ -363,9 +365,13 @@ export async function updateSociety(
   const key = societyKey(name);
   const clash = await prisma.studioSociety.findFirst({ where: { studioId: access.scope.studioId, key, NOT: { id } }, select: { id: true } });
   if (clash) return { ok: false, error: 'Another society already has that name.' };
+  /* The old name stays a spelling of it, so leads typed the old way still link (renaming "Vtp Seirra" to "VTP Sierra"). */
+  const before = await prisma.studioSociety.findFirst({ where: { id, studioId: access.scope.studioId }, select: { name: true, aliases: true } });
+  const oldKey = before ? parseSociety(before.name).key : '';
+  const aliases = [...new Set([...(before?.aliases ?? []), ...(oldKey && oldKey !== parseSociety(name).key ? [oldKey] : [])])];
   await prisma.studioSociety.updateMany({
     where: { id, studioId: access.scope.studioId },
-    data: { name, key, locality: clean(input.locality, 80) || null, builder: clean(input.builder, 80) || null },
+    data: { name, key, aliases, locality: clean(input.locality, 80) || null, builder: clean(input.builder, 80) || null },
   });
   const linked = key !== found.key ? await linkLeadsByName(access.scope.studioId, { id, key }) : 0;
   return { ok: true, linked };
