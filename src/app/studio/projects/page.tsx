@@ -70,7 +70,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
   ]);
   const justDeleted = sp.deleted === '1';
   /* By designer (owner, 1 Nov 2026): the owner, a PM and the design head see every project, so they can narrow it to one designer's. */
-  const allCards = fullBoard ? [...fullBoard.design, ...fullBoard.execution, ...fullBoard.snags, ...fullBoard.closed] : [];
+  const allCards = fullBoard ? [...fullBoard.design, ...fullBoard.preExecution, ...fullBoard.execution, ...fullBoard.snags, ...fullBoard.closed] : [];
   const choices = fullBoard?.scope === 'studio' ? designerChoices(allCards) : [];
   const picked = pickDesigner(sp.designer, choices);
   const designerOf = new Map(allCards.map((c) => [c.id, c.designerId]));
@@ -338,6 +338,7 @@ function narrow(b: LifecycleBoard, picked: string): LifecycleBoard {
   return {
     ...b,
     design: keep(b.design),
+    preExecution: keep(b.preExecution),
     execution: keep(b.execution),
     snags: keep(b.snags),
     closed: keep(b.closed),

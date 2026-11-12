@@ -29,7 +29,7 @@ const dayWords = (iso: string | null) =>
 export default async function DesignPage({ searchParams }: { searchParams: Promise<{ tab?: string; deleted?: string; designer?: string }> }) {
   const [{ tab: rawTab, deleted, designer }, fullBoard, w, member] = await Promise.all([searchParams, lifecycleBoard().catch(() => null), designWorkload(), currentMember()]);
   /* By designer (owner, 1 Nov 2026): the owner, a PM and the design head narrow the board to one designer's projects. */
-  const choices = fullBoard?.scope === 'studio' ? designerChoices([...fullBoard.design, ...fullBoard.execution, ...fullBoard.snags, ...fullBoard.closed]) : [];
+  const choices = fullBoard?.scope === 'studio' ? designerChoices([...fullBoard.design, ...fullBoard.preExecution, ...fullBoard.execution, ...fullBoard.snags, ...fullBoard.closed]) : [];
   const picked = pickDesigner(designer, choices);
   const board: LifecycleBoard | null = fullBoard && picked ? narrowBoard(fullBoard, picked) : fullBoard;
   const designers = w ? w.designers.filter((d) => picked === null || (picked === NO_DESIGNER ? d.id === null : d.id === picked)) : null;
@@ -174,5 +174,5 @@ function Designer({ d, showLoad }: { d: DesignerRow; showLoad: boolean }) {
 /** The board with only the picked designer's projects (designer-filter.ts). */
 function narrowBoard(b: LifecycleBoard, picked: string): LifecycleBoard {
   const keep = <T extends { designerId: string | null }>(l: T[]) => l.filter((c) => byDesigner(c.designerId, picked));
-  return { ...b, design: keep(b.design), execution: keep(b.execution), snags: keep(b.snags), closed: keep(b.closed), closures: keep(b.closures) };
+  return { ...b, design: keep(b.design), preExecution: keep(b.preExecution), execution: keep(b.execution), snags: keep(b.snags), closed: keep(b.closed), closures: keep(b.closures) };
 }

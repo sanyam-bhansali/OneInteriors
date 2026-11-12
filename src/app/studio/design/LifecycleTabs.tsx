@@ -22,7 +22,9 @@ export function LifecycleTabs({ board, tab, base, mine, keep = '' }: { board: Li
   const label: Record<LifeTab, string> = mine
     ? { design: 'My Design', execution: 'My Execution', snags: 'My Snags' }
     : { design: 'Design', execution: 'Execution', snags: 'Snags' };
-  const counts: Record<LifeTab, number> = { design: board.design.length, execution: board.execution.length, snags: board.snags.length };
+  /* Pre-execution sits in the Design tab, after the design projects (owner, 12 Nov 2026). */
+  const counts: Record<LifeTab, number> = { design: board.design.length + board.preExecution.length, execution: board.execution.length, snags: board.snags.length };
+  const pre = tab === 'design' ? board.preExecution : [];
   const cards = board[tab];
   return (
     <div className="oi-life">
@@ -72,23 +74,39 @@ export function LifecycleTabs({ board, tab, base, mine, keep = '' }: { board: Li
         </section>
       ) : null}
 
-      {cards.length === 0 ? (
+      {cards.length === 0 && pre.length === 0 ? (
         <div className="empty">
           <b>{tab === 'design' ? 'Nothing in design.' : tab === 'execution' ? 'Nothing on site.' : 'No snags to close.'}</b>
           <span className="muted">
             {tab === 'design'
-              ? 'Projects move to execution when the design is signed off.'
+              ? 'Projects move to execution when the design and pre-execution are done.'
               : tab === 'execution'
-                ? 'A project comes here once its design is signed off, and stays until it is closed out.'
+                ? 'A project comes here once pre-execution is done, and stays until it is closed out.'
                 : 'A project comes here once it is closed out, and stays through its warranty.'}
           </span>
         </div>
       ) : (
-        <div className="lgrid">
-          {cards.map((c) => (
-            <ProjectCard key={c.id} c={c} tab={tab} showDesigner={!mine} />
-          ))}
-        </div>
+        <>
+          {cards.length > 0 ? (
+            <div className="lgrid">
+              {cards.map((c) => (
+                <ProjectCard key={c.id} c={c} tab={tab} showDesigner={!mine} />
+              ))}
+            </div>
+          ) : null}
+          {pre.length > 0 ? (
+            <section aria-label="Pre-execution" data-testid="pre-execution" className="flex flex-col gap-2">
+              <h2 className="m-0 mt-2 border-t border-[var(--line)] pt-3 text-[14px] font-semibold">
+                Pre-execution <span className="mono muted">{pre.length}</span>
+              </h2>
+              <div className="lgrid">
+                {pre.map((c) => (
+                  <ProjectCard key={c.id} c={c} tab={tab} showDesigner={!mine} />
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </>
       )}
       {board.closed.length > 0 && tab === 'snags' ? <p className="muted sm m-0">{board.closed.length} project{board.closed.length === 1 ? '' : 's'} closed (warranty over).</p> : null}
     </div>
