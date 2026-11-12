@@ -38,6 +38,7 @@ import { recordEvent, type ProjectActor } from './events';
 import {
   canMarkStageDone,
   currentStatus,
+  designMoveInstants,
   gateWords,
   handoverStage,
   isDelayReason,
@@ -439,6 +440,8 @@ export interface PlanStepView {
 }
 
 export interface PlanStageView extends StageStatus {
+  /** The client is not shown its last move: one that started on the design stage (the client reads no design date; tracker-view.ts). */
+  moveHidden: boolean;
   photos: number;
   gate: DoneGate;
   /** Whole percent of the stage done (in-scope steps); null when nothing in it is in scope. */
@@ -530,6 +533,7 @@ export async function planForStudio(projectId: string, now = new Date()): Promis
   }));
   const photos = await photosByStage(prisma, projectId, stored);
   const statuses = stageStatuses(stages, changes, today, cal);
+  const hiddenAt = designMoveInstants(stages, changes);
   const notes = new Map<number, string | null>();
   for (const c of p.dateChanges) if (!notes.has(c.at.getTime())) notes.set(c.at.getTime(), c.note);
   const names = new Map(stages.map((s) => [s.id, s.name]));
@@ -573,6 +577,7 @@ export async function planForStudio(projectId: string, now = new Date()): Promis
         const done = flags.filter((f) => f.done).length;
         return {
           ...s,
+          moveHidden: s.lastMove !== null && hiddenAt.has(s.lastMove.at.getTime()),
           photos: n,
           gate: canMarkStageDone({ items: flags, photos: n }),
           progressPct: sp?.pct ?? null,

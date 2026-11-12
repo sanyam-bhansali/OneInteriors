@@ -30,7 +30,7 @@ describe('Projects', () => {
     expect(k[0]).toMatchObject({ value: 2, note: '1 running late', href: '/studio/projects?tab=design', active: true });
     expect(k[1]!.note).toBe('1 closure to do');
     expect(k[2]!.note).toBe('2 open snags');
-    expect(k[3]).toMatchObject({ value: 2, note: '1 on us', tone: 'bad' });
+    expect(k[3]).toMatchObject({ value: 1, note: 'on us', tone: 'bad' });
     expect(k[4]).toMatchObject({ value: 1, note: '1 decision past the date' });
     expect(k[5]).toMatchObject({ value: '₹25,000', note: 'on 1 project' });
   });

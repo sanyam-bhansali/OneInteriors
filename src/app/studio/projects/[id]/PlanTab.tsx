@@ -120,7 +120,8 @@ function Overall({ plan, customer, onMove }: { plan: StudioPlan; customer: strin
   const o = plan.overall;
   const c = plan.current;
   const stageLine = c ? `${c.name} · ${c.status === 'late' ? `${days(c.lateDays)} late` : 'on track'}` : 'Handed over';
-  const overallLine = o.lateDays > 0 ? `Overall · ${days(o.lateDays)} late` : o.earlyDays > 0 ? `Overall · ${days(o.earlyDays)} early` : 'Overall · on time';
+  /* The client's days are not our delay (owner, 12 Nov 2026): "late" is the studio's days only; theirs are explained below. */
+  const overallLine = o.studioDays > 0 ? `Overall · ${days(o.studioDays)} late` : o.earlyDays > 0 ? `Overall · ${days(o.earlyDays)} early` : 'Overall · on time';
   return (
     <div className="card oi-overall">
       <div className="flex w-full flex-col gap-1.5">
@@ -135,7 +136,7 @@ function Overall({ plan, customer, onMove }: { plan: StudioPlan; customer: strin
         <div className="flex flex-wrap gap-2">
 
           <Chip tone={c?.status === 'late' ? 'bad' : 'good'}>{stageLine}</Chip>
-          <Chip tone={o.studioDays > 0 ? 'bad' : o.lateDays > 0 ? 'warn' : 'good'}>{overallLine}</Chip>
+          <Chip tone={o.studioDays > 0 ? 'bad' : 'good'}>{overallLine}</Chip>
         </div>
         {o.plannedHandover && o.forecastHandover ? (
           <p className="m-0 mt-1 text-[13.5px] text-[var(--text2)]">
@@ -150,7 +151,7 @@ function Overall({ plan, customer, onMove }: { plan: StudioPlan; customer: strin
         ) : null}
         {o.lateDays > 0 ? (
           <p className={`m-0 ${muted}`}>
-            {o.customerDays > 0 ? `${days(o.customerDays)} of it ${o.customerDays === 1 ? 'is' : 'are'} from ${customer}'s changes or late decisions: shown in the app, not counted against you. ` : ''}
+            {o.customerDays > 0 ? `Handover moved ${days(o.customerDays).replace('day', 'working day')} for ${customer}'s side (late approvals, changes or decisions): shown in their app, not counted as your delay. ` : ''}
             {o.studioDays > 0 ? `${days(o.studioDays)} count${o.studioDays === 1 ? 's' : ''} against the studio` : 'Nothing counts against the studio'}
             {o.overrunDays > 0 ? `, ${days(o.overrunDays)} of that from the stage under way running past its date — move the date with a reason if it is not yours.` : '.'}
           </p>
@@ -226,7 +227,8 @@ function StageRow({
   }, [s.groups]);
   const [pending, start] = useTransition();
   const line = customerLine(s);
-  const moved = s.lastMove;
+  // What the client sees: never a move that started on the design (they read no design date).
+  const moved = s.moveHidden ? null : s.lastMove;
   const hasSteps = s.groups.some((g) => g.steps.length > 0);
   const pct = s.progressPct ?? (s.state === 'done' ? 100 : 0);
 

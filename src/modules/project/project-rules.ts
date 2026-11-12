@@ -269,6 +269,17 @@ export function overallDelay(
   };
 }
 
+/**
+ * The instants of the moves the client is not shown: a move whose rows touch
+ * the design stage (the client reads no design date, DESIGN-PROCESS-PLAN.md
+ * Decision 11; a late design tick moves the design's end and handover,
+ * owner 12 Nov 2026). A move writes all its rows at one instant.
+ */
+export function designMoveInstants(stages: readonly Pick<RuleStage, 'id' | 'kind'>[], changes: readonly Pick<RuleChange, 'stageId' | 'at'>[]): Set<number> {
+  const design = new Set(stages.filter((s) => s.kind === 'DESIGN').map((s) => s.id));
+  return new Set(changes.filter((c) => c.stageId !== null && design.has(c.stageId)).map((c) => c.at.getTime()));
+}
+
 // ── Moving a date ─────────────────────────────────────────────
 
 export interface MoveRequest {

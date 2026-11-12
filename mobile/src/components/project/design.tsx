@@ -58,6 +58,10 @@ export function DesignCard({
         </View>
       ) : null}
 
+      {(design.clientDelayDays ?? 0) > 0 && !design.done ? (
+        <Text style={styles.note}>{design.clientDelayDays === 1 ? t('design.waitedOne') : t('design.waited', { n: design.clientDelayDays! })}</Text>
+      ) : null}
+
       {next && !design.done ? (
         <View style={styles.next}>
           <Text style={styles.eyebrow}>{t('design.next')}</Text>

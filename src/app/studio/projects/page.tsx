@@ -250,12 +250,11 @@ function Card({ r, money, own }: { r: WorkspaceRow; money: boolean; own: boolean
   const handedOver = r.stage === null;
   const done = r.stages.filter((s) => s.state === 'done').length;
   const prog = r.stages.length ? Math.round((done / r.stages.length) * 100) : 0;
+  /* The client's days are never shown as our delay (owner, 12 Nov 2026): late counts our days only. */
+  const ourLate = Math.max(0, r.lateDays - r.customerLateDays);
   const health =
-    r.lateDays > 0
-      ? {
-          cls: r.customerLateDays === r.lateDays ? 'warn' : 'bad',
-          text: `${r.lateDays} day${r.lateDays === 1 ? '' : 's'} late`,
-        }
+    ourLate > 0
+      ? { cls: 'bad', text: `${ourLate} day${ourLate === 1 ? '' : 's'} late` }
       : { cls: 'good', text: handedOver ? 'Done' : 'On track' };
   const today = handedOver
     ? null
@@ -302,7 +301,7 @@ function Card({ r, money, own }: { r: WorkspaceRow; money: boolean; own: boolean
       </div>
       {r.customerLateDays > 0 ? (
         <span className="muted sm">
-          {r.customerLateDays === r.lateDays ? 'All' : r.customerLateDays} from {r.customer}, not yours
+          {r.customerLateDays} day{r.customerLateDays === 1 ? '' : 's'} waiting on {r.customer}: not counted as ours
         </span>
       ) : null}
       {r.snags.overdue.length ? (
