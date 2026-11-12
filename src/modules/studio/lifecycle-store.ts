@@ -72,6 +72,8 @@ export interface LifecycleBoard {
   /** A designer's own projects, or the studio's (owner) / the PM's. */
   scope: 'designer' | 'studio';
   design: BoardCard[];
+  /** Pre-execution (owner, 12 Nov 2026): shown in the Design tab, after the design projects, under its own heading. */
+  preExecution: BoardCard[];
   /** Execution and the closure (the closure sits in My Execution). */
   execution: BoardCard[];
   /** Snags and the warranty. */
@@ -219,16 +221,7 @@ export async function lifecycleBoard(now = new Date()): Promise<LifecycleBoard |
   const rows = await prisma.homeProject.findMany({ where, orderBy: { startOn: 'desc' }, take: 300, select: SELECT });
   // Money on the board: the owner, and the PM or designer on the project (all of these rows are theirs).
   const cards = rows.map((r) => cardOf(r, now, true));
-  /* Stars first (the design meeting, 24 Oct 2026; DESIGN-PROCESS-PLAN.md §2.4), then the latest. */
-  const byLate = (a: BoardCard, b: BoardCard) => (b.priority ?? 0) - (a.priority ?? 0) || b.lateDays - a.lateDays || a.client.localeCompare(b.client);
-  return {
-    scope: member.role === 'DESIGNER' && !member.designHead ? 'designer' : 'studio',
-    design: cards.filter((c) => c.phase === 'DESIGN').sort(byLate),
-    execution: cards.filter((c) => c.phase === 'PRE_EXECUTION' || c.phase === 'EXECUTION' || c.phase === 'CLOSURE').sort((a, b) => Number(b.phase === 'CLOSURE') - Number(a.phase === 'CLOSURE') || byLate(a, b)),
-    snags: cards.filter((c) => c.phase === 'SNAGS' || c.phase === 'WARRANTY').sort((a, b) => b.snags.length - a.snags.length),
-    closed: cards.filter((c) => c.phase === 'CLOSED'),
-    closures: cards.filter((c) => c.phase === 'CLOSURE'),
-  };
+  return { scope: member.role === 'DESIGNER' && !member.designHead ? 'designer' : 'studio', ...boardColumns(cards) };
 }
 
 /** The studio-wide "closures remaining" for the owner's Today / home (the PM: their projects). Null for other roles. */
@@ -270,5 +263,23 @@ export async function projectPhaseFor(projectId: string, now = new Date()): Prom
     provisionalOn: p.provisionalHandoverAt ? istDay(p.provisionalHandoverAt) : null,
     closedOutOn: p.closedOutAt ? istDay(p.closedOutAt) : null,
     signedOffOn: p.handoverSignedAt ? istDay(p.handoverSignedAt) : null,
+  };
+}
+
+/**
+ * The board's columns from its cards: design, then pre-execution (shown in
+ * the Design tab under its own heading, owner 12 Nov 2026), execution with
+ * the closure, snags with the warranty, closed. Stars first, then most late.
+ */
+export function boardColumns<C extends Pick<BoardCard, 'phase' | 'priority' | 'lateDays' | 'client' | 'snags'>>(cards: readonly C[]) {
+  /* Stars first (the design meeting, 24 Oct 2026; DESIGN-PROCESS-PLAN.md §2.4), then the latest. */
+  const byLate = (a: C, b: C) => (b.priority ?? 0) - (a.priority ?? 0) || b.lateDays - a.lateDays || a.client.localeCompare(b.client);
+  return {
+    design: cards.filter((c) => c.phase === 'DESIGN').sort(byLate),
+    preExecution: cards.filter((c) => c.phase === 'PRE_EXECUTION').sort(byLate),
+    execution: cards.filter((c) => c.phase === 'EXECUTION' || c.phase === 'CLOSURE').sort((a, b) => Number(b.phase === 'CLOSURE') - Number(a.phase === 'CLOSURE') || byLate(a, b)),
+    snags: cards.filter((c) => c.phase === 'SNAGS' || c.phase === 'WARRANTY').sort((a, b) => b.snags.length - a.snags.length),
+    closed: cards.filter((c) => c.phase === 'CLOSED'),
+    closures: cards.filter((c) => c.phase === 'CLOSURE'),
   };
 }
