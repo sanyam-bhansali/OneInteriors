@@ -1960,6 +1960,13 @@ model HomeChangeOrder {
   releasedAt      DateTime?
   releasedById    String?
   cancelledAt     DateTime?
+  /// Additional scope (owner, 12 Nov 2026): the quotation it was built in
+  /// (studio_quotes.scopeForProjectId set), the extra days the work needs
+  /// (added to the plan once paid), and the day it is due: the day it was
+  /// built and sent. Null on ordinary extra work.
+  scopeQuoteId    String?
+  daysRequired    Int?
+  dueOn           DateTime?         @db.Date
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -3763,6 +3770,10 @@ model StudioQuote {
   /// Sales Final, so the two can be compared line by line. Null for a
   /// quotation written fresh or copied as a template.
   basedOnId String?
+  /// Additional scope (owner, 12 Nov 2026): the project this quotation adds
+  /// to after its design final (numbered like 101-A1). Only its new items;
+  /// sent to the client as a change order with its payment due at once.
+  scopeForProjectId String?
 
   /// Their words on this document, snapshotted for the same reason.
   welcomeNote String? @db.Text
@@ -3813,6 +3824,7 @@ model StudioQuote {
   /// render. Without this it is 400 sequential scans of the studio's
   /// whole quotation history.
   @@index([clientId])
+  @@index([scopeForProjectId])
   @@map("studio_quotes")
 }
 
@@ -5823,6 +5835,10 @@ model HomeProjectHold {
   endedById String?
   /// Days the plan moved when it ended.
   shiftedDays Int?
+  /// Additional scope (owner, 12 Nov 2026): the change order whose payment
+  /// this hold waits on; it starts when the client approves and ends when
+  /// the payment is recorded. Null on a hold someone asked for.
+  changeOrderId String?
 
   @@index([projectId, askedAt])
   @@map("home_project_holds")

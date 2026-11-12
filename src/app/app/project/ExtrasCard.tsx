@@ -103,11 +103,16 @@ function ExtraItem({ e, onChanged }: { e: Extra; onChanged: () => void }) {
     <article style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 12, borderTop: '1px solid var(--line)' }} data-testid="extra" data-state={e.state}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
         <b>
-          {lw(lang, 'life.extra.number', { n: e.number })}: {e.title}
+          {e.dueOn ? e.title : `${lw(lang, 'life.extra.number', { n: e.number })}: ${e.title}`}
         </b>
         <b className="mono">{formatINR(e.totalPaise)}</b>
       </div>
       <span className="oa-meta">{stateLine}</span>
+      {e.dueOn !== null && e.dueOn !== undefined ? (
+        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.45 }} data-testid="scope-terms">
+          {lw(lang, 'life.scope.days', { n: e.daysRequired ?? 0 })}. {lw(lang, 'life.scope.due', { date: shortDate(`${e.dueOn}T00:00:00Z`) })}.
+        </p>
+      ) : null}
       {e.reason ? (
         <p style={{ margin: 0, fontSize: 14, lineHeight: 1.45 }}>
           <span className="oa-meta">{lw(lang, 'life.extra.why')}: </span>

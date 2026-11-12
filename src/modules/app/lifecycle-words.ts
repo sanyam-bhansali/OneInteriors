@@ -53,6 +53,9 @@ export const lifecycleWords = {
     mr: 'डिझाइन साइन-ऑफनंतर जोडलेले काम. तुमची मंजुरी आणि पेमेंट झाल्याशिवाय काहीही बनत नाही.',
   },
   'life.extra.number': { en: 'Extra work {n}', hi: 'अतिरिक्त काम {n}', mr: 'अतिरिक्त काम {n}' },
+  /* Additional scope (owner, 12 Nov 2026): the extra days and the payment due at once. */
+  'life.scope.days': { en: 'Adds {n} days to your timeline', hi: 'आपकी टाइमलाइन में {n} दिन जुड़ेंगे', mr: 'तुमच्या वेळापत्रकात {n} दिवस वाढतील' },
+  'life.scope.due': { en: 'Payment due on approval ({date}); work restarts once it is paid', hi: 'मंज़ूरी पर भुगतान देय ({date}); भुगतान होते ही काम फिर शुरू होगा', mr: 'मंजुरीवर पेमेंट देय ({date}); पेमेंट झाल्यावर काम पुन्हा सुरू होईल' },
   'life.extra.why': { en: 'Why', hi: 'क्यों', mr: 'का' },
   'life.extra.discount': { en: 'Discount', hi: 'छूट', mr: 'सवलत' },
   'life.extra.gst': { en: 'GST {pct}', hi: 'जीएसटी {pct}', mr: 'जीएसटी {pct}' },

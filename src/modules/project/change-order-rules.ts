@@ -86,8 +86,10 @@ export const STATUS_LABEL: Record<ChangeOrderStatusName, string> = {
 /** The phases a new change order may be added in: after design sign-off, before the closure is fixed. */
 export const EXTRAS_PHASES = ['PRE_EXECUTION', 'EXECUTION', 'CLOSURE'] as const;
 
-export function extrasOpen(phase: string, closedOut: boolean): { ok: true } | { ok: false; error: string } {
+export function extrasOpen(phase: string, closedOut: boolean, designFinal = false): { ok: true } | { ok: false; error: string } {
   if (closedOut) return { ok: false, error: 'This project is closed out: its final payment is fixed, so extra work cannot be added.' };
+  /* Additional scope (owner, 12 Nov 2026): once the design final quotation is made, even while design steps remain. */
+  if (phase === 'DESIGN' && designFinal) return { ok: true };
   if (phase === 'DESIGN') return { ok: false, error: 'Extra work is added after the design is signed off. Until then, change the design final.' };
   if (!(EXTRAS_PHASES as readonly string[]).includes(phase)) return { ok: false, error: 'Extra work cannot be added at this stage of the project.' };
   return { ok: true };
@@ -350,6 +352,9 @@ export interface CustomerExtra {
   photoUrl: string | null;
   /** The owner of the brief may approve or decline now. */
   canAnswer: boolean;
+  /** Additional scope (owner, 12 Nov 2026): extra days the work adds, and the day its payment is due (at once). Null on ordinary extra work. */
+  daysRequired: number | null;
+  dueOn: string | null;
 }
 
 export interface ExtraRowForCustomer {
@@ -368,6 +373,9 @@ export interface ExtraRowForCustomer {
   declineReason: string | null;
   lines: (Pick<ExtraLine, 'product' | 'room' | 'details' | 'unit' | 'widthMm' | 'heightMm' | 'qtyMilli' | 'productId' | 'amountPaise'>)[];
   payments: ExtraPaymentRow[];
+  /** Additional scope: extra days the work needs, and the day its payment is due. */
+  daysRequired?: number | null;
+  dueOn?: string | null;
 }
 
 /** One order as the client sees it, field by field (never the studio's ids, who made it or the rate). */
@@ -394,5 +402,33 @@ export function toCustomerExtra(r: ExtraRowForCustomer, owner: boolean, photoUrl
     declineReason: state === 'declined' ? r.declineReason : null,
     photoUrl,
     canAnswer: owner && state === 'waiting',
+    daysRequired: r.daysRequired ?? null,
+    dueOn: r.dueOn ?? null,
   };
+}
+
+// ── Additional scope (owner, 12 Nov 2026) ─────────────────────
+
+export const SCOPE_DAYS_MAX = 365;
+
+/** The days the additional work needs: a whole number of days, 0 to a year. */
+export function checkDaysRequired(raw: unknown): { ok: true; days: number } | { ok: false; error: string } {
+  const n = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() !== '' ? Number(raw.trim()) : NaN;
+  if (!Number.isInteger(n) || n < 0 || n > SCOPE_DAYS_MAX) return { ok: false, error: 'Say how many days the additional work needs: 0 to 365.' };
+  return { ok: true, days: n };
+}
+
+/** The additional-scope quotation's number: the design final's, then -A1, -A2… (never one taken). */
+export function scopeNumber(base: string, taken: readonly string[]): string {
+  const root = base.replace(/-A\d+$/, '');
+  for (let n = 1; ; n += 1) if (!taken.includes(`${root}-A${n}`)) return `${root}-A${n}`;
+}
+
+/**
+ * When the additional scope's payment is recorded, the plan moves later by
+ * the days the project waited on it (on hold from the approval) plus the
+ * days the work needs: the client's side, never our delay.
+ */
+export function scopePaidDays(holdDays: number, daysRequired: number | null): number {
+  return Math.max(0, holdDays) + Math.max(0, daysRequired ?? 0);
 }

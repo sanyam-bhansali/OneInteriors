@@ -54,8 +54,10 @@ describe('what a designer may do', () => {
     expect(can(head, 'design.work', { assigned: false })).toBe(true);
     expect(can(head, 'design.workload')).toBe(true);
     expect(projectsVisibleTo(head)).toEqual({ introduction: { studioId: 's1' } });
-    // Still a designer: no money recorded, no plan edits, no leads.
-    for (const a of ['payment.record', 'plan.edit', 'lead.read', 'design.template'] as const) expect(can(head, a, { assigned: true }), a).toBe(false);
+    // Still a designer: no plan edits, no leads.
+    for (const a of ['plan.edit', 'lead.read', 'design.template'] as const) expect(can(head, a, { assigned: true }), a).toBe(false);
+    // Records payments received on every project (owner, 12 Nov 2026: "Renuka Designer head should have access to add payment received").
+    expect(can(head, 'payment.record', { assigned: false })).toBe(true);
     // The flag means nothing on anyone but a designer.
     expect(can({ ...designer, role: 'SUPERVISOR' as const, designHead: true }, 'design.workload')).toBe(false);
   });

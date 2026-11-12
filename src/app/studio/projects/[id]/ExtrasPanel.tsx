@@ -293,7 +293,7 @@ function ExtraCard({ e, data, customer, onEdit }: { e: StudioExtra; data: Studio
     <li className="card flex flex-col gap-2 p-4" data-testid="extra-card" data-status={e.status}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <b>
-          Extra work {e.number}: {e.title}
+          {e.scope ? e.title : `Extra work ${e.number}: ${e.title}`}
         </b>
         <span className="flex flex-wrap items-center gap-2">
           <span className={`chip ${tone[e.status]}`}>{ready ? 'Paid · ready to release' : STATUS_LABEL[e.status]}</span>
@@ -301,6 +301,13 @@ function ExtraCard({ e, data, customer, onEdit }: { e: StudioExtra; data: Studio
         </span>
       </div>
       {e.reason ? <span className="sm">Why: {e.reason}</span> : null}
+      {e.scope ? (
+        <span className="sm" data-testid="scope-terms">
+          Additional scope · needs {e.scope.daysRequired} more day{e.scope.daysRequired === 1 ? '' : 's'}
+          {e.scope.dueOn ? ` · payment due ${new Date(`${e.scope.dueOn}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' })}` : ''}
+          {e.status === 'APPROVED' ? ' · the project is on hold until it is paid' : ''}
+        </span>
+      ) : null}
       <div className="tscroll">
         <table className="tbl" aria-label={`Extra work ${e.number}`}>
           <tbody>

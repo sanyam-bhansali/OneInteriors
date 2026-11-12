@@ -6,6 +6,7 @@ import 'server-only';
  * (studio/access.ts `memberOnProject`). Nobody is messaged outside the app.
  */
 
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { memberOnProject } from '@/modules/studio/access';
 import { recordEvent, type ProjectActor } from '@/modules/project/events';
@@ -72,7 +73,7 @@ export async function holdView(projectId: string, now = new Date()): Promise<Hol
     canAsk: write && access.may('design.work'),
     canApprove: write && mayApproveHold(member),
     canEnd: write && open !== null && mayEndHold(member, open),
-    reasons: (Object.keys(HOLD_REASONS) as HoldReason[]).map((key) => ({ key, label: HOLD_REASONS[key] })),
+    reasons: (Object.keys(HOLD_REASONS) as HoldReason[]).filter((key) => key !== 'ADDITIONAL_SCOPE').map((key) => ({ key, label: HOLD_REASONS[key] })),
   };
 }
 
@@ -150,41 +151,57 @@ export async function endHold(projectId: string, holdId: string, now = new Date(
   await prisma.$transaction(async (tx) => {
     const { count } = await tx.homeProjectHold.updateMany({ where: { id: holdId, status: 'ON' }, data: { status: 'ENDED', endedOn: dayToDb(today), endedById: member.userId, shiftedDays: days } });
     if (count !== 1) return;
-    const rows = await tx.homeProjectStage.findMany({
-      where: { projectId },
-      orderBy: { sortOrder: 'asc' },
-      select: { id: true, kind: true, name: true, plannedStart: true, plannedEnd: true, actualEnd: true, items: { select: { id: true, plannedOn: true, doneAt: true } } },
-    });
-    const stages: RuleStage[] = rows.map((s) => ({ id: s.id, kind: s.kind as StageKind, name: s.name, plannedStart: istDay(s.plannedStart), plannedEnd: istDay(s.plannedEnd), actualEnd: s.actualEnd ? istDay(s.actualEnd) : null }));
-    const steps = rows.flatMap((s) => s.items.map((i) => ({ id: i.id, stageId: s.id, plannedOn: i.plannedOn ? dayFromDb(i.plannedOn) : null, done: i.doneAt !== null })));
-    const shift = holdEndShift(stages, steps, days);
-    for (const m of shift.steps) await tx.homeChecklistItem.update({ where: { id: m.id }, data: { plannedOn: dayToDb(m.to) } });
-    if (shift.plan) {
-      const current = shift.plan.stages[0]!.stageId;
-      for (const s of shift.plan.stages) {
-        await tx.homeProjectStage.update({ where: { id: s.stageId }, data: { plannedStart: dayToDb(s.plannedStart), plannedEnd: dayToDb(s.plannedEnd) } });
-        const was = stages.find((x) => x.id === s.stageId)!;
-        // The stage under way's steps moved above, by the exact days; a later stage's steps move with it.
-        if (s.stageId !== current) await shiftStepsWithStage(tx, s.stageId, { start: was.plannedStart, end: was.plannedEnd }, { start: s.plannedStart, end: s.plannedEnd });
-      }
-      const label = isHoldReason(hold.reason) ? HOLD_REASONS[hold.reason].toLowerCase() : 'client side';
-      const note = `On hold ${days} day${days === 1 ? '' : 's'} (${label}).`;
-      let leadId: string | null = null;
-      for (const r of shift.plan.rows) {
-        const row = await tx.homeProjectDateChange.create({
-          data: { projectId, stageId: r.stageId, field: r.field, fromDate: dayToDb(r.from), toDate: dayToDb(r.to), reason: 'CUSTOMER_CHANGE', note, byId: member.userId, at: now },
-          select: { id: true },
-        });
-        leadId ??= row.id;
-      }
-      await recordEvent(tx, { projectId, type: 'date.moved', actor, refId: leadId, payload: { stageId: current, field: shift.plan.rows[0]!.field, days, rows: shift.plan.rows.length, reason: 'CUSTOMER_CHANGE', customer: true, holdId }, at: now });
-    }
-    await recordEvent(tx, { projectId, type: 'project.hold_ended', actor, refId: holdId, payload: { days, steps: shift.steps.length }, at: now });
+    const label = isHoldReason(hold.reason) ? HOLD_REASONS[hold.reason].toLowerCase() : 'client side';
+    const steps = await shiftPlanForClient(tx, { projectId, days, note: `On hold ${days} day${days === 1 ? '' : 's'} (${label}).`, byId: member.userId, actor, now, ref: { holdId } });
+    await recordEvent(tx, { projectId, type: 'project.hold_ended', actor, refId: holdId, payload: { days, steps }, at: now });
   });
   return {
     ok: true,
     message: days > 0 ? `Off hold after ${days} day${days === 1 ? '' : 's'}. The open steps, the stage under way and handover moved ${days} day${days === 1 ? '' : 's'} later, on the client's side.` : 'Off hold. It was on hold less than a day, so no date moved.',
   };
+}
+
+/**
+ * Moves the plan later by `days` on the client's side (a hold taken off,
+ * additional scope paid): the open steps of the stage under way by exactly
+ * the days, its end and every later stage (handover included), filed as
+ * CUSTOMER_CHANGE so it never counts as our delay. Inside the caller's
+ * transaction. The number of steps moved.
+ */
+export async function shiftPlanForClient(
+  tx: Prisma.TransactionClient,
+  input: { projectId: string; days: number; note: string; byId: string; actor: ProjectActor; now: Date; ref: Record<string, string> },
+): Promise<number> {
+  const { projectId, days, now } = input;
+  if (days <= 0) return 0;
+  const rows = await tx.homeProjectStage.findMany({
+    where: { projectId },
+    orderBy: { sortOrder: 'asc' },
+    select: { id: true, kind: true, name: true, plannedStart: true, plannedEnd: true, actualEnd: true, items: { select: { id: true, plannedOn: true, doneAt: true } } },
+  });
+  const stages: RuleStage[] = rows.map((s) => ({ id: s.id, kind: s.kind as StageKind, name: s.name, plannedStart: istDay(s.plannedStart), plannedEnd: istDay(s.plannedEnd), actualEnd: s.actualEnd ? istDay(s.actualEnd) : null }));
+  const steps = rows.flatMap((s) => s.items.map((i) => ({ id: i.id, stageId: s.id, plannedOn: i.plannedOn ? dayFromDb(i.plannedOn) : null, done: i.doneAt !== null })));
+  const shift = holdEndShift(stages, steps, days);
+  for (const m of shift.steps) await tx.homeChecklistItem.update({ where: { id: m.id }, data: { plannedOn: dayToDb(m.to) } });
+  if (shift.plan) {
+    const current = shift.plan.stages[0]!.stageId;
+    for (const s of shift.plan.stages) {
+      await tx.homeProjectStage.update({ where: { id: s.stageId }, data: { plannedStart: dayToDb(s.plannedStart), plannedEnd: dayToDb(s.plannedEnd) } });
+      const was = stages.find((x) => x.id === s.stageId)!;
+      // The stage under way's steps moved above, by the exact days; a later stage's steps move with it.
+      if (s.stageId !== current) await shiftStepsWithStage(tx, s.stageId, { start: was.plannedStart, end: was.plannedEnd }, { start: s.plannedStart, end: s.plannedEnd });
+    }
+    let leadId: string | null = null;
+    for (const r of shift.plan.rows) {
+      const row = await tx.homeProjectDateChange.create({
+        data: { projectId, stageId: r.stageId, field: r.field, fromDate: dayToDb(r.from), toDate: dayToDb(r.to), reason: 'CUSTOMER_CHANGE', note: input.note, byId: input.byId, at: now },
+        select: { id: true },
+      });
+      leadId ??= row.id;
+    }
+    await recordEvent(tx, { projectId, type: 'date.moved', actor: input.actor, refId: leadId, payload: { stageId: current, field: shift.plan.rows[0]!.field, days, rows: shift.plan.rows.length, reason: 'CUSTOMER_CHANGE', customer: true, ...input.ref }, at: now });
+  }
+  return shift.steps.length;
 }
 
 /** The projects of these ids that are on hold now (for lists that count lateness). */
