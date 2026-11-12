@@ -22,6 +22,8 @@ import { broughtInOf } from '@/modules/studio-bring-in/bring-in';
 /* Studio OS Phase 2: the design phase (modules/studio-design). */
 import { DesignTab as DesignSection } from './DesignTab';
 import { currentMember } from '@/modules/studio/access';
+import { holdView } from '@/modules/studio-hold/store';
+import { HoldCard } from './HoldCard';
 import { SITE_HOME, mayOpen } from '@/modules/studio/surfaces';
 /* Studio OS Phase 3: the site crews' work orders (modules/studio-crews). */
 import { CrewsTab as CrewsSection } from './CrewsTab';
@@ -113,6 +115,8 @@ export default async function ProjectWorkspacePage({
   ]);
   /* Change orders and sign-offs: null for those who do not see the project's money. */
   const [extras, signoffs] = await Promise.all([extrasForStudio(w.id).catch(() => null), signoffsForStudio(w.id).catch(() => null)]);
+  /* A project on hold (owner, 12 Nov 2026): ask, approve, take off. */
+  const hold = await holdView(w.id, now).catch(() => null);
   const closureOpen = closure !== null && life !== null && life.phase !== 'DESIGN' && life.phase !== 'PRE_EXECUTION' && life.phase !== 'EXECUTION';
   // Studio OS Phase 3: Crews for those who see work orders (owner, PM, accounts; a designer on their project since the lifecycle).
   const crews = viewer === null || roleCan(viewer, 'workorder.read', { assigned: true });
@@ -219,6 +223,8 @@ export default async function ProjectWorkspacePage({
           canResend={w.canInvite}
         />
       ) : null}
+
+      {hold ? <HoldCard view={hold} customer={w.customerFirst} /> : null}
 
       {broughtIn ? (
         <p className="muted sm" style={{ margin: 0 }}>

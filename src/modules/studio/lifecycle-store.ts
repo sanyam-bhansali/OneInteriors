@@ -1,4 +1,5 @@
 import 'server-only';
+import { HOLD_REASONS } from '@/modules/studio-hold/rules';
 
 /**
  * The project lifecycle board (owner, 13 Oct 2026; docs/studio-os/PROJECT-LIFECYCLE.md):
@@ -81,6 +82,8 @@ export interface LifecycleBoard {
 }
 
 const SELECT = {
+  /* On hold (owner, 12 Nov 2026): not late, and the blocker says so. */
+  holds: { where: { status: 'ON' }, take: 1, select: { reason: true } },
   priority: true,
   category: true,
   id: true,
@@ -187,6 +190,7 @@ function cardOf(p: Row, now: Date, seesMoney: boolean): BoardCard {
     phase,
     phaseLabel: PHASE_LABEL[phase],
     ...view,
+    ...(p.holds?.length ? { lateDays: 0, blocker: { side: 'client' as const, text: `On hold: ${(HOLD_REASONS as Record<string, string>)[p.holds[0]!.reason]?.toLowerCase() ?? 'client side'}` } } : {}),
     warrantyEndsOn,
     provisionalOn: p.provisionalHandoverAt ? istDay(p.provisionalHandoverAt) : null,
     snags: shown.map(({ s, st }) => ({ id: s.id, title: s.title, room: s.room, warranty: s.warranty, state: st.state, fixBy: s.fixBy ? istDay(s.fixBy) : null })),

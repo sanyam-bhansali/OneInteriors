@@ -232,6 +232,8 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       moodBoardNote: true,
       designer: { select: { id: true, user: { select: { name: true, phone: true } } } },
       ...GATE_SELECT,
+      /* On hold (owner, 12 Nov 2026): nothing counts as late. */
+      holds: { where: { status: 'ON' }, take: 1, select: { id: true } },
       introduction: {
         select: {
           studioId: true,
@@ -289,6 +291,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
   const customerFirst = firstName(brief.contactName || brief.user?.name);
   const studio = p.introduction.studio.tradeName;
   const today = istDay(now);
+  const onHold = (p.holds?.length ?? 0) > 0;
   const stage = p.stages[0] ?? null;
   const items = stage?.items ?? [];
   const gates = gateStagesOf(p);
@@ -348,7 +351,7 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
       done,
       doneOn: i.doneAt ? istDay(i.doneAt) : null,
       plannedOn,
-      lateDays: i.inScope && !lockedBy ? lateDays({ plannedOn, done }, today) : 0,
+      lateDays: i.inScope && !lockedBy && !onHold ? lateDays({ plannedOn, done }, today) : 0,
       sharePct: i.inScope && stageBp > 0 ? Math.round(((progress.weights.get(i.id) ?? 0) * 1000) / stageBp) / 10 : 0,
       doneNote: i.doneNote,
       beforeJoining: i.doneSource === 'BEFORE_JOINING',
@@ -376,8 +379,9 @@ export async function designForStudio(projectId: string, now = new Date()): Prom
   });
   const lastOpen = [...steps].reverse().find((s) => s.inScope && !s.done && s.plannedOn);
   const stageEnd = stage ? dayFromDb(stage.plannedEnd) : null;
-  const overrunDays =
-    lastOpen?.plannedOn && stageEnd && lastOpen.plannedOn > stageEnd
+  const overrunDays = onHold
+    ? 0
+    : lastOpen?.plannedOn && stageEnd && lastOpen.plannedOn > stageEnd
       ? Math.round((Date.parse(lastOpen.plannedOn) - Date.parse(stageEnd)) / 86_400_000)
       : 0;
 
@@ -542,6 +546,8 @@ export async function designWorkload(now = new Date()): Promise<DesignWorkload |
       id: true,
       designerId: true,
       ...GATE_SELECT,
+      /* On hold (owner, 12 Nov 2026): nothing counts as late. */
+      holds: { where: { status: 'ON' }, take: 1, select: { id: true } },
       introduction: { select: { brief: { select: { society: true, locality: true, propertyType: true, contactName: true, user: { select: { name: true } } } } } },
       stages: {
         where: { kind: 'DESIGN' },
@@ -565,7 +571,7 @@ export async function designWorkload(now = new Date()): Promise<DesignWorkload |
     const steps = items.map((i, k) => ({ ...i, done: i.doneAt !== null, plannedOn: i.plannedOn ? dayFromDb(i.plannedOn) : null, lockedBy: locks[k] ?? null }));
     const progress = progressOf(steps.map((i) => ({ id: i.id, stageId: 'd', weightBp: i.weightBp, inScope: i.inScope, done: i.done })));
     const n = nextStep(steps);
-    const dl = dueAndLate(steps, today);
+    const dl = p.holds?.length ? { ...dueAndLate(steps, today), late: 0 } : dueAndLate(steps, today);
     return {
       designerId: p.designerId,
       row: {

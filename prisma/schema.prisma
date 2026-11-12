@@ -1808,6 +1808,7 @@ model HomeProject {
   measurements       HomeMeasurement[]
   designReviews      HomeDesignReview[]
   stepDelays         HomeStepDelay[]
+  holds              HomeProjectHold[]
 
   /// Studio OS Phase 3: the site crews' work orders. Internal: never in any
   /// customer projection.
@@ -5761,6 +5762,41 @@ model HomeStepDelay {
   @@index([projectId, at])
   @@index([stepId])
   @@map("home_step_delays")
+}
+
+/// A project on hold (owner, 12 Nov 2026: "if the client ghosts or needs
+/// time or possession is late"): a designer (or anyone doing design work)
+/// asks with a reason; the design head or the owner approves (or declines).
+/// While it is on, nothing on the project counts as late. When it is taken
+/// off (the one who asked, the design head or the owner), every open step,
+/// stage and handover moves later by the days it was on hold, filed as the
+/// client's side (home_project_date_changes), never our delay. `status`:
+/// ASKED → ON → ENDED, or ASKED → DECLINED / WITHDRAWN. One open (ASKED or
+/// ON) per project at a time. The customer sees "on hold" and the reason in
+/// plain words, never `note`.
+model HomeProjectHold {
+  id        String      @id @default(cuid())
+  projectId String
+  project   HomeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status    String      @default("ASKED")
+  /// CLIENT_NOT_RESPONDING | CLIENT_NEEDS_TIME | POSSESSION_LATE | OTHER (studio-hold/rules.ts).
+  reason    String
+  /// The team's words. Internal: NEVER crosses.
+  note      String?     @db.Text
+  askedById String
+  askedAt   DateTime    @default(now())
+  /// Who approved or declined, and when.
+  decidedById String?
+  decidedAt   DateTime?
+  /// The IST day the hold started (approved) and ended (taken off).
+  startedOn DateTime? @db.Date
+  endedOn   DateTime? @db.Date
+  endedById String?
+  /// Days the plan moved when it ended.
+  shiftedDays Int?
+
+  @@index([projectId, askedAt])
+  @@map("home_project_holds")
 }
 
 // ─────────────────────────────────────────────────────────────

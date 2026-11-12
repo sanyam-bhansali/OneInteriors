@@ -12,6 +12,13 @@ export const project = {
     hi: '{studio} डिज़ाइन का हर काम पूरा करता है, तो यह बढ़ता है।',
     mr: '{studio} डिझाइनचे प्रत्येक काम पूर्ण करतो तसे हे वाढते.',
   },
+  /* On hold (owner, 12 Nov 2026): since when and why, politely; never the studio's note. */
+  'project.hold.title': { en: 'On hold since {date}', hi: '{date} से रुका हुआ', mr: '{date} पासून थांबवले' },
+  'project.hold.CLIENT_NOT_RESPONDING': { en: 'Waiting to hear from you.', hi: 'आपके जवाब का इंतज़ार है।', mr: 'तुमच्या उत्तराची वाट आहे.' },
+  'project.hold.CLIENT_NEEDS_TIME': { en: 'Paused while you take the time you need.', hi: 'आपको जितना समय चाहिए, तब तक रुका है।', mr: 'तुम्हाला हवा तेवढा वेळ घ्या, तोपर्यंत थांबवले आहे.' },
+  'project.hold.POSSESSION_LATE': { en: 'Waiting for possession of your flat.', hi: 'आपके फ़्लैट के पज़ेशन का इंतज़ार है।', mr: 'तुमच्या फ्लॅटच्या ताब्याची वाट आहे.' },
+  'project.hold.OTHER': { en: 'Paused on your side.', hi: 'आपकी ओर से रुका है।', mr: 'तुमच्या बाजूने थांबवले आहे.' },
+  'project.hold.body': { en: 'The plan picks up from here when it restarts.', hi: 'दोबारा शुरू होने पर योजना यहीं से आगे बढ़ेगी।', mr: 'पुन्हा सुरू झाल्यावर योजना इथूनच पुढे जाईल.' },
   'project.wholePlan': { en: 'See the whole plan', hi: 'पूरी योजना देखें', mr: 'संपूर्ण योजना पहा' },
   'project.wholePlan.design': {
     en: 'Every stage after design, site, snags and all payments',

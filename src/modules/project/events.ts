@@ -100,6 +100,12 @@ export const PROJECT_EVENT_TYPES = [
   'project.replaced',
   // "Add an existing project" (docs/studio-os/BRING-IN-PROJECTS.md): a running project brought onto One Interiors
   'project.brought_in',
+  // A project on hold (owner, 12 Nov 2026; studio-hold/): asked, approved (on), declined, withdrawn, taken off
+  'project.hold_asked',
+  'project.hold_started',
+  'project.hold_declined',
+  'project.hold_withdrawn',
+  'project.hold_ended',
   // Studio OS Phase 2 (docs/studio-os/PHASE-2-DESIGN.md): design
   'designer.assigned',
   'design.ticked',

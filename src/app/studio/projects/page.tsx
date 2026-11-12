@@ -252,8 +252,9 @@ function Card({ r, money, own }: { r: WorkspaceRow; money: boolean; own: boolean
   const prog = r.stages.length ? Math.round((done / r.stages.length) * 100) : 0;
   /* The client's days are never shown as our delay (owner, 12 Nov 2026): late counts our days only. */
   const ourLate = Math.max(0, r.lateDays - r.customerLateDays);
-  const health =
-    ourLate > 0
+  const health = r.onHold
+    ? { cls: 'warn', text: 'On hold' }
+    : ourLate > 0
       ? { cls: 'bad', text: `${ourLate} day${ourLate === 1 ? '' : 's'} late` }
       : { cls: 'good', text: handedOver ? 'Done' : 'On track' };
   const today = handedOver

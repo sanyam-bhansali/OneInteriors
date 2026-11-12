@@ -108,6 +108,8 @@ export interface WorkspaceRow {
   started: boolean;
   /** Today's latest update, or null when nothing is posted yet today. */
   postedToday: Date | null;
+  /** On hold (owner, 12 Nov 2026): shown as on hold, never late. */
+  onHold?: boolean;
   lateDays: number;
   /** Of `lateDays`, the customer's (their changes, late decisions): shown, not counted against the studio. */
   customerLateDays: number;
