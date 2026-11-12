@@ -296,13 +296,19 @@ export async function tickDesignStep(
         shift = await shiftAfterLateTick(tx, { projectId, stepId: step.id, label: step.label, side: late.delay.side, today: istDay(now), byId: check.member.userId, actor, now });
         // What it moved, so an untick can put it back (owner, 12 Nov 2026).
         undo = { lateDays: late.delay.days, side: late.delay.side, delayId: delay.id, shift: { ...shift } };
+      } else if (!held && plannedDay && plannedDay > istDay(now)) {
+        // Done before its day (owner, 12 Nov 2026): the later steps, the design's end and handover come forward.
+        shift = await shiftAfterLateTick(tx, { projectId, stepId: step.id, label: step.label, side: 'EARLY', today: istDay(now), byId: check.member.userId, actor, now });
+        if (shift.days !== 0) undo = { side: 'EARLY', shift: { ...shift } };
       }
       await recordEvent(tx, { projectId, type: 'design.ticked', actor, refId: step.id, at: now, payload: { file: docId !== null, ...undo } as EventPayload });
       const settled = await settleStageAfterTicks(tx, projectId, step.stageId, actor, now);
       await settleDesignPhase(tx, projectId, actor, now);
       return settled;
     });
-    const movedWords = late.delay
+    const movedWords = !late.delay && shift && shift.days < 0
+      ? ` Done early: the steps after it, the design's end and handover came forward ${-shift.days} day${shift.days === -1 ? '' : 's'}.`
+      : late.delay
       ? ` ${shift?.movedSteps.length ? 'The steps after it, the' : 'The'} design's end and handover moved ${late.delay.days} day${late.delay.days === 1 ? '' : 's'} later${late.delay.side === 'CLIENT' ? ": the client's delay, not counted as ours" : ''}.`
       : '';
     if (share && stored) tell(p.introduction.brief.userId, p.introduction.studio.tradeName, step.label);
@@ -345,7 +351,7 @@ export async function untickDesignStep(projectId: string, stepId: string, rawRea
       data: { doneAt: null, doneById: null, doneSource: null, doneSiteLogId: null, donePhotoId: null, doneNote: null, doneDocumentId: null },
     });
     if (count !== 1) throw new Refused('Someone unticked it already. Reload the page.');
-    if (undo && undo.days > 0) {
+    if (undo && undo.days !== 0) {
       const steps = stage.items.map((i) => ({ id: i.id, plannedOn: i.plannedOn ? dayFromDb(i.plannedOn) : null, done: i.doneAt !== null && i.id !== step.id }));
       for (const m of untickStepMoves(steps, undo)) await tx.homeChecklistItem.update({ where: { id: m.id }, data: { plannedOn: dayToDb(m.to) } });
       if (undo.planMoved) {
@@ -358,8 +364,8 @@ export async function untickDesignStep(projectId: string, stepId: string, rawRea
             const was = stages.find((x) => x.id === sMove.stageId)!;
             if (was.kind !== 'DESIGN') await shiftStepsWithStage(tx, sMove.stageId, { start: was.plannedStart, end: was.plannedEnd }, { start: sMove.plannedStart, end: sMove.plannedEnd });
           }
-          const reason = undo.side === 'CLIENT' ? 'CUSTOMER_CHANGE' : 'STUDIO';
-          const note = `“${step.label}” unticked: its late tick's ${undo.days} day${undo.days === 1 ? '' : 's'} put back.`;
+          const reason = undo.side === 'CLIENT' ? 'CUSTOMER_CHANGE' : undo.side === 'STUDIO' ? 'STUDIO' : 'OTHER';
+          const note = `“${step.label}” unticked: its ${undo.side === 'EARLY' ? 'early' : 'late'} tick's ${Math.abs(undo.days)} day${Math.abs(undo.days) === 1 ? '' : 's'} put back.`;
           let leadId: string | null = null;
           for (const r of plan.rows) {
             const row = await tx.homeProjectDateChange.create({
@@ -387,7 +393,8 @@ export async function untickDesignStep(projectId: string, stepId: string, rawRea
     },
   );
   if (refused) return { ok: false, error: refused };
-  const back = undo && undo.days > 0 ? ` The dates it moved went back ${undo.days} day${undo.days === 1 ? '' : 's'}, and its ${undo.side === 'CLIENT' ? "client's" : 'our'} delay is removed.` : '';
+  const n = Math.abs(undo?.days ?? 0);
+  const back = undo && undo.days !== 0 ? ` The dates it moved went back ${n} day${n === 1 ? '' : 's'}${undo.side === 'EARLY' ? '' : `, and its ${undo.side === 'CLIENT' ? "client's" : 'our'} delay is removed`}.` : '';
   return { ok: true, message: `Unticked: ${step.label}.${back} The client sees it as not done; its sentence and file stay in the history.` };
 }
 
