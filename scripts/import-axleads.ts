@@ -4,7 +4,7 @@
  *
  *     npx tsx scripts/import-axleads.ts --file hauspire-export.json --studio <slug> --dry-run
  *     npx tsx scripts/import-axleads.ts --file hauspire-export.json --studio <slug> [--roles roles.json]
- *     npx tsx scripts/import-axleads.ts --file hauspire-export.json --studio <slug> --refresh [--dry-run]
+ *     npx tsx scripts/import-axleads.ts --file hauspire-export.json --studio <slug> --refresh [--keep-owners] [--dry-run]
  *
  * The file is AxLeads' `scripts/export-tenant.mjs` output. The database is
  * DATABASE_URL from the environment — this script loads no .env file, so it
@@ -55,8 +55,10 @@ async function main() {
   const rolesFile = arg('roles');
   const dryRun = process.argv.includes('--dry-run');
   const refresh = process.argv.includes('--refresh');
+  /* With --refresh: a lead nobody has on AxLeads keeps its salesperson here (owner, 12 Nov 2026). */
+  const keepOwners = process.argv.includes('--keep-owners');
   if (!file || !slug) {
-    console.error('Usage: npx tsx scripts/import-axleads.ts --file <export.json> --studio <slug> [--dry-run] [--refresh] [--roles roles.json]');
+    console.error('Usage: npx tsx scripts/import-axleads.ts --file <export.json> --studio <slug> [--dry-run] [--refresh [--keep-owners]] [--roles roles.json]');
     process.exit(1);
   }
   const url = process.env.DATABASE_URL;
@@ -92,7 +94,7 @@ async function main() {
     }
 
     const started = Date.now();
-    const { plan, blocked, written } = await runImport(prisma, { studioId: studio.id, ax: parsed.data, choices: choices.choices, dryRun, refresh });
+    const { plan, blocked, written } = await runImport(prisma, { studioId: studio.id, ax: parsed.data, choices: choices.choices, dryRun, refresh, keepOwners });
     console.log(formatReport(plan.report, { tenant: parsed.data.tenant.name, studio: `${studio.tradeName} (${slug})`, dryRun }));
 
     if (!written) {
