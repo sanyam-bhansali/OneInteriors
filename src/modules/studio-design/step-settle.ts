@@ -11,7 +11,7 @@ import 'server-only';
  */
 
 import type { Prisma } from '@prisma/client';
-import { recordEvent, type ProjectActor } from '@/modules/project/events';
+import { recordEvent, type EventPayload, type ProjectActor } from '@/modules/project/events';
 import { applyPhaseEvent } from '@/modules/project/lifecycle';
 import { settleStageAfterTicks, shiftStepsWithStage } from '@/modules/project/stage-settle';
 import type { RuleStage, StageKind } from '@/modules/project/project-rules';
@@ -36,14 +36,19 @@ export async function settleDesignPhase(tx: Prisma.TransactionClient, projectId:
   }
 }
 
-/**
- * Has this step been ticked before (and unticked since)? Then the first
- * tick's answer stands (owner, 12 Nov 2026): a re-tick asks nothing and
- * moves nothing again.
- */
-export async function tickedBefore(db: Prisma.TransactionClient, projectId: string, stepId: string): Promise<boolean> {
-  const e = await db.homeProjectEvent.findFirst({ where: { projectId, type: 'design.ticked', refId: stepId }, select: { id: true } });
-  return e !== null;
+/** Is the project on hold (studio-hold/)? A tick then asks nothing and moves nothing: the hold moves the dates when it ends. */
+export async function projectOnHold(db: Prisma.TransactionClient, projectId: string): Promise<boolean> {
+  return (await db.homeProjectHold.count({ where: { projectId, status: 'ON' } })) > 0;
+}
+
+/** What a late tick moved, kept on its `design.ticked` event so an untick can put it back (owner, 12 Nov 2026). */
+export interface TickShift {
+  /** Days late; every move below was by these days. */
+  days: number;
+  /** The later open steps moved. */
+  movedSteps: string[];
+  /** Whether the design's end and later stages moved. */
+  planMoved: boolean;
 }
 
 /**
@@ -52,20 +57,20 @@ export async function tickedBefore(db: Prisma.TransactionClient, projectId: stri
  * design's end and every later stage of the plan, handover included. The
  * plan's moves are filed as the client's change or our delay, so the
  * studio's counts leave out the client's days. Inside the caller's
- * transaction. The number of steps moved.
+ * transaction. What moved.
  */
 export async function shiftAfterLateTick(
   tx: Prisma.TransactionClient,
   input: { projectId: string; stepId: string; label: string; side: DelaySideName; today: string; byId: string; actor: ProjectActor; now: Date },
-): Promise<number> {
+): Promise<TickShift> {
   const stage = await tx.homeProjectStage.findFirst({
     where: { projectId: input.projectId, kind: 'DESIGN' },
     select: { items: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], select: { id: true, plannedOn: true, doneAt: true } } },
   });
-  if (!stage) return 0;
+  if (!stage) return { days: 0, movedSteps: [], planMoved: false };
   const steps = stage.items.map((i) => ({ id: i.id, plannedOn: i.plannedOn ? dayFromDb(i.plannedOn) : null, done: i.doneAt !== null && i.id !== input.stepId }));
   const shift = lateTickShift(steps, input.stepId, input.today);
-  if (shift.days <= 0) return 0;
+  if (shift.days <= 0) return { days: 0, movedSteps: [], planMoved: false };
   for (const m of shift.moves) await tx.homeChecklistItem.update({ where: { id: m.id }, data: { plannedOn: dayToDb(m.to) } });
 
   const rows = await tx.homeProjectStage.findMany({
@@ -101,7 +106,7 @@ export async function shiftAfterLateTick(
       at: input.now,
     });
   }
-  return shift.moves.length;
+  return { days: shift.days, movedSteps: shift.moves.map((m) => m.id), planMoved: plan !== null };
 }
 
 /**
@@ -128,7 +133,7 @@ export async function tickApprovalStep(tx: Prisma.TransactionClient, projectId: 
     select: { id: true, stageId: true, label: true, plannedOn: true, responsible: true },
   });
   if (!step) return false;
-  const again = (await tickedBefore(tx, projectId, step.id)) || (await tx.homeProjectHold.count({ where: { projectId, status: 'ON' } })) > 0;
+  const held = await projectOnHold(tx, projectId);
   const { count } = await tx.homeChecklistItem.updateMany({
     where: { id: step.id, doneAt: null },
     data: { doneAt: now, doneById: userId, doneSource: 'TICK', doneNote: 'Approved by the client in the app.' },
@@ -136,15 +141,17 @@ export async function tickApprovalStep(tx: Prisma.TransactionClient, projectId: 
   if (count !== 1) return false;
   const actor: ProjectActor = { type: 'CUSTOMER', id: userId };
   const planned = step.plannedOn ? dayFromDb(step.plannedOn) : null;
-  const late = again ? null : lateTickCheck({ plannedOn: planned, responsible: 'CLIENT' }, istDay(now), null);
-  let shifted = 0;
+  const late = held ? null : lateTickCheck({ plannedOn: planned, responsible: 'CLIENT' }, istDay(now), null);
+  let undo: Record<string, unknown> = {};
   if (late?.ok && late.delay && planned) {
-    await tx.homeStepDelay.create({
+    const delay = await tx.homeStepDelay.create({
       data: { projectId, stepId: step.id, fromDate: dayToDb(planned), toDate: dayToDb(istDay(now)), side: 'CLIENT', reason: late.delay.reason, note: null, byId: userId },
+      select: { id: true },
     });
-    shifted = await shiftAfterLateTick(tx, { projectId, stepId: step.id, label: step.label, side: 'CLIENT', today: istDay(now), byId: userId, actor, now });
+    const shift = await shiftAfterLateTick(tx, { projectId, stepId: step.id, label: step.label, side: 'CLIENT', today: istDay(now), byId: userId, actor, now });
+    undo = { lateDays: late.delay.days, side: 'CLIENT', delayId: delay.id, shift };
   }
-  await recordEvent(tx, { projectId, type: 'design.ticked', actor, refId: step.id, at: now, payload: { file: false, approval: kind, ...(late?.ok && late.delay ? { lateDays: late.delay.days, side: 'CLIENT', shifted } : {}) } });
+  await recordEvent(tx, { projectId, type: 'design.ticked', actor, refId: step.id, at: now, payload: { file: false, approval: kind, ...undo } as EventPayload });
   await settleStageAfterTicks(tx, projectId, step.stageId, actor, now);
   await settleDesignPhase(tx, projectId, actor, now);
   return true;

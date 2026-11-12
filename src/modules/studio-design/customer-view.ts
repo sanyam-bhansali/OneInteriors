@@ -43,7 +43,9 @@ export const CUSTOMER_DESIGN_SELECT = {
   /* The customer's own answers: verdict, their words, when. Never `byUserId`. */
   designReviews: { orderBy: { at: 'asc' }, select: { documentId: true, verdict: true, comment: true, at: true } },
   /* Which step moved, to when, and why (a key read as plain words). Never `note` or `byId`. */
-  stepDelays: { orderBy: { at: 'asc' }, select: { stepId: true, fromDate: true, toDate: true, reason: true, side: true } },
+  stepDelays: { orderBy: { at: 'asc' }, select: { id: true, stepId: true, fromDate: true, toDate: true, reason: true, side: true } },
+  /* Delays voided by an untick (owner, 12 Nov 2026): their ids only. */
+  events: { where: { type: 'design.delay_voided' }, select: { refId: true } },
 } satisfies Prisma.HomeProjectSelect;
 
 export interface DesignStepRow {
@@ -81,7 +83,8 @@ export interface DesignRow {
   siteVisits?: readonly { id?: string; at: Date; purpose: string; status: string; clientAnswer?: string | null; clientReason?: string | null }[];
   measurements?: readonly { room: string; lengthMm: number | null; widthMm: number | null; heightMm: number | null }[];
   designReviews?: readonly { documentId: string; verdict: string; comment: string | null; at: Date }[];
-  stepDelays?: readonly { stepId: string; fromDate?: Date; toDate: Date; reason: string; side?: string }[];
+  stepDelays?: readonly { id?: string; stepId: string; fromDate?: Date; toDate: Date; reason: string; side?: string }[];
+  events?: readonly { refId: string | null }[];
 }
 
 export interface CustomerDesignStep {
@@ -183,8 +186,10 @@ export function toCustomerDesign(
   if (!stage) return null;
   const live = (stage.items ?? []).filter((i) => i.inScope !== false);
   const progress = progressOf(live.map((i, k) => ({ id: String(k), stageId: 'design', weightBp: i.weightBp, inScope: true, done: i.doneAt !== null })));
+  const voidedIds = new Set((row.events ?? []).map((e) => e.refId));
+  const delays = (row.stepDelays ?? []).filter((d) => !d.id || !voidedIds.has(d.id));
   const movedById = new Map<string, string>();
-  for (const d of row.stepDelays ?? []) if (isDelayReasonKey(d.reason)) movedById.set(d.stepId, CUSTOMER_REASON[d.reason]);
+  for (const d of delays) if (isDelayReasonKey(d.reason)) movedById.set(d.stepId, CUSTOMER_REASON[d.reason]);
   /*
    * The design process (owner and Hauspire's design team, 24 Oct 2026;
    * DESIGN-PROCESS-PLAN.md Decision 11): the client sees every step, never a
@@ -261,7 +266,7 @@ export function toCustomerDesign(
     next: nextMilestone ? { ...nextMilestone, waitingFor: waitingFor ?? nextMilestone.waitingFor } : null,
     waitingFor,
     yourStep: nowStep?.yours ? nowStep.label : null,
-    clientDelayDays: (row.stepDelays ?? [])
+    clientDelayDays: delays
       .filter((d) => d.side === 'CLIENT' && d.fromDate)
       .reduce((sum, d) => sum + Math.max(0, daysBetween(dayFromDb(d.fromDate!), dayFromDb(d.toDate))), 0),
     moodBoard: { shared: Boolean(row.moodBoardSharedAt), sharedOn: isoDay(row.moodBoardSharedAt), note: row.moodBoardSharedAt ? (row.moodBoardNote ?? null) : null },

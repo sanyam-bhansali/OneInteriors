@@ -244,6 +244,9 @@ export async function untickStep(projectId: string, stepId: string, now = new Da
   const { step } = await stepOn(projectId, stepId);
   if (!step) return { ok: false, error: GONE };
   if (step.doneAt === null) return { ok: true, message: 'Already open.' };
+  // A design step's untick undoes its tick and asks why (owner, 12 Nov 2026): on the Design tab.
+  const kind = await prisma.homeProjectStage.findFirst({ where: { id: step.stageId }, select: { kind: true } });
+  if (kind?.kind === 'DESIGN') return { ok: false, error: 'Untick a design step on the Design tab: it asks why and puts back the dates the tick moved.' };
   const actor: ProjectActor = { type: 'STUDIO', id: check.member.userId };
   const outcome = await prisma.$transaction(async (tx) => {
     await tx.homeChecklistItem.update({

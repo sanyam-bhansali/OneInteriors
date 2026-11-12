@@ -398,6 +398,63 @@ export function lateTickPlanMove(stages: readonly RuleStage[], days: number, sid
   return r.ok ? r.plan : null;
 }
 
+// ── Unticking a design step (owner, 12 Nov 2026) ──────────────
+
+export const UNTICK_REASON_MAX = 300;
+
+/** An untick needs a short reason (owner, 12 Nov 2026), seen by the team only. */
+export function checkUntickReason(raw: unknown): { ok: true; reason: string } | { ok: false; error: string } {
+  const reason = typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim() : '';
+  if (reason.length < 3) return { ok: false, error: 'Say why you are unticking it, like "Ticked by mistake".' };
+  if (reason.length > UNTICK_REASON_MAX) return { ok: false, error: `Keep the reason under ${UNTICK_REASON_MAX} characters.` };
+  return { ok: true, reason };
+}
+
+/** What a late tick moved, as kept on its `design.ticked` event; null when it moved nothing (on time, on hold, or an older tick). */
+export interface TickUndo {
+  days: number;
+  side: DelaySideName;
+  delayId: string | null;
+  movedSteps: string[];
+  planMoved: boolean;
+}
+
+export function readTickUndo(payload: unknown): TickUndo | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const o = payload as Record<string, unknown>;
+  const shift = o.shift && typeof o.shift === 'object' ? (o.shift as Record<string, unknown>) : null;
+  const side = o.side === 'CLIENT' || o.side === 'STUDIO' ? o.side : null;
+  if (!side) return null;
+  const days = shift && typeof shift.days === 'number' ? shift.days : 0;
+  return {
+    days: Math.max(0, Math.round(days)),
+    side,
+    delayId: typeof o.delayId === 'string' ? o.delayId : null,
+    movedSteps: shift && Array.isArray(shift.movedSteps) ? shift.movedSteps.filter((x): x is string => typeof x === 'string') : [],
+    planMoved: shift?.planMoved === true,
+  };
+}
+
+/**
+ * Unticking puts back what the late tick moved: each step it moved that is
+ * still open goes back by the same days. A step ticked since stays where it
+ * is (its day is history now).
+ */
+export function untickStepMoves(steps: readonly StepDay[], undo: Pick<TickUndo, 'days' | 'movedSteps'>): { id: string; from: string; to: string }[] {
+  if (undo.days <= 0) return [];
+  const moved = new Set(undo.movedSteps);
+  return steps.filter((s) => moved.has(s.id) && !s.done && s.plannedOn).map((s) => ({ id: s.id, from: s.plannedOn!, to: addDays(s.plannedOn!, -undo.days) }));
+}
+
+/** The design's end and every later stage back by the late tick's days, filed with the same side so the two moves cancel out. */
+export function lateTickPlanUndo(stages: readonly RuleStage[], days: number, side: DelaySideName): StageMovePlan | null {
+  if (days <= 0) return null;
+  const design = stages.find((s) => s.kind === 'DESIGN');
+  if (!design) return null;
+  const r = planMove(stages, { stageId: design.id, field: 'PLANNED_END', to: addDays(design.plannedEnd, -days), reason: side === 'CLIENT' ? 'CUSTOMER_CHANGE' : 'STUDIO', shiftLater: true });
+  return r.ok ? r.plan : null;
+}
+
 /** Days a step is late on `today`: past its planned day and still open. 0 when not late. */
 export function lateDays(step: { plannedOn: string | null; done: boolean }, today: string): number {
   if (step.done || !step.plannedOn) return 0;

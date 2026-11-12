@@ -22,6 +22,7 @@ import {
   shareDrawing,
   shareMoodBoard,
   tickDesignStep,
+  untickDesignStep,
   uploadDrawing,
   type DesignResult,
 } from '@/modules/studio-design/design-flow';
@@ -58,6 +59,11 @@ export async function tickDesignStepAction(form: FormData): Promise<DesignResult
       fileOf(form.get('file')),
     ),
   );
+}
+
+export async function untickDesignStepAction(projectId: string, stepId: string, reason: string): Promise<DesignResult> {
+  const p = id(projectId);
+  return done(p, await untickDesignStep(p, id(stepId), text(reason, 400)));
 }
 
 export async function moveDesignStepAction(input: { projectId: string; stepId: string; to: string; reason: string; note: string }): Promise<DesignResult> {
