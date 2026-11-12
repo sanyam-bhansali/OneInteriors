@@ -22,7 +22,7 @@ import { BOARD_KINDS, CLOSED_KINDS } from '@/modules/studio-practice/vocabulary'
 import { istDay } from '@/modules/project/working-days';
 import { istDayEnd } from './ist-range';
 import { PAGE_SIZE, cursorOf, NOT_SET, without, withCustom, type Cursor, type LeadFilters, type SortKey } from './lead-filters';
-import { clockAt, keysetWhere, kpiRules, orderByFor, scopedLeadWhere } from './lead-where';
+import { clockAt, keysetWhere, kpiRules, orderByFor, scopedLeadWhere, SOCIETY_FIELD_KEY } from './lead-where';
 import { rawLeadFence, rawPoolFence } from './lead-sql';
 import { subtreeOf } from '@/modules/studio/sales-access';
 
@@ -557,7 +557,15 @@ export async function tagAndGroupFacets(
           GROUP BY tg ORDER BY n DESC, tg ASC LIMIT 200`,
       ),
       ...keys.map((key) =>
-        prisma.$queryRaw<{ value: string; n: number }[]>(
+        key === SOCIETY_FIELD_KEY
+          ? /* Society: the society record's name (typos merged), else the society as typed (lead-where.ts societyWhere). */
+            prisma.$queryRaw<{ value: string; n: number }[]>(
+              Prisma.sql`SELECT COALESCE(s.name, NULLIF(TRIM(c.society), ''), ${NOT_SET}) AS value, COUNT(*)::int AS n
+                FROM studio_clients c LEFT JOIN studio_societies s ON s.id = c."societyId"
+                WHERE c."studioId" = ${scope.studioId} AND c."deletedAt" IS NULL AND c."isDemo" = false ${fence}
+                GROUP BY 1 ORDER BY n DESC LIMIT 200`,
+            )
+          : prisma.$queryRaw<{ value: string; n: number }[]>(
           Prisma.sql`SELECT COALESCE(NULLIF(c.fields->>${key}, ''), ${NOT_SET}) AS value, COUNT(*)::int AS n
             FROM studio_clients c
             WHERE c."studioId" = ${scope.studioId} AND c."deletedAt" IS NULL AND c."isDemo" = false ${fence}
