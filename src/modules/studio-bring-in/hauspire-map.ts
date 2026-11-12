@@ -22,7 +22,8 @@
  * - **Money.** The source works in rupees (rates may have decimals, e.g.
  *   ₹26.5 / sq ft); we store integer paise, rounded once here.
  * - **Terms.** `modularPct` is a fraction (0.15 = 15%; the source's default
- *   when unset) — a value above 1 is read as a percent; `onSpot` rupees;
+ *   when unset) — a value above 1 is read as a percent; `modularOff: true`
+ *   means no modular discount at all; `onSpot` rupees;
  *   `feeOn` (default on) is our 7% fee; `gstOn` (default off) is 18%;
  *   `quoteDate` 'YYYY-MM-DD'.
  * - **Check.** Our total before GST is compared with the source's `tpv`. The
@@ -51,6 +52,8 @@ export interface SourceLine {
 /** The source's `settings` jsonb (`QuoteSettings`). */
 export interface SourceSettings {
   modularPct?: unknown;
+  /** true: the modular discount is switched off for this quotation. */
+  modularOff?: unknown;
   onSpot?: unknown;
   onSpotLabel?: unknown;
   feeOn?: unknown;
@@ -214,7 +217,8 @@ export function mapTerms(raw: unknown): MappedTerms {
   const s = (raw && typeof raw === 'object' ? raw : {}) as SourceSettings;
   const pct = num(s.modularPct);
   const fraction = pct === null ? 0.15 : pct > 1 ? pct / 100 : pct;
-  const discountBps = Math.min(10_000, Math.max(0, Math.round(fraction * 10_000)));
+  /* `modularOff` (the source's "no modular discount" box, 12 Nov 2026): no discount, whatever modularPct says. */
+  const discountBps = s.modularOff === true ? 0 : Math.min(10_000, Math.max(0, Math.round(fraction * 10_000)));
   const onSpot = num(s.onSpot);
   const date = typeof s.quoteDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.quoteDate) && !Number.isNaN(Date.parse(`${s.quoteDate}T00:00:00Z`)) ? s.quoteDate : null;
   return {

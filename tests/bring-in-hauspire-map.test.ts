@@ -103,6 +103,9 @@ describe('the pricing choices become our terms', () => {
   it('fee off, GST on, a percent written as 12, a bad date', () => {
     expect(mapTerms({ feeOn: false, gstOn: true, modularPct: 12, quoteDate: '30/08/2026' })).toMatchObject({ feeBps: 0, gstBps: 1800, discountBps: 1200, quoteDate: null });
     expect(mapTerms({ modularPct: 0 }).discountBps).toBe(0);
+    /* The source's "no modular discount" box (12 Nov 2026) wins over modularPct. */
+    expect(mapTerms({ modularOff: true, modularPct: 0.15 }).discountBps).toBe(0);
+    expect(mapTerms({ modularOff: false, modularPct: 0.15 }).discountBps).toBe(1500);
   });
 });
 
