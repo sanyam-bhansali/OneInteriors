@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { parseLeadFilters, staleReviewQuery } from '@/modules/studio-sales/lead-filters';
+import { NOT_SET, parseLeadFilters, staleReviewQuery } from '@/modules/studio-sales/lead-filters';
 import { kpiRules, clockAt, leadWhere } from '@/modules/studio-sales/lead-where';
 import { boardColumnPlan, claimableView, seesFullLead, type LeadView } from '@/modules/studio-sales/lead-view';
 
@@ -8,6 +8,23 @@ import { boardColumnPlan, claimableView, seesFullLead, type LeadView } from '@/m
 
 const ist = (day: string, hm: string) => new Date(Date.parse(`${day}T${hm}:00Z`) - 330 * 60_000);
 const NOW = ist('2026-10-12', '10:00');
+
+describe('Society filter (12 Nov 2026: it showed only "Not set")', () => {
+  it('reads the society record or the society column, never fields.society', () => {
+    const w = leadWhere({ custom: { society: ['Godrej Meadows', NOT_SET] } }, NOW) as { AND: unknown[] };
+    expect(w.AND).toContainEqual({
+      OR: [
+        { OR: [{ societyRecord: { name: 'Godrej Meadows' } }, { societyId: null, society: 'Godrej Meadows' }] },
+        { societyId: null, OR: [{ society: null }, { society: '' }] },
+      ],
+    });
+    expect(JSON.stringify(w)).not.toMatch(/"path":\["society"\]/);
+  });
+
+  it('counts societies by the society record, else the column', () => {
+    expect(readFileSync('src/modules/studio-sales/leads-list.ts', 'utf8')).toMatch(/COALESCE\(s\.name, NULLIF\(TRIM\(c\.society\), ''\)/);
+  });
+});
 
 describe('Today is due today only (it was counting the whole overdue backlog)', () => {
   const r = kpiRules(clockAt(NOW));
