@@ -367,7 +367,7 @@ describe('Meta lead ads', () => {
   });
 
   it('the Graph address carries no token, and an error never shows one', () => {
-    expect(graphLeadUrl('123')).toBe('https://graph.facebook.com/v21.0/123?fields=created_time,field_data,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id,platform');
+    expect(graphLeadUrl('123')).toBe('https://graph.facebook.com/v23.0/123?fields=created_time,field_data,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id,platform');
     expect(graphError({ error: { message: 'Invalid OAuth access_token=EAAB123 token' } }, 400)).not.toContain('EAAB123');
     expect(graphError(null, 500)).toBe('Meta did not give the lead: HTTP 500');
   });

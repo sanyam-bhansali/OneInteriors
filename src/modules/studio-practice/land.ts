@@ -97,6 +97,12 @@ export interface LandInput {
   connectionId?: string | null;
   /** Which ad, as columns (`payloads.adColumns`). */
   ads?: AdColumns | null;
+  /**
+   * Past leads brought in all at once (Meta, owner 12 Nov 2026): nobody is
+   * told, and a person already on the board gets no "came in again" line
+   * (only the ad columns, when their card has none).
+   */
+  quiet?: boolean;
 }
 
 export type LandResult =
@@ -122,7 +128,7 @@ export async function landLead(input: LandInput): Promise<LandResult> {
   const ads = input.ads && hasAds(input.ads) ? adData(input.ads) : null;
 
   if (landing.kind === 'attach') {
-    await record({ studioId, clientId: landing.id, kind: 'NOTE', summary: input.againSummary, by: null });
+    if (!input.quiet) await record({ studioId, clientId: landing.id, kind: 'NOTE', summary: input.againSummary, by: null });
     if (ads) {
       /* First touch kept: only a card that has no ad at all is given this one. */
       await prisma.studioClient.updateMany({
@@ -130,6 +136,7 @@ export async function landLead(input: LandInput): Promise<LandResult> {
         data: ads,
       }).catch((error: unknown) => console.error('[land] ad columns not filled', error instanceof Error ? error.message : 'unknown'));
     }
+    if (input.quiet) return { kind: 'attached', clientId: landing.id, alerted: Promise.resolve() };
     const match = matches.find((m) => m.id === landing.id)!;
     const event = { kind: 'lead-new' as const, clientId: landing.id, name: match.name, source: input.how, again: true };
     const alerted = match.assignedTo && match.assignedTo.status === 'ACTIVE' ? notify(match.assignedTo.userId, event) : notifyStudio(studioId, event);
@@ -200,6 +207,7 @@ export async function landLead(input: LandInput): Promise<LandResult> {
   /* The owner and PMs hear about every new lead, in the inbox and by email;
      the person it was given to is told it is theirs (an owner or PM already
      hears through the first, so once is enough). */
+  if (input.quiet) return { kind: 'created', clientId: client.id, alerted: Promise.resolve() };
   const givenTo = decision.kind === 'person' ? decision.name : null;
   const alerts: Promise<unknown>[] = [notifyStudio(studioId, { kind: 'lead-new', clientId: client.id, name: lead.name, source: input.how, again: false, givenTo })];
   if (decision.kind === 'person') {
