@@ -6,8 +6,10 @@
  * customer's account name, but only where the old name is the one being
  * replaced. Quotations keep the name they were issued with, unless
  * `--quotes` (owner, 12 Nov 2026: "Change Ganesh pawar projects name, lead,
- * quotation name all to Rahul Pawar"): then the lead's quotations with the old
- * name get the new one too (the copies already sent, R1, R2…, stay as sent).
+ * quotation name all to Rahul Pawar"): then every quotation of this client
+ * (on the lead, the introduction, the project's signed and design final ones
+ * and those made from them) gets the new name too; the dry run lists each
+ * with its current name. The copies already sent (R1, R2…) stay as sent.
  * The lead is found by `--mobile`, or by its current name with `--from`.
  *
  *     npx tsx scripts/rename-client.ts --studio <slug> --mobile 9373798010 --name "Chetan Patil" --dry-run
@@ -62,7 +64,7 @@ async function main() {
     const intro = lead.bookedIntroductionId
       ? await prisma.introduction.findUnique({
           where: { id: lead.bookedIntroductionId },
-          select: { brief: { select: { id: true, contactName: true, user: { select: { id: true, name: true } } } }, homeProject: { select: { id: true, invites: { where: { revokedAt: null }, select: { id: true, name: true } } } } },
+          select: { id: true, briefId: true, brief: { select: { id: true, contactName: true, user: { select: { id: true, name: true } } } }, homeProject: { select: { id: true, signedQuoteId: true, designFinalQuoteId: true, invites: { where: { revokedAt: null }, select: { id: true, name: true } } } } },
         })
       : null;
     const brief = intro?.brief ?? null;
@@ -70,9 +72,29 @@ async function main() {
     const briefChange = brief && same(brief.contactName);
     const userChange = brief?.user && same(brief.user.name);
     const invites = intro?.homeProject?.invites.filter((i) => same(i.name)) ?? [];
-    /* --quotes: the lead's quotations still under the old name (the live copy; sent revisions stay as sent). */
-    const quotes = withQuotes ? await prisma.studioQuote.findMany({ where: { studioId, clientId: lead.id, clientName: { equals: old.trim(), mode: 'insensitive' } }, select: { id: true, number: true } }) : [];
-    if (withQuotes) console.log(`Quotations: ${quotes.length ? quotes.map((q) => q.number).join(', ') : 'none under the old name'}`);
+    /*
+     * --quotes: every quotation of this client — on the lead, on its introduction or brief, the project's signed
+     * and design final ones, and those made from them (design finals, additional scope) — not already under the
+     * new name. The live copy only; sent revisions stay as sent.
+     */
+    const p = intro?.homeProject ?? null;
+    const ids = [p?.signedQuoteId, p?.designFinalQuoteId].filter((x): x is string => Boolean(x));
+    const linked = withQuotes
+      ? await prisma.studioQuote.findMany({
+          where: {
+            studioId,
+            OR: [
+              { clientId: lead.id },
+              ...(intro ? [{ introductionId: intro.id }, { briefId: intro.briefId }] : []),
+              ...(ids.length ? [{ id: { in: ids } }, { basedOnId: { in: ids } }] : []),
+              ...(p ? [{ scopeForProjectId: p.id }] : []),
+            ],
+          },
+          select: { id: true, number: true, clientName: true },
+        })
+      : [];
+    const quotes = linked.filter((q) => q.clientName.trim() !== name);
+    if (withQuotes) console.log(`Quotations: ${quotes.length ? quotes.map((q) => `${q.number} ("${q.clientName}")`).join(', ') : linked.length ? 'all already under the new name' : 'none found for this client'}`);
     console.log(`Project: ${intro?.homeProject ? `client name ${briefChange ? `"${brief!.contactName}" → "${name}"` : 'already right'}; account ${userChange ? 'renamed' : 'kept'}; ${invites.length} invite(s) renamed` : 'none booked on this lead'}`);
     if (dryRun) {
       console.log('Dry run: nothing was written. Run again without --dry-run to rename.');
